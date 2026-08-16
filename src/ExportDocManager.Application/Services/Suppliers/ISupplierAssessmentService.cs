@@ -1,19 +1,19 @@
 namespace ExportDocManager.Services.Suppliers
 {
     public sealed record SupplierAssessmentRecord(
-        int Id, int SupplierCompanyId, DateTimeOffset AssessedAt, string AssessmentKind,
+        int Id, int SupplierCompanyId, DateOnly AssessmentDate, string AssessmentKind,
         int QualityScore, int DeliveryScore, int ServiceScore, int PriceScore,
         decimal AverageScore, string Conclusion, string Notes, string AssessedBy,
         DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int VersionNumber);
 
     public sealed record SupplierAssessmentSaveRequest(
-        int Id, int SupplierCompanyId, DateTimeOffset AssessedAt, string AssessmentKind,
+        int Id, int SupplierCompanyId, DateOnly AssessmentDate, string AssessmentKind,
         int QualityScore, int DeliveryScore, int ServiceScore, int PriceScore,
         string Conclusion, string Notes, int ExpectedVersion = 0);
 
     public sealed record SupplierAssessmentOverviewItem(
         int SupplierCompanyId, string SupplierName, string SupplierStatus, string Category,
-        int AssessmentCount, DateTimeOffset LatestAssessedAt, string LatestAssessmentKind,
+        int AssessmentCount, DateOnly LatestAssessmentDate, string LatestAssessmentKind,
         int QualityScore, int DeliveryScore, int ServiceScore, int PriceScore,
         decimal AverageScore, string Conclusion, string Notes);
 

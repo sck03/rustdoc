@@ -184,10 +184,12 @@ function formatExpireDate(status: ApiLicenseStatusResponse | null) {
     return "-";
   }
 
-  const date = new Date(status.expireDate);
-  if (Number.isNaN(date.getTime())) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(status.expireDate);
+  if (!match) {
     return status.expireDate;
   }
 
-  return date.getFullYear() >= 9999 ? "终身授权" : date.toLocaleDateString();
+  return Number(match[1]) >= 9999
+    ? "终身授权"
+    : `${Number(match[1])}/${Number(match[2])}/${Number(match[3])}`;
 }

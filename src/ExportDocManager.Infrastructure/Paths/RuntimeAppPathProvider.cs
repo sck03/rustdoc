@@ -72,8 +72,9 @@ namespace ExportDocManager.Services.Infrastructure
             return Path.Combine(AppRoot, name);
         }
 
-        private static string NormalizeRoot(string path)
+        public static string NormalizeRoot(string path)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(path);
             string fullPath = Path.GetFullPath(path);
             int rootLength = Path.GetPathRoot(fullPath)?.Length ?? 0;
             return fullPath.Length > rootLength

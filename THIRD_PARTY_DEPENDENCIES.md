@@ -138,13 +138,13 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | lucide-react | 0.468.0 | ISC | web |
 | meshoptimizer | 1.1.1 | MIT | web |
 | ms | 2.1.3 | MIT | web |
-| nanoid | 3.3.15 | MIT | web |
+| nanoid | 3.3.18 | MIT | web |
 | node-releases | 2.0.48 | MIT | web |
 | picocolors | 1.1.1 | ISC | web |
 | picomatch | 4.0.5 | MIT | web |
 | pixelmatch | 7.2.0 | ISC | web |
 | pngjs | 7.0.0 | MIT | web |
-| postcss | 8.5.15 | MIT | web |
+| postcss | 8.5.26 | MIT | web |
 | react | 18.3.1 | MIT | web |
 | react-dom | 18.3.1 | MIT | web |
 | react-refresh | 0.18.0 | MIT | web |
@@ -163,7 +163,7 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | vite | 7.3.6 | MIT | web |
 | yallist | 3.1.1 | ISC | web |
 
-## nuget (81)
+## nuget (96)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -194,13 +194,21 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | Microsoft.EntityFrameworkCore.Sqlite.Core | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Microsoft.Extensions.Caching.Abstractions | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Microsoft.Extensions.Caching.Memory | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.Configuration | 10.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj |
 | Microsoft.Extensions.Configuration.Abstractions | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.Configuration.Binder | 10.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj |
+| Microsoft.Extensions.Configuration.EnvironmentVariables | 10.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj |
 | Microsoft.Extensions.DependencyInjection | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Microsoft.Extensions.DependencyModel | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.Diagnostics.Abstractions | 10.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj |
+| Microsoft.Extensions.FileProviders.Abstractions | 10.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj |
+| Microsoft.Extensions.Hosting.Abstractions | 10.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj |
 | Microsoft.Extensions.Logging | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Microsoft.Extensions.Logging.Abstractions | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.Logging.Configuration | 10.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj |
 | Microsoft.Extensions.Options | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| Microsoft.Extensions.Options.ConfigurationExtensions | 10.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj |
 | Microsoft.Extensions.Primitives | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Microsoft.IO.RecyclableMemoryStream | 3.0.1 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
 | Microsoft.ML.OnnxRuntime | 1.28.0 | MIT | ExportDocManager.Infrastructure.PdfOcr.csproj |
@@ -214,12 +222,19 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | Npgsql.EntityFrameworkCore.PostgreSQL | 10.0.3 | PostgreSQL | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | NPOI | 2.7.6 | Apache-2.0 | ExportDocManager.Infrastructure.Tests.csproj |
 | NSax | 1.0.2 | LGPL-3.0-only | ExportDocManager.Infrastructure.Tests.csproj |
+| OpenTelemetry | 1.17.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj |
+| OpenTelemetry.Api | 1.17.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj |
+| OpenTelemetry.Api.ProviderBuilderExtensions | 1.17.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj |
+| OpenTelemetry.Exporter.OpenTelemetryProtocol | 1.17.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj |
+| OpenTelemetry.Extensions.Hosting | 1.17.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj |
+| OpenTelemetry.Instrumentation.AspNetCore | 1.17.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj |
+| OpenTelemetry.Instrumentation.Http | 1.17.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj |
+| OpenTelemetry.Instrumentation.Runtime | 1.17.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj |
 | PdfPig | 0.1.15 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | PDFsharp | 6.2.4 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | PDFtoImage | 5.3.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | RBush.Signed | 4.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | Scriban | 7.2.6 | BSD-2-Clause | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
-| Serilog | 4.4.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | SharpZipLib | 1.4.2 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
 | SixLabors.Fonts | 1.0.0 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Excel.csproj |
 | SixLabors.Fonts | 1.0.1 | Apache-2.0 | ExportDocManager.Infrastructure.Tests.csproj |

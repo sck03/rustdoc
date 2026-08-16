@@ -269,7 +269,7 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("EXPORTDOCMANAGER_RUST_TARGET: ${{ inputs.rust_target }}", desktopWorkflow, StringComparison.Ordinal);
         Assert.Contains("rust_target: x86_64-pc-windows-msvc", crossPlatformWorkflow, StringComparison.Ordinal);
         Assert.DoesNotContain("msys2/setup-msys2", crossPlatformWorkflow, StringComparison.Ordinal);
-        Assert.Contains("cargo test --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --target ${{ matrix.rust_target }}", crossPlatformWorkflow, StringComparison.Ordinal);
+        Assert.Contains("cargo test --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --locked --target ${{ matrix.rust_target }}", crossPlatformWorkflow, StringComparison.Ordinal);
         Assert.Contains("runtime_identifier: osx-arm64", macOsWorkflow, StringComparison.Ordinal);
         Assert.DoesNotContain("osx-x64", macOsWorkflow, StringComparison.Ordinal);
         Assert.DoesNotContain("macos-15-intel", macOsWorkflow, StringComparison.Ordinal);
@@ -308,7 +308,7 @@ public sealed class PackagePayloadContractTests
     {
         string root = FindWorkspaceRoot();
         string bundleScript = File.ReadAllText(Path.Combine(root, "scripts", "prepare-tauri-bundle.mjs"));
-        const string solutionRestore = "run(\"dotnet\", [\"restore\", path.join(repoRoot, \"ExportDocManager.sln\")], buildEnv);";
+        const string solutionRestore = "run(\"dotnet\", [\"restore\", path.join(repoRoot, \"ExportDocManager.sln\"), \"--locked-mode\"], buildEnv);";
         const string governanceGenerator = "path.join(repoRoot, \"scripts\", \"generate-dependency-governance.mjs\")";
 
         int restoreIndex = bundleScript.IndexOf(solutionRestore, StringComparison.Ordinal);

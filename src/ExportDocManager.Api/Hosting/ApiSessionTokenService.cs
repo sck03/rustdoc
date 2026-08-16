@@ -30,11 +30,13 @@ namespace ExportDocManager.Api.Hosting
         private static readonly TimeSpan CleanupInterval = TimeSpan.FromMinutes(15);
         private const int MaximumTokenCount = 10_000;
         private readonly ConcurrentDictionary<string, ApiSessionToken> _tokens = new(StringComparer.Ordinal);
-        private readonly Timer _cleanupTimer;
+        private readonly TimeProvider _timeProvider;
+        private readonly ITimer _cleanupTimer;
 
-        public InMemoryApiSessionTokenService()
+        public InMemoryApiSessionTokenService(TimeProvider? timeProvider = null)
         {
-            _cleanupTimer = new Timer(
+            _timeProvider = timeProvider ?? TimeProvider.System;
+            _cleanupTimer = _timeProvider.CreateTimer(
                 static state => ((InMemoryApiSessionTokenService?)state)?.CleanupExpiredTokens(),
                 this,
                 CleanupInterval,
@@ -48,7 +50,7 @@ namespace ExportDocManager.Api.Hosting
             string token = CreateToken();
             var issued = new ApiSessionToken(
                 token,
-                DateTimeOffset.UtcNow.Add(lifetime ?? DefaultLifetime),
+                _timeProvider.GetUtcNow().Add(lifetime ?? DefaultLifetime),
                 ApiUserDtoFactory.ToUserSnapshot(user));
 
             _tokens[token] = issued;
@@ -74,7 +76,7 @@ namespace ExportDocManager.Api.Hosting
                 return null;
             }
 
-            if (issued.ExpiresAt <= DateTimeOffset.UtcNow)
+            if (issued.ExpiresAt <= _timeProvider.GetUtcNow())
             {
                 _tokens.TryRemove(token.Trim(), out _);
                 return null;
@@ -131,7 +133,7 @@ namespace ExportDocManager.Api.Hosting
 
         private void CleanupExpiredTokens()
         {
-            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset now = _timeProvider.GetUtcNow();
             foreach (var pair in _tokens.ToArray())
             {
                 if (pair.Value.ExpiresAt <= now)
@@ -171,13 +173,17 @@ namespace ExportDocManager.Api.Hosting
         private const int SessionMutationBatchSize = 500;
         private const int MaximumCleanupScanCount = 10_000;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
+        private readonly TimeProvider _timeProvider;
         private readonly ConcurrentDictionary<string, CachedSessionValidation> _validationCache = new(StringComparer.Ordinal);
         private long _nextCleanupUtcTicks;
         private long _cleanupScanCursor;
 
-        public DatabaseApiSessionTokenService(IDbContextFactory<AppDbContext> contextFactory)
+        public DatabaseApiSessionTokenService(
+            IDbContextFactory<AppDbContext> contextFactory,
+            TimeProvider? timeProvider = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+            _timeProvider = timeProvider ?? TimeProvider.System;
         }
 
         public async Task<ApiSessionToken> IssueAsync(
@@ -188,7 +194,7 @@ namespace ExportDocManager.Api.Hosting
             ArgumentNullException.ThrowIfNull(user);
 
             string token = CreateToken();
-            var now = DateTimeOffset.UtcNow;
+            var now = _timeProvider.GetUtcNow();
             var expiresAt = now.Add(lifetime ?? DefaultLifetime);
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             await TryCleanupExpiredSessionsAsync(context, now, cancellationToken).ConfigureAwait(false);
@@ -215,7 +221,7 @@ namespace ExportDocManager.Api.Hosting
             }
 
             string tokenHash = HashToken(token.Trim());
-            var now = DateTimeOffset.UtcNow;
+            var now = _timeProvider.GetUtcNow();
             if (TryGetCachedValidation(tokenHash, now, out User? cachedUser))
             {
                 return cachedUser;
@@ -275,7 +281,7 @@ namespace ExportDocManager.Api.Hosting
                 return false;
             }
 
-            session.RevokedAt = DateTimeOffset.UtcNow;
+            session.RevokedAt = _timeProvider.GetUtcNow();
             await context.SaveChangesAsync(cancellationToken);
             return true;
         }
@@ -289,7 +295,7 @@ namespace ExportDocManager.Api.Hosting
                 return 0;
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = _timeProvider.GetUtcNow();
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var activeSessions = context.ApiUserSessions
                 .Where(item => item.UserId == userId && !item.RevokedAt.HasValue);

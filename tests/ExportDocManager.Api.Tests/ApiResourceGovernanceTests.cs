@@ -11,7 +11,8 @@ namespace ExportDocManager.Api.Tests;
 public sealed class ApiResourceGovernanceTests
 {
     [Theory]
-    [InlineData((int)ApiResourceProfile.Authentication, 30, 6)]
+    [InlineData((int)ApiResourceProfile.Login, 120, 8)]
+    [InlineData((int)ApiResourceProfile.Identity, 300, 16)]
     [InlineData((int)ApiResourceProfile.Interactive, 300, 64)]
     [InlineData((int)ApiResourceProfile.Workload, 90, 12)]
     [InlineData((int)ApiResourceProfile.Maintenance, 20, 2)]
@@ -27,6 +28,20 @@ public sealed class ApiResourceGovernanceTests
         Assert.Equal(requestsPerMinute, limits.RequestsPerMinute);
         Assert.Equal(concurrentRequests, limits.ConcurrentRequests);
         Assert.False(string.IsNullOrWhiteSpace(ApiResourcePolicyCatalog.GetTimeoutPolicyName(profile)));
+    }
+
+    [Fact]
+    public void ResourcePartitions_ShouldSeparateSessionsBehindTheSameAddress()
+    {
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("10.0.0.8");
+        context.Request.Headers.Authorization = "Bearer session-a";
+        string firstIdentity = ApiResourceGovernanceExtensions.ResolveClientKey(context, ApiResourceProfile.Identity);
+        string login = ApiResourceGovernanceExtensions.ResolveClientKey(context, ApiResourceProfile.Login);
+        context.Request.Headers.Authorization = "Bearer session-b";
+
+        Assert.NotEqual(firstIdentity, ApiResourceGovernanceExtensions.ResolveClientKey(context, ApiResourceProfile.Identity));
+        Assert.Equal(login, ApiResourceGovernanceExtensions.ResolveClientKey(context, ApiResourceProfile.Login));
     }
 
     [Fact]

@@ -121,8 +121,8 @@ namespace ExportDocManager.Api.Hosting
 
         private static string NormalizeRoot(string path)
         {
-            return Path.GetFullPath(string.IsNullOrWhiteSpace(path) ? AppContext.BaseDirectory : path)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return RuntimeAppPathProvider.NormalizeRoot(
+                string.IsNullOrWhiteSpace(path) ? AppContext.BaseDirectory : path);
         }
 
         private static string NormalizeListenUrls(string urls)

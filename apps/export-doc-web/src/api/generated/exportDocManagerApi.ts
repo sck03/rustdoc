@@ -407,7 +407,7 @@ export interface ApiCrmCustomerBatchStatusResult {
 export interface ApiCrmCustomerDto {
   countryRegion: string;
   id: number;
-  linkedDocumentCustomerId: number | null;
+  linkedDocumentCustomerId?: number | null;
   name: string;
   notes: string;
   source: string;
@@ -474,7 +474,7 @@ export interface ApiCrmDashboardDto {
 }
 
 export interface ApiCrmEmailVariableDraftDto {
-  crmContactId: number | null;
+  crmContactId?: number | null;
   crmCustomerId: number;
   toAddress: string;
   variables: Record<string, unknown>;
@@ -483,14 +483,14 @@ export interface ApiCrmEmailVariableDraftDto {
 export interface ApiCrmFollowUpDto {
   contactName: string;
   createdAt: string;
-  crmContactId: number | null;
+  crmContactId?: number | null;
   crmCustomerId: number;
   customerName: string;
   followedUpAt: string;
   id: number;
   isCompleted: boolean;
   nextAction: string;
-  nextFollowUpAt: string | null;
+  nextFollowUpAt?: string | null;
   summary: string;
   type: string;
   updatedAt: string;
@@ -1015,7 +1015,7 @@ export interface ApiExcelImportAnalysisReportDto {
   confidence: number;
   fields: ApiExcelImportFieldAnalysisDto[];
   issues: ApiExcelImportAnalysisIssueDto[];
-  itemTable: unknown | ApiExcelImportItemTableAnalysisDto;
+  itemTable?: null | ApiExcelImportItemTableAnalysisDto;
   schemaVersion: string;
   selectedWorksheetName: string;
   sheets: ApiExcelImportSheetAnalysisDto[];
@@ -1073,11 +1073,11 @@ export interface ApiExcelImportPreviewRequest {
 }
 
 export interface ApiExcelImportPreviewResponse {
-  analysisReport: ApiExcelImportAnalysisReportDto;
-  customer: ApiImportedCustomerDto;
+  analysisReport?: null | ApiExcelImportAnalysisReportDto;
+  customer?: null | ApiImportedCustomerDto;
   errors: string[];
-  exporter: ApiImportedExporterDto;
-  invoice: ApiInvoiceDetailDto;
+  exporter?: null | ApiImportedExporterDto;
+  invoice?: null | ApiInvoiceDetailDto;
   sourcePath: string;
   storagePolicy: string;
   success: boolean;
@@ -1202,7 +1202,7 @@ export interface ApiHsCodeDto {
   summaryUrl: string;
   supervisionConditions: string;
   unit: string;
-  updateTime: string | null;
+  updateTime?: string | null;
   valueAddedTaxRate: string;
 }
 
@@ -1252,7 +1252,7 @@ export interface ApiHsCodeImportPreviewResponse {
   columns: ApiHsCodeImportColumnMappingDto[];
   confidence: number;
   conflictCount: number;
-  effectiveYear: number | null;
+  effectiveYear?: number | null;
   fileName: string;
   headerRowNumber: number;
   invalidCount: number;
@@ -1507,7 +1507,7 @@ export interface ApiInvoiceDocumentPackageRequest {
 }
 
 export interface ApiInvoiceDraftReportHtmlPreviewRequest {
-  invoice?: unknown | ApiInvoiceDetailDto;
+  invoice?: null | ApiInvoiceDetailDto;
   reportType?: string;
   templatePath?: string;
   withSeal?: boolean;
@@ -1574,7 +1574,7 @@ export interface ApiInvoiceProfitAnalysisRequest {
 
 export interface ApiInvoiceProfitAnalysisResponse {
   currency: string;
-  exchangeRate: number | null;
+  exchangeRate?: number | null;
   exchangeRateText: string;
   grossProfit: number;
   grossProfitText: string;
@@ -1622,7 +1622,7 @@ export interface ApiInvoiceSaveResponse {
 
 export interface ApiInvoiceStatusHistoryDto {
   changedAt: string;
-  changedByUserId: number | null;
+  changedByUserId?: number | null;
   changedByUsername: string;
   fromStatus: string;
   id: number;
@@ -1662,7 +1662,7 @@ export interface ApiInvoiceTransferImportResponse {
 export interface ApiInvoiceTransferImportResultDto {
   actionTaken: string;
   finalInvoiceNo: string;
-  invoiceId: number | null;
+  invoiceId?: number | null;
   message: string;
   success: boolean;
 }
@@ -1974,7 +1974,7 @@ export interface ApiPayeeDto {
 }
 
 export interface ApiPaymentDraftReportHtmlPreviewRequest {
-  payment?: unknown | ApiPaymentDto;
+  payment?: null | ApiPaymentDto;
   templatePath?: string;
 }
 
@@ -2245,7 +2245,7 @@ export interface ApiReportTemplateContentDto {
   reportType: string;
   storagePolicy: string;
   templatePath: string;
-  withSealDefault: boolean | null;
+  withSealDefault?: boolean | null;
 }
 
 export interface ApiReportTemplateCreateRequest {
@@ -2258,7 +2258,7 @@ export interface ApiReportTemplateDto {
   displayName: string;
   reportType: string;
   templatePath: string;
-  withSealDefault: boolean | null;
+  withSealDefault?: boolean | null;
 }
 
 export interface ApiReportTemplateFieldCatalogResponse {
@@ -2304,7 +2304,7 @@ export interface ApiReportTemplatePreviewRequest {
 export interface ApiReportTemplatePreviewResponse {
   html: string;
   reportType: string;
-  withSeal: boolean | null;
+  withSeal?: boolean | null;
 }
 
 export interface ApiReportTemplateRenameRequest {
@@ -2360,13 +2360,13 @@ export interface ApiSalesOpportunityDto {
   currency: string;
   customerName: string;
   estimatedAmount: number;
-  expectedCloseDate: string | null;
+  expectedCloseDate?: string | null;
   id: number;
   nextAction: string;
   notes: string;
   probabilityPercent: number;
   productCode: string;
-  productId: number | null;
+  productId?: number | null;
   productName: string;
   quotationNo: string;
   stage: string;
@@ -2381,7 +2381,7 @@ export interface ApiSalesOpportunityHistoryDto {
   createdAt: string;
   currency: string;
   estimatedAmount: number;
-  expectedCloseDate: string | null;
+  expectedCloseDate?: string | null;
   id: number;
   probabilityPercent: number;
   quotationNo: string;
@@ -2446,7 +2446,7 @@ export interface ApiServerMigrationStatusResponse {
   postgreSqlConfigured: boolean;
   restoreDetail: string;
   restorePhase: string;
-  restoreUpdatedAtUtc: string | null;
+  restoreUpdatedAtUtc?: string | null;
   storagePolicy: string;
   supported: boolean;
   toolsReady: boolean;
@@ -2635,7 +2635,7 @@ export interface ApiSingleWindowHandoffPackageResponse {
   packagePath: string;
   storagePolicy: string;
   success: boolean;
-  trackingBatchId: number | null;
+  trackingBatchId?: number | null;
 }
 
 export interface ApiSingleWindowImportPackageRequest {
@@ -2652,7 +2652,7 @@ export interface ApiSingleWindowImportedPackageResponse {
   persistedReceiptCount: number;
   storagePolicy: string;
   success: boolean;
-  trackingBatchId: number | null;
+  trackingBatchId?: number | null;
   trackingStatus: string;
   workingDirectory: string;
   workingDirectoryKept: boolean;
@@ -2751,8 +2751,8 @@ export interface ApiSingleWindowUnlockFieldsRequest {
 }
 
 export interface ApiSupplierAssessmentDto {
-  assessedAt: string;
   assessedBy: string;
+  assessmentDate: string;
   assessmentKind: string;
   averageScore: number;
   conclusion: string;
@@ -2789,7 +2789,7 @@ export interface ApiSupplierAssessmentOverviewItemDto {
   category: string;
   conclusion: string;
   deliveryScore: number;
-  latestAssessedAt: string;
+  latestAssessmentDate: string;
   latestAssessmentKind: string;
   notes: string;
   priceScore: number;
@@ -2801,7 +2801,7 @@ export interface ApiSupplierAssessmentOverviewItemDto {
 }
 
 export interface ApiSupplierAssessmentSaveRequest {
-  assessedAt: string;
+  assessmentDate: string;
   assessmentKind: string;
   conclusion: string;
   deliveryScore: number;
@@ -2992,7 +2992,7 @@ export interface ApiUserAccountDto {
   id: number;
   isActive: boolean;
   permissionTemplateCode: string;
-  permissionTemplateId: number | null;
+  permissionTemplateId?: number | null;
   permissionTemplateName: string;
   role: string;
   username: string;
@@ -3033,7 +3033,7 @@ export interface ApiUserReportTemplateDto {
   isActive: boolean;
   isShared: boolean;
   name: string;
-  ownerUserId: number | null;
+  ownerUserId?: number | null;
   reportType: string;
   shareScope: string;
   versionNumber: number;
@@ -3307,9 +3307,9 @@ export interface HsCodeKnowledgeSearchResult {
   confirmedCount: number;
   conflictWarnings: string[];
   currentCode: string;
-  effectiveYear: number | null;
+  effectiveYear?: number | null;
   exampleCount: number;
-  lastVerifiedAt: string | null;
+  lastVerifiedAt?: string | null;
   matchReasons: string[];
   name: string;
   rawCode: string;

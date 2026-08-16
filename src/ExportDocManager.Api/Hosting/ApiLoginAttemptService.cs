@@ -34,7 +34,7 @@ namespace ExportDocManager.Api.Hosting
             lock (_gate)
             {
                 CleanupIfNeeded(now);
-                TimeSpan retryAfter = GetRetryAfter(AccountKey(username), now);
+                TimeSpan retryAfter = GetRetryAfter(PrincipalKey(username, remoteAddress), now);
                 TimeSpan ipRetryAfter = GetRetryAfter(IpKey(remoteAddress), now);
                 if (ipRetryAfter > retryAfter)
                 {
@@ -52,7 +52,7 @@ namespace ExportDocManager.Api.Hosting
             lock (_gate)
             {
                 CleanupIfNeeded(now);
-                TimeSpan accountRetry = RecordFailure(AccountKey(username), now);
+                TimeSpan accountRetry = RecordFailure(PrincipalKey(username, remoteAddress), now);
                 TimeSpan ipRetry = RecordFailure(IpKey(remoteAddress), now);
                 TimeSpan retryAfter = accountRetry > ipRetry ? accountRetry : ipRetry;
                 return retryAfter > TimeSpan.Zero
@@ -65,7 +65,7 @@ namespace ExportDocManager.Api.Hosting
         {
             lock (_gate)
             {
-                _states.Remove(AccountKey(username));
+                _states.Remove(PrincipalKey(username, remoteAddress));
                 _states.Remove(IpKey(remoteAddress));
             }
         }
@@ -169,11 +169,14 @@ namespace ExportDocManager.Api.Hosting
             }
         }
 
-        private static string AccountKey(string username) =>
-            "account:" + (username ?? string.Empty).Trim().ToUpperInvariant();
+        private static string PrincipalKey(string username, string remoteAddress) =>
+            "principal:" + (username ?? string.Empty).Trim().ToUpperInvariant() + "@" + NormalizeAddress(remoteAddress);
 
         private static string IpKey(string remoteAddress) =>
-            "ip:" + (string.IsNullOrWhiteSpace(remoteAddress) ? "unknown" : remoteAddress.Trim());
+            "ip:" + NormalizeAddress(remoteAddress);
+
+        private static string NormalizeAddress(string remoteAddress) =>
+            string.IsNullOrWhiteSpace(remoteAddress) ? "unknown" : remoteAddress.Trim();
 
         private sealed class AttemptState
         {

@@ -108,6 +108,7 @@ namespace ExportDocManager.Api.Hosting
                     ApiUserDtoFactory.FromUser(user, authorizationService)));
             })
             .WithApiAccess(false, true, false)
+            .WithApiResourceProfile(ApiResourceProfile.Login)
             .WithName("Login")
             .Produces<ApiErrorResponse>(StatusCodes.Status401Unauthorized)
             .Produces<ApiErrorResponse>(StatusCodes.Status429TooManyRequests)

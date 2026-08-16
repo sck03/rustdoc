@@ -24,7 +24,7 @@ public sealed class ApiSecurityBoundaryTests
     }
 
     [Fact]
-    public void LoginAttempts_ShouldApplyAccountAndIpDimensions()
+    public void LoginAttempts_ShouldApplyPrincipalAndIpDimensions()
     {
         var attempts = new ApiLoginAttemptService(new MutableTimeProvider(DateTimeOffset.UtcNow));
 
@@ -33,7 +33,13 @@ public sealed class ApiSecurityBoundaryTests
             attempts.RecordFailure("same-account", $"10.0.0.{index + 1}");
         }
 
-        Assert.False(attempts.Evaluate("same-account", "10.0.0.99").Allowed);
+        Assert.True(attempts.Evaluate("same-account", "10.0.0.99").Allowed);
+        for (int index = 1; index < ApiLoginAttemptService.MaximumFailures; index++)
+        {
+            attempts.RecordFailure("same-account", "10.0.0.1");
+        }
+        Assert.False(attempts.Evaluate("same-account", "10.0.0.1").Allowed);
+        Assert.True(attempts.Evaluate("same-account", "10.0.0.99").Allowed);
 
         var otherAttempts = new ApiLoginAttemptService(new MutableTimeProvider(DateTimeOffset.UtcNow));
         for (int index = 0; index < ApiLoginAttemptService.MaximumFailures; index++)

@@ -94,6 +94,7 @@ const args = [
   "/p:PublishReadyToRun=false",
   "/p:DebugType=None",
   "/p:DebugSymbols=false",
+  "/p:ExportDocRuntimeRestore=true",
   "/p:ExportDocPackageProfile=Desktop",
   `/p:ExportDocIncludeTemplates=${resourceProfile.documentResources}`,
   `/p:ExportDocIncludeOcrModels=${resourceProfile.ocr}`,
@@ -245,7 +246,7 @@ function validateResourceProfile(value, edition) {
 }
 
 async function generateDependencyGovernance(buildEnv) {
-  run("dotnet", ["restore", path.join(repoRoot, "ExportDocManager.sln")], buildEnv);
+  run("dotnet", ["restore", path.join(repoRoot, "ExportDocManager.sln"), "--locked-mode"], buildEnv);
   run(
     "node",
     [

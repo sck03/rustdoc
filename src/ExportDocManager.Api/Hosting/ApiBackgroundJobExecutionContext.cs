@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Models.Entities;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -10,16 +11,20 @@ namespace ExportDocManager.Api.Hosting
         public ApiBackgroundJobExecutionContext(
             ApiBackgroundJobService jobs,
             BackgroundJobSnapshot initial,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            User? user = null)
         {
             _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
             _initial = initial ?? throw new ArgumentNullException(nameof(initial));
             CancellationToken = cancellationToken;
+            User = user;
         }
 
         public string JobId => _initial.JobId;
 
         public CancellationToken CancellationToken { get; }
+
+        public User? User { get; }
 
         public void Report(
             int? progressPercent,

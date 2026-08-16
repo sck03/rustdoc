@@ -199,15 +199,7 @@ namespace ExportDocManager.DataAccess
                 .HasForeignKey(item => item.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<SupplierAssessment>()
-                .HasIndex(item => new { item.SupplierCompanyId, item.AssessedAt, item.Id });
-            if (Database.IsSqlite())
-            {
-                modelBuilder.Entity<SupplierAssessment>()
-                    .Property(item => item.AssessedAt)
-                    .HasConversion(
-                        value => value.UtcDateTime.Ticks,
-                        value => new DateTimeOffset(value, TimeSpan.Zero));
-            }
+                .HasIndex(item => new { item.SupplierCompanyId, item.AssessmentDate, item.Id });
             modelBuilder.Entity<SupplierAssessment>()
                 .HasOne<SupplierCompany>()
                 .WithMany()

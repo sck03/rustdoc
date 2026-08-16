@@ -19,6 +19,7 @@ const playwrightBrowsersPath = path.resolve(
 process.env.PLAYWRIGHT_BROWSERS_PATH = playwrightBrowsersPath;
 const requestedBrowsers = readBrowserArgument();
 const legacyWindowsFirefoxSandboxDisabled = shouldDisableLegacyWindowsFirefoxSandbox();
+const closeTimeoutMs = 10_000;
 const runtimeIdentifier = `${platformPrefix()}-${architectureName()}`;
 const apiOutputRoot = path.join(
   repositoryRoot,
@@ -73,6 +74,7 @@ const apiProcess = spawn(
     },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
+    detached: process.platform !== "win32",
   },
 );
 let apiOutput = "";
@@ -85,14 +87,19 @@ try {
   for (const browserName of requestedBrowsers) {
     const browserType = playwright[browserName];
     if (!browserType) throw new Error(`Unsupported Playwright browser: ${browserName}`);
-    const launchOptions = { headless: true };
+    const operationTimeout = browserOperationTimeout(browserName);
+    const launchOptions = { headless: true, timeout: operationTimeout };
     if (browserName === "firefox" && legacyWindowsFirefoxSandboxDisabled) {
       // Firefox 151's content sandbox cannot spawn its tab process on the
       // still-supported Windows 10 LTSC 2019 kernel. This acceptance worker
       // only opens the loopback test server and is deleted after the run.
       launchOptions.env = { ...process.env, MOZ_DISABLE_CONTENT_SANDBOX: "1" };
     }
-    const browser = await browserType.launch(launchOptions);
+    const browser = await withTimeout(
+      browserType.launch(launchOptions),
+      operationTimeout + 5_000,
+      `${browserName} launch`,
+    );
     try {
       results.push(await runViewportAcceptance(browser, browserName, baseUrl, axeSource, {
         name: "desktop",
@@ -105,7 +112,7 @@ try {
         height: 844,
       }));
     } finally {
-      await browser.close();
+      await withTimeout(browser.close(), closeTimeoutMs, `${browserName} close`);
     }
   }
   process.stdout.write(`${JSON.stringify({
@@ -125,13 +132,25 @@ try {
 
 async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, viewport) {
   const operationTimeout = browserOperationTimeout(browserName);
-  const context = await browser.newContext({
-    viewport: { width: viewport.width, height: viewport.height },
-    locale: "zh-CN",
-    timezoneId: "Asia/Shanghai",
-  });
-  await context.addInitScript({ path: axeSource });
-  const page = await context.newPage();
+  const context = await withTimeout(
+    browser.newContext({
+      viewport: { width: viewport.width, height: viewport.height },
+      locale: "zh-CN",
+      timezoneId: "Asia/Shanghai",
+    }),
+    operationTimeout,
+    `${browserName}/${viewport.name} context creation`,
+  );
+  await withTimeout(
+    context.addInitScript({ path: axeSource }),
+    operationTimeout,
+    `${browserName}/${viewport.name} init script`,
+  );
+  const page = await withTimeout(
+    context.newPage(),
+    operationTimeout,
+    `${browserName}/${viewport.name} page creation`,
+  );
   page.setDefaultTimeout(operationTimeout);
   page.setDefaultNavigationTimeout(operationTimeout);
   const pageErrors = [];
@@ -148,7 +167,7 @@ async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, v
     await page.locator(".app-shell").waitFor({ state: "visible", timeout: operationTimeout });
 
     const metrics = {
-      ...await page.evaluate(() => {
+      ...await withTimeout(page.evaluate(() => {
         const shell = document.querySelector(".app-shell");
         const mobileToggle = document.querySelector(".mobile-nav-toggle");
         return {
@@ -158,10 +177,10 @@ async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, v
             getComputedStyle(mobileToggle).display !== "none" &&
             mobileToggle.getBoundingClientRect().width > 0,
         };
-      }),
-      ...await readHorizontalOverflowDiagnostics(page),
+      }), operationTimeout, `${browserName}/${viewport.name} workspace metrics`),
+      ...await readHorizontalOverflowDiagnostics(page, operationTimeout),
     };
-    const accessibility = await page.evaluate(async () => {
+    const accessibility = await withTimeout(page.evaluate(async () => {
       const axe = globalThis.axe;
       if (!axe) throw new Error("axe-core was not injected");
       const report = await axe.run(document, {
@@ -176,7 +195,7 @@ async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, v
           description: violation.description,
           targets: violation.nodes.slice(0, 5).map((node) => node.target.join(" ")),
         }));
-    });
+    }), operationTimeout, `${browserName}/${viewport.name} accessibility scan`);
 
     if (!metrics.title) throw new Error(`${browserName}/${viewport.name}: workspace title is empty`);
     if (metrics.horizontalOverflow > 1) {
@@ -219,7 +238,11 @@ async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, v
       lazyRouteStyles,
     };
   } finally {
-    await context.close();
+    await withTimeout(
+      context.close(),
+      closeTimeoutMs,
+      `${browserName}/${viewport.name} context close`,
+    );
   }
 }
 
@@ -264,7 +287,7 @@ async function validateLazyRouteStyles(page, browserName, viewportName, baseUrl,
       { timeout: operationTimeout },
     );
     const metrics = {
-      ...await page.evaluate(({ selector, expectedProperty }) => {
+      ...await withTimeout(page.evaluate(({ selector, expectedProperty }) => {
         const element = document.querySelector(selector);
         if (!(element instanceof HTMLElement)) return null;
         const style = getComputedStyle(element);
@@ -272,7 +295,9 @@ async function validateLazyRouteStyles(page, browserName, viewportName, baseUrl,
           computedValue: style[expectedProperty],
         };
       }, { selector: route.selector, expectedProperty: route.expectedProperty }),
-      ...await readHorizontalOverflowDiagnostics(page),
+      operationTimeout,
+      `${browserName}/${viewportName}/${route.name} style metrics`),
+      ...await readHorizontalOverflowDiagnostics(page, operationTimeout),
     };
     if (!metrics || metrics.computedValue !== route.expectedValue || metrics.horizontalOverflow > 1) {
       throw new Error(
@@ -285,8 +310,8 @@ async function validateLazyRouteStyles(page, browserName, viewportName, baseUrl,
   return results;
 }
 
-async function readHorizontalOverflowDiagnostics(page) {
-  return page.evaluate(() => {
+async function readHorizontalOverflowDiagnostics(page, timeoutMs) {
+  return withTimeout(page.evaluate(() => {
     const horizontalOverflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
     if (horizontalOverflow <= 1) {
       return { horizontalOverflow, overflowingElements: [], overflowAncestors: [] };
@@ -345,7 +370,7 @@ async function readHorizontalOverflowDiagnostics(page) {
       const classes = [...element.classList].slice(0, 4).map((name) => `.${name}`).join("");
       return `${element.tagName.toLowerCase()}${id}${classes}`;
     }
-  });
+  }), timeoutMs, "horizontal overflow diagnostics");
 }
 
 function readBrowserArgument() {
@@ -401,7 +426,9 @@ async function waitForHealth(url, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(Math.min(2_000, Math.max(1, deadline - Date.now()))),
+      });
       if (response.ok) return;
     } catch {
     }
@@ -412,10 +439,46 @@ async function waitForHealth(url, timeoutMs) {
 
 async function stopChild(child) {
   if (child.exitCode !== null || child.signalCode !== null) return;
-  child.kill();
-  await Promise.race([
-    new Promise((resolve) => child.once("exit", resolve)),
-    new Promise((resolve) => setTimeout(resolve, 5000)),
-  ]);
-  if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  signalChildTree(child, "SIGTERM");
+  if (await waitForChildExit(child, closeTimeoutMs)) return;
+  signalChildTree(child, "SIGKILL");
+  if (!await waitForChildExit(child, closeTimeoutMs)) {
+    throw new Error(`API process tree ${child.pid} did not exit after SIGKILL`);
+  }
+}
+
+function signalChildTree(child, signal) {
+  if (process.platform !== "win32") {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+    }
+  }
+  child.kill(signal);
+}
+
+async function waitForChildExit(child, timeoutMs) {
+  if (child.exitCode !== null || child.signalCode !== null) return true;
+  return withTimeout(
+    new Promise((resolve) => child.once("exit", () => resolve(true))),
+    timeoutMs,
+    `process ${child.pid} exit`,
+    false,
+  );
+}
+
+async function withTimeout(promise, timeoutMs, label, throwOnTimeout = true) {
+  let timer;
+  const timeout = new Promise((resolve, reject) => {
+    timer = setTimeout(() => {
+      if (throwOnTimeout) reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+      else resolve(false);
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }

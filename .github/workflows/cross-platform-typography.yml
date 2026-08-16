@@ -97,6 +97,7 @@ jobs:
             scale_profiles: linux-100,mobile-320,mobile-375,mobile-keyboard-390,mobile-safari-contract
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     env:
       NUGET_PACKAGES: ${{ github.workspace }}/.codex-runtime/nuget-packages
       EXPORTDOCMANAGER_RETAIN_REPORT_TEST_ARTIFACTS: 1
@@ -192,7 +193,7 @@ jobs:
           retention-days: 14
 
       - name: Restore report test project
-        run: dotnet restore tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj --configfile NuGet.Config
+        run: dotnet restore tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj --locked-mode --configfile NuGet.Config
 
       - name: Build report test project
         run: >-
@@ -237,6 +238,7 @@ jobs:
     name: Compare pagination and wrapping metrics
     needs: render-reports
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5

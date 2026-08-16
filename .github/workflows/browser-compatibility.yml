@@ -32,6 +32,7 @@ jobs:
   firefox-webkit:
     name: Firefox + WebKit desktop/mobile
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       DOTNET_CLI_HOME: ${{ github.workspace }}/.codex-runtime/dotnet-cli
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
@@ -75,4 +76,5 @@ jobs:
           exit $LASTEXITCODE
 
       - name: Run real browser accessibility and responsive acceptance
+        timeout-minutes: 15
         run: npm --prefix apps/export-doc-web run test:cross-browser-ui

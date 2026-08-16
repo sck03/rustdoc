@@ -193,6 +193,13 @@ namespace ExportDocManager.Services.Infrastructure
                     "本地数据库初始化失败。请确认运行数据根可写；如这是预发布旧数据库，请备份后删除并重新初始化。",
                     shouldResetPassword: false);
             }
+            catch (Exception ex) when (!usesPostgreSql && ex is DbException or IOException or UnauthorizedAccessException)
+            {
+                _logger.LogError(ex, "Local database storage is unavailable.");
+                return DatabaseInitializationResult.Fail(
+                    "本地数据库暂时不可用。请确认运行数据根可写，且数据库文件未被其他程序或同名目录占用。",
+                    shouldResetPassword: false);
+            }
             catch (NpgsqlException ex) when (usesPostgreSql)
             {
                 _logger.LogError(ex, "PostgreSQL database initialization failed.");

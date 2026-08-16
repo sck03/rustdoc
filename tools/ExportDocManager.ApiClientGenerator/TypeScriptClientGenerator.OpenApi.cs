@@ -195,6 +195,11 @@ internal static partial class TypeScriptClientGenerator
         }
 
         string[] types = GetSchemaTypes(schema);
+        if (types.Length == 1 && types[0] == "null")
+        {
+            return "null";
+        }
+
         string result = types.FirstOrDefault(type => type != "null") switch
         {
             "array" => $"{SchemaToType(schema["items"] as JsonObject)}[]",

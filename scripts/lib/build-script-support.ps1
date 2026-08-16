@@ -65,7 +65,8 @@ function New-ExportDocProcessStartInfo {
 function Stop-ExportDocProcessTree {
     param(
         [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
-        [ValidateRange(1, 60)][int]$TimeoutSeconds = 10
+        [ValidateRange(1, 60)][int]$TimeoutSeconds = 10,
+        [bool]$UnixProcessGroup = $false
     )
 
     if ($Process.HasExited) {
@@ -76,7 +77,22 @@ function Stop-ExportDocProcessTree {
 & {
     try {
         $target = [System.Diagnostics.Process]::GetProcessById([int]$args[0])
-        $target.Kill($true)
+        $useUnixProcessGroup = [bool]::Parse($args[1])
+        if (-not $IsWindows -and $useUnixProcessGroup) {
+            & /bin/kill -TERM "-$($target.Id)"
+            if ($LASTEXITCODE -ne 0 -and -not $target.HasExited) {
+                throw "Could not terminate Unix process group $($target.Id)."
+            }
+            [void]$target.WaitForExit(2000)
+            # The group leader can exit before testhost or browser descendants.
+            # Always send the hard-stop signal to the original process group.
+            & /bin/kill -KILL "-$($target.Id)"
+            if ($LASTEXITCODE -ne 0 -and -not $target.HasExited) {
+                throw "Could not kill Unix process group $($target.Id)."
+            }
+        } else {
+            $target.Kill($true)
+        }
     } catch [System.ArgumentException] {
         exit 0
     }
@@ -85,7 +101,7 @@ function Stop-ExportDocProcessTree {
     $helper = [System.Diagnostics.Process]::new()
     $helper.StartInfo = New-ExportDocProcessStartInfo `
         -FilePath (Resolve-ExportDocPowerShellExecutable) `
-        -Arguments @("-NoProfile", "-NonInteractive", "-Command", $killCommand, $Process.Id.ToString()) `
+        -Arguments @("-NoProfile", "-NonInteractive", "-Command", $killCommand, $Process.Id.ToString(), $UnixProcessGroup.ToString()) `
         -CaptureOutput
 
     try {
@@ -96,6 +112,10 @@ function Stop-ExportDocProcessTree {
         if (-not $helper.WaitForExit($TimeoutSeconds * 1000)) {
             $helper.Kill()
             [void]$helper.WaitForExit(5000)
+            return $false
+        }
+
+        if ($helper.ExitCode -ne 0) {
             return $false
         }
 

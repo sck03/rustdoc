@@ -6,7 +6,7 @@ namespace ExportDocManager.Models.Entities
     {
         public int Id { get; set; }
         public int SupplierCompanyId { get; set; }
-        public DateTimeOffset AssessedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateOnly AssessmentDate { get; set; }
         [Required, MaxLength(30)] public string AssessmentKind { get; set; } = "定期评价";
         public int QualityScore { get; set; }
         public int DeliveryScore { get; set; }
@@ -15,8 +15,8 @@ namespace ExportDocManager.Models.Entities
         [Required, MaxLength(30)] public string Conclusion { get; set; } = "合格";
         [MaxLength(1000)] public string Notes { get; set; } = string.Empty;
         [MaxLength(100)] public string AssessedBy { get; set; } = string.Empty;
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
         [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
     }
 }

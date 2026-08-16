@@ -1,5 +1,6 @@
 using System.Globalization;
-using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.RateLimiting;
@@ -9,7 +10,8 @@ namespace ExportDocManager.Api.Hosting;
 internal enum ApiResourceProfile
 {
     Interactive,
-    Authentication,
+    Login,
+    Identity,
     Workload,
     Maintenance,
     Streaming
@@ -20,14 +22,16 @@ internal sealed record ApiEndpointResourceMetadata(ApiResourceProfile Profile);
 internal static class ApiResourcePolicyCatalog
 {
     public const string InteractiveTimeoutPolicy = "api-interactive";
-    public const string AuthenticationTimeoutPolicy = "api-authentication";
+    public const string LoginTimeoutPolicy = "api-login";
+    public const string IdentityTimeoutPolicy = "api-identity";
     public const string WorkloadTimeoutPolicy = "api-workload";
     public const string MaintenanceTimeoutPolicy = "api-maintenance";
     public const string StreamingTimeoutPolicy = "api-streaming";
 
     public static string GetTimeoutPolicyName(ApiResourceProfile profile) => profile switch
     {
-        ApiResourceProfile.Authentication => AuthenticationTimeoutPolicy,
+        ApiResourceProfile.Login => LoginTimeoutPolicy,
+        ApiResourceProfile.Identity => IdentityTimeoutPolicy,
         ApiResourceProfile.Workload => WorkloadTimeoutPolicy,
         ApiResourceProfile.Maintenance => MaintenanceTimeoutPolicy,
         ApiResourceProfile.Streaming => StreamingTimeoutPolicy,
@@ -36,7 +40,8 @@ internal static class ApiResourcePolicyCatalog
 
     public static ApiResourceLimits GetLimits(ApiResourceProfile profile) => profile switch
     {
-        ApiResourceProfile.Authentication => new(30, 6, 2),
+        ApiResourceProfile.Login => new(120, 8, 4),
+        ApiResourceProfile.Identity => new(300, 16, 8),
         ApiResourceProfile.Workload => new(90, 12, 4),
         ApiResourceProfile.Maintenance => new(20, 2, 1),
         ApiResourceProfile.Streaming => new(60, 12, 4),
@@ -73,7 +78,8 @@ internal static class ApiResourceGovernanceExtensions
         services.AddRequestTimeouts(options =>
         {
             options.AddPolicy(ApiResourcePolicyCatalog.InteractiveTimeoutPolicy, TimeSpan.FromMinutes(1));
-            options.AddPolicy(ApiResourcePolicyCatalog.AuthenticationTimeoutPolicy, TimeSpan.FromSeconds(20));
+            options.AddPolicy(ApiResourcePolicyCatalog.LoginTimeoutPolicy, TimeSpan.FromSeconds(20));
+            options.AddPolicy(ApiResourcePolicyCatalog.IdentityTimeoutPolicy, TimeSpan.FromSeconds(30));
             options.AddPolicy(ApiResourcePolicyCatalog.WorkloadTimeoutPolicy, TimeSpan.FromMinutes(5));
             options.AddPolicy(ApiResourcePolicyCatalog.MaintenanceTimeoutPolicy, TimeSpan.FromMinutes(35));
             options.AddPolicy(ApiResourcePolicyCatalog.StreamingTimeoutPolicy, TimeSpan.FromMinutes(30));
@@ -126,7 +132,7 @@ internal static class ApiResourceGovernanceExtensions
         }
 
         ApiResourceLimits limits = ApiResourcePolicyCatalog.GetLimits(profile.Value);
-        string clientKey = ResolveClientKey(context);
+        string clientKey = ResolveAddressKey(context);
         string partitionKey = $"{profile.Value}:{clientKey}";
         return RateLimitPartition.GetFixedWindowLimiter(
             partitionKey,
@@ -148,8 +154,9 @@ internal static class ApiResourceGovernanceExtensions
         }
 
         ApiResourceLimits limits = ApiResourcePolicyCatalog.GetLimits(profile.Value);
+        string clientKey = ResolveClientKey(context, profile.Value);
         return RateLimitPartition.GetConcurrencyLimiter(
-            profile.Value.ToString(),
+            $"{profile.Value}:{clientKey}",
             _ => new ConcurrencyLimiterOptions
             {
                 PermitLimit = limits.ConcurrentRequests,
@@ -158,9 +165,21 @@ internal static class ApiResourceGovernanceExtensions
             });
     }
 
-    private static string ResolveClientKey(HttpContext context)
+    internal static string ResolveClientKey(HttpContext context, ApiResourceProfile profile)
     {
-        IPAddress? address = context.Connection.RemoteIpAddress;
-        return address?.MapToIPv6().ToString() ?? "local";
+        if (profile != ApiResourceProfile.Login)
+        {
+            string token = ApiCurrentUserResolver.GetBearerToken(context);
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+                return "session:" + Convert.ToHexString(digest.AsSpan(0, 12));
+            }
+        }
+
+        return ResolveAddressKey(context);
     }
+
+    private static string ResolveAddressKey(HttpContext context) =>
+        "ip:" + (context.Connection.RemoteIpAddress?.MapToIPv6().ToString() ?? "local");
 }

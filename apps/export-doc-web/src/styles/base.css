@@ -52,6 +52,23 @@ button:disabled {
   min-height: 100dvh;
 }
 
+.skip-link {
+  position: fixed;
+  inset-block-start: var(--space-2, 8px);
+  inset-inline-start: var(--space-2, 8px);
+  z-index: 1000;
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--color-text-on-accent, #fff);
+  background: var(--color-accent, #155eef);
+  transform: translateY(calc(-100% - 16px));
+  transition: transform 120ms ease-out;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 .workspace-nav {
   display: flex;
   flex-direction: column;

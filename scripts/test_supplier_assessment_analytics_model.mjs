@@ -23,9 +23,9 @@ const empty = buildSupplierAssessmentAnalytics([]);
 assert(empty.totalCount === 0 && empty.latestAverage === null && empty.dimensions.length === 0, "empty analytics");
 
 const rows = [
-  { id: 1, assessedAt: "2026-01-10T12:00:00Z", qualityScore: 4, deliveryScore: 2, serviceScore: 3, priceScore: 5, averageScore: 3.5, conclusion: "观察" },
-  { id: 3, assessedAt: "2026-03-10T12:00:00Z", qualityScore: 5, deliveryScore: 4, serviceScore: 5, priceScore: 4, averageScore: 4.5, conclusion: "优先合作" },
-  { id: 2, assessedAt: "2026-02-10T12:00:00Z", qualityScore: 5, deliveryScore: 3, serviceScore: 4, priceScore: 3, averageScore: 3.75, conclusion: "合格" },
+  { id: 1, assessmentDate: "2026-01-10", qualityScore: 4, deliveryScore: 2, serviceScore: 3, priceScore: 5, averageScore: 3.5, conclusion: "观察" },
+  { id: 3, assessmentDate: "2026-03-10", qualityScore: 5, deliveryScore: 4, serviceScore: 5, priceScore: 4, averageScore: 4.5, conclusion: "优先合作" },
+  { id: 2, assessmentDate: "2026-02-10", qualityScore: 5, deliveryScore: 3, serviceScore: 4, priceScore: 3, averageScore: 3.75, conclusion: "合格" },
 ];
 const analytics = buildSupplierAssessmentAnalytics(rows);
 assert(analytics.totalCount === 3 && analytics.latestAverage === 4.5, "latest score and count");

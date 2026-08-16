@@ -38,8 +38,11 @@ namespace ExportDocManager.Api.Hosting
             services.AddSingleton(pathProvider);
             services.AddSingleton(databaseSettings);
             services.AddSingleton(runtimeOptions);
-            services.AddSingleton<IBusinessClock>(
-                new BusinessClock(TimeProvider.System, runtimeOptions.BusinessTimeZoneId));
+            services.TryAddSingleton(TimeProvider.System);
+            services.AddSingleton<IBusinessClock>(provider =>
+                new BusinessClock(
+                    provider.GetRequiredService<TimeProvider>(),
+                    runtimeOptions.BusinessTimeZoneId));
             services.ConfigureHttpJsonOptions(options =>
             {
                 options.SerializerOptions.RespectNullableAnnotations = true;
@@ -57,6 +60,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddExportDocManagerObservability();
             services.AddSingleton<ApiSecurityAuditWriter>();
             services.AddHttpContextAccessor();
+            services.AddSingleton<ApiBackgroundJobExecutionUserAccessor>();
             services.AddCors(options =>
             {
                 options.AddPolicy(

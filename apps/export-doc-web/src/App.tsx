@@ -82,8 +82,10 @@ function App() {
   );
 
   useEffect(() => {
-    document.title = activeProduct.displayName;
-  }, [activeProduct.displayName]);
+    if (!session) {
+      document.title = activeProduct.displayName;
+    }
+  }, [activeProduct.displayName, session]);
 
   useEffect(() => {
     if (!isDesktopRuntime) {

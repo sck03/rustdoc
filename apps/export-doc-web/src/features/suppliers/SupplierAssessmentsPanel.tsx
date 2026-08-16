@@ -67,11 +67,11 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
     if (!canOperate) return;
     const form = new FormData(event.currentTarget);
     const id = selected?.id ?? 0;
-    const assessedDate = text(form, "assessedAt");
+    const assessmentDate = text(form, "assessmentDate");
     const body = {
       id,
       supplierCompanyId: supplierId,
-      assessedAt: `${assessedDate}T12:00:00Z`,
+      assessmentDate,
       assessmentKind: text(form, "assessmentKind"),
       qualityScore: number(form, "qualityScore"),
       deliveryScore: number(form, "deliveryScore"),
@@ -95,7 +95,7 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
   }
 
   async function remove() {
-    if (!canManage || !selected || !await requestConfirmation({ title: "删除供应商评价", description: `确定删除 ${selected.assessedAt.slice(0, 10)} 的供应商评价吗？`, confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除供应商评价")) return;
+    if (!canManage || !selected || !await requestConfirmation({ title: "删除供应商评价", description: `确定删除 ${selected.assessmentDate} 的供应商评价吗？`, confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除供应商评价")) return;
     try {
       await client.deleteSupplierAssessment({ supplierId, id: selected.id });
       await load();
@@ -129,7 +129,7 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
         <th data-table-priority="secondary">服务</th><th data-table-priority="secondary">价格</th><th>结论</th><th>备注</th><th />
       </tr></thead><tbody>
         {rows.map((item) => <tr key={item.id}>
-          <td><TablePrimaryText value={item.assessedAt.slice(0, 10)} secondary={item.assessmentKind} /></td>
+          <td><TablePrimaryText value={item.assessmentDate} secondary={item.assessmentKind} /></td>
           <td><strong>{item.averageScore.toFixed(2)}</strong> / 5</td>
           <td data-table-priority="secondary">{item.qualityScore}</td><td data-table-priority="secondary">{item.deliveryScore}</td>
           <td data-table-priority="secondary">{item.serviceScore}</td><td data-table-priority="secondary">{item.priceScore}</td>
@@ -146,7 +146,7 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
       <div className="section-heading-row"><h4>{selected ? canOperate ? "编辑评价" : "查看评价" : "记录新评价"}</h4><button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回评价记录</button></div>
       <div className="form-field-wide context-strip"><strong>{supplierName}</strong><span>1 分表示明显不足，5 分表示表现优秀。</span></div>
       <fieldset className="permission-fieldset form-field-wide" disabled={!canOperate} onChangeCapture={() => setDraftDirty(true)}>
-      <label>评价日期<input name="assessedAt" type="date" required max={today} defaultValue={selected?.assessedAt.slice(0, 10) ?? today} /></label>
+      <label>评价日期<input name="assessmentDate" type="date" required max={today} defaultValue={selected?.assessmentDate ?? today} /></label>
       <label>评价类型<select name="assessmentKind" defaultValue={selected?.assessmentKind ?? "定期评价"}><option>定期评价</option><option>订单复盘</option><option>样品评估</option><option>其它</option></select></label>
       <ScoreField name="qualityScore" label="质量评分" value={selected?.qualityScore ?? 4} />
       <ScoreField name="deliveryScore" label="交期评分" value={selected?.deliveryScore ?? 4} />

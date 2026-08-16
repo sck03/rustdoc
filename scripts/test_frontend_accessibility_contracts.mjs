@@ -277,6 +277,17 @@ for (const file of walk(root)) {
   }
 
   if (sourceRelativePath === "app/WorkspaceShell.tsx") {
+    for (const routeAccessibilityContract of [
+      'className="skip-link"',
+      'href="#workspace-main-content"',
+      'id="workspace-main-content"',
+      "workspaceTitleRef.current?.focus",
+      "document.title = `${context.title}",
+    ]) {
+      if (!sourceText.includes(routeAccessibilityContract)) {
+        failures.push(`${sourceRelativePath}: 路由切换缺少跳转主内容、标题更新或焦点落点：${routeAccessibilityContract}`);
+      }
+    }
     for (const requiredWorkspaceNoticeView of ["workspace-global-notice", "InlineNotice", "关闭提示"]) {
       if (!sourceText.includes(requiredWorkspaceNoticeView)) {
         failures.push(`${sourceRelativePath}: 工作区通知缺少统一反馈、可见容器或关闭操作：${requiredWorkspaceNoticeView}`);

@@ -15,11 +15,13 @@ namespace ExportDocManager.Services.BrowserRuntime
         public const string RecycleMinutesEnvironmentVariable = "EXPORTDOCMANAGER_BROWSER_AUTOMATION_RECYCLE_MINUTES";
         public const string IdleTimeoutSecondsEnvironmentVariable = "EXPORTDOCMANAGER_BROWSER_IDLE_TIMEOUT_SECONDS";
         private static readonly TimeSpan BrowserShutdownTimeout = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan LifecycleGateTimeout = TimeSpan.FromSeconds(20);
 
         private readonly BrowserRuntimeManager _runtime;
         private readonly BrowserExecutableResolver _resolver;
         private readonly IAppPathProvider _pathProvider;
         private readonly BrowserNavigationPolicy _navigationPolicy;
+        private readonly TimeProvider _timeProvider;
         private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
         private readonly CancellationTokenSource _shutdownSource = new();
         private readonly AsyncIdleActionScheduler _idleRecycleScheduler;
@@ -44,12 +46,14 @@ namespace ExportDocManager.Services.BrowserRuntime
             BrowserRuntimeManager runtime,
             BrowserExecutableResolver resolver,
             IAppPathProvider pathProvider,
-            BrowserNavigationPolicy navigationPolicy = BrowserNavigationPolicy.Unrestricted)
+            BrowserNavigationPolicy navigationPolicy = BrowserNavigationPolicy.Unrestricted,
+            TimeProvider? timeProvider = null)
         {
             _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
             _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _navigationPolicy = navigationPolicy;
+            _timeProvider = timeProvider ?? TimeProvider.System;
             _idleRecycleScheduler = new AsyncIdleActionScheduler(RecycleIdleBrowserAsync);
             CleanupStaleProfiles();
         }
@@ -225,14 +229,12 @@ namespace ExportDocManager.Services.BrowserRuntime
             {
                 _recycleRequested |= requestRecycle;
                 _activeOperations = Math.Max(0, _activeOperations - 1);
-                if (_activeOperations == 0 && _recycleRequested)
+                if (_activeOperations == 0 && _browser != null && !_remoteBrowser && !_stopping)
                 {
-                    await StopBrowserCoreAsync().ConfigureAwait(false);
-                    _recycleRequested = false;
-                }
-                else if (_activeOperations == 0)
-                {
-                    ScheduleIdleRecycle();
+                    TimeSpan delay = _recycleRequested
+                        ? TimeSpan.FromMilliseconds(1)
+                        : TimeSpan.FromSeconds(ReadPositiveInt(IdleTimeoutSecondsEnvironmentVariable, 120, 1, 3600));
+                    _idleRecycleScheduler.Schedule(delay);
                 }
                 drained = _activeOperations == 0;
             }
@@ -368,7 +370,7 @@ namespace ExportDocManager.Services.BrowserRuntime
                 .WaitAsync(startupTimeout, cancellationToken)
                 .ConfigureAwait(false);
             _remoteBrowser = false;
-            _startedAt = DateTimeOffset.UtcNow;
+            _startedAt = _timeProvider.GetUtcNow();
             _useCount = 0;
         }
 
@@ -410,7 +412,7 @@ namespace ExportDocManager.Services.BrowserRuntime
                 .WaitAsync(startupTimeout, cancellationToken)
                 .ConfigureAwait(false);
             _remoteBrowser = true;
-            _startedAt = DateTimeOffset.UtcNow;
+            _startedAt = _timeProvider.GetUtcNow();
             _useCount = 0;
         }
 
@@ -532,18 +534,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             int maxUses = ReadPositiveInt(RecycleUsesEnvironmentVariable, 100, 1, 1000);
             int maxMinutes = ReadPositiveInt(RecycleMinutesEnvironmentVariable, 30, 1, 240);
             return Volatile.Read(ref _useCount) >= maxUses ||
-                   DateTimeOffset.UtcNow - _startedAt >= TimeSpan.FromMinutes(maxMinutes);
-        }
-
-        private void ScheduleIdleRecycle()
-        {
-            if (_browser == null || _remoteBrowser || _stopping)
-            {
-                return;
-            }
-
-            int idleSeconds = ReadPositiveInt(IdleTimeoutSecondsEnvironmentVariable, 120, 1, 3600);
-            _idleRecycleScheduler.Schedule(TimeSpan.FromSeconds(idleSeconds));
+                   _timeProvider.GetUtcNow() - _startedAt >= TimeSpan.FromMinutes(maxMinutes);
         }
 
         private async Task RecycleIdleBrowserAsync(CancellationToken cancellationToken)
@@ -638,22 +629,40 @@ namespace ExportDocManager.Services.BrowserRuntime
                     // leaves a report worker waiting indefinitely.
                 }
             }
-            if (_process != null)
+            Process? process = _process;
+            _process = null;
+            BrowserProcessRegistration? registration = _registration;
+            _registration = null;
+            if (process != null)
             {
-                await BrowserRuntimeManager.KillOwnedProcessAsync(_process).ConfigureAwait(false);
-                _registration?.Dispose();
-                _registration = null;
-                _process.Dispose();
-                _process = null;
+                await BrowserRuntimeManager.KillOwnedProcessAsync(process).ConfigureAwait(false);
+                registration?.Dispose();
+                process.Dispose();
             }
-            _playwright?.Dispose();
+            IPlaywright? playwright = _playwright;
             _playwright = null;
+            await DisposePlaywrightAsync(playwright).ConfigureAwait(false);
             _remoteBrowser = false;
             await DeleteRuntimeDirectoryAsync(_profileRoot).ConfigureAwait(false);
             await DeleteRuntimeDirectoryAsync(_artifactsRoot).ConfigureAwait(false);
             _profileRoot = null;
             _artifactsRoot = null;
             _useCount = 0;
+        }
+
+        private static async Task DisposePlaywrightAsync(IPlaywright? playwright)
+        {
+            if (playwright == null) return;
+            try
+            {
+                await Task.Run(playwright.Dispose)
+                    .WaitAsync(BrowserShutdownTimeout)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                // The owned process is already gone; a stalled driver pipe must not block shutdown.
+            }
         }
 
         private static async Task DeleteRuntimeDirectoryAsync(string? path)
@@ -686,67 +695,69 @@ namespace ExportDocManager.Services.BrowserRuntime
                 return;
             }
 
+            _stopping = true;
             _shutdownSource.Cancel();
-            Task operationsDrained;
-            await _lifecycleGate.WaitAsync().ConfigureAwait(false);
-            try
+            _operationsDrained ??= new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            Task operationsDrained = _operationsDrained.Task;
+            if (await _lifecycleGate.WaitAsync(LifecycleGateTimeout).ConfigureAwait(false))
             {
-                _stopping = true;
-                if (_activeOperations == 0)
-                {
-                    operationsDrained = Task.CompletedTask;
-                }
-                else
-                {
-                    _operationsDrained ??= new TaskCompletionSource<bool>(
-                        TaskCreationOptions.RunContinuationsAsynchronously);
-                    operationsDrained = _operationsDrained.Task;
-                }
-            }
-            finally
-            {
-                _lifecycleGate.Release();
-            }
-
-            // Stop the idle worker after marking the host as stopping and
-            // before competing with it for browser shutdown. This prevents a
-            // delayed recycle from racing explicit host disposal on macOS.
-            await _idleRecycleScheduler.DisposeAsync().ConfigureAwait(false);
-
-            try
-            {
-                await operationsDrained.WaitAsync(BrowserShutdownTimeout).ConfigureAwait(false);
-            }
-            catch (TimeoutException)
-            {
-                await _lifecycleGate.WaitAsync().ConfigureAwait(false);
                 try
                 {
-                    await StopBrowserCoreAsync().ConfigureAwait(false);
+                    if (_activeOperations == 0)
+                    {
+                        _operationsDrained.TrySetResult(true);
+                    }
                 }
                 finally
                 {
                     _lifecycleGate.Release();
                 }
-
-                // ExecuteAsync links every page operation to _shutdownSource and
-                // bounds page/context cleanup, so force-stopping the process lets
-                // the remaining finally blocks drain without abandoning the gate.
-                await operationsDrained.ConfigureAwait(false);
             }
 
-            await _lifecycleGate.WaitAsync().ConfigureAwait(false);
+            // Stop the idle worker after marking the host as stopping and
+            // before competing with it for browser shutdown. This prevents a
+            // delayed recycle from racing explicit host disposal on macOS.
+            Task idleSchedulerStopped = _idleRecycleScheduler.DisposeAsync().AsTask();
+            await WaitWithinShutdownBudgetAsync(idleSchedulerStopped).ConfigureAwait(false);
+            await WaitWithinShutdownBudgetAsync(operationsDrained).ConfigureAwait(false);
+            await TryStopBrowserAsync().ConfigureAwait(false);
+            await WaitWithinShutdownBudgetAsync(operationsDrained).ConfigureAwait(false);
+
+            if (operationsDrained.IsCompleted && idleSchedulerStopped.IsCompleted)
+            {
+                _shutdownSource.Dispose();
+                _lifecycleGate.Dispose();
+            }
+        }
+
+        private async Task TryStopBrowserAsync()
+        {
+            if (!await _lifecycleGate.WaitAsync(LifecycleGateTimeout).ConfigureAwait(false)) return;
             try
             {
                 await StopBrowserCoreAsync().ConfigureAwait(false);
+                if (_activeOperations == 0)
+                {
+                    _operationsDrained?.TrySetResult(true);
+                }
             }
             finally
             {
                 _lifecycleGate.Release();
             }
+        }
 
-            _shutdownSource.Dispose();
-            _lifecycleGate.Dispose();
+        private static async Task WaitWithinShutdownBudgetAsync(Task task)
+        {
+            try
+            {
+                await task.WaitAsync(BrowserShutdownTimeout).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Timeout or late cleanup failure must not hold application shutdown open.
+            }
         }
 
         public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();

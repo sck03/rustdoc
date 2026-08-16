@@ -2,6 +2,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
+using Microsoft.Data.Sqlite;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -237,6 +238,34 @@ namespace ExportDocManager.Api.Hosting
                 Path.GetDirectoryName(databasePath),
                 "SQLite 数据库目录",
                 pathProvider.DataRoot);
+            ValidateSqliteDatabase(databasePath);
+        }
+
+        private static void ValidateSqliteDatabase(string databasePath)
+        {
+            try
+            {
+                var connectionString = new SqliteConnectionStringBuilder
+                {
+                    DataSource = databasePath,
+                    Mode = SqliteOpenMode.ReadWriteCreate,
+                    Pooling = false,
+                    ForeignKeys = true
+                }.ToString();
+
+                using var connection = new SqliteConnection(connectionString);
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = "PRAGMA schema_version;";
+                _ = command.ExecuteScalar();
+            }
+            catch (Exception exception) when (
+                exception is SqliteException or IOException or UnauthorizedAccessException)
+            {
+                throw new InvalidOperationException(
+                    "本地数据库无法打开。请确认运行数据目录可写，且数据库文件没有被同名目录占用。",
+                    exception);
+            }
         }
 
         private static void EnsureWritableDirectory(

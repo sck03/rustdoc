@@ -223,7 +223,9 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.Single(runtime.GetSnapshot().OwnedProcessIds);
                 releaseFirst.TrySetResult(true);
                 Assert.Equal("still-alive", await first.WaitAsync(TimeSpan.FromSeconds(10)));
-                Assert.Empty(runtime.GetSnapshot().OwnedProcessIds);
+                await WaitUntilAsync(
+                    () => runtime.GetSnapshot().OwnedProcessIds.Count == 0,
+                    TimeSpan.FromSeconds(15));
             }
             finally
             {

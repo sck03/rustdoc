@@ -68,7 +68,7 @@ export function SupplierAssessmentOverview({ client, onOpenSupplier }: {
     </tr></thead><tbody>
       {rows.map((item) => <tr key={item.supplierCompanyId}>
         <td><TablePrimaryText value={item.supplierName} secondary={[item.category, item.supplierStatus].filter(Boolean).join(" · ")} /></td>
-        <td><TablePrimaryText value={item.latestAssessedAt.slice(0, 10)} secondary={`${item.latestAssessmentKind} · 共 ${item.assessmentCount} 次`} /></td>
+        <td><TablePrimaryText value={item.latestAssessmentDate} secondary={`${item.latestAssessmentKind} · 共 ${item.assessmentCount} 次`} /></td>
         <td><strong>{item.averageScore.toFixed(2)}</strong> / 5</td>
         <td data-table-priority="secondary">{item.qualityScore} / {item.deliveryScore} / {item.serviceScore} / {item.priceScore}</td>
         <td><BusinessStatusBadge value={item.conclusion} /></td>

@@ -31,15 +31,15 @@ namespace ExportDocManager.Api.Hosting
     public sealed record ApiSupplierProductLinkSaveRequest(int Id, int SupplierCompanyId, int ProductId,
         string SupplierProductCode, decimal ReferencePrice, string Currency, int LeadTimeDays, string Status,
         int ExpectedVersion = 0);
-    public sealed record ApiSupplierAssessmentDto(int Id, int SupplierCompanyId, DateTimeOffset AssessedAt,
+    public sealed record ApiSupplierAssessmentDto(int Id, int SupplierCompanyId, DateOnly AssessmentDate,
         string AssessmentKind, int QualityScore, int DeliveryScore, int ServiceScore, int PriceScore,
         decimal AverageScore, string Conclusion, string Notes, string AssessedBy,
         DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int VersionNumber);
-    public sealed record ApiSupplierAssessmentSaveRequest(int Id, int SupplierCompanyId, DateTimeOffset AssessedAt,
+    public sealed record ApiSupplierAssessmentSaveRequest(int Id, int SupplierCompanyId, DateOnly AssessmentDate,
         string AssessmentKind, int QualityScore, int DeliveryScore, int ServiceScore, int PriceScore,
         string Conclusion, string Notes, int ExpectedVersion = 0);
     public sealed record ApiSupplierAssessmentOverviewItemDto(int SupplierCompanyId, string SupplierName,
-        string SupplierStatus, string Category, int AssessmentCount, DateTimeOffset LatestAssessedAt,
+        string SupplierStatus, string Category, int AssessmentCount, DateOnly LatestAssessmentDate,
         string LatestAssessmentKind, int QualityScore, int DeliveryScore, int ServiceScore, int PriceScore,
         decimal AverageScore, string Conclusion, string Notes);
     public sealed record ApiSupplierAssessmentOverviewDto(int TotalSuppliers, int AssessedSuppliers,

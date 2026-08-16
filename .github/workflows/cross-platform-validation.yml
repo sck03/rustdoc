@@ -84,7 +84,7 @@ jobs:
         run: npm --prefix apps/export-doc-tauri run test:updater-release-contract
 
       - name: Restore .NET projects
-        run: dotnet restore ExportDocManager.sln
+        run: dotnet restore ExportDocManager.sln --locked-mode
 
       - name: Build cross-platform backend layers
         run: dotnet build src/ExportDocManager.Api/ExportDocManager.Api.csproj --no-restore -c Release -v minimal
@@ -95,14 +95,14 @@ jobs:
       # each declared RID before using --no-restore.  This avoids project.assets.json
       # failures in Domain/Application/Infrastructure on hosted runners.
       - name: Restore primary backend runtime graph
-        run: dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -r ${{ matrix.primary_rid }}
+        run: dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -r ${{ matrix.primary_rid }} /p:ExportDocRuntimeRestore=true
 
       - name: Validate primary backend contract
         run: dotnet build src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj --no-restore -c Release -r ${{ matrix.primary_rid }} -v minimal
 
       - name: Restore secondary backend runtime graph
         if: matrix.secondary_rid != ''
-        run: dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -r ${{ matrix.secondary_rid }}
+        run: dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -r ${{ matrix.secondary_rid }} /p:ExportDocRuntimeRestore=true
 
       - name: Validate secondary backend contract
         if: matrix.secondary_rid != ''
@@ -126,13 +126,10 @@ jobs:
         run: npm --prefix apps/export-doc-web run test:container-packing-model
 
       - name: Fetch native Rust dependencies
-        run: cargo fetch --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --target ${{ matrix.rust_target }}
-
-      - name: Prepare native Tauri sidecar and resources
-        run: npm --prefix apps/export-doc-tauri run prepare:bundle
+        run: cargo fetch --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --locked --target ${{ matrix.rust_target }}
 
       - name: Check native Tauri shell
-        run: cargo check --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --target ${{ matrix.rust_target }}
+        run: cargo check --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --locked --target ${{ matrix.rust_target }}
 
       - name: Test native Tauri path contracts
-        run: cargo test --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --target ${{ matrix.rust_target }}
+        run: cargo test --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --locked --target ${{ matrix.rust_target }}

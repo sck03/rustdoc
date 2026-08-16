@@ -21,6 +21,7 @@ namespace ExportDocManager.Services.BrowserRuntime
         public const string GlobalConcurrencyEnvironmentVariable = "EXPORTDOCMANAGER_BROWSER_GLOBAL_CONCURRENCY";
         public const string PdfConcurrencyEnvironmentVariable = "EXPORTDOCMANAGER_BROWSER_PDF_CONCURRENCY";
         public const string AutomationConcurrencyEnvironmentVariable = "EXPORTDOCMANAGER_BROWSER_AUTOMATION_CONCURRENCY";
+        private static readonly TimeSpan ShutdownTimeout = TimeSpan.FromSeconds(10);
 
         private readonly SemaphoreSlim _globalGate;
         private readonly SemaphoreSlim _pdfGate;
@@ -168,16 +169,27 @@ namespace ExportDocManager.Services.BrowserRuntime
                 }
             }
 
-            await leasesDrained.ConfigureAwait(false);
+            try
+            {
+                await leasesDrained.WaitAsync(ShutdownTimeout).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+            }
             foreach (var owned in _ownedProcesses.Values.OrderBy(item => item.Process.Id))
             {
                 await KillOwnedProcessAsync(owned.Process).ConfigureAwait(false);
             }
             _ownedProcesses.Clear();
-            _globalGate.Dispose();
-            _pdfGate.Dispose();
-            _automationGate.Dispose();
-            _shutdownSource.Dispose();
+
+            // Late leases may still release these gates; leave them to GC after a timeout.
+            if (leasesDrained.IsCompleted)
+            {
+                _globalGate.Dispose();
+                _pdfGate.Dispose();
+                _automationGate.Dispose();
+                _shutdownSource.Dispose();
+            }
         }
 
         public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();

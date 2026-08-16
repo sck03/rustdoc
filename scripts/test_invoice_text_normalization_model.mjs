@@ -77,7 +77,9 @@ assert(!draftEquality.areInvoiceDraftsEqual(changedDraft, persistedDraft), "invo
 const restoredDraft = { ...changedDraft, customerNameEN: persistedDraft.customerNameEN };
 assert(draftEquality.areInvoiceDraftsEqual(restoredDraft, persistedDraft), "invoice dirty comparison clears after restoring the saved value");
 assert(!draftEquality.areInvoiceDraftsEqual({ ...persistedDraft, items: [{ ...persistedDraft.items[0], quantity: 11 }] }, persistedDraft), "invoice dirty comparison detects nested item changes");
-assert(formUtils.toDateInputValue("2026-07-29T00:00:00") === "2026-07-29", "business date keeps its calendar day in positive time zones");
+assert(formUtils.toDateInputValue("2026-07-29") === "2026-07-29", "business date keeps the DateOnly wire format");
+assert(formUtils.toDateInputValue("2026-07-29T00:00:00") === "", "business date rejects date-time compatibility values");
+assert(formUtils.dateInputToApiDate("2026-07-29") === "2026-07-29", "date inputs submit the DateOnly wire format");
 assert(formUtils.currentLocalDateInputValue(new Date(2026, 6, 29, 0, 30, 0)) === "2026-07-29", "local date input uses the operator calendar day instead of UTC");
 
 const imported = model.readRouteInvoiceDraft({ invoiceDraft: { ...draft, customerNameEN: "mixed Case buyer" } });

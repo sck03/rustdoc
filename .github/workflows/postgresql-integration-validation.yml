@@ -79,7 +79,7 @@ jobs:
           dotnet-version: 10.0.302
 
       - name: Restore
-        run: dotnet restore ExportDocManager.sln
+        run: dotnet restore ExportDocManager.sln --locked-mode
 
       - name: Run real PostgreSQL initialization, concurrency and capacity validation
         timeout-minutes: 45

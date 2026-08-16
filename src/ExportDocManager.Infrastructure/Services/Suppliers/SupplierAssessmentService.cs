@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Suppliers
@@ -11,13 +12,16 @@ namespace ExportDocManager.Services.Suppliers
         private static readonly string[] AllowedConclusions = ["优先合作", "合格", "观察", "暂停合作"];
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
+        private readonly IBusinessClock _clock;
 
         public SupplierAssessmentService(
             IDbContextFactory<AppDbContext> contextFactory,
-            BusinessDataAccessScope accessScope)
+            BusinessDataAccessScope accessScope,
+            IBusinessClock clock)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         }
 
         public async Task<IReadOnlyList<SupplierAssessmentRecord>> ListAsync(
@@ -31,7 +35,7 @@ namespace ExportDocManager.Services.Suppliers
                 .OrderByDescending(item => item.Id)
                 .Take(500)
                 .ToListAsync(cancellationToken);
-            return rows.OrderByDescending(item => item.AssessedAt).ThenByDescending(item => item.Id)
+            return rows.OrderByDescending(item => item.AssessmentDate).ThenByDescending(item => item.Id)
                 .Select(ToRecord).ToArray();
         }
 
@@ -54,7 +58,7 @@ namespace ExportDocManager.Services.Suppliers
                     SupplierCompanyId = item.Key,
                     AssessmentCount = item.Count(),
                     LatestAssessmentId = item
-                        .OrderByDescending(assessment => assessment.AssessedAt)
+                        .OrderByDescending(assessment => assessment.AssessmentDate)
                         .ThenByDescending(assessment => assessment.Id)
                         .Select(assessment => assessment.Id)
                         .First()
@@ -76,12 +80,12 @@ namespace ExportDocManager.Services.Suppliers
                 var latest = latestAssessments[summary.LatestAssessmentId];
                 return new SupplierAssessmentOverviewItem(
                     supplier.Id, supplier.Name, supplier.Status, supplier.Category, summary.AssessmentCount,
-                    latest.AssessedAt, latest.AssessmentKind,
+                    latest.AssessmentDate, latest.AssessmentKind,
                     latest.QualityScore, latest.DeliveryScore, latest.ServiceScore, latest.PriceScore,
                     Average(latest.QualityScore, latest.DeliveryScore, latest.ServiceScore, latest.PriceScore),
                     latest.Conclusion, latest.Notes);
             }).OrderBy(item => ConclusionPriority(item.Conclusion))
-                .ThenByDescending(item => item.LatestAssessedAt)
+                .ThenByDescending(item => item.LatestAssessmentDate)
                 .ThenBy(item => item.SupplierName, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
@@ -109,11 +113,18 @@ namespace ExportDocManager.Services.Suppliers
                 throw new KeyNotFoundException("供应商不存在或无权访问。");
 
             bool isNew = request.Id <= 0;
+            DateTimeOffset now = _clock.UtcNow;
             var entity = request.Id > 0
                 ? await context.SupplierAssessments.FirstOrDefaultAsync(
                     item => item.Id == request.Id && item.SupplierCompanyId == request.SupplierCompanyId,
                     cancellationToken) ?? throw new KeyNotFoundException("供应商评价不存在。")
-                : new SupplierAssessment { SupplierCompanyId = request.SupplierCompanyId, VersionNumber = 1 };
+                : new SupplierAssessment
+                {
+                    SupplierCompanyId = request.SupplierCompanyId,
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                    VersionNumber = 1
+                };
 
             if (!isNew)
             {
@@ -123,7 +134,7 @@ namespace ExportDocManager.Services.Suppliers
             }
 
             if (entity.Id == 0) await context.SupplierAssessments.AddAsync(entity, cancellationToken);
-            entity.AssessedAt = request.AssessedAt;
+            entity.AssessmentDate = request.AssessmentDate;
             entity.AssessmentKind = request.AssessmentKind.Trim();
             entity.QualityScore = request.QualityScore;
             entity.DeliveryScore = request.DeliveryScore;
@@ -132,7 +143,7 @@ namespace ExportDocManager.Services.Suppliers
             entity.Conclusion = request.Conclusion.Trim();
             entity.Notes = (request.Notes ?? string.Empty).Trim();
             entity.AssessedBy = _accessScope.CurrentUser?.Username?.Trim() ?? string.Empty;
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.UpdatedAt = now;
 
             await SaveWithConcurrencyAsync(context, cancellationToken);
             return ToRecord(entity);
@@ -157,11 +168,11 @@ namespace ExportDocManager.Services.Suppliers
             _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking())
                 .AnyAsync(item => item.Id == supplierCompanyId, cancellationToken);
 
-        private static void Validate(SupplierAssessmentSaveRequest request)
+        private void Validate(SupplierAssessmentSaveRequest request)
         {
             if (request.SupplierCompanyId <= 0) throw new ArgumentException("请选择供应商。");
-            if (request.AssessedAt == default) throw new ArgumentException("请选择评价日期。");
-            if (request.AssessedAt > DateTimeOffset.UtcNow.AddDays(1)) throw new ArgumentException("评价日期不能晚于今天。");
+            if (request.AssessmentDate == default) throw new ArgumentException("请选择评价日期。");
+            if (request.AssessmentDate > _clock.Today) throw new ArgumentException("评价日期不能晚于今天。");
             if (!AllowedKinds.Contains((request.AssessmentKind ?? string.Empty).Trim())) throw new ArgumentException("评价类型无效。");
             if (!AllowedConclusions.Contains((request.Conclusion ?? string.Empty).Trim())) throw new ArgumentException("评价结论无效。");
             ValidateScore(request.QualityScore, "质量");
@@ -177,7 +188,7 @@ namespace ExportDocManager.Services.Suppliers
         }
 
         private static SupplierAssessmentRecord ToRecord(SupplierAssessment item) => new(
-            item.Id, item.SupplierCompanyId, item.AssessedAt, item.AssessmentKind,
+            item.Id, item.SupplierCompanyId, item.AssessmentDate, item.AssessmentKind,
             item.QualityScore, item.DeliveryScore, item.ServiceScore, item.PriceScore,
             Math.Round((item.QualityScore + item.DeliveryScore + item.ServiceScore + item.PriceScore) / 4m, 2),
             item.Conclusion, item.Notes, item.AssessedBy, item.CreatedAt, item.UpdatedAt,

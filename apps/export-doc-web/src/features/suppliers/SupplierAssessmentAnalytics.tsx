@@ -18,7 +18,7 @@ export function SupplierAssessmentAnalytics({ rows, supplierName, onCreate }: {
 
   const latest = rows.reduce((current, row) => {
     if (!current) return row;
-    const dateDifference = Date.parse(row.assessedAt) - Date.parse(current.assessedAt);
+    const dateDifference = row.assessmentDate.localeCompare(current.assessmentDate);
     return dateDifference > 0 || (dateDifference === 0 && row.id > current.id) ? row : current;
   }, null as ApiSupplierAssessmentDto | null);
 
@@ -73,7 +73,7 @@ function SummaryCard({ label, value, detail, tone }: { label: string; value: str
 }
 
 function TrendChart({ points }: { points: ReturnType<typeof buildSupplierAssessmentAnalytics>["trend"] }) {
-  if (points.length === 1) return <div className="supplier-single-trend"><strong>{points[0].averageScore.toFixed(2)}</strong><span>{points[0].assessedAt.slice(0, 10)} · 继续评价后可查看变化趋势</span></div>;
+  if (points.length === 1) return <div className="supplier-single-trend"><strong>{points[0].averageScore.toFixed(2)}</strong><span>{points[0].assessmentDate} · 继续评价后可查看变化趋势</span></div>;
   const width = 720;
   const height = 210;
   const paddingX = 34;
@@ -92,10 +92,10 @@ function TrendChart({ points }: { points: ReturnType<typeof buildSupplierAssessm
       })}
       <polyline className="supplier-trend-line" points={line} />
       {coordinates.map((point) => <g key={point.id}>
-        <circle className="supplier-trend-point" cx={point.x} cy={point.y} r="5"><title>{`${point.assessedAt.slice(0, 10)}：${point.averageScore.toFixed(2)} 分`}</title></circle>
+        <circle className="supplier-trend-point" cx={point.x} cy={point.y} r="5"><title>{`${point.assessmentDate}：${point.averageScore.toFixed(2)} 分`}</title></circle>
       </g>)}
     </svg>
-    <div className="supplier-trend-labels"><span>{points[0].assessedAt.slice(0, 10)}</span><span>{points.at(-1)?.assessedAt.slice(0, 10)}</span></div>
+    <div className="supplier-trend-labels"><span>{points[0].assessmentDate}</span><span>{points.at(-1)?.assessmentDate}</span></div>
   </div>;
 }
 

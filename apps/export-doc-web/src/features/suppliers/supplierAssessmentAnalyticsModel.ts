@@ -1,6 +1,6 @@
 export type SupplierAssessmentAnalyticsInput = {
   id: number;
-  assessedAt: string;
+  assessmentDate: string;
   qualityScore: number;
   deliveryScore: number;
   serviceScore: number;
@@ -23,7 +23,7 @@ export type SupplierAssessmentConclusionDistribution = {
 
 export type SupplierAssessmentTrendPoint = {
   id: number;
-  assessedAt: string;
+  assessmentDate: string;
   averageScore: number;
 };
 
@@ -44,7 +44,7 @@ export function buildSupplierAssessmentAnalytics(
   rows: readonly SupplierAssessmentAnalyticsInput[],
 ): SupplierAssessmentAnalytics {
   const ordered = [...rows].sort((left, right) => {
-    const dateDifference = Date.parse(right.assessedAt) - Date.parse(left.assessedAt);
+    const dateDifference = right.assessmentDate.localeCompare(left.assessmentDate);
     return dateDifference || right.id - left.id;
   });
   const totalCount = ordered.length;
@@ -76,7 +76,7 @@ export function buildSupplierAssessmentAnalytics(
     conclusions,
     trend: ordered.slice(0, 12).reverse().map((row) => ({
       id: row.id,
-      assessedAt: row.assessedAt,
+      assessmentDate: row.assessmentDate,
       averageScore: round(row.averageScore),
     })),
   };

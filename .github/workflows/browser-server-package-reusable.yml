@@ -120,6 +120,7 @@ jobs:
           dotnet restore src/ExportDocManager.Api/ExportDocManager.Api.csproj
           --runtime ${{ inputs.runtime_identifier }}
           --configfile NuGet.Config
+          /p:ExportDocRuntimeRestore=true
 
       - name: Publish self-contained browser server
         shell: pwsh
@@ -134,6 +135,7 @@ jobs:
           /p:PublishReadyToRun=false
           /p:DebugType=None
           /p:DebugSymbols=false
+          /p:ExportDocRuntimeRestore=true
           /p:ExportDocPackageProfile=Server
 
       - name: Build Rust OCR sidecar

@@ -13,6 +13,11 @@
          still override the RID explicitly for any executable. -->
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(_ExportDocManagerHostOs)' != '' and ('$(MSBuildProjectName)' == 'ExportDocManager.Api' or '$(MSBuildProjectName)' == 'ExportDocManager.Infrastructure.PdfOcr')">$(_ExportDocManagerHostOs)-$(_ExportDocManagerHostArchitecture)</RuntimeIdentifier>
     <SelfContained Condition="'$(SelfContained)' == ''">false</SelfContained>
+    <ExportDocRuntimeRestore Condition="'$(ExportDocRuntimeRestore)' == ''">false</ExportDocRuntimeRestore>
+    <RestorePackagesWithLockFile Condition="'$(ExportDocRuntimeRestore)' == 'true'">true</RestorePackagesWithLockFile>
+    <NuGetLockFilePath Condition="'$(ExportDocRuntimeRestore)' == 'true'">$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', 'obj', 'runtime.$(RuntimeIdentifier).packages.lock.json'))</NuGetLockFilePath>
+    <RestorePackagesWithLockFile Condition="'$(ExportDocRuntimeRestore)' != 'true' and '$(RuntimeIdentifier)' == ''">true</RestorePackagesWithLockFile>
+    <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
     <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win-'))">onnxruntime.dll</_ExportDocOnnxRuntimeFile>
     <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('linux-'))">libonnxruntime.so</_ExportDocOnnxRuntimeFile>
     <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('osx-'))">libonnxruntime.dylib</_ExportDocOnnxRuntimeFile>

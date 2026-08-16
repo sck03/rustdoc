@@ -321,7 +321,7 @@ namespace ExportDocManager.Api.Hosting
             x.ProductCode, x.ProductNameCN, x.ProductNameEN, x.SupplierProductCode, x.ReferencePrice,
             x.Currency, x.LeadTimeDays, x.Status, x.VersionNumber);
         private static ApiSupplierAssessmentDto ToApiDto(SupplierAssessmentRecord x) => new(
-            x.Id, x.SupplierCompanyId, x.AssessedAt, x.AssessmentKind, x.QualityScore, x.DeliveryScore,
+            x.Id, x.SupplierCompanyId, x.AssessmentDate, x.AssessmentKind, x.QualityScore, x.DeliveryScore,
             x.ServiceScore, x.PriceScore, x.AverageScore, x.Conclusion, x.Notes, x.AssessedBy,
             x.CreatedAt, x.UpdatedAt, x.VersionNumber);
         private static ApiSupplierAssessmentOverviewDto ToApiDto(SupplierAssessmentOverview x) => new(
@@ -331,7 +331,7 @@ namespace ExportDocManager.Api.Hosting
             x.Items.Select(ToApiDto).ToArray());
         private static ApiSupplierAssessmentOverviewItemDto ToApiDto(SupplierAssessmentOverviewItem x) => new(
             x.SupplierCompanyId, x.SupplierName, x.SupplierStatus, x.Category, x.AssessmentCount,
-            x.LatestAssessedAt, x.LatestAssessmentKind, x.QualityScore, x.DeliveryScore,
+            x.LatestAssessmentDate, x.LatestAssessmentKind, x.QualityScore, x.DeliveryScore,
             x.ServiceScore, x.PriceScore, x.AverageScore, x.Conclusion, x.Notes);
         private static SupplierSaveRequest ToSaveRequest(ApiSupplierSaveRequest x, int id) => new(id, x.Name,
             x.CountryRegion, x.Category, x.Website, x.Status, x.MainProducts, x.Notes, x.ExpectedVersion);
@@ -345,7 +345,7 @@ namespace ExportDocManager.Api.Hosting
             new(id, supplierCompanyId, x.ProductId, x.SupplierProductCode, x.ReferencePrice, x.Currency,
                 x.LeadTimeDays, x.Status, x.ExpectedVersion);
         private static SupplierAssessmentSaveRequest ToSaveRequest(ApiSupplierAssessmentSaveRequest x, int supplierCompanyId, int id) =>
-            new(id, supplierCompanyId, x.AssessedAt, x.AssessmentKind, x.QualityScore, x.DeliveryScore,
+            new(id, supplierCompanyId, x.AssessmentDate, x.AssessmentKind, x.QualityScore, x.DeliveryScore,
                 x.ServiceScore, x.PriceScore, x.Conclusion, x.Notes, x.ExpectedVersion);
     }
 }

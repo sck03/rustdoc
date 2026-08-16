@@ -119,7 +119,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("先解除供应商供货关联", await protectedProductDeleteResponse.Content.ReadAsStringAsync());
 
             var createAssessmentResponse = await client.PostAsJsonAsync($"/api/suppliers/{supplier.Id}/assessments",
-                new ApiSupplierAssessmentSaveRequest(0, supplier.Id, DateTimeOffset.UtcNow.AddDays(-1),
+                new ApiSupplierAssessmentSaveRequest(0, supplier.Id, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1),
                     "订单复盘", 5, 4, 5, 3, "优先合作", "交付稳定，价格仍可继续协商。"));
             Assert.Equal(HttpStatusCode.Created, createAssessmentResponse.StatusCode);
             var assessment = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSupplierAssessmentDto>(createAssessmentResponse);
@@ -127,12 +127,12 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("admin", assessment.AssessedBy);
 
             var invalidAssessmentResponse = await client.PostAsJsonAsync($"/api/suppliers/{supplier.Id}/assessments",
-                new ApiSupplierAssessmentSaveRequest(0, supplier.Id, DateTimeOffset.UtcNow,
+                new ApiSupplierAssessmentSaveRequest(0, supplier.Id, DateOnly.FromDateTime(DateTime.UtcNow),
                     "订单复盘", 6, 4, 5, 3, "合格", string.Empty));
             Assert.Equal(HttpStatusCode.BadRequest, invalidAssessmentResponse.StatusCode);
 
             var updateAssessmentResponse = await client.PutAsJsonAsync($"/api/suppliers/{supplier.Id}/assessments/{assessment.Id}",
-                new ApiSupplierAssessmentSaveRequest(assessment.Id, supplier.Id, assessment.AssessedAt,
+                new ApiSupplierAssessmentSaveRequest(assessment.Id, supplier.Id, assessment.AssessmentDate,
                     "订单复盘", 5, 5, 5, 4, "优先合作", "复评后交期表现提升。",
                     assessment.VersionNumber));
             Assert.Equal(HttpStatusCode.OK, updateAssessmentResponse.StatusCode);
@@ -140,13 +140,13 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(4.75m, updatedAssessment.AverageScore);
             var staleAssessmentResponse = await client.PutAsJsonAsync(
                 $"/api/suppliers/{supplier.Id}/assessments/{assessment.Id}",
-                new ApiSupplierAssessmentSaveRequest(assessment.Id, supplier.Id, assessment.AssessedAt,
+                new ApiSupplierAssessmentSaveRequest(assessment.Id, supplier.Id, assessment.AssessmentDate,
                     "订单复盘", 1, 1, 1, 1, "观察", "过期修改", assessment.VersionNumber));
             Assert.Equal(HttpStatusCode.Conflict, staleAssessmentResponse.StatusCode);
             Assert.Single(await client.GetFromJsonAsync<List<ApiSupplierAssessmentDto>>($"/api/suppliers/{supplier.Id}/assessments") ?? []);
 
             var temporaryAssessmentResponse = await client.PostAsJsonAsync($"/api/suppliers/{supplier.Id}/assessments",
-                new ApiSupplierAssessmentSaveRequest(0, supplier.Id, DateTimeOffset.UtcNow,
+                new ApiSupplierAssessmentSaveRequest(0, supplier.Id, DateOnly.FromDateTime(DateTime.UtcNow),
                     "样品评估", 3, 3, 4, 4, "观察", "临时样品评价。"));
             var temporaryAssessment = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSupplierAssessmentDto>(temporaryAssessmentResponse);
             Assert.Equal(HttpStatusCode.OK,

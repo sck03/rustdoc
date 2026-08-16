@@ -27,26 +27,12 @@ export function readRouteSuccessMessage(state: unknown) {
 }
 
 export function toDateInputValue(value?: string | null) {
-  if (!value) {
-    return "";
-  }
-
-  const datePrefix = /^(\d{4}-\d{2}-\d{2})(?:T|$)/.exec(value.trim());
-  if (datePrefix) {
-    return datePrefix[1];
-  }
-
-  const parsed = new Date(value);
-  if (!Number.isNaN(parsed.getTime())) {
-    return currentLocalDateInputValue(parsed);
-  }
-
-  return value.slice(0, 10);
+  const normalized = value?.trim() ?? "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
 }
 
 export function dateInputToApiDate(value: string) {
-  const date = value || currentLocalDateInputValue();
-  return `${date}T00:00:00`;
+  return toDateInputValue(value);
 }
 
 export function currentLocalDateInputValue(value = new Date()) {

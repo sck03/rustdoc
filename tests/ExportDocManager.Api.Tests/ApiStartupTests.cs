@@ -63,6 +63,16 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public void Parse_ShouldPreserveFileSystemRootPaths()
+        {
+            string root = Path.GetPathRoot(Path.GetFullPath(AppContext.BaseDirectory)) ??
+                throw new InvalidOperationException("当前平台没有可用的文件系统根目录。");
+            var options = ApiRuntimeOptions.Parse(["--app-root", root, "--data-root", root]);
+            Assert.Equal(root, options.AppRoot);
+            Assert.Equal(root, options.DataRoot);
+        }
+
+        [Fact]
         public void EndpointPublication_ShouldRequireProcessBoundDynamicLoopbackConfiguration()
         {
             string appRoot = CreateTempDirectory("edm-api-endpoint-app");
@@ -197,6 +207,44 @@ namespace ExportDocManager.Api.Tests
                 Assert.True(Directory.Exists(expectedDatabaseRoot));
                 Assert.True(Directory.Exists(Path.Combine(dataRoot, "SingleWindow")));
                 Assert.StartsWith(expectedDatabaseRoot, databasePath, StringComparison.OrdinalIgnoreCase);
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        [Fact]
+        public void Validate_ShouldOpenSqliteDatabaseWithoutLeakingItsPathOnFailure()
+        {
+            string appRoot = CreateTempDirectory("edm-api-sqlite-probe-app");
+            string dataRoot = Path.Combine(Path.GetTempPath(), $"edm-api-sqlite-probe-data-{Guid.NewGuid():N}");
+
+            try
+            {
+                var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
+                ApiStartupValidator.PrepareRuntimeDirectories(pathProvider);
+                string databasePath = Path.Combine(pathProvider.DatabaseRoot, "occupied.db");
+                Directory.CreateDirectory(databasePath);
+
+                var exception = Assert.Throws<InvalidOperationException>(() => ApiStartupValidator.Validate(
+                    pathProvider,
+                    new DatabaseConnectionSettings
+                    {
+                        Provider = DatabaseConnectionSettings.SqliteProvider,
+                        SqliteDatabaseFileName = "occupied.db"
+                    },
+                    new ApiRuntimeOptions
+                    {
+                        AppRoot = appRoot,
+                        DataRoot = dataRoot,
+                        ListenUrls = "http://127.0.0.1:5199"
+                    }));
+
+                Assert.Contains("本地数据库无法打开", exception.Message, StringComparison.Ordinal);
+                Assert.DoesNotContain(databasePath, exception.Message, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain(nameof(Microsoft.Data.Sqlite.SqliteException), exception.Message, StringComparison.Ordinal);
             }
             finally
             {
@@ -1510,6 +1558,7 @@ namespace ExportDocManager.Api.Tests
                 IsActive = true
             }));
             services.AddHttpContextAccessor();
+            services.AddSingleton<ApiBackgroundJobExecutionUserAccessor>();
             services.AddSingleton<ApiCurrentUserResolver>();
             services.AddSingleton<IApiSessionTokenService, InMemoryApiSessionTokenService>();
             services.AddSingleton<ICurrentUserContext, ApiCurrentUserContext>();

@@ -18,10 +18,10 @@ namespace ExportDocManager.Api.Hosting
                 .WithApiResourceProfile(ApiResourceProfile.Interactive);
             api.MapSystemEndpoints(runtimeOptions, databaseSettings);
             api.MapGroup(string.Empty)
-                .WithApiResourceProfile(ApiResourceProfile.Authentication)
+                .WithApiResourceProfile(ApiResourceProfile.Identity)
                 .MapLicenseEndpoints();
             api.MapGroup(string.Empty)
-                .WithApiResourceProfile(ApiResourceProfile.Authentication)
+                .WithApiResourceProfile(ApiResourceProfile.Identity)
                 .MapAuthEndpoints();
             api.MapUserEndpoints();
             api.MapPermissionTemplateEndpoints();

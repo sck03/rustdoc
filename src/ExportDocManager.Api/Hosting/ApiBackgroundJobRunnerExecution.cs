@@ -50,7 +50,7 @@ namespace ExportDocManager.Api.Hosting
                         RequestedBy = current.RequestedBy,
                         RequestedByUserId = current.RequestedByUserId,
                         CreatedAt = current.CreatedAt,
-                        StartedAt = DateTimeOffset.UtcNow,
+                        StartedAt = _timeProvider.GetUtcNow(),
                         OutputPath = current.OutputPath,
                         ErrorMessage = string.Empty,
                         CanCancel = true,
@@ -76,8 +76,14 @@ namespace ExportDocManager.Api.Hosting
                 {
                     throw new InvalidOperationException("任务提交账号已停用或不存在，任务已阻止执行。");
                 }
-                using var backgroundUserScope = ApiCurrentUserContext.UseBackgroundUser(backgroundUser);
-                var context = new ApiBackgroundJobExecutionContext(_jobs, initial, cancellationSource.Token);
+                var backgroundUserAccessor = scope.ServiceProvider
+                    .GetService<ApiBackgroundJobExecutionUserAccessor>();
+                using var backgroundUserScope = backgroundUserAccessor?.Push(backgroundUser);
+                var context = new ApiBackgroundJobExecutionContext(
+                    _jobs,
+                    initial,
+                    cancellationSource.Token,
+                    backgroundUser);
                 producedOutputPath = await executeAsync(scope.ServiceProvider, context) ?? string.Empty;
 
                 BackgroundJobSnapshot? completedJob = _jobs.Update(jobId, current =>
@@ -101,7 +107,7 @@ namespace ExportDocManager.Api.Hosting
                         RequestedByUserId = current.RequestedByUserId,
                         CreatedAt = current.CreatedAt,
                         StartedAt = current.StartedAt,
-                        CompletedAt = DateTimeOffset.UtcNow,
+                        CompletedAt = _timeProvider.GetUtcNow(),
                         OutputPath = string.IsNullOrWhiteSpace(producedOutputPath)
                             ? current.OutputPath
                             : producedOutputPath,
@@ -135,7 +141,7 @@ namespace ExportDocManager.Api.Hosting
                     RequestedByUserId = current.RequestedByUserId,
                     CreatedAt = current.CreatedAt,
                     StartedAt = current.StartedAt,
-                    CompletedAt = DateTimeOffset.UtcNow,
+                    CompletedAt = _timeProvider.GetUtcNow(),
                     OutputPath = string.Empty,
                     ErrorMessage = string.Empty,
                     CanCancel = false,
@@ -170,7 +176,7 @@ namespace ExportDocManager.Api.Hosting
                         RequestedByUserId = current.RequestedByUserId,
                         CreatedAt = current.CreatedAt,
                         StartedAt = current.StartedAt,
-                        CompletedAt = DateTimeOffset.UtcNow,
+                        CompletedAt = _timeProvider.GetUtcNow(),
                         OutputPath = string.Empty,
                         ErrorMessage = cancellationWon ? string.Empty : ex.Message,
                         CanCancel = false,

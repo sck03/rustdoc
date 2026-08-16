@@ -11,6 +11,7 @@ namespace ExportDocManager.Api.Hosting
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<ApiBackgroundJobRunner> _logger;
         private readonly ICurrentUserContext? _currentUserContext;
+        private readonly TimeProvider _timeProvider;
         private readonly SemaphoreSlim _globalConcurrency;
         private readonly SemaphoreSlim _browserConcurrency;
         private readonly int _perUserConcurrencyLimit;
@@ -48,12 +49,14 @@ namespace ExportDocManager.Api.Hosting
             IServiceScopeFactory scopeFactory,
             ILogger<ApiBackgroundJobRunner> logger,
             ICurrentUserContext? currentUserContext,
-            ApiBackgroundJobConcurrencyOptions concurrencyOptions)
+            ApiBackgroundJobConcurrencyOptions concurrencyOptions,
+            TimeProvider? timeProvider = null)
         {
             _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _currentUserContext = currentUserContext;
+            _timeProvider = timeProvider ?? TimeProvider.System;
             var normalizedOptions = (concurrencyOptions ?? throw new ArgumentNullException(nameof(concurrencyOptions)))
                 .Normalize();
             _globalConcurrency = new SemaphoreSlim(normalizedOptions.GlobalLimit, normalizedOptions.GlobalLimit);
@@ -81,7 +84,7 @@ namespace ExportDocManager.Api.Hosting
             string normalizedRetryRequestJson = retryRequestJson?.Trim() ?? string.Empty;
             string normalizedInitialOutputPath = initialOutputPath?.Trim() ?? string.Empty;
             string jobId = $"{normalizedKind.ToLowerInvariant()}-{Guid.NewGuid():N}";
-            var now = DateTimeOffset.UtcNow;
+            var now = _timeProvider.GetUtcNow();
             var currentUser = _currentUserContext?.CurrentUser;
             string normalizedRequestedBy = requestedBy?.Trim() ?? string.Empty;
             if (Volatile.Read(ref _stopping) != 0)

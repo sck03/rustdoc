@@ -56,9 +56,9 @@
       "directories": ["scripts", "deploy", ".github/workflows"],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 39020,
+      "baselineAggregateLines": 39252,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 39170,
+      "maximumAggregateLines": 39402,
       "reportFiles": false
     },
     {

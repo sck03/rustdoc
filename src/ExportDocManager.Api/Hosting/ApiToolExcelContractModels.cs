@@ -26,44 +26,15 @@ namespace ExportDocManager.Api.Hosting
         public string DestinationPath { get; set; } = string.Empty;
     }
 
-    public sealed class ApiExcelImportPreviewResponse
-    {
-        public ApiExcelImportPreviewResponse(
-            string sourcePath,
-            bool success,
-            ApiInvoiceDetailDto? invoice,
-            ApiImportedCustomerDto? customer,
-            ApiImportedExporterDto? exporter,
-            ApiExcelImportAnalysisReportDto? analysisReport,
-            IReadOnlyList<string> errors,
-            string storagePolicy)
-        {
-            SourcePath = sourcePath ?? string.Empty;
-            Success = success;
-            Invoice = invoice;
-            Customer = customer;
-            Exporter = exporter;
-            AnalysisReport = analysisReport;
-            Errors = errors ?? Array.Empty<string>();
-            StoragePolicy = storagePolicy ?? string.Empty;
-        }
-
-        public string SourcePath { get; }
-
-        public bool Success { get; }
-
-        public ApiInvoiceDetailDto? Invoice { get; }
-
-        public ApiImportedCustomerDto? Customer { get; }
-
-        public ApiImportedExporterDto? Exporter { get; }
-
-        public ApiExcelImportAnalysisReportDto? AnalysisReport { get; }
-
-        public IReadOnlyList<string> Errors { get; }
-
-        public string StoragePolicy { get; }
-    }
+    public sealed record ApiExcelImportPreviewResponse(
+        string SourcePath,
+        bool Success,
+        ApiInvoiceDetailDto? Invoice,
+        ApiImportedCustomerDto? Customer,
+        ApiImportedExporterDto? Exporter,
+        ApiExcelImportAnalysisReportDto? AnalysisReport,
+        IReadOnlyList<string> Errors,
+        string StoragePolicy);
 
     public sealed record ApiExcelImportAnalysisReportDto(
         string SchemaVersion,

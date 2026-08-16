@@ -73,6 +73,7 @@ public sealed class ApiOpenApiIntegrationTests
         AssertLocalReferencesResolve(root, root, "$");
         AssertCriticalRequestParameters(paths);
         AssertTypedEndpointResponseContracts(paths);
+        AssertNullableAndDateOnlyContracts(root);
     }
 
     [Fact]
@@ -444,6 +445,49 @@ public sealed class ApiOpenApiIntegrationTests
             "200",
             "SingleWindowOperationCenterPageResult");
     }
+
+    private static void AssertNullableAndDateOnlyContracts(JsonElement root)
+    {
+        JsonElement schemas = root.GetProperty("components").GetProperty("schemas");
+        AssertNullableProperty(schemas, "ApiExcelImportAnalysisReportDto", "itemTable");
+        AssertNullableProperty(schemas, "ApiExcelImportPreviewResponse", "analysisReport");
+        AssertNullableProperty(schemas, "ApiExcelImportPreviewResponse", "customer");
+        AssertNullableProperty(schemas, "ApiExcelImportPreviewResponse", "exporter");
+        AssertNullableProperty(schemas, "ApiExcelImportPreviewResponse", "invoice");
+
+        AssertDateOnlyProperty(schemas, "ApiInvoiceDetailDto", "invoiceDate");
+        AssertDateOnlyProperty(schemas, "ApiInvoiceDetailDto", "shipmentDate");
+        AssertDateOnlyProperty(schemas, "ApiPaymentDto", "paymentDate");
+        AssertDateOnlyProperty(schemas, "ApiSupplierAssessmentDto", "assessmentDate");
+        AssertDateOnlyProperty(schemas, "ApiSupplierAssessmentSaveRequest", "assessmentDate");
+    }
+
+    private static void AssertNullableProperty(JsonElement schemas, string schemaName, string propertyName)
+    {
+        JsonElement schema = schemas.GetProperty(schemaName);
+        Assert.False(
+            schema.TryGetProperty("required", out JsonElement required) &&
+            required.EnumerateArray().Any(item => item.GetString() == propertyName));
+        JsonElement property = schema.GetProperty("properties").GetProperty(propertyName);
+        Assert.True(SchemaAllowsNull(property), $"{schemaName}.{propertyName} does not allow JSON null.");
+    }
+
+    private static void AssertDateOnlyProperty(JsonElement schemas, string schemaName, string propertyName)
+    {
+        JsonElement property = schemas.GetProperty(schemaName).GetProperty("properties").GetProperty(propertyName);
+        Assert.True(SchemaHasType(property, "string"), $"{schemaName}.{propertyName} is not a JSON string date.");
+        Assert.Equal("date", property.GetProperty("format").GetString());
+    }
+
+    private static bool SchemaAllowsNull(JsonElement schema) =>
+        SchemaHasType(schema, "null") ||
+        schema.TryGetProperty("oneOf", out JsonElement oneOf) && oneOf.EnumerateArray().Any(SchemaAllowsNull) ||
+        schema.TryGetProperty("anyOf", out JsonElement anyOf) && anyOf.EnumerateArray().Any(SchemaAllowsNull);
+
+    private static bool SchemaHasType(JsonElement schema, string expected) =>
+        schema.TryGetProperty("type", out JsonElement type) &&
+        (type.ValueKind == JsonValueKind.String && type.GetString() == expected ||
+         type.ValueKind == JsonValueKind.Array && type.EnumerateArray().Any(item => item.GetString() == expected));
 
     private static void AssertResponseSchema(
         JsonElement paths,

@@ -75,7 +75,7 @@ namespace ExportDocManager.Api.Tests
             };
             var resolver = new ApiCurrentUserResolver(tokenService);
             await resolver.ResolveAsync(httpContext);
-            var context = new ApiCurrentUserContext(accessor);
+            var context = new ApiCurrentUserContext(accessor, new ApiBackgroundJobExecutionUserAccessor());
 
             Assert.Equal("admin", Assert.IsType<User>(context.CurrentUser).Username);
             Assert.Equal(issued.AccessToken, ApiCurrentUserContext.GetBearerToken(httpContext));
@@ -116,7 +116,9 @@ namespace ExportDocManager.Api.Tests
             var resolver = new ApiCurrentUserResolver(tokenService);
             await resolver.ResolveAsync(adminContext);
             await resolver.ResolveAsync(operatorContext);
-            var currentUserContext = new ApiCurrentUserContext(accessor);
+            var currentUserContext = new ApiCurrentUserContext(
+                accessor,
+                new ApiBackgroundJobExecutionUserAccessor());
 
             accessor.HttpContext = adminContext;
             Assert.Equal("admin", Assert.IsType<User>(currentUserContext.CurrentUser).Username);

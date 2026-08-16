@@ -123,7 +123,11 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
 }
 
 function formatAmount(value?: number) { return (value ?? 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function formatDate(value?: string | null) { return value ? new Date(value).toLocaleDateString("zh-CN") : "未设置"; }
+function formatDate(value?: string | null) {
+  if (!value) return "未设置";
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${Number(match[1])}/${Number(match[2])}/${Number(match[3])}` : value;
+}
 
 function formatDateTime(value?: string | null) {
   if (!value) return "未设置";

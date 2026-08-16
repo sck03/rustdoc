@@ -2,6 +2,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Suppliers;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Infrastructure.Tests
@@ -21,13 +22,13 @@ namespace ExportDocManager.Infrastructure.Tests
                 context.SupplierAssessments.AddRange(
                     new SupplierAssessment
                     {
-                        SupplierCompanyId = owned.Id, AssessedAt = DateTimeOffset.UtcNow.AddDays(-2),
+                        SupplierCompanyId = owned.Id, AssessmentDate = new DateOnly(2026, 8, 14),
                         AssessmentKind = "订单复盘", QualityScore = 4, DeliveryScore = 3,
                         ServiceScore = 5, PriceScore = 4, Conclusion = "合格"
                     },
                     new SupplierAssessment
                     {
-                        SupplierCompanyId = other.Id, AssessedAt = DateTimeOffset.UtcNow.AddDays(-1),
+                        SupplierCompanyId = other.Id, AssessmentDate = new DateOnly(2026, 8, 15),
                         AssessmentKind = "订单复盘", QualityScore = 1, DeliveryScore = 1,
                         ServiceScore = 1, PriceScore = 1, Conclusion = "暂停合作"
                     });
@@ -36,7 +37,8 @@ namespace ExportDocManager.Infrastructure.Tests
 
             var currentUser = new FixedCurrentUserContext(new User { Id = 7, Username = "sales", Role = "Sales" });
             var service = new SupplierAssessmentService(factory,
-                new BusinessDataAccessScope(CreatePostgreSqlModeSettings(), currentUser));
+                new BusinessDataAccessScope(CreatePostgreSqlModeSettings(), currentUser),
+                BusinessClock.CreateSystem());
 
             var overview = await service.GetOverviewAsync();
 

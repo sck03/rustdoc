@@ -32,9 +32,12 @@ function Write-WatchdogMessage {
 }
 
 function Stop-TestProcessTree {
-    param([Parameter(Mandatory)][System.Diagnostics.Process]$Process)
+    param(
+        [Parameter(Mandatory)][System.Diagnostics.Process]$Process,
+        [bool]$UnixProcessGroup = $false
+    )
 
-    if (-not (Stop-ExportDocProcessTree -Process $Process -TimeoutSeconds 10)) {
+    if (-not (Stop-ExportDocProcessTree -Process $Process -TimeoutSeconds 10 -UnixProcessGroup:$UnixProcessGroup)) {
         Write-WatchdogMessage "PID $($Process.Id) did not confirm process-tree termination within the cleanup deadline."
     }
 }
@@ -93,6 +96,12 @@ function Resolve-DotnetExecutable {
 }
 
 $dotnetExecutable = Resolve-DotnetExecutable
+$setsidExecutable = if ($IsLinux) {
+    Get-Command setsid -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1 -ExpandProperty Source
+} else {
+    $null
+}
 
 if ($Tests.Count -eq 0) {
     throw "At least one report PDF test must be supplied."
@@ -108,10 +117,10 @@ foreach ($test in $Tests) {
     $trxFileName = "$testSlug.trx"
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $process.StartInfo.FileName = $dotnetExecutable
+    $process.StartInfo.FileName = if ($setsidExecutable) { $setsidExecutable } else { $dotnetExecutable }
     $process.StartInfo.WorkingDirectory = $repositoryRoot
     $process.StartInfo.UseShellExecute = $false
-    $process.StartInfo.CreateNoWindow = $false
+    $process.StartInfo.CreateNoWindow = $true
 
     $arguments = @(
         "test",
@@ -127,7 +136,8 @@ foreach ($test in $Tests) {
         "--diag", $diagnosticLogPath,
         "--filter", "FullyQualifiedName=$test"
     )
-    foreach ($argument in $arguments) {
+    $processArguments = if ($setsidExecutable) { @($dotnetExecutable) + $arguments } else { $arguments }
+    foreach ($argument in $processArguments) {
         $process.StartInfo.ArgumentList.Add($argument)
     }
 
@@ -146,7 +156,7 @@ foreach ($test in $Tests) {
             if ($remaining -le [TimeSpan]::Zero) {
                 $timedOut = $true
                 Write-WatchdogMessage "$test exceeded its hard timeout; terminating the complete dotnet/testhost/Chrome process tree."
-                Stop-TestProcessTree -Process $process
+                Stop-TestProcessTree -Process $process -UnixProcessGroup ([bool]$setsidExecutable)
                 break
             }
 
@@ -168,7 +178,7 @@ foreach ($test in $Tests) {
     finally {
         $stopwatch.Stop()
         if (-not $process.HasExited) {
-            Stop-TestProcessTree -Process $process
+            Stop-TestProcessTree -Process $process -UnixProcessGroup ([bool]$setsidExecutable)
         }
         $process.Dispose()
     }

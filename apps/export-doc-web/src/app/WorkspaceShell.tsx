@@ -94,6 +94,7 @@ export function WorkspaceShell({
   const mobileNavToggleRef = useRef<HTMLButtonElement | null>(null);
   const mobileNavRef = useRef<HTMLElement | null>(null);
   const workspaceMainRef = useRef<HTMLElement | null>(null);
+  const workspaceTitleRef = useRef<HTMLHeadingElement | null>(null);
   const workspaceContentRef = useRef<HTMLDivElement | null>(null);
   const sessionAttentionRef = useRef<HTMLDivElement | null>(null);
   const workspaceDeviceMode = useWorkspaceDeviceMode();
@@ -111,6 +112,7 @@ export function WorkspaceShell({
     () => findActiveWorkspaceNavGroupKey(pathname, visibleGroups),
     [pathname, visibleGroups],
   );
+  const context = useMemo(() => getWorkspaceContext(pathname), [pathname]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() =>
     createInitialWorkspaceNavGroupState(pathname, visibleGroups),
   );
@@ -141,6 +143,15 @@ export function WorkspaceShell({
   useEffect(() => {
     setIsMobileNavOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const product = getProductEditionPresentation(user.capabilities.productEdition);
+    document.title = `${context.title} · ${product.displayName}`;
+    const focusFrame = window.requestAnimationFrame(() => {
+      workspaceTitleRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [context.title, pathname, user.capabilities.productEdition]);
 
   useEffect(() => {
     if (!isMobileNavOpen) {
@@ -255,7 +266,6 @@ export function WorkspaceShell({
     persistInterfaceDensity(nextDensity);
   }
 
-  const context = getWorkspaceContext(pathname);
   const ContextIcon = context.icon;
   const displayName = user.fullName || user.username;
   const productText = renderProductText(user);
@@ -270,6 +280,7 @@ export function WorkspaceShell({
       className={isNavCollapsed ? "app-shell app-shell-nav-collapsed" : "app-shell"}
       data-workspace-device={workspaceDeviceMode}
     >
+      <a className="skip-link" href="#workspace-main-content">跳到主要内容</a>
       <aside
         className={isMobileNavOpen ? "workspace-nav workspace-nav-mobile-open" : "workspace-nav"}
         inert={sessionExpired}
@@ -345,7 +356,7 @@ export function WorkspaceShell({
         />
       ) : null}
 
-      <main ref={workspaceMainRef} className="workspace-main">
+      <main id="workspace-main-content" ref={workspaceMainRef} className="workspace-main" tabIndex={-1}>
         <header className="workspace-header">
           <div className="workspace-title-cluster">
             <span className="workspace-context-icon" aria-hidden="true">
@@ -353,7 +364,7 @@ export function WorkspaceShell({
             </span>
             <div className="workspace-title-block">
               <p className="eyebrow">{context.section}</p>
-              <h1>{context.title}</h1>
+              <h1 ref={workspaceTitleRef} tabIndex={-1}>{context.title}</h1>
               <p className="workspace-description">{context.description}</p>
             </div>
           </div>
