@@ -208,10 +208,7 @@ jobs:
         env:
           EXPORTDOCMANAGER_CHROMIUM_NO_SANDBOX: ${{ runner.os == 'Linux' && '1' || '0' }}
           EXPORTDOCMANAGER_BROWSER_AUTOMATION_RECYCLE_USES: ${{ runner.os == 'macOS' && '4' || '100' }}
-        run: >-
-          node scripts/run-report-pdf-tests-with-timeout.mjs
-          --per-test-timeout-seconds=180
-          --heartbeat-seconds=15
+        run: node scripts/run-report-pdf-tests-with-timeout.mjs --per-test-timeout-seconds=180 --heartbeat-seconds=15
 
       - name: Upload report render watchdog diagnostics
         if: ${{ always() }}

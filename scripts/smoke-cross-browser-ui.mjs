@@ -84,7 +84,6 @@ apiProcess.stderr.on("data", (chunk) => { apiOutput += chunk.toString(); });
 try {
   await waitForHealth(`${baseUrl}/healthz`, 30_000);
   const results = [];
-  const cleanupWarnings = [];
   for (const browserName of requestedBrowsers) {
     const browserType = playwright[browserName];
     if (!browserType) throw new Error(`Unsupported Playwright browser: ${browserName}`);
@@ -113,8 +112,7 @@ try {
         height: 844,
       }));
     } finally {
-      const warning = await closeBrowser(browser, browserName);
-      if (warning) cleanupWarnings.push(warning);
+      await closeBrowser(browser, browserName);
     }
   }
   process.stdout.write(`${JSON.stringify({
@@ -122,54 +120,43 @@ try {
     runtimeIdentifier,
     playwrightBrowsersPath,
     legacyWindowsFirefoxSandboxDisabled,
-    cleanupWarnings,
     results,
   }, null, 2)}\n`);
 } catch (error) {
   if (apiOutput.trim()) process.stderr.write(`API output:\n${apiOutput}\n`);
   throw error;
 } finally {
-  let cleanupError;
+  let stopped = false;
   try {
-    if (!await stopProcessTree(apiProcess, closeTimeoutMs)) {
-      cleanupError = new Error(`API process tree ${apiProcess.pid} did not exit within the cleanup deadline`);
-    }
-  } catch (error) {
-    cleanupError = error;
+    stopped = await stopProcessTree(apiProcess, closeTimeoutMs);
   } finally {
-    if (cleanupError) {
-      apiProcess.stdout.destroy();
-      apiProcess.stderr.destroy();
-      apiProcess.unref();
-    }
+    apiProcess.stdout.destroy();
+    apiProcess.stderr.destroy();
+    apiProcess.unref();
     rmSync(runtimeRoot, { recursive: true, force: true });
   }
-  if (cleanupError) throw cleanupError;
+  if (!stopped) throw new Error(`API process tree ${apiProcess.pid} did not exit within the cleanup deadline`);
 }
 
 async function closeBrowser(browser, browserName) {
-  const closeResult = Promise.resolve().then(() => browser.close()).then(
-    () => ({ error: null }),
-    (error) => ({ error }),
-  );
   const result = await withTimeout(
-    closeResult,
+    Promise.resolve().then(() => browser.close()).then(() => ({ error: null }), (error) => ({ error })),
     browserCloseTimeoutMs,
     `${browserName} close`,
     false,
   );
   if (result === false) {
-    const warning = `${browserName} close exceeded ${browserCloseTimeoutMs}ms after its acceptance checks passed`;
-    process.stderr.write(`Warning: ${warning}\n`);
-    return warning;
+    writeCleanupWarning(`${browserName} close exceeded ${browserCloseTimeoutMs}ms`);
+    return;
   }
   if (result.error) {
     const message = result.error instanceof Error ? result.error.message : String(result.error);
-    const warning = `${browserName} close reported a cleanup error after its acceptance checks passed: ${message}`;
-    process.stderr.write(`Warning: ${warning}\n`);
-    return warning;
+    writeCleanupWarning(`${browserName} close reported a cleanup error: ${message}`);
   }
-  return "";
+}
+
+function writeCleanupWarning(message) {
+  process.stderr.write(`Warning: ${message} after its acceptance checks passed\n`);
 }
 
 async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, viewport) {

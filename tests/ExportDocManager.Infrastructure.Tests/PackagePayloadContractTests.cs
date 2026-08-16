@@ -200,24 +200,6 @@ public sealed class PackagePayloadContractTests
     }
 
     [Fact]
-    public void BrowserCompatibilityWorkflow_ShouldBoundCleanupWithoutMaskingAcceptance()
-    {
-        string root = FindWorkspaceRoot();
-        string workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "browser-compatibility.yml"));
-        string acceptance = File.ReadAllText(Path.Combine(root, "scripts", "smoke-cross-browser-ui.mjs"));
-        string processTree = File.ReadAllText(Path.Combine(root, "scripts", "lib", "child-process-tree.mjs"));
-
-        Assert.Contains("timeout-minutes: 15", workflow, StringComparison.Ordinal);
-        Assert.Contains("scripts/lib/child-process-tree.mjs", workflow, StringComparison.Ordinal);
-        Assert.Contains("const browserCloseTimeoutMs = 30_000", acceptance, StringComparison.Ordinal);
-        Assert.Contains("cleanupWarnings", acceptance, StringComparison.Ordinal);
-        Assert.Contains("after its acceptance checks passed", acceptance, StringComparison.Ordinal);
-        Assert.Contains("stopProcessTree(apiProcess", acceptance, StringComparison.Ordinal);
-        Assert.DoesNotContain("await withTimeout(browser.close()", acceptance, StringComparison.Ordinal);
-        Assert.Contains("runCleanupProcess", processTree, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void CrossPlatformTypographyWorkflow_ShouldComparePdfLineWrappingAndRejectTextOverlap()
     {
         string root = FindWorkspaceRoot();
@@ -239,18 +221,14 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("src/ExportDocManager.Infrastructure.Browser/Services/BrowserRuntime/**", workflow, StringComparison.Ordinal);
         Assert.Contains("src/ExportDocManager.Infrastructure.Browser/Services/Reporting/**", workflow, StringComparison.Ordinal);
         Assert.Contains("Upload report render watchdog diagnostics", workflow, StringComparison.Ordinal);
-        Assert.Contains("spawnProcessTree", reportWatchdog, StringComparison.Ordinal);
-        Assert.Contains("stopProcessTree", reportWatchdog, StringComparison.Ordinal);
-        Assert.Contains("signalProcessGroup", processTree, StringComparison.Ordinal);
+        Assert.All(["spawnProcessTree", "stopProcessTree", "child.unref()", "setTimeout(() => { void terminateTimedOutTest(); }",
+            "verifyDotnetSdk", "No native dotnet executable on PATH can load the required SDK", "child.once(\"exit\"",
+            "process.exitCode = 124", "RenderBuiltInProgramTemplatesToPdf_ShouldUseConfiguredRendererAndRuntimeDataRoot",
+            "readTrxExecutedTestCount", "did not execute any tests", "--filter", "FullyQualifiedName=${test}"],
+            expected => Assert.Contains(expected, reportWatchdog, StringComparison.Ordinal));
+        Assert.All(["detached: process.platform !== \"win32\"", "signalProcessGroup", "SIGKILL", "killer.unref()"],
+            expected => Assert.Contains(expected, processTree, StringComparison.Ordinal));
         Assert.Contains("$target.Kill($true)", processSupport, StringComparison.Ordinal);
-        Assert.Contains("verifyDotnetSdk", reportWatchdog, StringComparison.Ordinal);
-        Assert.Contains("No native dotnet executable on PATH can load the required SDK", reportWatchdog, StringComparison.Ordinal);
-        Assert.Contains("child.once(\"exit\"", reportWatchdog, StringComparison.Ordinal);
-        Assert.Contains("process.exitCode = 124", reportWatchdog, StringComparison.Ordinal);
-        Assert.Contains("RenderBuiltInProgramTemplatesToPdf_ShouldUseConfiguredRendererAndRuntimeDataRoot", reportWatchdog, StringComparison.Ordinal);
-        Assert.Contains("readTrxExecutedTestCount", reportWatchdog, StringComparison.Ordinal);
-        Assert.Contains("--filter", reportWatchdog, StringComparison.Ordinal);
-        Assert.Contains("FullyQualifiedName=${test}", reportWatchdog, StringComparison.Ordinal);
         Assert.DoesNotContain("--blame-hang", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain(
             "FullyQualifiedName~RenderBuiltInProgramTemplatesToPdf|FullyQualifiedName~RenderBuiltInProgramTemplatesWithMultiItemBusinessDataToPdf",

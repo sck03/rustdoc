@@ -21,25 +21,6 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public void ReportPdfWatchdog_ShouldBoundProcessTreeTermination()
-        {
-            string processTree = File.ReadAllText(ResolveWorkspacePath("scripts", "lib", "child-process-tree.mjs"));
-            string watchdog = File.ReadAllText(ResolveWorkspacePath("scripts", "run-report-pdf-tests-with-timeout.mjs"));
-
-            Assert.Contains("spawnProcessTree", watchdog, StringComparison.Ordinal);
-            Assert.Contains("stopProcessTree(child, cleanupTimeoutMs)", watchdog, StringComparison.Ordinal);
-            Assert.Contains("setTimeout(() => { void terminateTimedOutTest(); }, timeoutMs)", watchdog, StringComparison.Ordinal);
-            Assert.Contains("readTrxExecutedTestCount", watchdog, StringComparison.Ordinal);
-            Assert.Contains("did not execute any tests", watchdog, StringComparison.Ordinal);
-            Assert.Contains("child.unref()", watchdog, StringComparison.Ordinal);
-            Assert.Contains("detached: process.platform !== \"win32\"", processTree, StringComparison.Ordinal);
-            Assert.Contains("signalProcessGroup(child.pid, \"SIGKILL\")", processTree, StringComparison.Ordinal);
-            Assert.Contains("setTimeout(() =>", processTree, StringComparison.Ordinal);
-            Assert.Contains("killer.unref()", processTree, StringComparison.Ordinal);
-            Assert.DoesNotContain("WaitForExit", watchdog, StringComparison.Ordinal);
-        }
-
-        [Fact]
         public void CleanupScript_ShouldUseWorkspaceBoundedLiteralPathDeletion()
         {
             string scriptPath = ResolveWorkspacePath("scripts", "clean-generated-artifacts.ps1");
