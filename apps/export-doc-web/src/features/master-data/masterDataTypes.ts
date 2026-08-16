@@ -59,9 +59,9 @@ export type MasterDataEntityConfig = {
   normalizeRecord: (record: MasterDataRecord, id: number) => MasterDataRecord;
   list: (client: ExportDocManagerApiClient, request: { keyword: string; pageNumber: number; pageSize: number }, signal?: AbortSignal) => Promise<MasterDataListResult>;
   get: (client: ExportDocManagerApiClient, recordKey: string, signal?: AbortSignal) => Promise<MasterDataRecord>;
-  create: (client: ExportDocManagerApiClient, record: MasterDataRecord) => Promise<MasterDataRecord>;
-  update: (client: ExportDocManagerApiClient, recordKey: string, record: MasterDataRecord) => Promise<MasterDataRecord>;
-  delete: (client: ExportDocManagerApiClient, record: MasterDataRecord, recordKey: string) => Promise<ApiCommandResponse>;
+  create: (client: ExportDocManagerApiClient, record: MasterDataRecord, signal?: AbortSignal) => Promise<MasterDataRecord>;
+  update: (client: ExportDocManagerApiClient, recordKey: string, record: MasterDataRecord, signal?: AbortSignal) => Promise<MasterDataRecord>;
+  delete: (client: ExportDocManagerApiClient, record: MasterDataRecord, recordKey: string, signal?: AbortSignal) => Promise<ApiCommandResponse>;
 };
 
 export type ProductUnitSourceField = "unitEN" | "packageUnitEN";

@@ -14,6 +14,7 @@ $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $workspaceRoot = (Resolve-Path (Join-Path $scriptRoot "..")).Path
 $workspaceRootFullPath = [System.IO.Path]::GetFullPath($workspaceRoot)
+. (Join-Path $scriptRoot "lib/platform-path-safety.ps1")
 
 function Assert-WorkspaceChildPath {
     param(
@@ -25,11 +26,7 @@ function Assert-WorkspaceChildPath {
     )
 
     $fullPath = [System.IO.Path]::GetFullPath($Path)
-    $workspacePrefix = $workspaceRootFullPath.TrimEnd(
-        [System.IO.Path]::DirectorySeparatorChar,
-        [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
-
-    if (-not $fullPath.StartsWith($workspacePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if (-not (Test-ExportDocPathUnderRoot -Path $fullPath -Root $workspaceRootFullPath)) {
         throw "Refusing to clean $Purpose outside workspace: $fullPath"
     }
 
@@ -259,7 +256,7 @@ function Add-Target {
 
     $alreadyAdded = $false
     foreach ($existingTarget in $Targets) {
-        if ($existingTarget.Path.Equals($target.Path, [System.StringComparison]::OrdinalIgnoreCase)) {
+        if (Test-ExportDocPathEqual -Left $existingTarget.Path -Right $target.Path) {
             $alreadyAdded = $true
             break
         }
@@ -279,17 +276,7 @@ function Test-IsUnderPath {
         [string]$Root
     )
 
-    $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd(
-        [System.IO.Path]::DirectorySeparatorChar,
-        [System.IO.Path]::AltDirectorySeparatorChar)
-    $fullRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd(
-        [System.IO.Path]::DirectorySeparatorChar,
-        [System.IO.Path]::AltDirectorySeparatorChar)
-
-    return $fullPath.Equals($fullRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
-        $fullPath.StartsWith(
-            $fullRoot + [System.IO.Path]::DirectorySeparatorChar,
-            [System.StringComparison]::OrdinalIgnoreCase)
+    return Test-ExportDocPathUnderRoot -Path $Path -Root $Root -AllowRoot
 }
 
 function Get-GeneratedArtifactCleanupPlan {

@@ -3,6 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { normalizeText, readApiError } from "../../ui/formUtils.ts";
 import {
   type InvoiceItemCellSelection,
@@ -44,6 +45,7 @@ export function useInvoiceItemsWorkspace({
   canSaveToProductLibrary,
 }: Options) {
   const requestConfirmation = useConfirmation();
+  const runAbortable = useAbortableOperation();
   const queryClient = useQueryClient();
   const [editHistory, setEditHistoryState] = useState<InvoiceItemEditHistory>(emptyInvoiceItemEditHistory);
   const [productLibraryKeyword, setProductLibraryKeyword] = useState("");
@@ -79,11 +81,14 @@ export function useInvoiceItemsWorkspace({
     staleTime: 5 * 60 * 1000,
   });
   const saveProductMutation = useMutation({
-    mutationFn: async ({ item }: { item: ApiInvoiceItemDto }) => {
+    mutationFn: ({ item }: { item: ApiInvoiceItemDto }) => runAbortable(async (signal) => {
       const productCode = normalizeText(item.styleNo);
       if (!productCode) throw new Error("商品编码(款号)不能为空。");
 
-      const candidates = (await client.listProducts({ keyword: productCode, pageNumber: 1, pageSize: 50 })).items;
+      const candidates = (await client.listProducts(
+        { keyword: productCode, pageNumber: 1, pageSize: 50 },
+        { signal },
+      )).items;
       const existing = candidates.find((product) => hasSameProductCode(product, productCode)) ?? null;
       if (existing && !await requestConfirmation({
         title: "更新商品库",
@@ -96,12 +101,12 @@ export function useInvoiceItemsWorkspace({
 
       const body = createProductDraftFromInvoiceItem(item, existing);
       if (existing) {
-        await client.updateProduct({ id: existing.id, body });
+        await client.updateProduct({ id: existing.id, body }, { signal });
         return { cancelled: false, isUpdate: true, productCode };
       }
-      await client.createProduct({ body });
+      await client.createProduct({ body }, { signal });
       return { cancelled: false, isUpdate: false, productCode };
-    },
+    }),
     onSuccess: async (result) => {
       if (result.cancelled) {
         setProductLibraryMessage("已取消商品库更新。");

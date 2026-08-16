@@ -4,8 +4,9 @@ using System.Text;
 using ExportDocManager.DataAccess;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
-using Serilog;
 
 namespace ExportDocManager.Services.Infrastructure
 {
@@ -24,6 +25,7 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly bool _requireBootstrapToken;
         private readonly string _expectedBootstrapToken;
         private readonly IAppPathProvider? _pathProvider;
+        private readonly ILogger<DatabaseInitializationService> _logger;
 
         public DatabaseInitializationService(
             IDbContextFactory<AppDbContext> dbContextFactory,
@@ -55,7 +57,8 @@ namespace ExportDocManager.Services.Infrastructure
             DatabaseInitializationCoordinator coordinator,
             bool requireBootstrapToken,
             string expectedBootstrapToken,
-            IAppPathProvider? pathProvider)
+            IAppPathProvider? pathProvider,
+            ILogger<DatabaseInitializationService>? logger = null)
         {
             _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
             _databaseSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
@@ -63,6 +66,7 @@ namespace ExportDocManager.Services.Infrastructure
             _requireBootstrapToken = requireBootstrapToken;
             _expectedBootstrapToken = expectedBootstrapToken?.Trim() ?? string.Empty;
             _pathProvider = pathProvider;
+            _logger = logger ?? NullLogger<DatabaseInitializationService>.Instance;
         }
 
         public async Task<DatabaseInitializationResult> InitializeAsync(
@@ -144,7 +148,7 @@ namespace ExportDocManager.Services.Infrastructure
                     await ConfigureSingleProcessSqliteAsync(context, cancellationToken).ConfigureAwait(false);
                 }
 
-                await DatabaseSchemaBaseline.EnsureCurrentAsync(context, usesPostgreSql, cancellationToken)
+                await DatabaseSchemaBaseline.EnsureCurrentAsync(context, usesPostgreSql, _logger, cancellationToken)
                     .ConfigureAwait(false);
                 if (maintenanceProfile?.UsesDedicatedCredentials == true)
                 {
@@ -177,28 +181,28 @@ namespace ExportDocManager.Services.Infrastructure
             }
             catch (InvalidOperationException ex)
             {
-                Log.Warning(ex, "Database initialization rejected the current schema or configuration.");
+                _logger.LogWarning(ex, "Database initialization rejected the current schema or configuration.");
                 return DatabaseInitializationResult.Fail(
                     "数据库结构或配置不符合当前版本要求。项目尚未投产，请备份需要保留的文件后使用空数据库重新初始化。",
                     shouldResetPassword: false);
             }
             catch (SqliteException ex)
             {
-                Log.Error(ex, "SQLite database initialization failed.");
+                _logger.LogError(ex, "SQLite database initialization failed.");
                 return DatabaseInitializationResult.Fail(
                     "本地数据库初始化失败。请确认运行数据根可写；如这是预发布旧数据库，请备份后删除并重新初始化。",
                     shouldResetPassword: false);
             }
             catch (NpgsqlException ex) when (usesPostgreSql)
             {
-                Log.Error(ex, "PostgreSQL database initialization failed.");
+                _logger.LogError(ex, "PostgreSQL database initialization failed.");
                 return DatabaseInitializationResult.Fail(
                     "连接或初始化共享数据库失败，请检查 PostgreSQL 地址、端口、数据库名、账号密码、网络和建表权限。",
                     shouldResetPassword: false);
             }
             catch (DbException ex) when (usesPostgreSql)
             {
-                Log.Error(ex, "Shared database initialization failed.");
+                _logger.LogError(ex, "Shared database initialization failed.");
                 return DatabaseInitializationResult.Fail(
                     "连接或初始化共享数据库失败，请检查数据库服务状态和连接配置。",
                     shouldResetPassword: false);

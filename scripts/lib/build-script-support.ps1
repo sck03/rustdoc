@@ -1,3 +1,5 @@
+. (Join-Path $PSScriptRoot "platform-path-safety.ps1")
+
 function Resolve-ExportDocPowerShellExecutable {
     $currentProcess = Get-Process -Id $PID -ErrorAction SilentlyContinue
     if ($null -ne $currentProcess -and
@@ -60,6 +62,53 @@ function New-ExportDocProcessStartInfo {
     return $startInfo
 }
 
+function Stop-ExportDocProcessTree {
+    param(
+        [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
+        [ValidateRange(1, 60)][int]$TimeoutSeconds = 10
+    )
+
+    if ($Process.HasExited) {
+        return $true
+    }
+
+    $killCommand = @'
+& {
+    try {
+        $target = [System.Diagnostics.Process]::GetProcessById([int]$args[0])
+        $target.Kill($true)
+    } catch [System.ArgumentException] {
+        exit 0
+    }
+}
+'@
+    $helper = [System.Diagnostics.Process]::new()
+    $helper.StartInfo = New-ExportDocProcessStartInfo `
+        -FilePath (Resolve-ExportDocPowerShellExecutable) `
+        -Arguments @("-NoProfile", "-NonInteractive", "-Command", $killCommand, $Process.Id.ToString()) `
+        -CaptureOutput
+
+    try {
+        if (-not $helper.Start()) {
+            throw "Could not start the bounded process-tree terminator."
+        }
+
+        if (-not $helper.WaitForExit($TimeoutSeconds * 1000)) {
+            $helper.Kill()
+            [void]$helper.WaitForExit(5000)
+            return $false
+        }
+
+        return $Process.WaitForExit(5000)
+    } finally {
+        if (-not $helper.HasExited) {
+            $helper.Kill()
+            [void]$helper.WaitForExit(5000)
+        }
+        $helper.Dispose()
+    }
+}
+
 function Wait-ExportDocExternalProcess {
     param(
         [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
@@ -73,11 +122,8 @@ function Wait-ExportDocExternalProcess {
     while (-not $Process.WaitForExit(1000)) {
         $now = [DateTimeOffset]::UtcNow
         if ($now - $startedAt -ge [TimeSpan]::FromSeconds($TimeoutSeconds)) {
-            try {
-                $Process.Kill($true)
-                [void]$Process.WaitForExit(5000)
-            } catch {
-                Write-Warning "Could not terminate timed-out process '$DisplayName': $($_.Exception.Message)"
+            if (-not (Stop-ExportDocProcessTree -Process $Process)) {
+                Write-Warning "Timed-out process '$DisplayName' did not confirm termination within the cleanup deadline."
             }
             throw "External command timed out after $TimeoutSeconds seconds: $DisplayName"
         }
@@ -158,14 +204,15 @@ function Move-ExportDocGeneratedDirectoryToQuarantine {
     $allowedPrefix = $fullAllowedRoot + [System.IO.Path]::DirectorySeparatorChar
     $quarantinePrefix = $fullQuarantineRoot + [System.IO.Path]::DirectorySeparatorChar
 
-    if (-not $fullPath.StartsWith($allowedPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $pathComparison = Get-ExportDocPathComparison
+    if (-not $fullPath.StartsWith($allowedPrefix, $pathComparison)) {
         throw "Generated cleanup source must stay below '$fullAllowedRoot'. Resolved path: $fullPath"
     }
-    if (-not $fullQuarantineRoot.StartsWith($allowedPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if (-not $fullQuarantineRoot.StartsWith($allowedPrefix, $pathComparison)) {
         throw "Generated cleanup quarantine must stay below '$fullAllowedRoot'. Resolved path: $fullQuarantineRoot"
     }
-    if ($fullPath.StartsWith($quarantinePrefix, [System.StringComparison]::OrdinalIgnoreCase) -or
-        [string]::Equals($fullPath, $fullQuarantineRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if ($fullPath.StartsWith($quarantinePrefix, $pathComparison) -or
+        [string]::Equals($fullPath, $fullQuarantineRoot, $pathComparison)) {
         throw "Generated cleanup source cannot already be inside the quarantine root: $fullPath"
     }
 

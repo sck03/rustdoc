@@ -4,7 +4,8 @@ using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
-using Serilog;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ExportDocManager.Services.Reporting
 {
@@ -16,6 +17,7 @@ namespace ExportDocManager.Services.Reporting
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
         private readonly IAppPathProvider _pathProvider;
+        private readonly ILogger<ReportHtmlService> _logger;
 
         private readonly SemaphoreSlim _templateConfigSemaphore = new(1, 1);
         private readonly Lock _configLock = new();
@@ -26,8 +28,14 @@ namespace ExportDocManager.Services.Reporting
         public ReportHtmlService(
             IDbContextFactory<AppDbContext> contextFactory,
             ISettingsService settingsService,
-            IAppPathProvider pathProvider)
-            : this(contextFactory, settingsService, pathProvider, new BusinessDataAccessScope(new DatabaseConnectionSettings()))
+            IAppPathProvider pathProvider,
+            ILogger<ReportHtmlService>? logger = null)
+            : this(
+                contextFactory,
+                settingsService,
+                pathProvider,
+                new BusinessDataAccessScope(new DatabaseConnectionSettings()),
+                logger)
         {
         }
 
@@ -35,16 +43,18 @@ namespace ExportDocManager.Services.Reporting
             IDbContextFactory<AppDbContext> contextFactory,
             ISettingsService settingsService,
             IAppPathProvider pathProvider,
-            BusinessDataAccessScope accessScope)
+            BusinessDataAccessScope accessScope,
+            ILogger<ReportHtmlService>? logger = null)
         {
             ArgumentNullException.ThrowIfNull(contextFactory);
             ArgumentNullException.ThrowIfNull(settingsService);
             _contextFactory = contextFactory;
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
+            _logger = logger ?? NullLogger<ReportHtmlService>.Instance;
             _entityLoader = new ReportEntityLoader(contextFactory, _accessScope);
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _pathResolver = new ReportTemplatePathResolver(pathProvider);
-            _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver);
+            _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver, _logger);
         }
 
         public async Task<IReadOnlyList<ReportTemplateDescriptor>> GetAvailableTemplatesAsync(
@@ -247,7 +257,7 @@ namespace ExportDocManager.Services.Reporting
             try
             {
                 ReportTemplateContentPolicy.Validate(reportType, templateContent);
-                templateContent = ScribanReportTemplateRenderer.PreprocessHtmlTemplate(templateContent);
+                templateContent = ScribanReportTemplateRenderer.PreprocessHtmlTemplate(templateContent, _logger);
 
                 if (!isPreview)
                 {
@@ -262,7 +272,13 @@ namespace ExportDocManager.Services.Reporting
                     .LoadInvoiceEntitiesAsync(invoice, isPreview, cancellationToken)
                     .ConfigureAwait(false);
 
-                var globals = ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(invoice, customer, exporter, withSeal, _pathProvider);
+                var globals = ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(
+                    invoice,
+                    customer,
+                    exporter,
+                    withSeal,
+                    _pathProvider,
+                    _logger);
                 return ScribanReportTemplateRenderer.Render(templateContent, globals);
             }
             catch (OperationCanceledException)
@@ -275,7 +291,7 @@ namespace ExportDocManager.Services.Reporting
             }
             catch (ArgumentException ex)
             {
-                Log.Warning(ex, "报表模板或内容校验失败, 类型 {ReportType}, 发票 {InvoiceId}", reportType, invoice?.Id);
+                _logger.LogWarning(ex, "报表模板或内容校验失败, 类型 {ReportType}, 发票 {InvoiceId}", reportType, invoice?.Id);
                 throw new ServiceValidationException($"报表模板或内容无效：{ex.Message}", ex);
             }
             catch (Exception ex) when (ex is ServiceException or KeyNotFoundException or
@@ -285,12 +301,12 @@ namespace ExportDocManager.Services.Reporting
             }
             catch (InvalidOperationException ex)
             {
-                Log.Warning(ex, "报表模板或渲染内容校验失败, 类型 {ReportType}, 发票 {InvoiceId}", reportType, invoice?.Id);
+                _logger.LogWarning(ex, "报表模板或渲染内容校验失败, 类型 {ReportType}, 发票 {InvoiceId}", reportType, invoice?.Id);
                 throw new ServiceValidationException($"报表模板或内容无效：{ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "生成报表失败, 类型 {ReportType}, 发票 {InvoiceId}", reportType, invoice?.Id);
+                _logger.LogError(ex, "生成报表失败, 类型 {ReportType}, 发票 {InvoiceId}", reportType, invoice?.Id);
                 throw new InfrastructureServiceException("报表生成服务暂时不可用，请稍后重试。", ex);
             }
         }
@@ -308,7 +324,7 @@ namespace ExportDocManager.Services.Reporting
             try
             {
                 ReportTemplateContentPolicy.Validate(ReportDocumentType.PaymentVoucher, templateContent);
-                templateContent = ScribanReportTemplateRenderer.PreprocessHtmlTemplate(templateContent);
+                templateContent = ScribanReportTemplateRenderer.PreprocessHtmlTemplate(templateContent, _logger);
                 var payee = await _entityLoader
                     .LoadPaymentVoucherEntitiesAsync(payment, cancellationToken)
                     .ConfigureAwait(false);
@@ -326,7 +342,7 @@ namespace ExportDocManager.Services.Reporting
             }
             catch (ArgumentException ex)
             {
-                Log.Warning(ex, "付款单模板或渲染内容校验失败, 付款单 {PaymentId}", payment?.Id);
+                _logger.LogWarning(ex, "付款单模板或渲染内容校验失败, 付款单 {PaymentId}", payment?.Id);
                 throw new ServiceValidationException($"付款单模板或内容无效：{ex.Message}", ex);
             }
             catch (Exception ex) when (ex is ServiceException or KeyNotFoundException or
@@ -336,12 +352,12 @@ namespace ExportDocManager.Services.Reporting
             }
             catch (InvalidOperationException ex)
             {
-                Log.Warning(ex, "付款单模板或渲染内容校验失败, 付款单 {PaymentId}", payment?.Id);
+                _logger.LogWarning(ex, "付款单模板或渲染内容校验失败, 付款单 {PaymentId}", payment?.Id);
                 throw new ServiceValidationException($"付款单模板或内容无效：{ex.Message}", ex);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "生成付款单失败, 付款单 {PaymentId}", payment?.Id);
+                _logger.LogError(ex, "生成付款单失败, 付款单 {PaymentId}", payment?.Id);
                 throw new InfrastructureServiceException("付款单生成服务暂时不可用，请稍后重试。", ex);
             }
         }
@@ -452,7 +468,7 @@ namespace ExportDocManager.Services.Reporting
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning(ex, "加载报表模板配置失败，本次使用内置模板并在下次请求时重试");
+                    _logger.LogWarning(ex, "加载报表模板配置失败，本次使用内置模板并在下次请求时重试");
                     lock (_configLock)
                     {
                         _templatePathCache = new Dictionary<ReportDocumentType, string>();

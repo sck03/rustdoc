@@ -68,10 +68,12 @@ app.UseExportDocManagerReadiness(databaseSettings, runtimeOptions);
 // and to the endpoint itself.  Route selection therefore intentionally occurs
 // before authentication/license/workspace policy evaluation.
 app.UseRouting();
+app.UseExportDocManagerResourceGovernance();
 app.UseExportDocManagerDesktopAccess();
 app.UseExportDocManagerApiAuthentication();
 app.UseExportDocManagerWorkspaceAccess();
 app.UseExportDocManagerLicenseRequirement();
+app.UseExportDocManagerSecurityAudit();
 app.UseExportDocManagerBrowserFrontend(pathProvider.AppRoot);
 app.MapExportDocManagerApiEndpoints(runtimeOptions, databaseSettings);
 app.MapExportDocManagerBrowserFallback(pathProvider.AppRoot);

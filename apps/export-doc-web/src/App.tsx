@@ -1,9 +1,8 @@
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ApiError,
-  ApiUserDto,
   createExportDocManagerApiClient,
 } from "./api/index.ts";
 import { queryKeys } from "./api/queryKeys.ts";
@@ -20,15 +19,17 @@ import { readDesktopError } from "./ui/DesktopPathActions.tsx";
 import { readApiError } from "./ui/formUtils.ts";
 import { useConfirmUnsavedChanges, useHasUnsavedChanges } from "./ui/unsavedChangesGuard.tsx";
 import { WorkspaceShell, type WorkspaceNotice, type WorkspaceSessionAttention } from "./app/WorkspaceShell.tsx";
-import { hasRouteModulePermission, PermissionAccessProvider } from "./app/PermissionAccessContext.tsx";
+import { PermissionAccessProvider } from "./app/PermissionAccessContext.tsx";
 import { AppWorkspaceRoutes } from "./app/AppWorkspaceRoutes.tsx";
+import { isRouteAccessAllowed, isWorkspaceModuleAccessAllowed } from "./app/routeAccess.ts";
 import {
   clearStoredSession,
   readStoredSession,
   type WebSessionState,
   writeStoredSession,
 } from "./app/webSessionStorage.ts";
-import { getRequiredModule, getRequiredRouteAccessLevel, getRequiredWorkspace, isAdminOnlyRoute, isDashboardRoute, isDesktopOnlyRoute, isFullEditionOnlyRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
+import { openSessionChannel, type SessionChannelMessage } from "./app/sessionChannel.ts";
+import { isDashboardRoute, isAdminOnlyRoute, isDesktopOnlyRoute, isFullEditionOnlyRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
 import {
   getDefaultWorkspaceRoute,
   getProductEditionPresentation,
@@ -36,7 +37,6 @@ import {
 } from "./app/productEdition.ts";
 
 const defaultApiBaseUrl = readDefaultApiBaseUrl();
-const defaultDesktopAccessToken = readDefaultDesktopAccessToken();
 
 type SessionState = WebSessionState;
 
@@ -44,9 +44,9 @@ type LoadState = "idle" | "loading" | "ready" | "error";
 
 function App() {
   const [apiBaseUrl, setApiBaseUrl] = useState(defaultApiBaseUrl);
-  const [desktopAccessToken, setDesktopAccessToken] = useState<string | undefined>(defaultDesktopAccessToken);
+  const [desktopAccessToken, setDesktopAccessToken] = useState<string | undefined>(undefined);
   const [desktopProductEdition, setDesktopProductEdition] = useState<ProductEdition>("Full");
-  const [desktopContextLoading, setDesktopContextLoading] = useState(() => isDesktopBridgeAvailable() && !defaultDesktopAccessToken);
+  const [desktopContextLoading, setDesktopContextLoading] = useState(() => isDesktopBridgeAvailable());
   const [username, setUsername] = useState(() => isDesktopBridgeAvailable() ? "admin" : "");
   const [password, setPassword] = useState("");
   const [bootstrapToken, setBootstrapToken] = useState("");
@@ -63,6 +63,13 @@ function App() {
   const queryClient = useQueryClient();
   const confirmDiscardChanges = useConfirmUnsavedChanges();
   const hasUnsavedChanges = useHasUnsavedChanges();
+  const sessionChannelRef = useRef<ReturnType<typeof openSessionChannel>>(null);
+  const sessionRef = useRef<SessionState | null>(session);
+  const apiBaseUrlRef = useRef(apiBaseUrl);
+  const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+  sessionRef.current = session;
+  apiBaseUrlRef.current = apiBaseUrl;
+  hasUnsavedChangesRef.current = hasUnsavedChanges;
   const isDesktopRuntime = isDesktopBridgeAvailable();
   const sessionAccessToken = session?.accessToken;
   const sessionApiBaseUrl = session?.apiBaseUrl;
@@ -115,7 +122,8 @@ function App() {
     };
   }, [confirmDiscardChanges, isDesktopRuntime]);
 
-  const endSession = useCallback((reason: string | null) => {
+  const endSession = useCallback((reason: string | null, broadcast = true) => {
+    const currentApiBaseUrl = sessionRef.current?.apiBaseUrl ?? apiBaseUrlRef.current;
     setSession(null);
     setMessage(reason);
     setWorkspaceNotice(null);
@@ -126,22 +134,76 @@ function App() {
     setLoginState("idle");
     clearStoredSession();
     queryClient.clear();
+    if (broadcast) {
+      sessionChannelRef.current?.post({ type: "session-cleared", apiBaseUrl: currentApiBaseUrl });
+    }
     navigate("/", { replace: true });
   }, [navigate, queryClient]);
 
   const expireSession = useCallback((reason: string) => {
-    if (session && hasUnsavedChanges) {
+    const currentSession = sessionRef.current;
+    if (currentSession && hasUnsavedChangesRef.current) {
       clearStoredSession();
       setWorkspaceNotice(null);
       setSessionAttentionState("expired");
       setSessionActionError(null);
       setSessionActionBusy(false);
       setReauthPassword("");
+      sessionChannelRef.current?.post({
+        type: "session-expired",
+        apiBaseUrl: currentSession.apiBaseUrl,
+        reason,
+      });
       return;
     }
 
     endSession(reason);
-  }, [endSession, hasUnsavedChanges, session]);
+  }, [endSession]);
+
+  useEffect(() => {
+    const channel = openSessionChannel((event: SessionChannelMessage) => {
+      const activeApiBaseUrl = sessionRef.current?.apiBaseUrl ?? apiBaseUrlRef.current;
+      const eventApiBaseUrl = event.type === "session-updated"
+        ? event.session.apiBaseUrl
+        : event.apiBaseUrl;
+      if (eventApiBaseUrl !== activeApiBaseUrl) {
+        return;
+      }
+
+      if (event.type === "session-updated") {
+        setSession(event.session);
+        writeStoredSession(event.session);
+        setSessionAttentionState(null);
+        setSessionActionError(null);
+        queryClient.clear();
+        navigate(getDefaultWorkspaceRoute(event.session.user.capabilities), { replace: true });
+        return;
+      }
+
+      if (event.type === "session-expired" && sessionRef.current && hasUnsavedChangesRef.current) {
+        clearStoredSession();
+        setSessionAttentionState("expired");
+        setSessionActionError(null);
+        setSessionActionBusy(false);
+        setReauthPassword("");
+        return;
+      }
+
+      endSession(
+        event.type === "session-expired"
+          ? event.reason
+          : "已在其他标签页退出登录，请重新登录后继续。",
+        false,
+      );
+    });
+    sessionChannelRef.current = channel;
+    return () => {
+      channel?.close();
+      if (sessionChannelRef.current === channel) {
+        sessionChannelRef.current = null;
+      }
+    };
+  }, [endSession, navigate, queryClient]);
 
   const client = useMemo(
     () =>
@@ -171,15 +233,11 @@ function App() {
         setDesktopProductEdition(context.productEdition);
         if (nextApiBaseUrl) {
           setApiBaseUrl(nextApiBaseUrl);
-          setSession((current) => {
-            if (!current || current.apiBaseUrl === nextApiBaseUrl) {
-              return current;
-            }
-
+          if (sessionRef.current && sessionRef.current.apiBaseUrl !== nextApiBaseUrl) {
             clearStoredSession();
             queryClient.clear();
-            return null;
-          });
+            setSession(null);
+          }
         }
 
         setDesktopAccessToken(nextDesktopAccessToken);
@@ -274,15 +332,15 @@ function App() {
           return;
         }
 
-        setSession((current) => {
-          if (!current) {
-            return current;
-          }
+        const currentSession = sessionRef.current;
+        if (!currentSession || currentSession.accessToken !== sessionAccessToken) {
+          return;
+        }
 
-          const nextSession = { ...current, user };
-          writeStoredSession(nextSession);
-          return nextSession;
-        });
+        const nextSession = { ...currentSession, user };
+        setSession(nextSession);
+        writeStoredSession(nextSession);
+        sessionChannelRef.current?.post({ type: "session-updated", session: nextSession });
       })
       .catch((error) => {
         if (isStale) {
@@ -299,21 +357,7 @@ function App() {
 
   useEffect(() => {
     if (!session) return;
-    const requiredWorkspace = getRequiredWorkspace(location.pathname);
-    const workspaceAllowed = requiredWorkspace === "sales"
-      ? session.user.capabilities.canUseSalesWorkspace
-      : requiredWorkspace === "document"
-        ? session.user.capabilities.canUseDocumentWorkspace
-        : true;
-    const requiredModule = getRequiredModule(location.pathname);
-    const requiredAccessLevel = getRequiredRouteAccessLevel(location.pathname);
-    const moduleAllowed = !requiredModule || hasRouteModulePermission(
-      session.user.capabilities.moduleAccess,
-      session.user.capabilities.enabledModules,
-      requiredModule,
-      requiredAccessLevel,
-    );
-    if (!workspaceAllowed || !moduleAllowed) {
+    if (!isWorkspaceModuleAccessAllowed(location.pathname, session.user)) {
       setWorkspaceNotice({
         id: "permission",
         tone: "warning",
@@ -402,6 +446,7 @@ function App() {
       setSessionAttentionState(null);
       setSessionActionError(null);
       writeStoredSession(nextSession);
+      sessionChannelRef.current?.post({ type: "session-updated", session: nextSession });
       setPassword("");
       setBootstrapToken("");
       queryClient.clear();
@@ -439,6 +484,7 @@ function App() {
       };
       setSession(nextSession);
       writeStoredSession(nextSession);
+      sessionChannelRef.current?.post({ type: "session-updated", session: nextSession });
       setSessionAttentionState(null);
       setReauthPassword("");
     } catch (error) {
@@ -468,6 +514,7 @@ function App() {
       };
       setSession(nextSession);
       writeStoredSession(nextSession);
+      sessionChannelRef.current?.post({ type: "session-updated", session: nextSession });
       setSessionAttentionState(null);
       setReauthPassword("");
     } catch (error) {
@@ -588,44 +635,8 @@ function App() {
   );
 }
 
-function isRouteAccessAllowed({
-  pathname,
-  user,
-  canManageSystem,
-  isDesktopRuntime,
-  isFullEdition,
-}: {
-  pathname: string;
-  user: ApiUserDto;
-  canManageSystem: boolean;
-  isDesktopRuntime: boolean;
-  isFullEdition: boolean;
-}) {
-  const requiredWorkspace = getRequiredWorkspace(pathname);
-  const workspaceAllowed = requiredWorkspace === "sales"
-    ? user.capabilities.canUseSalesWorkspace
-    : requiredWorkspace === "document"
-      ? user.capabilities.canUseDocumentWorkspace
-      : true;
-  const requiredModule = getRequiredModule(pathname);
-  const moduleAllowed = !requiredModule || hasRouteModulePermission(
-    user.capabilities.moduleAccess,
-    user.capabilities.enabledModules,
-    requiredModule,
-    getRequiredRouteAccessLevel(pathname),
-  );
-  const adminAllowed = !isAdminOnlyRoute(pathname) || canManageSystem;
-  const runtimeAllowed = !isDesktopOnlyRoute(pathname) || isDesktopRuntime;
-  const editionAllowed = !isFullEditionOnlyRoute(pathname) || isFullEdition;
-  return workspaceAllowed && moduleAllowed && adminAllowed && runtimeAllowed && editionAllowed;
-}
-
 function readDefaultApiBaseUrl() {
   return import.meta.env.VITE_EXPORTDOC_API_BASE_URL ?? window.location.origin;
-}
-
-function readDefaultDesktopAccessToken() {
-  return undefined;
 }
 
 function isDesktopRuntimeContextUnavailable(error: unknown) {

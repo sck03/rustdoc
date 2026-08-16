@@ -3,6 +3,7 @@ import type { ApiCrmContactDto, ApiCrmCustomerDto, ExportDocManagerApiClient } f
 import { requestErrorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 type Props = {
   client: ExportDocManagerApiClient;
@@ -19,6 +20,7 @@ type Props = {
 
 export function CrmPartyManagementPanel(props: Props) {
   const requestConfirmation = useConfirmation();
+  const runAbortableOperation = useAbortableOperation();
   const { client, customers, contacts, customerId, onSelectCustomer, onReloadCustomers, onReloadContacts, onFeedback, canOperate, canManage } = props;
   const selectedCustomer = customers.find((item) => item.id === customerId);
   const [isNewCustomer, setIsNewCustomer] = useState(false);
@@ -92,24 +94,28 @@ export function CrmPartyManagementPanel(props: Props) {
         linkedDocumentCustomerId: selectedCustomer?.linkedDocumentCustomerId,
         expectedVersion: id > 0 ? selectedCustomer?.versionNumber ?? 0 : 0,
       };
-      const saved = id > 0
-        ? await client.updateCrmCustomer({ id, body })
-        : await client.createCrmCustomer({ body });
+      const saved = await runAbortableOperation((signal) => id > 0
+        ? client.updateCrmCustomer({ id, body }, { signal })
+        : client.createCrmCustomer({ body }, { signal }));
       await onReloadCustomers(saved);
       setCustomerDraftDirty(false);
       setContactDraftDirty(false);
       setIsNewCustomer(false);
       onFeedback(successFeedback(id > 0 ? "CRM 客户已更新。" : "CRM 客户已建立；单证客户资料未被修改。"));
-    } catch (error) { onFeedback(requestErrorFeedback(error)); }
+    } catch (error) {
+      if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
+    }
   }
 
   async function deleteCustomer() {
     if (!canManage || !selectedCustomer || !await requestConfirmation({ title: "删除 CRM 客户", description: `确定删除 CRM 客户“${selectedCustomer.name}”吗？`, details: ["存在业务引用时服务端会拒绝删除。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmAndResetDrafts("删除客户")) return;
     try {
-      await client.deleteCrmCustomer({ id: selectedCustomer.id });
+      await runAbortableOperation((signal) => client.deleteCrmCustomer({ id: selectedCustomer.id }, { signal }));
       await onReloadCustomers();
       onFeedback(successFeedback("CRM 客户已删除。"));
-    } catch (error) { onFeedback(requestErrorFeedback(error)); }
+    } catch (error) {
+      if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
+    }
   }
 
   async function saveContact(event: FormEvent<HTMLFormElement>) {
@@ -130,24 +136,31 @@ export function CrmPartyManagementPanel(props: Props) {
       expectedVersion: id > 0 ? selectedContact?.versionNumber ?? 0 : 0,
     };
     try {
-      const saved = id > 0
-        ? await client.updateCrmContact({ customerId: activeCustomerId, id, body })
-        : await client.createCrmContact({ customerId: activeCustomerId, body });
+      const saved = await runAbortableOperation((signal) => id > 0
+        ? client.updateCrmContact({ customerId: activeCustomerId, id, body }, { signal })
+        : client.createCrmContact({ customerId: activeCustomerId, body }, { signal }));
       await onReloadContacts();
       setContactId(saved.id);
       setContactDraftDirty(false);
       onFeedback(successFeedback(id > 0 ? "联系人已更新。" : "联系人已添加。"));
-    } catch (error) { onFeedback(requestErrorFeedback(error)); }
+    } catch (error) {
+      if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
+    }
   }
 
   async function deleteContact() {
     if (!canManage || !selectedContact || !await requestConfirmation({ title: "删除客户联系人", description: `确定删除联系人“${selectedContact.name}”吗？`, details: ["历史跟进记录仍会保留。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmAndResetDrafts("删除联系人")) return;
     try {
-      await client.deleteCrmContact({ customerId: activeCustomerId, id: selectedContact.id });
+      await runAbortableOperation((signal) => client.deleteCrmContact(
+        { customerId: activeCustomerId, id: selectedContact.id },
+        { signal },
+      ));
       setContactId(0);
       await onReloadContacts();
       onFeedback(successFeedback("联系人已删除，历史跟进仍保留。"));
-    } catch (error) { onFeedback(requestErrorFeedback(error)); }
+    } catch (error) {
+      if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
+    }
   }
 
   return (

@@ -1,15 +1,42 @@
 use std::{
     fs,
     io::Write,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        LazyLock,
+    },
 };
 
+use regex::{Captures, Regex};
 use tauri::Manager;
+use url::Url;
 
 use crate::runtime_paths::{self, RuntimePaths};
 
 const MAX_FRONTEND_LOG_FIELD_LENGTH: usize = 8 * 1024;
 static EXIT_CONFIRMED: AtomicBool = AtomicBool::new(false);
+static HTTP_URL_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?i)https?://[^\s"'<>]+"#).expect("valid HTTP URL regex"));
+static BEARER_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}").expect("valid bearer regex")
+});
+static SENSITIVE_ASSIGNMENT_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r#"(?i)(?P<prefix>["']?(?:password|passwd|pwd|secret|api[-_]?key|token|credential|access[-_]?key|signing[-_]?key|encryption[-_]?key|connection[-_]?string)["']?\s*(?:=|:)\s*["']?)[^"'\s,;}\]]+"#,
+    )
+    .expect("valid sensitive assignment regex")
+});
+static EMAIL_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b").expect("valid email regex")
+});
+static WINDOWS_USER_PATH_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?i)\b(?P<prefix>[A-Z]:\\Users)\\[^\\\s"'<>|]+"#)
+        .expect("valid Windows user path regex")
+});
+static UNIX_HOME_PATH_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?P<prefix>(?:^|[^A-Za-z0-9_])/(?:Users|home))/[^/\s"'<>]+"#)
+        .expect("valid Unix home path regex")
+});
 
 #[tauri::command]
 pub(crate) fn get_runtime_storage_context(
@@ -59,10 +86,10 @@ pub(crate) fn log_frontend_error(
                 log,
                 "\n=== Frontend error at {:?} ===\nurl: {}\nsource: {}\nmessage: {}\nstack:\n{}",
                 std::time::SystemTime::now(),
-                truncate_log_field(url.unwrap_or_default()),
-                truncate_log_field(source.unwrap_or_default()),
-                truncate_log_field(message),
-                truncate_log_field(stack.unwrap_or_default())
+                sanitize_log_url(url.unwrap_or_default()),
+                sanitize_log_field(source.unwrap_or_default()),
+                sanitize_log_field(message),
+                sanitize_log_field(stack.unwrap_or_default())
             )
         })
         .map_err(|error| format!("无法写入前端错误日志 '{}': {error}", log_path.display()))
@@ -91,17 +118,93 @@ pub(crate) fn confirm_app_exit() {
     EXIT_CONFIRMED.store(true, Ordering::SeqCst);
 }
 
-fn truncate_log_field(value: String) -> String {
+fn sanitize_log_field(value: String) -> String {
+    let sanitized = HTTP_URL_PATTERN
+        .replace_all(&value, |captures: &Captures<'_>| {
+            sanitize_http_url(&captures[0])
+        })
+        .into_owned();
+    let sanitized = BEARER_PATTERN
+        .replace_all(&sanitized, "Bearer [REDACTED]")
+        .into_owned();
+    let sanitized = SENSITIVE_ASSIGNMENT_PATTERN
+        .replace_all(&sanitized, |captures: &Captures<'_>| {
+            format!("{}[REDACTED]", &captures["prefix"])
+        })
+        .into_owned();
+    let sanitized = EMAIL_PATTERN
+        .replace_all(&sanitized, "[REDACTED_EMAIL]")
+        .into_owned();
+    let sanitized = WINDOWS_USER_PATH_PATTERN
+        .replace_all(&sanitized, |captures: &Captures<'_>| {
+            format!("{}\\[REDACTED]", &captures["prefix"])
+        })
+        .into_owned();
+    let sanitized = UNIX_HOME_PATH_PATTERN
+        .replace_all(&sanitized, |captures: &Captures<'_>| {
+            format!("{}/[REDACTED]", &captures["prefix"])
+        })
+        .into_owned();
+
     let mut output = String::new();
-    for ch in value.chars().take(MAX_FRONTEND_LOG_FIELD_LENGTH) {
-        output.push(ch);
+    for ch in sanitized.chars().take(MAX_FRONTEND_LOG_FIELD_LENGTH) {
+        output.push(if ch.is_control() && !matches!(ch, '\r' | '\n' | '\t') {
+            ' '
+        } else {
+            ch
+        });
     }
 
-    if value.chars().count() > MAX_FRONTEND_LOG_FIELD_LENGTH {
+    if sanitized.chars().count() > MAX_FRONTEND_LOG_FIELD_LENGTH {
         output.push_str("\n... truncated ...");
     }
 
     output
+}
+
+fn sanitize_log_url(value: String) -> String {
+    let Ok(url) = Url::parse(&value) else {
+        return "[REDACTED_URL]".to_owned();
+    };
+    if !matches!(url.scheme(), "http" | "https") {
+        return "[REDACTED_URL]".to_owned();
+    }
+    sanitize_http_url(&value)
+}
+
+fn sanitize_http_url(value: &str) -> String {
+    let Ok(mut url) = Url::parse(value) else {
+        return "[REDACTED_URL]".to_owned();
+    };
+    if !matches!(url.scheme(), "http" | "https") {
+        return "[REDACTED_URL]".to_owned();
+    }
+
+    let _ = url.set_username("");
+    let _ = url.set_password(None);
+    url.set_query(None);
+    url.set_fragment(None);
+    let path = url
+        .path_segments()
+        .map(|segments| {
+            segments
+                .map(|segment| {
+                    if segment.len() >= 24
+                        && segment
+                            .chars()
+                            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
+                    {
+                        "[REDACTED]"
+                    } else {
+                        segment
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("/")
+        })
+        .unwrap_or_default();
+    url.set_path(&format!("/{path}"));
+    url.to_string()
 }
 
 #[cfg(test)]
@@ -115,6 +218,43 @@ mod tests {
     use base64::{engine::general_purpose::STANDARD, Engine as _};
     use std::ffi::OsString;
     use std::path::PathBuf;
+
+    #[test]
+    fn frontend_log_fields_remove_credentials_and_personal_paths() {
+        let sanitized = sanitize_log_field(
+            r#"Authorization: Bearer abcdefghijklmnopqrstuvwxyz password=plain-secret operator@example.com C:\Users\bridge\workspace\app.ts request https://example.test/jobs/0123456789abcdef0123456789abcdef?token=query-secret"#
+                .to_owned(),
+        );
+
+        for secret in [
+            "abcdefghijklmnopqrstuvwxyz",
+            "plain-secret",
+            "operator@example.com",
+            "bridge",
+            "query-secret",
+        ] {
+            assert!(!sanitized.contains(secret), "sanitized log leaked {secret}");
+        }
+        assert!(sanitized.contains("Bearer [REDACTED]"));
+        assert!(sanitized.contains("[REDACTED_EMAIL]"));
+        assert!(sanitized.contains(r"C:\Users\[REDACTED]"));
+        assert!(sanitized.contains("https://example.test/jobs/[REDACTED]"));
+    }
+
+    #[test]
+    fn frontend_log_urls_keep_only_safe_http_location() {
+        assert_eq!(
+            sanitize_log_url(
+                "https://user:pass@example.test/invoices/0123456789abcdef0123456789abcdef?token=query-secret#details"
+                    .to_owned(),
+            ),
+            "https://example.test/invoices/[REDACTED]"
+        );
+        assert_eq!(
+            sanitize_log_url("file:///Users/bridge/private.log".to_owned()),
+            "[REDACTED_URL]"
+        );
+    }
 
     #[test]
     fn exporter_seal_reader_accepts_managed_upload_formats() {

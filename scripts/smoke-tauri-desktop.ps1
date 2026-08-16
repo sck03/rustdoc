@@ -52,6 +52,7 @@ $scriptUtf8Encoding = New-Object System.Text.UTF8Encoding($false)
 [Console]::InputEncoding = $scriptUtf8Encoding
 [Console]::OutputEncoding = $scriptUtf8Encoding
 $OutputEncoding = $scriptUtf8Encoding
+. (Join-Path $PSScriptRoot "lib/platform-path-safety.ps1")
 
 function Get-FullPath {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -100,7 +101,7 @@ function Assert-SamePath {
 
     $actualFullPath = Get-FullPath -Path $Actual
     $expectedFullPath = Get-FullPath -Path $Expected
-    if (-not [string]::Equals($actualFullPath, $expectedFullPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if (-not (Test-ExportDocPathEqual -Left $actualFullPath -Right $expectedFullPath)) {
         throw "$Purpose mismatch. Expected '$expectedFullPath', got '$actualFullPath'."
     }
 }
@@ -118,7 +119,7 @@ function Assert-PathUnderRoot {
         $fullRoot = $fullRoot + [System.IO.Path]::DirectorySeparatorChar
     }
 
-    if (-not $fullPath.StartsWith($fullRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if (-not (Test-ExportDocPathUnderRoot -Path $fullPath -Root $fullRoot -AllowRoot)) {
         throw "$Purpose must be under '$fullRoot', got '$fullPath'."
     }
 }

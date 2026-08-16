@@ -53,6 +53,9 @@ namespace ExportDocManager.Api.Hosting
             });
             services.AddSingleton(ApiDesktopAccessOptions.FromRuntimeOptions(runtimeOptions));
             services.AddLogging();
+            services.AddExportDocManagerResourceGovernance();
+            services.AddExportDocManagerObservability();
+            services.AddSingleton<ApiSecurityAuditWriter>();
             services.AddHttpContextAccessor();
             services.AddCors(options =>
             {
@@ -100,7 +103,8 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IBackupService>(provider => new BackupService(
                 databaseSettings,
                 pathProvider,
-                clock: provider.GetRequiredService<IBusinessClock>()));
+                clock: provider.GetRequiredService<IBusinessClock>(),
+                logger: provider.GetRequiredService<ILogger<BackupService>>()));
             services.AddScoped<ICloudSyncService, WebDavCloudSyncService>();
             services.AddScoped<ISharedDatabaseMaintenanceService, SharedDatabaseMaintenanceService>();
             services.AddScoped<IServerMigrationService, ServerMigrationService>();
@@ -134,7 +138,8 @@ namespace ExportDocManager.Api.Hosting
                     provider.GetRequiredService<DatabaseInitializationCoordinator>(),
                     runtimeOptions.NetworkMode && DatabaseModeHelper.UsesPostgreSql(databaseSettings),
                     runtimeOptions.BootstrapToken,
-                    pathProvider));
+                    pathProvider,
+                    provider.GetRequiredService<ILogger<DatabaseInitializationService>>()));
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IPermissionTemplateService, PermissionTemplateService>();
             services.AddScoped<BusinessDataAccessScope>();

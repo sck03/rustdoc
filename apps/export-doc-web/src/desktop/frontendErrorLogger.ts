@@ -1,4 +1,5 @@
 import { logFrontendError } from "./desktopBridge.ts";
+import { sanitizeFrontendLogPayload } from "./desktopLogSanitizer.ts";
 
 let installed = false;
 
@@ -36,10 +37,10 @@ async function writeFrontendError(payload: {
   stack?: string;
 }) {
   try {
-    await logFrontendError({
+    await logFrontendError(sanitizeFrontendLogPayload({
       ...payload,
       url: window.location.href,
-    });
+    }));
   } catch {
     // Error logging is best-effort and must not create recursive failures.
   }

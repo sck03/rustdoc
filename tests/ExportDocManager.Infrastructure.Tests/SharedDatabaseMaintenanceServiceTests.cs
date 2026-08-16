@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +36,39 @@ public sealed class SharedDatabaseMaintenanceServiceTests
             SharedDatabaseMaintenanceService.QuotePowerShellLiteral("C:\\Tools\\O'Brien\\pg_restore.exe"));
         Assert.Equal("'/opt/o'\"'\"'brien/pg_restore'",
             SharedDatabaseMaintenanceService.QuotePosixShellArgument("/opt/o'brien/pg_restore"));
+    }
+
+    [Fact]
+    public void PostgreSqlBackupValidation_ShouldUsePgRestoreListMode()
+    {
+        IReadOnlyList<string> arguments =
+            SharedDatabaseMaintenanceService.BuildPgRestoreValidationArguments("E:/runtime/backup.dump");
+
+        Assert.Equal(["--list", "E:/runtime/backup.dump"], arguments);
+        Assert.Throws<ArgumentException>(() =>
+            SharedDatabaseMaintenanceService.BuildPgRestoreValidationArguments(" "));
+    }
+
+    [Fact]
+    public void RestorePlanScript_ShouldMakeRestoreAndOwnershipChangesTransactional()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"export-doc-restore-script-{Guid.NewGuid():N}");
+        using var factory = new TestDbContextFactory();
+        var pathProvider = new TestAppPathProvider(root, Path.Combine(root, "App_Data"));
+        var service = new SharedDatabaseMaintenanceService(
+            factory,
+            new DatabaseConnectionSettings(),
+            pathProvider);
+
+        string script = service.BuildRestoreScript(
+            Path.Combine(root, "backup.dump"),
+            "team_db",
+            "team_owner",
+            Path.Combine(root, "ownership.sql"),
+            new PostgreSqlToolPaths(root, "pg_dump", "pg_restore", "psql"));
+
+        Assert.Equal(2, CountOccurrences(script, "--single-transaction"));
+        Assert.Contains("ON_ERROR_STOP=1", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -135,6 +169,11 @@ public sealed class SharedDatabaseMaintenanceServiceTests
                   "ExternalCredential": "credential-secret"
                 }
                 """);
+            await File.WriteAllTextAsync(
+                Path.Combine(pathProvider.LogRoot, "frontend-errors.log"),
+                "Authorization: Bearer abcdefghijklmnopqrstuvwxyz; Password=plain-secret; " +
+                "email=operator@example.com; " +
+                "url=https://example.test/downloads/jobs/0123456789abcdef0123456789abcdef?token=query-secret");
             string logPath = Path.Combine(pathProvider.LogRoot, "oversized.log");
             await using (var stream = new FileStream(logPath, FileMode.CreateNew, FileAccess.Write))
             {
@@ -159,6 +198,18 @@ public sealed class SharedDatabaseMaintenanceServiceTests
             Assert.Equal(8L * 1024 * 1024, logEntry.Length);
             await using Stream logStream = logEntry.Open();
             Assert.Equal(0x7a, logStream.ReadByte());
+
+            ZipArchiveEntry sensitiveLogEntry = Assert.Single(
+                archive.Entries,
+                entry => entry.FullName == "logs/frontend-errors.log");
+            using var sensitiveLogReader = new StreamReader(sensitiveLogEntry.Open());
+            string sensitiveLog = await sensitiveLogReader.ReadToEndAsync();
+            Assert.DoesNotContain("abcdefghijklmnopqrstuvwxyz", sensitiveLog, StringComparison.Ordinal);
+            Assert.DoesNotContain("plain-secret", sensitiveLog, StringComparison.Ordinal);
+            Assert.DoesNotContain("operator@example.com", sensitiveLog, StringComparison.Ordinal);
+            Assert.DoesNotContain("query-secret", sensitiveLog, StringComparison.Ordinal);
+            Assert.Contains("[REDACTED]", sensitiveLog, StringComparison.Ordinal);
+            Assert.Contains("[REDACTED_EMAIL]", sensitiveLog, StringComparison.Ordinal);
 
             ZipArchiveEntry indexEntry = Assert.Single(
                 archive.Entries,
@@ -249,6 +300,19 @@ public sealed class SharedDatabaseMaintenanceServiceTests
             using AppDbContext context = CreateDbContext();
             context.Database.EnsureDeleted();
         }
+    }
+
+    private static int CountOccurrences(string value, string token)
+    {
+        int count = 0;
+        int offset = 0;
+        while ((offset = value.IndexOf(token, offset, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += token.Length;
+        }
+
+        return count;
     }
 
     private sealed class TestAppPathProvider : IAppPathProvider

@@ -13,18 +13,27 @@ namespace ExportDocManager.Api.Hosting
             ArgumentNullException.ThrowIfNull(runtimeOptions);
             ArgumentNullException.ThrowIfNull(databaseSettings);
 
-            var api = endpoints.MapGroup(string.Empty).WithMetadata(
-                new ApiEndpointAccessMetadata(true, true, true));
+            var api = endpoints.MapGroup(string.Empty)
+                .WithMetadata(new ApiEndpointAccessMetadata(true, true, true))
+                .WithApiResourceProfile(ApiResourceProfile.Interactive);
             api.MapSystemEndpoints(runtimeOptions, databaseSettings);
-            api.MapLicenseEndpoints();
-            api.MapAuthEndpoints();
+            api.MapGroup(string.Empty)
+                .WithApiResourceProfile(ApiResourceProfile.Authentication)
+                .MapLicenseEndpoints();
+            api.MapGroup(string.Empty)
+                .WithApiResourceProfile(ApiResourceProfile.Authentication)
+                .MapAuthEndpoints();
             api.MapUserEndpoints();
             api.MapPermissionTemplateEndpoints();
             api.MapSettingsEndpoints();
-            api.MapBackupEndpoints();
-            api.MapSharedDatabaseMaintenanceEndpoints();
-            api.MapServerMigrationEndpoints();
-            api.MapPermissionGroup(PermissionModuleCatalog.DocumentInvoices).MapInvoiceDataMaintenanceEndpoints();
+            var maintenance = api.MapGroup(string.Empty)
+                .WithApiResourceProfile(ApiResourceProfile.Maintenance)
+                .WithApiSecurityAudit("database-maintenance");
+            maintenance.MapBackupEndpoints();
+            maintenance.MapSharedDatabaseMaintenanceEndpoints();
+            maintenance.MapServerMigrationEndpoints();
+            maintenance.MapPermissionGroup(PermissionModuleCatalog.DocumentInvoices)
+                .MapInvoiceDataMaintenanceEndpoints();
             api.MapPermissionGroup(PermissionModuleCatalog.DocumentDashboard).MapDashboardEndpoints();
             var invoices = api.MapPermissionGroup(PermissionModuleCatalog.DocumentInvoices);
             invoices.MapInvoiceEndpoints();
@@ -32,17 +41,24 @@ namespace ExportDocManager.Api.Hosting
             invoices.MapInvoiceTransferEndpoints();
             api.MapPermissionGroup(PermissionModuleCatalog.DocumentQuery).MapQueryEndpoints();
             api.MapPermissionGroup(PermissionModuleCatalog.DocumentPayments).MapPaymentEndpoints();
-            api.MapAuditLogEndpoints();
-            api.MapPermissionGroup(PermissionModuleCatalog.DocumentJobs).MapJobEndpoints();
+            api.MapGroup(string.Empty)
+                .WithApiResourceProfile(ApiResourceProfile.Workload)
+                .MapAuditLogEndpoints();
+            api.MapGroup(string.Empty)
+                .WithApiResourceProfile(ApiResourceProfile.Streaming)
+                .MapPermissionGroup(PermissionModuleCatalog.DocumentJobs)
+                .MapJobEndpoints();
             api.MapPermissionGroup(PermissionModuleCatalog.DocumentCustomOptions).MapCustomOptionEndpoints();
-            api.MapToolEndpoints();
-            api.MapReportEndpoints();
+            var workloads = api.MapGroup(string.Empty)
+                .WithApiResourceProfile(ApiResourceProfile.Workload);
+            workloads.MapToolEndpoints();
+            workloads.MapReportEndpoints();
             api.MapMasterDataEndpoints();
             api.MapPermissionGroup(PermissionModuleCatalog.SalesCrm).MapCrmEndpoints();
             api.MapPermissionGroup(PermissionModuleCatalog.SalesSuppliers).MapSupplierEndpoints();
             api.MapPermissionGroup(PermissionModuleCatalog.SalesEmailTemplates).MapEmailTemplateEndpoints();
             api.MapPermissionGroup(PermissionModuleCatalog.SalesOpportunities).MapSalesOpportunityEndpoints();
-            api.MapSingleWindowEndpoints();
+            workloads.MapSingleWindowEndpoints();
 
             return endpoints;
         }

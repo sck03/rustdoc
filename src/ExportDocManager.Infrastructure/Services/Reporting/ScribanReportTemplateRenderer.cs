@@ -4,10 +4,10 @@ using System.Security.Cryptography;
 using System.Text;
 using ExportDocManager.Services.Errors;
 using HtmlAgilityPack;
+using Microsoft.Extensions.Logging;
 using Scriban;
 using Scriban.Parsing;
 using Scriban.Runtime;
-using Serilog;
 using HtmlDocument = HtmlAgilityPack.HtmlDocument;
 
 namespace ExportDocManager.Services.Reporting
@@ -20,7 +20,7 @@ namespace ExportDocManager.Services.Reporting
 
         internal static int CachedTemplateCount => TemplateCache.Count;
 
-        public static string PreprocessHtmlTemplate(string html)
+        public static string PreprocessHtmlTemplate(string html, ILogger? logger = null)
         {
             if (string.IsNullOrWhiteSpace(html))
             {
@@ -54,7 +54,7 @@ namespace ExportDocManager.Services.Reporting
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "Failed to preprocess HTML template");
+                logger?.LogWarning(ex, "Failed to preprocess HTML template");
             }
 
             return DecodeScribanBlocks(html);

@@ -1,8 +1,8 @@
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
+using Microsoft.Extensions.Logging;
 using Scriban.Runtime;
-using Serilog;
 
 namespace ExportDocManager.Services.Reporting
 {
@@ -13,7 +13,8 @@ namespace ExportDocManager.Services.Reporting
             Customer? customer,
             Exporter? exporter,
             bool withSeal,
-            IAppPathProvider? pathProvider = null)
+            IAppPathProvider? pathProvider = null,
+            ILogger? logger = null)
         {
             invoice.Items ??= new List<Item>();
 
@@ -40,13 +41,13 @@ namespace ExportDocManager.Services.Reporting
 
             if (withSeal)
             {
-                scriptObject.Add("doc_seal_path", ReportImageDataUriHelper.GetSealDataUri(exporter?.DocSealPath, pathProvider));
-                scriptObject.Add("customs_seal_path", ReportImageDataUriHelper.GetSealDataUri(exporter?.CustomsSealPath, pathProvider));
+                scriptObject.Add("doc_seal_path", ReportImageDataUriHelper.GetSealDataUri(exporter?.DocSealPath, pathProvider, logger));
+                scriptObject.Add("customs_seal_path", ReportImageDataUriHelper.GetSealDataUri(exporter?.CustomsSealPath, pathProvider, logger));
             }
 
             if (invoice.ShippingMarksType == "Image" && !string.IsNullOrWhiteSpace(invoice.ShippingMarksImage))
             {
-                scriptObject.Add("shipping_marks_image_data", ReportImageDataUriHelper.GetShippingMarkDataUri(invoice.ShippingMarksImage, pathProvider));
+                scriptObject.Add("shipping_marks_image_data", ReportImageDataUriHelper.GetShippingMarkDataUri(invoice.ShippingMarksImage, pathProvider, logger));
             }
 
             return scriptObject;
@@ -102,7 +103,10 @@ namespace ExportDocManager.Services.Reporting
     {
         private const long MaximumImageBytes = 5L * 1024L * 1024L;
 
-        public static string GetShippingMarkDataUri(string? path, IAppPathProvider? pathProvider)
+        public static string GetShippingMarkDataUri(
+            string? path,
+            IAppPathProvider? pathProvider,
+            ILogger? logger = null)
         {
             if (pathProvider == null || string.IsNullOrWhiteSpace(path))
             {
@@ -116,16 +120,19 @@ namespace ExportDocManager.Services.Reporting
                     path,
                     marksRoot,
                     "Marks");
-                return GetDataUri(resolved, [marksRoot]);
+                return GetDataUri(resolved, [marksRoot], logger);
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "Blocked invalid shipping mark image path: {Path}", path);
+                logger?.LogWarning(ex, "Blocked invalid shipping mark image path: {Path}", path);
                 return string.Empty;
             }
         }
 
-        public static string GetSealDataUri(string? path, IAppPathProvider? pathProvider)
+        public static string GetSealDataUri(
+            string? path,
+            IAppPathProvider? pathProvider,
+            ILogger? logger = null)
         {
             if (pathProvider == null || string.IsNullOrWhiteSpace(path))
             {
@@ -142,16 +149,19 @@ namespace ExportDocManager.Services.Reporting
                         path,
                         sealRoot,
                         "Files");
-                return GetDataUri(resolved, [sealRoot, pathProvider.ResourceRoot]);
+                return GetDataUri(resolved, [sealRoot, pathProvider.ResourceRoot], logger);
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "Blocked invalid seal image path: {Path}", path);
+                logger?.LogWarning(ex, "Blocked invalid seal image path: {Path}", path);
                 return string.Empty;
             }
         }
 
-        private static string GetDataUri(string path, IReadOnlyList<string> allowedRoots)
+        private static string GetDataUri(
+            string path,
+            IReadOnlyList<string> allowedRoots,
+            ILogger? logger)
         {
             if (string.IsNullOrWhiteSpace(path))
             {
@@ -167,7 +177,7 @@ namespace ExportDocManager.Services.Reporting
                     !File.Exists(fullPath) ||
                     HasReparsePointBelowRoot(fullPath, allowedRoot))
                 {
-                    Log.Warning("Blocked report image outside managed roots: {Path}", fullPath);
+                    logger?.LogWarning("Blocked report image outside managed roots: {Path}", fullPath);
                     return string.Empty;
                 }
 
@@ -185,7 +195,7 @@ namespace ExportDocManager.Services.Reporting
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to load report image: {Path}", path);
+                logger?.LogError(ex, "Failed to load report image: {Path}", path);
                 return string.Empty;
             }
         }

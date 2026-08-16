@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Serilog;
+using Microsoft.Extensions.Logging;
 
 namespace ExportDocManager.Services.Reporting
 {
@@ -18,10 +18,14 @@ namespace ExportDocManager.Services.Reporting
         };
 
         private readonly ReportTemplatePathResolver _pathResolver;
+        private readonly ILogger? _logger;
 
-        public ReportTemplateCatalogLoader(ReportTemplatePathResolver pathResolver)
+        public ReportTemplateCatalogLoader(
+            ReportTemplatePathResolver pathResolver,
+            ILogger? logger = null)
         {
             _pathResolver = pathResolver ?? throw new ArgumentNullException(nameof(pathResolver));
+            _logger = logger;
         }
 
         public async Task<IReadOnlyList<ReportTemplateConfig>> LoadResolvedConfigsAsync(
@@ -33,7 +37,7 @@ namespace ExportDocManager.Services.Reporting
             if (File.Exists(configPath))
             {
                 string json = await File.ReadAllTextAsync(configPath, cancellationToken).ConfigureAwait(false);
-                if (ValidateReportTemplateConfig(json))
+                if (ValidateReportTemplateConfig(json, _logger))
                 {
                     var root = JsonSerializer.Deserialize<ReportTemplateConfigRoot>(json, JsonOptions);
                     if (root?.Reports != null)
@@ -59,7 +63,7 @@ namespace ExportDocManager.Services.Reporting
                 }
                 else
                 {
-                    Log.Warning("报表模板配置文件格式无效");
+                    _logger?.LogWarning("报表模板配置文件格式无效");
                 }
             }
 
@@ -236,7 +240,7 @@ namespace ExportDocManager.Services.Reporting
             return Path.GetFileNameWithoutExtension(templatePath) ?? string.Empty;
         }
 
-        public static bool ValidateReportTemplateConfig(string json)
+        public static bool ValidateReportTemplateConfig(string json, ILogger? logger = null)
         {
             try
             {
@@ -276,7 +280,7 @@ namespace ExportDocManager.Services.Reporting
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "验证报表模板配置 JSON 失败");
+                logger?.LogError(ex, "验证报表模板配置 JSON 失败");
                 return false;
             }
         }

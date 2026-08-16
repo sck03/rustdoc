@@ -6,6 +6,8 @@ using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ExportDocManager.Services.Reporting
 {
@@ -18,16 +20,19 @@ namespace ExportDocManager.Services.Reporting
         private readonly ReportTemplateCatalogLoader _catalogLoader;
         private readonly ISettingsService _settingsService;
         private readonly IBusinessClock _clock;
+        private readonly ILogger<ReportTemplateService> _logger;
 
         public ReportTemplateService(
             IAppPathProvider pathProvider,
             ISettingsService settingsService,
-            IBusinessClock? clock = null)
+            IBusinessClock? clock = null,
+            ILogger<ReportTemplateService>? logger = null)
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
             ArgumentNullException.ThrowIfNull(settingsService);
             _pathResolver = new ReportTemplatePathResolver(pathProvider);
-            _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver);
+            _logger = logger ?? NullLogger<ReportTemplateService>.Instance;
+            _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver, _logger);
             _settingsService = settingsService;
             _clock = clock ?? BusinessClock.CreateSystem();
         }
@@ -176,7 +181,9 @@ namespace ExportDocManager.Services.Reporting
         {
             cancellationToken.ThrowIfCancellationRequested();
             ReportTemplateContentPolicy.Validate(reportType, content ?? string.Empty);
-            string templateContent = ScribanReportTemplateRenderer.PreprocessHtmlTemplate(content ?? string.Empty);
+            string templateContent = ScribanReportTemplateRenderer.PreprocessHtmlTemplate(
+                content ?? string.Empty,
+                _logger);
             bool effectiveWithSeal = reportType != ReportDocumentType.PaymentVoucher && withSeal;
             string html = reportType == ReportDocumentType.PaymentVoucher
                 ? RenderPaymentVoucherPreview(templateContent)
@@ -477,7 +484,7 @@ namespace ExportDocManager.Services.Reporting
             return $"{prefix}_{_clock.Now:yyyyMMddHHmmss}.html";
         }
 
-        private static string RenderInvoicePreview(string templateContent, bool withSeal)
+        private string RenderInvoicePreview(string templateContent, bool withSeal)
         {
             var invoice = BuildSampleInvoice();
             var customer = new Customer
@@ -489,7 +496,12 @@ namespace ExportDocManager.Services.Reporting
                 Phone = "+49 40 0000 0000"
             };
             var exporter = BuildSampleExporter();
-            var globals = ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(invoice, customer, exporter, withSeal);
+            var globals = ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(
+                invoice,
+                customer,
+                exporter,
+                withSeal,
+                logger: _logger);
             return ScribanReportTemplateRenderer.Render(templateContent, globals);
         }
 

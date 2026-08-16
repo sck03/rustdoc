@@ -190,6 +190,8 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("RunShutdownMaintenance")
             .WithApiAccess(false, true, false)
+            .WithApiResourceProfile(ApiResourceProfile.Maintenance)
+            .WithApiSecurityAudit("shutdown-maintenance")
             .Produces<ApiShutdownMaintenanceResponse>(StatusCodes.Status200OK)
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
@@ -234,6 +236,8 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("CleanupSystemLogs")
+            .WithApiResourceProfile(ApiResourceProfile.Maintenance)
+            .WithApiSecurityAudit("log-maintenance")
             .Produces<ApiSystemLogCleanupResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden)

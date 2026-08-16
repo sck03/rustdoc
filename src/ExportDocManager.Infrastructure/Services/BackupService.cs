@@ -15,7 +15,8 @@ using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using Microsoft.Data.Sqlite;
-using Serilog;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ExportDocManager.Services.Infrastructure
 {
@@ -34,18 +35,21 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly IAppPathProvider _pathProvider;
         private readonly Regex? _managedBackupNamePattern;
         private readonly IBusinessClock _clock;
+        private readonly ILogger<BackupService> _logger;
 
         public BackupService(
             DatabaseConnectionSettings databaseSettings,
             IAppPathProvider pathProvider,
             string? backupDirectory = null,
             string? databasePath = null,
-            IBusinessClock? clock = null)
+            IBusinessClock? clock = null,
+            ILogger<BackupService>? logger = null)
         {
             ArgumentNullException.ThrowIfNull(databaseSettings);
             ArgumentNullException.ThrowIfNull(pathProvider);
             _pathProvider = pathProvider;
             _clock = clock ?? BusinessClock.CreateSystem();
+            _logger = logger ?? NullLogger<BackupService>.Instance;
             _usesSqlite = !DatabaseModeHelper.UsesPostgreSql(databaseSettings);
 
             if (_usesSqlite)
@@ -76,7 +80,7 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 if (!_usesSqlite)
                 {
-                    Log.Information("Skipping local database backup because the current provider is PostgreSQL.");
+                    _logger.LogInformation("Skipping local database backup because the current provider is PostgreSQL.");
                     return new DatabaseBackupResult(
                         Success: false,
                         Skipped: true,
@@ -86,7 +90,7 @@ namespace ExportDocManager.Services.Infrastructure
 
                 if (!File.Exists(_databasePath))
                 {
-                    Log.Warning("Database file not found at {Path}, skipping backup.", _databasePath);
+                    _logger.LogWarning("Database file not found at {Path}, skipping backup.", _databasePath);
                     return new DatabaseBackupResult(
                         Success: false,
                         Skipped: true,
@@ -98,7 +102,7 @@ namespace ExportDocManager.Services.Infrastructure
                     namePrefix: string.Empty,
                     cancellationToken).ConfigureAwait(false);
 
-                Log.Information("Database backed up successfully to {Path}", backupPath);
+                _logger.LogInformation("Database backed up successfully to {Path}", backupPath);
                 return new DatabaseBackupResult(
                     Success: true,
                     Skipped: false,
@@ -111,7 +115,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to backup database.");
+                _logger.LogError(ex, "Failed to backup database.");
                 return new DatabaseBackupResult(
                     Success: false,
                     Skipped: false,
@@ -216,13 +220,13 @@ namespace ExportDocManager.Services.Infrastructure
                     if (file.LastWriteTimeUtc < cutoffDate)
                     {
                         file.Delete();
-                        Log.Information("Deleted old backup: {FileName}", file.Name);
+                        _logger.LogInformation("Deleted old backup: {FileName}", file.Name);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to clean old backups.");
+                _logger.LogError(ex, "Failed to clean old backups.");
                 throw new InfrastructureServiceException("清理旧数据库备份失败，请检查备份目录权限和磁盘状态。", ex);
             }
         }
@@ -244,7 +248,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to get available backups.");
+                _logger.LogError(ex, "Failed to get available backups.");
                 throw new InfrastructureServiceException("读取数据库备份列表失败，请检查备份目录权限和磁盘状态。", ex);
             }
         }
@@ -303,7 +307,7 @@ namespace ExportDocManager.Services.Infrastructure
                     JsonSerializer.Serialize(marker, RestoreMarkerJsonOptions),
                     cancellationToken: cancellationToken).ConfigureAwait(false);
 
-                Log.Information(
+                _logger.LogInformation(
                     "Database restore scheduled from {Path}; it will be applied before the next database connection is opened.",
                     backupFilePath);
                 return new DatabaseRestoreScheduleResult(
@@ -318,7 +322,7 @@ namespace ExportDocManager.Services.Infrastructure
                 {
                     AtomicFileHelper.TryDeleteFile(stagedRestorePath);
                 }
-                Log.Error(ex, "Failed to schedule database restore.");
+                _logger.LogError(ex, "Failed to schedule database restore.");
                 throw;
             }
             finally

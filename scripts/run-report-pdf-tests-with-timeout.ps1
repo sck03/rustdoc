@@ -18,6 +18,7 @@ $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $projectPath = Join-Path $repositoryRoot "tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj"
 $diagnosticRoot = Join-Path $repositoryRoot ".codex-runtime/report-pdf-test-watchdog"
 $watchdogLogPath = Join-Path $diagnosticRoot "watchdog.log"
+. (Join-Path $PSScriptRoot "lib/build-script-support.ps1")
 
 [System.IO.Directory]::CreateDirectory($diagnosticRoot) | Out-Null
 [System.IO.File]::WriteAllText($watchdogLogPath, [string]::Empty)
@@ -33,28 +34,8 @@ function Write-WatchdogMessage {
 function Stop-TestProcessTree {
     param([Parameter(Mandatory)][System.Diagnostics.Process]$Process)
 
-    try {
-        if (-not $Process.HasExited) {
-            $Process.Kill($true)
-        }
-    }
-    catch {
-        Write-WatchdogMessage "Process-tree termination failed for PID $($Process.Id): $($_.Exception.Message)"
-        try {
-            if (-not $Process.HasExited) {
-                $Process.Kill()
-            }
-        }
-        catch {
-            Write-WatchdogMessage "Parent-process termination also failed for PID $($Process.Id): $($_.Exception.Message)"
-        }
-    }
-
-    try {
-        [void]$Process.WaitForExit(10000)
-    }
-    catch {
-        Write-WatchdogMessage "PID $($Process.Id) did not confirm exit within the cleanup grace period."
+    if (-not (Stop-ExportDocProcessTree -Process $Process -TimeoutSeconds 10)) {
+        Write-WatchdogMessage "PID $($Process.Id) did not confirm process-tree termination within the cleanup deadline."
     }
 }
 

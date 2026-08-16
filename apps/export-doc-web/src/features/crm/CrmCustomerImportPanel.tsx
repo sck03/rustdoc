@@ -3,6 +3,7 @@ import type { ApiCrmCustomerImportPreviewDto, ExportDocManagerApiClient } from "
 import { readApiError } from "../../ui/formUtils.ts";
 import { OperationFeedback, errorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 export function CrmCustomerImportPanel({ client, canOperate, onImported }: {
   client: ExportDocManagerApiClient;
@@ -12,14 +13,23 @@ export function CrmCustomerImportPanel({ client, canOperate, onImported }: {
   const [preview, setPreview] = useState<ApiCrmCustomerImportPreviewDto | null>(null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
+  const runAbortableOperation = useAbortableOperation();
 
   async function selectFile(file?: File) {
     if (!canOperate || !file) return;
     setBusy(true);
     try {
-      setPreview(await client.previewCrmCustomerImport({ fileName: file.name, body: file }));
+      setPreview(await runAbortableOperation((signal) => client.previewCrmCustomerImport(
+        { fileName: file.name, body: file },
+        { signal },
+      )));
       setFeedback(null);
-    } catch (error) { setFeedback(errorFeedback(readApiError(error))); setPreview(null); }
+    } catch (error) {
+      if (!isAbortError(error)) {
+        setFeedback(errorFeedback(readApiError(error)));
+        setPreview(null);
+      }
+    }
     finally { setBusy(false); }
   }
 
@@ -27,11 +37,16 @@ export function CrmCustomerImportPanel({ client, canOperate, onImported }: {
     if (!canOperate || !preview?.validRows) return;
     setBusy(true);
     try {
-      const result = await client.importCrmCustomers({ body: { rows: preview.rows } });
+      const result = await runAbortableOperation((signal) => client.importCrmCustomers(
+        { body: { rows: preview.rows } },
+        { signal },
+      ));
       setFeedback(successFeedback(`已导入 ${result.createdCustomers} 家客户、${result.createdContacts} 位联系人，跳过 ${result.skippedDuplicates} 行。`));
       setPreview(null);
       await onImported();
-    } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
+    } catch (error) {
+      if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
+    }
     finally { setBusy(false); }
   }
 

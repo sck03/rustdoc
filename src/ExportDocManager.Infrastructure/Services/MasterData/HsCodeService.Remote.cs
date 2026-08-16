@@ -1,6 +1,6 @@
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Utils;
-using Serilog;
+using Microsoft.Extensions.Logging;
 
 namespace ExportDocManager.Services.MasterData
 {
@@ -54,7 +54,7 @@ namespace ExportDocManager.Services.MasterData
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning(ex, "HS编码详情补充失败，已继续处理其他记录。Code={Code}", item.Code);
+                    _logger.LogWarning(ex, "HS编码详情补充失败，已继续处理其他记录。Code={Code}", item.Code);
                 }
                 finally
                 {
@@ -79,7 +79,7 @@ namespace ExportDocManager.Services.MasterData
         {
             if (_remoteProviders.Count == 0)
             {
-                Log.Warning("HS编码联网查询未配置任何 Provider。Keyword={Keyword}", keyword);
+                _logger.LogWarning("HS编码联网查询未配置任何 Provider。Keyword={Keyword}", keyword);
                 return HsCodeRemoteSearchBundle.Empty(keyword, "未配置");
             }
 
@@ -99,7 +99,7 @@ namespace ExportDocManager.Services.MasterData
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning(ex, "HS编码联网 Provider 查询失败。Provider={Provider}", provider.Name);
+                    _logger.LogWarning(ex, "HS编码联网 Provider 查询失败。Provider={Provider}", provider.Name);
                 }
             }
 
@@ -108,7 +108,7 @@ namespace ExportDocManager.Services.MasterData
                 string.Join(", ", _remoteProviders.Select(provider => provider.Name)));
         }
 
-        private static async Task<HsCodeRemoteSearchBundle> EnrichRemoteEvidenceAsync(
+        private async Task<HsCodeRemoteSearchBundle> EnrichRemoteEvidenceAsync(
             IHsCodeRemoteProvider provider,
             HsCodeRemoteSearchBundle initialBundle,
             CancellationToken cancellationToken)
@@ -153,7 +153,7 @@ namespace ExportDocManager.Services.MasterData
                     if (!visitedDetailCodes.Add(oldCode)) continue;
                     if (remainingDetailLookups-- <= 0)
                     {
-                        Log.Information(
+                        _logger.LogInformation(
                             "HS编码联网自动详情追踪达到上限。Provider={Provider}, Query={Query}, Limit={Limit}",
                             provider.Name,
                             initialBundle.Query,
@@ -191,7 +191,7 @@ namespace ExportDocManager.Services.MasterData
                     }
                     catch (Exception ex)
                     {
-                        Log.Warning(
+                        _logger.LogWarning(
                             ex,
                             "HS编码联网自动详情追踪失败，已继续处理其他旧编码。Provider={Provider}, Code={Code}",
                             provider.Name,
@@ -218,7 +218,7 @@ namespace ExportDocManager.Services.MasterData
                     }
                     catch (Exception ex)
                     {
-                        Log.Warning(
+                        _logger.LogWarning(
                             ex,
                             "HS编码联网推荐查询失败，已继续处理其他推荐编码。Provider={Provider}, Keyword={Keyword}",
                             provider.Name,
@@ -379,7 +379,7 @@ namespace ExportDocManager.Services.MasterData
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning(ex, "替代HS编码详情补充失败。Code={Code}", item.Code);
+                    _logger.LogWarning(ex, "替代HS编码详情补充失败。Code={Code}", item.Code);
                 }
             }
         }

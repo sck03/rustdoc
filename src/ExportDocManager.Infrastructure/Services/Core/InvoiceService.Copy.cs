@@ -7,7 +7,7 @@ using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using Microsoft.EntityFrameworkCore;
-using Serilog;
+using Microsoft.Extensions.Logging;
 
 namespace ExportDocManager.Services.Core
 {
@@ -61,7 +61,7 @@ namespace ExportDocManager.Services.Core
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                Log.Error(ex, "复制发票流程失败");
+                _logger.LogError(ex, "复制发票流程失败");
                 throw new InfrastructureServiceException("发票复制服务暂时不可用，请稍后重试。", ex);
             }
         }
@@ -142,7 +142,7 @@ namespace ExportDocManager.Services.Core
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                Log.Error(ex, "生成另一发票类型流程失败");
+                _logger.LogError(ex, "生成另一发票类型流程失败");
                 throw new InfrastructureServiceException("发票类型转换服务暂时不可用，请稍后重试。", ex);
             }
         }

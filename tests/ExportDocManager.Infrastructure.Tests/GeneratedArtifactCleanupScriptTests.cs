@@ -3,6 +3,36 @@ namespace ExportDocManager.Infrastructure.Tests
     public class GeneratedArtifactCleanupScriptTests
     {
         [Fact]
+        public void PathSafetyScripts_ShouldUsePlatformAwareCaseComparison()
+        {
+            string pathSafety = File.ReadAllText(ResolveWorkspacePath("scripts", "lib", "platform-path-safety.ps1"));
+            string portablePackage = File.ReadAllText(ResolveWorkspacePath("scripts", "package-desktop-portable.ps1"));
+            string cleanup = File.ReadAllText(ResolveWorkspacePath("scripts", "clean-generated-artifacts.ps1"));
+            string smoke = File.ReadAllText(ResolveWorkspacePath("scripts", "smoke-tauri-desktop.ps1"));
+
+            Assert.Contains("OSPlatform]::Windows", pathSafety, StringComparison.Ordinal);
+            Assert.Contains("StringComparison]::OrdinalIgnoreCase", pathSafety, StringComparison.Ordinal);
+            Assert.Contains("StringComparison]::Ordinal", pathSafety, StringComparison.Ordinal);
+            Assert.Contains("Test-ExportDocPathUnderRoot", portablePackage, StringComparison.Ordinal);
+            Assert.Contains("Test-ExportDocPathUnderRoot", cleanup, StringComparison.Ordinal);
+            Assert.Contains("Test-ExportDocPathEqual", smoke, StringComparison.Ordinal);
+            Assert.DoesNotContain("$fullPath.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)", portablePackage, StringComparison.Ordinal);
+            Assert.DoesNotContain("$fullPath.StartsWith($workspacePrefix, [System.StringComparison]::OrdinalIgnoreCase)", cleanup, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void ReportPdfWatchdog_ShouldBoundProcessTreeTermination()
+        {
+            string support = File.ReadAllText(ResolveWorkspacePath("scripts", "lib", "build-script-support.ps1"));
+            string watchdog = File.ReadAllText(ResolveWorkspacePath("scripts", "run-report-pdf-tests-with-timeout.ps1"));
+
+            Assert.Contains("function Stop-ExportDocProcessTree", support, StringComparison.Ordinal);
+            Assert.Contains("$helper.WaitForExit($TimeoutSeconds * 1000)", support, StringComparison.Ordinal);
+            Assert.Contains("Stop-ExportDocProcessTree -Process $Process -TimeoutSeconds 10", watchdog, StringComparison.Ordinal);
+            Assert.DoesNotContain("$Process.Kill($true)", watchdog, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void CleanupScript_ShouldUseWorkspaceBoundedLiteralPathDeletion()
         {
             string scriptPath = ResolveWorkspacePath("scripts", "clean-generated-artifacts.ps1");
@@ -245,8 +275,8 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("Generated cleanup source must stay below", powerShellSupport, StringComparison.Ordinal);
             Assert.Contains("AllowedRoot and QuarantineRoot must be provided together", powerShellSupport, StringComparison.Ordinal);
             Assert.Contains("WebView2 can keep BrowserMetrics files open briefly", powerShellSupport, StringComparison.Ordinal);
-            Assert.All(["function Wait-ExportDocExternalProcess", "$Process.Kill($true)", "HeartbeatSeconds", "ReadToEndAsync",
-                "CreateNoWindow = $CaptureOutput", "GetUnresolvedProviderPathFromPSPath"],
+            Assert.All(["function Wait-ExportDocExternalProcess", "function Stop-ExportDocProcessTree", "$helper.WaitForExit($TimeoutSeconds * 1000)",
+                "HeartbeatSeconds", "ReadToEndAsync", "CreateNoWindow = $CaptureOutput", "GetUnresolvedProviderPathFromPSPath"],
                 expected => Assert.Contains(expected, powerShellSupport, StringComparison.Ordinal));
 
             (string CommandFile, string PowerShellFile)[] entryPoints =
@@ -306,7 +336,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public void DotNetBuilds_ShouldDefaultToTheCurrentHostRuntimeIdentifier()
+        public void DotNetBuilds_ShouldKeepLibrariesPortableAndScopeHostRidToApi()
         {
             string propsPath = ResolveWorkspacePath("Directory.Build.props");
             string content = File.ReadAllText(propsPath);
@@ -315,6 +345,9 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("OperatingSystem]::IsLinux", content, StringComparison.Ordinal);
             Assert.Contains("OperatingSystem]::IsMacOS", content, StringComparison.Ordinal);
             Assert.Contains("<SelfContained Condition=", content, StringComparison.Ordinal);
+            Assert.Contains("MSBuildProjectName", content, StringComparison.Ordinal);
+            Assert.Contains("ExportDocManager.Api", content, StringComparison.Ordinal);
+            Assert.Contains("ExportDocManager.Infrastructure.PdfOcr", content, StringComparison.Ordinal);
             Assert.DoesNotContain("<RuntimeIdentifier>win-x64</RuntimeIdentifier>", content, StringComparison.OrdinalIgnoreCase);
         }
 

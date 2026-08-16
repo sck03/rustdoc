@@ -8,7 +8,10 @@
     <_ExportDocManagerHostOs Condition="$([System.OperatingSystem]::IsWindows())">win</_ExportDocManagerHostOs>
     <_ExportDocManagerHostOs Condition="$([System.OperatingSystem]::IsLinux())">linux</_ExportDocManagerHostOs>
     <_ExportDocManagerHostOs Condition="$([System.OperatingSystem]::IsMacOS())">osx</_ExportDocManagerHostOs>
-    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(_ExportDocManagerHostOs)' != ''">$(_ExportDocManagerHostOs)-$(_ExportDocManagerHostArchitecture)</RuntimeIdentifier>
+    <!-- Keep domain/application/infrastructure libraries portable. The API host and the
+         ONNX-bearing PDF/OCR module are the only host-RID exceptions; publish scripts may
+         still override the RID explicitly for any executable. -->
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(_ExportDocManagerHostOs)' != '' and ('$(MSBuildProjectName)' == 'ExportDocManager.Api' or '$(MSBuildProjectName)' == 'ExportDocManager.Infrastructure.PdfOcr')">$(_ExportDocManagerHostOs)-$(_ExportDocManagerHostArchitecture)</RuntimeIdentifier>
     <SelfContained Condition="'$(SelfContained)' == ''">false</SelfContained>
     <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win-'))">onnxruntime.dll</_ExportDocOnnxRuntimeFile>
     <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('linux-'))">libonnxruntime.so</_ExportDocOnnxRuntimeFile>

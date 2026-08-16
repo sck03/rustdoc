@@ -70,7 +70,6 @@ namespace ExportDocManager.Services.Infrastructure
 
             long remainingBytes = SupportPackageTotalLogByteLimit;
             var index = new List<object>();
-            byte[] buffer = new byte[64 * 1024];
             foreach (var file in logs)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -96,20 +95,36 @@ namespace ExportDocManager.Services.Infrastructure
                     }
 
                     source.Seek(Math.Max(0, originalLength - includedBytes), SeekOrigin.Begin);
+                    byte[] sourceTail = new byte[checked((int)includedBytes)];
+                    int sourceTailBytes = 0;
+                    while (sourceTailBytes < sourceTail.Length)
+                    {
+                        int read = await source.ReadAsync(
+                                sourceTail.AsMemory(sourceTailBytes, sourceTail.Length - sourceTailBytes),
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                        if (read == 0)
+                        {
+                            break;
+                        }
+                        sourceTailBytes += read;
+                    }
+
+                    byte[] sanitizedTail = DiagnosticLogSanitizer.SanitizeUtf8(
+                        sourceTail.AsSpan(0, sourceTailBytes),
+                        checked((int)Math.Min(includedBytes, remainingBytes)));
                     var entry = archive.CreateEntry($"logs/{file.Name}", CompressionLevel.Fastest);
                     await using var target = entry.Open();
-                    long copiedBytes = await CopyAtMostAsync(
-                        source,
-                        target,
-                        includedBytes,
-                        buffer,
-                        cancellationToken).ConfigureAwait(false);
+                    await target.WriteAsync(sanitizedTail, cancellationToken).ConfigureAwait(false);
+                    long copiedBytes = sanitizedTail.Length;
                     index.Add(new
                     {
                         file.Name,
                         OriginalLength = originalLength,
+                        SourceTailBytes = sourceTailBytes,
                         IncludedBytes = copiedBytes,
-                        TailOnly = copiedBytes < originalLength,
+                        TailOnly = sourceTailBytes < originalLength,
+                        Sanitized = true,
                         file.LastWriteTimeUtc
                     });
                     remainingBytes -= copiedBytes;

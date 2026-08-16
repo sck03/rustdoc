@@ -2,8 +2,8 @@ using System.Data;
 using System.Data.Common;
 using ExportDocManager.DataAccess;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Npgsql;
-using Serilog;
 
 namespace ExportDocManager.Services.Infrastructure
 {
@@ -15,10 +15,13 @@ namespace ExportDocManager.Services.Infrastructure
     {
         internal const int CurrentVersion = 8;
         internal const string MetadataTableName = "__ExportDocManagerSchema";
+        internal const string PostgreSqlTrigramFeatureName = "postgresql.pg_trgm";
+        internal const int PostgreSqlTrigramFeatureVersion = 1;
 
         public static async Task EnsureCurrentAsync(
             AppDbContext context,
             bool usesPostgreSql,
+            ILogger? logger = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(context);
@@ -59,7 +62,7 @@ namespace ExportDocManager.Services.Infrastructure
 
                 if (usesPostgreSql)
                 {
-                    await CreatePostgreSqlTrigramIndexesAsync(context, cancellationToken).ConfigureAwait(false);
+                    await CreatePostgreSqlTrigramIndexesAsync(context, logger, cancellationToken).ConfigureAwait(false);
                 }
                 return;
             }
@@ -67,6 +70,11 @@ namespace ExportDocManager.Services.Infrastructure
             int? version = await ReadVersionAsync(context, usesPostgreSql, cancellationToken).ConfigureAwait(false);
             if (version != CurrentVersion)
             {
+                if (version.HasValue)
+                {
+                    _ = DatabaseSchemaMigrationPlanner.BuildPlan(version.Value, CurrentVersion);
+                }
+
                 string detected = version.HasValue ? $"v{version.Value}" : "无版本标记";
                 throw new InvalidOperationException(
                     $"当前数据库为{detected}，程序只接受正式 v{CurrentVersion} 基线。项目尚未投产，不执行旧结构兼容升级；请先备份需要保留的文件，再使用空数据库重新初始化。");
@@ -74,7 +82,7 @@ namespace ExportDocManager.Services.Infrastructure
 
             if (usesPostgreSql)
             {
-                await CreatePostgreSqlTrigramIndexesAsync(context, cancellationToken).ConfigureAwait(false);
+                await CreatePostgreSqlTrigramIndexesAsync(context, logger, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -245,6 +253,7 @@ namespace ExportDocManager.Services.Infrastructure
 
         private static async Task CreatePostgreSqlTrigramIndexesAsync(
             AppDbContext context,
+            ILogger? logger,
             CancellationToken cancellationToken)
         {
             try
@@ -255,13 +264,6 @@ namespace ExportDocManager.Services.Infrastructure
                     .ConfigureAwait(false);
                 await context.Database.ExecuteSqlRawAsync(
                     """
-                    DROP INDEX IF EXISTS "IX_HsCodes_TextSearch_Trgm";
-                    DROP INDEX IF EXISTS "IX_HsCodeDeclarationExamples_TextSearch_Trgm";
-                    DROP INDEX IF EXISTS "IX_HsCodeRemoteCandidates_TextSearch_Trgm";
-                    DROP INDEX IF EXISTS "IX_Products_HistorySearch_Trgm";
-                    DROP INDEX IF EXISTS "IX_Items_HistorySearch_Trgm";
-                    DROP INDEX IF EXISTS "IX_CustomsCooItems_HistorySearch_Trgm";
-
                     CREATE INDEX IF NOT EXISTS "IX_HsCodes_TextSearch_Upper_Trgm"
                         ON "HsCodes" USING gin (
                             upper("Name") gin_trgm_ops,
@@ -376,9 +378,11 @@ namespace ExportDocManager.Services.Infrastructure
             }
             catch (PostgresException ex) when (ex.SqlState is "42501" or "0A000" or "58P01")
             {
-                Log.Warning(
+                logger?.LogWarning(
                     ex,
-                    "PostgreSQL pg_trgm indexes were not installed. Exact and prefix indexes remain active; contains searches use the stable fallback.");
+                    "PostgreSQL pg_trgm indexes were not installed; optional search feature {FeatureName} v{FeatureVersion} remains unavailable. Exact and prefix indexes remain active; contains searches use the stable fallback.",
+                    PostgreSqlTrigramFeatureName,
+                    PostgreSqlTrigramFeatureVersion);
             }
         }
     }

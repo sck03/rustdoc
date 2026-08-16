@@ -5,6 +5,8 @@ using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Time;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ExportDocManager.Services.SingleWindow
 {
@@ -25,6 +27,7 @@ namespace ExportDocManager.Services.SingleWindow
         private readonly ISettingsService _settingsService;
         private readonly IAppPathProvider _pathProvider;
         private readonly IBusinessClock _clock;
+        private readonly ILogger<SingleWindowHandoffPackageService> _logger;
 
         public SingleWindowHandoffPackageService(
             ICustomsCooSourceAssembler customsCooSourceAssembler,
@@ -39,7 +42,8 @@ namespace ExportDocManager.Services.SingleWindow
             ISingleWindowTrackingService singleWindowTrackingService,
             ISettingsService settingsService,
             IAppPathProvider pathProvider,
-            IBusinessClock? clock = null)
+            IBusinessClock? clock = null,
+            ILogger<SingleWindowHandoffPackageService>? logger = null)
         {
             _customsCooSourceAssembler = customsCooSourceAssembler ?? throw new ArgumentNullException(nameof(customsCooSourceAssembler));
             _agentConsignmentSourceAssembler = agentConsignmentSourceAssembler ?? throw new ArgumentNullException(nameof(agentConsignmentSourceAssembler));
@@ -54,6 +58,7 @@ namespace ExportDocManager.Services.SingleWindow
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _clock = clock ?? BusinessClock.CreateSystem();
+            _logger = logger ?? NullLogger<SingleWindowHandoffPackageService>.Instance;
         }
 
         public async Task<SingleWindowHandoffPackageResult> ExportSubmitPackageAsync(
@@ -284,7 +289,7 @@ namespace ExportDocManager.Services.SingleWindow
                     }
                     catch (Exception trackingException)
                     {
-                        Serilog.Log.Error(
+                        _logger.LogError(
                             trackingException,
                             "Marking failed single-window reservation {BatchId} failed",
                             reservationBatchId);

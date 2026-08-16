@@ -48,12 +48,7 @@ $artifactsRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "artifacts"))
 function Test-ChildPath {
     param([string]$Path, [string]$Root)
 
-    $fullPath = [IO.Path]::GetFullPath($Path)
-    $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd(
-        [IO.Path]::DirectorySeparatorChar,
-        [IO.Path]::AltDirectorySeparatorChar)
-    $prefix = $fullRoot + [IO.Path]::DirectorySeparatorChar
-    return $fullPath.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
+    return Test-ExportDocPathUnderRoot -Path $Path -Root $Root
 }
 
 function Assert-GeneratedPath {

@@ -33,6 +33,28 @@ namespace ExportDocManager.Services.Infrastructure
             EnsurePgDumpVersionSupported(pgDumpMajor, serverMajor);
         }
 
+        private async Task ValidatePostgreSqlDumpAsync(
+            string pgRestorePath,
+            string dumpPath,
+            CancellationToken cancellationToken)
+        {
+            await RunPostgreSqlToolAsync(
+                pgRestorePath,
+                BuildPgRestoreValidationArguments(dumpPath),
+                PostgreSqlBackupTimeout,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        internal static IReadOnlyList<string> BuildPgRestoreValidationArguments(string dumpPath)
+        {
+            if (string.IsNullOrWhiteSpace(dumpPath))
+            {
+                throw new ArgumentException("PostgreSQL 备份路径不能为空。", nameof(dumpPath));
+            }
+
+            return ["--list", dumpPath];
+        }
+
         private async Task<PostgreSqlToolRunResult> RunPostgreSqlToolAsync(
             string executablePath,
             IReadOnlyList<string> arguments,
@@ -203,7 +225,7 @@ namespace ExportDocManager.Services.Infrastructure
             return item?.FullPath ?? throw new ResourceNotFoundException("未找到指定 PostgreSQL 物理备份。");
         }
 
-        private string BuildRestoreScript(
+        internal string BuildRestoreScript(
             string backupPath,
             string targetDatabase,
             string restoreRole,
@@ -224,7 +246,7 @@ $ErrorActionPreference = 'Stop'
 # 如需避免输入密码，可临时设置 PGPASSWORD，或使用 pgpass.conf / 密码管理工具。
 $pgRestore = {{QuotePowerShellLiteral(pgRestore)}}
 $restoreArgs = @(
-    '--clean', '--if-exists', '--no-owner',
+    '--clean', '--if-exists', '--no-owner', '--single-transaction',
     '--role', {{QuotePowerShellLiteral(restoreRole)}},
     '--host', {{QuotePowerShellLiteral(host)}},
     '--port', {{QuotePowerShellLiteral(port)}},
@@ -241,6 +263,7 @@ $psqlArgs = @(
     '--port', {{QuotePowerShellLiteral(port)}},
     '--username', {{QuotePowerShellLiteral(username)}},
     '--dbname', {{QuotePowerShellLiteral(targetDatabase)}},
+    '--single-transaction',
     '--set', 'ON_ERROR_STOP=1',
     '--file', {{QuotePowerShellLiteral(ownershipSqlPath)}}
 )
@@ -253,8 +276,8 @@ if ($LASTEXITCODE -ne 0) { throw "psql failed with exit code $LASTEXITCODE." }
 #!/usr/bin/env sh
 set -eu
 # PostgreSQL 团队版业务数据库还原计划。执行前请确认目标服务器、数据库名和应用账号。
-{QuotePosixShellArgument(pgRestore)} --clean --if-exists --no-owner --role {QuotePosixShellArgument(restoreRole)} --host {QuotePosixShellArgument(host)} --port {QuotePosixShellArgument(port)} --username {QuotePosixShellArgument(username)} --dbname {QuotePosixShellArgument(targetDatabase)} {QuotePosixShellArgument(backupPath)}
-{QuotePosixShellArgument(psql)} --host {QuotePosixShellArgument(host)} --port {QuotePosixShellArgument(port)} --username {QuotePosixShellArgument(username)} --dbname {QuotePosixShellArgument(targetDatabase)} --set=ON_ERROR_STOP=1 --file {QuotePosixShellArgument(ownershipSqlPath)}
+{QuotePosixShellArgument(pgRestore)} --clean --if-exists --no-owner --single-transaction --role {QuotePosixShellArgument(restoreRole)} --host {QuotePosixShellArgument(host)} --port {QuotePosixShellArgument(port)} --username {QuotePosixShellArgument(username)} --dbname {QuotePosixShellArgument(targetDatabase)} {QuotePosixShellArgument(backupPath)}
+{QuotePosixShellArgument(psql)} --host {QuotePosixShellArgument(host)} --port {QuotePosixShellArgument(port)} --username {QuotePosixShellArgument(username)} --dbname {QuotePosixShellArgument(targetDatabase)} --single-transaction --set=ON_ERROR_STOP=1 --file {QuotePosixShellArgument(ownershipSqlPath)}
 """;
         }
 

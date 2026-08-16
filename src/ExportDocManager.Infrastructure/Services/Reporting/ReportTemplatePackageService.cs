@@ -3,6 +3,8 @@ using System.Text.Json.Serialization;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ExportDocManager.Services.Reporting
 {
@@ -25,15 +27,18 @@ namespace ExportDocManager.Services.Reporting
         private readonly ISettingsService _settingsService;
         private readonly ReportTemplatePathResolver _pathResolver;
         private readonly ReportTemplateCatalogLoader _catalogLoader;
+        private readonly ILogger<ReportTemplatePackageService> _logger;
 
         public ReportTemplatePackageService(
             IAppPathProvider pathProvider,
-            ISettingsService settingsService)
+            ISettingsService settingsService,
+            ILogger<ReportTemplatePackageService>? logger = null)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             _pathResolver = new ReportTemplatePathResolver(pathProvider);
-            _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver);
+            _logger = logger ?? NullLogger<ReportTemplatePackageService>.Instance;
+            _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver, _logger);
         }
 
         public async Task<ReportTemplatePackageExportResult> ExportAsync(

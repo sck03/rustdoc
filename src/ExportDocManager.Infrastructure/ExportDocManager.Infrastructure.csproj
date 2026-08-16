@@ -16,7 +16,6 @@
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="Scriban" />
-    <PackageReference Include="Serilog" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     <PackageReference Include="System.Security.Cryptography.Xml" />
   </ItemGroup>

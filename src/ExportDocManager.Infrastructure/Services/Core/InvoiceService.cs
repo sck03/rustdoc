@@ -10,7 +10,8 @@ using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
-using Serilog;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ExportDocManager.Services.Core
 {
@@ -21,6 +22,7 @@ namespace ExportDocManager.Services.Core
         private readonly IInvoicePartyResolver _invoicePartyResolver;
         private readonly BusinessDataAccessScope _businessDataAccessScope;
         private readonly IBusinessClock _clock;
+        private readonly ILogger<InvoiceService> _logger;
 
         public InvoiceService(
             IDbContextFactory<AppDbContext> contextFactory,
@@ -28,7 +30,8 @@ namespace ExportDocManager.Services.Core
             IInvoicePartyResolver invoicePartyResolver,
             DatabaseConnectionSettings databaseSettings,
             BusinessDataAccessScope? businessDataAccessScope = null,
-            IBusinessClock? clock = null)
+            IBusinessClock? clock = null,
+            ILogger<InvoiceService>? logger = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _itemService = itemService ?? throw new ArgumentNullException(nameof(itemService));
@@ -36,6 +39,7 @@ namespace ExportDocManager.Services.Core
             var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
             _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(normalizedSettings);
             _clock = clock ?? BusinessClock.CreateSystem();
+            _logger = logger ?? NullLogger<InvoiceService>.Instance;
         }
 
         public async Task<SaveResult> SaveInvoiceWithAutoCreationAsync(
@@ -131,7 +135,7 @@ namespace ExportDocManager.Services.Core
             }
             catch (DbUpdateConcurrencyException ex)
             {
-                Log.Error(ex, "保存发票流程失败");
+                _logger.LogError(ex, "保存发票流程失败");
                 result.ErrorMessage = "保存失败: 该发票数据已被其他用户修改，请刷新后重试。";
                 result.FailureKind = SaveFailureKind.Conflict;
                 return result;
@@ -162,7 +166,7 @@ namespace ExportDocManager.Services.Core
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                Log.Error(ex, "保存发票流程失败");
+                _logger.LogError(ex, "保存发票流程失败");
                 result.ErrorMessage = $"保存失败: {ex.Message}";
                 result.FailureKind = SaveFailureKind.Infrastructure;
                 return result;

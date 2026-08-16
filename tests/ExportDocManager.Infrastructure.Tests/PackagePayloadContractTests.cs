@@ -205,6 +205,7 @@ public sealed class PackagePayloadContractTests
         string root = FindWorkspaceRoot();
         string workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "cross-platform-typography.yml"));
         string reportWatchdog = File.ReadAllText(Path.Combine(root, "scripts", "run-report-pdf-tests-with-timeout.ps1"));
+        string processSupport = File.ReadAllText(Path.Combine(root, "scripts", "lib", "build-script-support.ps1"));
         string extractor = File.ReadAllText(Path.Combine(root, "scripts", "extract-report-pdf-layout.py"));
         string comparer = File.ReadAllText(Path.Combine(root, "scripts", "compare-report-pdf-metrics.mjs"));
 
@@ -219,7 +220,8 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("src/ExportDocManager.Infrastructure.Browser/Services/BrowserRuntime/**", workflow, StringComparison.Ordinal);
         Assert.Contains("src/ExportDocManager.Infrastructure.Browser/Services/Reporting/**", workflow, StringComparison.Ordinal);
         Assert.Contains("Upload report render watchdog diagnostics", workflow, StringComparison.Ordinal);
-        Assert.Contains("$Process.Kill($true)", reportWatchdog, StringComparison.Ordinal);
+        Assert.Contains("Stop-ExportDocProcessTree", reportWatchdog, StringComparison.Ordinal);
+        Assert.Contains("$target.Kill($true)", processSupport, StringComparison.Ordinal);
         Assert.Contains("Resolve-DotnetExecutable", reportWatchdog, StringComparison.Ordinal);
         Assert.Contains("No native dotnet executable on PATH can load the required SDK", reportWatchdog, StringComparison.Ordinal);
         Assert.Contains("$process.WaitForExit($waitMilliseconds)", reportWatchdog, StringComparison.Ordinal);

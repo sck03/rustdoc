@@ -2,13 +2,7 @@ param([Parameter(Mandatory = $true)][string]$BrowserRoot)
 $ErrorActionPreference = "Stop"
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 . (Join-Path $PSScriptRoot "lib/build-script-support.ps1")
-$isWindowsPlatform = [Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
-    [Runtime.InteropServices.OSPlatform]::Windows)
-$pathComparison = if ($isWindowsPlatform) {
-    [System.StringComparison]::OrdinalIgnoreCase
-} else {
-    [System.StringComparison]::Ordinal
-}
+$pathComparison = Get-ExportDocPathComparison
 
 function Assert-RepositoryChildPath {
     param(

@@ -95,6 +95,7 @@ export function WorkspaceShell({
   const mobileNavRef = useRef<HTMLElement | null>(null);
   const workspaceMainRef = useRef<HTMLElement | null>(null);
   const workspaceContentRef = useRef<HTMLDivElement | null>(null);
+  const sessionAttentionRef = useRef<HTMLDivElement | null>(null);
   const workspaceDeviceMode = useWorkspaceDeviceMode();
   const isOnline = useOnlineStatus(connectivityOverride);
   const { availability: serviceAvailability, retry: retryServiceAvailability } = useServiceAvailability({
@@ -207,16 +208,12 @@ export function WorkspaceShell({
   }, [isMobileNavOpen]);
 
   useEffect(() => {
-    const workspaceContent = workspaceContentRef.current;
-    if (!workspaceContent) {
+    if (sessionAttention?.state !== "expired") {
       return undefined;
     }
 
-    const previousInert = workspaceContent.inert;
-    workspaceContent.inert = sessionAttention?.state === "expired";
-    return () => {
-      workspaceContent.inert = previousInert;
-    };
+    const focusFrame = window.requestAnimationFrame(() => sessionAttentionRef.current?.focus());
+    return () => window.cancelAnimationFrame(focusFrame);
   }, [sessionAttention?.state]);
 
   useEffect(() => {
@@ -266,13 +263,18 @@ export function WorkspaceShell({
   const serviceConnectionState = resolveServiceConnectionState({ isDesktopRuntime, isOnline, availability: serviceAvailability });
   const showServiceUnavailableNotice = serviceConnectionState === "unreachable";
   const serviceStatusLabel = getServiceConnectionLabel(serviceConnectionState);
+  const sessionExpired = sessionAttention?.state === "expired";
 
   return (
     <div
       className={isNavCollapsed ? "app-shell app-shell-nav-collapsed" : "app-shell"}
       data-workspace-device={workspaceDeviceMode}
     >
-      <aside className={isMobileNavOpen ? "workspace-nav workspace-nav-mobile-open" : "workspace-nav"}>
+      <aside
+        className={isMobileNavOpen ? "workspace-nav workspace-nav-mobile-open" : "workspace-nav"}
+        inert={sessionExpired}
+        aria-disabled={sessionExpired}
+      >
         <div className="brand-mark">
           <span className="brand-icon">
             <FileText size={20} aria-hidden="true" />
@@ -416,7 +418,13 @@ export function WorkspaceShell({
         </div> : null}
 
         {sessionAttention ? (
-          <div className="workspace-service-notice" role={sessionAttention.state === "expired" ? "alert" : "status"} aria-live={sessionAttention.state === "expired" ? "assertive" : "polite"}>
+          <div
+            ref={sessionAttentionRef}
+            className="workspace-service-notice"
+            role={sessionAttention.state === "expired" ? "alert" : "status"}
+            aria-live={sessionAttention.state === "expired" ? "assertive" : "polite"}
+            tabIndex={sessionAttention.state === "expired" ? -1 : undefined}
+          >
             <div>
               <strong>{sessionAttention.state === "expired" ? "登录已到期，草稿仍保留" : "登录即将到期"}</strong>
               <span>{sessionAttention.message}</span>
@@ -448,7 +456,7 @@ export function WorkspaceShell({
           </div>
         ) : null}
 
-        <div ref={workspaceContentRef} className="workspace-content">{children}</div>
+        <div ref={workspaceContentRef} className="workspace-content" inert={sessionExpired}>{children}</div>
       </main>
     </div>
   );

@@ -7,10 +7,11 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
-using Serilog;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ExportDocManager.Services.MasterData
 {
@@ -21,9 +22,10 @@ namespace ExportDocManager.Services.MasterData
         private readonly SemaphoreSlim _detailFetchSemaphore = new SemaphoreSlim(1, 1);
         private readonly IReadOnlyList<IHsCodeRemoteProvider> _remoteProviders;
         private readonly IHsCodeImportService _importService;
+        private readonly ILogger<HsCodeService> _logger;
 
         public HsCodeService(IDbContextFactory<AppDbContext> dbContextFactory, IHsCodeReadRepository hsCodeReadRepository)
-            : this(dbContextFactory, hsCodeReadRepository, Enumerable.Empty<IHsCodeRemoteProvider>(), null)
+            : this(dbContextFactory, hsCodeReadRepository, Enumerable.Empty<IHsCodeRemoteProvider>(), null, null)
         {
         }
 
@@ -31,7 +33,8 @@ namespace ExportDocManager.Services.MasterData
             IDbContextFactory<AppDbContext> dbContextFactory,
             IHsCodeReadRepository hsCodeReadRepository,
             IEnumerable<IHsCodeRemoteProvider> remoteProviders,
-            IHsCodeImportService? importService = null)
+            IHsCodeImportService? importService = null,
+            ILogger<HsCodeService>? logger = null)
         {
             _dbContextFactory = dbContextFactory;
             _hsCodeReadRepository = hsCodeReadRepository;
@@ -39,6 +42,7 @@ namespace ExportDocManager.Services.MasterData
                 .OrderBy(provider => provider.Priority)
                 .ToList();
             _importService = importService ?? new UnsupportedHsCodeImportService();
+            _logger = logger ?? NullLogger<HsCodeService>.Instance;
         }
 
         public Task ImportAsync(string filePath) => _importService.ImportAsync(filePath);
@@ -152,7 +156,7 @@ namespace ExportDocManager.Services.MasterData
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "远程 HS 搜索失败，已按降级结果继续。");
+                _logger.LogWarning(ex, "远程 HS 搜索失败，已按降级结果继续。");
                 return [];
             }
         }

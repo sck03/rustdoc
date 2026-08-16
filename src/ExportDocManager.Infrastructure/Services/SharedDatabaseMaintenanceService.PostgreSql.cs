@@ -16,6 +16,10 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 throw new InfrastructureServiceException("未找到 pg_dump。请把 PostgreSQL 客户端工具放到程序根 Tools/PostgreSQL/bin，或用 EXPORTDOCMANAGER_POSTGRES_BIN 指向工具目录。");
             }
+            if (string.IsNullOrWhiteSpace(tools.PgRestorePath))
+            {
+                throw new InfrastructureServiceException("未找到 pg_restore，无法验证 PostgreSQL 备份归档。请把完整客户端工具放到程序根 Tools/PostgreSQL/bin。");
+            }
 
             await PostgreSqlBackupGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
@@ -51,6 +55,11 @@ namespace ExportDocManager.Services.Infrastructure
                     {
                         throw new InfrastructureServiceException("pg_dump 未生成有效的备份文件。");
                     }
+
+                    await ValidatePostgreSqlDumpAsync(
+                        tools.PgRestorePath,
+                        tempPath,
+                        cancellationToken).ConfigureAwait(false);
 
                     RuntimeFilePermissionHelper.RestrictFile(tempPath);
                     AtomicFileHelper.ReplaceFile(tempPath, outputPath);

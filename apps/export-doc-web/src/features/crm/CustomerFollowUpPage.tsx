@@ -23,6 +23,7 @@ import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 type CustomerFollowUpPageProps = {
   client: ExportDocManagerApiClient;
@@ -35,6 +36,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
   const crmPermission = useModulePermission("sales.crm");
   const requestConfirmation = useConfirmation();
   const queryClient = useQueryClient();
+  const runAbortableOperation = useAbortableOperation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [customers, setCustomers] = useState<ApiCrmCustomerDto[]>([]);
   const [contacts, setContacts] = useState<ApiCrmContactDto[]>([]);
@@ -127,34 +129,49 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
   }
 
   async function reloadCustomers(preferred?: ApiCrmCustomerDto) {
-    const page = await client.queryCrmCustomers({ keyword: customerKeyword.trim(), status: "", pageNumber: 1, pageSize: 100 });
-    const nextCustomers = preferred && !page.items.some((item) => item.id === preferred.id)
-      ? [preferred, ...page.items]
-      : page.items;
-    setCustomers(nextCustomers);
-    const nextId = preferred && nextCustomers.some((item) => item.id === preferred.id)
-      ? preferred.id
-      : nextCustomers[0]?.id ?? 0;
-    setCustomerId(nextId);
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.crmCustomersRoot() }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() }),
-    ]);
+    await runAbortableOperation(async (signal) => {
+      const page = await client.queryCrmCustomers(
+        { keyword: customerKeyword.trim(), status: "", pageNumber: 1, pageSize: 100 },
+        { signal },
+      );
+      const nextCustomers = preferred && !page.items.some((item) => item.id === preferred.id)
+        ? [preferred, ...page.items]
+        : page.items;
+      setCustomers(nextCustomers);
+      const nextId = preferred && nextCustomers.some((item) => item.id === preferred.id)
+        ? preferred.id
+        : nextCustomers[0]?.id ?? 0;
+      setCustomerId(nextId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.crmCustomersRoot() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() }),
+      ]);
+    });
   }
 
   async function searchCustomerOptions() {
     try {
-      const page = await client.queryCrmCustomers({ keyword: customerKeyword.trim(), status: "", pageNumber: 1, pageSize: 100 });
+      const page = await runAbortableOperation((signal) => client.queryCrmCustomers(
+        { keyword: customerKeyword.trim(), status: "", pageNumber: 1, pageSize: 100 },
+        { signal },
+      ));
       const current = customers.find((item) => item.id === customerId);
       setCustomers(current && !page.items.some((item) => item.id === current.id) ? [current, ...page.items] : page.items);
       if (!customerId && page.items.length > 0) setCustomerId(page.items[0].id);
     } catch (error) {
+      if (isAbortError(error)) return;
       setFeedback(requestErrorFeedback(error));
     }
   }
 
   async function reloadContacts() {
-    setContacts(customerId ? await client.listCrmContacts({ customerId }) : []);
+    if (!customerId) {
+      setContacts([]);
+      return;
+    }
+    await runAbortableOperation(async (signal) => {
+      setContacts(await client.listCrmContacts({ customerId }, { signal }));
+    });
   }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
@@ -181,11 +198,16 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
           isCompleted: editingFollowUp?.isCompleted ?? false,
           expectedVersion: editingFollowUp?.versionNumber ?? 0,
         };
-      if (editingFollowUp) {
-        await client.updateCrmFollowUp({ id: editingFollowUp.id, body: { ...body, id: editingFollowUp.id, followedUpAt: editingFollowUp.followedUpAt } });
-      } else {
-        await client.createCrmFollowUp({ body });
-      }
+      await runAbortableOperation(async (signal) => {
+        if (editingFollowUp) {
+          await client.updateCrmFollowUp(
+            { id: editingFollowUp.id, body: { ...body, id: editingFollowUp.id, followedUpAt: editingFollowUp.followedUpAt } },
+            { signal },
+          );
+        } else {
+          await client.createCrmFollowUp({ body }, { signal });
+        }
+      });
       formElement.reset();
       setFollowUpContactId("");
       setFollowUpDraftDirty(false);
@@ -194,6 +216,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
       await refresh();
       applyView("followups");
     } catch (error) {
+      if (isAbortError(error)) return;
       setFeedback(requestErrorFeedback(error));
     } finally {
       setSaving(false);
@@ -203,7 +226,7 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
   async function toggleCompleted(item: ApiCrmFollowUpDto) {
     if (!crmPermission.canOperate) return;
     try {
-      await client.updateCrmFollowUp({
+      await runAbortableOperation((signal) => client.updateCrmFollowUp({
         id: item.id,
         body: {
           id: item.id,
@@ -217,10 +240,11 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
           isCompleted: !item.isCompleted,
           expectedVersion: item.versionNumber,
         },
-      });
+      }, { signal }));
       await refresh();
       setFeedback(successFeedback(item.isCompleted ? "跟进记录已恢复为待跟进。" : "跟进记录已标记完成。"));
     } catch (error) {
+      if (isAbortError(error)) return;
       setFeedback(requestErrorFeedback(error));
     }
   }
@@ -228,10 +252,12 @@ export function CustomerFollowUpPage({ client }: CustomerFollowUpPageProps) {
   async function deleteFollowUp(item: ApiCrmFollowUpDto) {
     if (!crmPermission.canManage || !await requestConfirmation({ title: "删除跟进记录", description: `确定删除“${item.customerName}”的这条跟进记录吗？`, confirmLabel: "确认删除", tone: "danger" })) return;
     try {
-      await client.deleteCrmFollowUp({ id: item.id });
+      await runAbortableOperation((signal) => client.deleteCrmFollowUp({ id: item.id }, { signal }));
       await refresh();
       setFeedback(successFeedback("跟进记录已删除。"));
-    } catch (error) { setFeedback(requestErrorFeedback(error)); }
+    } catch (error) {
+      if (!isAbortError(error)) setFeedback(requestErrorFeedback(error));
+    }
   }
 
   return (

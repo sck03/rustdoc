@@ -1,6 +1,7 @@
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Utils;
-using Serilog;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ExportDocManager.Services.Infrastructure
 {
@@ -13,19 +14,22 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly ICloudSyncService _cloudSyncService;
         private readonly IAuditLogService _auditLogService;
         private readonly IAppPathProvider _pathProvider;
+        private readonly ILogger<ShutdownMaintenanceService> _logger;
 
         public ShutdownMaintenanceService(
             ISettingsService settingsService,
             IBackupService backupService,
             ICloudSyncService cloudSyncService,
             IAuditLogService auditLogService,
-            IAppPathProvider pathProvider)
+            IAppPathProvider pathProvider,
+            ILogger<ShutdownMaintenanceService>? logger = null)
         {
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             _backupService = backupService ?? throw new ArgumentNullException(nameof(backupService));
             _cloudSyncService = cloudSyncService ?? throw new ArgumentNullException(nameof(cloudSyncService));
             _auditLogService = auditLogService ?? throw new ArgumentNullException(nameof(auditLogService));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            _logger = logger ?? NullLogger<ShutdownMaintenanceService>.Instance;
         }
 
         public async Task<ShutdownMaintenanceResult> RunAsync(CancellationToken cancellationToken = default)
@@ -52,7 +56,7 @@ namespace ExportDocManager.Services.Infrastructure
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     AddMaintenanceError(maintenanceErrors, ex.Message);
-                    Log.Warning(ex, "Old database backup cleanup failed during shutdown maintenance.");
+                    _logger.LogWarning(ex, "Old database backup cleanup failed during shutdown maintenance.");
                 }
 
                 var backupResult = await _backupService
@@ -61,7 +65,7 @@ namespace ExportDocManager.Services.Infrastructure
                 if (!backupResult.Success && !backupResult.Skipped)
                 {
                     AddMaintenanceError(maintenanceErrors, backupResult.Message);
-                    Log.Warning("Local database backup failed during shutdown maintenance: {Message}", backupResult.Message);
+                    _logger.LogWarning("Local database backup failed during shutdown maintenance: {Message}", backupResult.Message);
                 }
                 else if (backupResult.Success)
                 {
@@ -74,7 +78,7 @@ namespace ExportDocManager.Services.Infrastructure
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         AddMaintenanceError(maintenanceErrors, ex.Message);
-                        Log.Warning(ex, "Cloud backup upload failed during shutdown maintenance.");
+                        _logger.LogWarning(ex, "Cloud backup upload failed during shutdown maintenance.");
                     }
                 }
             }

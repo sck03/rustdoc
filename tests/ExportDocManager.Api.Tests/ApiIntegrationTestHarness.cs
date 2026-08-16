@@ -157,10 +157,12 @@ namespace ExportDocManager.Api.Tests
                 app.UseExportDocManagerReadiness(databaseSettings, runtimeOptions);
                 app.UsePathBase(runtimeOptions.PathBase);
                 app.UseRouting();
+                app.UseExportDocManagerResourceGovernance();
                 app.UseExportDocManagerDesktopAccess();
                 app.UseExportDocManagerApiAuthentication();
                 app.UseExportDocManagerWorkspaceAccess();
                 app.UseExportDocManagerLicenseRequirement();
+                app.UseExportDocManagerSecurityAudit();
                 app.MapExportDocManagerApiEndpoints(runtimeOptions, databaseSettings);
                 await app.StartAsync();
 

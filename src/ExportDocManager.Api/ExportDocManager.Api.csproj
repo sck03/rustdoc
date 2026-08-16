@@ -20,6 +20,11 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
     <ProjectReference Include="..\ExportDocManager.Application\ExportDocManager.Application.csproj" />
     <ProjectReference Include="..\ExportDocManager.Infrastructure\ExportDocManager.Infrastructure.csproj" />
     <ProjectReference Include="..\ExportDocManager.Infrastructure.Excel\ExportDocManager.Infrastructure.Excel.csproj"

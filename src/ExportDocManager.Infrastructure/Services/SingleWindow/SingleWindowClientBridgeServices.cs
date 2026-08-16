@@ -3,6 +3,8 @@ using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ExportDocManager.Services.SingleWindow
 {
@@ -16,6 +18,7 @@ namespace ExportDocManager.Services.SingleWindow
         private readonly ISingleWindowClientProfileService _clientProfileService;
         private readonly ISingleWindowStationIdentityService _stationIdentity;
         private readonly bool _isSqlite;
+        private readonly ILogger<ManualImportClientBridge> _logger;
 
         public ManualImportClientBridge(
             IDbContextFactory<AppDbContext> contextFactory,
@@ -24,7 +27,8 @@ namespace ExportDocManager.Services.SingleWindow
             BusinessDataAccessScope businessDataAccessScope,
             IAppPathProvider pathProvider,
             ISingleWindowClientProfileService clientProfileService,
-            ISingleWindowStationIdentityService stationIdentity)
+            ISingleWindowStationIdentityService stationIdentity,
+            ILogger<ManualImportClientBridge>? logger = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _singleWindowReceiptParser = singleWindowReceiptParser ?? throw new ArgumentNullException(nameof(singleWindowReceiptParser));
@@ -34,6 +38,7 @@ namespace ExportDocManager.Services.SingleWindow
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _clientProfileService = clientProfileService ?? throw new ArgumentNullException(nameof(clientProfileService));
             _stationIdentity = stationIdentity ?? throw new ArgumentNullException(nameof(stationIdentity));
+            _logger = logger ?? NullLogger<ManualImportClientBridge>.Instance;
         }
 
         private void EnsureSqliteStation()

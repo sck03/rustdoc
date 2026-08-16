@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
 
+export function isAbortError(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "name" in error && (error as { name?: unknown }).name === "AbortError");
+}
+
 export function useAbortableOperation() {
   const activeControllers = useRef(new Set<AbortController>());
 

@@ -4988,7 +4988,8 @@ export interface UpdateUserAccountRequest {
   body: ApiUserSaveRequest;
 }
 
-export type AccessTokenProvider = string | (() => string | undefined | Promise<string | undefined>);
+export type AccessTokenProvider = string | ((signal?: AbortSignal) => string | undefined | Promise<string | undefined>);
+export type ApiRequestInit = RequestInit & { timeoutMs?: number };
 type QueryValue = string | number | boolean | null | undefined;
 const desktopAccessTokenHeaderName = "X-ExportDocManager-Desktop-Token";
 
@@ -4996,6 +4997,7 @@ export interface ApiClientOptions {
   baseUrl: string;
   accessToken?: AccessTokenProvider;
   desktopAccessToken?: AccessTokenProvider;
+  defaultTimeoutMs?: number;
   fetch?: typeof globalThis.fetch;
 }
 
@@ -5018,12 +5020,14 @@ export class ExportDocManagerApiClient {
   private readonly baseUrl: string;
   private readonly accessToken?: AccessTokenProvider;
   private readonly desktopAccessToken?: AccessTokenProvider;
+  private readonly defaultTimeoutMs: number;
   private readonly fetchImpl: typeof globalThis.fetch;
 
   constructor(options: ApiClientOptions) {
     this.baseUrl = `${options.baseUrl.replace(/\/+$/, "")}/`;
     this.accessToken = options.accessToken;
     this.desktopAccessToken = options.desktopAccessToken;
+    this.defaultTimeoutMs = normalizeTimeout(options.defaultTimeoutMs ?? 60_000);
     if (typeof options.fetch === "function") {
       this.fetchImpl = options.fetch;
     } else if (typeof globalThis.fetch === "function") {
@@ -5037,12 +5041,12 @@ export class ExportDocManagerApiClient {
     return new URL(path, this.baseUrl).toString();
   }
 
-  public activateSingleWindowClientProfile(request: ActivateSingleWindowClientProfileRequest, init?: RequestInit): Promise<ApiSingleWindowClientProfilesResponse> {
+  public activateSingleWindowClientProfile(request: ActivateSingleWindowClientProfileRequest, init?: ApiRequestInit): Promise<ApiSingleWindowClientProfilesResponse> {
     const path = `/api/single-window/client-profiles/${encodePath(request.profileKey)}/activate`;
     return this.request<ApiSingleWindowClientProfilesResponse>("POST", path, { init });
   }
 
-  public analyzeContainerPacking(request: AnalyzeContainerPackingRequest, init?: RequestInit): Promise<ApiContainerPackingAnalyzeResponse> {
+  public analyzeContainerPacking(request: AnalyzeContainerPackingRequest, init?: ApiRequestInit): Promise<ApiContainerPackingAnalyzeResponse> {
     const path = "/api/tools/container-packing/analyze";
     return this.request<ApiContainerPackingAnalyzeResponse>("POST", path, {
       body: request.body,
@@ -5050,7 +5054,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public analyzeInvoiceProfit(request: AnalyzeInvoiceProfitRequest, init?: RequestInit): Promise<ApiInvoiceProfitAnalysisResponse> {
+  public analyzeInvoiceProfit(request: AnalyzeInvoiceProfitRequest, init?: ApiRequestInit): Promise<ApiInvoiceProfitAnalysisResponse> {
     const path = "/api/invoices/profit-analysis";
     return this.request<ApiInvoiceProfitAnalysisResponse>("POST", path, {
       body: request.body,
@@ -5058,7 +5062,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public authorizeServerMigrationOperation(request: AuthorizeServerMigrationOperationRequest, init?: RequestInit): Promise<ApiSensitiveOperationAuthorizationResponse> {
+  public authorizeServerMigrationOperation(request: AuthorizeServerMigrationOperationRequest, init?: ApiRequestInit): Promise<ApiSensitiveOperationAuthorizationResponse> {
     const path = "/api/server-migration/authorization";
     return this.request<ApiSensitiveOperationAuthorizationResponse>("POST", path, {
       body: request.body,
@@ -5066,32 +5070,32 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public buildAgentConsignmentDefaults(request: BuildAgentConsignmentDefaultsRequest, init?: RequestInit): Promise<ApiAgentConsignmentDocumentDto> {
+  public buildAgentConsignmentDefaults(request: BuildAgentConsignmentDefaultsRequest, init?: ApiRequestInit): Promise<ApiAgentConsignmentDocumentDto> {
     const path = `/api/single-window/acd/${encodePath(request.invoiceId)}/build-defaults`;
     return this.request<ApiAgentConsignmentDocumentDto>("POST", path, { init });
   }
 
-  public buildAgentConsignmentExportReview(request: BuildAgentConsignmentExportReviewRequest, init?: RequestInit): Promise<SingleWindowExportReview> {
+  public buildAgentConsignmentExportReview(request: BuildAgentConsignmentExportReviewRequest, init?: ApiRequestInit): Promise<SingleWindowExportReview> {
     const path = `/api/single-window/acd/${encodePath(request.invoiceId)}/export-review`;
     return this.request<SingleWindowExportReview>("POST", path, { init });
   }
 
-  public buildCustomsCooDefaults(request: BuildCustomsCooDefaultsRequest, init?: RequestInit): Promise<ApiCustomsCooDocumentDto> {
+  public buildCustomsCooDefaults(request: BuildCustomsCooDefaultsRequest, init?: ApiRequestInit): Promise<ApiCustomsCooDocumentDto> {
     const path = `/api/single-window/coo/${encodePath(request.invoiceId)}/build-defaults`;
     return this.request<ApiCustomsCooDocumentDto>("POST", path, { init });
   }
 
-  public buildCustomsCooExportReview(request: BuildCustomsCooExportReviewRequest, init?: RequestInit): Promise<SingleWindowExportReview> {
+  public buildCustomsCooExportReview(request: BuildCustomsCooExportReviewRequest, init?: ApiRequestInit): Promise<SingleWindowExportReview> {
     const path = `/api/single-window/coo/${encodePath(request.invoiceId)}/export-review`;
     return this.request<SingleWindowExportReview>("POST", path, { init });
   }
 
-  public cancelJob(request: CancelJobRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public cancelJob(request: CancelJobRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/jobs/${encodePath(request.jobId)}/cancel`;
     return this.request<ApiCommandResponse>("POST", path, { init });
   }
 
-  public captureRemoteHsCodes(request: CaptureRemoteHsCodesRequest, init?: RequestInit): Promise<ApiHsCodeSearchResponse> {
+  public captureRemoteHsCodes(request: CaptureRemoteHsCodesRequest, init?: ApiRequestInit): Promise<ApiHsCodeSearchResponse> {
     const path = "/api/master-data/hs-codes/search-remote/capture";
     return this.request<ApiHsCodeSearchResponse>("POST", path, {
       body: request.body,
@@ -5099,12 +5103,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public checkReportTemplateStorage(init?: RequestInit): Promise<ApiReportTemplateStorageStatusResponse> {
+  public checkReportTemplateStorage(init?: ApiRequestInit): Promise<ApiReportTemplateStorageStatusResponse> {
     const path = "/api/reports/templates/storage-check";
     return this.request<ApiReportTemplateStorageStatusResponse>("POST", path, { init });
   }
 
-  public cleanupAuditLogs(request: CleanupAuditLogsRequest, init?: RequestInit): Promise<ApiAuditLogCommandResponse> {
+  public cleanupAuditLogs(request: CleanupAuditLogsRequest, init?: ApiRequestInit): Promise<ApiAuditLogCommandResponse> {
     const path = "/api/audit-logs/cleanup";
     return this.request<ApiAuditLogCommandResponse>("POST", path, {
       body: request.body,
@@ -5112,7 +5116,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public cleanupDatabaseBackups(request: CleanupDatabaseBackupsRequest, init?: RequestInit): Promise<ApiBackupCreateResponse> {
+  public cleanupDatabaseBackups(request: CleanupDatabaseBackupsRequest, init?: ApiRequestInit): Promise<ApiBackupCreateResponse> {
     const path = "/api/backup/cleanup";
     return this.request<ApiBackupCreateResponse>("POST", path, {
       body: request.body,
@@ -5120,12 +5124,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public cleanupSystemLogs(init?: RequestInit): Promise<ApiSystemLogCleanupResponse> {
+  public cleanupSystemLogs(init?: ApiRequestInit): Promise<ApiSystemLogCleanupResponse> {
     const path = "/api/system/logs/cleanup";
     return this.request<ApiSystemLogCleanupResponse>("POST", path, { init });
   }
 
-  public clearAllHsCodes(request: ClearAllHsCodesRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public clearAllHsCodes(request: ClearAllHsCodesRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/master-data/hs-codes/clear-all";
     return this.request<ApiCommandResponse>("POST", path, {
       body: request.body,
@@ -5133,12 +5137,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public clearFinishedJobs(init?: RequestInit): Promise<ApiCommandResponse> {
+  public clearFinishedJobs(init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/jobs/finished";
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public cloneInvoice(request: CloneInvoiceRequest, init?: RequestInit): Promise<ApiInvoiceCloneResponse> {
+  public cloneInvoice(request: CloneInvoiceRequest, init?: ApiRequestInit): Promise<ApiInvoiceCloneResponse> {
     const path = `/api/invoices/${encodePath(request.id)}/clone`;
     return this.request<ApiInvoiceCloneResponse>("POST", path, {
       body: request.body,
@@ -5146,7 +5150,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public cloneInvoiceAsType(request: CloneInvoiceAsTypeRequest, init?: RequestInit): Promise<ApiInvoiceCloneTypeResponse> {
+  public cloneInvoiceAsType(request: CloneInvoiceAsTypeRequest, init?: ApiRequestInit): Promise<ApiInvoiceCloneTypeResponse> {
     const path = `/api/invoices/${encodePath(request.id)}/clone-type`;
     return this.request<ApiInvoiceCloneTypeResponse>("POST", path, {
       body: request.body,
@@ -5154,7 +5158,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public collectSingleWindowClientReceipts(request: CollectSingleWindowClientReceiptsRequest, init?: RequestInit): Promise<SingleWindowReceiptCollectionResult> {
+  public collectSingleWindowClientReceipts(request: CollectSingleWindowClientReceiptsRequest, init?: ApiRequestInit): Promise<SingleWindowReceiptCollectionResult> {
     const path = "/api/single-window/client/collect-receipts";
     return this.request<SingleWindowReceiptCollectionResult>("POST", path, {
       body: request.body,
@@ -5162,7 +5166,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public commitHsCodesImport(request: CommitHsCodesImportRequest, init?: RequestInit): Promise<ApiHsCodeImportCommitResponse> {
+  public commitHsCodesImport(request: CommitHsCodesImportRequest, init?: ApiRequestInit): Promise<ApiHsCodeImportCommitResponse> {
     const path = "/api/master-data/hs-codes/import-commit";
     return this.request<ApiHsCodeImportCommitResponse>("POST", path, {
       body: request.body,
@@ -5170,7 +5174,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createCrmContact(request: CreateCrmContactRequest, init?: RequestInit): Promise<ApiCrmContactDto> {
+  public createCrmContact(request: CreateCrmContactRequest, init?: ApiRequestInit): Promise<ApiCrmContactDto> {
     const path = `/api/crm/customers/${encodePath(request.customerId)}/contacts`;
     return this.request<ApiCrmContactDto>("POST", path, {
       body: request.body,
@@ -5178,7 +5182,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createCrmCustomer(request: CreateCrmCustomerRequest, init?: RequestInit): Promise<ApiCrmCustomerDto> {
+  public createCrmCustomer(request: CreateCrmCustomerRequest, init?: ApiRequestInit): Promise<ApiCrmCustomerDto> {
     const path = "/api/crm/customers";
     return this.request<ApiCrmCustomerDto>("POST", path, {
       body: request.body,
@@ -5186,7 +5190,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createCrmFollowUp(request: CreateCrmFollowUpRequest, init?: RequestInit): Promise<ApiCrmFollowUpDto> {
+  public createCrmFollowUp(request: CreateCrmFollowUpRequest, init?: ApiRequestInit): Promise<ApiCrmFollowUpDto> {
     const path = "/api/crm/follow-ups";
     return this.request<ApiCrmFollowUpDto>("POST", path, {
       body: request.body,
@@ -5194,7 +5198,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createCustomer(request: CreateCustomerRequest, init?: RequestInit): Promise<ApiCustomerDto> {
+  public createCustomer(request: CreateCustomerRequest, init?: ApiRequestInit): Promise<ApiCustomerDto> {
     const path = "/api/master-data/customers";
     return this.request<ApiCustomerDto>("POST", path, {
       body: request.body,
@@ -5202,7 +5206,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createCustomsCooProducerProfile(request: CreateCustomsCooProducerProfileRequest, init?: RequestInit): Promise<ApiCustomsCooProducerProfileSaveResponse> {
+  public createCustomsCooProducerProfile(request: CreateCustomsCooProducerProfileRequest, init?: ApiRequestInit): Promise<ApiCustomsCooProducerProfileSaveResponse> {
     const path = "/api/single-window/coo/producer-profiles";
     return this.request<ApiCustomsCooProducerProfileSaveResponse>("POST", path, {
       body: request.body,
@@ -5210,12 +5214,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createDatabaseBackup(init?: RequestInit): Promise<ApiBackupCreateResponse> {
+  public createDatabaseBackup(init?: ApiRequestInit): Promise<ApiBackupCreateResponse> {
     const path = "/api/backup";
     return this.request<ApiBackupCreateResponse>("POST", path, { init });
   }
 
-  public createDisasterRecoveryPackage(request: CreateDisasterRecoveryPackageRequest, init?: RequestInit): Promise<ApiDisasterRecoveryPackageResponse> {
+  public createDisasterRecoveryPackage(request: CreateDisasterRecoveryPackageRequest, init?: ApiRequestInit): Promise<ApiDisasterRecoveryPackageResponse> {
     const path = "/api/backup/disaster-recovery/create";
     return this.request<ApiDisasterRecoveryPackageResponse>("POST", path, {
       body: request.body,
@@ -5223,7 +5227,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createEmailTemplate(request: CreateEmailTemplateRequest, init?: RequestInit): Promise<ApiEmailTemplateDto> {
+  public createEmailTemplate(request: CreateEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
     const path = "/api/email-templates";
     return this.request<ApiEmailTemplateDto>("POST", path, {
       body: request.body,
@@ -5231,7 +5235,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createExporter(request: CreateExporterRequest, init?: RequestInit): Promise<ApiExporterDto> {
+  public createExporter(request: CreateExporterRequest, init?: ApiRequestInit): Promise<ApiExporterDto> {
     const path = "/api/master-data/exporters";
     return this.request<ApiExporterDto>("POST", path, {
       body: request.body,
@@ -5239,7 +5243,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createHsCode(request: CreateHsCodeRequest, init?: RequestInit): Promise<ApiHsCodeDto> {
+  public createHsCode(request: CreateHsCodeRequest, init?: ApiRequestInit): Promise<ApiHsCodeDto> {
     const path = "/api/master-data/hs-codes";
     return this.request<ApiHsCodeDto>("POST", path, {
       body: request.body,
@@ -5247,7 +5251,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createInvoice(request: CreateInvoiceRequest, init?: RequestInit): Promise<ApiInvoiceSaveResponse> {
+  public createInvoice(request: CreateInvoiceRequest, init?: ApiRequestInit): Promise<ApiInvoiceSaveResponse> {
     const path = "/api/invoices";
     return this.request<ApiInvoiceSaveResponse>("POST", path, {
       body: request.body,
@@ -5255,12 +5259,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createJobDownloadTicket(request: CreateJobDownloadTicketRequest, init?: RequestInit): Promise<ApiDownloadTicket> {
+  public createJobDownloadTicket(request: CreateJobDownloadTicketRequest, init?: ApiRequestInit): Promise<ApiDownloadTicket> {
     const path = `/api/jobs/${encodePath(request.jobId)}/download-ticket`;
     return this.request<ApiDownloadTicket>("POST", path, { init });
   }
 
-  public createPayee(request: CreatePayeeRequest, init?: RequestInit): Promise<ApiPayeeDto> {
+  public createPayee(request: CreatePayeeRequest, init?: ApiRequestInit): Promise<ApiPayeeDto> {
     const path = "/api/master-data/payees";
     return this.request<ApiPayeeDto>("POST", path, {
       body: request.body,
@@ -5268,7 +5272,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createPayment(request: CreatePaymentRequest, init?: RequestInit): Promise<ApiPaymentSaveResponse> {
+  public createPayment(request: CreatePaymentRequest, init?: ApiRequestInit): Promise<ApiPaymentSaveResponse> {
     const path = "/api/payments";
     return this.request<ApiPaymentSaveResponse>("POST", path, {
       body: request.body,
@@ -5276,7 +5280,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createPermissionTemplate(request: CreatePermissionTemplateRequest, init?: RequestInit): Promise<ApiPermissionTemplateDto> {
+  public createPermissionTemplate(request: CreatePermissionTemplateRequest, init?: ApiRequestInit): Promise<ApiPermissionTemplateDto> {
     const path = "/api/permission-templates";
     return this.request<ApiPermissionTemplateDto>("POST", path, {
       body: request.body,
@@ -5284,7 +5288,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createPort(request: CreatePortRequest, init?: RequestInit): Promise<ApiPortDto> {
+  public createPort(request: CreatePortRequest, init?: ApiRequestInit): Promise<ApiPortDto> {
     const path = "/api/master-data/ports";
     return this.request<ApiPortDto>("POST", path, {
       body: request.body,
@@ -5292,12 +5296,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createPostgreSqlPhysicalBackup(init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public createPostgreSqlPhysicalBackup(init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/postgresql-maintenance/backups";
     return this.request<BackgroundJobSnapshot>("POST", path, { init });
   }
 
-  public createPostgreSqlPhysicalBackupDownloadTicket(request: CreatePostgreSqlPhysicalBackupDownloadTicketRequest = {}, init?: RequestInit): Promise<ApiDownloadTicket> {
+  public createPostgreSqlPhysicalBackupDownloadTicket(request: CreatePostgreSqlPhysicalBackupDownloadTicketRequest = {}, init?: ApiRequestInit): Promise<ApiDownloadTicket> {
     const path = "/api/postgresql-maintenance/backups/download-ticket";
     return this.request<ApiDownloadTicket>("POST", path, {
       query: {
@@ -5307,7 +5311,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createPostgreSqlRestorePlan(request: CreatePostgreSqlRestorePlanRequest, init?: RequestInit): Promise<ApiPostgreSqlRestorePlanResponse> {
+  public createPostgreSqlRestorePlan(request: CreatePostgreSqlRestorePlanRequest, init?: ApiRequestInit): Promise<ApiPostgreSqlRestorePlanResponse> {
     const path = "/api/postgresql-maintenance/restore-plan";
     return this.request<ApiPostgreSqlRestorePlanResponse>("POST", path, {
       body: request.body,
@@ -5315,7 +5319,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createProduct(request: CreateProductRequest, init?: RequestInit): Promise<ApiProductDto> {
+  public createProduct(request: CreateProductRequest, init?: ApiRequestInit): Promise<ApiProductDto> {
     const path = "/api/master-data/products";
     return this.request<ApiProductDto>("POST", path, {
       body: request.body,
@@ -5323,7 +5327,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createReportTemplate(request: CreateReportTemplateRequest, init?: RequestInit): Promise<ApiReportTemplateContentDto> {
+  public createReportTemplate(request: CreateReportTemplateRequest, init?: ApiRequestInit): Promise<ApiReportTemplateContentDto> {
     const path = "/api/reports/templates";
     return this.request<ApiReportTemplateContentDto>("POST", path, {
       body: request.body,
@@ -5331,7 +5335,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createSalesOpportunity(request: CreateSalesOpportunityRequest, init?: RequestInit): Promise<ApiSalesOpportunityDto> {
+  public createSalesOpportunity(request: CreateSalesOpportunityRequest, init?: ApiRequestInit): Promise<ApiSalesOpportunityDto> {
     const path = "/api/crm/opportunities";
     return this.request<ApiSalesOpportunityDto>("POST", path, {
       body: request.body,
@@ -5339,7 +5343,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createServerMigrationPackage(request: CreateServerMigrationPackageRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public createServerMigrationPackage(request: CreateServerMigrationPackageRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/server-migration/packages";
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -5347,7 +5351,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createSupplier(request: CreateSupplierRequest, init?: RequestInit): Promise<ApiSupplierDto> {
+  public createSupplier(request: CreateSupplierRequest, init?: ApiRequestInit): Promise<ApiSupplierDto> {
     const path = "/api/suppliers";
     return this.request<ApiSupplierDto>("POST", path, {
       body: request.body,
@@ -5355,7 +5359,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createSupplierAssessment(request: CreateSupplierAssessmentRequest, init?: RequestInit): Promise<ApiSupplierAssessmentDto> {
+  public createSupplierAssessment(request: CreateSupplierAssessmentRequest, init?: ApiRequestInit): Promise<ApiSupplierAssessmentDto> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/assessments`;
     return this.request<ApiSupplierAssessmentDto>("POST", path, {
       body: request.body,
@@ -5363,7 +5367,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createSupplierContact(request: CreateSupplierContactRequest, init?: RequestInit): Promise<ApiSupplierContactDto> {
+  public createSupplierContact(request: CreateSupplierContactRequest, init?: ApiRequestInit): Promise<ApiSupplierContactDto> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/contacts`;
     return this.request<ApiSupplierContactDto>("POST", path, {
       body: request.body,
@@ -5371,7 +5375,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createSupplierProductLink(request: CreateSupplierProductLinkRequest, init?: RequestInit): Promise<ApiSupplierProductLinkDto> {
+  public createSupplierProductLink(request: CreateSupplierProductLinkRequest, init?: ApiRequestInit): Promise<ApiSupplierProductLinkDto> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/products`;
     return this.request<ApiSupplierProductLinkDto>("POST", path, {
       body: request.body,
@@ -5379,7 +5383,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createUnit(request: CreateUnitRequest, init?: RequestInit): Promise<ApiUnitDto> {
+  public createUnit(request: CreateUnitRequest, init?: ApiRequestInit): Promise<ApiUnitDto> {
     const path = "/api/master-data/units";
     return this.request<ApiUnitDto>("POST", path, {
       body: request.body,
@@ -5387,7 +5391,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createUserReportTemplate(request: CreateUserReportTemplateRequest, init?: RequestInit): Promise<ApiUserReportTemplateDto> {
+  public createUserReportTemplate(request: CreateUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
     const path = "/api/reports/user-templates";
     return this.request<ApiUserReportTemplateDto>("POST", path, {
       body: request.body,
@@ -5395,7 +5399,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public deleteAuditLogsByCriteria(request: DeleteAuditLogsByCriteriaRequest, init?: RequestInit): Promise<ApiAuditLogCommandResponse> {
+  public deleteAuditLogsByCriteria(request: DeleteAuditLogsByCriteriaRequest, init?: ApiRequestInit): Promise<ApiAuditLogCommandResponse> {
     const path = "/api/audit-logs/delete";
     return this.request<ApiAuditLogCommandResponse>("POST", path, {
       body: request.body,
@@ -5403,62 +5407,62 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public deleteContainerPackingContainerType(request: DeleteContainerPackingContainerTypeRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteContainerPackingContainerType(request: DeleteContainerPackingContainerTypeRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/tools/container-packing/container-types/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteContainerPackingProject(request: DeleteContainerPackingProjectRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteContainerPackingProject(request: DeleteContainerPackingProjectRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/tools/container-packing/projects/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteCrmContact(request: DeleteCrmContactRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteCrmContact(request: DeleteCrmContactRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/crm/customers/${encodePath(request.customerId)}/contacts/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteCrmCustomer(request: DeleteCrmCustomerRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteCrmCustomer(request: DeleteCrmCustomerRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/crm/customers/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteCrmFollowUp(request: DeleteCrmFollowUpRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteCrmFollowUp(request: DeleteCrmFollowUpRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/crm/follow-ups/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteCustomer(request: DeleteCustomerRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteCustomer(request: DeleteCustomerRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/customers/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteCustomsCooProducerProfile(request: DeleteCustomsCooProducerProfileRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteCustomsCooProducerProfile(request: DeleteCustomsCooProducerProfileRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/single-window/coo/producer-profiles/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteEmailTemplate(request: DeleteEmailTemplateRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteEmailTemplate(request: DeleteEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/email-templates/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteExporter(request: DeleteExporterRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteExporter(request: DeleteExporterRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/exporters/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteHsCode(request: DeleteHsCodeRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteHsCode(request: DeleteHsCodeRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/hs-codes/by-id/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteHsCodeKnowledgeExample(request: DeleteHsCodeKnowledgeExampleRequest, init?: RequestInit): Promise<void> {
+  public deleteHsCodeKnowledgeExample(request: DeleteHsCodeKnowledgeExampleRequest, init?: ApiRequestInit): Promise<void> {
     const path = `/api/master-data/hs-knowledge/examples/${encodePath(request.id)}`;
     return this.request<void>("DELETE", path, { init });
   }
 
-  public deleteHsCodeKnowledgeExamplesBatch(request: DeleteHsCodeKnowledgeExamplesBatchRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteHsCodeKnowledgeExamplesBatch(request: DeleteHsCodeKnowledgeExamplesBatchRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/master-data/hs-knowledge/examples/delete-batch";
     return this.request<ApiCommandResponse>("POST", path, {
       body: request.body,
@@ -5466,7 +5470,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public deleteHsCodesBatch(request: DeleteHsCodesBatchRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteHsCodesBatch(request: DeleteHsCodesBatchRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/master-data/hs-codes/delete-batch";
     return this.request<ApiCommandResponse>("POST", path, {
       body: request.body,
@@ -5474,42 +5478,42 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public deleteInvoice(request: DeleteInvoiceRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteInvoice(request: DeleteInvoiceRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/invoices/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteJob(request: DeleteJobRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteJob(request: DeleteJobRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/jobs/${encodePath(request.jobId)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deletePayee(request: DeletePayeeRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deletePayee(request: DeletePayeeRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/payees/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deletePayment(request: DeletePaymentRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deletePayment(request: DeletePaymentRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/payments/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deletePermissionTemplate(request: DeletePermissionTemplateRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deletePermissionTemplate(request: DeletePermissionTemplateRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/permission-templates/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deletePort(request: DeletePortRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deletePort(request: DeletePortRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/ports/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteProduct(request: DeleteProductRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteProduct(request: DeleteProductRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/products/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteReportTemplate(request: DeleteReportTemplateRequest = {}, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteReportTemplate(request: DeleteReportTemplateRequest = {}, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/reports/templates/content";
     return this.request<ApiCommandResponse>("DELETE", path, {
       query: {
@@ -5520,42 +5524,42 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public deleteSalesOpportunity(request: DeleteSalesOpportunityRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteSalesOpportunity(request: DeleteSalesOpportunityRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/crm/opportunities/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteSupplier(request: DeleteSupplierRequest, init?: RequestInit): Promise<ApiSupplierDeleteResponse> {
+  public deleteSupplier(request: DeleteSupplierRequest, init?: ApiRequestInit): Promise<ApiSupplierDeleteResponse> {
     const path = `/api/suppliers/${encodePath(request.id)}`;
     return this.request<ApiSupplierDeleteResponse>("DELETE", path, { init });
   }
 
-  public deleteSupplierAssessment(request: DeleteSupplierAssessmentRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteSupplierAssessment(request: DeleteSupplierAssessmentRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/assessments/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteSupplierContact(request: DeleteSupplierContactRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteSupplierContact(request: DeleteSupplierContactRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/contacts/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteSupplierProductLink(request: DeleteSupplierProductLinkRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteSupplierProductLink(request: DeleteSupplierProductLinkRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/products/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteUnit(request: DeleteUnitRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteUnit(request: DeleteUnitRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/units/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteUserReportTemplate(request: DeleteUserReportTemplateRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteUserReportTemplate(request: DeleteUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/reports/user-templates/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public discoverHsCodeHistoryCandidates(request: DiscoverHsCodeHistoryCandidatesRequest = {}, init?: RequestInit): Promise<HsCodeHistoryCandidatePage> {
+  public discoverHsCodeHistoryCandidates(request: DiscoverHsCodeHistoryCandidatesRequest = {}, init?: ApiRequestInit): Promise<HsCodeHistoryCandidatePage> {
     const path = "/api/master-data/hs-knowledge/history-candidates";
     return this.request<HsCodeHistoryCandidatePage>("GET", path, {
       query: {
@@ -5567,7 +5571,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public dispatchSingleWindowBatchToClient(request: DispatchSingleWindowBatchToClientRequest, init?: RequestInit): Promise<SingleWindowClientDispatchResult> {
+  public dispatchSingleWindowBatchToClient(request: DispatchSingleWindowBatchToClientRequest, init?: ApiRequestInit): Promise<SingleWindowClientDispatchResult> {
     const path = "/api/single-window/client/dispatch";
     return this.request<SingleWindowClientDispatchResult>("POST", path, {
       body: request.body,
@@ -5575,7 +5579,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public downloadAgentConsignmentSubmitPackage(request: DownloadAgentConsignmentSubmitPackageRequest, init?: RequestInit): Promise<Blob> {
+  public downloadAgentConsignmentSubmitPackage(request: DownloadAgentConsignmentSubmitPackageRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = `/api/single-window/acd/${encodePath(request.invoiceId)}/submit-package/download`;
     return this.request<Blob>("POST", path, {
       body: request.body,
@@ -5583,7 +5587,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public downloadAuditLogs(request: DownloadAuditLogsRequest, init?: RequestInit): Promise<Blob> {
+  public downloadAuditLogs(request: DownloadAuditLogsRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = "/api/audit-logs/download";
     return this.request<Blob>("POST", path, {
       body: request.body,
@@ -5591,7 +5595,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public downloadCloudDatabaseBackup(request: DownloadCloudDatabaseBackupRequest, init?: RequestInit): Promise<ApiCloudBackupCommandResponse> {
+  public downloadCloudDatabaseBackup(request: DownloadCloudDatabaseBackupRequest, init?: ApiRequestInit): Promise<ApiCloudBackupCommandResponse> {
     const path = "/api/backup/cloud/download";
     return this.request<ApiCloudBackupCommandResponse>("POST", path, {
       body: request.body,
@@ -5599,7 +5603,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public downloadContainerPackingPdf(request: DownloadContainerPackingPdfRequest, init?: RequestInit): Promise<Blob> {
+  public downloadContainerPackingPdf(request: DownloadContainerPackingPdfRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = "/api/tools/container-packing/pdf/download";
     return this.request<Blob>("POST", path, {
       body: request.body,
@@ -5607,7 +5611,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public downloadCustomsCooSubmitPackage(request: DownloadCustomsCooSubmitPackageRequest, init?: RequestInit): Promise<Blob> {
+  public downloadCustomsCooSubmitPackage(request: DownloadCustomsCooSubmitPackageRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = `/api/single-window/coo/${encodePath(request.invoiceId)}/submit-package/download`;
     return this.request<Blob>("POST", path, {
       body: request.body,
@@ -5615,27 +5619,27 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public downloadInvoiceTransferPackage(request: DownloadInvoiceTransferPackageRequest, init?: RequestInit): Promise<Blob> {
+  public downloadInvoiceTransferPackage(request: DownloadInvoiceTransferPackageRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = `/api/invoices/${encodePath(request.id)}/transfer-package/download`;
     return this.request<Blob>("POST", path, { init });
   }
 
-  public downloadJobResult(request: DownloadJobResultRequest, init?: RequestInit): Promise<Blob> {
+  public downloadJobResult(request: DownloadJobResultRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = `/api/jobs/${encodePath(request.jobId)}/download`;
     return this.request<Blob>("GET", path, { init });
   }
 
-  public downloadJobResultWithTicket(request: DownloadJobResultWithTicketRequest, init?: RequestInit): Promise<Blob> {
+  public downloadJobResultWithTicket(request: DownloadJobResultWithTicketRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = `/downloads/jobs/${encodePath(request.token)}`;
     return this.request<Blob>("GET", path, { init });
   }
 
-  public downloadPostgreSqlPhysicalBackupWithTicket(request: DownloadPostgreSqlPhysicalBackupWithTicketRequest, init?: RequestInit): Promise<Blob> {
+  public downloadPostgreSqlPhysicalBackupWithTicket(request: DownloadPostgreSqlPhysicalBackupWithTicketRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = `/downloads/postgresql-backups/${encodePath(request.token)}`;
     return this.request<Blob>("GET", path, { init });
   }
 
-  public downloadQueriedInvoices(request: DownloadQueriedInvoicesRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public downloadQueriedInvoices(request: DownloadQueriedInvoicesRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/query/invoices/download";
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -5643,12 +5647,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public downloadReportTemplatePackage(init?: RequestInit): Promise<Blob> {
+  public downloadReportTemplatePackage(init?: ApiRequestInit): Promise<Blob> {
     const path = "/api/reports/templates/package/download";
     return this.request<Blob>("POST", path, { init });
   }
 
-  public downloadSingleWindowReceiptPackage(request: DownloadSingleWindowReceiptPackageRequest, init?: RequestInit): Promise<Blob> {
+  public downloadSingleWindowReceiptPackage(request: DownloadSingleWindowReceiptPackageRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = "/api/single-window/receipts/download-package";
     return this.request<Blob>("POST", path, {
       body: request.body,
@@ -5656,7 +5660,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public downloadSupportPackage(request: DownloadSupportPackageRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public downloadSupportPackage(request: DownloadSupportPackageRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/support-package/download";
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -5664,7 +5668,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public exportCrmCustomers(request: ExportCrmCustomersRequest = {}, init?: RequestInit): Promise<Blob> {
+  public exportCrmCustomers(request: ExportCrmCustomersRequest = {}, init?: ApiRequestInit): Promise<Blob> {
     const path = "/api/crm/customers/export";
     return this.request<Blob>("GET", path, {
       query: {
@@ -5675,7 +5679,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public exportHsCodeKnowledge(request: ExportHsCodeKnowledgeRequest = {}, init?: RequestInit): Promise<Blob> {
+  public exportHsCodeKnowledge(request: ExportHsCodeKnowledgeRequest = {}, init?: ApiRequestInit): Promise<Blob> {
     const path = "/api/master-data/hs-knowledge/export";
     return this.request<Blob>("GET", path, {
       query: {
@@ -5685,7 +5689,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public exportSuppliers(request: ExportSuppliersRequest = {}, init?: RequestInit): Promise<Blob> {
+  public exportSuppliers(request: ExportSuppliersRequest = {}, init?: ApiRequestInit): Promise<Blob> {
     const path = "/api/suppliers/export";
     return this.request<Blob>("GET", path, {
       query: {
@@ -5696,7 +5700,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public fetchRemoteHsCodeDetail(request: FetchRemoteHsCodeDetailRequest, init?: RequestInit): Promise<ApiHsCodeDto> {
+  public fetchRemoteHsCodeDetail(request: FetchRemoteHsCodeDetailRequest, init?: ApiRequestInit): Promise<ApiHsCodeDto> {
     const path = "/api/master-data/hs-codes/fetch-remote-detail";
     return this.request<ApiHsCodeDto>("POST", path, {
       body: request.body,
@@ -5704,142 +5708,142 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public getAgentConsignmentDocument(request: GetAgentConsignmentDocumentRequest, init?: RequestInit): Promise<ApiAgentConsignmentDocumentDto> {
+  public getAgentConsignmentDocument(request: GetAgentConsignmentDocumentRequest, init?: ApiRequestInit): Promise<ApiAgentConsignmentDocumentDto> {
     const path = `/api/single-window/acd/${encodePath(request.invoiceId)}`;
     return this.request<ApiAgentConsignmentDocumentDto>("GET", path, { init });
   }
 
-  public getAgentConsignmentLockedFields(request: GetAgentConsignmentLockedFieldsRequest, init?: RequestInit): Promise<ApiSingleWindowLockedFieldsResponse> {
+  public getAgentConsignmentLockedFields(request: GetAgentConsignmentLockedFieldsRequest, init?: ApiRequestInit): Promise<ApiSingleWindowLockedFieldsResponse> {
     const path = `/api/single-window/acd/${encodePath(request.invoiceId)}/locked-fields`;
     return this.request<ApiSingleWindowLockedFieldsResponse>("GET", path, { init });
   }
 
-  public getCloudBackupStatus(init?: RequestInit): Promise<ApiCloudBackupStatusResponse> {
+  public getCloudBackupStatus(init?: ApiRequestInit): Promise<ApiCloudBackupStatusResponse> {
     const path = "/api/backup/cloud/status";
     return this.request<ApiCloudBackupStatusResponse>("GET", path, { init });
   }
 
-  public getContainerPackingProject(request: GetContainerPackingProjectRequest, init?: RequestInit): Promise<ApiContainerPackingProjectResponse> {
+  public getContainerPackingProject(request: GetContainerPackingProjectRequest, init?: ApiRequestInit): Promise<ApiContainerPackingProjectResponse> {
     const path = `/api/tools/container-packing/projects/${encodePath(request.id)}`;
     return this.request<ApiContainerPackingProjectResponse>("GET", path, { init });
   }
 
-  public getCrmDashboard(init?: RequestInit): Promise<ApiCrmDashboardDto> {
+  public getCrmDashboard(init?: ApiRequestInit): Promise<ApiCrmDashboardDto> {
     const path = "/api/crm/dashboard";
     return this.request<ApiCrmDashboardDto>("GET", path, { init });
   }
 
-  public getCrmEmailVariableDraft(request: GetCrmEmailVariableDraftRequest, init?: RequestInit): Promise<ApiCrmEmailVariableDraftDto> {
+  public getCrmEmailVariableDraft(request: GetCrmEmailVariableDraftRequest, init?: ApiRequestInit): Promise<ApiCrmEmailVariableDraftDto> {
     const path = `/api/crm/customers/${encodePath(request.customerId)}/email-variable-draft`;
     return this.request<ApiCrmEmailVariableDraftDto>("GET", path, { init });
   }
 
-  public getCustomer(request: GetCustomerRequest, init?: RequestInit): Promise<ApiCustomerDto> {
+  public getCustomer(request: GetCustomerRequest, init?: ApiRequestInit): Promise<ApiCustomerDto> {
     const path = `/api/master-data/customers/${encodePath(request.id)}`;
     return this.request<ApiCustomerDto>("GET", path, { init });
   }
 
-  public getCustomsCooDocument(request: GetCustomsCooDocumentRequest, init?: RequestInit): Promise<ApiCustomsCooDocumentDto> {
+  public getCustomsCooDocument(request: GetCustomsCooDocumentRequest, init?: ApiRequestInit): Promise<ApiCustomsCooDocumentDto> {
     const path = `/api/single-window/coo/${encodePath(request.invoiceId)}`;
     return this.request<ApiCustomsCooDocumentDto>("GET", path, { init });
   }
 
-  public getCustomsCooEditorOptions(init?: RequestInit): Promise<ApiCustomsCooEditorOptionsResponse> {
+  public getCustomsCooEditorOptions(init?: ApiRequestInit): Promise<ApiCustomsCooEditorOptionsResponse> {
     const path = "/api/single-window/coo/editor-options";
     return this.request<ApiCustomsCooEditorOptionsResponse>("GET", path, { init });
   }
 
-  public getCustomsCooIssuingAuthorities(init?: RequestInit): Promise<ApiSingleWindowIssuingAuthorityCatalogResponse> {
+  public getCustomsCooIssuingAuthorities(init?: ApiRequestInit): Promise<ApiSingleWindowIssuingAuthorityCatalogResponse> {
     const path = "/api/single-window/coo/issuing-authorities";
     return this.request<ApiSingleWindowIssuingAuthorityCatalogResponse>("GET", path, { init });
   }
 
-  public getCustomsCooLockedFields(request: GetCustomsCooLockedFieldsRequest, init?: RequestInit): Promise<ApiSingleWindowLockedFieldsResponse> {
+  public getCustomsCooLockedFields(request: GetCustomsCooLockedFieldsRequest, init?: ApiRequestInit): Promise<ApiSingleWindowLockedFieldsResponse> {
     const path = `/api/single-window/coo/${encodePath(request.invoiceId)}/locked-fields`;
     return this.request<ApiSingleWindowLockedFieldsResponse>("GET", path, { init });
   }
 
-  public getCustomsCooProducerProfile(request: GetCustomsCooProducerProfileRequest, init?: RequestInit): Promise<ApiCustomsCooProducerProfileResponse> {
+  public getCustomsCooProducerProfile(request: GetCustomsCooProducerProfileRequest, init?: ApiRequestInit): Promise<ApiCustomsCooProducerProfileResponse> {
     const path = `/api/single-window/coo/producer-profiles/${encodePath(request.id)}`;
     return this.request<ApiCustomsCooProducerProfileResponse>("GET", path, { init });
   }
 
-  public getDashboard(init?: RequestInit): Promise<ApiDashboardResponse> {
+  public getDashboard(init?: ApiRequestInit): Promise<ApiDashboardResponse> {
     const path = "/api/dashboard";
     return this.request<ApiDashboardResponse>("GET", path, { init });
   }
 
-  public getDisasterRecoveryStatus(init?: RequestInit): Promise<ApiDisasterRecoveryStatusResponse> {
+  public getDisasterRecoveryStatus(init?: ApiRequestInit): Promise<ApiDisasterRecoveryStatusResponse> {
     const path = "/api/backup/disaster-recovery/status";
     return this.request<ApiDisasterRecoveryStatusResponse>("GET", path, { init });
   }
 
-  public getEmailToolStatus(init?: RequestInit): Promise<ApiEmailStatusResponse> {
+  public getEmailToolStatus(init?: ApiRequestInit): Promise<ApiEmailStatusResponse> {
     const path = "/api/tools/email/status";
     return this.request<ApiEmailStatusResponse>("GET", path, { init });
   }
 
-  public getExporter(request: GetExporterRequest, init?: RequestInit): Promise<ApiExporterDto> {
+  public getExporter(request: GetExporterRequest, init?: ApiRequestInit): Promise<ApiExporterDto> {
     const path = `/api/master-data/exporters/${encodePath(request.id)}`;
     return this.request<ApiExporterDto>("GET", path, { init });
   }
 
-  public getHsCode(request: GetHsCodeRequest, init?: RequestInit): Promise<ApiHsCodeDto> {
+  public getHsCode(request: GetHsCodeRequest, init?: ApiRequestInit): Promise<ApiHsCodeDto> {
     const path = `/api/master-data/hs-codes/${encodePath(request.code)}`;
     return this.request<ApiHsCodeDto>("GET", path, { init });
   }
 
-  public getHsCodeRemoteHealth(init?: RequestInit): Promise<ApiHsCodeRemoteHealthResponse> {
+  public getHsCodeRemoteHealth(init?: ApiRequestInit): Promise<ApiHsCodeRemoteHealthResponse> {
     const path = "/api/master-data/hs-codes/remote-health";
     return this.request<ApiHsCodeRemoteHealthResponse>("GET", path, { init });
   }
 
-  public getInvoice(request: GetInvoiceRequest, init?: RequestInit): Promise<ApiInvoiceDetailDto> {
+  public getInvoice(request: GetInvoiceRequest, init?: ApiRequestInit): Promise<ApiInvoiceDetailDto> {
     const path = `/api/invoices/${encodePath(request.id)}`;
     return this.request<ApiInvoiceDetailDto>("GET", path, { init });
   }
 
-  public getInvoiceDataMaintenancePreview(request: GetInvoiceDataMaintenancePreviewRequest, init?: RequestInit): Promise<ApiInvoiceDataMaintenancePreviewResponse> {
+  public getInvoiceDataMaintenancePreview(request: GetInvoiceDataMaintenancePreviewRequest, init?: ApiRequestInit): Promise<ApiInvoiceDataMaintenancePreviewResponse> {
     const path = `/api/system/data-maintenance/invoices/${encodePath(request.id)}`;
     return this.request<ApiInvoiceDataMaintenancePreviewResponse>("GET", path, { init });
   }
 
-  public getInvoiceHsCode(request: GetInvoiceHsCodeRequest, init?: RequestInit): Promise<ApiHsCodeDto> {
+  public getInvoiceHsCode(request: GetInvoiceHsCodeRequest, init?: ApiRequestInit): Promise<ApiHsCodeDto> {
     const path = `/api/invoices/hs-codes/${encodePath(request.code)}`;
     return this.request<ApiHsCodeDto>("GET", path, { init });
   }
 
-  public getJob(request: GetJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public getJob(request: GetJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/jobs/${encodePath(request.jobId)}`;
     return this.request<BackgroundJobSnapshot>("GET", path, { init });
   }
 
-  public getLicenseStatus(init?: RequestInit): Promise<ApiLicenseStatusResponse> {
+  public getLicenseStatus(init?: ApiRequestInit): Promise<ApiLicenseStatusResponse> {
     const path = "/api/system/license";
     return this.request<ApiLicenseStatusResponse>("GET", path, { init });
   }
 
-  public getPayee(request: GetPayeeRequest, init?: RequestInit): Promise<ApiPayeeDto> {
+  public getPayee(request: GetPayeeRequest, init?: ApiRequestInit): Promise<ApiPayeeDto> {
     const path = `/api/master-data/payees/${encodePath(request.id)}`;
     return this.request<ApiPayeeDto>("GET", path, { init });
   }
 
-  public getPayment(request: GetPaymentRequest, init?: RequestInit): Promise<ApiPaymentDto> {
+  public getPayment(request: GetPaymentRequest, init?: ApiRequestInit): Promise<ApiPaymentDto> {
     const path = `/api/payments/${encodePath(request.id)}`;
     return this.request<ApiPaymentDto>("GET", path, { init });
   }
 
-  public getPort(request: GetPortRequest, init?: RequestInit): Promise<ApiPortDto> {
+  public getPort(request: GetPortRequest, init?: ApiRequestInit): Promise<ApiPortDto> {
     const path = `/api/master-data/ports/${encodePath(request.id)}`;
     return this.request<ApiPortDto>("GET", path, { init });
   }
 
-  public getProduct(request: GetProductRequest, init?: RequestInit): Promise<ApiProductDto> {
+  public getProduct(request: GetProductRequest, init?: ApiRequestInit): Promise<ApiProductDto> {
     const path = `/api/master-data/products/${encodePath(request.id)}`;
     return this.request<ApiProductDto>("GET", path, { init });
   }
 
-  public getReportTemplateContent(request: GetReportTemplateContentRequest = {}, init?: RequestInit): Promise<ApiReportTemplateContentDto> {
+  public getReportTemplateContent(request: GetReportTemplateContentRequest = {}, init?: ApiRequestInit): Promise<ApiReportTemplateContentDto> {
     const path = "/api/reports/templates/content";
     return this.request<ApiReportTemplateContentDto>("GET", path, {
       query: {
@@ -5850,7 +5854,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public getReportTemplateFieldCatalog(request: GetReportTemplateFieldCatalogRequest = {}, init?: RequestInit): Promise<ApiReportTemplateFieldCatalogResponse> {
+  public getReportTemplateFieldCatalog(request: GetReportTemplateFieldCatalogRequest = {}, init?: ApiRequestInit): Promise<ApiReportTemplateFieldCatalogResponse> {
     const path = "/api/reports/templates/fields";
     return this.request<ApiReportTemplateFieldCatalogResponse>("GET", path, {
       query: {
@@ -5860,52 +5864,52 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public getServerMigrationStatus(init?: RequestInit): Promise<ApiServerMigrationStatusResponse> {
+  public getServerMigrationStatus(init?: ApiRequestInit): Promise<ApiServerMigrationStatusResponse> {
     const path = "/api/server-migration/status";
     return this.request<ApiServerMigrationStatusResponse>("GET", path, { init });
   }
 
-  public getSettings(init?: RequestInit): Promise<ApiSettingsResponse> {
+  public getSettings(init?: ApiRequestInit): Promise<ApiSettingsResponse> {
     const path = "/api/settings";
     return this.request<ApiSettingsResponse>("GET", path, { init });
   }
 
-  public getSharedDatabaseOwnershipSummary(init?: RequestInit): Promise<ApiSharedDatabaseOwnershipSummaryResponse> {
+  public getSharedDatabaseOwnershipSummary(init?: ApiRequestInit): Promise<ApiSharedDatabaseOwnershipSummaryResponse> {
     const path = "/api/shared-database/ownership";
     return this.request<ApiSharedDatabaseOwnershipSummaryResponse>("GET", path, { init });
   }
 
-  public getSingleWindowClientProfiles(init?: RequestInit): Promise<ApiSingleWindowClientProfilesResponse> {
+  public getSingleWindowClientProfiles(init?: ApiRequestInit): Promise<ApiSingleWindowClientProfilesResponse> {
     const path = "/api/single-window/client-profiles";
     return this.request<ApiSingleWindowClientProfilesResponse>("GET", path, { init });
   }
 
-  public getSingleWindowExportReview(request: GetSingleWindowExportReviewRequest, init?: RequestInit): Promise<SingleWindowExportReview> {
+  public getSingleWindowExportReview(request: GetSingleWindowExportReviewRequest, init?: ApiRequestInit): Promise<SingleWindowExportReview> {
     const path = `/api/single-window/export-review/${encodePath(request.businessType)}/${encodePath(request.invoiceId)}`;
     return this.request<SingleWindowExportReview>("GET", path, { init });
   }
 
-  public getSingleWindowOperationCenterDetail(request: GetSingleWindowOperationCenterDetailRequest, init?: RequestInit): Promise<SingleWindowOperationCenterDetail> {
+  public getSingleWindowOperationCenterDetail(request: GetSingleWindowOperationCenterDetailRequest, init?: ApiRequestInit): Promise<SingleWindowOperationCenterDetail> {
     const path = `/api/single-window/operation-center/${encodePath(request.batchId)}`;
     return this.request<SingleWindowOperationCenterDetail>("GET", path, { init });
   }
 
-  public getSingleWindowReferenceCatalog(init?: RequestInit): Promise<ApiSingleWindowReferenceCatalogResponse> {
+  public getSingleWindowReferenceCatalog(init?: ApiRequestInit): Promise<ApiSingleWindowReferenceCatalogResponse> {
     const path = "/api/single-window/reference-catalog";
     return this.request<ApiSingleWindowReferenceCatalogResponse>("GET", path, { init });
   }
 
-  public getSupplierAssessmentOverview(init?: RequestInit): Promise<ApiSupplierAssessmentOverviewDto> {
+  public getSupplierAssessmentOverview(init?: ApiRequestInit): Promise<ApiSupplierAssessmentOverviewDto> {
     const path = "/api/suppliers/assessment-overview";
     return this.request<ApiSupplierAssessmentOverviewDto>("GET", path, { init });
   }
 
-  public getUnit(request: GetUnitRequest, init?: RequestInit): Promise<ApiUnitDto> {
+  public getUnit(request: GetUnitRequest, init?: ApiRequestInit): Promise<ApiUnitDto> {
     const path = `/api/master-data/units/${encodePath(request.id)}`;
     return this.request<ApiUnitDto>("GET", path, { init });
   }
 
-  public importCrmCustomers(request: ImportCrmCustomersRequest, init?: RequestInit): Promise<ApiCrmCustomerImportResultDto> {
+  public importCrmCustomers(request: ImportCrmCustomersRequest, init?: ApiRequestInit): Promise<ApiCrmCustomerImportResultDto> {
     const path = "/api/crm/import";
     return this.request<ApiCrmCustomerImportResultDto>("POST", path, {
       body: request.body,
@@ -5913,7 +5917,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public importHsCodeKnowledge(request: ImportHsCodeKnowledgeRequest, init?: RequestInit): Promise<ApiHsCodeKnowledgeImportResponse> {
+  public importHsCodeKnowledge(request: ImportHsCodeKnowledgeRequest, init?: ApiRequestInit): Promise<ApiHsCodeKnowledgeImportResponse> {
     const path = "/api/master-data/hs-knowledge/import";
     return this.request<ApiHsCodeKnowledgeImportResponse>("POST", path, {
       body: request.body,
@@ -5921,7 +5925,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public importHsCodesFromPath(request: ImportHsCodesFromPathRequest, init?: RequestInit): Promise<ApiHsCodeImportResponse> {
+  public importHsCodesFromPath(request: ImportHsCodesFromPathRequest, init?: ApiRequestInit): Promise<ApiHsCodeImportResponse> {
     const path = "/api/master-data/hs-codes/import-path";
     return this.request<ApiHsCodeImportResponse>("POST", path, {
       body: request.body,
@@ -5929,7 +5933,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public importInvoiceTransferPackage(request: ImportInvoiceTransferPackageRequest, init?: RequestInit): Promise<ApiInvoiceTransferImportResponse> {
+  public importInvoiceTransferPackage(request: ImportInvoiceTransferPackageRequest, init?: ApiRequestInit): Promise<ApiInvoiceTransferImportResponse> {
     const path = "/api/invoices/transfer-package/import";
     return this.request<ApiInvoiceTransferImportResponse>("POST", path, {
       body: request.body,
@@ -5937,7 +5941,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public importLetterOfCreditDocument(request: ImportLetterOfCreditDocumentRequest, init?: RequestInit): Promise<ApiLetterOfCreditImportResponse> {
+  public importLetterOfCreditDocument(request: ImportLetterOfCreditDocumentRequest, init?: ApiRequestInit): Promise<ApiLetterOfCreditImportResponse> {
     const path = "/api/tools/letter-of-credit/import";
     return this.request<ApiLetterOfCreditImportResponse>("POST", path, {
       body: request.body,
@@ -5945,7 +5949,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public importReportTemplatePackage(request: ImportReportTemplatePackageRequest, init?: RequestInit): Promise<ApiReportTemplatePackageImportResponse> {
+  public importReportTemplatePackage(request: ImportReportTemplatePackageRequest, init?: ApiRequestInit): Promise<ApiReportTemplatePackageImportResponse> {
     const path = "/api/reports/templates/package/import";
     return this.request<ApiReportTemplatePackageImportResponse>("POST", path, {
       body: request.body,
@@ -5953,7 +5957,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public importSingleWindowReceiptPackage(request: ImportSingleWindowReceiptPackageRequest, init?: RequestInit): Promise<ApiSingleWindowImportedPackageResponse> {
+  public importSingleWindowReceiptPackage(request: ImportSingleWindowReceiptPackageRequest, init?: ApiRequestInit): Promise<ApiSingleWindowImportedPackageResponse> {
     const path = "/api/single-window/receipts/import";
     return this.request<ApiSingleWindowImportedPackageResponse>("POST", path, {
       body: request.body,
@@ -5961,7 +5965,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public importSingleWindowReferenceCatalogJson(request: ImportSingleWindowReferenceCatalogJsonRequest, init?: RequestInit): Promise<ApiSingleWindowReferenceCatalogSaveResponse> {
+  public importSingleWindowReferenceCatalogJson(request: ImportSingleWindowReferenceCatalogJsonRequest, init?: ApiRequestInit): Promise<ApiSingleWindowReferenceCatalogSaveResponse> {
     const path = "/api/single-window/reference-catalog/import-json";
     return this.request<ApiSingleWindowReferenceCatalogSaveResponse>("POST", path, {
       body: request.body,
@@ -5969,7 +5973,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public importSingleWindowSubmitPackage(request: ImportSingleWindowSubmitPackageRequest, init?: RequestInit): Promise<ApiSingleWindowImportedPackageResponse> {
+  public importSingleWindowSubmitPackage(request: ImportSingleWindowSubmitPackageRequest, init?: ApiRequestInit): Promise<ApiSingleWindowImportedPackageResponse> {
     const path = "/api/single-window/packages/import";
     return this.request<ApiSingleWindowImportedPackageResponse>("POST", path, {
       body: request.body,
@@ -5977,7 +5981,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public importSuppliers(request: ImportSuppliersRequest, init?: RequestInit): Promise<ApiSupplierImportResultDto> {
+  public importSuppliers(request: ImportSuppliersRequest, init?: ApiRequestInit): Promise<ApiSupplierImportResultDto> {
     const path = "/api/suppliers/import";
     return this.request<ApiSupplierImportResultDto>("POST", path, {
       body: request.body,
@@ -5985,7 +5989,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public importUploadedInvoiceTransferPackage(request: ImportUploadedInvoiceTransferPackageRequest, init?: RequestInit): Promise<ApiInvoiceTransferImportResponse> {
+  public importUploadedInvoiceTransferPackage(request: ImportUploadedInvoiceTransferPackageRequest, init?: ApiRequestInit): Promise<ApiInvoiceTransferImportResponse> {
     const path = "/api/invoices/transfer-package/upload/import";
     return this.request<ApiInvoiceTransferImportResponse>("POST", path, {
       query: {
@@ -5998,7 +6002,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listAuditLogs(request: ListAuditLogsRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiAuditLogDto> {
+  public listAuditLogs(request: ListAuditLogsRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiAuditLogDto> {
     const path = "/api/audit-logs";
     return this.request<ApiPagedResponseOfApiAuditLogDto>("GET", path, {
       query: {
@@ -6016,22 +6020,22 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listAvailableExchangeRateCurrencies(init?: RequestInit): Promise<ApiExchangeRateAvailableCurrenciesResponse> {
+  public listAvailableExchangeRateCurrencies(init?: ApiRequestInit): Promise<ApiExchangeRateAvailableCurrenciesResponse> {
     const path = "/api/tools/exchange-rates/available-currencies";
     return this.request<ApiExchangeRateAvailableCurrenciesResponse>("GET", path, { init });
   }
 
-  public listCloudDatabaseBackups(init?: RequestInit): Promise<ApiCloudBackupListResponse> {
+  public listCloudDatabaseBackups(init?: ApiRequestInit): Promise<ApiCloudBackupListResponse> {
     const path = "/api/backup/cloud/backups";
     return this.request<ApiCloudBackupListResponse>("GET", path, { init });
   }
 
-  public listContainerPackingContainerTypes(init?: RequestInit): Promise<ApiContainerTypeListResponse> {
+  public listContainerPackingContainerTypes(init?: ApiRequestInit): Promise<ApiContainerTypeListResponse> {
     const path = "/api/tools/container-packing/container-types";
     return this.request<ApiContainerTypeListResponse>("GET", path, { init });
   }
 
-  public listContainerPackingProjects(request: ListContainerPackingProjectsRequest = {}, init?: RequestInit): Promise<ApiContainerPackingProjectListResponse> {
+  public listContainerPackingProjects(request: ListContainerPackingProjectsRequest = {}, init?: ApiRequestInit): Promise<ApiContainerPackingProjectListResponse> {
     const path = "/api/tools/container-packing/projects";
     return this.request<ApiContainerPackingProjectListResponse>("GET", path, {
       query: {
@@ -6041,12 +6045,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listCrmContacts(request: ListCrmContactsRequest, init?: RequestInit): Promise<ApiCrmContactDto[]> {
+  public listCrmContacts(request: ListCrmContactsRequest, init?: ApiRequestInit): Promise<ApiCrmContactDto[]> {
     const path = `/api/crm/customers/${encodePath(request.customerId)}/contacts`;
     return this.request<ApiCrmContactDto[]>("GET", path, { init });
   }
 
-  public listCrmFollowUps(request: ListCrmFollowUpsRequest = {}, init?: RequestInit): Promise<ApiCrmFollowUpDto[]> {
+  public listCrmFollowUps(request: ListCrmFollowUpsRequest = {}, init?: ApiRequestInit): Promise<ApiCrmFollowUpDto[]> {
     const path = "/api/crm/follow-ups";
     return this.request<ApiCrmFollowUpDto[]>("GET", path, {
       query: {
@@ -6058,12 +6062,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listCustomOptions(request: ListCustomOptionsRequest, init?: RequestInit): Promise<ApiCustomOptionListResponse> {
+  public listCustomOptions(request: ListCustomOptionsRequest, init?: ApiRequestInit): Promise<ApiCustomOptionListResponse> {
     const path = `/api/custom-options/${encodePath(request.optionType)}`;
     return this.request<ApiCustomOptionListResponse>("GET", path, { init });
   }
 
-  public listCustomers(request: ListCustomersRequest = {}, init?: RequestInit): Promise<ApiCustomerDto[]> {
+  public listCustomers(request: ListCustomersRequest = {}, init?: ApiRequestInit): Promise<ApiCustomerDto[]> {
     const path = "/api/master-data/customers";
     return this.request<ApiCustomerDto[]>("GET", path, {
       query: {
@@ -6073,7 +6077,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listCustomersPage(request: ListCustomersPageRequest, init?: RequestInit): Promise<ApiPagedResponseOfApiCustomerDto> {
+  public listCustomersPage(request: ListCustomersPageRequest, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiCustomerDto> {
     const path = "/api/master-data/customers/page";
     return this.request<ApiPagedResponseOfApiCustomerDto>("GET", path, {
       query: {
@@ -6085,7 +6089,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listCustomsCooProducerProfiles(request: ListCustomsCooProducerProfilesRequest = {}, init?: RequestInit): Promise<ApiCustomsCooProducerProfileListResponse> {
+  public listCustomsCooProducerProfiles(request: ListCustomsCooProducerProfilesRequest = {}, init?: ApiRequestInit): Promise<ApiCustomsCooProducerProfileListResponse> {
     const path = "/api/single-window/coo/producer-profiles";
     return this.request<ApiCustomsCooProducerProfileListResponse>("GET", path, {
       query: {
@@ -6095,22 +6099,22 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listDatabaseBackups(init?: RequestInit): Promise<ApiBackupListResponse> {
+  public listDatabaseBackups(init?: ApiRequestInit): Promise<ApiBackupListResponse> {
     const path = "/api/backup";
     return this.request<ApiBackupListResponse>("GET", path, { init });
   }
 
-  public listEmailTemplateVariables(init?: RequestInit): Promise<ApiEmailTemplateVariableDto[]> {
+  public listEmailTemplateVariables(init?: ApiRequestInit): Promise<ApiEmailTemplateVariableDto[]> {
     const path = "/api/email-templates/variables";
     return this.request<ApiEmailTemplateVariableDto[]>("GET", path, { init });
   }
 
-  public listEmailTemplateVersions(request: ListEmailTemplateVersionsRequest, init?: RequestInit): Promise<ApiEmailTemplateVersionDto[]> {
+  public listEmailTemplateVersions(request: ListEmailTemplateVersionsRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateVersionDto[]> {
     const path = `/api/email-templates/${encodePath(request.id)}/versions`;
     return this.request<ApiEmailTemplateVersionDto[]>("GET", path, { init });
   }
 
-  public listEmailTemplates(request: ListEmailTemplatesRequest = {}, init?: RequestInit): Promise<ApiEmailTemplateDto[]> {
+  public listEmailTemplates(request: ListEmailTemplatesRequest = {}, init?: ApiRequestInit): Promise<ApiEmailTemplateDto[]> {
     const path = "/api/email-templates";
     return this.request<ApiEmailTemplateDto[]>("GET", path, {
       query: {
@@ -6122,7 +6126,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listExchangeRates(request: ListExchangeRatesRequest = {}, init?: RequestInit): Promise<ApiExchangeRateListResponse> {
+  public listExchangeRates(request: ListExchangeRatesRequest = {}, init?: ApiRequestInit): Promise<ApiExchangeRateListResponse> {
     const path = "/api/tools/exchange-rates";
     return this.request<ApiExchangeRateListResponse>("GET", path, {
       query: {
@@ -6132,7 +6136,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listExporters(request: ListExportersRequest = {}, init?: RequestInit): Promise<ApiExporterDto[]> {
+  public listExporters(request: ListExportersRequest = {}, init?: ApiRequestInit): Promise<ApiExporterDto[]> {
     const path = "/api/master-data/exporters";
     return this.request<ApiExporterDto[]>("GET", path, {
       query: {
@@ -6142,7 +6146,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listExportersPage(request: ListExportersPageRequest, init?: RequestInit): Promise<ApiPagedResponseOfApiExporterDto> {
+  public listExportersPage(request: ListExportersPageRequest, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiExporterDto> {
     const path = "/api/master-data/exporters/page";
     return this.request<ApiPagedResponseOfApiExporterDto>("GET", path, {
       query: {
@@ -6154,7 +6158,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listHsCodeKnowledgeExamples(request: ListHsCodeKnowledgeExamplesRequest = {}, init?: RequestInit): Promise<ApiHsCodeKnowledgeExamplePage> {
+  public listHsCodeKnowledgeExamples(request: ListHsCodeKnowledgeExamplesRequest = {}, init?: ApiRequestInit): Promise<ApiHsCodeKnowledgeExamplePage> {
     const path = "/api/master-data/hs-knowledge/examples";
     return this.request<ApiHsCodeKnowledgeExamplePage>("GET", path, {
       query: {
@@ -6166,7 +6170,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listHsCodeRemoteCandidates(request: ListHsCodeRemoteCandidatesRequest = {}, init?: RequestInit): Promise<HsCodeRemoteCandidatePage> {
+  public listHsCodeRemoteCandidates(request: ListHsCodeRemoteCandidatesRequest = {}, init?: ApiRequestInit): Promise<HsCodeRemoteCandidatePage> {
     const path = "/api/master-data/hs-knowledge/remote-candidates";
     return this.request<HsCodeRemoteCandidatePage>("GET", path, {
       query: {
@@ -6179,7 +6183,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listHsCodes(request: ListHsCodesRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiHsCodeDto> {
+  public listHsCodes(request: ListHsCodesRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiHsCodeDto> {
     const path = "/api/master-data/hs-codes";
     return this.request<ApiPagedResponseOfApiHsCodeDto>("GET", path, {
       query: {
@@ -6191,12 +6195,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listInvoiceStatusHistory(request: ListInvoiceStatusHistoryRequest, init?: RequestInit): Promise<ApiInvoiceStatusHistoryDto[]> {
+  public listInvoiceStatusHistory(request: ListInvoiceStatusHistoryRequest, init?: ApiRequestInit): Promise<ApiInvoiceStatusHistoryDto[]> {
     const path = `/api/invoices/${encodePath(request.id)}/status-history`;
     return this.request<ApiInvoiceStatusHistoryDto[]>("GET", path, { init });
   }
 
-  public listInvoices(request: ListInvoicesRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiInvoiceListItemDto> {
+  public listInvoices(request: ListInvoicesRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiInvoiceListItemDto> {
     const path = "/api/invoices";
     return this.request<ApiPagedResponseOfApiInvoiceListItemDto>("GET", path, {
       query: {
@@ -6210,7 +6214,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listJobs(request: ListJobsRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfBackgroundJobSnapshot> {
+  public listJobs(request: ListJobsRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfBackgroundJobSnapshot> {
     const path = "/api/jobs";
     return this.request<ApiPagedResponseOfBackgroundJobSnapshot>("GET", path, {
       query: {
@@ -6223,7 +6227,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listPayees(request: ListPayeesRequest = {}, init?: RequestInit): Promise<ApiPayeeDto[]> {
+  public listPayees(request: ListPayeesRequest = {}, init?: ApiRequestInit): Promise<ApiPayeeDto[]> {
     const path = "/api/master-data/payees";
     return this.request<ApiPayeeDto[]>("GET", path, {
       query: {
@@ -6233,7 +6237,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listPayeesPage(request: ListPayeesPageRequest, init?: RequestInit): Promise<ApiPagedResponseOfApiPayeeDto> {
+  public listPayeesPage(request: ListPayeesPageRequest, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiPayeeDto> {
     const path = "/api/master-data/payees/page";
     return this.request<ApiPagedResponseOfApiPayeeDto>("GET", path, {
       query: {
@@ -6245,7 +6249,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listPayments(request: ListPaymentsRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiPaymentDto> {
+  public listPayments(request: ListPaymentsRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiPaymentDto> {
     const path = "/api/payments";
     return this.request<ApiPagedResponseOfApiPaymentDto>("GET", path, {
       query: {
@@ -6257,12 +6261,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listPermissionTemplates(init?: RequestInit): Promise<ApiPermissionTemplateCatalogResponse> {
+  public listPermissionTemplates(init?: ApiRequestInit): Promise<ApiPermissionTemplateCatalogResponse> {
     const path = "/api/permission-templates";
     return this.request<ApiPermissionTemplateCatalogResponse>("GET", path, { init });
   }
 
-  public listPorts(request: ListPortsRequest = {}, init?: RequestInit): Promise<ApiPortDto[]> {
+  public listPorts(request: ListPortsRequest = {}, init?: ApiRequestInit): Promise<ApiPortDto[]> {
     const path = "/api/master-data/ports";
     return this.request<ApiPortDto[]>("GET", path, {
       query: {
@@ -6272,7 +6276,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listPortsPage(request: ListPortsPageRequest, init?: RequestInit): Promise<ApiPagedResponseOfApiPortDto> {
+  public listPortsPage(request: ListPortsPageRequest, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiPortDto> {
     const path = "/api/master-data/ports/page";
     return this.request<ApiPagedResponseOfApiPortDto>("GET", path, {
       query: {
@@ -6284,12 +6288,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listPostgreSqlPhysicalBackups(init?: RequestInit): Promise<ApiPostgreSqlPhysicalBackupListResponse> {
+  public listPostgreSqlPhysicalBackups(init?: ApiRequestInit): Promise<ApiPostgreSqlPhysicalBackupListResponse> {
     const path = "/api/postgresql-maintenance/backups";
     return this.request<ApiPostgreSqlPhysicalBackupListResponse>("GET", path, { init });
   }
 
-  public listProducts(request: ListProductsRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiProductDto> {
+  public listProducts(request: ListProductsRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiProductDto> {
     const path = "/api/master-data/products";
     return this.request<ApiPagedResponseOfApiProductDto>("GET", path, {
       query: {
@@ -6301,7 +6305,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listQueriedInvoices(request: ListQueriedInvoicesRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiQueryInvoiceRowDto> {
+  public listQueriedInvoices(request: ListQueriedInvoicesRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiQueryInvoiceRowDto> {
     const path = "/api/query/invoices";
     return this.request<ApiPagedResponseOfApiQueryInvoiceRowDto>("GET", path, {
       query: {
@@ -6322,7 +6326,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listReportTemplates(request: ListReportTemplatesRequest = {}, init?: RequestInit): Promise<ApiReportTemplateDto[]> {
+  public listReportTemplates(request: ListReportTemplatesRequest = {}, init?: ApiRequestInit): Promise<ApiReportTemplateDto[]> {
     const path = "/api/reports/templates";
     return this.request<ApiReportTemplateDto[]>("GET", path, {
       query: {
@@ -6332,12 +6336,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listSalesOpportunityHistory(request: ListSalesOpportunityHistoryRequest, init?: RequestInit): Promise<ApiSalesOpportunityHistoryDto[]> {
+  public listSalesOpportunityHistory(request: ListSalesOpportunityHistoryRequest, init?: ApiRequestInit): Promise<ApiSalesOpportunityHistoryDto[]> {
     const path = `/api/crm/opportunities/${encodePath(request.id)}/history`;
     return this.request<ApiSalesOpportunityHistoryDto[]>("GET", path, { init });
   }
 
-  public listSingleWindowOperationCenter(request: ListSingleWindowOperationCenterRequest = {}, init?: RequestInit): Promise<SingleWindowOperationCenterPageResult> {
+  public listSingleWindowOperationCenter(request: ListSingleWindowOperationCenterRequest = {}, init?: ApiRequestInit): Promise<SingleWindowOperationCenterPageResult> {
     const path = "/api/single-window/operation-center";
     return this.request<SingleWindowOperationCenterPageResult>("GET", path, {
       query: {
@@ -6351,27 +6355,27 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listSupplierAssessments(request: ListSupplierAssessmentsRequest, init?: RequestInit): Promise<ApiSupplierAssessmentDto[]> {
+  public listSupplierAssessments(request: ListSupplierAssessmentsRequest, init?: ApiRequestInit): Promise<ApiSupplierAssessmentDto[]> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/assessments`;
     return this.request<ApiSupplierAssessmentDto[]>("GET", path, { init });
   }
 
-  public listSupplierContacts(request: ListSupplierContactsRequest, init?: RequestInit): Promise<ApiSupplierContactDto[]> {
+  public listSupplierContacts(request: ListSupplierContactsRequest, init?: ApiRequestInit): Promise<ApiSupplierContactDto[]> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/contacts`;
     return this.request<ApiSupplierContactDto[]>("GET", path, { init });
   }
 
-  public listSupplierProductLinks(request: ListSupplierProductLinksRequest, init?: RequestInit): Promise<ApiSupplierProductLinkDto[]> {
+  public listSupplierProductLinks(request: ListSupplierProductLinksRequest, init?: ApiRequestInit): Promise<ApiSupplierProductLinkDto[]> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/products`;
     return this.request<ApiSupplierProductLinkDto[]>("GET", path, { init });
   }
 
-  public listSuppliers(init?: RequestInit): Promise<ApiSupplierDto[]> {
+  public listSuppliers(init?: ApiRequestInit): Promise<ApiSupplierDto[]> {
     const path = "/api/suppliers";
     return this.request<ApiSupplierDto[]>("GET", path, { init });
   }
 
-  public listUnits(request: ListUnitsRequest = {}, init?: RequestInit): Promise<ApiUnitDto[]> {
+  public listUnits(request: ListUnitsRequest = {}, init?: ApiRequestInit): Promise<ApiUnitDto[]> {
     const path = "/api/master-data/units";
     return this.request<ApiUnitDto[]>("GET", path, {
       query: {
@@ -6381,7 +6385,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listUnitsPage(request: ListUnitsPageRequest, init?: RequestInit): Promise<ApiPagedResponseOfApiUnitDto> {
+  public listUnitsPage(request: ListUnitsPageRequest, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiUnitDto> {
     const path = "/api/master-data/units/page";
     return this.request<ApiPagedResponseOfApiUnitDto>("GET", path, {
       query: {
@@ -6393,12 +6397,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listUserReportTemplateVersions(request: ListUserReportTemplateVersionsRequest, init?: RequestInit): Promise<ApiUserReportTemplateVersionDto[]> {
+  public listUserReportTemplateVersions(request: ListUserReportTemplateVersionsRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateVersionDto[]> {
     const path = `/api/reports/user-templates/${encodePath(request.id)}/versions`;
     return this.request<ApiUserReportTemplateVersionDto[]>("GET", path, { init });
   }
 
-  public listUserReportTemplates(request: ListUserReportTemplatesRequest = {}, init?: RequestInit): Promise<ApiUserReportTemplateDto[]> {
+  public listUserReportTemplates(request: ListUserReportTemplatesRequest = {}, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto[]> {
     const path = "/api/reports/user-templates";
     return this.request<ApiUserReportTemplateDto[]>("GET", path, {
       query: {
@@ -6409,12 +6413,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listUsers(init?: RequestInit): Promise<ApiUserListResponse> {
+  public listUsers(init?: ApiRequestInit): Promise<ApiUserListResponse> {
     const path = "/api/users";
     return this.request<ApiUserListResponse>("GET", path, { init });
   }
 
-  public login(request: LoginRequest, init?: RequestInit): Promise<ApiLoginResponse> {
+  public login(request: LoginRequest, init?: ApiRequestInit): Promise<ApiLoginResponse> {
     const path = "/api/auth/login";
     return this.request<ApiLoginResponse>("POST", path, {
       body: request.body,
@@ -6427,12 +6431,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public logout(init?: RequestInit): Promise<ApiLogoutResponse> {
+  public logout(init?: ApiRequestInit): Promise<ApiLogoutResponse> {
     const path = "/api/auth/logout";
     return this.request<ApiLogoutResponse>("POST", path, { init });
   }
 
-  public previewCrmCustomerImport(request: PreviewCrmCustomerImportRequest, init?: RequestInit): Promise<ApiCrmCustomerImportPreviewDto> {
+  public previewCrmCustomerImport(request: PreviewCrmCustomerImportRequest, init?: ApiRequestInit): Promise<ApiCrmCustomerImportPreviewDto> {
     const path = "/api/crm/import/preview";
     return this.request<ApiCrmCustomerImportPreviewDto>("POST", path, {
       query: {
@@ -6443,7 +6447,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewEmailTemplate(request: PreviewEmailTemplateRequest, init?: RequestInit): Promise<ApiEmailTemplatePreviewDto> {
+  public previewEmailTemplate(request: PreviewEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplatePreviewDto> {
     const path = "/api/email-templates/preview";
     return this.request<ApiEmailTemplatePreviewDto>("POST", path, {
       body: request.body,
@@ -6451,7 +6455,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewExcelImport(request: PreviewExcelImportRequest, init?: RequestInit): Promise<ApiExcelImportPreviewResponse> {
+  public previewExcelImport(request: PreviewExcelImportRequest, init?: ApiRequestInit): Promise<ApiExcelImportPreviewResponse> {
     const path = "/api/tools/excel/import-preview";
     return this.request<ApiExcelImportPreviewResponse>("POST", path, {
       body: request.body,
@@ -6459,7 +6463,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewHsCodesImportFromPath(request: PreviewHsCodesImportFromPathRequest, init?: RequestInit): Promise<ApiHsCodeImportPreviewResponse> {
+  public previewHsCodesImportFromPath(request: PreviewHsCodesImportFromPathRequest, init?: ApiRequestInit): Promise<ApiHsCodeImportPreviewResponse> {
     const path = "/api/master-data/hs-codes/import-preview-path";
     return this.request<ApiHsCodeImportPreviewResponse>("POST", path, {
       body: request.body,
@@ -6467,7 +6471,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewHsCodesImportUpload(request: PreviewHsCodesImportUploadRequest, init?: RequestInit): Promise<ApiHsCodeImportPreviewResponse> {
+  public previewHsCodesImportUpload(request: PreviewHsCodesImportUploadRequest, init?: ApiRequestInit): Promise<ApiHsCodeImportPreviewResponse> {
     const path = "/api/master-data/hs-codes/import-preview-upload";
     return this.request<ApiHsCodeImportPreviewResponse>("POST", path, {
       query: {
@@ -6481,7 +6485,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewInvoiceDocumentPackageHtml(request: PreviewInvoiceDocumentPackageHtmlRequest, init?: RequestInit): Promise<ApiInvoiceDocumentPackagePreviewResponse> {
+  public previewInvoiceDocumentPackageHtml(request: PreviewInvoiceDocumentPackageHtmlRequest, init?: ApiRequestInit): Promise<ApiInvoiceDocumentPackagePreviewResponse> {
     const path = `/api/reports/invoices/${encodePath(request.invoiceId)}/document-package/html-preview`;
     return this.request<ApiInvoiceDocumentPackagePreviewResponse>("POST", path, {
       body: request.body,
@@ -6489,7 +6493,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewInvoiceReportDraftHtml(request: PreviewInvoiceReportDraftHtmlRequest, init?: RequestInit): Promise<ApiReportHtmlPreviewResponse> {
+  public previewInvoiceReportDraftHtml(request: PreviewInvoiceReportDraftHtmlRequest, init?: ApiRequestInit): Promise<ApiReportHtmlPreviewResponse> {
     const path = "/api/reports/invoices/draft/html-preview";
     return this.request<ApiReportHtmlPreviewResponse>("POST", path, {
       body: request.body,
@@ -6497,7 +6501,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewInvoiceReportHtml(request: PreviewInvoiceReportHtmlRequest, init?: RequestInit): Promise<ApiReportHtmlPreviewResponse> {
+  public previewInvoiceReportHtml(request: PreviewInvoiceReportHtmlRequest, init?: ApiRequestInit): Promise<ApiReportHtmlPreviewResponse> {
     const path = `/api/reports/invoices/${encodePath(request.invoiceId)}/html-preview`;
     return this.request<ApiReportHtmlPreviewResponse>("POST", path, {
       body: request.body,
@@ -6505,7 +6509,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewInvoiceTransferPackage(request: PreviewInvoiceTransferPackageRequest, init?: RequestInit): Promise<ApiInvoiceTransferPreviewResponse> {
+  public previewInvoiceTransferPackage(request: PreviewInvoiceTransferPackageRequest, init?: ApiRequestInit): Promise<ApiInvoiceTransferPreviewResponse> {
     const path = "/api/invoices/transfer-package/preview";
     return this.request<ApiInvoiceTransferPreviewResponse>("POST", path, {
       body: request.body,
@@ -6513,7 +6517,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewOcrImage(request: PreviewOcrImageRequest = {}, init?: RequestInit): Promise<Blob> {
+  public previewOcrImage(request: PreviewOcrImageRequest = {}, init?: ApiRequestInit): Promise<Blob> {
     const path = "/api/tools/ocr/preview-image";
     return this.request<Blob>("GET", path, {
       query: {
@@ -6523,7 +6527,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewPaymentVoucherDraftHtml(request: PreviewPaymentVoucherDraftHtmlRequest, init?: RequestInit): Promise<ApiPaymentReportHtmlPreviewResponse> {
+  public previewPaymentVoucherDraftHtml(request: PreviewPaymentVoucherDraftHtmlRequest, init?: ApiRequestInit): Promise<ApiPaymentReportHtmlPreviewResponse> {
     const path = "/api/reports/payments/draft/html-preview";
     return this.request<ApiPaymentReportHtmlPreviewResponse>("POST", path, {
       body: request.body,
@@ -6531,7 +6535,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewPaymentVoucherHtml(request: PreviewPaymentVoucherHtmlRequest, init?: RequestInit): Promise<ApiPaymentReportHtmlPreviewResponse> {
+  public previewPaymentVoucherHtml(request: PreviewPaymentVoucherHtmlRequest, init?: ApiRequestInit): Promise<ApiPaymentReportHtmlPreviewResponse> {
     const path = `/api/reports/payments/${encodePath(request.paymentId)}/html-preview`;
     return this.request<ApiPaymentReportHtmlPreviewResponse>("POST", path, {
       body: request.body,
@@ -6539,7 +6543,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewReportTemplateContent(request: PreviewReportTemplateContentRequest, init?: RequestInit): Promise<ApiReportTemplatePreviewResponse> {
+  public previewReportTemplateContent(request: PreviewReportTemplateContentRequest, init?: ApiRequestInit): Promise<ApiReportTemplatePreviewResponse> {
     const path = "/api/reports/templates/preview";
     return this.request<ApiReportTemplatePreviewResponse>("POST", path, {
       body: request.body,
@@ -6547,7 +6551,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewShippingMarkImage(request: PreviewShippingMarkImageRequest, init?: RequestInit): Promise<ApiShippingMarkImagePreviewResponse> {
+  public previewShippingMarkImage(request: PreviewShippingMarkImageRequest, init?: ApiRequestInit): Promise<ApiShippingMarkImagePreviewResponse> {
     const path = "/api/invoices/shipping-marks/image/preview";
     return this.request<ApiShippingMarkImagePreviewResponse>("POST", path, {
       body: request.body,
@@ -6555,7 +6559,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewSingleWindowReferenceCatalogExcelImport(request: PreviewSingleWindowReferenceCatalogExcelImportRequest, init?: RequestInit): Promise<ApiSingleWindowReferenceCatalogExcelImportPreviewResponse> {
+  public previewSingleWindowReferenceCatalogExcelImport(request: PreviewSingleWindowReferenceCatalogExcelImportRequest, init?: ApiRequestInit): Promise<ApiSingleWindowReferenceCatalogExcelImportPreviewResponse> {
     const path = "/api/single-window/reference-catalog/excel/preview";
     return this.request<ApiSingleWindowReferenceCatalogExcelImportPreviewResponse>("POST", path, {
       query: {
@@ -6579,7 +6583,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewSupplierImport(request: PreviewSupplierImportRequest, init?: RequestInit): Promise<ApiSupplierImportPreviewDto> {
+  public previewSupplierImport(request: PreviewSupplierImportRequest, init?: ApiRequestInit): Promise<ApiSupplierImportPreviewDto> {
     const path = "/api/suppliers/import/preview";
     return this.request<ApiSupplierImportPreviewDto>("POST", path, {
       query: {
@@ -6590,7 +6594,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewUploadedExcelImport(request: PreviewUploadedExcelImportRequest, init?: RequestInit): Promise<ApiExcelImportPreviewResponse> {
+  public previewUploadedExcelImport(request: PreviewUploadedExcelImportRequest, init?: ApiRequestInit): Promise<ApiExcelImportPreviewResponse> {
     const path = "/api/tools/excel/import-preview-upload";
     return this.request<ApiExcelImportPreviewResponse>("POST", path, {
       query: {
@@ -6601,7 +6605,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public previewUploadedInvoiceTransferPackage(request: PreviewUploadedInvoiceTransferPackageRequest, init?: RequestInit): Promise<ApiInvoiceTransferPreviewResponse> {
+  public previewUploadedInvoiceTransferPackage(request: PreviewUploadedInvoiceTransferPackageRequest, init?: ApiRequestInit): Promise<ApiInvoiceTransferPreviewResponse> {
     const path = "/api/invoices/transfer-package/upload/preview";
     return this.request<ApiInvoiceTransferPreviewResponse>("POST", path, {
       query: {
@@ -6612,7 +6616,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public purgeCancelledInvoice(request: PurgeCancelledInvoiceRequest, init?: RequestInit): Promise<ApiInvoicePurgeResponse> {
+  public purgeCancelledInvoice(request: PurgeCancelledInvoiceRequest, init?: ApiRequestInit): Promise<ApiInvoicePurgeResponse> {
     const path = `/api/system/data-maintenance/invoices/${encodePath(request.id)}/purge`;
     return this.request<ApiInvoicePurgeResponse>("POST", path, {
       body: request.body,
@@ -6620,7 +6624,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public queryCrmCustomers(request: QueryCrmCustomersRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiCrmCustomerDto> {
+  public queryCrmCustomers(request: QueryCrmCustomersRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiCrmCustomerDto> {
     const path = "/api/crm/customers/page";
     return this.request<ApiPagedResponseOfApiCrmCustomerDto>("GET", path, {
       query: {
@@ -6633,7 +6637,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public queryCrmFollowUps(request: QueryCrmFollowUpsRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiCrmFollowUpDto> {
+  public queryCrmFollowUps(request: QueryCrmFollowUpsRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiCrmFollowUpDto> {
     const path = "/api/crm/follow-ups/page";
     return this.request<ApiPagedResponseOfApiCrmFollowUpDto>("GET", path, {
       query: {
@@ -6646,7 +6650,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public querySalesOpportunities(request: QuerySalesOpportunitiesRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiSalesOpportunityDto> {
+  public querySalesOpportunities(request: QuerySalesOpportunitiesRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiSalesOpportunityDto> {
     const path = "/api/crm/opportunities";
     return this.request<ApiPagedResponseOfApiSalesOpportunityDto>("GET", path, {
       query: {
@@ -6659,7 +6663,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public querySuppliers(request: QuerySuppliersRequest = {}, init?: RequestInit): Promise<ApiPagedResponseOfApiSupplierDto> {
+  public querySuppliers(request: QuerySuppliersRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiSupplierDto> {
     const path = "/api/suppliers/page";
     return this.request<ApiPagedResponseOfApiSupplierDto>("GET", path, {
       query: {
@@ -6672,7 +6676,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public recognizeOcrImage(request: RecognizeOcrImageRequest, init?: RequestInit): Promise<ApiOcrRecognizeImageResponse> {
+  public recognizeOcrImage(request: RecognizeOcrImageRequest, init?: ApiRequestInit): Promise<ApiOcrRecognizeImageResponse> {
     const path = "/api/tools/ocr/recognize-image";
     return this.request<ApiOcrRecognizeImageResponse>("POST", path, {
       body: request.body,
@@ -6680,7 +6684,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public recordHsCodeKnowledgeFeedback(request: RecordHsCodeKnowledgeFeedbackRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public recordHsCodeKnowledgeFeedback(request: RecordHsCodeKnowledgeFeedbackRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/master-data/hs-knowledge/feedback";
     return this.request<ApiCommandResponse>("POST", path, {
       body: request.body,
@@ -6688,7 +6692,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public recordInvoiceHsCodeKnowledgeFeedback(request: RecordInvoiceHsCodeKnowledgeFeedbackRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public recordInvoiceHsCodeKnowledgeFeedback(request: RecordInvoiceHsCodeKnowledgeFeedbackRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/invoices/hs-knowledge/feedback";
     return this.request<ApiCommandResponse>("POST", path, {
       body: request.body,
@@ -6696,7 +6700,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public registerLicense(request: RegisterLicenseRequest, init?: RequestInit): Promise<ApiLicenseRegisterResponse> {
+  public registerLicense(request: RegisterLicenseRequest, init?: ApiRequestInit): Promise<ApiLicenseRegisterResponse> {
     const path = "/api/system/license/register";
     return this.request<ApiLicenseRegisterResponse>("POST", path, {
       body: request.body,
@@ -6704,7 +6708,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public renameReportTemplate(request: RenameReportTemplateRequest, init?: RequestInit): Promise<ApiReportTemplateContentDto> {
+  public renameReportTemplate(request: RenameReportTemplateRequest, init?: ApiRequestInit): Promise<ApiReportTemplateContentDto> {
     const path = "/api/reports/templates/rename";
     return this.request<ApiReportTemplateContentDto>("POST", path, {
       body: request.body,
@@ -6712,12 +6716,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public renewSession(init?: RequestInit): Promise<ApiLoginResponse> {
+  public renewSession(init?: ApiRequestInit): Promise<ApiLoginResponse> {
     const path = "/api/auth/renew";
     return this.request<ApiLoginResponse>("POST", path, { init });
   }
 
-  public repairSingleWindowExportReviewGroups(request: RepairSingleWindowExportReviewGroupsRequest, init?: RequestInit): Promise<ApiSingleWindowRepairGroupsResponse> {
+  public repairSingleWindowExportReviewGroups(request: RepairSingleWindowExportReviewGroupsRequest, init?: ApiRequestInit): Promise<ApiSingleWindowRepairGroupsResponse> {
     const path = `/api/single-window/export-review/${encodePath(request.businessType)}/${encodePath(request.invoiceId)}/repair`;
     return this.request<ApiSingleWindowRepairGroupsResponse>("POST", path, {
       body: request.body,
@@ -6725,7 +6729,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public resetHsCodeRemoteCandidates(request: ResetHsCodeRemoteCandidatesRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public resetHsCodeRemoteCandidates(request: ResetHsCodeRemoteCandidatesRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/master-data/hs-knowledge/remote-candidates/reset";
     return this.request<ApiCommandResponse>("POST", path, {
       body: request.body,
@@ -6733,12 +6737,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public resetSingleWindowReferenceCatalog(init?: RequestInit): Promise<ApiSingleWindowReferenceCatalogSaveResponse> {
+  public resetSingleWindowReferenceCatalog(init?: ApiRequestInit): Promise<ApiSingleWindowReferenceCatalogSaveResponse> {
     const path = "/api/single-window/reference-catalog";
     return this.request<ApiSingleWindowReferenceCatalogSaveResponse>("DELETE", path, { init });
   }
 
-  public resolveRemoteHsCodeDetail(request: ResolveRemoteHsCodeDetailRequest, init?: RequestInit): Promise<ApiHsCodeRemoteDetailResolutionResponse> {
+  public resolveRemoteHsCodeDetail(request: ResolveRemoteHsCodeDetailRequest, init?: ApiRequestInit): Promise<ApiHsCodeRemoteDetailResolutionResponse> {
     const path = "/api/master-data/hs-codes/resolve-remote-detail";
     return this.request<ApiHsCodeRemoteDetailResolutionResponse>("POST", path, {
       body: request.body,
@@ -6746,7 +6750,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public restoreDatabaseBackup(request: RestoreDatabaseBackupRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public restoreDatabaseBackup(request: RestoreDatabaseBackupRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/backup/restore";
     return this.request<ApiCommandResponse>("POST", path, {
       body: request.body,
@@ -6754,7 +6758,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public restoreDisasterRecoveryPackage(request: RestoreDisasterRecoveryPackageRequest, init?: RequestInit): Promise<ApiDisasterRecoveryRestoreResponse> {
+  public restoreDisasterRecoveryPackage(request: RestoreDisasterRecoveryPackageRequest, init?: ApiRequestInit): Promise<ApiDisasterRecoveryRestoreResponse> {
     const path = "/api/backup/disaster-recovery/restore";
     return this.request<ApiDisasterRecoveryRestoreResponse>("POST", path, {
       body: request.body,
@@ -6762,12 +6766,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public restoreEmailTemplateVersion(request: RestoreEmailTemplateVersionRequest, init?: RequestInit): Promise<ApiEmailTemplateDto> {
+  public restoreEmailTemplateVersion(request: RestoreEmailTemplateVersionRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
     const path = `/api/email-templates/${encodePath(request.id)}/versions/${encodePath(request.versionNumber)}/restore`;
     return this.request<ApiEmailTemplateDto>("POST", path, { init });
   }
 
-  public restorePostgreSqlPhysicalBackup(request: RestorePostgreSqlPhysicalBackupRequest, init?: RequestInit): Promise<ApiServerMigrationRestoreResponse> {
+  public restorePostgreSqlPhysicalBackup(request: RestorePostgreSqlPhysicalBackupRequest, init?: ApiRequestInit): Promise<ApiServerMigrationRestoreResponse> {
     const path = "/api/postgresql-maintenance/backups/restore";
     return this.request<ApiServerMigrationRestoreResponse>("POST", path, {
       body: request.body,
@@ -6775,17 +6779,17 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public restoreUserReportTemplateVersion(request: RestoreUserReportTemplateVersionRequest, init?: RequestInit): Promise<ApiUserReportTemplateDto> {
+  public restoreUserReportTemplateVersion(request: RestoreUserReportTemplateVersionRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
     const path = `/api/reports/user-templates/${encodePath(request.id)}/versions/${encodePath(request.versionNumber)}/restore`;
     return this.request<ApiUserReportTemplateDto>("POST", path, { init });
   }
 
-  public retryJob(request: RetryJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public retryJob(request: RetryJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/jobs/${encodePath(request.jobId)}/retry`;
     return this.request<BackgroundJobSnapshot>("POST", path, { init });
   }
 
-  public reviewHsCodeRemoteCandidate(request: ReviewHsCodeRemoteCandidateRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public reviewHsCodeRemoteCandidate(request: ReviewHsCodeRemoteCandidateRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/master-data/hs-knowledge/remote-candidates/review";
     return this.request<ApiCommandResponse>("POST", path, {
       body: request.body,
@@ -6793,7 +6797,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public reviewHsCodeRemoteCandidatesBatch(request: ReviewHsCodeRemoteCandidatesBatchRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public reviewHsCodeRemoteCandidatesBatch(request: ReviewHsCodeRemoteCandidatesBatchRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/master-data/hs-knowledge/remote-candidates/review-batch";
     return this.request<ApiCommandResponse>("POST", path, {
       body: request.body,
@@ -6801,7 +6805,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public reviewLetterOfCreditCompliance(request: ReviewLetterOfCreditComplianceRequest, init?: RequestInit): Promise<ApiLetterOfCreditReviewResponse> {
+  public reviewLetterOfCreditCompliance(request: ReviewLetterOfCreditComplianceRequest, init?: ApiRequestInit): Promise<ApiLetterOfCreditReviewResponse> {
     const path = "/api/tools/letter-of-credit/review";
     return this.request<ApiLetterOfCreditReviewResponse>("POST", path, {
       body: request.body,
@@ -6809,12 +6813,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public runShutdownMaintenance(init?: RequestInit): Promise<ApiShutdownMaintenanceResponse> {
+  public runShutdownMaintenance(init?: ApiRequestInit): Promise<ApiShutdownMaintenanceResponse> {
     const path = "/api/system/shutdown-maintenance";
     return this.request<ApiShutdownMaintenanceResponse>("POST", path, { init });
   }
 
-  public saveAgentConsignmentDocument(request: SaveAgentConsignmentDocumentRequest, init?: RequestInit): Promise<ApiAgentConsignmentDocumentSaveResponse> {
+  public saveAgentConsignmentDocument(request: SaveAgentConsignmentDocumentRequest, init?: ApiRequestInit): Promise<ApiAgentConsignmentDocumentSaveResponse> {
     const path = `/api/single-window/acd/${encodePath(request.invoiceId)}`;
     return this.request<ApiAgentConsignmentDocumentSaveResponse>("PUT", path, {
       body: request.body,
@@ -6822,7 +6826,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveAgentConsignmentSubmitPackageToPath(request: SaveAgentConsignmentSubmitPackageToPathRequest, init?: RequestInit): Promise<ApiSingleWindowHandoffPackageResponse> {
+  public saveAgentConsignmentSubmitPackageToPath(request: SaveAgentConsignmentSubmitPackageToPathRequest, init?: ApiRequestInit): Promise<ApiSingleWindowHandoffPackageResponse> {
     const path = `/api/single-window/acd/${encodePath(request.invoiceId)}/submit-package/save-to-path`;
     return this.request<ApiSingleWindowHandoffPackageResponse>("POST", path, {
       body: request.body,
@@ -6830,7 +6834,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveAuditLogsToPath(request: SaveAuditLogsToPathRequest, init?: RequestInit): Promise<ApiAuditLogCommandResponse> {
+  public saveAuditLogsToPath(request: SaveAuditLogsToPathRequest, init?: ApiRequestInit): Promise<ApiAuditLogCommandResponse> {
     const path = "/api/audit-logs/save-to-path";
     return this.request<ApiAuditLogCommandResponse>("POST", path, {
       body: request.body,
@@ -6838,7 +6842,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveContainerPackingContainerType(request: SaveContainerPackingContainerTypeRequest, init?: RequestInit): Promise<ApiContainerTypeSaveResponse> {
+  public saveContainerPackingContainerType(request: SaveContainerPackingContainerTypeRequest, init?: ApiRequestInit): Promise<ApiContainerTypeSaveResponse> {
     const path = "/api/tools/container-packing/container-types";
     return this.request<ApiContainerTypeSaveResponse>("POST", path, {
       body: request.body,
@@ -6846,7 +6850,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveContainerPackingPdfToPath(request: SaveContainerPackingPdfToPathRequest, init?: RequestInit): Promise<ApiContainerPackingPdfSaveResponse> {
+  public saveContainerPackingPdfToPath(request: SaveContainerPackingPdfToPathRequest, init?: ApiRequestInit): Promise<ApiContainerPackingPdfSaveResponse> {
     const path = "/api/tools/container-packing/pdf/save-to-path";
     return this.request<ApiContainerPackingPdfSaveResponse>("POST", path, {
       body: request.body,
@@ -6854,7 +6858,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveContainerPackingProject(request: SaveContainerPackingProjectRequest, init?: RequestInit): Promise<ApiContainerPackingProjectSaveResponse> {
+  public saveContainerPackingProject(request: SaveContainerPackingProjectRequest, init?: ApiRequestInit): Promise<ApiContainerPackingProjectSaveResponse> {
     const path = "/api/tools/container-packing/projects";
     return this.request<ApiContainerPackingProjectSaveResponse>("POST", path, {
       body: request.body,
@@ -6862,7 +6866,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveCustomOption(request: SaveCustomOptionRequest, init?: RequestInit): Promise<ApiCustomOptionListResponse> {
+  public saveCustomOption(request: SaveCustomOptionRequest, init?: ApiRequestInit): Promise<ApiCustomOptionListResponse> {
     const path = `/api/custom-options/${encodePath(request.optionType)}`;
     return this.request<ApiCustomOptionListResponse>("POST", path, {
       body: request.body,
@@ -6870,7 +6874,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveCustomsCooDocument(request: SaveCustomsCooDocumentRequest, init?: RequestInit): Promise<ApiCustomsCooDocumentSaveResponse> {
+  public saveCustomsCooDocument(request: SaveCustomsCooDocumentRequest, init?: ApiRequestInit): Promise<ApiCustomsCooDocumentSaveResponse> {
     const path = `/api/single-window/coo/${encodePath(request.invoiceId)}`;
     return this.request<ApiCustomsCooDocumentSaveResponse>("PUT", path, {
       body: request.body,
@@ -6878,7 +6882,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveCustomsCooSubmitPackageToPath(request: SaveCustomsCooSubmitPackageToPathRequest, init?: RequestInit): Promise<ApiSingleWindowHandoffPackageResponse> {
+  public saveCustomsCooSubmitPackageToPath(request: SaveCustomsCooSubmitPackageToPathRequest, init?: ApiRequestInit): Promise<ApiSingleWindowHandoffPackageResponse> {
     const path = `/api/single-window/coo/${encodePath(request.invoiceId)}/submit-package/save-to-path`;
     return this.request<ApiSingleWindowHandoffPackageResponse>("POST", path, {
       body: request.body,
@@ -6886,7 +6890,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveHsCodeKnowledgeExample(request: SaveHsCodeKnowledgeExampleRequest, init?: RequestInit): Promise<HsCodeDeclarationExample> {
+  public saveHsCodeKnowledgeExample(request: SaveHsCodeKnowledgeExampleRequest, init?: ApiRequestInit): Promise<HsCodeDeclarationExample> {
     const path = "/api/master-data/hs-knowledge/examples";
     return this.request<HsCodeDeclarationExample>("POST", path, {
       body: request.body,
@@ -6894,7 +6898,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveInvoiceTransferPackageToPath(request: SaveInvoiceTransferPackageToPathRequest, init?: RequestInit): Promise<ApiInvoiceTransferExportResponse> {
+  public saveInvoiceTransferPackageToPath(request: SaveInvoiceTransferPackageToPathRequest, init?: ApiRequestInit): Promise<ApiInvoiceTransferExportResponse> {
     const path = `/api/invoices/${encodePath(request.id)}/transfer-package/save-to-path`;
     return this.request<ApiInvoiceTransferExportResponse>("POST", path, {
       body: request.body,
@@ -6902,7 +6906,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveQueriedInvoicesToPath(request: SaveQueriedInvoicesToPathRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public saveQueriedInvoicesToPath(request: SaveQueriedInvoicesToPathRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/query/invoices/save-to-path";
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -6910,7 +6914,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveReportTemplateContent(request: SaveReportTemplateContentRequest, init?: RequestInit): Promise<ApiReportTemplateContentDto> {
+  public saveReportTemplateContent(request: SaveReportTemplateContentRequest, init?: ApiRequestInit): Promise<ApiReportTemplateContentDto> {
     const path = "/api/reports/templates/content";
     return this.request<ApiReportTemplateContentDto>("PUT", path, {
       body: request.body,
@@ -6918,7 +6922,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveReportTemplatePackageToPath(request: SaveReportTemplatePackageToPathRequest, init?: RequestInit): Promise<ApiReportTemplatePackageExportResponse> {
+  public saveReportTemplatePackageToPath(request: SaveReportTemplatePackageToPathRequest, init?: ApiRequestInit): Promise<ApiReportTemplatePackageExportResponse> {
     const path = "/api/reports/templates/package/save-to-path";
     return this.request<ApiReportTemplatePackageExportResponse>("POST", path, {
       body: request.body,
@@ -6926,7 +6930,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveShippingMarkImage(request: SaveShippingMarkImageRequest, init?: RequestInit): Promise<ApiShippingMarkImageSaveResponse> {
+  public saveShippingMarkImage(request: SaveShippingMarkImageRequest, init?: ApiRequestInit): Promise<ApiShippingMarkImageSaveResponse> {
     const path = "/api/invoices/shipping-marks/image";
     return this.request<ApiShippingMarkImageSaveResponse>("POST", path, {
       body: request.body,
@@ -6934,7 +6938,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveSingleWindowClientProfile(request: SaveSingleWindowClientProfileRequest, init?: RequestInit): Promise<ApiSingleWindowClientProfilesResponse> {
+  public saveSingleWindowClientProfile(request: SaveSingleWindowClientProfileRequest, init?: ApiRequestInit): Promise<ApiSingleWindowClientProfilesResponse> {
     const path = "/api/single-window/client-profiles";
     return this.request<ApiSingleWindowClientProfilesResponse>("PUT", path, {
       body: request.body,
@@ -6942,7 +6946,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveSingleWindowReceiptPackageToPath(request: SaveSingleWindowReceiptPackageToPathRequest, init?: RequestInit): Promise<ApiSingleWindowHandoffPackageResponse> {
+  public saveSingleWindowReceiptPackageToPath(request: SaveSingleWindowReceiptPackageToPathRequest, init?: ApiRequestInit): Promise<ApiSingleWindowHandoffPackageResponse> {
     const path = "/api/single-window/receipts/save-package-to-path";
     return this.request<ApiSingleWindowHandoffPackageResponse>("POST", path, {
       body: request.body,
@@ -6950,7 +6954,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public saveSupportPackageToRuntime(request: SaveSupportPackageToRuntimeRequest, init?: RequestInit): Promise<ApiSupportPackageResponse> {
+  public saveSupportPackageToRuntime(request: SaveSupportPackageToRuntimeRequest, init?: ApiRequestInit): Promise<ApiSupportPackageResponse> {
     const path = "/api/support-package/save-to-runtime";
     return this.request<ApiSupportPackageResponse>("POST", path, {
       body: request.body,
@@ -6958,7 +6962,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public searchHsCodeKnowledge(request: SearchHsCodeKnowledgeRequest = {}, init?: RequestInit): Promise<HsCodeKnowledgeSearchResponse> {
+  public searchHsCodeKnowledge(request: SearchHsCodeKnowledgeRequest = {}, init?: ApiRequestInit): Promise<HsCodeKnowledgeSearchResponse> {
     const path = "/api/master-data/hs-knowledge/search";
     return this.request<HsCodeKnowledgeSearchResponse>("GET", path, {
       query: {
@@ -6969,7 +6973,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public searchInvoiceHsCodeKnowledge(request: SearchInvoiceHsCodeKnowledgeRequest = {}, init?: RequestInit): Promise<HsCodeKnowledgeSearchResponse> {
+  public searchInvoiceHsCodeKnowledge(request: SearchInvoiceHsCodeKnowledgeRequest = {}, init?: ApiRequestInit): Promise<HsCodeKnowledgeSearchResponse> {
     const path = "/api/invoices/hs-knowledge/search";
     return this.request<HsCodeKnowledgeSearchResponse>("GET", path, {
       query: {
@@ -6980,7 +6984,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public searchRemoteHsCodes(request: SearchRemoteHsCodesRequest = {}, init?: RequestInit): Promise<ApiHsCodeSearchResponse> {
+  public searchRemoteHsCodes(request: SearchRemoteHsCodesRequest = {}, init?: ApiRequestInit): Promise<ApiHsCodeSearchResponse> {
     const path = "/api/master-data/hs-codes/search-remote";
     return this.request<ApiHsCodeSearchResponse>("GET", path, {
       query: {
@@ -6990,7 +6994,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public searchSupplierProductOptions(request: SearchSupplierProductOptionsRequest = {}, init?: RequestInit): Promise<ApiSupplierProductOptionDto[]> {
+  public searchSupplierProductOptions(request: SearchSupplierProductOptionsRequest = {}, init?: ApiRequestInit): Promise<ApiSupplierProductOptionDto[]> {
     const path = "/api/suppliers/product-options";
     return this.request<ApiSupplierProductOptionDto[]>("GET", path, {
       query: {
@@ -7000,7 +7004,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public sendEmail(request: SendEmailRequest, init?: RequestInit): Promise<ApiEmailSendResponse> {
+  public sendEmail(request: SendEmailRequest, init?: ApiRequestInit): Promise<ApiEmailSendResponse> {
     const path = "/api/tools/email/send";
     return this.request<ApiEmailSendResponse>("POST", path, {
       body: request.body,
@@ -7008,7 +7012,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public stageServerMigrationRestore(request: StageServerMigrationRestoreRequest, init?: RequestInit): Promise<ApiServerMigrationRestoreResponse> {
+  public stageServerMigrationRestore(request: StageServerMigrationRestoreRequest, init?: ApiRequestInit): Promise<ApiServerMigrationRestoreResponse> {
     const path = "/api/server-migration/restore";
     return this.request<ApiServerMigrationRestoreResponse>("POST", path, {
       body: request.body,
@@ -7024,12 +7028,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startBlankBookingSheetDownloadJob(init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startBlankBookingSheetDownloadJob(init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/tools/excel/booking-sheet/blank/download";
     return this.request<BackgroundJobSnapshot>("POST", path, { init });
   }
 
-  public startBlankBookingSheetSaveToPathJob(request: StartBlankBookingSheetSaveToPathJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startBlankBookingSheetSaveToPathJob(request: StartBlankBookingSheetSaveToPathJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/tools/excel/booking-sheet/blank/save-to-path";
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7037,7 +7041,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startBookingSheetConvertSaveToPathJob(request: StartBookingSheetConvertSaveToPathJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startBookingSheetConvertSaveToPathJob(request: StartBookingSheetConvertSaveToPathJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/tools/excel/booking-sheet/convert/save-to-path";
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7045,12 +7049,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startExcelTemplateDownloadJob(init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startExcelTemplateDownloadJob(init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/tools/excel/template/download";
     return this.request<BackgroundJobSnapshot>("POST", path, { init });
   }
 
-  public startExcelTemplateSaveToPathJob(request: StartExcelTemplateSaveToPathJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startExcelTemplateSaveToPathJob(request: StartExcelTemplateSaveToPathJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/tools/excel/template/save-to-path";
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7058,12 +7062,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startInvoiceBookingSheetDownloadJob(request: StartInvoiceBookingSheetDownloadJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startInvoiceBookingSheetDownloadJob(request: StartInvoiceBookingSheetDownloadJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/tools/excel/booking-sheet/from-invoice/${encodePath(request.invoiceId)}/download`;
     return this.request<BackgroundJobSnapshot>("POST", path, { init });
   }
 
-  public startInvoiceBookingSheetSaveToPathJob(request: StartInvoiceBookingSheetSaveToPathJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startInvoiceBookingSheetSaveToPathJob(request: StartInvoiceBookingSheetSaveToPathJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/tools/excel/booking-sheet/from-invoice/save-to-path";
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7071,7 +7075,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startInvoiceDocumentEmailJob(request: StartInvoiceDocumentEmailJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startInvoiceDocumentEmailJob(request: StartInvoiceDocumentEmailJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/reports/invoices/${encodePath(request.invoiceId)}/document-email`;
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7079,7 +7083,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startInvoiceDocumentPackageDownloadJob(request: StartInvoiceDocumentPackageDownloadJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startInvoiceDocumentPackageDownloadJob(request: StartInvoiceDocumentPackageDownloadJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/reports/invoices/${encodePath(request.invoiceId)}/document-package/download`;
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7087,7 +7091,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startInvoiceDocumentPackageSaveToPathJob(request: StartInvoiceDocumentPackageSaveToPathJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startInvoiceDocumentPackageSaveToPathJob(request: StartInvoiceDocumentPackageSaveToPathJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/reports/invoices/${encodePath(request.invoiceId)}/document-package/save-to-path`;
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7095,7 +7099,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startInvoiceReportPdfDownloadJob(request: StartInvoiceReportPdfDownloadJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startInvoiceReportPdfDownloadJob(request: StartInvoiceReportPdfDownloadJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/reports/invoices/${encodePath(request.invoiceId)}/pdf/download`;
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7103,7 +7107,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startInvoiceReportPdfSaveToPathJob(request: StartInvoiceReportPdfSaveToPathJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startInvoiceReportPdfSaveToPathJob(request: StartInvoiceReportPdfSaveToPathJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/reports/invoices/${encodePath(request.invoiceId)}/pdf/save-to-path`;
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7111,7 +7115,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startInvoiceReportPdfZipDownloadJob(request: StartInvoiceReportPdfZipDownloadJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startInvoiceReportPdfZipDownloadJob(request: StartInvoiceReportPdfZipDownloadJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/reports/invoices/pdf-zip/download";
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7119,7 +7123,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startInvoiceReportPdfZipSaveToPathJob(request: StartInvoiceReportPdfZipSaveToPathJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startInvoiceReportPdfZipSaveToPathJob(request: StartInvoiceReportPdfZipSaveToPathJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/reports/invoices/pdf-zip/save-to-path";
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7127,7 +7131,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startPaymentVoucherPdfDownloadJob(request: StartPaymentVoucherPdfDownloadJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startPaymentVoucherPdfDownloadJob(request: StartPaymentVoucherPdfDownloadJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/reports/payments/${encodePath(request.paymentId)}/pdf/download`;
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7135,7 +7139,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startPaymentVoucherPdfSaveToPathJob(request: StartPaymentVoucherPdfSaveToPathJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startPaymentVoucherPdfSaveToPathJob(request: StartPaymentVoucherPdfSaveToPathJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/reports/payments/${encodePath(request.paymentId)}/pdf/save-to-path`;
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7143,7 +7147,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public startPdfMergeSaveToPathJob(request: StartPdfMergeSaveToPathJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public startPdfMergeSaveToPathJob(request: StartPdfMergeSaveToPathJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/tools/pdf/merge/save-to-path";
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7151,7 +7155,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public suggestEmailServerConfig(request: SuggestEmailServerConfigRequest, init?: RequestInit): Promise<ApiEmailServerSuggestionResponse> {
+  public suggestEmailServerConfig(request: SuggestEmailServerConfigRequest, init?: ApiRequestInit): Promise<ApiEmailServerSuggestionResponse> {
     const path = "/api/tools/email/server-suggestion";
     return this.request<ApiEmailServerSuggestionResponse>("POST", path, {
       body: request.body,
@@ -7159,17 +7163,17 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public testCloudBackupConnection(init?: RequestInit): Promise<ApiCloudBackupCommandResponse> {
+  public testCloudBackupConnection(init?: ApiRequestInit): Promise<ApiCloudBackupCommandResponse> {
     const path = "/api/backup/cloud/test-connection";
     return this.request<ApiCloudBackupCommandResponse>("POST", path, { init });
   }
 
-  public testEmailConnection(init?: RequestInit): Promise<ApiEmailTestResponse> {
+  public testEmailConnection(init?: ApiRequestInit): Promise<ApiEmailTestResponse> {
     const path = "/api/tools/email/test-connection";
     return this.request<ApiEmailTestResponse>("POST", path, { init });
   }
 
-  public transferSharedDatabaseOwnership(request: TransferSharedDatabaseOwnershipRequest, init?: RequestInit): Promise<ApiSharedDatabaseOwnershipTransferResponse> {
+  public transferSharedDatabaseOwnership(request: TransferSharedDatabaseOwnershipRequest, init?: ApiRequestInit): Promise<ApiSharedDatabaseOwnershipTransferResponse> {
     const path = "/api/shared-database/ownership/transfer";
     return this.request<ApiSharedDatabaseOwnershipTransferResponse>("POST", path, {
       body: request.body,
@@ -7177,7 +7181,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public transitionInvoiceStatus(request: TransitionInvoiceStatusRequest, init?: RequestInit): Promise<ApiInvoiceSaveResponse> {
+  public transitionInvoiceStatus(request: TransitionInvoiceStatusRequest, init?: ApiRequestInit): Promise<ApiInvoiceSaveResponse> {
     const path = `/api/invoices/${encodePath(request.id)}/status`;
     return this.request<ApiInvoiceSaveResponse>("POST", path, {
       body: request.body,
@@ -7185,7 +7189,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public unlockAgentConsignmentFields(request: UnlockAgentConsignmentFieldsRequest, init?: RequestInit): Promise<ApiAgentConsignmentUnlockFieldsResponse> {
+  public unlockAgentConsignmentFields(request: UnlockAgentConsignmentFieldsRequest, init?: ApiRequestInit): Promise<ApiAgentConsignmentUnlockFieldsResponse> {
     const path = `/api/single-window/acd/${encodePath(request.invoiceId)}/unlock-fields`;
     return this.request<ApiAgentConsignmentUnlockFieldsResponse>("POST", path, {
       body: request.body,
@@ -7193,7 +7197,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public unlockCustomsCooFields(request: UnlockCustomsCooFieldsRequest, init?: RequestInit): Promise<ApiCustomsCooUnlockFieldsResponse> {
+  public unlockCustomsCooFields(request: UnlockCustomsCooFieldsRequest, init?: ApiRequestInit): Promise<ApiCustomsCooUnlockFieldsResponse> {
     const path = `/api/single-window/coo/${encodePath(request.invoiceId)}/unlock-fields`;
     return this.request<ApiCustomsCooUnlockFieldsResponse>("POST", path, {
       body: request.body,
@@ -7201,7 +7205,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public unverifyInvoice(request: UnverifyInvoiceRequest, init?: RequestInit): Promise<ApiInvoiceSaveResponse> {
+  public unverifyInvoice(request: UnverifyInvoiceRequest, init?: ApiRequestInit): Promise<ApiInvoiceSaveResponse> {
     const path = `/api/invoices/${encodePath(request.id)}/unverify`;
     return this.request<ApiInvoiceSaveResponse>("POST", path, {
       body: request.body,
@@ -7209,7 +7213,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateCrmContact(request: UpdateCrmContactRequest, init?: RequestInit): Promise<ApiCrmContactDto> {
+  public updateCrmContact(request: UpdateCrmContactRequest, init?: ApiRequestInit): Promise<ApiCrmContactDto> {
     const path = `/api/crm/customers/${encodePath(request.customerId)}/contacts/${encodePath(request.id)}`;
     return this.request<ApiCrmContactDto>("PUT", path, {
       body: request.body,
@@ -7217,7 +7221,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateCrmCustomer(request: UpdateCrmCustomerRequest, init?: RequestInit): Promise<ApiCrmCustomerDto> {
+  public updateCrmCustomer(request: UpdateCrmCustomerRequest, init?: ApiRequestInit): Promise<ApiCrmCustomerDto> {
     const path = `/api/crm/customers/${encodePath(request.id)}`;
     return this.request<ApiCrmCustomerDto>("PUT", path, {
       body: request.body,
@@ -7225,7 +7229,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateCrmCustomerBatchStatus(request: UpdateCrmCustomerBatchStatusRequest, init?: RequestInit): Promise<ApiCrmCustomerBatchStatusResult> {
+  public updateCrmCustomerBatchStatus(request: UpdateCrmCustomerBatchStatusRequest, init?: ApiRequestInit): Promise<ApiCrmCustomerBatchStatusResult> {
     const path = "/api/crm/customers/batch-status";
     return this.request<ApiCrmCustomerBatchStatusResult>("POST", path, {
       body: request.body,
@@ -7233,7 +7237,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateCrmFollowUp(request: UpdateCrmFollowUpRequest, init?: RequestInit): Promise<ApiCrmFollowUpDto> {
+  public updateCrmFollowUp(request: UpdateCrmFollowUpRequest, init?: ApiRequestInit): Promise<ApiCrmFollowUpDto> {
     const path = `/api/crm/follow-ups/${encodePath(request.id)}`;
     return this.request<ApiCrmFollowUpDto>("PUT", path, {
       body: request.body,
@@ -7241,7 +7245,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateCustomer(request: UpdateCustomerRequest, init?: RequestInit): Promise<ApiCustomerDto> {
+  public updateCustomer(request: UpdateCustomerRequest, init?: ApiRequestInit): Promise<ApiCustomerDto> {
     const path = `/api/master-data/customers/${encodePath(request.id)}`;
     return this.request<ApiCustomerDto>("PUT", path, {
       body: request.body,
@@ -7249,7 +7253,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateCustomsCooProducerProfile(request: UpdateCustomsCooProducerProfileRequest, init?: RequestInit): Promise<ApiCustomsCooProducerProfileSaveResponse> {
+  public updateCustomsCooProducerProfile(request: UpdateCustomsCooProducerProfileRequest, init?: ApiRequestInit): Promise<ApiCustomsCooProducerProfileSaveResponse> {
     const path = `/api/single-window/coo/producer-profiles/${encodePath(request.id)}`;
     return this.request<ApiCustomsCooProducerProfileSaveResponse>("PUT", path, {
       body: request.body,
@@ -7257,7 +7261,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateEmailTemplate(request: UpdateEmailTemplateRequest, init?: RequestInit): Promise<ApiEmailTemplateDto> {
+  public updateEmailTemplate(request: UpdateEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
     const path = `/api/email-templates/${encodePath(request.id)}`;
     return this.request<ApiEmailTemplateDto>("PUT", path, {
       body: request.body,
@@ -7265,7 +7269,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateExporter(request: UpdateExporterRequest, init?: RequestInit): Promise<ApiExporterDto> {
+  public updateExporter(request: UpdateExporterRequest, init?: ApiRequestInit): Promise<ApiExporterDto> {
     const path = `/api/master-data/exporters/${encodePath(request.id)}`;
     return this.request<ApiExporterDto>("PUT", path, {
       body: request.body,
@@ -7273,7 +7277,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateHsCode(request: UpdateHsCodeRequest, init?: RequestInit): Promise<ApiHsCodeDto> {
+  public updateHsCode(request: UpdateHsCodeRequest, init?: ApiRequestInit): Promise<ApiHsCodeDto> {
     const path = `/api/master-data/hs-codes/${encodePath(request.code)}`;
     return this.request<ApiHsCodeDto>("PUT", path, {
       body: request.body,
@@ -7281,7 +7285,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateInvoice(request: UpdateInvoiceRequest, init?: RequestInit): Promise<ApiInvoiceSaveResponse> {
+  public updateInvoice(request: UpdateInvoiceRequest, init?: ApiRequestInit): Promise<ApiInvoiceSaveResponse> {
     const path = `/api/invoices/${encodePath(request.id)}`;
     return this.request<ApiInvoiceSaveResponse>("PUT", path, {
       body: request.body,
@@ -7289,7 +7293,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updatePayee(request: UpdatePayeeRequest, init?: RequestInit): Promise<ApiPayeeDto> {
+  public updatePayee(request: UpdatePayeeRequest, init?: ApiRequestInit): Promise<ApiPayeeDto> {
     const path = `/api/master-data/payees/${encodePath(request.id)}`;
     return this.request<ApiPayeeDto>("PUT", path, {
       body: request.body,
@@ -7297,7 +7301,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updatePayment(request: UpdatePaymentRequest, init?: RequestInit): Promise<ApiPaymentSaveResponse> {
+  public updatePayment(request: UpdatePaymentRequest, init?: ApiRequestInit): Promise<ApiPaymentSaveResponse> {
     const path = `/api/payments/${encodePath(request.id)}`;
     return this.request<ApiPaymentSaveResponse>("PUT", path, {
       body: request.body,
@@ -7305,7 +7309,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updatePermissionTemplate(request: UpdatePermissionTemplateRequest, init?: RequestInit): Promise<ApiPermissionTemplateDto> {
+  public updatePermissionTemplate(request: UpdatePermissionTemplateRequest, init?: ApiRequestInit): Promise<ApiPermissionTemplateDto> {
     const path = `/api/permission-templates/${encodePath(request.id)}`;
     return this.request<ApiPermissionTemplateDto>("PUT", path, {
       body: request.body,
@@ -7313,7 +7317,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updatePort(request: UpdatePortRequest, init?: RequestInit): Promise<ApiPortDto> {
+  public updatePort(request: UpdatePortRequest, init?: ApiRequestInit): Promise<ApiPortDto> {
     const path = `/api/master-data/ports/${encodePath(request.id)}`;
     return this.request<ApiPortDto>("PUT", path, {
       body: request.body,
@@ -7321,7 +7325,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateProduct(request: UpdateProductRequest, init?: RequestInit): Promise<ApiProductDto> {
+  public updateProduct(request: UpdateProductRequest, init?: ApiRequestInit): Promise<ApiProductDto> {
     const path = `/api/master-data/products/${encodePath(request.id)}`;
     return this.request<ApiProductDto>("PUT", path, {
       body: request.body,
@@ -7329,7 +7333,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateSalesOpportunity(request: UpdateSalesOpportunityRequest, init?: RequestInit): Promise<ApiSalesOpportunityDto> {
+  public updateSalesOpportunity(request: UpdateSalesOpportunityRequest, init?: ApiRequestInit): Promise<ApiSalesOpportunityDto> {
     const path = `/api/crm/opportunities/${encodePath(request.id)}`;
     return this.request<ApiSalesOpportunityDto>("PUT", path, {
       body: request.body,
@@ -7337,7 +7341,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateSettings(request: UpdateSettingsRequest, init?: RequestInit): Promise<ApiSettingsSaveResponse> {
+  public updateSettings(request: UpdateSettingsRequest, init?: ApiRequestInit): Promise<ApiSettingsSaveResponse> {
     const path = "/api/settings";
     return this.request<ApiSettingsSaveResponse>("PUT", path, {
       body: request.body,
@@ -7345,7 +7349,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateSingleWindowReferenceCatalog(request: UpdateSingleWindowReferenceCatalogRequest, init?: RequestInit): Promise<ApiSingleWindowReferenceCatalogSaveResponse> {
+  public updateSingleWindowReferenceCatalog(request: UpdateSingleWindowReferenceCatalogRequest, init?: ApiRequestInit): Promise<ApiSingleWindowReferenceCatalogSaveResponse> {
     const path = "/api/single-window/reference-catalog";
     return this.request<ApiSingleWindowReferenceCatalogSaveResponse>("PUT", path, {
       body: request.body,
@@ -7353,7 +7357,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateSupplier(request: UpdateSupplierRequest, init?: RequestInit): Promise<ApiSupplierDto> {
+  public updateSupplier(request: UpdateSupplierRequest, init?: ApiRequestInit): Promise<ApiSupplierDto> {
     const path = `/api/suppliers/${encodePath(request.id)}`;
     return this.request<ApiSupplierDto>("PUT", path, {
       body: request.body,
@@ -7361,7 +7365,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateSupplierAssessment(request: UpdateSupplierAssessmentRequest, init?: RequestInit): Promise<ApiSupplierAssessmentDto> {
+  public updateSupplierAssessment(request: UpdateSupplierAssessmentRequest, init?: ApiRequestInit): Promise<ApiSupplierAssessmentDto> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/assessments/${encodePath(request.id)}`;
     return this.request<ApiSupplierAssessmentDto>("PUT", path, {
       body: request.body,
@@ -7369,7 +7373,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateSupplierBatchStatus(request: UpdateSupplierBatchStatusRequest, init?: RequestInit): Promise<ApiSupplierBatchStatusResult> {
+  public updateSupplierBatchStatus(request: UpdateSupplierBatchStatusRequest, init?: ApiRequestInit): Promise<ApiSupplierBatchStatusResult> {
     const path = "/api/suppliers/batch-status";
     return this.request<ApiSupplierBatchStatusResult>("POST", path, {
       body: request.body,
@@ -7377,7 +7381,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateSupplierContact(request: UpdateSupplierContactRequest, init?: RequestInit): Promise<ApiSupplierContactDto> {
+  public updateSupplierContact(request: UpdateSupplierContactRequest, init?: ApiRequestInit): Promise<ApiSupplierContactDto> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/contacts/${encodePath(request.id)}`;
     return this.request<ApiSupplierContactDto>("PUT", path, {
       body: request.body,
@@ -7385,7 +7389,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateSupplierProductLink(request: UpdateSupplierProductLinkRequest, init?: RequestInit): Promise<ApiSupplierProductLinkDto> {
+  public updateSupplierProductLink(request: UpdateSupplierProductLinkRequest, init?: ApiRequestInit): Promise<ApiSupplierProductLinkDto> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/products/${encodePath(request.id)}`;
     return this.request<ApiSupplierProductLinkDto>("PUT", path, {
       body: request.body,
@@ -7393,7 +7397,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateUnit(request: UpdateUnitRequest, init?: RequestInit): Promise<ApiUnitDto> {
+  public updateUnit(request: UpdateUnitRequest, init?: ApiRequestInit): Promise<ApiUnitDto> {
     const path = `/api/master-data/units/${encodePath(request.id)}`;
     return this.request<ApiUnitDto>("PUT", path, {
       body: request.body,
@@ -7401,7 +7405,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateUserReportTemplate(request: UpdateUserReportTemplateRequest, init?: RequestInit): Promise<ApiUserReportTemplateDto> {
+  public updateUserReportTemplate(request: UpdateUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
     const path = `/api/reports/user-templates/${encodePath(request.id)}`;
     return this.request<ApiUserReportTemplateDto>("PUT", path, {
       body: request.body,
@@ -7409,7 +7413,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public uploadAndRestorePostgreSqlPhysicalBackup(request: UploadAndRestorePostgreSqlPhysicalBackupRequest, init?: RequestInit): Promise<ApiServerMigrationRestoreResponse> {
+  public uploadAndRestorePostgreSqlPhysicalBackup(request: UploadAndRestorePostgreSqlPhysicalBackupRequest, init?: ApiRequestInit): Promise<ApiServerMigrationRestoreResponse> {
     const path = "/api/postgresql-maintenance/backups/upload-restore";
     return this.request<ApiServerMigrationRestoreResponse>("POST", path, {
       body: request.body,
@@ -7424,7 +7428,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public uploadAndStartBookingSheetConvertDownloadJob(request: UploadAndStartBookingSheetConvertDownloadJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public uploadAndStartBookingSheetConvertDownloadJob(request: UploadAndStartBookingSheetConvertDownloadJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/tools/excel/booking-sheet/convert/upload";
     return this.request<BackgroundJobSnapshot>("POST", path, {
       query: {
@@ -7435,7 +7439,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public uploadAndStartPdfMergeDownloadJob(request: UploadAndStartPdfMergeDownloadJobRequest, init?: RequestInit): Promise<BackgroundJobSnapshot> {
+  public uploadAndStartPdfMergeDownloadJob(request: UploadAndStartPdfMergeDownloadJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/tools/pdf/merge/upload";
     return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
@@ -7443,7 +7447,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public uploadExporterSeal(request: UploadExporterSealRequest, init?: RequestInit): Promise<ApiExporterDto> {
+  public uploadExporterSeal(request: UploadExporterSealRequest, init?: ApiRequestInit): Promise<ApiExporterDto> {
     const path = `/api/master-data/exporters/${encodePath(request.id)}/seals/${encodePath(request.sealType)}/upload`;
     return this.request<ApiExporterDto>("POST", path, {
       query: {
@@ -7454,7 +7458,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public uploadHsCodesImportFile(request: UploadHsCodesImportFileRequest, init?: RequestInit): Promise<ApiHsCodeImportResponse> {
+  public uploadHsCodesImportFile(request: UploadHsCodesImportFileRequest, init?: ApiRequestInit): Promise<ApiHsCodeImportResponse> {
     const path = "/api/master-data/hs-codes/import-upload";
     return this.request<ApiHsCodeImportResponse>("POST", path, {
       query: {
@@ -7465,12 +7469,12 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public uploadLatestDatabaseBackupToCloud(init?: RequestInit): Promise<ApiCloudBackupCommandResponse> {
+  public uploadLatestDatabaseBackupToCloud(init?: ApiRequestInit): Promise<ApiCloudBackupCommandResponse> {
     const path = "/api/backup/cloud/upload-latest";
     return this.request<ApiCloudBackupCommandResponse>("POST", path, { init });
   }
 
-  public uploadLetterOfCreditDocument(request: UploadLetterOfCreditDocumentRequest, init?: RequestInit): Promise<ApiLetterOfCreditImportResponse> {
+  public uploadLetterOfCreditDocument(request: UploadLetterOfCreditDocumentRequest, init?: ApiRequestInit): Promise<ApiLetterOfCreditImportResponse> {
     const path = "/api/tools/letter-of-credit/import-upload";
     return this.request<ApiLetterOfCreditImportResponse>("POST", path, {
       query: {
@@ -7481,7 +7485,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public uploadOcrImage(request: UploadOcrImageRequest, init?: RequestInit): Promise<ApiOcrRecognizeImageResponse> {
+  public uploadOcrImage(request: UploadOcrImageRequest, init?: ApiRequestInit): Promise<ApiOcrRecognizeImageResponse> {
     const path = "/api/tools/ocr/recognize-image-upload";
     return this.request<ApiOcrRecognizeImageResponse>("POST", path, {
       query: {
@@ -7493,7 +7497,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public uploadReportTemplatePackage(request: UploadReportTemplatePackageRequest, init?: RequestInit): Promise<ApiReportTemplatePackageImportResponse> {
+  public uploadReportTemplatePackage(request: UploadReportTemplatePackageRequest, init?: ApiRequestInit): Promise<ApiReportTemplatePackageImportResponse> {
     const path = "/api/reports/templates/package/upload";
     return this.request<ApiReportTemplatePackageImportResponse>("POST", path, {
       query: {
@@ -7505,7 +7509,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public uploadSingleWindowReceiptPackage(request: UploadSingleWindowReceiptPackageRequest, init?: RequestInit): Promise<ApiSingleWindowImportedPackageResponse> {
+  public uploadSingleWindowReceiptPackage(request: UploadSingleWindowReceiptPackageRequest, init?: ApiRequestInit): Promise<ApiSingleWindowImportedPackageResponse> {
     const path = "/api/single-window/receipts/upload";
     return this.request<ApiSingleWindowImportedPackageResponse>("POST", path, {
       query: {
@@ -7518,7 +7522,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public uploadSingleWindowSubmitPackage(request: UploadSingleWindowSubmitPackageRequest, init?: RequestInit): Promise<ApiSingleWindowImportedPackageResponse> {
+  public uploadSingleWindowSubmitPackage(request: UploadSingleWindowSubmitPackageRequest, init?: ApiRequestInit): Promise<ApiSingleWindowImportedPackageResponse> {
     const path = "/api/single-window/packages/upload";
     return this.request<ApiSingleWindowImportedPackageResponse>("POST", path, {
       query: {
@@ -7531,7 +7535,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public validateSettings(request: ValidateSettingsRequest, init?: RequestInit): Promise<ApiSettingsValidationResponse> {
+  public validateSettings(request: ValidateSettingsRequest, init?: ApiRequestInit): Promise<ApiSettingsValidationResponse> {
     const path = "/api/settings/validate";
     return this.request<ApiSettingsValidationResponse>("POST", path, {
       body: request.body,
@@ -7539,7 +7543,7 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createUserAccount(request: CreateUserAccountRequest, init?: RequestInit): Promise<ApiUserSaveResponse> {
+  public createUserAccount(request: CreateUserAccountRequest, init?: ApiRequestInit): Promise<ApiUserSaveResponse> {
     const path = "/api/users";
     return this.request<ApiUserSaveResponse>("POST", path, {
       body: request.body,
@@ -7547,32 +7551,32 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public deleteUserAccount(request: DeleteUserAccountRequest, init?: RequestInit): Promise<ApiCommandResponse> {
+  public deleteUserAccount(request: DeleteUserAccountRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/users/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public getCurrentUser(init?: RequestInit): Promise<ApiUserDto> {
+  public getCurrentUser(init?: ApiRequestInit): Promise<ApiUserDto> {
     const path = "/api/auth/me";
     return this.request<ApiUserDto>("GET", path, { init });
   }
 
-  public getHealth(init?: RequestInit): Promise<ApiHealthResponse> {
+  public getHealth(init?: ApiRequestInit): Promise<ApiHealthResponse> {
     const path = "/healthz";
     return this.request<ApiHealthResponse>("GET", path, { init });
   }
 
-  public getLiveness(init?: RequestInit): Promise<void> {
+  public getLiveness(init?: ApiRequestInit): Promise<void> {
     const path = "/livez";
     return this.request<void>("GET", path, { init });
   }
 
-  public getReadiness(init?: RequestInit): Promise<void> {
+  public getReadiness(init?: ApiRequestInit): Promise<void> {
     const path = "/readyz";
     return this.request<void>("GET", path, { init });
   }
 
-  public updateUserAccount(request: UpdateUserAccountRequest, init?: RequestInit): Promise<ApiUserSaveResponse> {
+  public updateUserAccount(request: UpdateUserAccountRequest, init?: ApiRequestInit): Promise<ApiUserSaveResponse> {
     const path = `/api/users/${encodePath(request.id)}`;
     return this.request<ApiUserSaveResponse>("PUT", path, {
       body: request.body,
@@ -7580,85 +7584,162 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  private async resolveAccessToken(): Promise<string | undefined> {
-    if (typeof this.accessToken === "function") {
-      return this.accessToken();
+  private async resolveAccessToken(signal?: AbortSignal): Promise<string | undefined> {
+    const provider = this.accessToken;
+    if (typeof provider === "function") {
+      throwIfAborted(signal);
+      return awaitWithSignal(Promise.resolve().then(() => provider(signal)), signal);
     }
 
-    return this.accessToken;
+    return provider;
   }
 
-  private async resolveDesktopAccessToken(): Promise<string | undefined> {
-    if (typeof this.desktopAccessToken === "function") {
-      return this.desktopAccessToken();
+  private async resolveDesktopAccessToken(signal?: AbortSignal): Promise<string | undefined> {
+    const provider = this.desktopAccessToken;
+    if (typeof provider === "function") {
+      throwIfAborted(signal);
+      return awaitWithSignal(Promise.resolve().then(() => provider(signal)), signal);
     }
 
-    return this.desktopAccessToken;
+    return provider;
   }
 
   private async request<T>(
     method: string,
     path: string,
-    options: { query?: Record<string, QueryValue>; body?: unknown; init?: RequestInit } = {},
+    options: { query?: Record<string, QueryValue>; body?: unknown; init?: ApiRequestInit } = {},
   ): Promise<T> {
-    const { headers: initHeaders, body: _ignoredBody, ...restInit } = options.init ?? {};
-    const headers = new Headers(initHeaders);
-    const isFormDataBody = typeof FormData !== "undefined" && options.body instanceof FormData;
-    const isBlobBody = typeof Blob !== "undefined" && options.body instanceof Blob;
-    if (!headers.has("Accept")) {
-      headers.set("Accept", "application/json");
-    }
-
-    if (options.body !== undefined && !headers.has("Content-Type")) {
-      if (isBlobBody) {
-        headers.set("Content-Type", "application/octet-stream");
-      } else if (!isFormDataBody) {
-        headers.set("Content-Type", "application/json");
+    const { headers: initHeaders, body: _ignoredBody, signal: callerSignal, timeoutMs, ...restInit } = options.init ?? {};
+    const timeout = createRequestTimeout(callerSignal, timeoutMs ?? this.defaultTimeoutMs);
+    try {
+      const headers = new Headers(initHeaders);
+      const isFormDataBody = typeof FormData !== "undefined" && options.body instanceof FormData;
+      const isBlobBody = typeof Blob !== "undefined" && options.body instanceof Blob;
+      if (!headers.has("Accept")) {
+        headers.set("Accept", "application/json");
       }
-    }
 
-    const desktopToken = await this.resolveDesktopAccessToken();
-    if (desktopToken && !headers.has(desktopAccessTokenHeaderName)) {
-      headers.set(desktopAccessTokenHeaderName, desktopToken);
-    }
+      if (options.body !== undefined && !headers.has("Content-Type")) {
+        if (isBlobBody) {
+          headers.set("Content-Type", "application/octet-stream");
+        } else if (!isFormDataBody) {
+          headers.set("Content-Type", "application/json");
+        }
+      }
 
-    const token = await this.resolveAccessToken();
-    if (token && !headers.has("Authorization")) {
-      headers.set("Authorization", `Bearer ${token}`);
-    }
+      const requestSignal = timeout.signal;
+      const desktopToken = await this.resolveDesktopAccessToken(requestSignal);
+      if (desktopToken && !headers.has(desktopAccessTokenHeaderName)) {
+        headers.set(desktopAccessTokenHeaderName, desktopToken);
+      }
 
-    const relativePath = appendQuery(path, options.query).replace(/^\/+/, "");
-    const url = new URL(relativePath, this.baseUrl);
-    const requestInit: RequestInit = { ...restInit, method, headers };
-    if (options.body !== undefined) {
-      requestInit.body = isFormDataBody || isBlobBody ? options.body as BodyInit : JSON.stringify(options.body);
-    }
+      const token = await this.resolveAccessToken(requestSignal);
+      if (token && !headers.has("Authorization")) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
 
-    const response = await this.fetchImpl(url, requestInit);
-    const contentType = response.headers.get("content-type") ?? "";
-    const contentDisposition = response.headers.get("content-disposition") ?? "";
-    const isBinaryResponse = contentType.startsWith("image/") || contentType.startsWith("audio/") ||
-      contentType.startsWith("video/") || contentType.includes("application/pdf") ||
-      contentType.includes("application/octet-stream") || contentDisposition.toLowerCase().includes("attachment");
-    if (isBinaryResponse) {
+      const relativePath = appendQuery(path, options.query).replace(/^\/+/, "");
+      const url = new URL(relativePath, this.baseUrl);
+      const requestInit: RequestInit = { ...restInit, method, headers, signal: requestSignal };
+      if (options.body !== undefined) {
+        requestInit.body = isFormDataBody || isBlobBody ? options.body as BodyInit : JSON.stringify(options.body);
+      }
+
+      throwIfAborted(requestSignal);
+      const response = await this.fetchImpl(url, requestInit);
+      const contentType = response.headers.get("content-type") ?? "";
+      const contentDisposition = response.headers.get("content-disposition") ?? "";
+      const isBinaryResponse = contentType.startsWith("image/") || contentType.startsWith("audio/") ||
+        contentType.startsWith("video/") || contentType.includes("application/pdf") ||
+        contentType.includes("application/octet-stream") || contentDisposition.toLowerCase().includes("attachment");
+      if (isBinaryResponse) {
+        if (!response.ok) {
+          throw new ApiError(response.status, response.statusText, await response.text());
+        }
+
+        return await response.blob() as T;
+      }
+
+      const responseText = await response.text();
       if (!response.ok) {
-        throw new ApiError(response.status, response.statusText, await response.text());
+        throw new ApiError(response.status, response.statusText, responseText);
       }
 
-      return await response.blob() as T;
-    }
+      if (!responseText) {
+        return undefined as T;
+      }
 
-    const responseText = await response.text();
-    if (!response.ok) {
-      throw new ApiError(response.status, response.statusText, responseText);
+      return (contentType.includes("application/json") ? JSON.parse(responseText) : responseText) as T;
+    } finally {
+      timeout.dispose();
     }
-
-    if (!responseText) {
-      return undefined as T;
-    }
-
-    return (contentType.includes("application/json") ? JSON.parse(responseText) : responseText) as T;
   }
+}
+
+function normalizeTimeout(value: number): number {
+  if (!Number.isFinite(value) || value < 0 || value > 60 * 60 * 1000) {
+    throw new RangeError("API request timeout must be between 0 and 3600000 milliseconds.");
+  }
+  return Math.trunc(value);
+}
+
+function throwIfAborted(signal: AbortSignal | null | undefined): void {
+  if (!signal?.aborted) return;
+  throw signal.reason ?? new DOMException("The operation was aborted.", "AbortError");
+}
+
+async function awaitWithSignal<T>(value: PromiseLike<T> | T, signal: AbortSignal | null | undefined): Promise<T> {
+  throwIfAborted(signal);
+  if (!signal) return await value;
+  return await new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => signal.removeEventListener("abort", onAbort);
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) onAbort();
+    Promise.resolve(value).then(result => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(result);
+    }, error => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    });
+  });
+}
+
+function createRequestTimeout(callerSignal: AbortSignal | null | undefined, timeoutMs: number): { signal?: AbortSignal; dispose: () => void } {
+  const normalizedTimeout = normalizeTimeout(timeoutMs);
+  if (normalizedTimeout === 0) {
+    return { signal: callerSignal ?? undefined, dispose: () => undefined };
+  }
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), normalizedTimeout);
+  const signals = [callerSignal, timeoutController.signal].filter((signal): signal is AbortSignal => Boolean(signal));
+  if (signals.length === 1) {
+    return { signal: signals[0], dispose: () => clearTimeout(timeoutId) };
+  }
+  const combinedController = new AbortController();
+  const abort = () => combinedController.abort();
+  for (const signal of signals) {
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+  }
+  return {
+    signal: combinedController.signal,
+    dispose: () => {
+      clearTimeout(timeoutId);
+      for (const signal of signals) signal.removeEventListener("abort", abort);
+    },
+  };
 }
 
 function appendQuery(path: string, query?: Record<string, QueryValue>): string {

@@ -15,6 +15,7 @@ readRouteSuccessMessage
 } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { ServerDraftUpdateNotice, useServerDraftSync } from "../../ui/serverDraftSync.tsx";
+import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { ConcurrencyConflictNotice, InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import {
 hasCustomOptionValue,
@@ -79,6 +80,7 @@ export function MasterDataEditorPage({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [hasConcurrencyConflict, setHasConcurrencyConflict] = useState(false);
   const queryClient = useQueryClient();
+  const runAbortableOperation = useAbortableOperation();
   const customOptionTypes = useMemo(
     () =>
       Array.from(
@@ -171,7 +173,9 @@ export function MasterDataEditorPage({
 
   const saveMutation = useMutation({
     mutationFn: (body: MasterDataRecord) =>
-      isNew ? config.create(client, body) : config.update(client, effectiveRecordKey, body),
+      runAbortableOperation((signal) => isNew
+        ? config.create(client, body, signal)
+        : config.update(client, effectiveRecordKey, body, signal)),
     onSuccess: async (saved) => {
       const nextMessage = isNew ? `${config.label}已创建。` : `${config.label}已保存。`;
       setRecord(saved);
@@ -189,6 +193,7 @@ export function MasterDataEditorPage({
       }
     },
     onError: (error) => {
+      if (isAbortError(error)) return;
       const errorMessage = readApiError(error);
       setMessage(errorMessage);
       setSuccessMessage(null);
@@ -205,7 +210,7 @@ export function MasterDataEditorPage({
         throw new Error(`${config.label}未加载，无法删除。`);
       }
 
-      return config.delete(client, record, effectiveRecordKey);
+      return runAbortableOperation((signal) => config.delete(client, record, effectiveRecordKey, signal));
     },
     onSuccess: async (response) => {
       const nextMessage = response.message || `${config.label}已删除。`;
@@ -228,6 +233,7 @@ export function MasterDataEditorPage({
       });
     },
     onError: (error) => {
+      if (isAbortError(error)) return;
       setDeleteDialogOpen(false);
       setMessage(readApiError(error));
       setSuccessMessage(null);
@@ -236,10 +242,10 @@ export function MasterDataEditorPage({
 
   const saveCustomOptionMutation = useMutation({
     mutationFn: ({ optionType, value }: { optionType: string; value: string }) =>
-      client.saveCustomOption({
+      runAbortableOperation((signal) => client.saveCustomOption({
         optionType,
         body: { value },
-      }),
+      }, { signal })),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.customOptionsRoot() });
     },
@@ -247,12 +253,12 @@ export function MasterDataEditorPage({
 
   const sealUploadMutation = useMutation({
     mutationFn: ({ fieldName, file }: { fieldName: "docSealPath" | "customsSealPath"; file: File }) =>
-      client.uploadExporterSeal({
+      runAbortableOperation((signal) => client.uploadExporterSeal({
         id: numberValue(record?.id),
         sealType: fieldName === "docSealPath" ? "document" : "customs",
         fileName: file.name,
         body: file,
-      }),
+      }, { signal })),
     onSuccess: async (saved: ApiExporterDto, variables) => {
       const nextRecord = saved as unknown as MasterDataRecord;
       const nextMessage = variables.fieldName === "docSealPath" ? "单证章已上传并保存。" : "报关章已上传并保存。";
@@ -268,6 +274,7 @@ export function MasterDataEditorPage({
       ]);
     },
     onError: (error) => {
+      if (isAbortError(error)) return;
       setMessage(readApiError(error));
       setSuccessMessage(null);
     },
@@ -419,9 +426,13 @@ export function MasterDataEditorPage({
     let hsCode = productHsCodeLookup.get(normalizedValue);
     if (!hsCode && normalizedValue.length >= 4) {
       try {
-        const result = await client.listHsCodes({ pageNumber: 1, pageSize: 20, keyword: normalizedValue });
+        const result = await runAbortableOperation((signal) => client.listHsCodes(
+          { pageNumber: 1, pageSize: 20, keyword: normalizedValue },
+          { signal },
+        ));
         hsCode = result.items.find(item => normalizeHsCodeKey(item.code || item.normalizedCode) === normalizedValue && item.status === "Active");
       } catch (error) {
+        if (isAbortError(error)) return;
         setProductUnitMessage(readApiError(error));
         return;
       }

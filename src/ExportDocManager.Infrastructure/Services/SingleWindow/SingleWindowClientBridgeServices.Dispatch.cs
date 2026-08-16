@@ -6,6 +6,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace ExportDocManager.Services.SingleWindow
 {
@@ -217,7 +218,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
             catch (Exception trackingException)
             {
-                Serilog.Log.Error(
+                _logger.LogError(
                     trackingException,
                     "Marking Single Window client dispatch {BatchId} as failed failed",
                     batchId);

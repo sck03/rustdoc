@@ -94,7 +94,7 @@ async function writeDirectoryBuildProps() {
     ],
     [
       "RuntimeIdentifier",
-      "    <RuntimeIdentifier Condition=\"'$(RuntimeIdentifier)' == '' and '$(_ExportDocManagerHostOs)' != ''\">$(_ExportDocManagerHostOs)-$(_ExportDocManagerHostArchitecture)</RuntimeIdentifier>",
+      "    <RuntimeIdentifier Condition=\"'$(RuntimeIdentifier)' == '' and '$(_ExportDocManagerHostOs)' != '' and ('$(MSBuildProjectName)' == 'ExportDocManager.Api' or '$(MSBuildProjectName)' == 'ExportDocManager.Infrastructure.PdfOcr')\">$(_ExportDocManagerHostOs)-$(_ExportDocManagerHostArchitecture)</RuntimeIdentifier>",
     ],
     [
       "SelfContained",

@@ -4,7 +4,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.Data.Sqlite;
-using Serilog;
+using Microsoft.Extensions.Logging;
 
 namespace ExportDocManager.Services.Infrastructure
 {
@@ -32,7 +32,8 @@ namespace ExportDocManager.Services.Infrastructure
 
         public static void ApplyPendingRestore(
             IAppPathProvider pathProvider,
-            DatabaseConnectionSettings databaseSettings)
+            DatabaseConnectionSettings databaseSettings,
+            ILogger? logger = null)
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
             ArgumentNullException.ThrowIfNull(databaseSettings);
@@ -107,7 +108,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
             if (!File.Exists(stagedPath))
             {
-                CompleteAlreadyAppliedRestore(databasePath, markerPath, marker);
+                CompleteAlreadyAppliedRestore(databasePath, markerPath, marker, logger);
                 return;
             }
 
@@ -123,7 +124,7 @@ namespace ExportDocManager.Services.Infrastructure
             AtomicFileHelper.TryDeleteFile(databasePath + "-wal");
             AtomicFileHelper.TryDeleteFile(databasePath + "-shm");
             AtomicFileHelper.TryDeleteFile(markerPath);
-            Log.Information(
+            logger?.LogInformation(
                 "Applied pending SQLite restore from {BackupFileName}; safety backup={SafetyBackupFilePath}.",
                 marker.SourceBackupFileName,
                 marker.SafetyBackupFilePath);
@@ -132,7 +133,8 @@ namespace ExportDocManager.Services.Infrastructure
         private static void CompleteAlreadyAppliedRestore(
             string databasePath,
             string markerPath,
-            SqlitePendingRestoreMarker marker)
+            SqlitePendingRestoreMarker marker,
+            ILogger? logger)
         {
             if (!File.Exists(databasePath) || string.IsNullOrWhiteSpace(marker.StagedSha256))
             {
@@ -150,7 +152,7 @@ namespace ExportDocManager.Services.Infrastructure
             AtomicFileHelper.TryDeleteFile(databasePath + "-shm");
             ValidateSnapshot(databasePath);
             AtomicFileHelper.TryDeleteFile(markerPath);
-            Log.Information(
+            logger?.LogInformation(
                 "Completed pending SQLite restore recovery after the staged database had already replaced the target; source={BackupFileName}; safety backup={SafetyBackupFilePath}.",
                 marker.SourceBackupFileName,
                 marker.SafetyBackupFilePath);

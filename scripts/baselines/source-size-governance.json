@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-13",
+  "capturedAt": "2026-08-16",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 108929,
+      "baselineAggregateLines": 109612,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 109129,
+      "maximumAggregateLines": 109812,
       "reportFiles": false
     },
     {
@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 37543,
+      "baselineAggregateLines": 37908,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 37663,
+      "maximumAggregateLines": 38028,
       "reportFiles": false
     },
     {
@@ -56,9 +56,9 @@
       "directories": ["scripts", "deploy", ".github/workflows"],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 38701,
+      "baselineAggregateLines": 39020,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 39000,
+      "maximumAggregateLines": 39170,
       "reportFiles": false
     },
     {
@@ -66,9 +66,9 @@
       "directory": ".github/workflows",
       "filePattern": "^.+\\.(?:yml|yaml)$",
       "maximumLines": 800,
-      "baselineAggregateLines": 2747,
+      "baselineAggregateLines": 2769,
       "maximumAggregateGrowthLines": 20,
-      "maximumAggregateLines": 2800,
+      "maximumAggregateLines": 2789,
       "reportFiles": false
     },
     {
