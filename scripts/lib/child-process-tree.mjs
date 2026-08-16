@@ -8,11 +8,11 @@ export function spawnProcessTree(command, args, options = {}) {
 }
 
 export async function stopProcessTree(child, timeoutMs = 5000) {
-  if (!child?.pid) return;
+  if (!child?.pid) return true;
 
   if (process.platform === "win32") {
-    if (!isProcessAlive(child.pid)) return;
-    await runCleanupProcess("taskkill.exe", ["/pid", String(child.pid), "/T", "/F"]);
+    if (!isProcessAlive(child.pid)) return true;
+    await runCleanupProcess("taskkill.exe", ["/pid", String(child.pid), "/T", "/F"], timeoutMs);
     if (isProcessAlive(child.pid)) {
       const command =
         `$process = [Diagnostics.Process]::GetProcessById(${child.pid}); ` +
@@ -23,32 +23,47 @@ export async function stopProcessTree(child, timeoutMs = 5000) {
         "-NonInteractive",
         "-Command",
         command,
-      ]);
+      ], timeoutMs);
     }
     if (isProcessAlive(child.pid)) {
       child.kill("SIGKILL");
     }
     await waitForChildExit(child, timeoutMs);
-    return;
+    return !isProcessAlive(child.pid);
   }
 
-  if (!isProcessGroupAlive(child.pid)) return;
+  if (!isProcessGroupAlive(child.pid)) return true;
   signalProcessGroup(child.pid, "SIGTERM");
   if (!(await waitForProcessGroupExit(child.pid, timeoutMs))) {
     signalProcessGroup(child.pid, "SIGKILL");
     await waitForProcessGroupExit(child.pid, Math.min(timeoutMs, 2000));
   }
   await waitForChildExit(child, Math.min(timeoutMs, 1000));
+  return !isProcessGroupAlive(child.pid);
 }
 
-function runCleanupProcess(command, args) {
+function runCleanupProcess(command, args, timeoutMs) {
   return new Promise((resolve) => {
     const killer = spawn(command, args, {
       stdio: "ignore",
       windowsHide: true,
     });
-    killer.once("exit", resolve);
-    killer.once("error", resolve);
+    killer.unref();
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      killer.kill("SIGKILL");
+      resolve(false);
+    }, timeoutMs);
+    const finish = (success) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(success);
+    };
+    killer.once("exit", (code) => finish(code === 0));
+    killer.once("error", () => finish(false));
   });
 }
 

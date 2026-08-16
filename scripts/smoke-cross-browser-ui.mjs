@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -10,6 +9,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
 import { resolveDotnetCommand } from "./lib/dotnet-command.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,6 +20,7 @@ process.env.PLAYWRIGHT_BROWSERS_PATH = playwrightBrowsersPath;
 const requestedBrowsers = readBrowserArgument();
 const legacyWindowsFirefoxSandboxDisabled = shouldDisableLegacyWindowsFirefoxSandbox();
 const closeTimeoutMs = 10_000;
+const browserCloseTimeoutMs = 30_000;
 const runtimeIdentifier = `${platformPrefix()}-${architectureName()}`;
 const apiOutputRoot = path.join(
   repositoryRoot,
@@ -60,7 +61,7 @@ if (!existsSync(path.join(appRoot, "wwwroot", "index.html"))) {
 
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
-const apiProcess = spawn(
+const apiProcess = spawnProcessTree(
   resolveDotnetCommand(),
   [apiDll, "--app-root", appRoot, "--data-root", dataRoot, "--urls", baseUrl],
   {
@@ -74,7 +75,6 @@ const apiProcess = spawn(
     },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
-    detached: process.platform !== "win32",
   },
 );
 let apiOutput = "";
@@ -84,6 +84,7 @@ apiProcess.stderr.on("data", (chunk) => { apiOutput += chunk.toString(); });
 try {
   await waitForHealth(`${baseUrl}/healthz`, 30_000);
   const results = [];
+  const cleanupWarnings = [];
   for (const browserName of requestedBrowsers) {
     const browserType = playwright[browserName];
     if (!browserType) throw new Error(`Unsupported Playwright browser: ${browserName}`);
@@ -112,7 +113,8 @@ try {
         height: 844,
       }));
     } finally {
-      await withTimeout(browser.close(), closeTimeoutMs, `${browserName} close`);
+      const warning = await closeBrowser(browser, browserName);
+      if (warning) cleanupWarnings.push(warning);
     }
   }
   process.stdout.write(`${JSON.stringify({
@@ -120,14 +122,54 @@ try {
     runtimeIdentifier,
     playwrightBrowsersPath,
     legacyWindowsFirefoxSandboxDisabled,
+    cleanupWarnings,
     results,
   }, null, 2)}\n`);
 } catch (error) {
   if (apiOutput.trim()) process.stderr.write(`API output:\n${apiOutput}\n`);
   throw error;
 } finally {
-  await stopChild(apiProcess);
-  rmSync(runtimeRoot, { recursive: true, force: true });
+  let cleanupError;
+  try {
+    if (!await stopProcessTree(apiProcess, closeTimeoutMs)) {
+      cleanupError = new Error(`API process tree ${apiProcess.pid} did not exit within the cleanup deadline`);
+    }
+  } catch (error) {
+    cleanupError = error;
+  } finally {
+    if (cleanupError) {
+      apiProcess.stdout.destroy();
+      apiProcess.stderr.destroy();
+      apiProcess.unref();
+    }
+    rmSync(runtimeRoot, { recursive: true, force: true });
+  }
+  if (cleanupError) throw cleanupError;
+}
+
+async function closeBrowser(browser, browserName) {
+  const closeResult = Promise.resolve().then(() => browser.close()).then(
+    () => ({ error: null }),
+    (error) => ({ error }),
+  );
+  const result = await withTimeout(
+    closeResult,
+    browserCloseTimeoutMs,
+    `${browserName} close`,
+    false,
+  );
+  if (result === false) {
+    const warning = `${browserName} close exceeded ${browserCloseTimeoutMs}ms after its acceptance checks passed`;
+    process.stderr.write(`Warning: ${warning}\n`);
+    return warning;
+  }
+  if (result.error) {
+    const message = result.error instanceof Error ? result.error.message : String(result.error);
+    const warning = `${browserName} close reported a cleanup error after its acceptance checks passed: ${message}`;
+    process.stderr.write(`Warning: ${warning}\n`);
+    return warning;
+  }
+  return "";
 }
 
 async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, viewport) {
@@ -435,37 +477,6 @@ async function waitForHealth(url, timeoutMs) {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error(`API did not become healthy within ${timeoutMs}ms: ${url}`);
-}
-
-async function stopChild(child) {
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  signalChildTree(child, "SIGTERM");
-  if (await waitForChildExit(child, closeTimeoutMs)) return;
-  signalChildTree(child, "SIGKILL");
-  if (!await waitForChildExit(child, closeTimeoutMs)) {
-    throw new Error(`API process tree ${child.pid} did not exit after SIGKILL`);
-  }
-}
-
-function signalChildTree(child, signal) {
-  if (process.platform !== "win32") {
-    try {
-      process.kill(-child.pid, signal);
-      return;
-    } catch {
-    }
-  }
-  child.kill(signal);
-}
-
-async function waitForChildExit(child, timeoutMs) {
-  if (child.exitCode !== null || child.signalCode !== null) return true;
-  return withTimeout(
-    new Promise((resolve) => child.once("exit", () => resolve(true))),
-    timeoutMs,
-    `process ${child.pid} exit`,
-    false,
-  );
 }
 
 async function withTimeout(promise, timeoutMs, label, throwOnTimeout = true) {

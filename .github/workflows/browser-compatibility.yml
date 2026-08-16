@@ -9,6 +9,7 @@ on:
       - "src/ExportDocManager.Application/**"
       - "src/ExportDocManager.Infrastructure/**"
       - "scripts/smoke-cross-browser-ui.mjs"
+      - "scripts/lib/child-process-tree.mjs"
       - ".github/workflows/browser-compatibility.yml"
   push:
     branches:
@@ -19,6 +20,7 @@ on:
       - "src/ExportDocManager.Application/**"
       - "src/ExportDocManager.Infrastructure/**"
       - "scripts/smoke-cross-browser-ui.mjs"
+      - "scripts/lib/child-process-tree.mjs"
       - ".github/workflows/browser-compatibility.yml"
 
 concurrency:
