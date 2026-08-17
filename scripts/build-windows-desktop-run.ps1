@@ -31,27 +31,6 @@ function Get-FullPath {
     return [System.IO.Path]::GetFullPath($Path)
 }
 
-function Test-SystemDrivePath {
-    param([Parameter(Mandatory = $true)][string]$Path)
-    $systemDrive = $env:SystemDrive
-    if ([string]::IsNullOrWhiteSpace($systemDrive)) {
-        return $false
-    }
-
-    return (Get-FullPath -Path $Path).StartsWith($systemDrive, [System.StringComparison]::OrdinalIgnoreCase)
-}
-
-function Assert-NonSystemDrivePath {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$Purpose
-    )
-
-    if (-not $AllowSystemDrive -and (Test-SystemDrivePath -Path $Path)) {
-        throw "$Purpose resolved to the system drive: $Path. Pass -AllowSystemDrive only for an intentional local override."
-    }
-}
-
 function Resolve-CargoBinDir {
     if (-not [string]::IsNullOrWhiteSpace($CargoBinDir)) {
         if (-not (Test-Path -LiteralPath (Join-Path $CargoBinDir "cargo.exe"))) {
@@ -143,20 +122,20 @@ if ($IncludeLicenseKeygen -and [string]::IsNullOrWhiteSpace($LicenseOutputDir)) 
 
 $resolvedLicenseOutputDir = if ($IncludeLicenseKeygen) { Get-FullPath -Path $LicenseOutputDir } else { $null }
 
-Assert-NonSystemDrivePath -Path $resolvedCargoTargetDir -Purpose "Main Cargo target directory"
+Assert-ExportDocNonSystemDrivePath -Path $resolvedCargoTargetDir -Purpose "Main Cargo target directory" -AllowSystemDrive:$AllowSystemDrive
 if ($IncludeLicenseKeygen) {
     if (-not (Test-Path -LiteralPath $licenseRoot -PathType Container)) {
         throw "Private license key generator source was not found. Keep it outside the public repository and restore it locally before using -IncludeLicenseKeygen: $licenseRoot"
     }
-    Assert-NonSystemDrivePath -Path $resolvedLicenseCargoTargetDir -Purpose "License keygen Cargo target directory"
+    Assert-ExportDocNonSystemDrivePath -Path $resolvedLicenseCargoTargetDir -Purpose "License keygen Cargo target directory" -AllowSystemDrive:$AllowSystemDrive
 }
-Assert-NonSystemDrivePath -Path $resolvedOutputDir -Purpose "Windows desktop output directory"
+Assert-ExportDocNonSystemDrivePath -Path $resolvedOutputDir -Purpose "Windows desktop output directory" -AllowSystemDrive:$AllowSystemDrive
 if ($IncludeLicenseKeygen) {
-    Assert-NonSystemDrivePath -Path $resolvedLicenseOutputDir -Purpose "License key generator output directory"
+    Assert-ExportDocNonSystemDrivePath -Path $resolvedLicenseOutputDir -Purpose "License key generator output directory" -AllowSystemDrive:$AllowSystemDrive
 }
 
 $resolvedCargoBinDir = Resolve-CargoBinDir
-Assert-NonSystemDrivePath -Path $resolvedCargoBinDir -Purpose "Cargo binary directory"
+Assert-ExportDocNonSystemDrivePath -Path $resolvedCargoBinDir -Purpose "Cargo binary directory" -AllowSystemDrive:$AllowSystemDrive
 $pathParts = New-Object System.Collections.Generic.List[string]
 $pathParts.Add($resolvedCargoBinDir)
 if (-not [string]::IsNullOrWhiteSpace($MsysUcrtBinDir) -and (Test-Path -LiteralPath $MsysUcrtBinDir)) {
@@ -176,9 +155,9 @@ if ([string]::IsNullOrWhiteSpace($env:RUSTUP_HOME)) {
     }
 }
 
-Assert-NonSystemDrivePath -Path $env:CARGO_HOME -Purpose "Cargo home directory"
+Assert-ExportDocNonSystemDrivePath -Path $env:CARGO_HOME -Purpose "Cargo home directory" -AllowSystemDrive:$AllowSystemDrive
 if (-not [string]::IsNullOrWhiteSpace($env:RUSTUP_HOME)) {
-    Assert-NonSystemDrivePath -Path $env:RUSTUP_HOME -Purpose "Rustup home directory"
+    Assert-ExportDocNonSystemDrivePath -Path $env:RUSTUP_HOME -Purpose "Rustup home directory" -AllowSystemDrive:$AllowSystemDrive
 }
 
 $powerShellExecutable = Resolve-ExportDocPowerShellExecutable
@@ -279,7 +258,7 @@ if (-not $SkipLaunchSmoke) {
     if (-not $smokeRoot.StartsWith($resolvedOutputRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "Windows desktop launch smoke data directory escaped the portable output root: $smokeRoot"
     }
-    Assert-NonSystemDrivePath -Path $smokeRoot -Purpose "Windows desktop launch smoke data directory"
+    Assert-ExportDocNonSystemDrivePath -Path $smokeRoot -Purpose "Windows desktop launch smoke data directory" -AllowSystemDrive:$AllowSystemDrive
     try {
         Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments @(
             "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",

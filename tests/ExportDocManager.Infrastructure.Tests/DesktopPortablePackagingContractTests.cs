@@ -160,6 +160,8 @@ public sealed class DesktopPortablePackagingContractTests
         Assert.Contains("bundle_targets: app,dmg", macos, StringComparison.Ordinal);
         Assert.DoesNotContain("osx-x64", macos, StringComparison.Ordinal);
         Assert.DoesNotContain("macos-15-intel", macos, StringComparison.Ordinal);
+        Assert.Contains("@($tauriCliPath, $Command)", localBuild, StringComparison.Ordinal);
+        Assert.DoesNotContain("Push-Location", localBuild, StringComparison.Ordinal);
         Assert.Contains("$env:CARGO_BUILD_JOBS = \"1\"", localBuild, StringComparison.Ordinal);
     }
 

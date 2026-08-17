@@ -263,7 +263,7 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("Generated cleanup source must stay below", powerShellSupport, StringComparison.Ordinal);
             Assert.Contains("AllowedRoot and QuarantineRoot must be provided together", powerShellSupport, StringComparison.Ordinal);
             Assert.Contains("WebView2 can keep BrowserMetrics files open briefly", powerShellSupport, StringComparison.Ordinal);
-            Assert.All(["function Wait-ExportDocExternalProcess", "function Stop-ExportDocProcessTree", "$helper.WaitForExit($TimeoutSeconds * 1000)",
+            Assert.All(["function Resolve-ExportDocExternalCommand", "CommandType Application", "function Wait-ExportDocExternalProcess", "function Stop-ExportDocProcessTree", "$helper.WaitForExit($TimeoutSeconds * 1000)",
                 "HeartbeatSeconds", "ReadToEndAsync", "CreateNoWindow = $CaptureOutput", "GetUnresolvedProviderPathFromPSPath"],
                 expected => Assert.Contains(expected, powerShellSupport, StringComparison.Ordinal));
 

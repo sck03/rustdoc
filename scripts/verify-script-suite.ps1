@@ -10,6 +10,7 @@ trap {
 }
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
+[void](Invoke-ExportDocExternal -FilePath "npm" -Arguments @("--version") -CaptureOutput)
 $scriptFiles = @(Get-ChildItem -LiteralPath $scriptRoot -Recurse -File)
 $powerShellScripts = @($scriptFiles | Where-Object Extension -eq ".ps1")
 $commandScripts = @($scriptFiles | Where-Object Extension -eq ".cmd")

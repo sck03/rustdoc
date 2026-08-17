@@ -131,7 +131,7 @@ foreach ($edition in @("Document", "Sales", "Full")) {
 }
 
 $verifier = Join-Path $scriptRoot "verify-windows-editions.ps1"
-    $verifyArguments = @(
+$verifyArguments = @(
     "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
     "-File", $verifier,
     "-OutputRoot", $outputRoot

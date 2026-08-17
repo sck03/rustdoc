@@ -18,7 +18,7 @@ param(
 
     [string]$CargoBinDir,
 
-    [string]$MsysUcrtBinDir = "D:\msys64\ucrt64\bin",
+    [string]$MsysUcrtBinDir,
 
     [string]$CargoTargetDir,
 
@@ -45,32 +45,11 @@ function Get-FullPath {
     return [System.IO.Path]::GetFullPath($Path)
 }
 
-function Test-SystemDrivePath {
-    param([Parameter(Mandatory = $true)][string]$Path)
-    $systemDrive = $env:SystemDrive
-    if ([string]::IsNullOrWhiteSpace($systemDrive)) {
-        return $false
-    }
-
-    $fullPath = Get-FullPath -Path $Path
-    return $fullPath.StartsWith($systemDrive, [System.StringComparison]::OrdinalIgnoreCase)
-}
-
-function Assert-NonSystemDrivePath {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$Purpose
-    )
-
-    if (-not $AllowSystemDrive -and (Test-SystemDrivePath -Path $Path)) {
-        throw "$Purpose resolved to the system drive: $Path. Pass -AllowSystemDrive only for an intentional local override."
-    }
-}
-
 function Resolve-CargoBinDir {
+    $cargoExecutableName = if ($IsWindows) { "cargo.exe" } else { "cargo" }
     if (-not [string]::IsNullOrWhiteSpace($CargoBinDir)) {
-        if (-not (Test-Path -LiteralPath (Join-Path $CargoBinDir "cargo.exe"))) {
-            throw "cargo.exe was not found under CargoBinDir: $CargoBinDir"
+        if (-not (Test-Path -LiteralPath (Join-Path $CargoBinDir $cargoExecutableName) -PathType Leaf)) {
+            throw "$cargoExecutableName was not found under CargoBinDir: $CargoBinDir"
         }
 
         return (Resolve-Path -LiteralPath $CargoBinDir).Path
@@ -81,20 +60,23 @@ function Resolve-CargoBinDir {
         $candidates.Add((Join-Path $env:CARGO_HOME "bin"))
     }
 
-    $candidates.Add("D:\Rust\.cargo\bin")
+    if ($IsWindows) {
+        $candidates.Add("D:\Rust\.cargo\bin")
+    }
 
-    $cargoCommand = Get-Command cargo.exe -ErrorAction SilentlyContinue
+    $cargoCommand = Get-Command $cargoExecutableName -CommandType Application -ErrorAction SilentlyContinue
     if ($null -ne $cargoCommand) {
         $candidates.Add((Split-Path -Parent $cargoCommand.Source))
     }
 
     foreach ($candidate in $candidates) {
-        if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath (Join-Path $candidate "cargo.exe"))) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and
+            (Test-Path -LiteralPath (Join-Path $candidate $cargoExecutableName) -PathType Leaf)) {
             return (Resolve-Path -LiteralPath $candidate).Path
         }
     }
 
-    throw "cargo.exe was not found. Set -CargoBinDir or install Rust/Cargo outside the system drive."
+    throw "$cargoExecutableName was not found. Set -CargoBinDir or install Rust/Cargo."
 }
 
 function Ensure-NpmProjectDependencies {
@@ -158,11 +140,15 @@ function Enter-TauriLocalBuildLock {
 if ($RemainingArgs.Count -gt 0 -and $RemainingArgs[0] -eq "--") {
     $RemainingArgs = @($RemainingArgs | Select-Object -Skip 1)
 }
+if ($IsWindows -and [string]::IsNullOrWhiteSpace($MsysUcrtBinDir)) {
+    $MsysUcrtBinDir = "D:\msys64\ucrt64\bin"
+}
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
 $tauriRoot = Join-Path $repoRoot "apps\export-doc-tauri"
 $webRoot = Join-Path $repoRoot "apps\export-doc-web"
 $srcTauriRoot = Join-Path $tauriRoot "src-tauri"
+$tauriCliPath = Join-Path $tauriRoot "node_modules\@tauri-apps\cli\tauri.js"
 . (Join-Path $scriptRoot "lib\initialize-local-build-environment.ps1") -RepositoryRoot $repoRoot
 
 $tauriBuildLock = $null
@@ -171,150 +157,144 @@ if ($Command -in @("dev", "build", "prepare-bundle")) {
 }
 
 try {
-if ($Command -in @("info", "dev", "build")) {
-    Ensure-NpmProjectDependencies `
-        -ProjectRoot $tauriRoot `
-        -ProjectName "Tauri desktop" `
-        -RequiredRelativePaths @("node_modules\@tauri-apps\cli\tauri.js")
-}
-if ($Command -in @("dev", "build", "prepare-bundle")) {
-    Ensure-NpmProjectDependencies `
-        -ProjectRoot $webRoot `
-        -ProjectName "Web frontend" `
-        -RequiredRelativePaths @(
-            "node_modules\typescript\bin\tsc",
-            "node_modules\vite\bin\vite.js"
-        )
-}
-
-Invoke-ExportDocExternal -FilePath "node" -Arguments @((Join-Path $scriptRoot "sync-version.mjs"))
-
-$resolvedCargoBinDir = Resolve-CargoBinDir
-Assert-NonSystemDrivePath -Path $resolvedCargoBinDir -Purpose "Cargo binary directory"
-$cargoExe = Join-Path $resolvedCargoBinDir "cargo.exe"
-$rustcExe = Join-Path $resolvedCargoBinDir "rustc.exe"
-if (-not (Test-Path -LiteralPath $rustcExe)) {
-    throw "rustc.exe was not found beside cargo.exe: $resolvedCargoBinDir"
-}
-
-if ([string]::IsNullOrWhiteSpace($env:CARGO_HOME)) {
-    $env:CARGO_HOME = (Split-Path -Parent $resolvedCargoBinDir)
-}
-
-if ([string]::IsNullOrWhiteSpace($env:RUSTUP_HOME)) {
-    $rustupHomeCandidate = Join-Path (Split-Path -Parent $env:CARGO_HOME) ".rustup"
-    if (Test-Path -LiteralPath $rustupHomeCandidate) {
-        $env:RUSTUP_HOME = (Resolve-Path -LiteralPath $rustupHomeCandidate).Path
+    if ($Command -in @("info", "dev", "build")) {
+        Ensure-NpmProjectDependencies `
+            -ProjectRoot $tauriRoot `
+            -ProjectName "Tauri desktop" `
+            -RequiredRelativePaths @("node_modules\@tauri-apps\cli\tauri.js")
     }
-}
-
-Assert-NonSystemDrivePath -Path $env:CARGO_HOME -Purpose "Cargo home directory"
-if (-not [string]::IsNullOrWhiteSpace($env:RUSTUP_HOME)) {
-    Assert-NonSystemDrivePath -Path $env:RUSTUP_HOME -Purpose "Rustup home directory"
-}
-
-if ([string]::IsNullOrWhiteSpace($CargoTargetDir)) {
-    if (-not [string]::IsNullOrWhiteSpace($env:CARGO_TARGET_DIR)) {
-        $CargoTargetDir = $env:CARGO_TARGET_DIR
-    } else {
-        $CargoTargetDir = Join-Path $repoRoot "artifacts\cargo-target-exportdoc"
-    }
-}
-
-$resolvedCargoTargetDir = Get-FullPath -Path $CargoTargetDir
-Assert-NonSystemDrivePath -Path $resolvedCargoTargetDir -Purpose "Cargo target directory"
-New-Item -ItemType Directory -Path $resolvedCargoTargetDir -Force | Out-Null
-$env:CARGO_TARGET_DIR = $resolvedCargoTargetDir
-$env:EXPORTDOCMANAGER_PRODUCT_EDITION = $ProductEdition
-
-if ([string]::IsNullOrWhiteSpace($env:CARGO_REGISTRIES_CRATES_IO_PROTOCOL)) {
-    $env:CARGO_REGISTRIES_CRATES_IO_PROTOCOL = "sparse"
-}
-if ([string]::IsNullOrWhiteSpace($env:CARGO_BUILD_JOBS)) {
-    # The GNU Windows target can require several GiB per rustc process while
-    # compiling the Windows bindings and the final Tauri crate.  Keep local
-    # builds single-flight so the public three-edition entry remains reliable
-    # on ordinary 16 GiB development machines.  Hosted MSVC workflows set
-    # their own value explicitly.
-    $env:CARGO_BUILD_JOBS = "1"
-}
-
-$pathParts = New-Object System.Collections.Generic.List[string]
-$pathParts.Add($resolvedCargoBinDir)
-if (-not [string]::IsNullOrWhiteSpace($MsysUcrtBinDir) -and (Test-Path -LiteralPath $MsysUcrtBinDir)) {
-    $pathParts.Add((Resolve-Path -LiteralPath $MsysUcrtBinDir).Path)
-}
-$pathParts.Add($env:PATH)
-$env:PATH = $pathParts -join [System.IO.Path]::PathSeparator
-
-Write-Host "Tauri local build environment"
-Write-Host "  CargoBinDir     $resolvedCargoBinDir"
-Write-Host "  CARGO_HOME      $env:CARGO_HOME"
-Write-Host "  RUSTUP_HOME     $env:RUSTUP_HOME"
-Write-Host "  CARGO_TARGET_DIR $env:CARGO_TARGET_DIR"
-Write-Host "  CARGO_BUILD_JOBS $env:CARGO_BUILD_JOBS"
-Write-Host "  ProductEdition  $env:EXPORTDOCMANAGER_PRODUCT_EDITION"
-Invoke-ExportDocExternal -FilePath $cargoExe -Arguments @("--version")
-Invoke-ExportDocExternal -FilePath $rustcExe -Arguments @("--version")
-
-switch ($Command) {
-    "cargo-check" {
-        Push-Location $srcTauriRoot
-        try {
-            Invoke-ExportDocExternal -FilePath $cargoExe -Arguments (@("check") + $RemainingArgs)
-        } finally {
-            Pop-Location
-        }
-        break
+    if ($Command -in @("dev", "build", "prepare-bundle")) {
+        Ensure-NpmProjectDependencies `
+            -ProjectRoot $webRoot `
+            -ProjectName "Web frontend" `
+            -RequiredRelativePaths @(
+                "node_modules\typescript\bin\tsc",
+                "node_modules\vite\bin\vite.js"
+            )
     }
 
-    "prepare-bundle" {
-        Push-Location $tauriRoot
-        try {
-            Invoke-ExportDocExternal -FilePath "npm" -Arguments (@("run", "prepare:bundle") + $RemainingArgs)
-        } finally {
-            Pop-Location
-        }
-        break
+    Invoke-ExportDocExternal `
+        -FilePath "node" `
+        -Arguments @((Join-Path $scriptRoot "sync-version.mjs")) `
+        -WorkingDirectory $repoRoot
+
+    $resolvedCargoBinDir = Resolve-CargoBinDir
+    Assert-ExportDocNonSystemDrivePath -Path $resolvedCargoBinDir -Purpose "Cargo binary directory" -AllowSystemDrive:$AllowSystemDrive
+    $cargoExe = Join-Path $resolvedCargoBinDir $(if ($IsWindows) { "cargo.exe" } else { "cargo" })
+    $rustcExe = Join-Path $resolvedCargoBinDir $(if ($IsWindows) { "rustc.exe" } else { "rustc" })
+    if (-not (Test-Path -LiteralPath $rustcExe)) {
+        throw "rustc was not found beside cargo: $resolvedCargoBinDir"
     }
 
-    default {
-        $tauriArgs = New-Object System.Collections.Generic.List[string]
-        if ($BuildDebug) {
-            $tauriArgs.Add("--debug")
+    if ([string]::IsNullOrWhiteSpace($env:CARGO_HOME)) {
+        $env:CARGO_HOME = (Split-Path -Parent $resolvedCargoBinDir)
+    }
+
+    if ([string]::IsNullOrWhiteSpace($env:RUSTUP_HOME)) {
+        $rustupHomeCandidate = Join-Path (Split-Path -Parent $env:CARGO_HOME) ".rustup"
+        if (Test-Path -LiteralPath $rustupHomeCandidate) {
+            $env:RUSTUP_HOME = (Resolve-Path -LiteralPath $rustupHomeCandidate).Path
         }
-        if ($NoBundle) {
-            $tauriArgs.Add("--no-bundle")
+    }
+
+    Assert-ExportDocNonSystemDrivePath -Path $env:CARGO_HOME -Purpose "Cargo home directory" -AllowSystemDrive:$AllowSystemDrive
+    if (-not [string]::IsNullOrWhiteSpace($env:RUSTUP_HOME)) {
+        Assert-ExportDocNonSystemDrivePath -Path $env:RUSTUP_HOME -Purpose "Rustup home directory" -AllowSystemDrive:$AllowSystemDrive
+    }
+
+    if ([string]::IsNullOrWhiteSpace($CargoTargetDir)) {
+        if (-not [string]::IsNullOrWhiteSpace($env:CARGO_TARGET_DIR)) {
+            $CargoTargetDir = $env:CARGO_TARGET_DIR
+        } else {
+            $CargoTargetDir = Join-Path $repoRoot "artifacts\cargo-target-exportdoc"
         }
-        if ($Bundles.Count -gt 0) {
-            $tauriArgs.Add("--bundles")
-            foreach ($bundle in $Bundles) {
-                $tauriArgs.Add($bundle)
+    }
+
+    $resolvedCargoTargetDir = Get-FullPath -Path $CargoTargetDir
+    Assert-ExportDocNonSystemDrivePath -Path $resolvedCargoTargetDir -Purpose "Cargo target directory" -AllowSystemDrive:$AllowSystemDrive
+    New-Item -ItemType Directory -Path $resolvedCargoTargetDir -Force | Out-Null
+    $env:CARGO_TARGET_DIR = $resolvedCargoTargetDir
+    $env:EXPORTDOCMANAGER_PRODUCT_EDITION = $ProductEdition
+
+    if ([string]::IsNullOrWhiteSpace($env:CARGO_REGISTRIES_CRATES_IO_PROTOCOL)) {
+        $env:CARGO_REGISTRIES_CRATES_IO_PROTOCOL = "sparse"
+    }
+    if ([string]::IsNullOrWhiteSpace($env:CARGO_BUILD_JOBS)) {
+        # Windows GNU linking can need several GiB per rustc process. Keep
+        # local builds single-flight on ordinary development machines.
+        $env:CARGO_BUILD_JOBS = "1"
+    }
+
+    $pathParts = New-Object System.Collections.Generic.List[string]
+    $pathParts.Add($resolvedCargoBinDir)
+    if (-not [string]::IsNullOrWhiteSpace($MsysUcrtBinDir) -and (Test-Path -LiteralPath $MsysUcrtBinDir)) {
+        $pathParts.Add((Resolve-Path -LiteralPath $MsysUcrtBinDir).Path)
+    }
+    $pathParts.Add($env:PATH)
+    $env:PATH = $pathParts -join [System.IO.Path]::PathSeparator
+
+    Write-Host "Tauri local build environment"
+    Write-Host "  CargoBinDir      $resolvedCargoBinDir"
+    Write-Host "  CARGO_HOME       $env:CARGO_HOME"
+    Write-Host "  RUSTUP_HOME      $env:RUSTUP_HOME"
+    Write-Host "  CARGO_TARGET_DIR $env:CARGO_TARGET_DIR"
+    Write-Host "  CARGO_BUILD_JOBS $env:CARGO_BUILD_JOBS"
+    Write-Host "  ProductEdition   $env:EXPORTDOCMANAGER_PRODUCT_EDITION"
+    Invoke-ExportDocExternal -FilePath $cargoExe -Arguments @("--version")
+    Invoke-ExportDocExternal -FilePath $rustcExe -Arguments @("--version")
+
+    switch ($Command) {
+        "cargo-check" {
+            Invoke-ExportDocExternal `
+                -FilePath $cargoExe `
+                -Arguments (@("check") + $RemainingArgs) `
+                -WorkingDirectory $srcTauriRoot
+            break
+        }
+
+        "prepare-bundle" {
+            Invoke-ExportDocExternal `
+                -FilePath "npm" `
+                -Arguments (@("run", "prepare:bundle") + $RemainingArgs) `
+                -WorkingDirectory $tauriRoot
+            break
+        }
+
+        default {
+            $tauriArgs = New-Object System.Collections.Generic.List[string]
+            if ($BuildDebug) {
+                $tauriArgs.Add("--debug")
             }
-        }
-        if ($NoSign) {
-            $tauriArgs.Add("--no-sign")
-        }
-        if (-not [string]::IsNullOrWhiteSpace($Config)) {
-            $tauriArgs.Add("--config")
-            $tauriArgs.Add((Get-FullPath -Path $Config))
-        }
-        if ($TauriVerbose) {
-            $tauriArgs.Add("--verbose")
-        }
-        foreach ($argument in $RemainingArgs) {
-            $tauriArgs.Add($argument)
-        }
+            if ($NoBundle) {
+                $tauriArgs.Add("--no-bundle")
+            }
+            if ($Bundles.Count -gt 0) {
+                $tauriArgs.Add("--bundles")
+                foreach ($bundle in $Bundles) {
+                    $tauriArgs.Add($bundle)
+                }
+            }
+            if ($NoSign) {
+                $tauriArgs.Add("--no-sign")
+            }
+            if (-not [string]::IsNullOrWhiteSpace($Config)) {
+                $tauriArgs.Add("--config")
+                $tauriArgs.Add((Get-FullPath -Path $Config))
+            }
+            if ($TauriVerbose) {
+                $tauriArgs.Add("--verbose")
+            }
+            foreach ($argument in $RemainingArgs) {
+                $tauriArgs.Add($argument)
+            }
 
-        Push-Location $tauriRoot
-        try {
-            Invoke-ExportDocExternal -FilePath "npm" -Arguments (@("run", "tauri", "--", $Command) + $tauriArgs.ToArray())
-        } finally {
-            Pop-Location
+            Invoke-ExportDocExternal `
+                -FilePath "node" `
+                -Arguments (@($tauriCliPath, $Command) + $tauriArgs.ToArray()) `
+                -WorkingDirectory $tauriRoot
+            break
         }
-        break
     }
-}
 } finally {
     if ($null -ne $tauriBuildLock) {
         $tauriBuildLock.Dispose()

@@ -1,5 +1,30 @@
 . (Join-Path $PSScriptRoot "platform-path-safety.ps1")
 
+function Resolve-ExportDocExternalCommand {
+    param([Parameter(Mandatory = $true)][string]$FilePath)
+    if ([string]::IsNullOrWhiteSpace($FilePath)) {
+        throw "External command path must not be empty."
+    }
+
+    $hasDirectorySeparator = $FilePath.IndexOf([System.IO.Path]::DirectorySeparatorChar) -ge 0 -or
+        $FilePath.IndexOf([System.IO.Path]::AltDirectorySeparatorChar) -ge 0
+    if (-not [System.IO.Path]::IsPathRooted($FilePath) -and -not $hasDirectorySeparator) {
+        $command = Get-Command $FilePath -CommandType Application -All -ErrorAction SilentlyContinue |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_.Source) -and (Test-Path -LiteralPath $_.Source -PathType Leaf) } |
+            Select-Object -First 1
+        if ($null -eq $command) {
+            throw "External command was not found on PATH: $FilePath"
+        }
+        return $command.Source
+    }
+
+    $resolvedPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($FilePath)
+    if (-not (Test-Path -LiteralPath $resolvedPath -PathType Leaf)) {
+        throw "External command file was not found: $resolvedPath"
+    }
+    return [System.IO.Path]::GetFullPath($resolvedPath)
+}
+
 function Resolve-ExportDocPowerShellExecutable {
     $currentProcess = Get-Process -Id $PID -ErrorAction SilentlyContinue
     if ($null -ne $currentProcess -and
@@ -8,12 +33,23 @@ function Resolve-ExportDocPowerShellExecutable {
         return $currentProcess.Path
     }
 
-    $command = Get-Command "pwsh.exe" -ErrorAction SilentlyContinue
-    if ($null -ne $command) {
-        return $command.Source
-    }
+    return Resolve-ExportDocExternalCommand -FilePath "pwsh"
+}
 
-    throw "PowerShell 7 executable (pwsh) was not found."
+function Assert-ExportDocNonSystemDrivePath {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Purpose,
+        [switch]$AllowSystemDrive
+    )
+
+    if ($AllowSystemDrive -or [string]::IsNullOrWhiteSpace($env:SystemDrive)) {
+        return
+    }
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    if ($fullPath.StartsWith($env:SystemDrive, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "$Purpose resolved to the system drive: $fullPath. Pass -AllowSystemDrive only for an intentional local override."
+    }
 }
 
 function New-ExportDocProcessStartInfo {
@@ -26,7 +62,7 @@ function New-ExportDocProcessStartInfo {
     )
 
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $startInfo.FileName = $FilePath
+    $startInfo.FileName = Resolve-ExportDocExternalCommand -FilePath $FilePath
     $startInfo.UseShellExecute = $false
     # Commands that are not captured must inherit the current console so CI and
     # local users see their native progress and failure output in real time.
@@ -38,10 +74,8 @@ function New-ExportDocProcessStartInfo {
     } else {
         $WorkingDirectory
     }
-    # ProcessStartInfo otherwise inherits the process-wide native directory,
-    # which PowerShell does not update when Push-Location changes its provider
-    # location. Resolve through PowerShell so existing location scopes and
-    # relative -WorkingDirectory values retain their expected semantics.
+    # Resolve through PowerShell so provider-backed and relative working
+    # directory values retain their expected semantics.
     $startInfo.WorkingDirectory = [System.IO.Path]::GetFullPath(
         $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($workingDirectoryPath))
 

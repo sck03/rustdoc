@@ -33,7 +33,7 @@ Tauri 正式 updater 密钥不由仓库脚本或 CI 自动生成，也不需要�
 
 同一工作区一次只允许一个本地 Tauri 构建占用共享 Cargo 与资源暂存目录。重复双击或同时从终端启动第二次构建时，后启动的入口会立即给出明确提示并停止，避免两个构建互相覆盖 `artifacts/tauri-bundle` 后出现 `EBUSY`、文件锁或不完整便携包。
 
-Tauri 构建包装器直接使用当前 Node 启动 `apps/export-doc-tauri/node_modules/@tauri-apps/cli/tauri.js`，不再从 Node 子进程调用 Windows `npm.cmd`。这是 Node 24 在 Windows 上的进程启动兼容要求，不改变 Tauri 版本、构建参数或安装包内容。
+Tauri CLI 由当前 Node 直接启动 `apps/export-doc-tauri/node_modules/@tauri-apps/cli/tauri.js`，不再通过 npm 命令垫片间接启动。依赖还原和普通 npm script 继续经过统一外部进程入口；该入口会把裸命令解析为当前平台的实际可执行文件（Windows 包括 `.cmd`），同时保留超时、心跳和退出码检查。
 
 公开仓库不提交 Chromium 二进制。`run-tests.ps1` 找不到程序根 Chromium 或 `EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE` 时，会明确跳过两个真实 PDF 浏览器测试；正式发布验收使用 `-RequireBrowserPdfTests`，缺少渲染器即失败。测试默认执行 restore，只有确认依赖已还原时才使用 `-NoRestore`。
 
