@@ -1,14 +1,14 @@
 import { ApiPaymentDto } from "../../api/index.ts";
 import {
-  currentLocalDateInputValue,
   dateInputToApiDate,
   normalizeText,
   numberValue,
   toDateInputValue,
 } from "../../ui/formUtils.ts";
 
-export function createEmptyPayment(): ApiPaymentDto {
-  const today = dateInputToApiDate(currentLocalDateInputValue());
+export function createEmptyPayment(businessDate: string): ApiPaymentDto {
+  const today = dateInputToApiDate(businessDate);
+  if (!today) throw new Error("服务端业务日期无效。");
 
   return {
     id: 0,

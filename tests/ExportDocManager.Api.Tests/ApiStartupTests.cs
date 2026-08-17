@@ -650,12 +650,28 @@ namespace ExportDocManager.Api.Tests
                 IsActive = true
             };
 
-            var dto = ApiUserDtoFactory.FromUser(user, service);
+            var dto = ApiUserDtoFactory.FromUser(
+                user,
+                service,
+                new BusinessClock(
+                    new FixedTimeProvider(new DateTimeOffset(2026, 8, 17, 2, 0, 0, TimeSpan.Zero)),
+                    BusinessClock.DefaultTimeZoneId));
 
             Assert.Equal(7, dto.Id);
             Assert.True(dto.Capabilities.CanManageSettings);
             Assert.True(dto.Capabilities.CanManageUsers);
             Assert.True(dto.Capabilities.CanViewAllBusinessData);
+            Assert.Equal(new DateOnly(2026, 8, 17), dto.BusinessDate);
+            Assert.Equal(BusinessClock.DefaultTimeZoneId, dto.BusinessTimeZone);
+
+            var utcDto = ApiUserDtoFactory.FromUser(
+                user,
+                service,
+                new BusinessClock(
+                    new FixedTimeProvider(new DateTimeOffset(2026, 8, 17, 23, 0, 0, TimeSpan.Zero)),
+                    "UTC"));
+            Assert.Equal(new DateOnly(2026, 8, 17), utcDto.BusinessDate);
+            Assert.Equal("UTC", utcDto.BusinessTimeZone);
         }
 
         [Theory]
@@ -2597,6 +2613,11 @@ namespace ExportDocManager.Api.Tests
             {
                 throw new NotSupportedException();
             }
+        }
+
+        private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+        {
+            public override DateTimeOffset GetUtcNow() => utcNow;
         }
     }
 }

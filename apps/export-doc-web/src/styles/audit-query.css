@@ -49,7 +49,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  color: #0f766e;
+  color: var(--edm-primary-600);
 }
 
 .audit-log-maintenance-card-heading > svg {
@@ -172,7 +172,7 @@
   display: inline-flex;
   padding: 4px 8px;
   color: #6b4a43;
-  background: #ffffff;
+  background: var(--edm-surface);
   border: 1px solid #ecd9d4;
   border-radius: 999px;
   font-size: 12px;
@@ -200,7 +200,7 @@
   min-width: 0;
   overflow: hidden;
   padding: 18px;
-  background: #ffffff;
+  background: var(--edm-surface);
   border: 1px solid #d7dfe3;
   border-radius: 12px;
   box-shadow: 0 24px 64px rgba(25, 39, 42, 0.28);
@@ -265,13 +265,13 @@
 }
 
 .confirmation-dialog .command-button.confirmation-dialog-confirm {
-  color: #ffffff;
+  color: var(--edm-surface);
   background: #b13a2b;
   border-color: #b13a2b;
 }
 
 .confirmation-dialog .command-button.confirmation-dialog-confirm:hover:not(:disabled) {
-  color: #ffffff;
+  color: var(--edm-surface);
   background: #982f23;
   border-color: #982f23;
 }
@@ -307,8 +307,8 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: #ffffff;
-  border: 1px solid #dde3e8;
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line);
   border-radius: 8px;
 }
 
@@ -326,7 +326,7 @@
 .audit-log-detail span {
   display: block;
   margin-top: 4px;
-  color: #69737d;
+  color: var(--edm-ink-500);
   font-size: 12px;
 }
 

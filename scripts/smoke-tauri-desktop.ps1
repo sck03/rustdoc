@@ -34,6 +34,8 @@ param(
 
     [int]$WebSmokeTimeoutSeconds = 45,
 
+    [ValidateRange(60, 3600)][int]$WebSmokeProcessTimeoutSeconds = 900,
+
     [switch]$UseRuntimePathsConfig,
 
     [switch]$UseExistingRuntimePathsConfig,
@@ -52,7 +54,7 @@ $scriptUtf8Encoding = New-Object System.Text.UTF8Encoding($false)
 [Console]::InputEncoding = $scriptUtf8Encoding
 [Console]::OutputEncoding = $scriptUtf8Encoding
 $OutputEncoding = $scriptUtf8Encoding
-. (Join-Path $PSScriptRoot "lib/platform-path-safety.ps1")
+. (Join-Path $PSScriptRoot "lib/build-script-support.ps1")
 
 function Get-FullPath {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -249,7 +251,7 @@ function Start-LoggedProcess {
     )
 
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $startInfo.FileName = $FileName
+    $startInfo.FileName = Resolve-ExportDocExternalCommand -FilePath $FileName
     if ($ArgumentList.Count -gt 0) {
         foreach ($argument in $ArgumentList) {
             $startInfo.ArgumentList.Add($argument)
@@ -398,14 +400,47 @@ function Get-WindowsProcessInventory {
 
 function Invoke-WebProductionBuild {
     Write-Host "Building web app for Tauri smoke preview."
-    Push-Location -LiteralPath $repoRoot
+    Invoke-ExportDocExternal `
+        -FilePath "npm" `
+        -Arguments @("--prefix", "apps/export-doc-web", "run", "build") `
+        -WorkingDirectory $repoRoot `
+        -TimeoutSeconds 1200 `
+        -HeartbeatSeconds 30
+}
+
+function Invoke-WebRuntimeSmokeProcess {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [Parameter(Mandatory = $true)][string]$OutputPath,
+        [Parameter(Mandatory = $true)][string]$Purpose
+    )
+
+    $globalTimeoutSeconds = [Math]::Max(30, $WebSmokeProcessTimeoutSeconds - 30)
+    $boundedArguments = @($Arguments) + @("--global-timeout-ms", ([string]($globalTimeoutSeconds * 1000)))
+    Write-Host "Starting $Purpose with a $globalTimeoutSeconds second smoke deadline and a $WebSmokeProcessTimeoutSeconds second process deadline."
+    $result = Invoke-ExportDocExternal `
+        -FilePath "node" `
+        -Arguments $boundedArguments `
+        -DisplayName $Purpose `
+        -WorkingDirectory $repoRoot `
+        -TimeoutSeconds $WebSmokeProcessTimeoutSeconds `
+        -HeartbeatSeconds 30 `
+        -CaptureOutput
+
+    if (-not [string]::IsNullOrWhiteSpace($result.Error)) {
+        Write-Verbose $result.Error.Trim()
+    }
+
+    $outputText = $result.Output.Trim()
+    if ([string]::IsNullOrWhiteSpace($outputText)) {
+        throw "$Purpose completed without returning its JSON result."
+    }
+
+    Set-Content -LiteralPath $OutputPath -Value $outputText -Encoding UTF8
     try {
-        & npm --prefix apps/export-doc-web run build
-        if ($LASTEXITCODE -ne 0) {
-            throw "Web production build failed with exit code $LASTEXITCODE."
-        }
-    } finally {
-        Pop-Location
+        return $outputText | ConvertFrom-Json
+    } catch {
+        throw "$Purpose returned invalid JSON. $($_.Exception.Message)"
     }
 }
 
@@ -703,16 +738,10 @@ function Invoke-WebDiagnosticsSmoke {
     $nodeArguments.Add("admin")
     $nodeArguments.Add("Admin")
 
-    $nodeArgumentsArray = $nodeArguments.ToArray()
-    $nodeOutput = & node @nodeArgumentsArray
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ne 0) {
-        throw "Web runtime diagnostics smoke failed with exit code $exitCode."
-    }
-
-    $nodeOutputText = $nodeOutput -join [Environment]::NewLine
-    Set-Content -LiteralPath $webSmokeJsonPath -Value $nodeOutputText -Encoding UTF8
-    return $nodeOutputText | ConvertFrom-Json
+    return Invoke-WebRuntimeSmokeProcess `
+        -Arguments $nodeArguments.ToArray() `
+        -OutputPath $webSmokeJsonPath `
+        -Purpose "Web runtime diagnostics smoke"
 }
 
 function Invoke-WebSalesWorkspaceSmoke {
@@ -754,15 +783,10 @@ function Invoke-WebSalesWorkspaceSmoke {
         "--screenshot-path", $screenshotPath
     )
 
-    $nodeOutput = & node @nodeArguments
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ne 0) {
-        throw "Web sales workspace smoke failed with exit code $exitCode."
-    }
-
-    $nodeOutputText = $nodeOutput -join [Environment]::NewLine
-    Set-Content -LiteralPath $jsonPath -Value $nodeOutputText -Encoding UTF8
-    return $nodeOutputText | ConvertFrom-Json
+    return Invoke-WebRuntimeSmokeProcess `
+        -Arguments $nodeArguments `
+        -OutputPath $jsonPath `
+        -Purpose "Web sales workspace smoke"
 }
 
 function Invoke-WebBackupRestoreSmoke {
@@ -820,16 +844,10 @@ function Invoke-WebBackupRestoreSmoke {
         $nodeArguments.Add([string]$value)
     }
 
-    $nodeArgumentsArray = $nodeArguments.ToArray()
-    $nodeOutput = & node @nodeArgumentsArray
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ne 0) {
-        throw "Web backup restore smoke failed with exit code $exitCode."
-    }
-
-    $nodeOutputText = $nodeOutput -join [Environment]::NewLine
-    Set-Content -LiteralPath $webSmokeJsonPath -Value $nodeOutputText -Encoding UTF8
-    return $nodeOutputText | ConvertFrom-Json
+    return Invoke-WebRuntimeSmokeProcess `
+        -Arguments $nodeArguments.ToArray() `
+        -OutputPath $webSmokeJsonPath `
+        -Purpose "Web backup restore smoke"
 }
 
 function Invoke-WebReportsSmoke {
@@ -934,16 +952,10 @@ function Invoke-WebReportsSmoke {
     $nodeArguments.Add("--audit-log-export-check")
     $nodeArguments.Add("--license-check")
 
-    $nodeArgumentsArray = $nodeArguments.ToArray()
-    $nodeOutput = & node @nodeArgumentsArray
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ne 0) {
-        throw "Web report template smoke failed with exit code $exitCode."
-    }
-
-    $nodeOutputText = $nodeOutput -join [Environment]::NewLine
-    Set-Content -LiteralPath $webSmokeJsonPath -Value $nodeOutputText -Encoding UTF8
-    return $nodeOutputText | ConvertFrom-Json
+    return Invoke-WebRuntimeSmokeProcess `
+        -Arguments $nodeArguments.ToArray() `
+        -OutputPath $webSmokeJsonPath `
+        -Purpose "Web report template smoke"
 }
 
 function Invoke-WebSingleWindowOperationCenterSmoke {
@@ -986,15 +998,10 @@ function Invoke-WebSingleWindowOperationCenterSmoke {
         "--single-window-operation-center-check"
     )
 
-    $nodeOutput = & node @nodeArguments
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ne 0) {
-        throw "Single Window operation-center smoke failed with exit code $exitCode."
-    }
-
-    $nodeOutputText = $nodeOutput -join [Environment]::NewLine
-    Set-Content -LiteralPath $jsonPath -Value $nodeOutputText -Encoding UTF8
-    return $nodeOutputText | ConvertFrom-Json
+    return Invoke-WebRuntimeSmokeProcess `
+        -Arguments $nodeArguments `
+        -OutputPath $jsonPath `
+        -Purpose "Single Window operation-center smoke"
 }
 
 function Invoke-WebInvoiceItemsSmoke {
@@ -1037,15 +1044,10 @@ function Invoke-WebInvoiceItemsSmoke {
         "--screenshot-path", $webSmokeScreenshotPath
     )
 
-    $nodeOutput = & node @nodeArguments
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ne 0) {
-        throw "Web invoice items smoke failed with exit code $exitCode."
-    }
-
-    $nodeOutputText = $nodeOutput -join [Environment]::NewLine
-    Set-Content -LiteralPath $webSmokeJsonPath -Value $nodeOutputText -Encoding UTF8
-    return $nodeOutputText | ConvertFrom-Json
+    return Invoke-WebRuntimeSmokeProcess `
+        -Arguments $nodeArguments `
+        -OutputPath $webSmokeJsonPath `
+        -Purpose "Web invoice items smoke"
 }
 
 function Invoke-WebContainerPackingSmoke {
@@ -1092,16 +1094,10 @@ function Invoke-WebContainerPackingSmoke {
         $nodeArguments.Add([string]$argument)
     }
 
-    $nodeArgumentsArray = $nodeArguments.ToArray()
-    $nodeOutput = & node @nodeArgumentsArray
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ne 0) {
-        throw "Web container packing smoke failed with exit code $exitCode."
-    }
-
-    $nodeOutputText = $nodeOutput -join [Environment]::NewLine
-    Set-Content -LiteralPath $webSmokeJsonPath -Value $nodeOutputText -Encoding UTF8
-    return $nodeOutputText | ConvertFrom-Json
+    return Invoke-WebRuntimeSmokeProcess `
+        -Arguments $nodeArguments.ToArray() `
+        -OutputPath $webSmokeJsonPath `
+        -Purpose "Web container packing smoke"
 }
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -1238,8 +1234,8 @@ try {
         Assert-SmokeVitePortAvailable
         Invoke-WebProductionBuild
         $vite = Start-LoggedProcess `
-            -FileName "cmd.exe" `
-            -Arguments "/c npm --prefix apps/export-doc-web run preview -- --port 5173 --strictPort" `
+            -FileName "npm" `
+            -ArgumentList @("--prefix", "apps/export-doc-web", "run", "preview", "--", "--port", "5173", "--strictPort") `
             -WorkingDirectory $repoRoot `
             -StdoutPath $viteStdout `
             -StderrPath $viteStderr

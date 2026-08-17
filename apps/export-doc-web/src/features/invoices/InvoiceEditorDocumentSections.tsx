@@ -8,12 +8,10 @@ import type {
 } from "../../api/index.ts";
 import type { CustomOptionMap } from "../custom-options/customOptionModel.ts";
 import type { ExporterSealType } from "../master-data/ExporterSealField.tsx";
-import {
-  InvoiceBasicInfoPanel,
-  InvoiceExtendedFieldsPanel,
-  InvoicePartiesPanel,
-  InvoiceShippingTermsPanel,
-} from "./InvoiceFormPanels.tsx";
+import { InvoiceBasicInfoPanel } from "./InvoiceBasicInfoPanel.tsx";
+import { InvoiceExtendedFieldsPanel } from "./InvoiceExtendedFieldsPanel.tsx";
+import { InvoicePartiesPanel } from "./InvoicePartiesPanel.tsx";
+import { InvoiceShippingTermsPanel } from "./InvoiceShippingTermsPanel.tsx";
 import { InvoiceEditorNavigation } from "./InvoiceEditorNavigation.tsx";
 import { InvoiceLetterOfCreditPanel } from "./InvoiceLetterOfCreditPanel.tsx";
 import { InvoiceProfitAnalysisPanel } from "./InvoiceProfitAnalysisPanel.tsx";

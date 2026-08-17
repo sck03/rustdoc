@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Drawing;
 using System.IO;
 using System.Threading;
 using PDFtoImage;
@@ -16,6 +17,14 @@ namespace ExportDocManager.Services.Tools
         public const long MaximumFileBytes = 25L * 1024L * 1024L;
         public const int MaximumPdfPages = 50;
         public const int MaximumExtractedTextCharacters = 500_000;
+        public const int PdfRenderDpi = 200;
+        public const long MaximumPdfRenderPixelsPerPage = 12_000_000;
+        public const long MaximumPdfRenderPixelsTotal = 200_000_000;
+        public const int MaximumPdfRenderDimension = 10_000;
+        private static readonly RenderOptions PdfRenderOptions = new(
+            Dpi: PdfRenderDpi,
+            UseTiling: true,
+            Grayscale: true);
         private static readonly FrozenSet<string> TextExtensions = new[]
         {
             ".txt",
@@ -173,10 +182,23 @@ namespace ExportDocManager.Services.Tools
 
             // PDFtoImage supports the desktop platforms targeted by the sidecar.
 #pragma warning disable CA1416
-            foreach (SKBitmap bitmap in Conversion.ToImages(pdfBytes))
+            ValidatePdfRenderBudget(Conversion.GetPageSizes(pdfBytes));
+            await foreach (SKBitmap bitmap in Conversion.ToImagesAsync(
+                pdfBytes,
+                options: PdfRenderOptions,
+                cancellationToken: cancellationToken))
 #pragma warning restore CA1416
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                long bitmapPixels = checked((long)bitmap.Width * bitmap.Height);
+                if (bitmap.Width > MaximumPdfRenderDimension ||
+                    bitmap.Height > MaximumPdfRenderDimension ||
+                    bitmapPixels > MaximumPdfRenderPixelsPerPage)
+                {
+                    bitmap.Dispose();
+                    throw new InvalidDataException("信用证 PDF 页面渲染尺寸超过安全限制，请缩小页面后重试。");
+                }
 
                 using (bitmap)
                 using (var image = SKImage.FromBitmap(bitmap))
@@ -201,6 +223,41 @@ namespace ExportDocManager.Services.Tools
             }
 
             return string.Join(Environment.NewLine + Environment.NewLine, texts);
+        }
+
+        internal static void ValidatePdfRenderBudget(IList<SizeF> pageSizes)
+        {
+            ArgumentNullException.ThrowIfNull(pageSizes);
+            if (pageSizes.Count <= 0 || pageSizes.Count > MaximumPdfPages)
+            {
+                throw new InvalidDataException($"信用证 PDF 页数必须在 1 至 {MaximumPdfPages} 页以内。");
+            }
+
+            long totalPixels = 0;
+            foreach (SizeF pageSize in pageSizes)
+            {
+                if (!float.IsFinite(pageSize.Width) || !float.IsFinite(pageSize.Height) ||
+                    pageSize.Width <= 0 || pageSize.Height <= 0)
+                {
+                    throw new InvalidDataException("信用证 PDF 包含无效页面尺寸。");
+                }
+
+                long width = checked((long)Math.Ceiling(pageSize.Width * PdfRenderDpi / 72d));
+                long height = checked((long)Math.Ceiling(pageSize.Height * PdfRenderDpi / 72d));
+                long pagePixels = checked(width * height);
+                if (width > MaximumPdfRenderDimension ||
+                    height > MaximumPdfRenderDimension ||
+                    pagePixels > MaximumPdfRenderPixelsPerPage)
+                {
+                    throw new InvalidDataException("信用证 PDF 页面尺寸超过 OCR 安全限制，请缩小页面后重试。");
+                }
+
+                totalPixels = checked(totalPixels + pagePixels);
+                if (totalPixels > MaximumPdfRenderPixelsTotal)
+                {
+                    throw new InvalidDataException("信用证 PDF 总渲染像素超过安全限制，请拆分文件后重试。");
+                }
+            }
         }
 
         private static bool LooksLikeUsefulPdfText(string text)

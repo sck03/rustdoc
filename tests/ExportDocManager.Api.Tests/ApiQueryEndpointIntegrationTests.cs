@@ -50,7 +50,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.Created, paymentResponse.StatusCode);
 
             var listResponse = await adminClient.GetAsync(
-                "/api/query/invoices?startDate=2026-06-01T00:00:00&endDateExclusive=2026-07-01T00:00:00&keyword=Q-STYLE-001&pageNumber=1&pageSize=10");
+                "/api/query/invoices?startDate=2026-06-01&endDateExclusive=2026-07-01&keyword=Q-STYLE-001&pageNumber=1&pageSize=10");
             Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
             var page = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPagedResponse<ApiQueryInvoiceRowDto>>(listResponse);
             Assert.Equal(1, page.TotalCount);
@@ -65,6 +65,10 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("2026-06-20", row.ShipmentDate);
             Assert.Equal("SEA", row.TransportMode);
             Assert.Equal(120m, row.TotalAmount);
+
+            var dateTimeListResponse = await adminClient.GetAsync(
+                "/api/query/invoices?startDate=2026-06-01T00:00:00&endDateExclusive=2026-07-01T00:00:00");
+            Assert.Equal(HttpStatusCode.BadRequest, dateTimeListResponse.StatusCode);
 
             var styleNameKeywordResponse = await adminClient.GetAsync("/api/query/invoices?keyword=Query%20Jacket&pageNumber=1&pageSize=10");
             Assert.Equal(HttpStatusCode.OK, styleNameKeywordResponse.StatusCode);
@@ -91,6 +95,21 @@ namespace ExportDocManager.Api.Tests
                 keyword = "Q-STYLE-001"
             });
             Assert.Equal(HttpStatusCode.Accepted, exportResponse.StatusCode);
+
+            using var stringDateContent = new StringContent(
+                """{"startDate":"2026-06-01","endDateExclusive":"2026-07-01","keyword":"Q-STYLE-001"}""",
+                System.Text.Encoding.UTF8,
+                "application/json");
+            var stringDateExportResponse = await adminClient.PostAsync("/api/query/invoices/download", stringDateContent);
+            Assert.Equal(HttpStatusCode.Accepted, stringDateExportResponse.StatusCode);
+
+            using var dateTimeContent = new StringContent(
+                """{"startDate":"2026-06-01T00:00:00","endDateExclusive":"2026-07-01T00:00:00"}""",
+                System.Text.Encoding.UTF8,
+                "application/json");
+            var dateTimeExportResponse = await adminClient.PostAsync("/api/query/invoices/download", dateTimeContent);
+            Assert.Equal(HttpStatusCode.BadRequest, dateTimeExportResponse.StatusCode);
+
             var acceptedJob = await ApiIntegrationTestHarness.ReadJsonAsync<BackgroundJobSnapshot>(exportResponse);
             var completedJob = await WaitForTerminalJobAsync(adminClient, acceptedJob.JobId);
             Assert.Equal(BackgroundJobStatusCatalog.Succeeded, completedJob.Status);

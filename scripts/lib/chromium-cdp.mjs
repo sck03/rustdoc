@@ -1,3 +1,5 @@
+import { stopProcessTree } from "./child-process-tree.mjs";
+
 export function waitForDevToolsUrl(child, slug, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     let output = "";
@@ -225,10 +227,8 @@ export async function closeChrome(browserWebSocketUrl, child) {
     }
   }
 
-  const exited = await waitForProcessExit(child, 5000);
-  if (!exited && !child.killed) {
-    child.kill();
-    await waitForProcessExit(child, 3000);
+  if (!(await waitForProcessExit(child, 5000))) {
+    await stopProcessTree(child, 5000);
   }
 }
 

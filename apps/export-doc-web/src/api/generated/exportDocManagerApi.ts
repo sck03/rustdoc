@@ -3010,6 +3010,8 @@ export interface ApiUserCapabilitiesDto {
 }
 
 export interface ApiUserDto {
+  businessDate: string;
+  businessTimeZone: string;
   capabilities: ApiUserCapabilitiesDto;
   companyScope: string;
   departmentId: string;

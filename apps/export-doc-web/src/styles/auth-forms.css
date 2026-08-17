@@ -3,8 +3,8 @@
   width: min(460px, calc(100vw - 44px));
   margin: 36px 22px;
   padding: 22px;
-  background: #ffffff;
-  border: 1px solid #dde3e8;
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line);
   border-radius: 8px;
 }
 
@@ -43,7 +43,7 @@ label {
 }
 
 .form-field:focus-within .form-field-label {
-  color: #0f766e;
+  color: var(--edm-primary-600);
 }
 
 .form-field-disabled .form-field-label {
@@ -63,7 +63,7 @@ label {
 }
 
 .form-field-description {
-  color: #69737d;
+  color: var(--edm-ink-500);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.45;
@@ -74,9 +74,9 @@ label select {
   width: 100%;
   height: 38px;
   padding: 0 10px;
-  color: #202124;
-  background: #ffffff;
-  border: 1px solid #cfd8df;
+  color: var(--edm-ink-950);
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line-strong);
   border-radius: 8px;
   outline: 0;
 }
@@ -84,7 +84,7 @@ label select {
 label input:disabled,
 label select:disabled,
 label textarea:disabled {
-  color: #69737d;
+  color: var(--edm-ink-500);
   background: #f3f5f6;
   border-color: #d8e0e6;
 }
@@ -93,7 +93,7 @@ label input:focus,
 label select:focus,
 label textarea:focus,
 .search-form:focus-within {
-  border-color: #0f766e;
+  border-color: var(--edm-primary-600);
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
 }
 
@@ -101,9 +101,9 @@ label textarea {
   width: 100%;
   min-height: 94px;
   padding: 9px 10px;
-  color: #202124;
-  background: #ffffff;
-  border: 1px solid #cfd8df;
+  color: var(--edm-ink-950);
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line-strong);
   border-radius: 8px;
   outline: 0;
   resize: vertical;
@@ -133,9 +133,9 @@ label textarea {
 .path-field-control textarea {
   width: 100%;
   min-width: 0;
-  color: #202124;
-  background: #ffffff;
-  border: 1px solid #cfd8df;
+  color: var(--edm-ink-950);
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line-strong);
   border-radius: 8px;
   outline: 0;
 }
@@ -153,7 +153,7 @@ label textarea {
 
 .path-field-control input:focus,
 .path-field-control textarea:focus {
-  border-color: #0f766e;
+  border-color: var(--edm-primary-600);
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
 }
 

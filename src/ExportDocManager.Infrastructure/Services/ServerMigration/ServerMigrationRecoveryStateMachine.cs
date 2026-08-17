@@ -144,23 +144,23 @@ public static partial class ServerMigrationRecoveryStateMachine
                 marker,
                 ServerMigrationRestorePhase.SafetyBackup,
                 "正在创建数据库与运行文件安全备份。");
-            long stagedManifestBytes = ServerMigrationStorageBudget.SumManifestBytes(marker.Manifest);
+            long stagedManifestBytes = ServerMigrationManifestBudget.SumBytes(marker.Manifest);
             long stagedDatabaseBytes = new FileInfo(databaseDump).Length;
             long replacementBytes = Math.Max(0, stagedManifestBytes - stagedDatabaseBytes);
             long currentRuntimeBytes =
-                ServerMigrationStorageBudget.SumDirectoryBytes(pathProvider.FileRoot) +
-                ServerMigrationStorageBudget.SumDirectoryBytes(pathProvider.UserTemplateRoot) +
-                ServerMigrationStorageBudget.SumDirectoryBytes(pathProvider.SingleWindowRoot) +
-                ServerMigrationStorageBudget.SumDirectoryBytes(Path.Combine(pathProvider.DataRoot, "Marks")) +
-                ServerMigrationStorageBudget.SumDirectoryBytes(pathProvider.ConfigRoot) +
-                ServerMigrationStorageBudget.SumDirectoryBytes(pathProvider.SecurityRoot);
-            ServerMigrationStorageBudget.EnsureAvailable(
+                RuntimeStorageBudget.SumDirectoryBytes(pathProvider.FileRoot) +
+                RuntimeStorageBudget.SumDirectoryBytes(pathProvider.UserTemplateRoot) +
+                RuntimeStorageBudget.SumDirectoryBytes(pathProvider.SingleWindowRoot) +
+                RuntimeStorageBudget.SumDirectoryBytes(Path.Combine(pathProvider.DataRoot, "Marks")) +
+                RuntimeStorageBudget.SumDirectoryBytes(pathProvider.ConfigRoot) +
+                RuntimeStorageBudget.SumDirectoryBytes(pathProvider.SecurityRoot);
+            RuntimeStorageBudget.EnsureAvailable(
                 safetyRoot,
-                ServerMigrationStorageBudget.WithSafetyMargin(Math.Max(stagedDatabaseBytes * 2, stagedDatabaseBytes)),
+                RuntimeStorageBudget.WithSafetyMargin(Math.Max(stagedDatabaseBytes * 2, stagedDatabaseBytes)),
                 "创建 PostgreSQL 安全备份");
-            ServerMigrationStorageBudget.EnsureAvailable(
+            RuntimeStorageBudget.EnsureAvailable(
                 pathProvider.DataRoot,
-                ServerMigrationStorageBudget.WithSafetyMargin(currentRuntimeBytes, replacementBytes),
+                RuntimeStorageBudget.WithSafetyMargin(currentRuntimeBytes, replacementBytes),
                 "创建运行文件安全备份");
             Directory.CreateDirectory(safetyRoot);
             RuntimeFilePermissionHelper.RestrictDirectory(safetyRoot);

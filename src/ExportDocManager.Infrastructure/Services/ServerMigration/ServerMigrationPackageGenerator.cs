@@ -105,9 +105,9 @@ internal sealed class ServerMigrationPackageGenerator
             cancellationToken).ConfigureAwait(false);
         sources.Add((manifestPath, ServerMigrationLayout.ManifestEntry));
         long manifestBytes = new FileInfo(manifestPath).Length;
-        ServerMigrationStorageBudget.EnsureAvailable(
+        RuntimeStorageBudget.EnsureAvailable(
             _packageRoot,
-            ServerMigrationStorageBudget.WithSafetyMargin(collectedBytes, manifestBytes, collectedBytes),
+            RuntimeStorageBudget.WithSafetyMargin(collectedBytes, manifestBytes, collectedBytes),
             "生成服务器迁移包");
         await ZipArchiveHelper.CreateFromFilesAsync(sources, payloadPath, cancellationToken).ConfigureAwait(false);
         await AtomicFileHelper.WriteFileAtomicAsync(

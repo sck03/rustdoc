@@ -194,6 +194,7 @@ function Invoke-ExportDocExternal {
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
         [string[]]$Arguments = @(),
+        [string]$DisplayName,
         [string]$WorkingDirectory,
         [ValidateRange(1, 86400)][int]$TimeoutSeconds = 7200,
         [ValidateRange(1, 3600)][int]$HeartbeatSeconds = 60,
@@ -201,7 +202,11 @@ function Invoke-ExportDocExternal {
         [switch]$CaptureOutput
     )
 
-    $displayName = "$FilePath $($Arguments -join ' ')".Trim()
+    $resolvedDisplayName = if ([string]::IsNullOrWhiteSpace($DisplayName)) {
+        "$FilePath $($Arguments -join ' ')".Trim()
+    } else {
+        $DisplayName.Trim()
+    }
     $startInfo = New-ExportDocProcessStartInfo `
         -FilePath $FilePath `
         -Arguments $Arguments `
@@ -210,7 +215,7 @@ function Invoke-ExportDocExternal {
         -CaptureOutput:$CaptureOutput
     $process = [System.Diagnostics.Process]::Start($startInfo)
     if ($null -eq $process) {
-        throw "Could not start external command: $displayName"
+        throw "Could not start external command: $resolvedDisplayName"
     }
 
     try {
@@ -218,17 +223,29 @@ function Invoke-ExportDocExternal {
             $standardOutput = $process.StandardOutput.ReadToEndAsync()
             $standardError = $process.StandardError.ReadToEndAsync()
         }
-        Wait-ExportDocExternalProcess `
-            -Process $process `
-            -DisplayName $displayName `
-            -TimeoutSeconds $TimeoutSeconds `
-            -HeartbeatSeconds $HeartbeatSeconds
+        try {
+            Wait-ExportDocExternalProcess `
+                -Process $process `
+                -DisplayName $resolvedDisplayName `
+                -TimeoutSeconds $TimeoutSeconds `
+                -HeartbeatSeconds $HeartbeatSeconds
+        } catch {
+            $diagnostic = ""
+            if ($CaptureOutput -and $standardError.Wait(3000)) {
+                $diagnostic = $standardError.GetAwaiter().GetResult().Trim()
+            }
+            if ($CaptureOutput -and [string]::IsNullOrWhiteSpace($diagnostic) -and $standardOutput.Wait(3000)) {
+                $diagnostic = $standardOutput.GetAwaiter().GetResult().Trim()
+            }
+            $suffix = if ([string]::IsNullOrWhiteSpace($diagnostic)) { "" } else { "`n$diagnostic" }
+            throw "$($_.Exception.Message)$suffix"
+        }
         $output = if ($CaptureOutput) { $standardOutput.GetAwaiter().GetResult() } else { "" }
         $errorOutput = if ($CaptureOutput) { $standardError.GetAwaiter().GetResult() } else { "" }
         if ($process.ExitCode -ne 0) {
             $diagnostic = if ([string]::IsNullOrWhiteSpace($errorOutput)) { $output } else { $errorOutput }
             $suffix = if ([string]::IsNullOrWhiteSpace($diagnostic)) { "." } else { ": $($diagnostic.Trim())" }
-            throw "$displayName failed with exit code $($process.ExitCode)$suffix"
+            throw "$resolvedDisplayName failed with exit code $($process.ExitCode)$suffix"
         }
         if ($CaptureOutput) {
             return [pscustomobject]@{ Output = $output; Error = $errorOutput; ExitCode = $process.ExitCode }

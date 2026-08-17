@@ -39,6 +39,7 @@ export function parseWebRuntimeSmokeArgs(args) {
     auditLogExportCheck: false,
     licenseCheck: false,
     timeoutMs: 45000,
+    globalTimeoutMs: 600000,
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -79,6 +80,9 @@ export function parseWebRuntimeSmokeArgs(args) {
         break;
       case "--timeout-ms":
         options.timeoutMs = Number(nextValue());
+        break;
+      case "--global-timeout-ms":
+        options.globalTimeoutMs = Number(nextValue());
         break;
       case "--expected-text":
         options.expectedText.push(nextValue());
@@ -228,6 +232,9 @@ export function validateWebRuntimeSmokeOptions(options) {
 
   if (!Number.isFinite(options.timeoutMs) || options.timeoutMs <= 0) {
     throw new Error("--timeout-ms must be a positive number.");
+  }
+  if (!Number.isFinite(options.globalTimeoutMs) || options.globalTimeoutMs <= 0) {
+    throw new Error("--global-timeout-ms must be a positive number.");
   }
 
   if (options.expectedText.length === 0) {

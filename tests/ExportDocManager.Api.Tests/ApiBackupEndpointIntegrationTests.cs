@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Net.Sockets;
 using System.Globalization;
 using System.Text;
 using ExportDocManager.Api.Hosting;
@@ -486,23 +485,21 @@ namespace ExportDocManager.Api.Tests
         {
             private readonly WebApplication _app;
 
-            private FakeWebDavServer(WebApplication app, string baseUrl)
+            private FakeWebDavServer(WebApplication app)
             {
                 _app = app;
-                BaseUrl = baseUrl;
             }
 
-            public string BaseUrl { get; }
+            public string BaseUrl { get; private set; } = string.Empty;
 
             public Dictionary<string, byte[]> Uploads { get; } = new(StringComparer.OrdinalIgnoreCase);
 
             public static async Task<FakeWebDavServer> StartAsync()
             {
-                string baseUrl = $"http://127.0.0.1:{GetAvailablePort()}";
                 var builder = WebApplication.CreateBuilder();
-                builder.WebHost.UseUrls(baseUrl);
+                builder.WebHost.UseUrls("http://127.0.0.1:0");
                 var app = builder.Build();
-                var server = new FakeWebDavServer(app, baseUrl);
+                var server = new FakeWebDavServer(app);
 
                 app.MapMethods("/{**path}", new[] { "OPTIONS" }, () => Results.Ok());
                 app.MapMethods("/{**path}", new[] { "PROPFIND" }, () =>
@@ -525,6 +522,7 @@ namespace ExportDocManager.Api.Tests
                 });
 
                 await app.StartAsync();
+                server.BaseUrl = ApiIntegrationTestHarness.ResolveBaseUrl(app);
                 return server;
             }
 
@@ -532,15 +530,6 @@ namespace ExportDocManager.Api.Tests
             {
                 await _app.StopAsync();
                 await _app.DisposeAsync();
-            }
-
-            private static int GetAvailablePort()
-            {
-                var listener = new TcpListener(IPAddress.Loopback, 0);
-                listener.Start();
-                int port = ((IPEndPoint)listener.LocalEndpoint).Port;
-                listener.Stop();
-                return port;
             }
 
             private string BuildPropFindXml()

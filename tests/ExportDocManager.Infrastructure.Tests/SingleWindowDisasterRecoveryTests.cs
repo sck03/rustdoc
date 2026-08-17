@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Security.Cryptography;
 using ExportDocManager.DataAccess;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
@@ -103,6 +104,48 @@ namespace ExportDocManager.Infrastructure.Tests
         public void PackagePasswordPolicy_ShouldRejectWeakPasswords(string password)
         {
             Assert.Throws<ArgumentException>(() => DisasterRecoveryPackageCrypto.ValidatePassword(password));
+        }
+
+        [Fact]
+        public async Task CreatePackage_ShouldStopBeforeSnapshotWhenRuntimeVolumeIsFull()
+        {
+            string root = CreateTestRoot();
+            try
+            {
+                var paths = new RuntimeAppPathProvider(Path.Combine(root, "app"), Path.Combine(root, "data"));
+                Directory.CreateDirectory(paths.DatabaseRoot);
+                Directory.CreateDirectory(paths.ConfigRoot);
+                var settings = new DatabaseConnectionSettings
+                {
+                    Provider = DatabaseConnectionSettings.SqliteProvider,
+                    SqliteDatabaseFileName = "holding-station.db"
+                };
+                await WriteValueAsync(
+                    DbHelper.ResolveRuntimeSqliteDatabasePath(paths, settings.SqliteDatabaseFileName),
+                    "storage-budget");
+                await File.WriteAllTextAsync(Path.Combine(paths.ConfigRoot, "appsettings.json"), "{}");
+                var stationService = new SingleWindowStationIdentityService(paths);
+                var service = new SingleWindowDisasterRecoveryService(
+                    settings,
+                    paths,
+                    stationService,
+                    getAvailableBytes: _ => 0);
+
+                await Assert.ThrowsAsync<InsufficientStorageException>(() =>
+                    service.CreatePackageAsync(PackagePassword));
+                Assert.Empty(Directory.EnumerateFiles(
+                    SingleWindowDisasterRecoveryManager.GetRecoveryRoot(paths),
+                    $"*{SingleWindowDisasterRecoveryLayout.PackageExtension}",
+                    SearchOption.TopDirectoryOnly));
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
         }
 
         private static async Task WriteValueAsync(string databasePath, string value)

@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-27",
+  "capturedAt": "2026-08-17",
   "purpose": "Freeze existing hard-coded CSS debt while new work moves toward semantic tokens and shared commercial components.",
   "maximum": {
-    "hexColors": 1400,
+    "hexColors": 1266,
     "rgbColors": 198,
     "boxShadows": 107,
-    "gradients": 50,
-    "pixelFontSizes": 333,
+    "gradients": 49,
+    "pixelFontSizes": 326,
     "importantDeclarations": 8
   }
 }

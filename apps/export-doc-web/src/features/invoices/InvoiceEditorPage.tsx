@@ -16,9 +16,7 @@ import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import {
   hasCustomOptionValue,
 } from "../custom-options/customOptionModel.ts";
-import {
-  InvoiceMarksAndItemsPanel,
-} from "./InvoiceFormPanels.tsx";
+import { InvoiceMarksAndItemsPanel } from "./InvoiceMarksAndItemsPanel.tsx";
 import { InvoiceStatusReasonDialog } from "./InvoiceStatusReasonDialog.tsx";
 import {
   canDeleteInvoiceStatus,
@@ -51,9 +49,11 @@ import { useInvoiceItemsWorkspace } from "./useInvoiceItemsWorkspace.ts";
 import { useInvoicePersistenceOperations } from "./useInvoicePersistenceOperations.ts";
 
 export function InvoiceEditorPage({
+  businessDate,
   client,
   mode,
 }: {
+  businessDate: string;
   client: ExportDocManagerApiClient;
   mode: "new" | "edit";
 }) {
@@ -69,18 +69,19 @@ export function InvoiceEditorPage({
   const workspaceDeviceProfile = useWorkspaceDeviceProfile();
   const workspaceDeviceMode = workspaceDeviceProfile.mode;
   const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
+  const [pageBusinessDate] = useState(() => businessDate);
   const [initialNewRouteState] = useState(() => ({
-    invoiceDraft: readRouteInvoiceDraft(location.state),
+    invoiceDraft: readRouteInvoiceDraft(location.state, pageBusinessDate),
     successMessage: readRouteSuccessMessage(location.state),
   }));
   const routeSuccessMessage = mode === "new" ? initialNewRouteState.successMessage : readRouteSuccessMessage(location.state);
   const routeInvoiceDraft = useMemo(
-    () => (mode === "new" ? initialNewRouteState.invoiceDraft : readRouteInvoiceDraft(location.state)),
-    [initialNewRouteState.invoiceDraft, location.state, mode],
+    () => (mode === "new" ? initialNewRouteState.invoiceDraft : readRouteInvoiceDraft(location.state, pageBusinessDate)),
+    [initialNewRouteState.invoiceDraft, location.state, mode, pageBusinessDate],
   );
   const routeInvoiceImportAction = useMemo(() => readRouteInvoiceImportAction(location.state), [location.state]);
   const [invoice, setInvoice] = useState<ApiInvoiceDetailDto | null>(() =>
-    mode === "new" ? routeInvoiceDraft ?? createEmptyInvoice() : null,
+    mode === "new" ? routeInvoiceDraft ?? createEmptyInvoice(pageBusinessDate) : null,
   );
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(routeSuccessMessage);
@@ -167,7 +168,7 @@ export function InvoiceEditorPage({
 
   useEffect(() => {
     if (isNew) {
-      const nextInvoice = routeInvoiceDraft ?? createEmptyInvoice();
+      const nextInvoice = routeInvoiceDraft ?? createEmptyInvoice(pageBusinessDate);
       setInvoice(nextInvoice);
       setPersistedInvoiceDraft(normalizeInvoiceForSave(nextInvoice, 0));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(nextInvoice.status));
@@ -189,7 +190,7 @@ export function InvoiceEditorPage({
       setSuccessMessage(null);
       return;
     }
-  }, [isNew, isInvoiceIdValid, parsedInvoiceId, routeInvoiceDraft, routeSuccessMessage]);
+  }, [isNew, isInvoiceIdValid, pageBusinessDate, parsedInvoiceId, routeInvoiceDraft, routeSuccessMessage]);
 
   useEffect(() => {
     if (!isNew && invoiceQuery.isError) {

@@ -147,19 +147,6 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<CrmFollowUp>().HasIndex(item => item.OwnerUserId);
             modelBuilder.Entity<CrmFollowUp>().HasIndex(item => new { item.IsCompleted, item.NextFollowUpAt });
             modelBuilder.Entity<CrmFollowUp>().HasIndex(item => new { item.CompanyScope, item.DepartmentId });
-            if (Database.IsSqlite())
-            {
-                modelBuilder.Entity<CrmFollowUp>()
-                    .Property(item => item.FollowedUpAt)
-                    .HasConversion(
-                        value => value.UtcDateTime.Ticks,
-                        value => new DateTimeOffset(value, TimeSpan.Zero));
-                modelBuilder.Entity<CrmFollowUp>()
-                    .Property(item => item.NextFollowUpAt)
-                    .HasConversion(
-                        value => value.HasValue ? value.Value.UtcDateTime.Ticks : (long?)null,
-                        value => value.HasValue ? new DateTimeOffset(value.Value, TimeSpan.Zero) : null);
-            }
             modelBuilder.Entity<CrmFollowUp>()
                 .HasOne<CrmCustomer>()
                 .WithMany()

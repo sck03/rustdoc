@@ -12,6 +12,7 @@ import { createInvoiceShippingMarkSmokeScene } from "./lib/web-runtime-invoice-s
 import { createJobCenterSmokeScene } from "./lib/web-runtime-job-center-scene.mjs";
 import { createMasterDataSmokeScene } from "./lib/web-runtime-master-data-scene.mjs";
 import { parseWebRuntimeSmokeArgs, validateWebRuntimeSmokeOptions } from "./lib/web-runtime-smoke-options.mjs";
+import { createSmokeStageRunner } from "./lib/web-runtime-smoke-deadline.mjs";
 import { createPaymentSmokeScene } from "./lib/web-runtime-payment-scene.mjs";
 import { createReportTemplateSmokeScene } from "./lib/web-runtime-report-template-scene.mjs";
 import { createSettingsBackupSmokeScene } from "./lib/web-runtime-settings-backup-scene.mjs";
@@ -298,13 +299,14 @@ const salesWorkspaceSmokeScene = createSalesWorkspaceSmokeScene({
 async function main() {
   const options = parseWebRuntimeSmokeArgs(process.argv.slice(2));
   validateWebRuntimeSmokeOptions(options);
+  const runStage = createSmokeStageRunner(options.globalTimeoutMs, options.timeoutMs);
 
   mkdirSync(options.userDataDir, { recursive: true });
   if (options.screenshotPath) {
     mkdirSync(path.dirname(options.screenshotPath), { recursive: true });
   }
 
-  const login = await loginToApi(options);
+  const login = await runStage("API login", () => loginToApi(options));
   const session = {
     accessToken: login.accessToken,
     expiresAt: login.expiresAt,
@@ -312,113 +314,124 @@ async function main() {
     user: login.user,
   };
 
-  const chrome = await startChrome(options);
+  const chrome = await runStage("Chrome startup", (timeoutMs) => startChrome({ ...options, timeoutMs }));
   let cdp;
   let text = "";
   try {
-    cdp = await CdpClient.connect(chrome.browserWebSocketUrl);
-    const page = await createPageSession(cdp);
-    await injectDesktopSession(page, JSON.stringify(session), options, sessionStorageKey);
-    await page.send("Page.navigate", { url: options.webUrl });
+    cdp = await runStage("DevTools connection", () => CdpClient.connect(chrome.browserWebSocketUrl));
+    const page = await runStage("Browser session initialization", async () => {
+      const value = await createPageSession(cdp);
+      await injectDesktopSession(value, JSON.stringify(session), options, sessionStorageKey);
+      await value.send("Page.navigate", { url: options.webUrl });
+      return value;
+    });
 
-    text = await waitForRuntimeDiagnostics(page, options.expectedText, options.timeoutMs);
+    text = await runStage("Runtime diagnostics", (timeoutMs) =>
+      waitForRuntimeDiagnostics(page, options.expectedText, timeoutMs));
     const initialDiagnosticsText = text;
-    const runtimePathActionsCheck = await waitForRuntimePathActionsCheck(page, options, options.timeoutMs);
-    const runtimeDependencyClassification = await waitForRuntimeDependencyClassification(page, options, options.timeoutMs);
-    const templateStorageCheck = await waitForTemplateStorageCheck(page, options, options.timeoutMs);
-    const frameDiagnostics = await waitForFrameDiagnostics(
+    const runtimePathActionsCheck = await runStage("Runtime path actions", (timeoutMs) =>
+      waitForRuntimePathActionsCheck(page, options, timeoutMs));
+    const runtimeDependencyClassification = await runStage("Runtime dependency classification", (timeoutMs) =>
+      waitForRuntimeDependencyClassification(page, options, timeoutMs));
+    const templateStorageCheck = await runStage("Template storage", (timeoutMs) =>
+      waitForTemplateStorageCheck(page, options, timeoutMs));
+    const frameDiagnostics = await runStage("Report frame diagnostics", (timeoutMs) => waitForFrameDiagnostics(
       page,
       options,
-      options.timeoutMs,
+      timeoutMs,
       reportTemplateSmokeScene.readPageTemplateDiagnostics,
-    );
-    const reportTemplateChecks = await reportTemplateSmokeScene.run(page, options, options.timeoutMs);
-    const invoiceReportCheck = await invoiceReportSmokeScene.run(
+    ));
+    const reportTemplateChecks = await runStage("Report templates", (timeoutMs) =>
+      reportTemplateSmokeScene.run(page, options, timeoutMs));
+    const invoiceReportCheck = await runStage("Invoice reports", (timeoutMs) => invoiceReportSmokeScene.run(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
-    const invoiceItemsCheck = await waitForInvoiceItemsCheck(
+      timeoutMs,
+    ));
+    const invoiceItemsCheck = await runStage("Invoice items", (timeoutMs) => waitForInvoiceItemsCheck(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
-    const invoiceLetterOfCreditCheck = await invoiceLetterOfCreditSmokeScene.run(
+      timeoutMs,
+    ));
+    const invoiceLetterOfCreditCheck = await runStage("Letter-of-credit tools", (timeoutMs) => invoiceLetterOfCreditSmokeScene.run(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
-    const invoiceDeleteCheck = await invoiceQuerySmokeScene.runDelete(
+      timeoutMs,
+    ));
+    const invoiceDeleteCheck = await runStage("Invoice deletion", (timeoutMs) => invoiceQuerySmokeScene.runDelete(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
-    const invoiceListDesktopWorkflowCheck = await invoiceListDesktopSmokeScene.run(
+      timeoutMs,
+    ));
+    const invoiceListDesktopWorkflowCheck = await runStage("Invoice desktop workflow", (timeoutMs) => invoiceListDesktopSmokeScene.run(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
-    const queryKeyboardCheck = await invoiceQuerySmokeScene.runQuery(
+      timeoutMs,
+    ));
+    const queryKeyboardCheck = await runStage("Invoice query keyboard workflow", (timeoutMs) => invoiceQuerySmokeScene.runQuery(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
-    const singleWindowEditorToolsCheck = await singleWindowEditorToolsSmokeScene.run(
+      timeoutMs,
+    ));
+    const singleWindowEditorToolsCheck = await runStage("Single Window editor tools", (timeoutMs) => singleWindowEditorToolsSmokeScene.run(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
-    const singleWindowOperationCenterCheck = await singleWindowOperationCenterSmokeScene.run(
+      timeoutMs,
+    ));
+    const singleWindowOperationCenterCheck = await runStage("Single Window operation center", (timeoutMs) => singleWindowOperationCenterSmokeScene.run(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
+      timeoutMs,
+    ));
     const {
       paymentReportCheck,
       paymentDeleteCheck,
-    } = await paymentSmokeScene.run(
+    } = await runStage("Payment workflows", (timeoutMs) => paymentSmokeScene.run(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
-    const masterDataDeleteCheck = await masterDataSmokeScene.run(
+      timeoutMs,
+    ));
+    const masterDataDeleteCheck = await runStage("Master data workflows", (timeoutMs) => masterDataSmokeScene.run(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
-    const jobCenterCheck = await jobCenterSmokeScene.run(
+      timeoutMs,
+    ));
+    const jobCenterCheck = await runStage("Job center", (timeoutMs) => jobCenterSmokeScene.run(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
-    const dashboardCheck = await waitForDashboardCheck(page, options, options.timeoutMs);
-    const salesWorkspaceCheck = await salesWorkspaceSmokeScene.run(page, options, options.timeoutMs);
+      timeoutMs,
+    ));
+    const dashboardCheck = await runStage("Dashboard", (timeoutMs) =>
+      waitForDashboardCheck(page, options, timeoutMs));
+    const salesWorkspaceCheck = await runStage("Sales workspace", (timeoutMs) =>
+      salesWorkspaceSmokeScene.run(page, options, timeoutMs));
     const {
       backupCheck,
       backupCreateCheck,
-    } = await settingsBackupSmokeScene.runPreparation(page, options, options.timeoutMs);
+    } = await runStage("Backup preparation", (timeoutMs) =>
+      settingsBackupSmokeScene.runPreparation(page, options, timeoutMs));
     const {
       updateCheck,
       smartOcrCheck,
@@ -426,42 +439,46 @@ async function main() {
       emailCheck,
       auditLogCheck,
       licenseCheck,
-    } = await systemToolsSmokeScene.run(
+    } = await runStage("System tools", (timeoutMs) => systemToolsSmokeScene.run(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
+      timeoutMs,
+    ));
     const {
       userManagementCrudCheck,
       userRows,
-    } = await userManagementSmokeScene.run(
+    } = await runStage("User management", (timeoutMs) => userManagementSmokeScene.run(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
+      timeoutMs,
+    ));
     if (options.expectedUserRows.length > 0) {
-      const refreshedText = await evaluate(page, "document.body ? document.body.innerText : ''", true).catch(() => ({ value: text }));
+      const refreshedText = await runStage("User list refresh", () =>
+        evaluate(page, "document.body ? document.body.innerText : ''", true)
+          .catch(() => ({ value: text })));
       text = refreshedText.value ?? text;
     }
-    const backupRestoreCheck = await settingsBackupSmokeScene.runRestore(
+    const backupRestoreCheck = await runStage("Backup restore", (timeoutMs) => settingsBackupSmokeScene.runRestore(
       page,
       options,
       login.accessToken,
       login.tokenType,
-      options.timeoutMs,
-    );
-    const title = await evaluate(page, "document.title", true);
-    const href = await evaluate(page, "window.location.href", true);
+      timeoutMs,
+    ));
+    const { title, href } = await runStage("Final browser state", async () => ({
+      title: await evaluate(page, "document.title", true),
+      href: await evaluate(page, "window.location.href", true),
+    }));
 
     if (options.screenshotPath) {
-      await captureScreenshot(page, options.screenshotPath);
+      await runStage("Screenshot", () => captureScreenshot(page, options.screenshotPath));
     }
 
-    await logoutFromApi(options, login.accessToken, login.tokenType);
+    await runStage("API logout", () => logoutFromApi(options, login.accessToken, login.tokenType));
 
     writeJson({
       success: true,

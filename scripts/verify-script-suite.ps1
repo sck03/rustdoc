@@ -96,7 +96,6 @@ foreach ($file in $powerShellScripts) {
 
 $approvedDirectNativeCommands = @{
     "provision-tauri-nsis.ps1" = @("curl.exe")
-    "smoke-tauri-desktop.ps1" = @("node", "npm")
 }
 $nativeCommandNames = @("dotnet", "node", "npm", "cargo", "rustc", "curl.exe", "cmd.exe", "pwsh.exe", "powershell.exe")
 $directNativeCommands = New-Object System.Collections.Generic.List[object]

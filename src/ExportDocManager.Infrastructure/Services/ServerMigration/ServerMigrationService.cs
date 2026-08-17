@@ -200,12 +200,12 @@ public sealed class ServerMigrationService : IServerMigrationService
             {
                 throw new PayloadLimitExceededException(ServerMigrationPackageValidator.MaximumPackageBytes);
             }
-            ServerMigrationStorageBudget.EnsureAvailable(
+            RuntimeStorageBudget.EnsureAvailable(
                 workingRoot,
-                ServerMigrationStorageBudget.WithSafetyMargin(incomingBytes ?? 0),
+                RuntimeStorageBudget.WithSafetyMargin(incomingBytes ?? 0),
                 "接收服务器迁移包");
-            ServerMigrationStorageBudget.IncrementalWriteGuard packageWriteGuard =
-                ServerMigrationStorageBudget.CreateIncrementalWriteGuard(workingRoot, "接收服务器迁移包");
+            RuntimeStorageBudget.IncrementalWriteGuard packageWriteGuard =
+                RuntimeStorageBudget.CreateIncrementalWriteGuard(workingRoot, "接收服务器迁移包");
             await ServerMigrationPackageValidator.CopyBoundedAsync(
                 package,
                 encryptedPath,
@@ -215,23 +215,23 @@ public sealed class ServerMigrationService : IServerMigrationService
             long declaredPlaintextBytes = await DisasterRecoveryPackageCrypto
                 .ReadDeclaredPlaintextLengthAsync(encryptedPath, cancellationToken)
                 .ConfigureAwait(false);
-            ServerMigrationStorageBudget.EnsureAvailable(
+            RuntimeStorageBudget.EnsureAvailable(
                 workingRoot,
-                ServerMigrationStorageBudget.WithSafetyMargin(declaredPlaintextBytes),
+                RuntimeStorageBudget.WithSafetyMargin(declaredPlaintextBytes),
                 "解密服务器迁移包");
             await DisasterRecoveryPackageCrypto.DecryptAsync(encryptedPath, payloadPath, password, cancellationToken).ConfigureAwait(false);
             ServerMigrationPackageValidator.ValidateArchiveEntries(payloadPath);
             long declaredExtractedBytes = ServerMigrationPackageValidator.GetDeclaredUncompressedBytes(payloadPath);
-            ServerMigrationStorageBudget.EnsureAvailable(
+            RuntimeStorageBudget.EnsureAvailable(
                 extractedRoot,
-                ServerMigrationStorageBudget.WithSafetyMargin(declaredExtractedBytes),
+                RuntimeStorageBudget.WithSafetyMargin(declaredExtractedBytes),
                 "解压服务器迁移包");
             await ZipArchiveHelper.ExtractToDirectorySafeAsync(payloadPath, extractedRoot, cancellationToken, limits: ServerMigrationPackageValidator.ExtractionLimits).ConfigureAwait(false);
             ServerMigrationManifest manifest = await ServerMigrationPackageValidator.ReadAndValidateManifestAsync(extractedRoot, cancellationToken).ConfigureAwait(false);
-            long stagedBytes = ServerMigrationStorageBudget.SumManifestBytes(manifest);
-            ServerMigrationStorageBudget.EnsureAvailable(
+            long stagedBytes = ServerMigrationManifestBudget.SumBytes(manifest);
+            RuntimeStorageBudget.EnsureAvailable(
                 _pathProvider.BackupRoot,
-                ServerMigrationStorageBudget.WithSafetyMargin(stagedBytes),
+                RuntimeStorageBudget.WithSafetyMargin(stagedBytes),
                 "准备服务器迁移暂存数据");
             packageId = manifest.PackageId;
             string sourceDump = ResolvePath(extractedRoot, ServerMigrationLayout.DatabaseEntry);
@@ -310,12 +310,12 @@ public sealed class ServerMigrationService : IServerMigrationService
             {
                 throw new PayloadLimitExceededException(DisasterRecoveryPackageCrypto.MaximumPlaintextBytes);
             }
-            ServerMigrationStorageBudget.EnsureAvailable(
+            RuntimeStorageBudget.EnsureAvailable(
                 workingRoot,
-                ServerMigrationStorageBudget.WithSafetyMargin(incomingBytes ?? 0),
+                RuntimeStorageBudget.WithSafetyMargin(incomingBytes ?? 0),
                 "接收 PostgreSQL 数据库备份");
-            ServerMigrationStorageBudget.IncrementalWriteGuard backupWriteGuard =
-                ServerMigrationStorageBudget.CreateIncrementalWriteGuard(workingRoot, "接收 PostgreSQL 数据库备份");
+            RuntimeStorageBudget.IncrementalWriteGuard backupWriteGuard =
+                RuntimeStorageBudget.CreateIncrementalWriteGuard(workingRoot, "接收 PostgreSQL 数据库备份");
             long receivedBackupBytes = await ServerMigrationPackageValidator.CopyBoundedAsync(
                 databaseBackup,
                 dumpPath,
@@ -328,9 +328,9 @@ public sealed class ServerMigrationService : IServerMigrationService
             string stagingRoot = Path.Combine(ServerMigrationManager.GetControlRoot(_pathProvider), stagingDirectoryName);
             Directory.CreateDirectory(stagingRoot);
             RuntimeFilePermissionHelper.RestrictDirectory(stagingRoot);
-            ServerMigrationStorageBudget.EnsureAvailable(
+            RuntimeStorageBudget.EnsureAvailable(
                 stagingRoot,
-                ServerMigrationStorageBudget.WithSafetyMargin(new FileInfo(dumpPath).Length),
+                RuntimeStorageBudget.WithSafetyMargin(new FileInfo(dumpPath).Length),
                 "准备 PostgreSQL 数据库恢复暂存数据");
             string target = ResolvePath(stagingRoot, ServerMigrationLayout.DatabaseEntry);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);

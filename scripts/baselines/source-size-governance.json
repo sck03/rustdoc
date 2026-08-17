@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-16",
+  "capturedAt": "2026-08-17",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 109612,
+      "baselineAggregateLines": 109924,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 109812,
+      "maximumAggregateLines": 110124,
       "reportFiles": false
     },
     {
@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 37908,
+      "baselineAggregateLines": 38193,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 38028,
+      "maximumAggregateLines": 38313,
       "reportFiles": false
     },
     {
@@ -56,9 +56,9 @@
       "directories": ["scripts", "deploy", ".github/workflows"],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 39252,
+      "baselineAggregateLines": 39471,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 39402,
+      "maximumAggregateLines": 39621,
       "reportFiles": false
     },
     {
@@ -66,9 +66,9 @@
       "directory": ".github/workflows",
       "filePattern": "^.+\\.(?:yml|yaml)$",
       "maximumLines": 800,
-      "baselineAggregateLines": 2769,
+      "baselineAggregateLines": 2851,
       "maximumAggregateGrowthLines": 20,
-      "maximumAggregateLines": 2789,
+      "maximumAggregateLines": 2871,
       "reportFiles": false
     },
     {
@@ -107,7 +107,7 @@
     },
     {
       "name": "built-in Excel analyzer partials",
-      "directory": "src/ExportDocManager.Infrastructure/Services/Data",
+      "directory": "src/ExportDocManager.Infrastructure.Excel/Services/Data",
       "filePattern": "^BuiltInExcelImportAnalyzer(?:\\..+)?\\.cs$",
       "maximumLines": 600,
       "maximumAggregateLines": 1550

@@ -195,7 +195,31 @@ namespace ExportDocManager.Infrastructure.Tests
             }
         }
 
-        private static BackupFixture CreateFixture(string root)
+        [Fact]
+        public async Task BackupDatabase_ShouldStopBeforeSnapshotWhenRuntimeVolumeIsFull()
+        {
+            string root = CreateTestRoot("sqlite-backup-space");
+            try
+            {
+                var fixture = CreateFixture(root, _ => 0);
+                await WriteValueAsync(fixture.DatabasePath, "storage-budget");
+
+                DatabaseBackupResult result = await fixture.Service.BackupDatabaseAsync();
+
+                Assert.False(result.Success);
+                Assert.Contains("可用空间", result.Message, StringComparison.Ordinal);
+                Assert.Empty(fixture.Service.GetAvailableBackups());
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                DeleteDirectoryIfExists(root);
+            }
+        }
+
+        private static BackupFixture CreateFixture(
+            string root,
+            Func<string, long>? getAvailableBytes = null)
         {
             string appRoot = Path.Combine(root, "app");
             string dataRoot = Path.Combine(root, "data");
@@ -211,7 +235,8 @@ namespace ExportDocManager.Infrastructure.Tests
                 settings,
                 pathProvider,
                 backupDirectory: pathProvider.BackupRoot,
-                databasePath: databasePath);
+                databasePath: databasePath,
+                getAvailableBytes: getAvailableBytes);
             return new BackupFixture(pathProvider, settings, service, databasePath);
         }
 

@@ -51,9 +51,9 @@ public sealed class ServerMigrationSecurityTests
     [Fact]
     public void StorageBudget_ShouldUseActualPayloadSizesAndASmallSafetyMargin()
     {
-        long budget = ServerMigrationStorageBudget.WithSafetyMargin(1_024, 2_048);
+        long budget = RuntimeStorageBudget.WithSafetyMargin(1_024, 2_048);
 
-        Assert.Equal(ServerMigrationStorageBudget.SafetyMarginBytes + 3_072, budget);
+        Assert.Equal(RuntimeStorageBudget.SafetyMarginBytes + 3_072, budget);
     }
 
     [Fact]
@@ -63,10 +63,11 @@ public sealed class ServerMigrationSecurityTests
         try
         {
             var exception = Assert.Throws<InsufficientStorageException>(() =>
-                ServerMigrationStorageBudget.EnsureAvailable(
+                RuntimeStorageBudget.EnsureAvailable(
                     root,
                     long.MaxValue,
-                    "测试迁移阶段"));
+                    "测试迁移阶段",
+                    _ => 1_024));
 
             Assert.Equal(long.MaxValue, exception.RequiredBytes);
             Assert.Contains("测试迁移阶段", exception.Message, StringComparison.Ordinal);
@@ -81,24 +82,24 @@ public sealed class ServerMigrationSecurityTests
     public void StreamingStorageGuard_ShouldRecheckAtEachWriteWindow()
     {
         var requiredBudgets = new List<long>();
-        var guard = new ServerMigrationStorageBudget.IncrementalWriteGuard(
+        var guard = new RuntimeStorageBudget.IncrementalWriteGuard(
             "test-root",
             "测试流式写入",
             requiredBudgets.Add);
 
         guard.EnsureCanWrite(0, 81_920);
-        guard.EnsureCanWrite(ServerMigrationStorageBudget.StreamingCheckWindowBytes - 1, 81_920);
-        guard.EnsureCanWrite(ServerMigrationStorageBudget.StreamingCheckWindowBytes, 40_960);
+        guard.EnsureCanWrite(RuntimeStorageBudget.StreamingCheckWindowBytes - 1, 81_920);
+        guard.EnsureCanWrite(RuntimeStorageBudget.StreamingCheckWindowBytes, 40_960);
 
         Assert.Equal(2, requiredBudgets.Count);
         Assert.Equal(
-            ServerMigrationStorageBudget.WithSafetyMargin(
-                ServerMigrationStorageBudget.StreamingCheckWindowBytes,
+            RuntimeStorageBudget.WithSafetyMargin(
+                RuntimeStorageBudget.StreamingCheckWindowBytes,
                 81_920),
             requiredBudgets[0]);
         Assert.Equal(
-            ServerMigrationStorageBudget.WithSafetyMargin(
-                ServerMigrationStorageBudget.StreamingCheckWindowBytes,
+            RuntimeStorageBudget.WithSafetyMargin(
+                RuntimeStorageBudget.StreamingCheckWindowBytes,
                 40_960),
             requiredBudgets[1]);
     }

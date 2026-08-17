@@ -1,6 +1,7 @@
 using ExportDocManager.Services.Tools;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
+using System.Drawing;
 
 namespace ExportDocManager.Infrastructure.Tests;
 
@@ -108,6 +109,21 @@ public sealed class LetterOfCreditDocumentServiceTests
         {
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
+    }
+
+    [Fact]
+    public void PdfRenderBudget_ShouldRejectOversizedAndExcessivePagesBeforeRasterization()
+    {
+        var oversized = Assert.Throws<InvalidDataException>(() =>
+            LetterOfCreditDocumentService.ValidatePdfRenderBudget([
+                new SizeF(20_000, 20_000)
+            ]));
+        Assert.Contains("页面尺寸", oversized.Message, StringComparison.Ordinal);
+
+        var excessive = Assert.Throws<InvalidDataException>(() =>
+            LetterOfCreditDocumentService.ValidatePdfRenderBudget(
+                Enumerable.Repeat(new SizeF(1_000, 1_000), LetterOfCreditDocumentService.MaximumPdfPages).ToArray()));
+        Assert.Contains("总渲染像素", excessive.Message, StringComparison.Ordinal);
     }
 
     private static void CreateGraphicsOnlyPdf(string path)

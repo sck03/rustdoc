@@ -1,3 +1,4 @@
+using System.Globalization;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Time;
@@ -14,6 +15,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/query/invoices", async Task<Results<
                 Ok<ApiPagedResponse<ApiQueryInvoiceRowDto>>,
+                BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult>>(
                 HttpContext context,
                 IQueryReadRepository queryReadRepository,
@@ -31,6 +33,12 @@ namespace ExportDocManager.Api.Hosting
                 int? pageSize,
                 CancellationToken cancellationToken) =>
             {
+                if (!HasStrictDateOnlyQueryValue(context.Request.Query, "startDate") ||
+                    !HasStrictDateOnlyQueryValue(context.Request.Query, "endDateExclusive"))
+                {
+                    return TypedResults.BadRequest(new ApiErrorResponse(
+                        "查询日期必须使用 yyyy-MM-dd 格式，且不能包含时间或时区。"));
+                }
 
                 var result = await queryReadRepository.QueryPageAsync(
                     new QueryPageQuery
@@ -193,6 +201,22 @@ namespace ExportDocManager.Api.Hosting
                 StyleName = request?.StyleName ?? string.Empty,
                 StyleNo = request?.StyleNo ?? string.Empty
             };
+        }
+
+        private static bool HasStrictDateOnlyQueryValue(IQueryCollection query, string name)
+        {
+            if (!query.TryGetValue(name, out var values))
+            {
+                return true;
+            }
+
+            return values.Count == 1 &&
+                DateOnly.TryParseExact(
+                    values[0],
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out _);
         }
     }
 }

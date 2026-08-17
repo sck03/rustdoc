@@ -18,30 +18,27 @@ import { formatAmount, formatPlainNumber, readApiError } from "../../ui/formUtil
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import {
+  createDefaultQueryFilters,
+  normalizeQueryFilters,
+  normalizeQueryPageSize,
+  queryPageSizeOptions,
+  readStoredQueryFilters,
+  toApiQueryFilters,
+  type QueryFilters,
+} from "./queryModel.ts";
 
-const defaultPageSize = 50;
-const pageSizeOptions = [20, 50, 100, 200] as const;
 const queryViewStateStorageKey = "exportDocManager.queryViewState.v1";
 const invoiceTypeOptions = ["", "实际数据", "报关数据"];
 const transportModeOptions = ["", "BY SEA", "BY AIR", "BY TRAIN", "BY DHL", "BY FedEx"];
 
-type QueryFilters = {
-  startDate: string;
-  endDate: string;
-  customerId: string;
-  exporterId: string;
-  keyword: string;
-  invoiceType: string;
-  transportMode: string;
-};
-
-export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
+export function QueryPage({ businessDate, client }: { businessDate: string; client: ExportDocManagerApiClient }) {
   const queryPermission = useModulePermission("document.query");
   const navigate = useNavigate();
   const keywordInputRef = useRef<HTMLInputElement | null>(null);
   const isDesktop = isDesktopBridgeAvailable();
   const runAbortableOperation = useAbortableOperation();
-  const [initialViewState] = useState(() => loadQueryViewState());
+  const [initialViewState] = useState(() => loadQueryViewState(businessDate));
   const [filters, setFilters] = useState<QueryFilters>(() => initialViewState.filters);
   const [committedFilters, setCommittedFilters] = useState<QueryFilters>(() => initialViewState.filters);
   const [pageNumber, setPageNumber] = useState(1);
@@ -76,7 +73,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
     queryKey: queryKeys.queryInvoices(pageNumber, pageSize, committedFilters),
     queryFn: ({ signal }) =>
       client.listQueriedInvoices({
-        ...toApiFilters(committedFilters),
+        ...toApiQueryFilters(committedFilters),
         pageNumber,
         pageSize,
       }, { signal }),
@@ -118,7 +115,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
       if (isDesktop) {
         const job = await client.saveQueriedInvoicesToPath({
           body: {
-            ...toApiFilters(committedFilters),
+            ...toApiQueryFilters(committedFilters),
             destinationPath: exportPath.trim(),
           },
         }, { signal });
@@ -127,7 +124,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
       }
 
       const job = await client.downloadQueriedInvoices({
-        body: toApiFilters(committedFilters),
+        body: toApiQueryFilters(committedFilters),
       }, { signal });
       setLastCreatedJobId(job.jobId);
       await downloadJobResultWhenReady(client, job, buildQueryExportFileName(), { signal });
@@ -161,7 +158,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
   }
 
   function runSearch() {
-    setCommittedFilters(normalizeFilters(filters));
+    setCommittedFilters(normalizeQueryFilters(filters));
     setActionMessage(null);
     setLastCreatedJobId(null);
     setPageNumber(1);
@@ -195,7 +192,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
   }
 
   function handlePageSizeChange(value: number) {
-    setPageSize(normalizePageSize(value));
+    setPageSize(normalizeQueryPageSize(value));
     setActionMessage(null);
     setPageNumber(1);
   }
@@ -385,7 +382,7 @@ export function QueryPage({ client }: { client: ExportDocManagerApiClient }) {
         totalPages={page?.totalPages ?? 1}
         totalCount={page?.totalCount ?? 0}
         pageSize={pageSize}
-        pageSizeOptions={pageSizeOptions}
+        pageSizeOptions={queryPageSizeOptions}
         isBusy={isBusy}
         onPageChange={setPageNumber}
         onPageSizeChange={handlePageSizeChange}
@@ -470,125 +467,20 @@ function QueryResultTable({
   );
 }
 
-function createDefaultFilters(): QueryFilters {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  return {
-    startDate: toDateInputValue(start),
-    endDate: toDateInputValue(now),
-    customerId: "0",
-    exporterId: "0",
-    keyword: "",
-    invoiceType: "",
-    transportMode: "",
-  };
-}
-
-function loadQueryViewState(): { filters: QueryFilters; pageSize: number } {
-  const defaults = createDefaultFilters();
+function loadQueryViewState(businessDate: string): { filters: QueryFilters; pageSize: number } {
+  const defaults = createDefaultQueryFilters(businessDate);
   const parsed = readStoredJson<{ filters?: unknown; pageSize?: unknown }>(queryViewStateStorageKey);
   return {
-    filters: normalizeFilters(readStoredFilters(parsed?.filters, defaults)),
-    pageSize: normalizePageSize(parsed?.pageSize),
+    filters: readStoredQueryFilters(parsed?.filters, defaults),
+    pageSize: normalizeQueryPageSize(parsed?.pageSize),
   };
 }
 
 function saveQueryViewState(filters: QueryFilters, pageSize: number) {
   writeStoredJson(queryViewStateStorageKey, {
-    filters: normalizeFilters(filters),
-    pageSize: normalizePageSize(pageSize),
+    filters: normalizeQueryFilters(filters),
+    pageSize: normalizeQueryPageSize(pageSize),
   });
-}
-
-function readStoredFilters(value: unknown, defaults: QueryFilters): QueryFilters {
-  if (!value || typeof value !== "object") {
-    return defaults;
-  }
-
-  const stored = value as Partial<Record<keyof QueryFilters, unknown>>;
-  const legacyStored = value as Record<string, unknown>;
-  return {
-    startDate: readStoredString(stored.startDate, defaults.startDate),
-    endDate: readStoredString(stored.endDate, defaults.endDate),
-    customerId: readStoredString(stored.customerId, defaults.customerId),
-    exporterId: readStoredString(stored.exporterId, defaults.exporterId),
-    keyword: mergeQueryKeywords(
-      readStoredString(stored.keyword, defaults.keyword),
-      readStoredString(legacyStored.contractNo, ""),
-      readStoredString(legacyStored.styleName, ""),
-      readStoredString(legacyStored.styleNo, ""),
-    ),
-    invoiceType: readStoredString(stored.invoiceType, defaults.invoiceType),
-    transportMode: readStoredString(stored.transportMode, defaults.transportMode),
-  };
-}
-
-function readStoredString(value: unknown, fallback: string) {
-  return typeof value === "string" ? value : fallback;
-}
-
-function normalizePageSize(value: unknown) {
-  const numericValue = typeof value === "number" ? value : Number(value);
-  return pageSizeOptions.includes(numericValue as (typeof pageSizeOptions)[number]) ? numericValue : defaultPageSize;
-}
-
-function normalizeFilters(filters: QueryFilters): QueryFilters {
-  return {
-    startDate: filters.startDate,
-    endDate: filters.endDate,
-    customerId: filters.customerId,
-    exporterId: filters.exporterId,
-    keyword: filters.keyword.trim(),
-    invoiceType: filters.invoiceType.trim(),
-    transportMode: filters.transportMode.trim(),
-  };
-}
-
-function toApiFilters(filters: QueryFilters) {
-  const normalized = normalizeFilters(filters);
-  const customerId = Number(normalized.customerId);
-  const exporterId = Number(normalized.exporterId);
-  return {
-    startDate: normalized.startDate ? `${normalized.startDate}T00:00:00` : undefined,
-    endDateExclusive: normalized.endDate ? `${nextCalendarDate(normalized.endDate)}T00:00:00` : undefined,
-    customerId: Number.isFinite(customerId) && customerId > 0 ? customerId : undefined,
-    exporterId: Number.isFinite(exporterId) && exporterId > 0 ? exporterId : undefined,
-    keyword: normalized.keyword || undefined,
-    invoiceType: normalized.invoiceType || undefined,
-    transportMode: normalized.transportMode || undefined,
-  };
-}
-
-function nextCalendarDate(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-    return value;
-  }
-
-  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
-}
-
-function mergeQueryKeywords(...values: string[]) {
-  const keywords: string[] = [];
-  const seen = new Set<string>();
-
-  for (const value of values) {
-    const keyword = value.trim();
-    const normalized = keyword.toUpperCase();
-    if (!keyword || seen.has(normalized)) {
-      continue;
-    }
-
-    keywords.push(keyword);
-    seen.add(normalized);
-  }
-
-  return keywords.join(" ");
-}
-
-function toDateInputValue(value: Date) {
-  const pad = (number: number) => String(number).padStart(2, "0");
-  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
 }
 
 function buildQueryExportFileName() {

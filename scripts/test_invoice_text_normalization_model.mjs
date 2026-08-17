@@ -29,6 +29,8 @@ const formUtilsPath = path
 const draftEqualityPath = path
   .join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "invoiceDraftEquality.ts")
   .replaceAll("\\", "/");
+const invoiceEditorSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "InvoiceEditorPage.tsx"), "utf8");
+const paymentEditorSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "payments", "PaymentEditorPage.tsx"), "utf8");
 fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as hsModel from ${JSON.stringify(hsModelPath)}; import * as itemModel from ${JSON.stringify(itemModelPath)}; import * as productLibrary from ${JSON.stringify(productLibraryPath)}; import * as formUtils from ${JSON.stringify(formUtilsPath)}; import * as draftEquality from ${JSON.stringify(draftEqualityPath)}; globalThis.__model = model; globalThis.__hsModel = hsModel; globalThis.__itemModel = itemModel; globalThis.__productLibrary = productLibrary; globalThis.__formUtils = formUtils; globalThis.__draftEquality = draftEquality;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
@@ -42,7 +44,7 @@ const formUtils = globalThis.__formUtils;
 const draftEquality = globalThis.__draftEquality;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const draft = model.uppercaseInvoiceEnglishText({
-  ...model.createEmptyInvoice(),
+  ...model.createEmptyInvoice("2026-07-29"),
   invoiceNo: "2026yh024",
   customerNameEN: "Peak Marketing",
   customerAddressEN: "1/40 Yarraman Place, Brisbane, Australia",
@@ -81,8 +83,15 @@ assert(formUtils.toDateInputValue("2026-07-29") === "2026-07-29", "business date
 assert(formUtils.toDateInputValue("2026-07-29T00:00:00") === "", "business date rejects date-time compatibility values");
 assert(formUtils.dateInputToApiDate("2026-07-29") === "2026-07-29", "date inputs submit the DateOnly wire format");
 assert(formUtils.currentLocalDateInputValue(new Date(2026, 6, 29, 0, 30, 0)) === "2026-07-29", "local date input uses the operator calendar day instead of UTC");
+assert(invoiceEditorSource.includes("const [pageBusinessDate] = useState(() => businessDate);"), "invoice editor captures the business date once per page instance");
+assert(!invoiceEditorSource.includes("createEmptyInvoice(businessDate)"), "session renewal must not reset a new invoice draft");
+assert(paymentEditorSource.includes("const [pageBusinessDate] = useState(() => businessDate);"), "payment editor captures the business date once per page instance");
+assert(!paymentEditorSource.includes("createEmptyPayment(businessDate)"), "session renewal must not reset a new payment draft");
 
-const imported = model.readRouteInvoiceDraft({ invoiceDraft: { ...draft, customerNameEN: "mixed Case buyer" } });
+const imported = model.readRouteInvoiceDraft(
+  { invoiceDraft: { ...draft, customerNameEN: "mixed Case buyer" } },
+  "2026-07-29",
+);
 assert(imported?.customerNameEN === "MIXED CASE BUYER", "routed Excel draft uppercased automatically");
 assert(model.canDeleteInvoiceStatus("Draft") === true, "draft invoice can be physically deleted");
 assert(model.canDeleteInvoiceStatus("Verified") === false, "verified invoice cannot be physically deleted");

@@ -1,7 +1,6 @@
 using ClosedXML.Excel;
 using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs;
-using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 
@@ -58,13 +57,11 @@ namespace ExportDocManager.Services.Infrastructure
                 DetailText = "系统正在准备导出数据。"
             });
 
-            var firstPage = await _queryReadRepository.QueryPageAsync(
-                BuildExportPageQuery(query, 1),
-                cancellationToken);
-            if (firstPage.TotalCount > MaximumExportRows)
+            int totalCount = await _queryReadRepository.CountAsync(query, cancellationToken);
+            if (totalCount > MaximumExportRows)
             {
                 throw new ServiceValidationException(
-                    $"当前查询结果有 {firstPage.TotalCount:N0} 条，超过单次 Excel 导出上限 {MaximumExportRows:N0} 条。请增加日期、客户或单据条件后重试。");
+                    $"当前查询结果有 {totalCount:N0} 条，超过单次 Excel 导出上限 {MaximumExportRows:N0} 条。请增加日期、客户或单据条件后重试。");
             }
 
             int exportedCount = 0;
@@ -75,7 +72,7 @@ namespace ExportDocManager.Services.Infrastructure
                     exportedCount = await WriteWorkbook(
                         tempFilePath,
                         query,
-                        firstPage,
+                        totalCount,
                         progress,
                         ct).ConfigureAwait(false);
                 },
@@ -94,7 +91,7 @@ namespace ExportDocManager.Services.Infrastructure
         private async Task<int> WriteWorkbook(
             string tempFilePath,
             QueryPageQuery query,
-            PagedResult<Invoice> firstPage,
+            int totalCount,
             IProgress<OperationProgressUpdate>? progress,
             CancellationToken cancellationToken)
         {
@@ -104,7 +101,7 @@ namespace ExportDocManager.Services.Infrastructure
             int writtenCount = await PopulateWorkbookAsync(
                 workbook,
                 query,
-                firstPage,
+                totalCount,
                 progress,
                 cancellationToken);
             workbook.SaveAs(tempFilePath);
@@ -114,7 +111,7 @@ namespace ExportDocManager.Services.Infrastructure
         private async Task<int> PopulateWorkbookAsync(
             IXLWorkbook workbook,
             QueryPageQuery query,
-            PagedResult<Invoice> firstPage,
+            int totalCount,
             IProgress<OperationProgressUpdate>? progress,
             CancellationToken cancellationToken)
         {
@@ -123,46 +120,30 @@ namespace ExportDocManager.Services.Infrastructure
             var worksheet = workbook.Worksheets.Add("查询结果");
             WriteHeader(worksheet);
 
-            int writtenCount = WriteRows(
-                worksheet,
-                firstPage.Items,
-                startRowNumber: 2,
-                firstPage.TotalCount,
-                progress,
-                cancellationToken);
-
-            for (int pageNumber = firstPage.PageNumber + 1;
-                 pageNumber <= Math.Max(firstPage.TotalPages, 1) && writtenCount < firstPage.TotalCount;
-                 pageNumber++)
+            int writtenCount = 0;
+            while (writtenCount < totalCount)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var nextPage = await _queryReadRepository.QueryPageAsync(
-                    BuildExportPageQuery(query, pageNumber),
-                    cancellationToken);
-                if (nextPage.Items.Count == 0)
+                var rows = await _queryReadRepository.QueryExportBatchAsync(
+                    query,
+                    writtenCount,
+                    ExportPageSize,
+                    cancellationToken).ConfigureAwait(false);
+                if (rows.Count == 0)
                 {
                     break;
                 }
 
                 writtenCount = WriteRows(
                     worksheet,
-                    nextPage.Items,
+                    rows,
                     writtenCount + 2,
-                    firstPage.TotalCount,
+                    totalCount,
                     progress,
                     cancellationToken);
             }
 
             return writtenCount;
-        }
-
-        private static QueryPageQuery BuildExportPageQuery(QueryPageQuery query, int pageNumber)
-        {
-            return (query ?? new QueryPageQuery()) with
-            {
-                PageNumber = Math.Max(1, pageNumber),
-                PageSize = ExportPageSize
-            };
         }
 
         private static void WriteHeader(IXLWorksheet worksheet)
@@ -182,17 +163,17 @@ namespace ExportDocManager.Services.Infrastructure
 
         private static int WriteRows(
             IXLWorksheet worksheet,
-            IReadOnlyList<Invoice> invoices,
+            IReadOnlyList<QueryResultRow> rows,
             int startRowNumber,
             int totalCount,
             IProgress<OperationProgressUpdate>? progress,
             CancellationToken cancellationToken)
         {
             int rowNumber = Math.Max(2, startRowNumber);
-            foreach (var invoice in invoices ?? Array.Empty<Invoice>())
+            foreach (var row in rows ?? Array.Empty<QueryResultRow>())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                WriteRow(worksheet, rowNumber, QueryResultRowMapper.FromInvoice(invoice));
+                WriteRow(worksheet, rowNumber, row);
 
                 int writtenCount = rowNumber - 1;
                 ReportExportProgress(progress, Math.Min(writtenCount, totalCount), totalCount);

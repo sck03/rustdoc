@@ -2,6 +2,8 @@ namespace ExportDocManager.Services.Time;
 
 public interface IBusinessClock
 {
+    string TimeZoneId { get; }
+
     DateTimeOffset UtcNow { get; }
 
     DateTimeOffset Now { get; }
@@ -19,8 +21,11 @@ public sealed class BusinessClock : IBusinessClock
     public BusinessClock(TimeProvider timeProvider, string timeZoneId)
     {
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
-        _timeZone = ResolveTimeZone(timeZoneId);
+        TimeZoneId = string.IsNullOrWhiteSpace(timeZoneId) ? DefaultTimeZoneId : timeZoneId.Trim();
+        _timeZone = ResolveTimeZone(TimeZoneId);
     }
+
+    public string TimeZoneId { get; }
 
     public DateTimeOffset UtcNow => _timeProvider.GetUtcNow();
 

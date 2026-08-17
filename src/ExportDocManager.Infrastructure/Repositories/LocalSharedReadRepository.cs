@@ -110,13 +110,68 @@ namespace ExportDocManager.Services.Infrastructure
             return new PagedResult<Invoice>(items, totalCount, normalizedQuery.PageNumber, normalizedQuery.PageSize);
         }
 
-        public async Task<IReadOnlyList<Invoice>> QueryAllAsync(
+        public async Task<int> CountAsync(
             QueryPageQuery query,
             CancellationToken cancellationToken = default)
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var normalizedQuery = Normalize(query);
-            return await ApplyInvoiceAccessScope(BuildQueryFormQuery(context, normalizedQuery)).ToListAsync(cancellationToken);
+            return await ApplyInvoiceAccessScope(BuildQueryFormQuery(context, normalizedQuery))
+                .CountAsync(cancellationToken);
+        }
+
+        public async Task<IReadOnlyList<QueryResultRow>> QueryExportBatchAsync(
+            QueryPageQuery query,
+            int skip,
+            int take,
+            CancellationToken cancellationToken = default)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var normalizedQuery = Normalize(query);
+            var rows = await ApplyInvoiceAccessScope(BuildQueryFormQuery(context, normalizedQuery))
+                .Skip(Math.Max(0, skip))
+                .Take(Math.Clamp(take, 1, 1000))
+                .Select(invoice => new
+                {
+                    invoice.Id,
+                    invoice.InvoiceNo,
+                    invoice.InvoiceDate,
+                    invoice.ContractNo,
+                    invoice.CustomerNameEN,
+                    invoice.ExporterNameEN,
+                    invoice.ExporterNameCN,
+                    invoice.DestinationCountry,
+                    invoice.TradeTerms,
+                    invoice.ShipmentDate,
+                    invoice.TransportMode,
+                    invoice.TotalCartons,
+                    invoice.TotalQuantity,
+                    invoice.TotalAmount,
+                    invoice.Currency,
+                    invoice.Type
+                })
+                .ToListAsync(cancellationToken);
+
+            return rows.Select(invoice => new QueryResultRow
+            {
+                Id = invoice.Id,
+                InvoiceNo = invoice.InvoiceNo ?? string.Empty,
+                InvoiceDate = invoice.InvoiceDate.ToString("yyyy-MM-dd"),
+                ContractNo = invoice.ContractNo ?? string.Empty,
+                CustomerName = invoice.CustomerNameEN ?? string.Empty,
+                ExporterName = invoice.ExporterNameEN ?? invoice.ExporterNameCN ?? string.Empty,
+                DestinationCountry = invoice.DestinationCountry ?? string.Empty,
+                TradeTerms = invoice.TradeTerms ?? string.Empty,
+                ShipmentDate = invoice.ShipmentDate == default
+                    ? string.Empty
+                    : invoice.ShipmentDate.ToString("yyyy-MM-dd"),
+                TransportMode = invoice.TransportMode ?? string.Empty,
+                TotalCartons = invoice.TotalCartons,
+                TotalQuantity = invoice.TotalQuantity,
+                TotalAmount = invoice.TotalAmount,
+                Currency = invoice.Currency ?? string.Empty,
+                Type = invoice.Type ?? string.Empty
+            }).ToList();
         }
 
         public async Task<PagedResult<AuditLog>> QueryPageAsync(
@@ -297,7 +352,9 @@ namespace ExportDocManager.Services.Infrastructure
                 .ThenByDescending(invoice => invoice.Id);
         }
 
-        private static IQueryable<Invoice> ApplyQueryKeywordSearch(IQueryable<Invoice> invoiceQuery, string keyword)
+        private static IQueryable<Invoice> ApplyQueryKeywordSearch(
+            IQueryable<Invoice> invoiceQuery,
+            string keyword)
         {
             foreach (var token in TextSearchHelper.Tokenize(keyword))
             {
@@ -305,39 +362,43 @@ namespace ExportDocManager.Services.Infrastructure
                 if (normalizedToken.Any(char.IsDigit))
                 {
                     invoiceQuery = invoiceQuery.Where(invoice =>
-                        (invoice.InvoiceNo != null && invoice.InvoiceNo.StartsWith(normalizedToken)) ||
-                        (invoice.ContractNo != null && invoice.ContractNo.StartsWith(normalizedToken)) ||
+                        (invoice.InvoiceNo != null && invoice.InvoiceNo.ToUpper().StartsWith(normalizedToken)) ||
+                        (invoice.ContractNo != null && invoice.ContractNo.ToUpper().StartsWith(normalizedToken)) ||
                         invoice.Items.Any(item =>
-                            (item.PoNumber != null && item.PoNumber.StartsWith(normalizedToken)) ||
-                            (item.StyleNo != null && item.StyleNo.StartsWith(normalizedToken)) ||
-                            (item.HSCode != null && item.HSCode.StartsWith(normalizedToken))));
+                            (item.PoNumber != null && item.PoNumber.ToUpper().StartsWith(normalizedToken)) ||
+                            (item.StyleNo != null && item.StyleNo.ToUpper().StartsWith(normalizedToken)) ||
+                            (item.HSCode != null && item.HSCode.ToUpper().StartsWith(normalizedToken))));
                     continue;
                 }
 
-                invoiceQuery = invoiceQuery.Where(invoice =>
-                    (invoice.InvoiceNo != null && invoice.InvoiceNo.ToUpper().Contains(normalizedToken)) ||
-                    (invoice.ContractNo != null && invoice.ContractNo.ToUpper().Contains(normalizedToken)) ||
-                    (invoice.CustomerNameEN != null && invoice.CustomerNameEN.ToUpper().Contains(normalizedToken)) ||
-                    (invoice.NotifyPartyName != null && invoice.NotifyPartyName.ToUpper().Contains(normalizedToken)) ||
-                    (invoice.ExporterNameEN != null && invoice.ExporterNameEN.ToUpper().Contains(normalizedToken)) ||
-                    (invoice.ExporterNameCN != null && invoice.ExporterNameCN.ToUpper().Contains(normalizedToken)) ||
-                    (invoice.DestinationCountry != null && invoice.DestinationCountry.ToUpper().Contains(normalizedToken)) ||
-                    (invoice.PortOfLoading != null && invoice.PortOfLoading.ToUpper().Contains(normalizedToken)) ||
-                    (invoice.PortOfDestination != null && invoice.PortOfDestination.ToUpper().Contains(normalizedToken)) ||
-                    (invoice.TradeTerms != null && invoice.TradeTerms.ToUpper().Contains(normalizedToken)) ||
-                    (invoice.TransportMode != null && invoice.TransportMode.ToUpper().Contains(normalizedToken)) ||
-                    invoice.Items.Any(item =>
-                        (item.PoNumber != null && item.PoNumber.ToUpper().Contains(normalizedToken)) ||
-                        (item.StyleName != null && item.StyleName.ToUpper().Contains(normalizedToken)) ||
-                        (item.StyleNameCN != null && item.StyleNameCN.ToUpper().Contains(normalizedToken)) ||
-                        (item.StyleNo != null && item.StyleNo.ToUpper().Contains(normalizedToken)) ||
-                        (item.HSCode != null && item.HSCode.ToUpper().Contains(normalizedToken)) ||
-                        (item.Brand != null && item.Brand.ToUpper().Contains(normalizedToken)) ||
-                        (item.Origin != null && item.Origin.ToUpper().Contains(normalizedToken))));
+                invoiceQuery = ApplyCaseInsensitiveQueryTextSearch(invoiceQuery, normalizedToken);
             }
 
             return invoiceQuery;
         }
+
+        private static IQueryable<Invoice> ApplyCaseInsensitiveQueryTextSearch(
+            IQueryable<Invoice> query,
+            string token) => query.Where(invoice =>
+                (invoice.InvoiceNo != null && invoice.InvoiceNo.ToUpper().Contains(token)) ||
+                (invoice.ContractNo != null && invoice.ContractNo.ToUpper().Contains(token)) ||
+                (invoice.CustomerNameEN != null && invoice.CustomerNameEN.ToUpper().Contains(token)) ||
+                (invoice.NotifyPartyName != null && invoice.NotifyPartyName.ToUpper().Contains(token)) ||
+                (invoice.ExporterNameEN != null && invoice.ExporterNameEN.ToUpper().Contains(token)) ||
+                (invoice.ExporterNameCN != null && invoice.ExporterNameCN.ToUpper().Contains(token)) ||
+                (invoice.DestinationCountry != null && invoice.DestinationCountry.ToUpper().Contains(token)) ||
+                (invoice.PortOfLoading != null && invoice.PortOfLoading.ToUpper().Contains(token)) ||
+                (invoice.PortOfDestination != null && invoice.PortOfDestination.ToUpper().Contains(token)) ||
+                (invoice.TradeTerms != null && invoice.TradeTerms.ToUpper().Contains(token)) ||
+                (invoice.TransportMode != null && invoice.TransportMode.ToUpper().Contains(token)) ||
+                invoice.Items.Any(item =>
+                    (item.PoNumber != null && item.PoNumber.ToUpper().Contains(token)) ||
+                    (item.StyleName != null && item.StyleName.ToUpper().Contains(token)) ||
+                    (item.StyleNameCN != null && item.StyleNameCN.ToUpper().Contains(token)) ||
+                    (item.StyleNo != null && item.StyleNo.ToUpper().Contains(token)) ||
+                    (item.HSCode != null && item.HSCode.ToUpper().Contains(token)) ||
+                    (item.Brand != null && item.Brand.ToUpper().Contains(token)) ||
+                    (item.Origin != null && item.Origin.ToUpper().Contains(token))));
 
         private static IQueryable<AuditLog> BuildAuditLogQuery(AppDbContext context, AuditLogPageQuery query)
         {

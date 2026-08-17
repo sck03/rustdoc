@@ -16,6 +16,8 @@ namespace ExportDocManager.Api.Hosting
         string DepartmentId,
         string CompanyScope,
         bool IsActive,
+        DateOnly BusinessDate,
+        string BusinessTimeZone,
         ApiUserCapabilitiesDto Capabilities);
 
     public sealed record ApiUserCapabilitiesDto(

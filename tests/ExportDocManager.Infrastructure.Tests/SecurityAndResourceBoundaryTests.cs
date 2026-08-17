@@ -6,6 +6,7 @@ using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Tools;
 using ExportDocManager.Utils;
+using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 
 namespace ExportDocManager.Infrastructure.Tests;
@@ -368,7 +369,7 @@ public sealed class SecurityAndResourceBoundaryTests
         {
             using (var document = new PdfDocument())
             {
-                for (int page = 0; page < 1001; page++)
+                for (int page = 0; page < PdfMergeService.MaxPagesPerFile + 1; page++)
                 {
                     document.AddPage();
                 }
@@ -379,7 +380,35 @@ public sealed class SecurityAndResourceBoundaryTests
             var exception = Assert.Throws<InvalidDataException>(() =>
                 service.Merge([sourcePath], destinationPath));
 
-            Assert.Contains("1000", exception.Message, StringComparison.Ordinal);
+            Assert.Contains(PdfMergeService.MaxPagesPerFile.ToString(), exception.Message, StringComparison.Ordinal);
+            Assert.False(File.Exists(destinationPath));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public void PdfMergeService_ShouldRejectOversizedPageDimensions()
+    {
+        string root = CreateTempDirectory("pdf-page-dimensions");
+        string sourcePath = Path.Combine(root, "oversized-page.pdf");
+        string destinationPath = Path.Combine(root, "merged.pdf");
+        try
+        {
+            using (var document = new PdfDocument())
+            {
+                PdfPage page = document.AddPage();
+                page.Width = XUnit.FromPoint(PdfMergeService.MaxPageDimensionPoints + 1);
+                page.Height = XUnit.FromPoint(100);
+                document.Save(sourcePath);
+            }
+
+            var error = Assert.Throws<InvalidDataException>(() =>
+                new PdfMergeService().Merge([sourcePath], destinationPath));
+
+            Assert.Contains("页面尺寸", error.Message, StringComparison.Ordinal);
             Assert.False(File.Exists(destinationPath));
         }
         finally

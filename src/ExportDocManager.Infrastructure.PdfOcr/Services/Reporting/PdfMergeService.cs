@@ -9,8 +9,12 @@ namespace ExportDocManager.Services.Reporting
 {
     public class PdfMergeService : IPdfMergeService
     {
-        private const int MaxPagesPerFile = 1000;
-        private const int MaxTotalPages = 5000;
+        internal const int MaxPagesPerFile = 500;
+        internal const int MaxTotalPages = 1000;
+        internal const long MaxTotalInputBytes = 250L * 1024L * 1024L;
+        internal const double MaxPageDimensionPoints = 14_400d;
+        internal const double MaxPageAreaPoints = 20_000_000d;
+        internal const double MaxTotalPageAreaPoints = 500_000_000d;
 
         public void Merge(
             IReadOnlyCollection<string> sourceFiles,
@@ -29,6 +33,21 @@ namespace ExportDocManager.Services.Reporting
                 throw new ArgumentException("至少需要一个 PDF 文件。", nameof(sourceFiles));
             }
 
+            long totalInputBytes = 0;
+            foreach (string file in files)
+            {
+                var info = new FileInfo(file);
+                if (!info.Exists)
+                {
+                    throw new FileNotFoundException("找不到待合并的 PDF 文件。", info.FullName);
+                }
+                totalInputBytes = checked(totalInputBytes + info.Length);
+                if (totalInputBytes > MaxTotalInputBytes)
+                {
+                    throw new InvalidDataException("待合并 PDF 总大小超过 250 MB 限制。");
+                }
+            }
+
             AtomicFileHelper.WriteFileAtomic(
                 destinationPath,
                 (tempPath, token) => MergeInto(files, tempPath, token),
@@ -42,6 +61,7 @@ namespace ExportDocManager.Services.Reporting
         {
             using var outputDocument = new PdfDocument();
             int totalPages = 0;
+            double totalPageArea = 0;
 
             foreach (string file in sourceFiles)
             {
@@ -63,7 +83,25 @@ namespace ExportDocManager.Services.Reporting
                 for (int index = 0; index < pageCount; index++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    outputDocument.AddPage(inputDocument.Pages[index]);
+                    PdfPage page = inputDocument.Pages[index];
+                    double width = page.Width.Point;
+                    double height = page.Height.Point;
+                    double area = width * height;
+                    if (!double.IsFinite(width) || !double.IsFinite(height) ||
+                        width <= 0 || height <= 0 ||
+                        width > MaxPageDimensionPoints || height > MaxPageDimensionPoints ||
+                        area > MaxPageAreaPoints)
+                    {
+                        throw new InvalidDataException($"PDF 页面尺寸超过安全限制：{Path.GetFileName(file)} 第 {index + 1} 页。");
+                    }
+
+                    totalPageArea += area;
+                    if (!double.IsFinite(totalPageArea) || totalPageArea > MaxTotalPageAreaPoints)
+                    {
+                        throw new InvalidDataException("合并后的 PDF 页面总面积超过安全限制，请分批处理。");
+                    }
+
+                    outputDocument.AddPage(page);
                 }
             }
 

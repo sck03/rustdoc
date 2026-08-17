@@ -34,6 +34,16 @@ namespace ExportDocManager.Services.SingleWindow
             ValidatePendingRestore(pathProvider, marker, stagingRoot);
 
             string safetyRoot = GetSafetyBackupRoot(pathProvider, marker.PackageId);
+            long currentBytes = marker.Files.Sum(file =>
+            {
+                string path = ResolveTargetPath(pathProvider, marker.DatabaseFileName, file.RelativePath);
+                return File.Exists(path) ? new FileInfo(path).Length : 0;
+            });
+            long largestReplacement = marker.Files.Max(file => file.SizeBytes);
+            RuntimeStorageBudget.EnsureAvailable(
+                safetyRoot,
+                RuntimeStorageBudget.WithSafetyMargin(currentBytes, largestReplacement),
+                "执行持卡机灾难恢复安全备份");
             EnsureSafetyBackup(pathProvider, marker, safetyRoot);
 
             foreach (var file in marker.Files)

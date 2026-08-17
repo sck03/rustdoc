@@ -1,5 +1,5 @@
 import { ApiInvoiceDetailDto, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
-import { currentLocalDateInputValue, dateInputToApiDate, readNumber, toDateInputValue } from "../../ui/formUtils.ts";
+import { dateInputToApiDate, readNumber, toDateInputValue } from "../../ui/formUtils.ts";
 import {
   calculateInvoiceTotals,
   createEmptyInvoiceItem,
@@ -83,8 +83,9 @@ export function canTransitionInvoiceStatus(value?: string, target?: string) {
   return getNextInvoiceStatus(current) === next || (next === "Cancelled" && current !== "Cancelled");
 }
 
-export function createEmptyInvoice(): ApiInvoiceDetailDto {
-  const today = dateInputToApiDate(currentLocalDateInputValue());
+export function createEmptyInvoice(businessDate: string): ApiInvoiceDetailDto {
+  const today = dateInputToApiDate(businessDate);
+  if (!today) throw new Error("服务端业务日期无效。");
 
   return {
     id: 0,
@@ -151,7 +152,7 @@ export function createEmptyInvoice(): ApiInvoiceDetailDto {
   };
 }
 
-export function readRouteInvoiceDraft(state: unknown): ApiInvoiceDetailDto | null {
+export function readRouteInvoiceDraft(state: unknown, businessDate: string): ApiInvoiceDetailDto | null {
   if (!state || typeof state !== "object" || !("invoiceDraft" in state)) {
     return null;
   }
@@ -163,7 +164,7 @@ export function readRouteInvoiceDraft(state: unknown): ApiInvoiceDetailDto | nul
 
   const invoiceDraft = draft as ApiInvoiceDetailDto;
   return uppercaseInvoiceEnglishText({
-    ...createEmptyInvoice(),
+    ...createEmptyInvoice(businessDate),
     ...invoiceDraft,
     id: 0,
     rowVersion: "",

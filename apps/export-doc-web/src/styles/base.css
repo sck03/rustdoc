@@ -2,7 +2,7 @@
   --edm-font-sans: "Segoe UI Variable Text", "Segoe UI", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC", system-ui, sans-serif;
   --edm-font-mono: "Cascadia Mono", "SFMono-Regular", "JetBrains Mono", Consolas, "Liberation Mono", monospace;
   font-family: var(--edm-font-sans);
-  color: #202124;
+  color: var(--edm-ink-950);
   background: #f5f7f8;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -148,12 +148,12 @@ button:disabled {
 
 .nav-group-button:hover,
 .nav-item:hover {
-  color: #ffffff;
+  color: var(--edm-surface);
   background: rgba(255, 255, 255, 0.08);
 }
 
 .nav-group-active > .nav-group-button {
-  color: #ffffff;
+  color: var(--edm-surface);
   background: rgba(15, 118, 110, 0.26);
 }
 
@@ -171,8 +171,8 @@ button:disabled {
 }
 
 .nav-item-active {
-  color: #ffffff;
-  background: #0f766e;
+  color: var(--edm-surface);
+  background: var(--edm-primary-600);
 }
 
 .workspace-main {
@@ -188,20 +188,20 @@ button:disabled {
   gap: 18px;
   min-height: 76px;
   padding: 16px 22px;
-  background: #ffffff;
-  border-bottom: 1px solid #dde3e8;
+  background: var(--edm-surface);
+  border-bottom: 1px solid var(--edm-line);
 }
 
 .eyebrow {
   margin: 0 0 4px;
-  color: #69737d;
+  color: var(--edm-ink-500);
   font-size: 12px;
 }
 
 h1,
 h2 {
   margin: 0;
-  color: #202124;
+  color: var(--edm-ink-950);
   font-weight: 700;
 }
 
@@ -261,7 +261,7 @@ h2 {
   grid-template-columns: repeat(2, minmax(86px, 1fr));
   min-height: 36px;
   overflow: hidden;
-  border: 1px solid #cfd8df;
+  border: 1px solid var(--edm-line-strong);
   border-radius: 8px;
   background: #eef2f5;
 }
@@ -282,12 +282,12 @@ h2 {
 }
 
 .segmented-control button + button {
-  border-left: 1px solid #cfd8df;
+  border-left: 1px solid var(--edm-line-strong);
 }
 
 .segmented-control .segmented-active {
-  color: #ffffff;
-  background: #0f766e;
+  color: var(--edm-surface);
+  background: var(--edm-primary-600);
 }
 
 .search-form {
@@ -297,8 +297,8 @@ h2 {
   max-width: 680px;
   height: 38px;
   padding: 0 11px;
-  background: #ffffff;
-  border: 1px solid #cfd8df;
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line-strong);
   border-radius: 8px;
 }
 
@@ -307,7 +307,7 @@ h2 {
   min-width: 0;
   border: 0;
   outline: 0;
-  color: #202124;
+  color: var(--edm-ink-950);
   background: transparent;
 }
 
@@ -318,30 +318,30 @@ h2 {
   width: 38px;
   height: 38px;
   flex: 0 0 auto;
-  color: #202124;
-  background: #ffffff;
-  border: 1px solid #cfd8df;
+  color: var(--edm-ink-950);
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line-strong);
   border-radius: 8px;
 }
 
 .icon-button:hover:not(:disabled) {
-  border-color: #0f766e;
-  color: #0f766e;
+  border-color: var(--edm-primary-600);
+  color: var(--edm-primary-600);
 }
 
 .icon-button.solid {
-  color: #ffffff;
-  background: #0f766e;
-  border-color: #0f766e;
+  color: var(--edm-surface);
+  background: var(--edm-primary-600);
+  border-color: var(--edm-primary-600);
 }
 
 .command-button {
   gap: 8px;
   min-height: 38px;
   padding: 0 12px;
-  color: #ffffff;
-  background: #0f766e;
-  border: 1px solid #0f766e;
+  color: var(--edm-surface);
+  background: var(--edm-primary-600);
+  border: 1px solid var(--edm-primary-600);
   border-radius: 8px;
   font-weight: 700;
   white-space: nowrap;
@@ -353,15 +353,15 @@ h2 {
 }
 
 .command-button.secondary {
-  color: #202124;
-  background: #ffffff;
-  border-color: #cfd8df;
+  color: var(--edm-ink-950);
+  background: var(--edm-surface);
+  border-color: var(--edm-line-strong);
 }
 
 .command-button.secondary:hover:not(:disabled) {
-  color: #0f766e;
-  background: #ffffff;
-  border-color: #0f766e;
+  color: var(--edm-primary-600);
+  background: var(--edm-surface);
+  border-color: var(--edm-primary-600);
 }
 
 .compact-command-button {
@@ -384,8 +384,8 @@ h2 {
   min-width: 0;
   min-height: 320px;
   overflow: auto;
-  background: #ffffff;
-  border: 1px solid #dde3e8;
+  background: var(--edm-surface);
+  border: 1px solid var(--edm-line);
   border-radius: 8px;
 }
 
@@ -429,7 +429,7 @@ tbody tr:hover {
 }
 
 .clickable-row:focus {
-  outline: 2px solid #0f766e;
+  outline: 2px solid var(--edm-primary-600);
   outline-offset: -2px;
 }
 
@@ -443,7 +443,7 @@ tbody tr:hover {
 
 .empty-cell {
   height: 220px;
-  color: #69737d;
+  color: var(--edm-ink-500);
   text-align: center;
 }
 

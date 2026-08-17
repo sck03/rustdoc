@@ -80,6 +80,39 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal(["ADMIN-OTHER", "ADMIN-OWN"], invoices.Items.Select(invoice => invoice.InvoiceNo).ToArray());
         }
 
+        [Fact]
+        public async Task QueryExportBatch_ShouldProjectStableScopedRowsWithoutRepeatedCounts()
+        {
+            using var factory = new TestDbContextFactory();
+            await using (var context = await factory.CreateDbContextAsync())
+            {
+                context.Invoices.AddRange(
+                    new Invoice { InvoiceNo = "OLDER", ContractNo = "C-1", Type = "实际数据", OwnerUserId = 7, InvoiceDate = new DateOnly(2026, 4, 1), ShipmentDate = new DateOnly(2026, 4, 1), TotalAmount = 10 },
+                    new Invoice { InvoiceNo = "NEWER", ContractNo = "C-2", Type = "实际数据", OwnerUserId = 7, InvoiceDate = new DateOnly(2026, 4, 2), ShipmentDate = new DateOnly(2026, 4, 2), TotalAmount = 20 },
+                    new Invoice { InvoiceNo = "FOREIGN", ContractNo = "C-3", Type = "实际数据", OwnerUserId = 8, InvoiceDate = new DateOnly(2026, 4, 3), ShipmentDate = new DateOnly(2026, 4, 3), TotalAmount = 30 });
+                await context.SaveChangesAsync();
+            }
+
+            var settings = CreatePostgreSqlModeSettings();
+            var repository = new LocalSharedReadRepository(
+                factory,
+                settings,
+                new BusinessDataAccessScope(
+                    settings,
+                    new FixedCurrentUserContext(new User { Id = 7, Username = "operator", Role = "User" })));
+            var query = new QueryPageQuery();
+
+            int count = await repository.CountAsync(query);
+            var first = await repository.QueryExportBatchAsync(query, skip: 0, take: 1);
+            var second = await repository.QueryExportBatchAsync(query, skip: 1, take: 1);
+
+            Assert.Equal(2, count);
+            Assert.Equal("NEWER", Assert.Single(first).InvoiceNo);
+            Assert.Equal("OLDER", Assert.Single(second).InvoiceNo);
+            Assert.Equal("2026-04-02", first[0].InvoiceDate);
+            Assert.Equal(20, first[0].TotalAmount);
+        }
+
         private static DatabaseConnectionSettings CreatePostgreSqlModeSettings()
         {
             return new DatabaseConnectionSettings

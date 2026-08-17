@@ -36,6 +36,7 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly Regex? _managedBackupNamePattern;
         private readonly IBusinessClock _clock;
         private readonly ILogger<BackupService> _logger;
+        private readonly Func<string, long>? _getAvailableBytes;
 
         public BackupService(
             DatabaseConnectionSettings databaseSettings,
@@ -43,13 +44,15 @@ namespace ExportDocManager.Services.Infrastructure
             string? backupDirectory = null,
             string? databasePath = null,
             IBusinessClock? clock = null,
-            ILogger<BackupService>? logger = null)
+            ILogger<BackupService>? logger = null,
+            Func<string, long>? getAvailableBytes = null)
         {
             ArgumentNullException.ThrowIfNull(databaseSettings);
             ArgumentNullException.ThrowIfNull(pathProvider);
             _pathProvider = pathProvider;
             _clock = clock ?? BusinessClock.CreateSystem();
             _logger = logger ?? NullLogger<BackupService>.Instance;
+            _getAvailableBytes = getAvailableBytes;
             _usesSqlite = !DatabaseModeHelper.UsesPostgreSql(databaseSettings);
 
             if (_usesSqlite)
@@ -152,10 +155,15 @@ namespace ExportDocManager.Services.Infrastructure
             bool importSucceeded = false;
             try
             {
-                if (sourcePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-                {
-                    ValidateZipBackupStructure(sourcePath, _databaseFileName);
-                }
+                long snapshotBytes = GetBackupSnapshotLength(sourcePath, _databaseFileName);
+                long targetBytes = sourcePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+                    ? new FileInfo(sourcePath).Length
+                    : snapshotBytes;
+                EnsureStorage(
+                    _backupDirectory,
+                    "导入数据库备份",
+                    snapshotBytes,
+                    targetBytes);
                 await ExtractDatabaseSnapshotAsync(sourcePath, snapshotPath, cancellationToken).ConfigureAwait(false);
                 await ValidateSqliteSnapshotAsync(snapshotPath, cancellationToken).ConfigureAwait(false);
 
@@ -287,6 +295,8 @@ namespace ExportDocManager.Services.Infrastructure
                     ? await CreateConsistentBackupCoreAsync("pre-restore", cancellationToken).ConfigureAwait(false)
                     : string.Empty;
 
+                long stagedBytes = GetBackupSnapshotLength(backupFilePath, _databaseFileName);
+                EnsureStorage(stagedRestorePath, "暂存数据库还原文件", stagedBytes);
                 await ExtractDatabaseSnapshotAsync(
                     backupFilePath,
                     stagedRestorePath,
@@ -345,6 +355,8 @@ namespace ExportDocManager.Services.Infrastructure
 
             try
             {
+                long databaseBytes = new FileInfo(_databasePath).Length;
+                EnsureStorage(_backupDirectory, "创建数据库备份", databaseBytes, databaseBytes);
                 await CreateSqliteOnlineSnapshotAsync(snapshotPath, cancellationToken).ConfigureAwait(false);
                 await ZipArchiveHelper.CreateFromFilesAsync(
                     new[] { (SourcePath: snapshotPath, EntryName: _databaseFileName) },
@@ -441,9 +453,19 @@ namespace ExportDocManager.Services.Infrastructure
                 cancellationToken).ConfigureAwait(false);
         }
 
-        private static void ValidateZipBackupStructure(string archivePath, string databaseFileName)
+        internal static long GetBackupSnapshotLength(string backupPath, string databaseFileName)
         {
-            using var archive = ZipFile.OpenRead(archivePath);
+            if (!backupPath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                long length = new FileInfo(backupPath).Length;
+                if (length <= 0 || length > 4L * 1024L * 1024L * 1024L)
+                {
+                    throw new PayloadLimitExceededException(4L * 1024L * 1024L * 1024L);
+                }
+                return length;
+            }
+
+            using var archive = ZipFile.OpenRead(backupPath);
             var fileEntries = archive.Entries
                 .Where(entry => !string.IsNullOrWhiteSpace(entry.Name))
                 .ToArray();
@@ -458,7 +480,15 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 throw new PayloadLimitExceededException(4L * 1024L * 1024L * 1024L);
             }
+            return fileEntries[0].Length;
         }
+
+        private void EnsureStorage(string path, string operation, params long[] sizes) =>
+            RuntimeStorageBudget.EnsureAvailable(
+                path,
+                RuntimeStorageBudget.WithSafetyMargin(sizes),
+                operation,
+                _getAvailableBytes);
 
         private static async Task ValidateSqliteSnapshotAsync(
             string databasePath,

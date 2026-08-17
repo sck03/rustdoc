@@ -13,6 +13,8 @@
          still override the RID explicitly for any executable. -->
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(_ExportDocManagerHostOs)' != '' and ('$(MSBuildProjectName)' == 'ExportDocManager.Api' or '$(MSBuildProjectName)' == 'ExportDocManager.Infrastructure.PdfOcr')">$(_ExportDocManagerHostOs)-$(_ExportDocManagerHostArchitecture)</RuntimeIdentifier>
     <SelfContained Condition="'$(SelfContained)' == ''">false</SelfContained>
+    <!-- Capability assemblies are intentionally removable from each edition, so publish output must remain multi-file. -->
+    <PublishSingleFile>false</PublishSingleFile>
     <ExportDocRuntimeRestore Condition="'$(ExportDocRuntimeRestore)' == ''">false</ExportDocRuntimeRestore>
     <RestorePackagesWithLockFile Condition="'$(ExportDocRuntimeRestore)' == 'true'">true</RestorePackagesWithLockFile>
     <NuGetLockFilePath Condition="'$(ExportDocRuntimeRestore)' == 'true'">$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', 'obj', 'runtime.$(RuntimeIdentifier).packages.lock.json'))</NuGetLockFilePath>

@@ -106,12 +106,12 @@ export function AppWorkspaceRoutes({
           ? <CustomerFollowUpPage client={client} />
           : <Navigate to="/dashboard" replace />} />
         <Route path="/invoices" element={<InvoiceListPage client={client} />} />
-        <Route path="/invoices/new" element={<InvoiceEditorPage client={client} mode="new" />} />
-        <Route path="/invoices/:invoiceId" element={<InvoiceEditorPage client={client} mode="edit" />} />
-        <Route path="/query/invoices" element={<QueryPage client={client} />} />
+        <Route path="/invoices/new" element={<InvoiceEditorPage businessDate={user.businessDate} client={client} mode="new" />} />
+        <Route path="/invoices/:invoiceId" element={<InvoiceEditorPage businessDate={user.businessDate} client={client} mode="edit" />} />
+        <Route path="/query/invoices" element={<QueryPage businessDate={user.businessDate} client={client} />} />
         <Route path="/payments" element={<PaymentListPage client={client} />} />
-        <Route path="/payments/new" element={<PaymentEditorPage client={client} mode="new" />} />
-        <Route path="/payments/:paymentId" element={<PaymentEditorPage client={client} mode="edit" />} />
+        <Route path="/payments/new" element={<PaymentEditorPage businessDate={user.businessDate} client={client} mode="new" />} />
+        <Route path="/payments/:paymentId" element={<PaymentEditorPage businessDate={user.businessDate} client={client} mode="edit" />} />
         <Route path="/master-data" element={<MasterDataRoute client={client} />} />
         <Route path="/master-data/hs-knowledge/:section" element={<HsCodeKnowledgePage client={client} />} />
         <Route path="/master-data/:entityKey" element={<MasterDataRoute client={client} />} />

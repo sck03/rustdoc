@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Http.Headers;
-using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using ClosedXML.Excel;
@@ -629,28 +628,26 @@ namespace ExportDocManager.Api.Tests
             private readonly string _reportText;
             private WebApplication? _app;
 
-            private FakeOpenAiServer(string endpoint, string reportText)
+            private FakeOpenAiServer(string reportText)
             {
-                Endpoint = endpoint;
                 _reportText = reportText;
             }
 
-            public string Endpoint { get; }
+            public string Endpoint { get; private set; } = string.Empty;
 
             public string LastRequestBody { get; private set; } = string.Empty;
 
             public static async Task<FakeOpenAiServer> StartAsync(string reportText)
             {
-                int port = GetAvailablePort();
-                string baseUrl = $"http://127.0.0.1:{port}";
-                var server = new FakeOpenAiServer($"{baseUrl}/v1/chat/completions", reportText);
+                var server = new FakeOpenAiServer(reportText);
                 var builder = WebApplication.CreateBuilder();
-                builder.WebHost.UseUrls(baseUrl);
+                builder.WebHost.UseUrls("http://127.0.0.1:0");
                 var app = builder.Build();
                 Func<HttpContext, Task<IResult>> handler = server.HandleAsync;
                 app.MapPost("/v1/chat/completions", handler);
                 server._app = app;
                 await app.StartAsync();
+                server.Endpoint = $"{ApiIntegrationTestHarness.ResolveBaseUrl(app)}/v1/chat/completions";
                 return server;
             }
 
@@ -685,14 +682,6 @@ namespace ExportDocManager.Api.Tests
                 });
             }
 
-            private static int GetAvailablePort()
-            {
-                var listener = new TcpListener(IPAddress.Loopback, 0);
-                listener.Start();
-                int port = ((IPEndPoint)listener.LocalEndpoint).Port;
-                listener.Stop();
-                return port;
-            }
         }
 
         private static MultipartFormDataContent CreatePdfMergeForm(params byte[][] documents)

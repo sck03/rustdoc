@@ -3,10 +3,9 @@ using ExportDocManager.Services.Errors;
 namespace ExportDocManager.Services.Infrastructure;
 
 /// <summary>
-/// 迁移过程的磁盘预算检查。每个阶段只按当前输入、清单和现有快照估算，
-/// 避免在小包上硬编码一个过大的全盘预留值，同时在磁盘耗尽前停止操作。
+/// Guards runtime file operations before they exhaust the volume that owns the configured data root.
 /// </summary>
-internal static class ServerMigrationStorageBudget
+internal static class RuntimeStorageBudget
 {
     internal const long SafetyMarginBytes = 64L * 1024L * 1024L;
     internal const long StreamingCheckWindowBytes = 8L * 1024L * 1024L;
@@ -14,7 +13,8 @@ internal static class ServerMigrationStorageBudget
     internal static void EnsureAvailable(
         string path,
         long requiredBytes,
-        string operation)
+        string operation,
+        Func<string, long>? getAvailableBytes = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         if (requiredBytes < 0)
@@ -26,13 +26,11 @@ internal static class ServerMigrationStorageBudget
             ?? throw new InfrastructureServiceException($"无法解析{operation}所在磁盘。");
         try
         {
-            var drive = new DriveInfo(volumeRoot);
-            if (!drive.IsReady)
+            long availableBytes = getAvailableBytes?.Invoke(volumeRoot) ?? GetAvailableBytes(volumeRoot, operation);
+            if (availableBytes < 0)
             {
-                throw new InfrastructureServiceException($"{operation}所在磁盘当前不可用。");
+                throw new InfrastructureServiceException($"{operation}所在磁盘返回了无效的可用空间。");
             }
-
-            long availableBytes = drive.AvailableFreeSpace;
             if (availableBytes < requiredBytes)
             {
                 throw new InsufficientStorageException(
@@ -74,7 +72,7 @@ internal static class ServerMigrationStorageBudget
         catch (OverflowException ex)
         {
             throw new InsufficientStorageException(
-                "迁移文件大小超出可计算的安全预算。",
+                "运行文件大小超出可计算的安全预算。",
                 long.MaxValue,
                 0,
                 ex);
@@ -84,6 +82,47 @@ internal static class ServerMigrationStorageBudget
     internal static IncrementalWriteGuard CreateIncrementalWriteGuard(
         string path,
         string operation) => new(path, operation);
+
+    internal static long SumDirectoryBytes(string root)
+    {
+        if (!Directory.Exists(root))
+        {
+            return 0;
+        }
+
+        string fullRoot = Path.GetFullPath(root);
+        long total = 0;
+        var pending = new Stack<string>();
+        pending.Push(fullRoot);
+        while (pending.Count > 0)
+        {
+            string current = pending.Pop();
+            var directory = new DirectoryInfo(current);
+            if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new ServiceValidationException($"运行目录不能是符号链接或重解析点：{current}");
+            }
+
+            foreach (FileSystemInfo item in directory.EnumerateFileSystemInfos())
+            {
+                if ((item.Attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new ServiceValidationException($"运行目录包含符号链接或重解析点：{item.FullName}");
+                }
+
+                if (item is DirectoryInfo child)
+                {
+                    pending.Push(child.FullName);
+                }
+                else if (item is FileInfo file)
+                {
+                    total = checked(total + file.Length);
+                }
+            }
+        }
+
+        return total;
+    }
 
     internal sealed class IncrementalWriteGuard
     {
@@ -121,60 +160,14 @@ internal static class ServerMigrationStorageBudget
         }
     }
 
-    internal static long SumDirectoryBytes(string root)
+    private static long GetAvailableBytes(string volumeRoot, string operation)
     {
-        if (!Directory.Exists(root))
+        var drive = new DriveInfo(volumeRoot);
+        if (!drive.IsReady)
         {
-            return 0;
+            throw new InfrastructureServiceException($"{operation}所在磁盘当前不可用。");
         }
-
-        string fullRoot = Path.GetFullPath(root);
-        long total = 0;
-        var pending = new Stack<string>();
-        pending.Push(fullRoot);
-        while (pending.Count > 0)
-        {
-            string current = pending.Pop();
-            var directory = new DirectoryInfo(current);
-            if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
-            {
-                throw new ServiceValidationException($"迁移安全备份目录不能是符号链接或重解析点：{current}");
-            }
-
-            foreach (FileSystemInfo item in directory.EnumerateFileSystemInfos())
-            {
-                if ((item.Attributes & FileAttributes.ReparsePoint) != 0)
-                {
-                    throw new ServiceValidationException($"迁移安全备份路径包含符号链接或重解析点：{item.FullName}");
-                }
-
-                if (item is DirectoryInfo)
-                {
-                    pending.Push(item.FullName);
-                }
-                else if (item is FileInfo file)
-                {
-                    total = checked(total + file.Length);
-                }
-            }
-        }
-
-        return total;
-    }
-
-    internal static long SumManifestBytes(ServerMigrationManifest manifest)
-    {
-        ArgumentNullException.ThrowIfNull(manifest);
-        long total = 0;
-        foreach (ServerMigrationFileManifest file in manifest.Files ?? [])
-        {
-            if (file.SizeBytes < 0)
-            {
-                throw new InvalidDataException($"迁移清单文件大小无效：{file.RelativePath}");
-            }
-            total = checked(total + file.SizeBytes);
-        }
-        return total;
+        return drive.AvailableFreeSpace;
     }
 
     private static string FormatBytes(long bytes) =>

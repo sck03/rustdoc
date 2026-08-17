@@ -278,14 +278,9 @@ export function run() {
   const modelSummary = summarizeReportDesignerSchemaModel(schema);
   const detailModelBindings = collectReportDesignerBlockFieldBindings(schema.sections[1].blocks[1]);
   const conditionalModelBindings = collectReportDesignerBlockFieldBindings(schema.sections[1].blocks[2]);
-  const legacySchema = JSON.parse(JSON.stringify(schema));
-  legacySchema.version = 1;
-  legacySchema.sections.forEach((section) => {
-    delete section.print;
-  });
-  const migrated = parseReportDesignerSchemaFromHtml(\`<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA
-\${JSON.stringify(legacySchema)}
--->\`);
+  const unsupportedSchema = JSON.parse(JSON.stringify(schema));
+  unsupportedSchema.version = 1;
+  const unsupportedSchemaIssues = normalizeReportDesignerSchema(unsupportedSchema).issues;
   const schemaWithoutPrintSettings = JSON.parse(JSON.stringify(schema));
   delete schemaWithoutPrintSettings.sections[1].blocks[1].print;
   const parsedWithoutPrintSettings = parseReportDesignerSchemaFromHtml(\`<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA
@@ -592,10 +587,7 @@ export function run() {
       conditionalModelBindings.length === 1,
     parsedText: parsed?.sections?.[0]?.blocks?.[0]?.text,
     roundtrippedSchemaSame: JSON.stringify(parsed) === JSON.stringify(normalizedSchema),
-    migratedVersion: migrated?.version,
-    migratedLegacyHeaderRepeat: migrated?.sections?.[0]?.print?.repeatOnEveryPage,
-    migratedLegacyFooterPin: migrated?.sections?.[2]?.print?.pinToPageBottom,
-    migratedLegacyHeaderHeightMissing: migrated?.sections?.[0]?.print?.minHeightMm === undefined,
+    unsupportedSchemaBlocked: hasBlockingReportDesignerSchemaIssues(unsupportedSchemaIssues),
     missingPrintDefaults: parsedWithoutPrintSettings?.sections?.[1]?.blocks?.[1]?.print?.repeatHeaderOnPageBreak === true &&
       parsedWithoutPrintSettings?.sections?.[1]?.blocks?.[1]?.print?.keepRowsTogether === true,
     validIssueCount: validIssues.length,
@@ -750,10 +742,7 @@ async function run() {
   assert(output.conditionalModelBindingsExposeConditionAndOutput, "Expected conditional block model bindings to expose condition/output fields");
   assert(output.parsedText === "Invoice <Draft> & Review", "Expected embedded schema to roundtrip through parser");
   assert(output.roundtrippedSchemaSame, "Expected exported schema comment to parse back to the same schema");
-  assert(output.migratedVersion === 2, "Expected parser to migrate legacy schema comments to v2");
-  assert(output.migratedLegacyHeaderRepeat === false, "Expected legacy v1 headers to preserve non-repeating output by default");
-  assert(output.migratedLegacyFooterPin === false, "Expected legacy v1 footers to preserve non-pinned output by default");
-  assert(output.migratedLegacyHeaderHeightMissing, "Expected legacy v1 section bands to preserve missing min-height by default");
+  assert(output.unsupportedSchemaBlocked, "Expected legacy report schema versions to be rejected");
   assert(output.missingPrintDefaults, "Expected parser to default missing detail table print settings");
   assert(output.validIssueCount === 0, "Expected fixture schema to have no validation issues");
   assert(output.invalidIssuesBlocked, "Expected invalid field paths to block schema validation");

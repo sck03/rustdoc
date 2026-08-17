@@ -1,5 +1,6 @@
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,6 +20,7 @@ namespace ExportDocManager.Api.Hosting
                 IUserService userService,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
+                IBusinessClock clock,
                 ApiLoginAttemptService loginAttempts,
                 ApiDownloadTicketService downloadTicketService,
                 ApiDesktopAccessOptions desktopAccessOptions,
@@ -105,7 +107,7 @@ namespace ExportDocManager.Api.Hosting
                     "Bearer",
                     token.AccessToken,
                     token.ExpiresAt,
-                    ApiUserDtoFactory.FromUser(user, authorizationService)));
+                    ApiUserDtoFactory.FromUser(user, authorizationService, clock)));
             })
             .WithApiAccess(false, true, false)
             .WithApiResourceProfile(ApiResourceProfile.Login)
@@ -117,12 +119,13 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapGet("/api/auth/me", Results<Ok<ApiUserDto>, UnauthorizedHttpResult> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
-                ApiAuthorizationService authorizationService) =>
+                ApiAuthorizationService authorizationService,
+                IBusinessClock clock) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 return user == null
                     ? TypedResults.Unauthorized()
-                    : TypedResults.Ok(ApiUserDtoFactory.FromUser(user, authorizationService));
+                    : TypedResults.Ok(ApiUserDtoFactory.FromUser(user, authorizationService, clock));
             })
             .WithName("getCurrentUser")
             .WithApiAccess(true, true, false);
@@ -130,7 +133,8 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/auth/renew", async Task<Results<Ok<ApiLoginResponse>, UnauthorizedHttpResult>>(
                 HttpContext context,
                 IApiSessionTokenService tokenService,
-                ApiAuthorizationService authorizationService) =>
+                ApiAuthorizationService authorizationService,
+                IBusinessClock clock) =>
             {
                 var user = ApiEndpointAuth.RequireUser(context, tokenService);
                 string currentToken = ApiCurrentUserContext.GetBearerToken(context);
@@ -152,7 +156,7 @@ namespace ExportDocManager.Api.Hosting
                     "Bearer",
                     renewed.AccessToken,
                     renewed.ExpiresAt,
-                    ApiUserDtoFactory.FromUser(user, authorizationService)));
+                    ApiUserDtoFactory.FromUser(user, authorizationService, clock)));
             })
             .WithName("RenewSession")
             .WithApiAccess(true, true, false);

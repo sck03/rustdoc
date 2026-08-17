@@ -31,8 +31,14 @@ namespace ExportDocManager.Services.Infrastructure
             QueryPageQuery query,
             CancellationToken cancellationToken = default);
 
-        Task<IReadOnlyList<Invoice>> QueryAllAsync(
+        Task<int> CountAsync(
             QueryPageQuery query,
+            CancellationToken cancellationToken = default);
+
+        Task<IReadOnlyList<QueryResultRow>> QueryExportBatchAsync(
+            QueryPageQuery query,
+            int skip,
+            int take,
             CancellationToken cancellationToken = default);
     }
 

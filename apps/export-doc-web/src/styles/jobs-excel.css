@@ -72,7 +72,7 @@
 }
 
 .job-title-cell span {
-  color: #69737d;
+  color: var(--edm-ink-500);
   font-size: 12px;
 }
 
@@ -110,7 +110,7 @@
 
 .job-create-panel details {
   min-width: 0;
-  background: #ffffff;
+  background: var(--edm-surface);
   border: 1px solid #dbe3ea;
   border-radius: 8px;
 }
@@ -137,7 +137,7 @@
 
 .job-create-panel summary small {
   flex: 0 0 auto;
-  color: #69737d;
+  color: var(--edm-ink-500);
   font-size: 12px;
   font-weight: 700;
 }
@@ -160,7 +160,7 @@
 }
 
 .job-tool-submit-row > span {
-  color: #69737d;
+  color: var(--edm-ink-500);
   font-size: 12px;
   font-weight: 700;
 }
@@ -180,16 +180,16 @@
   min-width: 0;
   min-height: 72px;
   padding: 12px;
-  color: #202124;
-  background: #ffffff;
+  color: var(--edm-ink-950);
+  background: var(--edm-surface);
   border: 1px solid #dbe3ea;
   border-radius: 8px;
   text-decoration: none;
 }
 
 .job-tool-link-card:hover {
-  color: #0f766e;
-  border-color: #0f766e;
+  color: var(--edm-primary-600);
+  border-color: var(--edm-primary-600);
 }
 
 .job-tool-link-icon {
@@ -197,7 +197,7 @@
   place-items: center;
   width: 40px;
   height: 40px;
-  color: #0f766e;
+  color: var(--edm-primary-600);
   background: #e8f5f2;
   border: 1px solid #c7e6df;
   border-radius: 8px;
@@ -223,7 +223,7 @@
 }
 
 .job-tool-link-text small {
-  color: #69737d;
+  color: var(--edm-ink-500);
   font-size: 12px;
   font-weight: 700;
 }
@@ -238,7 +238,7 @@
 
 .tool-panel-heading h2 {
   margin: 0;
-  color: #202124;
+  color: var(--edm-ink-950);
   font-size: 17px;
   line-height: 1.25;
 }
@@ -246,7 +246,7 @@
 .tool-panel-heading span {
   display: block;
   margin-top: 3px;
-  color: #69737d;
+  color: var(--edm-ink-500);
   font-size: 12px;
   font-weight: 700;
 }
@@ -282,9 +282,9 @@
 }
 
 .action-button.solid {
-  color: #ffffff;
-  background: #0f766e;
-  border: 1px solid #0f766e;
+  color: var(--edm-surface);
+  background: var(--edm-primary-600);
+  border: 1px solid var(--edm-primary-600);
 }
 
 .job-tool-grid {
@@ -305,7 +305,7 @@
 .job-excel-grid .job-tool-stack {
   align-content: start;
   padding: 12px;
-  background: #ffffff;
+  background: var(--edm-surface);
   border: 1px solid #dbe3ea;
   border-radius: 8px;
 }
@@ -334,7 +334,7 @@
 
 .job-tool-stack-primary {
   padding: 12px;
-  background: #ffffff;
+  background: var(--edm-surface);
   border: 1px solid #b9d9d3;
   border-radius: 8px;
 }
@@ -349,7 +349,7 @@
 
 .job-tool-stack-title svg {
   flex: 0 0 auto;
-  color: #0f766e;
+  color: var(--edm-primary-600);
 }
 
 .job-tool-stack-title strong {
@@ -418,12 +418,12 @@
 }
 
 .job-excel-preview strong {
-  color: #202124;
+  color: var(--edm-ink-950);
   font-size: 14px;
 }
 
 .job-excel-preview span {
-  color: #69737d;
+  color: var(--edm-ink-500);
   font-size: 12px;
   font-weight: 700;
 }
@@ -454,12 +454,12 @@
 }
 
 .job-excel-conflict strong {
-  color: #202124;
+  color: var(--edm-ink-950);
   font-size: 14px;
 }
 
 .job-excel-conflict span {
-  color: #69737d;
+  color: var(--edm-ink-500);
   font-size: 12px;
   font-weight: 700;
 }
@@ -500,7 +500,7 @@
 }
 
 .job-excel-analysis-head strong {
-  color: #202124;
+  color: var(--edm-ink-950);
   font-size: 14px;
 }
 
@@ -508,7 +508,7 @@
 .job-excel-analysis-meta span,
 .job-excel-analysis-fields span,
 .job-excel-analysis-issues span {
-  color: #69737d;
+  color: var(--edm-ink-500);
   font-size: 12px;
   font-weight: 700;
 }
@@ -541,11 +541,11 @@
   padding: 7px 8px;
   border: 1px solid #dbe3ea;
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--edm-surface);
 }
 
 .job-excel-analysis-fields strong {
-  color: #202124;
+  color: var(--edm-ink-950);
   font-size: 13px;
 }
 
@@ -570,7 +570,7 @@
   padding: 9px 10px;
   border: 1px solid #dbe3ea;
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--edm-surface);
 }
 
 .job-excel-imported-card > div {
@@ -581,7 +581,7 @@
 
 .job-excel-imported-card span,
 .job-excel-imported-card small {
-  color: #69737d;
+  color: var(--edm-ink-500);
   font-size: 12px;
   font-weight: 700;
 }
@@ -595,7 +595,7 @@
 }
 
 .job-excel-imported-card strong {
-  color: #202124;
+  color: var(--edm-ink-950);
   font-size: 14px;
 }
 

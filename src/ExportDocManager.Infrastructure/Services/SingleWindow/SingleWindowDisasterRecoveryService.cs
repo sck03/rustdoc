@@ -32,17 +32,20 @@ namespace ExportDocManager.Services.SingleWindow
         private readonly string _databaseFileName;
         private readonly string _databasePath;
         private readonly IBusinessClock _clock;
+        private readonly Func<string, long>? _getAvailableBytes;
 
         public SingleWindowDisasterRecoveryService(
             DatabaseConnectionSettings databaseSettings,
             IAppPathProvider pathProvider,
             ISingleWindowStationIdentityService stationIdentityService,
-            IBusinessClock? clock = null)
+            IBusinessClock? clock = null,
+            Func<string, long>? getAvailableBytes = null)
         {
             _databaseSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _stationIdentityService = stationIdentityService ?? throw new ArgumentNullException(nameof(stationIdentityService));
             _clock = clock ?? BusinessClock.CreateSystem();
+            _getAvailableBytes = getAvailableBytes;
             _usesSqlite = !DatabaseModeHelper.UsesPostgreSql(databaseSettings);
             _databasePath = _usesSqlite
                 ? DbHelper.ResolveRuntimeSqliteDatabasePath(pathProvider, databaseSettings.SqliteDatabaseFileName)
@@ -114,6 +117,15 @@ namespace ExportDocManager.Services.SingleWindow
             string packagePath = Path.Combine(recoveryRoot, fileName);
             try
             {
+                long databaseBytes = new FileInfo(_databasePath).Length;
+                long supportingBytes = new FileInfo(appSettingsPath).Length +
+                    new FileInfo(masterKeyPath).Length +
+                    new FileInfo(stationPath).Length;
+                EnsureStorage(
+                    workingRoot,
+                    "准备持卡机灾难恢复快照",
+                    databaseBytes,
+                    checked(databaseBytes + supportingBytes));
                 await CreateSqliteSnapshotAsync(snapshotPath, cancellationToken).ConfigureAwait(false);
                 var sourceFiles = new[]
                 {
@@ -153,6 +165,10 @@ namespace ExportDocManager.Services.SingleWindow
                         .Append((manifestPath, SingleWindowDisasterRecoveryLayout.ManifestEntry)),
                     innerZipPath,
                     cancellationToken).ConfigureAwait(false);
+                EnsureStorage(
+                    packagePath,
+                    "加密持卡机灾难恢复包",
+                    new FileInfo(innerZipPath).Length);
                 await AtomicFileHelper.WriteFileAtomicAsync(
                     packagePath,
                     (tempPath, ct) => DisasterRecoveryPackageCrypto.EncryptAsync(
@@ -216,12 +232,17 @@ namespace ExportDocManager.Services.SingleWindow
             string stagingRoot = string.Empty;
             try
             {
+                long declaredPlaintextBytes = await DisasterRecoveryPackageCrypto
+                    .ReadDeclaredPlaintextLengthAsync(fullPackagePath, cancellationToken)
+                    .ConfigureAwait(false);
+                EnsureStorage(workingRoot, "解密持卡机灾难恢复包", declaredPlaintextBytes);
                 await DisasterRecoveryPackageCrypto.DecryptAsync(
                     fullPackagePath,
                     innerZipPath,
                     password,
                     cancellationToken).ConfigureAwait(false);
-                ValidateArchiveEntries(innerZipPath);
+                long extractedBytes = ValidateArchiveEntries(innerZipPath);
+                EnsureStorage(extractedRoot, "解压持卡机灾难恢复包", extractedBytes);
                 await ZipArchiveHelper.ExtractToDirectorySafeAsync(
                     innerZipPath,
                     extractedRoot,
@@ -239,6 +260,10 @@ namespace ExportDocManager.Services.SingleWindow
                 {
                     throw new ResourceConflictException("同一恢复包已存在暂存数据，请先处理上一次恢复任务。");
                 }
+                EnsureStorage(
+                    stagingRoot,
+                    "暂存持卡机灾难恢复文件",
+                    manifest.Files.Sum(file => file.SizeBytes));
                 Directory.CreateDirectory(stagingRoot);
                 SingleWindowDisasterRecoveryManager.RestrictDirectoryPermissions(stagingRoot);
                 foreach (var file in manifest.Files)
@@ -375,7 +400,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
         }
 
-        private static void ValidateArchiveEntries(string zipPath)
+        private static long ValidateArchiveEntries(string zipPath)
         {
             using var archive = ZipFile.OpenRead(zipPath);
             if (archive.Entries.Count != 5 || archive.Entries.Any(entry => string.IsNullOrWhiteSpace(entry.Name)))
@@ -393,7 +418,15 @@ namespace ExportDocManager.Services.SingleWindow
             {
                 throw new InvalidDataException("灾难恢复包包含缺失、重复或未授权的内部文件。");
             }
+            return archive.Entries.Aggregate(0L, (total, entry) => checked(total + entry.Length));
         }
+
+        private void EnsureStorage(string path, string operation, params long[] sizes) =>
+            RuntimeStorageBudget.EnsureAvailable(
+                path,
+                RuntimeStorageBudget.WithSafetyMargin(sizes),
+                operation,
+                _getAvailableBytes);
 
         private static async Task<DisasterRecoveryPackageManifest> ReadAndValidateManifestAsync(
             string extractedRoot,

@@ -1,4 +1,5 @@
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Time;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -6,10 +7,12 @@ namespace ExportDocManager.Api.Hosting
     {
         public static ApiUserDto FromUser(
             User user,
-            ApiAuthorizationService authorizationService)
+            ApiAuthorizationService authorizationService,
+            IBusinessClock clock)
         {
             ArgumentNullException.ThrowIfNull(user);
             ArgumentNullException.ThrowIfNull(authorizationService);
+            ArgumentNullException.ThrowIfNull(clock);
 
             return new ApiUserDto(
                 user.Id,
@@ -19,6 +22,8 @@ namespace ExportDocManager.Api.Hosting
                 user.DepartmentId ?? string.Empty,
                 user.CompanyScope ?? string.Empty,
                 user.IsActive,
+                clock.Today,
+                clock.TimeZoneId,
                 authorizationService.GetCapabilities(user));
         }
 

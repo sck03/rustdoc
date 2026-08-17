@@ -63,14 +63,14 @@ export function normalizeReportDesignerSchema(input: unknown): ReportDesignerSch
     };
   }
 
-  const migrated = migrateReportDesignerSchemaVersion(input, issues);
-  if (!migrated) {
+  const current = requireCurrentReportDesignerSchemaVersion(input, issues);
+  if (!current) {
     return { schema: null, issues };
   }
 
-  const reportType = normalizeReportType(migrated.reportType, issues);
-  const page = normalizePageSettings(migrated.page, issues);
-  const sections = normalizeSections(migrated.sections, issues);
+  const reportType = normalizeReportType(current.reportType, issues);
+  const page = normalizePageSettings(current.page, issues);
+  const sections = normalizeSections(current.sections, issues);
   if (!page || !sections) {
     return { schema: null, issues };
   }
@@ -97,47 +97,16 @@ export function hasBlockingReportDesignerSchemaIssues(issues: ReportDesignerSche
   return issues.some((issue) => issue.severity === "error");
 }
 
-function migrateReportDesignerSchemaVersion(
+function requireCurrentReportDesignerSchemaVersion(
   input: Record<string, unknown>,
   issues: ReportDesignerSchemaIssue[],
 ): Record<string, unknown> | null {
-  const version = input.version;
-  if (version === CURRENT_REPORT_DESIGNER_SCHEMA_VERSION) {
+  if (input.version === CURRENT_REPORT_DESIGNER_SCHEMA_VERSION) {
     return input;
   }
 
-  if (version === 1 || version === 0 || version === undefined) {
-    issues.push(createIssue("warning", "$.version", "已按 v2 schema 兼容读取旧草稿结构。"));
-    return {
-      ...input,
-      version: CURRENT_REPORT_DESIGNER_SCHEMA_VERSION,
-      sections: migrateLegacySectionsToV2(input.sections),
-    };
-  }
-
-  issues.push(createIssue("error", "$.version", `暂不支持 schema version ${String(version)}。`));
+  issues.push(createIssue("error", "$.version", `暂不支持 schema version ${String(input.version)}。`));
   return null;
-}
-
-function migrateLegacySectionsToV2(value: unknown) {
-  if (!Array.isArray(value)) {
-    return value;
-  }
-
-  return value.map((section) => {
-    if (!isRecord(section) || section.print !== undefined) {
-      return section;
-    }
-
-    const sectionType = section.type === "Header" || section.type === "Body" || section.type === "Footer"
-      ? section.type
-      : "Body";
-
-    return {
-      ...section,
-      print: createLegacySectionPrintDefaults(sectionType),
-    };
-  });
 }
 
 function normalizeReportType(value: unknown, issues: ReportDesignerSchemaIssue[]): ReportDesignerReportType {
@@ -280,14 +249,6 @@ function createSectionPrintDefaults(sectionType: ReportSection["type"]): ReportS
     repeatOnEveryPage: true,
     keepTogether: true,
     pinToPageBottom: sectionType === "Footer",
-  };
-}
-
-function createLegacySectionPrintDefaults(sectionType: ReportSection["type"]): ReportSectionPrintSettings {
-  return {
-    repeatOnEveryPage: false,
-    keepTogether: sectionType !== "Body",
-    pinToPageBottom: false,
   };
 }
 

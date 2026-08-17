@@ -1,8 +1,8 @@
-import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { waitForDevToolsUrl } from "./chromium-cdp.mjs";
+import { spawnProcessTree, stopProcessTree } from "./child-process-tree.mjs";
 import {
   buildChromiumSandboxArguments,
   detectChromiumRuntime,
@@ -11,7 +11,7 @@ import {
 export async function startChrome(options) {
   const runtime = detectChromiumRuntime();
   const args = buildChromeLaunchArguments(options, runtime);
-  const chrome = spawn(options.browserExecutable, args, {
+  const chrome = spawnProcessTree(options.browserExecutable, args, {
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
@@ -29,10 +29,7 @@ export async function startChrome(options) {
 
     return { process: chrome, debugPort, browserWebSocketUrl };
   } catch (error) {
-    if (chrome.exitCode === null && chrome.signalCode === null) {
-      chrome.kill();
-      await waitForChildExit(chrome, 5000);
-    }
+    await stopProcessTree(chrome, 5000);
     throw error;
   }
 }
@@ -67,24 +64,6 @@ export function buildChromeLaunchArguments(options, runtime = detectChromeRuntim
   args.unshift(...buildChromiumSandboxArguments(runtime));
 
   return args;
-}
-
-function waitForChildExit(child, timeoutMs) {
-  if (child.exitCode !== null || child.signalCode !== null) {
-    return Promise.resolve();
-  }
-
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      child.off("exit", onExit);
-      resolve();
-    }, timeoutMs);
-    function onExit() {
-      clearTimeout(timer);
-      resolve();
-    }
-    child.once("exit", onExit);
-  });
 }
 
 export async function getFreePort() {

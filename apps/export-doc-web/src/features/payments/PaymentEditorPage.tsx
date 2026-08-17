@@ -21,9 +21,11 @@ import { PaymentReportPreviewPanel } from "./PaymentReportPreviewPanel.tsx";
 import { createEmptyPayment, normalizePaymentForSave, validatePaymentDraft } from "./paymentModel.ts";
 
 export function PaymentEditorPage({
+  businessDate,
   client,
   mode,
 }: {
+  businessDate: string;
   client: ExportDocManagerApiClient;
   mode: "new" | "edit";
 }) {
@@ -34,7 +36,10 @@ export function PaymentEditorPage({
   const navigate = useNavigate();
   const location = useLocation();
   const routeSuccessMessage = readRouteSuccessMessage(location.state);
-  const [payment, setPayment] = useState<ApiPaymentDto | null>(() => (mode === "new" ? createEmptyPayment() : null));
+  const [pageBusinessDate] = useState(() => businessDate);
+  const [payment, setPayment] = useState<ApiPaymentDto | null>(() =>
+    mode === "new" ? createEmptyPayment(pageBusinessDate) : null,
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(routeSuccessMessage);
   const [concurrencyMessage, setConcurrencyMessage] = useState<string | null>(null);
@@ -67,7 +72,7 @@ export function PaymentEditorPage({
 
   useEffect(() => {
     if (isNew) {
-      const nextPayment = createEmptyPayment();
+      const nextPayment = createEmptyPayment(pageBusinessDate);
       setPayment(nextPayment);
       setPersistedPaymentSnapshot(buildPaymentSnapshot(nextPayment, 0));
       setMessage(null);
@@ -82,7 +87,7 @@ export function PaymentEditorPage({
       setMessage("付款 ID 无效。");
       setSuccessMessage(null);
     }
-  }, [isNew, isPaymentIdValid, parsedPaymentId]);
+  }, [isNew, isPaymentIdValid, pageBusinessDate, parsedPaymentId]);
 
   useEffect(() => {
     if (!isNew && paymentQuery.isError) {

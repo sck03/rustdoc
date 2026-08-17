@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ExportDocManager.Api.Hosting;
@@ -10,6 +9,8 @@ using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -108,7 +109,7 @@ namespace ExportDocManager.Api.Tests
             bool cleanupOnFailure)
         {
             string databasePath = Path.Combine(dataRoot, "Database", databaseFileName);
-            string baseUrl = $"http://127.0.0.1:{GetAvailablePort()}";
+            const string listenUrl = "http://127.0.0.1:0";
             WebApplication? app = null;
 
             try
@@ -123,7 +124,7 @@ namespace ExportDocManager.Api.Tests
                 {
                     AppRoot = appRoot,
                     DataRoot = dataRoot,
-                    ListenUrls = baseUrl,
+                    ListenUrls = listenUrl,
                     DesktopAccessToken = desktopAccessToken ?? string.Empty,
                     ProductEdition = ProductEditionCatalog.Normalize(productEdition ?? string.Empty),
                     PathBase = pathBase ?? string.Empty
@@ -133,7 +134,7 @@ namespace ExportDocManager.Api.Tests
 
                 var builder = WebApplication.CreateBuilder();
                 builder.Logging.ClearProviders();
-                builder.WebHost.UseUrls(baseUrl);
+                builder.WebHost.UseUrls(listenUrl);
                 builder.Services.AddSingleton<IRuntimeLicenseAnchorStore>(
                     new FileRuntimeLicenseAnchorStore(
                         Path.Combine(dataRoot, "Security", "test-license-anchor.dat"),
@@ -166,6 +167,7 @@ namespace ExportDocManager.Api.Tests
                 app.MapExportDocManagerApiEndpoints(runtimeOptions, databaseSettings);
                 await app.StartAsync();
 
+                string baseUrl = ResolveBaseUrl(app);
                 return new ApiIntegrationTestHarness(app, appRoot, dataRoot, databasePath, baseUrl);
             }
             catch
@@ -242,6 +244,14 @@ namespace ExportDocManager.Api.Tests
                 ?? throw new InvalidOperationException($"无法解析 API 响应: {json}");
         }
 
+        internal static string ResolveBaseUrl(WebApplication app)
+        {
+            ArgumentNullException.ThrowIfNull(app);
+            var addresses = app.Services.GetRequiredService<IServer>()
+                .Features.Get<IServerAddressesFeature>()?.Addresses ?? app.Urls;
+            return ApiEndpointPublication.ResolveApiBaseUrl(addresses);
+        }
+
         private static JsonSerializerOptions CreateJsonOptions()
         {
             var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
@@ -266,15 +276,6 @@ namespace ExportDocManager.Api.Tests
             await _app.StopAsync();
             await _app.DisposeAsync();
             _disposed = true;
-        }
-
-        private static int GetAvailablePort()
-        {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            int port = ((IPEndPoint)listener.LocalEndpoint).Port;
-            listener.Stop();
-            return port;
         }
 
         private static string CreateTempDirectory(string prefix)
