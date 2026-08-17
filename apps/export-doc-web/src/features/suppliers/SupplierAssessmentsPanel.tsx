@@ -4,7 +4,7 @@ import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { OperationFeedback, errorFeedback, requestErrorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { TaskViewTabs, getTaskViewPanelProps } from "../../ui/TaskViewTabs.tsx";
-import { currentLocalDateInputValue, readApiError } from "../../ui/formUtils.ts";
+import { dateInputToApiDate, readApiError } from "../../ui/formUtils.ts";
 import { SupplierAssessmentAnalytics } from "./SupplierAssessmentAnalytics.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
@@ -12,7 +12,8 @@ import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
 type AssessmentView = "directory" | "analytics" | "editor";
 
-export function SupplierAssessmentsPanel({ client, supplierId, supplierName, canOperate, canManage }: {
+export function SupplierAssessmentsPanel({ businessDate, client, supplierId, supplierName, canOperate, canManage }: {
+  businessDate: string;
   client: ExportDocManagerApiClient;
   supplierId: number;
   supplierName: string;
@@ -107,7 +108,8 @@ export function SupplierAssessmentsPanel({ client, supplierId, supplierName, can
     }
   }
 
-  const today = currentLocalDateInputValue();
+  const today = dateInputToApiDate(businessDate);
+  if (!today) throw new Error("服务端业务日期无效。");
   return <section className="form-section supplier-assessment-workspace">
     <div className="section-header">
       <div><h3>{view === "directory" ? "供应商评价记录" : view === "analytics" ? "供应商评价分析" : selected ? "编辑供应商评价" : "新增供应商评价"}</h3>

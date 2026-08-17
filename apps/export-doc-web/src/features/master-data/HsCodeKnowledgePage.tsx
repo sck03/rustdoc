@@ -8,7 +8,7 @@ import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
-import { readApiError } from "../../ui/formUtils.ts";
+import { dateInputToApiDate, readApiError } from "../../ui/formUtils.ts";
 import { useDebouncedValue } from "../../ui/useDebouncedValue.ts";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
@@ -33,13 +33,16 @@ const maintenanceSections = [
 const sections = [...primarySections, ...maintenanceSections] as const;
 type KnowledgeFeedback = { tone: "success" | "error" | "warning"; message: string };
 
-export function HsCodeKnowledgePage({ client }: { client: ExportDocManagerApiClient }) {
+export function HsCodeKnowledgePage({ businessDate, client }: { businessDate: string; client: ExportDocManagerApiClient }) {
   const { section = "search" } = useParams();
   const permission = useModulePermission("document.hs-knowledge");
   const queryClient = useQueryClient();
   const workspaceDeviceProfile = useWorkspaceDeviceProfile();
   const workspaceDeviceMode = workspaceDeviceProfile.mode;
   const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
+  const normalizedBusinessDate = dateInputToApiDate(businessDate);
+  if (!normalizedBusinessDate) throw new Error("服务端业务日期无效。");
+  const businessYear = Number(normalizedBusinessDate.slice(0, 4));
   const [maintenanceOpen, setMaintenanceOpen] = useState(() => maintenanceSections.some(([key]) => key === section));
   useEffect(() => { setMaintenanceOpen(maintenanceSections.some(([key]) => key === section)); }, [section]);
   if (!sections.some(([key]) => key === section)) return <Navigate to="/master-data/hs-knowledge/search" replace />;
@@ -57,11 +60,11 @@ export function HsCodeKnowledgePage({ client }: { client: ExportDocManagerApiCli
     </nav>
     {!permission.canManage ? <PermissionNotice>当前权限只允许查询和查看；共享知识库导入、确认和编辑需要 HS 编码管理权限。</PermissionNotice> : null}
     {section === "search" ? <KnowledgeSearch client={client} canOperate={permission.canOperate}/> : null}
-    {section === "examples" ? <ExampleLibrary client={client} canOperate={permission.canManage && workspaceDeviceMode !== "phone"} canManage={permission.canManage && workspaceDeviceMode !== "phone"} canBatchManage={permission.canManage && workspaceDeviceCapabilities.canUseBatchOperations}/> : null}
-    {section === "history" ? <HistoryLearning client={client} canOperate={permission.canManage}/> : null}
+    {section === "examples" ? <ExampleLibrary businessYear={businessYear} client={client} canOperate={permission.canManage && workspaceDeviceMode !== "phone"} canManage={permission.canManage && workspaceDeviceMode !== "phone"} canBatchManage={permission.canManage && workspaceDeviceCapabilities.canUseBatchOperations}/> : null}
+    {section === "history" ? <HistoryLearning businessYear={businessYear} client={client} canOperate={permission.canManage}/> : null}
     {section === "transfer" ? <>{!workspaceDeviceCapabilities.canImportExport ? <WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="知识库迁移属于完整导入导出操作，请使用带鼠标或触控板的电脑。" tablet="连接鼠标或触控板后可在当前设备完成知识库迁移。"/> : null}<KnowledgeTransfer client={client} canImport={permission.canManage && workspaceDeviceCapabilities.canImportExport} canExport={permission.canManage && workspaceDeviceCapabilities.canImportExport}/></> : null}
-    {section === "annual" ? <div className="knowledge-task-card knowledge-tool-card">{!workspaceDeviceCapabilities.canImportExport ? <WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="年度税则导入和版本维护请使用带鼠标或触控板的电脑；手机端可继续查询当前有效编码。" tablet="连接鼠标或触控板后可在当前设备导入年度税则；当前仍可查询和现场确认。"/> : null}<p className="knowledge-task-lead">只有年度税则导入和可信知识库迁移可以建立当前有效编码；每条有效编码都必须带来源、年度和验证时间。</p><HsCodeToolsPanel mode="import" client={client} disabled={!permission.canManage || !workspaceDeviceCapabilities.canImportExport} keyword="" onLocalDataChanged={async () => { await queryClient.invalidateQueries({ queryKey: ["hs-knowledge"] }); }}/></div> : null}
-    {section === "online" ? <div className="knowledge-task-card knowledge-tool-card"><WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="可联网搜索并逐条审核候选；批量审核请使用桌面端。" tablet="可联网搜索并逐条审核候选；批量审核请使用桌面端。"/><p className="knowledge-task-lead">联网实例只进入待审核候选池。选择已验证年度税则中的有效编码后，才会加入公司的申报实例库。</p><HsCodeToolsPanel mode="remote" client={client} disabled={!permission.canManage} keyword="" onLocalDataChanged={async () => undefined} onRemoteCandidatesChanged={async () => { await queryClient.invalidateQueries({ queryKey: ["hs-remote-candidates"] }); }}/><RemoteCandidateReview client={client} canOperate={permission.canManage} canBatchOperate={permission.canManage && workspaceDeviceCapabilities.canUseBatchOperations}/></div> : null}
+    {section === "annual" ? <div className="knowledge-task-card knowledge-tool-card">{!workspaceDeviceCapabilities.canImportExport ? <WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="年度税则导入和版本维护请使用带鼠标或触控板的电脑；手机端可继续查询当前有效编码。" tablet="连接鼠标或触控板后可在当前设备导入年度税则；当前仍可查询和现场确认。"/> : null}<p className="knowledge-task-lead">只有年度税则导入和可信知识库迁移可以建立当前有效编码；每条有效编码都必须带来源、年度和验证时间。</p><HsCodeToolsPanel businessYear={businessYear} mode="import" client={client} disabled={!permission.canManage || !workspaceDeviceCapabilities.canImportExport} keyword="" onLocalDataChanged={async () => { await queryClient.invalidateQueries({ queryKey: ["hs-knowledge"] }); }}/></div> : null}
+    {section === "online" ? <div className="knowledge-task-card knowledge-tool-card"><WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="可联网搜索并逐条审核候选；批量审核请使用桌面端。" tablet="可联网搜索并逐条审核候选；批量审核请使用桌面端。"/><p className="knowledge-task-lead">联网实例只进入待审核候选池。选择已验证年度税则中的有效编码后，才会加入公司的申报实例库。</p><HsCodeToolsPanel businessYear={businessYear} mode="remote" client={client} disabled={!permission.canManage} keyword="" onLocalDataChanged={async () => undefined} onRemoteCandidatesChanged={async () => { await queryClient.invalidateQueries({ queryKey: ["hs-remote-candidates"] }); }}/><RemoteCandidateReview client={client} canOperate={permission.canManage} canBatchOperate={permission.canManage && workspaceDeviceCapabilities.canUseBatchOperations}/></div> : null}
   </section>;
 }
 
@@ -102,7 +105,7 @@ function KnowledgeSearch({ client, canOperate }: { client: ExportDocManagerApiCl
   </div>;
 }
 
-function ExampleLibrary({ client, canOperate, canManage, canBatchManage }: { client: ExportDocManagerApiClient; canOperate: boolean; canManage: boolean; canBatchManage: boolean }) {
+function ExampleLibrary({ businessYear, client, canOperate, canManage, canBatchManage }: { businessYear: number; client: ExportDocManagerApiClient; canOperate: boolean; canManage: boolean; canBatchManage: boolean }) {
   const queryClient = useQueryClient();
   const requestConfirmation = useConfirmation();
   const [keyword, setKeyword] = useState(""); const debouncedKeyword = useDebouncedValue(keyword); const [pageNumber, setPageNumber] = useState(1); const [pageSize, setPageSize] = useState(30);
@@ -112,7 +115,7 @@ function ExampleLibrary({ client, canOperate, canManage, canBatchManage }: { cli
   const save = useMutation({ mutationFn: (value: HsCodeExampleInput) => client.saveHsCodeKnowledgeExample({ body: value }), onSuccess: async () => { setEditing(null); setFeedback({tone:"success",message:"申报实例已保存。"}); await invalidate(); }, onError: error => setFeedback({tone:"error",message:readApiError(error)}) });
   const remove = useMutation({ mutationFn: (id: number) => client.deleteHsCodeKnowledgeExample({ id }), onSuccess: async () => { setFeedback({tone:"success",message:"申报实例已删除。"}); await invalidate(); }, onError: error => setFeedback({tone:"error",message:readApiError(error)}) });
   const batchRemove = useMutation({ mutationFn: (ids: number[]) => client.deleteHsCodeKnowledgeExamplesBatch({ body: { ids } }), onSuccess: async response => { setFeedback({tone:"success",message:response.message}); await invalidate(); }, onError: error => setFeedback({tone:"error",message:readApiError(error)}) });
-  const blank: HsCodeExampleInput = { id: 0, rawReportedHsCode: "", resolvedCurrentHsCode: "", productName: "", specification: "", source: "Manual", sourceYear: new Date().getFullYear(), resolutionStatus: "Unresolved", isManuallyVerified: true };
+  const blank: HsCodeExampleInput = { id: 0, rawReportedHsCode: "", resolvedCurrentHsCode: "", productName: "", specification: "", source: "Manual", sourceYear: businessYear, resolutionStatus: "Unresolved", isManuallyVerified: true };
   const totalPages = Math.max(1, Math.ceil((data.data?.totalCount ?? 0) / pageSize));
   useEffect(() => { setPageNumber(1); setSelected(new Set()); }, [debouncedKeyword, pageSize]);
   function toggle(id: number) { setSelected(current => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; }); }
@@ -173,7 +176,7 @@ function RemoteCandidateReview({ client, canOperate, canBatchOperate }: { client
   </section>;
 }
 
-function HistoryLearning({ client, canOperate }: { client: ExportDocManagerApiClient; canOperate:boolean }) {
+function HistoryLearning({ businessYear, client, canOperate }: { businessYear: number; client: ExportDocManagerApiClient; canOperate:boolean }) {
   const queryClient = useQueryClient();
   const [keyword, setKeyword] = useState("");
   const debouncedKeyword = useDebouncedValue(keyword);
@@ -182,7 +185,7 @@ function HistoryLearning({ client, canOperate }: { client: ExportDocManagerApiCl
   const candidates = useQuery({ queryKey: ["hs-history-candidates", debouncedKeyword, pageNumber, pageSize], queryFn: ({ signal }) => client.discoverHsCodeHistoryCandidates({ keyword: debouncedKeyword, pageNumber, pageSize }, { signal }), placeholderData: keepPreviousData });
   useEffect(() => setPageNumber(1), [debouncedKeyword, pageSize]);
   const confirm = useMutation({
-    mutationFn: (item: NonNullable<typeof candidates.data>["items"][number]) => client.saveHsCodeKnowledgeExample({ body: { id: 0, rawReportedHsCode: item.rawCode, resolvedCurrentHsCode: item.currentCode, productName: item.productName, specification: item.specification, source: `HistoryConfirmed:${item.source}`, sourceYear: new Date().getFullYear(), resolutionStatus: "ManuallyVerified", isManuallyVerified: true } }),
+    mutationFn: (item: NonNullable<typeof candidates.data>["items"][number]) => client.saveHsCodeKnowledgeExample({ body: { id: 0, rawReportedHsCode: item.rawCode, resolvedCurrentHsCode: item.currentCode, productName: item.productName, specification: item.specification, source: `HistoryConfirmed:${item.source}`, sourceYear: businessYear, resolutionStatus: "ManuallyVerified", isManuallyVerified: true } }),
     onSuccess: async () => { setFeedback({tone:"success",message:"历史经验已确认并加入申报实例库。"}); await queryClient.invalidateQueries({ queryKey: ["hs-history-candidates"] }); await queryClient.invalidateQueries({ queryKey: ["hs-knowledge", "examples"] }); },
     onError: error => setFeedback({tone:"error",message:readApiError(error)}),
   });

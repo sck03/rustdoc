@@ -27,6 +27,7 @@ import { hsCodeClearAllConfirmationText } from "./masterDataTypes.ts";
 
 
 export function HsCodeToolsPanel({
+  businessYear,
   client,
   disabled,
   keyword,
@@ -34,6 +35,7 @@ export function HsCodeToolsPanel({
   onRemoteCandidatesChanged,
   mode = "hub",
 }: {
+  businessYear: number;
   client: ExportDocManagerApiClient;
   disabled: boolean;
   keyword: string;
@@ -54,7 +56,7 @@ export function HsCodeToolsPanel({
   const [workspace, setWorkspace] = useState<"none" | "import" | "remote">(mode === "hub" ? "none" : mode);
   const [importMode, setImportMode] = useState<"Incremental" | "CompleteSnapshot">("Incremental");
   const [importSourceName, setImportSourceName] = useState("");
-  const [importEffectiveYear, setImportEffectiveYear] = useState(String(new Date().getFullYear()));
+  const [importEffectiveYear, setImportEffectiveYear] = useState(String(businessYear));
   const [importPreview, setImportPreview] = useState<ApiHsCodeImportPreviewResponse | null>(null);
   const [remoteHealth, setRemoteHealth] = useState<string | null>(null);
 

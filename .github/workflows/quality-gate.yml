@@ -57,7 +57,11 @@ jobs:
       - name: Build and test .NET solution
         run: |
           dotnet build ExportDocManager.sln -c Release --no-restore -m:1 -p:BuildInParallel=false
-          dotnet test ExportDocManager.sln -c Release --no-build -m:1 -p:BuildInParallel=false
+          for project in tests/ExportDocManager.{Infrastructure,Application,Domain,Api}.Tests/ExportDocManager.*.Tests.csproj; do
+            echo "::group::Test $project"
+            dotnet test "$project" -c Release --no-build -m:1 -p:BuildInParallel=false
+            echo "::endgroup::"
+          done
 
       - name: Build and test web contracts
         run: |
@@ -67,6 +71,7 @@ jobs:
           npm --prefix apps/export-doc-web run test:invoice-text-normalization
           npm --prefix apps/export-doc-web run test:new-report-designer-exporter
           npm --prefix apps/export-doc-web run test:workspace-navigation
+          npm --prefix apps/export-doc-web run test:supplier-assessment-analytics
           npm --prefix apps/export-doc-web run test:style-governance
           npm --prefix apps/export-doc-web run test:source-size-governance
 

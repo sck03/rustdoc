@@ -20,7 +20,7 @@ import { downloadBlob } from "../../ui/downloadBlob.ts";
 type SupplierTaskView = "overview" | "directory" | "profile" | "contacts" | "products" | "assessments" | "import";
 const supplierTabsId = "supplier-directory-workspace";
 
-export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiClient }) {
+export function SupplierDirectoryPage({ businessDate, client }: { businessDate: string; client: ExportDocManagerApiClient }) {
   const supplierPermission = useModulePermission("sales.suppliers");
   const requestConfirmation = useConfirmation();
   const [suppliers, setSuppliers] = useState<ApiSupplierDto[]>([]);
@@ -283,7 +283,7 @@ export function SupplierDirectoryPage({ client }: { client: ExportDocManagerApiC
       </form>}
     </section> : null}
     {view === "products" && selectedSupplier && !newSupplier ? <div {...getTaskViewPanelProps(supplierTabsId, "products")}><SupplierProductLinksPanel client={client} supplierId={selectedSupplier.id} supplierName={selectedSupplier.name} canOperate={supplierPermission.canOperate} canManage={supplierPermission.canManage} /></div> : null}
-    {view === "assessments" && selectedSupplier && !newSupplier ? <div {...getTaskViewPanelProps(supplierTabsId, "assessments")}><SupplierAssessmentsPanel client={client} supplierId={selectedSupplier.id} supplierName={selectedSupplier.name} canOperate={supplierPermission.canOperate} canManage={supplierPermission.canManage} /></div> : null}
+    {view === "assessments" && selectedSupplier && !newSupplier ? <div {...getTaskViewPanelProps(supplierTabsId, "assessments")}><SupplierAssessmentsPanel businessDate={businessDate} client={client} supplierId={selectedSupplier.id} supplierName={selectedSupplier.name} canOperate={supplierPermission.canOperate} canManage={supplierPermission.canManage} /></div> : null}
   </section>;
 }
 

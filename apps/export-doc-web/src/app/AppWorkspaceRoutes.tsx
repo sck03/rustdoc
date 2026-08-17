@@ -94,7 +94,7 @@ export function AppWorkspaceRoutes({
           ? <SalesDashboardPage client={client} />
           : <Navigate to="/dashboard" replace />} />
         <Route path="/suppliers" element={user.capabilities.canUseSalesWorkspace
-          ? <SupplierDirectoryPage client={client} />
+          ? <SupplierDirectoryPage businessDate={user.businessDate} client={client} />
           : <Navigate to="/dashboard" replace />} />
         <Route path="/crm/email-templates" element={user.capabilities.canUseSalesWorkspace
           ? <EmailTemplatePage client={client} />
@@ -113,7 +113,7 @@ export function AppWorkspaceRoutes({
         <Route path="/payments/new" element={<PaymentEditorPage businessDate={user.businessDate} client={client} mode="new" />} />
         <Route path="/payments/:paymentId" element={<PaymentEditorPage businessDate={user.businessDate} client={client} mode="edit" />} />
         <Route path="/master-data" element={<MasterDataRoute client={client} />} />
-        <Route path="/master-data/hs-knowledge/:section" element={<HsCodeKnowledgePage client={client} />} />
+        <Route path="/master-data/hs-knowledge/:section" element={<HsCodeKnowledgePage businessDate={user.businessDate} client={client} />} />
         <Route path="/master-data/:entityKey" element={<MasterDataRoute client={client} />} />
         <Route path="/master-data/:entityKey/new" element={<MasterDataEditorRoute client={client} mode="new" />} />
         <Route path="/master-data/:entityKey/:recordKey" element={<MasterDataEditorRoute client={client} mode="edit" />} />
