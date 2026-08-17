@@ -64,7 +64,11 @@ jobs:
           Get-ChildItem TestResults -Filter *.trx | ForEach-Object {
             ([xml](Get-Content $_)).TestRun.Results.UnitTestResult |
               Where-Object outcome -eq "Failed" |
-              ForEach-Object { Write-Output "::error title=.NET test failed::$($_.testName)" }
+              ForEach-Object {
+                $details = "$($_.testName): $($_.Output.ErrorInfo.Message)"
+                $details = $details.Replace("%", "%25").Replace("`r", "%0D").Replace("`n", "%0A")
+                Write-Output "::error title=.NET test failed::$details"
+              }
           }
           exit 1
 

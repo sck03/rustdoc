@@ -115,6 +115,7 @@ namespace ExportDocManager.Domain.Tests
                 .Where(element => element.Name.LocalName == "ProjectReference")
                 .Select(element => element.Attribute("Include")?.Value)
                 .Where(include => !string.IsNullOrWhiteSpace(include))
+                .Select(include => include!.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar))
                 .Select(include => Path.GetFullPath(Path.Combine(projectDirectory, include!)))
                 .Select(path => NormalizeRelativePath(repositoryRoot, path));
         }
