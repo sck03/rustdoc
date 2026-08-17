@@ -53,15 +53,16 @@ jobs:
         run: |
           dotnet restore ExportDocManager.sln --locked-mode
           npm ci --prefix apps/export-doc-web
-
-      - name: Build and test .NET solution
-        run: |
-          dotnet build ExportDocManager.sln -c Release --no-restore -m:1 -p:BuildInParallel=false
-          for project in tests/ExportDocManager.{Infrastructure,Application,Domain,Api}.Tests/ExportDocManager.*.Tests.csproj; do
-            echo "::group::Test $project"
-            dotnet test "$project" -c Release --no-build -m:1 -p:BuildInParallel=false
-            echo "::endgroup::"
-          done
+      - name: Build .NET solution
+        run: dotnet build ExportDocManager.sln -c Release --no-restore -m:1 -p:BuildInParallel=false
+      - name: Test infrastructure
+        run: dotnet test tests/ExportDocManager.Infrastructure.Tests/ExportDocManager.Infrastructure.Tests.csproj -c Release --no-build -m:1 -p:BuildInParallel=false
+      - name: Test application
+        run: dotnet test tests/ExportDocManager.Application.Tests/ExportDocManager.Application.Tests.csproj -c Release --no-build -m:1 -p:BuildInParallel=false
+      - name: Test domain
+        run: dotnet test tests/ExportDocManager.Domain.Tests/ExportDocManager.Domain.Tests.csproj -c Release --no-build -m:1 -p:BuildInParallel=false
+      - name: Test API
+        run: dotnet test tests/ExportDocManager.Api.Tests/ExportDocManager.Api.Tests.csproj -c Release --no-build -m:1 -p:BuildInParallel=false
 
       - name: Build and test web contracts
         run: |
