@@ -196,7 +196,9 @@ namespace ExportDocManager.Infrastructure.Tests
                 factory,
                 new BusinessDataAccessScope(new DatabaseConnectionSettings(), new FixedCurrentUserContext(user)));
             var visible = await service.ListAsync(ReportDocumentType.ExportDocument);
-            Assert.Equal(new[] { "部门模板", "公司模板", "全员模板" }, visible.Select(item => item.Name).OrderBy(item => item));
+            Assert.Equal(
+                new[] { "全员模板", "公司模板", "部门模板" },
+                visible.Select(item => item.Name).OrderBy(item => item, StringComparer.Ordinal));
 
             var otherUser = new User { Id = 6, Username = "other-user", Role = UserRoleCatalog.User, DepartmentId = "finance", CompanyScope = "other" };
             var otherService = new UserReportTemplateService(

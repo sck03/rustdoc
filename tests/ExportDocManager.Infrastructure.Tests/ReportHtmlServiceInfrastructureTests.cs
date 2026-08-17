@@ -362,6 +362,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        [Trait("Category", BrowserIntegrationCollection.Category)]
         public async Task RenderBuiltInProgramTemplatesToPdf_ShouldUseConfiguredRendererAndRuntimeDataRoot()
         {
             string repositoryRoot = FindRepositoryRoot();
@@ -442,6 +443,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        [Trait("Category", BrowserIntegrationCollection.Category)]
         public async Task RenderBuiltInProgramTemplatesWithMultiItemBusinessDataToPdf_ShouldPreservePaginationAndDomainIsolation()
         {
             string repositoryRoot = FindRepositoryRoot();

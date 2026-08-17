@@ -52,12 +52,8 @@ if ($NoRestore) {
     $arguments += "--no-restore"
 }
 if (-not $hasBrowserPdfRenderer) {
-    $browserPdfFilter = @(
-        "FullyQualifiedName!~RenderBuiltInProgramTemplatesToPdf_ShouldUseConfiguredRendererAndRuntimeDataRoot",
-        "FullyQualifiedName!~RenderBuiltInProgramTemplatesWithMultiItemBusinessDataToPdf_ShouldPreservePaginationAndDomainIsolation"
-    ) -join "&"
-    $arguments += @("--filter", $browserPdfFilter)
-    Write-Warning "Chromium was not found. Two real browser PDF tests will be skipped. Use -RequireBrowserPdfTests for strict release validation."
+    $arguments += @("--filter", "Category!=BrowserIntegration")
+    Write-Warning "Chromium was not found. Real browser integration tests will be skipped. Use -RequireBrowserPdfTests for strict release validation."
 }
 
 Write-Host "Running ExportDocManager solution tests ($Configuration)..."

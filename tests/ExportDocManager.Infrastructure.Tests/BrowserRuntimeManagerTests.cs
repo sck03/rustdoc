@@ -160,6 +160,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        [Trait("Category", BrowserIntegrationCollection.Category)]
         public async Task ManagedPlaywrightHost_ShouldUseBundledBrowserAndLeaveNoOwnedProcess()
         {
             string root = FindRepositoryRoot();
@@ -188,6 +189,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        [Trait("Category", BrowserIntegrationCollection.Category)]
         public async Task ManagedPlaywrightHost_ShouldDeferRecycleUntilParallelPagesFinish()
         {
             string? previousConcurrency = Environment.GetEnvironmentVariable(BrowserRuntimeManager.AutomationConcurrencyEnvironmentVariable);
@@ -236,6 +238,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        [Trait("Category", BrowserIntegrationCollection.Category)]
         public async Task ManagedPlaywrightHost_ShouldRecycleLocalBrowserAfterIdleTimeout()
         {
             string? previousIdleTimeout = Environment.GetEnvironmentVariable(
@@ -281,6 +284,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        [Trait("Category", BrowserIntegrationCollection.Category)]
         public async Task ManagedPlaywrightHost_DisposeAsync_ShouldCancelActivePageAndRejectNewWork()
         {
             string root = FindRepositoryRoot();
@@ -325,6 +329,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        [Trait("Category", BrowserIntegrationCollection.Category)]
         public async Task ChromiumPdfRenderer_ShouldReleaseLeaseAndOwnedProcess()
         {
             string root = FindRepositoryRoot();
@@ -349,6 +354,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        [Trait("Category", BrowserIntegrationCollection.Category)]
         public async Task ChromiumPdfRenderer_ShouldDecodeDataImageBeforePrinting()
         {
             string root = FindRepositoryRoot();
@@ -381,6 +387,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        [Trait("Category", BrowserIntegrationCollection.Category)]
         public async Task I5a6BrowserParser_ShouldReadDynamicSearchTable()
         {
             string root = FindRepositoryRoot();
@@ -412,6 +419,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        [Trait("Category", BrowserIntegrationCollection.Category)]
         public async Task I5a6BrowserParser_ShouldPreferTableWithDetailLinksAndReadSpecification()
         {
             string root = FindRepositoryRoot();
@@ -447,6 +455,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        [Trait("Category", BrowserIntegrationCollection.Category)]
         public async Task I5a6BrowserParser_ShouldReadMobileDealCards()
         {
             string root = FindRepositoryRoot();
