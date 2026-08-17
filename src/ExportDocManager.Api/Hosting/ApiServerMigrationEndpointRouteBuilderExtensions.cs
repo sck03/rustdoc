@@ -131,11 +131,10 @@ namespace ExportDocManager.Api.Hosting
                     return WriteForbidden("当前账号没有灾难恢复管理权限。");
                 IResult? transportError = RequireSecureDisasterRecoveryTransport(context);
                 if (transportError != null) return transportError;
-                SharedDatabaseBackupItem? backup = maintenanceService.ListPostgreSqlPhysicalBackups()
-                    .FirstOrDefault(item => string.Equals(
-                        item.FileName,
-                        fileName,
-                        StringComparison.OrdinalIgnoreCase));
+                SharedDatabaseBackupItem? backup = FindManagedPostgreSqlBackup(
+                    maintenanceService,
+                    pathProvider,
+                    fileName);
                 return backup == null ||
                     !File.Exists(backup.FullPath) ||
                     !IsManagedPostgreSqlBackupPath(pathProvider, backup.FullPath)
@@ -173,11 +172,10 @@ namespace ExportDocManager.Api.Hosting
                     return Results.NotFound();
                 }
 
-                SharedDatabaseBackupItem? backup = maintenanceService.ListPostgreSqlPhysicalBackups()
-                    .FirstOrDefault(item => string.Equals(
-                        item.FileName,
-                        fileName,
-                        StringComparison.OrdinalIgnoreCase));
+                SharedDatabaseBackupItem? backup = FindManagedPostgreSqlBackup(
+                    maintenanceService,
+                    pathProvider,
+                    fileName);
                 return backup == null ||
                     !File.Exists(backup.FullPath) ||
                     !IsManagedPostgreSqlBackupPath(pathProvider, backup.FullPath)
@@ -589,6 +587,44 @@ namespace ExportDocManager.Api.Hosting
                 PathTooLongException)
             {
                 return false;
+            }
+        }
+
+        private static SharedDatabaseBackupItem? FindManagedPostgreSqlBackup(
+            ISharedDatabaseMaintenanceService maintenanceService,
+            IAppPathProvider pathProvider,
+            string? fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                return null;
+            }
+            try
+            {
+                string normalized = fileName.Trim();
+                if (normalized is "." or ".." ||
+                    !string.Equals(normalized, Path.GetFileName(normalized), StringComparison.Ordinal))
+                {
+                    return null;
+                }
+                if (!IsManagedPostgreSqlBackupPath(
+                    pathProvider,
+                    Path.Combine(pathProvider.DataRoot, "Backups", "PostgreSQL", normalized)))
+                {
+                    return null;
+                }
+                return maintenanceService.ListPostgreSqlPhysicalBackups()
+                    .FirstOrDefault(item => string.Equals(
+                        item.FileName,
+                        normalized,
+                        StringComparison.OrdinalIgnoreCase));
+            }
+            catch (Exception ex) when (
+                ex is ArgumentException or
+                NotSupportedException or
+                PathTooLongException)
+            {
+                return null;
             }
         }
 
