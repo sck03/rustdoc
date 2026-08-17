@@ -57,6 +57,16 @@ jobs:
       - name: Build and test .NET solution
         shell: pwsh
         run: ./scripts/run-tests.ps1 -Configuration Release -NoRestore -NoPause
+      - name: Report failed .NET tests
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-ChildItem TestResults -Filter *.trx | ForEach-Object {
+            ([xml](Get-Content $_)).TestRun.Results.UnitTestResult |
+              Where-Object outcome -eq "Failed" |
+              ForEach-Object { Write-Output "::error title=.NET test failed::$($_.testName)" }
+          }
+          exit 1
 
       - name: Build and test web contracts
         run: |
