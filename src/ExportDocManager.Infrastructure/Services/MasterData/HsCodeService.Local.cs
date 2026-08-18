@@ -64,7 +64,7 @@ namespace ExportDocManager.Services.MasterData
                     {
                         context.Entry(existing).Property(item => item.RowVersion).OriginalValue = hsCode.RowVersion;
                     }
-                    existing.UpdateTime = DateTimeOffset.UtcNow;
+                    existing.UpdateTime = _clock.UtcNow;
                     context.HsCodes.Update(existing);
                     hsCode.Id = existing.Id;
                 }
@@ -72,7 +72,7 @@ namespace ExportDocManager.Services.MasterData
                 {
                     hsCode.Id = 0;
                     hsCode.RowVersion = null;
-                    hsCode.UpdateTime = DateTimeOffset.UtcNow;
+                    hsCode.UpdateTime = _clock.UtcNow;
                     await context.HsCodes.AddAsync(hsCode);
                 }
 

@@ -78,9 +78,13 @@ namespace ExportDocManager.Services.Suppliers
                     if (name.Length == 0 || row.Error.Length > 0 || row.IsDuplicate || !existing.Add(name)) { skipped++; continue; }
                     var supplier = new SupplierCompany
                     {
-                        Name = name, CountryRegion = Clean(row.CountryRegion), Category = Clean(row.Category),
-                        Website = Clean(row.Website), Status = Default(Clean(row.Status), "合作中"),
-                        MainProducts = Clean(row.MainProducts), Notes = Clean(row.Notes)
+                        Name = name,
+                        CountryRegion = Clean(row.CountryRegion),
+                        Category = Clean(row.Category),
+                        Website = Clean(row.Website),
+                        Status = Default(Clean(row.Status), "合作中"),
+                        MainProducts = Clean(row.MainProducts),
+                        Notes = Clean(row.Notes)
                     };
                     _accessScope.ApplyOwner(supplier);
                     await context.SupplierCompanies.AddAsync(supplier, token);
@@ -92,9 +96,12 @@ namespace ExportDocManager.Services.Suppliers
                 {
                     await context.SupplierContacts.AddAsync(new SupplierContact
                     {
-                        SupplierCompanyId = pending.Supplier.Id, Name = Clean(pending.Row.ContactName),
-                        Title = Clean(pending.Row.ContactTitle), Email = Clean(pending.Row.ContactEmail),
-                        Phone = Clean(pending.Row.ContactPhone), IsPrimary = true
+                        SupplierCompanyId = pending.Supplier.Id,
+                        Name = Clean(pending.Row.ContactName),
+                        Title = Clean(pending.Row.ContactTitle),
+                        Email = Clean(pending.Row.ContactEmail),
+                        Phone = Clean(pending.Row.ContactPhone),
+                        IsPrimary = true
                     }, token);
                 }
                 if (pendingContacts.Count > 0) await context.SaveChangesAsync(token);
@@ -108,6 +115,7 @@ namespace ExportDocManager.Services.Suppliers
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var query = _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking());
             query = query.ApplyKeywordSearch(
+                context,
                 keyword,
                 item => item.Name,
                 item => item.Category,
@@ -145,12 +153,34 @@ namespace ExportDocManager.Services.Suppliers
         {
             var aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["供应商名称"]="name", ["公司名称"]="name", ["suppliername"]="name", ["name"]="name",
-                ["国家地区"]="country", ["国家"]="country", ["country"]="country", ["countryregion"]="country",
-                ["分类"]="category", ["category"]="category", ["网站"]="website", ["website"]="website",
-                ["状态"]="status", ["status"]="status", ["主要产品"]="products", ["产品"]="products", ["mainproducts"]="products",
-                ["备注"]="notes", ["notes"]="notes", ["联系人"]="contact", ["contact"]="contact", ["contactname"]="contact",
-                ["职位"]="title", ["title"]="title", ["邮箱"]="email", ["email"]="email", ["电话"]="phone", ["phone"]="phone"
+                ["供应商名称"] = "name",
+                ["公司名称"] = "name",
+                ["suppliername"] = "name",
+                ["name"] = "name",
+                ["国家地区"] = "country",
+                ["国家"] = "country",
+                ["country"] = "country",
+                ["countryregion"] = "country",
+                ["分类"] = "category",
+                ["category"] = "category",
+                ["网站"] = "website",
+                ["website"] = "website",
+                ["状态"] = "status",
+                ["status"] = "status",
+                ["主要产品"] = "products",
+                ["产品"] = "products",
+                ["mainproducts"] = "products",
+                ["备注"] = "notes",
+                ["notes"] = "notes",
+                ["联系人"] = "contact",
+                ["contact"] = "contact",
+                ["contactname"] = "contact",
+                ["职位"] = "title",
+                ["title"] = "title",
+                ["邮箱"] = "email",
+                ["email"] = "email",
+                ["电话"] = "phone",
+                ["phone"] = "phone"
             };
             var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             for (int index = 0; index < headers.Count; index++)

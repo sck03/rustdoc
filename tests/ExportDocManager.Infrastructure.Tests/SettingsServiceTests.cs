@@ -46,11 +46,10 @@ public sealed class SettingsServiceTests
             {
                 var paths = new RuntimeAppPathProvider(root, Path.Combine(root, "App_Data"));
                 var service = new SettingsService(paths);
-                ApplySecrets(service.Settings, "email-secret", "webdav-secret", "postgres-secret", "ai-secret");
+                await UpdateSecretsAsync(service, "email-secret", "webdav-secret", "postgres-secret", "ai-secret");
 
-                await service.SaveAsync();
                 Assert.Equal("email-secret", service.Settings.Email.Password);
-                await service.SaveAsync();
+                await service.UpdateAsync(_ => true);
                 Assert.Equal("email-secret", service.Settings.Email.Password);
 
                 string storedJson = await File.ReadAllTextAsync(Path.Combine(paths.ConfigRoot, "appsettings.json"));
@@ -84,8 +83,7 @@ public sealed class SettingsServiceTests
             {
                 var paths = new RuntimeAppPathProvider(root, Path.Combine(root, "App_Data"));
                 var writer = new SettingsService(paths);
-                ApplySecrets(writer.Settings, "email-secret", "webdav-secret", "postgres-secret", "ai-secret");
-                await writer.SaveAsync();
+                await UpdateSecretsAsync(writer, "email-secret", "webdav-secret", "postgres-secret", "ai-secret");
 
                 string settingsPath = Path.Combine(paths.ConfigRoot, "appsettings.json");
                 string originalJson = await File.ReadAllTextAsync(settingsPath);
@@ -113,8 +111,7 @@ public sealed class SettingsServiceTests
             {
                 var paths = new RuntimeAppPathProvider(root, Path.Combine(root, "App_Data"));
                 var writer = new SettingsService(paths);
-                ApplySecrets(writer.Settings, "email-secret", string.Empty, string.Empty, string.Empty);
-                await writer.SaveAsync();
+                await UpdateSecretsAsync(writer, "email-secret", string.Empty, string.Empty, string.Empty);
 
                 string settingsPath = Path.Combine(paths.ConfigRoot, "appsettings.json");
                 var stored = JsonSerializer.Deserialize<AppSettings>(await File.ReadAllTextAsync(settingsPath))!;
@@ -199,17 +196,19 @@ public sealed class SettingsServiceTests
         {
             var paths = new RuntimeAppPathProvider(root, Path.Combine(root, "App_Data"));
             var writer = new SettingsService(paths);
-            writer.Settings.PaymentTemplates =
-            [
-                new PaymentTemplateItem
-                {
-                    Name = "付款模板",
-                    TemplatePath = "user:Internal/payment.html",
-                    ReportType = "ExportDocument"
-                }
-            ];
-
-            await writer.SaveAsync();
+            await writer.UpdateAsync(settings =>
+            {
+                settings.PaymentTemplates =
+                [
+                    new PaymentTemplateItem
+                    {
+                        Name = "付款模板",
+                        TemplatePath = "user:Internal/payment.html",
+                        ReportType = "ExportDocument"
+                    }
+                ];
+                return true;
+            });
 
             var savedItem = Assert.Single(writer.Settings.PaymentTemplates);
             Assert.Equal("PaymentVoucher", savedItem.ReportType);
@@ -257,6 +256,61 @@ public sealed class SettingsServiceTests
         Assert.Contains("ShowSeal", error.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task SettingsSnapshot_ShouldBeIsolatedFromPersistedState()
+    {
+        string root = CreateTempRoot();
+        try
+        {
+            var paths = new RuntimeAppPathProvider(root, Path.Combine(root, "App_Data"));
+            var service = new SettingsService(paths);
+            await service.UpdateAsync(settings =>
+            {
+                settings.System.AppName = "Persisted";
+                return true;
+            });
+
+            var snapshot = service.Settings;
+            snapshot.System.AppName = "Mutated outside service";
+
+            Assert.Equal("Persisted", service.Settings.System.AppName);
+        }
+        finally
+        {
+            TryDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ConcurrentUpdates_ShouldSerializeWithoutLosingChanges()
+    {
+        string root = CreateTempRoot();
+        try
+        {
+            var paths = new RuntimeAppPathProvider(root, Path.Combine(root, "App_Data"));
+            var service = new SettingsService(paths);
+
+            await Task.WhenAll(
+                service.UpdateAsync(settings =>
+                {
+                    settings.System.AppName = "Concurrent";
+                    return true;
+                }),
+                service.UpdateAsync(settings =>
+                {
+                    settings.System.ItemEntryBlankRowCount = 64;
+                    return true;
+                }));
+
+            Assert.Equal("Concurrent", service.Settings.System.AppName);
+            Assert.Equal(64, service.Settings.System.ItemEntryBlankRowCount);
+        }
+        finally
+        {
+            TryDeleteDirectory(root);
+        }
+    }
+
     private static AppSettings CreateSettings(
         string emailPassword,
         string webDavPassword,
@@ -284,6 +338,18 @@ public sealed class SettingsServiceTests
         settings.System.PostgreSqlPassword = postgreSqlPassword;
         settings.AI.ApiKey = aiApiKey;
     }
+
+    private static Task<bool> UpdateSecretsAsync(
+        SettingsService service,
+        string emailPassword,
+        string webDavPassword,
+        string postgreSqlPassword,
+        string aiApiKey) =>
+        service.UpdateAsync(settings =>
+        {
+            ApplySecrets(settings, emailPassword, webDavPassword, postgreSqlPassword, aiApiKey);
+            return true;
+        });
 
     private static async Task WithLocalKeyFileModeAsync(Func<Task> action)
     {

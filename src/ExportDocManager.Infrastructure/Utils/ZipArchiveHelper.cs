@@ -130,7 +130,7 @@ namespace ExportDocManager.Utils
             using var archive = ZipFile.OpenRead(fullPackagePath);
             if (archive.Entries.Count > limits.MaximumEntries)
             {
-                throw new InvalidDataException($"压缩包条目数超过允许上限 {limits.MaximumEntries}。" );
+                throw new InvalidDataException($"压缩包条目数超过允许上限 {limits.MaximumEntries}。");
             }
 
             var normalizedNames = new Dictionary<ZipArchiveEntry, string>();
@@ -257,7 +257,7 @@ namespace ExportDocManager.Utils
                     : (double)entry.Length / entry.CompressedLength;
                 if (ratio > limits.MaximumCompressionRatio)
                 {
-                    throw new InvalidDataException($"压缩包条目 {entry.FullName} 的压缩比异常。" );
+                    throw new InvalidDataException($"压缩包条目 {entry.FullName} 的压缩比异常。");
                 }
             }
         }

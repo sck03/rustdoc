@@ -30,7 +30,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 await context.SaveChangesAsync();
             }
 
-            ICustomerReadRepository repository = new LocalMasterDataReadRepository(factory);
+            ICustomerReadRepository repository = CreateRepository(factory);
 
             var result = await repository.QueryAsync(new CustomerReadQuery { Keyword = "BETA" });
 
@@ -56,7 +56,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 await context.SaveChangesAsync();
             }
 
-            var repository = new LocalMasterDataReadRepository(factory);
+            var repository = CreateRepository(factory);
             var customers = await ((ICustomerReadRepository)repository).QueryPageAsync(
                 new CustomerReadQuery { PageNumber = 2, PageSize = 10 });
             var exporters = await ((IExporterReadRepository)repository).QueryPageAsync(
@@ -102,7 +102,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 unitId = await context.Units.OrderBy(item => item.Id).Select(item => item.Id).LastAsync();
             }
 
-            var repository = new LocalMasterDataReadRepository(factory);
+            var repository = CreateRepository(factory);
 
             Assert.Equal("Payee 205", (await ((IPayeeReadRepository)repository).GetByIdAsync(payeeId))?.Name);
             Assert.Equal("Port 205", (await ((IPortReadRepository)repository).GetByIdAsync(portId))?.NameEN);
@@ -121,7 +121,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 await context.SaveChangesAsync();
             }
 
-            IHsCodeReadRepository repository = new LocalMasterDataReadRepository(factory);
+            IHsCodeReadRepository repository = CreateRepository(factory);
 
             var result = await repository.QueryPageAsync(new HsCodeReadQuery
             {
@@ -150,7 +150,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 await context.SaveChangesAsync();
             }
 
-            IHsCodeReadRepository repository = new LocalMasterDataReadRepository(factory);
+            IHsCodeReadRepository repository = CreateRepository(factory);
             var result = await repository.QueryPageAsync(new HsCodeReadQuery
             {
                 PageNumber = 1,
@@ -180,7 +180,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 await context.SaveChangesAsync();
             }
 
-            IProductReadRepository repository = new LocalMasterDataReadRepository(factory);
+            IProductReadRepository repository = CreateRepository(factory);
             var result = await repository.QueryPageAsync(new ProductReadQuery
             {
                 Keyword = "COTTON",
@@ -194,6 +194,9 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal("SKU-12", result.Items[0].ProductCode);
             Assert.All(result.Items, item => Assert.Contains("COTTON", item.NameEN, StringComparison.Ordinal));
         }
+
+        private static LocalMasterDataReadRepository CreateRepository(IDbContextFactory<AppDbContext> factory) =>
+            new(factory, TestAccessScope.Create());
 
         private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
         {

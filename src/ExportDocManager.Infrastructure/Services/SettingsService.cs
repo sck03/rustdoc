@@ -2,20 +2,24 @@ using System.Text.Json;
 using System.Threading;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
-using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Reporting;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Infrastructure
 {
-    public class SettingsService : ISettingsService
+    public sealed class SettingsService : ISettingsService
     {
         private const string SettingsFileName = "appsettings.json";
+        private static readonly JsonSerializerOptions SnapshotSerializerOptions = new();
+        private static readonly JsonSerializerOptions PersistedSerializerOptions = new() { WriteIndented = true };
 
         private readonly string _filePath;
         private readonly LocalSecretProtector _secretProtector;
-        private readonly SemaphoreSlim _saveLock = new(1, 1);
-        public AppSettings Settings { get; private set; } = new AppSettings();
+        private readonly SemaphoreSlim _mutationGate = new(1, 1);
+        private AppSettings _settings = Normalize(new AppSettings());
+
+        public AppSettings Settings => Clone(Volatile.Read(ref _settings));
 
         public SettingsService(IAppPathProvider pathProvider)
             : this(pathProvider, null)
@@ -29,211 +33,187 @@ namespace ExportDocManager.Services.Infrastructure
             _secretProtector = new LocalSecretProtector(pathProvider);
         }
 
-        public async Task LoadAsync()
+        public async Task LoadAsync(CancellationToken cancellationToken = default)
         {
-            if (!File.Exists(_filePath))
-            {
-                EnsureSettingsDefaults();
-                return;
-            }
-
-            string json;
+            await _mutationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                json = await File.ReadAllTextAsync(_filePath).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                throw new InvalidDataException($"无法读取设置文件 {_filePath}。", ex);
-            }
-
-            AppSettings loaded;
-            try
-            {
-                loaded = JsonSerializer.Deserialize<AppSettings>(json)
-                    ?? throw new InvalidDataException("设置文件内容为空。");
-            }
-            catch (JsonException ex)
-            {
-                throw new InvalidDataException($"设置文件 JSON 损坏：{_filePath}。", ex);
-            }
-
-            var previous = Settings;
-            Settings = loaded;
-            try
-            {
-                EnsureSettingsDefaults();
-                Settings.Email.Password = _secretProtector.UnprotectSettingsValue(Settings.Email.Password);
-                Settings.WebDav.Password = _secretProtector.UnprotectSettingsValue(Settings.WebDav.Password);
-                if (!string.IsNullOrEmpty(Settings.System.PostgreSqlPassword) &&
-                    !_secretProtector.IsProtectedPayload(Settings.System.PostgreSqlPassword))
+                if (!File.Exists(_filePath))
                 {
-                    throw new InvalidDataException(
-                        $"PostgreSQL 密码不能以明文保存在 appsettings.json；请使用 {DbHelper.PostgreSqlPasswordEnvironmentVariable}、" +
-                        $"{DbHelper.PostgreSqlPasswordFileEnvironmentVariable}，或通过设置界面保存受保护载荷。");
+                    Volatile.Write(ref _settings, Normalize(new AppSettings()));
+                    return;
                 }
-                Settings.System.PostgreSqlPassword = _secretProtector.UnprotectSettingsValue(Settings.System.PostgreSqlPassword);
-                Settings.AI.ApiKey = _secretProtector.UnprotectSettingsValue(Settings.AI.ApiKey);
-            }
-            catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or IOException or UnauthorizedAccessException or ArgumentException)
-            {
-                Settings = previous;
-                throw new InvalidDataException($"设置文件包含无效配置：{_filePath}。{ex.Message}", ex);
-            }
-        }
 
-        public async Task SaveAsync()
-        {
-            await _saveLock.WaitAsync();
-            try
-            {
-                EnsureSettingsDefaults();
-                await SaveUnsafeAsync();
+                string json;
+                try
+                {
+                    json = await File.ReadAllTextAsync(_filePath, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    throw new InvalidDataException($"无法读取设置文件 {_filePath}。", ex);
+                }
+
+                AppSettings loaded;
+                try
+                {
+                    loaded = JsonSerializer.Deserialize<AppSettings>(json, SnapshotSerializerOptions)
+                        ?? throw new InvalidDataException("设置文件内容为空。");
+                }
+                catch (JsonException ex)
+                {
+                    throw new InvalidDataException($"设置文件 JSON 损坏：{_filePath}。", ex);
+                }
+
+                try
+                {
+                    loaded = Normalize(loaded);
+                    UnprotectSecrets(loaded);
+                    Volatile.Write(ref _settings, loaded);
+                }
+                catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or IOException or UnauthorizedAccessException or ArgumentException)
+                {
+                    throw new InvalidDataException($"设置文件包含无效配置：{_filePath}。{ex.Message}", ex);
+                }
             }
             finally
             {
-                _saveLock.Release();
+                _mutationGate.Release();
             }
         }
 
-        public async Task<bool> UpdateAsync(Func<AppSettings, bool> update, CancellationToken cancellationToken = default)
+        public async Task<bool> UpdateAsync(
+            Func<AppSettings, bool> update,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(update);
 
-            await _saveLock.WaitAsync(cancellationToken);
+            await _mutationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                EnsureSettingsDefaults();
-                if (!update(Settings))
+                var candidate = Clone(Volatile.Read(ref _settings));
+                if (!update(candidate))
                 {
                     return false;
                 }
 
-                await SaveUnsafeAsync();
+                candidate = Normalize(candidate);
+                await SaveUnsafeAsync(candidate, cancellationToken).ConfigureAwait(false);
+                Volatile.Write(ref _settings, candidate);
                 return true;
             }
             finally
             {
-                _saveLock.Release();
+                _mutationGate.Release();
             }
         }
 
-        private async Task SaveUnsafeAsync()
+        private async Task SaveUnsafeAsync(AppSettings settings, CancellationToken cancellationToken)
         {
-            string originalEmailPwd = Settings.Email?.Password ?? string.Empty;
-            string originalWebDavPwd = Settings.WebDav?.Password ?? string.Empty;
-            string originalPostgreSqlPwd = Settings.System?.PostgreSqlPassword ?? string.Empty;
-            string originalAiApiKey = Settings.AI?.ApiKey ?? string.Empty;
+            var persisted = Clone(settings);
+            ProtectSecrets(persisted);
+            string json = JsonSerializer.Serialize(persisted, PersistedSerializerOptions);
+            await AtomicFileHelper.WriteAllTextAtomicAsync(
+                    _filePath,
+                    json,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        }
 
-            try
+        private void ProtectSecrets(AppSettings settings)
+        {
+            if (!string.IsNullOrEmpty(settings.Email.Password))
             {
-                if (!string.IsNullOrEmpty(Settings.Email?.Password))
-                {
-                    Settings.Email.Password = _secretProtector.Protect(Settings.Email.Password);
-                }
-
-                if (!string.IsNullOrEmpty(Settings.WebDav?.Password))
-                {
-                    Settings.WebDav.Password = _secretProtector.Protect(Settings.WebDav.Password);
-                }
-
-                if (!string.IsNullOrEmpty(Settings.System?.PostgreSqlPassword))
-                {
-                    Settings.System.PostgreSqlPassword = _secretProtector.Protect(Settings.System.PostgreSqlPassword);
-                }
-
-                if (!string.IsNullOrEmpty(Settings.AI?.ApiKey))
-                {
-                    Settings.AI.ApiKey = _secretProtector.Protect(Settings.AI.ApiKey);
-                }
-
-                var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
-                await AtomicFileHelper.WriteAllTextAtomicAsync(_filePath, json);
+                settings.Email.Password = _secretProtector.Protect(settings.Email.Password);
             }
-            finally
+
+            if (!string.IsNullOrEmpty(settings.WebDav.Password))
             {
-                if (Settings.Email != null)
-                {
-                    Settings.Email.Password = originalEmailPwd;
-                }
+                settings.WebDav.Password = _secretProtector.Protect(settings.WebDav.Password);
+            }
 
-                if (Settings.WebDav != null)
-                {
-                    Settings.WebDav.Password = originalWebDavPwd;
-                }
+            if (!string.IsNullOrEmpty(settings.System.PostgreSqlPassword))
+            {
+                settings.System.PostgreSqlPassword = _secretProtector.Protect(settings.System.PostgreSqlPassword);
+            }
 
-                if (Settings.System != null)
-                {
-                    Settings.System.PostgreSqlPassword = originalPostgreSqlPwd;
-                }
-
-                if (Settings.AI != null)
-                {
-                    Settings.AI.ApiKey = originalAiApiKey;
-                }
+            if (!string.IsNullOrEmpty(settings.AI.ApiKey))
+            {
+                settings.AI.ApiKey = _secretProtector.Protect(settings.AI.ApiKey);
             }
         }
 
-        private void EnsureSettingsDefaults()
+        private void UnprotectSecrets(AppSettings settings)
         {
-            Settings ??= new AppSettings();
-            Settings.System ??= new SystemSettings();
-            Settings.BatchExport ??= new BatchExportSettings();
-            Settings.PaymentTemplates ??= new List<PaymentTemplateItem>();
-            foreach (var paymentTemplate in Settings.PaymentTemplates.Where(item => item != null))
+            settings.Email.Password = _secretProtector.UnprotectSettingsValue(settings.Email.Password);
+            settings.WebDav.Password = _secretProtector.UnprotectSettingsValue(settings.WebDav.Password);
+            if (!string.IsNullOrEmpty(settings.System.PostgreSqlPassword) &&
+                !_secretProtector.IsProtectedPayload(settings.System.PostgreSqlPassword))
+            {
+                throw new InvalidDataException(
+                    $"PostgreSQL 密码不能以明文保存在 appsettings.json；请使用 {DbHelper.PostgreSqlPasswordEnvironmentVariable}、" +
+                    $"{DbHelper.PostgreSqlPasswordFileEnvironmentVariable}，或通过设置界面保存受保护载荷。");
+            }
+
+            settings.System.PostgreSqlPassword = _secretProtector.UnprotectSettingsValue(settings.System.PostgreSqlPassword);
+            settings.AI.ApiKey = _secretProtector.UnprotectSettingsValue(settings.AI.ApiKey);
+        }
+
+        private static AppSettings Normalize(AppSettings? settings)
+        {
+            settings ??= new AppSettings();
+            settings.System ??= new SystemSettings();
+            settings.BatchExport ??= new BatchExportSettings();
+            settings.PaymentTemplates ??= new List<PaymentTemplateItem>();
+            foreach (var paymentTemplate in settings.PaymentTemplates.Where(item => item != null))
             {
                 paymentTemplate.ReportType = ReportDocumentType.PaymentVoucher.ToString();
             }
-            Settings.ExcelImport ??= new ExcelImportSettings();
-            Settings.ExcelImportSchemes ??= new List<ExcelImportSettings>();
-            Settings.ExchangeRate ??= new ExchangeRateSettings();
-            Settings.ExchangeRate.SelectedCurrencies ??= new List<string>();
-            Settings.ExchangeRate.AllSupportedCurrencies ??= new List<string>();
-            Settings.Email ??= new EmailConfig();
-            Settings.WebDav ??= new WebDavSettings();
-            Settings.AI ??= new AISettings();
-            Settings.SingleWindow ??= new SingleWindowSettings();
-            Settings.SingleWindow.CustomsCooDefaults ??= new CustomsCooDefaultProfile();
+            settings.ExcelImport ??= new ExcelImportSettings();
+            settings.ExcelImportSchemes ??= new List<ExcelImportSettings>();
+            settings.ExchangeRate ??= new ExchangeRateSettings();
+            settings.ExchangeRate.SelectedCurrencies ??= new List<string>();
+            settings.ExchangeRate.AllSupportedCurrencies ??= new List<string>();
+            settings.Email ??= new EmailConfig();
+            settings.WebDav ??= new WebDavSettings();
+            settings.AI ??= new AISettings();
+            settings.SingleWindow ??= new SingleWindowSettings();
+            settings.SingleWindow.CustomsCooDefaults ??= new CustomsCooDefaultProfile();
 
-            if (Settings.System.BackupRetentionDays < 0)
-            {
-                Settings.System.BackupRetentionDays = 0;
-            }
-
-            Settings.System.PostgreSqlAutoBackupSchedule =
-                string.Equals(Settings.System.PostgreSqlAutoBackupSchedule?.Trim(), "Weekly", StringComparison.OrdinalIgnoreCase)
+            settings.System.BackupRetentionDays = Math.Max(0, settings.System.BackupRetentionDays);
+            settings.System.PostgreSqlAutoBackupSchedule =
+                string.Equals(settings.System.PostgreSqlAutoBackupSchedule?.Trim(), "Weekly", StringComparison.OrdinalIgnoreCase)
                     ? "Weekly"
                     : "Daily";
-            Settings.System.PostgreSqlAutoBackupTime = TimeSpan.TryParse(
-                Settings.System.PostgreSqlAutoBackupTime?.Trim(),
+            settings.System.PostgreSqlAutoBackupTime = TimeSpan.TryParse(
+                settings.System.PostgreSqlAutoBackupTime?.Trim(),
                 out var backupTime)
                     ? new TimeSpan(backupTime.Hours, backupTime.Minutes, 0).ToString(@"hh\:mm")
                     : "02:00";
-            Settings.System.PostgreSqlAutoBackupDayOfWeek =
-                Math.Clamp(Settings.System.PostgreSqlAutoBackupDayOfWeek, 0, 6);
-            Settings.System.PostgreSqlAutoBackupRetentionCount =
-                Math.Max(1, Settings.System.PostgreSqlAutoBackupRetentionCount);
+            settings.System.PostgreSqlAutoBackupDayOfWeek =
+                Math.Clamp(settings.System.PostgreSqlAutoBackupDayOfWeek, 0, 6);
+            settings.System.PostgreSqlAutoBackupRetentionCount =
+                Math.Max(1, settings.System.PostgreSqlAutoBackupRetentionCount);
+            settings.System.ItemEntryBlankRowCount =
+                Math.Clamp(settings.System.ItemEntryBlankRowCount <= 0 ? 20 : settings.System.ItemEntryBlankRowCount, 1, 500);
+            settings.System.DatabaseProvider = DatabaseModeHelper.NormalizeProvider(settings.System.DatabaseProvider);
+            settings.System.SqliteDatabaseFileName =
+                DbHelper.NormalizeRuntimeSqliteDatabaseFileName(settings.System.SqliteDatabaseFileName);
+            settings.System.PostgreSqlPort = DbHelper.NormalizePostgreSqlPort(settings.System.PostgreSqlPort);
+            settings.System.PostgreSqlHost = DbHelper.NormalizePostgreSqlText(settings.System.PostgreSqlHost);
+            settings.System.PostgreSqlDatabase = DbHelper.NormalizePostgreSqlText(settings.System.PostgreSqlDatabase);
+            settings.System.PostgreSqlUsername = DbHelper.NormalizePostgreSqlText(settings.System.PostgreSqlUsername);
+            settings.System.PostgreSqlAdditionalOptions =
+                DbHelper.NormalizePostgreSqlAdditionalOptions(settings.System.PostgreSqlAdditionalOptions);
+            settings.System.UpdaterEndpoint = UpdaterEndpointPolicy.Normalize(settings.System.UpdaterEndpoint);
+            return settings;
+        }
 
-            if (Settings.System.ItemEntryBlankRowCount <= 0)
-            {
-                Settings.System.ItemEntryBlankRowCount = 20;
-            }
-            else if (Settings.System.ItemEntryBlankRowCount > 500)
-            {
-                Settings.System.ItemEntryBlankRowCount = 500;
-            }
-
-            Settings.System.DatabaseProvider = DatabaseModeHelper.NormalizeProvider(Settings.System.DatabaseProvider);
-
-            Settings.System.SqliteDatabaseFileName =
-                DbHelper.NormalizeRuntimeSqliteDatabaseFileName(Settings.System.SqliteDatabaseFileName);
-
-            Settings.System.PostgreSqlPort = DbHelper.NormalizePostgreSqlPort(Settings.System.PostgreSqlPort);
-            Settings.System.PostgreSqlHost = DbHelper.NormalizePostgreSqlText(Settings.System.PostgreSqlHost);
-            Settings.System.PostgreSqlDatabase = DbHelper.NormalizePostgreSqlText(Settings.System.PostgreSqlDatabase);
-            Settings.System.PostgreSqlUsername = DbHelper.NormalizePostgreSqlText(Settings.System.PostgreSqlUsername);
-            Settings.System.PostgreSqlAdditionalOptions = DbHelper.NormalizePostgreSqlAdditionalOptions(Settings.System.PostgreSqlAdditionalOptions);
-            Settings.System.UpdaterEndpoint = UpdaterEndpointPolicy.Normalize(Settings.System.UpdaterEndpoint);
+        private static AppSettings Clone(AppSettings settings)
+        {
+            byte[] json = JsonSerializer.SerializeToUtf8Bytes(settings, SnapshotSerializerOptions);
+            return JsonSerializer.Deserialize<AppSettings>(json, SnapshotSerializerOptions)
+                ?? throw new InvalidOperationException("无法创建设置快照。");
         }
 
         private static string ResolveSettingsPath(IAppPathProvider pathProvider, string? filePath)
@@ -243,7 +223,7 @@ namespace ExportDocManager.Services.Infrastructure
                 return Path.Combine(pathProvider.ConfigRoot, SettingsFileName);
             }
 
-            var trimmed = filePath.Trim();
+            string trimmed = filePath.Trim();
             return Path.IsPathRooted(trimmed)
                 ? Path.GetFullPath(trimmed)
                 : Path.GetFullPath(Path.Combine(pathProvider.ConfigRoot, trimmed));

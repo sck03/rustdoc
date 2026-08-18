@@ -14,7 +14,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/master-data/exporters", async Task<Results<
                 Ok<IReadOnlyList<ApiExporterDto>>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterReadRepository repository,
@@ -32,7 +32,7 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/master-data/exporters/page", async Task<Results<
                 Ok<ApiPagedResponse<ApiExporterDto>>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterReadRepository repository,
@@ -55,7 +55,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiExporterDto>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterService exporterService,
@@ -81,7 +81,7 @@ namespace ExportDocManager.Api.Hosting
                 UnauthorizedHttpResult,
                 NotFound<ApiErrorResponse>,
                 JsonHttpResult<ApiErrorResponse>,
-                StatusCodeHttpResult>>(
+                StatusCodeHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterSealService sealService,
@@ -166,7 +166,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/master-data/exporters", async Task<Results<
                 Created<ApiExporterDto>,
                 BadRequest<ApiErrorResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterService exporterService,
@@ -210,7 +210,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiExporterDto>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterService exporterService,
@@ -262,7 +262,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiCommandResponse>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IExporterService exporterService,

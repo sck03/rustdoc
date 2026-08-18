@@ -1,5 +1,5 @@
-using System.Net.Mail;
 using ExportDocManager.Models;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using ExportDocManager.Services.Infrastructure;
 
@@ -126,17 +126,9 @@ namespace ExportDocManager.Api.Hosting
                         StoragePolicy = EmailToolStoragePolicy
                     });
                 }
-                catch (FormatException ex)
-                {
-                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
-                }
-                catch (InvalidOperationException ex)
+                catch (ServiceException ex)
                 {
                     return WriteServiceException(ex);
-                }
-                catch (SmtpException ex)
-                {
-                    return WriteInfrastructureFailure("邮件发送服务暂时不可用，请稍后重试。", ex);
                 }
             })
             .WithName("SendEmail")
@@ -182,17 +174,9 @@ namespace ExportDocManager.Api.Hosting
                         StoragePolicy = EmailToolStoragePolicy
                     });
                 }
-                catch (FormatException ex)
-                {
-                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
-                }
-                catch (InvalidOperationException ex)
+                catch (ServiceException ex)
                 {
                     return WriteServiceException(ex);
-                }
-                catch (SmtpException ex)
-                {
-                    return WriteInfrastructureFailure("邮件连接服务暂时不可用，请稍后重试。", ex);
                 }
             })
             .WithName("TestEmailConnection")
@@ -220,13 +204,9 @@ namespace ExportDocManager.Api.Hosting
                 return Results.BadRequest(new ApiErrorResponse("收件人地址不能为空。"));
             }
 
-            try
+            if (!ApiEmailAddressPolicy.TryNormalize(toAddress, out string normalizedToAddress))
             {
-                _ = new MailAddress(toAddress);
-            }
-            catch (FormatException ex)
-            {
-                return Results.BadRequest(new ApiErrorResponse($"收件人地址无效：{ex.Message}"));
+                return Results.BadRequest(new ApiErrorResponse("收件人地址无效。"));
             }
 
             var requestedAttachmentPaths = (request.AttachmentPaths ?? Array.Empty<string>())
@@ -241,7 +221,7 @@ namespace ExportDocManager.Api.Hosting
 
             normalizedRequest = new ApiEmailSendRequest
             {
-                ToAddress = toAddress,
+                ToAddress = normalizedToAddress,
                 Subject = request.Subject?.Trim() ?? string.Empty,
                 Body = string.IsNullOrWhiteSpace(request.Body)
                     ? "Dear Customer,\r\n\r\nPlease find the attached export documents.\r\n\r\nBest regards,"
@@ -268,14 +248,9 @@ namespace ExportDocManager.Api.Hosting
                 return string.Empty;
             }
 
-            try
-            {
-                return new MailAddress(emailAddress.Trim()).Address.Trim();
-            }
-            catch (FormatException)
-            {
-                return string.Empty;
-            }
+            return ApiEmailAddressPolicy.TryNormalize(emailAddress, out string normalized)
+                ? normalized
+                : string.Empty;
         }
     }
 }

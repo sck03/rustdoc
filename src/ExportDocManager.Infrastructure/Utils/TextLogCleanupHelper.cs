@@ -11,7 +11,8 @@ namespace ExportDocManager.Utils
             string logsPath,
             int retentionDays,
             int retainedFileCount,
-            int maxFileSizeMB = 20)
+            int maxFileSizeMB = 20,
+            DateTimeOffset? utcNow = null)
         {
             long maxFileSizeBytes = Math.Clamp(maxFileSizeMB, 1, 1024) * 1024L * 1024L;
             TrimOversizedFiles(logsPath, maxFileSizeBytes);
@@ -31,10 +32,16 @@ namespace ExportDocManager.Utils
                 file => file.LastWriteTimeUtc,
                 file => TryDeleteFile(file.FullName),
                 retentionDays,
-                retainedFileCount);
+                retainedFileCount,
+                utcNow);
         }
 
-        public static TextLogCleanupSummary CleanFiles(string directoryPath, string searchPattern, int retentionDays, int retainedFileCount)
+        public static TextLogCleanupSummary CleanFiles(
+            string directoryPath,
+            string searchPattern,
+            int retentionDays,
+            int retainedFileCount,
+            DateTimeOffset? utcNow = null)
         {
             if (string.IsNullOrWhiteSpace(directoryPath) || !Directory.Exists(directoryPath))
             {
@@ -52,10 +59,15 @@ namespace ExportDocManager.Utils
                 file => file.LastWriteTimeUtc,
                 file => TryDeleteFile(file.FullName),
                 retentionDays,
-                retainedFileCount);
+                retainedFileCount,
+                utcNow);
         }
 
-        public static TextLogCleanupSummary CleanDirectories(string rootPath, int retentionDays, int retainedDirectoryCount)
+        public static TextLogCleanupSummary CleanDirectories(
+            string rootPath,
+            int retentionDays,
+            int retainedDirectoryCount,
+            DateTimeOffset? utcNow = null)
         {
             if (string.IsNullOrWhiteSpace(rootPath) || !Directory.Exists(rootPath))
             {
@@ -72,7 +84,8 @@ namespace ExportDocManager.Utils
                 directory => directory.LastWriteTimeUtc,
                 directory => TryDeleteDirectory(directory.FullName),
                 retentionDays,
-                retainedDirectoryCount);
+                retainedDirectoryCount,
+                utcNow);
         }
 
         private static TextLogCleanupSummary CleanEntries<T>(
@@ -80,14 +93,15 @@ namespace ExportDocManager.Utils
             Func<T, DateTimeOffset> getLastWriteTime,
             Func<T, bool> tryDelete,
             int retentionDays,
-            int retainedCount)
+            int retainedCount,
+            DateTimeOffset? utcNow)
         {
             int deletedByAge = 0;
             int deletedByCount = 0;
 
             if (retentionDays > 0)
             {
-                var cutoff = DateTimeOffset.UtcNow.AddDays(-retentionDays);
+                var cutoff = (utcNow ?? TimeProvider.System.GetUtcNow()).AddDays(-retentionDays);
                 foreach (var entry in entries.Where(entry => getLastWriteTime(entry) < cutoff).ToList())
                 {
                     if (tryDelete(entry))

@@ -6,7 +6,7 @@ import {
   createExportDocManagerApiClient,
 } from "./api/index.ts";
 import { queryKeys } from "./api/queryKeys.ts";
-import { notifyAuthenticationFailure, subscribeToAuthenticationFailure } from "./api/authenticationFailureEvents.ts";
+import { subscribeToAuthenticationFailure } from "./api/authenticationFailureEvents.ts";
 import { calculateSessionExpiryDelay, calculateSessionWarningDelay } from "./api/sessionExpiryModel.ts";
 import {
   getDesktopRuntimeContext,
@@ -29,6 +29,7 @@ import {
   writeStoredSession,
 } from "./app/webSessionStorage.ts";
 import { openSessionChannel, type SessionChannelMessage } from "./app/sessionChannel.ts";
+import { useBusinessDateSessionRefresh } from "./app/useBusinessDateSessionRefresh.ts";
 import { isDashboardRoute, isAdminOnlyRoute, isDesktopOnlyRoute, isFullEditionOnlyRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
 import {
   getDefaultWorkspaceRoute,
@@ -321,41 +322,14 @@ function App() {
     };
   }, [expireSession, session?.expiresAt]);
 
-  useEffect(() => {
-    if (!session || desktopContextLoading) {
-      return undefined;
-    }
-
-    let isStale = false;
-    void client
-      .getCurrentUser()
-      .then((user) => {
-        if (isStale) {
-          return;
-        }
-
-        const currentSession = sessionRef.current;
-        if (!currentSession || currentSession.accessToken !== sessionAccessToken) {
-          return;
-        }
-
-        const nextSession = { ...currentSession, user };
-        setSession(nextSession);
-        writeStoredSession(nextSession);
-        sessionChannelRef.current?.post({ type: "session-updated", session: nextSession });
-      })
-      .catch((error) => {
-        if (isStale) {
-          return;
-        }
-
-        notifyAuthenticationFailure(error);
-      });
-
-    return () => {
-      isStale = true;
-    };
-  }, [client, desktopContextLoading, expireSession, sessionAccessToken, sessionApiBaseUrl]);
+  useBusinessDateSessionRefresh({
+    client,
+    desktopContextLoading,
+    queryClient,
+    session,
+    sessionRef,
+    setSession,
+  });
 
   useEffect(() => {
     if (!session) return;

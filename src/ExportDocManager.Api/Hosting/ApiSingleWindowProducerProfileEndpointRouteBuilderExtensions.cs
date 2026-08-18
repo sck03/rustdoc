@@ -11,7 +11,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/single-window/coo/producer-profiles", async Task<Results<
                 Ok<ApiCustomsCooProducerProfileListResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomsCooProducerProfileService producerProfileService,
@@ -31,7 +31,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiCustomsCooProducerProfileResponse>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound<ApiErrorResponse>>>(
+                NotFound<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomsCooProducerProfileService producerProfileService,
@@ -54,7 +54,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/single-window/coo/producer-profiles", async Task<Results<
                 Ok<ApiCustomsCooProducerProfileSaveResponse>,
                 BadRequest<ApiErrorResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomsCooProducerProfileService producerProfileService,
@@ -89,7 +89,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiCustomsCooProducerProfileSaveResponse>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound<ApiErrorResponse>>>(
+                NotFound<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomsCooProducerProfileService producerProfileService,
@@ -143,7 +143,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiCommandResponse>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound<ApiErrorResponse>>>(
+                NotFound<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomsCooProducerProfileService producerProfileService,

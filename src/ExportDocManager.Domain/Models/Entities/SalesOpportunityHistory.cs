@@ -17,6 +17,6 @@ namespace ExportDocManager.Models.Entities
         public DateOnly? ExpectedCloseDate { get; set; }
         [MaxLength(1000)] public string ChangeNote { get; set; } = string.Empty;
         [MaxLength(100)] public string ChangedBy { get; set; } = string.Empty;
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; }
     }
 }

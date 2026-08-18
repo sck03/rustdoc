@@ -26,6 +26,7 @@ namespace ExportDocManager.Services.Crm
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var customers = _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking());
             customers = customers.ApplyKeywordSearch(
+                context,
                 keyword,
                 item => item.Name,
                 item => item.CountryRegion,

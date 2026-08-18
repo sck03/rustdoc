@@ -63,6 +63,19 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public void SecurityHeaders_ShouldRestrictConnectionsToSelfAndConfiguredOrigins()
+        {
+            string policy = ApiSecurityHeadersMiddleware.BuildContentSecurityPolicy(new ApiRuntimeOptions
+            {
+                AllowedOrigins = ["https://erp.example.com", "http://192.168.1.20:8080"]
+            });
+
+            Assert.Contains("connect-src 'self' https://erp.example.com http://192.168.1.20:8080;", policy);
+            Assert.DoesNotContain("connect-src 'self' http: https:", policy);
+            Assert.DoesNotContain(" ws: ", policy);
+        }
+
+        [Fact]
         public void Parse_ShouldPreserveFileSystemRootPaths()
         {
             string root = Path.GetPathRoot(Path.GetFullPath(AppContext.BaseDirectory)) ??
@@ -1059,7 +1072,11 @@ namespace ExportDocManager.Api.Tests
 
                 var settingsService = scope.ServiceProvider.GetRequiredService<ISettingsService>();
                 await settingsService.LoadAsync();
-                settingsService.Settings.System.DefaultTemplateExporterNameCn = "宁波测试出口有限公司";
+                await settingsService.UpdateAsync(settings =>
+                {
+                    settings.System.DefaultTemplateExporterNameCn = "宁波测试出口有限公司";
+                    return true;
+                });
                 var excelImportService = scope.ServiceProvider.GetRequiredService<IExcelImportService>();
 
                 var result = await excelImportService.ImportFromExcelAsync(sourcePath);
@@ -2453,9 +2470,12 @@ namespace ExportDocManager.Api.Tests
 
             public AppSettings Settings { get; }
 
-            public Task LoadAsync() => Task.CompletedTask;
+            public Task LoadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-            public Task SaveAsync() => Task.CompletedTask;
+            public Task<bool> UpdateAsync(
+                Func<AppSettings, bool> update,
+                CancellationToken cancellationToken = default) =>
+                Task.FromResult(update(Settings));
         }
 
         private sealed class TestPdfMergeService : IPdfMergeService

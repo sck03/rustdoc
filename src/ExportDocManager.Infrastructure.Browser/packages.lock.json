@@ -18,6 +18,11 @@
           "System.ComponentModel.Annotations": "5.0.0"
         }
       },
+      "BouncyCastle.Cryptography": {
+        "type": "Transitive",
+        "resolved": "2.6.2",
+        "contentHash": "7oWOcvnntmMKNzDLsdxAYqApt+AjpRpP2CShjMfIa3umZ42UQMvH0tl1qAliYPNYO6vTdcGMqnRrCPmsfzTI1w=="
+      },
       "Microsoft.Data.Sqlite.Core": {
         "type": "Transitive",
         "resolved": "10.0.10",
@@ -92,6 +97,7 @@
           "ExportDocManager.Application": "[0.1.1, )",
           "ExportDocManager.Domain": "[0.1.1, )",
           "HtmlAgilityPack": "[1.12.4, )",
+          "MailKit": "[4.17.0, )",
           "Microsoft.Data.Sqlite": "[10.0.10, )",
           "Microsoft.EntityFrameworkCore": "[10.0.10, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.10, )",
@@ -100,6 +106,15 @@
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.5, )",
           "Scriban": "[7.2.6, )",
           "System.Security.Cryptography.ProtectedData": "[10.0.10, )"
+        }
+      },
+      "MailKit": {
+        "type": "CentralTransitive",
+        "requested": "[4.17.0, )",
+        "resolved": "4.17.0",
+        "contentHash": "eOy/ZDcmdeD76anXpviyZYynl7k45FhwWIQAHU8W0/uyeKbsKo2MEtQUmD5n2wHeQAGzKCcIRt2LjZJXLC6kPw==",
+        "dependencies": {
+          "MimeKit": "4.17.0"
         }
       },
       "Microsoft.Bcl.AsyncInterfaces": {
@@ -150,6 +165,16 @@
           "SQLitePCLRaw.core": "2.1.11"
         }
       },
+      "MimeKit": {
+        "type": "CentralTransitive",
+        "requested": "[4.17.0, )",
+        "resolved": "4.17.0",
+        "contentHash": "uH/TEqa5XnbxCid4CXk12IhCwUvbg11erqOBLEmQ2fC6Nn/ksY6mYevbPB+GiC+FE7v8d5lfdBmil+UF7mxJ5g==",
+        "dependencies": {
+          "BouncyCastle.Cryptography": "2.6.2",
+          "System.Security.Cryptography.Pkcs": "10.0.0"
+        }
+      },
       "Npgsql.EntityFrameworkCore.PostgreSQL": {
         "type": "CentralTransitive",
         "requested": "[10.0.3, )",
@@ -176,6 +201,12 @@
           "SQLite": "3.53.4",
           "SQLitePCLRaw.config.e_sqlite3": "3.0.5"
         }
+      },
+      "System.Security.Cryptography.Pkcs": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.10, )",
+        "resolved": "10.0.10",
+        "contentHash": "KG8t5RHczdgB3IWvRndpI0nE1DSo7ikDYSDbITxfgRFyIvnYiKzuPjaZOsPnwFQ1aOGUl9sEulJul9wlHLEUoA=="
       },
       "System.Security.Cryptography.ProtectedData": {
         "type": "CentralTransitive",

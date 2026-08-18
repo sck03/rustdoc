@@ -173,7 +173,7 @@ namespace ExportDocManager.Services.Infrastructure
             var gcMemoryInfo = GC.GetGCMemoryInfo();
             return new
             {
-                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedAt = _clock.UtcNow,
                 Environment.MachineName,
                 Environment.OSVersion.Platform,
                 Environment.OSVersion.VersionString,

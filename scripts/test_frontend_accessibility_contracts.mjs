@@ -503,7 +503,7 @@ if (themeCss.includes(".invoice-editor-sticky-actions span {")) {
   failures.push("theme.css: 发票保存区状态文字选择器不得覆盖按钮组件内部文字");
 }
 const hsKnowledgeCss = fs.readFileSync(path.join(root, "features", "master-data", "hsKnowledge.css"), "utf8");
-if (!hsKnowledgeCss.includes("background: var(--input-background, #fff)")) {
+if (!hsKnowledgeCss.includes("background: var(--input-background, var(--edm-white))")) {
   failures.push("hsKnowledge.css: 智能 HS 查询输入框必须有稳定的非透明背景回退");
 }
 for (const reducedMotionContract of [

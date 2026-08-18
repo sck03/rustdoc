@@ -34,15 +34,6 @@ export function DisasterRecoveryPanel({
             <div className="detail-item-actions">{renderOpenPathAction(status?.recoveryRoot, "打开恢复包目录", onPathError)}</div>
           </div>
         </div>
-        {controller.lastRecoveryPackagePath ? (
-          <div className="detail-item detail-item-wide">
-            <span>本次生成</span>
-            <div className="detail-value-row">
-              <strong title={controller.lastRecoveryPackagePath}>{controller.lastRecoveryPackagePath}</strong>
-              <div className="detail-item-actions">{renderOpenPathAction(controller.lastRecoveryPackagePath, "打开恢复包", onPathError)}</div>
-            </div>
-          </div>
-        ) : null}
       </div>
       <div className="backup-action-grid">
         <label>

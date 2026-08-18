@@ -2,6 +2,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Reporting
@@ -14,13 +15,16 @@ namespace ExportDocManager.Services.Reporting
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
+        private readonly IBusinessClock _clock;
 
         public UserReportTemplateService(
             IDbContextFactory<AppDbContext> contextFactory,
-            BusinessDataAccessScope accessScope)
+            BusinessDataAccessScope accessScope,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<IReadOnlyList<UserReportTemplateRecord>> ListAsync(
@@ -131,7 +135,7 @@ namespace ExportDocManager.Services.Reporting
             entity.ShareScope = shareScope;
             entity.IsShared = !string.Equals(shareScope, UserReportTemplateShareScope.Private, StringComparison.OrdinalIgnoreCase);
             entity.VersionNumber = isNew ? 1 : Math.Max(1, entity.VersionNumber + 1);
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.UpdatedAt = _clock.UtcNow;
             await context.UserReportTemplateVersions.AddAsync(new UserReportTemplateVersion
             {
                 Template = entity,
@@ -219,7 +223,7 @@ namespace ExportDocManager.Services.Reporting
             entity.IsShared = source.IsShared;
             entity.ShareScope = source.ShareScope;
             entity.VersionNumber = Math.Max(1, entity.VersionNumber + 1);
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.UpdatedAt = _clock.UtcNow;
             await context.UserReportTemplateVersions.AddAsync(new UserReportTemplateVersion
             {
                 Template = entity,

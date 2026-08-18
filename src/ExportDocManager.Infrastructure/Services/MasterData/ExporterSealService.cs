@@ -18,11 +18,11 @@ namespace ExportDocManager.Services.MasterData
         public ExporterSealService(
             IDbContextFactory<AppDbContext> contextFactory,
             IAppPathProvider pathProvider,
-            BusinessDataAccessScope? accessScope = null)
+            BusinessDataAccessScope accessScope)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
-            _accessScope = accessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
+            _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
         }
 
         public async Task<Exporter> SaveSealAsync(

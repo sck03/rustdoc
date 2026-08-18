@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Time;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -53,7 +54,8 @@ namespace ExportDocManager.Api.Hosting
                 IRuntimeDependencyDiagnosticsService dependencyDiagnostics,
                 ApiCurrentUserResolver currentUserResolver,
                 ApiAuthorizationService authorizationService,
-                ApiDesktopAccessOptions desktopAccessOptions) =>
+                ApiDesktopAccessOptions desktopAccessOptions,
+                IBusinessClock clock) =>
             {
                 // Container/load-balancer probes are anonymous by design.  Do
                 // not perform filesystem, browser, OCR, or PostgreSQL tool
@@ -70,7 +72,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (!canViewDetails)
                 {
-                    return Results.Ok(ApiHealthResponseFactory.CreatePublic(databaseSettings));
+                    return Results.Ok(ApiHealthResponseFactory.CreatePublic(databaseSettings, clock));
                 }
 
                 string sqliteDatabasePath = DatabaseModeHelper.UsesPostgreSql(databaseSettings)
@@ -82,7 +84,8 @@ namespace ExportDocManager.Api.Hosting
                     databaseSettings,
                     sqliteDatabasePath,
                     dependencyDiagnostics.Inspect(),
-                    hasDesktopAccess);
+                    hasDesktopAccess,
+                    clock);
                 return Results.Ok(response);
             })
                 .WithName("getHealth")

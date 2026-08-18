@@ -13,7 +13,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/single-window/operation-center", async Task<Results<
                 Ok<SingleWindowOperationCenterPageResult>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ISingleWindowOperationCenterService operationCenterService,
@@ -44,7 +44,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<SingleWindowOperationCenterDetail>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ISingleWindowOperationCenterService operationCenterService,

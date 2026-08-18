@@ -66,7 +66,7 @@ namespace ExportDocManager.Services.MasterData
 
                 var manifest = new KnowledgeManifest(
                     PackageSchemaVersion,
-                    DateTimeOffset.UtcNow,
+                    _clock.UtcNow,
                     since,
                     checksums);
                 byte[] manifestBytes = JsonSerializer.SerializeToUtf8Bytes(manifest, JsonOptions);

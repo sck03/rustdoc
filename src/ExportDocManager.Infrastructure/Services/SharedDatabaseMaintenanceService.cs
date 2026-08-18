@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Errors;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -39,17 +40,20 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly string _postgreSqlOwnerRole;
         private readonly IAppPathProvider _pathProvider;
         private readonly IBackgroundJobService? _backgroundJobs;
+        private readonly IBusinessClock _clock;
 
         public SharedDatabaseMaintenanceService(
             IDbContextFactory<AppDbContext> contextFactory,
             DatabaseConnectionSettings databaseSettings,
             IAppPathProvider pathProvider,
-            IBackgroundJobService? backgroundJobs = null)
+            IBackgroundJobService? backgroundJobs = null,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _databaseSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _backgroundJobs = backgroundJobs;
+            _clock = clock ?? BusinessClock.CreateSystem();
             if (DatabaseModeHelper.UsesPostgreSql(databaseSettings))
             {
                 PostgreSqlMaintenanceConnectionProfile profile =

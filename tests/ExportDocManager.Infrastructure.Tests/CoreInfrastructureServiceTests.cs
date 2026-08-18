@@ -78,8 +78,8 @@ namespace ExportDocManager.Infrastructure.Tests
             var service = new InvoiceService(
                 factory,
                 new ItemService(factory),
-                new InvoicePartyResolver(),
-                new DatabaseConnectionSettings());
+                new InvoicePartyResolver(TestAccessScope.Create()),
+                TestAccessScope.Create());
 
             await service.SaveInvoiceAsync(new Invoice
             {
@@ -101,8 +101,8 @@ namespace ExportDocManager.Infrastructure.Tests
             var service = new InvoiceService(
                 factory,
                 new ItemService(factory),
-                new InvoicePartyResolver(),
-                new DatabaseConnectionSettings());
+                new InvoicePartyResolver(TestAccessScope.Create()),
+                TestAccessScope.Create());
 
             await service.SaveInvoiceAsync(new Invoice
             {
@@ -137,7 +137,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 await context.SaveChangesAsync();
             }
 
-            var resolver = new InvoicePartyResolver();
+            var resolver = new InvoicePartyResolver(TestAccessScope.Create());
             await using var resolveContext = await factory.CreateDbContextAsync();
 
             var customerId = await resolver.ResolveCustomerIdAsync(

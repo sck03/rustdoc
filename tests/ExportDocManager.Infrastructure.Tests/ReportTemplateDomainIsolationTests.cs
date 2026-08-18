@@ -593,12 +593,20 @@ public sealed class ReportTemplateDomainIsolationTests
 
         public int SaveCount { get; private set; }
 
-        public Task LoadAsync() => Task.CompletedTask;
+        public Task LoadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-        public Task SaveAsync()
+        public Task<bool> UpdateAsync(
+            Func<AppSettings, bool> update,
+            CancellationToken cancellationToken = default)
         {
+            bool changed = update(Settings);
+            if (!changed)
+            {
+                return Task.FromResult(false);
+            }
+
             SaveCount++;
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
     }
 }

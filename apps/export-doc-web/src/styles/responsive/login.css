@@ -7,10 +7,10 @@
   min-height: 100dvh;
   padding: 48px;
   overflow: hidden;
-  color: #14242a;
+  color: var(--edm-neutral-850);
   background:
-    linear-gradient(112deg, rgba(222, 238, 234, 0.88) 0%, rgba(239, 246, 244, 0.9) 45%, transparent 45.2%),
-    linear-gradient(145deg, #f5f9f8 0%, #edf3f1 63%, #f5f1e9 100%);
+    linear-gradient(112deg, color-mix(in srgb, var(--edm-primary-150) 88%, transparent) 0%, color-mix(in srgb, var(--edm-ink-100) 90%, transparent) 45%, transparent 45.2%),
+    linear-gradient(145deg, var(--edm-primary-25) 0%, var(--edm-ink-100) 63%, var(--edm-neutral-75) 100%);
 }
 
 .login-screen::before {
@@ -21,9 +21,9 @@
   z-index: 0;
   pointer-events: none;
   background:
-    repeating-linear-gradient(90deg, transparent 0 94px, rgba(40, 99, 90, 0.055) 94px 95px),
-    linear-gradient(128deg, rgba(255, 255, 255, 0.72), rgba(72, 143, 132, 0.08));
-  border-right: 1px solid rgba(44, 105, 96, 0.2);
+    repeating-linear-gradient(90deg, transparent 0 94px, color-mix(in srgb, var(--edm-primary-750) 5.5%, transparent) 94px 95px),
+    linear-gradient(128deg, color-mix(in srgb, var(--edm-white) 72%, transparent), color-mix(in srgb, var(--edm-primary-600) 8%, transparent));
+  border-right: 1px solid color-mix(in srgb, var(--edm-primary-700) 20%, transparent);
   clip-path: polygon(0 0, 83% 0, 100% 100%, 0 100%);
   animation: login-ambient-sweep 24s ease-in-out infinite alternate;
 }
@@ -37,8 +37,8 @@
   height: 72%;
   z-index: 0;
   pointer-events: none;
-  border-top: 1px solid rgba(13, 111, 101, 0.2);
-  border-bottom: 1px solid rgba(13, 111, 101, 0.16);
+  border-top: 1px solid color-mix(in srgb, var(--edm-primary-650) 20%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--edm-primary-650) 16%, transparent);
   opacity: 0.72;
   transform: skewY(-4deg);
   animation: login-frame-breathe 16s ease-in-out infinite alternate;
@@ -51,11 +51,11 @@
   pointer-events: none;
   opacity: 0.58;
   background-image:
-    linear-gradient(rgba(20, 74, 66, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(20, 74, 66, 0.07) 1px, transparent 1px),
-    repeating-linear-gradient(0deg, transparent 0 143px, rgba(161, 119, 45, 0.08) 143px 144px);
+    linear-gradient(color-mix(in srgb, var(--edm-primary-850) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--edm-primary-850) 7%, transparent) 1px, transparent 1px),
+    repeating-linear-gradient(0deg, transparent 0 143px, color-mix(in srgb, var(--edm-earth-500) 8%, transparent) 143px 144px);
   background-size: 48px 48px, 48px 48px, 100% 144px;
-  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.88), rgba(0, 0, 0, 0.4) 54%, transparent 76%);
+  mask-image: linear-gradient(90deg, color-mix(in srgb, var(--edm-black) 88%, transparent), color-mix(in srgb, var(--edm-black) 40%, transparent) 54%, transparent 76%);
   animation: login-grid-drift 28s ease-in-out infinite alternate;
 }
 
@@ -72,7 +72,7 @@
   top: 31%;
   left: 7%;
   width: min(44vw, 560px);
-  background: linear-gradient(90deg, transparent, rgba(15, 118, 110, 0.76), rgba(15, 118, 110, 0.18), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--edm-primary-650) 76%, transparent), color-mix(in srgb, var(--edm-primary-650) 18%, transparent), transparent);
   animation: login-signal-drift 18s ease-in-out infinite alternate;
 }
 
@@ -80,7 +80,7 @@
   right: 8%;
   bottom: 20%;
   width: min(34vw, 440px);
-  background: linear-gradient(90deg, transparent, rgba(174, 123, 34, 0.5), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--edm-warning-600) 50%, transparent), transparent);
   animation: login-signal-drift 22s ease-in-out 1.5s infinite alternate-reverse;
 }
 
@@ -107,7 +107,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #24433f;
+  color: var(--edm-ink-900);
 }
 
 .login-brand-lockup-copy {
@@ -117,14 +117,14 @@
 }
 
 .login-brand-lockup-copy strong {
-  color: #173b36;
+  color: var(--edm-ink-900);
   font-size: 15px;
   font-weight: 800;
 }
 
 .login-brand-lockup-copy small {
   overflow: hidden;
-  color: #647773;
+  color: var(--edm-ink-500);
   font-size: 12px;
   font-weight: 650;
   letter-spacing: 0;
@@ -138,10 +138,10 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  color: #ffffff;
+  color: var(--edm-white);
   background: linear-gradient(145deg, var(--edm-primary-500), var(--edm-primary-700));
   border-radius: 12px;
-  box-shadow: 0 12px 26px rgba(15, 118, 110, 0.18);
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--edm-primary-650) 18%, transparent);
 }
 
 .login-app-icon {
@@ -158,7 +158,7 @@
 
 .login-title-row h1 {
   margin: 0;
-  color: #102522;
+  color: var(--edm-primary-900);
   font-size: clamp(36px, 3.35vw, 46px);
   line-height: 1.14;
   letter-spacing: 0;
@@ -170,10 +170,10 @@
   min-height: 32px;
   padding: 0 12px;
   color: var(--edm-primary-800);
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid #a9cbc4;
+  background: color-mix(in srgb, var(--edm-white) 72%, transparent);
+  border: 1px solid var(--edm-neutral-450);
   border-radius: 999px;
-  box-shadow: 0 4px 12px rgba(24, 55, 51, 0.07);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--edm-ink-900) 7%, transparent);
   font-size: 14px;
   font-weight: 800;
   white-space: nowrap;
@@ -181,7 +181,7 @@
 
 .login-brand-copy p {
   margin: 0;
-  color: #536b66;
+  color: var(--edm-ink-600);
   font-size: 17px;
   font-weight: 650;
 }
@@ -191,18 +191,18 @@
   gap: 17px;
   width: 100%;
   padding: 28px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(172, 194, 188, 0.72);
+  background: color-mix(in srgb, var(--edm-white) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--edm-neutral-450) 72%, transparent);
   border-radius: 8px;
-  box-shadow: 0 24px 64px rgba(24, 55, 51, 0.14);
+  box-shadow: 0 24px 64px color-mix(in srgb, var(--edm-ink-900) 14%, transparent);
   backdrop-filter: blur(14px);
   animation: login-card-enter 560ms cubic-bezier(0.22, 1, 0.36, 1) 80ms both;
   transition: border-color 180ms ease, box-shadow 220ms ease;
 }
 
 .login-card:focus-within {
-  border-color: rgba(85, 150, 137, 0.72);
-  box-shadow: 0 28px 72px rgba(24, 55, 51, 0.17);
+  border-color: color-mix(in srgb, var(--edm-primary-350) 72%, transparent);
+  box-shadow: 0 28px 72px color-mix(in srgb, var(--edm-ink-900) 17%, transparent);
 }
 
 .login-card-header {
@@ -232,14 +232,14 @@
 
 .login-card-subtitle {
   margin: 4px 0 0;
-  color: #657773;
+  color: var(--edm-ink-500);
   font-size: 12px;
   font-weight: 600;
 }
 
 .login-field {
   gap: 8px;
-  color: #3d4d55;
+  color: var(--edm-neutral-700);
   font-size: 13px;
   font-weight: 800;
 }
@@ -251,17 +251,17 @@
   min-width: 0;
   height: 42px;
   padding: 0 12px;
-  color: #60727a;
-  background: #ffffff;
-  border: 1px solid #bdcfcb;
+  color: var(--edm-neutral-550);
+  background: var(--edm-white);
+  border: 1px solid var(--edm-ink-300);
   border-radius: 10px;
   transition: color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .login-input-shell:focus-within {
-  color: #0f766e;
-  border-color: #0f766e;
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+  color: var(--edm-primary-650);
+  border-color: var(--edm-primary-650);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--edm-primary-650) 14%, transparent);
 }
 
 .login-input-shell input,
@@ -269,7 +269,7 @@
   min-width: 0;
   height: 100%;
   padding: 0;
-  color: #14242a;
+  color: var(--edm-neutral-850);
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -279,9 +279,9 @@
 
 .login-alert {
   padding: 10px 12px;
-  color: #8a1f13;
-  background: #fff0ed;
-  border: 1px solid #f1b4aa;
+  color: var(--edm-danger-800);
+  background: var(--edm-danger-50);
+  border: 1px solid var(--edm-danger-300);
   border-radius: 8px;
   font-size: 13px;
   font-weight: 700;
@@ -297,16 +297,16 @@
   width: 100%;
   min-height: 44px;
   padding: 0 14px 0 18px;
-  color: #ffffff;
-  background: #0f766e;
+  color: var(--edm-white);
+  background: var(--edm-primary-650);
   border-radius: 10px;
-  box-shadow: 0 14px 30px rgba(15, 118, 110, 0.18);
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--edm-primary-650) 18%, transparent);
   font-weight: 800;
   transition: background-color 160ms ease, box-shadow 180ms ease, transform 160ms ease;
 }
 
 .login-submit-button:hover:not(:disabled) {
-  background: #0d635d;
+  background: var(--edm-primary-750);
 }
 
 .login-submit-button svg {
@@ -418,7 +418,7 @@
 
   .login-grid-overlay {
     opacity: 0.22;
-    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.66), transparent 72%);
+    mask-image: linear-gradient(180deg, color-mix(in srgb, var(--edm-black) 66%, transparent), transparent 72%);
   }
 
   .login-grid-overlay::after {

@@ -54,7 +54,7 @@ namespace ExportDocManager.Services.SingleWindow
                 batches = batches.Where(batch => batch.Status == status);
             }
 
-            batches = ApplyKeywordFilter(batches, normalizedQuery.Keyword);
+            batches = ApplyKeywordFilter(context, batches, normalizedQuery.Keyword);
 
             int totalCount = await batches.CountAsync(cancellationToken);
             var pagedRows = await batches
@@ -179,6 +179,7 @@ namespace ExportDocManager.Services.SingleWindow
         }
 
         private static IQueryable<SwSubmissionBatch> ApplyKeywordFilter(
+            AppDbContext context,
             IQueryable<SwSubmissionBatch> batches,
             string keyword)
         {
@@ -188,6 +189,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
 
             return batches.ApplyKeywordSearch(
+                context,
                 keyword,
                 batch => batch.InvoiceNo,
                 batch => batch.ContractNo,

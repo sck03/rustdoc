@@ -24,11 +24,11 @@ namespace ExportDocManager.Services.MasterData
         public CustomerService(
             IDbContextFactory<AppDbContext> contextFactory,
             ICustomerReadRepository customerReadRepository,
-            BusinessDataAccessScope? accessScope = null)
+            BusinessDataAccessScope accessScope)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _customerReadRepository = customerReadRepository ?? throw new ArgumentNullException(nameof(customerReadRepository));
-            _accessScope = accessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
+            _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
         }
 
         public async Task<int> SaveCustomerAsync(

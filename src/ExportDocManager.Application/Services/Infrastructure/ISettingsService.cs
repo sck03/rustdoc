@@ -4,28 +4,15 @@ namespace ExportDocManager.Services.Infrastructure
 {
     public interface ISettingsService
     {
+        /// <summary>
+        /// Returns an isolated snapshot. Mutating it never changes persisted settings;
+        /// use <see cref="UpdateAsync"/> for every write.
+        /// </summary>
         AppSettings Settings { get; }
 
-        Task LoadAsync();
-
-        Task SaveAsync();
+        Task LoadAsync(CancellationToken cancellationToken = default);
 
         Task<bool> UpdateAsync(Func<AppSettings, bool> update, CancellationToken cancellationToken = default)
-        {
-            ArgumentNullException.ThrowIfNull(update);
-
-            if (!update(Settings))
-            {
-                return Task.FromResult(false);
-            }
-
-            return PersistAsync();
-
-            async Task<bool> PersistAsync()
-            {
-                await SaveAsync().ConfigureAwait(false);
-                return true;
-            }
-        }
+            => throw new NotSupportedException("This settings service does not support atomic updates.");
     }
 }

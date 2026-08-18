@@ -16,7 +16,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapGet("/api/query/invoices", async Task<Results<
                 Ok<ApiPagedResponse<ApiQueryInvoiceRowDto>>,
                 BadRequest<ApiErrorResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IQueryReadRepository queryReadRepository,
                 DateOnly? startDate,

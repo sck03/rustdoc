@@ -42,6 +42,6 @@ public sealed class DatabaseSchemaMigrationPlannerTests
     public void PostgreSqlTrigramFeature_ShouldHaveExplicitOptionalVersion()
     {
         Assert.Equal("postgresql.pg_trgm", DatabaseSchemaBaseline.PostgreSqlTrigramFeatureName);
-        Assert.Equal(1, DatabaseSchemaBaseline.PostgreSqlTrigramFeatureVersion);
+        Assert.Equal(2, DatabaseSchemaBaseline.PostgreSqlTrigramFeatureVersion);
     }
 }

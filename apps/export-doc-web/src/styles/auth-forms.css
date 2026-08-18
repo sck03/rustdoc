@@ -22,7 +22,7 @@ label {
   display: grid;
   gap: 7px;
   min-width: 0;
-  color: #4d5963;
+  color: var(--edm-neutral-650);
   font-size: 13px;
   font-weight: 600;
 }
@@ -47,15 +47,15 @@ label {
 }
 
 .form-field-disabled .form-field-label {
-  color: #7b858f;
+  color: var(--edm-neutral-550);
 }
 
 .form-field-required-badge {
   flex: 0 0 auto;
   padding: 2px 6px;
-  color: #8a1f13;
-  background: #fff0ed;
-  border: 1px solid #f1b4aa;
+  color: var(--edm-danger-800);
+  background: var(--edm-danger-50);
+  border: 1px solid var(--edm-danger-300);
   border-radius: 999px;
   font-size: var(--edm-font-size-xs);
   font-weight: 800;
@@ -85,8 +85,8 @@ label input:disabled,
 label select:disabled,
 label textarea:disabled {
   color: var(--edm-ink-500);
-  background: #f3f5f6;
-  border-color: #d8e0e6;
+  background: var(--edm-neutral-100);
+  border-color: var(--edm-neutral-350);
 }
 
 label input:focus,
@@ -94,7 +94,7 @@ label select:focus,
 label textarea:focus,
 .search-form:focus-within {
   border-color: var(--edm-primary-600);
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--edm-primary-650) 14%, transparent);
 }
 
 label textarea {
@@ -113,7 +113,7 @@ label textarea {
   display: grid;
   gap: 7px;
   min-width: 0;
-  color: #4d5963;
+  color: var(--edm-neutral-650);
   font-size: 13px;
   font-weight: 600;
 }
@@ -154,7 +154,7 @@ label textarea {
 .path-field-control input:focus,
 .path-field-control textarea:focus {
   border-color: var(--edm-primary-600);
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--edm-primary-650) 14%, transparent);
 }
 
 .path-field-actions {

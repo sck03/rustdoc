@@ -1,10 +1,12 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-17",
-  "purpose": "Freeze existing hard-coded CSS debt while new work moves toward semantic tokens and shared commercial components.",
+  "capturedAt": "2026-08-18",
+  "purpose": "Keep all raw CSS colors centralized in the reviewed color token registry; feature styles must consume semantic or palette tokens only.",
   "maximum": {
-    "hexColors": 1266,
-    "rgbColors": 198,
+    "hexColors": 125,
+    "rgbColors": 0,
+    "featureHexColors": 0,
+    "featureRgbColors": 0,
     "boxShadows": 107,
     "gradients": 49,
     "pixelFontSizes": 326,

@@ -3,6 +3,7 @@ using ExportDocManager.Models;
 using ExportDocManager.Services.Data;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Tools;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -319,10 +320,13 @@ namespace ExportDocManager.Api.Hosting
         {
             _ = raw;
             normalized ??= new AISettings();
-            if (!string.IsNullOrWhiteSpace(normalized.ApiEndpoint) &&
-                !Uri.TryCreate(normalized.ApiEndpoint.Trim(), UriKind.Absolute, out _))
+            try
             {
-                messages.Add(Warning("ai.apiEndpoint", "AI API 地址不是有效的绝对地址。", false));
+                _ = AiEndpointPolicy.Normalize(normalized.ApiEndpoint);
+            }
+            catch (ServiceValidationException ex)
+            {
+                messages.Add(Error("ai.apiEndpoint", ex.Message, false));
             }
         }
 

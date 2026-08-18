@@ -45,13 +45,13 @@
 
 .agent-consignment-card-header h3 {
   margin: 0;
-  color: #26323d;
+  color: var(--edm-neutral-750);
   font-size: 14px;
   font-weight: 800;
 }
 
 .agent-consignment-card-header span {
-  color: #69737d;
+  color: var(--edm-neutral-550);
   font-size: 12px;
   font-weight: 700;
   line-height: 1.45;
@@ -89,13 +89,13 @@
   min-width: 0;
   min-height: 72px;
   padding: 12px;
-  background: #f8fbfc;
-  border: 1px solid #d8e0e6;
+  background: var(--edm-neutral-50);
+  border: 1px solid var(--edm-neutral-350);
   border-radius: 8px;
 }
 
 .agent-consignment-receipt-card span {
-  color: #69737d;
+  color: var(--edm-neutral-550);
   font-size: 12px;
   font-weight: 800;
 }
@@ -103,7 +103,7 @@
 .agent-consignment-receipt-card strong {
   min-width: 0;
   overflow: hidden;
-  color: #202124;
+  color: var(--edm-neutral-800);
   font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -113,9 +113,9 @@
   display: grid;
   place-items: center;
   min-height: 180px;
-  color: #69737d;
-  background: #f8fafb;
-  border: 1px dashed #cfd8df;
+  color: var(--edm-neutral-550);
+  background: var(--edm-neutral-50);
+  border: 1px dashed var(--edm-neutral-400);
   border-radius: 8px;
   font-size: 13px;
   font-weight: 700;
@@ -135,8 +135,8 @@
   min-width: 0;
   max-height: 720px;
   overflow: hidden;
-  background: #fbfcfd;
-  border: 1px solid #d8e0e6;
+  background: var(--edm-neutral-25);
+  border: 1px solid var(--edm-neutral-350);
   border-radius: 8px;
 }
 
@@ -147,17 +147,17 @@
   gap: 8px;
   min-height: 42px;
   padding: 9px 10px;
-  border-bottom: 1px solid #e1e7ec;
+  border-bottom: 1px solid var(--edm-neutral-250);
 }
 
 .coo-items-rail-header strong {
-  color: #26323d;
+  color: var(--edm-neutral-750);
   font-size: 13px;
   font-weight: 800;
 }
 
 .coo-items-rail-header span {
-  color: #69737d;
+  color: var(--edm-neutral-550);
   font-size: 12px;
   font-weight: 800;
 }
@@ -181,21 +181,21 @@
   min-height: 58px;
   padding: 8px;
   text-align: left;
-  color: #26323d;
-  background: #ffffff;
-  border: 1px solid #d8e0e6;
+  color: var(--edm-neutral-750);
+  background: var(--edm-white);
+  border: 1px solid var(--edm-neutral-350);
   border-radius: 8px;
   cursor: pointer;
 }
 
 .coo-item-row-card:hover {
-  border-color: #9ccfca;
+  border-color: var(--edm-primary-300);
 }
 
 .coo-item-row-card-active {
-  background: #eef8f5;
-  border-color: #0f766e;
-  box-shadow: inset 3px 0 0 #0f766e;
+  background: var(--edm-primary-75);
+  border-color: var(--edm-primary-650);
+  box-shadow: inset 3px 0 0 var(--edm-primary-650);
 }
 
 .coo-item-row-card-index {
@@ -205,9 +205,9 @@
   min-width: 34px;
   height: 24px;
   padding: 0 7px;
-  color: #0f5f58;
-  background: #e6f4f1;
-  border: 1px solid #c8e4dd;
+  color: var(--edm-primary-750);
+  background: var(--edm-primary-75);
+  border: 1px solid var(--edm-primary-150);
   border-radius: 999px;
   font-size: 12px;
   font-weight: 800;
@@ -228,7 +228,7 @@
 
 .coo-item-row-card-meta {
   grid-column: 2;
-  color: #69737d;
+  color: var(--edm-neutral-550);
   font-size: 12px;
   font-weight: 700;
 }
@@ -247,8 +247,8 @@
   min-width: 0;
   min-height: 42px;
   padding: 8px 10px;
-  background: #f8fbfc;
-  border: 1px solid #d8e0e6;
+  background: var(--edm-neutral-50);
+  border: 1px solid var(--edm-neutral-350);
   border-radius: 8px;
 }
 
@@ -259,7 +259,7 @@
 }
 
 .coo-item-detail-title span {
-  color: #69737d;
+  color: var(--edm-neutral-550);
   font-size: 12px;
   font-weight: 800;
 }
@@ -267,7 +267,7 @@
 .coo-item-detail-title strong {
   min-width: 0;
   overflow: hidden;
-  color: #202124;
+  color: var(--edm-neutral-800);
   font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -292,7 +292,7 @@
   gap: 10px;
   min-width: 0;
   padding-top: 12px;
-  border-top: 1px solid #e3e8ed;
+  border-top: 1px solid var(--edm-neutral-250);
 }
 
 .coo-item-field-group:first-child {
@@ -302,7 +302,7 @@
 
 .coo-item-field-group h3 {
   margin: 0;
-  color: #26323d;
+  color: var(--edm-neutral-750);
   font-size: 14px;
 }
 
@@ -444,16 +444,16 @@
   gap: 8px;
   min-width: 0;
   padding: 10px 12px;
-  color: #4d5963;
-  background: #f7fafc;
-  border: 1px solid #dde6ed;
+  color: var(--edm-neutral-650);
+  background: var(--edm-neutral-50);
+  border: 1px solid var(--edm-neutral-250);
   border-radius: 6px;
 }
 
 .single-window-review-source-diff.has-diff {
-  color: #6b3d00;
-  background: #fff8e8;
-  border-color: #f2d19c;
+  color: var(--edm-warning-900);
+  background: var(--edm-warning-50);
+  border-color: var(--edm-warning-400);
 }
 
 .single-window-review-source-diff summary {
@@ -466,7 +466,7 @@
   margin: 6px 0 0;
   overflow: auto;
   white-space: pre-wrap;
-  color: #202124;
+  color: var(--edm-neutral-800);
   font: 12px/1.5 var(--edm-font-mono);
 }
 
@@ -540,7 +540,7 @@
 
 .receipt-package-panel h3 {
   margin: 0;
-  color: #202124;
+  color: var(--edm-neutral-800);
   font-size: 15px;
 }
 

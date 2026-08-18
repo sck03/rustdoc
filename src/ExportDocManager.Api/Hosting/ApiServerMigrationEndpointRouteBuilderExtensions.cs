@@ -66,6 +66,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiLoginAttemptService loginAttempts,
                 ApiSensitiveOperationTicketService ticketService,
                 IAppPathProvider pathProvider,
+                TimeProvider timeProvider,
                 ApiSensitiveOperationAuthorizationRequest request) =>
             {
                 User? user = ApiEndpointAuth.RequireUser(context, tokenService);
@@ -92,7 +93,8 @@ namespace ExportDocManager.Api.Hosting
                         requestContext,
                         string.Empty,
                         success: false,
-                        "管理员重新认证失败。");
+                        "管理员重新认证失败。",
+                        timeProvider.GetUtcNow());
                     return reauthenticationError;
                 }
                 ApiSensitiveOperationTicket ticket = ticketService.Issue(user.Id, action);
@@ -102,7 +104,8 @@ namespace ExportDocManager.Api.Hosting
                     requestContext,
                     string.Empty,
                     success: true,
-                    "已签发一次性敏感操作票据。");
+                    "已签发一次性敏感操作票据。",
+                    timeProvider.GetUtcNow());
                 return Results.Ok(new ApiSensitiveOperationAuthorizationResponse(
                     action,
                     ticket.Token,

@@ -17,7 +17,8 @@ namespace ExportDocManager.Services.Infrastructure
             ServerMigrationRequestContext requestContext,
             string packageId,
             bool? success,
-            string message)
+            string message,
+            DateTimeOffset timestampUtc)
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
             requestContext ??= new ServerMigrationRequestContext(string.Empty, string.Empty);
@@ -25,7 +26,7 @@ namespace ExportDocManager.Services.Infrastructure
             string auditPath = Path.Combine(auditRoot, "server-migration.jsonl");
             var record = new
             {
-                timestampUtc = DateTimeOffset.UtcNow,
+                timestampUtc,
                 action = action?.Trim() ?? string.Empty,
                 requestedBy = requestContext.RequestedBy?.Trim() ?? string.Empty,
                 remoteAddress = requestContext.RemoteAddress?.Trim() ?? string.Empty,

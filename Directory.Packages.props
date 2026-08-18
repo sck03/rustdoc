@@ -10,6 +10,8 @@
     <PackageVersion Include="ClosedXML" Version="0.105.1" />
     <PackageVersion Include="ExcelDataReader" Version="3.9.0" />
     <PackageVersion Include="HtmlAgilityPack" Version="1.12.4" />
+    <PackageVersion Include="MailKit" Version="4.17.0" />
+    <PackageVersion Include="MimeKit" Version="4.17.0" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />

@@ -19,5 +19,5 @@ namespace ExportDocManager.Api.Hosting
             MapHsCodeCrudEndpoints(endpoints);
             MapHsCodeKnowledgeEndpoints(endpoints);
         }
-}
+    }
 }

@@ -16,6 +16,6 @@ namespace ExportDocManager.Models.Entities
         public bool IsActive { get; set; } = true;
         public bool IsShared { get; set; }
         [MaxLength(100)] public string ChangedBy { get; set; } = string.Empty;
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; }
     }
 }

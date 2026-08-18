@@ -1,6 +1,7 @@
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -112,6 +113,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 IAuditLogService auditLogService,
                 IAppPathProvider pathProvider,
+                IBusinessClock clock,
                 ApiAuditLogFilterRequest request,
                 CancellationToken cancellationToken) =>
             {
@@ -132,7 +134,7 @@ namespace ExportDocManager.Api.Hosting
                     "AuditExports",
                     Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(exportDirectory);
-                string fileName = $"AuditLogs_{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.xlsx";
+                string fileName = $"AuditLogs_{clock.UtcNow:yyyyMMdd-HHmmss}.xlsx";
                 string outputPath = Path.Combine(exportDirectory, fileName);
                 try
                 {
@@ -208,6 +210,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
                 IAuditLogService auditLogService,
+                IBusinessClock clock,
                 ApiAuditLogCleanupRequest request,
                 CancellationToken cancellationToken) =>
             {
@@ -233,7 +236,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("清理审计日志前必须明确确认操作。"));
                 }
 
-                var cutoffUtc = DateTimeOffset.UtcNow.AddDays(-request.DaysToKeep);
+                var cutoffUtc = clock.UtcNow.AddDays(-request.DaysToKeep);
                 int deletedCount = await auditLogService.DeleteOlderThanAsync(
                     cutoffUtc,
                     NormalizeMaxCount(request.MaxCount, AuditLogCleanupMaxCount),

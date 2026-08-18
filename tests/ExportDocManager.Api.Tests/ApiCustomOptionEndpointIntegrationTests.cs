@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using ExportDocManager.Api.Hosting;
+using ExportDocManager.DataAccess;
 using Microsoft.Data.Sqlite;
 
 namespace ExportDocManager.Api.Tests
@@ -88,7 +89,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("独立付款主体", savedPayerNames.CustomOptions);
             Assert.Contains("独立付款主体", savedPayerNames.Options);
 
-            await using (var connection = new SqliteConnection($"Data Source={harness.DatabasePath}"))
+            await using (var connection = new SqliteConnection(DbHelper.BuildConnectionString(harness.DatabasePath)))
             {
                 await connection.OpenAsync();
                 await using var command = connection.CreateCommand();

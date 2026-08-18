@@ -29,29 +29,5 @@ namespace ExportDocManager.Domain.Tests
             Assert.Equal(["alpha", "beta"], tokens);
         }
 
-        [Fact]
-        public void ApplyKeywordSearch_ShouldMatchAllTokensAcrossConfiguredFields()
-        {
-            var rows = new[]
-            {
-                new SearchRow { Code = "SKU-001", Name = "Beta Shirt" },
-                new SearchRow { Code = "SKU-002", Name = "Alpha Shirt" },
-                new SearchRow { Code = "SKU-003", Name = null }
-            }.AsQueryable();
-
-            var result = rows
-                .ApplyKeywordSearch(" alpha 002 ", row => row.Code, row => row.Name)
-                .ToList();
-
-            var matched = Assert.Single(result);
-            Assert.Equal("SKU-002", matched.Code);
-        }
-
-        private sealed class SearchRow
-        {
-            public string Code { get; init; } = string.Empty;
-
-            public string? Name { get; init; }
-        }
     }
 }

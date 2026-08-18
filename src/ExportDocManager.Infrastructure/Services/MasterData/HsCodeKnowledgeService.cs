@@ -28,11 +28,11 @@ namespace ExportDocManager.Services.MasterData
 
         public HsCodeKnowledgeService(
             IDbContextFactory<AppDbContext> dbContextFactory,
-            BusinessDataAccessScope? businessDataAccessScope = null,
+            BusinessDataAccessScope businessDataAccessScope,
             IBusinessClock? clock = null)
         {
             _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
-            _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
+            _businessDataAccessScope = businessDataAccessScope ?? throw new ArgumentNullException(nameof(businessDataAccessScope));
             _clock = clock ?? BusinessClock.CreateSystem();
         }
 

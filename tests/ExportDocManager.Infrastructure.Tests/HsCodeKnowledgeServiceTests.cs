@@ -36,7 +36,7 @@ public sealed class HsCodeKnowledgeServiceTests
                 ActiveCode("9999999999", "其它商品"));
             await context.SaveChangesAsync();
         }
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         await service.SaveExampleAsync(new HsCodeExampleInput(0, "6109100090", "6109100090", "男士全棉圆领短袖T-SHIRT", "针织", "Manual", 2026, "Active", true));
         await service.SaveExampleAsync(new HsCodeExampleInput(0, "9999999999", "9999999999", "其它商品", "男士全棉圆领短袖T恤衫", "Manual", 2026, "Active", true));
 
@@ -54,7 +54,7 @@ public sealed class HsCodeKnowledgeServiceTests
             context.HsCodes.Add(ActiveCode("6110200090", "棉制钩编套头衫"));
             await context.SaveChangesAsync();
         }
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         await service.SaveExampleAsync(new HsCodeExampleInput(0, "6110200090", "6110200090", "棉制钩编男式套头衫", "长袖", "Manual", 2026, "Active", true));
 
         var result = await service.SearchAsync("棉制针织男式套头衫");
@@ -75,7 +75,7 @@ public sealed class HsCodeKnowledgeServiceTests
             await context.SaveChangesAsync();
         }
 
-        var result = await new HsCodeKnowledgeService(factory).SearchAsync("6110");
+        var result = await CreateService(factory).SearchAsync("6110");
 
         var item = Assert.Single(result.Items);
         Assert.Equal("6110300090", item.CurrentCode);
@@ -94,7 +94,7 @@ public sealed class HsCodeKnowledgeServiceTests
             context.Products.Add(new Product { ProductCode = "TS01", NameCN = "男士全棉圆领短袖", HSCode = "6109100090", Material = "100%棉", Brand = "自有品牌" });
             await context.SaveChangesAsync();
         }
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
 
         var firstPage = await service.DiscoverHistoryCandidatesAsync("圆领短袖", 1, 30);
         var candidate = Assert.Single(firstPage.Items);
@@ -130,7 +130,7 @@ public sealed class HsCodeKnowledgeServiceTests
             await context.SaveChangesAsync();
         }
 
-        var candidate = Assert.Single((await new HsCodeKnowledgeService(factory)
+        var candidate = Assert.Single((await CreateService(factory)
             .DiscoverHistoryCandidatesAsync("套头衫", 1, 30)).Items);
 
         Assert.Equal("化纤制针织女式非起绒套头衫", candidate.ProductName);
@@ -150,7 +150,7 @@ public sealed class HsCodeKnowledgeServiceTests
             context.HsCodes.Add(ActiveCode("6109100090", "棉制T恤衫"));
             await context.SaveChangesAsync();
         }
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
 
         await service.CaptureRemoteExamplesAsync("男士全棉短袖", [new HsCode { Code = "6109100090", Name = "男士全棉圆领短袖", Description = "针织，100%棉", DetailUrl = "https://www.i5a6.com/hscode/detail/6109100090" }]);
 
@@ -179,7 +179,7 @@ public sealed class HsCodeKnowledgeServiceTests
             });
             await context.SaveChangesAsync();
         }
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         await service.SaveExampleAsync(new HsCodeExampleInput(
             0, "6109100090", "", "棉制针织T恤衫", "短袖|圆领", "Legacy", 2024, "Unresolved", false));
         await service.CaptureRemoteExamplesAsync("棉制针织T恤衫",
@@ -202,7 +202,7 @@ public sealed class HsCodeKnowledgeServiceTests
             context.HsCodes.Add(ActiveCode("6109100000", "棉制针织T恤衫"));
             await context.SaveChangesAsync();
         }
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         await service.CaptureRemoteExamplesAsync("T恤",
         [
             new HsCode { Code = "6109100010", Name = "男式T恤一", Description = "针织|棉" },
@@ -237,7 +237,7 @@ public sealed class HsCodeKnowledgeServiceTests
     public async Task RemoteCandidateCodeFilter_ShouldMatchHsCodePrefixOnly()
     {
         using var factory = new SqliteFactory();
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         await service.CaptureRemoteExamplesAsync("编码前缀",
         [
             new HsCode { Code = "6109100000", Name = "前缀匹配" },
@@ -260,7 +260,7 @@ public sealed class HsCodeKnowledgeServiceTests
             context.HsCodeReplacementRelations.Add(new HsCodeReplacementRelation { OldCode = "6109100021", NewCode = "6109100090", Source = "2026税则", Confidence = 90 });
             await context.SaveChangesAsync();
         }
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         await service.SaveExampleAsync(new HsCodeExampleInput(0, "6109100021", "", "男式T-SHIRT", "针织，100%棉，男式", "i5a6", 2024, "Unresolved", false));
 
         var result = await service.SearchAsync("棉制针织男式T恤衫");
@@ -286,7 +286,7 @@ public sealed class HsCodeKnowledgeServiceTests
                 new HsCodeReplacementRelation { OldCode = "6109100010", NewCode = "6109100012", Source = "test", Confidence = 80 });
             await context.SaveChangesAsync();
         }
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         await service.SaveExampleAsync(new HsCodeExampleInput(0, "6109100010", "", "棉制男式T恤衫", "针织", "i5a6", 2023, "Unresolved", false));
 
         var item = Assert.Single((await service.SearchAsync("棉制男式T恤衫")).Items, row => row.RawCode == "6109100010");
@@ -305,7 +305,7 @@ public sealed class HsCodeKnowledgeServiceTests
             await context.SaveChangesAsync();
         }
 
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         await service.SaveExampleAsync(new HsCodeExampleInput(
             0,
             "6109100021",
@@ -360,7 +360,7 @@ public sealed class HsCodeKnowledgeServiceTests
             context.HsCodes.Add(ActiveCode("6109100090", "棉制T恤衫"));
             await context.SaveChangesAsync();
         }
-        var source = new HsCodeKnowledgeService(sourceFactory);
+        var source = CreateService(sourceFactory);
         await source.SaveExampleAsync(new HsCodeExampleInput(0, "6109100090", "6109100090", "棉制T恤衫", "针织", "Manual", 2026, "Active", true));
         using var packageOutput = new MemoryStream();
         await source.ExportPackageAsync(packageOutput);
@@ -370,7 +370,7 @@ public sealed class HsCodeKnowledgeServiceTests
         try
         {
             using var targetFactory = new SqliteFactory();
-            var target = new HsCodeKnowledgeService(targetFactory);
+            var target = CreateService(targetFactory);
             var preview = await target.PreviewPackageAsync(path);
             Assert.Single(preview.Examples);
             Assert.DoesNotContain("invoice", System.Text.Encoding.UTF8.GetString(package), StringComparison.OrdinalIgnoreCase);
@@ -388,7 +388,7 @@ public sealed class HsCodeKnowledgeServiceTests
     public async Task PackageImport_ShouldMergeMoreThanOneDatabaseParameterBatch()
     {
         using var factory = new SqliteFactory();
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         var codes = Enumerable.Range(0, 405)
             .Select(index => new HsCode
             {
@@ -440,14 +440,14 @@ public sealed class HsCodeKnowledgeServiceTests
             await context.SaveChangesAsync();
         }
         using var packageOutput = new MemoryStream();
-        await new HsCodeKnowledgeService(sourceFactory).ExportPackageAsync(packageOutput);
+        await CreateService(sourceFactory).ExportPackageAsync(packageOutput);
         byte[] package = packageOutput.ToArray();
         string path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.edmhs");
         await File.WriteAllBytesAsync(path, package);
         try
         {
             using var targetFactory = new SqliteFactory();
-            var target = new HsCodeKnowledgeService(targetFactory);
+            var target = CreateService(targetFactory);
             await Assert.ThrowsAsync<InvalidDataException>(() => target.PreviewPackageAsync(path));
         }
         finally { File.Delete(path); }
@@ -470,7 +470,7 @@ public sealed class HsCodeKnowledgeServiceTests
             }
 
             using var factory = new SqliteFactory();
-            var service = new HsCodeKnowledgeService(factory);
+            var service = CreateService(factory);
             await Assert.ThrowsAsync<InvalidDataException>(() => service.PreviewPackageAsync(path));
         }
         finally
@@ -483,7 +483,7 @@ public sealed class HsCodeKnowledgeServiceTests
     public async Task CaptureRemoteEvidence_ShouldOnlyCreateCandidatesFromDeclarationExamples()
     {
         using var factory = new SqliteFactory();
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         var observedAt = DateTimeOffset.UtcNow;
         var bundle = new HsCodeRemoteSearchBundle(
             "睡衣",
@@ -517,7 +517,7 @@ public sealed class HsCodeKnowledgeServiceTests
             context.HsCodes.Add(ActiveCode("6109100000", "棉制针织T恤衫"));
             await context.SaveChangesAsync();
         }
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         var observedAt = DateTimeOffset.UtcNow;
         var bundle = new HsCodeRemoteSearchBundle(
             "女式T恤衫", "i5a6",
@@ -546,7 +546,7 @@ public sealed class HsCodeKnowledgeServiceTests
             context.HsCodes.Add(ActiveCode("6109100000", "棉制针织T恤衫"));
             await context.SaveChangesAsync();
         }
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         await service.CaptureRemoteExamplesAsync("女式T恤衫",
             [new HsCode { Code = "6109100022", Name = "女式T恤衫", Description = "针织|女式|棉" }]);
         var candidate = Assert.Single((await service.ListRemoteCandidatesAsync("Pending", "", 1, 30)).Items);
@@ -568,7 +568,7 @@ public sealed class HsCodeKnowledgeServiceTests
             context.HsCodes.Add(ActiveCode("6109100000", "棉制针织T恤衫"));
             await context.SaveChangesAsync();
         }
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         await service.SaveExampleAsync(new HsCodeExampleInput(
             0, "6109100000", "6109100000", "棉制针织T恤衫", "短袖|圆领", "Manual", 2026, "ManuallyVerified", true));
         int before = Assert.Single((await service.SearchAsync("短袖")).Items).Score;
@@ -591,7 +591,7 @@ public sealed class HsCodeKnowledgeServiceTests
                 ActiveCode("6109100002", "棉制针织女式T恤衫"));
             await context.SaveChangesAsync();
         }
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         await service.SaveExampleAsync(new HsCodeExampleInput(0, "6109100001", "6109100001", "棉制针织男式T恤衫", "针织|男式|100%棉", "Manual", 2026, "Active", true));
         await service.SaveExampleAsync(new HsCodeExampleInput(0, "6109100002", "6109100002", "棉制针织女式T恤衫", "针织|女式|100%棉", "Manual", 2026, "Active", true));
 
@@ -623,7 +623,7 @@ public sealed class HsCodeKnowledgeServiceTests
             await context.SaveChangesAsync();
         }
 
-        var page = await new HsCodeKnowledgeService(factory)
+        var page = await CreateService(factory)
             .DiscoverHistoryCandidatesAsync(string.Empty, 1, 30);
 
         Assert.True(page.IsTruncated);
@@ -703,7 +703,7 @@ public sealed class HsCodeKnowledgeServiceTests
             context.Products.Add(new Product { ProductCode = "SAFE", NameCN = "安全商品", HSCode = "6109100090" });
             await context.SaveChangesAsync();
         }
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
         const string payload = "%' OR 1=1; DROP TABLE HsCodes; --";
 
         Assert.Empty((await service.DiscoverHistoryCandidatesAsync(payload, 1, 30)).Items);
@@ -723,7 +723,7 @@ public sealed class HsCodeKnowledgeServiceTests
     public async Task KnowledgeInputs_ShouldRejectOversizedTextBeforeDatabaseWrite()
     {
         using var factory = new SqliteFactory();
-        var service = new HsCodeKnowledgeService(factory);
+        var service = CreateService(factory);
 
         await Assert.ThrowsAsync<ArgumentException>(() => service.SearchAsync(new string('Q', 501)));
         await Assert.ThrowsAsync<ArgumentException>(() => service.DiscoverHistoryCandidatesAsync(new string('H', 201), 1, 30));
@@ -764,6 +764,9 @@ public sealed class HsCodeKnowledgeServiceTests
         public FixedCurrentUserContext(User currentUser) => CurrentUser = currentUser;
         public User CurrentUser { get; }
     }
+
+    private static HsCodeKnowledgeService CreateService(IDbContextFactory<AppDbContext> factory) =>
+        new(factory, TestAccessScope.Create());
 
     private static HsCode ActiveCode(string code, string name) => new()
     {

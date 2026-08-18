@@ -8,6 +8,7 @@ using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,7 @@ namespace ExportDocManager.Services.MasterData
         private readonly IReadOnlyList<IHsCodeRemoteProvider> _remoteProviders;
         private readonly IHsCodeImportService _importService;
         private readonly ILogger<HsCodeService> _logger;
+        private readonly IBusinessClock _clock;
 
         public HsCodeService(IDbContextFactory<AppDbContext> dbContextFactory, IHsCodeReadRepository hsCodeReadRepository)
             : this(dbContextFactory, hsCodeReadRepository, Enumerable.Empty<IHsCodeRemoteProvider>(), null, null)
@@ -34,7 +36,8 @@ namespace ExportDocManager.Services.MasterData
             IHsCodeReadRepository hsCodeReadRepository,
             IEnumerable<IHsCodeRemoteProvider> remoteProviders,
             IHsCodeImportService? importService = null,
-            ILogger<HsCodeService>? logger = null)
+            ILogger<HsCodeService>? logger = null,
+            IBusinessClock? clock = null)
         {
             _dbContextFactory = dbContextFactory;
             _hsCodeReadRepository = hsCodeReadRepository;
@@ -43,6 +46,7 @@ namespace ExportDocManager.Services.MasterData
                 .ToList();
             _importService = importService ?? new UnsupportedHsCodeImportService();
             _logger = logger ?? NullLogger<HsCodeService>.Instance;
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public Task ImportAsync(string filePath) => _importService.ImportAsync(filePath);
@@ -133,7 +137,7 @@ namespace ExportDocManager.Services.MasterData
                 return new HsCodeRemoteSourceHealth(
                     "未配置",
                     false,
-                    DateTimeOffset.UtcNow,
+                    _clock.UtcNow,
                     "未配置 HS 编码联网数据源 Provider。");
             }
 
@@ -144,7 +148,7 @@ namespace ExportDocManager.Services.MasterData
             return new HsCodeRemoteSourceHealth(
                 string.Join(", ", results.Select(result => result.Source)),
                 available,
-                DateTimeOffset.UtcNow,
+                _clock.UtcNow,
                 string.Join("；", results.Select(result => result.Message)));
         }
 

@@ -393,7 +393,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
             public bool LoadCalled { get; private set; }
 
-            public Task LoadAsync()
+            public Task LoadAsync(CancellationToken cancellationToken = default)
             {
                 LoadCalled = true;
                 return Task.CompletedTask;

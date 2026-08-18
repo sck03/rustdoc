@@ -144,8 +144,9 @@ public static class ServerMigrationManager
 
     public static Task ApplyPendingRestoreAsync(
         IAppPathProvider pathProvider,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken = default) =>
-        ServerMigrationRecoveryStateMachine.ApplyAsync(pathProvider, cancellationToken);
+        ServerMigrationRecoveryStateMachine.ApplyAsync(pathProvider, timeProvider, cancellationToken);
 
     internal static void WriteStatus(
         IAppPathProvider pathProvider,
@@ -242,9 +243,7 @@ public static class ServerMigrationManager
             Phase = marker.Phase,
             Attempt = marker.Attempt,
             RequestedBy = marker.RequestedBy,
-            UpdatedAtUtc = marker.UpdatedAtUtc == default
-                ? DateTimeOffset.UtcNow
-                : marker.UpdatedAtUtc,
+            UpdatedAtUtc = marker.UpdatedAtUtc,
             Message = message ?? string.Empty,
             SafetyBackupRoot = safetyBackupRoot ?? string.Empty
         };

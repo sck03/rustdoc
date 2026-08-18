@@ -11,7 +11,7 @@ namespace ExportDocManager.Application.Tests
             var helpers = new SingleWindowFieldMapperHelpers(
                 new SingleWindowReferenceCatalogModel
                 {
-                        Countries =
+                    Countries =
                         [
                             new()
                             {
@@ -21,7 +21,7 @@ namespace ExportDocManager.Application.Tests
                                 Aliases = ["测试国"]
                             }
                         ],
-                        AcdCountries =
+                    AcdCountries =
                         [
                             new()
                             {
@@ -31,7 +31,7 @@ namespace ExportDocManager.Application.Tests
                                 Aliases = ["测试货源"]
                             }
                         ],
-                        Currencies =
+                    Currencies =
                         [
                             new()
                             {
@@ -41,7 +41,7 @@ namespace ExportDocManager.Application.Tests
                                 Aliases = ["测试币"]
                             }
                         ],
-                        AcdTradeModes =
+                    AcdTradeModes =
                         [
                             new()
                             {
@@ -51,7 +51,7 @@ namespace ExportDocManager.Application.Tests
                                 Aliases = ["测试模式"]
                             }
                         ],
-                        TransportModes =
+                    TransportModes =
                         [
                             new()
                             {
@@ -59,7 +59,7 @@ namespace ExportDocManager.Application.Tests
                                 Aliases = ["测试航线"]
                             }
                         ],
-                        Ports =
+                    Ports =
                         [
                             new()
                             {

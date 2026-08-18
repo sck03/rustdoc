@@ -128,7 +128,15 @@ namespace ExportDocManager.Api.Hosting
                     UseProxy = false,
                     PooledConnectionLifetime = TimeSpan.FromMinutes(2)
                 });
-            services.AddHttpClient("AI");
+            services.AddHttpClient("AI", client => client.Timeout = Timeout.InfiniteTimeSpan)
+                .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+                {
+                    AllowAutoRedirect = false,
+                    AutomaticDecompression = System.Net.DecompressionMethods.All,
+                    ConnectCallback = AiEndpointPolicy.ConnectAllowedHostAsync,
+                    UseProxy = false,
+                    PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+                });
             services.AddSingleton<IExchangeRateService>(provider =>
                 new BocExchangeRateService(
                     provider.GetRequiredService<ISettingsService>(),

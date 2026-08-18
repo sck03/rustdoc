@@ -238,12 +238,12 @@ namespace ExportDocManager.Services.Reporting
                                 .ConfigureAwait(false);
                             await WaitForPageAssetsAsync(page, ct).ConfigureAwait(false);
                             await page.PdfAsync(new PagePdfOptions
-                                {
-                                    Path = pdfPath,
-                                    DisplayHeaderFooter = false,
-                                    PrintBackground = true,
-                                    PreferCSSPageSize = true
-                                })
+                            {
+                                Path = pdfPath,
+                                DisplayHeaderFooter = false,
+                                PrintBackground = true,
+                                PreferCSSPageSize = true
+                            })
                                 .WaitAsync(ct)
                                 .ConfigureAwait(false);
                             return true;

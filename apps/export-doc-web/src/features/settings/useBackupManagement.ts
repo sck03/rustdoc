@@ -19,6 +19,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
   const desktopBridgeAvailable = isDesktopBridgeAvailable();
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [lastCreatedJobId, setLastCreatedJobId] = useState<string | null>(null);
   const [cleanupDays, setCleanupDays] = useState(30);
   const [restoreFileName, setRestoreFileName] = useState("");
   const [restoreConfirmation, setRestoreConfirmation] = useState("");
@@ -30,7 +31,6 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
   const [recoveryPackagePath, setRecoveryPackagePath] = useState("");
   const [recoveryRestorePassword, setRecoveryRestorePassword] = useState("");
   const [recoveryRestoreConfirmation, setRecoveryRestoreConfirmation] = useState("");
-  const [lastRecoveryPackagePath, setLastRecoveryPackagePath] = useState("");
 
   useEffect(() => {
     if (!desktopBridgeAvailable) {
@@ -125,11 +125,10 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
   };
   const createMutation = useMutation({
     mutationFn: () => client.createDatabaseBackup(),
-    onSuccess: (response) => {
-      updateBackupQuery(queryClient, response);
+    onSuccess: (job) => {
       setMessage(null);
-      setSuccessMessage(response.message || "数据库备份已创建。");
-      void queryClient.invalidateQueries({ queryKey: queryKeys.cloudBackupStatus() });
+      setSuccessMessage("数据库备份任务已加入任务中心；完成后刷新列表即可查看新备份。");
+      setLastCreatedJobId(job.jobId);
     },
     onError: mutationError,
   });
@@ -144,21 +143,19 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
   });
   const uploadCloudMutation = useMutation({
     mutationFn: () => client.uploadLatestDatabaseBackupToCloud(),
-    onSuccess: async (response) => {
+    onSuccess: (job) => {
       setMessage(null);
-      setSuccessMessage(response.message || "最新备份已上传到 WebDAV。");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.cloudBackupStatus() });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.cloudBackupBackups() });
+      setSuccessMessage("WebDAV 上传任务已加入任务中心。");
+      setLastCreatedJobId(job.jobId);
     },
     onError: mutationError,
   });
   const downloadCloudMutation = useMutation({
     mutationFn: () => client.downloadCloudDatabaseBackup({ body: { remoteFileName: cloudDownloadFileName } }),
-    onSuccess: async (response) => {
+    onSuccess: (job) => {
       setMessage(null);
-      setSuccessMessage(response.message || "WebDAV 云备份已下载到本地备份目录。");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.backups() });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.cloudBackupStatus() });
+      setSuccessMessage("WebDAV 下载与校验任务已加入任务中心；完成后刷新备份列表即可使用。");
+      setLastCreatedJobId(job.jobId);
     },
     onError: mutationError,
   });
@@ -166,22 +163,22 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     mutationFn: () => client.restoreDatabaseBackup({
       body: { backupFileName: restoreFileName, confirmationText: restoreConfirmation.trim() },
     }),
-    onSuccess: (response) => {
+    onSuccess: (job) => {
       setMessage(null);
-      setSuccessMessage(response.message || "数据库已还原。");
+      setSuccessMessage("数据库还原校验任务已加入任务中心；任务成功后请立即重启程序完成离线还原。");
+      setLastCreatedJobId(job.jobId);
       setRestoreConfirmation("");
     },
     onError: mutationError,
   });
   const createRecoveryMutation = useMutation({
     mutationFn: () => client.createDisasterRecoveryPackage({ body: { password: recoveryPassword } }),
-    onSuccess: async (response) => {
+    onSuccess: (job) => {
       setMessage(null);
-      setSuccessMessage(response.message || "持卡机灾难恢复包已创建。");
-      setLastRecoveryPackagePath(response.filePath);
+      setSuccessMessage("加密灾难恢复包任务已加入任务中心；完成后可在恢复包目录中查看。");
+      setLastCreatedJobId(job.jobId);
       setRecoveryPassword("");
       setRecoveryPasswordConfirmation("");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.disasterRecoveryStatus() });
     },
     onError: mutationError,
   });
@@ -193,12 +190,12 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
         confirmationText: recoveryRestoreConfirmation.trim(),
       },
     }),
-    onSuccess: async (response) => {
+    onSuccess: (job) => {
       setMessage(null);
-      setSuccessMessage(response.message || "持卡机灾难恢复已排队，请立即重启程序。");
+      setSuccessMessage("灾难恢复校验任务已加入任务中心；任务成功后请立即重启程序。");
+      setLastCreatedJobId(job.jobId);
       setRecoveryRestorePassword("");
       setRecoveryRestoreConfirmation("");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.disasterRecoveryStatus() });
     },
     onError: mutationError,
   });
@@ -216,6 +213,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
   const clearNotices = () => {
     setMessage(null);
     setSuccessMessage(null);
+    setLastCreatedJobId(null);
   };
   const runMutation = (mutate: () => void) => {
     clearNotices();
@@ -233,7 +231,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     if (!await requestConfirmation({
       title: "更换运行数据目录",
       description: "程序将在退出后迁移现有数据，并于下次启动使用新目录。",
-      details: ["请选择一个空目录，并确保当前账号拥有完整读写权限。", "迁移期间请勿关闭计算机或拔出目标磁盘。"],
+      details: ["请选择本机磁盘上的保存位置，程序会创建 ExportDocManager_Data 专用子目录。", "迁移期间请勿关闭计算机或拔出目标磁盘。"],
       confirmLabel: "继续选择目录",
       tone: "warning",
     })) return;
@@ -269,6 +267,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     canManageSettings,
     message,
     successMessage,
+    lastCreatedJobId,
     desktopBridgeAvailable,
     runtimeStorage,
     dataRootMigrationPending,
@@ -296,7 +295,6 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     setRecoveryRestorePassword,
     recoveryRestoreConfirmation,
     setRecoveryRestoreConfirmation,
-    lastRecoveryPackagePath,
     cloudBackupsEnabled,
     canRestore: canManageSettings && Boolean(restoreFileName) && restoreConfirmation.trim() === "RESTORE" && !isBusy,
     canUploadCloud: canManageSettings && Boolean(cloudStatus?.enabled) && Boolean(cloudStatus?.isConfigured) && backups.length > 0 && !isBusy,

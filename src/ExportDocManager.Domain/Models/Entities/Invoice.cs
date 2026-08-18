@@ -201,7 +201,7 @@ namespace ExportDocManager.Models.Entities
             TotalAmount = decimal.Round(totalAmount, 2, MidpointRounding.AwayFromZero);
             TotalPurchaseAmount = decimal.Round(totalPurchase, 2, MidpointRounding.AwayFromZero);
             TotalTaxRefundAmount = decimal.Round(totalTaxRefund, 2, MidpointRounding.AwayFromZero);
-            
+
             // Profit is meaningful only when a conversion rate is known. CNY is
             // already the reporting currency and therefore has an implicit rate of 1.
             decimal? rate = ExchangeRate;

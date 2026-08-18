@@ -112,7 +112,7 @@ namespace ExportDocManager.Services.SingleWindow
                         not SingleWindowBatchStatusCatalog.ClientDispatchFailed)
                     {
                         throw new ResourceConflictException(
-                            "只有本机已导入且尚未派发，或上次派发已完整回滚的提交包可以写入官方客户端。" );
+                            "只有本机已导入且尚未派发，或上次派发已完整回滚的提交包可以写入官方客户端。");
                     }
 
                     batch.Status = SingleWindowBatchStatusCatalog.ClientDispatching;
@@ -121,7 +121,7 @@ namespace ExportDocManager.Services.SingleWindow
                     batch.AssignedProfileKey = profile.ProfileKey;
                     batch.AssignedCardIdentifier = profile.CardIdentifier;
                     batch.LastError = string.Empty;
-                    batch.UpdatedAt = DateTimeOffset.UtcNow;
+                    batch.UpdatedAt = _clock.UtcNow;
                     await context.SaveChangesAsync(token);
                     return new ClientDispatchReservation(
                         batch.Id,
@@ -159,7 +159,7 @@ namespace ExportDocManager.Services.SingleWindow
                         throw new ServiceConcurrencyException("客户端派发状态已被其他操作修改，不能确认完成。");
                     }
 
-                    DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
+                    DateTimeOffset nowUtc = _clock.UtcNow;
                     batch.Status = SingleWindowBatchStatusCatalog.QueuedToClient;
                     batch.ClientDispatchPath = outBoxPath;
                     batch.LastClientDispatchAt = nowUtc;
@@ -213,7 +213,7 @@ namespace ExportDocManager.Services.SingleWindow
                 batch.LastError = string.IsNullOrWhiteSpace(errorMessage)
                     ? "写入官方客户端目录失败。"
                     : errorMessage.Trim()[..Math.Min(errorMessage.Trim().Length, 2000)];
-                batch.UpdatedAt = DateTimeOffset.UtcNow;
+                batch.UpdatedAt = _clock.UtcNow;
                 await context.SaveChangesAsync(cancellationToken);
             }
             catch (Exception trackingException)

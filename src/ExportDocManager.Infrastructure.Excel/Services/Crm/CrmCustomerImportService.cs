@@ -129,12 +129,32 @@ namespace ExportDocManager.Services.Crm
         {
             var aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["客户名称"]="name", ["公司名称"]="name", ["customername"]="name", ["name"]="name",
-                ["国家地区"]="country", ["国家"]="country", ["countryregion"]="country", ["country"]="country",
-                ["网站"]="website", ["网址"]="website", ["website"]="website",
-                ["状态"]="status", ["status"]="status", ["来源"]="source", ["source"]="source",
-                ["备注"]="notes", ["notes"]="notes", ["联系人"]="contact", ["contactname"]="contact", ["contact"]="contact",
-                ["职位"]="title", ["title"]="title", ["邮箱"]="email", ["email"]="email", ["电话"]="phone", ["phone"]="phone"
+                ["客户名称"] = "name",
+                ["公司名称"] = "name",
+                ["customername"] = "name",
+                ["name"] = "name",
+                ["国家地区"] = "country",
+                ["国家"] = "country",
+                ["countryregion"] = "country",
+                ["country"] = "country",
+                ["网站"] = "website",
+                ["网址"] = "website",
+                ["website"] = "website",
+                ["状态"] = "status",
+                ["status"] = "status",
+                ["来源"] = "source",
+                ["source"] = "source",
+                ["备注"] = "notes",
+                ["notes"] = "notes",
+                ["联系人"] = "contact",
+                ["contactname"] = "contact",
+                ["contact"] = "contact",
+                ["职位"] = "title",
+                ["title"] = "title",
+                ["邮箱"] = "email",
+                ["email"] = "email",
+                ["电话"] = "phone",
+                ["phone"] = "phone"
             };
             var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             for (int index = 0; index < headers.Count; index++)

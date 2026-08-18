@@ -17,29 +17,46 @@ namespace ExportDocManager.Services.Infrastructure
     {
         private const int DefaultPageSize = 50;
         private const int MaxPageSize = 200;
+        private static readonly string[] InvoiceListSearchColumns =
+        [
+            "InvoiceNo", "ContractNo", "CustomerNameEN", "NotifyPartyName", "ExporterNameEN",
+            "ExporterNameCN", "PortOfLoading", "PortOfDestination", "DestinationCountry"
+        ];
+        private static readonly string[] PaymentSearchColumns =
+        [
+            "InvoiceNo", "PayerName", "Project", "Department", "PayeeName", "BankName",
+            "AccountNo", "GoodsName", "ShipmentCountry", "Notes"
+        ];
+        private static readonly string[] QueryTextSearchColumns =
+        [
+            "InvoiceNo", "ContractNo", "CustomerNameEN", "NotifyPartyName", "ExporterNameEN",
+            "ExporterNameCN", "DestinationCountry", "PortOfLoading", "PortOfDestination",
+            "TradeTerms", "TransportMode", "ItemPoNumber", "ItemStyleName", "ItemStyleNameCN",
+            "ItemStyleNo", "ItemHSCode", "ItemBrand", "ItemOrigin"
+        ];
+        private static readonly string[] QueryIdentifierSearchColumns =
+            ["InvoiceNo", "ContractNo", "ItemPoNumber", "ItemStyleNo", "ItemHSCode"];
+        private static readonly string[] ContractSearchColumn = ["ContractNo"];
+        private static readonly string[] StyleNameSearchColumn = ["ItemStyleName"];
+        private static readonly string[] StyleNoSearchColumn = ["ItemStyleNo"];
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _businessDataAccessScope;
 
-        public LocalSharedReadRepository(IDbContextFactory<AppDbContext> contextFactory)
-            : this(contextFactory, new DatabaseConnectionSettings())
-        {
-        }
-
-        public LocalSharedReadRepository(
-            IDbContextFactory<AppDbContext> contextFactory,
-            DatabaseConnectionSettings databaseSettings)
-            : this(contextFactory, databaseSettings, null)
-        {
-        }
-
-        public LocalSharedReadRepository(
+        internal LocalSharedReadRepository(
             IDbContextFactory<AppDbContext> contextFactory,
             DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope? businessDataAccessScope)
+            BusinessDataAccessScope businessDataAccessScope)
+            : this(contextFactory, businessDataAccessScope)
+        {
+            ArgumentNullException.ThrowIfNull(databaseSettings);
+        }
+
+        public LocalSharedReadRepository(
+            IDbContextFactory<AppDbContext> contextFactory,
+            BusinessDataAccessScope businessDataAccessScope)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
-            var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
-            _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(normalizedSettings);
+            _businessDataAccessScope = businessDataAccessScope ?? throw new ArgumentNullException(nameof(businessDataAccessScope));
         }
 
         public async Task<PagedResult<Invoice>> QueryPageAsync(
@@ -254,27 +271,31 @@ namespace ExportDocManager.Services.Infrastructure
         private static IQueryable<Invoice> BuildInvoiceListQuery(AppDbContext context, InvoiceListPageQuery query)
         {
             var invoiceQuery = context.Invoices.AsNoTracking().AsQueryable();
-            invoiceQuery = invoiceQuery.ApplyKeywordSearch(
-                query.Keyword,
-                invoice => invoice.InvoiceNo,
-                invoice => invoice.ContractNo,
-                invoice => invoice.CustomerNameEN,
-                invoice => invoice.NotifyPartyName,
-                invoice => invoice.ExporterNameEN,
-                invoice => invoice.ExporterNameCN,
-                invoice => invoice.PortOfLoading,
-                invoice => invoice.PortOfDestination,
-                invoice => invoice.DestinationCountry);
+            invoiceQuery = context.Database.IsSqlite()
+                ? ApplySqliteInvoiceSearch(context, invoiceQuery, query.Keyword, InvoiceListSearchColumns)
+                : invoiceQuery.ApplyKeywordSearch(
+                    context,
+                    query.Keyword,
+                    invoice => invoice.InvoiceNo,
+                    invoice => invoice.ContractNo,
+                    invoice => invoice.CustomerNameEN,
+                    invoice => invoice.NotifyPartyName,
+                    invoice => invoice.ExporterNameEN,
+                    invoice => invoice.ExporterNameCN,
+                    invoice => invoice.PortOfLoading,
+                    invoice => invoice.PortOfDestination,
+                    invoice => invoice.DestinationCountry);
 
             return ApplyInvoiceListSort(invoiceQuery, query.SortColumn, query.Ascending);
         }
 
         private static IQueryable<Payment> BuildPaymentQuery(AppDbContext context, PaymentPageQuery query)
         {
-            return context.Payments
-                .AsNoTracking()
-                .AsQueryable()
-                .ApplyKeywordSearch(
+            var paymentQuery = context.Payments.AsNoTracking().AsQueryable();
+            paymentQuery = context.Database.IsSqlite()
+                ? ApplySqlitePaymentSearch(context, paymentQuery, query.Keyword)
+                : paymentQuery.ApplyKeywordSearch(
+                    context,
                     query.Keyword,
                     payment => payment.InvoiceNo,
                     payment => payment.PayerName,
@@ -285,7 +306,9 @@ namespace ExportDocManager.Services.Infrastructure
                     payment => payment.AccountNo,
                     payment => payment.GoodsName,
                     payment => payment.ShipmentCountry,
-                    payment => payment.Notes)
+                    payment => payment.Notes);
+
+            return paymentQuery
                 .OrderByDescending(payment => payment.PaymentDate)
                 .ThenByDescending(payment => payment.Id);
         }
@@ -326,25 +349,58 @@ namespace ExportDocManager.Services.Infrastructure
 
             if (!string.IsNullOrWhiteSpace(query.Keyword))
             {
-                invoiceQuery = ApplyQueryKeywordSearch(invoiceQuery, query.Keyword);
+                invoiceQuery = context.Database.IsSqlite()
+                    ? ApplySqliteInvoiceSearch(
+                        context,
+                        invoiceQuery,
+                        query.Keyword,
+                        QueryTextSearchColumns,
+                        QueryIdentifierSearchColumns)
+                    : ApplyPostgreSqlQueryKeywordSearch(invoiceQuery, query.Keyword);
             }
 
             if (!string.IsNullOrWhiteSpace(query.ContractNo) &&
                 !string.Equals(query.ContractNo, query.Keyword, StringComparison.OrdinalIgnoreCase))
             {
-                invoiceQuery = invoiceQuery.ApplyKeywordSearch(query.ContractNo, invoice => invoice.ContractNo);
+                invoiceQuery = context.Database.IsSqlite()
+                    ? ApplySqliteInvoiceSearch(context, invoiceQuery, query.ContractNo, ContractSearchColumn)
+                    : invoiceQuery.ApplyKeywordSearch(context, query.ContractNo, invoice => invoice.ContractNo);
             }
 
             if (!string.IsNullOrWhiteSpace(query.StyleName))
             {
-                invoiceQuery = invoiceQuery.Where(invoice =>
-                    invoice.Items.Any(item => item.StyleName != null && item.StyleName.Contains(query.StyleName)));
+                if (context.Database.IsSqlite())
+                {
+                    invoiceQuery = ApplySqliteInvoiceSearch(
+                        context,
+                        invoiceQuery,
+                        query.StyleName,
+                        StyleNameSearchColumn);
+                }
+                else
+                {
+                    string pattern = $"%{EfTextSearchExtensions.EscapeLikePattern(query.StyleName)}%";
+                    invoiceQuery = invoiceQuery.Where(invoice => invoice.Items.Any(item =>
+                        item.StyleName != null && EF.Functions.ILike(item.StyleName, pattern, "\\")));
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(query.StyleNo))
             {
-                invoiceQuery = invoiceQuery.Where(invoice =>
-                    invoice.Items.Any(item => item.StyleNo != null && item.StyleNo.Contains(query.StyleNo)));
+                if (context.Database.IsSqlite())
+                {
+                    invoiceQuery = ApplySqliteInvoiceSearch(
+                        context,
+                        invoiceQuery,
+                        query.StyleNo,
+                        StyleNoSearchColumn);
+                }
+                else
+                {
+                    string pattern = $"%{EfTextSearchExtensions.EscapeLikePattern(query.StyleNo)}%";
+                    invoiceQuery = invoiceQuery.Where(invoice => invoice.Items.Any(item =>
+                        item.StyleNo != null && EF.Functions.ILike(item.StyleNo, pattern, "\\")));
+                }
             }
 
             return invoiceQuery
@@ -352,53 +408,88 @@ namespace ExportDocManager.Services.Infrastructure
                 .ThenByDescending(invoice => invoice.Id);
         }
 
-        private static IQueryable<Invoice> ApplyQueryKeywordSearch(
+        private static IQueryable<Invoice> ApplyPostgreSqlQueryKeywordSearch(
             IQueryable<Invoice> invoiceQuery,
             string keyword)
         {
             foreach (var token in TextSearchHelper.Tokenize(keyword))
             {
-                var normalizedToken = token.ToUpperInvariant();
-                if (normalizedToken.Any(char.IsDigit))
+                if (token.Any(char.IsDigit))
                 {
+                    string pattern = $"{EfTextSearchExtensions.EscapeLikePattern(token)}%";
                     invoiceQuery = invoiceQuery.Where(invoice =>
-                        (invoice.InvoiceNo != null && invoice.InvoiceNo.ToUpper().StartsWith(normalizedToken)) ||
-                        (invoice.ContractNo != null && invoice.ContractNo.ToUpper().StartsWith(normalizedToken)) ||
+                        (invoice.InvoiceNo != null && EF.Functions.ILike(invoice.InvoiceNo, pattern, "\\")) ||
+                        (invoice.ContractNo != null && EF.Functions.ILike(invoice.ContractNo, pattern, "\\")) ||
                         invoice.Items.Any(item =>
-                            (item.PoNumber != null && item.PoNumber.ToUpper().StartsWith(normalizedToken)) ||
-                            (item.StyleNo != null && item.StyleNo.ToUpper().StartsWith(normalizedToken)) ||
-                            (item.HSCode != null && item.HSCode.ToUpper().StartsWith(normalizedToken))));
+                            (item.PoNumber != null && EF.Functions.ILike(item.PoNumber, pattern, "\\")) ||
+                            (item.StyleNo != null && EF.Functions.ILike(item.StyleNo, pattern, "\\")) ||
+                            (item.HSCode != null && EF.Functions.ILike(item.HSCode, pattern, "\\"))));
                     continue;
                 }
 
-                invoiceQuery = ApplyCaseInsensitiveQueryTextSearch(invoiceQuery, normalizedToken);
+                invoiceQuery = ApplyPostgreSqlQueryTextSearch(invoiceQuery, token);
             }
 
             return invoiceQuery;
         }
 
-        private static IQueryable<Invoice> ApplyCaseInsensitiveQueryTextSearch(
+        private static IQueryable<Invoice> ApplyPostgreSqlQueryTextSearch(
             IQueryable<Invoice> query,
-            string token) => query.Where(invoice =>
-                (invoice.InvoiceNo != null && invoice.InvoiceNo.ToUpper().Contains(token)) ||
-                (invoice.ContractNo != null && invoice.ContractNo.ToUpper().Contains(token)) ||
-                (invoice.CustomerNameEN != null && invoice.CustomerNameEN.ToUpper().Contains(token)) ||
-                (invoice.NotifyPartyName != null && invoice.NotifyPartyName.ToUpper().Contains(token)) ||
-                (invoice.ExporterNameEN != null && invoice.ExporterNameEN.ToUpper().Contains(token)) ||
-                (invoice.ExporterNameCN != null && invoice.ExporterNameCN.ToUpper().Contains(token)) ||
-                (invoice.DestinationCountry != null && invoice.DestinationCountry.ToUpper().Contains(token)) ||
-                (invoice.PortOfLoading != null && invoice.PortOfLoading.ToUpper().Contains(token)) ||
-                (invoice.PortOfDestination != null && invoice.PortOfDestination.ToUpper().Contains(token)) ||
-                (invoice.TradeTerms != null && invoice.TradeTerms.ToUpper().Contains(token)) ||
-                (invoice.TransportMode != null && invoice.TransportMode.ToUpper().Contains(token)) ||
+            string token)
+        {
+            string pattern = $"%{EfTextSearchExtensions.EscapeLikePattern(token)}%";
+            return query.Where(invoice =>
+                (invoice.InvoiceNo != null && EF.Functions.ILike(invoice.InvoiceNo, pattern, "\\")) ||
+                (invoice.ContractNo != null && EF.Functions.ILike(invoice.ContractNo, pattern, "\\")) ||
+                (invoice.CustomerNameEN != null && EF.Functions.ILike(invoice.CustomerNameEN, pattern, "\\")) ||
+                (invoice.NotifyPartyName != null && EF.Functions.ILike(invoice.NotifyPartyName, pattern, "\\")) ||
+                (invoice.ExporterNameEN != null && EF.Functions.ILike(invoice.ExporterNameEN, pattern, "\\")) ||
+                (invoice.ExporterNameCN != null && EF.Functions.ILike(invoice.ExporterNameCN, pattern, "\\")) ||
+                (invoice.DestinationCountry != null && EF.Functions.ILike(invoice.DestinationCountry, pattern, "\\")) ||
+                (invoice.PortOfLoading != null && EF.Functions.ILike(invoice.PortOfLoading, pattern, "\\")) ||
+                (invoice.PortOfDestination != null && EF.Functions.ILike(invoice.PortOfDestination, pattern, "\\")) ||
+                (invoice.TradeTerms != null && EF.Functions.ILike(invoice.TradeTerms, pattern, "\\")) ||
+                (invoice.TransportMode != null && EF.Functions.ILike(invoice.TransportMode, pattern, "\\")) ||
                 invoice.Items.Any(item =>
-                    (item.PoNumber != null && item.PoNumber.ToUpper().Contains(token)) ||
-                    (item.StyleName != null && item.StyleName.ToUpper().Contains(token)) ||
-                    (item.StyleNameCN != null && item.StyleNameCN.ToUpper().Contains(token)) ||
-                    (item.StyleNo != null && item.StyleNo.ToUpper().Contains(token)) ||
-                    (item.HSCode != null && item.HSCode.ToUpper().Contains(token)) ||
-                    (item.Brand != null && item.Brand.ToUpper().Contains(token)) ||
-                    (item.Origin != null && item.Origin.ToUpper().Contains(token))));
+                    (item.PoNumber != null && EF.Functions.ILike(item.PoNumber, pattern, "\\")) ||
+                    (item.StyleName != null && EF.Functions.ILike(item.StyleName, pattern, "\\")) ||
+                    (item.StyleNameCN != null && EF.Functions.ILike(item.StyleNameCN, pattern, "\\")) ||
+                    (item.StyleNo != null && EF.Functions.ILike(item.StyleNo, pattern, "\\")) ||
+                    (item.HSCode != null && EF.Functions.ILike(item.HSCode, pattern, "\\")) ||
+                    (item.Brand != null && EF.Functions.ILike(item.Brand, pattern, "\\")) ||
+                    (item.Origin != null && EF.Functions.ILike(item.Origin, pattern, "\\"))));
+        }
+
+        private static IQueryable<Invoice> ApplySqliteInvoiceSearch(
+            AppDbContext context,
+            IQueryable<Invoice> query,
+            string? keyword,
+            IReadOnlyList<string> containsColumns,
+            IReadOnlyList<string>? numericPrefixColumns = null)
+        {
+            IQueryable<int> matchingIds = SqliteFtsSearch.QueryIds(
+                context,
+                "InvoiceSearch",
+                "InvoiceId",
+                keyword,
+                containsColumns,
+                numericPrefixColumns);
+            return query.Where(invoice => matchingIds.Contains(invoice.Id));
+        }
+
+        private static IQueryable<Payment> ApplySqlitePaymentSearch(
+            AppDbContext context,
+            IQueryable<Payment> query,
+            string? keyword)
+        {
+            IQueryable<int> matchingIds = SqliteFtsSearch.QueryIds(
+                context,
+                "PaymentSearch",
+                "PaymentId",
+                keyword,
+                PaymentSearchColumns);
+            return query.Where(payment => matchingIds.Contains(payment.Id));
+        }
 
         private static IQueryable<AuditLog> BuildAuditLogQuery(AppDbContext context, AuditLogPageQuery query)
         {

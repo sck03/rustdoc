@@ -310,32 +310,23 @@ namespace ExportDocManager.Services.Reporting
             string normalizedPreviousPath = _catalogLoader.NormalizeStoredTemplatePath(previousTemplatePath);
             string normalizedPreviousAbsolutePath = _catalogLoader.NormalizeAbsoluteTemplatePath(previousTemplatePath);
             string normalizedCurrentPath = _catalogLoader.NormalizeStoredTemplatePath(currentTemplatePath);
-            bool settingsChanged = false;
-
-            if (reportType == ReportDocumentType.PaymentVoucher)
+            await _settingsService.UpdateAsync(settings =>
             {
-                if (_settingsService.Settings.PaymentTemplates != null)
+                if (reportType == ReportDocumentType.PaymentVoucher)
                 {
-                    settingsChanged |= UpdateTemplateReferences(
-                        _settingsService.Settings.PaymentTemplates,
+                    return UpdateTemplateReferences(
+                        settings.PaymentTemplates,
                         normalizedPreviousPath,
                         normalizedPreviousAbsolutePath,
                         normalizedCurrentPath);
                 }
-            }
-            else if (_settingsService.Settings.BatchExport?.Items != null)
-            {
-                settingsChanged |= UpdateTemplateReferences(
-                    _settingsService.Settings.BatchExport.Items,
+
+                return UpdateTemplateReferences(
+                    settings.BatchExport.Items,
                     normalizedPreviousPath,
                     normalizedPreviousAbsolutePath,
                     normalizedCurrentPath);
-            }
-
-            if (settingsChanged)
-            {
-                await _settingsService.SaveAsync().ConfigureAwait(false);
-            }
+            }, cancellationToken).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
             await RefreshTemplateCatalogAsync(cancellationToken).ConfigureAwait(false);

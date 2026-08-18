@@ -23,13 +23,13 @@ namespace ExportDocManager.Services.MasterData
         public ExporterService(
             IDbContextFactory<AppDbContext> contextFactory,
             IExporterReadRepository exporterReadRepository,
-            IExporterSealService? exporterSealService = null,
-            BusinessDataAccessScope? accessScope = null)
+            BusinessDataAccessScope accessScope,
+            IExporterSealService? exporterSealService = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _exporterReadRepository = exporterReadRepository ?? throw new ArgumentNullException(nameof(exporterReadRepository));
             _exporterSealService = exporterSealService;
-            _accessScope = accessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
+            _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
         }
 
         public async Task<int> SaveExporterAsync(

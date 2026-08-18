@@ -44,8 +44,8 @@
   gap: 8px;
   min-width: 0;
   padding: 10px;
-  background: #f3f8f8;
-  border: 1px solid #d7e5e2;
+  background: var(--edm-workspace-aqua-50);
+  border: 1px solid var(--edm-ink-200);
   border-radius: 8px;
 }
 
@@ -59,8 +59,8 @@
   min-width: 0;
   min-height: 48px;
   padding: 7px 8px;
-  background: #ffffff;
-  border: 1px solid #dce5ea;
+  background: var(--edm-white);
+  border: 1px solid var(--edm-neutral-300);
   border-radius: 8px;
   flex-wrap: wrap;
 }
@@ -69,7 +69,7 @@
   display: inline-flex;
   align-items: center;
   min-height: 30px;
-  color: #42515f;
+  color: var(--edm-neutral-650);
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
@@ -116,17 +116,17 @@
   height: 34px;
   min-height: 34px;
   padding: 0 30px 0 10px;
-  color: #202124;
-  background: #ffffff;
-  border: 1px solid #cfd8df;
+  color: var(--edm-neutral-800);
+  background: var(--edm-white);
+  border: 1px solid var(--edm-neutral-400);
   border-radius: 8px;
   font-size: 12px;
   font-weight: 700;
 }
 
 .single-window-scope-select:focus {
-  outline: 2px solid rgba(15, 118, 110, 0.22);
-  border-color: #0f766e;
+  outline: 2px solid color-mix(in srgb, var(--edm-primary-650) 22%, transparent);
+  border-color: var(--edm-primary-650);
 }
 
 .single-window-section-nav {
@@ -138,8 +138,8 @@
   align-items: center;
   min-width: 0;
   padding: 8px;
-  background: rgba(247, 250, 250, 0.96);
-  border: 1px solid #d7e5e2;
+  background: color-mix(in srgb, var(--edm-primary-25) 96%, transparent);
+  border: 1px solid var(--edm-ink-200);
   border-radius: 8px;
   backdrop-filter: blur(8px);
 }
@@ -152,18 +152,18 @@
   min-height: 32px;
   min-width: 0;
   padding: 0 11px;
-  color: #344151;
+  color: var(--edm-neutral-700);
   text-decoration: none;
-  background: #ffffff;
-  border: 1px solid #d8e0e6;
+  background: var(--edm-white);
+  border: 1px solid var(--edm-neutral-350);
   border-radius: 8px;
   font-size: 12px;
   font-weight: 800;
 }
 
 .single-window-section-nav-item:hover {
-  color: #0f766e;
-  border-color: #0f766e;
+  color: var(--edm-primary-650);
+  border-color: var(--edm-primary-650);
 }
 
 .single-window-section-nav-item strong {
@@ -173,9 +173,9 @@
   min-width: 22px;
   height: 20px;
   padding: 0 7px;
-  color: #0f5f58;
-  background: #e8f6f3;
-  border: 1px solid #c8e4dd;
+  color: var(--edm-primary-750);
+  background: var(--edm-primary-75);
+  border: 1px solid var(--edm-primary-150);
   border-radius: 999px;
   font-size: var(--edm-font-size-xs);
   font-weight: 800;
@@ -247,7 +247,7 @@
   min-width: 180px;
   height: 36px;
   padding: 0 10px;
-  border: 1px solid #cfd8df;
+  border: 1px solid var(--edm-neutral-400);
   border-radius: 8px;
 }
 
@@ -256,14 +256,14 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  color: #58616a;
+  color: var(--edm-neutral-600);
   font-size: 13px;
 }
 
 .producer-profile-target strong {
   max-width: 320px;
   overflow: hidden;
-  color: #202124;
+  color: var(--edm-neutral-800);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -298,7 +298,7 @@
 }
 
 .producer-profile-row-selected {
-  background: #eef8f5;
+  background: var(--edm-primary-75);
 }
 
 .producer-profile-editor {
@@ -308,8 +308,8 @@
   min-height: 0;
   overflow: hidden;
   padding: 12px;
-  background: #f8fbfc;
-  border: 1px solid #dde6eb;
+  background: var(--edm-neutral-50);
+  border: 1px solid var(--edm-neutral-300);
   border-radius: 8px;
 }
 
@@ -335,7 +335,7 @@
   display: grid;
   gap: 5px;
   min-width: 0;
-  color: #4d5963;
+  color: var(--edm-neutral-650);
   font-size: 12px;
   font-weight: 700;
 }
@@ -345,10 +345,10 @@
 .producer-profile-editor-grid textarea {
   width: 100%;
   min-width: 0;
-  border: 1px solid #cfd8df;
+  border: 1px solid var(--edm-neutral-400);
   border-radius: 8px;
-  color: #202124;
-  background: #ffffff;
+  color: var(--edm-neutral-800);
+  background: var(--edm-white);
 }
 
 .producer-profile-editor-grid input,
@@ -369,7 +369,7 @@
 
 .producer-profile-storage-policy {
   margin: 8px 0 0;
-  color: #58616a;
+  color: var(--edm-neutral-600);
   font-size: 12px;
   line-height: 1.5;
 }

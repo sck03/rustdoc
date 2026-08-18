@@ -348,7 +348,7 @@ namespace ExportDocManager.Services.Core
                 Note = note,
                 ChangedByUserId = currentUser?.Id > 0 ? currentUser.Id : null,
                 ChangedByUsername = currentUser?.Username?.Trim() ?? string.Empty,
-                ChangedAt = DateTimeOffset.UtcNow
+                ChangedAt = _clock.UtcNow
             }, cancellationToken);
         }
 

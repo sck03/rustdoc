@@ -12,11 +12,15 @@ namespace ExportDocManager.Services.MasterData
         private const long MaximumStaticPageBytes = 4L * 1024L * 1024L;
         private readonly HttpClient _httpClient;
         private readonly ManagedPlaywrightBrowserHost _browserHost;
+        private readonly TimeProvider _timeProvider;
 
-        public I5a6HsCodeProvider(ManagedPlaywrightBrowserHost browserHost)
+        public I5a6HsCodeProvider(
+            ManagedPlaywrightBrowserHost browserHost,
+            TimeProvider? timeProvider = null)
         {
             _httpClient = CreateHttpClient();
             _browserHost = browserHost ?? throw new ArgumentNullException(nameof(browserHost));
+            _timeProvider = timeProvider ?? TimeProvider.System;
         }
 
         private static HttpClient CreateHttpClient()
@@ -54,7 +58,7 @@ namespace ExportDocManager.Services.MasterData
                 null,
                 string.Empty,
                 item.DetailUrl ?? string.Empty,
-                DateTimeOffset.UtcNow);
+                _timeProvider.GetUtcNow());
             var bundle = await FetchDetailEvidenceAsync(record, cancellationToken).ConfigureAwait(false);
             if (bundle.IsExpired) throw new HsCodeRemoteExpiredException(bundle.RecommendedKeywords);
             return bundle.Item;
@@ -101,9 +105,9 @@ namespace ExportDocManager.Services.MasterData
                 return I5a6PageParser.ParseDetailPage(
                     html,
                     item,
+                    _timeProvider.GetUtcNow(),
                     record.InstanceCount,
-                    record.EvidenceUrl,
-                    DateTimeOffset.UtcNow);
+                    record.EvidenceUrl);
             }
             catch (OperationCanceledException) { throw; }
             catch (PayloadLimitExceededException) { throw; }
@@ -117,7 +121,7 @@ namespace ExportDocManager.Services.MasterData
 
         public async Task<HsCodeRemoteSourceHealth> CheckHealthAsync(CancellationToken cancellationToken = default)
         {
-            DateTimeOffset checkedAt = DateTimeOffset.UtcNow;
+            DateTimeOffset checkedAt = _timeProvider.GetUtcNow();
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/hscode/");
@@ -143,7 +147,7 @@ namespace ExportDocManager.Services.MasterData
             if (depth > 3 || !visitedKeywords.Add(keyword)) return HsCodeRemoteSearchBundle.Empty(keyword, Name);
             string url = $"{BaseUrl}/hscode/key/{System.Net.WebUtility.UrlEncode(keyword)}";
             string html = await GetHtmlWithRetryAsync(url, cancellationToken).ConfigureAwait(false);
-            var current = I5a6PageParser.ParseSearchPage(html, keyword, Name, DateTimeOffset.UtcNow);
+            var current = I5a6PageParser.ParseSearchPage(html, keyword, _timeProvider.GetUtcNow(), Name);
             var records = current.Records.ToList();
             var replacements = current.ReplacementEvidence.ToList();
             foreach (string recommendedKeyword in current.ReplacementEvidence
@@ -163,7 +167,7 @@ namespace ExportDocManager.Services.MasterData
             return MergeBundle(keyword, records, replacements);
         }
 
-        private static async Task<HsCodeRemoteSearchBundle> SearchWithBrowserEvidenceAsync(
+        private async Task<HsCodeRemoteSearchBundle> SearchWithBrowserEvidenceAsync(
             IPage page,
             string keyword,
             CancellationToken cancellationToken)
@@ -177,24 +181,28 @@ namespace ExportDocManager.Services.MasterData
             string html = await page.ContentAsync()
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
-            return I5a6PageParser.ParseSearchPage(html, keyword, "i5a6", DateTimeOffset.UtcNow);
+            return I5a6PageParser.ParseSearchPage(html, keyword, _timeProvider.GetUtcNow());
         }
 
-        internal static async Task<IReadOnlyList<HsCode>> ParseSearchPageAsync(IPage page)
+        internal static async Task<IReadOnlyList<HsCode>> ParseSearchPageAsync(
+            IPage page,
+            TimeProvider timeProvider)
         {
+            ArgumentNullException.ThrowIfNull(timeProvider);
             string html = await page.ContentAsync().ConfigureAwait(false);
             const string source = "i5a6（浏览器降级）";
-            var bundle = I5a6PageParser.ParseSearchPage(html, string.Empty, source);
+            DateTimeOffset observedAt = timeProvider.GetUtcNow();
+            var bundle = I5a6PageParser.ParseSearchPage(html, string.Empty, observedAt, source);
             var records = bundle.Records.Count > 0
                 ? bundle.Records
-                : I5a6PageParser.ParseLegacySimpleTable(html, source);
+                : I5a6PageParser.ParseLegacySimpleTable(html, source, observedAt);
             return records
                 .Where(record => !record.IsExpired)
                 .Select(record => record.Item)
                 .ToList();
         }
 
-        private static async Task<HsCodeRemoteDetailBundle> FetchDetailWithBrowserEvidenceAsync(
+        private async Task<HsCodeRemoteDetailBundle> FetchDetailWithBrowserEvidenceAsync(
             IPage page,
             HsCodeRemoteSearchRecord record,
             CancellationToken cancellationToken)
@@ -210,7 +218,12 @@ namespace ExportDocManager.Services.MasterData
             string html = await page.ContentAsync()
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
-            return I5a6PageParser.ParseDetailPage(html, item, record.InstanceCount, record.EvidenceUrl, DateTimeOffset.UtcNow);
+            return I5a6PageParser.ParseDetailPage(
+                html,
+                item,
+                _timeProvider.GetUtcNow(),
+                record.InstanceCount,
+                record.EvidenceUrl);
         }
 
         private async Task<string> GetHtmlWithRetryAsync(string url, CancellationToken cancellationToken)

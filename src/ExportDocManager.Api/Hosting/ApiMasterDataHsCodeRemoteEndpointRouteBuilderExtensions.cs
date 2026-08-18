@@ -2,6 +2,7 @@ using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
@@ -167,6 +168,7 @@ namespace ExportDocManager.Api.Hosting
                 IHsCodeService hsCodeService,
                 IHsCodeKnowledgeService knowledgeService,
                 ApiHsCodeDto request,
+                IBusinessClock clock,
                 CancellationToken cancellationToken) =>
             {
 
@@ -182,7 +184,7 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    var response = await ResolveRemoteHsCodeDetailAsync(hsCodeService, knowledgeService, request, cancellationToken);
+                    var response = await ResolveRemoteHsCodeDetailAsync(hsCodeService, knowledgeService, request, clock, cancellationToken);
                     return Results.Ok(response);
                 }
                 catch (OperationCanceledException)

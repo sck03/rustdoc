@@ -13,6 +13,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,19 +28,20 @@ namespace ExportDocManager.Services.Core
         private readonly IInvoicePartyResolver _invoicePartyResolver;
         private readonly BusinessDataAccessScope _businessDataAccessScope;
         private readonly IAppPathProvider _pathProvider;
+        private readonly IBusinessClock _clock;
 
         public InvoiceTransferService(
             IDbContextFactory<AppDbContext> contextFactory,
             IInvoicePartyResolver invoicePartyResolver,
-            DatabaseConnectionSettings databaseSettings,
             IAppPathProvider pathProvider,
-            BusinessDataAccessScope? businessDataAccessScope = null)
+            BusinessDataAccessScope businessDataAccessScope,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _invoicePartyResolver = invoicePartyResolver ?? throw new ArgumentNullException(nameof(invoicePartyResolver));
-            var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
-            _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(normalizedSettings);
+            _businessDataAccessScope = businessDataAccessScope ?? throw new ArgumentNullException(nameof(businessDataAccessScope));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<string> ExportAsync(int invoiceId, string savePath, CancellationToken cancellationToken = default)
@@ -349,7 +351,7 @@ namespace ExportDocManager.Services.Core
             {
                 SchemaVersion = "1.0",
                 AppVersion = typeof(InvoiceTransferService).Assembly.GetName().Version?.ToString() ?? "1.0",
-                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedAt = _clock.UtcNow,
                 Invoice = CloneInvoice(invoice),
                 Items = CloneItems(items),
                 Customer = CloneCustomer(customer),

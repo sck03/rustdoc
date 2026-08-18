@@ -303,7 +303,10 @@ namespace ExportDocManager.Infrastructure.Tests
             });
             context.Payees.Add(new Payee
             {
-                Category = "Supplier", Name = "Private Company", BankName = "Private Bank", RMBAccount = "6222000012345678",
+                Category = "Supplier",
+                Name = "Private Company",
+                BankName = "Private Bank",
+                RMBAccount = "6222000012345678",
                 Phone = "13800138000"
             });
             context.SaveChanges();

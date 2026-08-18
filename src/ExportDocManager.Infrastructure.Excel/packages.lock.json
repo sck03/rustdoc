@@ -21,6 +21,11 @@
         "resolved": "3.9.0",
         "contentHash": "3lEkUzG67UWPYj/xlX5Hua3MeQQktnK0B7WGzDjLpdJpBtct7szX0E4WB3Kl6C/8bNnbkyT2eO0FSPV+9CCemw=="
       },
+      "BouncyCastle.Cryptography": {
+        "type": "Transitive",
+        "resolved": "2.6.2",
+        "contentHash": "7oWOcvnntmMKNzDLsdxAYqApt+AjpRpP2CShjMfIa3umZ42UQMvH0tl1qAliYPNYO6vTdcGMqnRrCPmsfzTI1w=="
+      },
       "ClosedXML.Parser": {
         "type": "Transitive",
         "resolved": "2.0.0",
@@ -126,6 +131,7 @@
           "ExportDocManager.Application": "[0.1.1, )",
           "ExportDocManager.Domain": "[0.1.1, )",
           "HtmlAgilityPack": "[1.12.4, )",
+          "MailKit": "[4.17.0, )",
           "Microsoft.Data.Sqlite": "[10.0.10, )",
           "Microsoft.EntityFrameworkCore": "[10.0.10, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.10, )",
@@ -141,6 +147,15 @@
         "requested": "[1.12.4, )",
         "resolved": "1.12.4",
         "contentHash": "ljqvBabvFwKoLniuoQKO8b5bJfJweKLs4fUNS/V5dsvpo0A8MlJqxxn9XVmP2DaskbUXty6IYaWAi1SArGIMeQ=="
+      },
+      "MailKit": {
+        "type": "CentralTransitive",
+        "requested": "[4.17.0, )",
+        "resolved": "4.17.0",
+        "contentHash": "eOy/ZDcmdeD76anXpviyZYynl7k45FhwWIQAHU8W0/uyeKbsKo2MEtQUmD5n2wHeQAGzKCcIRt2LjZJXLC6kPw==",
+        "dependencies": {
+          "MimeKit": "4.17.0"
+        }
       },
       "Microsoft.Data.Sqlite": {
         "type": "CentralTransitive",
@@ -184,6 +199,16 @@
           "SQLitePCLRaw.core": "2.1.11"
         }
       },
+      "MimeKit": {
+        "type": "CentralTransitive",
+        "requested": "[4.17.0, )",
+        "resolved": "4.17.0",
+        "contentHash": "uH/TEqa5XnbxCid4CXk12IhCwUvbg11erqOBLEmQ2fC6Nn/ksY6mYevbPB+GiC+FE7v8d5lfdBmil+UF7mxJ5g==",
+        "dependencies": {
+          "BouncyCastle.Cryptography": "2.6.2",
+          "System.Security.Cryptography.Pkcs": "10.0.0"
+        }
+      },
       "Npgsql.EntityFrameworkCore.PostgreSQL": {
         "type": "CentralTransitive",
         "requested": "[10.0.3, )",
@@ -216,6 +241,12 @@
         "requested": "[10.0.10, )",
         "resolved": "10.0.10",
         "contentHash": "SZT8XZ8Tktdnhaq5eWOJWN0VBczFZ7l6K5C5ykbaQFXZ0Uv8UBJwQcYUM1NVk5pKAmPlHnancMh33jF6IKnUrg=="
+      },
+      "System.Security.Cryptography.Pkcs": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.10, )",
+        "resolved": "10.0.10",
+        "contentHash": "KG8t5RHczdgB3IWvRndpI0nE1DSo7ikDYSDbITxfgRFyIvnYiKzuPjaZOsPnwFQ1aOGUl9sEulJul9wlHLEUoA=="
       },
       "System.Security.Cryptography.ProtectedData": {
         "type": "CentralTransitive",

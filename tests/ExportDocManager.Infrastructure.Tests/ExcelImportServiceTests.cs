@@ -1556,7 +1556,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             public AppSettings Settings { get; } = new();
 
-            public Task LoadAsync() => Task.CompletedTask;
+            public Task LoadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
             public Task SaveAsync() => Task.CompletedTask;
         }

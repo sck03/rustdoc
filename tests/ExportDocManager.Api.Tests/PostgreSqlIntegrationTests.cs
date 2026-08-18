@@ -69,11 +69,11 @@ namespace ExportDocManager.Api.Tests
                     "IX_HsCodes_Status_NormalizedCode_Prefix",
                     "IX_HsCodeDeclarationExamples_RawCode_Prefix",
                     "IX_HsCodeRemoteCandidates_Status_RawCode_Prefix",
-                    "IX_HsCodes_TextSearch_Upper_Trgm",
-                    "IX_HsCodeDeclarationExamples_TextSearch_Upper_Trgm",
-                    "IX_Items_HistorySearch_Upper_Trgm",
-                    "IX_Invoices_TextSearch_Upper_Trgm",
-                    "IX_Payments_TextSearch_Upper_Trgm"
+                    "IX_HsCodes_TextSearch_Trgm",
+                    "IX_HsCodeDeclarationExamples_TextSearch_Trgm",
+                    "IX_Items_HistorySearch_Trgm",
+                    "IX_Invoices_TextSearch_Trgm",
+                    "IX_Payments_TextSearch_Trgm"
                 })
                 {
                     Assert.Contains(requiredIndex, indexNames);
@@ -237,7 +237,11 @@ namespace ExportDocManager.Api.Tests
                 Assert.True(initialized.IsSuccess, initialized.ErrorMessage);
 
                 await SeedCapacityDataAsync(connectionString, hsRecordCount, invoiceRecordCount);
-                var knowledge = new HsCodeKnowledgeService(factory);
+                var knowledge = new HsCodeKnowledgeService(
+                    factory,
+                    new BusinessDataAccessScope(
+                        settings,
+                        new FixedCurrentUserContext(new User { Role = "Admin" })));
                 var stopwatch = Stopwatch.StartNew();
 
                 var prefixResults = await knowledge.SearchAsync("610000", 20);

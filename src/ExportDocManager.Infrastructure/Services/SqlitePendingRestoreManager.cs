@@ -78,7 +78,7 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 marker = JsonSerializer.Deserialize<SqlitePendingRestoreMarker>(
                     File.ReadAllText(markerPath),
-                    JsonOptions) ?? throw new InvalidDataException("SQLite 待还原任务内容为空。" );
+                    JsonOptions) ?? throw new InvalidDataException("SQLite 待还原任务内容为空。");
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
             {
@@ -104,7 +104,7 @@ namespace ExportDocManager.Services.Infrastructure
                 !PathBoundaryHelper.IsWithinRoot(stagedPath, databaseDirectory) ||
                 !string.Equals(stagedPath, GetStagedRestorePath(databasePath), PathComparison))
             {
-                throw new InfrastructureServiceException("SQLite 待还原任务的目标路径或暂存路径无效。" );
+                throw new InfrastructureServiceException("SQLite 待还原任务的目标路径或暂存路径无效。");
             }
             if (!File.Exists(stagedPath))
             {
@@ -115,7 +115,7 @@ namespace ExportDocManager.Services.Infrastructure
             string actualHash = ComputeSha256(stagedPath);
             if (!string.Equals(actualHash, marker.StagedSha256, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InfrastructureServiceException("SQLite 待还原数据库摘要不一致，已拒绝覆盖当前数据库。" );
+                throw new InfrastructureServiceException("SQLite 待还原数据库摘要不一致，已拒绝覆盖当前数据库。");
             }
 
             ValidateSnapshot(stagedPath);
@@ -138,13 +138,13 @@ namespace ExportDocManager.Services.Infrastructure
         {
             if (!File.Exists(databasePath) || string.IsNullOrWhiteSpace(marker.StagedSha256))
             {
-                throw new InfrastructureServiceException("SQLite 待还原任务缺少暂存数据库文件。" );
+                throw new InfrastructureServiceException("SQLite 待还原任务缺少暂存数据库文件。");
             }
 
             string targetHash = ComputeSha256(databasePath);
             if (!string.Equals(targetHash, marker.StagedSha256, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InfrastructureServiceException("SQLite 待还原任务缺少暂存数据库文件，且当前数据库不是已排队的还原版本。" );
+                throw new InfrastructureServiceException("SQLite 待还原任务缺少暂存数据库文件，且当前数据库不是已排队的还原版本。");
             }
 
             SqliteConnection.ClearAllPools();
@@ -186,7 +186,7 @@ namespace ExportDocManager.Services.Infrastructure
             string result = SqliteMaintenanceGateway.RunQuickCheck(connection);
             if (!string.Equals(result, "ok", StringComparison.OrdinalIgnoreCase))
             {
-                throw new InfrastructureServiceException($"SQLite 待还原数据库一致性检查失败：{result}" );
+                throw new InfrastructureServiceException($"SQLite 待还原数据库一致性检查失败：{result}");
             }
         }
     }

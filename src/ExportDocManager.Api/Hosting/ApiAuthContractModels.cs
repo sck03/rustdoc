@@ -18,6 +18,7 @@ namespace ExportDocManager.Api.Hosting
         bool IsActive,
         DateOnly BusinessDate,
         string BusinessTimeZone,
+        DateTimeOffset BusinessDateValidUntilUtc,
         ApiUserCapabilitiesDto Capabilities);
 
     public sealed record ApiUserCapabilitiesDto(

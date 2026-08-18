@@ -20,8 +20,8 @@ namespace ExportDocManager.Models.Entities
         public int UseCount { get; set; }
         public int RejectedCount { get; set; }
         public DateTimeOffset? LastUsedAt { get; set; }
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
     }
 
     [Table("HsCodeReplacementRelations")]
@@ -34,8 +34,8 @@ namespace ExportDocManager.Models.Entities
         [Required, MaxLength(100)] public string Source { get; set; } = string.Empty;
         public int Confidence { get; set; }
         public bool IsManuallyVerified { get; set; }
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
     }
 
     [Table("HsCodeSearchFeedback")]
@@ -50,7 +50,7 @@ namespace ExportDocManager.Models.Entities
         public int AcceptedCount { get; set; }
         public int RejectedCount { get; set; }
         public DateTimeOffset? LastConfirmedAt { get; set; }
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset UpdatedAt { get; set; }
     }
 
     [Table("HsCodeRemoteCandidates")]
@@ -68,8 +68,8 @@ namespace ExportDocManager.Models.Entities
         [Required, MaxLength(30)] public string ReviewStatus { get; set; } = "Pending";
         [Required, MaxLength(30)] public string ResolutionStatus { get; set; } = "Unresolved";
         public int SeenCount { get; set; } = 1;
-        public DateTimeOffset FirstSeenAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset LastSeenAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset FirstSeenAt { get; set; }
+        public DateTimeOffset LastSeenAt { get; set; }
         public DateTimeOffset? ReviewedAt { get; set; }
     }
 }

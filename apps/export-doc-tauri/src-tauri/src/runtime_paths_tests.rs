@@ -37,6 +37,28 @@ fn reads_runtime_path_arguments_from_equals_values() {
 }
 
 #[test]
+fn selected_storage_parent_gets_a_product_specific_data_directory() {
+    let parent = absolute_test_data_root("selected-parent");
+
+    assert_eq!(
+        runtime_data_root_under(&parent),
+        parent.join(RUNTIME_DATA_ROOT_DIRECTORY_NAME)
+    );
+}
+
+#[test]
+fn recognizes_network_file_system_families() {
+    for name in ["nfs", "NFS4", "smbfs", "cifs", "webdav", "afpfs"] {
+        assert!(is_network_file_system_name(name), "{name}");
+    }
+    assert!(!is_network_file_system_name("apfs"));
+    assert!(!is_network_file_system_name("ext4"));
+    assert!(is_network_file_system_magic(0x0000_6969));
+    assert!(is_network_file_system_magic(0xFE53_4D42));
+    assert!(!is_network_file_system_magic(0x0000_EF53));
+}
+
+#[test]
 fn reads_persisted_absolute_runtime_data_root() {
     let app_root = fresh_test_dir("absolute-runtime-data-root");
     let config_root = app_root.join("platform-config");

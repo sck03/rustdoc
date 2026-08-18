@@ -17,22 +17,85 @@ namespace ExportDocManager.Services.MasterData
         private static readonly IReadOnlyDictionary<string, string> CustomsUnitMap =
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["001"] = "台", ["002"] = "座", ["003"] = "辆", ["004"] = "艘", ["005"] = "架",
-                ["006"] = "套", ["007"] = "个", ["008"] = "只", ["009"] = "头", ["010"] = "张",
-                ["011"] = "件", ["012"] = "支", ["013"] = "根", ["014"] = "条", ["015"] = "把",
-                ["016"] = "块", ["017"] = "卷", ["018"] = "副", ["019"] = "枚", ["020"] = "吊",
-                ["021"] = "双", ["022"] = "对", ["023"] = "箱", ["025"] = "桶", ["026"] = "扎",
-                ["027"] = "包", ["028"] = "筐", ["029"] = "罗", ["030"] = "匹", ["031"] = "册",
-                ["032"] = "本", ["033"] = "格", ["034"] = "筒", ["035"] = "千克", ["036"] = "克",
-                ["037"] = "毫克", ["038"] = "吨", ["039"] = "公担", ["044"] = "厘米", ["045"] = "毫米",
-                ["046"] = "米", ["047"] = "千米", ["048"] = "英尺", ["049"] = "英寸", ["050"] = "码",
-                ["063"] = "千瓦时", ["070"] = "升", ["071"] = "毫升", ["072"] = "微升", ["095"] = "升",
-                ["096"] = "毫升", ["097"] = "微升", ["110"] = "平方米", ["111"] = "平方英尺", ["112"] = "平方码",
-                ["115"] = "立方米", ["116"] = "立方英尺", ["120"] = "立方厘米", ["121"] = "立方毫米", ["126"] = "立方米",
-                ["132"] = "升", ["133"] = "毫升", ["134"] = "微升", ["135"] = "升", ["136"] = "毫升",
-                ["137"] = "微升", ["138"] = "升", ["139"] = "毫升", ["140"] = "微升", ["141"] = "升",
-                ["142"] = "毫升", ["143"] = "微升", ["144"] = "升", ["145"] = "毫升", ["146"] = "微升",
-                ["147"] = "升", ["148"] = "毫升", ["149"] = "微升", ["163"] = "克拉"
+                ["001"] = "台",
+                ["002"] = "座",
+                ["003"] = "辆",
+                ["004"] = "艘",
+                ["005"] = "架",
+                ["006"] = "套",
+                ["007"] = "个",
+                ["008"] = "只",
+                ["009"] = "头",
+                ["010"] = "张",
+                ["011"] = "件",
+                ["012"] = "支",
+                ["013"] = "根",
+                ["014"] = "条",
+                ["015"] = "把",
+                ["016"] = "块",
+                ["017"] = "卷",
+                ["018"] = "副",
+                ["019"] = "枚",
+                ["020"] = "吊",
+                ["021"] = "双",
+                ["022"] = "对",
+                ["023"] = "箱",
+                ["025"] = "桶",
+                ["026"] = "扎",
+                ["027"] = "包",
+                ["028"] = "筐",
+                ["029"] = "罗",
+                ["030"] = "匹",
+                ["031"] = "册",
+                ["032"] = "本",
+                ["033"] = "格",
+                ["034"] = "筒",
+                ["035"] = "千克",
+                ["036"] = "克",
+                ["037"] = "毫克",
+                ["038"] = "吨",
+                ["039"] = "公担",
+                ["044"] = "厘米",
+                ["045"] = "毫米",
+                ["046"] = "米",
+                ["047"] = "千米",
+                ["048"] = "英尺",
+                ["049"] = "英寸",
+                ["050"] = "码",
+                ["063"] = "千瓦时",
+                ["070"] = "升",
+                ["071"] = "毫升",
+                ["072"] = "微升",
+                ["095"] = "升",
+                ["096"] = "毫升",
+                ["097"] = "微升",
+                ["110"] = "平方米",
+                ["111"] = "平方英尺",
+                ["112"] = "平方码",
+                ["115"] = "立方米",
+                ["116"] = "立方英尺",
+                ["120"] = "立方厘米",
+                ["121"] = "立方毫米",
+                ["126"] = "立方米",
+                ["132"] = "升",
+                ["133"] = "毫升",
+                ["134"] = "微升",
+                ["135"] = "升",
+                ["136"] = "毫升",
+                ["137"] = "微升",
+                ["138"] = "升",
+                ["139"] = "毫升",
+                ["140"] = "微升",
+                ["141"] = "升",
+                ["142"] = "毫升",
+                ["143"] = "微升",
+                ["144"] = "升",
+                ["145"] = "毫升",
+                ["146"] = "微升",
+                ["147"] = "升",
+                ["148"] = "毫升",
+                ["149"] = "微升",
+                ["163"] = "克拉"
             };
 
         public HsCodeImportService(
@@ -152,7 +215,7 @@ namespace ExportDocManager.Services.MasterData
                     int unchanged = 0;
                     int obsolete = 0;
                     int skipped = 0;
-                    DateTimeOffset now = DateTimeOffset.UtcNow;
+                    DateTimeOffset now = _clock.UtcNow;
 
                     // Process the preview in bounded batches. Keep the source
                     // preview immutable so an execution-strategy retry starts
@@ -440,7 +503,7 @@ namespace ExportDocManager.Services.MasterData
             return (int)Math.Round(valid * 20d / checkedCount);
         }
 
-        private static List<ParsedImportRow> ParseImportRows(DetectedImportLayout detected, CancellationToken cancellationToken)
+        private List<ParsedImportRow> ParseImportRows(DetectedImportLayout detected, CancellationToken cancellationToken)
         {
             var result = new List<ParsedImportRow>();
             int lastRow = detected.Worksheet.LastRowUsed()?.RowNumber() ?? detected.HeaderRowNumber;
@@ -543,7 +606,7 @@ namespace ExportDocManager.Services.MasterData
                 item, fields, replacements, message);
         }
 
-        private static HsCode? BuildImportEntity(IXLRow row, ImportLayout layout)
+        private HsCode? BuildImportEntity(IXLRow row, ImportLayout layout)
         {
             string code = HsCodeTextHelper.NormalizeCode(ReadImportCell(row.Cell(layout.CodeColumn)));
             if (string.IsNullOrWhiteSpace(code) || code.Length < 6 || code.Length > 13 || !code.All(char.IsDigit))
@@ -567,7 +630,7 @@ namespace ExportDocManager.Services.MasterData
                 Description = ReadOptionalCell(row, layout.DescriptionColumn),
                 Notes = NormalizeImportNotes(ReadOptionalCell(row, layout.NotesColumn)),
                 Status = "Active",
-                UpdateTime = DateTimeOffset.UtcNow
+                UpdateTime = _clock.UtcNow
             };
         }
 
@@ -747,14 +810,27 @@ namespace ExportDocManager.Services.MasterData
 
         private static HsCode CloneHsCode(HsCode item) => new()
         {
-            Id = item.Id, Code = item.Code, Name = item.Name, Unit = item.Unit, RebateRate = item.RebateRate,
-            SupervisionConditions = item.SupervisionConditions, InspectionCategory = item.InspectionCategory,
-            Elements = item.Elements, Description = item.Description, Status = item.Status,
-            NormalTariffRate = item.NormalTariffRate, PreferentialTariffRate = item.PreferentialTariffRate,
-            ExportTariffRate = item.ExportTariffRate, ConsumptionTaxRate = item.ConsumptionTaxRate,
-            ValueAddedTaxRate = item.ValueAddedTaxRate, Notes = item.Notes,
-            SourceName = item.SourceName, EffectiveYear = item.EffectiveYear, LastVerifiedAt = item.LastVerifiedAt,
-            ReplacedByCodes = item.ReplacedByCodes, UpdateTime = item.UpdateTime
+            Id = item.Id,
+            Code = item.Code,
+            Name = item.Name,
+            Unit = item.Unit,
+            RebateRate = item.RebateRate,
+            SupervisionConditions = item.SupervisionConditions,
+            InspectionCategory = item.InspectionCategory,
+            Elements = item.Elements,
+            Description = item.Description,
+            Status = item.Status,
+            NormalTariffRate = item.NormalTariffRate,
+            PreferentialTariffRate = item.PreferentialTariffRate,
+            ExportTariffRate = item.ExportTariffRate,
+            ConsumptionTaxRate = item.ConsumptionTaxRate,
+            ValueAddedTaxRate = item.ValueAddedTaxRate,
+            Notes = item.Notes,
+            SourceName = item.SourceName,
+            EffectiveYear = item.EffectiveYear,
+            LastVerifiedAt = item.LastVerifiedAt,
+            ReplacedByCodes = item.ReplacedByCodes,
+            UpdateTime = item.UpdateTime
         };
 
         private sealed record ParsedImportRow(int RowNumber, HsCode? Item, string? Error);

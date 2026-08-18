@@ -28,9 +28,9 @@ namespace ExportDocManager.Services.Core
     {
         private readonly BusinessDataAccessScope _accessScope;
 
-        public InvoicePartyResolver(BusinessDataAccessScope? accessScope = null)
+        public InvoicePartyResolver(BusinessDataAccessScope accessScope)
         {
-            _accessScope = accessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
+            _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
         }
 
         public async Task<int> ResolveCustomerIdAsync(

@@ -13,7 +13,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/master-data/customers", async Task<Results<
                 Ok<IReadOnlyList<ApiCustomerDto>>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomerReadRepository repository,
@@ -31,7 +31,7 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/master-data/customers/page", async Task<Results<
                 Ok<ApiPagedResponse<ApiCustomerDto>>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomerReadRepository repository,
@@ -54,7 +54,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiCustomerDto>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomerService customerService,
@@ -77,7 +77,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/master-data/customers", async Task<Results<
                 Created<ApiCustomerDto>,
                 BadRequest<ApiErrorResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomerService customerService,
@@ -121,7 +121,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiCustomerDto>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomerService customerService,
@@ -173,7 +173,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiCommandResponse>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ICustomerService customerService,

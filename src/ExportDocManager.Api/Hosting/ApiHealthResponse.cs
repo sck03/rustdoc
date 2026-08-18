@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Time;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -49,13 +50,15 @@ namespace ExportDocManager.Api.Hosting
 
     public static class ApiHealthResponseFactory
     {
-        public static ApiHealthResponse CreatePublic(DatabaseConnectionSettings databaseSettings)
+        public static ApiHealthResponse CreatePublic(
+            DatabaseConnectionSettings databaseSettings,
+            IBusinessClock? clock = null)
         {
             ArgumentNullException.ThrowIfNull(databaseSettings);
 
             return new ApiHealthResponse(
                 "ok",
-                DateTimeOffset.UtcNow,
+                (clock ?? BusinessClock.CreateSystem()).UtcNow,
                 ProductVersionProvider.ProductVersion,
                 ProductVersionProvider.InformationalVersion,
                 string.Empty,
@@ -77,7 +80,8 @@ namespace ExportDocManager.Api.Hosting
             DatabaseConnectionSettings databaseSettings,
             string sqliteDatabasePath,
             IReadOnlyList<RuntimeDependencyDiagnostic> runtimeDependencies,
-            bool revealPaths = true)
+            bool revealPaths = true,
+            IBusinessClock? clock = null)
         {
             ArgumentNullException.ThrowIfNull(paths);
             ArgumentNullException.ThrowIfNull(databaseSettings);
@@ -87,7 +91,7 @@ namespace ExportDocManager.Api.Hosting
 
             return new ApiHealthResponse(
                 "ok",
-                DateTimeOffset.UtcNow,
+                (clock ?? BusinessClock.CreateSystem()).UtcNow,
                 ProductVersionProvider.ProductVersion,
                 ProductVersionProvider.InformationalVersion,
                 ApiResponsePathPolicy.Reveal(paths.AppRoot, revealPaths),

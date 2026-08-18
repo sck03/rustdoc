@@ -27,7 +27,7 @@ namespace ExportDocManager.Services.Infrastructure
                 await ValidatePgDumpCompatibilityAsync(tools.PgDumpPath, cancellationToken).ConfigureAwait(false);
 
                 string database = DbHelper.NormalizePostgreSqlText(_maintenanceDatabaseSettings.PostgreSqlDatabase);
-                string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd_HHmmss_fff");
+                string timestamp = _clock.UtcNow.ToString("yyyyMMdd_HHmmss_fff");
                 string fileName = $"{timestamp}_{NormalizeFileToken(database)}_{Guid.NewGuid():N}.dump";
                 string outputPath = Path.Combine(PostgreSqlBackupRoot, fileName);
                 string tempPath = AtomicFileHelper.GetSiblingTempFilePath(outputPath);
@@ -102,7 +102,7 @@ namespace ExportDocManager.Services.Infrastructure
             IReadOnlyList<string> oldOwnerRoles = NormalizePostgreSqlOwnerRoles(request.OldOwnerRoles);
 
             var tools = PostgreSqlToolLocator.Resolve(_pathProvider);
-            string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd_HHmmss_fff");
+            string timestamp = _clock.UtcNow.ToString("yyyyMMdd_HHmmss_fff");
             string planRoot = EnsureDirectory(Path.Combine(PostgreSqlRestorePlanRoot, $"{timestamp}_{Guid.NewGuid():N}"));
             string ownershipSqlPath = Path.Combine(planRoot, "post_restore_ownership.sql");
             string restoreScriptPath = Path.Combine(planRoot, OperatingSystem.IsWindows() ? "restore-postgresql.ps1" : "restore-postgresql.sh");

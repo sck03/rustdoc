@@ -54,6 +54,9 @@ jobs:
           dotnet restore ExportDocManager.sln --locked-mode
           npm ci --prefix apps/export-doc-web
 
+      - name: Verify .NET formatting
+        run: dotnet format ExportDocManager.sln --verify-no-changes --no-restore
+
       - name: Build and test .NET solution
         shell: pwsh
         run: ./scripts/run-tests.ps1 -Configuration Release -NoRestore -NoPause
@@ -77,6 +80,7 @@ jobs:
           npm --prefix apps/export-doc-web run build
           npm --prefix apps/export-doc-web run test:api-client-contracts
           npm --prefix apps/export-doc-web run test:browser-session-contracts
+          npm --prefix apps/export-doc-web run test:business-date-refresh
           npm --prefix apps/export-doc-web run test:invoice-text-normalization
           npm --prefix apps/export-doc-web run test:new-report-designer-exporter
           npm --prefix apps/export-doc-web run test:workspace-navigation
@@ -89,6 +93,6 @@ jobs:
           cargo fmt --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --check
           cargo fmt --manifest-path apps/exportdoc-ocr-rs/Cargo.toml --check
           cargo fmt --manifest-path tools/excel-analyzer-rs/Cargo.toml --check
-          cargo check --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --locked
-          cargo check --manifest-path apps/exportdoc-ocr-rs/Cargo.toml --locked
-          cargo check --manifest-path tools/excel-analyzer-rs/Cargo.toml --locked
+          cargo test --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --locked
+          cargo test --manifest-path apps/exportdoc-ocr-rs/Cargo.toml --locked
+          cargo test --manifest-path tools/excel-analyzer-rs/Cargo.toml --locked

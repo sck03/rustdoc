@@ -2,6 +2,7 @@ using ExportDocManager.Services.Crm;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Opportunities;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -52,11 +53,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/crm/customers/export", async (HttpContext context, IApiSessionTokenService tokens,
                 ApiAuthorizationService auth, ICrmCustomerExportService exportService, string? keyword, string? status,
-                CancellationToken ct) =>
+                IBusinessClock clock, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(context, tokens, auth, out var denied)) return denied;
                 byte[] content = await exportService.ExportAsync(keyword, status, ct);
-                return Results.File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"crm-customers-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.xlsx");
+                return Results.File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"crm-customers-{clock.UtcNow:yyyyMMdd-HHmmss}.xlsx");
             }).WithName("ExportCrmCustomers")
             .Produces<byte[]>(StatusCodes.Status200OK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             .Produces(StatusCodes.Status401Unauthorized)

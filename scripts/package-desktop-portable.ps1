@@ -84,15 +84,6 @@ function Copy-DirectoryContents {
     }
 }
 
-function Invoke-NativeCommand {
-    param([string]$Command, [string[]]$Arguments)
-
-    & $Command @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "Command failed with exit code ${LASTEXITCODE}: $Command $($Arguments -join ' ')"
-    }
-}
-
 function Write-PortableMarker {
     param([string]$Destination)
 
@@ -142,12 +133,14 @@ function Resolve-MacOsBundleExecutable {
         throw "macOS portable app is missing Contents/Info.plist: $AppBundle"
     }
 
-    $bundleExecutable = & /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" $infoPlist
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to read CFBundleExecutable from '$infoPlist'."
-    }
-
-    $executableName = ([string]($bundleExecutable | Select-Object -First 1)).Trim()
+    $bundleExecutable = Invoke-ExportDocExternal `
+        -FilePath "/usr/libexec/PlistBuddy" `
+        -Arguments @("-c", "Print :CFBundleExecutable", $infoPlist) `
+        -DisplayName "Read macOS bundle executable metadata" `
+        -TimeoutSeconds 30 `
+        -HeartbeatSeconds 10 `
+        -CaptureOutput
+    $executableName = ([string]$bundleExecutable.Output).Trim()
     if ([string]::IsNullOrWhiteSpace($executableName)) {
         throw "CFBundleExecutable is empty in '$infoPlist'."
     }
@@ -256,12 +249,22 @@ switch ($Platform) {
         $entryPoint = "$assetBaseName.AppImage"
         $portableAppImage = Join-Path $stagingRoot $entryPoint
         Copy-Item -LiteralPath $appImages[0].FullName -Destination $portableAppImage -Force
-        Invoke-NativeCommand -Command "chmod" -Arguments @("+x", $portableAppImage)
+        Invoke-ExportDocExternal `
+            -FilePath "chmod" `
+            -Arguments @("+x", $portableAppImage) `
+            -DisplayName "Mark portable AppImage executable" `
+            -TimeoutSeconds 30 `
+            -HeartbeatSeconds 10
 
         New-Item -ItemType Directory -Path $inspectionRoot -Force | Out-Null
         Push-Location $inspectionRoot
         try {
-            Invoke-NativeCommand -Command $portableAppImage -Arguments @("--appimage-extract")
+            Invoke-ExportDocExternal `
+                -FilePath $portableAppImage `
+                -Arguments @("--appimage-extract") `
+                -DisplayName "Extract portable AppImage for payload verification" `
+                -TimeoutSeconds 300 `
+                -HeartbeatSeconds 15
         }
         finally {
             Pop-Location
@@ -275,7 +278,12 @@ switch ($Platform) {
         if (-not (Test-Path -LiteralPath $launchExecutablePath -PathType Leaf)) {
             throw "Extracted Linux AppImage is missing AppRun: $launchExecutablePath"
         }
-        Invoke-NativeCommand -Command "chmod" -Arguments @("+x", $launchExecutablePath)
+        Invoke-ExportDocExternal `
+            -FilePath "chmod" `
+            -Arguments @("+x", $launchExecutablePath) `
+            -DisplayName "Mark extracted AppRun executable" `
+            -TimeoutSeconds 30 `
+            -HeartbeatSeconds 10
     }
     "macos" {
         $macOsBundleRoot = Join-Path $bundleRoot "macos"
@@ -285,7 +293,12 @@ switch ($Platform) {
         }
         $entryPoint = $appBundles[0].Name
         $portableAppBundle = Join-Path $stagingRoot $entryPoint
-        Invoke-NativeCommand -Command "ditto" -Arguments @($appBundles[0].FullName, $portableAppBundle)
+        Invoke-ExportDocExternal `
+            -FilePath "ditto" `
+            -Arguments @($appBundles[0].FullName, $portableAppBundle) `
+            -DisplayName "Copy macOS application bundle" `
+            -TimeoutSeconds 600 `
+            -HeartbeatSeconds 20
         $payloadVerificationRoot = Join-Path $portableAppBundle "Contents/Resources"
         if (-not (Test-Path -LiteralPath (Join-Path $payloadVerificationRoot "runtime-layout.json") -PathType Leaf)) {
             throw "macOS portable app is missing Contents/Resources/runtime-layout.json."
@@ -371,11 +384,16 @@ if ($Platform -eq "windows") {
     Compress-Archive -LiteralPath $stagingRoot -DestinationPath $archivePath -CompressionLevel Optimal
 }
 else {
-    Invoke-NativeCommand -Command "tar" -Arguments @(
-        "-czf", $archivePath,
-        "-C", (Split-Path -Parent $stagingRoot),
-        (Split-Path -Leaf $stagingRoot)
-    )
+    Invoke-ExportDocExternal `
+        -FilePath "tar" `
+        -Arguments @(
+            "-czf", $archivePath,
+            "-C", (Split-Path -Parent $stagingRoot),
+            (Split-Path -Leaf $stagingRoot)
+        ) `
+        -DisplayName "Create portable desktop archive" `
+        -TimeoutSeconds 1200 `
+        -HeartbeatSeconds 30
 }
 
 $archive = Get-Item -LiteralPath $archivePath

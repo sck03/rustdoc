@@ -23,6 +23,7 @@ namespace ExportDocManager.Services.SingleWindow
             string plaintextPath,
             string packagePath,
             string password,
+            DateTimeOffset createdAtUtc,
             CancellationToken cancellationToken = default)
         {
             ValidatePassword(password);
@@ -50,7 +51,7 @@ namespace ExportDocManager.Services.SingleWindow
                     Convert.ToBase64String(noncePrefix),
                     ChunkSize,
                     plaintextInfo.Length,
-                    DateTimeOffset.UtcNow);
+                    createdAtUtc);
                 byte[] headerBytes = JsonSerializer.SerializeToUtf8Bytes(header, JsonOptions);
                 byte[] headerHash = SHA256.HashData(headerBytes);
 

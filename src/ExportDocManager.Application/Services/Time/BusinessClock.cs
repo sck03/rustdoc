@@ -9,6 +9,8 @@ public interface IBusinessClock
     DateTimeOffset Now { get; }
 
     DateOnly Today { get; }
+
+    DateTimeOffset TodayValidUntilUtc { get; }
 }
 
 public sealed class BusinessClock : IBusinessClock
@@ -32,6 +34,16 @@ public sealed class BusinessClock : IBusinessClock
     public DateTimeOffset Now => TimeZoneInfo.ConvertTime(UtcNow, _timeZone);
 
     public DateOnly Today => DateOnly.FromDateTime(Now.DateTime);
+
+    public DateTimeOffset TodayValidUntilUtc
+    {
+        get
+        {
+            DateTimeOffset now = Now;
+            DateTime nextMidnight = DateTime.SpecifyKind(now.Date.AddDays(1), DateTimeKind.Unspecified);
+            return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(nextMidnight, _timeZone), TimeSpan.Zero);
+        }
+    }
 
     public static IBusinessClock CreateSystem(string? timeZoneId = null) =>
         new BusinessClock(TimeProvider.System, timeZoneId ?? DefaultTimeZoneId);

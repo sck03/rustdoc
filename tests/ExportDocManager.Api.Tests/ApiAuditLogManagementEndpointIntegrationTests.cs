@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using ClosedXML.Excel;
 using ExportDocManager.Api.Hosting;
+using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Security;
 using Microsoft.Data.Sqlite;
 
@@ -190,7 +191,7 @@ namespace ExportDocManager.Api.Tests
 
         private static async Task SeedAuditLogsAsync(string databasePath)
         {
-            await using var connection = new SqliteConnection($"Data Source={databasePath}");
+            await using var connection = new SqliteConnection(DbHelper.BuildConnectionString(databasePath));
             await connection.OpenAsync();
 
             await InsertAuditLogAsync(

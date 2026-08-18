@@ -4,6 +4,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,12 +18,14 @@ namespace ExportDocManager.Services.SingleWindow
         private readonly IAppPathProvider _pathProvider;
         private readonly LocalSecretProtector _secretProtector;
         private readonly bool _isSqlite;
+        private readonly IBusinessClock _clock;
 
         public SingleWindowClientProfileService(
             IDbContextFactory<AppDbContext> contextFactory,
             ISingleWindowStationIdentityService stationIdentity,
             IAppPathProvider pathProvider,
-            DatabaseConnectionSettings databaseSettings)
+            DatabaseConnectionSettings databaseSettings,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _stationIdentity = stationIdentity ?? throw new ArgumentNullException(nameof(stationIdentity));
@@ -30,6 +33,7 @@ namespace ExportDocManager.Services.SingleWindow
             _secretProtector = new LocalSecretProtector(_pathProvider);
             _isSqlite = !DatabaseModeHelper.UsesPostgreSql(
                 databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings)));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<IReadOnlyList<SwClientProfile>> ListAsync(
@@ -203,7 +207,7 @@ namespace ExportDocManager.Services.SingleWindow
             profile.CanSubmitAgentConsignment = update.CanSubmitAgentConsignment;
             profile.IsEnabled = true;
             profile.IsActive = true;
-            profile.UpdatedAt = DateTimeOffset.UtcNow;
+            profile.UpdatedAt = _clock.UtcNow;
 
             EnsureClientFolderStructure(customsCooRoot);
             EnsureClientFolderStructure(agentConsignmentRoot);
@@ -254,7 +258,7 @@ namespace ExportDocManager.Services.SingleWindow
                 profile.IsActive = profile.Id == selected.Id;
             }
 
-            selected.UpdatedAt = DateTimeOffset.UtcNow;
+            selected.UpdatedAt = _clock.UtcNow;
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
 

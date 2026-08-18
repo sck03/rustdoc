@@ -57,10 +57,10 @@ namespace ExportDocManager.Models.Entities
         public decimal Length { get; set; }
         public decimal Width { get; set; }
         public decimal Height { get; set; }
-        
+
         [Display(Name = "单箱毛重")]
         public decimal GWPerCtn { get; set; }
-        
+
         [Display(Name = "单箱净重")]
         public decimal NWPerCtn { get; set; }
 
@@ -76,8 +76,8 @@ namespace ExportDocManager.Models.Entities
         [Display(Name = "默认单价")]
         public decimal DefaultPrice { get; set; }
 
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
 
         [ConcurrencyCheck]
         public byte[]? RowVersion { get; set; }

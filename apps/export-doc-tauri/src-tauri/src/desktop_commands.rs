@@ -56,13 +56,15 @@ pub(crate) fn schedule_data_root_migration(
         );
     }
 
-    let mut dialog = rfd::FileDialog::new().set_title("选择新的业务数据目录（必须为空）");
+    let mut dialog =
+        rfd::FileDialog::new().set_title("选择新的业务数据保存位置（程序会创建专用子目录）");
     if let Some(parent) = paths.data_root.parent().filter(|path| path.is_dir()) {
         dialog = dialog.set_directory(parent);
     }
-    let Some(target_root) = dialog.pick_folder() else {
+    let Some(target_parent) = dialog.pick_folder() else {
         return Ok(None);
     };
+    let target_root = runtime_paths::runtime_data_root_under(&target_parent);
 
     runtime_paths::schedule_data_root_migration(&paths, &target_root)
         .map(Some)

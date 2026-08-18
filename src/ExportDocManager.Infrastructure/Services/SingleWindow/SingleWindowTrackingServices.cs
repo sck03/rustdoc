@@ -6,6 +6,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -24,6 +25,7 @@ namespace ExportDocManager.Services.SingleWindow
         private readonly ISingleWindowClientProfileService _clientProfileService;
         private readonly LocalSecretProtector _secretProtector;
         private readonly bool _isSqlite;
+        private readonly IBusinessClock _clock;
 
         public SingleWindowTrackingService(
             IDbContextFactory<AppDbContext> contextFactory,
@@ -31,7 +33,8 @@ namespace ExportDocManager.Services.SingleWindow
             BusinessDataAccessScope businessDataAccessScope,
             ISingleWindowStationIdentityService stationIdentity,
             ISingleWindowClientProfileService clientProfileService,
-            IAppPathProvider pathProvider)
+            IAppPathProvider pathProvider,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
@@ -41,6 +44,7 @@ namespace ExportDocManager.Services.SingleWindow
             _secretProtector = new LocalSecretProtector(
                 pathProvider ?? throw new ArgumentNullException(nameof(pathProvider)));
             _isSqlite = !DatabaseModeHelper.UsesPostgreSql(normalizedSettings);
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<SingleWindowSubmissionReservation> ReserveSubmissionAsync(
@@ -93,7 +97,7 @@ namespace ExportDocManager.Services.SingleWindow
                                     token)
                                 .ConfigureAwait(false);
                             string batchReference = BuildBatchReference(businessType, submissionVersion);
-                            DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
+                            DateTimeOffset nowUtc = _clock.UtcNow;
                             var batch = new SwSubmissionBatch
                             {
                                 BatchReference = batchReference,
@@ -157,7 +161,7 @@ namespace ExportDocManager.Services.SingleWindow
 
             batch.Status = SingleWindowBatchStatusCatalog.Failed;
             batch.LastError = Truncate(errorMessage, 2000);
-            batch.UpdatedAt = DateTimeOffset.UtcNow;
+            batch.UpdatedAt = _clock.UtcNow;
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -247,7 +251,7 @@ namespace ExportDocManager.Services.SingleWindow
         {
             if (string.IsNullOrWhiteSpace(batch?.ProtectedAssignmentSecret))
             {
-                throw new InvalidDataException("提交批次缺少交接认证密钥，不能生成或接收回执包。" );
+                throw new InvalidDataException("提交批次缺少交接认证密钥，不能生成或接收回执包。");
             }
 
             string secret = _secretProtector.Unprotect(batch.ProtectedAssignmentSecret) ?? string.Empty;
@@ -286,14 +290,14 @@ namespace ExportDocManager.Services.SingleWindow
             return Math.Max(1, currentVersion + 1);
         }
 
-        private static string BuildBatchReference(
+        private string BuildBatchReference(
             SingleWindowBusinessType businessType,
             int submissionVersion)
         {
             string prefix = businessType == SingleWindowBusinessType.CustomsCoo ? "COO" : "ACD";
             string versionText = $"V{Math.Max(1, submissionVersion):000}";
             string guidPart = Guid.NewGuid().ToString("N")[..12].ToUpperInvariant();
-            return $"{prefix}-{versionText}-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{guidPart}".ToUpperInvariant();
+            return $"{prefix}-{versionText}-{_clock.UtcNow:yyyyMMddHHmmss}-{guidPart}".ToUpperInvariant();
         }
 
         private static bool IsReservationConcurrencyConflict(Exception exception)

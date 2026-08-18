@@ -81,7 +81,7 @@
     display: block;
     min-width: 0;
     padding: 12px;
-    background: #ffffff;
+    background: var(--edm-white);
     border: 1px solid var(--edm-line);
     border-radius: var(--edm-radius-md);
     box-shadow: var(--edm-shadow-sm);
@@ -151,7 +151,7 @@
     display: block;
     min-width: 0;
     padding: 12px;
-    background: #ffffff;
+    background: var(--edm-white);
     border: 1px solid var(--edm-line);
     border-radius: var(--edm-radius-md);
     box-shadow: var(--edm-shadow-sm);

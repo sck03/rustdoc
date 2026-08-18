@@ -4,6 +4,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Core
@@ -15,13 +16,16 @@ namespace ExportDocManager.Services.Core
 
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly ICurrentUserContext _currentUserContext;
+        private readonly IBusinessClock _clock;
 
         public InvoiceDataMaintenanceService(
             IDbContextFactory<AppDbContext> contextFactory,
-            ICurrentUserContext currentUserContext)
+            ICurrentUserContext currentUserContext,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _currentUserContext = currentUserContext ?? throw new ArgumentNullException(nameof(currentUserContext));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<InvoiceDataMaintenancePreview?> GetPurgePreviewAsync(
@@ -179,7 +183,7 @@ namespace ExportDocManager.Services.Core
             return "该发票属于正式业务状态，禁止物理删除；如确需清理，必须先按业务流程作废。";
         }
 
-        private static AuditLog CreateMaintenanceAuditLog(
+        private AuditLog CreateMaintenanceAuditLog(
             Invoice invoice,
             string reason,
             string? username)
@@ -204,7 +208,7 @@ namespace ExportDocManager.Services.Core
                     Policy = "Administrator cancelled-invoice purge"
                 }),
                 UserId = string.IsNullOrWhiteSpace(username) ? "Api" : username.Trim(),
-                Timestamp = DateTimeOffset.UtcNow
+                Timestamp = _clock.UtcNow
             };
         }
     }

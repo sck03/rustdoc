@@ -40,8 +40,8 @@
   gap: 14px;
   min-width: 0;
   padding: 16px;
-  background: #fbfcfd;
-  border: 1px solid #dce4e8;
+  background: var(--edm-neutral-25);
+  border: 1px solid var(--edm-neutral-300);
   border-radius: 10px;
 }
 
@@ -59,14 +59,14 @@
 
 .audit-log-maintenance-card-heading h3 {
   margin: 0;
-  color: #1f2a30;
+  color: var(--edm-neutral-850);
   font-size: 14px;
 }
 
 .audit-log-maintenance-card-heading p,
 .audit-log-advanced-maintenance-content p {
   margin: 5px 0 0;
-  color: #66727b;
+  color: var(--edm-neutral-550);
   font-size: 12px;
   line-height: 1.55;
 }
@@ -94,7 +94,7 @@
 
 .audit-log-browser-download p {
   margin: 0;
-  color: #66727b;
+  color: var(--edm-neutral-550);
   font-size: 12px;
   line-height: 1.55;
 }
@@ -116,16 +116,16 @@
 }
 
 .audit-log-number-field > span {
-  color: #5e6972;
+  color: var(--edm-neutral-600);
   font-size: 13px;
   font-weight: 700;
 }
 
 .audit-log-advanced-maintenance {
   margin-top: 12px;
-  border: 1px solid #ead7d2;
+  border: 1px solid var(--edm-danger-100);
   border-radius: 10px;
-  background: #fffaf8;
+  background: var(--edm-white);
 }
 
 .audit-log-advanced-maintenance summary {
@@ -134,7 +134,7 @@
   gap: 8px;
   min-height: 42px;
   padding: 0 14px;
-  color: #7c3d34;
+  color: var(--edm-earth-700);
   cursor: pointer;
   font-size: 13px;
   font-weight: 800;
@@ -146,7 +146,7 @@
   justify-content: space-between;
   gap: 18px;
   padding: 0 14px 14px;
-  border-top: 1px solid #f0dfda;
+  border-top: 1px solid var(--edm-danger-100);
 }
 
 .audit-log-advanced-maintenance-content > div {
@@ -154,7 +154,7 @@
 }
 
 .audit-log-advanced-maintenance-content strong {
-  color: #4b2c27;
+  color: var(--edm-earth-900);
   font-size: 13px;
 }
 
@@ -171,9 +171,9 @@
 .audit-log-filter-hint {
   display: inline-flex;
   padding: 4px 8px;
-  color: #6b4a43;
+  color: var(--edm-earth-700);
   background: var(--edm-surface);
-  border: 1px solid #ecd9d4;
+  border: 1px solid var(--edm-danger-100);
   border-radius: 999px;
   font-size: 12px;
 }
@@ -189,7 +189,7 @@
   display: grid;
   place-items: center;
   padding: 18px;
-  background: rgba(15, 31, 30, 0.44);
+  background: color-mix(in srgb, var(--edm-primary-950) 44%, transparent);
   backdrop-filter: blur(3px);
 }
 
@@ -201,9 +201,9 @@
   overflow: hidden;
   padding: 18px;
   background: var(--edm-surface);
-  border: 1px solid #d7dfe3;
+  border: 1px solid var(--edm-neutral-350);
   border-radius: 12px;
-  box-shadow: 0 24px 64px rgba(25, 39, 42, 0.28);
+  box-shadow: 0 24px 64px color-mix(in srgb, var(--edm-ink-950) 28%, transparent);
 }
 
 .confirmation-dialog-header {
@@ -218,25 +218,25 @@
   place-items: center;
   width: 38px;
   height: 38px;
-  color: #a43a2b;
-  background: #fff0ed;
+  color: var(--edm-danger-700);
+  background: var(--edm-danger-50);
   border-radius: 10px;
 }
 
 .confirmation-dialog-warning .confirmation-dialog-icon {
-  color: #9a650d;
-  background: #fff7df;
+  color: var(--edm-warning-600);
+  background: var(--edm-warning-100);
 }
 
 .confirmation-dialog-header h2 {
   margin: 0;
-  color: #1f292f;
+  color: var(--edm-neutral-850);
   font-size: 17px;
 }
 
 .confirmation-dialog-header p {
   margin: 6px 0 0;
-  color: #626f78;
+  color: var(--edm-neutral-550);
   font-size: 13px;
   line-height: 1.55;
 }
@@ -246,9 +246,9 @@
   gap: 6px;
   margin-top: 16px;
   padding: 12px 14px;
-  color: #4e5b63;
-  background: #f7f9fa;
-  border: 1px solid #e2e8eb;
+  color: var(--edm-neutral-650);
+  background: var(--edm-neutral-50);
+  border: 1px solid var(--edm-neutral-250);
   border-radius: 9px;
   font-size: 12px;
   line-height: 1.5;
@@ -266,14 +266,14 @@
 
 .confirmation-dialog .command-button.confirmation-dialog-confirm {
   color: var(--edm-surface);
-  background: #b13a2b;
-  border-color: #b13a2b;
+  background: var(--edm-danger-700);
+  border-color: var(--edm-danger-700);
 }
 
 .confirmation-dialog .command-button.confirmation-dialog-confirm:hover:not(:disabled) {
   color: var(--edm-surface);
-  background: #982f23;
-  border-color: #982f23;
+  background: var(--edm-danger-700);
+  border-color: var(--edm-danger-700);
 }
 
 .audit-log-layout {
@@ -292,7 +292,7 @@
 }
 
 .audit-log-row-selected {
-  background: #eef8f5;
+  background: var(--edm-primary-75);
 }
 
 .audit-log-preview-cell {
@@ -315,7 +315,7 @@
 .audit-log-detail .section-header {
   min-height: 60px;
   padding: 12px;
-  border-bottom: 1px solid #e8edf1;
+  border-bottom: 1px solid var(--edm-neutral-200);
 }
 
 .audit-log-detail h2 {
@@ -335,8 +335,8 @@
   margin: 0;
   padding: 12px;
   overflow: auto;
-  color: #242a31;
-  background: #fbfcfd;
+  color: var(--edm-neutral-850);
+  background: var(--edm-neutral-25);
   font-family: var(--edm-font-mono);
   font-size: 12px;
   line-height: 1.55;

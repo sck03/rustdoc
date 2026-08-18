@@ -13,7 +13,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/master-data/products", async Task<Results<
                 Ok<ApiPagedResponse<ApiProductDto>>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductReadRepository repository,
@@ -47,7 +47,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiProductDto>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductService productService,
@@ -70,7 +70,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/master-data/products", async Task<Results<
                 Created<ApiProductDto>,
                 BadRequest<ApiErrorResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductService productService,
@@ -113,7 +113,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiProductDto>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductService productService,
@@ -170,7 +170,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiCommandResponse>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IProductService productService,

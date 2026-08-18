@@ -13,6 +13,7 @@ namespace ExportDocManager.Api.Hosting
         private readonly ConcurrentDictionary<string, long> _lastPersistedUtcTicks = new(StringComparer.OrdinalIgnoreCase);
         private readonly IAppPathProvider? _pathProvider;
         private readonly ApiBackgroundJobRetentionOptions _retentionOptions;
+        private readonly TimeProvider _timeProvider;
         private readonly Lock _mutationLock = new();
         private readonly Lock _historyCleanupLock = new();
 
@@ -21,12 +22,14 @@ namespace ExportDocManager.Api.Hosting
         public ApiBackgroundJobService()
         {
             _retentionOptions = new ApiBackgroundJobRetentionOptions().Normalize();
+            _timeProvider = TimeProvider.System;
             _storePath = string.Empty;
         }
 
         public ApiBackgroundJobService(IAppPathProvider pathProvider)
         {
             _retentionOptions = new ApiBackgroundJobRetentionOptions().Normalize();
+            _timeProvider = TimeProvider.System;
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _storePath = Path.Combine(pathProvider.CacheRoot, "BackgroundJobs", "jobs.json");
             LoadPersistedJobs();
@@ -46,10 +49,21 @@ namespace ExportDocManager.Api.Hosting
             DatabaseConnectionSettings databaseSettings,
             IDbContextFactory<AppDbContext> contextFactory,
             ApiBackgroundJobRetentionOptions retentionOptions)
+            : this(pathProvider, databaseSettings, contextFactory, retentionOptions, TimeProvider.System)
+        {
+        }
+
+        public ApiBackgroundJobService(
+            IAppPathProvider pathProvider,
+            DatabaseConnectionSettings databaseSettings,
+            IDbContextFactory<AppDbContext> contextFactory,
+            ApiBackgroundJobRetentionOptions retentionOptions,
+            TimeProvider timeProvider)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _retentionOptions = (retentionOptions ?? throw new ArgumentNullException(nameof(retentionOptions))).Normalize();
+            _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
             _useDatabaseStore = DatabaseModeHelper.UsesPostgreSql(
                 databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings)));
             _storePath = _useDatabaseStore
@@ -80,32 +94,32 @@ namespace ExportDocManager.Api.Hosting
                         return Task.FromResult(false);
                     }
 
-                // Move the job to Canceling before signaling the worker.  The
-                // worker may complete immediately after observing cancellation;
-                // changing the state first prevents a stale Running snapshot
-                // from making an otherwise accepted request look unsuccessful.
-                var next = new BackgroundJobSnapshot
-                {
-                    JobId = job.JobId,
-                    Kind = job.Kind,
-                    Title = job.Title,
-                    Status = BackgroundJobStatusCatalog.Canceling,
-                    ProgressPercent = job.ProgressPercent,
-                    StatusText = "正在取消",
-                    DetailText = job.DetailText,
-                    RequestedBy = job.RequestedBy,
-                    RequestedByUserId = job.RequestedByUserId,
-                    CreatedAt = job.CreatedAt,
-                    StartedAt = job.StartedAt,
-                    CompletedAt = job.CompletedAt,
-                    UpdatedAt = NextUpdatedAt(job.UpdatedAt, default),
-                    OutputPath = job.OutputPath,
-                    ErrorMessage = job.ErrorMessage,
-                    CanCancel = false,
-                    CanRetry = job.CanRetry,
-                    RetryOperation = job.RetryOperation,
-                    RetryRequestJson = job.RetryRequestJson
-                };
+                    // Move the job to Canceling before signaling the worker.  The
+                    // worker may complete immediately after observing cancellation;
+                    // changing the state first prevents a stale Running snapshot
+                    // from making an otherwise accepted request look unsuccessful.
+                    var next = new BackgroundJobSnapshot
+                    {
+                        JobId = job.JobId,
+                        Kind = job.Kind,
+                        Title = job.Title,
+                        Status = BackgroundJobStatusCatalog.Canceling,
+                        ProgressPercent = job.ProgressPercent,
+                        StatusText = "正在取消",
+                        DetailText = job.DetailText,
+                        RequestedBy = job.RequestedBy,
+                        RequestedByUserId = job.RequestedByUserId,
+                        CreatedAt = job.CreatedAt,
+                        StartedAt = job.StartedAt,
+                        CompletedAt = job.CompletedAt,
+                        UpdatedAt = NextUpdatedAt(job.UpdatedAt, default),
+                        OutputPath = job.OutputPath,
+                        ErrorMessage = job.ErrorMessage,
+                        CanCancel = false,
+                        CanRetry = job.CanRetry,
+                        RetryOperation = job.RetryOperation,
+                        RetryRequestJson = job.RetryRequestJson
+                    };
 
                     if (!_jobs.TryUpdate(key, next, job))
                     {
@@ -410,7 +424,7 @@ namespace ExportDocManager.Api.Hosting
                 return true;
             }
 
-            long nowTicks = DateTimeOffset.UtcNow.UtcTicks;
+            long nowTicks = _timeProvider.GetUtcNow().UtcTicks;
             long lastTicks = _lastPersistedUtcTicks.GetOrAdd(next.JobId, 0);
             if (lastTicks != 0 && nowTicks - lastTicks < TimeSpan.FromSeconds(1).Ticks)
             {
@@ -434,7 +448,7 @@ namespace ExportDocManager.Api.Hosting
                     return;
                 }
 
-                DateTimeOffset cutoff = DateTimeOffset.UtcNow.AddDays(-_retentionOptions.RetentionDays);
+                DateTimeOffset cutoff = _timeProvider.GetUtcNow().AddDays(-_retentionOptions.RetentionDays);
                 var removeIds = terminalJobs
                     .Where(job => (job.CompletedAt ?? job.CreatedAt) < cutoff)
                     .Select(job => job.JobId)
@@ -504,7 +518,7 @@ namespace ExportDocManager.Api.Hosting
             }
         }
 
-        private static BackgroundJobSnapshot Normalize(
+        private BackgroundJobSnapshot Normalize(
             BackgroundJobSnapshot job,
             BackgroundJobSnapshot fallback)
         {
@@ -537,7 +551,7 @@ namespace ExportDocManager.Api.Hosting
             };
         }
 
-        private static BackgroundJobSnapshot NormalizeNewJob(BackgroundJobSnapshot job, string jobId)
+        private BackgroundJobSnapshot NormalizeNewJob(BackgroundJobSnapshot job, string jobId)
         {
             return new BackgroundJobSnapshot
             {
@@ -550,7 +564,7 @@ namespace ExportDocManager.Api.Hosting
                 DetailText = job.DetailText ?? string.Empty,
                 RequestedBy = job.RequestedBy ?? string.Empty,
                 RequestedByUserId = job.RequestedByUserId,
-                CreatedAt = job.CreatedAt == default ? DateTimeOffset.UtcNow : job.CreatedAt,
+                CreatedAt = job.CreatedAt == default ? _timeProvider.GetUtcNow() : job.CreatedAt,
                 StartedAt = job.StartedAt,
                 CompletedAt = job.CompletedAt,
                 UpdatedAt = NextUpdatedAt(default, job.UpdatedAt),
@@ -563,9 +577,9 @@ namespace ExportDocManager.Api.Hosting
             };
         }
 
-        private static DateTimeOffset NextUpdatedAt(DateTimeOffset previous, DateTimeOffset requested)
+        private DateTimeOffset NextUpdatedAt(DateTimeOffset previous, DateTimeOffset requested)
         {
-            DateTimeOffset candidate = requested == default ? DateTimeOffset.UtcNow : requested;
+            DateTimeOffset candidate = requested == default ? _timeProvider.GetUtcNow() : requested;
             if (previous != default && candidate <= previous)
             {
                 candidate = previous.AddTicks(1);

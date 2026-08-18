@@ -3,6 +3,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 
@@ -21,6 +22,7 @@ namespace ExportDocManager.Api.Hosting
         private static async Task<ApiHsCodeImportPreviewResponse> StoreHsCodeImportPreviewAsync(
             IAppPathProvider pathProvider,
             HsCodeImportPreview preview,
+            IBusinessClock clock,
             CancellationToken cancellationToken)
         {
             string token = Guid.NewGuid().ToString("N");
@@ -28,7 +30,7 @@ namespace ExportDocManager.Api.Hosting
             string previewRoot = Path.GetDirectoryName(path)!;
             Directory.CreateDirectory(previewRoot);
             foreach (string staleFile in Directory.EnumerateFiles(previewRoot, "*.json")
-                         .Where(file => File.GetLastWriteTimeUtc(file) < DateTimeOffset.UtcNow.AddHours(-24)))
+                         .Where(file => File.GetLastWriteTimeUtc(file) < clock.UtcNow.AddHours(-24)))
             {
                 AtomicFileHelper.TryDeleteFile(staleFile);
             }
@@ -45,7 +47,7 @@ namespace ExportDocManager.Api.Hosting
                     item.ChangedFields, item.ReplacementCandidates, item.Message)).ToList(),
                 preview.AddCount, preview.UpdateCount, preview.UnchangedCount, preview.SuspectedObsoleteCount,
                 preview.ConflictCount, preview.InvalidCount, preview.Warnings,
-                "预检文件仅保存在运行数据根 Cache/HsCodeImports/Previews，提交或过期后删除；不会写系统临时目录，也不会触碰商业发票Excel导入。" );
+                "预检文件仅保存在运行数据根 Cache/HsCodeImports/Previews，提交或过期后删除；不会写系统临时目录，也不会触碰商业发票Excel导入。");
         }
 
         private static string GetHsCodeImportPreviewPath(IAppPathProvider pathProvider, string token) =>
@@ -55,6 +57,7 @@ namespace ExportDocManager.Api.Hosting
             IHsCodeService hsCodeService,
             IHsCodeKnowledgeService knowledgeService,
             ApiHsCodeDto request,
+            IBusinessClock clock,
             CancellationToken cancellationToken)
         {
             var seed = ApiMasterDataDtoFactory.ToHsCodeForSave(request);
@@ -68,7 +71,7 @@ namespace ExportDocManager.Api.Hosting
                 request.InstanceCount,
                 request.SummaryUrl ?? string.Empty,
                 string.IsNullOrWhiteSpace(request.EvidenceUrl) ? request.DetailUrl ?? string.Empty : request.EvidenceUrl,
-                request.ObservedAt ?? DateTimeOffset.UtcNow);
+                request.ObservedAt ?? clock.UtcNow);
             var evidence = await hsCodeService.FetchRemoteDetailEvidenceAsync(record, cancellationToken);
             await knowledgeService.CaptureRemoteDetailEvidenceAsync(request.Name, evidence, cancellationToken);
 

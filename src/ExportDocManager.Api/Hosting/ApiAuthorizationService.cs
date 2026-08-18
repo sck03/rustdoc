@@ -155,12 +155,12 @@ namespace ExportDocManager.Api.Hosting
             !PermissionAccessLevel.IsKnown(accessLevel)
                 ? 0
                 : PermissionAccessLevel.Normalize(accessLevel) switch
-            {
-                PermissionAccessLevel.Manage => 3,
-                PermissionAccessLevel.Operate => 2,
-                PermissionAccessLevel.View => 1,
-                _ => 0
-            };
+                {
+                    PermissionAccessLevel.Manage => 3,
+                    PermissionAccessLevel.Operate => 2,
+                    PermissionAccessLevel.View => 1,
+                    _ => 0
+                };
 
         private static bool IsAdministrator(User user)
         {

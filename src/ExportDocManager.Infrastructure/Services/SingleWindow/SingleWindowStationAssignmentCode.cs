@@ -55,7 +55,7 @@ namespace ExportDocManager.Services.SingleWindow
             string normalized = assignmentCode?.Trim() ?? string.Empty;
             if (!normalized.StartsWith(Prefix, StringComparison.Ordinal) || normalized.Length > 4096)
             {
-                throw new InvalidDataException("持卡机授权码格式无效，请从目标操作档案重新复制。" );
+                throw new InvalidDataException("持卡机授权码格式无效，请从目标操作档案重新复制。");
             }
 
             AssignmentCodePayload payload;
@@ -93,7 +93,7 @@ namespace ExportDocManager.Services.SingleWindow
             ArgumentNullException.ThrowIfNull(secretProtector);
             if (string.IsNullOrWhiteSpace(profile.ProtectedHandoffSecret))
             {
-                throw new InvalidDataException("操作档案缺少交接认证密钥，请重新保存该档案。" );
+                throw new InvalidDataException("操作档案缺少交接认证密钥，请重新保存该档案。");
             }
 
             string secret = secretProtector.Unprotect(profile.ProtectedHandoffSecret) ?? string.Empty;
@@ -110,7 +110,7 @@ namespace ExportDocManager.Services.SingleWindow
                 {
                     if (bytes.Length != SecretSize)
                     {
-                        throw new InvalidDataException("单一窗口交接认证密钥长度无效。" );
+                        throw new InvalidDataException("单一窗口交接认证密钥长度无效。");
                     }
                 }
                 finally
@@ -138,7 +138,7 @@ namespace ExportDocManager.Services.SingleWindow
                 payload.CardIdentifier.Length > 120 ||
                 (!payload.CanSubmitCustomsCoo && !payload.CanSubmitAgentConsignment))
             {
-                throw new InvalidDataException("持卡机授权码缺少有效的机器、操作卡或公司绑定信息。" );
+                throw new InvalidDataException("持卡机授权码缺少有效的机器、操作卡或公司绑定信息。");
             }
 
             EnsureValidSecret(payload.AuthenticationSecret);

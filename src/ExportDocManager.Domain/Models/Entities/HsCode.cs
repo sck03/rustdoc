@@ -20,7 +20,7 @@ namespace ExportDocManager.Models.Entities
         private string? _supervisionConditions;
         private string? _inspectionCategory;
         private string? _rebateRate;
-        private DateTimeOffset? _updateTime = DateTimeOffset.UtcNow;
+        private DateTimeOffset? _updateTime;
         private string? _detailUrl;
         private string _status = "ReferenceOnly";
         private string? _sourceName;

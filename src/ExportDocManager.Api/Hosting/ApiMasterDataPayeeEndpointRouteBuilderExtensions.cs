@@ -13,7 +13,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/master-data/payees", async Task<Results<
                 Ok<IReadOnlyList<ApiPayeeDto>>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPayeeReadRepository repository,
@@ -31,7 +31,7 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/master-data/payees/page", async Task<Results<
                 Ok<ApiPagedResponse<ApiPayeeDto>>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPayeeReadRepository repository,
@@ -54,7 +54,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiPayeeDto>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPayeeReadRepository repository,
@@ -77,7 +77,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/master-data/payees", async Task<Results<
                 Created<ApiPayeeDto>,
                 BadRequest<ApiErrorResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPayeeService payeeService,
@@ -121,7 +121,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiPayeeDto>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPayeeService payeeService,
@@ -173,7 +173,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiCommandResponse>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPayeeService payeeService,

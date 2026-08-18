@@ -32,22 +32,20 @@ namespace ExportDocManager.Services.Tools
             operationCancellation.CancelAfter(OperationTimeout);
             CancellationToken operationToken = operationCancellation.Token;
             var aiSettings = _settingsService.Settings?.AI ?? new AISettings();
-            var endpoint = BuildEndpointUri(string.IsNullOrWhiteSpace(aiSettings.ApiEndpoint)
-                ? "https://api.deepseek.com/v1/chat/completions"
-                : aiSettings.ApiEndpoint.Trim());
+            var endpoint = AiEndpointPolicy.Normalize(aiSettings.ApiEndpoint);
             var model = string.IsNullOrWhiteSpace(aiSettings.ModelName)
                 ? "deepseek-chat"
                 : aiSettings.ModelName.Trim();
             var apiKey = aiSettings.ApiKey?.Trim() ?? string.Empty;
-            
+
             // Allow empty API Key only for loopback endpoints (like Ollama on localhost).
             if (string.IsNullOrWhiteSpace(apiKey) && !endpoint.IsLoopback)
             {
                 throw new ServiceValidationException("AI API Key 未配置，请先到“系统设置 > AI 审查配置”中填写。");
             }
 
-            var systemPrompt = string.IsNullOrWhiteSpace(aiSettings.SystemPrompt) 
-                ? "你是一个专业的国际贸易信用证(L/C)单证审核专家。你的任务是：\n1. 仔细核对信用证条款与实际发票/装箱单数据。\n2. 严格遵循 UCP600 惯例。\n3. 找出所有不符点 (Discrepancies) 并提供修改建议。\n请以清晰、专业的结构输出审查报告。" 
+            var systemPrompt = string.IsNullOrWhiteSpace(aiSettings.SystemPrompt)
+                ? "你是一个专业的国际贸易信用证(L/C)单证审核专家。你的任务是：\n1. 仔细核对信用证条款与实际发票/装箱单数据。\n2. 严格遵循 UCP600 惯例。\n3. 找出所有不符点 (Discrepancies) 并提供修改建议。\n请以清晰、专业的结构输出审查报告。"
                 : aiSettings.SystemPrompt;
 
             var requestBody = new
@@ -68,7 +66,7 @@ namespace ExportDocManager.Services.Tools
             {
                 Content = requestContent
             };
-            
+
             if (!string.IsNullOrWhiteSpace(apiKey))
             {
                 requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
@@ -100,17 +98,6 @@ namespace ExportDocManager.Services.Tools
             }
 
             throw new InfrastructureServiceException("AI 服务返回了无法解析的响应。");
-        }
-
-        private static Uri BuildEndpointUri(string endpoint)
-        {
-            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) ||
-                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-            {
-                throw new ServiceValidationException("AI 接口地址无效，请在“系统设置 > AI 审查配置”中填写完整的 http/https 地址。");
-            }
-
-            return uri;
         }
 
         private static string ExtractErrorMessage(string responseBody)

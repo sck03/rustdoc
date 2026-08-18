@@ -16,7 +16,6 @@ namespace ExportDocManager.Infrastructure.Tests
             var settings = new DatabaseConnectionSettings();
             var service = new PaymentService(
                 factory,
-                settings,
                 new BusinessDataAccessScope(
                     settings,
                     new FixedCurrentUserContext(new User
@@ -53,7 +52,6 @@ namespace ExportDocManager.Infrastructure.Tests
             var settings = CreatePostgreSqlModeSettings();
             var service = new PaymentService(
                 factory,
-                settings,
                 new BusinessDataAccessScope(
                     settings,
                     new FixedCurrentUserContext(new User { Id = 7, Username = "operator", Role = "User" })));
@@ -75,7 +73,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task SavePaymentAsync_ShouldAllowBlankBusinessFieldsAndZeroAmounts()
         {
             using var factory = new TestDbContextFactory();
-            var service = new PaymentService(factory, new DatabaseConnectionSettings());
+            var service = new PaymentService(factory, TestAccessScope.Create());
 
             int paymentId = await service.SavePaymentAsync(new Payment());
 

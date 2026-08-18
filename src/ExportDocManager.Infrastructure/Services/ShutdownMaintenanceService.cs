@@ -1,4 +1,5 @@
 using ExportDocManager.Models.DTOs;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -15,6 +16,7 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly IAuditLogService _auditLogService;
         private readonly IAppPathProvider _pathProvider;
         private readonly ILogger<ShutdownMaintenanceService> _logger;
+        private readonly IBusinessClock _clock;
 
         public ShutdownMaintenanceService(
             ISettingsService settingsService,
@@ -22,7 +24,8 @@ namespace ExportDocManager.Services.Infrastructure
             ICloudSyncService cloudSyncService,
             IAuditLogService auditLogService,
             IAppPathProvider pathProvider,
-            ILogger<ShutdownMaintenanceService>? logger = null)
+            ILogger<ShutdownMaintenanceService>? logger = null,
+            IBusinessClock? clock = null)
         {
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             _backupService = backupService ?? throw new ArgumentNullException(nameof(backupService));
@@ -30,6 +33,7 @@ namespace ExportDocManager.Services.Infrastructure
             _auditLogService = auditLogService ?? throw new ArgumentNullException(nameof(auditLogService));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _logger = logger ?? NullLogger<ShutdownMaintenanceService>.Instance;
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<ShutdownMaintenanceResult> RunAsync(CancellationToken cancellationToken = default)
@@ -86,7 +90,7 @@ namespace ExportDocManager.Services.Infrastructure
             if (systemSettings.AuditLogRetentionDays > 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var cutoffUtc = DateTimeOffset.UtcNow.AddDays(-systemSettings.AuditLogRetentionDays);
+                var cutoffUtc = _clock.UtcNow.AddDays(-systemSettings.AuditLogRetentionDays);
                 deletedAuditLogs = await _auditLogService
                     .DeleteOlderThanAsync(cutoffUtc, AuditLogCleanupMaxCount, cancellationToken)
                     .ConfigureAwait(false);
@@ -100,7 +104,8 @@ namespace ExportDocManager.Services.Infrastructure
                         _pathProvider.LogRoot,
                         systemSettings.LogRetentionDays,
                         retainedFileCount: 0,
-                        maxFileSizeMB: systemSettings.LogFileSizeLimitMB)
+                        maxFileSizeMB: systemSettings.LogFileSizeLimitMB,
+                        utcNow: _clock.UtcNow)
                     .TotalDeleted;
             }
 

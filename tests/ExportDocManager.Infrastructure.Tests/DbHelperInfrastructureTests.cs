@@ -3,6 +3,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Infrastructure.Tests
@@ -10,6 +11,18 @@ namespace ExportDocManager.Infrastructure.Tests
     [Collection(LocalSecretProtectionCollection.Name)]
     public class DbHelperInfrastructureTests
     {
+        [Fact]
+        public void BuildConnectionString_ShouldUsePrivateCacheWithPooling()
+        {
+            var connectionString = DbHelper.BuildConnectionString("runtime.db");
+
+            var builder = new SqliteConnectionStringBuilder(connectionString);
+
+            Assert.Equal(SqliteCacheMode.Private, builder.Cache);
+            Assert.True(builder.Pooling);
+            Assert.True(builder.ForeignKeys);
+        }
+
         [Fact]
         public void GetDatabasePath_WithConfiguredPathProvider_ShouldUseRuntimeDatabaseRoot()
         {

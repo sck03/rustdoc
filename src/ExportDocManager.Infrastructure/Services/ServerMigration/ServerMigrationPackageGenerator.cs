@@ -4,6 +4,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Infrastructure;
@@ -19,15 +20,18 @@ internal sealed class ServerMigrationPackageGenerator
 
     private readonly IAppPathProvider _paths;
     private readonly ISharedDatabaseMaintenanceService _databaseMaintenance;
+    private readonly IBusinessClock _clock;
     private readonly string _packageRoot;
 
     public ServerMigrationPackageGenerator(
         IAppPathProvider paths,
         ISharedDatabaseMaintenanceService databaseMaintenance,
+        IBusinessClock clock,
         string packageRoot)
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _databaseMaintenance = databaseMaintenance ?? throw new ArgumentNullException(nameof(databaseMaintenance));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _packageRoot = packageRoot ?? throw new ArgumentNullException(nameof(packageRoot));
     }
 
@@ -70,11 +74,12 @@ internal sealed class ServerMigrationPackageGenerator
                 ref collectedBytes);
         }
 
+        DateTimeOffset packageCreatedAtUtc = _clock.UtcNow;
         var manifest = new ServerMigrationManifest
         {
             SchemaVersion = ServerMigrationLayout.SchemaVersion,
             PackageId = packageId,
-            CreatedAtUtc = DateTimeOffset.UtcNow,
+            CreatedAtUtc = packageCreatedAtUtc,
             SourceDataRoot = _paths.DataRoot,
             SourcePlatform = GetCurrentPlatformName(),
             SourcePathCaseSensitive = !OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS()
@@ -112,7 +117,12 @@ internal sealed class ServerMigrationPackageGenerator
         await ZipArchiveHelper.CreateFromFilesAsync(sources, payloadPath, cancellationToken).ConfigureAwait(false);
         await AtomicFileHelper.WriteFileAtomicAsync(
             packagePath,
-            (tempPath, ct) => DisasterRecoveryPackageCrypto.EncryptAsync(payloadPath, tempPath, password, ct),
+            (tempPath, ct) => DisasterRecoveryPackageCrypto.EncryptAsync(
+                payloadPath,
+                tempPath,
+                password,
+                packageCreatedAtUtc,
+                ct),
             cancellationToken).ConfigureAwait(false);
         RuntimeFilePermissionHelper.RestrictFile(packagePath);
         var package = new FileInfo(packagePath);

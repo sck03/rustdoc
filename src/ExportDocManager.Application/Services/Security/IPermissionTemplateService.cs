@@ -28,6 +28,10 @@ namespace ExportDocManager.Services.Security
             PermissionTemplateSaveRequest request,
             CancellationToken cancellationToken = default);
 
+        Task<IReadOnlyList<int>> ListAssignedUserIdsAsync(
+            int templateId,
+            CancellationToken cancellationToken = default);
+
         Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
     }
 }

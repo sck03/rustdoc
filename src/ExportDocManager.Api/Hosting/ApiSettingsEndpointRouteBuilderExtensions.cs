@@ -9,7 +9,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/settings", async Task<Results<
                 Ok<ApiSettingsResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
@@ -29,7 +29,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiSettingsValidationResponse>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                JsonHttpResult<ApiErrorResponse>>>(
+                JsonHttpResult<ApiErrorResponse>>> (
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
@@ -63,7 +63,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiSettingsSaveResponse>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                JsonHttpResult<ApiErrorResponse>>>(
+                JsonHttpResult<ApiErrorResponse>>> (
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,

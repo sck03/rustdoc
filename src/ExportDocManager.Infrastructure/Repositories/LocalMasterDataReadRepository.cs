@@ -23,10 +23,10 @@ namespace ExportDocManager.Services.Infrastructure
 
         public LocalMasterDataReadRepository(
             IDbContextFactory<AppDbContext> contextFactory,
-            BusinessDataAccessScope? accessScope = null)
+            BusinessDataAccessScope accessScope)
         {
-            _contextFactory = contextFactory;
-            _accessScope = accessScope ?? new BusinessDataAccessScope(new DatabaseConnectionSettings());
+            _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+            _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
         }
 
         public async Task<IReadOnlyList<Customer>> QueryAsync(CustomerReadQuery query, CancellationToken cancellationToken = default)
@@ -37,6 +37,7 @@ namespace ExportDocManager.Services.Infrastructure
                 .AsNoTracking()
                 .AsQueryable())
                 .ApplyKeywordSearch(
+                    context,
                     keyword,
                     customer => customer.CustomerNameEN,
                     customer => customer.NotifyPartyName,
@@ -62,7 +63,7 @@ namespace ExportDocManager.Services.Infrastructure
             int pageSize = Math.Clamp(normalized.PageSize <= 0 ? 50 : normalized.PageSize, 1, 200);
             string keyword = TextSearchHelper.NormalizeFilter(normalized.Keyword);
             var rows = _accessScope.ApplyCustomerScope(context.Customers.AsNoTracking())
-                .ApplyKeywordSearch(keyword, customer => customer.CustomerNameEN, customer => customer.NotifyPartyName,
+                .ApplyKeywordSearch(context, keyword, customer => customer.CustomerNameEN, customer => customer.NotifyPartyName,
                     customer => customer.ContactPerson, customer => customer.Phone, customer => customer.Email, customer => customer.TaxId)
                 .OrderBy(customer => customer.CustomerNameEN).ThenBy(customer => customer.NotifyPartyName).ThenBy(customer => customer.Id);
             int totalCount = await rows.CountAsync(cancellationToken);
@@ -78,6 +79,7 @@ namespace ExportDocManager.Services.Infrastructure
                 .AsNoTracking()
                 .AsQueryable())
                 .ApplyKeywordSearch(
+                    context,
                     keyword,
                     exporter => exporter.ExporterNameEN,
                     exporter => exporter.ExporterNameCN,
@@ -104,7 +106,7 @@ namespace ExportDocManager.Services.Infrastructure
             int pageSize = Math.Clamp(normalized.PageSize <= 0 ? 50 : normalized.PageSize, 1, 200);
             string keyword = TextSearchHelper.NormalizeFilter(normalized.Keyword);
             var rows = _accessScope.ApplyExporterScope(context.Exporters.AsNoTracking())
-                .ApplyKeywordSearch(keyword, exporter => exporter.ExporterNameEN, exporter => exporter.ExporterNameCN,
+                .ApplyKeywordSearch(context, keyword, exporter => exporter.ExporterNameEN, exporter => exporter.ExporterNameCN,
                     exporter => exporter.ContactPerson, exporter => exporter.CreditCode, exporter => exporter.CustomsCode,
                     exporter => exporter.Phone, exporter => exporter.BankName)
                 .OrderBy(exporter => exporter.ExporterNameEN).ThenBy(exporter => exporter.ExporterNameCN).ThenBy(exporter => exporter.Id);
@@ -137,6 +139,7 @@ namespace ExportDocManager.Services.Infrastructure
                 .AsNoTracking()
                 .AsQueryable()
                 .ApplyKeywordSearch(
+                    context,
                     keyword,
                     payee => payee.Category,
                     payee => payee.Name,
@@ -164,7 +167,7 @@ namespace ExportDocManager.Services.Infrastructure
             int pageSize = Math.Clamp(normalized.PageSize <= 0 ? 50 : normalized.PageSize, 1, 200);
             string keyword = TextSearchHelper.NormalizeFilter(normalized.Keyword);
             var rows = context.Payees.AsNoTracking()
-                .ApplyKeywordSearch(keyword, payee => payee.Category, payee => payee.Name, payee => payee.BankName,
+                .ApplyKeywordSearch(context, keyword, payee => payee.Category, payee => payee.Name, payee => payee.BankName,
                     payee => payee.RMBAccount, payee => payee.USDAccount, payee => payee.ContactPerson, payee => payee.Phone, payee => payee.Notes)
                 .OrderBy(payee => payee.Category).ThenBy(payee => payee.Name).ThenBy(payee => payee.Id);
             int totalCount = await rows.CountAsync(cancellationToken);
@@ -195,6 +198,7 @@ namespace ExportDocManager.Services.Infrastructure
                 .AsNoTracking()
                 .AsQueryable()
                 .ApplyKeywordSearch(
+                    context,
                     keyword,
                     product => product.ProductCode,
                     product => product.NameEN,
@@ -224,6 +228,7 @@ namespace ExportDocManager.Services.Infrastructure
             var productQuery = context.Products
                 .AsNoTracking()
                 .ApplyKeywordSearch(
+                    context,
                     keyword,
                     product => product.ProductCode,
                     product => product.NameEN,
@@ -251,7 +256,7 @@ namespace ExportDocManager.Services.Infrastructure
             IQueryable<Port> portQuery = context.Ports
                 .AsNoTracking()
                 .AsQueryable()
-                .ApplyKeywordSearch(keyword, port => port.NameEN, port => port.NameCN, port => port.Country, port => port.Code)
+                .ApplyKeywordSearch(context, keyword, port => port.NameEN, port => port.NameCN, port => port.Country, port => port.Code)
                 .OrderBy(port => port.NameEN)
                 .ThenBy(port => port.NameCN)
                 .ThenBy(port => port.Id);
@@ -270,7 +275,7 @@ namespace ExportDocManager.Services.Infrastructure
             int pageSize = Math.Clamp(normalized.PageSize <= 0 ? 50 : normalized.PageSize, 1, 200);
             string keyword = TextSearchHelper.NormalizeFilter(normalized.Keyword);
             var rows = context.Ports.AsNoTracking()
-                .ApplyKeywordSearch(keyword, port => port.NameEN, port => port.NameCN, port => port.Country, port => port.Code)
+                .ApplyKeywordSearch(context, keyword, port => port.NameEN, port => port.NameCN, port => port.Country, port => port.Code)
                 .OrderBy(port => port.NameEN).ThenBy(port => port.NameCN).ThenBy(port => port.Id);
             int totalCount = await rows.CountAsync(cancellationToken);
             var items = await rows.Skip(PagingHelper.CalculateOffset(pageNumber, pageSize)).Take(pageSize).ToListAsync(cancellationToken);
@@ -299,7 +304,7 @@ namespace ExportDocManager.Services.Infrastructure
             IQueryable<Unit> unitQuery = context.Units
                 .AsNoTracking()
                 .AsQueryable()
-                .ApplyKeywordSearch(keyword, unit => unit.NameEN, unit => unit.NameCN, unit => unit.Code)
+                .ApplyKeywordSearch(context, keyword, unit => unit.NameEN, unit => unit.NameCN, unit => unit.Code)
                 .OrderBy(unit => unit.NameEN)
                 .ThenBy(unit => unit.NameCN)
                 .ThenBy(unit => unit.Id);
@@ -318,7 +323,7 @@ namespace ExportDocManager.Services.Infrastructure
             int pageSize = Math.Clamp(normalized.PageSize <= 0 ? 50 : normalized.PageSize, 1, 200);
             string keyword = TextSearchHelper.NormalizeFilter(normalized.Keyword);
             var rows = context.Units.AsNoTracking()
-                .ApplyKeywordSearch(keyword, unit => unit.NameEN, unit => unit.NameCN, unit => unit.Code)
+                .ApplyKeywordSearch(context, keyword, unit => unit.NameEN, unit => unit.NameCN, unit => unit.Code)
                 .OrderBy(unit => unit.NameEN).ThenBy(unit => unit.NameCN).ThenBy(unit => unit.Id);
             int totalCount = await rows.CountAsync(cancellationToken);
             var items = await rows.Skip(PagingHelper.CalculateOffset(pageNumber, pageSize)).Take(pageSize).ToListAsync(cancellationToken);

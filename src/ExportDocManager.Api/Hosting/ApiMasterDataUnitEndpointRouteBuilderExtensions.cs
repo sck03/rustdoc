@@ -13,7 +13,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/master-data/units", async Task<Results<
                 Ok<IReadOnlyList<ApiUnitDto>>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IUnitReadRepository repository,
@@ -38,7 +38,7 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/master-data/units/page", async Task<Results<
                 Ok<ApiPagedResponse<ApiUnitDto>>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IUnitReadRepository repository,
@@ -61,7 +61,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiUnitDto>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IUnitReadRepository repository,
@@ -84,7 +84,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/master-data/units", async Task<Results<
                 Created<ApiUnitDto>,
                 BadRequest<ApiErrorResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IAuxiliaryService auxiliaryService,
@@ -126,7 +126,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiUnitDto>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IAuxiliaryService auxiliaryService,
@@ -178,7 +178,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiCommandResponse>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IAuxiliaryService auxiliaryService,

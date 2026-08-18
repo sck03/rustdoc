@@ -8,6 +8,15 @@
         "resolved": "1.12.4",
         "contentHash": "ljqvBabvFwKoLniuoQKO8b5bJfJweKLs4fUNS/V5dsvpo0A8MlJqxxn9XVmP2DaskbUXty6IYaWAi1SArGIMeQ=="
       },
+      "MailKit": {
+        "type": "Direct",
+        "requested": "[4.17.0, )",
+        "resolved": "4.17.0",
+        "contentHash": "eOy/ZDcmdeD76anXpviyZYynl7k45FhwWIQAHU8W0/uyeKbsKo2MEtQUmD5n2wHeQAGzKCcIRt2LjZJXLC6kPw==",
+        "dependencies": {
+          "MimeKit": "4.17.0"
+        }
+      },
       "Microsoft.Data.Sqlite": {
         "type": "Direct",
         "requested": "[10.0.10, )",
@@ -99,6 +108,11 @@
         "dependencies": {
           "System.Security.Cryptography.Pkcs": "10.0.10"
         }
+      },
+      "BouncyCastle.Cryptography": {
+        "type": "Transitive",
+        "resolved": "2.6.2",
+        "contentHash": "7oWOcvnntmMKNzDLsdxAYqApt+AjpRpP2CShjMfIa3umZ42UQMvH0tl1qAliYPNYO6vTdcGMqnRrCPmsfzTI1w=="
       },
       "Microsoft.Data.Sqlite.Core": {
         "type": "Transitive",
@@ -238,6 +252,16 @@
       },
       "exportdocmanager.domain": {
         "type": "Project"
+      },
+      "MimeKit": {
+        "type": "CentralTransitive",
+        "requested": "[4.17.0, )",
+        "resolved": "4.17.0",
+        "contentHash": "uH/TEqa5XnbxCid4CXk12IhCwUvbg11erqOBLEmQ2fC6Nn/ksY6mYevbPB+GiC+FE7v8d5lfdBmil+UF7mxJ5g==",
+        "dependencies": {
+          "BouncyCastle.Cryptography": "2.6.2",
+          "System.Security.Cryptography.Pkcs": "10.0.0"
+        }
       },
       "System.Security.Cryptography.Pkcs": {
         "type": "CentralTransitive",

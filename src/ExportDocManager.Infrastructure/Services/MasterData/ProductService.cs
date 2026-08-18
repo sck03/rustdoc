@@ -8,6 +8,7 @@ using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Errors;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.MasterData
@@ -16,13 +17,16 @@ namespace ExportDocManager.Services.MasterData
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly IProductReadRepository _productReadRepository;
+        private readonly IBusinessClock _clock;
 
         public ProductService(
             IDbContextFactory<AppDbContext> contextFactory,
-            IProductReadRepository productReadRepository)
+            IProductReadRepository productReadRepository,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _productReadRepository = productReadRepository ?? throw new ArgumentNullException(nameof(productReadRepository));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<List<Product>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -65,7 +69,7 @@ namespace ExportDocManager.Services.MasterData
 
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             NormalizeProduct(product);
-            product.CreatedAt = DateTimeOffset.UtcNow;
+            product.CreatedAt = _clock.UtcNow;
             product.UpdatedAt = product.CreatedAt;
             context.Products.Add(product);
             await context.SaveChangesAsync(cancellationToken);
@@ -87,7 +91,7 @@ namespace ExportDocManager.Services.MasterData
                 NormalizeProduct(product);
                 context.Entry(existing).CurrentValues.SetValues(product);
                 context.Entry(existing).Property(item => item.RowVersion).OriginalValue = product.RowVersion;
-                existing.UpdatedAt = DateTimeOffset.UtcNow;
+                existing.UpdatedAt = _clock.UtcNow;
                 await context.SaveChangesAsync(cancellationToken);
                 product.RowVersion = existing.RowVersion?.ToArray();
                 return true;

@@ -170,23 +170,43 @@ namespace ExportDocManager.Infrastructure.Tests
                 seed.UserReportTemplates.AddRange(
                     new UserReportTemplate
                     {
-                        OwnerUserId = 8, ReportType = "ExportDocument", Name = "部门模板", ContentHtml = "department",
-                        IsShared = true, ShareScope = UserReportTemplateShareScope.Department, DepartmentId = "sales", CompanyScope = "acme"
+                        OwnerUserId = 8,
+                        ReportType = "ExportDocument",
+                        Name = "部门模板",
+                        ContentHtml = "department",
+                        IsShared = true,
+                        ShareScope = UserReportTemplateShareScope.Department,
+                        DepartmentId = "sales",
+                        CompanyScope = "acme"
                     },
                     new UserReportTemplate
                     {
-                        OwnerUserId = 8, ReportType = "ExportDocument", Name = "公司模板", ContentHtml = "company",
-                        IsShared = true, ShareScope = UserReportTemplateShareScope.Company, CompanyScope = "acme"
+                        OwnerUserId = 8,
+                        ReportType = "ExportDocument",
+                        Name = "公司模板",
+                        ContentHtml = "company",
+                        IsShared = true,
+                        ShareScope = UserReportTemplateShareScope.Company,
+                        CompanyScope = "acme"
                     },
                     new UserReportTemplate
                     {
-                        OwnerUserId = 8, ReportType = "ExportDocument", Name = "全员模板", ContentHtml = "all",
-                        IsShared = true, ShareScope = UserReportTemplateShareScope.All
+                        OwnerUserId = 8,
+                        ReportType = "ExportDocument",
+                        Name = "全员模板",
+                        ContentHtml = "all",
+                        IsShared = true,
+                        ShareScope = UserReportTemplateShareScope.All
                     },
                     new UserReportTemplate
                     {
-                        OwnerUserId = 8, ReportType = "ExportDocument", Name = "停用模板", ContentHtml = "inactive",
-                        IsShared = true, ShareScope = UserReportTemplateShareScope.All, IsActive = false
+                        OwnerUserId = 8,
+                        ReportType = "ExportDocument",
+                        Name = "停用模板",
+                        ContentHtml = "inactive",
+                        IsShared = true,
+                        ShareScope = UserReportTemplateShareScope.All,
+                        IsActive = false
                     });
                 await seed.SaveChangesAsync();
             }

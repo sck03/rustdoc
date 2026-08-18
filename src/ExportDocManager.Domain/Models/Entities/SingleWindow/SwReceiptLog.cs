@@ -29,7 +29,7 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(260)]
         public string SourceFileName { get; set; } = string.Empty;
 
-        public DateTimeOffset ImportedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset ImportedAt { get; set; }
 
         public DateTimeOffset? OccurredAt { get; set; }
 

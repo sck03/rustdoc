@@ -14,12 +14,10 @@ namespace ExportDocManager.Services.SingleWindow
 
         public CustomsCooSourceAssembler(
             IDbContextFactory<AppDbContext> contextFactory,
-            DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope? businessDataAccessScope = null)
+            BusinessDataAccessScope businessDataAccessScope)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
-            var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
-            _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(normalizedSettings);
+            _businessDataAccessScope = businessDataAccessScope ?? throw new ArgumentNullException(nameof(businessDataAccessScope));
         }
 
         public async Task<CooSourceSnapshot> BuildAsync(int invoiceId, CancellationToken cancellationToken = default)
@@ -77,12 +75,10 @@ namespace ExportDocManager.Services.SingleWindow
 
         public AgentConsignmentSourceAssembler(
             IDbContextFactory<AppDbContext> contextFactory,
-            DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope? businessDataAccessScope = null)
+            BusinessDataAccessScope businessDataAccessScope)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
-            var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
-            _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(normalizedSettings);
+            _businessDataAccessScope = businessDataAccessScope ?? throw new ArgumentNullException(nameof(businessDataAccessScope));
         }
 
         public async Task<AcdSourceSnapshot> BuildAsync(int invoiceId, CancellationToken cancellationToken = default)

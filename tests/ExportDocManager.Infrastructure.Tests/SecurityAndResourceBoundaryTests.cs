@@ -417,6 +417,37 @@ public sealed class SecurityAndResourceBoundaryTests
         }
     }
 
+    [Fact]
+    public void PdfMergeService_ShouldRejectEstimatedWorkingSetBeyondBudget()
+    {
+        long inputBytes = PdfMergeService.MaxEstimatedWorkingSetBytes / 3;
+
+        var error = Assert.Throws<InvalidDataException>(() =>
+            PdfMergeService.EnsureWithinWorkingSetBudget(
+                inputBytes,
+                totalPages: 200,
+                totalPageArea: 200 * 595d * 842d));
+
+        Assert.Contains("512 MB", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PdfMergeService_WorkingSetEstimate_ShouldAccountForContentAndPages()
+    {
+        long small = PdfMergeService.EstimateWorkingSetBytes(
+            totalInputBytes: 4L * 1024L * 1024L,
+            totalPages: 10,
+            totalPageArea: 10 * 595d * 842d);
+        long complex = PdfMergeService.EstimateWorkingSetBytes(
+            totalInputBytes: 32L * 1024L * 1024L,
+            totalPages: 100,
+            totalPageArea: 100 * 595d * 842d);
+
+        Assert.True(small > 0);
+        Assert.True(complex > small);
+        Assert.True(complex < PdfMergeService.MaxEstimatedWorkingSetBytes);
+    }
+
     private static string CreateTempDirectory(string prefix)
     {
         string path = Path.Combine(Path.GetTempPath(), $"edm-{prefix}-{Guid.NewGuid():N}");

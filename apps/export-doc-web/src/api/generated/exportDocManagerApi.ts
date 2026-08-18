@@ -847,28 +847,10 @@ export interface ApiDisasterRecoveryCreateRequest {
   password: string;
 }
 
-export interface ApiDisasterRecoveryPackageResponse {
-  fileName: string;
-  filePath: string;
-  message: string;
-  sizeBytes: number;
-  storagePolicy: string;
-  success: boolean;
-}
-
 export interface ApiDisasterRecoveryRestoreRequest {
   confirmationText: string;
   packagePath: string;
   password: string;
-}
-
-export interface ApiDisasterRecoveryRestoreResponse {
-  message: string;
-  packageFileName: string;
-  restartRequired: boolean;
-  safetyBackupRoot: string;
-  storagePolicy: string;
-  success: boolean;
 }
 
 export interface ApiDisasterRecoveryStatusResponse {
@@ -3011,6 +2993,7 @@ export interface ApiUserCapabilitiesDto {
 
 export interface ApiUserDto {
   businessDate: string;
+  businessDateValidUntilUtc: string;
   businessTimeZone: string;
   capabilities: ApiUserCapabilitiesDto;
   companyScope: string;
@@ -5216,14 +5199,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public createDatabaseBackup(init?: ApiRequestInit): Promise<ApiBackupCreateResponse> {
+  public createDatabaseBackup(init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/backup";
-    return this.request<ApiBackupCreateResponse>("POST", path, { init });
+    return this.request<BackgroundJobSnapshot>("POST", path, { init });
   }
 
-  public createDisasterRecoveryPackage(request: CreateDisasterRecoveryPackageRequest, init?: ApiRequestInit): Promise<ApiDisasterRecoveryPackageResponse> {
+  public createDisasterRecoveryPackage(request: CreateDisasterRecoveryPackageRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/backup/disaster-recovery/create";
-    return this.request<ApiDisasterRecoveryPackageResponse>("POST", path, {
+    return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
       init,
     });
@@ -5597,9 +5580,9 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public downloadCloudDatabaseBackup(request: DownloadCloudDatabaseBackupRequest, init?: ApiRequestInit): Promise<ApiCloudBackupCommandResponse> {
+  public downloadCloudDatabaseBackup(request: DownloadCloudDatabaseBackupRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/backup/cloud/download";
-    return this.request<ApiCloudBackupCommandResponse>("POST", path, {
+    return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
       init,
     });
@@ -6752,17 +6735,17 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public restoreDatabaseBackup(request: RestoreDatabaseBackupRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
+  public restoreDatabaseBackup(request: RestoreDatabaseBackupRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/backup/restore";
-    return this.request<ApiCommandResponse>("POST", path, {
+    return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
       init,
     });
   }
 
-  public restoreDisasterRecoveryPackage(request: RestoreDisasterRecoveryPackageRequest, init?: ApiRequestInit): Promise<ApiDisasterRecoveryRestoreResponse> {
+  public restoreDisasterRecoveryPackage(request: RestoreDisasterRecoveryPackageRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/backup/disaster-recovery/restore";
-    return this.request<ApiDisasterRecoveryRestoreResponse>("POST", path, {
+    return this.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
       init,
     });
@@ -7471,9 +7454,9 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public uploadLatestDatabaseBackupToCloud(init?: ApiRequestInit): Promise<ApiCloudBackupCommandResponse> {
+  public uploadLatestDatabaseBackupToCloud(init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/backup/cloud/upload-latest";
-    return this.request<ApiCloudBackupCommandResponse>("POST", path, { init });
+    return this.request<BackgroundJobSnapshot>("POST", path, { init });
   }
 
   public uploadLetterOfCreditDocument(request: UploadLetterOfCreditDocumentRequest, init?: ApiRequestInit): Promise<ApiLetterOfCreditImportResponse> {

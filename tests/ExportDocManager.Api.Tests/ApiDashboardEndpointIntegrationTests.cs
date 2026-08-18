@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using ExportDocManager.Api.Hosting;
+using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using Microsoft.Data.Sqlite;
@@ -226,7 +227,7 @@ namespace ExportDocManager.Api.Tests
             decimal totalProfit,
             decimal totalTaxRefundAmount)
         {
-            await using var connection = new SqliteConnection($"Data Source={databasePath}");
+            await using var connection = new SqliteConnection(DbHelper.BuildConnectionString(databasePath));
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
             command.CommandText = """
@@ -248,7 +249,7 @@ namespace ExportDocManager.Api.Tests
             string companyScope,
             string type)
         {
-            await using var connection = new SqliteConnection($"Data Source={databasePath}");
+            await using var connection = new SqliteConnection(DbHelper.BuildConnectionString(databasePath));
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
             command.CommandText = """

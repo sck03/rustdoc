@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Api.Hosting;
@@ -25,15 +26,18 @@ public sealed class ApiReadinessProbe : IApiReadinessProbe
     private readonly IDbContextFactory<AppDbContext> _contextFactory;
     private readonly IAppPathProvider _pathProvider;
     private readonly IBrowserRuntimeProbe? _browserRuntimeProbe;
+    private readonly IBusinessClock _clock;
 
     public ApiReadinessProbe(
         IDbContextFactory<AppDbContext> contextFactory,
         IAppPathProvider pathProvider,
-        IBrowserRuntimeProbe? browserRuntimeProbe = null)
+        IBrowserRuntimeProbe? browserRuntimeProbe = null,
+        IBusinessClock? clock = null)
     {
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
         _browserRuntimeProbe = browserRuntimeProbe;
+        _clock = clock ?? BusinessClock.CreateSystem();
     }
 
     public async Task<ApiReadinessSnapshot> CheckAsync(
@@ -69,7 +73,7 @@ public sealed class ApiReadinessProbe : IApiReadinessProbe
         };
         return new ApiReadinessSnapshot(
             databaseReady && runtimeDirectoriesReady && browserReady,
-            DateTimeOffset.UtcNow,
+            _clock.UtcNow,
             checks);
     }
 

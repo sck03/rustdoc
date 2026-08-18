@@ -20,21 +20,20 @@ internal static class I5a6PageParser
     public static HsCodeRemoteSearchBundle ParseSearchPage(
         string html,
         string query,
-        string source = "i5a6",
-        DateTimeOffset? observedAt = null)
+        DateTimeOffset observedAt,
+        string source = "i5a6")
     {
         var document = Load(html);
-        DateTimeOffset timestamp = observedAt ?? DateTimeOffset.UtcNow;
         var records = new List<HsCodeRemoteSearchRecord>();
         var replacements = new List<HsCodeRemoteReplacementEvidence>();
 
         var standardTable = SelectStandardTable(document);
-        ParseStandardTable(standardTable, records, replacements, timestamp, source);
-        records.AddRange(ParseDeclarationTable(SelectDeclarationTable(document), timestamp, source: source));
+        ParseStandardTable(standardTable, records, replacements, observedAt, source);
+        records.AddRange(ParseDeclarationTable(SelectDeclarationTable(document), observedAt, source: source));
 
         if (records.Count == 0)
         {
-            ParseMobileCards(document, records, timestamp, source);
+            ParseMobileCards(document, records, observedAt, source);
         }
 
         return new HsCodeRemoteSearchBundle(
@@ -51,13 +50,12 @@ internal static class I5a6PageParser
     public static HsCodeRemoteDetailBundle ParseDetailPage(
         string html,
         HsCode seed,
+        DateTimeOffset observedAt,
         int? instanceCount = null,
-        string evidenceUrl = "",
-        DateTimeOffset? observedAt = null)
+        string evidenceUrl = "")
     {
         ArgumentNullException.ThrowIfNull(seed);
         var document = Load(html);
-        DateTimeOffset timestamp = observedAt ?? DateTimeOffset.UtcNow;
         var detailRoot = SelectDetailRoot(document);
         var fields = ReadFieldTable(detailRoot);
         string Get(params string[] labels) => labels
@@ -86,8 +84,8 @@ internal static class I5a6PageParser
         bool isExpired = HsCodeTextHelper.IsExpiredText(detailRoot.InnerText);
         item.Status = isExpired ? "Obsolete" : HsCodeValidityPolicy.ReferenceOnlyStatus;
         item.SourceName = "i5a6（第三方参考）";
-        item.LastVerifiedAt = timestamp;
-        item.UpdateTime = timestamp;
+        item.LastVerifiedAt = observedAt;
+        item.UpdateTime = observedAt;
 
         var recommendedKeywords = ExtractRecommendedKeywords(document.DocumentNode.OuterHtml);
         string exampleEvidenceUrl = string.IsNullOrWhiteSpace(item.DetailUrl)
@@ -95,7 +93,7 @@ internal static class I5a6PageParser
             : item.DetailUrl.Split('#')[0] + "#sbsl";
         var examples = ParseDeclarationTable(
             SelectFollowingSemanticTable(document, "申报实例汇总", "申报实例", "申报案例"),
-            timestamp,
+            observedAt,
             exampleEvidenceUrl,
             fallbackCode: item.Code,
             source: "i5a6");
@@ -114,7 +112,7 @@ internal static class I5a6PageParser
             ciqEntries,
             classificationEntries,
             string.IsNullOrWhiteSpace(evidenceUrl) ? item.DetailUrl ?? string.Empty : evidenceUrl,
-            timestamp);
+            observedAt);
     }
 
     internal static IReadOnlyList<string> ExtractRecommendedKeywords(string html)
@@ -144,7 +142,7 @@ internal static class I5a6PageParser
     internal static IReadOnlyList<HsCodeRemoteSearchRecord> ParseLegacySimpleTable(
         string html,
         string source,
-        DateTimeOffset? observedAt = null)
+        DateTimeOffset observedAt)
     {
         var document = Load(html);
         var table = document.DocumentNode.SelectNodes("//table")?.FirstOrDefault(candidate =>
@@ -155,7 +153,7 @@ internal static class I5a6PageParser
         });
         return ParseDeclarationTable(
             table,
-            observedAt ?? DateTimeOffset.UtcNow,
+            observedAt,
             source: source);
     }
 

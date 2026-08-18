@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Time;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -7,16 +8,19 @@ namespace ExportDocManager.Api.Hosting
     {
         private readonly IAppPathProvider _pathProvider;
         private readonly DatabaseConnectionSettings _databaseSettings;
+        private readonly IBusinessClock _clock;
         private FileStream? _leaseStream;
         private string _leasePath = string.Empty;
         private bool _ownsLease;
 
         public SqliteSingleInstanceHostedService(
             IAppPathProvider pathProvider,
-            DatabaseConnectionSettings databaseSettings)
+            DatabaseConnectionSettings databaseSettings,
+            IBusinessClock? clock = null)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _databaseSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -41,7 +45,7 @@ namespace ExportDocManager.Api.Hosting
                 _ownsLease = true;
                 _leaseStream.SetLength(0);
                 await using var writer = new StreamWriter(_leaseStream, leaveOpen: true);
-                await writer.WriteAsync($"pid={Environment.ProcessId};started={DateTimeOffset.UtcNow:O}")
+                await writer.WriteAsync($"pid={Environment.ProcessId};started={_clock.UtcNow:O}")
                     .ConfigureAwait(false);
                 await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
                 _leaseStream.Position = 0;

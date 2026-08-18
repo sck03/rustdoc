@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -28,17 +29,20 @@ namespace ExportDocManager.Services.Reporting
         private readonly ReportTemplatePathResolver _pathResolver;
         private readonly ReportTemplateCatalogLoader _catalogLoader;
         private readonly ILogger<ReportTemplatePackageService> _logger;
+        private readonly IBusinessClock _clock;
 
         public ReportTemplatePackageService(
             IAppPathProvider pathProvider,
             ISettingsService settingsService,
-            ILogger<ReportTemplatePackageService>? logger = null)
+            ILogger<ReportTemplatePackageService>? logger = null,
+            IBusinessClock? clock = null)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             _pathResolver = new ReportTemplatePathResolver(pathProvider);
             _logger = logger ?? NullLogger<ReportTemplatePackageService>.Instance;
             _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver, _logger);
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<ReportTemplatePackageExportResult> ExportAsync(
@@ -84,7 +88,7 @@ namespace ExportDocManager.Services.Reporting
                 var manifest = new TemplatePackageManifest
                 {
                     PackageVersion = PackageSchemaVersion,
-                    ExportedAt = DateTimeOffset.UtcNow,
+                    ExportedAt = _clock.UtcNow,
                     Templates = rows.Select(row => new TemplateRowManifest
                     {
                         Type = row.Type,
@@ -229,19 +233,19 @@ namespace ExportDocManager.Services.Reporting
                 if (exportTemplates.Count > 0 || internalTemplates.Count > 0)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    _settingsService.Settings.BatchExport ??= new BatchExportSettings();
-                    _settingsService.Settings.BatchExport.Items ??= new List<BatchExportItem>();
-                    _settingsService.Settings.PaymentTemplates ??= new List<PaymentTemplateItem>();
-                    _settingsService.Settings.BatchExport.Items = MergeBatchExportItems(
-                        _settingsService.Settings.BatchExport.Items,
-                        exportTemplates,
-                        strategy);
-                    _settingsService.Settings.PaymentTemplates = MergePaymentTemplateItems(
-                        _settingsService.Settings.PaymentTemplates,
-                        internalTemplates,
-                        strategy);
                     ReportProgress(progress, "正在保存模板配置", "正在写入批量导出和付款模板设置。", 90);
-                    await _settingsService.SaveAsync().ConfigureAwait(false);
+                    await _settingsService.UpdateAsync(settings =>
+                    {
+                        settings.BatchExport.Items = MergeBatchExportItems(
+                            settings.BatchExport.Items,
+                            exportTemplates,
+                            strategy);
+                        settings.PaymentTemplates = MergePaymentTemplateItems(
+                            settings.PaymentTemplates,
+                            internalTemplates,
+                            strategy);
+                        return true;
+                    }, cancellationToken).ConfigureAwait(false);
                 }
 
                 int importedTemplateCount = manifest.Templates?.Count ?? 0;

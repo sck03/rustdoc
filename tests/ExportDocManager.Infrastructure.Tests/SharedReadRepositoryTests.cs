@@ -3,6 +3,7 @@ using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Infrastructure.Tests
@@ -28,7 +29,7 @@ namespace ExportDocManager.Infrastructure.Tests
             var accessScope = new BusinessDataAccessScope(
                 settings,
                 new FixedCurrentUserContext(new User { Id = 7, Username = "operator", Role = "User" }));
-            var repository = new LocalSharedReadRepository(factory, settings, accessScope);
+            var repository = new LocalSharedReadRepository(factory, accessScope);
             int ownPaymentId;
             int otherPaymentId;
             await using (var context = await factory.CreateDbContextAsync())
@@ -72,7 +73,7 @@ namespace ExportDocManager.Infrastructure.Tests
             var accessScope = new BusinessDataAccessScope(
                 settings,
                 new FixedCurrentUserContext(new User { Id = 1, Username = "admin", Role = "Admin" }));
-            var repository = new LocalSharedReadRepository(factory, settings, accessScope);
+            var repository = new LocalSharedReadRepository(factory, accessScope);
 
             var invoices = await repository.QueryPageAsync(new InvoiceListPageQuery { PageNumber = 1, PageSize = 10 });
 
@@ -96,7 +97,6 @@ namespace ExportDocManager.Infrastructure.Tests
             var settings = CreatePostgreSqlModeSettings();
             var repository = new LocalSharedReadRepository(
                 factory,
-                settings,
                 new BusinessDataAccessScope(
                     settings,
                     new FixedCurrentUserContext(new User { Id = 7, Username = "operator", Role = "User" })));
@@ -112,6 +112,102 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal("2026-04-02", first[0].InvoiceDate);
             Assert.Equal(20, first[0].TotalAmount);
         }
+
+        [Theory]
+        [InlineData("%", "INV-100%")]
+        [InlineData("_", "INV_STYLE")]
+        [InlineData("\\", "PATH\\DOC")]
+        [InlineData("alpha", "ALPHA-CASE")]
+        public async Task InvoiceKeywordSearch_ShouldTreatLikeMetacharactersAsLiterals(
+            string keyword,
+            string expectedInvoiceNo)
+        {
+            using var factory = new SqliteTestDbContextFactory();
+            await using (var context = await factory.CreateDbContextAsync())
+            {
+                context.Invoices.AddRange(
+                    CreateInvoice("INV-100%", 1),
+                    CreateInvoice("INV-100X", 2),
+                    CreateInvoice("INV_STYLE", 3),
+                    CreateInvoice("INVXSTYLE", 4),
+                    CreateInvoice("PATH\\DOC", 5),
+                    CreateInvoice("PATHXDOC", 6),
+                    CreateInvoice("ALPHA-CASE", 7));
+                await context.SaveChangesAsync();
+            }
+
+            var repository = new LocalSharedReadRepository(factory, TestAccessScope.Create());
+
+            var result = await repository.QueryPageAsync(new InvoiceListPageQuery
+            {
+                Keyword = keyword,
+                PageNumber = 1,
+                PageSize = 20
+            });
+
+            var invoice = Assert.Single(result.Items);
+            Assert.Equal(expectedInvoiceNo, invoice.InvoiceNo);
+        }
+
+        [Fact]
+        public async Task QueryKeywordSearch_ShouldTrackInvoiceItemChangesThroughSqliteFts()
+        {
+            using var factory = new SqliteTestDbContextFactory();
+            int invoiceId;
+            await using (var context = await factory.CreateDbContextAsync())
+            {
+                var invoice = CreateInvoice("ITEM-SEARCH", 8);
+                invoice.Items.Add(new Item
+                {
+                    StyleNo = "FTS-001",
+                    StyleName = "Unique Jacket",
+                    HSCode = "620100"
+                });
+                context.Invoices.Add(invoice);
+                await context.SaveChangesAsync();
+                invoiceId = invoice.Id;
+            }
+
+            var repository = new LocalSharedReadRepository(factory, TestAccessScope.Create());
+            var initial = await repository.QueryPageAsync(new QueryPageQuery
+            {
+                Keyword = "unique jacket",
+                PageNumber = 1,
+                PageSize = 20
+            });
+            Assert.Equal("ITEM-SEARCH", Assert.Single(initial.Items).InvoiceNo);
+
+            await using (var context = await factory.CreateDbContextAsync())
+            {
+                var item = await context.Items.SingleAsync(row => row.InvoiceId == invoiceId);
+                item.StyleName = "Renamed Coat";
+                await context.SaveChangesAsync();
+            }
+
+            var stale = await repository.QueryPageAsync(new QueryPageQuery
+            {
+                Keyword = "unique jacket",
+                PageNumber = 1,
+                PageSize = 20
+            });
+            var updated = await repository.QueryPageAsync(new QueryPageQuery
+            {
+                Keyword = "renamed coat",
+                PageNumber = 1,
+                PageSize = 20
+            });
+
+            Assert.Empty(stale.Items);
+            Assert.Equal("ITEM-SEARCH", Assert.Single(updated.Items).InvoiceNo);
+        }
+
+        private static Invoice CreateInvoice(string invoiceNo, int day) => new()
+        {
+            InvoiceNo = invoiceNo,
+            Type = "实际数据",
+            InvoiceDate = new DateOnly(2026, 4, day),
+            ShipmentDate = new DateOnly(2026, 4, day)
+        };
 
         private static DatabaseConnectionSettings CreatePostgreSqlModeSettings()
         {
@@ -160,6 +256,31 @@ namespace ExportDocManager.Infrastructure.Tests
                 using var context = CreateDbContext();
                 context.Database.EnsureDeleted();
             }
+        }
+
+        private sealed class SqliteTestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
+        {
+            private readonly SqliteConnection _connection = new("Data Source=:memory:");
+            private readonly DbContextOptions<AppDbContext> _options;
+
+            public SqliteTestDbContextFactory()
+            {
+                _connection.Open();
+                _options = new DbContextOptionsBuilder<AppDbContext>()
+                    .UseSqlite(_connection)
+                    .Options;
+                using var context = CreateDbContext();
+                DatabaseSchemaBaseline.EnsureCurrentAsync(context, usesPostgreSql: false)
+                    .GetAwaiter()
+                    .GetResult();
+            }
+
+            public AppDbContext CreateDbContext() => new(_options);
+
+            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
+                Task.FromResult(CreateDbContext());
+
+            public void Dispose() => _connection.Dispose();
         }
     }
 }

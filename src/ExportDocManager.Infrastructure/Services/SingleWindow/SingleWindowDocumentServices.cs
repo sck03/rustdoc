@@ -35,8 +35,7 @@ namespace ExportDocManager.Services.SingleWindow
             IAgentConsignmentFieldMapper agentConsignmentFieldMapper,
             ISettingsService settingsService,
             ICustomsCooProducerProfileService producerProfileService,
-            DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope? businessDataAccessScope = null,
+            BusinessDataAccessScope businessDataAccessScope,
             IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
@@ -44,8 +43,7 @@ namespace ExportDocManager.Services.SingleWindow
             _agentConsignmentFieldMapper = agentConsignmentFieldMapper ?? throw new ArgumentNullException(nameof(agentConsignmentFieldMapper));
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             _producerProfileService = producerProfileService ?? throw new ArgumentNullException(nameof(producerProfileService));
-            var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
-            _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(normalizedSettings);
+            _businessDataAccessScope = businessDataAccessScope ?? throw new ArgumentNullException(nameof(businessDataAccessScope));
             _clock = clock ?? BusinessClock.CreateSystem();
         }
 

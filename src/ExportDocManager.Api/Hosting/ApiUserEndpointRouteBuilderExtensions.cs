@@ -11,7 +11,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapGet("/api/users", async Task<Results<
                 Ok<ApiUserListResponse>,
                 UnauthorizedHttpResult,
-                JsonHttpResult<ApiErrorResponse>>>(
+                JsonHttpResult<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -49,7 +49,7 @@ namespace ExportDocManager.Api.Hosting
                 UnauthorizedHttpResult,
                 JsonHttpResult<ApiErrorResponse>,
                 NotFound<ApiErrorResponse>,
-                Conflict<ApiErrorResponse>>>(
+                Conflict<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -113,7 +113,7 @@ namespace ExportDocManager.Api.Hosting
                 UnauthorizedHttpResult,
                 JsonHttpResult<ApiErrorResponse>,
                 NotFound<ApiErrorResponse>,
-                Conflict<ApiErrorResponse>>>(
+                Conflict<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -183,7 +183,7 @@ namespace ExportDocManager.Api.Hosting
                 UnauthorizedHttpResult,
                 JsonHttpResult<ApiErrorResponse>,
                 NotFound<ApiErrorResponse>,
-                Conflict<ApiErrorResponse>>>(
+                Conflict<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,

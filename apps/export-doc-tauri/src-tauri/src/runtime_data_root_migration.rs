@@ -5,6 +5,7 @@ use std::{
 };
 
 use crate::{
+    runtime_data_root_network::reject_network_data_root,
     runtime_data_root_storage::{
         canonical_runtime_data_root, copy_directory_tree, directory_tree_size,
         ensure_directory_is_empty, ensure_expected_runtime_data_root, probe_writable_directory,
@@ -62,6 +63,7 @@ pub(crate) fn schedule_data_root_migration(
     let source_root = canonical_runtime_data_root(&paths.data_root, true)?;
     ensure_expected_runtime_data_root(&source_root)?;
     validate_migration_root_shape(requested_target, "targetRoot")?;
+    reject_network_data_root(requested_target)?;
     reject_link_like_path(requested_target)?;
     ensure_directory(requested_target)?;
     reject_link_like_path(requested_target)?;

@@ -163,14 +163,14 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | vite | 7.3.6 | MIT | web |
 | yallist | 3.1.1 | ISC | web |
 
-## nuget (96)
+## nuget (98)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
 | bblanchon.PDFium.Linux | 152.0.7961 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | bblanchon.PDFium.macOS | 152.0.7961 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | bblanchon.PDFium.Win32 | 152.0.7961 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj |
-| BouncyCastle.Cryptography | 2.6.2 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
+| BouncyCastle.Cryptography | 2.6.2 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | ClosedXML | 0.105.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | ClosedXML.Parser | 2.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | DocumentFormat.OpenXml | 3.1.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.Tests.csproj |
@@ -180,6 +180,7 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | ExcelNumberFormat | 1.1.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | ExtendedNumerics.BigDecimal | 2025.1001.2.129 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
 | HtmlAgilityPack | 1.12.4 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| MailKit | 4.17.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | MathNet.Numerics.Signed | 5.0.0 | MIT | ExportDocManager.Infrastructure.Tests.csproj |
 | Microsoft.AspNetCore.OpenApi | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj |
 | Microsoft.Bcl.AsyncInterfaces | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Tests.csproj |
@@ -218,6 +219,7 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | Microsoft.Playwright | 1.61.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | Microsoft.TestPlatform.ObjectModel | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | Microsoft.TestPlatform.TestHost | 18.8.1 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |
+| MimeKit | 4.17.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Npgsql | 10.0.3 | PostgreSQL | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | Npgsql.EntityFrameworkCore.PostgreSQL | 10.0.3 | PostgreSQL | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | NPOI | 2.7.6 | Apache-2.0 | ExportDocManager.Infrastructure.Tests.csproj |
@@ -251,7 +253,7 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | System.ComponentModel.Annotations | 5.0.0 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | System.IO.Packaging | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.Tests.csproj |
 | System.Numerics.Tensors | 10.0.10 | MIT | ExportDocManager.Infrastructure.PdfOcr.csproj |
-| System.Security.Cryptography.Pkcs | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
+| System.Security.Cryptography.Pkcs | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | System.Security.Cryptography.ProtectedData | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Browser.csproj, ExportDocManager.Infrastructure.Excel.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | System.Security.Cryptography.Xml | 10.0.10 | MIT | ExportDocManager.Api.Tests.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.Tests.csproj, ExportDocManager.Infrastructure.csproj |
 | xunit | 2.9.3 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Application.Tests.csproj, ExportDocManager.Domain.Tests.csproj, ExportDocManager.Infrastructure.Tests.csproj |

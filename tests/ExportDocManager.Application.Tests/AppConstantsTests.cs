@@ -34,6 +34,17 @@ namespace ExportDocManager.Application.Tests
             Assert.Equal(new DateOnly(2026, 8, expectedDay), clock.Today);
             Assert.Equal(TimeSpan.FromHours(8), clock.Now.Offset);
         }
+
+        [Fact]
+        public void BusinessClock_ShouldExposeNextShanghaiMidnightInUtc()
+        {
+            var clock = new BusinessClock(
+                new FixedTimeProvider(DateTimeOffset.Parse("2026-06-01T15:30:00Z")),
+                BusinessClock.DefaultTimeZoneId);
+
+            Assert.Equal(new DateTimeOffset(2026, 6, 1, 16, 0, 0, TimeSpan.Zero), clock.TodayValidUntilUtc);
+        }
+
         private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
         {
             public override DateTimeOffset GetUtcNow() => now;

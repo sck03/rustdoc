@@ -18,7 +18,7 @@ namespace ExportDocManager.Services.SingleWindow
             SingleWindowPackageIntegrity.ValidateAuthentication(
                 manifest,
                 authenticationSecret,
-                "提交包认证签名无效，已拒绝归档。" );
+                "提交包认证签名无效，已拒绝归档。");
             var archive = await ReadSubmitPackageArchiveAsync(packagePath, cancellationToken)
                 .ConfigureAwait(false);
 
@@ -54,7 +54,7 @@ namespace ExportDocManager.Services.SingleWindow
                     batch.ClientProfileName = manifest.ClientProfileName ?? string.Empty;
                     batch.ProtectedAssignmentSecret = _secretProtector.Protect(authenticationSecret);
                     batch.LastError = string.Empty;
-                    batch.UpdatedAt = DateTimeOffset.UtcNow;
+                    batch.UpdatedAt = _clock.UtcNow;
                     await StoreSubmitPackageArchiveAsync(context, batch, archive, cancellationToken)
                         .ConfigureAwait(false);
 
@@ -100,7 +100,7 @@ namespace ExportDocManager.Services.SingleWindow
                         stationBinding.Profile.CardIdentifier);
 
                     batch.Status = SingleWindowBatchStatusCatalog.SubmitPackageImported;
-                    batch.UpdatedAt = DateTimeOffset.UtcNow;
+                    batch.UpdatedAt = _clock.UtcNow;
                     batch.SubmissionVersion = batch.SubmissionVersion > 0 ? batch.SubmissionVersion : imported.Manifest.SubmissionVersion;
                     batch.DraftRevision = Math.Max(batch.DraftRevision, imported.Manifest.DraftRevision);
                     batch.SourceBaselineHash = string.IsNullOrWhiteSpace(batch.SourceBaselineHash)
@@ -156,7 +156,7 @@ namespace ExportDocManager.Services.SingleWindow
                         ? SingleWindowBatchStatusCatalog.ReceiptPackageExported
                         : batch.Status;
                     batch.LastReceiptPackagePath = packagePath ?? string.Empty;
-                    batch.UpdatedAt = DateTimeOffset.UtcNow;
+                    batch.UpdatedAt = _clock.UtcNow;
 
                     context.SwHandoffPackageRecords.Add(BuildPackageRecord(
                         batchId: batch.Id,
@@ -220,7 +220,7 @@ namespace ExportDocManager.Services.SingleWindow
                             ReceiptMessage = receipt.ReceiptMessage ?? string.Empty,
                             BusinessStatus = receipt.BusinessStatus.ToString(),
                             SourceFileName = NormalizeReceiptKeyPart(receipt.SourceFileName),
-                            ImportedAt = DateTimeOffset.UtcNow,
+                            ImportedAt = _clock.UtcNow,
                             OccurredAt = receipt.OccurredAt,
                             RawContent = entry.RawContent,
                             ContentSha256 = entry.ContentSha256
@@ -246,10 +246,10 @@ namespace ExportDocManager.Services.SingleWindow
                         batch.LastReceiptKind = primaryReceipt?.ReceiptKind.ToString() ?? string.Empty;
                         batch.LastReceiptCode = primaryReceipt?.ReceiptCode ?? string.Empty;
                         batch.LastReceiptMessage = primaryReceipt?.ReceiptMessage ?? string.Empty;
-                        batch.LastReceiptAt = primaryReceipt?.OccurredAt ?? DateTimeOffset.UtcNow;
+                        batch.LastReceiptAt = primaryReceipt?.OccurredAt ?? _clock.UtcNow;
                     }
                     batch.LastReceiptPackagePath = packagePath ?? string.Empty;
-                    batch.UpdatedAt = DateTimeOffset.UtcNow;
+                    batch.UpdatedAt = _clock.UtcNow;
 
                     context.SwHandoffPackageRecords.Add(BuildPackageRecord(
                         batchId: batch.Id,
@@ -314,13 +314,13 @@ namespace ExportDocManager.Services.SingleWindow
 
             if (parsedReferences.Length > 1)
             {
-                throw new InvalidDataException("回执包包含多个不同的官方业务编号，不能写入同一批次。" );
+                throw new InvalidDataException("回执包包含多个不同的官方业务编号，不能写入同一批次。");
             }
 
             if (parsedReferences.Length == 1 &&
                 !string.Equals(parsedReferences[0], manifestReference, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidDataException("回执内容的官方业务编号与回执包 manifest 不一致。" );
+                throw new InvalidDataException("回执内容的官方业务编号与回执包 manifest 不一致。");
             }
 
             string parsedReference = parsedReferences.SingleOrDefault() ?? manifestReference;
@@ -328,7 +328,7 @@ namespace ExportDocManager.Services.SingleWindow
                 !string.IsNullOrWhiteSpace(parsedReference) &&
                 !string.Equals(batch.ReferenceNo, parsedReference, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidDataException("回执官方业务编号不属于当前批次。" );
+                throw new InvalidDataException("回执官方业务编号不属于当前批次。");
             }
         }
 
@@ -409,7 +409,7 @@ namespace ExportDocManager.Services.SingleWindow
                 !string.Equals(profile.ProfileName, manifest.ClientProfileName, StringComparison.Ordinal))
             {
                 throw new PermissionDeniedException(
-                    "提交包已预分派给其他持卡机、操作档案或操作卡，当前档案不能领取。" );
+                    "提交包已预分派给其他持卡机、操作档案或操作卡，当前档案不能领取。");
             }
 
             bool canHandle = manifest.BusinessType switch
@@ -434,7 +434,7 @@ namespace ExportDocManager.Services.SingleWindow
             SingleWindowPackageIntegrity.ValidateAuthentication(
                 manifest,
                 SingleWindowStationAssignmentCode.UnprotectProfileSecret(profile, _secretProtector),
-                "提交包来源认证失败或授权码已失效，已拒绝导入。" );
+                "提交包来源认证失败或授权码已失效，已拒绝导入。");
 
             return new SingleWindowStationBinding(stationKey, profile);
         }
@@ -461,7 +461,7 @@ namespace ExportDocManager.Services.SingleWindow
             return new SubmitPackageArchivePayload(content, sha256);
         }
 
-        private static async Task StoreSubmitPackageArchiveAsync(
+        private async Task StoreSubmitPackageArchiveAsync(
             AppDbContext context,
             SwSubmissionBatch batch,
             SubmitPackageArchivePayload archive,
@@ -484,7 +484,7 @@ namespace ExportDocManager.Services.SingleWindow
                     SizeBytes = archive.Content.LongLength,
                     Sha256 = archive.Sha256,
                     Content = archive.Content,
-                    CreatedAt = DateTimeOffset.UtcNow
+                    CreatedAt = _clock.UtcNow
                 }, cancellationToken).ConfigureAwait(false);
             }
 

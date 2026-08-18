@@ -38,6 +38,7 @@ namespace ExportDocManager.Services.Crm
             if (keyword.Length > 0)
             {
                 query = query.ApplyKeywordSearch(
+                    context,
                     keyword,
                     item => item.Name,
                     item => item.CountryRegion,
@@ -92,7 +93,7 @@ namespace ExportDocManager.Services.Crm
             entity.Source = Clean(request.Source);
             entity.Notes = Clean(request.Notes);
             entity.LinkedDocumentCustomerId = request.LinkedDocumentCustomerId;
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.UpdatedAt = _clock.UtcNow;
             try
             {
                 await context.SaveChangesAsync(cancellationToken);
@@ -141,7 +142,7 @@ namespace ExportDocManager.Services.Crm
             {
                 row.Status = status;
                 row.VersionNumber++;
-                row.UpdatedAt = DateTimeOffset.UtcNow;
+                row.UpdatedAt = _clock.UtcNow;
             }
             try
             {
@@ -220,7 +221,7 @@ namespace ExportDocManager.Services.Crm
             entity.InstantMessaging = Clean(request.InstantMessaging);
             bool makePrimary = request.IsPrimary;
             entity.IsPrimary = false;
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.UpdatedAt = _clock.UtcNow;
             if (makePrimary)
             {
                 await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
@@ -231,7 +232,7 @@ namespace ExportDocManager.Services.Crm
                 {
                     previousPrimary.IsPrimary = false;
                     previousPrimary.VersionNumber++;
-                    previousPrimary.UpdatedAt = DateTimeOffset.UtcNow;
+                    previousPrimary.UpdatedAt = _clock.UtcNow;
                 }
 
                 await SaveWithConcurrencyAsync(context, "联系人", cancellationToken);
@@ -353,10 +354,10 @@ namespace ExportDocManager.Services.Crm
             entity.Type = string.IsNullOrWhiteSpace(request.Type) ? "其他" : request.Type.Trim();
             entity.Summary = Required(request.Summary, "跟进摘要");
             entity.NextAction = Clean(request.NextAction);
-            entity.FollowedUpAt = request.FollowedUpAt ?? (entity.Id == 0 ? DateTimeOffset.UtcNow : entity.FollowedUpAt);
+            entity.FollowedUpAt = request.FollowedUpAt ?? (entity.Id == 0 ? _clock.UtcNow : entity.FollowedUpAt);
             entity.NextFollowUpAt = request.NextFollowUpAt;
             entity.IsCompleted = request.IsCompleted;
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.UpdatedAt = _clock.UtcNow;
             await SaveWithConcurrencyAsync(context, "跟进记录", cancellationToken);
             return new(entity.Id, entity.CrmCustomerId, customer.Name, entity.CrmContactId,
                 contact?.Name ?? string.Empty, entity.Type, entity.Summary, entity.NextAction,
@@ -380,7 +381,7 @@ namespace ExportDocManager.Services.Crm
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var customers = _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking());
             var followUps = _accessScope.ApplyCrmFollowUpScope(context.CrmFollowUps.AsNoTracking());
-            var now = DateTimeOffset.UtcNow;
+            var now = _clock.UtcNow;
             var sevenDaysLater = now.AddDays(7);
 
             int customerCount = await customers.CountAsync(cancellationToken);

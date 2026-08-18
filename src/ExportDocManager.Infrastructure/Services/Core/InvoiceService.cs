@@ -28,16 +28,14 @@ namespace ExportDocManager.Services.Core
             IDbContextFactory<AppDbContext> contextFactory,
             IItemService itemService,
             IInvoicePartyResolver invoicePartyResolver,
-            DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope? businessDataAccessScope = null,
+            BusinessDataAccessScope businessDataAccessScope,
             IBusinessClock? clock = null,
             ILogger<InvoiceService>? logger = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _itemService = itemService ?? throw new ArgumentNullException(nameof(itemService));
             _invoicePartyResolver = invoicePartyResolver ?? throw new ArgumentNullException(nameof(invoicePartyResolver));
-            var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
-            _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(normalizedSettings);
+            _businessDataAccessScope = businessDataAccessScope ?? throw new ArgumentNullException(nameof(businessDataAccessScope));
             _clock = clock ?? BusinessClock.CreateSystem();
             _logger = logger ?? NullLogger<InvoiceService>.Instance;
         }

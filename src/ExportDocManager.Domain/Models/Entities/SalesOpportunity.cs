@@ -19,8 +19,8 @@ namespace ExportDocManager.Models.Entities
         public DateOnly? ExpectedCloseDate { get; set; }
         [MaxLength(500)] public string NextAction { get; set; } = string.Empty;
         [MaxLength(2000)] public string Notes { get; set; } = string.Empty;
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
         [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
     }
 }

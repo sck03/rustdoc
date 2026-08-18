@@ -5,9 +5,16 @@ import { fileURLToPath } from "node:url";
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = path.join(repositoryRoot, "apps", "export-doc-web", "src");
 const baselinePath = path.join(repositoryRoot, "scripts", "baselines", "frontend-style-governance.json");
+const colorTokenPath = path.join(sourceRoot, "styles", "theme", "color-tokens.css");
 const cssFiles = walk(sourceRoot).filter((file) => file.endsWith(".css"));
-const css = cssFiles
-  .map((file) => readFileSync(file, "utf8"))
+const cssSources = cssFiles.map((file) => ({ file, source: readFileSync(file, "utf8") }));
+const css = cssSources
+  .map(({ source }) => source)
+  .join("\n")
+  .replaceAll(/\/\*[\s\S]*?\*\//gu, "");
+const featureCss = cssSources
+  .filter(({ file }) => path.resolve(file) !== path.resolve(colorTokenPath))
+  .map(({ source }) => source)
   .join("\n")
   .replaceAll(/\/\*[\s\S]*?\*\//gu, "");
 
@@ -16,6 +23,8 @@ const current = {
   sourceLines: css.split(/\r?\n/u).length,
   hexColors: count(/(?:^|[^\w-])#[0-9a-f]{3,8}\b/giu),
   rgbColors: count(/\brgba?\s*\(/giu),
+  featureHexColors: countIn(featureCss, /(?:^|[^\w-])#[0-9a-f]{3,8}\b/giu),
+  featureRgbColors: countIn(featureCss, /\brgba?\s*\(/giu),
   boxShadows: count(/\bbox-shadow\s*:/giu),
   gradients: count(/\b(?:linear|radial|conic)-gradient\s*\(/giu),
   pixelFontSizes: count(/\bfont-size\s*:\s*[^;{}]*?\d+(?:\.\d+)?px\b/giu),
@@ -33,7 +42,16 @@ if (!existsSync(baselinePath)) {
 
 const baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
 const failures = [];
-for (const metric of ["hexColors", "rgbColors", "boxShadows", "gradients", "pixelFontSizes", "importantDeclarations"]) {
+for (const metric of [
+  "hexColors",
+  "rgbColors",
+  "featureHexColors",
+  "featureRgbColors",
+  "boxShadows",
+  "gradients",
+  "pixelFontSizes",
+  "importantDeclarations",
+]) {
   const maximum = Number(baseline.maximum?.[metric]);
   if (!Number.isFinite(maximum)) {
     failures.push(`Baseline is missing maximum.${metric}.`);
@@ -53,6 +71,10 @@ process.stdout.write(`Frontend style governance passed: ${JSON.stringify(current
 
 function count(pattern) {
   return [...css.matchAll(pattern)].length;
+}
+
+function countIn(source, pattern) {
+  return [...source.matchAll(pattern)].length;
 }
 
 function walk(directory) {

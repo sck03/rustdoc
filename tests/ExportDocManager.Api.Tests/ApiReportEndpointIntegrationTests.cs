@@ -418,7 +418,7 @@ namespace ExportDocManager.Api.Tests
                     reportType = "ExportDocument",
                     templatePath,
                     content = "<html>blocked</html>"
-            });
+                });
             Assert.Equal(HttpStatusCode.Forbidden, forbiddenSaveResponse.StatusCode);
             Assert.Equal(savedHtml, await File.ReadAllTextAsync(templatePath));
 

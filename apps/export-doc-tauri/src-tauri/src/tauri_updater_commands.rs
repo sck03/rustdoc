@@ -1,5 +1,10 @@
+use std::sync::{
+    atomic::{AtomicU8, Ordering},
+    Arc, Mutex,
+};
+
 use serde::Serialize;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri_plugin_updater::{Updater, UpdaterExt};
 use url::Url;
 
@@ -33,11 +38,146 @@ pub(crate) struct TauriUpdaterInstallResult {
     storage_policy: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TauriUpdaterCancelResult {
+    accepted: bool,
+    status_text: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TauriUpdaterProgress {
+    phase: &'static str,
+    downloaded_bytes: u64,
+    total_bytes: Option<u64>,
+    progress_percent: Option<u8>,
+    status_text: &'static str,
+}
+
+#[derive(Default)]
+pub(crate) struct TauriUpdaterState {
+    active: Mutex<Option<Arc<UpdaterCancellation>>>,
+}
+
+struct UpdaterCancellation {
+    phase: AtomicU8,
+    abort: Mutex<Option<Box<dyn Fn() + Send + Sync>>>,
+}
+
+impl UpdaterCancellation {
+    const DOWNLOADING: u8 = 0;
+    const CANCEL_REQUESTED: u8 = 1;
+    const INSTALLING: u8 = 2;
+
+    fn new() -> Self {
+        Self {
+            phase: AtomicU8::new(Self::DOWNLOADING),
+            abort: Mutex::new(None),
+        }
+    }
+
+    fn request_cancel(&self) -> bool {
+        if self
+            .phase
+            .compare_exchange(
+                Self::DOWNLOADING,
+                Self::CANCEL_REQUESTED,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            )
+            .is_err()
+        {
+            return false;
+        }
+
+        if let Some(abort) = self
+            .abort
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .take()
+        {
+            abort();
+        }
+        true
+    }
+
+    fn set_abort(&self, abort: impl Fn() + Send + Sync + 'static) {
+        let abort: Box<dyn Fn() + Send + Sync> = Box::new(abort);
+        if self.phase.load(Ordering::Acquire) == Self::CANCEL_REQUESTED {
+            abort();
+            return;
+        }
+
+        let mut slot = self.abort.lock().unwrap_or_else(|error| error.into_inner());
+        if self.phase.load(Ordering::Acquire) == Self::CANCEL_REQUESTED {
+            drop(slot);
+            abort();
+        } else {
+            *slot = Some(abort);
+        }
+    }
+
+    fn begin_install(&self) -> bool {
+        self.phase
+            .compare_exchange(
+                Self::DOWNLOADING,
+                Self::INSTALLING,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            )
+            .is_ok()
+    }
+
+    fn is_cancel_requested(&self) -> bool {
+        self.phase.load(Ordering::Acquire) == Self::CANCEL_REQUESTED
+    }
+}
+
+impl TauriUpdaterState {
+    fn begin(&self) -> Result<Arc<UpdaterCancellation>, String> {
+        let mut active = self
+            .active
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if active.is_some() {
+            return Err("已有软件更新任务正在运行。".to_owned());
+        }
+
+        let cancellation = Arc::new(UpdaterCancellation::new());
+        *active = Some(cancellation.clone());
+        Ok(cancellation)
+    }
+
+    fn finish(&self, cancellation: &Arc<UpdaterCancellation>) {
+        let mut active = self
+            .active
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if active
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, cancellation))
+        {
+            *active = None;
+        }
+    }
+
+    fn request_cancel(&self) -> bool {
+        let cancellation = self
+            .active
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone();
+        cancellation.is_some_and(|value| value.request_cancel())
+    }
+}
+
 const TAURI_UPDATER_STORAGE_POLICY: &str =
     "软件更新只更新程序文件；业务数据库、授权文件和运行数据保持在运行数据目录。";
 const PORTABLE_UPDATER_STORAGE_POLICY: &str =
     "便携版不执行安装器式自动更新；请退出程序后替换程序文件，并保留解包目录旁的 App_Data。";
 const MAX_UPDATER_ENDPOINT_LENGTH: usize = 2048;
+const TAURI_UPDATER_PROGRESS_EVENT: &str = "exportdoc://updater-progress";
 
 #[tauri::command]
 pub(crate) async fn check_tauri_update(
@@ -95,6 +235,33 @@ pub(crate) async fn check_tauri_update(
 pub(crate) async fn install_tauri_update(
     app: tauri::AppHandle,
     endpoint: Option<String>,
+    state: tauri::State<'_, TauriUpdaterState>,
+) -> Result<TauriUpdaterInstallResult, String> {
+    let cancellation = state.begin()?;
+    let result = install_tauri_update_core(app, endpoint, cancellation.clone()).await;
+    state.finish(&cancellation);
+    result
+}
+
+#[tauri::command]
+pub(crate) fn cancel_tauri_update(
+    state: tauri::State<'_, TauriUpdaterState>,
+) -> TauriUpdaterCancelResult {
+    let accepted = state.request_cancel();
+    TauriUpdaterCancelResult {
+        accepted,
+        status_text: if accepted {
+            "已请求取消更新下载，正在停止网络传输。".to_owned()
+        } else {
+            "当前没有可取消的更新下载；进入安装阶段后不能中断。".to_owned()
+        },
+    }
+}
+
+async fn install_tauri_update_core(
+    app: tauri::AppHandle,
+    endpoint: Option<String>,
+    cancellation: Arc<UpdaterCancellation>,
 ) -> Result<TauriUpdaterInstallResult, String> {
     ensure_updater_install_supported(app.state::<RuntimePaths>().portable)?;
     let updater = build_tauri_updater(&app, endpoint)?;
@@ -105,10 +272,56 @@ pub(crate) async fn install_tauri_update(
         .ok_or_else(|| "未发现可安装的新版本。".to_owned())?;
     let version = update.version.clone();
 
-    update
-        .download_and_install(|_, _| {}, || {})
-        .await
-        .map_err(describe_updater_error)?;
+    emit_updater_progress(&app, "preparing", 0, None, "正在准备更新下载。");
+    let download_app = app.clone();
+    let install_app = app.clone();
+    let download_update = update.clone();
+    let download_handle = tauri::async_runtime::spawn(async move {
+        let mut downloaded_bytes = 0_u64;
+        download_update
+            .download(
+                move |chunk_bytes, total_bytes| {
+                    downloaded_bytes = downloaded_bytes.saturating_add(chunk_bytes as u64);
+                    emit_updater_progress(
+                        &download_app,
+                        "downloading",
+                        downloaded_bytes,
+                        total_bytes,
+                        "正在下载并校验更新包。",
+                    );
+                },
+                move || {
+                    emit_updater_progress(
+                        &install_app,
+                        "verifying",
+                        0,
+                        None,
+                        "下载完成，正在校验更新包签名。",
+                    );
+                },
+            )
+            .await
+    });
+    let abort_handle = download_handle.inner().abort_handle();
+    cancellation.set_abort(move || abort_handle.abort());
+    let bytes = match download_handle.await {
+        Ok(result) => result.map_err(describe_updater_error)?,
+        Err(_error) if cancellation.is_cancel_requested() => {
+            emit_updater_progress(&app, "canceled", 0, None, "更新下载已取消。");
+            return Err("软件更新下载已取消。".to_owned());
+        }
+        Err(error) => return Err(format!("软件更新下载任务失败：{error}")),
+    };
+
+    if !cancellation.begin_install() {
+        emit_updater_progress(&app, "canceled", 0, None, "更新下载已取消。");
+        return Err("软件更新下载已取消。".to_owned());
+    }
+
+    emit_updater_progress(&app, "installing", 0, None, "签名校验完成，正在安装更新。");
+    update.install(bytes).map_err(describe_updater_error)?;
+
+    emit_updater_progress(&app, "restarting", 0, None, "更新安装完成，正在重启程序。");
 
     desktop_commands::confirm_app_exit();
     sidecar::run_shutdown_maintenance(&app);
@@ -122,6 +335,28 @@ pub(crate) async fn install_tauri_update(
         restart_policy: "安装完成后自动重启程序。".to_owned(),
         storage_policy: TAURI_UPDATER_STORAGE_POLICY.to_owned(),
     })
+}
+
+fn emit_updater_progress(
+    app: &tauri::AppHandle,
+    phase: &'static str,
+    downloaded_bytes: u64,
+    total_bytes: Option<u64>,
+    status_text: &'static str,
+) {
+    let progress_percent = total_bytes
+        .filter(|total| *total > 0)
+        .map(|total| ((downloaded_bytes.saturating_mul(100) / total).min(100)) as u8);
+    let _ = app.emit(
+        TAURI_UPDATER_PROGRESS_EVENT,
+        TauriUpdaterProgress {
+            phase,
+            downloaded_bytes,
+            total_bytes,
+            progress_percent,
+            status_text,
+        },
+    );
 }
 
 fn ensure_updater_install_supported(portable: bool) -> Result<(), String> {
@@ -296,5 +531,17 @@ mod tests {
             updater_storage_policy(true),
             PORTABLE_UPDATER_STORAGE_POLICY
         );
+    }
+
+    #[test]
+    fn updater_cancellation_is_only_accepted_before_installation() {
+        let canceled = UpdaterCancellation::new();
+        assert!(canceled.request_cancel());
+        assert!(!canceled.request_cancel());
+        assert!(!canceled.begin_install());
+
+        let installing = UpdaterCancellation::new();
+        assert!(installing.begin_install());
+        assert!(!installing.request_cancel());
     }
 }

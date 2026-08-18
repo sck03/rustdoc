@@ -114,6 +114,6 @@ namespace ExportDocManager.Api.Tests
         }
 
         private static AppDbContext CreateContext(string databasePath) => new(
-            new DbContextOptionsBuilder<AppDbContext>().UseSqlite($"Data Source={databasePath}").Options);
+            new DbContextOptionsBuilder<AppDbContext>().UseSqlite(DbHelper.BuildConnectionString(databasePath)).Options);
     }
 }

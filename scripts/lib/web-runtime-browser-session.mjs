@@ -34,7 +34,7 @@ export async function startChrome(options) {
   }
 }
 
-export function buildChromeLaunchArguments(options, runtime = detectChromeRuntime()) {
+export function buildChromeLaunchArguments(options, runtime = detectChromiumRuntime()) {
   const executableName = path.basename(options.browserExecutable).toLowerCase();
   const args = [
     "--remote-debugging-address=127.0.0.1",

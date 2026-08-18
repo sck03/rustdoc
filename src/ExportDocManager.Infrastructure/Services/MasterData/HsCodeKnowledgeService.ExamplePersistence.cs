@@ -90,7 +90,7 @@ namespace ExportDocManager.Services.MasterData
                     var resolution = ResolveCurrentCode(example, map, relations);
                     example.ResolvedCurrentHsCode = resolution.CurrentCode;
                     example.ResolutionStatus = resolution.Status;
-                    example.UpdatedAt = DateTimeOffset.UtcNow;
+                    example.UpdatedAt = _clock.UtcNow;
                 }
 
                 await context.SaveChangesAsync(cancellationToken);

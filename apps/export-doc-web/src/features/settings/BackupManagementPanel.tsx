@@ -1,5 +1,6 @@
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
 import { DataRootMigrationPanel } from "./DataRootMigrationPanel.tsx";
 import { DatabaseBackupPanel } from "./DatabaseBackupPanel.tsx";
 import { DatabaseBackupTable } from "./DatabaseBackupTable.tsx";
@@ -21,7 +22,14 @@ export default function BackupManagementPanel({
     <section className="form-section backup-management-section" aria-label="数据备份与还原">
       <DatabaseBackupPanel controller={controller} onPathError={onPathError} />
       {controller.message ? <InlineNotice tone="error" title="备份操作失败">{controller.message}</InlineNotice> : null}
-      {controller.successMessage ? <InlineNotice tone="success">{controller.successMessage}</InlineNotice> : null}
+      {controller.successMessage ? (
+        <InlineNotice
+          tone="success"
+          action={controller.lastCreatedJobId ? <ViewJobButton jobId={controller.lastCreatedJobId} disabled={controller.isBusy} /> : undefined}
+        >
+          {controller.successMessage}
+        </InlineNotice>
+      ) : null}
       <DataRootMigrationPanel controller={controller} onPathError={onPathError} />
       {controller.desktopBridgeAvailable ? (
         <DisasterRecoveryPanel controller={controller} onPathError={onPathError} />

@@ -8,6 +8,7 @@ using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 
 namespace ExportDocManager.Services.Tools
 {
@@ -15,13 +16,16 @@ namespace ExportDocManager.Services.Tools
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
+        private readonly IBusinessClock _clock;
 
         public ContainerLoadingService(
             IDbContextFactory<AppDbContext> contextFactory,
-            BusinessDataAccessScope accessScope)
+            BusinessDataAccessScope accessScope,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<List<ContainerProject>> GetRecentProjectsAsync(
@@ -92,7 +96,7 @@ namespace ExportDocManager.Services.Tools
                 _contextFactory,
                 async (context, token) =>
                 {
-                    var now = DateTimeOffset.UtcNow;
+                    var now = _clock.UtcNow;
                     ContainerProject targetProject;
 
                     if (project.Id == 0)

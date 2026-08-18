@@ -12,8 +12,8 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(3)] public string Currency { get; set; } = "CNY";
         public int LeadTimeDays { get; set; }
         [MaxLength(30)] public string Status { get; set; } = "供货中";
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
         [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
     }
 }

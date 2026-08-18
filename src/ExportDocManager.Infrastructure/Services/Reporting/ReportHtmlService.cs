@@ -29,20 +29,6 @@ namespace ExportDocManager.Services.Reporting
             IDbContextFactory<AppDbContext> contextFactory,
             ISettingsService settingsService,
             IAppPathProvider pathProvider,
-            ILogger<ReportHtmlService>? logger = null)
-            : this(
-                contextFactory,
-                settingsService,
-                pathProvider,
-                new BusinessDataAccessScope(new DatabaseConnectionSettings()),
-                logger)
-        {
-        }
-
-        public ReportHtmlService(
-            IDbContextFactory<AppDbContext> contextFactory,
-            ISettingsService settingsService,
-            IAppPathProvider pathProvider,
             BusinessDataAccessScope accessScope,
             ILogger<ReportHtmlService>? logger = null)
         {

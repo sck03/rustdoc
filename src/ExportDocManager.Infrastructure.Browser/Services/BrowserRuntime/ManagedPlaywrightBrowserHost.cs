@@ -122,10 +122,10 @@ namespace ExportDocManager.Services.BrowserRuntime
                 IBrowser browser = await BeginOperationAsync(workload, linkedCts.Token).ConfigureAwait(false);
                 operationStarted = true;
                 context = await browser.NewContextAsync(new BrowserNewContextOptions
-                    {
-                        IgnoreHTTPSErrors = false,
-                        Locale = "zh-CN"
-                    })
+                {
+                    IgnoreHTTPSErrors = false,
+                    Locale = "zh-CN"
+                })
                     .WaitAsync(linkedCts.Token)
                     .ConfigureAwait(false);
                 await ConfigureNavigationPolicyAsync(context, linkedCts.Token).ConfigureAwait(false);

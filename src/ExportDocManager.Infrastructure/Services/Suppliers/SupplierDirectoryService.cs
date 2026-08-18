@@ -3,6 +3,7 @@ using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,11 +16,16 @@ namespace ExportDocManager.Services.Suppliers
         private const int LegacyListLimit = 200;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
+        private readonly IBusinessClock _clock;
 
-        public SupplierDirectoryService(IDbContextFactory<AppDbContext> contextFactory, BusinessDataAccessScope accessScope)
+        public SupplierDirectoryService(
+            IDbContextFactory<AppDbContext> contextFactory,
+            BusinessDataAccessScope accessScope,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<IReadOnlyList<SupplierRecord>> ListAsync(CancellationToken cancellationToken = default)
@@ -42,6 +48,7 @@ namespace ExportDocManager.Services.Suppliers
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var query = _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking());
             query = query.ApplyKeywordSearch(
+                context,
                 keyword,
                 item => item.Name,
                 item => item.CountryRegion,
@@ -85,7 +92,7 @@ namespace ExportDocManager.Services.Suppliers
             entity.Status = string.IsNullOrWhiteSpace(request.Status) ? "合作中" : request.Status.Trim();
             entity.MainProducts = Clean(request.MainProducts);
             entity.Notes = Clean(request.Notes);
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.UpdatedAt = _clock.UtcNow;
             try
             {
                 await context.SaveChangesAsync(cancellationToken);
@@ -120,7 +127,7 @@ namespace ExportDocManager.Services.Suppliers
             {
                 entity.Status = "停用";
                 entity.VersionNumber++;
-                entity.UpdatedAt = DateTimeOffset.UtcNow;
+                entity.UpdatedAt = _clock.UtcNow;
                 await SaveWithConcurrencyAsync(context, "供应商", cancellationToken);
                 return new SupplierDeleteResult(
                     true,
@@ -170,7 +177,7 @@ namespace ExportDocManager.Services.Suppliers
             {
                 row.Status = status;
                 row.VersionNumber++;
-                row.UpdatedAt = DateTimeOffset.UtcNow;
+                row.UpdatedAt = _clock.UtcNow;
             }
             try
             {
@@ -222,7 +229,7 @@ namespace ExportDocManager.Services.Suppliers
             entity.InstantMessaging = Clean(request.InstantMessaging);
             bool makePrimary = request.IsPrimary;
             entity.IsPrimary = false;
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.UpdatedAt = _clock.UtcNow;
             if (makePrimary)
             {
                 await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
@@ -231,7 +238,7 @@ namespace ExportDocManager.Services.Suppliers
                 {
                     item.IsPrimary = false;
                     item.VersionNumber++;
-                    item.UpdatedAt = DateTimeOffset.UtcNow;
+                    item.UpdatedAt = _clock.UtcNow;
                 }
 
                 await SaveWithConcurrencyAsync(context, "供应商联系人", cancellationToken);
@@ -280,10 +287,10 @@ namespace ExportDocManager.Services.Suppliers
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             if (!await CanAccessSupplierAsync(context, supplierCompanyId, cancellationToken)) return [];
             return await (from link in context.SupplierProductLinks.AsNoTracking()
-                join product in context.Products.AsNoTracking() on link.ProductId equals product.Id
-                where link.SupplierCompanyId == supplierCompanyId
-                orderby product.ProductCode, product.NameCN
-                select new { Link = link, Product = product })
+                          join product in context.Products.AsNoTracking() on link.ProductId equals product.Id
+                          where link.SupplierCompanyId == supplierCompanyId
+                          orderby product.ProductCode, product.NameCN
+                          select new { Link = link, Product = product })
                 .Take(MaximumProductLinksPerSupplier)
                 .Select(row => new SupplierProductLinkRecord(row.Link.Id, row.Link.SupplierCompanyId, row.Link.ProductId,
                     row.Product.ProductCode ?? string.Empty, row.Product.NameCN ?? string.Empty, row.Product.NameEN ?? string.Empty,
@@ -331,7 +338,7 @@ namespace ExportDocManager.Services.Suppliers
             entity.Currency = currency;
             entity.LeadTimeDays = request.LeadTimeDays;
             entity.Status = status;
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.UpdatedAt = _clock.UtcNow;
             await SaveWithConcurrencyAsync(context, "供应产品关联", cancellationToken);
             return ToProductLinkRecord(entity, product);
         }

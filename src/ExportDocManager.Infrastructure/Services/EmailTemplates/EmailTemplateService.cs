@@ -4,6 +4,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.EmailTemplates
@@ -23,11 +24,16 @@ namespace ExportDocManager.Services.EmailTemplates
         private static readonly Regex TokenPattern = new(@"\{\{[A-Za-z][A-Za-z0-9]*\}\}", RegexOptions.Compiled);
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
+        private readonly IBusinessClock _clock;
 
-        public EmailTemplateService(IDbContextFactory<AppDbContext> contextFactory, BusinessDataAccessScope accessScope)
+        public EmailTemplateService(
+            IDbContextFactory<AppDbContext> contextFactory,
+            BusinessDataAccessScope accessScope,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<IReadOnlyList<EmailTemplateRecord>> ListAsync(
@@ -86,7 +92,7 @@ namespace ExportDocManager.Services.EmailTemplates
             if (duplicate) throw new ResourceConflictException("同一分类下已存在同名邮件模板。");
             bool changed = isNew || HasChanges(entity, name, category, subject, bodyHtml, request.IsActive, request.IsShared);
             if (!changed) return ToRecord(entity);
-            var now = DateTimeOffset.UtcNow;
+            var now = _clock.UtcNow;
             entity.Name = name;
             entity.Category = category;
             entity.Subject = subject;
@@ -150,7 +156,7 @@ namespace ExportDocManager.Services.EmailTemplates
             entity.IsActive = source.IsActive;
             entity.IsShared = source.IsShared;
             entity.VersionNumber = Math.Max(1, entity.VersionNumber + 1);
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.UpdatedAt = _clock.UtcNow;
             await context.EmailTemplateVersions.AddAsync(
                 CreateVersion(entity, $"恢复 V{source.VersionNumber}", entity.UpdatedAt), cancellationToken);
             try

@@ -13,7 +13,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/auth/login", async Task<Results<
                 Ok<ApiLoginResponse>,
                 BadRequest<ApiErrorResponse>,
-                JsonHttpResult<ApiErrorResponse>>>(
+                JsonHttpResult<ApiErrorResponse>>> (
                 HttpContext context,
                 ApiLoginRequest request,
                 IDatabaseInitializationService databaseInitializationService,
@@ -130,7 +130,7 @@ namespace ExportDocManager.Api.Hosting
             .WithName("getCurrentUser")
             .WithApiAccess(true, true, false);
 
-            endpoints.MapPost("/api/auth/renew", async Task<Results<Ok<ApiLoginResponse>, UnauthorizedHttpResult>>(
+            endpoints.MapPost("/api/auth/renew", async Task<Results<Ok<ApiLoginResponse>, UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -161,7 +161,7 @@ namespace ExportDocManager.Api.Hosting
             .WithName("RenewSession")
             .WithApiAccess(true, true, false);
 
-            endpoints.MapPost("/api/auth/logout", async Task<Ok<ApiLogoutResponse>>(
+            endpoints.MapPost("/api/auth/logout", async Task<Ok<ApiLogoutResponse>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiDownloadTicketService downloadTicketService) =>

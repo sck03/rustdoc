@@ -713,8 +713,11 @@ namespace ExportDocManager.Api.Tests
             Container = new ApiContainerDimensionsDto { Length = 1200, Width = 235, Height = 269 },
             Analysis = new ApiContainerPackingAnalysisDto
             {
-                TotalPackages = 1, PackedPackages = 1, EstimatedContainerCount = 1,
-                VolumeUtilizationPercent = 50m, WeightUtilizationPercent = 25m,
+                TotalPackages = 1,
+                PackedPackages = 1,
+                EstimatedContainerCount = 1,
+                VolumeUtilizationPercent = 50m,
+                WeightUtilizationPercent = 25m,
                 IsCenterOfGravityWithinTolerance = true,
                 PackedItems =
                 [

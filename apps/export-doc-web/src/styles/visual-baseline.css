@@ -3,6 +3,7 @@
  * Keep the historical production cascade here while real application routes
  * load the heavy report, Single Window and container styles on demand.
  */
+@import "./theme/color-tokens.css";
 @import "./base.css";
 @import "./dashboard.css";
 @import "./master-data.css";

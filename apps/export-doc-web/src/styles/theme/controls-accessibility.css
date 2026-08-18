@@ -3,13 +3,13 @@
   min-height: var(--edm-control-height);
   background: linear-gradient(135deg, var(--edm-primary-600), var(--edm-primary-700));
   border-color: var(--edm-primary-700);
-  box-shadow: 0 5px 13px rgba(15, 127, 114, 0.17);
+  box-shadow: 0 5px 13px color-mix(in srgb, var(--edm-primary-600) 17%, transparent);
 }
 
 .command-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #0e7469, #095c55);
-  border-color: #095c55;
-  box-shadow: 0 8px 18px rgba(15, 127, 114, 0.22);
+  background: linear-gradient(135deg, var(--edm-primary-650), var(--edm-primary-775));
+  border-color: var(--edm-primary-775);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--edm-primary-600) 22%, transparent);
   transform: translateY(-1px);
 }
 
@@ -18,25 +18,25 @@
    which made the 作废 label difficult to read in the invoice editor. */
 .command-button.danger,
 .command-button.danger-command {
-  color: #ffffff;
-  background: linear-gradient(135deg, #b4233f, #8f1d35);
-  border-color: #8f1d35;
-  box-shadow: 0 5px 13px rgba(143, 29, 53, 0.2);
+  color: var(--edm-white);
+  background: linear-gradient(135deg, var(--edm-danger-600), var(--edm-danger-900));
+  border-color: var(--edm-danger-900);
+  box-shadow: 0 5px 13px color-mix(in srgb, var(--edm-danger-900) 20%, transparent);
 }
 
 .command-button.danger:hover:not(:disabled),
 .command-button.danger-command:hover:not(:disabled) {
-  color: #ffffff;
-  background: linear-gradient(135deg, #9f1f3a, #74162c);
-  border-color: #74162c;
-  box-shadow: 0 8px 18px rgba(116, 22, 44, 0.24);
+  color: var(--edm-white);
+  background: linear-gradient(135deg, var(--edm-danger-600), var(--edm-danger-900));
+  border-color: var(--edm-danger-900);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--edm-danger-900) 24%, transparent);
 }
 
 .command-button.danger:disabled,
 .command-button.danger-command:disabled {
-  color: #fcebed;
-  background: #79505a;
-  border-color: #69434d;
+  color: var(--edm-danger-50);
+  background: var(--edm-earth-650);
+  border-color: var(--edm-earth-750);
   box-shadow: none;
   opacity: 1;
 }
@@ -53,9 +53,9 @@
 .pager-buttons button,
 .master-data-tab {
   color: var(--edm-ink-800);
-  background: rgba(255, 255, 255, 0.9);
+  background: color-mix(in srgb, var(--edm-white) 90%, transparent);
   border-color: var(--edm-line-strong);
-  box-shadow: 0 1px 2px rgba(24, 55, 51, 0.035);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--edm-ink-900) 3.5%, transparent);
 }
 
 .command-button.secondary:hover:not(:disabled),
@@ -65,7 +65,7 @@
 .master-data-tab:hover {
   color: var(--edm-primary-700);
   background: var(--edm-primary-50);
-  border-color: #8fc7bc;
+  border-color: var(--edm-primary-300);
 }
 
 .search-form,
@@ -80,7 +80,7 @@
 .inline-check {
   border-color: var(--edm-line-strong);
   border-radius: 10px;
-  box-shadow: inset 0 1px 2px rgba(16, 35, 34, 0.025);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--edm-ink-950) 2.5%, transparent);
 }
 
 .app-shell input:not([type="checkbox"]):not([type="radio"]),
@@ -99,14 +99,14 @@
 .app-shell textarea:focus,
 .search-form:focus-within {
   border-color: var(--edm-primary-500);
-  box-shadow: 0 0 0 3px rgba(17, 155, 136, 0.13);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--edm-primary-500) 13%, transparent);
   outline: 0;
 }
 
 .app-shell input:not([type="checkbox"]):not([type="radio"]):hover:not(:disabled),
 .app-shell select:hover:not(:disabled),
 .app-shell textarea:hover:not(:disabled) {
-  border-color: #aebfbb;
+  border-color: var(--edm-neutral-450);
 }
 
 .form-field-label {
@@ -121,7 +121,7 @@
 
 .table-frame {
   overflow: auto;
-  background: rgba(255, 255, 255, 0.94);
+  background: color-mix(in srgb, var(--edm-white) 94%, transparent);
 }
 
 .empty-cell,
@@ -130,14 +130,14 @@
 .smart-ocr-preview-empty {
   color: var(--edm-ink-500);
   background:
-    radial-gradient(circle at 50% 42%, rgba(17, 155, 136, 0.055), transparent 8rem),
-    linear-gradient(180deg, rgba(248, 251, 250, 0.38), rgba(255, 255, 255, 0.76));
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--edm-primary-500) 5.5%, transparent), transparent 8rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--edm-primary-25) 38%, transparent), color-mix(in srgb, var(--edm-white) 76%, transparent));
 }
 
 th {
-  color: #48605d;
-  background: #edf4f2;
-  border-bottom-color: #d8e5e1;
+  color: var(--edm-ink-600);
+  background: var(--edm-ink-100);
+  border-bottom-color: var(--edm-ink-200);
   letter-spacing: 0.025em;
 }
 
@@ -148,19 +148,19 @@ th.amount-cell {
 
 td {
   color: var(--edm-ink-800);
-  border-bottom-color: #e8efed;
+  border-bottom-color: var(--edm-ink-100);
 }
 
 tbody tr:nth-child(even) {
-  background: rgba(248, 251, 250, 0.72);
+  background: color-mix(in srgb, var(--edm-primary-25) 72%, transparent);
 }
 
 tbody tr:hover {
-  background: #eef9f6;
+  background: var(--edm-primary-75);
 }
 
 .selected-row {
-  background: #ddf4ee !important;
+  background: var(--edm-primary-150) !important;
   box-shadow: inset 3px 0 0 var(--edm-primary-600);
 }
 
@@ -178,33 +178,33 @@ tbody tr:hover {
 }
 
 .business-status-badge[data-tone="info"] {
-  color: #155e75;
-  background: #ecfeff;
-  border-color: #a5f3fc;
+  color: var(--edm-cyan-800);
+  background: var(--edm-cyan-50);
+  border-color: var(--edm-cyan-200);
 }
 
 .business-status-badge[data-tone="positive"] {
-  color: #166534;
-  background: #f0fdf4;
-  border-color: #bbf7d0;
+  color: var(--edm-success-800);
+  background: var(--edm-success-50);
+  border-color: var(--edm-success-200);
 }
 
 .business-status-badge[data-tone="warning"] {
-  color: #92400e;
-  background: #fffbeb;
-  border-color: #fde68a;
+  color: var(--edm-warning-800);
+  background: var(--edm-warning-50);
+  border-color: var(--edm-warning-300);
 }
 
 .business-status-badge[data-tone="danger"] {
-  color: #991b1b;
-  background: #fef2f2;
-  border-color: #fecaca;
+  color: var(--edm-danger-800);
+  background: var(--edm-danger-50);
+  border-color: var(--edm-danger-200);
 }
 
 .business-status-badge[data-tone="muted"] {
-  color: #52615f;
-  background: #f1f5f4;
-  border-color: #d8e2e0;
+  color: var(--edm-ink-600);
+  background: var(--edm-neutral-75);
+  border-color: var(--edm-ink-200);
 }
 
 .table-primary-text-wrap {
@@ -236,7 +236,7 @@ tbody tr:hover {
 .pagination-bar {
   min-height: 52px;
   padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.82);
+  background: color-mix(in srgb, var(--edm-white) 82%, transparent);
   border: 1px solid var(--edm-line);
   border-radius: var(--edm-radius-md);
   box-shadow: var(--edm-shadow-sm);
@@ -245,13 +245,13 @@ tbody tr:hover {
 .detail-item {
   min-height: 62px;
   padding: 10px 11px;
-  background: linear-gradient(180deg, #fbfdfc, #f6faf8);
+  background: linear-gradient(180deg, var(--edm-primary-25), var(--edm-primary-25));
 }
 
 .dashboard-metric {
   min-height: 104px;
   padding: 16px;
-  background: linear-gradient(155deg, #ffffff, #f9fcfb);
+  background: linear-gradient(155deg, var(--edm-white), var(--edm-primary-25));
   border-color: var(--edm-line);
   border-left-width: 4px;
   border-radius: var(--edm-radius-md);
@@ -259,38 +259,38 @@ tbody tr:hover {
 }
 
 .dashboard-metric:hover {
-  border-color: #c1d5d0;
+  border-color: var(--edm-ink-300);
   box-shadow: var(--edm-shadow-md);
   transform: translateY(-1px);
 }
 
 .dashboard-metric-icon {
   border-radius: 11px;
-  box-shadow: 0 8px 18px rgba(24, 55, 51, 0.14);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--edm-ink-900) 14%, transparent);
 }
 
 .dashboard-todo-item {
   min-height: 72px;
-  background: linear-gradient(155deg, #ffffff, #f7fbf9);
+  background: linear-gradient(155deg, var(--edm-white), var(--edm-primary-25));
   border-color: var(--edm-line);
   border-radius: 11px;
 }
 
 .dashboard-todo-item:hover:not(:disabled) {
   background: var(--edm-primary-50);
-  border-color: #9dcec4;
+  border-color: var(--edm-primary-300);
   box-shadow: var(--edm-shadow-sm);
   transform: translateY(-1px);
 }
 
 .settings-command-strip {
   padding: 14px;
-  background: linear-gradient(145deg, #ffffff, #f8fbfa);
+  background: linear-gradient(145deg, var(--edm-white), var(--edm-primary-25));
 }
 
 .settings-category-nav {
   padding: 9px;
-  background: rgba(255, 255, 255, 0.9);
+  background: color-mix(in srgb, var(--edm-white) 90%, transparent);
 }
 
 .settings-category-item:hover {
@@ -303,27 +303,27 @@ tbody tr:hover {
 .master-data-tab-active,
 .master-data-tab-active:hover,
 .segmented-control .segmented-active {
-  color: #ffffff;
+  color: var(--edm-white);
   background: linear-gradient(135deg, var(--edm-primary-600), var(--edm-primary-700));
   border-color: var(--edm-primary-700);
-  box-shadow: 0 5px 13px rgba(15, 127, 114, 0.16);
+  box-shadow: 0 5px 13px color-mix(in srgb, var(--edm-primary-600) 16%, transparent);
 }
 
 .loading-panel {
   display: grid;
   place-items: center;
   color: var(--edm-ink-500);
-  background: rgba(255, 255, 255, 0.84);
+  background: color-mix(in srgb, var(--edm-white) 84%, transparent);
 }
 
 .login-screen {
   background:
-    linear-gradient(118deg, rgba(255, 255, 255, 0.9) 0%, rgba(237, 248, 244, 0.68) 48%, rgba(255, 247, 228, 0.76) 100%),
-    linear-gradient(136deg, #edf7f3 0%, #e7eef8 48%, #fff2dc 100%);
+    linear-gradient(118deg, color-mix(in srgb, var(--edm-white) 90%, transparent) 0%, color-mix(in srgb, var(--edm-primary-75) 68%, transparent) 48%, color-mix(in srgb, var(--edm-warning-50) 76%, transparent) 100%),
+    linear-gradient(136deg, var(--edm-primary-75) 0%, var(--edm-info-50) 48%, var(--edm-warning-100) 100%);
 }
 
 .login-card {
-  border-color: rgba(164, 187, 181, 0.52);
+  border-color: color-mix(in srgb, var(--edm-neutral-450) 52%, transparent);
   border-radius: var(--edm-radius-lg);
   box-shadow: var(--edm-shadow-lg);
 }
@@ -346,8 +346,8 @@ tbody tr:hover {
 }
 
 .login-submit-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #0e7469, #095c55);
-  box-shadow: 0 18px 38px rgba(15, 127, 114, 0.24);
+  background: linear-gradient(135deg, var(--edm-primary-650), var(--edm-primary-775));
+  box-shadow: 0 18px 38px color-mix(in srgb, var(--edm-primary-600) 24%, transparent);
   transform: translateY(-1px);
 }
 
@@ -380,8 +380,8 @@ tbody tr:hover {
 
   .workspace-nav {
     border-right: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 10px 30px rgba(16, 35, 34, 0.12);
+    border-bottom: 1px solid color-mix(in srgb, var(--edm-white) 8%, transparent);
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--edm-ink-950) 12%, transparent);
   }
 
   .app-shell-nav-collapsed .workspace-nav {

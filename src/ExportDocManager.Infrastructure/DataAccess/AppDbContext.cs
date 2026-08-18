@@ -9,6 +9,8 @@ namespace ExportDocManager.DataAccess
 {
     public class AppDbContext : DbContext
     {
+        private readonly TimeProvider _timeProvider;
+
         public DbSet<Customer> Customers { get; set; }
         public DbSet<Exporter> Exporters { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
@@ -60,12 +62,55 @@ namespace ExportDocManager.DataAccess
         public DbSet<SwHandoffPackageRecord> SwHandoffPackageRecords { get; set; }
         public DbSet<SwSubmitPackageArchive> SwSubmitPackageArchives { get; set; }
 
-        public AppDbContext()
+        internal AppDbContext(DbContextOptions<AppDbContext> options)
+            : this(options, TimeProvider.System)
         {
         }
 
-        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+        public AppDbContext(DbContextOptions<AppDbContext> options, TimeProvider timeProvider)
+            : base(options)
         {
+            _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        }
+
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            ApplyPersistenceTimestamps();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override Task<int> SaveChangesAsync(
+            bool acceptAllChangesOnSuccess,
+            CancellationToken cancellationToken = default)
+        {
+            ApplyPersistenceTimestamps();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        private void ApplyPersistenceTimestamps()
+        {
+            DateTimeOffset now = _timeProvider.GetUtcNow();
+            foreach (var entry in ChangeTracker.Entries()
+                         .Where(item => item.State is EntityState.Added or EntityState.Modified))
+            {
+                var created = entry.Properties.FirstOrDefault(property =>
+                    property.Metadata.Name == "CreatedAt" &&
+                    property.Metadata.ClrType == typeof(DateTimeOffset));
+                if (entry.State == EntityState.Added && created?.CurrentValue is DateTimeOffset createdAt && createdAt == default)
+                {
+                    created.CurrentValue = now;
+                }
+
+                var updated = entry.Properties.FirstOrDefault(property =>
+                    property.Metadata.Name == "UpdatedAt" &&
+                    property.Metadata.ClrType == typeof(DateTimeOffset));
+                if (updated != null &&
+                    (entry.State == EntityState.Added && updated.CurrentValue is DateTimeOffset updatedAt && updatedAt == default ||
+                     entry.State == EntityState.Modified && !updated.IsModified))
+                {
+                    updated.CurrentValue = now;
+                }
+            }
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -230,7 +275,7 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<Exporter>().HasIndex(e => e.ExporterNameEN);
             modelBuilder.Entity<Exporter>().HasIndex(e => e.OwnerUserId);
             modelBuilder.Entity<Exporter>().HasIndex(e => new { e.CompanyScope, e.DepartmentId });
-            
+
             modelBuilder.Entity<Product>().HasIndex(p => p.ProductCode);
             modelBuilder.Entity<Product>().HasIndex(p => p.NameEN);
             modelBuilder.Entity<Product>().HasIndex(p => p.HSCode);
@@ -321,7 +366,7 @@ namespace ExportDocManager.DataAccess
                 .HasIndex(cp => cp.Name);
             modelBuilder.Entity<ContainerProject>()
                 .HasIndex(cp => cp.CreatedAt);
-            
+
             modelBuilder.Entity<ContainerProject>()
                 .HasMany(p => p.Items)
                 .WithOne()

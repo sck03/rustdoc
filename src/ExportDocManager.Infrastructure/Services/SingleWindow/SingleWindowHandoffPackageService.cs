@@ -97,45 +97,45 @@ namespace ExportDocManager.Services.SingleWindow
                 switch (businessType)
                 {
                     case SingleWindowBusinessType.CustomsCoo:
-                    {
-                        var source = await _customsCooSourceAssembler.BuildAsync(invoiceId, cancellationToken);
-                        snapshot = source;
-                        var mapped = _customsCooFieldMapper.Map(source);
-                        CustomsCooDefaultProfileApplicator.Apply(
-                            mapped,
-                            _settingsService.Settings?.SingleWindow?.CustomsCooDefaults);
-                        warnings.AddRange(mapped.Warnings);
-                        warnings.AddRange(_xmlValidator.ValidateForBuild(businessType, mapped));
-                        payloads.Add(_customsCooPayloadGenerator.BuildCertificateXml(mapped));
-                        customsCooDocument = mapped;
-                        attachments = mapped.Attachments;
-                        invoiceNo = source.Invoice?.InvoiceNo ?? string.Empty;
-                        contractNo = source.Invoice?.ContractNo ?? string.Empty;
-                        companyScope = source.Invoice?.CompanyScope ?? string.Empty;
-                        draftRevision = source.ExistingDocument?.DraftRevision ?? 0;
-                        sourceBaselineHash = source.ExistingDocument?.SourceBaselineHash ?? string.Empty;
-                        sourceDocumentId = await TryPersistCustomsCooDocumentAsync(source, mapped, cancellationToken);
-                        sourceDocumentType = sourceDocumentId > 0 ? nameof(CustomsCooDocument) : string.Empty;
-                        break;
-                    }
+                        {
+                            var source = await _customsCooSourceAssembler.BuildAsync(invoiceId, cancellationToken);
+                            snapshot = source;
+                            var mapped = _customsCooFieldMapper.Map(source);
+                            CustomsCooDefaultProfileApplicator.Apply(
+                                mapped,
+                                _settingsService.Settings?.SingleWindow?.CustomsCooDefaults);
+                            warnings.AddRange(mapped.Warnings);
+                            warnings.AddRange(_xmlValidator.ValidateForBuild(businessType, mapped));
+                            payloads.Add(_customsCooPayloadGenerator.BuildCertificateXml(mapped));
+                            customsCooDocument = mapped;
+                            attachments = mapped.Attachments;
+                            invoiceNo = source.Invoice?.InvoiceNo ?? string.Empty;
+                            contractNo = source.Invoice?.ContractNo ?? string.Empty;
+                            companyScope = source.Invoice?.CompanyScope ?? string.Empty;
+                            draftRevision = source.ExistingDocument?.DraftRevision ?? 0;
+                            sourceBaselineHash = source.ExistingDocument?.SourceBaselineHash ?? string.Empty;
+                            sourceDocumentId = await TryPersistCustomsCooDocumentAsync(source, mapped, cancellationToken);
+                            sourceDocumentType = sourceDocumentId > 0 ? nameof(CustomsCooDocument) : string.Empty;
+                            break;
+                        }
                     case SingleWindowBusinessType.AgentConsignment:
-                    {
-                        var source = await _agentConsignmentSourceAssembler.BuildAsync(invoiceId, cancellationToken);
-                        snapshot = source;
-                        var mapped = _agentConsignmentFieldMapper.Map(source);
-                        warnings.AddRange(mapped.Warnings);
-                        warnings.AddRange(_xmlValidator.ValidateForBuild(businessType, mapped));
-                        payloads.Add(_agentConsignmentPayloadGenerator.BuildRequestXml(mapped));
-                        attachments = source.Attachments;
-                        invoiceNo = source.Invoice?.InvoiceNo ?? string.Empty;
-                        contractNo = source.Invoice?.ContractNo ?? string.Empty;
-                        companyScope = source.Invoice?.CompanyScope ?? string.Empty;
-                        draftRevision = source.ExistingDocument?.DraftRevision ?? 0;
-                        sourceBaselineHash = source.ExistingDocument?.SourceBaselineHash ?? string.Empty;
-                        sourceDocumentId = await TryPersistAgentConsignmentDocumentAsync(source, mapped, cancellationToken);
-                        sourceDocumentType = sourceDocumentId > 0 ? nameof(AgentConsignmentDocument) : string.Empty;
-                        break;
-                    }
+                        {
+                            var source = await _agentConsignmentSourceAssembler.BuildAsync(invoiceId, cancellationToken);
+                            snapshot = source;
+                            var mapped = _agentConsignmentFieldMapper.Map(source);
+                            warnings.AddRange(mapped.Warnings);
+                            warnings.AddRange(_xmlValidator.ValidateForBuild(businessType, mapped));
+                            payloads.Add(_agentConsignmentPayloadGenerator.BuildRequestXml(mapped));
+                            attachments = source.Attachments;
+                            invoiceNo = source.Invoice?.InvoiceNo ?? string.Empty;
+                            contractNo = source.Invoice?.ContractNo ?? string.Empty;
+                            companyScope = source.Invoice?.CompanyScope ?? string.Empty;
+                            draftRevision = source.ExistingDocument?.DraftRevision ?? 0;
+                            sourceBaselineHash = source.ExistingDocument?.SourceBaselineHash ?? string.Empty;
+                            sourceDocumentId = await TryPersistAgentConsignmentDocumentAsync(source, mapped, cancellationToken);
+                            sourceDocumentType = sourceDocumentId > 0 ? nameof(AgentConsignmentDocument) : string.Empty;
+                            break;
+                        }
                     default:
                         throw new ServiceValidationException("不支持的单一窗口业务类型。");
                 }
@@ -243,6 +243,7 @@ namespace ExportDocManager.Services.SingleWindow
                     ClientProfileName = stationAssignment.ProfileName,
                     AssignmentNonce = Guid.NewGuid().ToString("N"),
                     AuthenticationAlgorithm = SingleWindowPackageIntegrity.AuthenticationAlgorithm,
+                    CreatedAt = _clock.UtcNow,
                     PayloadFiles = payloadFiles,
                     AttachmentFiles = attachmentFiles,
                     Warnings = warnings.Distinct(StringComparer.Ordinal).ToList()
@@ -367,7 +368,7 @@ namespace ExportDocManager.Services.SingleWindow
                 }
                 if (parsedReceiptReferences.Count > 1)
                 {
-                    throw new InvalidDataException("所选回执文件包含多个不同的官方业务编号，不能打入同一批次回执包。" );
+                    throw new InvalidDataException("所选回执文件包含多个不同的官方业务编号，不能打入同一批次回执包。");
                 }
 
                 var manifest = new SingleWindowPackageManifest
@@ -392,6 +393,7 @@ namespace ExportDocManager.Services.SingleWindow
                     ClientProfileName = binding.ClientProfileName,
                     AssignmentNonce = Guid.NewGuid().ToString("N"),
                     AuthenticationAlgorithm = SingleWindowPackageIntegrity.AuthenticationAlgorithm,
+                    CreatedAt = _clock.UtcNow,
                     PayloadFiles = copiedFiles
                 };
                 manifest.ContentDigest = SingleWindowPackageIntegrity.ComputeContentDigest(manifest);
@@ -447,7 +449,7 @@ namespace ExportDocManager.Services.SingleWindow
                     StringComparison.OrdinalIgnoreCase))
             {
                 throw new PermissionDeniedException(
-                    "持卡机授权码绑定的公司抬头与当前单据不一致。" );
+                    "持卡机授权码绑定的公司抬头与当前单据不一致。");
             }
 
             bool canHandle = businessType switch
@@ -458,7 +460,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
             if (!canHandle)
             {
-                throw new PermissionDeniedException("目标操作档案未启用当前单一窗口业务。" );
+                throw new PermissionDeniedException("目标操作档案未启用当前单一窗口业务。");
             }
         }
     }

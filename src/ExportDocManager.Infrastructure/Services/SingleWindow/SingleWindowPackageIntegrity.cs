@@ -453,7 +453,7 @@ namespace ExportDocManager.Services.SingleWindow
                 if (key.Length != 32)
                 {
                     CryptographicOperations.ZeroMemory(key);
-                    throw new InvalidDataException("单一窗口交接认证密钥长度无效。" );
+                    throw new InvalidDataException("单一窗口交接认证密钥长度无效。");
                 }
 
                 return key;

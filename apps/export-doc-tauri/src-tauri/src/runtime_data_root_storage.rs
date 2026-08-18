@@ -6,14 +6,17 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use crate::runtime_data_root_network::reject_network_data_root;
 use crate::runtime_paths::{
     ensure_directory, ensure_runtime_data_directories, RUNTIME_DATA_DIRECTORIES,
 };
 
 pub(crate) fn ensure_runtime_data_root_is_usable(data_root: &Path) -> Result<(), Box<dyn Error>> {
     validate_migration_root_shape(data_root, "dataRoot")?;
+    reject_network_data_root(data_root)?;
     reject_link_like_path(data_root)?;
     ensure_runtime_data_directories(data_root)?;
+    reject_network_data_root(data_root)?;
     reject_link_like_path(data_root)?;
     for directory_name in RUNTIME_DATA_DIRECTORIES {
         reject_link_like_path(&data_root.join(directory_name))?;
@@ -33,6 +36,7 @@ pub(crate) fn canonical_runtime_data_root(
         )
     })?;
     validate_migration_root_shape(&canonical, "dataRoot")?;
+    reject_network_data_root(&canonical)?;
     if require_expected_layout {
         ensure_expected_runtime_data_root(&canonical)?;
     }

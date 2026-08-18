@@ -39,7 +39,7 @@
   max-width: min(42vw, 640px);
   margin-top: 4px;
   overflow: hidden;
-  color: #69737d;
+  color: var(--edm-neutral-550);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -58,9 +58,9 @@
   justify-content: center;
   min-width: 54px;
   height: 32px;
-  color: #39424c;
-  background: #f1f4f6;
-  border: 1px solid #dde3e8;
+  color: var(--edm-neutral-700);
+  background: var(--edm-neutral-100);
+  border: 1px solid var(--edm-neutral-300);
   border-radius: 8px;
   font-size: 12px;
   font-weight: 700;
@@ -73,8 +73,8 @@
   justify-items: center;
   min-height: 420px;
   overflow: auto;
-  background: #edf1f4;
-  border: 1px solid #cfd8df;
+  background: var(--edm-neutral-150);
+  border: 1px solid var(--edm-neutral-400);
   border-radius: 8px;
   cursor: grab;
 }
@@ -88,8 +88,8 @@
   min-width: 1px;
   min-height: 1px;
   overflow: hidden;
-  background: #ffffff;
-  box-shadow: 0 1px 6px rgba(32, 33, 36, 0.16);
+  background: var(--edm-white);
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--edm-neutral-800) 16%, transparent);
 }
 
 .smart-ocr-preview-canvas img {
@@ -108,9 +108,9 @@
 
 .smart-ocr-line-box {
   position: absolute;
-  background: rgba(22, 163, 74, 0.14);
-  border: 2px solid #16a34a;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
+  background: color-mix(in srgb, var(--edm-success-550) 14%, transparent);
+  border: 2px solid var(--edm-success-550);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--edm-white) 55%, transparent);
 }
 
 .smart-ocr-preview-empty {
@@ -118,7 +118,7 @@
   place-items: center;
   width: 100%;
   min-height: 420px;
-  color: #69737d;
+  color: var(--edm-neutral-550);
   font-size: 13px;
 }
 
@@ -140,9 +140,9 @@
   min-height: 420px;
   resize: none;
   padding: 12px;
-  color: #202124;
-  background: #fbfcfd;
-  border: 1px solid #dde3e8;
+  color: var(--edm-neutral-800);
+  background: var(--edm-neutral-25);
+  border: 1px solid var(--edm-neutral-300);
   border-radius: 8px;
   font-family: var(--edm-font-mono);
   font-size: 13px;
@@ -164,14 +164,14 @@
 }
 
 .toolbar-summary strong {
-  color: #202124;
+  color: var(--edm-neutral-800);
   font-size: 14px;
 }
 
 .toolbar-summary span {
   max-width: 760px;
   overflow: hidden;
-  color: #65717c;
+  color: var(--edm-neutral-550);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -228,9 +228,9 @@
   align-items: center;
   min-height: 28px;
   padding: 5px 9px;
-  color: #1f3d37;
-  background: #eef7f4;
-  border: 1px solid #d2e5df;
+  color: var(--edm-ink-900);
+  background: var(--edm-primary-75);
+  border: 1px solid var(--edm-primary-150);
   border-radius: 8px;
   font-size: 12px;
   line-height: 1.2;

@@ -9,7 +9,7 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapSalesOpportunityEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/crm/opportunities", async Task<Results<Ok<ApiPagedResponse<ApiSalesOpportunityDto>>, UnauthorizedHttpResult, ForbidHttpResult>>(
+            endpoints.MapGet("/api/crm/opportunities", async Task<Results<Ok<ApiPagedResponse<ApiSalesOpportunityDto>>, UnauthorizedHttpResult, ForbidHttpResult>> (
                 HttpContext c, ApiAuthorizationService a, ISalesOpportunityService service,
                 string? keyword, string? stage, int? pageNumber, int? pageSize, CancellationToken ct) =>
             {
@@ -22,7 +22,7 @@ namespace ExportDocManager.Api.Hosting
                     page.TotalCount, page.PageNumber, page.PageSize, page.TotalPages, page.HasPreviousPage, page.HasNextPage));
             }).WithName("QuerySalesOpportunities");
 
-            endpoints.MapPost("/api/crm/opportunities", async Task<Results<Created<ApiSalesOpportunityDto>, BadRequest<ApiErrorResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>>(
+            endpoints.MapPost("/api/crm/opportunities", async Task<Results<Created<ApiSalesOpportunityDto>, BadRequest<ApiErrorResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>> (
                 HttpContext c, ApiAuthorizationService a,
                 ISalesOpportunityService service, ApiSalesOpportunitySaveRequest request, CancellationToken ct) =>
             {
@@ -40,7 +40,7 @@ namespace ExportDocManager.Api.Hosting
                 catch (KeyNotFoundException) { return TypedResults.NotFound(); }
             }).WithName("CreateSalesOpportunity");
 
-            endpoints.MapGet("/api/crm/opportunities/{id:int}/history", async Task<Results<Ok<IReadOnlyList<ApiSalesOpportunityHistoryDto>>, UnauthorizedHttpResult, ForbidHttpResult, NotFound>>(
+            endpoints.MapGet("/api/crm/opportunities/{id:int}/history", async Task<Results<Ok<IReadOnlyList<ApiSalesOpportunityHistoryDto>>, UnauthorizedHttpResult, ForbidHttpResult, NotFound>> (
                 HttpContext c, ApiAuthorizationService a,
                 ISalesOpportunityService service, int id, CancellationToken ct) =>
             {
@@ -52,7 +52,7 @@ namespace ExportDocManager.Api.Hosting
                     : TypedResults.Ok<IReadOnlyList<ApiSalesOpportunityHistoryDto>>(rows.Select(ToApiDto).ToArray());
             }).WithName("ListSalesOpportunityHistory");
 
-            endpoints.MapPut("/api/crm/opportunities/{id:int}", async Task<Results<Ok<ApiSalesOpportunityDto>, BadRequest<ApiErrorResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>>(
+            endpoints.MapPut("/api/crm/opportunities/{id:int}", async Task<Results<Ok<ApiSalesOpportunityDto>, BadRequest<ApiErrorResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>> (
                 HttpContext c, ApiAuthorizationService a, ISalesOpportunityService service,
                 int id, ApiSalesOpportunitySaveRequest request, CancellationToken ct) =>
             {
@@ -66,7 +66,7 @@ namespace ExportDocManager.Api.Hosting
                 catch (KeyNotFoundException) { return TypedResults.NotFound(); }
             }).WithName("UpdateSalesOpportunity");
 
-            endpoints.MapDelete("/api/crm/opportunities/{id:int}", async Task<Results<Ok<ApiCommandResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>>(
+            endpoints.MapDelete("/api/crm/opportunities/{id:int}", async Task<Results<Ok<ApiCommandResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>> (
                 HttpContext c, ApiAuthorizationService a,
                 ISalesOpportunityService service, int id, CancellationToken ct) =>
             {

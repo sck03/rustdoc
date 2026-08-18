@@ -170,7 +170,16 @@ function collectCargoMetadata(scope, relativeManifestPath) {
 function collectNuGet() {
   const result = spawnSync(
     resolveDotnetCommand(),
-    ["list", "ExportDocManager.sln", "package", "--include-transitive", "--format", "json"],
+    [
+      "package",
+      "list",
+      "--project",
+      "ExportDocManager.sln",
+      "--include-transitive",
+      "--format",
+      "json",
+      "--no-restore",
+    ],
     { cwd: repositoryRoot, encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024 },
   );
   if (result.error) throw result.error;
@@ -180,11 +189,14 @@ function collectNuGet() {
   const raw = String(result.stdout || "");
   const report = JSON.parse(raw.slice(raw.indexOf("{")));
   const packagesRoot = resolveNuGetPackagesRoot();
+  const projectsWithMissingGraphs = [];
   for (const project of report.projects || []) {
     const projectName = path.basename(project.path || "dotnet-project");
+    let projectPackageCount = 0;
     for (const framework of project.frameworks || []) {
       for (const groupName of ["topLevelPackages", "transitivePackages"]) {
         for (const item of framework[groupName] || []) {
+          projectPackageCount += 1;
           const version = item.resolvedVersion || item.requestedVersion || "unknown";
           addComponent({
             ecosystem: "nuget",
@@ -198,6 +210,23 @@ function collectNuGet() {
         }
       }
     }
+
+    const projectPath = path.resolve(project.path || "");
+    if (
+      projectPackageCount === 0
+      && existsSync(projectPath)
+      && /<PackageReference\b/iu.test(readFileSync(projectPath, "utf8"))
+    ) {
+      projectsWithMissingGraphs.push(path.relative(repositoryRoot, projectPath));
+    }
+  }
+
+  if (projectsWithMissingGraphs.length > 0) {
+    throw new Error(
+      "NuGet package inventory is incomplete for restored projects:\n"
+      + projectsWithMissingGraphs.join("\n")
+      + "\nRun dotnet restore before dependency governance generation.",
+    );
   }
 }
 

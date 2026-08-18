@@ -33,7 +33,8 @@ public sealed class ServerMigrationSecurityTests
                 new ServerMigrationRequestContext("tester", "127.0.0.1"),
                 "package-1",
                 success: true,
-                "completed");
+                "completed",
+                new DateTimeOffset(2026, 8, 18, 0, 0, 0, TimeSpan.Zero));
 
             string archivePath = Path.Combine(auditRoot, "server-migration.1.jsonl");
             Assert.True(File.Exists(archivePath));
@@ -523,7 +524,7 @@ public sealed class ServerMigrationSecurityTests
                 markerPath,
                 JsonSerializer.Serialize(marker, ServerMigrationService.JsonOptions));
 
-            await ServerMigrationManager.ApplyPendingRestoreAsync(paths);
+            await ServerMigrationManager.ApplyPendingRestoreAsync(paths, TimeProvider.System);
 
             Assert.False(File.Exists(markerPath));
             Assert.False(Directory.Exists(stagingRoot));
@@ -591,7 +592,7 @@ public sealed class ServerMigrationSecurityTests
                 markerPath,
                 JsonSerializer.Serialize(marker, ServerMigrationService.JsonOptions));
 
-            await ServerMigrationManager.ApplyPendingRestoreAsync(paths);
+            await ServerMigrationManager.ApplyPendingRestoreAsync(paths, TimeProvider.System);
 
             Assert.Equal("live-data", File.ReadAllText(liveFile));
             Assert.False(Directory.Exists(replacementRoot));
@@ -657,7 +658,7 @@ public sealed class ServerMigrationSecurityTests
                 JsonSerializer.Serialize(marker, ServerMigrationService.JsonOptions));
 
             await Assert.ThrowsAsync<ManualRecoveryRequiredException>(() =>
-                ServerMigrationManager.ApplyPendingRestoreAsync(paths));
+                ServerMigrationManager.ApplyPendingRestoreAsync(paths, TimeProvider.System));
 
             Assert.True(File.Exists(markerPath));
             Assert.True(Directory.Exists(stagingRoot));
@@ -670,7 +671,7 @@ public sealed class ServerMigrationSecurityTests
             Assert.Contains("自动回滚未完全成功", failedMarker.LastError, StringComparison.Ordinal);
 
             await Assert.ThrowsAsync<ManualRecoveryRequiredException>(() =>
-                ServerMigrationManager.ApplyPendingRestoreAsync(paths));
+                ServerMigrationManager.ApplyPendingRestoreAsync(paths, TimeProvider.System));
 
             Assert.True(File.Exists(markerPath));
             Assert.True(Directory.Exists(stagingRoot));
@@ -717,7 +718,7 @@ public sealed class ServerMigrationSecurityTests
                 markerPath,
                 JsonSerializer.Serialize(marker, ServerMigrationService.JsonOptions));
 
-            await ServerMigrationManager.ApplyPendingRestoreAsync(paths);
+            await ServerMigrationManager.ApplyPendingRestoreAsync(paths, TimeProvider.System);
 
             Assert.False(File.Exists(markerPath));
             ServerMigrationRestoreStatusSnapshot status = Assert.IsType<ServerMigrationRestoreStatusSnapshot>(ServerMigrationManager.ReadStatus(paths));
@@ -791,6 +792,8 @@ public sealed class ServerMigrationSecurityTests
             SchemaVersion = ServerMigrationLayout.SchemaVersion,
             PackageId = packageId,
             PackageFileName = "migration.edmmigration",
+            ScheduledAtUtc = new DateTimeOffset(2026, 8, 18, 0, 0, 0, TimeSpan.Zero),
+            UpdatedAtUtc = new DateTimeOffset(2026, 8, 18, 0, 0, 0, TimeSpan.Zero),
             StagingDirectoryName = stagingDirectoryName,
             Phase = phase,
             Manifest = new ServerMigrationManifest

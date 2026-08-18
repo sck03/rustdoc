@@ -110,6 +110,16 @@ if (!new RegExp(`channel\\s*=\\s*["']${requiredRustToolchain.replaceAll(".", "\\
 
 const dependencyWorkflowPath = path.join(workflowRoot, "dependency-governance.yml");
 const dependencyWorkflow = readFileSync(dependencyWorkflowPath, "utf8");
+if (!dependencyWorkflow.includes("generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository")) {
+  failures.push("dependency-governance.yml: dependency inventory must enforce release licenses and repository notice consistency.");
+}
+const dependencyGenerator = readFileSync(
+  path.join(repositoryRoot, "scripts", "generate-dependency-governance.mjs"),
+  "utf8",
+);
+if (!dependencyGenerator.includes('"--no-restore"')) {
+  failures.push("generate-dependency-governance.mjs: NuGet inventory must consume the dependency graph restored by the workflow.");
+}
 const cargoAuditInvocations = dependencyWorkflow
   .split(/\r?\n/u)
   .filter((line) => line.includes('cargo-audit"') && line.includes("--file"));

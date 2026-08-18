@@ -45,6 +45,6 @@ namespace ExportDocManager.Models.Entities
 
         public bool IsActive { get; set; }
 
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset UpdatedAt { get; set; }
     }
 }

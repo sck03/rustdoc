@@ -60,7 +60,7 @@ namespace ExportDocManager.Services.MasterData
             DetailUrl = source?.DetailUrl
         };
 
-        private static HsCodeDeclarationExample CloneHsCodeDeclarationExample(HsCodeDeclarationExample? source) => new()
+        private HsCodeDeclarationExample CloneHsCodeDeclarationExample(HsCodeDeclarationExample? source) => new()
         {
             Id = source?.Id ?? 0,
             Fingerprint = source?.Fingerprint ?? string.Empty,
@@ -76,11 +76,11 @@ namespace ExportDocManager.Services.MasterData
             UseCount = source?.UseCount ?? 0,
             RejectedCount = source?.RejectedCount ?? 0,
             LastUsedAt = source?.LastUsedAt,
-            CreatedAt = source?.CreatedAt ?? DateTimeOffset.UtcNow,
-            UpdatedAt = source?.UpdatedAt ?? DateTimeOffset.UtcNow
+            CreatedAt = source?.CreatedAt ?? _clock.UtcNow,
+            UpdatedAt = source?.UpdatedAt ?? _clock.UtcNow
         };
 
-        private static HsCodeReplacementRelation CloneHsCodeReplacementRelation(HsCodeReplacementRelation? source) => new()
+        private HsCodeReplacementRelation CloneHsCodeReplacementRelation(HsCodeReplacementRelation? source) => new()
         {
             Id = source?.Id ?? 0,
             OldCode = source?.OldCode ?? string.Empty,
@@ -89,11 +89,11 @@ namespace ExportDocManager.Services.MasterData
             Source = source?.Source ?? string.Empty,
             Confidence = source?.Confidence ?? 0,
             IsManuallyVerified = source?.IsManuallyVerified ?? false,
-            CreatedAt = source?.CreatedAt ?? DateTimeOffset.UtcNow,
-            UpdatedAt = source?.UpdatedAt ?? DateTimeOffset.UtcNow
+            CreatedAt = source?.CreatedAt ?? _clock.UtcNow,
+            UpdatedAt = source?.UpdatedAt ?? _clock.UtcNow
         };
 
-        private static HsCodeSearchFeedback CloneHsCodeSearchFeedback(HsCodeSearchFeedback? source) => new()
+        private HsCodeSearchFeedback CloneHsCodeSearchFeedback(HsCodeSearchFeedback? source) => new()
         {
             Id = source?.Id ?? 0,
             Fingerprint = source?.Fingerprint ?? string.Empty,
@@ -104,7 +104,7 @@ namespace ExportDocManager.Services.MasterData
             AcceptedCount = source?.AcceptedCount ?? 0,
             RejectedCount = source?.RejectedCount ?? 0,
             LastConfirmedAt = source?.LastConfirmedAt,
-            UpdatedAt = source?.UpdatedAt ?? DateTimeOffset.UtcNow
+            UpdatedAt = source?.UpdatedAt ?? _clock.UtcNow
         };
 
         private static string Prefer(string? primary, string? fallback) =>

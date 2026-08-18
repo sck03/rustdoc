@@ -1,5 +1,6 @@
 using ExportDocManager.Services.Suppliers;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -119,11 +120,11 @@ namespace ExportDocManager.Api.Hosting
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
             endpoints.MapGet("/api/suppliers/export", async (HttpContext c, IApiSessionTokenService t, ApiAuthorizationService a,
-                ISupplierFileService files, string? keyword, string? status, CancellationToken ct) =>
+                ISupplierFileService files, string? keyword, string? status, IBusinessClock clock, CancellationToken ct) =>
             {
                 if (!HasSalesAccess(c, t, a, out var denied)) return denied;
                 byte[] content = await files.ExportAsync(keyword, status, ct);
-                return Results.File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"suppliers-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.xlsx");
+                return Results.File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"suppliers-{clock.UtcNow:yyyyMMdd-HHmmss}.xlsx");
             }).WithName("ExportSuppliers")
             .Produces<byte[]>(StatusCodes.Status200OK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             .Produces(StatusCodes.Status401Unauthorized)

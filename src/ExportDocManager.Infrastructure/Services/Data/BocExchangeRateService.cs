@@ -310,7 +310,7 @@ namespace ExportDocManager.Services.Data
             {
                 if (_cachedRates == null ||
                     !string.Equals(_cachedRatesSignature, cacheSignature, StringComparison.Ordinal) ||
-                    (DateTimeOffset.UtcNow - _lastFetchTime).TotalMinutes >= cacheDurationMinutes)
+                    (_clock.UtcNow - _lastFetchTime).TotalMinutes >= cacheDurationMinutes)
                 {
                     rates = null;
                     return false;
@@ -327,7 +327,7 @@ namespace ExportDocManager.Services.Data
             {
                 _cachedRates = CloneRates(rates);
                 _cachedRatesSignature = cacheSignature;
-                _lastFetchTime = DateTimeOffset.UtcNow;
+                _lastFetchTime = _clock.UtcNow;
             }
         }
 

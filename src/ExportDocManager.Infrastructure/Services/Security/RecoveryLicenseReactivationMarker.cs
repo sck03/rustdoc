@@ -11,7 +11,10 @@ namespace ExportDocManager.Services.Security
         public static bool Exists(IAppPathProvider pathProvider) =>
             File.Exists(GetPath(pathProvider));
 
-        public static void Require(IAppPathProvider pathProvider, string packageId)
+        public static void Require(
+            IAppPathProvider pathProvider,
+            string packageId,
+            DateTimeOffset requiredAtUtc)
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
             var payload = JsonSerializer.Serialize(
@@ -20,7 +23,7 @@ namespace ExportDocManager.Services.Security
                     schemaVersion = 1,
                     reason = "single-window-disaster-recovery",
                     packageId = packageId ?? string.Empty,
-                    requiredAtUtc = DateTimeOffset.UtcNow
+                    requiredAtUtc
                 },
                 new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
             AtomicFileHelper.WriteAllTextAtomic(GetPath(pathProvider), payload);

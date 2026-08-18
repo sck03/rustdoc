@@ -195,6 +195,7 @@ namespace ExportDocManager.Api.Tests
 
                 if (cleanupOnFailure)
                 {
+                    ClearSqlitePool(databasePath);
                     DeleteDirectoryIfExists(appRoot);
                     DeleteDirectoryIfExists(dataRoot);
                 }
@@ -262,6 +263,7 @@ namespace ExportDocManager.Api.Tests
         public async ValueTask DisposeAsync()
         {
             await StopAppAsync();
+            ClearSqlitePool(DatabasePath);
             DeleteDirectoryIfExists(AppRoot);
             DeleteDirectoryIfExists(DataRoot);
         }
@@ -320,7 +322,6 @@ namespace ExportDocManager.Api.Tests
                 return;
             }
 
-            SqliteConnection.ClearAllPools();
             for (int attempt = 0; attempt < 5; attempt++)
             {
                 try
@@ -333,6 +334,17 @@ namespace ExportDocManager.Api.Tests
                     Thread.Sleep(100);
                 }
             }
+        }
+
+        private static void ClearSqlitePool(string databasePath)
+        {
+            if (string.IsNullOrWhiteSpace(databasePath))
+            {
+                return;
+            }
+
+            using var connection = new SqliteConnection(DbHelper.BuildConnectionString(databasePath));
+            SqliteConnection.ClearPool(connection);
         }
 
         private sealed class TestReadinessProbe : IApiReadinessProbe

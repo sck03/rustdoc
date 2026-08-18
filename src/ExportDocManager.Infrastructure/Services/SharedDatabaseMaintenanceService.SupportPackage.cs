@@ -17,7 +17,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             options ??= new SupportPackageOptions();
             cancellationToken.ThrowIfCancellationRequested();
-            string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd_HHmmss_fff");
+            string timestamp = _clock.UtcNow.ToString("yyyyMMdd_HHmmss_fff");
             string fileName = $"{timestamp}_{Guid.NewGuid():N}_support_package.zip";
             string path = Path.Combine(SupportPackageRoot, fileName);
             string tempPath = AtomicFileHelper.GetSiblingTempFilePath(path);

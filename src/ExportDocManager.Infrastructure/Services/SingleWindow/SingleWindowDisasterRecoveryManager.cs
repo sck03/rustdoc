@@ -19,9 +19,12 @@ namespace ExportDocManager.Services.SingleWindow
         public static bool HasPendingRestore(IAppPathProvider pathProvider) =>
             File.Exists(GetPendingMarkerPath(pathProvider));
 
-        public static void ApplyPendingRestore(IAppPathProvider pathProvider)
+        public static void ApplyPendingRestore(
+            IAppPathProvider pathProvider,
+            TimeProvider timeProvider)
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
+            ArgumentNullException.ThrowIfNull(timeProvider);
             string markerPath = GetPendingMarkerPath(pathProvider);
             if (!File.Exists(markerPath))
             {
@@ -44,7 +47,7 @@ namespace ExportDocManager.Services.SingleWindow
                 safetyRoot,
                 RuntimeStorageBudget.WithSafetyMargin(currentBytes, largestReplacement),
                 "执行持卡机灾难恢复安全备份");
-            EnsureSafetyBackup(pathProvider, marker, safetyRoot);
+            EnsureSafetyBackup(pathProvider, marker, safetyRoot, timeProvider.GetUtcNow());
 
             foreach (var file in marker.Files)
             {
@@ -72,7 +75,10 @@ namespace ExportDocManager.Services.SingleWindow
             string databasePath = Path.Combine(pathProvider.DatabaseRoot, marker.DatabaseFileName);
             AtomicFileHelper.TryDeleteFile(databasePath + "-wal");
             AtomicFileHelper.TryDeleteFile(databasePath + "-shm");
-            RecoveryLicenseReactivationMarker.Require(pathProvider, marker.PackageId);
+            RecoveryLicenseReactivationMarker.Require(
+                pathProvider,
+                marker.PackageId,
+                timeProvider.GetUtcNow());
 
             File.Delete(markerPath);
             AtomicFileHelper.TryDeleteDirectory(stagingRoot);
@@ -232,7 +238,8 @@ namespace ExportDocManager.Services.SingleWindow
         private static void EnsureSafetyBackup(
             IAppPathProvider pathProvider,
             PendingDisasterRecoveryRestore marker,
-            string safetyRoot)
+            string safetyRoot,
+            DateTimeOffset createdAtUtc)
         {
             string completedPath = Path.Combine(safetyRoot, SingleWindowDisasterRecoveryLayout.SafetyCompleteFileName);
             if (File.Exists(completedPath))
@@ -264,7 +271,7 @@ namespace ExportDocManager.Services.SingleWindow
                 {
                     schemaVersion = 1,
                     marker.PackageId,
-                    createdAtUtc = DateTimeOffset.UtcNow
+                    createdAtUtc
                 }, JsonOptions));
             RestrictRecoveredFilePermissions(completedPath);
         }
@@ -306,21 +313,21 @@ namespace ExportDocManager.Services.SingleWindow
             IAppPathProvider pathProvider,
             string databaseFileName,
             string relativePath) => relativePath switch
-        {
-            var path when path.Equals(
-                SingleWindowDisasterRecoveryLayout.DatabaseEntry(databaseFileName),
-                StringComparison.OrdinalIgnoreCase) => Path.Combine(pathProvider.DatabaseRoot, databaseFileName),
-            var path when path.Equals(
-                SingleWindowDisasterRecoveryLayout.AppSettingsEntry,
-                StringComparison.OrdinalIgnoreCase) => Path.Combine(pathProvider.ConfigRoot, "appsettings.json"),
-            var path when path.Equals(
-                SingleWindowDisasterRecoveryLayout.MasterKeyEntry,
-                StringComparison.OrdinalIgnoreCase) => Path.Combine(pathProvider.SecurityRoot, "local-master-key.bin"),
-            var path when path.Equals(
-                SingleWindowDisasterRecoveryLayout.StationIdentityEntry,
-                StringComparison.OrdinalIgnoreCase) => Path.Combine(pathProvider.SecurityRoot, "SingleWindow", "station.id"),
-            _ => throw new InvalidDataException($"灾难恢复文件不在允许清单内：{relativePath}")
-        };
+            {
+                var path when path.Equals(
+                    SingleWindowDisasterRecoveryLayout.DatabaseEntry(databaseFileName),
+                    StringComparison.OrdinalIgnoreCase) => Path.Combine(pathProvider.DatabaseRoot, databaseFileName),
+                var path when path.Equals(
+                    SingleWindowDisasterRecoveryLayout.AppSettingsEntry,
+                    StringComparison.OrdinalIgnoreCase) => Path.Combine(pathProvider.ConfigRoot, "appsettings.json"),
+                var path when path.Equals(
+                    SingleWindowDisasterRecoveryLayout.MasterKeyEntry,
+                    StringComparison.OrdinalIgnoreCase) => Path.Combine(pathProvider.SecurityRoot, "local-master-key.bin"),
+                var path when path.Equals(
+                    SingleWindowDisasterRecoveryLayout.StationIdentityEntry,
+                    StringComparison.OrdinalIgnoreCase) => Path.Combine(pathProvider.SecurityRoot, "SingleWindow", "station.id"),
+                _ => throw new InvalidDataException($"灾难恢复文件不在允许清单内：{relativePath}")
+            };
 
         private static void ValidateSqliteSnapshot(string databasePath)
         {

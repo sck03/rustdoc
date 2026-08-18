@@ -1,4 +1,3 @@
-using System.Net.Mail;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
@@ -95,13 +94,9 @@ namespace ExportDocManager.Api.Hosting
             toAddress = request.ToAddress?.Trim() ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(toAddress))
             {
-                try
+                if (!ApiEmailAddressPolicy.TryNormalize(toAddress, out toAddress))
                 {
-                    toAddress = new MailAddress(toAddress).Address;
-                }
-                catch (FormatException ex)
-                {
-                    return Results.BadRequest(new ApiErrorResponse($"收件人地址无效：{ex.Message}"));
+                    return Results.BadRequest(new ApiErrorResponse("收件人地址无效。"));
                 }
             }
 
@@ -290,14 +285,12 @@ namespace ExportDocManager.Api.Hosting
             string address,
             string label)
         {
-            try
+            if (ApiEmailAddressPolicy.TryNormalize(address, out string normalized))
             {
-                return new MailAddress(address?.Trim() ?? string.Empty).Address;
+                return normalized;
             }
-            catch (FormatException ex)
-            {
-                throw new ServiceValidationException($"{label}无效：{ex.Message}", ex);
-            }
+
+            throw new ServiceValidationException($"{label}无效。");
         }
 
         internal sealed class ApiInvoiceDocumentEmailJobRetryRequest

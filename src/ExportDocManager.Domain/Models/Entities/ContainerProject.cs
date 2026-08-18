@@ -11,7 +11,7 @@ namespace ExportDocManager.Models.Entities
         public string CompanyScope { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string? ContainerType { get; set; } // 20GP, 40GP, etc.
-        
+
         // Custom Container Dimensions
         public int ContainerLength { get; set; } // cm
         public int ContainerWidth { get; set; }  // cm

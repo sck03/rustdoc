@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
+using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Security
@@ -8,10 +9,14 @@ namespace ExportDocManager.Services.Security
     public sealed class PermissionTemplateService : IPermissionTemplateService
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
+        private readonly IBusinessClock _clock;
 
-        public PermissionTemplateService(IDbContextFactory<AppDbContext> contextFactory)
+        public PermissionTemplateService(
+            IDbContextFactory<AppDbContext> contextFactory,
+            IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<IReadOnlyList<PermissionTemplateRecord>> ListAsync(
@@ -83,7 +88,7 @@ namespace ExportDocManager.Services.Security
             template.Name = name;
             template.Description = (request.Description ?? string.Empty).Trim();
             template.IsActive = template.IsSystem || request.IsActive;
-            template.UpdatedAt = DateTimeOffset.UtcNow;
+            template.UpdatedAt = _clock.UtcNow;
             template.Modules = modules.Select(module => new PermissionTemplateModule
             {
                 ModuleKey = module.ModuleKey,
@@ -115,6 +120,23 @@ namespace ExportDocManager.Services.Security
             context.PermissionTemplates.Remove(template);
             await context.SaveChangesAsync(cancellationToken);
             return true;
+        }
+
+        public async Task<IReadOnlyList<int>> ListAssignedUserIdsAsync(
+            int templateId,
+            CancellationToken cancellationToken = default)
+        {
+            if (templateId <= 0)
+            {
+                return [];
+            }
+
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.Users
+                .AsNoTracking()
+                .Where(user => user.PermissionTemplateId == templateId)
+                .Select(user => user.Id)
+                .ToArrayAsync(cancellationToken);
         }
 
         private static PermissionTemplateRecord ToRecord(PermissionTemplate template) =>

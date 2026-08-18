@@ -1,5 +1,4 @@
 using ExportDocManager.Models;
-using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
@@ -40,12 +39,10 @@ namespace ExportDocManager.Api.Hosting
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
 
-            endpoints.MapPost("/api/backup", async (
+            endpoints.MapPost("/api/backup", (
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
-                IBackupService backupService,
-                IAppPathProvider pathProvider,
-                ApiDesktopAccessOptions desktopAccessOptions) =>
+                ApiBackgroundJobRunner jobRunner) =>
             {
                 var user = ApiEndpointAuth.GetRequiredUser(context);
 
@@ -54,27 +51,13 @@ namespace ExportDocManager.Api.Hosting
                     return WriteForbidden("只有管理员可以创建数据库备份。");
                 }
 
-                var backupResult = await backupService.BackupDatabaseAsync(context.RequestAborted);
-                var list = CreateBackupListResponse(
-                    backupService,
-                    pathProvider,
-                    ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions));
-                var response = new ApiBackupCreateResponse(
-                    backupResult.Success,
-                    backupResult.Message,
-                    list.Backups,
-                    list.BackupRoot,
-                    list.StoragePolicy);
-                return backupResult.Success || backupResult.Skipped
-                    ? Results.Ok(response)
-                    : WriteInfrastructureFailure(
-                        "数据库备份服务暂时不可用，请稍后重试。",
-                        new InvalidOperationException(backupResult.Message));
+                return AcceptedBackgroundJob(EnqueueDatabaseBackupJob(jobRunner, user.Username));
             })
             .WithName("CreateDatabaseBackup")
-            .Produces<ApiBackupCreateResponse>(StatusCodes.Status200OK)
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status401Unauthorized)
-            .Produces(StatusCodes.Status403Forbidden);
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status429TooManyRequests);
 
             endpoints.MapPost("/api/backup/cleanup", (
                 HttpContext context,
@@ -119,10 +102,11 @@ namespace ExportDocManager.Api.Hosting
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
 
-            endpoints.MapPost("/api/backup/restore", async (
+            endpoints.MapPost("/api/backup/restore", (
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
                 IBackupService backupService,
+                ApiBackgroundJobRunner jobRunner,
                 ApiBackupRestoreRequest request) =>
             {
                 var user = ApiEndpointAuth.GetRequiredUser(context);
@@ -147,26 +131,17 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse(errorMessage));
                 }
 
-                try
-                {
-                    var result = await backupService
-                        .ScheduleRestoreAsync(backupPath, context.RequestAborted)
-                        .ConfigureAwait(false);
-                    return Results.Ok(new ApiCommandResponse(result.Success, result.Message));
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
+                return AcceptedBackgroundJob(EnqueueDatabaseRestoreJob(
+                    jobRunner,
+                    user.Username,
+                    backupPath));
             })
             .WithName("RestoreDatabaseBackup")
-            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status404NotFound)
-            .Produces(StatusCodes.Status409Conflict)
-            .Produces(StatusCodes.Status503ServiceUnavailable);
+            .Produces(StatusCodes.Status429TooManyRequests);
 
             endpoints.MapGet("/api/backup/disaster-recovery/status", (
                 HttpContext context,
@@ -197,11 +172,11 @@ namespace ExportDocManager.Api.Hosting
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
 
-            endpoints.MapPost("/api/backup/disaster-recovery/create", async (
+            endpoints.MapPost("/api/backup/disaster-recovery/create", (
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
-                ISingleWindowDisasterRecoveryService recoveryService,
+                ApiBackgroundJobRunner jobRunner,
                 ApiDisasterRecoveryCreateRequest request) =>
             {
                 var user = ApiEndpointAuth.GetRequiredUser(context);
@@ -221,41 +196,23 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("恢复包密码不能为空。"));
                 }
 
-                try
-                {
-                    var result = await recoveryService
-                        .CreatePackageAsync(request.Password, context.RequestAborted)
-                        .ConfigureAwait(false);
-                    return Results.Ok(new ApiDisasterRecoveryPackageResponse(
-                        result.Success,
-                        result.Message,
-                        result.FileName,
-                        result.FilePath,
-                        result.SizeBytes,
-                        result.StoragePolicy));
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or
-                                           InvalidDataException or IOException or NotSupportedException)
-                {
-                    return WriteServiceException(ex);
-                }
+                return AcceptedBackgroundJob(EnqueueDisasterRecoveryPackageJob(
+                    jobRunner,
+                    user.Username,
+                    request.Password));
             })
             .WithName("CreateDisasterRecoveryPackage")
-            .Produces<ApiDisasterRecoveryPackageResponse>(StatusCodes.Status200OK)
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status503ServiceUnavailable);
+            .Produces(StatusCodes.Status429TooManyRequests);
 
-            endpoints.MapPost("/api/backup/disaster-recovery/restore", async (
+            endpoints.MapPost("/api/backup/disaster-recovery/restore", (
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
-                ISingleWindowDisasterRecoveryService recoveryService,
+                ApiBackgroundJobRunner jobRunner,
                 ApiDisasterRecoveryRestoreRequest request) =>
             {
                 var user = ApiEndpointAuth.GetRequiredUser(context);
@@ -282,41 +239,18 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("安排灾难恢复前需要输入确认文本 RECOVER。"));
                 }
 
-                try
-                {
-                    var result = await recoveryService
-                        .ScheduleRestoreAsync(
-                            request.PackagePath,
-                            request.Password,
-                            context.RequestAborted)
-                        .ConfigureAwait(false);
-                    return Results.Ok(new ApiDisasterRecoveryRestoreResponse(
-                        result.Success,
-                        result.RestartRequired,
-                        result.Message,
-                        result.PackageFileName,
-                        result.SafetyBackupRoot,
-                        result.StoragePolicy));
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or
-                                           InvalidDataException or IOException or NotSupportedException or
-                                           UnauthorizedAccessException)
-                {
-                    return WriteServiceException(ex);
-                }
+                return AcceptedBackgroundJob(EnqueueDisasterRecoveryRestoreJob(
+                    jobRunner,
+                    user.Username,
+                    request.PackagePath,
+                    request.Password));
             })
             .WithName("RestoreDisasterRecoveryPackage")
-            .Produces<ApiDisasterRecoveryRestoreResponse>(StatusCodes.Status200OK)
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status404NotFound)
-            .Produces(StatusCodes.Status409Conflict)
-            .Produces(StatusCodes.Status503ServiceUnavailable);
+            .Produces(StatusCodes.Status429TooManyRequests);
 
             endpoints.MapGet("/api/backup/cloud/status", async (
                 HttpContext context,
@@ -333,8 +267,8 @@ namespace ExportDocManager.Api.Hosting
                     return WriteForbidden("只有管理员可以查看 WebDAV 云备份状态。");
                 }
 
-                await settingsService.LoadAsync();
-                var webDav = settingsService.Settings?.WebDav ?? new WebDavSettings();
+                await settingsService.LoadAsync(context.RequestAborted);
+                var webDav = settingsService.Settings.WebDav;
                 var latestBackup = GetLatestBackupFile(backupService);
                 return Results.Ok(new ApiCloudBackupStatusResponse(
                     webDav.Enabled,
@@ -367,8 +301,8 @@ namespace ExportDocManager.Api.Hosting
                     return WriteForbidden("只有管理员可以测试 WebDAV 云备份连接。");
                 }
 
-                await settingsService.LoadAsync();
-                var webDav = settingsService.Settings?.WebDav ?? new WebDavSettings();
+                await settingsService.LoadAsync(cancellationToken);
+                var webDav = settingsService.Settings.WebDav;
                 if (!IsWebDavConfigured(webDav))
                 {
                     return WriteValidation("WebDAV 尚未配置，请先保存服务器地址和用户名。");
@@ -403,10 +337,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
                 IBackupService backupService,
-                ICloudSyncService cloudSyncService,
-                IAppPathProvider pathProvider,
-                ApiDesktopAccessOptions desktopAccessOptions,
-                CancellationToken cancellationToken) =>
+                ApiBackgroundJobRunner jobRunner) =>
             {
                 var user = ApiEndpointAuth.GetRequiredUser(context);
 
@@ -415,8 +346,8 @@ namespace ExportDocManager.Api.Hosting
                     return WriteForbidden("只有管理员可以上传数据库备份到 WebDAV。");
                 }
 
-                await settingsService.LoadAsync();
-                var webDav = settingsService.Settings?.WebDav ?? new WebDavSettings();
+                await settingsService.LoadAsync(context.RequestAborted);
+                var webDav = settingsService.Settings.WebDav;
                 if (!webDav.Enabled)
                 {
                     return WriteValidation("WebDAV 云备份未启用，请先保存启用状态。");
@@ -433,38 +364,15 @@ namespace ExportDocManager.Api.Hosting
                     return WriteNotFound("当前没有可上传的数据库备份，请先创建本地备份。");
                 }
 
-                try
-                {
-                    await cloudSyncService.UploadFileAsync(latestBackup.FullName, latestBackup.Name, cancellationToken);
-                    return Results.Ok(new ApiCloudBackupCommandResponse(
-                        true,
-                        $"已上传最新数据库备份：{latestBackup.Name}",
-                        latestBackup.Name,
-                        ApiResponsePathPolicy.Reveal(
-                            latestBackup.FullName,
-                            ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
-                        latestBackup.Length,
-                        ApiResponsePathPolicy.Reveal(
-                            pathProvider.BackupRoot,
-                            ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
-                        CloudBackupStoragePolicy));
-                }
-                catch (Exception ex) when (
-                    ex is InvalidOperationException ||
-                    ex is ArgumentException ||
-                    ex is IOException ||
-                    ex is HttpRequestException)
-                {
-                    return WriteInfrastructureFailure("WebDAV 云备份上传服务暂时不可用，请稍后重试。", ex);
-                }
+                return AcceptedBackgroundJob(EnqueueCloudBackupUploadJob(jobRunner, user.Username));
             })
             .WithName("UploadLatestDatabaseBackupToCloud")
-            .Produces<ApiCloudBackupCommandResponse>(StatusCodes.Status200OK)
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound)
-            .Produces(StatusCodes.Status503ServiceUnavailable);
+            .Produces(StatusCodes.Status429TooManyRequests);
 
             endpoints.MapGet("/api/backup/cloud/backups", async (
                 HttpContext context,
@@ -483,8 +391,8 @@ namespace ExportDocManager.Api.Hosting
                     return WriteForbidden("只有管理员可以查看 WebDAV 云备份列表。");
                 }
 
-                await settingsService.LoadAsync();
-                var webDav = settingsService.Settings?.WebDav ?? new WebDavSettings();
+                await settingsService.LoadAsync(cancellationToken);
+                var webDav = settingsService.Settings.WebDav;
                 if (!webDav.Enabled)
                 {
                     return WriteValidation("WebDAV 云备份未启用，请先保存启用状态。");
@@ -526,12 +434,8 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
                 ISettingsService settingsService,
-                ICloudSyncService cloudSyncService,
-                IBackupService backupService,
-                IAppPathProvider pathProvider,
-                ApiDesktopAccessOptions desktopAccessOptions,
                 ApiCloudBackupDownloadRequest request,
-                CancellationToken cancellationToken) =>
+                ApiBackgroundJobRunner jobRunner) =>
             {
                 var user = ApiEndpointAuth.GetRequiredUser(context);
 
@@ -550,8 +454,8 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse(fileNameError));
                 }
 
-                await settingsService.LoadAsync();
-                var webDav = settingsService.Settings?.WebDav ?? new WebDavSettings();
+                await settingsService.LoadAsync(context.RequestAborted);
+                var webDav = settingsService.Settings.WebDav;
                 if (!webDav.Enabled)
                 {
                     return WriteValidation("WebDAV 云备份未启用，请先保存启用状态。");
@@ -562,71 +466,17 @@ namespace ExportDocManager.Api.Hosting
                     return WriteValidation("WebDAV 尚未配置，请先保存服务器地址和用户名。");
                 }
 
-                try
-                {
-                    var remoteBackups = await cloudSyncService.ListBackupFilesAsync(cancellationToken);
-                    var selectedBackup = remoteBackups.FirstOrDefault(backup =>
-                        string.Equals(backup.FileName, remoteFileName, StringComparison.Ordinal));
-                    if (selectedBackup == null)
-                    {
-                        return Results.BadRequest(new ApiErrorResponse("只能下载当前 WebDAV 云备份列表中的 ZIP 文件。"));
-                    }
-
-                    if (selectedBackup.SizeBytes > WebDavCloudSyncService.MaximumDownloadBytes)
-                    {
-                        return Results.BadRequest(new ApiErrorResponse("所选 WebDAV 备份超过 4 GiB 下载上限。"));
-                    }
-
-                    string stagingRoot = Path.Combine(pathProvider.BackupRoot, ".cloud-downloads");
-                    Directory.CreateDirectory(stagingRoot);
-                    RuntimeFilePermissionHelper.RestrictDirectory(stagingRoot);
-                    string stagedPath = Path.Combine(stagingRoot, $"{Guid.NewGuid():N}.zip");
-                    DatabaseBackupImportResult imported;
-                    try
-                    {
-                        await cloudSyncService.DownloadFileAsync(remoteFileName, stagedPath, cancellationToken);
-                        imported = await backupService.ImportBackupAsync(
-                            stagedPath,
-                            remoteFileName,
-                            cancellationToken);
-                    }
-                    finally
-                    {
-                        AtomicFileHelper.TryDeleteFile(stagedPath);
-                    }
-
-                    var downloadedFile = new FileInfo(imported.FilePath);
-                    return Results.Ok(new ApiCloudBackupCommandResponse(
-                        true,
-                        $"已下载并验证 WebDAV 云备份：{downloadedFile.Name}",
-                        remoteFileName,
-                        ApiResponsePathPolicy.Reveal(
-                            downloadedFile.FullName,
-                            ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
-                        imported.SizeBytes,
-                        ApiResponsePathPolicy.Reveal(
-                            pathProvider.BackupRoot,
-                            ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)),
-                        CloudBackupStoragePolicy));
-                }
-                catch (Exception ex) when (
-                    ex is ServiceException ||
-                    ex is InvalidOperationException ||
-                    ex is ArgumentException ||
-                    ex is IOException ||
-                    ex is UnauthorizedAccessException ||
-                    ex is HttpRequestException ||
-                    ex is System.Xml.XmlException)
-                {
-                    return WriteInfrastructureFailure("WebDAV 云备份下载服务暂时不可用，请稍后重试。", ex);
-                }
+                return AcceptedBackgroundJob(EnqueueCloudBackupDownloadJob(
+                    jobRunner,
+                    user.Username,
+                    remoteFileName));
             })
             .WithName("DownloadCloudDatabaseBackup")
-            .Produces<ApiCloudBackupCommandResponse>(StatusCodes.Status200OK)
+            .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status503ServiceUnavailable);
+            .Produces(StatusCodes.Status429TooManyRequests);
         }
 
         private static ApiBackupListResponse CreateBackupListResponse(

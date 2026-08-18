@@ -17,6 +17,8 @@ use crate::runtime_sidecar_path::resolve_sidecar_path;
 #[cfg(test)]
 use crate::runtime_data_root_migration::pending_data_root_migration_path;
 #[cfg(test)]
+use crate::runtime_data_root_network::{is_network_file_system_magic, is_network_file_system_name};
+#[cfg(test)]
 use crate::runtime_data_root_storage::validate_distinct_migration_roots;
 #[cfg(test)]
 use crate::runtime_paths_config::*;
@@ -31,6 +33,7 @@ use crate::runtime_sidecar_path::sidecar_file_name;
 use std::fs;
 
 const RUNTIME_CONFIG_ROOT_ENVIRONMENT_VARIABLE: &str = "EXPORTDOCMANAGER_RUNTIME_CONFIG_ROOT";
+pub(crate) const RUNTIME_DATA_ROOT_DIRECTORY_NAME: &str = "ExportDocManager_Data";
 pub(crate) const RUNTIME_DATA_DIRECTORIES: [&str; 11] = [
     "Database",
     "Templates",
@@ -172,7 +175,7 @@ fn resolve_data_root(
 
     let suggested_data_root = app_root.join("App_Data");
     let selected = prompt_for_runtime_data_root(
-        "首次启用需要选择业务数据目录。建议选择非系统盘；只有单一磁盘时也可选择该磁盘上的专用目录。",
+        "首次启用需要选择业务数据保存位置。建议选择非系统盘；程序会在所选位置下创建专用目录。",
         &suggested_data_root,
     )?;
     let selected = crate::runtime_data_root_storage::canonical_runtime_data_root(&selected, true)?;
@@ -199,15 +202,15 @@ fn prompt_for_runtime_data_root(
 ) -> Result<PathBuf, Box<dyn Error>> {
     rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Warning)
-        .set_title("选择程序数据目录")
+        .set_title("选择业务数据保存位置")
         .set_description(format!(
-            "{reason}\n\n数据库、缓存、单一窗口业务数据和运行期可写数据会放到该目录。不会静默改写到 AppData 或 ProgramData。"
+            "{reason}\n\n数据库、缓存、单一窗口业务数据和运行期可写数据会统一放到 {RUNTIME_DATA_ROOT_DIRECTORY_NAME} 子目录。不会静默改写到 AppData 或 ProgramData。"
         ))
         .set_buttons(rfd::MessageButtons::Ok)
         .show();
 
-    let selected = rfd::FileDialog::new()
-        .set_title("选择程序数据目录")
+    let selected_parent = rfd::FileDialog::new()
+        .set_title("选择业务数据保存位置（程序会创建专用子目录）")
         .pick_folder()
         .ok_or_else(|| {
             format!(
@@ -215,8 +218,13 @@ fn prompt_for_runtime_data_root(
                 default_data_root.display()
             )
         })?;
+    let selected = runtime_data_root_under(&selected_parent);
     ensure_runtime_data_root_is_usable(&selected)?;
     Ok(selected)
+}
+
+pub(crate) fn runtime_data_root_under(parent: &Path) -> PathBuf {
+    parent.join(RUNTIME_DATA_ROOT_DIRECTORY_NAME)
 }
 
 pub(crate) fn ensure_runtime_data_directories(data_root: &Path) -> Result<(), Box<dyn Error>> {

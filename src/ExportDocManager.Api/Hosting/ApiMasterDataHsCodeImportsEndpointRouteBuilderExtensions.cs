@@ -2,6 +2,7 @@ using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
@@ -18,6 +19,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IHsCodeService hsCodeService,
                 IAppPathProvider pathProvider,
+                IBusinessClock clock,
                 ApiHsCodeImportPreviewPathRequest request,
                 CancellationToken cancellationToken) =>
             {
@@ -36,7 +38,7 @@ namespace ExportDocManager.Api.Hosting
                         request.SourceName,
                         request.EffectiveYear,
                         cancellationToken);
-                    return Results.Ok(await StoreHsCodeImportPreviewAsync(pathProvider, preview, cancellationToken));
+                    return Results.Ok(await StoreHsCodeImportPreviewAsync(pathProvider, preview, clock, cancellationToken));
                 }
                 catch (PayloadLimitExceededException ex)
                 {
@@ -59,6 +61,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IHsCodeService hsCodeService,
                 IAppPathProvider pathProvider,
+                IBusinessClock clock,
                 string? fileName,
                 string? mode,
                 string? sourceName,
@@ -85,7 +88,7 @@ namespace ExportDocManager.Api.Hosting
                         sourceName ?? string.Empty,
                         effectiveYear,
                         cancellationToken);
-                    return Results.Ok(await StoreHsCodeImportPreviewAsync(pathProvider, preview, cancellationToken));
+                    return Results.Ok(await StoreHsCodeImportPreviewAsync(pathProvider, preview, clock, cancellationToken));
                 }
                 catch (PayloadLimitExceededException ex)
                 {

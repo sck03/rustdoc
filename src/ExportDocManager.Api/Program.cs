@@ -12,6 +12,7 @@ var runtimeOptions = ApiRuntimeOptions.Parse(args);
 var pathProvider = string.IsNullOrWhiteSpace(runtimeOptions.DataRoot)
     ? new RuntimeAppPathProvider(runtimeOptions.AppRoot)
     : new RuntimeAppPathProvider(runtimeOptions.AppRoot, runtimeOptions.DataRoot);
+var startupTimeProvider = TimeProvider.System;
 
 // Validate the complete existing path chain before any runtime directory,
 // recovery marker, cache file or database setting can be created.
@@ -22,8 +23,8 @@ ApiStartupValidator.PrepareRuntimeDirectories(pathProvider);
 string aspNetTempRoot = Path.Combine(pathProvider.CacheRoot, "AspNetTemp");
 Directory.CreateDirectory(aspNetTempRoot);
 Environment.SetEnvironmentVariable("ASPNETCORE_TEMP", aspNetTempRoot);
-await ServerMigrationRecoveryStateMachine.ApplyAsync(pathProvider);
-SingleWindowDisasterRecoveryManager.ApplyPendingRestore(pathProvider);
+await ServerMigrationRecoveryStateMachine.ApplyAsync(pathProvider, startupTimeProvider);
+SingleWindowDisasterRecoveryManager.ApplyPendingRestore(pathProvider, startupTimeProvider);
 var databaseSettings = DbHelper.LoadDatabaseSettings(pathProvider);
 ApiStartupValidator.Validate(pathProvider, databaseSettings, runtimeOptions);
 

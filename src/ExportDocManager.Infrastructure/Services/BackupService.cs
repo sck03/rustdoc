@@ -221,7 +221,7 @@ namespace ExportDocManager.Services.Infrastructure
 
             try
             {
-                var cutoffDate = DateTimeOffset.UtcNow.AddDays(-daysToKeep);
+                var cutoffDate = _clock.UtcNow.AddDays(-daysToKeep);
 
                 foreach (var file in GetCandidateBackupFiles())
                 {
@@ -310,7 +310,7 @@ namespace ExportDocManager.Services.Infrastructure
                     SourceBackupFileName = Path.GetFileName(backupFilePath),
                     SafetyBackupFilePath = safetyBackupPath,
                     StagedSha256 = await ComputeSha256Async(stagedRestorePath, cancellationToken).ConfigureAwait(false),
-                    CreatedAt = DateTimeOffset.UtcNow
+                    CreatedAt = _clock.UtcNow
                 };
                 await AtomicFileHelper.WriteAllTextAtomicAsync(
                     markerPath,
@@ -364,7 +364,7 @@ namespace ExportDocManager.Services.Infrastructure
                     cancellationToken).ConfigureAwait(false);
                 if (!File.Exists(backupPath) || new FileInfo(backupPath).Length == 0)
                 {
-                    throw new IOException("备份压缩包未成功写入。" );
+                    throw new IOException("备份压缩包未成功写入。");
                 }
 
                 return backupPath;
@@ -426,7 +426,7 @@ namespace ExportDocManager.Services.Infrastructure
                         var entry = entries[0];
                         if (entry.Length <= 0 || entry.Length > 4L * 1024L * 1024L * 1024L)
                         {
-                            throw new InvalidDataException("备份数据库文件大小无效。" );
+                            throw new InvalidDataException("备份数据库文件大小无效。");
                         }
 
                         await using var entryStream = entry.Open();
@@ -513,7 +513,7 @@ namespace ExportDocManager.Services.Infrastructure
                 .ConfigureAwait(false);
             if (!string.Equals(result, "ok", StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidDataException($"SQLite 一致性检查失败：{result}" );
+                throw new InvalidDataException($"SQLite 一致性检查失败：{result}");
             }
         }
 

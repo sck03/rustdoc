@@ -15,8 +15,8 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(30)] public string Status { get; set; } = "潜在客户";
         [MaxLength(50)] public string Source { get; set; } = string.Empty;
         [MaxLength(1000)] public string Notes { get; set; } = string.Empty;
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
         [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
     }
 
@@ -30,8 +30,8 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(100)] public string Phone { get; set; } = string.Empty;
         [MaxLength(100)] public string InstantMessaging { get; set; } = string.Empty;
         public bool IsPrimary { get; set; }
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
         [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
     }
 
@@ -46,11 +46,11 @@ namespace ExportDocManager.Models.Entities
         [Required, MaxLength(30)] public string Type { get; set; } = "其他";
         [Required, MaxLength(500)] public string Summary { get; set; } = string.Empty;
         [MaxLength(300)] public string NextAction { get; set; } = string.Empty;
-        public DateTimeOffset FollowedUpAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset FollowedUpAt { get; set; }
         public DateTimeOffset? NextFollowUpAt { get; set; }
         public bool IsCompleted { get; set; }
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
         [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
     }
 }

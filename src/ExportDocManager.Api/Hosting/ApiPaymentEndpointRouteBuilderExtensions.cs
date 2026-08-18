@@ -13,7 +13,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/payments", async Task<Results<
                 Ok<ApiPagedResponse<ApiPaymentDto>>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPaymentReadRepository paymentReadRepository,
@@ -40,7 +40,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiPaymentDto>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPaymentDetailReadRepository paymentDetailReadRepository,
@@ -63,7 +63,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/payments", async Task<Results<
                 Created<ApiPaymentSaveResponse>,
                 BadRequest<ApiErrorResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPaymentService paymentService,
@@ -105,7 +105,7 @@ namespace ExportDocManager.Api.Hosting
                 BadRequest<ApiErrorResponse>,
                 Conflict<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPaymentService paymentService,
@@ -159,7 +159,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiCommandResponse>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IPaymentService paymentService,

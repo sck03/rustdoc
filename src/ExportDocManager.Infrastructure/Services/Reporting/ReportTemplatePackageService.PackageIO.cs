@@ -184,7 +184,7 @@ namespace ExportDocManager.Services.Reporting
             public string PackageVersion { get; set; } = string.Empty;
 
             [JsonRequired]
-            public DateTimeOffset ExportedAt { get; set; } = DateTimeOffset.UtcNow;
+            public DateTimeOffset ExportedAt { get; set; }
 
             [JsonRequired]
             public List<TemplateRowManifest> Templates { get; set; } = new();

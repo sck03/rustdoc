@@ -99,7 +99,7 @@ jobs:
           "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file tools/excel-analyzer-rs/Cargo.lock
 
       - name: Generate SPDX, CycloneDX and third-party inventory
-        run: node scripts/generate-dependency-governance.mjs artifacts/dependency-governance
+        run: node scripts/generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository
 
       - name: Upload dependency governance evidence
         if: ${{ always() }}

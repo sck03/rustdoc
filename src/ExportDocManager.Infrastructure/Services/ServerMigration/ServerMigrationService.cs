@@ -38,6 +38,7 @@ public sealed class ServerMigrationService : IServerMigrationService
         _packageGenerator = new ServerMigrationPackageGenerator(
             pathProvider,
             databaseMaintenance ?? throw new ArgumentNullException(nameof(databaseMaintenance)),
+            _clock,
             Path.Combine(pathProvider.BackupRoot, ServerMigrationLayout.PackageDirectoryName));
     }
 
@@ -119,7 +120,8 @@ public sealed class ServerMigrationService : IServerMigrationService
                 requestContext,
                 packageId,
                 null,
-                "开始创建服务器迁移包。");
+                "开始创建服务器迁移包。",
+                _clock.UtcNow);
             try
             {
                 ServerMigrationPackageResult result = await _packageGenerator
@@ -131,7 +133,8 @@ public sealed class ServerMigrationService : IServerMigrationService
                     requestContext,
                     packageId,
                     true,
-                    "服务器迁移包创建成功。");
+                    "服务器迁移包创建成功。",
+                    _clock.UtcNow);
                 return result;
             }
             catch (Exception ex)
@@ -143,7 +146,8 @@ public sealed class ServerMigrationService : IServerMigrationService
                     requestContext,
                     packageId,
                     false,
-                    ex.Message);
+                    ex.Message,
+                    _clock.UtcNow);
                 throw;
             }
         }
@@ -250,15 +254,15 @@ public sealed class ServerMigrationService : IServerMigrationService
                 SchemaVersion = ServerMigrationLayout.SchemaVersion,
                 PackageId = manifest.PackageId,
                 PackageFileName = fileName,
-                ScheduledAtUtc = DateTimeOffset.UtcNow,
-                UpdatedAtUtc = DateTimeOffset.UtcNow,
+                ScheduledAtUtc = _clock.UtcNow,
+                UpdatedAtUtc = _clock.UtcNow,
                 StagingDirectoryName = stagingDirectoryName,
                 Phase = ServerMigrationRestorePhase.Pending,
                 RequestedBy = requestContext.RequestedBy?.Trim() ?? string.Empty,
                 RemoteAddress = requestContext.RemoteAddress?.Trim() ?? string.Empty,
                 Manifest = manifest
             });
-            TryWriteSecurityAudit(_pathProvider, "stage-full-restore", requestContext, manifest.PackageId, true, "服务器迁移恢复已排队。");
+            TryWriteSecurityAudit(_pathProvider, "stage-full-restore", requestContext, manifest.PackageId, true, "服务器迁移恢复已排队。", _clock.UtcNow);
             return new ServerMigrationRestoreResult(true, true, "服务器迁移已安全排队。请重启 API 服务；恢复会在建立数据库连接前执行。", fileName, ServerMigrationManager.GetSafetyBackupRoot(_pathProvider, manifest.PackageId), ServerMigrationLayout.StoragePolicy);
         }
         catch (Exception ex)
@@ -267,7 +271,7 @@ public sealed class ServerMigrationService : IServerMigrationService
             {
                 AtomicFileHelper.TryDeleteDirectory(Path.Combine(ServerMigrationManager.GetControlRoot(_pathProvider), stagingDirectoryName));
             }
-            TryWriteSecurityAudit(_pathProvider, "stage-full-restore", requestContext, packageId, false, ex.Message);
+            TryWriteSecurityAudit(_pathProvider, "stage-full-restore", requestContext, packageId, false, ex.Message, _clock.UtcNow);
             throw;
         }
         finally
@@ -340,7 +344,7 @@ public sealed class ServerMigrationService : IServerMigrationService
             {
                 SchemaVersion = ServerMigrationLayout.SchemaVersion,
                 PackageId = packageId,
-                CreatedAtUtc = DateTimeOffset.UtcNow,
+                CreatedAtUtc = _clock.UtcNow,
                 SourceDataRoot = _pathProvider.DataRoot,
                 SourcePlatform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "linux",
                 SourcePathCaseSensitive = !OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS(),
@@ -360,21 +364,21 @@ public sealed class ServerMigrationService : IServerMigrationService
                 SchemaVersion = ServerMigrationLayout.SchemaVersion,
                 PackageId = packageId,
                 PackageFileName = fileName,
-                ScheduledAtUtc = DateTimeOffset.UtcNow,
-                UpdatedAtUtc = DateTimeOffset.UtcNow,
+                ScheduledAtUtc = _clock.UtcNow,
+                UpdatedAtUtc = _clock.UtcNow,
                 StagingDirectoryName = stagingDirectoryName,
                 Phase = ServerMigrationRestorePhase.Pending,
                 RequestedBy = requestContext.RequestedBy?.Trim() ?? string.Empty,
                 RemoteAddress = requestContext.RemoteAddress?.Trim() ?? string.Empty,
                 Manifest = manifest
             });
-            TryWriteSecurityAudit(_pathProvider, "stage-database-restore", requestContext, packageId, true, "PostgreSQL 数据库恢复已排队。");
+            TryWriteSecurityAudit(_pathProvider, "stage-database-restore", requestContext, packageId, true, "PostgreSQL 数据库恢复已排队。", _clock.UtcNow);
             return new ServerMigrationRestoreResult(true, true, "PostgreSQL 数据库恢复已排队。请重启 API 服务；恢复会在建立数据库连接前执行。", fileName, ServerMigrationManager.GetSafetyBackupRoot(_pathProvider, packageId), ServerMigrationLayout.StoragePolicy);
         }
         catch (Exception ex)
         {
             if (!string.IsNullOrWhiteSpace(stagingDirectoryName)) AtomicFileHelper.TryDeleteDirectory(Path.Combine(ServerMigrationManager.GetControlRoot(_pathProvider), stagingDirectoryName));
-            TryWriteSecurityAudit(_pathProvider, "stage-database-restore", requestContext, packageId, false, ex.Message);
+            TryWriteSecurityAudit(_pathProvider, "stage-database-restore", requestContext, packageId, false, ex.Message, _clock.UtcNow);
             throw;
         }
         finally
@@ -445,7 +449,8 @@ public sealed class ServerMigrationService : IServerMigrationService
         ServerMigrationRequestContext requestContext,
         string packageId,
         bool? success,
-        string message)
+        string message,
+        DateTimeOffset timestampUtc)
     {
         try
         {
@@ -455,7 +460,8 @@ public sealed class ServerMigrationService : IServerMigrationService
                 requestContext,
                 packageId,
                 success,
-                message);
+                message,
+                timestampUtc);
         }
         catch
         {

@@ -13,7 +13,7 @@ namespace ExportDocManager.Api.Hosting
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
                 JsonHttpResult<ApiErrorResponse>,
-                NotFound>>(
+                NotFound>> (
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
                 IInvoiceDataMaintenanceService maintenanceService,
@@ -58,7 +58,7 @@ namespace ExportDocManager.Api.Hosting
                 UnauthorizedHttpResult,
                 JsonHttpResult<ApiErrorResponse>,
                 NotFound,
-                Conflict<ApiErrorResponse>>>(
+                Conflict<ApiErrorResponse>>> (
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
                 IInvoiceDataMaintenanceService maintenanceService,

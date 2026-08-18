@@ -43,10 +43,10 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(80)]
         public string LastSourceStyleNo { get; set; } = string.Empty;
 
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; }
 
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset UpdatedAt { get; set; }
 
-        public DateTimeOffset LastUsedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset LastUsedAt { get; set; }
     }
 }

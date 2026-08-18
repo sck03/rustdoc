@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 
 namespace ExportDocManager.Api.Hosting;
 
@@ -28,10 +29,12 @@ internal sealed class ApiSecurityAuditWriter
     private static readonly JsonSerializerOptions JsonOptions = JsonSerializerOptions.Web;
     private readonly Lock _writeGate = new();
     private readonly IAppPathProvider _pathProvider;
+    private readonly IBusinessClock _clock;
 
-    public ApiSecurityAuditWriter(IAppPathProvider pathProvider)
+    public ApiSecurityAuditWriter(IAppPathProvider pathProvider, IBusinessClock? clock = null)
     {
         _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+        _clock = clock ?? BusinessClock.CreateSystem();
     }
 
     public string AuditPath => Path.Combine(
@@ -130,15 +133,18 @@ internal sealed class ApiSecurityAuditMiddleware
     private readonly RequestDelegate _next;
     private readonly ApiSecurityAuditWriter _writer;
     private readonly ILogger<ApiSecurityAuditMiddleware> _logger;
+    private readonly IBusinessClock _clock;
 
     public ApiSecurityAuditMiddleware(
         RequestDelegate next,
         ApiSecurityAuditWriter writer,
-        ILogger<ApiSecurityAuditMiddleware> logger)
+        ILogger<ApiSecurityAuditMiddleware> logger,
+        IBusinessClock? clock = null)
     {
         _next = next ?? throw new ArgumentNullException(nameof(next));
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _clock = clock ?? BusinessClock.CreateSystem();
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -207,7 +213,7 @@ internal sealed class ApiSecurityAuditMiddleware
             ? routeEndpoint.RoutePattern.RawText ?? string.Empty
             : string.Empty;
         _writer.Write(new ApiSecurityAuditRecord(
-            DateTimeOffset.UtcNow,
+            _clock.UtcNow,
             metadata.Category,
             phase,
             context.Request.Method,

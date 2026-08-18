@@ -53,6 +53,9 @@ const options = {
   userDataDir: "/repo/.codex-runtime/browser-profile",
 };
 
+const detectedRuntimeArguments = buildChromeLaunchArguments(options);
+assert(detectedRuntimeArguments.includes("--remote-debugging-address=127.0.0.1"));
+
 const linuxCiArguments = buildChromeLaunchArguments(options, {
   platform: "linux",
   isCi: true,

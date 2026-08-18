@@ -58,11 +58,9 @@ namespace ExportDocManager.Api.Tests
             Assert.Empty(initialList.Backups);
 
             var createBackupResponse = await adminClient.PostAsync("/api/backup", content: null);
-            Assert.Equal(HttpStatusCode.OK, createBackupResponse.StatusCode);
-            var created = await ApiIntegrationTestHarness.ReadJsonAsync<ApiBackupCreateResponse>(createBackupResponse);
-
+            await WaitForAcceptedJobAsync(adminClient, createBackupResponse);
+            var created = await GetBackupsAsync(adminClient);
             var backup = Assert.Single(created.Backups);
-            Assert.True(created.Success);
             Assert.EndsWith(".zip", backup.FileName, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(string.Empty, backup.FullPath);
             string physicalBackupPath = Path.Combine(expectedBackupRoot, backup.FileName);
@@ -108,9 +106,8 @@ namespace ExportDocManager.Api.Tests
             using var adminClient = harness.CreateClient(adminLogin.AccessToken, desktopToken);
 
             HttpResponseMessage createResponse = await adminClient.PostAsync("/api/backup", content: null);
-            Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
-            ApiBackupCreateResponse created =
-                await ApiIntegrationTestHarness.ReadJsonAsync<ApiBackupCreateResponse>(createResponse);
+            await WaitForAcceptedJobAsync(adminClient, createResponse);
+            ApiBackupListResponse created = await GetBackupsAsync(adminClient);
             ApiBackupItemDto backup = Assert.Single(created.Backups);
 
             string expectedRoot = Path.Combine(harness.DataRoot, "Backups");
@@ -134,8 +131,8 @@ namespace ExportDocManager.Api.Tests
                 using var adminClient = harness.CreateClient(adminLogin.AccessToken);
 
                 var createBackupResponse = await adminClient.PostAsync("/api/backup", content: null);
-                Assert.Equal(HttpStatusCode.OK, createBackupResponse.StatusCode);
-                var created = await ApiIntegrationTestHarness.ReadJsonAsync<ApiBackupCreateResponse>(createBackupResponse);
+                await WaitForAcceptedJobAsync(adminClient, createBackupResponse);
+                var created = await GetBackupsAsync(adminClient);
                 var backup = Assert.Single(created.Backups);
                 string physicalBackupPath = Path.Combine(harness.DataRoot, "Backups", backup.FileName);
                 Assert.Equal(string.Empty, backup.FullPath);
@@ -162,10 +159,8 @@ namespace ExportDocManager.Api.Tests
                     backupFileName = backup.FileName,
                     confirmationText = "RESTORE"
                 });
-                Assert.Equal(HttpStatusCode.OK, restoreResponse.StatusCode);
-                var restoreResult = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCommandResponse>(restoreResponse);
-                Assert.True(restoreResult.Success);
-                Assert.Contains("重启", restoreResult.Message, StringComparison.Ordinal);
+                BackgroundJobSnapshot restoreResult = await WaitForAcceptedJobAsync(adminClient, restoreResponse);
+                Assert.Contains("重启", restoreResult.DetailText, StringComparison.Ordinal);
 
                 string appRoot = harness.AppRoot;
                 string dataRoot = harness.DataRoot;
@@ -267,7 +262,7 @@ namespace ExportDocManager.Api.Tests
             var createResponse = await trustedAdminClient.PostAsJsonAsync(
                 "/api/backup/disaster-recovery/create",
                 new { password = "strong-recovery-password" });
-            Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+            await WaitForAcceptedJobAsync(trustedAdminClient, createResponse);
             Assert.Equal(1, recoveryService.CreateCalls);
 
             var unconfirmedRestoreResponse = await trustedAdminClient.PostAsJsonAsync(
@@ -288,7 +283,7 @@ namespace ExportDocManager.Api.Tests
                     password = "strong-recovery-password",
                     confirmationText = "RECOVER"
                 });
-            Assert.Equal(HttpStatusCode.OK, restoreResponse.StatusCode);
+            await WaitForAcceptedJobAsync(trustedAdminClient, restoreResponse);
             Assert.Equal(1, recoveryService.RestoreCalls);
         }
 
@@ -346,8 +341,8 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, saveResponse.StatusCode);
 
             var createBackupResponse = await adminClient.PostAsync("/api/backup", content: null);
-            Assert.Equal(HttpStatusCode.OK, createBackupResponse.StatusCode);
-            var created = await ApiIntegrationTestHarness.ReadJsonAsync<ApiBackupCreateResponse>(createBackupResponse);
+            await WaitForAcceptedJobAsync(adminClient, createBackupResponse);
+            var created = await GetBackupsAsync(adminClient);
             var backup = Assert.Single(created.Backups);
             string physicalBackupPath = Path.Combine(harness.DataRoot, "Backups", backup.FileName);
             Assert.Equal(string.Empty, backup.FullPath);
@@ -368,13 +363,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("测试成功", testConnection.Message, StringComparison.Ordinal);
 
             var uploadResponse = await adminClient.PostAsync("/api/backup/cloud/upload-latest", content: null);
-            Assert.Equal(HttpStatusCode.OK, uploadResponse.StatusCode);
-            var uploaded = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCloudBackupCommandResponse>(uploadResponse);
-            Assert.True(uploaded.Success);
-            Assert.Equal(backup.FileName, uploaded.RemoteFileName);
-            Assert.Equal(string.Empty, uploaded.LocalBackupPath);
-            Assert.Equal(backup.SizeBytes, uploaded.SizeBytes);
-            Assert.Equal(string.Empty, uploaded.BackupRoot);
+            await WaitForAcceptedJobAsync(adminClient, uploadResponse);
 
             Assert.True(webDavServer.Uploads.TryGetValue(backup.FileName, out var remoteBytes));
             Assert.True(remoteBytes.Length > 0);
@@ -401,13 +390,7 @@ namespace ExportDocManager.Api.Tests
             {
                 remoteFileName = backup.FileName
             });
-            Assert.Equal(HttpStatusCode.OK, downloadResponse.StatusCode);
-            var downloaded = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCloudBackupCommandResponse>(downloadResponse);
-            Assert.True(downloaded.Success);
-            Assert.Equal(backup.FileName, downloaded.RemoteFileName);
-            Assert.Equal(backup.SizeBytes, downloaded.SizeBytes);
-            Assert.Equal(string.Empty, downloaded.LocalBackupPath);
-            Assert.Equal(string.Empty, downloaded.BackupRoot);
+            await WaitForAcceptedJobAsync(adminClient, downloadResponse);
             Assert.True(File.Exists(physicalBackupPath));
             Assert.Equal(remoteBytes, await File.ReadAllBytesAsync(physicalBackupPath));
 
@@ -420,6 +403,33 @@ namespace ExportDocManager.Api.Tests
             var response = await client.GetAsync("/api/backup");
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             return await ApiIntegrationTestHarness.ReadJsonAsync<ApiBackupListResponse>(response);
+        }
+
+        private static async Task<BackgroundJobSnapshot> WaitForAcceptedJobAsync(
+            HttpClient client,
+            HttpResponseMessage response)
+        {
+            Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+            BackgroundJobSnapshot accepted =
+                await ApiIntegrationTestHarness.ReadJsonAsync<BackgroundJobSnapshot>(response);
+            for (int attempt = 0; attempt < 300; attempt++)
+            {
+                HttpResponseMessage jobResponse = await client.GetAsync($"/api/jobs/{accepted.JobId}");
+                Assert.Equal(HttpStatusCode.OK, jobResponse.StatusCode);
+                BackgroundJobSnapshot job =
+                    await ApiIntegrationTestHarness.ReadJsonAsync<BackgroundJobSnapshot>(jobResponse);
+                if (BackgroundJobStatusCatalog.IsTerminal(job.Status))
+                {
+                    Assert.True(
+                        string.Equals(job.Status, BackgroundJobStatusCatalog.Succeeded, StringComparison.Ordinal),
+                        job.ErrorMessage);
+                    return job;
+                }
+
+                await Task.Delay(50);
+            }
+
+            throw new TimeoutException($"后台任务 {accepted.JobId} 未在测试时限内完成。");
         }
 
         private static async Task<ApiUserListResponse> GetUsersAsync(HttpClient client)

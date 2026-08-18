@@ -1,5 +1,6 @@
 using ExportDocManager.Models;
 using ExportDocManager.Models.DTOs;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Infrastructure
@@ -11,15 +12,18 @@ namespace ExportDocManager.Services.Infrastructure
         private readonly ISettingsService _settingsService;
         private readonly IAuditLogService _auditLogService;
         private readonly IAppPathProvider _pathProvider;
+        private readonly IBusinessClock _clock;
 
         public SystemLogCleanupService(
             ISettingsService settingsService,
             IAuditLogService auditLogService,
-            IAppPathProvider pathProvider)
+            IAppPathProvider pathProvider,
+            IBusinessClock? clock = null)
         {
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             _auditLogService = auditLogService ?? throw new ArgumentNullException(nameof(auditLogService));
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<SystemLogCleanupResult> CleanAsync(CancellationToken cancellationToken = default)
@@ -31,7 +35,7 @@ namespace ExportDocManager.Services.Infrastructure
             if (systemSettings.AuditLogRetentionDays > 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var cutoffUtc = DateTimeOffset.UtcNow.AddDays(-systemSettings.AuditLogRetentionDays);
+                var cutoffUtc = _clock.UtcNow.AddDays(-systemSettings.AuditLogRetentionDays);
                 deletedAuditLogs = await _auditLogService
                     .DeleteOlderThanAsync(cutoffUtc, AuditLogCleanupMaxCount, cancellationToken)
                     .ConfigureAwait(false);
@@ -43,7 +47,8 @@ namespace ExportDocManager.Services.Infrastructure
                 _pathProvider.LogRoot,
                 systemSettings.LogRetentionDays,
                 retainedFileCount,
-                systemSettings.LogFileSizeLimitMB);
+                systemSettings.LogFileSizeLimitMB,
+                _clock.UtcNow);
 
             return new SystemLogCleanupResult
             {

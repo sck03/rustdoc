@@ -15,9 +15,11 @@ public static partial class ServerMigrationRecoveryStateMachine
 {
     public static async Task ApplyAsync(
         IAppPathProvider pathProvider,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(pathProvider);
+        ArgumentNullException.ThrowIfNull(timeProvider);
         using FileStream migrationLock = ServerMigrationManager.AcquireExclusiveLock(pathProvider);
         string markerPath = ServerMigrationManager.GetPendingMarkerPath(pathProvider);
         if (!File.Exists(markerPath))
@@ -36,7 +38,7 @@ public static partial class ServerMigrationRecoveryStateMachine
         }
         catch (Exception ex)
         {
-            await MarkUnreadableMarkerFailedAsync(pathProvider, markerPath, ex)
+            await MarkUnreadableMarkerFailedAsync(pathProvider, markerPath, ex, timeProvider)
                 .ConfigureAwait(false);
             return;
         }
@@ -85,6 +87,7 @@ public static partial class ServerMigrationRecoveryStateMachine
                 markerPath,
                 marker,
                 requestContext,
+                timeProvider,
                 cancellationToken).ConfigureAwait(false);
             return;
         }
@@ -107,6 +110,7 @@ public static partial class ServerMigrationRecoveryStateMachine
                 markerPath,
                 marker,
                 ServerMigrationRestorePhase.Validating,
+                timeProvider.GetUtcNow(),
                 "正在验证迁移包、产品数据库身份和架构版本。");
             if (!Directory.Exists(stagingRoot))
             {
@@ -143,6 +147,7 @@ public static partial class ServerMigrationRecoveryStateMachine
                 markerPath,
                 marker,
                 ServerMigrationRestorePhase.SafetyBackup,
+                timeProvider.GetUtcNow(),
                 "正在创建数据库与运行文件安全备份。");
             long stagedManifestBytes = ServerMigrationManifestBudget.SumBytes(marker.Manifest);
             long stagedDatabaseBytes = new FileInfo(databaseDump).Length;
@@ -182,6 +187,7 @@ public static partial class ServerMigrationRecoveryStateMachine
                 markerPath,
                 marker,
                 ServerMigrationRestorePhase.ApplyingDatabase,
+                timeProvider.GetUtcNow(),
                 "正在事务性恢复 PostgreSQL 业务库。");
             await ServerMigrationDatabaseRestorer.RestoreAsync(
                 tools,
@@ -200,12 +206,13 @@ public static partial class ServerMigrationRecoveryStateMachine
                 markerPath,
                 marker,
                 ServerMigrationRestorePhase.ApplyingFiles,
+                timeProvider.GetUtcNow(),
                 "正在原子替换运行配置与业务文件。");
             ServerMigrationFileSwitcher.Apply(fileState);
             ServerMigrationFileSwitcher.CleanupPrepared(fileState);
 
             marker.Phase = ServerMigrationRestorePhase.Completed;
-            marker.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            marker.UpdatedAtUtc = timeProvider.GetUtcNow();
             marker.LastError = string.Empty;
             marker.ManualRecoveryRequired = false;
             ServerMigrationManager.WriteStatus(
@@ -226,6 +233,7 @@ public static partial class ServerMigrationRecoveryStateMachine
                 tools,
                 safetyRoot,
                 ex,
+                timeProvider,
                 cancellationToken).ConfigureAwait(false);
             if (!marker.ManualRecoveryRequired)
             {
@@ -237,7 +245,8 @@ public static partial class ServerMigrationRecoveryStateMachine
                 requestContext,
                 marker.PackageId,
                 success: false,
-                rollbackMessage);
+                rollbackMessage,
+                timeProvider.GetUtcNow());
             Console.Error.WriteLine($"Server migration restore failed: {rollbackMessage}");
             if (marker.ManualRecoveryRequired)
             {
@@ -257,7 +266,8 @@ public static partial class ServerMigrationRecoveryStateMachine
             requestContext,
             marker.PackageId,
             success: true,
-            "服务器迁移恢复完成。");
+            "服务器迁移恢复完成。",
+            timeProvider.GetUtcNow());
     }
 
     private static async Task RecoverInterruptedRestoreAsync(
@@ -265,6 +275,7 @@ public static partial class ServerMigrationRecoveryStateMachine
         string markerPath,
         PendingServerMigrationRestore marker,
         ServerMigrationRequestContext requestContext,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         string safetyRoot = ServerMigrationManager.GetSafetyBackupRoot(pathProvider, marker.PackageId);
@@ -301,6 +312,7 @@ public static partial class ServerMigrationRecoveryStateMachine
             tools,
             safetyRoot,
             interruption,
+            timeProvider,
             cancellationToken).ConfigureAwait(false);
         if (!marker.ManualRecoveryRequired)
         {
@@ -314,7 +326,8 @@ public static partial class ServerMigrationRecoveryStateMachine
             requestContext,
             marker.PackageId,
             success: false,
-            message);
+            message,
+            timeProvider.GetUtcNow());
         Console.Error.WriteLine($"Interrupted server migration recovered: {message}");
         if (marker.ManualRecoveryRequired)
         {
@@ -330,6 +343,7 @@ public static partial class ServerMigrationRecoveryStateMachine
         PostgreSqlToolPaths? tools,
         string safetyRoot,
         Exception originalError,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         string interruptedPhase = marker.Phase;
@@ -343,7 +357,7 @@ public static partial class ServerMigrationRecoveryStateMachine
             ServerMigrationRestorePhase.RollingBack or
             ServerMigrationRestorePhase.Completed;
         marker.Phase = ServerMigrationRestorePhase.RollingBack;
-        marker.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        marker.UpdatedAtUtc = timeProvider.GetUtcNow();
         marker.LastError = originalError.Message;
         ServerMigrationManager.WriteStatus(
             pathProvider,
@@ -404,7 +418,7 @@ public static partial class ServerMigrationRecoveryStateMachine
                 : $"{originalError.Message} 已清理未应用的迁移准备数据，服务将继续启动。"
             : $"{originalError.Message} 自动回滚未完全成功：{string.Join("；", rollbackErrors)} 请使用安全备份 {safetyRoot} 人工恢复。";
         marker.Phase = ServerMigrationRestorePhase.Failed;
-        marker.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        marker.UpdatedAtUtc = timeProvider.GetUtcNow();
         marker.LastError = result;
         marker.ManualRecoveryRequired = rollbackErrors.Count > 0;
         ServerMigrationManager.WriteStatus(pathProvider, marker, result, safetyRoot);
@@ -420,10 +434,11 @@ public static partial class ServerMigrationRecoveryStateMachine
         string markerPath,
         PendingServerMigrationRestore marker,
         string phase,
+        DateTimeOffset updatedAtUtc,
         string message)
     {
         marker.Phase = phase;
-        marker.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        marker.UpdatedAtUtc = updatedAtUtc;
         marker.LastError = string.Empty;
         ServerMigrationManager.WriteStatus(
             pathProvider,
@@ -435,20 +450,22 @@ public static partial class ServerMigrationRecoveryStateMachine
     private static async Task MarkUnreadableMarkerFailedAsync(
         IAppPathProvider pathProvider,
         string markerPath,
-        Exception error)
+        Exception error,
+        TimeProvider timeProvider)
     {
+        DateTimeOffset failedAtUtc = timeProvider.GetUtcNow();
         var marker = new PendingServerMigrationRestore
         {
             PackageId = Guid.NewGuid().ToString("N"),
             PackageFileName = Path.GetFileName(markerPath),
             Phase = ServerMigrationRestorePhase.Failed,
-            UpdatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = failedAtUtc,
             LastError = $"服务器迁移恢复标记无效：{error.Message}"
         };
         ServerMigrationManager.WriteStatus(pathProvider, marker, marker.LastError, string.Empty);
         string failedPath = Path.Combine(
             Path.GetDirectoryName(markerPath)!,
-            $"invalid-marker-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}.json");
+            $"invalid-marker-{failedAtUtc:yyyyMMddHHmmss}.json");
         try
         {
             File.Move(markerPath, failedPath, overwrite: false);
@@ -464,7 +481,8 @@ public static partial class ServerMigrationRecoveryStateMachine
             new ServerMigrationRequestContext(string.Empty, string.Empty),
             string.Empty,
             success: false,
-            marker.LastError);
+            marker.LastError,
+            failedAtUtc);
         await Task.CompletedTask;
     }
 
@@ -474,7 +492,8 @@ public static partial class ServerMigrationRecoveryStateMachine
         ServerMigrationRequestContext requestContext,
         string packageId,
         bool? success,
-        string message)
+        string message,
+        DateTimeOffset timestampUtc)
     {
         try
         {
@@ -484,7 +503,8 @@ public static partial class ServerMigrationRecoveryStateMachine
                 requestContext,
                 packageId,
                 success,
-                message);
+                message,
+                timestampUtc);
         }
         catch (Exception ex)
         {

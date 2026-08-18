@@ -11,12 +11,12 @@ namespace ExportDocManager.Services.Infrastructure
     /// Owns the current production database baseline. Pre-release databases without an explicit
     /// schema marker are intentionally rejected instead of being upgraded through compatibility SQL.
     /// </summary>
-    internal static class DatabaseSchemaBaseline
+    internal static partial class DatabaseSchemaBaseline
     {
         internal const int CurrentVersion = 8;
         internal const string MetadataTableName = "__ExportDocManagerSchema";
         internal const string PostgreSqlTrigramFeatureName = "postgresql.pg_trgm";
-        internal const int PostgreSqlTrigramFeatureVersion = 1;
+        internal const int PostgreSqlTrigramFeatureVersion = 2;
 
         public static async Task EnsureCurrentAsync(
             AppDbContext context,
@@ -225,6 +225,7 @@ namespace ExportDocManager.Services.Infrastructure
 
             if (!usesPostgreSql)
             {
+                await CreateSqliteSearchIndexesAsync(context, cancellationToken).ConfigureAwait(false);
                 return;
             }
 
@@ -264,115 +265,115 @@ namespace ExportDocManager.Services.Infrastructure
                     .ConfigureAwait(false);
                 await context.Database.ExecuteSqlRawAsync(
                     """
-                    CREATE INDEX IF NOT EXISTS "IX_HsCodes_TextSearch_Upper_Trgm"
+                    CREATE INDEX IF NOT EXISTS "IX_HsCodes_TextSearch_Trgm"
                         ON "HsCodes" USING gin (
-                            upper("Name") gin_trgm_ops,
-                            upper("Elements") gin_trgm_ops,
-                            upper("Description") gin_trgm_ops);
-                    CREATE INDEX IF NOT EXISTS "IX_HsCodeDeclarationExamples_TextSearch_Upper_Trgm"
+                            "Name" gin_trgm_ops,
+                            "Elements" gin_trgm_ops,
+                            "Description" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_HsCodeDeclarationExamples_TextSearch_Trgm"
                         ON "HsCodeDeclarationExamples" USING gin (
-                            upper("ProductName") gin_trgm_ops,
-                            upper("Specification") gin_trgm_ops,
-                            upper("SearchText") gin_trgm_ops);
-                    CREATE INDEX IF NOT EXISTS "IX_HsCodeRemoteCandidates_TextSearch_Upper_Trgm"
+                            "ProductName" gin_trgm_ops,
+                            "Specification" gin_trgm_ops,
+                            "SearchText" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_HsCodeRemoteCandidates_TextSearch_Trgm"
                         ON "HsCodeRemoteCandidates" USING gin (
-                            upper("ProductName") gin_trgm_ops,
-                            upper("Specification") gin_trgm_ops,
-                            upper("QueryText") gin_trgm_ops);
-                    CREATE INDEX IF NOT EXISTS "IX_Products_HistorySearch_Upper_Trgm"
+                            "ProductName" gin_trgm_ops,
+                            "Specification" gin_trgm_ops,
+                            "QueryText" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_Products_HistorySearch_Trgm"
                         ON "Products" USING gin (
-                            upper("ProductCode") gin_trgm_ops,
-                            upper("NameCN") gin_trgm_ops,
-                            upper("NameEN") gin_trgm_ops,
-                            upper("Material") gin_trgm_ops,
-                            upper("Brand") gin_trgm_ops);
-                    CREATE INDEX IF NOT EXISTS "IX_Items_HistorySearch_Upper_Trgm"
+                            "ProductCode" gin_trgm_ops,
+                            "NameCN" gin_trgm_ops,
+                            "NameEN" gin_trgm_ops,
+                            "Material" gin_trgm_ops,
+                            "Brand" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_Items_HistorySearch_Trgm"
                         ON "Items" USING gin (
-                            upper("StyleNo") gin_trgm_ops,
-                            upper("StyleNameCN") gin_trgm_ops,
-                            upper("StyleName") gin_trgm_ops,
-                            upper("FabricComposition") gin_trgm_ops,
-                            upper("Brand") gin_trgm_ops);
-                    CREATE INDEX IF NOT EXISTS "IX_CustomsCooItems_HistorySearch_Upper_Trgm"
+                            "StyleNo" gin_trgm_ops,
+                            "StyleNameCN" gin_trgm_ops,
+                            "StyleName" gin_trgm_ops,
+                            "FabricComposition" gin_trgm_ops,
+                            "Brand" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_CustomsCooItems_HistorySearch_Trgm"
                         ON "CustomsCooItems" USING gin (
-                            upper("SourceStyleNo") gin_trgm_ops,
-                            upper("GoodsName") gin_trgm_ops,
-                            upper("GoodsNameE") gin_trgm_ops,
-                            upper("GoodsDesc") gin_trgm_ops);
-                    CREATE INDEX IF NOT EXISTS "IX_Invoices_TextSearch_Upper_Trgm"
+                            "SourceStyleNo" gin_trgm_ops,
+                            "GoodsName" gin_trgm_ops,
+                            "GoodsNameE" gin_trgm_ops,
+                            "GoodsDesc" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_Invoices_TextSearch_Trgm"
                         ON "Invoices" USING gin (
-                            upper("InvoiceNo") gin_trgm_ops,
-                            upper("ContractNo") gin_trgm_ops,
-                            upper("CustomerNameEN") gin_trgm_ops,
-                            upper("NotifyPartyName") gin_trgm_ops,
-                            upper("ExporterNameEN") gin_trgm_ops,
-                            upper("ExporterNameCN") gin_trgm_ops,
-                            upper("PortOfLoading") gin_trgm_ops,
-                            upper("PortOfDestination") gin_trgm_ops,
-                            upper("DestinationCountry") gin_trgm_ops);
-                    CREATE INDEX IF NOT EXISTS "IX_Payments_TextSearch_Upper_Trgm"
+                            "InvoiceNo" gin_trgm_ops,
+                            "ContractNo" gin_trgm_ops,
+                            "CustomerNameEN" gin_trgm_ops,
+                            "NotifyPartyName" gin_trgm_ops,
+                            "ExporterNameEN" gin_trgm_ops,
+                            "ExporterNameCN" gin_trgm_ops,
+                            "PortOfLoading" gin_trgm_ops,
+                            "PortOfDestination" gin_trgm_ops,
+                            "DestinationCountry" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_Payments_TextSearch_Trgm"
                         ON "Payments" USING gin (
-                            upper("InvoiceNo") gin_trgm_ops,
-                            upper("PayerName") gin_trgm_ops,
-                            upper("Project") gin_trgm_ops,
-                            upper("Department") gin_trgm_ops,
-                            upper("PayeeName") gin_trgm_ops,
-                            upper("BankName") gin_trgm_ops,
-                            upper("AccountNo") gin_trgm_ops,
-                            upper("GoodsName") gin_trgm_ops,
-                            upper("ShipmentCountry") gin_trgm_ops);
-                    CREATE INDEX IF NOT EXISTS "IX_Customers_TextSearch_Upper_Trgm"
+                            "InvoiceNo" gin_trgm_ops,
+                            "PayerName" gin_trgm_ops,
+                            "Project" gin_trgm_ops,
+                            "Department" gin_trgm_ops,
+                            "PayeeName" gin_trgm_ops,
+                            "BankName" gin_trgm_ops,
+                            "AccountNo" gin_trgm_ops,
+                            "GoodsName" gin_trgm_ops,
+                            "ShipmentCountry" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_Customers_TextSearch_Trgm"
                         ON "Customers" USING gin (
-                            upper("CustomerNameEN") gin_trgm_ops,
-                            upper("NotifyPartyName") gin_trgm_ops,
-                            upper("ContactPerson") gin_trgm_ops,
-                            upper("Phone") gin_trgm_ops,
-                            upper("Email") gin_trgm_ops,
-                            upper("TaxId") gin_trgm_ops);
-                    CREATE INDEX IF NOT EXISTS "IX_Exporters_TextSearch_Upper_Trgm"
+                            "CustomerNameEN" gin_trgm_ops,
+                            "NotifyPartyName" gin_trgm_ops,
+                            "ContactPerson" gin_trgm_ops,
+                            "Phone" gin_trgm_ops,
+                            "Email" gin_trgm_ops,
+                            "TaxId" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_Exporters_TextSearch_Trgm"
                         ON "Exporters" USING gin (
-                            upper("ExporterNameEN") gin_trgm_ops,
-                            upper("ExporterNameCN") gin_trgm_ops,
-                            upper("ContactPerson") gin_trgm_ops,
-                            upper("CreditCode") gin_trgm_ops,
-                            upper("CustomsCode") gin_trgm_ops,
-                            upper("Phone") gin_trgm_ops,
-                            upper("BankName") gin_trgm_ops);
-                    CREATE INDEX IF NOT EXISTS "IX_Payees_TextSearch_Upper_Trgm"
+                            "ExporterNameEN" gin_trgm_ops,
+                            "ExporterNameCN" gin_trgm_ops,
+                            "ContactPerson" gin_trgm_ops,
+                            "CreditCode" gin_trgm_ops,
+                            "CustomsCode" gin_trgm_ops,
+                            "Phone" gin_trgm_ops,
+                            "BankName" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_Payees_TextSearch_Trgm"
                         ON "Payees" USING gin (
-                            upper("Category") gin_trgm_ops,
-                            upper("Name") gin_trgm_ops,
-                            upper("BankName") gin_trgm_ops,
-                            upper("RMBAccount") gin_trgm_ops,
-                            upper("USDAccount") gin_trgm_ops,
-                            upper("ContactPerson") gin_trgm_ops,
-                            upper("Phone") gin_trgm_ops,
-                            upper("Notes") gin_trgm_ops);
-                    CREATE INDEX IF NOT EXISTS "IX_CrmCustomers_TextSearch_Upper_Trgm"
+                            "Category" gin_trgm_ops,
+                            "Name" gin_trgm_ops,
+                            "BankName" gin_trgm_ops,
+                            "RMBAccount" gin_trgm_ops,
+                            "USDAccount" gin_trgm_ops,
+                            "ContactPerson" gin_trgm_ops,
+                            "Phone" gin_trgm_ops,
+                            "Notes" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_CrmCustomers_TextSearch_Trgm"
                         ON "CrmCustomers" USING gin (
-                            upper("Name") gin_trgm_ops,
-                            upper("CountryRegion") gin_trgm_ops,
-                            upper("Website") gin_trgm_ops,
-                            upper("Source") gin_trgm_ops,
-                            upper("Notes") gin_trgm_ops);
-                    CREATE INDEX IF NOT EXISTS "IX_SupplierCompanies_TextSearch_Upper_Trgm"
+                            "Name" gin_trgm_ops,
+                            "CountryRegion" gin_trgm_ops,
+                            "Website" gin_trgm_ops,
+                            "Source" gin_trgm_ops,
+                            "Notes" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_SupplierCompanies_TextSearch_Trgm"
                         ON "SupplierCompanies" USING gin (
-                            upper("Name") gin_trgm_ops,
-                            upper("CountryRegion") gin_trgm_ops,
-                            upper("Category") gin_trgm_ops,
-                            upper("MainProducts") gin_trgm_ops,
-                            upper("Notes") gin_trgm_ops);
-                    CREATE INDEX IF NOT EXISTS "IX_CustomsCooProducerProfiles_TextSearch_Upper_Trgm"
+                            "Name" gin_trgm_ops,
+                            "CountryRegion" gin_trgm_ops,
+                            "Category" gin_trgm_ops,
+                            "MainProducts" gin_trgm_ops,
+                            "Notes" gin_trgm_ops);
+                    CREATE INDEX IF NOT EXISTS "IX_CustomsCooProducerProfiles_TextSearch_Trgm"
                         ON "CustomsCooProducerProfiles" USING gin (
-                            upper("CiqRegNo") gin_trgm_ops,
-                            upper("PrdcEtpsName") gin_trgm_ops,
-                            upper("PrdcEtpsConcEr") gin_trgm_ops,
-                            upper("PrdcEtpsTel") gin_trgm_ops,
-                            upper("Producer") gin_trgm_ops,
-                            upper("ProducerTel") gin_trgm_ops,
-                            upper("ProducerEmail") gin_trgm_ops,
-                            upper("LastInvoiceNo") gin_trgm_ops,
-                            upper("LastSourceStyleNo") gin_trgm_ops);
+                            "CiqRegNo" gin_trgm_ops,
+                            "PrdcEtpsName" gin_trgm_ops,
+                            "PrdcEtpsConcEr" gin_trgm_ops,
+                            "PrdcEtpsTel" gin_trgm_ops,
+                            "Producer" gin_trgm_ops,
+                            "ProducerTel" gin_trgm_ops,
+                            "ProducerEmail" gin_trgm_ops,
+                            "LastInvoiceNo" gin_trgm_ops,
+                            "LastSourceStyleNo" gin_trgm_ops);
                     """,
                     cancellationToken).ConfigureAwait(false);
             }

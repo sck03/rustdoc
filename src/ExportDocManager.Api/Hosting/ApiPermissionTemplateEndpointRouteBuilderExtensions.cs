@@ -11,7 +11,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapGet("/api/permission-templates", async Task<Results<
                 Ok<ApiPermissionTemplateCatalogResponse>,
                 UnauthorizedHttpResult,
-                JsonHttpResult<ApiErrorResponse>>>(
+                JsonHttpResult<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -30,7 +30,7 @@ namespace ExportDocManager.Api.Hosting
                     PermissionModuleCatalog.Modules.Select(ToApiDto).ToArray(),
                     templates.Select(ToApiDto).ToArray(),
                     PermissionAccessLevel.Levels,
-                    "模板修改后，已登录账号需要重新登录；服务端按产品版本、模板和数据归属计算最终权限。"));
+                    "模板修改后，使用该模板的登录会话立即失效；服务端按产品版本、模板和数据归属计算最终权限。"));
             })
             .WithName("ListPermissionTemplates")
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
@@ -41,7 +41,7 @@ namespace ExportDocManager.Api.Hosting
                 UnauthorizedHttpResult,
                 JsonHttpResult<ApiErrorResponse>,
                 NotFound<ApiErrorResponse>,
-                Conflict<ApiErrorResponse>>>(
+                Conflict<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -65,7 +65,7 @@ namespace ExportDocManager.Api.Hosting
                 UnauthorizedHttpResult,
                 JsonHttpResult<ApiErrorResponse>,
                 NotFound<ApiErrorResponse>,
-                Conflict<ApiErrorResponse>>>(
+                Conflict<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -89,7 +89,7 @@ namespace ExportDocManager.Api.Hosting
                 UnauthorizedHttpResult,
                 JsonHttpResult<ApiErrorResponse>,
                 NotFound<ApiErrorResponse>,
-                Conflict<ApiErrorResponse>>>(
+                Conflict<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 ApiAuthorizationService authorizationService,
@@ -159,6 +159,11 @@ namespace ExportDocManager.Api.Hosting
                         (request.Modules ?? []).Select(module =>
                             new PermissionTemplateModuleRecord(module.ModuleKey, module.AccessLevel)).ToArray()),
                     cancellationToken);
+                var assignedUserIds = await service.ListAssignedUserIdsAsync(saved.Id, cancellationToken);
+                foreach (int userId in assignedUserIds)
+                {
+                    await tokenService.RevokeUserSessionsAsync(userId, cancellationToken);
+                }
                 return TypedResults.Ok(ToApiDto(saved));
             }
             catch (ServiceValidationException ex)

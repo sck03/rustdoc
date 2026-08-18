@@ -39,7 +39,7 @@
 }
 
 .board-panel-header span {
-  color: #58616a;
+  color: var(--edm-neutral-600);
   font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
@@ -77,8 +77,8 @@
 }
 
 .job-row-focused {
-  background: #fff8db;
-  outline: 2px solid #e0a82e;
+  background: var(--edm-warning-100);
+  outline: 2px solid var(--edm-warning-500);
   outline-offset: -2px;
 }
 
@@ -99,7 +99,7 @@
   gap: 12px;
   min-width: 0;
   padding-bottom: 14px;
-  border-bottom: 1px solid #dbe3ea;
+  border-bottom: 1px solid var(--edm-neutral-350);
 }
 
 .job-create-panel {
@@ -111,7 +111,7 @@
 .job-create-panel details {
   min-width: 0;
   background: var(--edm-surface);
-  border: 1px solid #dbe3ea;
+  border: 1px solid var(--edm-neutral-350);
   border-radius: 8px;
 }
 
@@ -128,7 +128,7 @@
 .job-create-panel summary span {
   min-width: 0;
   overflow: hidden;
-  color: #20313d;
+  color: var(--edm-neutral-750);
   font-size: 14px;
   font-weight: 800;
   text-overflow: ellipsis;
@@ -143,7 +143,7 @@
 }
 
 .job-create-panel details[open] summary {
-  border-bottom: 1px solid #e1e7ec;
+  border-bottom: 1px solid var(--edm-neutral-250);
 }
 
 .job-create-panel .job-tool-panel {
@@ -182,7 +182,7 @@
   padding: 12px;
   color: var(--edm-ink-950);
   background: var(--edm-surface);
-  border: 1px solid #dbe3ea;
+  border: 1px solid var(--edm-neutral-350);
   border-radius: 8px;
   text-decoration: none;
 }
@@ -198,8 +198,8 @@
   width: 40px;
   height: 40px;
   color: var(--edm-primary-600);
-  background: #e8f5f2;
-  border: 1px solid #c7e6df;
+  background: var(--edm-primary-75);
+  border: 1px solid var(--edm-primary-150);
   border-radius: 8px;
 }
 
@@ -306,7 +306,7 @@
   align-content: start;
   padding: 12px;
   background: var(--edm-surface);
-  border: 1px solid #dbe3ea;
+  border: 1px solid var(--edm-neutral-350);
   border-radius: 8px;
 }
 
@@ -335,7 +335,7 @@
 .job-tool-stack-primary {
   padding: 12px;
   background: var(--edm-surface);
-  border: 1px solid #b9d9d3;
+  border: 1px solid var(--edm-ink-300);
   border-radius: 8px;
 }
 
@@ -344,7 +344,7 @@
   align-items: center;
   gap: 7px;
   min-width: 0;
-  color: #20313d;
+  color: var(--edm-neutral-750);
 }
 
 .job-tool-stack-title svg {
@@ -364,14 +364,14 @@
 .job-tool-advanced {
   min-width: 0;
   padding-top: 2px;
-  border-top: 1px dashed #d8e0e6;
+  border-top: 1px dashed var(--edm-neutral-350);
 }
 
 .job-tool-advanced summary {
   display: inline-flex;
   align-items: center;
   min-height: 30px;
-  color: #46525e;
+  color: var(--edm-neutral-650);
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
@@ -404,8 +404,8 @@
   align-items: center;
   min-width: 0;
   padding: 9px 10px;
-  background: #f8fafb;
-  border: 1px solid #dbe3ea;
+  background: var(--edm-neutral-50);
+  border: 1px solid var(--edm-neutral-350);
   border-radius: 8px;
 }
 
@@ -433,8 +433,8 @@
   gap: 10px;
   min-width: 0;
   padding: 10px;
-  background: #fff8e6;
-  border: 1px solid #efc266;
+  background: var(--edm-warning-50);
+  border: 1px solid var(--edm-warning-400);
   border-radius: 8px;
 }
 
@@ -481,9 +481,9 @@
   gap: 10px;
   min-width: 0;
   padding: 10px;
-  border: 1px solid #cfdde8;
+  border: 1px solid var(--edm-neutral-400);
   border-radius: 8px;
-  background: #f7fbfd;
+  background: var(--edm-neutral-50);
 }
 
 .job-excel-analysis-head,
@@ -539,7 +539,7 @@
   gap: 2px;
   min-width: 0;
   padding: 7px 8px;
-  border: 1px solid #dbe3ea;
+  border: 1px solid var(--edm-neutral-350);
   border-radius: 6px;
   background: var(--edm-surface);
 }
@@ -568,7 +568,7 @@
   align-items: center;
   min-width: 0;
   padding: 9px 10px;
-  border: 1px solid #dbe3ea;
+  border: 1px solid var(--edm-neutral-350);
   border-radius: 8px;
   background: var(--edm-surface);
 }
@@ -606,7 +606,7 @@
 }
 
 .job-excel-invoice-export label span {
-  color: #58616a;
+  color: var(--edm-neutral-600);
   font-size: 13px;
   font-weight: 700;
 }

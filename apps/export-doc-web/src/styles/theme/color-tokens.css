@@ -1,0 +1,159 @@
+:root {
+  /* Neutral and ink primitives. Raw color values live only in this file. */
+  --edm-white: #ffffff;
+  --edm-black: #000000;
+  --edm-neutral-25: #fbfcfd;
+  --edm-neutral-50: #f8fafb;
+  --edm-neutral-75: #f3f7f5;
+  --edm-neutral-100: #f1f4f6;
+  --edm-neutral-150: #eef2f5;
+  --edm-neutral-200: #e8edf1;
+  --edm-neutral-250: #e2e8ee;
+  --edm-neutral-300: #dde3e8;
+  --edm-neutral-350: #d8e0e6;
+  --edm-neutral-400: #cfd8df;
+  --edm-neutral-450: #aebfbb;
+  --edm-neutral-500: #91aab2;
+  --edm-neutral-550: #69737d;
+  --edm-neutral-600: #58616a;
+  --edm-neutral-650: #4d5963;
+  --edm-neutral-700: #39424c;
+  --edm-neutral-750: #26323d;
+  --edm-neutral-800: #202124;
+  --edm-neutral-850: #1f2933;
+  --edm-neutral-900: #111827;
+
+  --edm-ink-100: #eef6f5;
+  --edm-ink-200: #d9e3e0;
+  --edm-ink-300: #c5d3cf;
+  --edm-ink-400: #91a8a2;
+  --edm-ink-500: #607572;
+  --edm-ink-600: #526866;
+  --edm-ink-700: #354742;
+  --edm-ink-800: #263c3a;
+  --edm-ink-900: #173f3b;
+  --edm-ink-950: #102322;
+
+  /* Brand palette. */
+  --edm-primary-25: #f8fbfa;
+  --edm-primary-50: #effcf8;
+  --edm-primary-75: #eef8f5;
+  --edm-primary-80: #f1faf7;
+  --edm-primary-100: #d7f7ed;
+  --edm-primary-150: #d9eee9;
+  --edm-primary-200: #afeedc;
+  --edm-primary-300: #98d0c5;
+  --edm-primary-325: #a9d5cc;
+  --edm-primary-350: #65aaa2;
+  --edm-primary-400: #58d7b7;
+  --edm-primary-500: #119b88;
+  --edm-primary-550: #16a38f;
+  --edm-primary-600: #0f7f72;
+  --edm-primary-650: #0f766e;
+  --edm-primary-700: #0c655d;
+  --edm-primary-750: #0b615a;
+  --edm-primary-775: #095c55;
+  --edm-primary-800: #104f4b;
+  --edm-primary-850: #0f4f46;
+  --edm-primary-900: #102725;
+  --edm-primary-925: #132d2b;
+  --edm-primary-950: #0d211f;
+
+  /* Status and data-visualization palettes. */
+  --edm-success-50: #ecfdf5;
+  --edm-success-100: #dff8ed;
+  --edm-success-200: #bbf7d0;
+  --edm-success-300: #86efac;
+  --edm-success-500: #22a06b;
+  --edm-success-550: #16a34a;
+  --edm-success-600: #1aa876;
+  --edm-success-700: #12805c;
+  --edm-success-800: #166534;
+  --edm-success-900: #22543d;
+
+  --edm-warning-50: #fff8e8;
+  --edm-warning-75: #fff8df;
+  --edm-warning-25: #fffaf0;
+  --edm-warning-100: #fff2d6;
+  --edm-warning-200: #fef3c7;
+  --edm-warning-300: #fde68a;
+  --edm-warning-400: #f2ca7b;
+  --edm-warning-425: #ead59d;
+  --edm-warning-430: #ead99b;
+  --edm-warning-450: #fb923c;
+  --edm-warning-500: #d99a14;
+  --edm-warning-600: #b56b08;
+  --edm-warning-700: #b45309;
+  --edm-warning-800: #92400e;
+  --edm-warning-900: #6b3d00;
+
+  --edm-danger-50: #fff0ed;
+  --edm-danger-100: #ffebe7;
+  --edm-danger-200: #f1c3c3;
+  --edm-danger-300: #f1b4aa;
+  --edm-danger-400: #f5a3a3;
+  --edm-danger-500: #c84a43;
+  --edm-danger-600: #b4233f;
+  --edm-danger-700: #982f23;
+  --edm-danger-800: #8a1f13;
+  --edm-danger-900: #74162c;
+
+  --edm-info-50: #eff6ff;
+  --edm-info-100: #dbeafe;
+  --edm-info-200: #b8dbe8;
+  --edm-info-300: #93c5fd;
+  --edm-info-400: #60a5fa;
+  --edm-info-500: #3b82f6;
+  --edm-info-525: #2563eb;
+  --edm-info-550: #1d4ed8;
+  --edm-info-575: #155eef;
+  --edm-info-600: #2f6fae;
+  --edm-info-700: #276c9d;
+  --edm-info-800: #1f4f73;
+  --edm-info-900: #1e3a5f;
+
+  --edm-purple-50: #f5f3ff;
+  --edm-purple-100: #ede9fe;
+  --edm-purple-200: #ddd6fe;
+  --edm-purple-300: #c4b5fd;
+  --edm-purple-500: #8b5cf6;
+  --edm-purple-600: #6f4aa1;
+  --edm-purple-700: #5b3d88;
+
+  --edm-cyan-50: #ecfeff;
+  --edm-cyan-100: #cffafe;
+  --edm-cyan-200: #a5f3fc;
+  --edm-cyan-400: #22d3ee;
+  --edm-cyan-600: #0891b2;
+  --edm-cyan-700: #126782;
+  --edm-cyan-800: #155e75;
+
+  --edm-earth-500: #806b3c;
+  --edm-earth-600: #7a5252;
+  --edm-earth-650: #79505a;
+  --edm-earth-700: #6b4a43;
+  --edm-earth-750: #69434d;
+  --edm-earth-800: #5b4b20;
+  --edm-earth-900: #4b2c27;
+
+  --edm-workspace-aqua-50: #f3f8f8;
+
+  /* Stable semantic roles consumed by every feature stylesheet. */
+  --edm-line: var(--edm-ink-200);
+  --edm-line-strong: var(--edm-ink-300);
+  --edm-border: var(--edm-line);
+  --edm-canvas: var(--edm-neutral-75);
+  --edm-surface: var(--edm-white);
+  --edm-surface-muted: var(--edm-primary-25);
+  --edm-success: var(--edm-success-700);
+  --edm-warning: var(--edm-warning-600);
+  --edm-danger: var(--edm-danger-600);
+  --edm-info: var(--edm-info-600);
+  --surface: var(--edm-surface);
+  --surface-muted: var(--edm-surface-muted);
+  --input-background: var(--edm-surface);
+  --border-color: var(--edm-line);
+  --text-primary: var(--edm-ink-950);
+  --text-secondary: var(--edm-ink-600);
+  --accent-color: var(--edm-primary-600);
+}

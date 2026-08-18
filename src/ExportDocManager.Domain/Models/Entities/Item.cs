@@ -40,7 +40,7 @@ namespace ExportDocManager.Models.Entities
         public decimal PurchasePrice { get; set; } // Added for Profit Analysis
         public decimal PurchaseTotal { get; set; } // Added for Profit Analysis
         public decimal TaxRebateRate { get; set; } // Added for Tax Refund Calculation
-        
+
         /// <summary>
         /// Calculated Tax Refund Amount (Not mapped to DB).
         /// 计算出的退税额 (采购总价 / 1.13 * 退税率)。
@@ -283,8 +283,8 @@ namespace ExportDocManager.Models.Entities
                     TotalPrice = NumberHelper.ParseDecimal(value);
                     CalculateUnitPriceFromTotal();
                     break;
-                case 25: 
-                    PurchasePrice = NumberHelper.ParseDecimal(value); 
+                case 25:
+                    PurchasePrice = NumberHelper.ParseDecimal(value);
                     CalculatePurchaseTotal();
                     break;
                 case 26: PurchaseTotal = NumberHelper.ParseDecimal(value); break;

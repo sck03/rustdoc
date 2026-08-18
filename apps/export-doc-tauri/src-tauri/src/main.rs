@@ -14,6 +14,7 @@ mod desktop_file_dialog_commands;
 mod desktop_open_commands;
 mod log_rotation;
 mod runtime_data_root_migration;
+mod runtime_data_root_network;
 mod runtime_data_root_storage;
 mod runtime_layout;
 mod runtime_paths;
@@ -95,6 +96,7 @@ fn run_tauri_app() -> tauri::Result<()> {
             desktop_commands::request_app_exit,
             tauri_updater_commands::check_tauri_update,
             tauri_updater_commands::install_tauri_update,
+            tauri_updater_commands::cancel_tauri_update,
             sidecar::get_desktop_runtime_context
         ])
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -111,6 +113,7 @@ fn run_tauri_app() -> tauri::Result<()> {
                 desktop_access_token,
             ));
             app.manage(paths.clone());
+            app.manage(tauri_updater_commands::TauriUpdaterState::default());
             window::open_main_window(app, &paths)?;
             Ok(())
         })

@@ -17,16 +17,23 @@ namespace ExportDocManager.DataAccess
     {
         private const string PendingEntityId = "[generated-after-save]";
         private readonly IAuditUserProvider _auditUserProvider;
+        private readonly TimeProvider _timeProvider;
         private readonly ConditionalWeakTable<DbContext, PendingAuditState> _pendingAudits = new();
 
         public AuditInterceptor()
-            : this(new SystemAuditUserProvider())
+            : this(new SystemAuditUserProvider(), TimeProvider.System)
         {
         }
 
         public AuditInterceptor(IAuditUserProvider auditUserProvider)
+            : this(auditUserProvider, TimeProvider.System)
+        {
+        }
+
+        public AuditInterceptor(IAuditUserProvider auditUserProvider, TimeProvider timeProvider)
         {
             _auditUserProvider = auditUserProvider ?? throw new ArgumentNullException(nameof(auditUserProvider));
+            _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         }
 
         public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
@@ -122,7 +129,7 @@ namespace ExportDocManager.DataAccess
         {
             var auditEntries = new List<AuditLog>();
             var entries = context.ChangeTracker.Entries()
-                .Where(e => e.Entity is not AuditLog && 
+                .Where(e => e.Entity is not AuditLog &&
                            (e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted))
                 .ToList();
 
@@ -132,7 +139,7 @@ namespace ExportDocManager.DataAccess
                 {
                     EntityName = entry.Entity.GetType().Name,
                     Action = entry.State.ToString(),
-                    Timestamp = DateTimeOffset.UtcNow,
+                    Timestamp = _timeProvider.GetUtcNow(),
                     UserId = _auditUserProvider.GetCurrentUserName()
                 };
 
@@ -160,7 +167,7 @@ namespace ExportDocManager.DataAccess
 
                     string propertyName = property.Metadata.Name;
 
-                    try 
+                    try
                     {
                         switch (entry.State)
                         {
@@ -187,7 +194,7 @@ namespace ExportDocManager.DataAccess
 
                 // Use safe serialization options
                 var jsonOptions = new JsonSerializerOptions { ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles };
-                
+
                 try
                 {
                     auditLog.OldValues = oldValues.Count == 0 ? null : JsonSerializer.Serialize(oldValues, jsonOptions);

@@ -69,12 +69,12 @@ namespace ExportDocManager.DataAccess
             {
                 DataSource = path,
                 Mode = SqliteOpenMode.ReadWriteCreate,
-                Cache = SqliteCacheMode.Shared,
+                Cache = SqliteCacheMode.Private,
                 Pooling = true,
                 DefaultTimeout = 10,
                 ForeignKeys = true,
             };
-            
+
             return builder.ToString();
         }
 

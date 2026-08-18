@@ -74,7 +74,7 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public string AuthenticationTag { get; set; } = string.Empty;
 
-        public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; init; }
 
         public string CreatedOnMachine { get; init; } = Environment.MachineName;
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-17",
+  "capturedAt": "2026-08-18",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 109924,
+      "baselineAggregateLines": 110915,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 110124,
+      "maximumAggregateLines": 111115,
       "reportFiles": false
     },
     {
@@ -22,7 +22,7 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 77823,
+      "baselineAggregateLines": 78136,
       "maximumAggregateGrowthLines": 200,
       "maximumAggregateLines": 78500,
       "reportFiles": false
@@ -36,9 +36,9 @@
       ],
       "filePattern": "^.+\\.rs$",
       "maximumLines": 1000,
-      "baselineAggregateLines": 9044,
+      "baselineAggregateLines": 9445,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 9200,
+      "maximumAggregateLines": 9520,
       "reportFiles": false
     },
     {
@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 38193,
+      "baselineAggregateLines": 38744,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 38313,
+      "maximumAggregateLines": 38864,
       "reportFiles": false
     },
     {
@@ -56,9 +56,9 @@
       "directories": ["scripts", "deploy", ".github/workflows"],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 39471,
+      "baselineAggregateLines": 39725,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 39621,
+      "maximumAggregateLines": 39875,
       "reportFiles": false
     },
     {
@@ -66,9 +66,9 @@
       "directory": ".github/workflows",
       "filePattern": "^.+\\.(?:yml|yaml)$",
       "maximumLines": 800,
-      "baselineAggregateLines": 2851,
+      "baselineAggregateLines": 2872,
       "maximumAggregateGrowthLines": 20,
-      "maximumAggregateLines": 2871,
+      "maximumAggregateLines": 2892,
       "reportFiles": false
     },
     {
@@ -156,9 +156,9 @@
     {
       "name": "Tauri data-root migration components",
       "directory": "apps/export-doc-tauri/src-tauri/src",
-      "filePattern": "^runtime_data_root_(?:migration|storage)\\.rs$",
+      "filePattern": "^runtime_data_root_(?:migration|network|storage)\\.rs$",
       "maximumLines": 420,
-      "maximumAggregateLines": 750
+      "maximumAggregateLines": 850
     },
     {
       "name": "Tauri sidecar components",

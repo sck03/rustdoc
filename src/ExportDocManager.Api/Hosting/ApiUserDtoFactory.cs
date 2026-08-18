@@ -24,6 +24,7 @@ namespace ExportDocManager.Api.Hosting
                 user.IsActive,
                 clock.Today,
                 clock.TimeZoneId,
+                clock.TodayValidUntilUtc,
                 authorizationService.GetCapabilities(user));
         }
 

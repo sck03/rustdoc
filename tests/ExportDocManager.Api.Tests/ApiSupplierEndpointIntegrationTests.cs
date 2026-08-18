@@ -245,7 +245,7 @@ namespace ExportDocManager.Api.Tests
         private static AppDbContext CreateContext(string databasePath)
         {
             var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseSqlite($"Data Source={databasePath}")
+                .UseSqlite(DbHelper.BuildConnectionString(databasePath))
                 .Options;
             return new AppDbContext(options);
         }

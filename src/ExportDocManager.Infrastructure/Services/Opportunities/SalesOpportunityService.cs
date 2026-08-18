@@ -33,10 +33,10 @@ namespace ExportDocManager.Services.Opportunities
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var opportunities = _accessScope.ApplySalesOpportunityScope(context.SalesOpportunities.AsNoTracking());
             var query = from opportunity in opportunities
-                join customer in context.CrmCustomers.AsNoTracking() on opportunity.CrmCustomerId equals customer.Id
-                join product in context.Products.AsNoTracking() on opportunity.ProductId equals product.Id into products
-                from product in products.DefaultIfEmpty()
-                select new { Opportunity = opportunity, Customer = customer, Product = product };
+                        join customer in context.CrmCustomers.AsNoTracking() on opportunity.CrmCustomerId equals customer.Id
+                        join product in context.Products.AsNoTracking() on opportunity.ProductId equals product.Id into products
+                        from product in products.DefaultIfEmpty()
+                        select new { Opportunity = opportunity, Customer = customer, Product = product };
             if (keyword.Length > 0)
                 query = query.Where(item => item.Opportunity.Title.Contains(keyword) || item.Opportunity.QuotationNo.Contains(keyword) ||
                     item.Opportunity.NextAction.Contains(keyword) || item.Customer.Name.Contains(keyword) ||
@@ -113,7 +113,7 @@ namespace ExportDocManager.Services.Opportunities
             entity.Title = title; entity.Stage = stage; entity.QuotationNo = quotationNo;
             entity.EstimatedAmount = request.EstimatedAmount; entity.Currency = currency;
             entity.ProbabilityPercent = request.ProbabilityPercent; entity.ExpectedCloseDate = request.ExpectedCloseDate;
-            entity.NextAction = Clean(request.NextAction); entity.Notes = Clean(request.Notes); entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.NextAction = Clean(request.NextAction); entity.Notes = Clean(request.Notes); entity.UpdatedAt = _clock.UtcNow;
 
             bool stageChanged = !string.Equals(previousStage, stage, StringComparison.Ordinal);
             bool quotationChanged = !string.Equals(previousQuotationNo, quotationNo, StringComparison.Ordinal) ||
@@ -127,11 +127,18 @@ namespace ExportDocManager.Services.Opportunities
                     .Where(item => item.SalesOpportunityId == entity.Id).MaxAsync(item => (int?)item.VersionNumber, cancellationToken) ?? 0) + 1;
                 var history = new SalesOpportunityHistory
                 {
-                    SalesOpportunityId = entity.Id, Opportunity = isNew ? entity : null, VersionNumber = version,
-                    ChangeType = changeType, Stage = stage, QuotationNo = quotationNo,
-                    EstimatedAmount = request.EstimatedAmount, Currency = currency,
-                    ProbabilityPercent = request.ProbabilityPercent, ExpectedCloseDate = request.ExpectedCloseDate,
-                    ChangeNote = changeNote, ChangedBy = _accessScope.CurrentUser?.Username ?? string.Empty
+                    SalesOpportunityId = entity.Id,
+                    Opportunity = isNew ? entity : null,
+                    VersionNumber = version,
+                    ChangeType = changeType,
+                    Stage = stage,
+                    QuotationNo = quotationNo,
+                    EstimatedAmount = request.EstimatedAmount,
+                    Currency = currency,
+                    ProbabilityPercent = request.ProbabilityPercent,
+                    ExpectedCloseDate = request.ExpectedCloseDate,
+                    ChangeNote = changeNote,
+                    ChangedBy = _accessScope.CurrentUser?.Username ?? string.Empty
                 };
                 await context.SalesOpportunityHistories.AddAsync(history, cancellationToken);
             }
@@ -216,19 +223,19 @@ namespace ExportDocManager.Services.Opportunities
                 .OrderBy(item => item.Currency).ToArray();
             var today = _clock.Today;
             var upcoming = await (from opportunity in active
-                where opportunity.ExpectedCloseDate.HasValue &&
-                    opportunity.ExpectedCloseDate.Value >= today &&
-                    opportunity.ExpectedCloseDate.Value <= today.AddDays(30)
-                join customer in context.CrmCustomers.AsNoTracking() on opportunity.CrmCustomerId equals customer.Id
-                join product in context.Products.AsNoTracking() on opportunity.ProductId equals product.Id into products
-                from product in products.DefaultIfEmpty()
-                orderby opportunity.ExpectedCloseDate, opportunity.ProbabilityPercent descending, opportunity.Id descending
-                select new SalesOpportunityRecord(opportunity.Id, opportunity.CrmCustomerId, customer.Name,
-                    opportunity.ProductId, product != null ? product.ProductCode ?? string.Empty : string.Empty,
-                    product != null ? (product.NameCN ?? product.NameEN ?? string.Empty) : string.Empty,
-                    opportunity.Title, opportunity.Stage, opportunity.QuotationNo, opportunity.EstimatedAmount,
-                    opportunity.Currency, opportunity.ProbabilityPercent, opportunity.ExpectedCloseDate,
-                    opportunity.NextAction, opportunity.Notes, opportunity.VersionNumber))
+                                  where opportunity.ExpectedCloseDate.HasValue &&
+                                      opportunity.ExpectedCloseDate.Value >= today &&
+                                      opportunity.ExpectedCloseDate.Value <= today.AddDays(30)
+                                  join customer in context.CrmCustomers.AsNoTracking() on opportunity.CrmCustomerId equals customer.Id
+                                  join product in context.Products.AsNoTracking() on opportunity.ProductId equals product.Id into products
+                                  from product in products.DefaultIfEmpty()
+                                  orderby opportunity.ExpectedCloseDate, opportunity.ProbabilityPercent descending, opportunity.Id descending
+                                  select new SalesOpportunityRecord(opportunity.Id, opportunity.CrmCustomerId, customer.Name,
+                                      opportunity.ProductId, product != null ? product.ProductCode ?? string.Empty : string.Empty,
+                                      product != null ? (product.NameCN ?? product.NameEN ?? string.Empty) : string.Empty,
+                                      opportunity.Title, opportunity.Stage, opportunity.QuotationNo, opportunity.EstimatedAmount,
+                                      opportunity.Currency, opportunity.ProbabilityPercent, opportunity.ExpectedCloseDate,
+                                      opportunity.NextAction, opportunity.Notes, opportunity.VersionNumber))
                 .Take(8)
                 .ToArrayAsync(cancellationToken);
             return new SalesOpportunityDashboard(stages, currencies, upcoming);

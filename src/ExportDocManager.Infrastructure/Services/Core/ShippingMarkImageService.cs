@@ -1,6 +1,7 @@
 using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Services.Core
@@ -12,10 +13,12 @@ namespace ExportDocManager.Services.Core
             "唛头图片只保存到运行数据根 Marks 目录，发票记录仅保存图片路径；预览也只读取该目录内图片，不读取付款/报销单据、不创建默认导出目录或系统盘默认落点。";
 
         private readonly IAppPathProvider _pathProvider;
+        private readonly IBusinessClock _clock;
 
-        public ShippingMarkImageService(IAppPathProvider pathProvider)
+        public ShippingMarkImageService(IAppPathProvider pathProvider, IBusinessClock? clock = null)
         {
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<ShippingMarkImageSaveResult> SavePngDataUrlAsync(
@@ -24,7 +27,7 @@ namespace ExportDocManager.Services.Core
         {
             byte[] bytes = DecodePngDataUrl(imageDataUrl);
             string marksRoot = GetMarksRoot();
-            string fileName = $"Mark_{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.png";
+            string fileName = $"Mark_{_clock.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.png";
             string imagePath = Path.Combine(marksRoot, fileName);
 
             await AtomicFileHelper.WriteFileAtomicAsync(

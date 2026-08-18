@@ -37,7 +37,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 int invoiceId = await SeedInvoiceAsync(factory);
 
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
-                var service = new ReportHtmlService(factory, new StubSettingsService(), pathProvider);
+                var service = CreateService(factory, new StubSettingsService(), pathProvider);
 
                 var result = await service.RenderInvoiceReportAsync(
                     invoiceId,
@@ -79,7 +79,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 int paymentId = await SeedPaymentWithMatchingInvoiceAsync(factory);
 
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
-                var service = new ReportHtmlService(factory, new StubSettingsService(), pathProvider);
+                var service = CreateService(factory, new StubSettingsService(), pathProvider);
 
                 var error = await Assert.ThrowsAsync<ServiceValidationException>(() =>
                     service.RenderPaymentVoucherAsync(paymentId));
@@ -114,7 +114,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 int invoiceId = await SeedInvoiceWithMatchingPaymentAsync(factory);
 
                 var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
-                var service = new ReportHtmlService(factory, new StubSettingsService(), pathProvider);
+                var service = CreateService(factory, new StubSettingsService(), pathProvider);
 
                 var error = await Assert.ThrowsAsync<ServiceValidationException>(() =>
                     service.RenderInvoiceReportAsync(
@@ -146,10 +146,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 await using var factory = new TestDbContextFactory();
                 int invoiceId = await SeedInvoiceAsync(factory);
-                var service = new ReportHtmlService(
-                    factory,
-                    new StubSettingsService(),
-                    new RuntimeAppPathProvider(appRoot, dataRoot));
+                var service = CreateService(factory, new StubSettingsService(), new RuntimeAppPathProvider(appRoot, dataRoot));
 
                 var error = await Assert.ThrowsAsync<ArgumentException>(() => service.RenderInvoiceReportAsync(
                     invoiceId,
@@ -180,10 +177,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 await using var factory = new TestDbContextFactory();
                 int paymentId = await SeedPaymentWithMatchingInvoiceAsync(factory);
-                var service = new ReportHtmlService(
-                    factory,
-                    new StubSettingsService(),
-                    new RuntimeAppPathProvider(appRoot, dataRoot));
+                var service = CreateService(factory, new StubSettingsService(), new RuntimeAppPathProvider(appRoot, dataRoot));
 
                 var error = await Assert.ThrowsAsync<ArgumentException>(() => service.RenderPaymentVoucherAsync(
                     paymentId,
@@ -213,10 +207,7 @@ namespace ExportDocManager.Infrastructure.Tests
                     "Internal",
                     "expense_reimbursement_template.html");
                 await using var factory = new TestDbContextFactory();
-                var service = new ReportHtmlService(
-                    factory,
-                    new StubSettingsService(),
-                    new RuntimeAppPathProvider(appRoot, dataRoot));
+                var service = CreateService(factory, new StubSettingsService(), new RuntimeAppPathProvider(appRoot, dataRoot));
 
                 var result = await service.RenderPaymentVoucherDraftAsync(new Payment(), templatePath);
 
@@ -249,7 +240,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 await using var invoiceFactory = new TestDbContextFactory();
                 int invoiceId = await SeedInvoiceWithMatchingPaymentAsync(invoiceFactory);
                 var invoicePathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
-                var invoiceService = new ReportHtmlService(invoiceFactory, new StubSettingsService(), invoicePathProvider);
+                var invoiceService = CreateService(invoiceFactory, new StubSettingsService(), invoicePathProvider);
 
                 var invoiceResult = await invoiceService.RenderInvoiceReportAsync(
                     invoiceId,
@@ -301,7 +292,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 await using var paymentFactory = new TestDbContextFactory();
                 int paymentId = await SeedPaymentWithMatchingInvoiceAsync(paymentFactory);
                 var paymentPathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
-                var paymentService = new ReportHtmlService(paymentFactory, new StubSettingsService(), paymentPathProvider);
+                var paymentService = CreateService(paymentFactory, new StubSettingsService(), paymentPathProvider);
 
                 var paymentVoucherResult = await paymentService.RenderPaymentVoucherAsync(
                     paymentId,
@@ -384,7 +375,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 await using var invoiceFactory = new TestDbContextFactory();
                 int invoiceId = await SeedInvoiceWithMatchingPaymentAsync(invoiceFactory);
-                var invoiceHtmlService = new ReportHtmlService(invoiceFactory, new StubSettingsService(), pathProvider);
+                var invoiceHtmlService = CreateService(invoiceFactory, new StubSettingsService(), pathProvider);
                 var invoicePdfService = new ReportPdfRenderService(invoiceHtmlService, pdfRenderer);
 
                 var invoiceTemplates = new[]
@@ -412,7 +403,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
                 await using var paymentFactory = new TestDbContextFactory();
                 int paymentId = await SeedPaymentWithMatchingInvoiceAsync(paymentFactory);
-                var paymentHtmlService = new ReportHtmlService(paymentFactory, new StubSettingsService(), pathProvider);
+                var paymentHtmlService = CreateService(paymentFactory, new StubSettingsService(), pathProvider);
                 var paymentPdfService = new ReportPdfRenderService(paymentHtmlService, pdfRenderer);
                 var paymentTemplates = new[]
                 {
@@ -461,7 +452,7 @@ namespace ExportDocManager.Infrastructure.Tests
                     pathProvider);
                 await using var factory = new TestDbContextFactory();
                 var seed = await SeedSameInvoiceNumberActualCustomsAndPaymentAsync(factory);
-                var htmlService = new ReportHtmlService(factory, new StubSettingsService(), pathProvider);
+                var htmlService = CreateService(factory, new StubSettingsService(), pathProvider);
                 var pdfService = new ReportPdfRenderService(
                     htmlService,
                     new ChromiumHtmlToPdfService(pathProvider, browserRuntime, browserHost));
@@ -1507,11 +1498,17 @@ namespace ExportDocManager.Infrastructure.Tests
             }
         }
 
+        private static ReportHtmlService CreateService(
+            IDbContextFactory<AppDbContext> factory,
+            ISettingsService settingsService,
+            IAppPathProvider pathProvider) =>
+            new(factory, settingsService, pathProvider, TestAccessScope.Create());
+
         private sealed class StubSettingsService : ISettingsService
         {
             public AppSettings Settings { get; } = new();
 
-            public Task LoadAsync() => Task.CompletedTask;
+            public Task LoadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
             public Task SaveAsync() => Task.CompletedTask;
         }

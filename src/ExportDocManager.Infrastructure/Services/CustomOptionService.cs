@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,10 +10,14 @@ namespace ExportDocManager.Services.Infrastructure
     {
         private const int MaximumOptionsPerType = 500;
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
+        private readonly IBusinessClock _clock;
 
-        public CustomOptionService(IDbContextFactory<AppDbContext> dbContextFactory)
+        public CustomOptionService(
+            IDbContextFactory<AppDbContext> dbContextFactory,
+            IBusinessClock? clock = null)
         {
-            _dbContextFactory = dbContextFactory;
+            _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<IReadOnlyList<string>> GetOptionsAsync(
@@ -72,7 +77,7 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 OptionType = normalizedType,
                 OptionValue = normalizedValue,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = _clock.UtcNow
             }, cancellationToken);
             await context.SaveChangesAsync(cancellationToken);
         }

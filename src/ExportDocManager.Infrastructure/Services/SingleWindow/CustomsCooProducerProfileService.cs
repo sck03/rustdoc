@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Models.SingleWindow;
+using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,10 +10,14 @@ namespace ExportDocManager.Services.SingleWindow
     public sealed class CustomsCooProducerProfileService : ICustomsCooProducerProfileService
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
+        private readonly IBusinessClock _clock;
 
-        public CustomsCooProducerProfileService(IDbContextFactory<AppDbContext> contextFactory)
+        public CustomsCooProducerProfileService(
+            IDbContextFactory<AppDbContext> contextFactory,
+            IBusinessClock? clock = null)
         {
-            _contextFactory = contextFactory;
+            _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+            _clock = clock ?? BusinessClock.CreateSystem();
         }
 
         public async Task<IReadOnlyList<CustomsCooProducerProfile>> SearchAsync(string keyword, CancellationToken cancellationToken = default)
@@ -23,6 +28,7 @@ namespace ExportDocManager.Services.SingleWindow
             if (!string.IsNullOrWhiteSpace(keyword))
             {
                 query = query.ApplyKeywordSearch(
+                    context,
                     keyword,
                     item => item.CiqRegNo,
                     item => item.PrdcEtpsName,
@@ -61,7 +67,7 @@ namespace ExportDocManager.Services.SingleWindow
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
             var normalized = NormalizeInput(input);
             var existing = await FindExistingAsync(context, normalized, cancellationToken).ConfigureAwait(false);
-            var now = DateTimeOffset.UtcNow;
+            var now = _clock.UtcNow;
 
             if (existing == null)
             {
@@ -87,7 +93,7 @@ namespace ExportDocManager.Services.SingleWindow
 
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
             var normalized = NormalizeInput(input);
-            var now = DateTimeOffset.UtcNow;
+            var now = _clock.UtcNow;
 
             CustomsCooProducerProfile? entity = null;
             if (profileId.GetValueOrDefault() > 0)
@@ -169,7 +175,7 @@ namespace ExportDocManager.Services.SingleWindow
                 }
             }
 
-            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset now = _clock.UtcNow;
             foreach (CustomsCooProducerProfileInput input in normalizedInputs)
             {
                 CustomsCooProducerProfile? entity = ResolveExisting(input, byCode, byName);

@@ -77,7 +77,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.True(SingleWindowDisasterRecoveryManager.HasPendingRestore(paths));
 
                 SqliteConnection.ClearAllPools();
-                SingleWindowDisasterRecoveryManager.ApplyPendingRestore(paths);
+                SingleWindowDisasterRecoveryManager.ApplyPendingRestore(paths, TimeProvider.System);
 
                 Assert.Equal("recover-me", await ReadValueAsync(databasePath));
                 Assert.Equal(originalSettings, await File.ReadAllTextAsync(appSettingsPath));

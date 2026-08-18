@@ -23,7 +23,7 @@ namespace ExportDocManager.Services.MasterData
         Task<HsCodeImportCommitResult> CommitImportAsync(
             HsCodeImportPreview preview,
             CancellationToken cancellationToken = default);
-        
+
         /// <summary>
         /// Searches for HS codes from online source (i5a6.com).
         /// </summary>
@@ -76,7 +76,7 @@ namespace ExportDocManager.Services.MasterData
         /// Gets a paged list of HS codes from the local database.
         /// </summary>
         Task<PagedResult<HsCode>> GetPagedLocalAsync(int pageNumber, int pageSize, string? keyword = null);
-        
+
         /// <summary>
         /// Clears all HS codes from the local database.
         /// </summary>
@@ -208,47 +208,13 @@ namespace ExportDocManager.Services.MasterData
         Task<HsCode> FetchDetailAsync(HsCode item, CancellationToken cancellationToken = default);
         Task<HsCodeRemoteSourceHealth> CheckHealthAsync(CancellationToken cancellationToken = default);
 
-        async Task<HsCodeRemoteSearchBundle> SearchEvidenceAsync(
+        Task<HsCodeRemoteSearchBundle> SearchEvidenceAsync(
             string keyword,
-            CancellationToken cancellationToken = default)
-        {
-            var observedAt = DateTimeOffset.UtcNow;
-            var rows = await SearchAsync(keyword, cancellationToken).ConfigureAwait(false);
-            return new HsCodeRemoteSearchBundle(
-                keyword ?? string.Empty,
-                Name,
-                (rows ?? [])
-                    .Where(item => item != null)
-                    .Select(item => new HsCodeRemoteSearchRecord(
-                        item,
-                        HsCodeRemoteRecordKind.StandardCode,
-                        HsCodeTextHelper.IsExpired(item),
-                        null,
-                        string.Empty,
-                        item.DetailUrl ?? string.Empty,
-                        observedAt))
-                    .ToList(),
-                []);
-        }
+            CancellationToken cancellationToken = default);
 
-        async Task<HsCodeRemoteDetailBundle> FetchDetailEvidenceAsync(
+        Task<HsCodeRemoteDetailBundle> FetchDetailEvidenceAsync(
             HsCodeRemoteSearchRecord record,
-            CancellationToken cancellationToken = default)
-        {
-            ArgumentNullException.ThrowIfNull(record);
-            var item = await FetchDetailAsync(record.Item, cancellationToken).ConfigureAwait(false);
-            return new HsCodeRemoteDetailBundle(
-                item,
-                HsCodeTextHelper.IsExpired(item),
-                record.InstanceCount,
-                [],
-                [],
-                string.Empty,
-                [],
-                [],
-                record.EvidenceUrl,
-                DateTimeOffset.UtcNow);
-        }
+            CancellationToken cancellationToken = default);
     }
 
     public sealed class HsCodeRemoteExpiredException : ResourceConflictException

@@ -404,7 +404,7 @@ namespace ExportDocManager.Infrastructure.Tests
                         <table><tr><th>HS编码</th><th>商品名称</th></tr>
                         <tr><td><a href="https://www.i5a6.com/hscode/detail/1">8517130000</a></td><td>智能手机</td></tr></table>
                         """);
-                    return await I5a6HsCodeProvider.ParseSearchPageAsync(page);
+                    return await I5a6HsCodeProvider.ParseSearchPageAsync(page, TimeProvider.System);
                 });
                 var item = Assert.Single(rows);
                 Assert.Equal("8517130000", item.Code);
@@ -439,7 +439,7 @@ namespace ExportDocManager.Infrastructure.Tests
                         <tr><td><a href="//www.i5a6.com/hscode/detail/6109100010">61091000.10</a></td><td>棉制男T恤</td><td>针织|男式|100%棉</td></tr>
                         </table></div>
                         """);
-                    return await I5a6HsCodeProvider.ParseSearchPageAsync(page);
+                    return await I5a6HsCodeProvider.ParseSearchPageAsync(page, TimeProvider.System);
                 });
                 var item = Assert.Single(rows);
                 Assert.Equal("6109100010", item.Code);
@@ -484,7 +484,7 @@ namespace ExportDocManager.Infrastructure.Tests
                           </div>
                         </a>
                         """);
-                    return await I5a6HsCodeProvider.ParseSearchPageAsync(page);
+                    return await I5a6HsCodeProvider.ParseSearchPageAsync(page, TimeProvider.System);
                 });
                 Assert.Equal(2, rows.Count);
                 Assert.All(rows, item => Assert.Equal("6109100010", item.Code));

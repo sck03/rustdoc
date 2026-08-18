@@ -10,7 +10,7 @@ namespace ExportDocManager.Services.SingleWindow
 {
     public sealed partial class SingleWindowTrackingService
     {
-        private static async Task<SwSubmissionBatch> FindOrCreateSubmitBatchAsync(
+        private async Task<SwSubmissionBatch> FindOrCreateSubmitBatchAsync(
             AppDbContext context,
             SingleWindowPackageManifest manifest,
             CancellationToken cancellationToken)
@@ -54,7 +54,7 @@ namespace ExportDocManager.Services.SingleWindow
                 ClientProfileName = manifest.ClientProfileName ?? string.Empty,
                 CreatedOnMachine = manifest.CreatedOnMachine ?? string.Empty,
                 CreatedAt = manifest.CreatedAt,
-                UpdatedAt = DateTimeOffset.UtcNow
+                UpdatedAt = _clock.UtcNow
             };
 
             await context.SwSubmissionBatches.AddAsync(batch, cancellationToken);
@@ -92,7 +92,7 @@ namespace ExportDocManager.Services.SingleWindow
             SingleWindowPackageIntegrity.ValidateAuthentication(
                 manifest,
                 UnprotectAssignmentSecret(batch),
-                "回执包来源认证失败，已拒绝写入办公室归档。" );
+                "回执包来源认证失败，已拒绝写入办公室归档。");
 
             batch.AssignedStationKey = manifest.StationKey ?? string.Empty;
             batch.AssignedProfileKey = manifest.ClientProfileKey ?? string.Empty;
@@ -203,7 +203,7 @@ namespace ExportDocManager.Services.SingleWindow
             return value?.Trim() ?? string.Empty;
         }
 
-        private static SwHandoffPackageRecord BuildPackageRecord(
+        private SwHandoffPackageRecord BuildPackageRecord(
             int batchId,
             string? packagePath,
             SingleWindowPackageManifest manifest,
@@ -228,7 +228,7 @@ namespace ExportDocManager.Services.SingleWindow
                 AttachmentFileCount = manifest.AttachmentFiles.Count,
                 WarningCount = manifest.Warnings.Count,
                 ContentDigest = manifest.ContentDigest ?? string.Empty,
-                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedAt = _clock.UtcNow,
                 ManifestJson = JsonSerializer.Serialize(manifest, JsonOptions)
             };
         }
@@ -249,7 +249,7 @@ namespace ExportDocManager.Services.SingleWindow
                 .ToArray();
             if (terminalStatuses.Length > 1)
             {
-                throw new InvalidDataException("同一回执包同时包含放行和退单终态，已拒绝写入。" );
+                throw new InvalidDataException("同一回执包同时包含放行和退单终态，已拒绝写入。");
             }
 
             return (parsedReceipts ?? [])

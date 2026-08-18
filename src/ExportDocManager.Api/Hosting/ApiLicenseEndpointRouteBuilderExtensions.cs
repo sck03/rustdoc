@@ -9,7 +9,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/system/license", async Task<Results<
                 Ok<ApiLicenseStatusResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 ILicenseService licenseService,
                 ApiDesktopAccessOptions desktopAccessOptions,
@@ -28,7 +28,7 @@ namespace ExportDocManager.Api.Hosting
                 Ok<ApiLicenseRegisterResponse>,
                 BadRequest<ApiErrorResponse>,
                 UnauthorizedHttpResult,
-                JsonHttpResult<ApiErrorResponse>>>(
+                JsonHttpResult<ApiErrorResponse>>> (
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
                 ILicenseService licenseService,

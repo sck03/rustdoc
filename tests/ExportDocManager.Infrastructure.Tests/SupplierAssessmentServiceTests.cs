@@ -22,15 +22,25 @@ namespace ExportDocManager.Infrastructure.Tests
                 context.SupplierAssessments.AddRange(
                     new SupplierAssessment
                     {
-                        SupplierCompanyId = owned.Id, AssessmentDate = new DateOnly(2026, 8, 14),
-                        AssessmentKind = "订单复盘", QualityScore = 4, DeliveryScore = 3,
-                        ServiceScore = 5, PriceScore = 4, Conclusion = "合格"
+                        SupplierCompanyId = owned.Id,
+                        AssessmentDate = new DateOnly(2026, 8, 14),
+                        AssessmentKind = "订单复盘",
+                        QualityScore = 4,
+                        DeliveryScore = 3,
+                        ServiceScore = 5,
+                        PriceScore = 4,
+                        Conclusion = "合格"
                     },
                     new SupplierAssessment
                     {
-                        SupplierCompanyId = other.Id, AssessmentDate = new DateOnly(2026, 8, 15),
-                        AssessmentKind = "订单复盘", QualityScore = 1, DeliveryScore = 1,
-                        ServiceScore = 1, PriceScore = 1, Conclusion = "暂停合作"
+                        SupplierCompanyId = other.Id,
+                        AssessmentDate = new DateOnly(2026, 8, 15),
+                        AssessmentKind = "订单复盘",
+                        QualityScore = 1,
+                        DeliveryScore = 1,
+                        ServiceScore = 1,
+                        PriceScore = 1,
+                        Conclusion = "暂停合作"
                     });
                 await context.SaveChangesAsync();
             }

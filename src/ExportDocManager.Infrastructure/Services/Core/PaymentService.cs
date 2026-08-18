@@ -16,19 +16,10 @@ namespace ExportDocManager.Services.Core
 
         public PaymentService(
             IDbContextFactory<AppDbContext> contextFactory,
-            DatabaseConnectionSettings databaseSettings)
-            : this(contextFactory, databaseSettings, null)
-        {
-        }
-
-        public PaymentService(
-            IDbContextFactory<AppDbContext> contextFactory,
-            DatabaseConnectionSettings databaseSettings,
-            BusinessDataAccessScope? businessDataAccessScope)
+            BusinessDataAccessScope businessDataAccessScope)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
-            var normalizedSettings = databaseSettings ?? throw new ArgumentNullException(nameof(databaseSettings));
-            _businessDataAccessScope = businessDataAccessScope ?? new BusinessDataAccessScope(normalizedSettings);
+            _businessDataAccessScope = businessDataAccessScope ?? throw new ArgumentNullException(nameof(businessDataAccessScope));
         }
 
         public async Task<int> SavePaymentAsync(

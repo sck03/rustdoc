@@ -8,7 +8,7 @@ namespace ExportDocManager.Api.Tests
     public class ApiUserManagementIntegrationTests
     {
         [Fact]
-        public async Task PermissionTemplateEndpoints_ShouldPersistAssignmentsAndApplyOnNextLogin()
+        public async Task PermissionTemplateEndpoints_ShouldPersistAssignmentsAndRevokeAffectedSessions()
         {
             await using var harness = await ApiIntegrationTestHarness.StartAsync(
                 "edm-api-permission-templates",
@@ -74,6 +74,8 @@ namespace ExportDocManager.Api.Tests
 
             var firstLogin = await harness.LoginAsync(anonymousClient, "template-user", "template-pass");
             Assert.Equal(new[] { PermissionModuleCatalog.SystemAbout }, firstLogin.User.Capabilities.EnabledModules);
+            using var templateUserClient = harness.CreateClient(firstLogin.AccessToken);
+            Assert.Equal(HttpStatusCode.OK, (await templateUserClient.GetAsync("/api/auth/me")).StatusCode);
 
             var updateTemplateResponse = await adminClient.PutAsJsonAsync(
                 $"/api/permission-templates/{createdTemplate.Id}",
@@ -91,6 +93,7 @@ namespace ExportDocManager.Api.Tests
                 });
             Assert.Equal(HttpStatusCode.OK, updateTemplateResponse.StatusCode);
             Assert.Equal(new[] { PermissionModuleCatalog.SystemAbout }, firstLogin.User.Capabilities.EnabledModules);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await templateUserClient.GetAsync("/api/auth/me")).StatusCode);
 
             var secondLogin = await harness.LoginAsync(anonymousClient, "template-user", "template-pass");
             Assert.Equal(new[] { PermissionModuleCatalog.CommonEmail }, secondLogin.User.Capabilities.EnabledModules);
@@ -305,7 +308,7 @@ namespace ExportDocManager.Api.Tests
                     companyScope = "HQ",
                     isActive = true,
                     resetPassword = string.Empty
-            });
+                });
             Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
             var updated = await ApiIntegrationTestHarness.ReadJsonAsync<ApiUserSaveResponse>(updateResponse);
             Assert.Equal(created.User.Id, updated.User.Id);

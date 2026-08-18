@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using ExportDocManager.Api.Hosting;
+using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Security;
@@ -241,7 +242,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(string.Empty, clone.Invoice.NotifyPartyName);
             Assert.Equal(string.Empty, clone.Invoice.NotifyPartyAddress);
 
-            await using var connection = new SqliteConnection($"Data Source={harness.DatabasePath}");
+            await using var connection = new SqliteConnection(DbHelper.BuildConnectionString(harness.DatabasePath));
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
             command.CommandText = """
@@ -426,7 +427,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("INV-COMPANY-SAME-001", clone.Invoice.InvoiceNo);
             Assert.Equal("报关数据", clone.Invoice.Type);
 
-            await using var connection = new SqliteConnection($"Data Source={harness.DatabasePath}");
+            await using var connection = new SqliteConnection(DbHelper.BuildConnectionString(harness.DatabasePath));
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
             command.CommandText = """
@@ -849,7 +850,7 @@ namespace ExportDocManager.Api.Tests
                 HttpStatusCode.NotFound,
                 (await adminClient.GetAsync($"/api/invoices/{formal.Id}")).StatusCode);
 
-            await using var connection = new SqliteConnection($"Data Source={harness.DatabasePath}");
+            await using var connection = new SqliteConnection(DbHelper.BuildConnectionString(harness.DatabasePath));
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
             command.CommandText = """
@@ -972,7 +973,7 @@ namespace ExportDocManager.Api.Tests
             int invoiceId,
             string companyScope)
         {
-            await using var connection = new SqliteConnection($"Data Source={databasePath}");
+            await using var connection = new SqliteConnection(DbHelper.BuildConnectionString(databasePath));
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
             command.CommandText = "UPDATE Invoices SET CompanyScope = $companyScope WHERE Id = $invoiceId;";

@@ -31,7 +31,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapGet("/api/custom-options/{optionType}", async Task<Results<
                 Ok<ApiCustomOptionListResponse>,
                 BadRequest<ApiErrorResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 string optionType,
                 IApiSessionTokenService tokenService,
@@ -54,7 +54,7 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapPost("/api/custom-options/{optionType}", async Task<Results<
                 Ok<ApiCustomOptionListResponse>,
                 BadRequest<ApiErrorResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 string optionType,
                 ApiCustomOptionSaveRequest request,

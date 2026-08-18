@@ -138,12 +138,13 @@ namespace ExportDocManager.Services.SingleWindow
                 {
                     SchemaVersion = SingleWindowDisasterRecoveryLayout.SchemaVersion,
                     PackageId = packageId,
-                    CreatedAtUtc = DateTimeOffset.UtcNow,
+                    CreatedAtUtc = _clock.UtcNow,
                     DatabaseFileName = _databaseFileName,
                     StationKey = stationKey,
                     LicensePolicy = "许可证、试用锚点和机器绑定信息不进入恢复包；恢复完成后必须按当前机器码重新激活。",
                     Files = []
                 };
+                DateTimeOffset packageCreatedAtUtc = manifest.CreatedAtUtc;
                 foreach (var source in sourceFiles)
                 {
                     manifest.Files.Add(new DisasterRecoveryFileManifest
@@ -175,6 +176,7 @@ namespace ExportDocManager.Services.SingleWindow
                         innerZipPath,
                         tempPath,
                         password,
+                        packageCreatedAtUtc,
                         ct),
                     cancellationToken).ConfigureAwait(false);
                 SingleWindowDisasterRecoveryManager.RestrictRecoveredFilePermissions(packagePath);
@@ -285,7 +287,7 @@ namespace ExportDocManager.Services.SingleWindow
                     SchemaVersion = SingleWindowDisasterRecoveryLayout.SchemaVersion,
                     PackageId = manifest.PackageId,
                     PackageFileName = Path.GetFileName(fullPackagePath),
-                    ScheduledAtUtc = DateTimeOffset.UtcNow,
+                    ScheduledAtUtc = _clock.UtcNow,
                     StagingDirectoryName = stagingDirectoryName,
                     DatabaseFileName = manifest.DatabaseFileName,
                     Files = manifest.Files

@@ -6,6 +6,8 @@ namespace ExportDocManager.Infrastructure.Tests
 {
     public class HsCodeRemoteSearchParserTests
     {
+        private static readonly DateTimeOffset ObservedAt = new(2026, 8, 18, 0, 0, 0, TimeSpan.Zero);
+
         [Fact]
         public void I5a6PageParser_ShouldReadCurrentExampleTableWhenStandardResultIsEmpty()
         {
@@ -24,7 +26,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 </body></html>
                 """;
 
-            var results = I5a6PageParser.ParseSearchPage(html, "男T恤").Records
+            var results = I5a6PageParser.ParseSearchPage(html, "男T恤", ObservedAt).Records
                 .Where(item => item.Kind == HsCodeRemoteRecordKind.DeclarationExample)
                 .Select(item => item.Item)
                 .ToList();
@@ -52,7 +54,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 </body></html>
                 """;
 
-            var item = Assert.Single(I5a6PageParser.ParseSearchPage(html, "男T恤").Records).Item;
+            var item = Assert.Single(I5a6PageParser.ParseSearchPage(html, "男T恤", ObservedAt).Records).Item;
 
             Assert.Equal("6109100010", item.Code);
             Assert.Equal("棉制男T恤", item.Name);
@@ -84,8 +86,8 @@ namespace ExportDocManager.Infrastructure.Tests
                 </table></body></html>
                 """;
 
-            var initial = I5a6PageParser.ParseSearchPage(expiredSearchHtml, "女式T恤衫");
-            var recommended = I5a6PageParser.ParseSearchPage(recommendedHtml, "61091000");
+            var initial = I5a6PageParser.ParseSearchPage(expiredSearchHtml, "女式T恤衫", ObservedAt);
+            var recommended = I5a6PageParser.ParseSearchPage(recommendedHtml, "61091000", ObservedAt);
 
             Assert.Contains(initial.Records, item => item.Kind == HsCodeRemoteRecordKind.DeclarationExample && item.Item.Code == "6109100010" && item.Item.Name == "女式T恤衫" && item.Item.Description == "针织|女式|100%棉");
             Assert.Contains(initial.ReplacementEvidence, item => item.OldCode == "6109100022" && item.RecommendedKeywords.Contains("61091000"));
@@ -189,7 +191,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 </table>
                 """;
 
-            var bundle = I5a6PageParser.ParseSearchPage(html, "睡衣");
+            var bundle = I5a6PageParser.ParseSearchPage(html, "睡衣", ObservedAt);
 
             var record = Assert.Single(bundle.Records);
             Assert.Equal(HsCodeRemoteRecordKind.StandardCode, record.Kind);
@@ -235,7 +237,7 @@ namespace ExportDocManager.Infrastructure.Tests
             };
 
             var bundle = I5a6PageParser.ParseDetailPage(
-                html, seed, 534,
+                html, seed, ObservedAt, 534,
                 "https://www.i5a6.com/hscode/detail/6108320000#sbsl");
 
             Assert.False(bundle.IsExpired);
@@ -268,7 +270,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 </table></div>
                 """;
 
-            var bundle = I5a6PageParser.ParseSearchPage(html, "女式T恤衫");
+            var bundle = I5a6PageParser.ParseSearchPage(html, "女式T恤衫", ObservedAt);
 
             Assert.Equal(2, bundle.Records.Count(item => item.Kind == HsCodeRemoteRecordKind.StandardCode && item.IsExpired));
             Assert.Single(bundle.Records, item => item.Kind == HsCodeRemoteRecordKind.DeclarationExample);
@@ -294,7 +296,7 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 Code = "6109100010",
                 DetailUrl = "https://www.i5a6.com/hscode/detail/6109100010"
-            });
+            }, ObservedAt);
 
             Assert.True(bundle.IsExpired);
             Assert.Contains("61091000", bundle.RecommendedKeywords);
@@ -321,7 +323,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 </section>
                 """;
 
-            var bundle = I5a6PageParser.ParseSearchPage(html, "睡衣");
+            var bundle = I5a6PageParser.ParseSearchPage(html, "睡衣", ObservedAt);
 
             var standard = Assert.Single(bundle.Records, item => item.Kind == HsCodeRemoteRecordKind.StandardCode);
             Assert.Equal("6108320000", standard.Item.Code);
@@ -355,7 +357,7 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 Code = "6108320000",
                 DetailUrl = "https://www.i5a6.com/hscode/detail/6108320000"
-            });
+            }, ObservedAt);
 
             Assert.Equal("化纤制针织女睡衣", bundle.Item.Name);
             Assert.Single(bundle.CiqEntries);
@@ -375,7 +377,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 </div>
                 """;
 
-            var item = Assert.Single(I5a6PageParser.ParseSearchPage(html, "男T恤").Records);
+            var item = Assert.Single(I5a6PageParser.ParseSearchPage(html, "男T恤", ObservedAt).Records);
 
             Assert.Equal(HsCodeRemoteRecordKind.DeclarationExample, item.Kind);
             Assert.Equal("6109100000", item.Item.Code);
@@ -391,7 +393,38 @@ namespace ExportDocManager.Infrastructure.Tests
             public Task<IReadOnlyList<HsCode>> SearchAsync(string keyword, CancellationToken cancellationToken = default) => Task.FromResult(rows);
             public Task<HsCode> FetchDetailAsync(HsCode item, CancellationToken cancellationToken = default) => Task.FromResult(item);
             public Task<HsCodeRemoteSourceHealth> CheckHealthAsync(CancellationToken cancellationToken = default) =>
-                Task.FromResult(new HsCodeRemoteSourceHealth(Name, true, DateTimeOffset.UtcNow, "ok"));
+                Task.FromResult(new HsCodeRemoteSourceHealth(Name, true, ObservedAt, "ok"));
+
+            public Task<HsCodeRemoteSearchBundle> SearchEvidenceAsync(
+                string keyword,
+                CancellationToken cancellationToken = default) =>
+                Task.FromResult(new HsCodeRemoteSearchBundle(
+                    keyword,
+                    Name,
+                    rows.Select(item => new HsCodeRemoteSearchRecord(
+                        item,
+                        HsCodeRemoteRecordKind.StandardCode,
+                        HsCodeTextHelper.IsExpired(item),
+                        null,
+                        string.Empty,
+                        item.DetailUrl ?? string.Empty,
+                        ObservedAt)).ToArray(),
+                    []));
+
+            public Task<HsCodeRemoteDetailBundle> FetchDetailEvidenceAsync(
+                HsCodeRemoteSearchRecord record,
+                CancellationToken cancellationToken = default) =>
+                Task.FromResult(new HsCodeRemoteDetailBundle(
+                    record.Item,
+                    HsCodeTextHelper.IsExpired(record.Item),
+                    record.InstanceCount,
+                    [],
+                    [],
+                    string.Empty,
+                    [],
+                    [],
+                    record.EvidenceUrl,
+                    ObservedAt));
         }
 
         private static HsCodeRemoteSearchRecord CreateRecord(
@@ -415,7 +448,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 null,
                 string.Empty,
                 detailUrl,
-                DateTimeOffset.UtcNow);
+                ObservedAt);
         }
 
         private sealed class EvidenceTrackingProvider(
@@ -432,7 +465,7 @@ namespace ExportDocManager.Infrastructure.Tests
             public Task<HsCode> FetchDetailAsync(HsCode item, CancellationToken cancellationToken = default) =>
                 Task.FromResult(item);
             public Task<HsCodeRemoteSourceHealth> CheckHealthAsync(CancellationToken cancellationToken = default) =>
-                Task.FromResult(new HsCodeRemoteSourceHealth(Name, true, DateTimeOffset.UtcNow, "ok"));
+                Task.FromResult(new HsCodeRemoteSourceHealth(Name, true, ObservedAt, "ok"));
 
             public Task<HsCodeRemoteSearchBundle> SearchEvidenceAsync(
                 string keyword,
@@ -458,7 +491,7 @@ namespace ExportDocManager.Infrastructure.Tests
                     [],
                     [],
                     record.EvidenceUrl,
-                    DateTimeOffset.UtcNow));
+                    ObservedAt));
             }
         }
     }

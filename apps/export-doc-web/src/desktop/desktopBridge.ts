@@ -47,6 +47,19 @@ export type TauriUpdaterInstallResult = {
   storagePolicy: string;
 };
 
+export type TauriUpdaterCancelResult = {
+  accepted: boolean;
+  statusText: string;
+};
+
+export type TauriUpdaterProgress = {
+  phase: "preparing" | "downloading" | "verifying" | "installing" | "restarting" | "canceled";
+  downloadedBytes: number;
+  totalBytes?: number | null;
+  progressPercent?: number | null;
+  statusText: string;
+};
+
 function getInvoke() {
   return typeof window !== "undefined" && isTauri() ? invoke : undefined;
 }
@@ -296,6 +309,23 @@ export async function installTauriUpdate(endpoint?: string) {
   return invoke<TauriUpdaterInstallResult>("install_tauri_update", {
     endpoint: normalizeOptionalText(endpoint),
   });
+}
+
+export async function cancelTauriUpdate() {
+  const invoke = getInvoke();
+  if (!invoke) {
+    return null;
+  }
+
+  return invoke<TauriUpdaterCancelResult>("cancel_tauri_update");
+}
+
+export async function subscribeToTauriUpdaterProgress(handler: (progress: TauriUpdaterProgress) => void) {
+  if (!getInvoke()) {
+    return () => undefined;
+  }
+
+  return listen<TauriUpdaterProgress>("exportdoc://updater-progress", (event) => handler(event.payload));
 }
 
 export async function requestAppExit() {

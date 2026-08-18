@@ -11,7 +11,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/dashboard", async Task<Results<
                 Ok<ApiDashboardResponse>,
-                UnauthorizedHttpResult>>(
+                UnauthorizedHttpResult>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
                 IDashboardService dashboardService,

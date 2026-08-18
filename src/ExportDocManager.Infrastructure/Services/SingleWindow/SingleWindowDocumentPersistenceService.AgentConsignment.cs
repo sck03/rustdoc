@@ -98,7 +98,7 @@ namespace ExportDocManager.Services.SingleWindow
                     entity.ManualLockedFieldsJson = SingleWindowDraftStateHelper.SerializeLockedFields(lockedFields);
                     entity.SourceBaselineJson = baselineJson;
                     entity.SourceBaselineHash = SingleWindowDraftStateHelper.ComputeBaselineHash(baselineJson);
-                    entity.LastGeneratedAt = DateTimeOffset.UtcNow;
+                    entity.LastGeneratedAt = _clock.UtcNow;
 
                     if (entity.Id <= 0)
                     {
@@ -196,7 +196,7 @@ namespace ExportDocManager.Services.SingleWindow
                         entity.SourceBaselineHash = SingleWindowDraftStateHelper.ComputeBaselineHash(entity.SourceBaselineJson);
                     }
 
-                    entity.LastGeneratedAt = DateTimeOffset.UtcNow;
+                    entity.LastGeneratedAt = _clock.UtcNow;
 
                     await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
                     return entity.Id;

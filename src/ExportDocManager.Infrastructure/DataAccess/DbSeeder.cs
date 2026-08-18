@@ -9,13 +9,14 @@ namespace ExportDocManager.DataAccess
         public static void SeedAuxiliaryData(
             AppDbContext context,
             DatabaseConnectionSettings? databaseSettings = null,
-            string? initialAdminPassword = null)
+            string? initialAdminPassword = null,
+            TimeProvider? timeProvider = null)
         {
             ArgumentNullException.ThrowIfNull(context);
             bool usesPostgreSql = databaseSettings != null &&
                                   DatabaseModeHelper.UsesPostgreSql(databaseSettings);
 
-            SeedPermissionTemplates(context);
+            SeedPermissionTemplates(context, timeProvider ?? TimeProvider.System);
             int adminTemplateId = context.PermissionTemplates
                 .Where(template => template.Code == BuiltInPermissionTemplateCatalog.Admin)
                 .Select(template => template.Id)
@@ -56,7 +57,7 @@ namespace ExportDocManager.DataAccess
                     new Unit { NameEN = "PCS", NameCN = "件", Code = "01" },
                     new Unit { NameEN = "PCS", NameCN = "支", Code = "01" },
                     new Unit { NameEN = "PCS", NameCN = "条", Code = "01" },
-                    
+
                     new Unit { NameEN = "CTNS", NameCN = "箱", Code = "02" },
                     new Unit { NameEN = "KGS", NameCN = "千克", Code = "03" },
                     new Unit { NameEN = "SETS", NameCN = "套", Code = "04" },
@@ -147,29 +148,29 @@ namespace ExportDocManager.DataAccess
             {
                 var containerTypes = new[]
                 {
-                    new ContainerTypeDefinition 
-                    { 
-                        Name = "20GP", 
-                        Length = 589, Width = 235, Height = 239, 
+                    new ContainerTypeDefinition
+                    {
+                        Name = "20GP",
+                        Length = 589, Width = 235, Height = 239,
                         MaxVolume = 28m, // Conservative practical volume
                         MaxWeight = 21000m, // Conservative weight
-                        IsSystemDefault = true 
+                        IsSystemDefault = true
                     },
-                    new ContainerTypeDefinition 
-                    { 
-                        Name = "40GP", 
-                        Length = 1203, Width = 235, Height = 239, 
-                        MaxVolume = 58m, 
-                        MaxWeight = 26000m, 
-                        IsSystemDefault = true 
+                    new ContainerTypeDefinition
+                    {
+                        Name = "40GP",
+                        Length = 1203, Width = 235, Height = 239,
+                        MaxVolume = 58m,
+                        MaxWeight = 26000m,
+                        IsSystemDefault = true
                     },
-                    new ContainerTypeDefinition 
-                    { 
-                        Name = "40HQ", 
-                        Length = 1203, Width = 235, Height = 269, 
-                        MaxVolume = 68m, 
-                        MaxWeight = 26000m, 
-                        IsSystemDefault = true 
+                    new ContainerTypeDefinition
+                    {
+                        Name = "40HQ",
+                        Length = 1203, Width = 235, Height = 269,
+                        MaxVolume = 68m,
+                        MaxWeight = 26000m,
+                        IsSystemDefault = true
                     }
                 };
                 context.ContainerTypeDefinitions.AddRange(containerTypes);
@@ -178,7 +179,7 @@ namespace ExportDocManager.DataAccess
             context.SaveChanges();
         }
 
-        private static void SeedPermissionTemplates(AppDbContext context)
+        private static void SeedPermissionTemplates(AppDbContext context, TimeProvider timeProvider)
         {
             if (context.PermissionTemplates.Any())
             {
@@ -194,7 +195,7 @@ namespace ExportDocManager.DataAccess
                     Description = definition.Description,
                     IsSystem = true,
                     IsActive = true,
-                    UpdatedAt = DateTimeOffset.UtcNow,
+                    UpdatedAt = timeProvider.GetUtcNow(),
                     Modules = definition.GetModuleAccess()
                         .Select(grant => new PermissionTemplateModule
                         {

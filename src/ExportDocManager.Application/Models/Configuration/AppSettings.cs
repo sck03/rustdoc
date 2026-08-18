@@ -255,8 +255,8 @@ namespace ExportDocManager.Models
         [Browsable(false)]
         public List<string> AllSupportedCurrencies { get; set; } = new List<string>
         {
-            "美元", "欧元", "日元", "英镑", "港币", 
-            "澳大利亚元", "加拿大元", "瑞士法郎", "新加坡元", 
+            "美元", "欧元", "日元", "英镑", "港币",
+            "澳大利亚元", "加拿大元", "瑞士法郎", "新加坡元",
             "新西兰元", "韩国元", "泰国铢", "卢布", "澳门元", "林吉特"
         };
 

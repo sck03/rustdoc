@@ -12,7 +12,7 @@ namespace ExportDocManager.Services.MasterData
         public async Task<int> CaptureRemoteExamplesAsync(
             string query, IEnumerable<HsCode> remoteRows, CancellationToken cancellationToken = default)
         {
-            DateTimeOffset observedAt = DateTimeOffset.UtcNow;
+            DateTimeOffset observedAt = _clock.UtcNow;
             var records = (remoteRows ?? Enumerable.Empty<HsCode>())
                 .Where(item => item != null)
                 .Select(item => new HsCodeRemoteSearchRecord(
@@ -108,7 +108,7 @@ namespace ExportDocManager.Services.MasterData
                 .ToList();
             var existingCandidates = await LoadRemoteCandidatesByFingerprintsAsync(context, fingerprints, cancellationToken);
             var candidatesByFingerprint = existingCandidates.ToDictionary(item => item.Fingerprint, StringComparer.OrdinalIgnoreCase);
-            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset now = _clock.UtcNow;
             int added = 0;
             foreach (var record in examples)
             {
@@ -245,7 +245,7 @@ namespace ExportDocManager.Services.MasterData
             return candidates.Count;
         }
 
-        private static async Task<bool> ReviewRemoteCandidateInContextAsync(
+        private async Task<bool> ReviewRemoteCandidateInContextAsync(
             AppDbContext context,
             HsCodeRemoteCandidateReviewInput input,
             CancellationToken cancellationToken,
@@ -253,7 +253,7 @@ namespace ExportDocManager.Services.MasterData
         {
             var candidate = await context.HsCodeRemoteCandidates.FirstOrDefaultAsync(item => item.Id == input.Id, cancellationToken);
             if (candidate == null || candidate.ReviewStatus != "Pending") return false;
-            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset now = _clock.UtcNow;
             if (!input.Confirmed)
             {
                 candidate.ReviewStatus = "Ignored";
@@ -327,7 +327,7 @@ namespace ExportDocManager.Services.MasterData
         {
             if (preview == null) return;
             await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset now = _clock.UtcNow;
             foreach (var item in preview.Items.Where(item => item.ChangeType == "SuspectedObsolete"))
             {
                 string oldCode = HsCodeTextHelper.NormalizeCode(item.Item?.Code);

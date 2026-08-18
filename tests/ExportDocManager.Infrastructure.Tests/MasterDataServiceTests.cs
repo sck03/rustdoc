@@ -17,7 +17,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task HsCodeReferenceSave_ShouldNotDowngradeOrOverwriteActiveAnnualTariff()
         {
             using var factory = new SqliteTestDbContextFactory();
-            var repository = new LocalMasterDataReadRepository(factory);
+            var repository = CreateRepository(factory);
             var service = CreateHsCodeService(factory, repository);
             await using (var context = factory.CreateDbContext())
             {
@@ -55,7 +55,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task HsCodeManualSave_ShouldCreateReferenceOnlyAndRejectActivePromotion()
         {
             using var factory = new SqliteTestDbContextFactory();
-            var service = new HsCodeService(factory, new LocalMasterDataReadRepository(factory));
+            var service = new HsCodeService(factory, CreateRepository(factory));
 
             await Assert.ThrowsAsync<ServiceValidationException>(() => service.SaveAsync(new HsCode
             {
@@ -87,7 +87,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task HsCodeNumericKeyword_ShouldMatchOnlyCodePrefix()
         {
             using var factory = new SqliteTestDbContextFactory();
-            var repository = new LocalMasterDataReadRepository(factory);
+            var repository = CreateRepository(factory);
             var service = CreateHsCodeService(factory, repository);
             await service.SaveAsync(new HsCode { Code = "6109100000", Name = "棉制针织T恤衫" });
             await service.SaveAsync(new HsCode { Code = "2846109010", Name = "其他稀土化合物" });
@@ -102,7 +102,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task HsCodeImport_ShouldDetectNonStandardHeaderAndPreserveExistingNonEmptyFields()
         {
             using var factory = new SqliteTestDbContextFactory();
-            var repository = new LocalMasterDataReadRepository(factory);
+            var repository = CreateRepository(factory);
             var service = CreateHsCodeService(factory, repository);
             await service.SaveAsync(new HsCode
             {
@@ -150,7 +150,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task HsCodeCompleteSnapshot_ShouldMarkMissingCodeWithoutDeletingIt()
         {
             using var factory = new SqliteTestDbContextFactory();
-            var repository = new LocalMasterDataReadRepository(factory);
+            var repository = CreateRepository(factory);
             var service = CreateHsCodeService(factory, repository);
             await service.SaveAsync(new HsCode { Code = "8517000000", Name = "旧通信设备", Unit = "台" });
             string path = CreateHsCodeWorkbook(workbook =>
@@ -181,7 +181,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task HsCodeImport_ShouldCommitMoreThanOneDatabaseBatch()
         {
             using var factory = new SqliteTestDbContextFactory();
-            var service = CreateHsCodeService(factory, new LocalMasterDataReadRepository(factory));
+            var service = CreateHsCodeService(factory, CreateRepository(factory));
             string path = CreateHsCodeWorkbook(workbook =>
             {
                 var sheet = workbook.AddWorksheet("大批量税则");
@@ -219,7 +219,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task HsCodeImport_ShouldRecognizeSpecificationElementsAndChineseTariffColumns()
         {
             using var factory = new SqliteTestDbContextFactory();
-            var repository = new LocalMasterDataReadRepository(factory);
+            var repository = CreateRepository(factory);
             var service = CreateHsCodeService(factory, repository);
             string path = CreateHsCodeWorkbook(workbook =>
             {
@@ -265,6 +265,9 @@ namespace ExportDocManager.Infrastructure.Tests
             }
         }
 
+        private static LocalMasterDataReadRepository CreateRepository(IDbContextFactory<AppDbContext> factory) =>
+            new(factory, TestAccessScope.Create());
+
         private static HsCodeService CreateHsCodeService(
             IDbContextFactory<AppDbContext> factory,
             IHsCodeReadRepository repository) =>
@@ -285,7 +288,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task CustomerService_ShouldNormalizeAndReturnSavedCustomer()
         {
             using var factory = new TestDbContextFactory();
-            var service = new CustomerService(factory, new LocalMasterDataReadRepository(factory));
+            var service = new CustomerService(factory, CreateRepository(factory), TestAccessScope.Create());
 
             await service.SaveCustomerAsync(new Customer
             {
@@ -307,7 +310,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task ProductService_ShouldNormalizeCodeHsCodeAndUnits()
         {
             using var factory = new TestDbContextFactory();
-            var service = new ProductService(factory, new LocalMasterDataReadRepository(factory));
+            var service = new ProductService(factory, CreateRepository(factory));
 
             await service.AddProductAsync(new Product
             {
@@ -332,7 +335,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task AuxiliaryService_ShouldNormalizePortsAndUnits()
         {
             using var factory = new TestDbContextFactory();
-            var repository = new LocalMasterDataReadRepository(factory);
+            var repository = CreateRepository(factory);
             var service = new AuxiliaryService(factory, repository, repository);
 
             await service.SavePortAsync(new Port
@@ -365,9 +368,9 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task MasterDataDeleteServices_ShouldRemoveExistingRowsWithRowVersion()
         {
             using var factory = new SqliteTestDbContextFactory(new AuditInterceptor());
-            var repository = new LocalMasterDataReadRepository(factory);
-            var customerService = new CustomerService(factory, repository);
-            var exporterService = new ExporterService(factory, repository);
+            var repository = CreateRepository(factory);
+            var customerService = new CustomerService(factory, repository, TestAccessScope.Create());
+            var exporterService = new ExporterService(factory, repository, TestAccessScope.Create());
             var payeeService = new PayeeService(factory, repository);
 
             int customerId = await customerService.SaveCustomerAsync(new Customer
@@ -401,7 +404,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task SharedMasterDataUpdates_ShouldRejectStaleConcurrentEditors()
         {
             using var factory = new SqliteTestDbContextFactory(new AuditInterceptor());
-            var repository = new LocalMasterDataReadRepository(factory);
+            var repository = CreateRepository(factory);
             var productService = new ProductService(factory, repository);
             var payeeService = new PayeeService(factory, repository);
             var auxiliaryService = new AuxiliaryService(factory, repository, repository);

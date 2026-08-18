@@ -109,10 +109,12 @@ namespace ExportDocManager.Api.Hosting
     public sealed class ApiSecurityHeadersMiddleware
     {
         private readonly RequestDelegate _next;
+        private readonly string _contentSecurityPolicy;
 
-        public ApiSecurityHeadersMiddleware(RequestDelegate next)
+        public ApiSecurityHeadersMiddleware(RequestDelegate next, ApiRuntimeOptions runtimeOptions)
         {
             _next = next ?? throw new ArgumentNullException(nameof(next));
+            _contentSecurityPolicy = BuildContentSecurityPolicy(runtimeOptions);
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -126,9 +128,7 @@ namespace ExportDocManager.Api.Hosting
                 headers.TryAdd("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
                 headers.TryAdd(
                     "Content-Security-Policy",
-                    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; " +
-                    "img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; " +
-                    "script-src 'self'; connect-src 'self' http: https: ws: wss:; frame-src 'self' blob:; worker-src 'self' blob:");
+                    _contentSecurityPolicy);
                 if (context.Request.IsHttps)
                 {
                     headers.TryAdd("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
@@ -137,6 +137,17 @@ namespace ExportDocManager.Api.Hosting
             });
 
             await _next(context);
+        }
+
+        internal static string BuildContentSecurityPolicy(ApiRuntimeOptions runtimeOptions)
+        {
+            ArgumentNullException.ThrowIfNull(runtimeOptions);
+            string connectSources = string.Join(
+                ' ',
+                new[] { "'self'" }.Concat(runtimeOptions.AllowedOrigins));
+            return "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; " +
+                   "img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; " +
+                   $"script-src 'self'; connect-src {connectSources}; frame-src 'self' blob:; worker-src 'self' blob:";
         }
     }
 

@@ -9,7 +9,7 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapEmailTemplateEndpoints(this IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/email-templates", async Task<Results<Ok<IReadOnlyList<ApiEmailTemplateDto>>, UnauthorizedHttpResult, ForbidHttpResult>>(
+            endpoints.MapGet("/api/email-templates", async Task<Results<Ok<IReadOnlyList<ApiEmailTemplateDto>>, UnauthorizedHttpResult, ForbidHttpResult>> (
                 HttpContext c, ApiAuthorizationService a, IEmailTemplateService service,
                 string? keyword, string? category, bool? includeInactive, CancellationToken ct) =>
             {
@@ -39,7 +39,7 @@ namespace ExportDocManager.Api.Hosting
                     request.Subject, request.BodyHtml, request.Variables ?? new Dictionary<string, string>()))));
             }).WithName("PreviewEmailTemplate");
 
-            endpoints.MapPost("/api/email-templates", async Task<Results<Created<ApiEmailTemplateDto>, BadRequest<ApiErrorResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>>>(
+            endpoints.MapPost("/api/email-templates", async Task<Results<Created<ApiEmailTemplateDto>, BadRequest<ApiErrorResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>>> (
                 HttpContext c, ApiAuthorizationService a,
                 IEmailTemplateService service, ApiEmailTemplateSaveRequest request, CancellationToken ct) =>
             {
@@ -56,7 +56,7 @@ namespace ExportDocManager.Api.Hosting
                 catch (ResourceConflictException ex) { return TypedResults.Conflict(new ApiErrorResponse(ex.Message)); }
             }).WithName("CreateEmailTemplate");
 
-            endpoints.MapPut("/api/email-templates/{id:int}", async Task<Results<Ok<ApiEmailTemplateDto>, BadRequest<ApiErrorResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>>(
+            endpoints.MapPut("/api/email-templates/{id:int}", async Task<Results<Ok<ApiEmailTemplateDto>, BadRequest<ApiErrorResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>> (
                 HttpContext c, ApiAuthorizationService a, IEmailTemplateService service,
                 int id, ApiEmailTemplateSaveRequest request, CancellationToken ct) =>
             {
@@ -70,7 +70,7 @@ namespace ExportDocManager.Api.Hosting
                 catch (KeyNotFoundException) { return TypedResults.NotFound(); }
             }).WithName("UpdateEmailTemplate");
 
-            endpoints.MapGet("/api/email-templates/{id:int}/versions", async Task<Results<Ok<IReadOnlyList<ApiEmailTemplateVersionDto>>, UnauthorizedHttpResult, ForbidHttpResult, NotFound>>(
+            endpoints.MapGet("/api/email-templates/{id:int}/versions", async Task<Results<Ok<IReadOnlyList<ApiEmailTemplateVersionDto>>, UnauthorizedHttpResult, ForbidHttpResult, NotFound>> (
                 HttpContext c, ApiAuthorizationService a,
                 IEmailTemplateService service, int id, CancellationToken ct) =>
             {
@@ -82,7 +82,7 @@ namespace ExportDocManager.Api.Hosting
                     : TypedResults.Ok<IReadOnlyList<ApiEmailTemplateVersionDto>>(rows.Select(ToApiDto).ToArray());
             }).WithName("ListEmailTemplateVersions");
 
-            endpoints.MapPost("/api/email-templates/{id:int}/versions/{versionNumber:int}/restore", async Task<Results<Ok<ApiEmailTemplateDto>, BadRequest<ApiErrorResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>>(
+            endpoints.MapPost("/api/email-templates/{id:int}/versions/{versionNumber:int}/restore", async Task<Results<Ok<ApiEmailTemplateDto>, BadRequest<ApiErrorResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>> (
                 HttpContext c, ApiAuthorizationService a, IEmailTemplateService service,
                 int id, int versionNumber, CancellationToken ct) =>
             {
@@ -96,7 +96,7 @@ namespace ExportDocManager.Api.Hosting
                 catch (KeyNotFoundException) { return TypedResults.NotFound(); }
             }).WithName("RestoreEmailTemplateVersion");
 
-            endpoints.MapDelete("/api/email-templates/{id:int}", async Task<Results<Ok<ApiCommandResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>>(
+            endpoints.MapDelete("/api/email-templates/{id:int}", async Task<Results<Ok<ApiCommandResponse>, UnauthorizedHttpResult, ForbidHttpResult, Conflict<ApiErrorResponse>, NotFound>> (
                 HttpContext c, ApiAuthorizationService a,
                 IEmailTemplateService service, int id, CancellationToken ct) =>
             {

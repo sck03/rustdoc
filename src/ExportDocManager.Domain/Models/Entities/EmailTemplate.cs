@@ -15,7 +15,7 @@ namespace ExportDocManager.Models.Entities
         public bool IsActive { get; set; } = true;
         public bool IsShared { get; set; }
         [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
     }
 }
