@@ -22,7 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\ExportDocManager.Application\ExportDocManager.Application.csproj" />
     <ProjectReference Include="..\ExportDocManager.Domain\ExportDocManager.Domain.csproj" />
     <ProjectReference Include="..\ExportDocManager.Infrastructure\ExportDocManager.Infrastructure.csproj" />

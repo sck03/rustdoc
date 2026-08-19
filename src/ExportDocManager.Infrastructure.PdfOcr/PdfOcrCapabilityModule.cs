@@ -1,7 +1,6 @@
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Tools;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace ExportDocManager.Infrastructure.PdfOcr;
 
@@ -10,7 +9,7 @@ public sealed class PdfOcrCapabilityModule : IExportDocCapabilityModule
     public string Key => "pdf-ocr";
 
     public void RegisterServices(
-        IServiceCollection services,
+        IExportDocCapabilityRegistry services,
         IAppPathProvider pathProvider)
     {
         ArgumentNullException.ThrowIfNull(services);

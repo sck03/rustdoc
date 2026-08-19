@@ -156,7 +156,7 @@ jobs:
 
       - name: Fetch Rust dependencies
         shell: pwsh
-        run: cargo fetch --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --target ${{ inputs.rust_target }}
+        run: cargo fetch --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --locked --target ${{ inputs.rust_target }}
 
       - name: Provision Chrome Headless Shell
         if: inputs.include_browser && inputs.chrome_platform != 'chromium-linux-arm64'

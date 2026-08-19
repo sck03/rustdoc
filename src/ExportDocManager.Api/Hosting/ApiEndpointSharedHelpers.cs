@@ -108,7 +108,11 @@ namespace ExportDocManager.Api.Hosting
             ArgumentException.ThrowIfNullOrWhiteSpace(kind);
             ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
 
-            string safeKind = SanitizeFileNamePart(kind);
+            // A path component that is only dots (or otherwise sanitizes to empty) is an
+            // invalid caller value, not a request for a generic fallback directory.  Keeping
+            // this distinction prevents traversal-looking input from being silently moved to
+            // an unrelated output location.
+            string safeKind = CrossPlatformFileNamePolicy.SanitizeFileNamePart(kind, '_', string.Empty);
             if (string.IsNullOrWhiteSpace(safeKind) ||
                 string.Equals(safeKind, ".", StringComparison.Ordinal) ||
                 string.Equals(safeKind, "..", StringComparison.Ordinal))
@@ -116,7 +120,7 @@ namespace ExportDocManager.Api.Hosting
                 throw new ArgumentException("下载类型目录名无效。", nameof(kind));
             }
 
-            string safeFileName = Path.GetFileName(fileName.Trim());
+            string safeFileName = CrossPlatformFileNamePolicy.SanitizeFileNamePart(fileName, '_', string.Empty);
             if (string.IsNullOrWhiteSpace(safeFileName) ||
                 string.Equals(safeFileName, ".", StringComparison.Ordinal) ||
                 string.Equals(safeFileName, "..", StringComparison.Ordinal))
@@ -199,12 +203,6 @@ namespace ExportDocManager.Api.Hosting
                 contentType,
                 downloadFileName,
                 enableRangeProcessing: true);
-        }
-
-        private static string SanitizeFileNamePart(string value)
-        {
-            string normalized = CrossPlatformFileNamePolicy.ReplaceInvalidCharacters(value.Trim(), '_');
-            return normalized.Trim('.', ' ');
         }
 
         private sealed class TemporaryDownloadCleanup : IDisposable

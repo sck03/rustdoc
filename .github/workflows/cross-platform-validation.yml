@@ -37,6 +37,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       NUGET_PACKAGES: ${{ github.workspace }}/artifacts/nuget-packages
+      NUGET_HTTP_CACHE_PATH: ${{ github.workspace }}/.codex-runtime/nuget-http-cache
       CARGO_TARGET_DIR: ${{ github.workspace }}/artifacts/cargo-target-exportdoc
       CARGO_BUILD_JOBS: 2
       # Public source intentionally excludes large Chrome Headless Shell
@@ -84,25 +85,25 @@ jobs:
         run: npm --prefix apps/export-doc-tauri run test:updater-release-contract
 
       - name: Restore .NET projects
-        run: dotnet restore ExportDocManager.sln --locked-mode
+        run: dotnet restore ExportDocManager.sln --locked-mode --configfile NuGet.Config
 
       - name: Build cross-platform backend layers
         run: dotnet build src/ExportDocManager.Api/ExportDocManager.Api.csproj --no-restore -c Release -v minimal
 
-      # A solution restore without --runtime creates only the portable
-      # net10.0 asset graph.  The contract builds below target two different
-      # RIDs, so restore the complete project-reference graph explicitly for
-      # each declared RID before using --no-restore.  This avoids project.assets.json
-      # failures in Domain/Application/Infrastructure on hosted runners.
+      # Portable builds have no RID; contract builds consume the committed per-RID locks.
       - name: Restore primary backend runtime graph
-        run: dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -r ${{ matrix.primary_rid }} /p:ExportDocRuntimeRestore=true
+        run: >-
+          dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj --locked-mode --configfile NuGet.Config
+          /p:RuntimeIdentifier=${{ matrix.primary_rid }} /p:ExportDocRuntimeRestore=true
 
       - name: Validate primary backend contract
         run: dotnet build src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj --no-restore -c Release -r ${{ matrix.primary_rid }} -v minimal
 
       - name: Restore secondary backend runtime graph
         if: matrix.secondary_rid != ''
-        run: dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj -r ${{ matrix.secondary_rid }} /p:ExportDocRuntimeRestore=true
+        run: >-
+          dotnet restore src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj --locked-mode --configfile NuGet.Config
+          /p:RuntimeIdentifier=${{ matrix.secondary_rid }} /p:ExportDocRuntimeRestore=true
 
       - name: Validate secondary backend contract
         if: matrix.secondary_rid != ''

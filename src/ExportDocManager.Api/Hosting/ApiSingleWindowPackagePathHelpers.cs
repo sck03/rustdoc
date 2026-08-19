@@ -81,9 +81,7 @@ namespace ExportDocManager.Api.Hosting
         private static string BuildSafeSingleWindowFileToken(string value)
         {
             string trimmed = string.IsNullOrWhiteSpace(value) ? "package" : value.Trim();
-            string safe = CrossPlatformFileNamePolicy
-                .ReplaceInvalidCharacters(trimmed, '-')
-                .Trim('-', '.', ' ');
+            string safe = CrossPlatformFileNamePolicy.SanitizeFileNamePart(trimmed, '-', "package");
             return string.IsNullOrWhiteSpace(safe) ? "package" : safe;
         }
 

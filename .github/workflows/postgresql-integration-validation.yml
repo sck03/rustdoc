@@ -65,6 +65,7 @@ jobs:
 
     env:
       NUGET_PACKAGES: ${{ github.workspace }}/artifacts/nuget-packages
+      NUGET_HTTP_CACHE_PATH: ${{ github.workspace }}/.codex-runtime/nuget-http-cache
       EXPORTDOC_TEST_POSTGRES_CONNECTION_STRING: Host=127.0.0.1;Port=5432;Database=exportdoc_test;Username=exportdoc;Password=exportdoc-test-password
       EXPORTDOC_TEST_HS_RECORDS: ${{ inputs.hs_records || '10000' }}
       EXPORTDOC_TEST_INVOICE_RECORDS: ${{ inputs.invoice_records || '10000' }}
@@ -79,7 +80,7 @@ jobs:
           dotnet-version: 10.0.302
 
       - name: Restore
-        run: dotnet restore ExportDocManager.sln --locked-mode
+        run: dotnet restore ExportDocManager.sln --locked-mode --configfile NuGet.Config
 
       - name: Run real PostgreSQL initialization, concurrency and capacity validation
         timeout-minutes: 45

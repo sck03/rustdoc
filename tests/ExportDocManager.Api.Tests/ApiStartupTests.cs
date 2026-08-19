@@ -215,7 +215,7 @@ namespace ExportDocManager.Api.Tests
                     });
 
                 string expectedDatabaseRoot = Path.Combine(dataRoot, "Database");
-                string databasePath = DbHelper.GetDatabasePath(pathProvider, databaseSettings.SqliteDatabaseFileName);
+                string databasePath = DbHelper.ResolveRuntimeSqliteDatabasePath(pathProvider, databaseSettings.SqliteDatabaseFileName);
 
                 Assert.True(Directory.Exists(expectedDatabaseRoot));
                 Assert.True(Directory.Exists(Path.Combine(dataRoot, "SingleWindow")));
@@ -267,7 +267,7 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
-        public void Validate_ShouldAllowOnlySqliteDatabasePathsInsideRuntimeDatabaseRoot()
+        public void Validate_ShouldAcceptOnlySimpleSqliteFileNameInRuntimeDatabaseRoot()
         {
             string appRoot = CreateTempDirectory("edm-api-path-app");
             string dataRoot = Path.Combine(Path.GetTempPath(), $"edm-api-path-data-{Guid.NewGuid():N}");
@@ -286,7 +286,7 @@ namespace ExportDocManager.Api.Tests
                     new DatabaseConnectionSettings
                     {
                         Provider = DatabaseConnectionSettings.SqliteProvider,
-                        SqliteDatabaseFileName = Path.Combine(pathProvider.DatabaseRoot, "inside.db")
+                        SqliteDatabaseFileName = "inside.db"
                     },
                     runtimeOptions);
 
@@ -322,6 +322,14 @@ namespace ExportDocManager.Api.Tests
                         SqliteDatabaseFileName = Path.Combine(appRoot, "outside.db")
                     },
                     runtimeOptions));
+                Assert.Throws<ServiceValidationException>(() => ApiStartupValidator.Validate(
+                    pathProvider,
+                    new DatabaseConnectionSettings
+                    {
+                        Provider = DatabaseConnectionSettings.SqliteProvider,
+                        SqliteDatabaseFileName = Path.Combine(pathProvider.DatabaseRoot, "inside.db")
+                    },
+                    runtimeOptions));
 
                 string browserDownloadRoot = Path.Combine(pathProvider.ExportRoot, "Browser");
                 string externalDownloadRoot = Path.Combine(dataRoot, "ExternalBrowserTarget");
@@ -346,7 +354,7 @@ namespace ExportDocManager.Api.Tests
                         new DatabaseConnectionSettings
                         {
                             Provider = DatabaseConnectionSettings.SqliteProvider,
-                            SqliteDatabaseFileName = Path.Combine(pathProvider.DatabaseRoot, "inside.db")
+                            SqliteDatabaseFileName = "inside.db"
                         },
                         runtimeOptions));
                     Assert.Empty(Directory.EnumerateFileSystemEntries(externalDownloadRoot));

@@ -141,7 +141,7 @@ $playwrightHostProject = Join-Path $repoRoot "src/ExportDocManager.Api/ExportDoc
 $previousPlaywrightBrowsersPath = $env:PLAYWRIGHT_BROWSERS_PATH
 try {
     Invoke-ExportDocExternal -FilePath "dotnet" -Arguments @(
-        "restore", $playwrightHostProject, "-r", "linux-arm64", "--configfile", (Join-Path $repoRoot "NuGet.Config")) -WorkingDirectory $repoRoot
+        "restore", $playwrightHostProject, "--locked-mode", "--configfile", (Join-Path $repoRoot "NuGet.Config"), "/p:RuntimeIdentifier=linux-arm64", "/p:ExportDocRuntimeRestore=true") -WorkingDirectory $repoRoot
     Invoke-ExportDocExternal -FilePath "dotnet" -Arguments @(
         "build", $playwrightHostProject, "-c", "Release", "-r", "linux-arm64", "--no-restore", "-o", $buildRoot) -WorkingDirectory $repoRoot
 

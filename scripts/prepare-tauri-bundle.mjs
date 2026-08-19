@@ -31,6 +31,7 @@ const rid = process.env.EXPORTDOCMANAGER_TAURI_RID || detectRuntimeIdentifier();
 const rustTarget = resolveRustTargetTriple(rid);
 const selfContained = (process.env.EXPORTDOCMANAGER_TAURI_SELF_CONTAINED || "true").toLowerCase() !== "false";
 const productEdition = normalizeProductEdition(process.env.EXPORTDOCMANAGER_PRODUCT_EDITION);
+const dependencyProfile = productEdition === "Sales" ? "sales" : "full";
 const productEditionCatalog = JSON.parse(
   await readFile(path.join(repoRoot, "scripts", "product-editions.json"), "utf8"),
 );
@@ -80,6 +81,23 @@ await mkdir(env.TEMP, { recursive: true });
 await mkdir(env.TMP, { recursive: true });
 
 const args = [
+  "restore",
+  apiProject,
+  "--locked-mode",
+  "--configfile",
+  path.join(repoRoot, "NuGet.Config"),
+  `/p:RuntimeIdentifier=${rid}`,
+  "/p:ExportDocRuntimeRestore=true",
+  `/p:ExportDocDependencyProfile=${dependencyProfile}`,
+  `/p:ExportDocIncludeExcelModule=${resourceProfile.excelAnalyzer}`,
+  `/p:ExportDocIncludeBrowserModule=${resourceProfile.browserRenderer}`,
+  `/p:ExportDocIncludePdfOcrModule=${resourceProfile.ocr}`,
+];
+
+console.log(`Restoring locked API runtime graph for Tauri bundle (${rid})...`);
+run("dotnet", args, env);
+
+const publishArgs = [
   "publish",
   apiProject,
   "-c",
@@ -94,7 +112,9 @@ const args = [
   "/p:PublishReadyToRun=false",
   "/p:DebugType=None",
   "/p:DebugSymbols=false",
-  "/p:ExportDocRuntimeRestore=true",
+  "--no-restore",
+  `/p:ExportDocRuntimeRestore=true`,
+  `/p:ExportDocDependencyProfile=${dependencyProfile}`,
   "/p:ExportDocPackageProfile=Desktop",
   `/p:ExportDocIncludeTemplates=${resourceProfile.documentResources}`,
   `/p:ExportDocIncludeOcrModels=${resourceProfile.ocr}`,
@@ -108,7 +128,7 @@ const args = [
 ];
 
 console.log(`Publishing API sidecar for Tauri bundle (${rid}, self-contained=${selfContained})...`);
-run("dotnet", args, env);
+run("dotnet", publishArgs, env);
 if (resourceProfile.ocr) {
   await buildRustOcrSidecar(env);
 }
@@ -194,7 +214,7 @@ async function buildRustOcrSidecar(buildEnv) {
   }
   const manifest = path.join(repoRoot, "apps", "exportdoc-ocr-rs", "Cargo.toml");
   console.log(`Building Rust OCR sidecar for ${target}...`);
-  run("cargo", ["build", "--manifest-path", manifest, "--release", "--target", target], buildEnv);
+  run("cargo", ["build", "--manifest-path", manifest, "--release", "--locked", "--target", target], buildEnv);
   const fileName = rid.startsWith("win-") ? "exportdoc-ocr.exe" : "exportdoc-ocr";
   const binary = path.join(buildEnv.CARGO_TARGET_DIR, target, "release", fileName);
   await mkdir(ocrSidecarRoot, { recursive: true });
@@ -246,7 +266,17 @@ function validateResourceProfile(value, edition) {
 }
 
 async function generateDependencyGovernance(buildEnv) {
-  run("dotnet", ["restore", path.join(repoRoot, "ExportDocManager.sln"), "--locked-mode"], buildEnv);
+  run(
+    "dotnet",
+    [
+      "restore",
+      path.join(repoRoot, "ExportDocManager.sln"),
+      "--locked-mode",
+      "--configfile",
+      path.join(repoRoot, "NuGet.Config"),
+    ],
+    buildEnv,
+  );
   run(
     "node",
     [

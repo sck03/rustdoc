@@ -4,21 +4,17 @@
     <AssemblyVersion>0.1.1.0</AssemblyVersion>
     <FileVersion>0.1.1.0</FileVersion>
     <InformationalVersion>0.1.1</InformationalVersion>
-    <_ExportDocManagerHostArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())</_ExportDocManagerHostArchitecture>
-    <_ExportDocManagerHostOs Condition="$([System.OperatingSystem]::IsWindows())">win</_ExportDocManagerHostOs>
-    <_ExportDocManagerHostOs Condition="$([System.OperatingSystem]::IsLinux())">linux</_ExportDocManagerHostOs>
-    <_ExportDocManagerHostOs Condition="$([System.OperatingSystem]::IsMacOS())">osx</_ExportDocManagerHostOs>
-    <!-- Keep domain/application/infrastructure libraries portable. The API host and the
-         ONNX-bearing PDF/OCR module are the only host-RID exceptions; publish scripts may
-         still override the RID explicitly for any executable. -->
-    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(_ExportDocManagerHostOs)' != '' and ('$(MSBuildProjectName)' == 'ExportDocManager.Api' or '$(MSBuildProjectName)' == 'ExportDocManager.Infrastructure.PdfOcr')">$(_ExportDocManagerHostOs)-$(_ExportDocManagerHostArchitecture)</RuntimeIdentifier>
     <SelfContained Condition="'$(SelfContained)' == ''">false</SelfContained>
     <!-- Capability assemblies are intentionally removable from each edition, so publish output must remain multi-file. -->
     <PublishSingleFile>false</PublishSingleFile>
+    <!-- Normal builds stay portable. Release scripts pass an explicit RID and consume a
+         committed per-RID graph without restoring unrelated platform packs. The core desktop
+         edition has a separate API graph because its optional capability projects are absent. -->
     <ExportDocRuntimeRestore Condition="'$(ExportDocRuntimeRestore)' == ''">false</ExportDocRuntimeRestore>
-    <RestorePackagesWithLockFile Condition="'$(ExportDocRuntimeRestore)' == 'true'">true</RestorePackagesWithLockFile>
-    <NuGetLockFilePath Condition="'$(ExportDocRuntimeRestore)' == 'true'">$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', 'obj', 'runtime.$(RuntimeIdentifier).packages.lock.json'))</NuGetLockFilePath>
-    <RestorePackagesWithLockFile Condition="'$(ExportDocRuntimeRestore)' != 'true' and '$(RuntimeIdentifier)' == ''">true</RestorePackagesWithLockFile>
+    <ExportDocDependencyProfile Condition="'$(ExportDocDependencyProfile)' == ''">full</ExportDocDependencyProfile>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <NuGetLockFilePath Condition="'$(ExportDocRuntimeRestore)' == 'true' and '$(RuntimeIdentifier)' != ''">$([System.IO.Path]::Combine('$(MSBuildThisFileDirectory)', 'eng', 'nuget-runtime-locks', '$(RuntimeIdentifier)', '$(MSBuildProjectName).packages.lock.json'))</NuGetLockFilePath>
+    <NuGetLockFilePath Condition="'$(ExportDocRuntimeRestore)' == 'true' and '$(RuntimeIdentifier)' != '' and '$(MSBuildProjectName)' == 'ExportDocManager.Api' and '$(ExportDocDependencyProfile)' != 'full'">$([System.IO.Path]::Combine('$(MSBuildThisFileDirectory)', 'eng', 'nuget-runtime-locks', '$(RuntimeIdentifier)', '$(MSBuildProjectName).$(ExportDocDependencyProfile).packages.lock.json'))</NuGetLockFilePath>
     <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
     <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win-'))">onnxruntime.dll</_ExportDocOnnxRuntimeFile>
     <_ExportDocOnnxRuntimeFile Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('linux-'))">libonnxruntime.so</_ExportDocOnnxRuntimeFile>

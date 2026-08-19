@@ -243,9 +243,10 @@ namespace ExportDocManager.Api.Hosting
                 new SingleWindowReferenceCatalogService(pathProvider, singleWindowCatalogStore));
             services.AddMasterDataReadRepositories();
             services.AddSharedReadRepositories();
+            var capabilityRegistry = new ServiceCollectionCapabilityRegistry(services);
             foreach (var module in ExportDocCapabilityModuleLoader.Load(typeof(ApiServiceCollectionExtensions).Assembly.Location))
             {
-                module.RegisterServices(services, pathProvider);
+                module.RegisterServices(capabilityRegistry, pathProvider);
             }
             services.AddDbContextFactory<AppDbContext>((serviceProvider, options) =>
             {

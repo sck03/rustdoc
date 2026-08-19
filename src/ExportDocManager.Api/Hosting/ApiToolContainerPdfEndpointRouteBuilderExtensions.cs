@@ -139,7 +139,7 @@ public static partial class ApiEndpointRouteBuilderExtensions
 
     private static string BuildContainerPackingPdfFileName(string? projectName, DateTimeOffset generatedAt)
     {
-        string safeName = CrossPlatformFileNamePolicy.ReplaceInvalidCharacters(projectName?.Trim() ?? string.Empty, '-').Trim('-', '.', ' ');
+        string safeName = CrossPlatformFileNamePolicy.SanitizeFileNamePart(projectName, '-', "未命名方案");
         if (string.IsNullOrWhiteSpace(safeName))
         {
             safeName = "未命名方案";

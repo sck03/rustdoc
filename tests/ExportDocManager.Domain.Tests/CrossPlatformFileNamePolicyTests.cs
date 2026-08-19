@@ -24,4 +24,25 @@ public sealed class CrossPlatformFileNamePolicyTests
         Assert.False(CrossPlatformFileNamePolicy.ContainsInvalidCharacters(value));
         Assert.Same(value, CrossPlatformFileNamePolicy.ReplaceInvalidCharacters(value, '_'));
     }
+
+    [Theory]
+    [InlineData("CON.xml")]
+    [InlineData("PRN")]
+    [InlineData("com9.sqlite")]
+    [InlineData("LPT1.txt")]
+    [InlineData("CON .archive.zip")]
+    public void ReservedWindowsDeviceNames_ShouldBeRejectedAcrossPlatforms(string value)
+    {
+        Assert.True(CrossPlatformFileNamePolicy.IsReservedDeviceName(value));
+        Assert.False(CrossPlatformFileNamePolicy.IsSafeFileName(value));
+        Assert.StartsWith("_", CrossPlatformFileNamePolicy.SanitizeFileNamePart(value));
+    }
+
+    [Fact]
+    public void Sanitization_ShouldNormalizeUnicodeAndTrimWindowsTrailingCharacters()
+    {
+        string decomposed = "e\u0301 report. ";
+
+        Assert.Equal("é report", CrossPlatformFileNamePolicy.SanitizeFileNamePart(decomposed));
+    }
 }

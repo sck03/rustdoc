@@ -12,6 +12,7 @@ use crate::{
         reject_link_like_path, sync_directory, unix_seconds_now, validate_distinct_migration_roots,
         validate_migration_root_shape, write_new_file_atomically,
     },
+    runtime_path_identity::same_path,
     runtime_paths::{
         ensure_directory, ensure_runtime_data_directories, DataRootMigrationScheduleResult,
         RuntimePaths,
@@ -76,7 +77,7 @@ pub(crate) fn schedule_data_root_migration(
     let persisted_root = read_persisted_data_root(&paths.runtime_config_root, &paths.app_root)?
         .ok_or("当前数据目录由命令行或环境变量临时指定，不能在界面中安排永久迁移。")?;
     let persisted_root = canonical_runtime_data_root(&persisted_root, true)?;
-    if persisted_root != source_root {
+    if !same_path(&persisted_root, &source_root) {
         return Err(
             "当前运行数据目录与持久化配置不一致，不能安排迁移。请移除临时路径参数后重启。".into(),
         );
@@ -139,7 +140,7 @@ pub(crate) fn apply_pending_data_root_migration(
     let configured_root = read_persisted_data_root(runtime_config_root, Path::new("."))?
         .ok_or("Pending data-root migration has no persisted source configuration.")?;
     let configured_root = canonical_runtime_data_root(&configured_root, true)?;
-    if configured_root != source_root {
+    if !same_path(&configured_root, &source_root) {
         return Err(format!(
             "Pending data-root migration source '{}' does not match configured data root '{}'.",
             source_root.display(),
@@ -289,8 +290,14 @@ fn migration_completion_matches(
         return Ok(false);
     }
     let metadata_matches = completed.schema_version == expected.schema_version
-        && completed.source_root == expected.source_root
-        && completed.target_root == expected.target_root
+        && same_path(
+            Path::new(&completed.source_root),
+            Path::new(&expected.source_root),
+        )
+        && same_path(
+            Path::new(&completed.target_root),
+            Path::new(&expected.target_root),
+        )
         && completed.requested_at_unix_seconds == expected.requested_at_unix_seconds;
     if !metadata_matches {
         return Ok(false);

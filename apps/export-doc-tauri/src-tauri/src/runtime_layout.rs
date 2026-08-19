@@ -1,10 +1,10 @@
 use std::{
-    env,
     error::Error,
     fs,
     path::{Component, Path, PathBuf},
 };
 
+use crate::runtime_path_identity::is_path_within;
 use crate::runtime_paths::RuntimePaths;
 
 const RUNTIME_LAYOUT_MANIFEST_FILE_NAME: &str = "runtime-layout.json";
@@ -201,35 +201,7 @@ fn runtime_layout_manifest_path(app_root: &Path) -> PathBuf {
 }
 
 fn is_path_under_root(path: &Path, root: &Path) -> bool {
-    let normalized_path = normalize_path_for_prefix(path);
-    let normalized_root = normalize_path_for_prefix(root);
-
-    if cfg!(windows) {
-        let normalized_path = normalized_path
-            .to_string_lossy()
-            .replace('/', "\\")
-            .to_ascii_lowercase();
-        let normalized_root = normalized_root
-            .to_string_lossy()
-            .replace('/', "\\")
-            .to_ascii_lowercase();
-
-        return normalized_path == normalized_root
-            || normalized_path
-                .starts_with(&format!("{}\\", normalized_root.trim_end_matches('\\')));
-    }
-
-    normalized_path == normalized_root || normalized_path.starts_with(normalized_root)
-}
-
-fn normalize_path_for_prefix(path: &Path) -> PathBuf {
-    if path.is_absolute() {
-        return path.to_path_buf();
-    }
-
-    env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join(path)
+    is_path_within(path, root)
 }
 
 #[cfg(test)]
@@ -395,7 +367,7 @@ mod tests {
     }
 
     fn fresh_test_dir(name: &str) -> PathBuf {
-        let root = env::current_dir()
+        let root = std::env::current_dir()
             .unwrap()
             .join("target")
             .join("runtime-layout-tests")

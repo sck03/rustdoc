@@ -78,9 +78,7 @@ namespace ExportDocManager.Services.SingleWindow
 
         private static string SanitizeFileName(string fileName)
         {
-            string sanitized = CrossPlatformFileNamePolicy.ReplaceInvalidCharacters(fileName, '_');
-            sanitized = sanitized.Trim(' ', '.');
-            return string.IsNullOrWhiteSpace(sanitized) ? "package" : sanitized;
+            return CrossPlatformFileNamePolicy.SanitizeFileNamePart(fileName, '_', "package");
         }
     }
 }

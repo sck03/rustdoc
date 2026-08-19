@@ -24,7 +24,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public void GetDatabasePath_WithConfiguredPathProvider_ShouldUseRuntimeDatabaseRoot()
+        public void ResolveRuntimeSqliteDatabasePath_WithConfiguredPathProvider_ShouldUseRuntimeDatabaseRoot()
         {
             var appRoot = CreateTempDirectory();
             var dataRoot = CreateTempDirectory();
@@ -33,12 +33,12 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 var provider = new RuntimeAppPathProvider(appRoot, dataRoot);
 
-                var path = DbHelper.GetDatabasePath(provider, Path.Combine("tenant-a", "exportdoc.db"));
+                var path = DbHelper.ResolveRuntimeSqliteDatabasePath(provider, "exportdoc.db");
 
                 Assert.Equal(
-                    Path.Combine(provider.DatabaseRoot, "tenant-a", "exportdoc.db"),
+                    Path.Combine(provider.DatabaseRoot, "exportdoc.db"),
                     path);
-                Assert.True(Directory.Exists(Path.GetDirectoryName(path)));
+                Assert.False(File.Exists(path));
             }
             finally
             {
@@ -211,7 +211,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public void ResolveRuntimeSqliteDatabasePath_ShouldRejectOutsidePathWithoutCreatingItsDirectory()
+        public void ResolveRuntimeSqliteDatabasePath_ShouldRejectEveryPathWithoutCreatingItsDirectory()
         {
             var root = CreateTempDirectory();
             var outsideRoot = Path.Combine(Path.GetDirectoryName(root)!, $"outside-{Guid.NewGuid():N}");
@@ -220,10 +220,10 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 var provider = new RuntimeAppPathProvider(Path.Combine(root, "app"), Path.Combine(root, "data"));
 
-                var error = Assert.Throws<ServiceValidationException>(() =>
+                var error = Assert.Throws<ArgumentException>(() =>
                     DbHelper.ResolveRuntimeSqliteDatabasePath(provider, outsidePath));
 
-                Assert.Contains("运行数据根 Database", error.Message, StringComparison.Ordinal);
+                Assert.Contains("只能填写", error.Message, StringComparison.Ordinal);
                 Assert.False(Directory.Exists(outsideRoot));
             }
             finally
@@ -240,18 +240,19 @@ namespace ExportDocManager.Infrastructure.Tests
             try
             {
                 var provider = new RuntimeAppPathProvider(Path.Combine(root, "app"), Path.Combine(root, "data"));
-                var databasePath = Path.Combine(provider.DatabaseRoot, "isolated.db");
                 var settings = new DatabaseConnectionSettings
                 {
                     Provider = DatabaseConnectionSettings.SqliteProvider,
-                    SqliteDatabaseFileName = databasePath,
+                    SqliteDatabaseFileName = "isolated.db",
                 };
                 var options = new DbContextOptionsBuilder<AppDbContext>();
 
                 DbHelper.ConfigureDbContextOptions(options, settings, provider);
 
                 using var context = new AppDbContext(options.Options);
-                Assert.Equal(Path.GetFullPath(databasePath), Path.GetFullPath(context.Database.GetDbConnection().DataSource));
+                Assert.Equal(
+                    Path.GetFullPath(Path.Combine(provider.DatabaseRoot, "isolated.db")),
+                    Path.GetFullPath(context.Database.GetDbConnection().DataSource));
             }
             finally
             {

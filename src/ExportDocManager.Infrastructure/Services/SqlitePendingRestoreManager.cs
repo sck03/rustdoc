@@ -42,31 +42,13 @@ namespace ExportDocManager.Services.Infrastructure
                 return;
             }
 
-            string configuredDatabaseFileName = DbHelper.NormalizeSqliteDatabaseFileName(
+            // SQLite database names are deliberately constrained to a simple file name under
+            // the runtime Database directory.  Keep restore discovery on the same canonical
+            // resolver used by the rest of the data-access stack; it does not create the
+            // directory, so composing the service graph remains side-effect free.
+            string databasePath = DbHelper.ResolveRuntimeSqliteDatabasePath(
+                pathProvider,
                 databaseSettings.SqliteDatabaseFileName);
-            string databasePath;
-            if (Path.IsPathRooted(configuredDatabaseFileName))
-            {
-                databasePath = DbHelper.ResolveRuntimeSqliteDatabasePath(
-                    pathProvider,
-                    configuredDatabaseFileName);
-            }
-            else
-            {
-                string normalizedFileName = DbHelper.NormalizeRuntimeSqliteDatabaseFileName(
-                    configuredDatabaseFileName);
-                string configuredDatabaseDirectory = Path.Combine(pathProvider.DataRoot, "Database");
-                databasePath = Path.GetFullPath(Path.Combine(configuredDatabaseDirectory, normalizedFileName));
-
-                // Merely composing the API service graph must not create the database directory.
-                // Resolve against the canonical path provider only when a restore marker exists.
-                if (!File.Exists(GetMarkerPath(databasePath)))
-                {
-                    return;
-                }
-
-                databasePath = DbHelper.ResolveRuntimeSqliteDatabasePath(pathProvider, normalizedFileName);
-            }
             string markerPath = GetMarkerPath(databasePath);
             if (!File.Exists(markerPath))
             {

@@ -83,20 +83,6 @@ async function writeDirectoryBuildProps() {
 
   const requiredBuildProperties = [
     [
-      "_ExportDocManagerHostArchitecture",
-      "    <_ExportDocManagerHostArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())</_ExportDocManagerHostArchitecture>",
-    ],
-    [
-      "_ExportDocManagerHostOs",
-      "    <_ExportDocManagerHostOs Condition=\"$([System.OperatingSystem]::IsWindows())\">win</_ExportDocManagerHostOs>\n" +
-        "    <_ExportDocManagerHostOs Condition=\"$([System.OperatingSystem]::IsLinux())\">linux</_ExportDocManagerHostOs>\n" +
-        "    <_ExportDocManagerHostOs Condition=\"$([System.OperatingSystem]::IsMacOS())\">osx</_ExportDocManagerHostOs>",
-    ],
-    [
-      "RuntimeIdentifier",
-      "    <RuntimeIdentifier Condition=\"'$(RuntimeIdentifier)' == '' and '$(_ExportDocManagerHostOs)' != '' and ('$(MSBuildProjectName)' == 'ExportDocManager.Api' or '$(MSBuildProjectName)' == 'ExportDocManager.Infrastructure.PdfOcr')\">$(_ExportDocManagerHostOs)-$(_ExportDocManagerHostArchitecture)</RuntimeIdentifier>",
-    ],
-    [
       "SelfContained",
       "    <SelfContained Condition=\"'$(SelfContained)' == ''\">false</SelfContained>",
     ],

@@ -4,7 +4,6 @@ using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Services.Suppliers;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace ExportDocManager.Infrastructure.Excel;
 
@@ -13,7 +12,7 @@ public sealed class ExcelCapabilityModule : IExportDocCapabilityModule
     public string Key => "excel";
 
     public void RegisterServices(
-        IServiceCollection services,
+        IExportDocCapabilityRegistry services,
         IAppPathProvider pathProvider)
     {
         ArgumentNullException.ThrowIfNull(services);

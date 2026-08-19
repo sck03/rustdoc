@@ -118,8 +118,9 @@ jobs:
         shell: pwsh
         run: >-
           dotnet restore src/ExportDocManager.Api/ExportDocManager.Api.csproj
-          --runtime ${{ inputs.runtime_identifier }}
+          --locked-mode
           --configfile NuGet.Config
+          /p:RuntimeIdentifier=${{ inputs.runtime_identifier }}
           /p:ExportDocRuntimeRestore=true
 
       - name: Publish self-contained browser server
@@ -140,7 +141,7 @@ jobs:
 
       - name: Build Rust OCR sidecar
         shell: pwsh
-        run: cargo build --manifest-path apps/exportdoc-ocr-rs/Cargo.toml --release --target ${{ inputs.rust_target }}
+        run: cargo build --manifest-path apps/exportdoc-ocr-rs/Cargo.toml --release --locked --target ${{ inputs.rust_target }}
 
       - name: Build Rust Excel analyzer
         shell: pwsh

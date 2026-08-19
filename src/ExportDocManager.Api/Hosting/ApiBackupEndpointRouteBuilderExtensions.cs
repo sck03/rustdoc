@@ -576,7 +576,7 @@ namespace ExportDocManager.Api.Hosting
                 return false;
             }
 
-            if (CrossPlatformFileNamePolicy.ContainsInvalidCharacters(fileName) ||
+            if (!CrossPlatformFileNamePolicy.IsSafeFileName(fileName) ||
                 !string.Equals(fileName, Path.GetFileName(fileName), StringComparison.Ordinal))
             {
                 errorMessage = "只能选择 WebDAV 云备份列表中的文件名，不能传入路径。";

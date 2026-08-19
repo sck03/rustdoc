@@ -101,9 +101,7 @@ namespace ExportDocManager.Utils
                 return string.Empty;
             }
 
-            return string
-                .Join("_", input.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries))
-                .Trim('_');
+            return CrossPlatformFileNamePolicy.SanitizeFileNamePart(input, '_', string.Empty);
         }
 
         private static string ApplyPattern(
@@ -133,7 +131,13 @@ namespace ExportDocManager.Utils
             var extension = Path.GetExtension(fileName);
             var candidate = fileName;
             var index = 1;
-            while (File.Exists(Path.Combine(directory, candidate)))
+            var existingNames = Directory.Exists(directory)
+                ? Directory.EnumerateFileSystemEntries(directory)
+                    .Select(Path.GetFileName)
+                    .OfType<string>()
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            while (existingNames.Contains(candidate))
             {
                 candidate = $"{fileNameWithoutExtension}_{index}{extension}";
                 index++;

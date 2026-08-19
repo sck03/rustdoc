@@ -118,7 +118,7 @@ namespace ExportDocManager.Api.Tests
                 var databaseSettings = new DatabaseConnectionSettings
                 {
                     Provider = DatabaseConnectionSettings.SqliteProvider,
-                    SqliteDatabaseFileName = databasePath
+                    SqliteDatabaseFileName = databaseFileName
                 };
                 var runtimeOptions = new ApiRuntimeOptions
                 {

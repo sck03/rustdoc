@@ -41,8 +41,6 @@ namespace ExportDocManager.Services.Infrastructure
         public BackupService(
             DatabaseConnectionSettings databaseSettings,
             IAppPathProvider pathProvider,
-            string? backupDirectory = null,
-            string? databasePath = null,
             IBusinessClock? clock = null,
             ILogger<BackupService>? logger = null,
             Func<string, long>? getAvailableBytes = null)
@@ -57,9 +55,9 @@ namespace ExportDocManager.Services.Infrastructure
 
             if (_usesSqlite)
             {
-                _databasePath = string.IsNullOrWhiteSpace(databasePath)
-                    ? DbHelper.ResolveRuntimeSqliteDatabasePath(pathProvider, databaseSettings.SqliteDatabaseFileName)
-                    : Path.GetFullPath(databasePath);
+                _databasePath = DbHelper.ResolveRuntimeSqliteDatabasePath(
+                    pathProvider,
+                    databaseSettings.SqliteDatabaseFileName);
                 _databaseFileName = Path.GetFileName(_databasePath);
                 _managedBackupNamePattern = BuildManagedBackupNamePattern(_databaseFileName);
             }
@@ -69,9 +67,7 @@ namespace ExportDocManager.Services.Infrastructure
                 _databaseFileName = string.Empty;
             }
 
-            _backupDirectory = string.IsNullOrWhiteSpace(backupDirectory)
-                ? pathProvider.BackupRoot
-                : backupDirectory;
+            _backupDirectory = pathProvider.BackupRoot;
 
             Directory.CreateDirectory(_backupDirectory);
         }

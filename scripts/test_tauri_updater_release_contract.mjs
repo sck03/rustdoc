@@ -21,6 +21,11 @@ const settingsModel = read("src/ExportDocManager.Application/Models/Configuratio
 assert.deepEqual(baseConfig.plugins?.updater?.endpoints, [], "base updater endpoint must remain unconfigured until release injection");
 assert.equal(baseConfig.plugins?.updater?.pubkey, "", "base updater public key must remain unconfigured until release injection");
 assert.equal(baseConfig.identifier, "com.exportdocmanager.desktop.full", "the default Tauri identifier must belong to Full edition");
+assert.deepEqual(
+  baseConfig.bundle?.windows?.webviewInstallMode,
+  { type: "downloadBootstrapper", silent: true },
+  "Windows installers must declare the Evergreen WebView2 bootstrapper policy explicitly",
+);
 assert.equal(editionCatalog.schemaVersion, 1);
 const editionEntries = Object.entries(editionCatalog.editions || {});
 assert.deepEqual(editionEntries.map(([name]) => name).sort(), ["Document", "Full", "Sales"]);

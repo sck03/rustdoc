@@ -309,15 +309,26 @@ public sealed class PackagePayloadContractTests
     {
         string root = FindWorkspaceRoot();
         string bundleScript = File.ReadAllText(Path.Combine(root, "scripts", "prepare-tauri-bundle.mjs"));
-        const string solutionRestore = "run(\"dotnet\", [\"restore\", path.join(repoRoot, \"ExportDocManager.sln\"), \"--locked-mode\"], buildEnv);";
+        const string governanceFunction = "async function generateDependencyGovernance(buildEnv)";
+        const string solutionPath = "path.join(repoRoot, \"ExportDocManager.sln\")";
         const string governanceGenerator = "path.join(repoRoot, \"scripts\", \"generate-dependency-governance.mjs\")";
 
-        int restoreIndex = bundleScript.IndexOf(solutionRestore, StringComparison.Ordinal);
+        int functionIndex = bundleScript.IndexOf(governanceFunction, StringComparison.Ordinal);
+        int restoreIndex = bundleScript.IndexOf("\"restore\"", functionIndex, StringComparison.Ordinal);
+        int solutionIndex = bundleScript.IndexOf(solutionPath, restoreIndex, StringComparison.Ordinal);
+        int lockedModeIndex = bundleScript.IndexOf("\"--locked-mode\"", solutionIndex, StringComparison.Ordinal);
+        int configFileIndex = bundleScript.IndexOf("\"--configfile\"", lockedModeIndex, StringComparison.Ordinal);
         int governanceIndex = bundleScript.IndexOf(governanceGenerator, StringComparison.Ordinal);
 
-        Assert.True(restoreIndex >= 0, "Desktop bundle preparation must restore the complete solution.");
+        Assert.True(functionIndex >= 0, "Desktop bundle preparation must define dependency governance orchestration.");
         Assert.True(
-            governanceIndex > restoreIndex,
+            restoreIndex > functionIndex && solutionIndex > restoreIndex,
+            "Desktop bundle preparation must restore the complete solution.");
+        Assert.True(
+            lockedModeIndex > solutionIndex && configFileIndex > lockedModeIndex,
+            "The complete solution restore must use the repository's locked NuGet graph and config.");
+        Assert.True(
+            governanceIndex > configFileIndex,
             "The complete solution restore must run before dependency governance scans every project.");
     }
 

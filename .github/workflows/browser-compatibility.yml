@@ -40,6 +40,7 @@ jobs:
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
       DOTNET_NOLOGO: 1
       NUGET_PACKAGES: ${{ github.workspace }}/.codex-runtime/nuget-packages
+      NUGET_HTTP_CACHE_PATH: ${{ github.workspace }}/.codex-runtime/nuget-http-cache
       npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/artifacts/playwright-browsers
 
@@ -67,7 +68,9 @@ jobs:
         run: |
           npm --prefix apps/export-doc-web run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet build src/ExportDocManager.Api/ExportDocManager.Api.csproj -c Release
+          dotnet restore src/ExportDocManager.Api/ExportDocManager.Api.csproj --locked-mode --configfile NuGet.Config /p:RuntimeIdentifier=linux-x64 /p:ExportDocRuntimeRestore=true
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build src/ExportDocManager.Api/ExportDocManager.Api.csproj -c Release -r linux-x64 --no-restore /p:ExportDocRuntimeRestore=true
           exit $LASTEXITCODE
 
       - name: Install Firefox and WebKit runtimes

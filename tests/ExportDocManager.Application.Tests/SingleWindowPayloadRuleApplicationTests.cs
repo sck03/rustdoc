@@ -38,6 +38,9 @@ namespace ExportDocManager.Application.Tests
             Assert.Equal(
                 "fallback_name.xml",
                 SingleWindowPayloadFileNameHelper.BuildBaseFileName(" ", "fallback/name", ".xml"));
+            Assert.Equal(
+                "_CON.xml",
+                SingleWindowPayloadFileNameHelper.BuildBaseFileName("CON", "fallback", ".xml"));
         }
     }
 }

@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::runtime_data_root_network::reject_network_data_root;
+use crate::runtime_path_identity::{is_path_within, same_path};
 use crate::runtime_paths::{
     ensure_directory, ensure_runtime_data_directories, RUNTIME_DATA_DIRECTORIES,
 };
@@ -68,10 +69,10 @@ pub(crate) fn validate_distinct_migration_roots(
     source_root: &Path,
     target_root: &Path,
 ) -> Result<(), Box<dyn Error>> {
-    if source_root == target_root {
+    if same_path(source_root, target_root) {
         return Err("新数据目录不能与当前数据目录相同。".into());
     }
-    if target_root.starts_with(source_root) || source_root.starts_with(target_root) {
+    if is_path_within(target_root, source_root) || is_path_within(source_root, target_root) {
         return Err("新旧数据目录不能互相包含，请选择彼此独立的目录。".into());
     }
     Ok(())

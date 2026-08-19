@@ -198,32 +198,6 @@ namespace ExportDocManager.DataAccess
             return new AppDbContext(options.Options);
         }
 
-        public static string GetDatabasePath(IAppPathProvider pathProvider, string dbFileName)
-        {
-            ArgumentNullException.ThrowIfNull(pathProvider);
-            string normalizedFileName = string.IsNullOrWhiteSpace(dbFileName)
-                ? DatabaseConnectionSettings.DefaultSqliteDatabaseFileName
-                : dbFileName.Trim();
-
-            if (Path.IsPathRooted(normalizedFileName))
-            {
-                TryEnsureDirectory(Path.GetDirectoryName(normalizedFileName));
-                return normalizedFileName;
-            }
-
-            var pathSegments = normalizedFileName
-                .Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries);
-
-            var databasePath = pathProvider.DatabaseRoot;
-            foreach (var segment in pathSegments)
-            {
-                databasePath = Path.Combine(databasePath, segment.Trim());
-            }
-
-            TryEnsureDirectory(Path.GetDirectoryName(databasePath));
-            return databasePath;
-        }
-
         public static string NormalizeSqliteDatabaseFileName(string sqliteDatabaseFileName)
         {
             return string.IsNullOrWhiteSpace(sqliteDatabaseFileName)
@@ -233,10 +207,10 @@ namespace ExportDocManager.DataAccess
 
         public static string NormalizeRuntimeSqliteDatabaseFileName(string sqliteDatabaseFileName)
         {
-            string normalized = NormalizeSqliteDatabaseFileName(sqliteDatabaseFileName);
+            string normalized = NormalizeSqliteDatabaseFileName(sqliteDatabaseFileName).Normalize();
             if (Path.IsPathRooted(normalized) ||
                 !string.Equals(normalized, Path.GetFileName(normalized), StringComparison.Ordinal) ||
-                CrossPlatformFileNamePolicy.ContainsInvalidCharacters(normalized) ||
+                !CrossPlatformFileNamePolicy.IsSafeFileName(normalized) ||
                 normalized.EndsWith(' ') ||
                 normalized.EndsWith('.'))
             {
@@ -245,13 +219,7 @@ namespace ExportDocManager.DataAccess
                     nameof(sqliteDatabaseFileName));
             }
 
-            string windowsBaseName = normalized.Split('.', 2)[0];
-            if (windowsBaseName.Equals("CON", StringComparison.OrdinalIgnoreCase) ||
-                windowsBaseName.Equals("PRN", StringComparison.OrdinalIgnoreCase) ||
-                windowsBaseName.Equals("AUX", StringComparison.OrdinalIgnoreCase) ||
-                windowsBaseName.Equals("NUL", StringComparison.OrdinalIgnoreCase) ||
-                IsWindowsNumberedDeviceName(windowsBaseName, "COM") ||
-                IsWindowsNumberedDeviceName(windowsBaseName, "LPT"))
+            if (CrossPlatformFileNamePolicy.IsReservedDeviceName(normalized))
             {
                 throw new ArgumentException(
                     "SQLite 文件名不能使用 Windows 保留设备名。",
@@ -275,18 +243,8 @@ namespace ExportDocManager.DataAccess
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
 
-            string normalized = NormalizeSqliteDatabaseFileName(sqliteDatabaseFileName);
-            string databasePath;
-            if (Path.IsPathRooted(normalized))
-            {
-                _ = NormalizeRuntimeSqliteDatabaseFileName(Path.GetFileName(normalized));
-                databasePath = Path.GetFullPath(normalized);
-            }
-            else
-            {
-                normalized = NormalizeRuntimeSqliteDatabaseFileName(normalized);
-                databasePath = Path.GetFullPath(Path.Combine(pathProvider.DatabaseRoot, normalized));
-            }
+            string normalized = NormalizeRuntimeSqliteDatabaseFileName(sqliteDatabaseFileName);
+            string databasePath = Path.GetFullPath(Path.Combine(pathProvider.DatabaseRoot, normalized));
 
             if (!PathBoundaryHelper.IsWithinRoot(databasePath, pathProvider.DatabaseRoot))
             {
@@ -295,13 +253,6 @@ namespace ExportDocManager.DataAccess
             }
 
             return databasePath;
-        }
-
-        private static bool IsWindowsNumberedDeviceName(string value, string prefix)
-        {
-            return value.Length == prefix.Length + 1 &&
-                value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
-                value[^1] is >= '1' and <= '9';
         }
 
         public static string BuildPostgreSqlConnectionString(DatabaseConnectionSettings settings)
@@ -435,24 +386,6 @@ namespace ExportDocManager.DataAccess
             }
 
             return Math.Clamp(parsed, bounds.Minimum, bounds.Maximum);
-        }
-
-        private static bool TryEnsureDirectory(string? directoryPath)
-        {
-            if (string.IsNullOrWhiteSpace(directoryPath))
-            {
-                return false;
-            }
-
-            try
-            {
-                Directory.CreateDirectory(directoryPath);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
         }
 
         private sealed class DatabaseSettingsFile

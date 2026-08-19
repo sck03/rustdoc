@@ -1,5 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
-
 namespace ExportDocManager.Services.Infrastructure;
 
 /// <summary>
@@ -12,6 +10,37 @@ public interface IExportDocCapabilityModule
     string Key { get; }
 
     void RegisterServices(
-        IServiceCollection services,
+        IExportDocCapabilityRegistry services,
         IAppPathProvider pathProvider);
+}
+
+/// <summary>
+/// Small composition contract exposed to optional capability assemblies. The application
+/// layer stays independent from ASP.NET Core and the API composition root owns the concrete
+/// dependency-injection container.
+/// </summary>
+public interface IExportDocCapabilityRegistry
+{
+    void AddScoped<TService>() where TService : class;
+
+    void AddScoped<TService, TImplementation>()
+        where TService : class
+        where TImplementation : class, TService;
+
+    void AddScoped<TService>(Func<IExportDocCapabilityServiceProvider, TService> factory)
+        where TService : class;
+
+    void AddSingleton<TService>() where TService : class;
+
+    void AddSingleton<TService, TImplementation>()
+        where TService : class
+        where TImplementation : class, TService;
+
+    void AddSingleton<TService>(Func<IExportDocCapabilityServiceProvider, TService> factory)
+        where TService : class;
+}
+
+public interface IExportDocCapabilityServiceProvider
+{
+    TService GetRequiredService<TService>() where TService : notnull;
 }

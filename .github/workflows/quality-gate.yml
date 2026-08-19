@@ -20,6 +20,7 @@ jobs:
     timeout-minutes: 45
     env:
       NUGET_PACKAGES: ${{ github.workspace }}/artifacts/nuget-packages
+      NUGET_HTTP_CACHE_PATH: ${{ github.workspace }}/.codex-runtime/nuget-http-cache
       CARGO_TARGET_DIR: ${{ github.workspace }}/artifacts/cargo-target-quality
       EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER: true
     steps:
@@ -51,20 +52,26 @@ jobs:
 
       - name: Restore dependencies
         run: |
-          dotnet restore ExportDocManager.sln --locked-mode
+          dotnet restore ExportDocManager.sln --locked-mode --configfile NuGet.Config
           npm ci --prefix apps/export-doc-web
 
       - name: Verify .NET formatting
         run: dotnet format ExportDocManager.sln --verify-no-changes --no-restore
 
       - name: Build and test .NET solution
+        id: dotnet_tests
         shell: pwsh
         run: ./scripts/run-tests.ps1 -Configuration Release -NoRestore -NoPause
+
       - name: Report failed .NET tests
-        if: failure()
+        if: steps.dotnet_tests.outcome == 'failure'
         shell: pwsh
         run: |
-          Get-ChildItem TestResults -Filter *.trx | ForEach-Object {
+          if (-not (Test-Path -LiteralPath TestResults -PathType Container)) {
+            Write-Output "::error title=.NET test runner failed::The .NET test step failed before producing TestResults."
+            exit 1
+          }
+          Get-ChildItem TestResults -Filter *.trx -File | ForEach-Object {
             ([xml](Get-Content $_)).TestRun.Results.UnitTestResult |
               Where-Object outcome -eq "Failed" |
               ForEach-Object {

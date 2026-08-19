@@ -24,6 +24,7 @@ RUN case "$TARGETARCH" in \
     esac
 
 COPY global.json Directory.Build.props Directory.Packages.props NuGet.Config version.json ./
+COPY eng/nuget-runtime-locks/ eng/nuget-runtime-locks/
 COPY src/ExportDocManager.Domain/ExportDocManager.Domain.csproj src/ExportDocManager.Domain/
 COPY src/ExportDocManager.Application/ExportDocManager.Application.csproj src/ExportDocManager.Application/
 COPY src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj src/ExportDocManager.Infrastructure/
@@ -34,8 +35,9 @@ COPY src/ExportDocManager.Api/ExportDocManager.Api.csproj src/ExportDocManager.A
 RUN --mount=type=cache,id=exportdoc-nuget-${TARGETARCH},target=/root/.nuget/packages,sharing=locked \
     runtime_identifier="$(cat /tmp/exportdoc-runtime-id)" \
     && dotnet restore src/ExportDocManager.Api/ExportDocManager.Api.csproj \
-        --runtime "$runtime_identifier" \
+        --locked-mode \
         --configfile NuGet.Config \
+        /p:RuntimeIdentifier="$runtime_identifier" \
         /p:ExportDocRuntimeRestore=true \
         /p:ExportDocPackageProfile=Container
 

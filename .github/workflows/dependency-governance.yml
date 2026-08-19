@@ -41,6 +41,7 @@ jobs:
     timeout-minutes: 30
     env:
       NUGET_PACKAGES: ${{ github.workspace }}/artifacts/nuget-packages
+      NUGET_HTTP_CACHE_PATH: ${{ github.workspace }}/.codex-runtime/nuget-http-cache
       CARGO_HOME: ${{ github.workspace }}/artifacts/cargo-home
 
     steps:
@@ -68,7 +69,7 @@ jobs:
 
       - name: Restore locked dependency graphs
         run: |
-          dotnet restore ExportDocManager.sln --locked-mode
+          dotnet restore ExportDocManager.sln --locked-mode --configfile NuGet.Config
           npm ci --prefix apps/export-doc-web
           npm ci --prefix apps/export-doc-tauri
           cargo fetch --locked --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml

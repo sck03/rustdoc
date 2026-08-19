@@ -27,6 +27,10 @@
     "targets": "all",
     "useLocalToolsDir": true,
     "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
       "nsis": {
         "installerHooks": "nsis/installer-hooks.nsh"
       }

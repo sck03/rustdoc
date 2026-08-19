@@ -229,13 +229,11 @@ namespace ExportDocManager.Infrastructure.Tests
             var settings = new DatabaseConnectionSettings
             {
                 Provider = DatabaseConnectionSettings.SqliteProvider,
-                SqliteDatabaseFileName = databasePath
+                SqliteDatabaseFileName = "backup-test.db"
             };
             var service = new BackupService(
                 settings,
                 pathProvider,
-                backupDirectory: pathProvider.BackupRoot,
-                databasePath: databasePath,
                 getAvailableBytes: getAvailableBytes);
             return new BackupFixture(pathProvider, settings, service, databasePath);
         }

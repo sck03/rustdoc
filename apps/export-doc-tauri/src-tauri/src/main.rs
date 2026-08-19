@@ -17,6 +17,7 @@ mod runtime_data_root_migration;
 mod runtime_data_root_network;
 mod runtime_data_root_storage;
 mod runtime_layout;
+mod runtime_path_identity;
 mod runtime_paths;
 mod runtime_paths_config;
 mod runtime_portable;

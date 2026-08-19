@@ -324,19 +324,20 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public void DotNetBuilds_ShouldKeepLibrariesPortableAndScopeHostRidToApi()
+        public void DotNetBuilds_ShouldStayPortableAndUseExplicitRuntimeLocks()
         {
             string propsPath = ResolveWorkspacePath("Directory.Build.props");
             string content = File.ReadAllText(propsPath);
 
-            Assert.Contains("RuntimeInformation", content, StringComparison.Ordinal);
-            Assert.Contains("OperatingSystem]::IsLinux", content, StringComparison.Ordinal);
-            Assert.Contains("OperatingSystem]::IsMacOS", content, StringComparison.Ordinal);
             Assert.Contains("<SelfContained Condition=", content, StringComparison.Ordinal);
+            Assert.Contains("<ExportDocRuntimeRestore Condition=", content, StringComparison.Ordinal);
+            Assert.Contains("<ExportDocDependencyProfile Condition=", content, StringComparison.Ordinal);
+            Assert.Contains("eng', 'nuget-runtime-locks', '$(RuntimeIdentifier)'", content, StringComparison.Ordinal);
             Assert.Contains("MSBuildProjectName", content, StringComparison.Ordinal);
             Assert.Contains("ExportDocManager.Api", content, StringComparison.Ordinal);
-            Assert.Contains("ExportDocManager.Infrastructure.PdfOcr", content, StringComparison.Ordinal);
-            Assert.DoesNotContain("<RuntimeIdentifier>win-x64</RuntimeIdentifier>", content, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("<RuntimeIdentifier", content, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("RuntimeInformation", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("OperatingSystem]::Is", content, StringComparison.Ordinal);
         }
 
         private static string ResolveWorkspacePath(params string[] segments)

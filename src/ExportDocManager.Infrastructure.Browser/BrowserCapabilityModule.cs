@@ -2,7 +2,6 @@ using ExportDocManager.Services.BrowserRuntime;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Reporting;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace ExportDocManager.Infrastructure.Browser;
 
@@ -11,7 +10,7 @@ public sealed class BrowserCapabilityModule : IExportDocCapabilityModule
     public string Key => "browser";
 
     public void RegisterServices(
-        IServiceCollection services,
+        IExportDocCapabilityRegistry services,
         IAppPathProvider pathProvider)
     {
         ArgumentNullException.ThrowIfNull(services);

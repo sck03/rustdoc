@@ -100,6 +100,7 @@ jobs:
     timeout-minutes: 45
     env:
       NUGET_PACKAGES: ${{ github.workspace }}/.codex-runtime/nuget-packages
+      NUGET_HTTP_CACHE_PATH: ${{ github.workspace }}/.codex-runtime/nuget-http-cache
       EXPORTDOCMANAGER_RETAIN_REPORT_TEST_ARTIFACTS: 1
 
     steps:
