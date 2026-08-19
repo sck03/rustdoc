@@ -17,6 +17,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 "ExportDocManager.Api",
                 "ExportDocManager.Api.csproj"));
             string buildProps = File.ReadAllText(Path.Combine(root, "Directory.Build.props"));
+            string packageProps = File.ReadAllText(Path.Combine(root, "Directory.Packages.props"));
             string dockerfile = File.ReadAllText(Path.Combine(root, "deploy", "container", "Dockerfile.api"));
             string rustManifest = File.ReadAllText(Path.Combine(root, "apps", "exportdoc-ocr-rs", "Cargo.toml"));
             string workflow = File.ReadAllText(Path.Combine(
@@ -41,8 +42,15 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("System.IO.Path]::Combine", project, StringComparison.Ordinal);
             Assert.DoesNotContain("$(PkgMicrosoft_ML_OnnxRuntime)\\runtimes\\", project, StringComparison.Ordinal);
             Assert.Contains("_ExportDocOnnxRuntimeFile", buildProps, StringComparison.Ordinal);
+            Assert.Contains("<MicrosoftMlOnnxRuntimeVersion>1.28.0</MicrosoftMlOnnxRuntimeVersion>", packageProps, StringComparison.Ordinal);
+            Assert.Contains("Include=\"Microsoft.ML.OnnxRuntime\" Version=\"$(MicrosoftMlOnnxRuntimeVersion)\"", packageProps, StringComparison.Ordinal);
             Assert.Contains("<ExportDocIncludeOcrRuntime Condition=\"'$(ExportDocIncludeOcrRuntime)' == ''\">true", apiProject, StringComparison.Ordinal);
             Assert.Contains("CopyOcrNativeRuntimeToPublish", apiProject, StringComparison.Ordinal);
+            Assert.Contains("$(NuGetPackageRoot)", apiProject, StringComparison.Ordinal);
+            Assert.Contains("$(_ExportDocOnnxRuntimeSource)", apiProject, StringComparison.Ordinal);
+            Assert.Contains("'$(ExportDocIncludePdfOcrModule)' == 'true'", apiProject, StringComparison.Ordinal);
+            Assert.Contains("'$(ExportDocIncludePdfOcrModule)' != 'true' or '$(ExportDocIncludeOcrRuntime)' != 'true'", apiProject, StringComparison.Ordinal);
+            Assert.DoesNotContain("Path]::Combine('$(TargetDir)', '$(_ExportDocOnnxRuntimeFile)')", apiProject, StringComparison.Ordinal);
             Assert.Contains("EXPORTDOCMANAGER_OCR_RUNTIME=enabled", dockerfile, StringComparison.Ordinal);
             Assert.DoesNotContain("--verify-ocr-runtime", dockerfile, StringComparison.Ordinal);
             Assert.Contains("test -s /app/libonnxruntime.so", dockerfile, StringComparison.Ordinal);

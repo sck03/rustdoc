@@ -16,6 +16,8 @@
     <ExportDocIncludePdfOcrModule Condition="'$(ExportDocIncludePdfOcrModule)' == ''">true</ExportDocIncludePdfOcrModule>
     <ExportDocIncludeBundledBrowser Condition="'$(ExportDocIncludeBundledBrowser)' == '' and '$(ExportDocPackageProfile)' == 'Container'">false</ExportDocIncludeBundledBrowser>
     <ExportDocIncludeBundledBrowser Condition="'$(ExportDocIncludeBundledBrowser)' == ''">true</ExportDocIncludeBundledBrowser>
+    <_ExportDocOnnxRuntimeDirectory Condition="'$(_ExportDocOnnxRuntimeFile)' != ''">$([System.IO.Path]::Combine('$(NuGetPackageRoot)', 'microsoft.ml.onnxruntime', '$(MicrosoftMlOnnxRuntimeVersion)', 'runtimes', '$(RuntimeIdentifier)', 'native'))</_ExportDocOnnxRuntimeDirectory>
+    <_ExportDocOnnxRuntimeSource Condition="'$(_ExportDocOnnxRuntimeFile)' != ''">$([System.IO.Path]::Combine('$(_ExportDocOnnxRuntimeDirectory)', '$(_ExportDocOnnxRuntimeFile)'))</_ExportDocOnnxRuntimeSource>
   </PropertyGroup>
 
   <ItemGroup>
@@ -92,8 +94,10 @@
   <Target Name="CopyOcrNativeRuntimeToPublish"
           AfterTargets="Publish"
           BeforeTargets="RemoveOptionalOcrRuntime"
-          Condition="'$(PublishDir)' != '' and '$(ExportDocIncludeOcrRuntime)' == 'true' and '$(_ExportDocOnnxRuntimeFile)' != ''">
-    <Copy SourceFiles="$([System.IO.Path]::Combine('$(TargetDir)', '$(_ExportDocOnnxRuntimeFile)'))"
+          Condition="'$(PublishDir)' != '' and '$(ExportDocIncludePdfOcrModule)' == 'true' and '$(ExportDocIncludeOcrRuntime)' == 'true' and '$(_ExportDocOnnxRuntimeFile)' != ''">
+    <Error Condition="!Exists('$(_ExportDocOnnxRuntimeSource)')"
+           Text="ONNX Runtime native library was not restored for $(RuntimeIdentifier): $(_ExportDocOnnxRuntimeSource)" />
+    <Copy SourceFiles="$(_ExportDocOnnxRuntimeSource)"
           DestinationFolder="$(PublishDir)"
           SkipUnchangedFiles="true" />
   </Target>
@@ -102,7 +106,7 @@
     <RemoveDir Directories="$(PublishDir).playwright" />
   </Target>
 
-  <Target Name="RemoveOptionalOcrRuntime" AfterTargets="Publish" Condition="'$(PublishDir)' != '' and '$(ExportDocIncludeOcrRuntime)' != 'true'">
+  <Target Name="RemoveOptionalOcrRuntime" AfterTargets="Publish" Condition="'$(PublishDir)' != '' and ('$(ExportDocIncludePdfOcrModule)' != 'true' or '$(ExportDocIncludeOcrRuntime)' != 'true')">
     <ItemGroup>
       <_OptionalOcrRuntime Include="$(PublishDir)onnxruntime.dll;$(PublishDir)libonnxruntime.so;$(PublishDir)libonnxruntime.dylib" />
     </ItemGroup>

@@ -165,11 +165,21 @@ public sealed class ApiBackgroundJobPersistenceAtomicityTests
 
     private static void DeleteDirectory(string root)
     {
-        if (!Directory.Exists(root))
+        for (var attempt = 0; attempt < 5 && Directory.Exists(root); attempt++)
         {
-            return;
+            try
+            {
+                Directory.Delete(root, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < 4)
+            {
+                Thread.Sleep(100);
+            }
+            catch (UnauthorizedAccessException) when (attempt < 4)
+            {
+                Thread.Sleep(100);
+            }
         }
-
-        Directory.Delete(root, recursive: true);
     }
 }

@@ -253,7 +253,16 @@ public sealed class PackagePayloadContractTests
         string typographyWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "cross-platform-typography.yml"));
         string reportWatchdog = File.ReadAllText(Path.Combine(root, "scripts", "run-report-pdf-tests-with-timeout.mjs"));
         string chromeProvisioning = File.ReadAllText(Path.Combine(root, "scripts", "provision-chrome-for-testing.ps1"));
-        string packageVersions = File.ReadAllText(Path.Combine(root, "Directory.Packages.props"));
+        string packageVersionsPath = Path.Combine(root, "Directory.Packages.props");
+        string packageVersions = File.ReadAllText(packageVersionsPath);
+        var packageVersionsDocument = XDocument.Load(packageVersionsPath);
+        string onnxRuntimeVersion = packageVersionsDocument.Descendants("MicrosoftMlOnnxRuntimeVersion").Single().Value;
+        string onnxRuntimePackageVersion = packageVersionsDocument.Descendants("PackageVersion")
+            .Single(element => string.Equals(
+                (string?)element.Attribute("Include"),
+                "Microsoft.ML.OnnxRuntime",
+                StringComparison.Ordinal))
+            .Attribute("Version")?.Value ?? string.Empty;
         string ocrManifest = File.ReadAllText(Path.Combine(root, "apps", "exportdoc-ocr-rs", "Cargo.toml"));
 
         Assert.Contains("resolveRustTargetTriple(rid)", bundleScript, StringComparison.Ordinal);
@@ -264,7 +273,8 @@ public sealed class PackagePayloadContractTests
         Assert.DoesNotContain("ensureMacOsX64OnnxRuntime", bundleScript, StringComparison.Ordinal);
         Assert.DoesNotContain("onnxruntime-osx-x86_64", bundleScript, StringComparison.Ordinal);
         Assert.DoesNotContain("osx-x64", bundleScript, StringComparison.Ordinal);
-        Assert.Contains("Microsoft.ML.OnnxRuntime\" Version=\"1.28.0\"", packageVersions, StringComparison.Ordinal);
+        Assert.Equal("1.28.0", onnxRuntimeVersion);
+        Assert.Equal("$(MicrosoftMlOnnxRuntimeVersion)", onnxRuntimePackageVersion);
         Assert.Contains("\"api-23\"", ocrManifest, StringComparison.Ordinal);
         Assert.DoesNotContain("\"api-24\"", ocrManifest, StringComparison.Ordinal);
         Assert.Contains("EXPORTDOCMANAGER_RUST_TARGET: ${{ inputs.rust_target }}", desktopWorkflow, StringComparison.Ordinal);

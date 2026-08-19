@@ -2,6 +2,7 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <MicrosoftMlOnnxRuntimeVersion>1.28.0</MicrosoftMlOnnxRuntimeVersion>
     <PlaywrightChromiumVersion>149.0.7827.55</PlaywrightChromiumVersion>
     <PlaywrightChromiumRevision>1228</PlaywrightChromiumRevision>
   </PropertyGroup>
@@ -18,7 +19,7 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite.Core" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.28.0" />
+    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="$(MicrosoftMlOnnxRuntimeVersion)" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.61.0" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
