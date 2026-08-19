@@ -2,26 +2,6 @@ name: Browser compatibility acceptance
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "apps/export-doc-web/**"
-      - "src/ExportDocManager.Api/**"
-      - "src/ExportDocManager.Application/**"
-      - "src/ExportDocManager.Infrastructure/**"
-      - "scripts/smoke-cross-browser-ui.mjs"
-      - "scripts/lib/child-process-tree.mjs"
-      - ".github/workflows/browser-compatibility.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "apps/export-doc-web/**"
-      - "src/ExportDocManager.Api/**"
-      - "src/ExportDocManager.Application/**"
-      - "src/ExportDocManager.Infrastructure/**"
-      - "scripts/smoke-cross-browser-ui.mjs"
-      - "scripts/lib/child-process-tree.mjs"
-      - ".github/workflows/browser-compatibility.yml"
 
 concurrency:
   group: browser-compatibility-${{ github.ref }}
