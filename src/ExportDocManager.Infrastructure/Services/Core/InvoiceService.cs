@@ -171,56 +171,5 @@ namespace ExportDocManager.Services.Core
             }
         }
 
-        public async Task<bool> SaveInvoiceAsync(
-            Invoice invoice,
-            CancellationToken cancellationToken = default)
-        {
-            ArgumentNullException.ThrowIfNull(invoice);
-
-            try
-            {
-                await AppDbContextExecution.ExecuteInTransactionAsync(
-                    _contextFactory,
-                    async (context, token) =>
-                    {
-                        // This legacy application-service entry point has no request DTO
-                        // carrying a concurrency token. Hydrate the token from the current
-                        // row before delegating to the strict save path. HTTP callers use
-                        // SaveInvoiceWithAutoCreationAsync and must still provide the token.
-                        if (invoice.Id > 0 && (invoice.RowVersion == null || invoice.RowVersion.Length == 0))
-                        {
-                            invoice.RowVersion = await context.Invoices
-                                .AsNoTracking()
-                                .Where(item => item.Id == invoice.Id)
-                                .Select(item => item.RowVersion)
-                                .FirstOrDefaultAsync(token);
-                        }
-                        await SaveInvoiceCoreAsync(
-                            context,
-                            invoice,
-                            pendingHsFeedback: null,
-                            requireRowVersion: false,
-                            cancellationToken: token);
-                    },
-                    cancellationToken);
-                return true;
-            }
-            catch (DbUpdateConcurrencyException ex)
-            {
-                throw new BusinessConcurrencyException("该发票数据已被其他用户修改，请刷新后重试。", ex);
-            }
-            catch (ServiceException)
-            {
-                throw;
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                throw new PermissionDeniedException("无权限保存该发票。", ex);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                throw new InfrastructureServiceException("发票保存服务暂时不可用，请稍后重试。", ex);
-            }
-        }
     }
 }

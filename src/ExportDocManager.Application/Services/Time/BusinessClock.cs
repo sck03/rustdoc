@@ -11,6 +11,8 @@ public interface IBusinessClock
     DateOnly Today { get; }
 
     DateTimeOffset TodayValidUntilUtc { get; }
+
+    DateTimeOffset InterpretLocal(DateTime localDateTime);
 }
 
 public sealed class BusinessClock : IBusinessClock
@@ -43,6 +45,22 @@ public sealed class BusinessClock : IBusinessClock
             DateTime nextMidnight = DateTime.SpecifyKind(now.Date.AddDays(1), DateTimeKind.Unspecified);
             return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(nextMidnight, _timeZone), TimeSpan.Zero);
         }
+    }
+
+    public DateTimeOffset InterpretLocal(DateTime localDateTime)
+    {
+        DateTime unspecified = DateTime.SpecifyKind(localDateTime, DateTimeKind.Unspecified);
+        if (_timeZone.IsInvalidTime(unspecified))
+        {
+            throw new ArgumentException(
+                $"本地业务时间位于时区跳时空档：{unspecified:yyyy-MM-dd HH:mm:ss}",
+                nameof(localDateTime));
+        }
+
+        TimeSpan offset = _timeZone.IsAmbiguousTime(unspecified)
+            ? _timeZone.GetAmbiguousTimeOffsets(unspecified).Max()
+            : _timeZone.GetUtcOffset(unspecified);
+        return new DateTimeOffset(unspecified, offset);
     }
 
     public static IBusinessClock CreateSystem(string? timeZoneId = null) =>

@@ -10,6 +10,7 @@ import {
   type RuntimeStorageContext,
 } from "../../desktop/desktopBridge.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { waitForJobCompletion } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { isStrongRecoveryPassword, readDesktopError, updateBackupQuery } from "./backupManagementModel.ts";
 
@@ -124,10 +125,16 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     setSuccessMessage(null);
   };
   const createMutation = useMutation({
-    mutationFn: () => client.createDatabaseBackup(),
+    mutationFn: async () => {
+      const acceptedJob = await client.createDatabaseBackup();
+      return waitForJobCompletion(client, acceptedJob, {
+        timeoutMessage: "数据库备份仍在后台生成，可稍后到任务中心查看结果。",
+      });
+    },
     onSuccess: (job) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.backups() });
       setMessage(null);
-      setSuccessMessage("数据库备份任务已加入任务中心；完成后刷新列表即可查看新备份。");
+      setSuccessMessage("数据库备份已完成，备份列表正在刷新。");
       setLastCreatedJobId(job.jobId);
     },
     onError: mutationError,

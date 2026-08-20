@@ -113,8 +113,21 @@
   .single-window-tool-group,
   .single-window-section-tools,
   .single-window-tool-group-primary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     flex: 0 1 auto;
     min-height: 0;
+  }
+
+  .single-window-tool-heading {
+    grid-column: 1 / -1;
+  }
+
+  .single-window-tool-group .command-button,
+  .single-window-section-tools .command-button,
+  .single-window-tool-group-primary .command-button {
+    justify-content: center;
+    width: 100%;
   }
 
   .single-window-section-nav {
@@ -131,6 +144,7 @@
   }
 
   .single-window-tool-group-primary {
+    grid-template-columns: minmax(0, 1fr);
     justify-content: flex-start;
     margin-left: 0;
   }

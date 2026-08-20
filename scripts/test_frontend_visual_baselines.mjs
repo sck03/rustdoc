@@ -127,25 +127,41 @@ try {
             }).length
           : 0;
         const queryFilterContractDetails = (() => {
-          const grid = document.querySelector(".query-filter-grid");
-          if (!(grid instanceof HTMLElement)) return null;
+          const filterStack = document.querySelector(".query-filter-stack");
+          const commonGrid = document.querySelector(".query-common-filter-grid");
+          const advancedGrid = document.querySelector(".query-advanced-filter-grid");
+          const advancedDetails = document.querySelector(".query-advanced-filters");
+          const advancedSummary = document.querySelector(".query-advanced-filter-summary");
+          if (!(filterStack instanceof HTMLElement)
+            || !(commonGrid instanceof HTMLElement)
+            || !(advancedGrid instanceof HTMLElement)
+            || !(advancedDetails instanceof HTMLDetailsElement)
+            || !(advancedSummary instanceof HTMLElement)) return null;
           const visibleElement = (element) => {
             if (!(element instanceof HTMLElement)) return false;
             const style = getComputedStyle(element);
             const rect = element.getBoundingClientRect();
             return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
           };
-          const dateRange = grid.querySelector(".query-date-range");
+          const dateRange = commonGrid.querySelector(".query-date-range");
           const actions = document.querySelector(".query-toolbar-actions");
-          const fields = [...grid.querySelectorAll(".query-filter-field")].filter(visibleElement);
-          const labels = [...grid.querySelectorAll(".query-filter-field > span, .query-filter-field > .form-field-label, .query-filter-field > .form-field-label > span:first-child")].filter(visibleElement);
-          const controls = [...grid.querySelectorAll("input, select")].filter(visibleElement);
-          const gridStyle = getComputedStyle(grid);
+          const allFields = [...filterStack.querySelectorAll(".query-filter-field")];
+          const labels = [...filterStack.querySelectorAll(".query-filter-field > span, .query-filter-field > .form-field-label, .query-filter-field > .form-field-label > span:first-child")].filter(visibleElement);
+          const controls = [...filterStack.querySelectorAll("input, select")].filter(visibleElement);
+          const commonGridStyle = getComputedStyle(commonGrid);
+          const advancedGridStyle = getComputedStyle(advancedGrid);
           const dateRangeStyle = dateRange instanceof HTMLElement ? getComputedStyle(dateRange) : null;
-          const gridColumnCount = gridStyle.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length;
+          const commonGridColumnCount = commonGridStyle.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length;
+          const advancedGridColumnCount = advancedGridStyle.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length;
           const dateRangeColumnCount = dateRangeStyle?.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length ?? 0;
-          const expectedGridColumnCount = innerWidth >= 1720 ? 6 : innerWidth > 1180 ? 4 : innerWidth > 620 ? 2 : 1;
+          const expectedCommonGridColumnCount = innerWidth <= 860 ? 1 : 2;
+          const expectedAdvancedGridColumnCount = innerWidth <= 620 ? 1 : innerWidth <= 1180 ? 2 : 4;
           const expectedDateRangeColumnCount = innerWidth <= 620 ? 1 : 2;
+          const expectedFieldCount = 7;
+          const expectedAdvancedOpen = innerWidth > 1180;
+          const advancedSummaryVisible = visibleElement(advancedSummary);
+          const advancedStateMatches = advancedDetails.open === expectedAdvancedOpen
+            && advancedSummaryVisible === !expectedAdvancedOpen;
           const labelClipping = labels.filter((label) => label.scrollWidth > label.clientWidth + 1 || label.scrollHeight > label.clientHeight + 1)
             .map((label) => (label.textContent || "").trim());
           const controlOverflow = controls.filter((control) => {
@@ -156,37 +172,46 @@ try {
             return controlRect.left < fieldRect.left - 1 || controlRect.right > fieldRect.right + 1
               || controlRect.top < fieldRect.top - 1 || controlRect.bottom > fieldRect.bottom + 1;
           }).map((control) => ({ tag: control.tagName, className: control.className }));
-          const fieldRects = fields.map((field) => ({ className: field.className, rect: field.getBoundingClientRect() }));
+          const fieldRects = allFields.map((field) => ({ className: field.className, rect: field.getBoundingClientRect() }));
           const fieldOverlapCount = fieldRects.flatMap((entry, index) => fieldRects.slice(index + 1).map((other) => ({ entry, other })))
             .filter(({ entry, other }) => Math.min(entry.rect.right, other.rect.right) - Math.max(entry.rect.left, other.rect.left) > 1
               && Math.min(entry.rect.bottom, other.rect.bottom) - Math.max(entry.rect.top, other.rect.top) > 1).length;
-          const gridRect = grid.getBoundingClientRect();
+          const filterRect = filterStack.getBoundingClientRect();
           const actionsRect = actions instanceof HTMLElement ? actions.getBoundingClientRect() : null;
           const gridActionsOverlap = actionsRect
-            ? Math.min(gridRect.right, actionsRect.right) - Math.max(gridRect.left, actionsRect.left) > 1
-              && Math.min(gridRect.bottom, actionsRect.bottom) - Math.max(gridRect.top, actionsRect.top) > 1
+            ? Math.min(filterRect.right, actionsRect.right) - Math.max(filterRect.left, actionsRect.left) > 1
+              && Math.min(filterRect.bottom, actionsRect.bottom) - Math.max(filterRect.top, actionsRect.top) > 1
             : true;
           const actionsPlacementMatches = actionsRect
             ? innerWidth <= 860
-              ? actionsRect.top >= gridRect.bottom - 1
-              : actionsRect.left >= gridRect.right - 1
+              ? actionsRect.top >= filterRect.bottom - 1
+              : actionsRect.left >= filterRect.right - 1
             : false;
           return {
-            gridColumnCount,
-            expectedGridColumnCount,
+            commonGridColumnCount,
+            expectedCommonGridColumnCount,
+            advancedGridColumnCount,
+            expectedAdvancedGridColumnCount,
             dateRangeColumnCount,
             expectedDateRangeColumnCount,
-            fieldCount: fields.length,
+            fieldCount: allFields.length,
+            expectedFieldCount,
+            advancedOpen: advancedDetails.open,
+            advancedSummaryVisible,
+            advancedStateMatches,
             labelClipping,
             controlOverflow,
             fieldOverlapCount,
             gridActionsOverlap,
             actionsPlacementMatches,
-            passed: gridStyle.display === "grid"
+            passed: commonGridStyle.display === "grid"
+              && advancedGridStyle.display === "grid"
               && dateRangeStyle?.display === "grid"
-              && gridColumnCount === expectedGridColumnCount
+              && commonGridColumnCount === expectedCommonGridColumnCount
+              && advancedGridColumnCount === expectedAdvancedGridColumnCount
               && dateRangeColumnCount === expectedDateRangeColumnCount
-              && fields.length === 7
+              && allFields.length === expectedFieldCount
+              && advancedStateMatches
               && labelClipping.length === 0
               && controlOverflow.length === 0
               && fieldOverlapCount === 0

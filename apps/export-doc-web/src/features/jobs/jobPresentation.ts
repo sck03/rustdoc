@@ -65,7 +65,7 @@ export function readPositiveIntegerTokens(value: string) {
 }
 
 export function findPreferredInvoiceTemplate(templates: ApiReportTemplateDto[]) {
-  return templates.find((template) => fileNameFromPath(template.templatePath).toLowerCase() === "invoice_template.html") ?? templates[0];
+  return templates.find((template) => fileNameFromPath(template.templatePath) === "invoice_template.html") ?? templates[0];
 }
 
 export function fileNameFromPath(value: string) {

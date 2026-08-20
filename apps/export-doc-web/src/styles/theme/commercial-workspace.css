@@ -203,7 +203,18 @@ html[data-interface-density="compact"] :where(th, td) {
 }
 
 .workspace-logout-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 11px;
   color: var(--edm-ink-500);
+  background: color-mix(in srgb, var(--edm-white) 84%, transparent);
+  border: 1px solid var(--edm-line);
+  border-radius: 999px;
+  font-size: var(--edm-font-size-xs);
+  font-weight: 750;
 }
 
 .workspace-logout-button:hover:not(:disabled) {
@@ -644,8 +655,7 @@ dialog::backdrop {
   }
 
   .workspace-context-icon,
-  .service-status,
-  .session-user-copy {
+  .service-status {
     display: none;
   }
 
@@ -658,7 +668,15 @@ dialog::backdrop {
   }
 
   .session-user {
-    padding: 3px;
+    padding: 3px 8px 3px 3px;
+  }
+
+  .session-user-copy small {
+    display: none;
+  }
+
+  .session-user-copy strong {
+    max-width: 84px;
   }
 
   .toolbar {

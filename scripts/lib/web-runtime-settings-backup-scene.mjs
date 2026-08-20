@@ -371,14 +371,6 @@ export function createSettingsBackupSmokeScene(runtime) {
             return { found: false, reason: 'missing email panel' };
           }
 
-          const notifyReactChange = (control) => {
-            const reactPropsKey = Object.keys(control).find((key) => key.startsWith('__reactProps$'));
-            const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-            if (reactProps && typeof reactProps.onChange === 'function') {
-              reactProps.onChange({ target: control, currentTarget: control });
-            }
-          };
-
           const setNativeValue = (control, value) => {
             const prototype = Object.getPrototypeOf(control);
             const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
@@ -390,7 +382,6 @@ export function createSettingsBackupSmokeScene(runtime) {
             control.focus();
             control.dispatchEvent(new Event('input', { bubbles: true }));
             control.dispatchEvent(new Event('change', { bubbles: true }));
-            notifyReactChange(control);
           };
 
           const fieldByLabel = (labelText) => {
@@ -984,14 +975,6 @@ export function createSettingsBackupSmokeScene(runtime) {
           throw new Error("数据备份与还原区域未找到。");
         }
 
-        const notifyReactChange = (control) => {
-          const reactPropsKey = Object.keys(control).find((key) => key.startsWith("__reactProps$"));
-          const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-          if (reactProps && typeof reactProps.onChange === "function") {
-            reactProps.onChange({ target: control, currentTarget: control });
-          }
-        };
-
         const setNativeValue = (control, value) => {
           const prototype = Object.getPrototypeOf(control);
           const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
@@ -1003,7 +986,6 @@ export function createSettingsBackupSmokeScene(runtime) {
           control.focus();
           control.dispatchEvent(new Event("input", { bubbles: true }));
           control.dispatchEvent(new Event("change", { bubbles: true }));
-          notifyReactChange(control);
         };
 
         const fieldByLabel = (labelText) => {

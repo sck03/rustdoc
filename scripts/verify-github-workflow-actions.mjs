@@ -9,6 +9,7 @@ const requiredActions = new Map([
   ["actions/setup-dotnet", "26b0ec14cb23fa6904739307f278c14f94c95bf1"],
   ["actions/setup-node", "a0853c24544627f65ddf259abe73b1d18a591444"],
   ["actions/setup-python", "ece7cb06caefa5fff74198d8649806c4678c61a1"],
+  ["actions/cache", "caa296126883cff596d87d8935842f9db880ef25"],
   ["actions/upload-artifact", "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"],
   ["actions/download-artifact", "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"],
   ["docker/metadata-action", "dc802804100637a589fabce1cb79ff13a1411302"],
@@ -20,6 +21,15 @@ const requiredActions = new Map([
 ]);
 const requiredDotNetSdk = "10.0.302";
 const requiredRustToolchain = "1.96.0";
+const runtimeIdentifiers = ["win-x64", "win-arm64", "linux-x64", "linux-arm64", "osx-arm64"];
+const fullOnlyRuntimeDependencies = [
+  "ClosedXML",
+  "Microsoft.Playwright",
+  "PDFtoImage",
+  "exportdocmanager.infrastructure.browser",
+  "exportdocmanager.infrastructure.excel",
+  "exportdocmanager.infrastructure.pdfocr",
+];
 const failures = [];
 let actionCount = 0;
 
@@ -106,6 +116,25 @@ for (const entry of readdirSync(workflowRoot, { withFileTypes: true })) {
 const rootToolchain = readFileSync(path.join(repositoryRoot, "rust-toolchain.toml"), "utf8");
 if (!new RegExp(`channel\\s*=\\s*["']${requiredRustToolchain.replaceAll(".", "\\.")}["']`, "u").test(rootToolchain)) {
   failures.push(`rust-toolchain.toml must pin Rust ${requiredRustToolchain}.`);
+}
+
+for (const runtimeIdentifier of runtimeIdentifiers) {
+  const lockRoot = path.join(repositoryRoot, "eng", "nuget-runtime-locks", runtimeIdentifier);
+  const fullLock = JSON.parse(readFileSync(path.join(lockRoot, "ExportDocManager.Api.packages.lock.json"), "utf8"));
+  const salesLock = JSON.parse(readFileSync(path.join(lockRoot, "ExportDocManager.Api.sales.packages.lock.json"), "utf8"));
+  const fullGraph = fullLock.dependencies?.["net10.0"] ?? {};
+  const salesGraph = salesLock.dependencies?.["net10.0"] ?? {};
+  if (Object.keys(salesGraph).length >= Object.keys(fullGraph).length) {
+    failures.push(`${runtimeIdentifier}: Sales API runtime graph must remain smaller than Full.`);
+  }
+  for (const dependency of fullOnlyRuntimeDependencies) {
+    if (!(dependency in fullGraph)) {
+      failures.push(`${runtimeIdentifier}: Full API runtime graph is missing ${dependency}.`);
+    }
+    if (dependency in salesGraph) {
+      failures.push(`${runtimeIdentifier}: Sales API runtime graph must not include ${dependency}.`);
+    }
+  }
 }
 
 const dependencyWorkflowPath = path.join(workflowRoot, "dependency-governance.yml");

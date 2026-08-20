@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Test projects intentionally use independent tokens to exercise cancellation boundaries. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+</Project>

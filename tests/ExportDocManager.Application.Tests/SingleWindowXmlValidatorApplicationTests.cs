@@ -1,5 +1,6 @@
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Services.SingleWindow;
+using System.Globalization;
 
 namespace ExportDocManager.Application.Tests
 {
@@ -28,6 +29,28 @@ namespace ExportDocManager.Application.Tests
                 value: string.Empty);
 
             Assert.Equal("62.03", normalized);
+        }
+
+        [Fact]
+        public void CustomsCooOriginCriteriaCatalog_ShouldRemainInvariantAcrossServerCultures()
+        {
+            CultureInfo previousCulture = CultureInfo.CurrentCulture;
+            try
+            {
+                CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+
+                string normalized = CustomsCooOriginCriteriaCatalog.NormalizeOriginCriteriaRefInput(
+                    certType: "E",
+                    originCriteria: "WP",
+                    hsCode: string.Empty,
+                    value: "40.5%");
+
+                Assert.Equal("40.5%", normalized);
+            }
+            finally
+            {
+                CultureInfo.CurrentCulture = previousCulture;
+            }
         }
 
         [Theory]

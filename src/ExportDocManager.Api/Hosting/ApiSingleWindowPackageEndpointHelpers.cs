@@ -131,7 +131,7 @@ namespace ExportDocManager.Api.Hosting
             var receiptFiles = (request.ReceiptFiles ?? Array.Empty<string>())
                 .Where(item => !string.IsNullOrWhiteSpace(item))
                 .Select(item => item.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Distinct(PhysicalPathComparison.Comparer)
                 .ToArray();
             if (receiptFiles.Length == 0)
             {
@@ -193,7 +193,7 @@ namespace ExportDocManager.Api.Hosting
             var receiptFiles = (request.ReceiptFiles ?? Array.Empty<string>())
                 .Where(item => !string.IsNullOrWhiteSpace(item))
                 .Select(item => item.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Distinct(PhysicalPathComparison.Comparer)
                 .ToArray();
             if (receiptFiles.Length == 0)
             {

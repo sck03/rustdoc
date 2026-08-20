@@ -327,7 +327,7 @@ export function findTemplateForBatchExportItem(
     return pathMatch;
   }
 
-  const itemFileName = fileNameFromPath(item.templatePath).toLowerCase();
+  const itemFileName = fileNameFromPath(item.templatePath);
   if (!itemFileName) {
     return undefined;
   }
@@ -335,7 +335,7 @@ export function findTemplateForBatchExportItem(
   const fileNameMatches = templates.filter(
     (template) =>
       !usedTemplatePaths.has(template.templatePath) &&
-      fileNameFromPath(template.templatePath).toLowerCase() === itemFileName,
+      fileNameFromPath(template.templatePath) === itemFileName,
   );
 
   return fileNameMatches.length === 1 ? fileNameMatches[0] : undefined;
@@ -361,8 +361,7 @@ export function normalizePathForMatch(path: string) {
     .replace(/^file:[/\\]*/i, "")
     .replace(/\\/g, "/")
     .replace(/\/+/g, "/")
-    .replace(/^\/+/, "")
-    .toLowerCase();
+    .replace(/^\/+/, "");
 }
 
 export function buildDocumentPackageDefaultFileName(

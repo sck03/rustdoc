@@ -141,6 +141,16 @@ export function includesText(text, expected) {
   return text.toLocaleLowerCase().includes(expected.toLocaleLowerCase());
 }
 
+export function retryAfterMilliseconds(response, fallbackMs = 5_000) {
+  const rawValue = response?.headers?.get?.("retry-after") ?? "";
+  const seconds = Number.parseInt(rawValue, 10);
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return fallbackMs;
+  }
+
+  return Math.min(60_000, Math.max(1_000, seconds * 1_000));
+}
+
 export async function fetchJson(url) {
   const response = await fetch(url);
   if (!response.ok) {

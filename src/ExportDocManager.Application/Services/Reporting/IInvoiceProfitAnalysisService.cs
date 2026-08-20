@@ -1,4 +1,5 @@
 using ExportDocManager.Models.Entities;
+using System.Globalization;
 
 namespace ExportDocManager.Services.Reporting
 {
@@ -45,13 +46,13 @@ namespace ExportDocManager.Services.Reporting
                 taxRefund,
                 grossProfit,
                 margin,
-                $"{invoice.Currency} {salesTotal:N2}",
-                rate > 0 ? rate.ToString("N4") : "未设置",
-                $"¥ {salesRmb:N2}",
-                $"- ¥ {purchaseCost:N2}",
-                $"+ ¥ {taxRefund:N2}",
-                $"¥ {grossProfit:N2}",
-                $"{margin:P2}");
+                $"{invoice.Currency} {salesTotal.ToString("N2", CultureInfo.InvariantCulture)}",
+                rate > 0 ? rate.ToString("N4", CultureInfo.InvariantCulture) : "未设置",
+                $"¥ {salesRmb.ToString("N2", CultureInfo.InvariantCulture)}",
+                $"- ¥ {purchaseCost.ToString("N2", CultureInfo.InvariantCulture)}",
+                $"+ ¥ {taxRefund.ToString("N2", CultureInfo.InvariantCulture)}",
+                $"¥ {grossProfit.ToString("N2", CultureInfo.InvariantCulture)}",
+                margin.ToString("P2", CultureInfo.InvariantCulture));
         }
 
         private static bool IsRmbCurrency(string? currency)

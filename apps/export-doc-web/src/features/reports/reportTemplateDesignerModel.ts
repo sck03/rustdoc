@@ -60,9 +60,8 @@ export function readPreviewSourceIdFromSearch(search: string, reportType: Report
 }
 
 export function matchesTemplateFileName(templatePath: string, requestedTemplateFileName: string) {
-  const requested = requestedTemplateFileName.toLowerCase();
-  const templatePathLower = templatePath.toLowerCase();
-  return fileNameFromPath(templatePathLower) === requested || templatePathLower.includes(requested);
+  const requested = requestedTemplateFileName.trim();
+  return fileNameFromPath(templatePath) === requested;
 }
 
 export function matchesTemplatePath(left: string, right: string) {
@@ -102,7 +101,7 @@ export function resolveDefaultTemplatePath({
   }
 
   return (
-    templates.find((template) => fileNameFromPath(template.templatePath).toLowerCase() === defaultTemplateFileName(reportType)) ??
+    templates.find((template) => fileNameFromPath(template.templatePath) === defaultTemplateFileName(reportType)) ??
     templates[0]
   ).templatePath;
 }
@@ -180,7 +179,7 @@ export function buildRawPreviewHtml(content: string) {
 }
 
 function normalizeTemplatePath(path: string) {
-  return path.trim().replace(/[\\/]+/g, "/").toLowerCase();
+  return path.trim().replace(/[\\/]+/g, "/");
 }
 
 function buildTimestamp(now: Date) {

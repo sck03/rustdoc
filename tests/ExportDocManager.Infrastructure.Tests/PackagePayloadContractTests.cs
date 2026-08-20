@@ -63,6 +63,7 @@ public sealed class PackagePayloadContractTests
         string compose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.yml"));
         string ghcrCompose = File.ReadAllText(Path.Combine(root, "deploy", "container", "docker-compose.ghcr.yml"));
         string containerRuntimeWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "container-runtime-validation.yml"));
+        string containerInstallerValidation = File.ReadAllText(Path.Combine(root, "scripts", "github", "validate-container-installer.sh"));
         string containerImageWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "container-images.yml"));
         string verifier = File.ReadAllText(Path.Combine(root, "scripts", "verify-package-payload.ps1"));
 
@@ -124,7 +125,8 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("USER nginx", webDockerfile, StringComparison.Ordinal);
         Assert.Contains("postgres:18.4-trixie", compose, StringComparison.Ordinal);
         Assert.Contains("postgres:18.4-trixie", ghcrCompose, StringComparison.Ordinal);
-        Assert.Contains("postgres:18.4-trixie", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("bash scripts/github/validate-container-installer.sh", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("postgres:18.4-trixie", containerInstallerValidation, StringComparison.Ordinal);
         Assert.DoesNotContain("--remote-debugging-port=0", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("nginx:1.30.4-alpine3.24", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("sha-${GITHUB_SHA}", containerImageWorkflow, StringComparison.Ordinal);
@@ -143,8 +145,8 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("/livez", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("Validate isolated Chromium PDF runtime and capability boundary", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("--print-to-pdf", containerRuntimeWorkflow, StringComparison.Ordinal);
-        Assert.Contains("sudo test -d \"$installer_root/runtime/api-data/Cache/ReportPdf\"", containerRuntimeWorkflow, StringComparison.Ordinal);
-        Assert.Contains("sudo test -d \"$installer_root/runtime/browser\"", containerRuntimeWorkflow, StringComparison.Ordinal);
+        Assert.Contains("sudo test -d \"$installer_root/runtime/api-data/Cache/ReportPdf\"", containerInstallerValidation, StringComparison.Ordinal);
+        Assert.Contains("sudo test -d \"$installer_root/runtime/browser\"", containerInstallerValidation, StringComparison.Ordinal);
         Assert.Contains("if [ ! -f .env ]; then", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("--env-file .env", containerRuntimeWorkflow, StringComparison.Ordinal);
         Assert.Contains("EXPORTDOCMANAGER_BROWSER_CDP_ENDPOINT: http://browser:9222", compose, StringComparison.Ordinal);
@@ -273,7 +275,7 @@ public sealed class PackagePayloadContractTests
         Assert.DoesNotContain("ensureMacOsX64OnnxRuntime", bundleScript, StringComparison.Ordinal);
         Assert.DoesNotContain("onnxruntime-osx-x86_64", bundleScript, StringComparison.Ordinal);
         Assert.DoesNotContain("osx-x64", bundleScript, StringComparison.Ordinal);
-        Assert.Equal("1.28.0", onnxRuntimeVersion);
+        Assert.Equal("1.29.0", onnxRuntimeVersion);
         Assert.Equal("$(MicrosoftMlOnnxRuntimeVersion)", onnxRuntimePackageVersion);
         Assert.Contains("\"api-23\"", ocrManifest, StringComparison.Ordinal);
         Assert.DoesNotContain("\"api-24\"", ocrManifest, StringComparison.Ordinal);

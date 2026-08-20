@@ -45,4 +45,25 @@ public sealed class CrossPlatformFileNamePolicyTests
 
         Assert.Equal("é report", CrossPlatformFileNamePolicy.SanitizeFileNamePart(decomposed));
     }
+
+    [Fact]
+    public void Sanitization_ShouldRespectPortableUtf8ComponentBudgetAndPreserveExtension()
+    {
+        string value = new string('报', 200) + ".pdf";
+
+        string sanitized = CrossPlatformFileNamePolicy.SanitizeFileNamePart(value);
+
+        Assert.EndsWith(".pdf", sanitized, StringComparison.Ordinal);
+        Assert.True(CrossPlatformFileNamePolicy.IsSafeFileName(sanitized));
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(sanitized) <=
+                    CrossPlatformFileNamePolicy.MaximumPortableComponentUtf8Bytes);
+    }
+
+    [Fact]
+    public void Sanitization_ShouldPreserveExplicitEmptyFallbackContract()
+    {
+        Assert.Equal(string.Empty, CrossPlatformFileNamePolicy.SanitizeFileNamePart("...", '_', string.Empty));
+        Assert.Equal("file", CrossPlatformFileNamePolicy.SanitizeFileNamePart("..."));
+    }
+
 }

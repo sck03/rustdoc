@@ -41,7 +41,6 @@ namespace ExportDocManager.Services.Core
             Exporter? exporter,
             IReadOnlyList<HsCodeKnowledgeFeedbackInput>? pendingHsFeedback = null,
             CancellationToken cancellationToken = default);
-        Task<bool> SaveInvoiceAsync(Invoice invoice, CancellationToken cancellationToken = default);
         Task<bool> DeleteInvoiceAsync(int id, CancellationToken cancellationToken = default);
         Task<Invoice?> GetInvoiceByIdAsync(int id, CancellationToken cancellationToken = default);
         Task<Invoice?> GetInvoiceByInvoiceNoAndTypeAsync(

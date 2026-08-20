@@ -464,7 +464,7 @@ namespace ExportDocManager.Services.SingleWindow
             Directory.CreateDirectory(outBoxDirectory);
             var publishedFiles = new List<string>(stagedFiles?.Count ?? 0);
             var publishPlans = new List<(string PendingPath, string TargetPath)>(stagedFiles?.Count ?? 0);
-            var reservedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var reservedTargets = new HashSet<string>(PhysicalPathComparison.Comparer);
             try
             {
                 foreach (string stagedFile in stagedFiles ?? [])

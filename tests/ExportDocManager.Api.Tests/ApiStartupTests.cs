@@ -62,6 +62,17 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains(IPAddress.IPv6Loopback, options.TrustedProxies);
         }
 
+        [Theory]
+        [InlineData("--app-root")]
+        [InlineData("--data-root")]
+        public void Parse_ShouldRejectRelativeRuntimeRoots(string optionName)
+        {
+            var exception = Assert.Throws<ArgumentException>(() =>
+                ApiRuntimeOptions.Parse([optionName, "relative-runtime-root"]));
+
+            Assert.Contains("绝对路径", exception.Message, StringComparison.Ordinal);
+        }
+
         [Fact]
         public void SecurityHeaders_ShouldRestrictConnectionsToSelfAndConfiguredOrigins()
         {
@@ -2348,11 +2359,6 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<bool> SaveInvoiceAsync(Invoice invoice, CancellationToken cancellationToken = default)
-            {
-                throw new NotSupportedException();
-            }
-
             public Task<bool> DeleteInvoiceAsync(int id, CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
@@ -2552,11 +2558,6 @@ namespace ExportDocManager.Api.Tests
                 Exporter? exporter,
                 IReadOnlyList<HsCodeKnowledgeFeedbackInput>? pendingHsFeedback = null,
                 CancellationToken cancellationToken = default)
-            {
-                throw new NotSupportedException();
-            }
-
-            public Task<bool> SaveInvoiceAsync(Invoice invoice, CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }

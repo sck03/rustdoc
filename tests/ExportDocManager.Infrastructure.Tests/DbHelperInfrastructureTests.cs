@@ -24,6 +24,38 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task BuildConnectionString_ShouldOpenLongWindowsAbsolutePath()
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return;
+            }
+
+            string root = CreateTempDirectory();
+            try
+            {
+                string deepRoot = root;
+                while (Path.Combine(deepRoot, "runtime.db").Length < 270)
+                {
+                    deepRoot = Path.Combine(deepRoot, $"segment-{Guid.NewGuid():N}");
+                }
+                Directory.CreateDirectory(deepRoot);
+                string databasePath = Path.Combine(deepRoot, "runtime.db");
+
+                await using var connection = new SqliteConnection(DbHelper.BuildConnectionString(databasePath));
+                await connection.OpenAsync();
+
+                Assert.Equal(System.Data.ConnectionState.Open, connection.State);
+                Assert.True(File.Exists(databasePath));
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                DeleteDirectory(root);
+            }
+        }
+
+        [Fact]
         public void ResolveRuntimeSqliteDatabasePath_WithConfiguredPathProvider_ShouldUseRuntimeDatabaseRoot()
         {
             var appRoot = CreateTempDirectory();
@@ -250,9 +282,11 @@ namespace ExportDocManager.Infrastructure.Tests
                 DbHelper.ConfigureDbContextOptions(options, settings, provider);
 
                 using var context = new AppDbContext(options.Options);
-                Assert.Equal(
-                    Path.GetFullPath(Path.Combine(provider.DatabaseRoot, "isolated.db")),
-                    Path.GetFullPath(context.Database.GetDbConnection().DataSource));
+                string expectedPath = Path.GetFullPath(Path.Combine(provider.DatabaseRoot, "isolated.db"));
+                string actualPath = NormalizeWindowsExtendedPath(
+                    context.Database.GetDbConnection().DataSource);
+
+                Assert.Equal(expectedPath, actualPath);
             }
             finally
             {
@@ -267,6 +301,22 @@ namespace ExportDocManager.Infrastructure.Tests
             Directory.CreateDirectory(Path.Combine(path, "App_Data", "Config"));
             Directory.CreateDirectory(Path.Combine(path, "App_Data", "Security"));
             return path;
+        }
+
+        private static string NormalizeWindowsExtendedPath(string path)
+        {
+            string fullPath = Path.GetFullPath(path);
+            const string extendedPathPrefix = @"\\?\";
+            const string extendedUncPrefix = @"\\?\UNC\";
+
+            if (fullPath.StartsWith(extendedUncPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return Path.GetFullPath(@"\\" + fullPath[extendedUncPrefix.Length..]);
+            }
+
+            return fullPath.StartsWith(extendedPathPrefix, StringComparison.OrdinalIgnoreCase)
+                ? Path.GetFullPath(fullPath[extendedPathPrefix.Length..])
+                : fullPath;
         }
 
         private static void DeleteDirectory(string path)

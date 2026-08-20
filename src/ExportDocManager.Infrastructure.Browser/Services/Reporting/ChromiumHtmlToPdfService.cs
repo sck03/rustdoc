@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Errors;
@@ -17,6 +18,8 @@ namespace ExportDocManager.Services.Reporting
         private static readonly TimeSpan DefaultRenderTimeout = TimeSpan.FromSeconds(60);
         private const int TemporaryDirectoryCleanupAttempts = 20;
         private const int TemporaryDirectoryCleanupDelayMilliseconds = 250;
+        private const string TemporaryDirectoryPrefix = "r-";
+        private const int TemporaryDirectoryRandomByteCount = 8;
         private const string ContentSecurityPolicy =
             "default-src 'none'; script-src 'none'; connect-src 'none'; frame-src 'none'; " +
             "object-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src file: data:; " +
@@ -54,7 +57,11 @@ namespace ExportDocManager.Services.Reporting
 
             string rendererPath = ResolveRendererExecutablePath();
             string destinationFullPath = Path.GetFullPath(destinationPath);
-            string tempRoot = Path.Combine(_pathProvider.CacheRoot, "ReportPdf", Guid.NewGuid().ToString("N"));
+            string tempRoot = Path.Combine(
+                _pathProvider.CacheRoot,
+                "ReportPdf",
+                TemporaryDirectoryPrefix + Convert.ToHexString(
+                    RandomNumberGenerator.GetBytes(TemporaryDirectoryRandomByteCount)).ToLowerInvariant());
             string htmlPath = Path.Combine(tempRoot, "index.html");
             string pdfPath = Path.Combine(tempRoot, "output.pdf");
             TimeSpan renderTimeout = ResolveRenderTimeout();
@@ -333,7 +340,7 @@ namespace ExportDocManager.Services.Reporting
                     foreach (string directory in Directory.EnumerateDirectories(fullRoot, "*", SearchOption.TopDirectoryOnly))
                     {
                         string name = Path.GetFileName(directory);
-                        if (!Guid.TryParseExact(name, "N", out _))
+                        if (!IsManagedTemporaryDirectoryName(name))
                         {
                             continue;
                         }
@@ -364,6 +371,25 @@ namespace ExportDocManager.Services.Reporting
                 || path.EndsWith(Path.AltDirectorySeparatorChar)
                     ? path
                     : path + Path.DirectorySeparatorChar;
+        }
+
+        private static bool IsManagedTemporaryDirectoryName(string name)
+        {
+            if (name.Length != TemporaryDirectoryPrefix.Length + (TemporaryDirectoryRandomByteCount * 2)
+                || !name.StartsWith(TemporaryDirectoryPrefix, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            foreach (char character in name.AsSpan(TemporaryDirectoryPrefix.Length))
+            {
+                if (character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f'))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

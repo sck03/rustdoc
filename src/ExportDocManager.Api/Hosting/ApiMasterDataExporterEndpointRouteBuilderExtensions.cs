@@ -310,8 +310,7 @@ namespace ExportDocManager.Api.Hosting
             string portableName = (fileName ?? string.Empty).Trim().Replace('\\', '/');
             string safeFileName = Path.GetFileName(portableName).Trim();
             if (string.IsNullOrWhiteSpace(safeFileName) ||
-                safeFileName.Length > 240 ||
-                safeFileName.Any(character => char.IsControl(character) || "<>:\"/\\|?*".Contains(character)))
+                !CrossPlatformFileNamePolicy.IsSafeFileName(safeFileName))
             {
                 return string.Empty;
             }

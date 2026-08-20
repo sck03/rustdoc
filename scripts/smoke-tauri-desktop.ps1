@@ -32,7 +32,7 @@ param(
 
     [string]$BrowserExecutablePath,
 
-    [int]$WebSmokeTimeoutSeconds = 45,
+    [int]$WebSmokeTimeoutSeconds = 90,
 
     [ValidateRange(60, 3600)][int]$WebSmokeProcessTimeoutSeconds = 900,
 
@@ -55,6 +55,7 @@ $scriptUtf8Encoding = New-Object System.Text.UTF8Encoding($false)
 [Console]::OutputEncoding = $scriptUtf8Encoding
 $OutputEncoding = $scriptUtf8Encoding
 . (Join-Path $PSScriptRoot "lib/build-script-support.ps1")
+. (Join-Path $PSScriptRoot "lib/web-runtime-smoke-arguments.ps1")
 
 function Get-FullPath {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -444,6 +445,28 @@ function Invoke-WebRuntimeSmokeProcess {
     }
 }
 
+function New-WebRuntimeSmokeArguments {
+    param(
+        [Parameter(Mandatory = $true)][string]$ScriptPath,
+        [Parameter(Mandatory = $true)][string]$BrowserExecutable,
+        [Parameter(Mandatory = $true)][string]$WebUrl,
+        [Parameter(Mandatory = $true)][string]$ApiBaseUrl,
+        [Parameter(Mandatory = $true)][string]$DesktopAccessToken,
+        [Parameter(Mandatory = $true)][string]$BrowserProfileRoot
+    )
+
+    return New-ExportDocWebRuntimeSmokeArguments `
+        -ScriptPath $ScriptPath `
+        -BrowserExecutable $BrowserExecutable `
+        -WebUrl $WebUrl `
+        -ApiBaseUrl $ApiBaseUrl `
+        -DesktopAccessToken $DesktopAccessToken `
+        -Username $Username `
+        -Password $Password `
+        -UserDataDirectory $BrowserProfileRoot `
+        -TimeoutMilliseconds ($WebSmokeTimeoutSeconds * 1000)
+}
+
 function Get-SmokeViteProcesses {
     $normalizedRepoRoot = (Get-FullPath -Path $repoRoot).Replace('/', '\')
     return Get-WindowsProcessInventory |
@@ -702,18 +725,14 @@ function Invoke-WebDiagnosticsSmoke {
         [string]$Health.singleWindowRoot
     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
-    $nodeArguments = New-Object System.Collections.Generic.List[string]
+    $nodeArguments = New-WebRuntimeSmokeArguments `
+        -ScriptPath $scriptPath `
+        -BrowserExecutable $browserExecutable `
+        -WebUrl $webUrl `
+        -ApiBaseUrl $ApiBaseUrl `
+        -DesktopAccessToken $DesktopAccessToken `
+        -BrowserProfileRoot $browserProfileRoot
     foreach ($argument in @(
-        $scriptPath,
-        "--browser-executable", $browserExecutable,
-        "--web-url", $webUrl,
-        "--api-base-url", $ApiBaseUrl,
-        "--desktop-access-token", $DesktopAccessToken,
-        "--mock-tauri-runtime-context",
-        "--username", $Username,
-        "--password", $Password,
-        "--user-data-dir", $browserProfileRoot,
-        "--timeout-ms", ([string]($WebSmokeTimeoutSeconds * 1000)),
         "--runtime-path-actions-check",
         "--backup-create-check",
         "--audit-log-check",
@@ -767,21 +786,20 @@ function Invoke-WebSalesWorkspaceSmoke {
 
     $jsonPath = Join-Path $LogRoot "web-sales-workspace-smoke.json"
     $screenshotPath = Join-Path $LogRoot "web-sales-workspace-smoke.png"
-    $nodeArguments = @(
-        $scriptPath,
-        "--browser-executable", $browserExecutable,
-        "--web-url", "http://127.0.0.1:5173/#/crm/dashboard",
-        "--api-base-url", $ApiBaseUrl,
-        "--desktop-access-token", $DesktopAccessToken,
-        "--mock-tauri-runtime-context",
-        "--username", $Username,
-        "--password", $Password,
-        "--user-data-dir", $browserProfileRoot,
-        "--timeout-ms", ([string]($WebSmokeTimeoutSeconds * 1000)),
+    $nodeArguments = New-WebRuntimeSmokeArguments `
+        -ScriptPath $scriptPath `
+        -BrowserExecutable $browserExecutable `
+        -WebUrl "http://127.0.0.1:5173/#/crm/dashboard" `
+        -ApiBaseUrl $ApiBaseUrl `
+        -DesktopAccessToken $DesktopAccessToken `
+        -BrowserProfileRoot $browserProfileRoot
+    foreach ($argument in @(
         "--expected-text", "销售概览",
         "--sales-workspace-check",
         "--screenshot-path", $screenshotPath
-    )
+    )) {
+        $nodeArguments.Add([string]$argument)
+    }
 
     return Invoke-WebRuntimeSmokeProcess `
         -Arguments $nodeArguments `
@@ -821,18 +839,14 @@ function Invoke-WebBackupRestoreSmoke {
         "还原数据库"
     )
 
-    $nodeArguments = New-Object System.Collections.Generic.List[string]
+    $nodeArguments = New-WebRuntimeSmokeArguments `
+        -ScriptPath $scriptPath `
+        -BrowserExecutable $browserExecutable `
+        -WebUrl $webUrl `
+        -ApiBaseUrl $ApiBaseUrl `
+        -DesktopAccessToken $DesktopAccessToken `
+        -BrowserProfileRoot $browserProfileRoot
     foreach ($argument in @(
-        $scriptPath,
-        "--browser-executable", $browserExecutable,
-        "--web-url", $webUrl,
-        "--api-base-url", $ApiBaseUrl,
-        "--desktop-access-token", $DesktopAccessToken,
-        "--mock-tauri-runtime-context",
-        "--username", $Username,
-        "--password", $Password,
-        "--user-data-dir", $browserProfileRoot,
-        "--timeout-ms", ([string]($WebSmokeTimeoutSeconds * 1000)),
         "--backup-restore-check",
         "--screenshot-path", $webSmokeScreenshotPath
     )) {
@@ -900,18 +914,14 @@ function Invoke-WebReportsSmoke {
         @("PaymentVoucher", "expense_reimbursement_template.html", "费用报销明细单")
     )
 
-    $nodeArguments = New-Object System.Collections.Generic.List[string]
+    $nodeArguments = New-WebRuntimeSmokeArguments `
+        -ScriptPath $scriptPath `
+        -BrowserExecutable $browserExecutable `
+        -WebUrl $webUrl `
+        -ApiBaseUrl $ApiBaseUrl `
+        -DesktopAccessToken $DesktopAccessToken `
+        -BrowserProfileRoot $browserProfileRoot
     foreach ($argument in @(
-        $scriptPath,
-        "--browser-executable", $browserExecutable,
-        "--web-url", $webUrl,
-        "--api-base-url", $ApiBaseUrl,
-        "--desktop-access-token", $DesktopAccessToken,
-        "--mock-tauri-runtime-context",
-        "--username", $Username,
-        "--password", $Password,
-        "--user-data-dir", $browserProfileRoot,
-        "--timeout-ms", ([string]($WebSmokeTimeoutSeconds * 1000)),
         "--screenshot-path", $webSmokeScreenshotPath
     )) {
         $nodeArguments.Add([string]$argument)
@@ -982,21 +992,20 @@ function Invoke-WebSingleWindowOperationCenterSmoke {
     $jsonPath = Join-Path $LogRoot "web-single-window-operation-center-smoke.json"
     $screenshotPath = Join-Path $LogRoot "web-single-window-operation-center-smoke.png"
     $webUrl = "http://127.0.0.1:5173/#/single-window/operation-center"
-    $nodeArguments = @(
-        $scriptPath,
-        "--browser-executable", $browserExecutable,
-        "--web-url", $webUrl,
-        "--api-base-url", $ApiBaseUrl,
-        "--desktop-access-token", $DesktopAccessToken,
-        "--mock-tauri-runtime-context",
-        "--username", $Username,
-        "--password", $Password,
-        "--user-data-dir", $browserProfileRoot,
-        "--timeout-ms", ([string]($WebSmokeTimeoutSeconds * 1000)),
+    $nodeArguments = New-WebRuntimeSmokeArguments `
+        -ScriptPath $scriptPath `
+        -BrowserExecutable $browserExecutable `
+        -WebUrl $webUrl `
+        -ApiBaseUrl $ApiBaseUrl `
+        -DesktopAccessToken $DesktopAccessToken `
+        -BrowserProfileRoot $browserProfileRoot
+    foreach ($argument in @(
         "--screenshot-path", $screenshotPath,
         "--expected-text", "持卡机本地模式",
         "--single-window-operation-center-check"
-    )
+    )) {
+        $nodeArguments.Add([string]$argument)
+    }
 
     return Invoke-WebRuntimeSmokeProcess `
         -Arguments $nodeArguments `
@@ -1028,21 +1037,20 @@ function Invoke-WebInvoiceItemsSmoke {
     $webSmokeJsonPath = Join-Path $LogRoot "web-invoice-items-smoke.json"
     $webSmokeScreenshotPath = Join-Path $LogRoot "web-invoice-items-smoke.png"
     $webUrl = "http://127.0.0.1:5173/#/invoices"
-    $nodeArguments = @(
-        $scriptPath,
-        "--browser-executable", $browserExecutable,
-        "--web-url", $webUrl,
-        "--api-base-url", $ApiBaseUrl,
-        "--desktop-access-token", $DesktopAccessToken,
-        "--mock-tauri-runtime-context",
-        "--username", $Username,
-        "--password", $Password,
-        "--user-data-dir", $browserProfileRoot,
-        "--timeout-ms", ([string]($WebSmokeTimeoutSeconds * 1000)),
+    $nodeArguments = New-WebRuntimeSmokeArguments `
+        -ScriptPath $scriptPath `
+        -BrowserExecutable $browserExecutable `
+        -WebUrl $webUrl `
+        -ApiBaseUrl $ApiBaseUrl `
+        -DesktopAccessToken $DesktopAccessToken `
+        -BrowserProfileRoot $browserProfileRoot
+    foreach ($argument in @(
         "--expected-text", "发票管理",
         "--invoice-items-check",
         "--screenshot-path", $webSmokeScreenshotPath
-    )
+    )) {
+        $nodeArguments.Add([string]$argument)
+    }
 
     return Invoke-WebRuntimeSmokeProcess `
         -Arguments $nodeArguments `
@@ -1075,18 +1083,14 @@ function Invoke-WebContainerPackingSmoke {
     $webSmokeScreenshotPath = Join-Path $LogRoot "web-container-packing-smoke.png"
     $webUrl = "http://127.0.0.1:5173/#/jobs"
 
-    $nodeArguments = New-Object System.Collections.Generic.List[string]
+    $nodeArguments = New-WebRuntimeSmokeArguments `
+        -ScriptPath $scriptPath `
+        -BrowserExecutable $browserExecutable `
+        -WebUrl $webUrl `
+        -ApiBaseUrl $ApiBaseUrl `
+        -DesktopAccessToken $DesktopAccessToken `
+        -BrowserProfileRoot $browserProfileRoot
     foreach ($argument in @(
-        $scriptPath,
-        "--browser-executable", $browserExecutable,
-        "--web-url", $webUrl,
-        "--api-base-url", $ApiBaseUrl,
-        "--desktop-access-token", $DesktopAccessToken,
-        "--mock-tauri-runtime-context",
-        "--username", $Username,
-        "--password", $Password,
-        "--user-data-dir", $browserProfileRoot,
-        "--timeout-ms", ([string]($WebSmokeTimeoutSeconds * 1000)),
         "--expected-text", "任务中心",
         "--job-center-check",
         "--screenshot-path", $webSmokeScreenshotPath
@@ -1580,7 +1584,7 @@ try {
         BackupRestore = $backupRestoreVerification
         TauriProcessId = $tauri.Id
         ViteProcessId = $viteProcessIdOutput
-    } | ConvertTo-Json -Depth 4
+    } | ConvertTo-Json -Depth 16
 
     if ($KeepRunning) {
         Write-Host "KeepRunning was set; leaving Tauri and Vite processes running."

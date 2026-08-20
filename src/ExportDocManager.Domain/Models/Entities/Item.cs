@@ -1,5 +1,3 @@
-using ExportDocManager.Utils;
-
 namespace ExportDocManager.Models.Entities
 {
     /// <summary>
@@ -208,91 +206,5 @@ namespace ExportDocManager.Models.Entities
             };
         }
 
-        /// <summary>
-        /// Sets the property value based on the column index.
-        /// 根据列索引设置属性值。
-        /// </summary>
-        /// <param name="columnIndex">The column index (0-30).</param>
-        /// <param name="value">The value string.</param>
-        public void SetPropertyByIndex(int columnIndex, string value)
-        {
-            switch (columnIndex)
-            {
-                case 0: PoNumber = value; break;
-                case 1: StyleNo = value; break;
-                case 2: StyleName = value; break;
-                case 3: FabricComposition = value; break;
-                case 4: StyleNameCN = value; break;
-                case 5: Brand = value; break;
-                case 6: HSCode = value; break;
-                case 7: Origin = value; break;
-                case 8: // Quantity
-                    Quantity = NumberHelper.ParseDecimal(value);
-                    CalculateCartons(); // Trigger smart packing
-                    CalculateVolume();
-                    CalculateTotalGW();
-                    CalculateTotalNW();
-                    RecalculatePrice();
-                    CalculatePurchaseTotal();
-                    break;
-                case 9: UnitEN = value; break;
-                case 10: UnitCN = value; break;
-                case 11: // PcsPerCtn (New)
-                    PcsPerCtn = NumberHelper.ParseDecimal(value);
-                    CalculateCartons(); // Trigger smart packing
-                    CalculateVolume(); // Indirectly updates dependent fields if Cartons changes
-                    CalculateTotalGW();
-                    CalculateTotalNW();
-                    break;
-                case 12: // Cartons
-                    Cartons = NumberHelper.ParseDecimal(value);
-                    CalculateTotalGW();
-                    CalculateTotalNW();
-                    CalculateVolume();
-                    break;
-                case 13: CtnUnitEN = value; break;
-                case 14: CtnUnitCN = value; break;
-                case 15: // Length
-                    Length = NumberHelper.ParseDecimal(value);
-                    CalculateVolume();
-                    break;
-                case 16: // Width
-                    Width = NumberHelper.ParseDecimal(value);
-                    CalculateVolume();
-                    break;
-                case 17: // Height
-                    Height = NumberHelper.ParseDecimal(value);
-                    CalculateVolume();
-                    break;
-                case 18: Volume = ItemMeasurementPrecisionPolicy.RoundVolume(NumberHelper.ParseDecimal(value)); break;
-                case 19: // GWPerCtn
-                    GWPerCtn = ItemMeasurementPrecisionPolicy.RoundWeight(NumberHelper.ParseDecimal(value));
-                    CalculateTotalGW();
-                    break;
-                case 20: GWTotal = ItemMeasurementPrecisionPolicy.RoundWeight(NumberHelper.ParseDecimal(value)); break;
-                case 21: // NWPerCtn
-                    NWPerCtn = ItemMeasurementPrecisionPolicy.RoundWeight(NumberHelper.ParseDecimal(value));
-                    CalculateTotalNW();
-                    break;
-                case 22: NWTotal = ItemMeasurementPrecisionPolicy.RoundWeight(NumberHelper.ParseDecimal(value)); break;
-                case 23: // UnitPrice
-                    UnitPrice = NumberHelper.ParseDecimal(value);
-                    CalculateTotalPrice();
-                    break;
-                case 24:
-                    TotalPrice = NumberHelper.ParseDecimal(value);
-                    CalculateUnitPriceFromTotal();
-                    break;
-                case 25:
-                    PurchasePrice = NumberHelper.ParseDecimal(value);
-                    CalculatePurchaseTotal();
-                    break;
-                case 26: PurchaseTotal = NumberHelper.ParseDecimal(value); break;
-                case 27: TaxRebateRate = NumberHelper.ParseDecimal(value); break;
-                case 28: Spare1 = value; break;
-                case 29: Spare2 = value; break;
-                case 30: Spare3 = value; break;
-            }
-        }
     }
 }

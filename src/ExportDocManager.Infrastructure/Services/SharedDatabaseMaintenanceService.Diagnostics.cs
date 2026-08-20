@@ -63,7 +63,7 @@ namespace ExportDocManager.Services.Infrastructure
             var logs = allLogs
                 .Where(file => priorityNames.Contains(file.Name))
                 .Concat(allLogs.OrderByDescending(file => file.LastWriteTimeUtc).Take(20))
-                .GroupBy(file => file.Name, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(file => file.Name, PhysicalPathComparison.Comparer)
                 .Select(group => group.First())
                 .OrderByDescending(file => file.LastWriteTimeUtc)
                 .ToArray();
@@ -298,7 +298,9 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 try
                 {
-                    candidates.AddRange(backupDirectory.EnumerateFiles("*.zip", SearchOption.TopDirectoryOnly));
+                    candidates.AddRange(backupDirectory
+                        .EnumerateFiles("*", SearchOption.TopDirectoryOnly)
+                        .Where(file => string.Equals(file.Extension, ".zip", StringComparison.OrdinalIgnoreCase)));
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
@@ -311,7 +313,9 @@ namespace ExportDocManager.Services.Infrastructure
                 {
                     try
                     {
-                        candidates.AddRange(postgreSqlDirectory.EnumerateFiles("*.dump", SearchOption.TopDirectoryOnly));
+                        candidates.AddRange(postgreSqlDirectory
+                            .EnumerateFiles("*", SearchOption.TopDirectoryOnly)
+                            .Where(file => string.Equals(file.Extension, ".dump", StringComparison.OrdinalIgnoreCase)));
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {

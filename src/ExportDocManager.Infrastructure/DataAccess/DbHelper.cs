@@ -67,7 +67,7 @@ namespace ExportDocManager.DataAccess
         {
             var builder = new SqliteConnectionStringBuilder
             {
-                DataSource = path,
+                DataSource = PrepareSqliteDataSource(path),
                 Mode = SqliteOpenMode.ReadWriteCreate,
                 Cache = SqliteCacheMode.Private,
                 Pooling = true,
@@ -76,6 +76,23 @@ namespace ExportDocManager.DataAccess
             };
 
             return builder.ToString();
+        }
+
+        private static string PrepareSqliteDataSource(string path)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(path);
+            if (!OperatingSystem.IsWindows() || !Path.IsPathRooted(path))
+                return path;
+
+            string fullPath = Path.GetFullPath(path);
+            bool alreadyExtended = fullPath.StartsWith(@"\\?\", StringComparison.Ordinal) ||
+                                   fullPath.StartsWith(@"\\.\", StringComparison.Ordinal);
+            if (alreadyExtended || fullPath.Length <= 240)
+                return fullPath;
+
+            return fullPath.StartsWith(@"\\", StringComparison.Ordinal)
+                ? @"\\?\UNC\" + fullPath[2..]
+                : @"\\?\" + fullPath;
         }
 
         public static DatabaseConnectionSettings LoadDatabaseSettings(IAppPathProvider pathProvider)

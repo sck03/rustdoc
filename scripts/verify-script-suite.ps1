@@ -4,6 +4,7 @@ param()
 $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptRoot "lib\build-script-support.ps1")
+. (Join-Path $scriptRoot "lib\web-runtime-smoke-arguments.ps1")
 trap {
     Write-ExportDocScriptFailure -ErrorRecord $_
     exit 1
@@ -11,10 +12,32 @@ trap {
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
 [void](Invoke-ExportDocExternal -FilePath "npm" -Arguments @("--version") -CaptureOutput)
+
+$smokeArgumentDefaults = @{
+    ScriptPath = "smoke.mjs"
+    BrowserExecutable = "browser.exe"
+    WebUrl = "http://127.0.0.1:5173/"
+    ApiBaseUrl = "http://127.0.0.1:5000/"
+    DesktopAccessToken = "desktop-token"
+    Username = "admin"
+    UserDataDirectory = "browser-profile"
+    TimeoutMilliseconds = 45000
+}
+$passwordlessSmokeArguments = New-ExportDocWebRuntimeSmokeArguments @smokeArgumentDefaults
+if ($passwordlessSmokeArguments.Contains("--password") -or $passwordlessSmokeArguments.Contains("")) {
+    throw "Passwordless web smoke arguments must omit both --password and empty argument values."
+}
+$passwordSmokeArguments = New-ExportDocWebRuntimeSmokeArguments @smokeArgumentDefaults -Password "secret value"
+$passwordIndex = $passwordSmokeArguments.IndexOf("--password")
+if ($passwordIndex -lt 0 -or $passwordSmokeArguments[$passwordIndex + 1] -ne "secret value") {
+    throw "Web smoke arguments must preserve a supplied password as one argument."
+}
+
 $scriptFiles = @(Get-ChildItem -LiteralPath $scriptRoot -Recurse -File)
 $powerShellScripts = @($scriptFiles | Where-Object Extension -eq ".ps1")
 $commandScripts = @($scriptFiles | Where-Object Extension -eq ".cmd")
 $moduleScripts = @($scriptFiles | Where-Object Extension -eq ".mjs")
+$shellScripts = @($scriptFiles | Where-Object Extension -eq ".sh")
 
 $parseFailures = New-Object System.Collections.Generic.List[string]
 foreach ($file in $powerShellScripts) {
@@ -34,6 +57,32 @@ if ($parseFailures.Count -gt 0) {
 
 foreach ($file in $moduleScripts) {
     Invoke-ExportDocExternal -FilePath "node" -Arguments @("--check", $file.FullName) -WorkingDirectory $repoRoot
+}
+
+$bashPath = Get-Command bash -CommandType Application -ErrorAction SilentlyContinue |
+    Select-Object -First 1 -ExpandProperty Source
+if ([string]::IsNullOrWhiteSpace($bashPath)) {
+    foreach ($gitPath in @(Get-Command git -CommandType Application -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty Source)) {
+        $gitRoot = Split-Path -Parent (Split-Path -Parent $gitPath)
+        $gitBashCandidate = Join-Path $gitRoot "bin\bash.exe"
+        if (Test-Path -LiteralPath $gitBashCandidate -PathType Leaf) {
+            $bashPath = $gitBashCandidate
+            break
+        }
+    }
+}
+foreach ($file in $shellScripts) {
+    $content = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8
+    if (-not $content.StartsWith("#!", [System.StringComparison]::Ordinal)) {
+        throw "Shell script must declare an interpreter: $($file.FullName)"
+    }
+    if ($content.Contains("`r", [System.StringComparison]::Ordinal)) {
+        throw "Shell script must use LF line endings: $($file.FullName)"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($bashPath)) {
+        Invoke-ExportDocExternal -FilePath $bashPath -Arguments @("-n", $file.FullName) -WorkingDirectory $repoRoot
+    }
 }
 
 $publicCommandScripts = @(
@@ -133,6 +182,8 @@ foreach ($file in $powerShellScripts) {
     PowerShellScriptCount = $powerShellScripts.Count
     CommandScriptCount = $commandScripts.Count
     ModuleScriptCount = $moduleScripts.Count
+    ShellScriptCount = $shellScripts.Count
+    ShellSyntaxValidated = -not [string]::IsNullOrWhiteSpace($bashPath)
     PublicCommandEntryCount = $publicCommandScripts.Count
     ApprovedDirectNativeCommandCount = $directNativeCommands.Count
 } | ConvertTo-Json -Depth 4

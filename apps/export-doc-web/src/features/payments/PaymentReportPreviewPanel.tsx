@@ -76,7 +76,7 @@ export function PaymentReportPreviewPanel({
     }
 
     const preferredTemplate =
-      templateViews.find((template) => fileNameFromPath(template.templatePath).toLowerCase() === "payment_voucher_template.html") ??
+      templateViews.find((template) => fileNameFromPath(template.templatePath) === "payment_voucher_template.html") ??
       templateViews[0];
     setSelectedTemplatePath((current) => {
       if (current && templateViews.some((template) => template.templatePath === current)) {
@@ -487,7 +487,7 @@ function findTemplateForPaymentItem(
     return pathMatch;
   }
 
-  const itemFileName = fileNameFromPath(item.templatePath).toLowerCase();
+  const itemFileName = fileNameFromPath(item.templatePath);
   if (!itemFileName) {
     return undefined;
   }
@@ -495,7 +495,7 @@ function findTemplateForPaymentItem(
   const fileNameMatches = templates.filter(
     (template) =>
       !usedTemplatePaths.has(normalizePathForMatch(template.templatePath)) &&
-      fileNameFromPath(template.templatePath).toLowerCase() === itemFileName,
+      fileNameFromPath(template.templatePath) === itemFileName,
   );
 
   return fileNameMatches.length === 1 ? fileNameMatches[0] : undefined;
@@ -521,8 +521,7 @@ function normalizePathForMatch(path: string) {
     .replace(/^file:[/\\]*/i, "")
     .replace(/\\/g, "/")
     .replace(/\/+/g, "/")
-    .replace(/^\/+/, "")
-    .toLowerCase();
+    .replace(/^\/+/, "");
 }
 
 function readRecordValue(record: SettingsLike, ...names: string[]) {

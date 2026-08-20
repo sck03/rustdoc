@@ -51,13 +51,6 @@ export function createMasterDataSmokeScene(runtime) {
       page,
       `(() => {
         const surface = document.querySelector('[aria-label="编辑客户"]');
-        const notifyReactChange = (control) => {
-          const reactPropsKey = Object.keys(control).find((key) => key.startsWith('__reactProps$'));
-          const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-          if (reactProps && typeof reactProps.onChange === 'function') {
-            reactProps.onChange({ target: control, currentTarget: control });
-          }
-        };
         const setNativeValue = (control, value) => {
           const prototype = Object.getPrototypeOf(control);
           const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
@@ -69,7 +62,6 @@ export function createMasterDataSmokeScene(runtime) {
           control.focus();
           control.dispatchEvent(new Event('input', { bubbles: true }));
           control.dispatchEvent(new Event('change', { bubbles: true }));
-          notifyReactChange(control);
         };
         const fieldByLabel = (labelText) => {
           const labels = Array.from(surface.querySelectorAll('label'));
@@ -321,11 +313,6 @@ export function createMasterDataSmokeScene(runtime) {
           control.focus();
           control.dispatchEvent(new Event("input", { bubbles: true }));
           control.dispatchEvent(new Event("change", { bubbles: true }));
-          const reactPropsKey = Object.keys(control).find((key) => key.startsWith("__reactProps$"));
-          const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-          if (reactProps && typeof reactProps.onChange === "function") {
-            reactProps.onChange({ target: control, currentTarget: control });
-          }
         };
 
         const deadline = Date.now() + ${Math.min(8000, 30000)};

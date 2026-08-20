@@ -7,7 +7,7 @@ param(
     [string]$CargoBinDir,
     [ValidateSet("Document", "Sales", "Full")]
     [string]$ProductEdition = "Full",
-    [string]$MsysUcrtBinDir = "D:\msys64\ucrt64\bin",
+    [string]$MsysUcrtBinDir,
     [switch]$AllowSystemDrive,
     [switch]$SkipMainBuild,
     [switch]$IncludeLicenseKeygen,
@@ -45,8 +45,6 @@ function Resolve-CargoBinDir {
         $candidates.Add((Join-Path $env:CARGO_HOME "bin"))
     }
 
-    $candidates.Add("D:\Rust\.cargo\bin")
-
     $cargoCommand = Get-Command cargo.exe -ErrorAction SilentlyContinue
     if ($null -ne $cargoCommand) {
         $candidates.Add((Split-Path -Parent $cargoCommand.Source))
@@ -68,6 +66,10 @@ $prepareScript = Join-Path $scriptRoot "prepare-windows-desktop-run.ps1"
 $smokeScript = Join-Path $scriptRoot "smoke-tauri-desktop.ps1"
 $licenseRoot = Join-Path $repoRoot "apps\license-keygen-tauri"
 . (Join-Path $scriptRoot "lib\initialize-local-build-environment.ps1") -RepositoryRoot $repoRoot
+
+if ([string]::IsNullOrWhiteSpace($MsysUcrtBinDir)) {
+    $MsysUcrtBinDir = $env:EXPORTDOCMANAGER_MSYS_UCRT_BIN
+}
 
 $editionCatalogPath = Join-Path $scriptRoot "product-editions.json"
 $editionCatalog = Get-Content -LiteralPath $editionCatalogPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -138,8 +140,13 @@ $resolvedCargoBinDir = Resolve-CargoBinDir
 Assert-ExportDocNonSystemDrivePath -Path $resolvedCargoBinDir -Purpose "Cargo binary directory" -AllowSystemDrive:$AllowSystemDrive
 $pathParts = New-Object System.Collections.Generic.List[string]
 $pathParts.Add($resolvedCargoBinDir)
-if (-not [string]::IsNullOrWhiteSpace($MsysUcrtBinDir) -and (Test-Path -LiteralPath $MsysUcrtBinDir)) {
-    $pathParts.Add((Resolve-Path -LiteralPath $MsysUcrtBinDir).Path)
+if (-not [string]::IsNullOrWhiteSpace($MsysUcrtBinDir)) {
+    if (-not (Test-Path -LiteralPath $MsysUcrtBinDir -PathType Container)) {
+        throw "MSYS2 UCRT tool directory was not found: $MsysUcrtBinDir"
+    }
+    $MsysUcrtBinDir = (Resolve-Path -LiteralPath $MsysUcrtBinDir).Path
+    Assert-ExportDocNonSystemDrivePath -Path $MsysUcrtBinDir -Purpose "MSYS2 UCRT tool directory" -AllowSystemDrive:$AllowSystemDrive
+    $pathParts.Add($MsysUcrtBinDir)
 }
 $pathParts.Add($env:PATH)
 $env:PATH = $pathParts -join [System.IO.Path]::PathSeparator
@@ -193,11 +200,12 @@ if (-not $SkipMainBuild) {
         $resolvedCargoTargetDir,
         "-CargoBinDir",
         $resolvedCargoBinDir,
-        "-MsysUcrtBinDir",
-        $MsysUcrtBinDir,
         "-ProductEdition",
         $ProductEdition
     )
+    if (-not [string]::IsNullOrWhiteSpace($MsysUcrtBinDir)) {
+        $mainBuildArgs += @("-MsysUcrtBinDir", $MsysUcrtBinDir)
+    }
     if ($AllowSystemDrive) {
         $mainBuildArgs += "-AllowSystemDrive"
     }

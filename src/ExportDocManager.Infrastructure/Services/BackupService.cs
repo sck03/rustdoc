@@ -542,7 +542,8 @@ namespace ExportDocManager.Services.Infrastructure
             }
 
             return directoryInfo
-                .EnumerateFiles("*.zip", SearchOption.TopDirectoryOnly)
+                .EnumerateFiles("*", SearchOption.TopDirectoryOnly)
+                .Where(file => string.Equals(file.Extension, ".zip", StringComparison.OrdinalIgnoreCase))
                 .Where(file => _managedBackupNamePattern?.IsMatch(file.Name) == true)
                 .ToList();
         }

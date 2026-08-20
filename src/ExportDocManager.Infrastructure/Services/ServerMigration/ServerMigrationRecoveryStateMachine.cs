@@ -175,7 +175,7 @@ public static partial class ServerMigrationRecoveryStateMachine
                 settings,
                 safetyDump,
                 cancellationToken).ConfigureAwait(false);
-            fileState = ServerMigrationFileSwitcher.Prepare(
+            fileState = ServerMigrationFileTransaction.Prepare(
                 pathProvider,
                 stagingRoot,
                 safetyRoot,
@@ -208,8 +208,8 @@ public static partial class ServerMigrationRecoveryStateMachine
                 ServerMigrationRestorePhase.ApplyingFiles,
                 timeProvider.GetUtcNow(),
                 "正在原子替换运行配置与业务文件。");
-            ServerMigrationFileSwitcher.Apply(fileState);
-            ServerMigrationFileSwitcher.CleanupPrepared(fileState);
+            ServerMigrationFileTransaction.Apply(fileState);
+            ServerMigrationFileTransaction.CleanupPrepared(fileState);
 
             marker.Phase = ServerMigrationRestorePhase.Completed;
             marker.UpdatedAtUtc = timeProvider.GetUtcNow();
@@ -371,17 +371,17 @@ public static partial class ServerMigrationRecoveryStateMachine
             if (Directory.Exists(safetyRoot))
             {
                 ServerMigrationFileTransactionState? state =
-                    ServerMigrationFileSwitcher.ReadState(safetyRoot);
+                    ServerMigrationFileTransaction.ReadState(safetyRoot);
                 if (state != null)
                 {
                     if (filesMayHaveChanged)
                     {
-                        ServerMigrationFileSwitcher.Rollback(safetyRoot);
+                        ServerMigrationFileTransaction.Rollback(safetyRoot);
                     }
                     else
                     {
-                        ServerMigrationFileSwitcher.CleanupPrepared(state);
-                        ServerMigrationFileSwitcher.CleanupSnapshots(state);
+                        ServerMigrationFileTransaction.CleanupPrepared(state);
+                        ServerMigrationFileTransaction.CleanupSnapshots(state);
                     }
                 }
             }

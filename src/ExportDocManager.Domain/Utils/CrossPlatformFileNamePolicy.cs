@@ -5,6 +5,9 @@ namespace ExportDocManager.Utils
 {
     public static class CrossPlatformFileNamePolicy
     {
+        public const int MaximumPortableComponentUtf8Bytes = 240;
+        public const int MaximumPortableComponentUtf16CodeUnits = 240;
+
         private static readonly SearchValues<char> InvalidCharacters =
             SearchValues.Create("<>:\"/\\|?*");
         private static readonly string[] ReservedDeviceNames =
@@ -61,11 +64,26 @@ namespace ExportDocManager.Utils
                 .Trim(' ', '.');
             if (string.IsNullOrWhiteSpace(normalized))
             {
-                return fallback;
+                normalized = ReplaceInvalidCharacters(fallback ?? string.Empty, replacement)
+                    .Trim(' ', '.');
+            }
+
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return string.Empty;
+            }
+
+            normalized = IsReservedDeviceName(normalized)
+                ? replacement + normalized
+                : normalized;
+            normalized = ApplyPortableLengthLimit(normalized).Trim(' ', '.');
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return string.Empty;
             }
 
             return IsReservedDeviceName(normalized)
-                ? replacement + normalized
+                ? ApplyPortableLengthLimit(replacement + normalized)
                 : normalized;
         }
 
@@ -79,7 +97,19 @@ namespace ExportDocManager.Utils
             string normalized = value.Normalize(NormalizationForm.FormC);
             return !ContainsInvalidCharacters(normalized)
                 && string.Equals(normalized, normalized.Trim(' ', '.'), StringComparison.Ordinal)
-                && !IsReservedDeviceName(normalized);
+                && !IsReservedDeviceName(normalized)
+                && IsWithinPortableLength(normalized);
+        }
+
+        public static bool IsWithinPortableLength(string value)
+        {
+            if (value == null)
+            {
+                return false;
+            }
+
+            return value.Length <= MaximumPortableComponentUtf16CodeUnits &&
+                   Encoding.UTF8.GetByteCount(value) <= MaximumPortableComponentUtf8Bytes;
         }
 
         public static bool IsReservedDeviceName(string? value)
@@ -101,5 +131,63 @@ namespace ExportDocManager.Utils
 
         public static bool IsInvalidCharacter(char character) =>
             char.IsControl(character) || InvalidCharacters.Contains(character);
+
+        private static string ApplyPortableLengthLimit(string value)
+        {
+            if (IsWithinPortableLength(value))
+            {
+                return value;
+            }
+
+            int extensionIndex = value.LastIndexOf('.');
+            string extension = extensionIndex > 0 && extensionIndex < value.Length - 1
+                ? value[extensionIndex..]
+                : string.Empty;
+            if (!string.IsNullOrEmpty(extension) && IsWithinPortableLength(extension))
+            {
+                int extensionUtf8Bytes = Encoding.UTF8.GetByteCount(extension);
+                string stem = TakePortablePrefix(
+                    value[..extensionIndex],
+                    MaximumPortableComponentUtf8Bytes - extensionUtf8Bytes,
+                    MaximumPortableComponentUtf16CodeUnits - extension.Length)
+                    .TrimEnd(' ', '.');
+                if (!string.IsNullOrWhiteSpace(stem))
+                {
+                    return stem + extension;
+                }
+            }
+
+            return TakePortablePrefix(
+                    value,
+                    MaximumPortableComponentUtf8Bytes,
+                    MaximumPortableComponentUtf16CodeUnits)
+                .TrimEnd(' ', '.');
+        }
+
+        private static string TakePortablePrefix(string value, int maximumUtf8Bytes, int maximumUtf16CodeUnits)
+        {
+            if (maximumUtf8Bytes <= 0 || maximumUtf16CodeUnits <= 0)
+            {
+                return string.Empty;
+            }
+
+            var result = new StringBuilder(Math.Min(value.Length, maximumUtf16CodeUnits));
+            int utf8Bytes = 0;
+            int utf16CodeUnits = 0;
+            foreach (Rune rune in value.EnumerateRunes())
+            {
+                if (utf8Bytes + rune.Utf8SequenceLength > maximumUtf8Bytes ||
+                    utf16CodeUnits + rune.Utf16SequenceLength > maximumUtf16CodeUnits)
+                {
+                    break;
+                }
+
+                result.Append(rune.ToString());
+                utf8Bytes += rune.Utf8SequenceLength;
+                utf16CodeUnits += rune.Utf16SequenceLength;
+            }
+
+            return result.ToString();
+        }
     }
 }

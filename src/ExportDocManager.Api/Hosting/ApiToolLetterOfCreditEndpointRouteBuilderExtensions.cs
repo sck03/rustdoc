@@ -246,8 +246,7 @@ namespace ExportDocManager.Api.Hosting
                 throw new ArgumentException("请上传有效的信用证文件。", nameof(fileName));
             }
 
-            if (normalized.Length > 240 ||
-                normalized.Any(character => char.IsControl(character) || "<>:\"/\\|?*".Contains(character)))
+            if (!CrossPlatformFileNamePolicy.IsSafeFileName(normalized))
             {
                 throw new ArgumentException("信用证文件名包含无效字符或超过长度限制。", nameof(fileName));
             }

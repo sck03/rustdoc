@@ -562,13 +562,6 @@ export function createJobCenterSmokeScene(runtime) {
               const buttonText = ${JSON.stringify(job.buttonText)};
               const outputPath = ${JSON.stringify(job.outputPath)};
               const panel = document.querySelector('[aria-label="Excel 模板与托单"]');
-              const notifyReactChange = (control) => {
-                const reactPropsKey = Object.keys(control).find((key) => key.startsWith("__reactProps$"));
-                const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-                if (reactProps && typeof reactProps.onChange === "function") {
-                  reactProps.onChange({ target: control, currentTarget: control });
-                }
-              };
               const setNativeValue = (control, value) => {
                 const prototype = Object.getPrototypeOf(control);
                 const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
@@ -581,7 +574,6 @@ export function createJobCenterSmokeScene(runtime) {
                 control.focus();
                 control.dispatchEvent(new Event("input", { bubbles: true }));
                 control.dispatchEvent(new Event("change", { bubbles: true }));
-                notifyReactChange(control);
               };
               const fieldByLabel = (labelText) => {
                 const fields = Array.from(stack ? stack.querySelectorAll(".path-field") : []);
@@ -779,13 +771,6 @@ export function createJobCenterSmokeScene(runtime) {
               const sourcePath = ${JSON.stringify(sourcePath)};
               const outputPath = ${JSON.stringify(outputPath)};
               const panel = document.querySelector('[aria-label="Excel 模板与托单"]');
-              const notifyReactChange = (control) => {
-                const reactPropsKey = Object.keys(control).find((key) => key.startsWith("__reactProps$"));
-                const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-                if (reactProps && typeof reactProps.onChange === "function") {
-                  reactProps.onChange({ target: control, currentTarget: control });
-                }
-              };
               const setNativeValue = (control, value) => {
                 const prototype = Object.getPrototypeOf(control);
                 const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
@@ -798,7 +783,6 @@ export function createJobCenterSmokeScene(runtime) {
                 control.focus();
                 control.dispatchEvent(new Event("input", { bubbles: true }));
                 control.dispatchEvent(new Event("change", { bubbles: true }));
-                notifyReactChange(control);
               };
               const fieldByLabel = (labelText) => {
                 const fields = Array.from(stack ? stack.querySelectorAll(".path-field") : []);
@@ -1004,13 +988,6 @@ export function createJobCenterSmokeScene(runtime) {
               const invoiceId = ${JSON.stringify(invoiceId)};
               const outputPath = ${JSON.stringify(outputPath)};
               const panel = document.querySelector('[aria-label="Excel 模板与托单"]');
-              const notifyReactChange = (control) => {
-                const reactPropsKey = Object.keys(control).find((key) => key.startsWith("__reactProps$"));
-                const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-                if (reactProps && typeof reactProps.onChange === "function") {
-                  reactProps.onChange({ target: control, currentTarget: control });
-                }
-              };
               const setNativeValue = (control, value) => {
                 const prototype = Object.getPrototypeOf(control);
                 const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
@@ -1023,7 +1000,6 @@ export function createJobCenterSmokeScene(runtime) {
                 control.focus();
                 control.dispatchEvent(new Event("input", { bubbles: true }));
                 control.dispatchEvent(new Event("change", { bubbles: true }));
-                notifyReactChange(control);
               };
               const fieldByLabel = (labelText) => {
                 const fields = Array.from(stack ? stack.querySelectorAll(".path-field") : []);
@@ -1231,13 +1207,6 @@ export function createJobCenterSmokeScene(runtime) {
               const sourcePathsText = ${JSON.stringify(sourcePathsText)};
               const outputPath = ${JSON.stringify(outputPath)};
               const form = document.querySelector('[aria-label="PDF 合并任务"]');
-              const notifyReactChange = (control) => {
-                const reactPropsKey = Object.keys(control).find((key) => key.startsWith("__reactProps$"));
-                const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-                if (reactProps && typeof reactProps.onChange === "function") {
-                  reactProps.onChange({ target: control, currentTarget: control });
-                }
-              };
               const setNativeValue = (control, value) => {
                 const prototype = Object.getPrototypeOf(control);
                 const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
@@ -1250,7 +1219,6 @@ export function createJobCenterSmokeScene(runtime) {
                 control.focus();
                 control.dispatchEvent(new Event("input", { bubbles: true }));
                 control.dispatchEvent(new Event("change", { bubbles: true }));
-                notifyReactChange(control);
               };
               const fieldByLabel = (labelText, selector) => {
                 const fields = Array.from(form ? form.querySelectorAll(".path-field") : []);
@@ -1470,13 +1438,6 @@ export function createJobCenterSmokeScene(runtime) {
               const invoiceIdsText = ${JSON.stringify(invoiceIdsText)};
               const outputPath = ${JSON.stringify(outputPath)};
               const form = document.querySelector('[aria-label="批量报表 ZIP 任务"]');
-              const notifyReactChange = (control) => {
-                const reactPropsKey = Object.keys(control).find((key) => key.startsWith("__reactProps$"));
-                const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-                if (reactProps && typeof reactProps.onChange === "function") {
-                  reactProps.onChange({ target: control, currentTarget: control });
-                }
-              };
               const setNativeValue = (control, value) => {
                 const prototype = Object.getPrototypeOf(control);
                 const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
@@ -1489,7 +1450,6 @@ export function createJobCenterSmokeScene(runtime) {
                 control.focus();
                 control.dispatchEvent(new Event("input", { bubbles: true }));
                 control.dispatchEvent(new Event("change", { bubbles: true }));
-                notifyReactChange(control);
               };
               const fieldByLabel = (labelText, selector) => {
                 const fields = Array.from(form ? form.querySelectorAll(".path-field") : []);
@@ -1675,14 +1635,6 @@ export function createJobCenterSmokeScene(runtime) {
           throw new Error("装箱分析区域未找到。");
         }
 
-        const notifyReactChange = (control) => {
-          const reactPropsKey = Object.keys(control).find((key) => key.startsWith("__reactProps$"));
-          const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-          if (reactProps && typeof reactProps.onChange === "function") {
-            reactProps.onChange({ target: control, currentTarget: control });
-          }
-        };
-
         const setNativeValue = (control, value) => {
           const prototype = Object.getPrototypeOf(control);
           const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
@@ -1695,7 +1647,6 @@ export function createJobCenterSmokeScene(runtime) {
           control.focus();
           control.dispatchEvent(new Event("input", { bubbles: true }));
           control.dispatchEvent(new Event("change", { bubbles: true }));
-          notifyReactChange(control);
         };
 
         const fieldByLabel = (labelText, selector = "input, select, textarea") => {

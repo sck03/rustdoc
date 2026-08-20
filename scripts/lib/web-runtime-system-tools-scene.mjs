@@ -8,11 +8,13 @@ export function createSystemToolsSmokeScene(runtime) {
     authorizedJsonHeaders,
     cleanupSmokeDirectory,
     cleanupSmokeFile,
+    delay,
     ensureTrailingSlash,
     evaluate,
     fetchJson,
     includesText,
     readFileSize,
+    retryAfterMilliseconds,
     redactDesktopAccessToken,
     waitFor,
     waitForPageExpression,
@@ -689,39 +691,45 @@ export function createSystemToolsSmokeScene(runtime) {
 
     const created = await createResponse.json();
     const userId = created?.user?.id;
-    let deleted = false;
-    if (userId) {
-      const deleteResponse = await fetch(new URL(`/api/users/${userId}`, ensureTrailingSlash(options.apiBaseUrl)), {
-        method: "DELETE",
-        headers: authorizedHeaders(options, accessToken, tokenType),
-      });
-      if (!deleteResponse.ok) {
-        throw new Error(`Audit smoke user delete failed with HTTP ${deleteResponse.status}: ${await deleteResponse.text()}`);
-      }
-
-      deleted = true;
+    if (!Number.isInteger(userId) || userId <= 0) {
+      throw new Error(`Audit smoke user create did not return a valid user id: ${JSON.stringify(created)}`);
     }
+
+    let deleted = false;
+    const deleteResponse = await fetch(new URL(`/api/users/${userId}`, ensureTrailingSlash(options.apiBaseUrl)), {
+      method: "DELETE",
+      headers: authorizedHeaders(options, accessToken, tokenType),
+    });
+    if (!deleteResponse.ok) {
+      throw new Error(`Audit smoke user delete failed with HTTP ${deleteResponse.status}: ${await deleteResponse.text()}`);
+    }
+
+    deleted = true;
 
     const auditRows = await waitFor(async () => {
       const url = new URL("/api/audit-logs", ensureTrailingSlash(options.apiBaseUrl));
       url.searchParams.set("pageNumber", "1");
       url.searchParams.set("pageSize", "10");
       url.searchParams.set("entityName", "User");
-      url.searchParams.set("keyword", username);
+      url.searchParams.set("keyword", String(userId));
       const response = await fetch(url, {
         headers: authorizedHeaders(options, accessToken, tokenType),
       });
+      if (response.status === 429) {
+        await delay(retryAfterMilliseconds(response));
+        return null;
+      }
       if (!response.ok) {
         throw new Error(`Audit smoke log query failed with HTTP ${response.status}: ${await response.text()}`);
       }
 
       const page = await response.json();
       return page?.totalCount > 0 ? page : null;
-    }, timeoutMs, `Timed out waiting for audit rows for smoke user ${username}.`);
+    }, timeoutMs, `Timed out waiting for audit rows for smoke user id ${userId}.`);
 
     return {
       username,
-      userId: userId ?? null,
+      userId,
       created: true,
       deleted,
       auditRowCount: auditRows.totalCount ?? 0,
@@ -816,11 +824,6 @@ export function createSystemToolsSmokeScene(runtime) {
           control.focus();
           control.dispatchEvent(new Event("input", { bubbles: true }));
           control.dispatchEvent(new Event("change", { bubbles: true }));
-          const reactPropsKey = Object.keys(control).find((key) => key.startsWith("__reactProps$"));
-          const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-          if (reactProps && typeof reactProps.onChange === "function") {
-            reactProps.onChange({ target: control, currentTarget: control });
-          }
         };
 
         const outputInput = section.querySelector('input[placeholder="AuditLogs.xlsx"]');

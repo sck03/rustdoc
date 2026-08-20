@@ -156,9 +156,7 @@ WHERE {identifier} IS NOT NULL
                 normalized = normalized[..^1];
             }
 
-            bool inferredCaseSensitive = !isWindowsDrivePath &&
-                                         !isWindowsUncPath &&
-                                         !LooksLikeDefaultMacPath(normalized);
+            bool inferredCaseSensitive = !isWindowsDrivePath && !isWindowsUncPath;
             return new PathRootModel(normalized, caseSensitive ?? inferredCaseSensitive);
         }
 
@@ -169,12 +167,6 @@ WHERE {identifier} IS NOT NULL
                 ? 2
                 : 2 + segments[0].Length + 1 + segments[1].Length;
         }
-
-        private static bool LooksLikeDefaultMacPath(string normalized) =>
-            normalized.Equals("/Users", StringComparison.OrdinalIgnoreCase) ||
-            normalized.StartsWith("/Users/", StringComparison.OrdinalIgnoreCase) ||
-            normalized.Equals("/Volumes", StringComparison.OrdinalIgnoreCase) ||
-            normalized.StartsWith("/Volumes/", StringComparison.OrdinalIgnoreCase);
 
         private sealed record PathRootModel(string Normalized, bool CaseSensitive);
 

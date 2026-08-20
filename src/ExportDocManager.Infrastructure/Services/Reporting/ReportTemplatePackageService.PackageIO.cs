@@ -24,7 +24,7 @@ namespace ExportDocManager.Services.Reporting
             var files = sourceFiles ?? Array.Empty<string>();
             if (files.Count == 0)
             {
-                ReportProgress(progress, statusText, "当前没有需要复制的文件。", endPercent);
+                OperationProgressReporter.Report(progress, statusText, "当前没有需要复制的文件。", endPercent);
                 return;
             }
 
@@ -42,11 +42,11 @@ namespace ExportDocManager.Services.Reporting
 
                 if (!overwrite && File.Exists(targetFile))
                 {
-                    ReportProgress(
+                    OperationProgressReporter.Report(
                         progress,
                         statusText,
                         $"已跳过现有文件：{relativePath}",
-                        CalculateProgress(index + 1, files.Count, startPercent, endPercent));
+                        OperationProgressReporter.Calculate(index + 1, files.Count, startPercent, endPercent));
                     continue;
                 }
 
@@ -57,11 +57,11 @@ namespace ExportDocManager.Services.Reporting
                         targetFile,
                         overwrite,
                         cancellationToken).ConfigureAwait(false);
-                    ReportProgress(
+                    OperationProgressReporter.Report(
                         progress,
                         statusText,
                         $"正在处理：{relativePath}",
-                        CalculateProgress(index + 1, files.Count, startPercent, endPercent));
+                        OperationProgressReporter.Calculate(index + 1, files.Count, startPercent, endPercent));
                 }
                 catch (FileNotFoundException)
                 {

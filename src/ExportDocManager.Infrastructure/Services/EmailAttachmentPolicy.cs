@@ -14,7 +14,7 @@ namespace ExportDocManager.Services.Infrastructure
             var paths = (attachmentPaths ?? [])
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Select(NormalizePath)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Distinct(PhysicalPathComparison.Comparer)
                 .ToList();
             if (paths.Count > MaximumAttachmentCount)
             {

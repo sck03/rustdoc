@@ -82,7 +82,7 @@ internal sealed class ServerMigrationPackageGenerator
             CreatedAtUtc = packageCreatedAtUtc,
             SourceDataRoot = _paths.DataRoot,
             SourcePlatform = GetCurrentPlatformName(),
-            SourcePathCaseSensitive = !OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS()
+            SourcePathCaseSensitive = FileSystemCaseSensitivity.IsCaseSensitive(_paths.DataRoot)
         };
         long hashedBytes = 0;
         for (int sourceIndex = 0; sourceIndex < sources.Count; sourceIndex++)

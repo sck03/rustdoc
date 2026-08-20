@@ -411,7 +411,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
             var names = archive.Entries
                 .Select(entry => entry.FullName.Replace('\\', '/').Trim('/'))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                .ToHashSet(PortablePathKey.Comparer);
             if (!names.Contains(SingleWindowDisasterRecoveryLayout.ManifestEntry) ||
                 !names.Contains(SingleWindowDisasterRecoveryLayout.AppSettingsEntry) ||
                 !names.Contains(SingleWindowDisasterRecoveryLayout.MasterKeyEntry) ||

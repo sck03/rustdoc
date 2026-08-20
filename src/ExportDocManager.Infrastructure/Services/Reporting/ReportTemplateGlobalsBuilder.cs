@@ -1,3 +1,4 @@
+using System.Globalization;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
@@ -75,8 +76,10 @@ namespace ExportDocManager.Services.Reporting
             scriptObject.Import("convert_to_words", new Func<decimal, string>(ConvertNumberToWords));
             scriptObject.Import("convert_to_chinese_upper", new Func<decimal, string>(ConvertNumberToChineseUpper));
             scriptObject.Import("format_date", new Func<object?, string, string>(FormatDate));
-            scriptObject.Import("format_number", new Func<decimal, string, string>((number, format) => number.ToString(format)));
-            scriptObject.Import("format_currency", new Func<decimal, string, string>((number, currency) => $"{currency} {number:N2}"));
+            scriptObject.Import("format_number", new Func<decimal, string, string>((number, format) =>
+                number.ToString(format, CultureInfo.InvariantCulture)));
+            scriptObject.Import("format_currency", new Func<decimal, string, string>((number, currency) =>
+                $"{currency} {number.ToString("N2", CultureInfo.InvariantCulture)}"));
             scriptObject.Import("format_unit_price", new Func<decimal, string>(ItemPricePrecisionPolicy.Format));
             scriptObject.Import("format_weight", new Func<decimal, string>(ItemMeasurementPrecisionPolicy.FormatWeight));
             scriptObject.Import("format_volume", new Func<decimal, string>(ItemMeasurementPrecisionPolicy.FormatVolume));
@@ -91,9 +94,9 @@ namespace ExportDocManager.Services.Reporting
             string normalizedFormat = string.IsNullOrWhiteSpace(format) ? "yyyy-MM-dd" : format;
             return value switch
             {
-                DateOnly date => date.ToString(normalizedFormat),
-                DateTimeOffset timestamp => timestamp.ToString(normalizedFormat),
-                DateTime dateTime => dateTime.ToString(normalizedFormat),
+                DateOnly date => date.ToString(normalizedFormat, CultureInfo.InvariantCulture),
+                DateTimeOffset timestamp => timestamp.ToString(normalizedFormat, CultureInfo.InvariantCulture),
+                DateTime dateTime => dateTime.ToString(normalizedFormat, CultureInfo.InvariantCulture),
                 _ => string.Empty
             };
         }

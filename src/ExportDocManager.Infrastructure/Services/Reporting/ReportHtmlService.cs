@@ -3,6 +3,7 @@ using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -80,7 +81,7 @@ namespace ExportDocManager.Services.Reporting
                     ? Path.GetFileNameWithoutExtension(templatePath)
                     : cfg.Name;
 
-                if (!result.Any(r => r.TemplatePath.Equals(templatePath, StringComparison.OrdinalIgnoreCase)))
+                if (!result.Any(r => PhysicalPathComparison.AreSamePath(r.TemplatePath, templatePath)))
                 {
                     result.Add(new ReportTemplateDescriptor
                     {

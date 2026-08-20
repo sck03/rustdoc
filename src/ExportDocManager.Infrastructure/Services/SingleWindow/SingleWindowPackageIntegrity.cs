@@ -385,7 +385,7 @@ namespace ExportDocManager.Services.SingleWindow
 
         private static void EnsureNoDuplicatePaths(params IReadOnlyList<SingleWindowPackageFile>[] fileGroups)
         {
-            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var paths = new HashSet<string>(PortablePathKey.Comparer);
             foreach (var file in fileGroups.SelectMany(group => group ?? []))
             {
                 string path = file?.RelativePath?.Replace('\\', '/') ?? string.Empty;
@@ -402,7 +402,7 @@ namespace ExportDocManager.Services.SingleWindow
             SingleWindowPackageType packageType)
         {
             string root = Path.GetFullPath(workingDirectory);
-            var declaredPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            var declaredPaths = new HashSet<string>(PortablePathKey.Comparer)
             {
                 "manifest.json"
             };

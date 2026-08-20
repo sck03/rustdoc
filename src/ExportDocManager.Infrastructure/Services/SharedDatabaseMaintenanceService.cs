@@ -117,7 +117,8 @@ namespace ExportDocManager.Services.Infrastructure
             try
             {
                 return new DirectoryInfo(root)
-                    .EnumerateFiles("*.dump", SearchOption.TopDirectoryOnly)
+                    .EnumerateFiles("*", SearchOption.TopDirectoryOnly)
+                    .Where(file => string.Equals(file.Extension, ".dump", StringComparison.OrdinalIgnoreCase))
                     .Where(IsRegularPostgreSqlBackupFile)
                     .OrderByDescending(file => file.LastWriteTimeUtc)
                     .ThenByDescending(file => file.Name, StringComparer.OrdinalIgnoreCase)

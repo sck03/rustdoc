@@ -117,7 +117,7 @@ $forbiddenPathPatterns = @(
 $textExtensions = @(
     '.cs', '.rs', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.ps1', '.cmd',
     '.yml', '.yaml', '.json', '.xml', '.toml', '.props', '.targets', '.md', '.txt',
-    '.html', '.css', '.config', '.example', '.env'
+    '.html', '.css', '.config', '.example', '.env', '.sh'
 )
 $forbiddenContentPatterns = @(
     '-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',

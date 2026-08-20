@@ -281,13 +281,6 @@ export function createPaymentSmokeScene(runtime) {
             throw new Error('Payment editor surface not found for draft preview check.');
           }
 
-          const notifyReactChange = (control) => {
-            const reactPropsKey = Object.keys(control).find((key) => key.startsWith('__reactProps$'));
-            const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-            if (reactProps && typeof reactProps.onChange === 'function') {
-              reactProps.onChange({ target: control, currentTarget: control });
-            }
-          };
           const setNativeValue = (control, value) => {
             const prototype = Object.getPrototypeOf(control);
             const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
@@ -299,7 +292,6 @@ export function createPaymentSmokeScene(runtime) {
             control.focus();
             control.dispatchEvent(new Event('input', { bubbles: true }));
             control.dispatchEvent(new Event('change', { bubbles: true }));
-            notifyReactChange(control);
           };
           const fieldByLabel = (labelText) => {
             const labels = Array.from(surface.querySelectorAll('label'));
@@ -414,13 +406,6 @@ export function createPaymentSmokeScene(runtime) {
             throw new Error('Payment editor surface not found for draft restore.');
           }
 
-          const notifyReactChange = (control) => {
-            const reactPropsKey = Object.keys(control).find((key) => key.startsWith('__reactProps$'));
-            const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-            if (reactProps && typeof reactProps.onChange === 'function') {
-              reactProps.onChange({ target: control, currentTarget: control });
-            }
-          };
           const setNativeValue = (control, value) => {
             const prototype = Object.getPrototypeOf(control);
             const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
@@ -432,7 +417,6 @@ export function createPaymentSmokeScene(runtime) {
             control.focus();
             control.dispatchEvent(new Event('input', { bubbles: true }));
             control.dispatchEvent(new Event('change', { bubbles: true }));
-            notifyReactChange(control);
           };
           const labels = Array.from(surface.querySelectorAll('label'));
           const label = labels.find((item) =>
@@ -565,13 +549,6 @@ export function createPaymentSmokeScene(runtime) {
       page,
       `(() => {
         const surface = document.querySelector('[aria-label="编辑付款报销"]');
-        const notifyReactChange = (control) => {
-          const reactPropsKey = Object.keys(control).find((key) => key.startsWith('__reactProps$'));
-          const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-          if (reactProps && typeof reactProps.onChange === 'function') {
-            reactProps.onChange({ target: control, currentTarget: control });
-          }
-        };
         const setNativeValue = (control, value) => {
           const prototype = Object.getPrototypeOf(control);
           const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
@@ -583,7 +560,6 @@ export function createPaymentSmokeScene(runtime) {
           control.focus();
           control.dispatchEvent(new Event('input', { bubbles: true }));
           control.dispatchEvent(new Event('change', { bubbles: true }));
-          notifyReactChange(control);
         };
         const fieldByLabel = (labelText) => {
           const labels = Array.from(surface.querySelectorAll('label'));
@@ -833,12 +809,6 @@ export function createPaymentSmokeScene(runtime) {
         }
         select.dispatchEvent(new Event('input', { bubbles: true }));
         select.dispatchEvent(new Event('change', { bubbles: true }));
-        const reactPropsKey = Object.keys(select).find((key) => key.startsWith('__reactProps$'));
-        const reactProps = reactPropsKey ? select[reactPropsKey] : null;
-        if (reactProps && typeof reactProps.onChange === 'function') {
-          reactProps.onChange({ target: select, currentTarget: select });
-        }
-
         return select.value;
       })()`,
       true,

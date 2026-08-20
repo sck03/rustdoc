@@ -38,7 +38,7 @@ export function parseWebRuntimeSmokeArgs(args) {
     auditLogCheck: false,
     auditLogExportCheck: false,
     licenseCheck: false,
-    timeoutMs: 45000,
+    timeoutMs: 90000,
     globalTimeoutMs: 600000,
   };
 

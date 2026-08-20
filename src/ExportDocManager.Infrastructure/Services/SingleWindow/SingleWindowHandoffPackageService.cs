@@ -185,7 +185,7 @@ namespace ExportDocManager.Services.SingleWindow
                 {
                     var usedPayloadFileNames = payloadFiles
                         .Select(file => Path.GetFileName(file.RelativePath))
-                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                        .ToHashSet(PortablePathKey.Comparer);
                     foreach (var attachment in attachments)
                     {
                         cancellationToken.ThrowIfCancellationRequested();

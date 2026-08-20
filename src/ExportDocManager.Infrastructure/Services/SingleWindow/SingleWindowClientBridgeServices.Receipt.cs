@@ -78,7 +78,7 @@ namespace ExportDocManager.Services.SingleWindow
                 layout,
                 batch)
                 .Where(path => !string.IsNullOrWhiteSpace(path))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Distinct(PhysicalPathComparison.Comparer)
                 .ToList();
             var candidateFiles = new List<string>();
 
@@ -95,7 +95,7 @@ namespace ExportDocManager.Services.SingleWindow
             }
 
             var matches = new List<(string Path, int Score)>();
-            foreach (var path in candidateFiles.Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (var path in candidateFiles.Distinct(PhysicalPathComparison.Comparer))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 int score = await CalculateReceiptMatchScoreAsync(path, batch, candidateDirectories, cancellationToken);

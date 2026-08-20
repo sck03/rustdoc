@@ -81,25 +81,34 @@ function DialogBaseline() {
 
 function DashboardBaseline() { return <section className="dashboard-page"><div className="dashboard-metric-grid">{["本月出口额","本月预估利润","本月退税额","待处理订单","已出运","总订单量"].map((label,index)=><div className="dashboard-metric dashboard-metric-teal" key={label}><div className="dashboard-metric-icon" aria-hidden="true">{index + 1}</div><div><span>{label}</span><strong data-visual-critical-text>{index < 3 ? "128,560.00" : String(12 + index)}</strong></div></div>)}</div><div className="dashboard-work-grid"><section className="form-section dashboard-recent-section"><div className="section-header"><h2>最新订单</h2></div><div className="table-frame" tabIndex={0} aria-label="最新订单表格"><table><thead><tr><th>发票号</th><th>状态</th><th>客户</th><th>日期</th><th>金额</th></tr></thead><tbody>{[1,2,3,4].map(i=><tr key={i}><td>YH2026-00{i}</td><td><span className="status-pill">处理中</span></td><td>BRIDGE GLOBAL LTD.</td><td>2026-07-{20+i}</td><td>32,140.00</td></tr>)}</tbody></table></div></section><section className="form-section dashboard-todo-section"><div className="section-header"><h2>待办事项</h2></div><div className="dashboard-todo-list">{["核对发票商品明细","审核联网 HS 候选","生成报关单证"].map(x=><button type="button" className="dashboard-todo-item" key={x}>{x}</button>)}</div></section></div></section>; }
 function QueryBaseline() {
+  const isDesktop = useWorkspaceDeviceMode() === "desktop";
   return (
     <section className="work-surface query-surface" aria-label="单据查询视觉基准">
       <form className="toolbar query-toolbar">
-        <div className="query-filter-grid">
-          <div className="query-date-range" role="group" aria-label="日期范围">
-            <label className="query-filter-field query-date-filter"><span>开始日期</span><input type="date" defaultValue="2026-08-01" /></label>
-            <label className="query-filter-field query-date-filter"><span>结束日期</span><input type="date" defaultValue="2026-08-10" /></label>
+        <div className="query-filter-stack">
+          <span className="query-filter-section-label">常用条件</span>
+          <div className="query-filter-grid query-common-filter-grid">
+            <div className="query-date-range" role="group" aria-label="日期范围">
+              <label className="query-filter-field query-date-filter"><span>开始日期</span><input type="date" defaultValue="2026-08-01" /></label>
+              <label className="query-filter-field query-date-filter"><span>结束日期</span><input type="date" defaultValue="2026-08-10" /></label>
+            </div>
+            <label className="query-filter-field query-keyword-filter"><span>关键字</span><input placeholder="发票号、合同号、客户等" /></label>
           </div>
-          <div className="remote-select-field query-filter-field query-party-filter query-customer-filter">
-            <span className="form-field-label"><span>客户</span></span>
-            <div className="remote-select-controls"><input type="search" aria-label="客户检索" placeholder="搜索客户" /><select aria-label="客户"><option>全部</option></select></div>
-          </div>
-          <div className="remote-select-field query-filter-field query-party-filter query-exporter-filter">
-            <span className="form-field-label"><span>出口商</span></span>
-            <div className="remote-select-controls"><input type="search" aria-label="出口商检索" placeholder="搜索出口商" /><select aria-label="出口商"><option>全部</option></select></div>
-          </div>
-          <label className="query-filter-field query-type-filter"><span>业务类型</span><select defaultValue=""><option value="">全部</option><option>实际数据</option></select></label>
-          <label className="query-filter-field query-transport-filter"><span>运输方式</span><select defaultValue=""><option value="">全部</option><option>BY SEA</option></select></label>
-          <label className="query-filter-field query-keyword-filter"><span>关键字</span><input placeholder="发票号、合同号、客户等" /></label>
+          <details className="query-advanced-filters" open={isDesktop}>
+            <summary className="query-advanced-filter-summary"><span>高级筛选</span><small>客户、出口商、类型与运输方式</small></summary>
+            <div className="query-filter-grid query-advanced-filter-grid">
+              <div className="remote-select-field query-filter-field query-party-filter query-customer-filter">
+                <span className="form-field-label"><span>客户</span></span>
+                <div className="remote-select-controls"><input type="search" aria-label="客户检索" placeholder="搜索客户" /><select aria-label="客户"><option>全部</option></select></div>
+              </div>
+              <div className="remote-select-field query-filter-field query-party-filter query-exporter-filter">
+                <span className="form-field-label"><span>出口商</span></span>
+                <div className="remote-select-controls"><input type="search" aria-label="出口商检索" placeholder="搜索出口商" /><select aria-label="出口商"><option>全部</option></select></div>
+              </div>
+              <label className="query-filter-field query-type-filter"><span>业务类型</span><select defaultValue=""><option value="">全部</option><option>实际数据</option></select></label>
+              <label className="query-filter-field query-transport-filter"><span>运输方式</span><select defaultValue=""><option value="">全部</option><option>BY SEA</option></select></label>
+            </div>
+          </details>
         </div>
         <div className="toolbar-actions query-toolbar-actions">
           <button className="icon-button" type="button" title="刷新" aria-label="刷新"><RefreshCw size={18} aria-hidden="true" /></button>

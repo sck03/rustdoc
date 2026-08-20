@@ -1,4 +1,5 @@
 using System.Net;
+using System.Globalization;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Data;
 using ExportDocManager.Services.Errors;
@@ -85,6 +86,35 @@ public sealed class BocExchangeRateServiceTests
         Assert.Equal(7.2m, rate.BuyingRate);
         Assert.Equal(2, handler.RequestCount);
         Assert.Equal("https://rates.example/final", handler.RequestUris[1].ToString());
+    }
+
+    [Fact]
+    public async Task Service_ShouldParseOfficialDecimalRatesIndependentlyOfServerCulture()
+    {
+        CultureInfo previousCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+            var handler = new SequenceHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""
+                    <table><tr><td>美元</td><td>720.5</td><td>718</td><td>725</td><td>726</td><td>723</td><td>2026-08-08 10:00:00</td></tr></table>
+                    """)
+            });
+            using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+            using var service = new BocExchangeRateService(
+                new StubSettingsService("https://rates.example/start"),
+                client,
+                (_, _) => Task.FromResult(new[] { IPAddress.Parse("93.184.216.34") }));
+
+            var rate = Assert.Single(await service.GetExchangeRatesAsync());
+
+            Assert.Equal(7.205m, rate.BuyingRate);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previousCulture;
+        }
     }
 
     [Fact]

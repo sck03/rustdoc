@@ -42,7 +42,7 @@ export function ReportTemplatePackagePanel({
   importStrategy: TemplateImportStrategyOption;
   exportPath: string;
   importPath: string;
-  uploadInputRef: RefObject<HTMLInputElement>;
+  uploadInputRef: RefObject<HTMLInputElement | null>;
   canExport: boolean;
   canExportByPath: boolean;
   canDownload: boolean;

@@ -17,11 +17,14 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
+      DOTNET_CLI_HOME: ${{ github.workspace }}/.codex-runtime/dotnet-cli
       NUGET_PACKAGES: ${{ github.workspace }}/artifacts/nuget-packages
       NUGET_HTTP_CACHE_PATH: ${{ github.workspace }}/.codex-runtime/nuget-http-cache
+      CARGO_HOME: ${{ github.workspace }}/.codex-runtime/cargo-home
       CARGO_TARGET_DIR: ${{ github.workspace }}/artifacts/cargo-target-quality
+      npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
       EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER: true
     steps:
       - name: Checkout
@@ -44,11 +47,33 @@ jobs:
           cache: npm
           cache-dependency-path: apps/export-doc-web/package-lock.json
 
+      - name: Verify public repository boundary
+        shell: pwsh
+        run: ./scripts/github/verify-public-source.ps1
+
+      - name: Verify GitHub Action runtime policy
+        run: node scripts/verify-github-workflow-actions.mjs
+
+      - name: Verify updater release trust contract
+        run: node scripts/test_tauri_updater_release_contract.mjs
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable action
         with:
           toolchain: 1.96.0
           components: rustfmt
+
+      - name: Restore quality-gate dependency caches
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            artifacts/nuget-packages
+            .codex-runtime/cargo-home/registry
+            .codex-runtime/cargo-home/git
+            artifacts/cargo-target-quality
+          key: quality-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('global.json', 'Directory.Packages.props', '**/packages.lock.json', 'rust-toolchain.toml', '**/Cargo.lock') }}
+          restore-keys: |
+            quality-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Restore dependencies
         run: |
@@ -88,10 +113,29 @@ jobs:
           npm --prefix apps/export-doc-web run test:api-client-contracts
           npm --prefix apps/export-doc-web run test:browser-session-contracts
           npm --prefix apps/export-doc-web run test:business-date-refresh
+          npm --prefix apps/export-doc-web run test:business-status-model
+          npm --prefix apps/export-doc-web run test:service-availability-model
+          npm --prefix apps/export-doc-web run test:session-expiry-model
           npm --prefix apps/export-doc-web run test:invoice-text-normalization
+          npm --prefix apps/export-doc-web run test:invoice-list-models
+          npm --prefix apps/export-doc-web run test:settings-models
+          npm --prefix apps/export-doc-web run test:email-template-model
+          npm --prefix apps/export-doc-web run test:concurrency-feedback
+          npm --prefix apps/export-doc-web run test:query-retry-policy
+          npm --prefix apps/export-doc-web run test:query-network-mode
+          npm --prefix apps/export-doc-web run test:background-job-polling
+          npm --prefix apps/export-doc-web run test:authentication-failure-events
           npm --prefix apps/export-doc-web run test:new-report-designer-exporter
+          npm --prefix apps/export-doc-web run test:print-preview-document
           npm --prefix apps/export-doc-web run test:workspace-navigation
+          npm --prefix apps/export-doc-web run test:accessibility-contracts
+          npm --prefix apps/export-doc-web run test:font-policy
           npm --prefix apps/export-doc-web run test:supplier-assessment-analytics
+          npm --prefix apps/export-doc-web run test:audit-log-maintenance-model
+          npm --prefix apps/export-doc-web run test:report-template-workspace-model
+          npm --prefix apps/export-doc-web run test:customs-coo-model
+          npm --prefix apps/export-doc-web run test:container-packing-model
+          npm --prefix apps/export-doc-web run test:reference-catalog-model
           npm --prefix apps/export-doc-web run test:style-governance
           npm --prefix apps/export-doc-web run test:source-size-governance
 

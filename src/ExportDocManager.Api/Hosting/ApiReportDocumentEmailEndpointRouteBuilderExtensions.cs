@@ -145,7 +145,7 @@ namespace ExportDocManager.Api.Hosting
                         var attachments = documentSet.Entries
                             .Select(entry => entry.SourcePath)
                             .Where(path => !string.IsNullOrWhiteSpace(path))
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .Distinct(PhysicalPathComparison.Comparer)
                             .ToList();
                         if (attachments.Count == 0)
                         {

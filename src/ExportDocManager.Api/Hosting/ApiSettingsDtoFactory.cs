@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
@@ -92,7 +93,7 @@ namespace ExportDocManager.Api.Hosting
 
         private static string NormalizePostgreSqlAutoBackupTime(string value)
         {
-            return TimeSpan.TryParse(value?.Trim(), out var time)
+            return TimeSpan.TryParse(value?.Trim(), CultureInfo.InvariantCulture, out var time)
                 ? new TimeSpan(time.Hours, time.Minutes, 0).ToString(@"hh\:mm")
                 : "02:00";
         }

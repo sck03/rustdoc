@@ -64,7 +64,8 @@ internal static class ServerMigrationPackageValidator
             await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false),
             ServerMigrationService.JsonOptions) ?? throw new InvalidDataException("服务器迁移包清单为空。");
         if (manifest.SchemaVersion != ServerMigrationLayout.SchemaVersion ||
-            !Guid.TryParseExact(manifest.PackageId, "N", out _))
+            !Guid.TryParseExact(manifest.PackageId, "N", out _) ||
+            manifest.SourcePathCaseSensitive is null)
         {
             throw new InvalidDataException("服务器迁移包清单版本或包 ID 无效。");
         }
@@ -76,7 +77,7 @@ internal static class ServerMigrationPackageValidator
             throw new InvalidDataException("服务器迁移包文件清单为空或过大。");
         }
 
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var names = new HashSet<string>(PortablePathKey.Comparer);
         foreach (ServerMigrationFileManifest file in manifest.Files)
         {
             string normalized = NormalizeRelativePath(file.RelativePath);
@@ -143,7 +144,7 @@ internal static class ServerMigrationPackageValidator
                 Name = item.FullName.Replace('\\', '/').Trim('/')
             })
             .ToList();
-        var names = fileEntries.Select(item => item.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var names = fileEntries.Select(item => item.Name).ToHashSet(PortablePathKey.Comparer);
         var manifestEntries = fileEntries.Where(item => item.Name.Equals(ServerMigrationLayout.ManifestEntry, StringComparison.OrdinalIgnoreCase)).ToList();
         if (manifestEntries.Count != 1 ||
             manifestEntries[0].Entry.Length <= 0 ||
@@ -155,7 +156,8 @@ internal static class ServerMigrationPackageValidator
         using Stream manifestStream = manifestEntries[0].Entry.Open();
         ServerMigrationManifest manifest = JsonSerializer.Deserialize<ServerMigrationManifest>(manifestStream, ServerMigrationService.JsonOptions)
             ?? throw new InvalidDataException("服务器迁移包清单为空。");
-        if (manifest.Files is null || manifest.Files.Any(file => file is null))
+        if (manifest.SourcePathCaseSensitive is null ||
+            manifest.Files is null || manifest.Files.Any(file => file is null))
         {
             throw new InvalidDataException("服务器迁移包清单文件列表无效。");
         }
@@ -166,7 +168,7 @@ internal static class ServerMigrationPackageValidator
         var expectedNames = manifest.Files
             .Select(file => NormalizeRelativePath(file.RelativePath))
             .Append(ServerMigrationLayout.ManifestEntry)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .ToHashSet(PortablePathKey.Comparer);
         if (expectedNames.Count != fileEntries.Count || fileEntries.Any(item => !expectedNames.Contains(item.Name)))
         {
             throw new InvalidDataException("服务器迁移包包含清单之外的文件。");
@@ -219,18 +221,19 @@ internal static class ServerMigrationPackageValidator
 
     public static string NormalizeRelativePath(string relativePath)
     {
-        string normalized = (relativePath ?? string.Empty).Trim().Replace('\\', '/');
-        if (string.IsNullOrWhiteSpace(normalized) || normalized.StartsWith("/", StringComparison.Ordinal) || Path.IsPathRooted(normalized) || normalized.IndexOf('\0') >= 0)
+        try
         {
-            throw new InvalidDataException("服务器迁移包相对路径无效。");
+            string normalized = PortablePathKey.NormalizeRelativePath(relativePath);
+            if (normalized.Split('/').Length > ExtractionLimits.MaximumPathDepth)
+            {
+                throw new InvalidDataException("服务器迁移包相对路径层级过深。");
+            }
+            return normalized;
         }
-        string[] segments = normalized.Split('/', StringSplitOptions.None);
-        if (segments.Length == 0 || segments.Length > ExtractionLimits.MaximumPathDepth || segments.Any(segment =>
-                string.IsNullOrWhiteSpace(segment) || segment is "." or ".." || segment.IndexOf(':') >= 0 || segment.Any(char.IsControl)))
+        catch (Exception ex) when (ex is ArgumentException or InvalidDataException)
         {
-            throw new InvalidDataException("服务器迁移包相对路径无效。");
+            throw new InvalidDataException("服务器迁移包相对路径无效。", ex);
         }
-        return string.Join('/', segments);
     }
 
     public static async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)

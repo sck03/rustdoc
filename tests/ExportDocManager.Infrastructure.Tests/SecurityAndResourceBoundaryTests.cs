@@ -35,6 +35,24 @@ public sealed class SecurityAndResourceBoundaryTests
     }
 
     [Fact]
+    public void PortablePathKey_ShouldNormalizeUnicodeAndSeparators()
+    {
+        Assert.True(PortablePathKey.Comparer.Equals(
+            "Reports\\e\u0301.HTML",
+            "reports/é.html"));
+        Assert.Equal("Reports/é.html", PortablePathKey.NormalizeRelativePath("Reports\\e\u0301.html"));
+    }
+
+    [Theory]
+    [InlineData("/absolute/file.txt")]
+    [InlineData("\\absolute\\file.txt")]
+    [InlineData("\\\\server\\share\\file.txt")]
+    public void PortablePathKey_ShouldRejectHostIndependentAbsolutePaths(string path)
+    {
+        Assert.Throws<InvalidDataException>(() => PortablePathKey.NormalizeRelativePath(path));
+    }
+
+    [Fact]
     public void LocalSecretProtector_ShouldUseRandomNonceAndRejectTampering()
     {
         string root = CreateTempDirectory("secret-protector");
@@ -181,6 +199,29 @@ public sealed class SecurityAndResourceBoundaryTests
                     archive.CreateEntry("report.txt:secret").Open(),
                     Encoding.UTF8);
                 await writer.WriteAsync("unsafe");
+            }
+
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                ZipArchiveHelper.ExtractToDirectorySafeAsync(packagePath, targetPath));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ZipArchiveHelper_ShouldRejectUnicodeNormalizationCollisions()
+    {
+        string root = CreateTempDirectory("zip-unicode-collision");
+        string packagePath = Path.Combine(root, "unsafe.zip");
+        string targetPath = Path.Combine(root, "target");
+        try
+        {
+            using (var archive = ZipFile.Open(packagePath, ZipArchiveMode.Create))
+            {
+                archive.CreateEntry("é.txt");
+                archive.CreateEntry("e\u0301.txt");
             }
 
             await Assert.ThrowsAsync<InvalidDataException>(() =>

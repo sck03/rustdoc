@@ -124,7 +124,7 @@ export function InvoiceReportPreviewPanel({
   useEffect(() => {
     if (!templates.length) return;
     const preferredTemplate = templates.find(
-      (template) => fileNameFromPath(template.templatePath).toLowerCase() === "invoice_template.html",
+      (template) => fileNameFromPath(template.templatePath) === "invoice_template.html",
     ) ?? templates[0];
     setSelectedTemplatePath((current) => current || preferredTemplate.templatePath);
     setWithSeal((current) => selectedTemplatePath ? current : preferredTemplate.withSealDefault ?? true);

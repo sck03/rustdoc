@@ -1,5 +1,5 @@
+using System.Globalization;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace ExportDocManager.Utils
 {
@@ -13,20 +13,11 @@ namespace ExportDocManager.Utils
         public static decimal ParseDecimal(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return 0;
-            if (decimal.TryParse(text, out decimal result))
-            {
-                return result;
-            }
-            return 0;
-        }
-
-        /// <summary>
-        /// 解析整数，如果解析失败返回0
-        /// </summary>
-        public static int ParseInt(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text)) return 0;
-            if (int.TryParse(text, out int result))
+            if (decimal.TryParse(
+                    text.Trim(),
+                    NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                    CultureInfo.InvariantCulture,
+                    out decimal result))
             {
                 return result;
             }
@@ -91,30 +82,6 @@ namespace ExportDocManager.Utils
         public static string ToChineseMoney(decimal money)
         {
             if (money == 0) return "零元整";
-
-            string s = money.ToString("#L#E#D#C#K#E#D#C#J#E#D#C#I#E#D#C#H#E#D#C#G#E#D#C#F#E#D#C#.00");
-            string d = Regex.Replace(s, @"((?<=-|^)[^1-9]*)|((?'z'0)[0A-E]*((?=[1-9])|(?'-z'(?=[F-L\.]|$))))|((?'b'[F-L])(?'z'0)[0A-E]*((?=[1-9])|(?'-z'(?=[[\.]|$))))", "${b}${z}");
-            string result = Regex.Replace(d, ".", m =>
-            {
-                if (".".Equals(m.Value)) return "元";
-                if ("0".Equals(m.Value)) return "零";
-                if (m.Value.CompareTo("9") > 0)
-                {
-                    switch (m.Value)
-                    {
-                        case "A": return "拾";
-                        case "B": return "佰";
-                        case "C": return "仟";
-                        case "D": return "万";
-                        case "E": return "拾";
-                        case "F": return "佰";
-                        case "G": return "仟";
-                        case "H": return "亿";
-                        default: return "";
-                    }
-                }
-                return ChineseDigits[int.Parse(m.Value)];
-            });
 
             return ConvertToChineseMoneySimple(money);
         }

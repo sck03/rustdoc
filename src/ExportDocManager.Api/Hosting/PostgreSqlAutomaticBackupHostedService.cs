@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
@@ -100,7 +101,10 @@ namespace ExportDocManager.Api.Hosting
             DateTimeOffset now,
             PostgreSqlAutomaticBackupState state)
         {
-            if (!TimeSpan.TryParse(settings.PostgreSqlAutoBackupTime, out var scheduledTime))
+            if (!TimeSpan.TryParse(
+                    settings.PostgreSqlAutoBackupTime,
+                    CultureInfo.InvariantCulture,
+                    out var scheduledTime))
             {
                 scheduledTime = new TimeSpan(2, 0, 0);
             }
@@ -153,7 +157,8 @@ namespace ExportDocManager.Api.Hosting
             }
 
             var oldFiles = new DirectoryInfo(backupRoot)
-                .EnumerateFiles("*.dump", SearchOption.TopDirectoryOnly)
+                .EnumerateFiles("*", SearchOption.TopDirectoryOnly)
+                .Where(file => string.Equals(file.Extension, ".dump", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(file => file.LastWriteTimeUtc)
                 .Skip(retentionCount)
                 .ToArray();

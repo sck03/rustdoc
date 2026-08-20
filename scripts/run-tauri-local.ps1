@@ -60,10 +60,6 @@ function Resolve-CargoBinDir {
         $candidates.Add((Join-Path $env:CARGO_HOME "bin"))
     }
 
-    if ($IsWindows) {
-        $candidates.Add("D:\Rust\.cargo\bin")
-    }
-
     $cargoCommand = Get-Command $cargoExecutableName -CommandType Application -ErrorAction SilentlyContinue
     if ($null -ne $cargoCommand) {
         $candidates.Add((Split-Path -Parent $cargoCommand.Source))
@@ -141,7 +137,7 @@ if ($RemainingArgs.Count -gt 0 -and $RemainingArgs[0] -eq "--") {
     $RemainingArgs = @($RemainingArgs | Select-Object -Skip 1)
 }
 if ($IsWindows -and [string]::IsNullOrWhiteSpace($MsysUcrtBinDir)) {
-    $MsysUcrtBinDir = "D:\msys64\ucrt64\bin"
+    $MsysUcrtBinDir = $env:EXPORTDOCMANAGER_MSYS_UCRT_BIN
 }
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
@@ -227,8 +223,13 @@ try {
 
     $pathParts = New-Object System.Collections.Generic.List[string]
     $pathParts.Add($resolvedCargoBinDir)
-    if (-not [string]::IsNullOrWhiteSpace($MsysUcrtBinDir) -and (Test-Path -LiteralPath $MsysUcrtBinDir)) {
-        $pathParts.Add((Resolve-Path -LiteralPath $MsysUcrtBinDir).Path)
+    if (-not [string]::IsNullOrWhiteSpace($MsysUcrtBinDir)) {
+        if (-not (Test-Path -LiteralPath $MsysUcrtBinDir -PathType Container)) {
+            throw "MSYS2 UCRT tool directory was not found: $MsysUcrtBinDir"
+        }
+        $resolvedMsysUcrtBinDir = (Resolve-Path -LiteralPath $MsysUcrtBinDir).Path
+        Assert-ExportDocNonSystemDrivePath -Path $resolvedMsysUcrtBinDir -Purpose "MSYS2 UCRT tool directory" -AllowSystemDrive:$AllowSystemDrive
+        $pathParts.Add($resolvedMsysUcrtBinDir)
     }
     $pathParts.Add($env:PATH)
     $env:PATH = $pathParts -join [System.IO.Path]::PathSeparator

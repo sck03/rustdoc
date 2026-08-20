@@ -1,4 +1,5 @@
 using ExportDocManager.Utils;
+using System.Globalization;
 
 namespace ExportDocManager.Domain.Tests
 {
@@ -6,6 +7,7 @@ namespace ExportDocManager.Domain.Tests
     {
         [Theory]
         [InlineData("12.34", "12.34")]
+        [InlineData(" 12.34 ", "12.34")]
         [InlineData("", "0")]
         [InlineData("not-a-number", "0")]
         public void ParseDecimal_ShouldKeepFallbackBehavior(string value, string expected)
@@ -13,13 +15,21 @@ namespace ExportDocManager.Domain.Tests
             Assert.Equal(decimal.Parse(expected), NumberHelper.ParseDecimal(value));
         }
 
-        [Theory]
-        [InlineData("42", 42)]
-        [InlineData("", 0)]
-        [InlineData("x", 0)]
-        public void ParseInt_ShouldKeepFallbackBehavior(string value, int expected)
+        [Fact]
+        public void NumericParsing_ShouldRemainInvariantUnderCommaDecimalCulture()
         {
-            Assert.Equal(expected, NumberHelper.ParseInt(value));
+            CultureInfo previousCulture = CultureInfo.CurrentCulture;
+            try
+            {
+                CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+
+                Assert.Equal(720.5m, NumberHelper.ParseDecimal("720.5"));
+                Assert.Equal(0m, NumberHelper.ParseDecimal("720,5"));
+            }
+            finally
+            {
+                CultureInfo.CurrentCulture = previousCulture;
+            }
         }
 
         [Theory]

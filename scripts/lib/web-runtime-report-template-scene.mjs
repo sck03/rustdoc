@@ -168,13 +168,6 @@ export function createReportTemplateSmokeScene(runtime) {
             return null;
           }
 
-          const notifyReactChange = (control) => {
-            const reactPropsKey = Object.keys(control).find((key) => key.startsWith('__reactProps$'));
-            const reactProps = reactPropsKey ? control[reactPropsKey] : null;
-            if (reactProps && typeof reactProps.onChange === 'function') {
-              reactProps.onChange({ target: control, currentTarget: control });
-            }
-          };
           const setNativeValue = (control, value) => {
             const prototype = Object.getPrototypeOf(control);
             const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
@@ -186,7 +179,6 @@ export function createReportTemplateSmokeScene(runtime) {
             control.focus();
             control.dispatchEvent(new Event('input', { bubbles: true }));
             control.dispatchEvent(new Event('change', { bubbles: true }));
-            notifyReactChange(control);
           };
 
           if (typeof window.__reportTemplateAdvancedHtmlFormatOriginal !== 'string') {

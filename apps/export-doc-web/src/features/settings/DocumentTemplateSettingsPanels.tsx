@@ -532,7 +532,7 @@ function buildTemplateOptions(templates: ReportTemplateOption[]) {
 
   for (const template of templates) {
     const templatePath = template.templatePath?.trim() ?? "";
-    if (!templatePath || seen.has(templatePath.toLowerCase())) {
+    if (!templatePath || seen.has(templatePath)) {
       continue;
     }
 
@@ -540,15 +540,15 @@ function buildTemplateOptions(templates: ReportTemplateOption[]) {
       value: templatePath,
       label: template.displayName || fileNameFromPath(templatePath),
     });
-    seen.add(templatePath.toLowerCase());
+    seen.add(templatePath);
   }
 
   return options;
 }
 
 function readTemplateDisplayName(templatePath: string, templates: ReportTemplateOption[]) {
-  const normalizedTemplatePath = templatePath.trim().toLowerCase();
-  const template = templates.find((item) => item.templatePath.trim().toLowerCase() === normalizedTemplatePath);
+  const normalizedTemplatePath = templatePath.trim();
+  const template = templates.find((item) => item.templatePath.trim() === normalizedTemplatePath);
   return template?.displayName || fileNameFromPath(templatePath) || "新单证";
 }
 

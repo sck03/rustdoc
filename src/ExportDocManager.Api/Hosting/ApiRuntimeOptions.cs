@@ -121,8 +121,14 @@ namespace ExportDocManager.Api.Hosting
 
         private static string NormalizeRoot(string path)
         {
+            string trimmed = path?.Trim() ?? string.Empty;
+            if (!Path.IsPathFullyQualified(trimmed))
+            {
+                throw new ArgumentException("运行根路径必须使用绝对路径。", nameof(path));
+            }
+
             return RuntimeAppPathProvider.NormalizeRoot(
-                string.IsNullOrWhiteSpace(path) ? AppContext.BaseDirectory : path);
+                trimmed);
         }
 
         private static string NormalizeListenUrls(string urls)

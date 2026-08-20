@@ -71,8 +71,7 @@ namespace ExportDocManager.Api.Hosting
                 string portableFileName = (fileName ?? string.Empty).Trim().Replace('\\', '/');
                 string safeFileName = Path.GetFileName(portableFileName).Trim();
                 if (string.IsNullOrWhiteSpace(safeFileName) ||
-                    safeFileName.Length > 240 ||
-                    safeFileName.Any(character => char.IsControl(character) || "<>:\"/\\|?*".Contains(character)))
+                    !CrossPlatformFileNamePolicy.IsSafeFileName(safeFileName))
                 {
                     return Results.BadRequest(new ApiErrorResponse("请上传文件名有效且不超过 240 个字符的 Excel 文件。"));
                 }

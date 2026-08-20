@@ -4,6 +4,7 @@ import { Download, FolderOpen, RefreshCw, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ApiCustomerDto, ApiExporterDto, ApiQueryInvoiceRowDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import { useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { isDesktopBridgeAvailable, selectSaveExcelPath } from "../../desktop/desktopBridge.ts";
 import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
@@ -37,6 +38,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
   const navigate = useNavigate();
   const keywordInputRef = useRef<HTMLInputElement | null>(null);
   const isDesktop = isDesktopBridgeAvailable();
+  const workspaceDeviceMode = useWorkspaceDeviceMode();
   const runAbortableOperation = useAbortableOperation();
   const [initialViewState] = useState(() => loadQueryViewState(businessDate));
   const [filters, setFilters] = useState<QueryFilters>(() => initialViewState.filters);
@@ -46,6 +48,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
   const [exportPath, setExportPath] = useState("");
   const [actionMessage, setActionMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [lastCreatedJobId, setLastCreatedJobId] = useState<string | null>(null);
+  const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
 
   const selectedCustomerId = Number(filters.customerId);
   const selectedCustomerQuery = useQuery({
@@ -150,6 +153,13 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
   const isActionBusy = exportMutation.isPending;
   const message = invoiceQuery.isError ? readApiError(invoiceQuery.error) : null;
   const canExport = queryPermission.canOperate && (!isDesktop || Boolean(exportPath.trim())) && !isActionBusy;
+  const advancedFilterCount = [
+    filters.customerId !== "0",
+    filters.exporterId !== "0",
+    Boolean(filters.invoiceType),
+    Boolean(filters.transportMode),
+  ].filter(Boolean).length;
+  const showAdvancedFilters = workspaceDeviceMode === "desktop" || isAdvancedFilterOpen;
 
   const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
 
@@ -223,106 +233,121 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
   return (
     <section className="work-surface query-surface" aria-label="单据查询">
       <form className="toolbar query-toolbar" onSubmit={handleSearch} onKeyDown={handleQueryFormKeyDown}>
-        <div className="query-filter-grid">
-          <div className="query-date-range" role="group" aria-label="日期范围">
-            <label className="query-filter-field query-date-filter">
-              <span>开始日期</span>
+        <div className="query-filter-stack">
+          <span className="query-filter-section-label">常用条件</span>
+          <div className="query-filter-grid query-common-filter-grid">
+            <div className="query-date-range" role="group" aria-label="日期范围">
+              <label className="query-filter-field query-date-filter">
+                <span>开始日期</span>
+                <input
+                  type="date"
+                  data-query-filter="startDate"
+                  value={filters.startDate}
+                  onChange={(event) => updateFilter("startDate", event.target.value)}
+                />
+              </label>
+              <label className="query-filter-field query-date-filter">
+                <span>结束日期</span>
+                <input
+                  type="date"
+                  data-query-filter="endDate"
+                  value={filters.endDate}
+                  onChange={(event) => updateFilter("endDate", event.target.value)}
+                />
+              </label>
+            </div>
+            <label className="query-filter-field query-keyword-filter">
+              <span>关键字</span>
               <input
-                type="date"
-                data-query-filter="startDate"
-                value={filters.startDate}
-                onChange={(event) => updateFilter("startDate", event.target.value)}
-              />
-            </label>
-            <label className="query-filter-field query-date-filter">
-              <span>结束日期</span>
-              <input
-                type="date"
-                data-query-filter="endDate"
-                value={filters.endDate}
-                onChange={(event) => updateFilter("endDate", event.target.value)}
+                ref={keywordInputRef}
+                data-query-filter="keyword"
+                value={filters.keyword}
+                placeholder="发票号、合同号、客户等"
+                onFocus={handleTextInputFocus}
+                onChange={(event) => updateFilter("keyword", event.target.value)}
               />
             </label>
           </div>
-          <RemoteSelectField<ApiCustomerDto>
-            className="query-filter-field query-party-filter query-customer-filter"
-            label="客户"
-            value={filters.customerId === "0" ? "" : filters.customerId}
-            selectedOption={selectedCustomerQuery.data}
-            selectedLabel={selectedCustomerQuery.data?.displayName || `客户 #${filters.customerId}`}
-            emptyLabel="全部"
-            searchPlaceholder="搜索客户"
-            queryKey={["master-data", "customers", "lookup"]}
-            loadOptions={async (keyword, signal) => (await client.listCustomersPage({
-              keyword: keyword || undefined,
-              pageNumber: 1,
-              pageSize: 50,
-            }, { signal })).items}
-            getValue={(customer) => String(customer.id)}
-            getLabel={(customer) => customer.displayName || customer.customerNameEN || "-"}
-            dataQueryFilter="customerId"
-            onChange={(customer) => updateFilter("customerId", customer ? String(customer.id) : "0")}
-          />
-          <RemoteSelectField<ApiExporterDto>
-            className="query-filter-field query-party-filter query-exporter-filter"
-            label="出口商"
-            value={filters.exporterId === "0" ? "" : filters.exporterId}
-            selectedOption={selectedExporterQuery.data}
-            selectedLabel={selectedExporterQuery.data?.exporterNameEN || selectedExporterQuery.data?.exporterNameCN || `出口商 #${filters.exporterId}`}
-            emptyLabel="全部"
-            searchPlaceholder="搜索出口商"
-            queryKey={["master-data", "exporters", "lookup"]}
-            loadOptions={async (keyword, signal) => (await client.listExportersPage({
-              keyword: keyword || undefined,
-              pageNumber: 1,
-              pageSize: 50,
-            }, { signal })).items}
-            getValue={(exporter) => String(exporter.id)}
-            getLabel={(exporter) => exporter.exporterNameEN || exporter.exporterNameCN || "-"}
-            dataQueryFilter="exporterId"
-            onChange={(exporter) => updateFilter("exporterId", exporter ? String(exporter.id) : "0")}
-          />
-          <label className="query-filter-field query-type-filter">
-            <span>业务类型</span>
-            <select
-              data-query-filter="invoiceType"
-              value={filters.invoiceType}
-              onChange={(event) => updateFilter("invoiceType", event.target.value)}
-            >
-              <option value="">全部</option>
-              {invoiceTypeOptions.filter(Boolean).map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="query-filter-field query-transport-filter">
-            <span>运输方式</span>
-            <select
-              data-query-filter="transportMode"
-              value={filters.transportMode}
-              onChange={(event) => updateFilter("transportMode", event.target.value)}
-            >
-              <option value="">全部</option>
-              {transportModeOptions.filter(Boolean).map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="query-filter-field query-keyword-filter">
-            <span>关键字</span>
-            <input
-              ref={keywordInputRef}
-              data-query-filter="keyword"
-              value={filters.keyword}
-              placeholder="发票号、合同号、客户等"
-              onFocus={handleTextInputFocus}
-              onChange={(event) => updateFilter("keyword", event.target.value)}
-            />
-          </label>
+          <details
+            className="query-advanced-filters"
+            open={showAdvancedFilters}
+            onToggle={(event) => {
+              if (workspaceDeviceMode !== "desktop") {
+                setIsAdvancedFilterOpen(event.currentTarget.open);
+              }
+            }}
+          >
+            <summary className="query-advanced-filter-summary">
+              <span>高级筛选</span>
+              <small>{advancedFilterCount > 0 ? `已设置 ${advancedFilterCount} 项` : "客户、出口商、类型与运输方式"}</small>
+            </summary>
+            <div className="query-filter-grid query-advanced-filter-grid">
+              <RemoteSelectField<ApiCustomerDto>
+                className="query-filter-field query-party-filter query-customer-filter"
+                label="客户"
+                value={filters.customerId === "0" ? "" : filters.customerId}
+                selectedOption={selectedCustomerQuery.data}
+                selectedLabel={selectedCustomerQuery.data?.displayName || `客户 #${filters.customerId}`}
+                emptyLabel="全部"
+                searchPlaceholder="搜索客户"
+                queryKey={["master-data", "customers", "lookup"]}
+                loadOptions={async (keyword, signal) => (await client.listCustomersPage({
+                  keyword: keyword || undefined,
+                  pageNumber: 1,
+                  pageSize: 50,
+                }, { signal })).items}
+                getValue={(customer) => String(customer.id)}
+                getLabel={(customer) => customer.displayName || customer.customerNameEN || "-"}
+                dataQueryFilter="customerId"
+                onChange={(customer) => updateFilter("customerId", customer ? String(customer.id) : "0")}
+              />
+              <RemoteSelectField<ApiExporterDto>
+                className="query-filter-field query-party-filter query-exporter-filter"
+                label="出口商"
+                value={filters.exporterId === "0" ? "" : filters.exporterId}
+                selectedOption={selectedExporterQuery.data}
+                selectedLabel={selectedExporterQuery.data?.exporterNameEN || selectedExporterQuery.data?.exporterNameCN || `出口商 #${filters.exporterId}`}
+                emptyLabel="全部"
+                searchPlaceholder="搜索出口商"
+                queryKey={["master-data", "exporters", "lookup"]}
+                loadOptions={async (keyword, signal) => (await client.listExportersPage({
+                  keyword: keyword || undefined,
+                  pageNumber: 1,
+                  pageSize: 50,
+                }, { signal })).items}
+                getValue={(exporter) => String(exporter.id)}
+                getLabel={(exporter) => exporter.exporterNameEN || exporter.exporterNameCN || "-"}
+                dataQueryFilter="exporterId"
+                onChange={(exporter) => updateFilter("exporterId", exporter ? String(exporter.id) : "0")}
+              />
+              <label className="query-filter-field query-type-filter">
+                <span>业务类型</span>
+                <select
+                  data-query-filter="invoiceType"
+                  value={filters.invoiceType}
+                  onChange={(event) => updateFilter("invoiceType", event.target.value)}
+                >
+                  <option value="">全部</option>
+                  {invoiceTypeOptions.filter(Boolean).map((value) => (
+                    <option key={value} value={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="query-filter-field query-transport-filter">
+                <span>运输方式</span>
+                <select
+                  data-query-filter="transportMode"
+                  value={filters.transportMode}
+                  onChange={(event) => updateFilter("transportMode", event.target.value)}
+                >
+                  <option value="">全部</option>
+                  {transportModeOptions.filter(Boolean).map((value) => (
+                    <option key={value} value={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </details>
         </div>
         <div className="toolbar-actions query-toolbar-actions">
           <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void invoiceQuery.refetch()}>

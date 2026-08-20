@@ -42,7 +42,7 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("System.IO.Path]::Combine", project, StringComparison.Ordinal);
             Assert.DoesNotContain("$(PkgMicrosoft_ML_OnnxRuntime)\\runtimes\\", project, StringComparison.Ordinal);
             Assert.Contains("_ExportDocOnnxRuntimeFile", buildProps, StringComparison.Ordinal);
-            Assert.Contains("<MicrosoftMlOnnxRuntimeVersion>1.28.0</MicrosoftMlOnnxRuntimeVersion>", packageProps, StringComparison.Ordinal);
+            Assert.Contains("<MicrosoftMlOnnxRuntimeVersion>1.29.0</MicrosoftMlOnnxRuntimeVersion>", packageProps, StringComparison.Ordinal);
             Assert.Contains("Include=\"Microsoft.ML.OnnxRuntime\" Version=\"$(MicrosoftMlOnnxRuntimeVersion)\"", packageProps, StringComparison.Ordinal);
             Assert.Contains("<ExportDocIncludeOcrRuntime Condition=\"'$(ExportDocIncludeOcrRuntime)' == ''\">true", apiProject, StringComparison.Ordinal);
             Assert.Contains("CopyOcrNativeRuntimeToPublish", apiProject, StringComparison.Ordinal);

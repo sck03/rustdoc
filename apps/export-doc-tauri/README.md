@@ -30,7 +30,7 @@ Rust/Cargo is required to run `npm run dev` or `npm run build`.
 Local Windows build notes:
 
 - this workspace is currently verified with the GNU Rust target `stable-x86_64-pc-windows-gnu`;
-- `scripts/run-tauri-local.ps1` adds `D:\Rust\.cargo\bin` and `D:\msys64\ucrt64\bin` for the current process only;
+- `scripts/run-tauri-local.ps1` discovers Cargo from `-CargoBinDir`, `CARGO_HOME`, or `PATH`; optional GNU/UCRT tools come from `-MsysUcrtBinDir`, `EXPORTDOCMANAGER_MSYS_UCRT_BIN`, or the existing `PATH`;
 - Cargo output defaults to the workspace `artifacts/cargo-target-exportdoc/` directory; callers may still pass `-CargoTargetDir` or `CARGO_TARGET_DIR` explicitly when a different non-system-drive cache is required;
 - `npm run tauri:check:local` runs `cargo check`;
 - `npm run tauri:compile:local` runs `tauri build --debug --no-bundle`;

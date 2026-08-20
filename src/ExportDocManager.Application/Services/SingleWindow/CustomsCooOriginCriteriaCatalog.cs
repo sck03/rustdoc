@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using ExportDocManager.ViewModels;
 
@@ -394,12 +395,16 @@ namespace ExportDocManager.Services.SingleWindow
             string percentageCore = normalized.EndsWith("%", StringComparison.Ordinal)
                 ? normalized[..^1].Trim()
                 : normalized;
-            if (!decimal.TryParse(percentageCore, out var percentage))
+            if (!decimal.TryParse(
+                    percentageCore,
+                    NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                    CultureInfo.InvariantCulture,
+                    out var percentage))
             {
                 return normalized;
             }
 
-            string formatted = percentage.ToString("0.##");
+            string formatted = percentage.ToString("0.##", CultureInfo.InvariantCulture);
             return $"{formatted}%";
         }
 

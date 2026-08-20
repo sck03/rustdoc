@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Xml.Linq;
 using ExportDocManager.Models.DTOs.SingleWindow;
+using ExportDocManager.Services.Time;
 
 namespace ExportDocManager.Services.SingleWindow
 {
@@ -10,6 +12,14 @@ namespace ExportDocManager.Services.SingleWindow
 
     public sealed class SingleWindowReceiptParser : ISingleWindowReceiptParser
     {
+        private const string ReceiptDateTimeFormat = "yyyy-MM-dd HH:mm:ss";
+        private readonly IBusinessClock _clock;
+
+        public SingleWindowReceiptParser(IBusinessClock clock)
+        {
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        }
+
         public SingleWindowReceiptParseResult Parse(SingleWindowBusinessType businessType, string rawContent, string sourceFileName = "")
         {
             if (string.IsNullOrWhiteSpace(rawContent))
@@ -53,7 +63,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        private static SingleWindowReceiptParseResult ParseCustomsCoo(XElement root, string sourceFileName)
+        private SingleWindowReceiptParseResult ParseCustomsCoo(XElement root, string sourceFileName)
         {
             if (string.Equals(root.Name.LocalName, "Receipt", StringComparison.Ordinal))
             {
@@ -112,7 +122,7 @@ namespace ExportDocManager.Services.SingleWindow
             };
         }
 
-        private static SingleWindowReceiptParseResult ParseAgentConsignment(XElement root, string sourceFileName)
+        private SingleWindowReceiptParseResult ParseAgentConsignment(XElement root, string sourceFileName)
         {
             if (string.Equals(root.Name.LocalName, "ImportAgrResponse", StringComparison.Ordinal))
             {
@@ -169,9 +179,26 @@ namespace ExportDocManager.Services.SingleWindow
                 ?.Trim() ?? string.Empty;
         }
 
-        private static DateTimeOffset? ParseDateTime(string value)
+        private DateTimeOffset? ParseDateTime(string value)
         {
-            return DateTimeOffset.TryParse(value, out var result) ? result : null;
+            if (!DateTime.TryParseExact(
+                    value?.Trim(),
+                    ReceiptDateTimeFormat,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out DateTime localTime))
+            {
+                return null;
+            }
+
+            try
+            {
+                return _clock.InterpretLocal(localTime);
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
         }
 
         private static SingleWindowReceiptBusinessStatus ParseCustomsCooBusinessStatus(string channel, string repType)

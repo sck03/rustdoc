@@ -347,7 +347,7 @@ public sealed class ServerMigrationService : IServerMigrationService
                 CreatedAtUtc = _clock.UtcNow,
                 SourceDataRoot = _pathProvider.DataRoot,
                 SourcePlatform = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "linux",
-                SourcePathCaseSensitive = !OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS(),
+                SourcePathCaseSensitive = FileSystemCaseSensitivity.IsCaseSensitive(_pathProvider.DataRoot),
                 Files =
                 [
                     new ServerMigrationFileManifest

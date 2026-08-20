@@ -216,10 +216,9 @@ export function mergePathLines(value: string, additions: string[]) {
   const seen = new Set<string>();
   const paths: string[] = [];
   for (const path of [...parseReceiptFilePaths(value), ...additions]) {
-    const key = path.toLowerCase();
-    if (!seen.has(key)) {
+    if (!seen.has(path)) {
       paths.push(path);
-      seen.add(key);
+      seen.add(path);
     }
   }
 
@@ -231,10 +230,9 @@ export function parseReceiptFilePaths(value: string) {
   const paths: string[] = [];
   for (const line of value.split(/\r?\n/)) {
     const trimmed = line.trim();
-    const key = trimmed.toLowerCase();
-    if (trimmed && !seen.has(key)) {
+    if (trimmed && !seen.has(trimmed)) {
       paths.push(trimmed);
-      seen.add(key);
+      seen.add(trimmed);
     }
   }
 

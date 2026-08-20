@@ -94,13 +94,14 @@ export function SingleWindowDocumentActionBar({
         <div className="single-window-tool-group" aria-label="草稿处理">
           <span className="single-window-tool-heading">草稿</span>
           <button
-            className="icon-button"
+            className="command-button secondary"
             type="button"
             title="刷新草稿" aria-label="刷新草稿"
             disabled={isBusy || !isInvoiceIdValid}
             onClick={onRefresh}
           >
             <RefreshCw size={17} aria-hidden="true" />
+            <span>刷新</span>
           </button>
           {viewMode === "advanced" ? (
             <button
@@ -153,8 +154,9 @@ export function SingleWindowDocumentActionBar({
                 <LockKeyholeOpen size={16} aria-hidden="true" />
                 <span>字段锁定</span>
               </button>
-              <button className="icon-button" type="button" title="撤销上一次工具动作" aria-label="撤销上一次工具动作" disabled={!canOperate || isBusy || !canUndo} onClick={onUndo}>
+              <button className="command-button secondary" type="button" title="撤销上一次工具动作" aria-label="撤销上一次工具动作" disabled={!canOperate || isBusy || !canUndo} onClick={onUndo}>
                 <Undo2 size={17} aria-hidden="true" />
+                <span>撤销</span>
               </button>
             </>
           ) : null}
@@ -170,6 +172,7 @@ export function SingleWindowDocumentActionBar({
         </div>
 
         <div className="single-window-tool-group single-window-tool-group-primary" aria-label="保存">
+          <span className="single-window-tool-heading">保存</span>
           <button className="command-button" type="submit" form={formId} disabled={!canOperate || isBusy || !isDocumentReady}>
             <Save size={17} aria-hidden="true" />
             <span>保存草稿</span>

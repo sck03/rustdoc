@@ -368,7 +368,15 @@ for (const motionContract of [
 
 const themeCss = readCssImportGraph(path.join(root, "theme.css"));
 const queryPageSource = fs.readFileSync(path.join(root, "features", "query", "QueryPage.tsx"), "utf8");
-for (const queryLayoutContract of ["query-filter-grid", "query-date-range", "query-filter-field"]) {
+for (const queryLayoutContract of [
+  "query-filter-stack",
+  "query-common-filter-grid",
+  "query-advanced-filters",
+  "query-advanced-filter-summary",
+  "query-advanced-filter-grid",
+  "query-date-range",
+  "query-filter-field",
+]) {
   if (!queryPageSource.includes(queryLayoutContract)) {
     failures.push(`features/query/QueryPage.tsx: 单据查询筛选区缺少响应式布局契约 ${queryLayoutContract}`);
   }
@@ -401,6 +409,20 @@ for (const queryGridContract of [
 ]) {
   if (!auditQueryCss.includes(queryGridContract)) {
     failures.push(`styles/audit-query.css: 单据查询筛选区缺少网格布局契约 ${queryGridContract}`);
+  }
+}
+const queryTabletBreakpointStart = auditQueryCss.indexOf("@media (max-width: 1180px)");
+const queryNarrowBreakpointStart = auditQueryCss.indexOf("@media (max-width: 860px)");
+const queryTabletCss = queryTabletBreakpointStart >= 0 && queryNarrowBreakpointStart > queryTabletBreakpointStart
+  ? auditQueryCss.slice(queryTabletBreakpointStart, queryNarrowBreakpointStart)
+  : "";
+for (const tabletFilterContract of [
+  ".query-advanced-filters",
+  ".query-advanced-filter-summary",
+  "display: flex",
+]) {
+  if (!queryTabletCss.includes(tabletFilterContract)) {
+    failures.push(`styles/audit-query.css: 681—1180px 平板筛选入口缺少 ${tabletFilterContract}`);
   }
 }
 for (const sharedWorkspacePrimitive of [

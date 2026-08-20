@@ -146,7 +146,7 @@ namespace ExportDocManager.Api.Hosting
             var files = (request.SourceFiles ?? new List<string>())
                 .Select(file => file?.Trim() ?? string.Empty)
                 .Where(file => !string.IsNullOrWhiteSpace(file))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Distinct(PhysicalPathComparison.Comparer)
                 .ToList();
 
             if (files.Count < 2 || files.Count > ApiUploadLimits.PdfMergeMaximumFileCount)
@@ -200,14 +200,16 @@ namespace ExportDocManager.Api.Hosting
 
             try
             {
-                destinationPath = Path.GetFullPath(output);
+                string resolvedDestinationPath = Path.GetFullPath(output);
                 sourceFiles = files.Select(Path.GetFullPath).ToList();
-                if (sourceFiles.Contains(destinationPath, StringComparer.OrdinalIgnoreCase))
+                if (sourceFiles.Any(sourcePath =>
+                        PhysicalPathComparison.CouldAddressSameExistingFile(sourcePath, resolvedDestinationPath)))
                 {
                     sourceFiles = Array.Empty<string>();
                     destinationPath = string.Empty;
                     return Results.BadRequest(new ApiErrorResponse("PDF 输出文件不能覆盖任一源文件。"));
                 }
+                destinationPath = resolvedDestinationPath;
                 return null;
             }
             catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PathTooLongException)

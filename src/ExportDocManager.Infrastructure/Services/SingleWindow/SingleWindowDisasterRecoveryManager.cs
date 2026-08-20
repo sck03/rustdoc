@@ -190,7 +190,7 @@ namespace ExportDocManager.Services.SingleWindow
             {
                 throw new InvalidDataException("灾难恢复包文件清单必须且只能包含四个运行文件。");
             }
-            var paths = files.Select(file => file.RelativePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var paths = files.Select(file => file.RelativePath).ToHashSet(PortablePathKey.Comparer);
             if (expected.Any(path => !paths.Contains(path)) || paths.Count != expected.Length)
             {
                 throw new InvalidDataException("灾难恢复包文件清单含有缺失、重复或未授权条目。");

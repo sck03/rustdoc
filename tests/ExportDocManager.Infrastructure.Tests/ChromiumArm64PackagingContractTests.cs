@@ -20,7 +20,8 @@ public sealed class ChromiumArm64PackagingContractTests
         Assert.Contains("Chromium ARM64", provision);
         Assert.Contains("Microsoft.Playwright trusted open-source Chromium build", provision);
         Assert.Contains("Directory.Packages.props", provision);
-        Assert.DoesNotContain("$playwrightPackageVersion = \"1.61.0\"", provision, StringComparison.Ordinal);
+        Assert.Contains("$playwrightPackageVersion = [string]$playwrightPackageNode.Version", provision, StringComparison.Ordinal);
+        Assert.DoesNotContain("$playwrightPackageVersion = \"", provision, StringComparison.Ordinal);
         Assert.Contains("ExportDocManager.Api/ExportDocManager.Api.csproj", provision);
         Assert.Contains("Microsoft.Playwright.dll", provision);
         Assert.Contains("install --with-deps chromium", provision);

@@ -1,11 +1,12 @@
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Services.SingleWindow;
+using ExportDocManager.Services.Time;
 
 namespace ExportDocManager.Application.Tests
 {
     public class SingleWindowReceiptParserApplicationTests
     {
-        private readonly SingleWindowReceiptParser _parser = new();
+        private readonly SingleWindowReceiptParser _parser = new(BusinessClock.CreateSystem());
 
         [Fact]
         public void Parse_CustomsCooReceipt_ShouldReturnBusinessReceipt()
@@ -32,6 +33,27 @@ namespace ExportDocManager.Application.Tests
             Assert.Equal("RC220123456780001", result.ReferenceNo);
             Assert.Equal("0000", result.ReceiptCode);
             Assert.Equal(SingleWindowReceiptBusinessStatus.Approved, result.BusinessStatus);
+            Assert.Equal(TimeSpan.FromHours(8), result.OccurredAt?.Offset);
+            Assert.Equal(
+                new DateTimeOffset(2026, 4, 16, 10, 0, 0, TimeSpan.FromHours(8)),
+                result.OccurredAt);
+        }
+
+        [Fact]
+        public void Parse_CustomsCooReceipt_ShouldUseConfiguredBusinessTimeZone()
+        {
+            const string xml = """
+                <Receipt>
+                  <ReceiveTime>2026-04-16 10:00:00</ReceiveTime>
+                  <Channel>1</Channel>
+                </Receipt>
+                """;
+            var utcParser = new SingleWindowReceiptParser(BusinessClock.CreateSystem("UTC"));
+
+            var result = utcParser.Parse(SingleWindowBusinessType.CustomsCoo, xml);
+
+            Assert.Equal(TimeSpan.Zero, result.OccurredAt?.Offset);
+            Assert.Equal(new DateTimeOffset(2026, 4, 16, 10, 0, 0, TimeSpan.Zero), result.OccurredAt);
         }
 
         [Fact]

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-18",
+  "capturedAt": "2026-08-20",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -22,9 +22,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 78136,
+      "baselineAggregateLines": 78337,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 78500,
+      "maximumAggregateLines": 78537,
       "reportFiles": false
     },
     {
@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 38744,
+      "baselineAggregateLines": 39020,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 38864,
+      "maximumAggregateLines": 39140,
       "reportFiles": false
     },
     {

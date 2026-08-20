@@ -274,12 +274,39 @@ public sealed class ServerMigrationSecurityTests
                 '\\'));
 
         Assert.Equal(
-            "/srv/exportdoc/App_Data/Marks/mark.png",
+            "/users/bridge/app_data/Marks/mark.png",
             ServerMigrationPathRewriter.RewriteManagedPath(
                 "/users/bridge/app_data/Marks/mark.png",
                 "/Users/bridge/App_Data",
                 "/srv/exportdoc/App_Data",
                 '/'));
+
+        Assert.Equal(
+            "/srv/exportdoc/App_Data/Marks/mark.png",
+            ServerMigrationPathRewriter.RewriteManagedPath(
+                "/users/bridge/app_data/Marks/mark.png",
+                "/Users/bridge/App_Data",
+                "/srv/exportdoc/App_Data",
+                '/',
+                sourcePathCaseSensitive: false));
+    }
+
+    [Fact]
+    public void FileSystemCaseSensitivity_ShouldProbeTheActualManagedVolume()
+    {
+        string root = CreateTestRoot("case-sensitivity");
+        try
+        {
+            bool first = FileSystemCaseSensitivity.IsCaseSensitive(root);
+            bool second = FileSystemCaseSensitivity.IsCaseSensitive(root);
+
+            Assert.Equal(first, second);
+            Assert.Empty(Directory.EnumerateFiles(root, ".edm-case-probe-*"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Theory]

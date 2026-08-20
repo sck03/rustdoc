@@ -164,7 +164,7 @@ export function PdfMergeJobPanel({
       const selected = await selectPdfFiles();
       if (selected.length > 0) {
         onSourcePathsChange([...readPathLines(sourcePaths), ...selected]
-          .filter((value, index, values) => values.findIndex((item) => item.toLowerCase() === value.toLowerCase()) === index)
+          .filter((value, index, values) => values.indexOf(value) === index)
           .join("\n"));
       }
     } catch (error) {

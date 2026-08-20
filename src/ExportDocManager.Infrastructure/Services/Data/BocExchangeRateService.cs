@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -366,7 +367,11 @@ namespace ExportDocManager.Services.Data
         private decimal? ParseRate(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return null;
-            if (decimal.TryParse(text.Trim(), out decimal rate))
+            if (decimal.TryParse(
+                    text.Trim(),
+                    NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                    CultureInfo.InvariantCulture,
+                    out decimal rate))
             {
                 // 汇率通常是 /100 的值 (例如 720.5 -> 7.205)
                 // 日元可能是例外? 不, 中行也是每100日元

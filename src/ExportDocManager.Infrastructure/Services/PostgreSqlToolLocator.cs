@@ -41,7 +41,7 @@ namespace ExportDocManager.Services
             }
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Select(Path.GetFullPath)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Distinct(PhysicalPathComparison.Comparer)
             .ToList();
 
             if (IsPathFallbackEnabled())
@@ -54,7 +54,7 @@ namespace ExportDocManager.Services
             }
 
             var best = new PostgreSqlToolPaths(string.Empty, string.Empty, string.Empty, string.Empty);
-            foreach (string root in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (string root in candidates.Distinct(PhysicalPathComparison.Comparer))
             {
                 var candidate = ResolveCandidate(root);
                 if (candidate.AvailableToolCount > best.AvailableToolCount)

@@ -56,11 +56,22 @@ assertEqual(
     templates,
     reportType: "ExportDocument",
     requestedTemplateFileName: "",
+    currentTemplatePath: "E:\\app\\Templates\\Export\\custom.html",
+    userTemplateSelected: false,
+  }),
+  "E:\\app\\Templates\\Export\\custom.html",
+  "当前有效选择应跨分隔符保留原值",
+);
+assertEqual(
+  resolveDefaultTemplatePath({
+    templates,
+    reportType: "ExportDocument",
+    requestedTemplateFileName: "",
     currentTemplatePath: "e:\\app\\templates\\export\\CUSTOM.html",
     userTemplateSelected: false,
   }),
-  "e:\\app\\templates\\export\\CUSTOM.html",
-  "当前有效选择应跨平台保留原值",
+  templates[1].templatePath,
+  "文件名和目录大小写不一致时不应在大小写敏感平台误匹配",
 );
 assertEqual(
   resolveDefaultTemplatePath({

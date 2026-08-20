@@ -221,7 +221,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
 
             var item = ListPostgreSqlPhysicalBackups()
-                .FirstOrDefault(backup => string.Equals(backup.FileName, fileName, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(backup => PhysicalPathComparison.Comparer.Equals(backup.FileName, fileName));
             return item?.FullPath ?? throw new ResourceNotFoundException("未找到指定 PostgreSQL 物理备份。");
         }
 

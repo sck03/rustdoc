@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Globalization;
 using System.Threading;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
@@ -187,6 +188,7 @@ namespace ExportDocManager.Services.Infrastructure
                     : "Daily";
             settings.System.PostgreSqlAutoBackupTime = TimeSpan.TryParse(
                 settings.System.PostgreSqlAutoBackupTime?.Trim(),
+                CultureInfo.InvariantCulture,
                 out var backupTime)
                     ? new TimeSpan(backupTime.Hours, backupTime.Minutes, 0).ToString(@"hh\:mm")
                     : "02:00";

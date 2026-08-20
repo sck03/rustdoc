@@ -23,6 +23,7 @@ export function ResponsiveTableFrame({
     aria-busy={busy}
     tabIndex={isScrollableRegion ? 0 : undefined}
   >
+    {isScrollableRegion ? <span className="responsive-table-scroll-hint" aria-hidden="true">左右滑动查看更多</span> : null}
     {children}
   </div>;
 }

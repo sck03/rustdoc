@@ -19,7 +19,7 @@ namespace ExportDocManager.Services.SingleWindow
             string attachmentDirectory = Path.Combine(tempDirectory, "attachments");
             Directory.CreateDirectory(attachmentDirectory);
             var packageFiles = new List<SingleWindowPackageFile>();
-            var usedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var usedFileNames = new HashSet<string>(PortablePathKey.Comparer);
 
             long copiedBytes = 0;
             foreach (var attachment in selectedAttachments)
@@ -76,7 +76,7 @@ namespace ExportDocManager.Services.SingleWindow
             Directory.CreateDirectory(receiptsDirectory);
 
             var copiedFiles = new List<SingleWindowPackageFile>();
-            var usedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var usedFileNames = new HashSet<string>(PortablePathKey.Comparer);
             foreach (var file in receiptFiles.Where(File.Exists))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -110,6 +110,8 @@ namespace ExportDocManager.Services.SingleWindow
             {
                 fileName = "file";
             }
+
+            fileName = CrossPlatformFileNamePolicy.SanitizeFileNamePart(fileName, '_', "file");
 
             string baseName = Path.GetFileNameWithoutExtension(fileName);
             string extension = Path.GetExtension(fileName);

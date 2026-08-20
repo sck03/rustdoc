@@ -68,11 +68,11 @@ namespace ExportDocManager.Utils
                     SourcePath: Path.GetFullPath(entry.SourcePath),
                     EntryName: NormalizeEntryName(entry.EntryName)))
                 .OrderBy(entry => entry.EntryName, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(entry => entry.SourcePath, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(entry => entry.SourcePath, PhysicalPathComparison.Comparer)
                 .ToList();
 
             var duplicateEntryName = normalizedEntries
-                .GroupBy(entry => entry.EntryName, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(entry => entry.EntryName, PortablePathKey.Comparer)
                 .FirstOrDefault(group => group.Count() > 1)
                 ?.Key;
             if (!string.IsNullOrWhiteSpace(duplicateEntryName))
@@ -134,7 +134,7 @@ namespace ExportDocManager.Utils
             }
 
             var normalizedNames = new Dictionary<ZipArchiveEntry, string>();
-            var uniqueNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var uniqueNames = new HashSet<string>(PortablePathKey.Comparer);
             long declaredTotalBytes = 0;
             foreach (var entry in archive.Entries)
             {
@@ -162,7 +162,7 @@ namespace ExportDocManager.Utils
 
             if (fileEntries.Count == 0)
             {
-                ReportProgress(progress, statusText, "压缩包中没有可解压的文件。", endPercent);
+                OperationProgressReporter.Report(progress, statusText, "压缩包中没有可解压的文件。", endPercent);
                 return;
             }
 
@@ -218,11 +218,11 @@ namespace ExportDocManager.Utils
                         }
                     },
                     cancellationToken);
-                ReportProgress(
+                OperationProgressReporter.Report(
                     progress,
                     statusText,
                     $"已解压：{entry.FullName}",
-                    CalculateProgress(index + 1, fileEntries.Count, startPercent, endPercent));
+                    OperationProgressReporter.Calculate(index + 1, fileEntries.Count, startPercent, endPercent));
             }
         }
 
@@ -287,7 +287,7 @@ namespace ExportDocManager.Utils
 
             if (entries.Count == 0)
             {
-                ReportProgress(progress, statusText, emptyDetailText, endPercent);
+                OperationProgressReporter.Report(progress, statusText, emptyDetailText, endPercent);
                 return;
             }
 
@@ -305,11 +305,11 @@ namespace ExportDocManager.Utils
                     FileOptions.Asynchronous | FileOptions.SequentialScan);
                 await using var entryStream = zipEntry.Open();
                 await sourceStream.CopyToAsync(entryStream, 81920, cancellationToken);
-                ReportProgress(
+                OperationProgressReporter.Report(
                     progress,
                     statusText,
                     $"已打包：{source.EntryName}",
-                    CalculateProgress(index + 1, entries.Count, startPercent, endPercent));
+                    OperationProgressReporter.Calculate(index + 1, entries.Count, startPercent, endPercent));
             }
         }
 
@@ -325,88 +325,15 @@ namespace ExportDocManager.Utils
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(entryName);
 
-            if (Path.IsPathRooted(entryName))
+            try
             {
-                throw new InvalidDataException("压缩包条目不能使用绝对路径。");
+                return PortablePathKey.NormalizeRelativePath(entryName);
             }
-
-            var normalized = entryName.Replace('\\', '/').Trim('/');
-            var segments = normalized.Split('/');
-            if (string.IsNullOrWhiteSpace(normalized) ||
-                segments.Any(segment => !IsSafeEntrySegment(segment)))
+            catch (Exception ex) when (ex is ArgumentException or InvalidDataException)
             {
-                throw new InvalidDataException("压缩包条目路径无效。");
+                throw new InvalidDataException("压缩包条目路径无效。", ex);
             }
-
-            return normalized;
         }
 
-        private static bool IsSafeEntrySegment(string segment)
-        {
-            if (string.IsNullOrWhiteSpace(segment) ||
-                segment.Equals(".", StringComparison.Ordinal) ||
-                segment.Equals("..", StringComparison.Ordinal) ||
-                segment.EndsWith(' ') ||
-                segment.EndsWith('.') ||
-                segment.Any(char.IsControl))
-            {
-                return false;
-            }
-
-            // Keep archive packages portable and reject Windows alternate data
-            // streams/device names even when validation runs on Linux.
-            if (segment.IndexOfAny(['<', '>', ':', '"', '/', '\\', '|', '?', '*']) >= 0)
-            {
-                return false;
-            }
-
-            string deviceName = segment;
-            int extensionIndex = deviceName.IndexOf('.');
-            if (extensionIndex >= 0)
-            {
-                deviceName = deviceName[..extensionIndex];
-            }
-
-            return !deviceName.Equals("CON", StringComparison.OrdinalIgnoreCase) &&
-                   !deviceName.Equals("PRN", StringComparison.OrdinalIgnoreCase) &&
-                   !deviceName.Equals("AUX", StringComparison.OrdinalIgnoreCase) &&
-                   !deviceName.Equals("NUL", StringComparison.OrdinalIgnoreCase) &&
-                   !(deviceName.Length == 4 &&
-                     (deviceName.StartsWith("COM", StringComparison.OrdinalIgnoreCase) ||
-                      deviceName.StartsWith("LPT", StringComparison.OrdinalIgnoreCase)) &&
-                     deviceName[3] is >= '1' and <= '9');
-        }
-
-        private static int CalculateProgress(int current, int total, int startPercent, int endPercent)
-        {
-            if (total <= 0)
-            {
-                return endPercent;
-            }
-
-            var clampedStart = Math.Clamp(startPercent, 0, 100);
-            var clampedEnd = Math.Clamp(endPercent, clampedStart, 100);
-            if (current <= 0)
-            {
-                return clampedStart;
-            }
-
-            var ratio = (double)current / total;
-            return clampedStart + (int)Math.Round((clampedEnd - clampedStart) * ratio);
-        }
-
-        private static void ReportProgress(
-            IProgress<OperationProgressUpdate>? progress,
-            string statusText,
-            string detailText,
-            int? percent = null)
-        {
-            progress?.Report(new OperationProgressUpdate
-            {
-                StatusText = statusText ?? string.Empty,
-                DetailText = detailText ?? string.Empty,
-                ProgressPercent = percent
-            });
-        }
     }
 }

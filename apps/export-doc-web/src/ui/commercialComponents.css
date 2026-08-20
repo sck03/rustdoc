@@ -23,7 +23,28 @@
   width: 100%;
 }
 
+.responsive-table-scroll-hint {
+  display: none;
+}
+
 @container responsive-table (max-width: 760px) {
+  .responsive-table-scroll-hint {
+    position: sticky;
+    left: 8px;
+    z-index: 4;
+    display: inline-flex;
+    width: max-content;
+    margin: 7px 8px 4px;
+    padding: 3px 8px;
+    color: var(--edm-ink-600);
+    background: color-mix(in srgb, var(--edm-white) 94%, transparent);
+    border: 1px solid var(--edm-line);
+    border-radius: 999px;
+    font-size: var(--edm-font-size-xs);
+    font-weight: 700;
+    pointer-events: none;
+  }
+
   .responsive-table-frame [data-table-priority="secondary"] {
     display: none;
   }

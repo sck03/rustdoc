@@ -64,7 +64,7 @@ namespace ExportDocManager.Services.Reporting
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                ReportProgress(progress, "正在扫描模板目录", "系统正在整理本次打包的模板文件。", 5);
+                OperationProgressReporter.Report(progress, "正在扫描模板目录", "系统正在整理本次打包的模板文件。", 5);
 
                 var templateFiles = Directory.Exists(templatesRoot)
                     ? Directory.GetFiles(templatesRoot, "*", SearchOption.AllDirectories)
@@ -83,7 +83,7 @@ namespace ExportDocManager.Services.Reporting
                     46).ConfigureAwait(false);
 
                 cancellationToken.ThrowIfCancellationRequested();
-                ReportProgress(progress, "正在整理模板清单", "系统正在写入模板包配置清单。", 55);
+                OperationProgressReporter.Report(progress, "正在整理模板清单", "系统正在写入模板包配置清单。", 55);
                 var rows = await LoadTemplateRowsAsync(cancellationToken).ConfigureAwait(false);
                 var manifest = new TemplatePackageManifest
                 {
@@ -116,7 +116,7 @@ namespace ExportDocManager.Services.Reporting
                     "正在生成模板包",
                     60,
                     95).ConfigureAwait(false);
-                ReportProgress(progress, "模板包导出完成", $"已生成：{Path.GetFileName(targetPath)}", 100);
+                OperationProgressReporter.Report(progress, "模板包导出完成", $"已生成：{Path.GetFileName(targetPath)}", 100);
 
                 return new ReportTemplatePackageExportResult
                 {
@@ -176,8 +176,15 @@ namespace ExportDocManager.Services.Reporting
                 var sourceFiles = Directory.GetFiles(sourceTemplates, "*", SearchOption.AllDirectories)
                     .Where(path => !string.Equals(Path.GetFileName(path), "report_templates.json", StringComparison.OrdinalIgnoreCase))
                     .ToArray();
+                if (sourceFiles.Any(path =>
+                        string.Equals(Path.GetExtension(path), ReportTemplateFilePolicy.Extension, StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(Path.GetExtension(path), ReportTemplateFilePolicy.Extension, StringComparison.Ordinal)))
+                {
+                    throw new InvalidDataException("模板包中的报表模板扩展名必须使用小写 .html。");
+                }
+
                 foreach (string sourceFile in sourceFiles.Where(path =>
-                             string.Equals(Path.GetExtension(path), ".html", StringComparison.OrdinalIgnoreCase)))
+                             string.Equals(Path.GetExtension(path), ReportTemplateFilePolicy.Extension, StringComparison.Ordinal)))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     string relativePath = Path.GetRelativePath(sourceTemplates, sourceFile);
@@ -192,6 +199,9 @@ namespace ExportDocManager.Services.Reporting
                         : ReportDocumentType.ExportDocument;
                     string templateContent = await File.ReadAllTextAsync(sourceFile, cancellationToken).ConfigureAwait(false);
                     ReportTemplateContentPolicy.Validate(reportType, templateContent);
+                    string targetFile = Path.Combine(templatesRoot, relativePath);
+                    ReportTemplateFilePolicy.ValidateExistingTemplatePath(sourceFile);
+                    ReportTemplateFilePolicy.EnsureNoPortableCollision(targetFile);
                 }
                 await CopyFilesAsync(
                     sourceFiles,
@@ -204,7 +214,7 @@ namespace ExportDocManager.Services.Reporting
                     40,
                     72).ConfigureAwait(false);
 
-                ReportProgress(progress, "正在读取模板包配置", "系统正在整合模板和列表配置。", 76);
+                OperationProgressReporter.Report(progress, "正在读取模板包配置", "系统正在整合模板和列表配置。", 76);
                 var incomingRows = (manifest.Templates ?? new List<TemplateRowManifest>())
                     .Where(item => !string.IsNullOrWhiteSpace(item.Type) && !string.IsNullOrWhiteSpace(item.FileName))
                     .Select(item => new ReportTemplateConfig
@@ -233,7 +243,7 @@ namespace ExportDocManager.Services.Reporting
                 if (exportTemplates.Count > 0 || internalTemplates.Count > 0)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    ReportProgress(progress, "正在保存模板配置", "正在写入批量导出和付款模板设置。", 90);
+                    OperationProgressReporter.Report(progress, "正在保存模板配置", "正在写入批量导出和付款模板设置。", 90);
                     await _settingsService.UpdateAsync(settings =>
                     {
                         settings.BatchExport.Items = MergeBatchExportItems(
@@ -249,7 +259,7 @@ namespace ExportDocManager.Services.Reporting
                 }
 
                 int importedTemplateCount = manifest.Templates?.Count ?? 0;
-                ReportProgress(progress, "模板包导入完成", $"共加载 {importedTemplateCount} 个模板配置项。", 100);
+                OperationProgressReporter.Report(progress, "模板包导入完成", $"共加载 {importedTemplateCount} 个模板配置项。", 100);
                 return new ReportTemplatePackageImportResult
                 {
                     TemplateCount = importedTemplateCount,
@@ -263,32 +273,5 @@ namespace ExportDocManager.Services.Reporting
             }
         }
 
-        private static void ReportProgress(
-            IProgress<OperationProgressUpdate>? progress,
-            string statusText,
-            string detailText,
-            int? percent = null)
-        {
-            progress?.Report(new OperationProgressUpdate
-            {
-                StatusText = statusText ?? string.Empty,
-                DetailText = detailText ?? string.Empty,
-                ProgressPercent = percent
-            });
-        }
-
-        private static int CalculateProgress(int completed, int total, int startPercent, int endPercent)
-        {
-            if (total <= 0)
-            {
-                return Math.Clamp(endPercent, 0, 100);
-            }
-
-            int normalizedCompleted = Math.Clamp(completed, 0, total);
-            int normalizedStart = Math.Clamp(startPercent, 0, 100);
-            int normalizedEnd = Math.Clamp(endPercent, normalizedStart, 100);
-            int progress = normalizedStart + ((normalizedEnd - normalizedStart) * normalizedCompleted / total);
-            return Math.Clamp(progress, normalizedStart, normalizedEnd);
-        }
     }
 }

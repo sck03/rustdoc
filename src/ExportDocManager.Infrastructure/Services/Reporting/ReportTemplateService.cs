@@ -48,6 +48,8 @@ namespace ExportDocManager.Services.Reporting
                 templatePath,
                 BuildDefaultTemplateFileName(reportType));
 
+            ReportTemplateFilePolicy.EnsureNoPortableCollision(resolvedPath);
+
             if (File.Exists(resolvedPath))
             {
                 throw new ResourceConflictException("目标模板已存在。");
@@ -131,13 +133,14 @@ namespace ExportDocManager.Services.Reporting
                 reportType,
                 newTemplatePath,
                 Path.GetFileName(current.TemplatePath));
-            if (string.Equals(current.TemplatePath, resolvedNewPath, PathBoundaryHelper.PathComparison))
+            if (PhysicalPathComparison.AreSamePath(current.TemplatePath, resolvedNewPath))
             {
                 string unchangedContent = await File.ReadAllTextAsync(current.TemplatePath, Encoding.UTF8, cancellationToken)
                     .ConfigureAwait(false);
                 return ToContentResult(current, unchangedContent);
             }
 
+            ReportTemplateFilePolicy.EnsureNoPortableCollision(resolvedNewPath, current.TemplatePath);
             if (File.Exists(resolvedNewPath))
             {
                 throw new ResourceConflictException("目标模板已存在。");
@@ -228,7 +231,7 @@ namespace ExportDocManager.Services.Reporting
                 }
             }
 
-            candidatePath = EnsureHtmlExtension(candidatePath);
+            candidatePath = ReportTemplateFilePolicy.NormalizeNewTemplatePath(candidatePath);
             if (!ReportTemplatePathResolver.IsPathWithinDirectory(candidatePath, categoryDirectory))
             {
                 throw new PermissionDeniedException("只能在当前模板分类目录下新建或重命名模板。");
@@ -249,14 +252,11 @@ namespace ExportDocManager.Services.Reporting
             }
 
             string resolvedPath = Path.GetFullPath(_pathResolver.ToAbsolutePath(templatePath.Trim()));
-            if (!string.Equals(Path.GetExtension(resolvedPath), ".html", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new ArgumentException("报表模板必须是 .html 文件。", nameof(templatePath));
-            }
+            ReportTemplateFilePolicy.ValidateExistingTemplatePath(resolvedPath);
 
             var configs = await _catalogLoader.LoadResolvedConfigsAsync(cancellationToken).ConfigureAwait(false);
             var matched = configs.FirstOrDefault(config =>
-                string.Equals(Path.GetFullPath(config.FileName), resolvedPath, PathBoundaryHelper.PathComparison));
+                PhysicalPathComparison.AreSamePath(config.FileName, resolvedPath));
 
             bool withinManagedTemplateRoots = _pathResolver.IsBuiltInTemplatePath(resolvedPath) ||
                                               _pathResolver.IsUserTemplatePath(resolvedPath);
@@ -382,9 +382,9 @@ namespace ExportDocManager.Services.Reporting
                 string normalizedItemAbsolutePath = _catalogLoader.NormalizeAbsoluteTemplatePath(item.TemplatePath);
                 bool matchesPreviousPath =
                     (!string.IsNullOrWhiteSpace(previousTemplatePath) &&
-                     string.Equals(normalizedItemPath, previousTemplatePath, StringComparison.OrdinalIgnoreCase)) ||
+                     string.Equals(normalizedItemPath, previousTemplatePath, StringComparison.Ordinal)) ||
                     (!string.IsNullOrWhiteSpace(previousAbsoluteTemplatePath) &&
-                     string.Equals(normalizedItemAbsolutePath, previousAbsoluteTemplatePath, StringComparison.OrdinalIgnoreCase));
+                     PhysicalPathComparison.Comparer.Equals(normalizedItemAbsolutePath, previousAbsoluteTemplatePath));
 
                 if (!matchesPreviousPath)
                 {
@@ -392,7 +392,7 @@ namespace ExportDocManager.Services.Reporting
                 }
 
                 string nextPath = currentTemplatePath ?? string.Empty;
-                if (string.Equals(item.TemplatePath, nextPath, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(item.TemplatePath, nextPath, StringComparison.Ordinal))
                 {
                     continue;
                 }
@@ -437,27 +437,6 @@ namespace ExportDocManager.Services.Reporting
             {
                 throw new PermissionDeniedException("内置模板为只读资源；请先保存为用户模板副本，再执行重命名或删除。");
             }
-        }
-
-        private static string EnsureHtmlExtension(string templatePath)
-        {
-            if (string.IsNullOrWhiteSpace(templatePath))
-            {
-                throw new ArgumentException("模板路径不能为空。", nameof(templatePath));
-            }
-
-            string extension = Path.GetExtension(templatePath);
-            if (string.IsNullOrWhiteSpace(extension))
-            {
-                return Path.ChangeExtension(templatePath, ".html");
-            }
-
-            if (!string.Equals(extension, ".html", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new ArgumentException("报表模板必须是 .html 文件。", nameof(templatePath));
-            }
-
-            return Path.GetFullPath(templatePath);
         }
 
         private static string GetTemplateCategory(ReportDocumentType reportType)

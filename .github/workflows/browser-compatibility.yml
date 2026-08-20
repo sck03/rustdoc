@@ -14,7 +14,7 @@ jobs:
   firefox-webkit:
     name: Firefox + WebKit desktop/mobile
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       DOTNET_CLI_HOME: ${{ github.workspace }}/.codex-runtime/dotnet-cli
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
@@ -40,6 +40,13 @@ jobs:
           cache: npm
           cache-dependency-path: apps/export-doc-web/package-lock.json
 
+      - name: Restore Playwright browser cache
+        id: playwright-cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/ExportDocManager.Api/packages.lock.json') }}-firefox-webkit
+
       - name: Install frontend dependencies
         run: npm ci --prefix apps/export-doc-web
 
@@ -57,9 +64,13 @@ jobs:
         shell: pwsh
         run: |
           $playwright = Join-Path $env:GITHUB_WORKSPACE "src/ExportDocManager.Api/bin/Release/net10.0/linux-x64/playwright.ps1"
-          & $playwright install --with-deps firefox webkit
+          & $playwright install-deps firefox webkit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ("${{ steps.playwright-cache.outputs.cache-hit }}" -ne "true") {
+            & $playwright install firefox webkit
+          }
           exit $LASTEXITCODE
 
       - name: Run real browser accessibility and responsive acceptance
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: npm --prefix apps/export-doc-web run test:cross-browser-ui

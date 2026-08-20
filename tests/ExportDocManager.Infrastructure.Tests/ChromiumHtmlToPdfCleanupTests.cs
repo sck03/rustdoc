@@ -21,7 +21,7 @@ public sealed class ChromiumHtmlToPdfCleanupTests
             Directory.CreateDirectory(dataRoot);
             var paths = new RuntimeAppPathProvider(appRoot, dataRoot);
             string reportRoot = Path.Combine(paths.CacheRoot, "ReportPdf");
-            string abandoned = Path.Combine(reportRoot, Guid.NewGuid().ToString("N"));
+            string abandoned = Path.Combine(reportRoot, "r-0123456789abcdef");
             string unmanaged = Path.Combine(reportRoot, "keep-me");
             Directory.CreateDirectory(abandoned);
             Directory.CreateDirectory(unmanaged);

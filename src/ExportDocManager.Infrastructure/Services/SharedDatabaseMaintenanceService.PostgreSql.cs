@@ -170,7 +170,7 @@ namespace ExportDocManager.Services.Infrastructure
             var roles = (values ?? Array.Empty<string>())
                 .Select(value => (value ?? string.Empty).Trim())
                 .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Distinct(StringComparer.Ordinal)
                 .ToArray();
             if (roles.Length > MaximumPostgreSqlOldOwnerRoleCount)
             {

@@ -25,7 +25,7 @@ import {
   type WorkspaceNavGroupConfig,
 } from "./workspaceNavigation.ts";
 import { getProductEditionPresentation } from "./productEdition.ts";
-import { Button, IconButton } from "../ui/Button.tsx";
+import { Button } from "../ui/Button.tsx";
 import { InlineNotice } from "../ui/PageState.tsx";
 import { getServiceConnectionLabel, resolveServiceConnectionState, type ServiceAvailability } from "../ui/serviceAvailabilityModel.ts";
 import { useOnlineStatus } from "../ui/useOnlineStatus.ts";
@@ -390,12 +390,13 @@ export function WorkspaceShell({
               </span>
               <span className="session-user-copy">
                 <strong>{displayName}</strong>
-                <small>{renderUserWorkspaceLabel(user)}</small>
+                <small>账号 · {renderUserWorkspaceLabel(user)}</small>
               </span>
             </span>
-            <IconButton className="workspace-logout-button" label="退出登录" onClick={onLogout}>
+            <button className="workspace-logout-button" type="button" title="退出登录" onClick={onLogout}>
               <LogOut size={18} aria-hidden="true" />
-            </IconButton>
+              <span>退出</span>
+            </button>
           </div>
         </header>
 

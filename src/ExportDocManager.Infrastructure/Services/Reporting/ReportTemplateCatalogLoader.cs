@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using ExportDocManager.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace ExportDocManager.Services.Reporting
@@ -76,8 +77,8 @@ namespace ExportDocManager.Services.Reporting
         {
             string builtInRoot = _pathResolver.GetBuiltInTemplatesBaseDirectory();
             string userRoot = _pathResolver.GetUserTemplatesBaseDirectory();
-            var configuredByPath = new Dictionary<string, ReportTemplateConfig>(StringComparer.OrdinalIgnoreCase);
-            var resolvedByIdentity = new Dictionary<string, ReportTemplateConfig>(StringComparer.OrdinalIgnoreCase);
+            var configuredByPath = new Dictionary<string, ReportTemplateConfig>(PhysicalPathComparison.Comparer);
+            var resolvedByIdentity = new Dictionary<string, ReportTemplateConfig>(PortablePathKey.Comparer);
 
             foreach (var row in configuredRows ?? Enumerable.Empty<ReportTemplateConfig>())
             {
@@ -125,12 +126,17 @@ namespace ExportDocManager.Services.Reporting
                 return;
             }
 
-            foreach (string templatePath in Directory.GetFiles(root, "*.html", SearchOption.AllDirectories)
-                         .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+            var identitiesInRoot = new HashSet<string>(PortablePathKey.Comparer);
+            foreach (string templatePath in ReportTemplateFilePolicy.EnumerateTemplates(root)
+                         .OrderBy(path => path, StringComparer.Ordinal))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string fullPath = Path.GetFullPath(templatePath);
                 string identity = _pathResolver.GetCatalogIdentity(fullPath);
+                if (!identitiesInRoot.Add(identity))
+                {
+                    throw new InvalidDataException($"报表模板存在跨平台大小写或 Unicode 冲突：{identity}");
+                }
 
                 resolvedByIdentity[identity] = configuredByPath.TryGetValue(fullPath, out var configured)
                     ? CloneTemplateConfig(configured)
