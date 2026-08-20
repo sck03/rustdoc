@@ -30,5 +30,6 @@ commands.allow = [
   "request_app_exit",
   "check_tauri_update",
   "install_tauri_update",
+  "cancel_tauri_update",
   "get_desktop_runtime_context",
 ]

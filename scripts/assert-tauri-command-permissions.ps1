@@ -21,17 +21,31 @@ if (-not $handlerMatch.Success) {
 $registeredCommands = @(
     [regex]::Matches(
         $handlerMatch.Groups[1].Value,
-        '(?:desktop_commands|tauri_updater_commands|sidecar)::([a-z0-9_]+)'
-    ) | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
+        '(?m)^\s*(?:[a-z_][a-z0-9_]*::)+(?<command>[a-z_][a-z0-9_]*)\s*,?\s*$'
+    ) | ForEach-Object { $_.Groups["command"].Value } | Sort-Object -Unique
 )
+$permissionAllowMatch = [regex]::Match(
+    $permissionSource,
+    '(?s)commands\.allow\s*=\s*\[(?<commands>.*?)\]'
+)
+if (-not $permissionAllowMatch.Success) {
+    throw "无法在 '$permissionPath' 中找到 commands.allow 桌面权限白名单。"
+}
+
 $allowedCommands = @(
-    [regex]::Matches($permissionSource, '"([a-z0-9_]+)"') |
-        ForEach-Object { $_.Groups[1].Value } |
+    [regex]::Matches(
+        $permissionAllowMatch.Groups["commands"].Value,
+        '"(?<command>[a-z_][a-z0-9_]*)"'
+    ) | ForEach-Object { $_.Groups["command"].Value } |
         Sort-Object -Unique
 )
 $missingPermissions = @($registeredCommands | Where-Object { $_ -notin $allowedCommands })
 if ($missingPermissions.Count -gt 0) {
     throw "以下 Tauri 命令已在 Rust 主程序注册，但未加入桌面权限白名单：$($missingPermissions -join ', ')"
+}
+$stalePermissions = @($allowedCommands | Where-Object { $_ -notin $registeredCommands })
+if ($stalePermissions.Count -gt 0) {
+    throw "以下桌面权限白名单命令未在 Rust 主程序注册：$($stalePermissions -join ', ')"
 }
 
 [pscustomobject]@{

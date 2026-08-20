@@ -55,6 +55,13 @@ if ($parseFailures.Count -gt 0) {
     throw "PowerShell syntax validation failed:`n$($parseFailures -join "`n")"
 }
 
+$permissionVerifier = Join-Path $scriptRoot "assert-tauri-command-permissions.ps1"
+[void](Invoke-ExportDocExternal -FilePath (Resolve-ExportDocPowerShellExecutable) -Arguments @(
+    "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
+    "-File", $permissionVerifier,
+    "-RepositoryRoot", $repoRoot
+) -CaptureOutput)
+
 foreach ($file in $moduleScripts) {
     Invoke-ExportDocExternal -FilePath "node" -Arguments @("--check", $file.FullName) -WorkingDirectory $repoRoot
 }
