@@ -75,6 +75,71 @@ function Resolve-CargoBinDir {
     throw "$cargoExecutableName was not found. Set -CargoBinDir or install Rust/Cargo."
 }
 
+function Get-NpmProjectDependencyIssues {
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectRoot,
+        [Parameter(Mandatory = $true)][string[]]$RequiredRelativePaths
+    )
+
+    $issues = New-Object System.Collections.Generic.List[string]
+    foreach ($relativePath in $RequiredRelativePaths) {
+        if (-not (Test-Path -LiteralPath (Join-Path $ProjectRoot $relativePath) -PathType Leaf)) {
+            $issues.Add("missing required file '$relativePath'")
+        }
+    }
+
+    $packageLockPath = Join-Path $ProjectRoot "package-lock.json"
+    if (-not (Test-Path -LiteralPath $packageLockPath -PathType Leaf)) {
+        $issues.Add("missing package-lock.json")
+        return $issues.ToArray()
+    }
+
+    try {
+        $lock = Get-Content -LiteralPath $packageLockPath -Raw -Encoding UTF8 |
+            ConvertFrom-Json -AsHashtable
+    } catch {
+        throw "Could not read npm lock file '$packageLockPath': $($_.Exception.Message)"
+    }
+    if (-not $lock.ContainsKey("packages") -or -not $lock.packages.ContainsKey("")) {
+        throw "npm lock file does not contain the expected package map: $packageLockPath"
+    }
+
+    $rootPackage = $lock.packages[""]
+    foreach ($dependencyGroup in @("dependencies", "devDependencies", "optionalDependencies")) {
+        if (-not $rootPackage.ContainsKey($dependencyGroup)) {
+            continue
+        }
+        foreach ($dependencyName in $rootPackage[$dependencyGroup].Keys) {
+            $lockedPackageKey = "node_modules/$dependencyName"
+            if (-not $lock.packages.ContainsKey($lockedPackageKey)) {
+                $issues.Add("lock entry is missing for '$dependencyName'")
+                continue
+            }
+
+            $expectedVersion = [string]$lock.packages[$lockedPackageKey]["version"]
+            $installedManifestPath = Join-Path $ProjectRoot "$lockedPackageKey/package.json"
+            if (-not (Test-Path -LiteralPath $installedManifestPath -PathType Leaf)) {
+                $issues.Add("dependency '$dependencyName' is not installed")
+                continue
+            }
+
+            try {
+                $installedPackage = Get-Content -LiteralPath $installedManifestPath -Raw -Encoding UTF8 |
+                    ConvertFrom-Json -AsHashtable
+            } catch {
+                $issues.Add("dependency manifest is unreadable for '$dependencyName'")
+                continue
+            }
+            $installedVersion = [string]$installedPackage["version"]
+            if ($installedVersion -ne $expectedVersion) {
+                $issues.Add("dependency '$dependencyName' is $installedVersion; lock requires $expectedVersion")
+            }
+        }
+    }
+
+    return $issues.ToArray()
+}
+
 function Ensure-NpmProjectDependencies {
     param(
         [Parameter(Mandatory = $true)][string]$ProjectRoot,
@@ -82,29 +147,32 @@ function Ensure-NpmProjectDependencies {
         [Parameter(Mandatory = $true)][string]$ProjectName
     )
 
-    $missingPaths = @($RequiredRelativePaths | Where-Object {
-        -not (Test-Path -LiteralPath (Join-Path $ProjectRoot $_) -PathType Leaf)
-    })
-    if ($missingPaths.Count -eq 0) {
+    $dependencyIssues = @(Get-NpmProjectDependencyIssues `
+        -ProjectRoot $ProjectRoot `
+        -RequiredRelativePaths $RequiredRelativePaths)
+    if ($dependencyIssues.Count -eq 0) {
         return
     }
 
     $packageLockPath = Join-Path $ProjectRoot "package-lock.json"
     if (-not (Test-Path -LiteralPath $packageLockPath -PathType Leaf)) {
-        throw "$ProjectName dependencies are missing and package-lock.json was not found: $packageLockPath"
+        throw "$ProjectName dependencies need restoration and package-lock.json was not found: $packageLockPath"
     }
 
-    Write-Host "$ProjectName npm dependencies are missing; restoring the locked dependency tree..."
+    Write-Host "$ProjectName npm dependencies do not match package-lock.json; restoring the locked dependency tree..."
+    foreach ($issue in $dependencyIssues) {
+        Write-Host "  - $issue"
+    }
     Invoke-ExportDocExternal `
         -FilePath "npm" `
         -Arguments @("ci", "--no-audit", "--no-fund") `
         -WorkingDirectory $ProjectRoot
 
-    $unrestoredPaths = @($RequiredRelativePaths | Where-Object {
-        -not (Test-Path -LiteralPath (Join-Path $ProjectRoot $_) -PathType Leaf)
-    })
-    if ($unrestoredPaths.Count -gt 0) {
-        throw "$ProjectName dependency restore completed without required files: $($unrestoredPaths -join ', ')"
+    $remainingIssues = @(Get-NpmProjectDependencyIssues `
+        -ProjectRoot $ProjectRoot `
+        -RequiredRelativePaths $RequiredRelativePaths)
+    if ($remainingIssues.Count -gt 0) {
+        throw "$ProjectName dependency restore completed with unresolved issues: $($remainingIssues -join '; ')"
     }
 }
 

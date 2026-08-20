@@ -14,7 +14,7 @@ type Options = {
 };
 
 export function useReportTemplatePackageWorkspace({ client, reportType, selectedTemplatePath, defaultExportDirectory, requestConfirmation, clearPreview, showMessage }: Options) {
-  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const [exportPath, setExportPath] = useState(() => buildTemplatePackageFileName());
   const [importPath, setImportPath] = useState("");
   const [importStrategy, setImportStrategy] = useState<TemplateImportStrategyOption>("Merge");

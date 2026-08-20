@@ -41,7 +41,7 @@ export function useInvoiceItemsGridInteraction({
   const [selectionAnchor, setSelectionAnchor] = useState<InvoiceItemCellSelection | null>(null);
   const [pendingFocusCell, setPendingFocusCell] = useState<InvoiceItemCellSelection | null>(null);
   const [tableViewport, setTableViewport] = useState({ scrollTop: 0, height: 0 });
-  const tableFrameRef = useRef<HTMLDivElement | null>(null);
+  const tableFrameRef = useRef<HTMLDivElement>(null);
   const tableScrollFrameRef = useRef<number | null>(null);
   const focusContextRef = useRef({ selectionAnchor, focusedCell, visibleColumns });
   focusContextRef.current = { selectionAnchor, focusedCell, visibleColumns };

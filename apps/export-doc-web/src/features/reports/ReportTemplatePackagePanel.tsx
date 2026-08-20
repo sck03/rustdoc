@@ -1,4 +1,4 @@
-import { ChangeEvent, RefObject } from "react";
+import { type ChangeEvent, type Ref } from "react";
 import { Download, FolderOpen, Upload } from "lucide-react";
 import { DesktopIconButton } from "../../ui/DesktopPathActions.tsx";
 import { SelectField } from "../../ui/FormFields.tsx";
@@ -42,7 +42,7 @@ export function ReportTemplatePackagePanel({
   importStrategy: TemplateImportStrategyOption;
   exportPath: string;
   importPath: string;
-  uploadInputRef: RefObject<HTMLInputElement | null>;
+  uploadInputRef: Ref<HTMLInputElement>;
   canExport: boolean;
   canExportByPath: boolean;
   canDownload: boolean;
