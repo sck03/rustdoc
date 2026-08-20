@@ -160,6 +160,9 @@ jobs:
       - name: Validate browser session contracts
         run: npm --prefix apps/export-doc-web run test:browser-session-contracts
 
+      - name: Validate report watchdog SDK compatibility
+        run: node scripts/test_dotnet_sdk_compatibility.mjs
+
       - name: Prevent new hard-coded CSS debt
         run: npm --prefix apps/export-doc-web run test:style-governance
 

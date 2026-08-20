@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
 import { resolveDotnetCommand } from "./lib/dotnet-command.mjs";
+import { isDotnetSdkVersionCompatible } from "./lib/dotnet-sdk-compatibility.mjs";
 const defaultTests = [
   "ExportDocManager.Infrastructure.Tests.ReportHtmlServiceInfrastructureTests.RenderBuiltInProgramTemplatesToPdf_ShouldUseConfiguredRendererAndRuntimeDataRoot",
   "ExportDocManager.Infrastructure.Tests.ReportHtmlServiceInfrastructureTests.RenderBuiltInProgramTemplatesWithMultiItemBusinessDataToPdf_ShouldPreservePaginationAndDomainIsolation",
@@ -49,7 +50,10 @@ async function run() {
   writeWatchdogMessage("All long-running report PDF tests completed successfully.");
 }
 async function verifyDotnetSdk(dotnetExecutable) {
-  const requiredSdk = JSON.parse(readFileSync(path.join(repositoryRoot, "global.json"), "utf8")).sdk.version;
+  const sdkConfig = JSON.parse(readFileSync(path.join(repositoryRoot, "global.json"), "utf8")).sdk;
+  const requiredSdk = sdkConfig.version;
+  const rollForward = sdkConfig.rollForward || "patch";
+  const allowPrerelease = sdkConfig.allowPrerelease === true;
   const { stdout } = await execFileAsync(dotnetExecutable, ["--version"], {
     cwd: repositoryRoot,
     encoding: "utf8",
@@ -57,10 +61,10 @@ async function verifyDotnetSdk(dotnetExecutable) {
     windowsHide: true,
   });
   const actualSdk = stdout.trim();
-  if (actualSdk !== requiredSdk) {
-    throw new Error(`No native dotnet executable on PATH can load the required SDK ${requiredSdk}; resolved ${dotnetExecutable} reported ${actualSdk || "no version"}.`);
+  if (!isDotnetSdkVersionCompatible(requiredSdk, actualSdk, rollForward, allowPrerelease)) {
+    throw new Error(`No native dotnet executable on PATH can load the required SDK ${requiredSdk} with rollForward=${rollForward}; resolved ${dotnetExecutable} reported ${actualSdk || "no version"}.`);
   }
-  writeWatchdogMessage(`Using .NET SDK ${actualSdk} from ${dotnetExecutable}.`);
+  writeWatchdogMessage(`Using .NET SDK ${actualSdk} from ${dotnetExecutable} (global.json ${requiredSdk}, rollForward=${rollForward}).`);
 }
 function runTest(dotnetExecutable, test) {
   const testSlug = test.split(".").at(-1).replaceAll(/[^A-Za-z0-9_.-]/gu, "_");
