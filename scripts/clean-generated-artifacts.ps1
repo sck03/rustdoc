@@ -284,12 +284,19 @@ function Get-GeneratedArtifactCleanupPlan {
     $artifactsRoot = Join-Path $workspaceRoot "artifacts"
     $codexRuntimeRoot = Join-Path $workspaceRoot ".codex-runtime"
     $nodeModulesPattern = [System.IO.Path]::DirectorySeparatorChar + "node_modules" + [System.IO.Path]::DirectorySeparatorChar
+    $localRuntimePattern = [System.IO.Path]::DirectorySeparatorChar + ".codex-runtime" + [System.IO.Path]::DirectorySeparatorChar
 
     # artifacts/ is reserved for generated development output. Preserve only
     # named delivery outputs and reusable download caches unless their explicit
     # cleanup switches are supplied. This prevents newly introduced test or
     # screenshot directories from accumulating indefinitely.
-    $releaseOutputNames = @("windows-desktop-run", "windows-installers", "desktop-portable", "license-keygen")
+    $releaseOutputNames = @(
+        "windows-desktop-run",
+        "windows-installers",
+        "desktop-portable",
+        "desktop-portable-final",
+        "license-keygen"
+    )
     $artifactCacheNames = @(
         "cargo-audit",
         "chrome-for-testing",
@@ -330,12 +337,15 @@ function Get-GeneratedArtifactCleanupPlan {
         $persistentRuntimeNames = @(
             ".dotnet",
             "cargo-audit",
+            "cargo-home",
             "dotnet-cli",
             "gh-cli",
             "gh-config",
             "npm-cache",
             "nuget-http-cache",
             "nuget-packages",
+            "playwright-browsers",
+            "rustup-home",
             "tools"
         )
 
@@ -363,6 +373,7 @@ function Get-GeneratedArtifactCleanupPlan {
     $sourceTreeDirectories |
         Where-Object {
             $_.Name -in @("bin", "obj", ".vite", "dist", "target") -and
+            -not $_.FullName.Contains($localRuntimePattern) -and
             ($IncludeNodeModules -or -not $_.FullName.Contains($nodeModulesPattern))
         } |
         ForEach-Object {
@@ -432,11 +443,30 @@ if ($plan.Count -gt 0) {
     Stop-RepositoryDotNetBuildServers
 }
 
+$cleanupFailures = [System.Collections.Generic.List[object]]::new()
 foreach ($target in $plan) {
     if ((Test-Path -LiteralPath $target.Path) -and
         $PSCmdlet.ShouldProcess($target.Path, "Remove generated artifact directory")) {
-        Remove-DirectoryWithRetry -Path $target.Path
+        try {
+            Remove-DirectoryWithRetry -Path $target.Path
+        }
+        catch {
+            [void]$cleanupFailures.Add([PSCustomObject]@{
+                Path = $target.Path
+                Message = $_.Exception.Message
+            })
+            Write-Warning "Could not completely remove generated artifact '$($target.Path)': $($_.Exception.Message)"
+        }
     }
+}
+
+if ($cleanupFailures.Count -gt 0) {
+    Write-Warning ("Cleanup completed with {0} target failure(s):" -f $cleanupFailures.Count)
+    foreach ($failure in $cleanupFailures) {
+        Write-Warning "  $($failure.Path): $($failure.Message)"
+    }
+
+    throw "Generated artifact cleanup left one or more targets incomplete. Review the warnings above."
 }
 
 Write-Host "Cleanup completed."
