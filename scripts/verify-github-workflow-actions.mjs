@@ -19,7 +19,8 @@ const requiredActions = new Map([
   ["docker/login-action", "dbcb813823bdd20940b903addbd779551569679f"],
   ["dtolnay/rust-toolchain", "4360b52568e2003a75bf9bc1d59f33a8e3fc893c"],
 ]);
-const requiredDotNetSdk = "10.0.302";
+const requiredDotNetSdk = JSON.parse(readFileSync(path.join(repositoryRoot, "global.json"), "utf8")).sdk?.version;
+if (!requiredDotNetSdk) throw new Error("global.json must declare sdk.version for workflow validation.");
 const requiredRustToolchain = "1.96.0";
 const runtimeIdentifiers = ["win-x64", "win-arm64", "linux-x64", "linux-arm64", "osx-arm64"];
 const fullOnlyRuntimeDependencies = [
@@ -141,6 +142,10 @@ const dependencyWorkflowPath = path.join(workflowRoot, "dependency-governance.ym
 const dependencyWorkflow = readFileSync(dependencyWorkflowPath, "utf8");
 if (!dependencyWorkflow.includes("generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository")) {
   failures.push("dependency-governance.yml: dependency inventory must enforce release licenses and repository notice consistency.");
+}
+const dependencyPolicyChecks = dependencyWorkflow.match(/node scripts\/verify-dependency-policy\.mjs/gu) ?? [];
+if (dependencyPolicyChecks.length < 2) {
+  failures.push("dependency-governance.yml: exact dependency policy must run before and after generating dependency evidence.");
 }
 const dependencyGenerator = readFileSync(
   path.join(repositoryRoot, "scripts", "generate-dependency-governance.mjs"),

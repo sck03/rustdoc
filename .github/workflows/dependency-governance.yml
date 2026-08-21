@@ -7,6 +7,7 @@ on:
   push:
     branches: [main]
     paths:
+      - "global.json"
       - "Directory.Packages.props"
       - "**/*.csproj"
       - "**/package.json"
@@ -15,9 +16,13 @@ on:
       - "**/Cargo.lock"
       - "scripts/audit-dotnet-packages.mjs"
       - "scripts/generate-dependency-governance.mjs"
+      - "scripts/verify-dependency-policy.mjs"
+      - "scripts/test_dependency_policy.mjs"
+      - "scripts/verify-github-workflow-actions.mjs"
       - ".github/workflows/dependency-governance.yml"
   pull_request:
     paths:
+      - "global.json"
       - "Directory.Packages.props"
       - "**/*.csproj"
       - "**/package.json"
@@ -26,6 +31,9 @@ on:
       - "**/Cargo.lock"
       - "scripts/audit-dotnet-packages.mjs"
       - "scripts/generate-dependency-governance.mjs"
+      - "scripts/verify-dependency-policy.mjs"
+      - "scripts/test_dependency_policy.mjs"
+      - "scripts/verify-github-workflow-actions.mjs"
       - ".github/workflows/dependency-governance.yml"
 
 concurrency:
@@ -79,6 +87,12 @@ jobs:
       - name: Validate Node 24 and artifact Action policy
         run: node scripts/verify-github-workflow-actions.mjs
 
+      - name: Verify exact dependency policy pins
+        run: node scripts/verify-dependency-policy.mjs
+
+      - name: Run dependency policy regression tests
+        run: node scripts/test_dependency_policy.mjs
+
       - name: Audit npm production dependencies
         run: |
           npm --prefix apps/export-doc-web run audit:production
@@ -101,6 +115,9 @@ jobs:
 
       - name: Generate SPDX, CycloneDX and third-party inventory
         run: node scripts/generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository
+
+      - name: Recheck generated dependency evidence
+        run: node scripts/verify-dependency-policy.mjs --generated-only
 
       - name: Upload dependency governance evidence
         if: ${{ always() }}

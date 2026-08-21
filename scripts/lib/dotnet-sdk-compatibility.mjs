@@ -5,18 +5,29 @@ export function isDotnetSdkVersionCompatible(requiredVersion, actualVersion, rol
   const actual = parseSdkVersion(actualVersion);
   if (!required || !actual) return false;
   if (!allowPrerelease && (required.prerelease || actual.prerelease)) return false;
-  if (required.major === actual.major && required.minor === actual.minor && required.featureBandAndPatch === actual.featureBandAndPatch) {
-    return true;
+  if (!rollForwardModes.has(rollForward)) return false;
+  if (rollForward === "disable") return sameSdkVersion(required, actual);
+
+  if (rollForward === "patch" || rollForward === "latestPatch") {
+    return sameSdkMinor(required, actual)
+      && actual.featureBand === required.featureBand
+      && actual.patch >= required.patch;
   }
 
-  if (rollForward !== "patch" && rollForward !== "latestPatch") return false;
+  if (rollForward === "feature" || rollForward === "latestFeature") {
+    return sameSdkMinor(required, actual)
+      && actual.featureBand >= required.featureBand
+      && (actual.featureBand > required.featureBand || actual.patch >= required.patch);
+  }
 
-  const requiredFeatureBand = Math.floor(required.featureBandAndPatch / 100) * 100;
-  const actualFeatureBand = Math.floor(actual.featureBandAndPatch / 100) * 100;
-  return required.major === actual.major
-    && required.minor === actual.minor
-    && requiredFeatureBand === actualFeatureBand
-    && actual.featureBandAndPatch > required.featureBandAndPatch;
+  if (rollForward === "minor" || rollForward === "latestMinor") {
+    return actual.major === required.major
+      && (actual.minor > required.minor || (actual.minor === required.minor && isFeatureBandAtLeast(required, actual)));
+  }
+
+  return actual.major > required.major
+    || (actual.major === required.major
+      && (actual.minor > required.minor || (actual.minor === required.minor && isFeatureBandAtLeast(required, actual))));
 }
 
 function parseSdkVersion(value) {
@@ -25,7 +36,35 @@ function parseSdkVersion(value) {
   return {
     major: Number.parseInt(match.groups.major, 10),
     minor: Number.parseInt(match.groups.minor, 10),
-    featureBandAndPatch: Number.parseInt(match.groups.featureBandAndPatch, 10),
+    featureBand: Math.floor(Number.parseInt(match.groups.featureBandAndPatch, 10) / 100) * 100,
+    patch: Number.parseInt(match.groups.featureBandAndPatch, 10) % 100,
     prerelease: match.groups.prerelease || "",
   };
+}
+
+const rollForwardModes = new Set([
+  "disable",
+  "patch",
+  "feature",
+  "minor",
+  "major",
+  "latestPatch",
+  "latestFeature",
+  "latestMinor",
+  "latestMajor",
+]);
+
+function sameSdkVersion(required, actual) {
+  return sameSdkMinor(required, actual)
+    && actual.featureBand === required.featureBand
+    && actual.patch === required.patch;
+}
+
+function sameSdkMinor(required, actual) {
+  return required.major === actual.major && required.minor === actual.minor;
+}
+
+function isFeatureBandAtLeast(required, actual) {
+  return actual.featureBand >= required.featureBand
+    && (actual.featureBand > required.featureBand || actual.patch >= required.patch);
 }

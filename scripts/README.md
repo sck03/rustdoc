@@ -9,6 +9,8 @@
 - `github/initialize-github-repository.ps1`：初始化 `main` 分支、暂存公开文件，可选配置 origin、创建提交和推送；默认不会提交或联网推送。
 - `verify-github-workflow-actions.mjs`：检查官方 Action 主版本、Node 24、`upload-artifact@v7` 和 `download-artifact@v8`，防止工作流运行时回退。
 - `audit-npm-production.mjs`、`audit-dotnet-packages.mjs`：执行结构化 npm/NuGet 漏洞审计；NuGet 优先读取官方源的 `dotnet --vulnerable` 结果，若宿主 TLS 无法访问漏洞元数据，则从已还原依赖图提取精确版本并使用 OSV NuGet 生态复核，依赖图本身不可读取时仍立即失败。
+- `verify-dependency-policy.mjs`：校验中央 NuGet 清单、所有锁文件和生成的依赖证据；NPOI 强制保持 `2.7.6`，发现 `2.8.0` 或锁图缺失时立即失败。普通生产依赖继续使用精确 lockfile，不用“大于某版本即可”替代可复现构建。依赖治理工作流生成 SBOM 后使用 `--generated-only` 只复核证据，避免重复扫描源码锁图。
+- `global.json` 的 `rollForward: latestPatch` 只允许同一 feature band 内的补丁更新，例如 `10.0.302 -> 10.0.303`；`10.0.401` 属于新的 feature band，必须显式改用 `feature/latestFeature` 并同步 CI 验证，不能被 patch 门禁静默放行。
 - `generate-dependency-governance.mjs`：从 npm/Cargo 锁文件和还原后的 NuGet 图生成 SPDX、CycloneDX 和第三方依赖清单到显式 `artifacts/` 目录。
 - `check_frontend_style_governance.mjs`：阻止硬编码颜色、阴影、渐变、px 字号和 `!important` 债务继续增长。
 - `check_source_size_governance.mjs`：对 .NET、Web、Rust、测试、自动化和 GitHub 工作流实行全仓库单文件上限、聚合上限与相对基线增量门禁；统一忽略 `bin/obj/dist/target/node_modules/artifacts/TestResults/.codex-runtime/.git` 等生成目录，避免构建产物污染统计。

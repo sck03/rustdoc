@@ -66,6 +66,11 @@ foreach ($file in $moduleScripts) {
     Invoke-ExportDocExternal -FilePath "node" -Arguments @("--check", $file.FullName) -WorkingDirectory $repoRoot
 }
 
+$dependencyPolicyScript = Join-Path $scriptRoot "verify-dependency-policy.mjs"
+Invoke-ExportDocExternal -FilePath "node" -Arguments @($dependencyPolicyScript) -WorkingDirectory $repoRoot
+$dependencyPolicyTestScript = Join-Path $scriptRoot "test_dependency_policy.mjs"
+Invoke-ExportDocExternal -FilePath "node" -Arguments @($dependencyPolicyTestScript) -WorkingDirectory $repoRoot
+
 $bashPath = Get-Command bash -CommandType Application -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty Source
 if ([string]::IsNullOrWhiteSpace($bashPath)) {
