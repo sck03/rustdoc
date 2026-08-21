@@ -33,8 +33,16 @@
     position: sticky;
     left: 0;
     z-index: 2;
-    background: var(--edm-white);
     box-shadow: 7px 0 12px color-mix(in srgb, var(--edm-ink-900) 5%, transparent);
+  }
+
+  /* Match the pinned cells to their table row instead of forcing white. */
+  .responsive-table-frame[data-mobile-layout="scroll"] th:first-child {
+    background: var(--edm-ink-100);
+  }
+
+  .responsive-table-frame[data-mobile-layout="scroll"] td:first-child {
+    background: inherit;
   }
 
   .responsive-table-frame[data-mobile-layout="cards"] table,
