@@ -338,7 +338,7 @@
   background: var(--edm-primary-75);
 }
 
-.user-management-form-grid {
+.field-grid.user-management-form-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
 }
@@ -604,7 +604,7 @@
   }
 
   .identity-management-tabs,
-  .user-management-form-grid,
+  .field-grid.user-management-form-grid,
   .permission-template-meta-grid,
   .permission-level-guide {
     grid-template-columns: minmax(0, 1fr);
