@@ -10,7 +10,7 @@
 - `verify-github-workflow-actions.mjs`：检查官方 Action 主版本、Node 24、`upload-artifact@v7` 和 `download-artifact@v8`，防止工作流运行时回退。
 - `audit-npm-production.mjs`、`audit-dotnet-packages.mjs`：执行结构化 npm/NuGet 漏洞审计；NuGet 优先读取官方源的 `dotnet --vulnerable` 结果，若宿主 TLS 无法访问漏洞元数据，则从已还原依赖图提取精确版本并使用 OSV NuGet 生态复核，依赖图本身不可读取时仍立即失败。
 - `verify-dependency-policy.mjs`：校验中央 NuGet 清单、所有锁文件和生成的依赖证据；NPOI 强制保持 `2.7.6`，发现 `2.8.0` 或锁图缺失时立即失败。普通生产依赖继续使用精确 lockfile，不用“大于某版本即可”替代可复现构建。依赖治理工作流生成 SBOM 后使用 `--generated-only` 只复核证据，避免重复扫描源码锁图。
-- `global.json` 的 `rollForward: latestPatch` 只允许同一 feature band 内的补丁更新，例如 `10.0.302 -> 10.0.303`；`10.0.401` 属于新的 feature band，必须显式改用 `feature/latestFeature` 并同步 CI 验证，不能被 patch 门禁静默放行。
+- `global.json` 以精确稳定版本声明最低 SDK 基线，并用 `rollForward: latestFeature`、`allowPrerelease: false` 允许同一 .NET `major.minor` 内使用更新的稳定 feature band，例如 `10.0.302 -> 10.0.303/10.0.400/10.0.401`；低于基线、preview、`10.1.x` 和 `11.x` 均拒绝。GitHub Actions 与容器分别使用稳定通道 `10.0.x`、`10.0-noble`，门禁从 `global.json` 推导通道，避免重复硬编码精确 SDK。NuGet servicing 与发布依赖仍使用中央精确版本和 lockfile，当前为 `10.0.11`，不得改成 `10.0.*` 或“大于某版本”。
 - `generate-dependency-governance.mjs`：从 npm/Cargo 锁文件和还原后的 NuGet 图生成 SPDX、CycloneDX 和第三方依赖清单到显式 `artifacts/` 目录。
 - `check_frontend_style_governance.mjs`：阻止硬编码颜色、阴影、渐变、px 字号和 `!important` 债务继续增长。
 - `check_source_size_governance.mjs`：对 .NET、Web、Rust、测试、自动化和 GitHub 工作流实行全仓库单文件上限、聚合上限与相对基线增量门禁；统一忽略 `bin/obj/dist/target/node_modules/artifacts/TestResults/.codex-runtime/.git` 等生成目录，避免构建产物污染统计。
@@ -81,6 +81,12 @@ pwsh -NoProfile -File ./scripts/verify-script-suite.ps1
 ./scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntimeWorkspaces
 ```
 
-默认清理会保留 `artifacts/windows-desktop-run/`、`artifacts/windows-installers/`、`artifacts/license-keygen/`、浏览器/工具下载缓存、`node_modules` 和完整 `.codex-runtime` 依赖缓存。只有确认可重新下载或重新构建时才组合使用 `-IncludePackageCaches`、`-IncludeNodeModules`、`-IncludeCodexRuntime` 或 `-IncludeLegacyRuntimeAssets`；只有明确不再需要便携包、安装器和内部注册机输出时才使用 `-IncludeReleaseOutputs`。所有目标都必须解析到当前工作区内部，脚本不会扫描或删除 `App_Data`、数据库、Git、模板、OCR 模型、字体资源或仓库外目录。
+依赖升级后可按仓库全部 `packages.lock.json` 精确删除不再引用的 NuGet 旧版本，同时保留当前锁定图和 NPOI `2.7.6`：
+
+```powershell
+./scripts/clean-generated-artifacts.ps1 -PruneUnusedNuGetVersions
+```
+
+默认清理会保留 `artifacts/windows-desktop-run/`、`artifacts/windows-installers/`、`artifacts/license-keygen/`、浏览器/工具下载缓存、`node_modules` 和完整 `.codex-runtime` 依赖缓存。`-PruneUnusedNuGetVersions` 只修剪锁文件未引用的普通 NuGet 精确版本，不清空当前依赖，并保留由当前 .NET SDK 管理的 Runtime/Host packs；Cargo 与 npm 内容寻址缓存不做猜测式版本删除。只有确认可重新下载或重新构建时才组合使用 `-IncludePackageCaches`、`-IncludeNodeModules`、`-IncludeCodexRuntime` 或 `-IncludeLegacyRuntimeAssets`；只有明确不再需要便携包、安装器和内部注册机输出时才使用 `-IncludeReleaseOutputs`。所有目标都必须解析到当前工作区内部，脚本不会扫描或删除 `App_Data`、数据库、Git、模板、OCR 模型、字体资源或仓库外目录。
 
 注意：`artifacts/windows-desktop-run/` 是一次性构建输出。正式便携构建不检测、不询问，也不保留旧运行数据，会直接删除目标版本目录中的 `App_Data/` 和 `logs/` 后覆盖。需要保留的开发数据请在运行构建脚本前自行备份；不要把真实业务数据库放在该构建目录中长期使用。

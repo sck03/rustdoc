@@ -30,6 +30,12 @@ export function isDotnetSdkVersionCompatible(requiredVersion, actualVersion, rol
       && (actual.minor > required.minor || (actual.minor === required.minor && isFeatureBandAtLeast(required, actual))));
 }
 
+export function getStableDotnetSdkChannel(version) {
+  const parsed = parseSdkVersion(version);
+  if (!parsed || parsed.prerelease) return null;
+  return `${parsed.major}.${parsed.minor}.x`;
+}
+
 function parseSdkVersion(value) {
   const match = String(value ?? "").trim().match(sdkVersionPattern);
   if (!match?.groups) return null;

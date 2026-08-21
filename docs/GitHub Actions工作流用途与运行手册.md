@@ -96,7 +96,7 @@
 显示名称：`Dependency security and SBOM governance`
 
 - **触发：** 手工、每周一 02:23 UTC 定时、`main` 依赖文件 push，以及依赖文件 PR。
-- **平台：** `ubuntu-latest`；.NET 10 SDK `10.0.302`、Node.js 24 和 stable Rust。
+- **平台：** `ubuntu-latest`；最新稳定 .NET 10 SDK `10.0.x`、Node.js 24 和 stable Rust。
 - **做什么：** 锁定还原 Web/Tauri/npm/NuGet/Cargo 图，执行 npm 生产依赖审计、NuGet 直接/传递审计和三个 `Cargo.lock` 的 RustSec 审计，拒绝新增漏洞、unsound 或 yanked crate，并生成 SPDX 2.3、CycloneDX 1.6 和第三方依赖清单。当前已审查的 React Router RSC 公告和 Tauri GTK 传递例外必须保持精确契约，不能用“忽略全部漏洞”通过。
 - **输出：** `dependency-governance` Artifact，通常保留 30 天；不修改依赖版本、不创建 Dependabot PR。
 - **Secrets/Variables：** 不需要自定义 Secret；需要 runner 能访问 npm/NuGet/RustSec advisory 源，源不可达时应区分网络告警与真实审计结果。
@@ -124,7 +124,7 @@
 
 - **触发：** `workflow_call`，不能从 Actions 列表单独运行；由 Windows/Linux/macOS 三个平台入口调用。
 - **平台：** 由调用方传入 runner、平台、架构、产品版和 bundle 类型。
-- **做什么：** 安装 .NET 10 SDK `10.0.302`/Node 24/固定 Rust `1.96.0`，按产品版准备资源：Document/Full 携带开源字体、Chrome Headless Shell、OCR、单证资源和 Excel 分析器，Sales 明确裁剪这些不可用能力。桌面资源准备会在 release 依赖治理前还原完整 `ExportDocManager.sln`，保证全新 checkout 或清理过 `bin/obj` 后仍能扫描全部项目。随后复用同一构建生成绿色便携包：Windows 复制主程序与已审计资源树后压缩 ZIP；Linux 对 AppImage 解包后在 Xvfb 中真实启动、登录并复验；macOS 从 `Info.plist` 解析 `.app` 真实入口后直接启动、登录并复验，再分别封装 tar.gz。便携包不预置 `App_Data`、密码、许可证、日志或用户配置，并生成逐文件与归档 SHA-256。`publish_release=false` 生成未签名验收包；`true` 才启用 updater 签名、上传安装版和便携版并合并 `latest.json`。
+- **做什么：** 安装最新稳定 .NET 10 SDK `10.0.x`/Node 24/固定 Rust `1.96.0`，按产品版准备资源：Document/Full 携带开源字体、Chrome Headless Shell、OCR、单证资源和 Excel 分析器，Sales 明确裁剪这些不可用能力。`global.json` 仍拒绝 preview、较低 SDK、`10.1` 和 .NET 11。桌面资源准备会在 release 依赖治理前还原完整 `ExportDocManager.sln`，保证全新 checkout 或清理过 `bin/obj` 后仍能扫描全部项目。随后复用同一构建生成绿色便携包：Windows 复制主程序与已审计资源树后压缩 ZIP；Linux 对 AppImage 解包后在 Xvfb 中真实启动、登录并复验；macOS 从 `Info.plist` 解析 `.app` 真实入口后直接启动、登录并复验，再分别封装 tar.gz。便携包不预置 `App_Data`、密码、许可证、日志或用户配置，并生成逐文件与归档 SHA-256。`publish_release=false` 生成未签名验收包；`true` 才启用 updater 签名、上传安装版和便携版并合并 `latest.json`。
 - **输出：** `...-installer` 与 `...-portable` 两个独立 Artifact，通常保留 14 天；发布模式把安装/Updater 资产、便携归档和 `.sha256` 一并上传到不可覆盖版本 Release。便携版只检查版本，不调用安装器式自动更新；人工替换程序文件时保留原目录 `App_Data`。
 - **Secrets/Variables：** 测试模式不需要签名材料；发布模式必须配置仓库 Variable `EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY`，以及带密码的 Secrets `TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。`EXPORTDOCMANAGER_UPDATER_ENDPOINT` 改为可选：留空时安装包只内置公钥，由管理员安装后在系统设置中配置 GitHub、自建服务器或公司内网地址。若构建时就要内置 HTTP 默认地址，还必须显式配置 `EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT=true`；公网默认地址仍应使用 HTTPS。调用方使用 `secrets: inherit`，不应把私钥写入仓库或日志。
 - **常见失败：** 版本格式、浏览器资源缺失/执行权限、OCR 运行时缺库、公钥或私钥缺失、未显式放行却尝试内置 HTTP endpoint、Release tag 已被其它版本占用。依赖清单校验不再因表单版本与仓库当前版本不同而失败；若旧提交在 `dotnet list package` 阶段提示项目没有 assets 文件，应从最新 `main` 新建运行，当前流程会先还原完整解决方案。若 Windows 日志显示 `spawnSync npm.cmd EINVAL`，同样说明运行的是旧提交；当前包装器由 Node 直接启动项目锁定的 Tauri CLI，不再调用 `.cmd`。若提示 stale，错误会指出首个真实差异行，应重新生成并审查依赖，而不是删除 `--verify-repository`。Linux AppImage 使用 Tauri 自带的无 FUSE 解压运行模式，不需要额外安装 `libfuse2`；工作流显式安装 `file`、`xdg-utils`，并设置 `NO_STRIP=1`，避免 `linuxdeploy` 内置旧版 `strip` 重复处理 Ubuntu 24.04 新 ELF 段时退出。桌面 sidecar 继续排除 CoreCLR 可选的 `libcoreclrtraceptprovider.so`，避免把宿主 LTTng ABI 作为应用启动依赖；不要用跨 ABI 软链接伪造兼容。桌面构建统一带 `--verbose`，后续 `linuxdeploy`、签名或公证失败会保留真实子进程输出。桌面摘要固定使用 PowerShell 字面量 here-string，避免 Markdown 行尾反引号被解释为续行；治理门禁会拒绝重新引入该 ParserError。

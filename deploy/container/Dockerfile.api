@@ -7,10 +7,10 @@ COPY Resources/Fonts/OpenSource/font-manifest.json Resources/Fonts/OpenSource/OF
 RUN node scripts/provision-report-fonts.mjs \
     && node scripts/verify-font-license-policy.mjs --require-files
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0.302-noble AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-noble AS build
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     DOTNET_NOLOGO=1
-RUN test "$(dotnet --version)" = "10.0.302"
+RUN dotnet --version | grep -Eq '^10\.0\.[0-9]+$'
 WORKDIR /src
 ARG TARGETARCH
 

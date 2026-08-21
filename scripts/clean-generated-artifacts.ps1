@@ -2,6 +2,7 @@
 param(
     [switch]$IncludeNodeModules,
     [switch]$IncludePackageCaches,
+    [switch]$PruneUnusedNuGetVersions,
     [switch]$IncludeCodexRuntimeWorkspaces,
     [switch]$IncludeCodexRuntime,
     [switch]$IncludeLegacyRuntimeAssets,
@@ -10,6 +11,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$cleanupCmdlet = $PSCmdlet
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $workspaceRoot = (Resolve-Path (Join-Path $scriptRoot "..")).Path
@@ -55,6 +57,62 @@ function Get-DirectorySizeBytes {
     }
 
     return [long]$sum.Sum
+}
+
+function Get-LockedNuGetPackageVersions {
+    $lockedVersions = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase)
+    $lockFiles = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
+
+    foreach ($sourceTreeName in @("apps", "eng", "src", "tests", "tools")) {
+        $sourceTreePath = Join-Path $workspaceRoot $sourceTreeName
+        if (-not (Test-Path -LiteralPath $sourceTreePath -PathType Container)) {
+            continue
+        }
+
+        Get-ChildItem -LiteralPath $sourceTreePath -Recurse -File -Filter "*packages.lock.json" -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.FullName -notmatch '[\\/](bin|obj|node_modules|target|artifacts|\.codex-runtime)[\\/]'
+            } |
+            ForEach-Object { [void]$lockFiles.Add($_) }
+    }
+
+    foreach ($lockFile in $lockFiles) {
+        try {
+            $lockDocument = Get-Content -LiteralPath $lockFile.FullName -Raw | ConvertFrom-Json
+        }
+        catch {
+            throw "Could not parse NuGet lock file '$($lockFile.FullName)': $($_.Exception.Message)"
+        }
+
+        foreach ($targetFramework in $lockDocument.dependencies.PSObject.Properties) {
+            foreach ($package in $targetFramework.Value.PSObject.Properties) {
+                $resolvedVersion = [string]$package.Value.resolved
+                if ([string]::IsNullOrWhiteSpace($resolvedVersion)) {
+                    continue
+                }
+
+                [void]$lockedVersions.Add("$($package.Name)`n$resolvedVersion")
+            }
+        }
+    }
+
+    if ($lockFiles.Count -eq 0 -or $lockedVersions.Count -eq 0) {
+        throw "Refusing to prune the NuGet cache because no usable packages.lock.json files were found."
+    }
+
+    # The repository's commercial dependency policy requires this exact NPOI version.
+    [void]$lockedVersions.Add("NPOI`n2.7.6")
+    return ,$lockedVersions
+}
+
+function Test-IsSdkManagedNuGetPackage {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PackageId
+    )
+
+    return $PackageId -match '^microsoft\.(netcore|aspnetcore|windowsdesktop)\.app\.(host|runtime)\.'
 }
 
 function Grant-CurrentUserGeneratedPathAccess {
@@ -329,6 +387,8 @@ function Get-GeneratedArtifactCleanupPlan {
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "tmp") -Reason "repository-local temporary output"
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".vs") -Reason "local Visual Studio workspace cache"
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".dotnet-cli") -Reason "repo-local dotnet CLI home cache"
+    Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "apps/.codex-runtime/cargo-target-tauri") -Reason "legacy Tauri Cargo build output"
+    Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".pnpm-store") -Reason "unused legacy pnpm cache"
 
     if ($IncludeCodexRuntime) {
         Add-Target -Targets $targets -Path $codexRuntimeRoot -Reason "local Codex/Playwright runtime cache"
@@ -394,7 +454,30 @@ function Get-GeneratedArtifactCleanupPlan {
         Add-Target -Targets $targets -Path (Join-Path $codexRuntimeRoot "nuget-packages") -Reason "repo-local NuGet package cache"
         Add-Target -Targets $targets -Path (Join-Path $codexRuntimeRoot "nuget-http-cache") -Reason "repo-local NuGet HTTP cache"
         Add-Target -Targets $targets -Path (Join-Path $codexRuntimeRoot "npm-cache") -Reason "repo-local npm download cache"
+        Add-Target -Targets $targets -Path (Join-Path $codexRuntimeRoot "cargo-home") -Reason "repo-local Cargo download cache"
         Add-Target -Targets $targets -Path (Join-Path $codexRuntimeRoot "cargo-audit") -Reason "repo-local cargo-audit tool cache"
+        Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "apps/.codex-runtime/cargo-home") -Reason "legacy Tauri Cargo download cache"
+        Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "apps/.codex-runtime/npm-cache") -Reason "legacy app npm download cache"
+        Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "apps/export-doc-tauri/.codex-runtime/npm-cache") -Reason "Tauri npm download cache"
+        Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "apps/export-doc-web/.codex-runtime/npm-cache") -Reason "Web npm download cache"
+    }
+    elseif ($PruneUnusedNuGetVersions) {
+        $lockedNuGetVersions = Get-LockedNuGetPackageVersions
+        $nugetPackagesRoot = Join-Path $codexRuntimeRoot "nuget-packages"
+        if (Test-Path -LiteralPath $nugetPackagesRoot -PathType Container) {
+            foreach ($packageDirectory in Get-ChildItem -LiteralPath $nugetPackagesRoot -Directory -Force -ErrorAction SilentlyContinue) {
+                if (Test-IsSdkManagedNuGetPackage -PackageId $packageDirectory.Name) {
+                    continue
+                }
+
+                foreach ($versionDirectory in Get-ChildItem -LiteralPath $packageDirectory.FullName -Directory -Force -ErrorAction SilentlyContinue) {
+                    $packageVersionKey = "$($packageDirectory.Name)`n$($versionDirectory.Name)"
+                    if (-not $lockedNuGetVersions.Contains($packageVersionKey)) {
+                        Add-Target -Targets $targets -Path $versionDirectory.FullName -Reason "NuGet package version not referenced by repository lock files"
+                    }
+                }
+            }
+        }
     }
 
     if ($IncludeLegacyRuntimeAssets) {
@@ -446,7 +529,7 @@ if ($plan.Count -gt 0) {
 $cleanupFailures = [System.Collections.Generic.List[object]]::new()
 foreach ($target in $plan) {
     if ((Test-Path -LiteralPath $target.Path) -and
-        $PSCmdlet.ShouldProcess($target.Path, "Remove generated artifact directory")) {
+        $cleanupCmdlet.ShouldProcess($target.Path, "Remove generated artifact directory")) {
         try {
             Remove-DirectoryWithRetry -Path $target.Path
         }

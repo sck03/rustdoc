@@ -65,7 +65,7 @@
 
 ## 4. 依赖与许可证策略（硬约束）
 
-所有 .NET 版本集中在 `Directory.Packages.props`，Web 版本集中在 `apps/export-doc-web/package.json`/`package-lock.json`，Rust 版本由各工程 `Cargo.toml`/`Cargo.lock` 管理。升级后必须同步锁文件、第三方 notices、依赖清单和治理证据。
+所有 .NET NuGet 包版本集中在 `Directory.Packages.props`，SDK 最低基线和滚动策略集中在 `global.json`，Web 版本集中在 `apps/export-doc-web/package.json`/`package-lock.json`，Rust 版本由各工程 `Cargo.toml`/`Cargo.lock` 管理。升级后必须同步锁文件、第三方 notices、依赖清单和治理证据。
 
 普通依赖的精确版本以中央清单和锁文件为准，不在本规范复制容易过期的版本表。当前批准的技术代际是 .NET 10、React 19 和 xUnit v3；改变技术代际时必须作为独立专项评审和验证。
 
@@ -83,6 +83,7 @@
 
 - 优先免费开源、许可证清晰、维护活跃、能离线/受控打包的库；禁止商业格式锁定、未审查二进制和不明来源下载。
 - 依赖升级必须是独立、可审计的变更；不要把 React、lucide、xUnit 等大版本迁移与无关业务修复混在同一未说明的补丁中。
+- .NET SDK 使用精确稳定最低基线、`rollForward: latestFeature` 和 `allowPrerelease: false`，只允许同一 `major.minor` 内滚动到更新的稳定 feature band；CI/容器使用由该基线推导的稳定 `10.0.x` 通道，拒绝 preview、较低版本、跨 minor 和跨 major。Runtime/NuGet servicing 包继续精确锁定并由 lockfile 保证可复现，不使用通配版本或开放范围。
 - 依赖校验和治理门禁也必须遵守精简原则：共享解析、版本判定和错误格式化逻辑，避免同一规则在多个脚本中复制；不要为旧版本、旧锁文件或历史生成物增加兼容分支，规则变化时直接更新正式契约、锁文件和最小回归测试。
 - 运行时浏览器、Cargo、NuGet、npm 缓存应定向到仓库运行目录或 CI workspace，避免写系统 C 盘；清理缓存前必须确认可重新获得且用户接受重新下载。
 - 运行 `node scripts/generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository`，结果必须 `unresolved=0`、`disallowed=0`。
@@ -154,6 +155,7 @@ pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntime
 
 清理脚本默认只删除可重建的 `artifacts/`、`bin/`、`obj/`、`dist/`、`target/`、`TestResults/` 和一次性测试工作区，并保留交付输出及可复用依赖/浏览器缓存。只有用户明确确认后，才使用：
 
+- `-PruneUnusedNuGetVersions`：按全部 `packages.lock.json` 删除未引用的普通 NuGet 精确版本，保留当前锁图、SDK Runtime/Host packs 和 NPOI `2.7.6`；
 - `-IncludeNodeModules`：删除 npm 安装树；
 - `-IncludePackageCaches`：删除 NuGet/npm/Cargo 审计缓存；
 - `-IncludeCodexRuntime`：删除整个本地代理运行缓存；

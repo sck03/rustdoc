@@ -89,7 +89,8 @@ public sealed class PackagePayloadContractTests
             StringComparison.Ordinal);
         int containerProfileCount = dockerfile.Split("/p:ExportDocPackageProfile=Container", StringSplitOptions.None).Length - 1;
         Assert.Equal(2, containerProfileCount);
-        Assert.Contains("mcr.microsoft.com/dotnet/sdk:10.0.302-noble AS build", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("mcr.microsoft.com/dotnet/sdk:10.0-noble AS build", dockerfile, StringComparison.Ordinal);
+        Assert.Contains("grep -Eq '^10\\.0\\.[0-9]+$'", dockerfile, StringComparison.Ordinal);
         Assert.Contains("FROM debian:trixie-slim AS runtime", dockerfile, StringComparison.Ordinal);
         Assert.DoesNotContain("        chromium \\", dockerfile, StringComparison.Ordinal);
         Assert.DoesNotContain("        chromium-sandbox \\", dockerfile, StringComparison.Ordinal);

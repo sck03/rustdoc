@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { getStableDotnetSdkChannel } from "./lib/dotnet-sdk-compatibility.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const workflowRoot = path.join(repositoryRoot, ".github", "workflows");
@@ -19,8 +20,14 @@ const requiredActions = new Map([
   ["docker/login-action", "dbcb813823bdd20940b903addbd779551569679f"],
   ["dtolnay/rust-toolchain", "4360b52568e2003a75bf9bc1d59f33a8e3fc893c"],
 ]);
-const requiredDotNetSdk = JSON.parse(readFileSync(path.join(repositoryRoot, "global.json"), "utf8")).sdk?.version;
-if (!requiredDotNetSdk) throw new Error("global.json must declare sdk.version for workflow validation.");
+const dotnetSdkPolicy = JSON.parse(readFileSync(path.join(repositoryRoot, "global.json"), "utf8")).sdk;
+const requiredDotNetSdkChannel = getStableDotnetSdkChannel(dotnetSdkPolicy?.version);
+if (!requiredDotNetSdkChannel) {
+  throw new Error("global.json must declare a stable sdk.version for workflow validation.");
+}
+if (dotnetSdkPolicy.rollForward !== "latestFeature" || dotnetSdkPolicy.allowPrerelease !== false) {
+  throw new Error("global.json must allow the latest stable feature band within its .NET major.minor line.");
+}
 const requiredRustToolchain = "1.96.0";
 const runtimeIdentifiers = ["win-x64", "win-arm64", "linux-x64", "linux-arm64", "osx-arm64"];
 const fullOnlyRuntimeDependencies = [
@@ -66,10 +73,10 @@ for (const entry of readdirSync(workflowRoot, { withFileTypes: true })) {
     }
     if (action === "actions/setup-dotnet") {
       const localBlock = lines.slice(index + 1, index + 8).join("\n");
-      const escapedSdk = requiredDotNetSdk.replaceAll(".", "\\.");
+      const escapedSdk = requiredDotNetSdkChannel.replaceAll(".", "\\.");
       if (!new RegExp(`dotnet-version:\\s*["']?${escapedSdk}["']?\\s*$`, "mu").test(localBlock)) {
         failures.push(
-          `${entry.name}:${index + 1}: actions/setup-dotnet must explicitly select ${requiredDotNetSdk}.`,
+          `${entry.name}:${index + 1}: actions/setup-dotnet must explicitly select stable channel ${requiredDotNetSdkChannel}.`,
         );
       }
     }
@@ -112,6 +119,18 @@ for (const entry of readdirSync(workflowRoot, { withFileTypes: true })) {
       );
     }
   }
+}
+
+const dockerSdkTag = requiredDotNetSdkChannel.replace(/\.x$/u, "-noble");
+const apiDockerfile = readFileSync(path.join(repositoryRoot, "deploy", "container", "Dockerfile.api"), "utf8");
+if (!apiDockerfile.includes(`FROM mcr.microsoft.com/dotnet/sdk:${dockerSdkTag} AS build`)) {
+  failures.push(`Dockerfile.api: build stage must use stable .NET SDK channel ${dockerSdkTag}.`);
+}
+const stableSdkPattern = requiredDotNetSdkChannel
+  .replaceAll(".", "\\.")
+  .replace(/\\\.x$/u, "\\.[0-9]+");
+if (!apiDockerfile.includes(`grep -Eq '^${stableSdkPattern}$'`)) {
+  failures.push(`Dockerfile.api: build stage must reject SDK versions outside ${requiredDotNetSdkChannel}.`);
 }
 
 const rootToolchain = readFileSync(path.join(repositoryRoot, "rust-toolchain.toml"), "utf8");
