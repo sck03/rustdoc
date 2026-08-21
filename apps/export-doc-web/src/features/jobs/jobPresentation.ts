@@ -1,4 +1,4 @@
-import type { ApiReportTemplateDto, BackgroundJobSnapshot } from "../../api/index.ts";
+import type { BackgroundJobSnapshot } from "../../api/index.ts";
 import { formatPlainNumber } from "../../ui/formUtils.ts";
 
 export const jobStatusOptions = [
@@ -62,10 +62,6 @@ export function readPositiveIntegerTokens(value: string) {
     }
   }
   return result;
-}
-
-export function findPreferredInvoiceTemplate(templates: ApiReportTemplateDto[]) {
-  return templates.find((template) => fileNameFromPath(template.templatePath) === "invoice_template.html") ?? templates[0];
 }
 
 export function fileNameFromPath(value: string) {

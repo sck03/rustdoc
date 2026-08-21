@@ -2,13 +2,14 @@ import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
 import "../../styles/runtime-diagnostics.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowLeft,
   ListChecks,
   RefreshCw,
   RotateCcw,
   Save,
   Trash2,
 } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   ApiSettingsResponse,
   ApiSettingsValidationResponse,
@@ -33,6 +34,7 @@ import { useSettingsDraftSync } from "./useSettingsDraftSync.ts";
 import { systemDefaultPatches } from "./settingsDefaults.ts";
 import { findIssuingAuthority, parseIssuingAuthorityCode } from "./settingsIssuingAuthority.ts";
 import { SettingsCategoryNav, SettingsValidationPanel } from "./SettingsPagePanels.tsx";
+import { readSettingsReturnTarget } from "./settingsReturnNavigation.ts";
 
 const LazyMaintenanceSettingsPanels = lazy(() => import("./MaintenanceSettingsPanels.tsx"));
 const LazyRuntimeDatabaseSettingsPanel = lazy(() => import("./RuntimeDatabaseSettingsPanel.tsx"));
@@ -41,6 +43,19 @@ const LazyExcelImportSettingsPanel = lazy(() => import("./ExcelImportSettingsPan
 const LazyExchangeRateSettingsPanel = lazy(() => import("./ExchangeRateSettingsPanel.tsx"));
 const LazyCommunicationSettingsPanel = lazy(() => import("./CommunicationSettingsPanel.tsx"));
 const LazySingleWindowSettingsPanel = lazy(() => import("./SingleWindowSettingsPanel.tsx"));
+
+function SettingsPanelDeepLink({ label }: { label: string | null }) {
+  useEffect(() => {
+    if (!label) return;
+
+    const panel = Array.from(document.querySelectorAll<HTMLElement>("[aria-label]")).find(
+      (element) => element.getAttribute("aria-label") === label,
+    );
+    panel?.scrollIntoView({ block: "start", behavior: "auto" });
+  }, [label]);
+
+  return null;
+}
 
 type EmailServerSuggestionDraft = {
   emailAddress: string;
@@ -69,6 +84,8 @@ export function SettingsPage({
 }) {
   const requestConfirmation = useConfirmation();
   const location = useLocation();
+  const navigate = useNavigate();
+  const returnTarget = readSettingsReturnTarget(location.state);
   const availableSettingsCategories = filterSettingsCategories({
     canUseDocumentWorkspace,
   });
@@ -102,14 +119,14 @@ export function SettingsPage({
   const exportTemplatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates("ExportDocument"),
     queryFn: ({ signal }) => client.listReportTemplates({ reportType: "ExportDocument" }, { signal }),
-    enabled: activeCategory === "document-templates",
+    enabled: activeCategory === "report-output",
     staleTime: 5 * 60 * 1000,
   });
 
   const paymentTemplatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates("PaymentVoucher"),
     queryFn: ({ signal }) => client.listReportTemplates({ reportType: "PaymentVoucher" }, { signal }),
-    enabled: activeCategory === "document-templates",
+    enabled: activeCategory === "report-output",
     staleTime: 5 * 60 * 1000,
   });
 
@@ -131,7 +148,7 @@ export function SettingsPage({
     setSingleWindowAuthorityAutoState,
   });
 
-  useUnsavedChangesGuard({
+  const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: hasUnsavedChanges,
     message: "系统设置页面有未保存修改，离开后这些配置将丢失。",
   });
@@ -146,26 +163,6 @@ export function SettingsPage({
   useEffect(() => {
     setActiveCategory(readSettingsCategoryFromSearch(location.search, availableSettingsCategoryKeys));
   }, [canUseDocumentWorkspace, location.search]);
-
-  useEffect(() => {
-    if (!settings) {
-      return;
-    }
-
-    const panelLabel = readSettingsPanelLabelFromSearch(location.search);
-    if (!panelLabel) {
-      return;
-    }
-
-    const timerId = window.setTimeout(() => {
-      const panel = Array.from(document.querySelectorAll<HTMLElement>("[aria-label]")).find(
-        (element) => element.getAttribute("aria-label") === panelLabel,
-      );
-      panel?.scrollIntoView({ block: "start", behavior: "auto" });
-    }, 0);
-
-    return () => window.clearTimeout(timerId);
-  }, [activeCategory, location.search, settings]);
 
   const saveMutation = useMutation({
     mutationFn: (body: SettingsRecord) =>
@@ -554,6 +551,12 @@ export function SettingsPage({
     saveMutation.mutate(settings);
   }
 
+  async function handleReturn() {
+    if (returnTarget && await confirmDiscardChanges(returnTarget.label)) {
+      navigate(returnTarget.path, { replace: true });
+    }
+  }
+
   return (
     <section className="editor-surface settings-surface" aria-label="设置">
       {message ? <InlineNotice tone="error" title="设置未保存">{message}</InlineNotice> : null}
@@ -564,7 +567,15 @@ export function SettingsPage({
         <form className="entity-form settings-center-form" onSubmit={handleSubmit} onKeyDownCapture={handleEnterAsTabFormKeyDown}>
           <div className="settings-command-strip">
             <div className="settings-command-heading">
-              <h2>{activeCategoryConfig.label}</h2>
+              <div className="settings-command-heading-row">
+                {returnTarget ? (
+                  <button className="command-button secondary" type="button" onClick={() => void handleReturn()}>
+                    <ArrowLeft size={17} aria-hidden="true" />
+                    <span>{returnTarget.label}</span>
+                  </button>
+                ) : null}
+                <h2>{activeCategoryConfig.label}</h2>
+              </div>
               {hasUnsavedChanges ? <span>有未保存修改</span> : null}
             </div>
             <div className="toolbar-actions settings-command-actions">
@@ -610,7 +621,7 @@ export function SettingsPage({
                   onSelectDefaultExportDirectory={() => void handleSelectDefaultExportDirectory()}
                 />
               ) : null}
-              {currentCategory === "document-templates" ? (
+              {currentCategory === "report-output" ? (
                 <LazyDocumentTemplateSettingsCategory
                   settings={settings}
                   canManageSettings={canManageSettings}
@@ -701,6 +712,7 @@ export function SettingsPage({
                   ) : null}
                 </>
               ) : null}
+              <SettingsPanelDeepLink label={readSettingsPanelLabelFromSearch(location.search)} />
               </Suspense>
             </div>
           </div>

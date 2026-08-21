@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 110915,
+      "baselineAggregateLines": 111256,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 111115,
+      "maximumAggregateLines": 111456,
       "reportFiles": false
     },
     {
@@ -22,9 +22,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 78337,
+      "baselineAggregateLines": 78551,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 78537,
+      "maximumAggregateLines": 78751,
       "reportFiles": false
     },
     {
@@ -56,9 +56,9 @@
       "directories": ["scripts", "deploy", ".github/workflows"],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 40202,
+      "baselineAggregateLines": 40377,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 40352,
+      "maximumAggregateLines": 40527,
       "reportFiles": false
     },
     {

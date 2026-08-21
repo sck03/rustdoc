@@ -63,6 +63,11 @@ namespace ExportDocManager.Api.Tests
             requestedSettings.System.AppName = "Settings Endpoint Smoke";
             requestedSettings.System.UpdaterEndpoint = "http://updates.internal:8080/desktop/latest.json";
             requestedSettings.System.DefaultExportDirectory = Path.Combine(harness.DataRoot, "Exports", "Configured");
+            requestedSettings.ReportTemplateDefaults = new ReportTemplateDefaults
+            {
+                ExportDocumentTemplatePath = "builtin:Export/invoice_template.html",
+                PaymentVoucherTemplatePath = "builtin:Internal/payment_voucher_template.html"
+            };
             requestedSettings.BatchExport.Items =
             [
                 new BatchExportItem
@@ -129,6 +134,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("Settings Endpoint Smoke", settingsJson);
             Assert.Contains("http://updates.internal:8080/desktop/latest.json", settingsJson);
             Assert.Contains("Configured", settingsJson, StringComparison.Ordinal);
+            Assert.Contains("builtin:Export/invoice_template.html", settingsJson, StringComparison.Ordinal);
             Assert.True(
                 settingsJson.IndexOf("Smoke Commercial Invoice", StringComparison.Ordinal) <
                 settingsJson.IndexOf("Smoke Packing List", StringComparison.Ordinal));
@@ -142,6 +148,12 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("Settings Endpoint Smoke", settingsAfterSave.Settings.System.AppName);
             Assert.Equal("http://updates.internal:8080/desktop/latest.json", settingsAfterSave.Settings.System.UpdaterEndpoint);
             Assert.Empty(settingsAfterSave.Settings.System.DefaultExportDirectory);
+            Assert.Equal(
+                "builtin:Export/invoice_template.html",
+                settingsAfterSave.Settings.ReportTemplateDefaults.ExportDocumentTemplatePath);
+            Assert.Equal(
+                "builtin:Internal/payment_voucher_template.html",
+                settingsAfterSave.Settings.ReportTemplateDefaults.PaymentVoucherTemplatePath);
             Assert.Collection(
                 settingsAfterSave.Settings.BatchExport.Items,
                 item =>

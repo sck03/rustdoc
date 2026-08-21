@@ -159,7 +159,7 @@ namespace ExportDocManager.Services.Reporting
         private List<BatchExportItemManifest> BuildExportManifestItems(IEnumerable<BatchExportItem>? items)
         {
             return (items ?? Enumerable.Empty<BatchExportItem>())
-                .Select(item => TryNormalizeTemplateReference(
+                .Select(item => _referencePolicy.TryNormalize(
                     item?.TemplatePath,
                     ReportDocumentType.ExportDocument,
                     out string templatePath)
@@ -179,7 +179,7 @@ namespace ExportDocManager.Services.Reporting
         private List<PaymentTemplateItemManifest> BuildPaymentManifestItems(IEnumerable<PaymentTemplateItem>? items)
         {
             return (items ?? Enumerable.Empty<PaymentTemplateItem>())
-                .Select(item => TryNormalizeTemplateReference(
+                .Select(item => _referencePolicy.TryNormalize(
                     item?.TemplatePath,
                     ReportDocumentType.PaymentVoucher,
                     out string templatePath)
@@ -198,7 +198,7 @@ namespace ExportDocManager.Services.Reporting
         private List<BatchExportItem> BuildImportedExportItems(IEnumerable<BatchExportItemManifest> items)
         {
             return (items ?? Enumerable.Empty<BatchExportItemManifest>())
-                .Select(item => TryNormalizeTemplateReference(
+                .Select(item => _referencePolicy.TryNormalize(
                     item?.TemplatePath,
                     ReportDocumentType.ExportDocument,
                     out string templatePath)
@@ -218,7 +218,7 @@ namespace ExportDocManager.Services.Reporting
         private List<PaymentTemplateItem> BuildImportedPaymentItems(IEnumerable<PaymentTemplateItemManifest> items)
         {
             return (items ?? Enumerable.Empty<PaymentTemplateItemManifest>())
-                .Select(item => TryNormalizeTemplateReference(
+                .Select(item => _referencePolicy.TryNormalize(
                     item?.TemplatePath,
                     ReportDocumentType.PaymentVoucher,
                     out string templatePath)
@@ -234,35 +234,5 @@ namespace ExportDocManager.Services.Reporting
                 .ToList();
         }
 
-        private bool TryNormalizeTemplateReference(
-            string? templatePath,
-            ReportDocumentType reportType,
-            out string normalizedPath)
-        {
-            normalizedPath = string.Empty;
-            if (string.IsNullOrWhiteSpace(templatePath))
-            {
-                return false;
-            }
-
-            try
-            {
-                string absolutePath = Path.GetFullPath(_pathResolver.ToAbsolutePath(templatePath));
-                bool managed = _pathResolver.IsBuiltInTemplatePath(absolutePath) ||
-                               _pathResolver.IsUserTemplatePath(absolutePath);
-                if (!managed || !File.Exists(absolutePath) ||
-                    ReportTemplateCatalogLoader.ResolveCatalogReportType(null, absolutePath) != reportType)
-                {
-                    return false;
-                }
-
-                normalizedPath = _pathResolver.ToStoredPath(absolutePath);
-                return true;
-            }
-            catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
-            {
-                return false;
-            }
-        }
     }
 }

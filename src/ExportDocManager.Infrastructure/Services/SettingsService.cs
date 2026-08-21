@@ -164,6 +164,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             settings ??= new AppSettings();
             settings.System ??= new SystemSettings();
+            settings.ReportTemplateDefaults ??= new ReportTemplateDefaults();
             settings.BatchExport ??= new BatchExportSettings();
             settings.PaymentTemplates ??= new List<PaymentTemplateItem>();
             foreach (var paymentTemplate in settings.PaymentTemplates.Where(item => item != null))

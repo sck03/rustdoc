@@ -12,7 +12,7 @@ namespace ExportDocManager.Services.Reporting
     public sealed partial class ReportTemplatePackageService : IReportTemplatePackageService
     {
         private const string PackageExtension = ".edtpl";
-        private const string PackageSchemaVersion = "1.1";
+        private const string PackageSchemaVersion = "1.2";
 
         private const string StoragePolicy =
             "模板包导出路径来自用户显式输入；相对路径解析到运行数据根 TemplatePackages/。只打包和导入运行数据根 Templates/ 下的用户模板，内置模板保持只读；临时文件使用运行数据根 Cache/TemplatePackages。";
@@ -27,6 +27,7 @@ namespace ExportDocManager.Services.Reporting
         private readonly IAppPathProvider _pathProvider;
         private readonly ISettingsService _settingsService;
         private readonly ReportTemplatePathResolver _pathResolver;
+        private readonly ReportTemplatePackageReferencePolicy _referencePolicy;
         private readonly ReportTemplateCatalogLoader _catalogLoader;
         private readonly ILogger<ReportTemplatePackageService> _logger;
         private readonly IBusinessClock _clock;
@@ -40,6 +41,7 @@ namespace ExportDocManager.Services.Reporting
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             _pathResolver = new ReportTemplatePathResolver(pathProvider);
+            _referencePolicy = new ReportTemplatePackageReferencePolicy(_pathResolver);
             _logger = logger ?? NullLogger<ReportTemplatePackageService>.Instance;
             _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver, _logger);
             _clock = clock ?? BusinessClock.CreateSystem();
@@ -99,6 +101,15 @@ namespace ExportDocManager.Services.Reporting
                             ? null
                             : row.WithSeal ?? true
                     }).ToList(),
+                    TemplateDefaults = new ReportTemplateDefaultsManifest
+                    {
+                        ExportDocumentTemplatePath = _referencePolicy.NormalizeDefault(
+                            _settingsService.Settings.ReportTemplateDefaults?.ExportDocumentTemplatePath,
+                            ReportDocumentType.ExportDocument),
+                        PaymentVoucherTemplatePath = _referencePolicy.NormalizeDefault(
+                            _settingsService.Settings.ReportTemplateDefaults?.PaymentVoucherTemplatePath,
+                            ReportDocumentType.PaymentVoucher)
+                    },
                     ExportTemplates = BuildExportManifestItems(_settingsService.Settings.BatchExport?.Items),
                     InternalTemplates = BuildPaymentManifestItems(_settingsService.Settings.PaymentTemplates)
                 };
@@ -239,24 +250,35 @@ namespace ExportDocManager.Services.Reporting
 
                 var exportTemplates = BuildImportedExportItems(manifest.ExportTemplates);
                 var internalTemplates = BuildImportedPaymentItems(manifest.InternalTemplates);
+                string exportDefault = _referencePolicy.NormalizeDefault(
+                    manifest.TemplateDefaults.ExportDocumentTemplatePath,
+                    ReportDocumentType.ExportDocument);
+                string paymentDefault = _referencePolicy.NormalizeDefault(
+                    manifest.TemplateDefaults.PaymentVoucherTemplatePath,
+                    ReportDocumentType.PaymentVoucher);
 
-                if (exportTemplates.Count > 0 || internalTemplates.Count > 0)
+                cancellationToken.ThrowIfCancellationRequested();
+                OperationProgressReporter.Report(progress, "正在保存模板配置", "正在写入默认模板、单据包和付款报表设置。", 90);
+                await _settingsService.UpdateAsync(settings =>
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    OperationProgressReporter.Report(progress, "正在保存模板配置", "正在写入批量导出和付款模板设置。", 90);
-                    await _settingsService.UpdateAsync(settings =>
-                    {
-                        settings.BatchExport.Items = MergeBatchExportItems(
-                            settings.BatchExport.Items,
-                            exportTemplates,
-                            strategy);
-                        settings.PaymentTemplates = MergePaymentTemplateItems(
-                            settings.PaymentTemplates,
-                            internalTemplates,
-                            strategy);
-                        return true;
-                    }, cancellationToken).ConfigureAwait(false);
-                }
+                    settings.ReportTemplateDefaults.ExportDocumentTemplatePath = ReportTemplatePackageReferencePolicy.MergeDefault(
+                        settings.ReportTemplateDefaults.ExportDocumentTemplatePath,
+                        exportDefault,
+                        strategy);
+                    settings.ReportTemplateDefaults.PaymentVoucherTemplatePath = ReportTemplatePackageReferencePolicy.MergeDefault(
+                        settings.ReportTemplateDefaults.PaymentVoucherTemplatePath,
+                        paymentDefault,
+                        strategy);
+                    settings.BatchExport.Items = MergeBatchExportItems(
+                        settings.BatchExport.Items,
+                        exportTemplates,
+                        strategy);
+                    settings.PaymentTemplates = MergePaymentTemplateItems(
+                        settings.PaymentTemplates,
+                        internalTemplates,
+                        strategy);
+                    return true;
+                }, cancellationToken).ConfigureAwait(false);
 
                 int importedTemplateCount = manifest.Templates?.Count ?? 0;
                 OperationProgressReporter.Report(progress, "模板包导入完成", $"共加载 {importedTemplateCount} 个模板配置项。", 100);

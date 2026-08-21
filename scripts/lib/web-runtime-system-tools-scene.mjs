@@ -193,7 +193,10 @@ export function createSystemToolsSmokeScene(runtime) {
     }, timeoutMs, () => `Timed out waiting for Tauri updater source to become available: ${updateSource.version}.\nLast state: ${JSON.stringify(lastCheckedState)}`);
 
     const installAction = options.mockTauriRuntimeContext
-      ? await runUpdateCenterUiAction(page, "下载并安装")
+      ? {
+          ...await runUpdateCenterUiAction(page, "下载并安装"),
+          confirmation: await confirmUpdateCenterInstall(page, timeoutMs),
+        }
       : null;
     const installedState = options.mockTauriRuntimeContext
       ? await waitFor(async () => {
@@ -261,6 +264,32 @@ export function createSystemToolsSmokeScene(runtime) {
       invocations: Array.isArray(value.invocations) ? value.invocations : [],
       buttons: Array.isArray(value.buttons) ? value.buttons : [],
     };
+  }
+
+  async function confirmUpdateCenterInstall(page, timeoutMs) {
+    let latest = null;
+    return waitFor(async () => {
+      const result = await evaluate(
+        page,
+        `(() => {
+          const dialog = document.querySelector('.confirmation-dialog[role="dialog"]');
+          const confirmButton = dialog?.querySelector('button.confirmation-dialog-confirm');
+          const text = dialog?.innerText || dialog?.textContent || "";
+          if (!dialog || !confirmButton || confirmButton.disabled || !text.includes("下载并安装更新")) {
+            return null;
+          }
+
+          confirmButton.click();
+          return {
+            text,
+            confirmLabel: confirmButton.innerText || confirmButton.textContent || "",
+          };
+        })()`,
+        true,
+      ).catch((error) => ({ value: { error: error.message } }));
+      latest = result.value ?? null;
+      return latest?.text ? latest : null;
+    }, timeoutMs, () => `Timed out waiting for the update install confirmation. Last state: ${JSON.stringify(latest)}`);
   }
 
   async function runUpdateCenterUiAction(page, titlePart) {

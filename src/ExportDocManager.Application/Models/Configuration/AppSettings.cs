@@ -9,6 +9,7 @@ namespace ExportDocManager.Models
     public class AppSettings
     {
         public SystemSettings System { get; set; } = new SystemSettings();
+        public ReportTemplateDefaults ReportTemplateDefaults { get; set; } = new ReportTemplateDefaults();
         public BatchExportSettings BatchExport { get; set; } = new BatchExportSettings();
         public List<PaymentTemplateItem> PaymentTemplates { get; set; } = new List<PaymentTemplateItem>();
         public ExcelImportSettings ExcelImport { get; set; } = new ExcelImportSettings();
@@ -18,6 +19,13 @@ namespace ExportDocManager.Models
         public WebDavSettings WebDav { get; set; } = new WebDavSettings();
         public AISettings AI { get; set; } = new AISettings();
         public SingleWindowSettings SingleWindow { get; set; } = new SingleWindowSettings();
+    }
+
+    public sealed class ReportTemplateDefaults
+    {
+        public string ExportDocumentTemplatePath { get; set; } = string.Empty;
+
+        public string PaymentVoucherTemplatePath { get; set; } = string.Empty;
     }
 
     public class SingleWindowSettings

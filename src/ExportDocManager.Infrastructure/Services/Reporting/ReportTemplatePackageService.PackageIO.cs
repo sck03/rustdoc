@@ -96,7 +96,7 @@ namespace ExportDocManager.Services.Reporting
             }
             catch (JsonException ex)
             {
-                throw new InvalidDataException("模板包配置文件已损坏或不符合 1.1 清单结构。", ex);
+                throw new InvalidDataException($"模板包配置文件已损坏或不符合 {PackageSchemaVersion} 清单结构。", ex);
             }
         }
 
@@ -107,9 +107,11 @@ namespace ExportDocManager.Services.Reporting
                 throw new InvalidDataException($"模板包版本无效；当前仅接受 {PackageSchemaVersion} 清单。开发期旧格式请重新导出。");
             }
 
-            if (manifest.Templates == null || manifest.ExportTemplates == null || manifest.InternalTemplates == null)
+            if (manifest.Templates == null || manifest.TemplateDefaults == null ||
+                manifest.ExportTemplates == null || manifest.InternalTemplates == null)
             {
-                throw new InvalidDataException("模板包 1.1 清单必须包含 Templates、ExportTemplates 和 InternalTemplates 数组。");
+                throw new InvalidDataException(
+                    $"模板包 {PackageSchemaVersion} 清单必须包含 Templates、TemplateDefaults、ExportTemplates 和 InternalTemplates。");
             }
 
             for (int index = 0; index < manifest.Templates.Count; index++)
@@ -188,6 +190,9 @@ namespace ExportDocManager.Services.Reporting
 
             [JsonRequired]
             public List<TemplateRowManifest> Templates { get; set; } = new();
+
+            [JsonRequired]
+            public ReportTemplateDefaultsManifest TemplateDefaults { get; set; } = new();
 
             [JsonRequired]
             public List<BatchExportItemManifest> ExportTemplates { get; set; } = new();

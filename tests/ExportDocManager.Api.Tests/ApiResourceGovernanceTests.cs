@@ -31,7 +31,7 @@ public sealed class ApiResourceGovernanceTests
     }
 
     [Fact]
-    public void ResourcePartitions_ShouldSeparateSessionsBehindTheSameAddress()
+    public void AuthenticatedResourcePartitions_ShouldSeparateSessionsBehindTheSameAddress()
     {
         var context = new DefaultHttpContext();
         context.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("10.0.0.8");

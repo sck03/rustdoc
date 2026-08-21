@@ -60,12 +60,12 @@ export function InvoiceReportTemplateControls(p:Props){const {canConfigureOutput
             {showTemplateSettings ? <button
               className="command-button secondary"
               type="button"
-              title="管理单证模板"
+              title="管理报表默认值和单据包"
               disabled={isBusy}
               onClick={p.onManageTemplates}
             >
               <Settings size={17} aria-hidden="true" />
-              <span>模板设置</span>
+              <span>报表与输出设置</span>
             </button> : null}
             {showTemplateDesigner ? <button
               className="command-button secondary"

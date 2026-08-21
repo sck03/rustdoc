@@ -97,9 +97,7 @@ export function ContainerPackingScene3d({
     const renderer = new WebGLRenderer({
       antialias: true,
       alpha: false,
-      // The export path requests a one-shot render before reading the
-      // canvas. Keeping the drawing buffer alive for every frame otherwise
-      // increases GPU memory use on low-power devices.
+      // Retaining every frame increases GPU memory use on low-power devices.
       preserveDrawingBuffer: false,
     });
     renderer.setClearColor(0xf7fafc, 1);

@@ -7,7 +7,7 @@ import {
 export async function createSmokeInvoice(options, accessToken, tokenType) {
   const timestamp = Date.now();
   const invoiceNo = `SMOKE-INV-${timestamp}`;
-  const invoiceDate = `${new Date().toISOString().slice(0, 10)}T00:00:00`;
+  const invoiceDate = new Date().toISOString().slice(0, 10);
   const unitPrice = 12.34;
   const quantity = 10;
   const purchasePrice = 11.3;

@@ -616,18 +616,19 @@ export function createInvoiceDocumentOutputSmokeScene(runtime) {
     await page.send("Page.navigate", { url: checkUrl });
     const expectedText = [
       "设置",
-      "模板设置",
-      "单证模板设置",
+      "报表与输出",
+      "默认报表模板",
+      "发票单据包设置",
       "文件命名规则",
       "导出项",
-      "新增单证",
+      "添加单据项",
     ];
     const pageText = await waitForRuntimeDiagnostics(page, expectedText, timeoutMs);
     const panelCheck = await waitForPageExpression(
       page,
       `(() => {
-        const panel = document.querySelector('[aria-label="单证模板设置"]');
-        if (!panel || !window.location.hash.includes('/settings?section=batchExport')) {
+        const panel = document.querySelector('[aria-label="发票单据包设置"]');
+        if (!panel || !window.location.hash.includes('/settings?section=documentOutput')) {
           return false;
         }
   

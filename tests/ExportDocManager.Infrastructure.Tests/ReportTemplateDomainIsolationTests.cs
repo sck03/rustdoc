@@ -338,6 +338,11 @@ public sealed class ReportTemplateDomainIsolationTests
 
         var settings = new AppSettings
         {
+            ReportTemplateDefaults = new ReportTemplateDefaults
+            {
+                ExportDocumentTemplatePath = builtInPath,
+                PaymentVoucherTemplatePath = builtInPath
+            },
             BatchExport = new BatchExportSettings
             {
                 Items =
@@ -376,11 +381,15 @@ public sealed class ReportTemplateDomainIsolationTests
             Assert.Equal(Path.Combine(dataRoot, "Templates", category, fileName), result.TemplatePath);
             if (reportType == ReportDocumentType.PaymentVoucher)
             {
+                Assert.Equal(builtInPath, settings.ReportTemplateDefaults.ExportDocumentTemplatePath);
+                Assert.Equal(expectedStoredPath, settings.ReportTemplateDefaults.PaymentVoucherTemplatePath);
                 Assert.Equal(builtInPath, settings.BatchExport.Items.Single().TemplatePath);
                 Assert.Equal(expectedStoredPath, settings.PaymentTemplates.Single().TemplatePath);
             }
             else
             {
+                Assert.Equal(expectedStoredPath, settings.ReportTemplateDefaults.ExportDocumentTemplatePath);
+                Assert.Equal(builtInPath, settings.ReportTemplateDefaults.PaymentVoucherTemplatePath);
                 Assert.Equal(expectedStoredPath, settings.BatchExport.Items.Single().TemplatePath);
                 Assert.Equal(builtInPath, settings.PaymentTemplates.Single().TemplatePath);
             }
@@ -405,6 +414,10 @@ public sealed class ReportTemplateDomainIsolationTests
 
         var settings = new AppSettings
         {
+            ReportTemplateDefaults = new ReportTemplateDefaults
+            {
+                PaymentVoucherTemplatePath = "user:Internal/payment.html"
+            },
             PaymentTemplates =
             [
                 new PaymentTemplateItem
@@ -434,6 +447,11 @@ public sealed class ReportTemplateDomainIsolationTests
             var paymentManifestItem = Assert.Single(
                 document.RootElement.GetProperty("InternalTemplates").EnumerateArray());
             Assert.False(paymentManifestItem.TryGetProperty("ShowSeal", out _));
+            Assert.Equal(
+                "user:Internal/payment.html",
+                document.RootElement.GetProperty("TemplateDefaults")
+                    .GetProperty("PaymentVoucherTemplatePath")
+                    .GetString());
 
             var templateRows = document.RootElement.GetProperty("Templates").EnumerateArray().ToArray();
             var paymentTemplateRow = Assert.Single(
@@ -465,7 +483,7 @@ public sealed class ReportTemplateDomainIsolationTests
             Path.Combine(packageSource, "config.json"),
             """
             {
-              "PackageVersion": "1.1",
+              "PackageVersion": "1.2",
               "ExportedAt": "2026-07-29T00:00:00",
               "Templates": [
                 {
@@ -475,6 +493,10 @@ public sealed class ReportTemplateDomainIsolationTests
                   "WithSeal": false
                 }
               ],
+              "TemplateDefaults": {
+                "ExportDocumentTemplatePath": "",
+                "PaymentVoucherTemplatePath": "user:Internal/payment.html"
+              },
               "ExportTemplates": [],
               "InternalTemplates": [
                 {
@@ -522,6 +544,10 @@ public sealed class ReportTemplateDomainIsolationTests
               "PackageVersion": "1.0",
               "ExportedAt": "2026-07-29T00:00:00",
               "Templates": [],
+              "TemplateDefaults": {
+                "ExportDocumentTemplatePath": "",
+                "PaymentVoucherTemplatePath": ""
+              },
               "ExportTemplates": [],
               "InternalTemplates": []
             }
@@ -535,7 +561,7 @@ public sealed class ReportTemplateDomainIsolationTests
         {
             var error = await Assert.ThrowsAsync<InvalidDataException>(() => service.ImportAsync(packagePath));
 
-            Assert.Contains("当前仅接受 1.1", error.Message, StringComparison.Ordinal);
+            Assert.Contains("当前仅接受 1.2", error.Message, StringComparison.Ordinal);
             Assert.False(File.Exists(Path.Combine(dataRoot, "Templates", "Export", "invoice.html")));
         }
         finally

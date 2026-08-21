@@ -75,6 +75,7 @@ export class CdpClient {
     this.nextId = 1;
     this.pending = new Map();
     this.eventWaiters = [];
+    this.openDialogs = new Map();
     this.socket.addEventListener("message", (event) => {
       void this.handleMessage(event.data);
     });
@@ -119,6 +120,11 @@ export class CdpClient {
   async handleMessage(data) {
     const text = await readWebSocketData(data);
     const message = JSON.parse(text);
+    if (message.method === "Page.javascriptDialogOpening" && message.sessionId) {
+      this.openDialogs.set(message.sessionId, message.params || {});
+    } else if (message.method === "Page.javascriptDialogClosed" && message.sessionId) {
+      this.openDialogs.delete(message.sessionId);
+    }
     if (message.id && this.pending.has(message.id)) {
       const waiter = this.pending.get(message.id);
       this.pending.delete(message.id);
@@ -155,7 +161,14 @@ export class CdpClient {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         const target = sessionId ? ` in session ${sessionId}` : "";
-        reject(new Error(`Timed out waiting for DevTools command: ${method}${target}.`));
+        const dialog = sessionId ? this.openDialogs.get(sessionId) : null;
+        const dialogDetails = dialog
+          ? ` Open JavaScript dialog: ${dialog.type || "unknown"} ${JSON.stringify(dialog.message || "")}.`
+          : "";
+        const commandDetails = method === "Runtime.evaluate"
+          ? ` Expression: ${JSON.stringify(String(params.expression || "").slice(0, 240))}.`
+          : "";
+        reject(new Error(`Timed out waiting for DevTools command: ${method}${target}.${dialogDetails}${commandDetails}`));
       }, this.commandTimeoutMs);
       this.pending.set(id, { resolve, reject, timer });
       try {

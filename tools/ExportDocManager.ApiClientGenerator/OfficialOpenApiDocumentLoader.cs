@@ -21,12 +21,11 @@ internal static class OfficialOpenApiDocumentLoader
             "artifacts",
             "api-client-openapi",
             Guid.NewGuid().ToString("N"));
-        string databasePath = Path.Combine(dataRoot, "Database", "api-client.db");
         var pathProvider = new RuntimeAppPathProvider(repositoryRoot, dataRoot);
         var databaseSettings = new DatabaseConnectionSettings
         {
             Provider = DatabaseConnectionSettings.SqliteProvider,
-            SqliteDatabaseFileName = databasePath
+            SqliteDatabaseFileName = "api-client.db"
         };
         var runtimeOptions = new ApiRuntimeOptions
         {

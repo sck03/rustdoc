@@ -31,6 +31,7 @@ namespace ExportDocManager.Api.Hosting
             EnsureDefaults(source);
 
             target.System = source.System;
+            target.ReportTemplateDefaults = source.ReportTemplateDefaults;
             target.BatchExport = source.BatchExport;
             target.PaymentTemplates = source.PaymentTemplates;
             target.ExcelImport = source.ExcelImport;

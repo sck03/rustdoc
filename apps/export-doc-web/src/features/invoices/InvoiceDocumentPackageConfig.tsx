@@ -47,7 +47,7 @@ export function InvoiceDocumentPackageConfig(props:Props){const {canEdit:canEdit
               <span>可用占位符: {"{InvoiceNo}"} {"{Customer}"} {"{DocType}"} {"{Date}"}</span>
               <button className="command-button secondary" type="button" disabled={!canEditPackageConfig} onClick={addPackageConfigItem}>
                 <Plus size={17} aria-hidden="true" />
-                <span>新增单证</span>
+                <span>添加单据项</span>
               </button>
             </div>
             <ResponsiveTableFrame className="batch-export-items-frame document-package-config-frame" label="单据包配置项">

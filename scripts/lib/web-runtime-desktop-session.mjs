@@ -29,6 +29,13 @@ try {
 function buildMockTauriBootstrap(options) {
   return `
   globalThis.isTauri = true;
+  const exportDocManagerSmokeFetch = globalThis.fetch.bind(globalThis);
+  globalThis.fetch = (input, init) => {
+        const handler = window.__exportDocManagerSmokeFetchHandler;
+        return typeof handler === "function"
+          ? handler(input, init, exportDocManagerSmokeFetch)
+          : exportDocManagerSmokeFetch(input, init);
+  };
   window.__TAURI_INTERNALS__ = window.__TAURI_INTERNALS__ || {};
   window.__TAURI_INTERNALS__.invoke = async (command, args = {}) => {
         window.__exportDocManagerSmokeTauriInvocations = window.__exportDocManagerSmokeTauriInvocations || [];

@@ -12,11 +12,11 @@ import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { listPageSizeOptions, loadListViewState, normalizeListPageSize, saveListViewState } from "../../ui/listViewState.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { readDefaultReportTemplatePath, resolveReportTemplatePath } from "../reports/reportTemplateSelectionModel.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 import { InvoiceReportZipJobPanel, PdfMergeJobPanel } from "./JobCreationPanels.tsx";
 import { JobTable } from "./JobTable.tsx";
 import {
-  findPreferredInvoiceTemplate,
   hasActiveJobs,
   jobStatusOptions,
   readPathLines,
@@ -79,6 +79,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   });
 
   const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
+  const configuredReportTemplatePath = readDefaultReportTemplatePath(settingsQuery.data?.settings, "ExportDocument");
   const operations = useJobCenterOperations({
     client,
     queryClient,
@@ -124,11 +125,15 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   }, [committedKeyword, focusedJobId, pageSize]);
 
   useEffect(() => {
-    if (!reportTemplatesQuery.data?.length || reportTemplatePath) return;
-    const preferredTemplate = findPreferredInvoiceTemplate(reportTemplatesQuery.data);
-    operations.setReportTemplatePath(preferredTemplate.templatePath);
-    operations.setReportWithSeal(preferredTemplate.withSealDefault ?? true);
-  }, [operations, reportTemplatePath, reportTemplatesQuery.data]);
+    const templates = reportTemplatesQuery.data ?? [];
+    if (!templates.length || settingsQuery.isFetching) return;
+    const nextPath = resolveReportTemplatePath({ templates, currentPath: reportTemplatePath,
+      configuredPath: configuredReportTemplatePath, fallbackFileName: "invoice_template.html" });
+    if (nextPath === reportTemplatePath) return;
+    const preferredTemplate = templates.find((template) => template.templatePath === nextPath);
+    operations.setReportTemplatePath(nextPath);
+    operations.setReportWithSeal(preferredTemplate?.withSealDefault ?? true);
+  }, [configuredReportTemplatePath, operations, reportTemplatePath, reportTemplatesQuery.data, settingsQuery.isFetching]);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

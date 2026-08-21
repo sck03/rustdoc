@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import { templatePathsMatch } from "../reports/reportTemplateSelectionModel.ts";
 
 type SettingsRecord = Record<string, unknown>;
 
@@ -34,6 +35,52 @@ type TemplateSettingsPanelProps = {
   templateErrorMessage: string | null;
   onChange: (path: string[], value: unknown) => void;
 };
+
+export function ReportTemplateDefaultsPanel({
+  settings,
+  canManageSettings,
+  isBusy,
+  exportTemplates,
+  exportTemplatesLoading,
+  paymentTemplates,
+  paymentTemplatesLoading,
+  onChange,
+}: {
+  settings: SettingsRecord;
+  canManageSettings: boolean;
+  isBusy: boolean;
+  exportTemplates: ReportTemplateOption[];
+  exportTemplatesLoading: boolean;
+  paymentTemplates: ReportTemplateOption[];
+  paymentTemplatesLoading: boolean;
+  onChange: (path: string[], value: unknown) => void;
+}) {
+  return (
+    <section className="form-section batch-export-settings-section" aria-label="默认报表模板">
+      <div className="section-header"><h2>默认报表模板</h2></div>
+      <fieldset className="settings-fieldset" disabled={!canManageSettings || isBusy}>
+        <div className="field-grid">
+          <TemplateDefaultSetting
+            settings={settings}
+            path={["reportTemplateDefaults", "exportDocumentTemplatePath"]}
+            label="发票默认模板"
+            templates={exportTemplates}
+            disabled={exportTemplatesLoading}
+            onChange={onChange}
+          />
+          <TemplateDefaultSetting
+            settings={settings}
+            path={["reportTemplateDefaults", "paymentVoucherTemplatePath"]}
+            label="付款/报销默认模板"
+            templates={paymentTemplates}
+            disabled={paymentTemplatesLoading}
+            onChange={onChange}
+          />
+        </div>
+      </fieldset>
+    </section>
+  );
+}
 
 export function BatchExportSettingsPanel({
   settings,
@@ -101,13 +148,13 @@ export function BatchExportSettingsPanel({
   }
 
   return (
-    <section className="form-section batch-export-settings-section" aria-label="单证模板设置">
+    <section className="form-section batch-export-settings-section" aria-label="发票单据包设置">
       <div className="section-header">
-        <h2>单证模板设置</h2>
+        <h2>发票单据包设置</h2>
         <div className="toolbar-actions">
           <button className="command-button secondary" type="button" disabled={disabled} onClick={addItem}>
             <Plus size={17} aria-hidden="true" />
-            <span>新增单证</span>
+            <span>添加单据项</span>
           </button>
         </div>
       </div>
@@ -295,13 +342,13 @@ export function PaymentTemplateSettingsPanel({
   }
 
   return (
-    <section className="form-section batch-export-settings-section" aria-label="付款/报销模板设置">
+    <section className="form-section batch-export-settings-section" aria-label="付款/报销报表设置">
       <div className="section-header">
-        <h2>付款/报销模板设置</h2>
+        <h2>付款/报销报表设置</h2>
         <div className="toolbar-actions">
           <button className="command-button secondary" type="button" disabled={disabled} onClick={addItem}>
             <Plus size={17} aria-hidden="true" />
-            <span>新增模板</span>
+            <span>添加模板项</span>
           </button>
         </div>
       </div>
@@ -422,6 +469,39 @@ function TextSetting({
     <label>
       <span>{label}</span>
       <input value={readString(settings, path)} onChange={(event) => onChange(path, event.target.value)} />
+    </label>
+  );
+}
+
+function TemplateDefaultSetting({
+  settings,
+  path,
+  label,
+  templates,
+  disabled,
+  onChange,
+}: {
+  settings: SettingsRecord;
+  path: string[];
+  label: string;
+  templates: ReportTemplateOption[];
+  disabled: boolean;
+  onChange: (path: string[], value: unknown) => void;
+}) {
+  const configuredPath = readString(settings, path);
+  const selectedPath = templates.find((template) =>
+    templatePathsMatch(template.templatePath, configuredPath))?.templatePath ?? "";
+  return (
+    <label>
+      <span>{label}</span>
+      <select disabled={disabled} value={selectedPath} onChange={(event) => onChange(path, event.target.value)}>
+        <option value="">自动选择内置默认模板</option>
+        {templates.map((template) => (
+          <option key={template.templatePath} value={template.templatePath}>
+            {template.displayName || fileNameFromPath(template.templatePath)}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }

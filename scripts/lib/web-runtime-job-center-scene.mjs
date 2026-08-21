@@ -224,6 +224,7 @@ export function createJobCenterSmokeScene(runtime) {
         timeoutMs,
         "Timed out waiting for the container packing PDF export entry.",
       );
+      const containerPdfPath = path.join(options.userDataDir, "container-packing.pdf");
       await evaluate(
         page,
         `(() => {
@@ -234,17 +235,20 @@ export function createJobCenterSmokeScene(runtime) {
           window.__containerPackingPdfSmoke = {
             tauri: window.__TAURI__,
             invoke: window.__TAURI__?.core?.invoke,
-            fetch: window.fetch,
+            fetchHandler: window.__exportDocManagerSmokeFetchHandler,
             request: null,
           };
           if (!window.__containerPackingPdfSmoke.invoke) throw new Error('Mock Tauri invoke is unavailable.');
           window.__TAURI__.core.invoke = async (command, args) => {
-            if (command === 'select_save_pdf_path') return 'E:/Smoke/container-packing.pdf';
+            if (command === 'select_save_pdf_path') return ${JSON.stringify(containerPdfPath)};
             return window.__containerPackingPdfSmoke.invoke(command, args);
           };
-          window.fetch = async (input, init) => {
-            if (String(input).includes('/api/tools/container-packing/pdf/save-to-path')) {
-              const body = JSON.parse(String(init?.body || '{}'));
+          window.__exportDocManagerSmokeFetchHandler = async (input, init, fallback) => {
+            const request = input instanceof Request ? input : null;
+            const requestUrl = request?.url || String(input);
+            if (requestUrl.includes('/api/tools/container-packing/pdf/save-to-path')) {
+              const requestBody = request ? await request.clone().text() : String(init?.body || '{}');
+              const body = JSON.parse(requestBody || '{}');
               window.__containerPackingPdfSmoke.request = body;
               return new Response(JSON.stringify({
                 success: true,
@@ -253,7 +257,7 @@ export function createJobCenterSmokeScene(runtime) {
                 message: '装柜现场 PDF 已保存。',
               }), { status: 200, headers: { 'Content-Type': 'application/json' } });
             }
-            return window.__containerPackingPdfSmoke.fetch(input, init);
+            return fallback(input, init);
           };
           exportButton.click();
           return true;
@@ -268,7 +272,7 @@ export function createJobCenterSmokeScene(runtime) {
           const panel = document.querySelector('[aria-label="装箱分析"]');
           const text = panel?.innerText || '';
           return Boolean(request &&
-            request.destinationPath === 'E:/Smoke/container-packing.pdf' &&
+            request.destinationPath === ${JSON.stringify(containerPdfPath)} &&
             request.container?.length > 0 &&
             request.analysis?.packedItems?.length > 0 &&
             text.includes('PDF 已保存到'));
@@ -297,7 +301,7 @@ export function createJobCenterSmokeScene(runtime) {
           if (!smoke) return false;
           window.__TAURI__ = smoke.tauri;
           window.__TAURI__.core.invoke = smoke.invoke;
-          window.fetch = smoke.fetch;
+          window.__exportDocManagerSmokeFetchHandler = smoke.fetchHandler;
           delete window.__containerPackingPdfSmoke;
           return true;
         })()`,
@@ -1626,14 +1630,11 @@ export function createJobCenterSmokeScene(runtime) {
       changedCargoName: `Unsaved Cargo ${Math.floor(Math.random() * 100000)}`,
     };
 
-    const action = await evaluate(
+    await evaluate(
       page,
-      `(async (payload) => {
-        const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      `((payload) => {
         const panel = document.querySelector('[aria-label="装箱分析"]');
-        if (!panel) {
-          throw new Error("装箱分析区域未找到。");
-        }
+        if (!panel) throw new Error("装箱分析区域未找到。");
 
         const setNativeValue = (control, value) => {
           const prototype = Object.getPrototypeOf(control);
@@ -1648,175 +1649,211 @@ export function createJobCenterSmokeScene(runtime) {
           control.dispatchEvent(new Event("input", { bubbles: true }));
           control.dispatchEvent(new Event("change", { bubbles: true }));
         };
-
         const fieldByLabel = (labelText, selector = "input, select, textarea") => {
           const labels = Array.from(panel.querySelectorAll("label"));
           const label = labels.find((item) =>
             Array.from(item.querySelectorAll("span")).some((span) => (span.textContent || "").trim() === labelText));
-          if (!label) {
-            throw new Error("字段未找到: " + labelText);
-          }
-
+          if (!label) throw new Error("字段未找到: " + labelText);
           const control = label.querySelector(selector);
-          if (!control) {
-            throw new Error("字段没有控件: " + labelText);
-          }
-
+          if (!control) throw new Error("字段没有控件: " + labelText);
           return control;
         };
+        const row = panel.querySelector(".container-packing-cargo-table tbody tr:not(:has(.empty-cell))");
+        const cargoName = row?.querySelector("td:nth-child(2) input");
+        const quantity = row?.querySelector("td:nth-child(7) input");
+        const maxTopLoad = row?.querySelector("td:nth-child(11) input");
+        if (!cargoName || !quantity || !maxTopLoad) throw new Error("装柜货物输入框未找到。");
 
-        const firstCargoRow = () => {
-          const row = panel.querySelector(".container-packing-cargo-table tbody tr:not(:has(.empty-cell))");
-          if (!row) {
-            throw new Error("装柜货物行未找到。");
-          }
-
-          return row;
-        };
-
-        const firstCargoNameInput = () => {
-          const input = firstCargoRow().querySelector("td:nth-child(2) input");
-          if (!input) {
-            throw new Error("装柜货物名称输入框未找到。");
-          }
-
-          return input;
-        };
-
-        const firstCargoQuantityInput = () => {
-          const input = firstCargoRow().querySelector("td:nth-child(7) input");
-          if (!input) {
-            throw new Error("装柜货物数量输入框未找到。");
-          }
-
-          return input;
-        };
-
-        const firstCargoMaxTopLoadInput = () => {
-          const input = firstCargoRow().querySelector("td:nth-child(11) input");
-          if (!input) {
-            throw new Error("装柜货物顶载输入框未找到。");
-          }
-
-          return input;
-        };
-
-        const buttons = () => Array.from(panel.querySelectorAll("button"));
-        const findButton = (text) => buttons().find((button) => (button.innerText || "").includes(text));
-        const clickButton = (text) => {
-          const button = findButton(text);
-          if (!button) {
-            throw new Error("按钮未找到: " + text);
-          }
-          if (button.disabled) {
-            throw new Error("按钮不可用: " + text);
-          }
-
-          button.click();
-          return button.innerText || text;
-        };
-
-        const waitForCondition = async (predicate, description) => {
-          const deadline = Date.now() + ${Number(timeoutMs)};
-          let latest = {};
-          while (Date.now() < deadline) {
-            latest = {
-              projectName: fieldByLabel("方案名称").value || "",
-              cargoName: firstCargoNameInput().value || "",
-              selectedProjectId: fieldByLabel("已存方案", "select").value || "",
-              message: Array.from(panel.querySelectorAll(".inline-notice, .success-alert, .alert")).map((item) => item.innerText || "").join("\\n"),
-              optionText: Array.from(fieldByLabel("已存方案", "select").options).map((option) => option.textContent || "").join("\\n"),
-            };
-
-            if (predicate(latest)) {
-              return latest;
-            }
-
-            await delay(120);
-          }
-
-          throw new Error("等待装柜方案状态超时: " + description + " latest=" + JSON.stringify(latest));
-        };
-
-        const projectNameInput = fieldByLabel("方案名称");
-        const projectSelect = fieldByLabel("已存方案", "select");
-        setNativeValue(projectNameInput, payload.projectName);
-        setNativeValue(firstCargoNameInput(), payload.cargoName);
-        setNativeValue(firstCargoQuantityInput(), "10");
-        setNativeValue(firstCargoMaxTopLoadInput(), "1000");
-        await delay(100);
-
-        const saveButtonText = clickButton("保存方案");
-        const savedState = await waitForCondition(
-          (state) => state.optionText.includes(payload.projectName) && state.message.includes("装柜方案已保存"),
-          "保存装柜方案",
-        );
-        const savedOption = Array.from(projectSelect.options).find((option) => (option.textContent || "").includes(payload.projectName));
-        if (!savedOption) {
-          throw new Error("保存后的装柜方案选项未找到。");
-        }
-
-        setNativeValue(projectSelect, savedOption.value);
-        setNativeValue(projectNameInput, payload.changedProjectName);
-        setNativeValue(firstCargoNameInput(), payload.changedCargoName);
-        await delay(100);
-
-        const loadButtonText = clickButton("加载方案");
-        const loadedState = await waitForCondition(
-          (state) => state.projectName === payload.projectName && state.cargoName === payload.cargoName && state.message.includes("装柜方案已加载"),
-          "加载装柜方案",
-        );
-
-        const refreshedOption = Array.from(projectSelect.options).find((option) => (option.textContent || "").includes(payload.projectName));
-        if (refreshedOption) {
-          setNativeValue(projectSelect, refreshedOption.value);
-        }
-        const deleteButtonText = clickButton("删除方案");
-        const confirmationDeadline = Date.now() + ${Number(timeoutMs)};
-        let confirmMessage = "";
-        while (Date.now() < confirmationDeadline) {
-          const dialog = document.querySelector('.confirmation-dialog[role="dialog"]');
-          const confirmButton = dialog ? dialog.querySelector('button.confirmation-dialog-confirm') : null;
-          const text = dialog ? dialog.innerText || dialog.textContent || "" : "";
-          if (dialog && confirmButton && !confirmButton.disabled && text.includes("删除装柜方案")) {
-            confirmMessage = text;
-            confirmButton.click();
-            break;
-          }
-          await delay(100);
-        }
-        if (!confirmMessage) {
-          throw new Error("删除装柜方案确认窗口未出现。");
-        }
-        const deletedState = await waitForCondition(
-          (state) => !state.optionText.includes(payload.projectName) && state.message.includes("装柜方案已删除"),
-          "删除装柜方案",
-        );
-
-        return {
-          projectName: payload.projectName,
-          savedProjectId: Number(savedOption.value || 0),
-          saveButtonText,
-          loadButtonText,
-          deleteButtonText,
-          confirmMessage,
-          savedState,
-          loadedState,
-          deletedState,
-          saved: true,
-          loaded: true,
-          deleted: true,
-        };
+        setNativeValue(fieldByLabel("方案名称"), payload.projectName);
+        setNativeValue(cargoName, payload.cargoName);
+        setNativeValue(quantity, "10");
+        setNativeValue(maxTopLoad, "1000");
+        return true;
       })(${JSON.stringify(payload)})`,
       true,
     );
 
-    return action.value ?? {
+    await waitForContainerPackingProjectState(
+      page,
+      timeoutMs,
+      "等待装柜方案输入提交",
+      (state) => state.projectName === payload.projectName
+        && state.cargoName === payload.cargoName
+        && state.quantity === "10"
+        && state.maxTopLoad === "1000",
+    );
+
+    const saveAction = await clickContainerPackingProjectButton(page, "保存方案");
+    const savedState = await waitForContainerPackingProjectState(
+      page,
+      timeoutMs,
+      "保存装柜方案",
+      (state) => state.optionText.includes(payload.projectName) && state.message.includes("装柜方案已保存"),
+    );
+    const savedOption = savedState.options.find((option) => option.text.includes(payload.projectName));
+    if (!savedOption) throw new Error("保存后的装柜方案选项未找到。");
+
+    await setContainerPackingProjectSelection(page, {
+      projectId: savedOption.value,
+      projectName: payload.changedProjectName,
+      cargoName: payload.changedCargoName,
+    });
+    await waitForContainerPackingProjectState(
+      page,
+      timeoutMs,
+      "等待装柜方案加载条件",
+      (state) => state.selectedProjectId === savedOption.value
+        && state.projectName === payload.changedProjectName
+        && state.cargoName === payload.changedCargoName,
+    );
+
+    const loadAction = await clickContainerPackingProjectButton(page, "加载方案");
+    const loadedState = await waitForContainerPackingProjectState(
+      page,
+      timeoutMs,
+      "加载装柜方案",
+      (state) => state.projectName === payload.projectName
+        && state.cargoName === payload.cargoName
+        && state.message.includes("装柜方案已加载"),
+    );
+
+    await setContainerPackingProjectSelection(page, { projectId: savedOption.value });
+    await waitForContainerPackingProjectState(
+      page,
+      timeoutMs,
+      "等待装柜方案删除条件",
+      (state) => state.selectedProjectId === savedOption.value,
+    );
+    const deleteAction = await clickContainerPackingProjectButton(page, "删除方案");
+    const confirmMessage = await confirmContainerPackingProjectDeletion(page, timeoutMs);
+    const deletedState = await waitForContainerPackingProjectState(
+      page,
+      timeoutMs,
+      "删除装柜方案",
+      (state) => !state.optionText.includes(payload.projectName) && state.message.includes("装柜方案已删除"),
+    );
+
+    return {
       projectName: payload.projectName,
+      savedProjectId: Number(savedOption.value || 0),
+      saveButtonText: saveAction.buttonText,
+      loadButtonText: loadAction.buttonText,
+      deleteButtonText: deleteAction.buttonText,
+      confirmMessage,
+      savedState,
+      loadedState,
+      deletedState,
       saved: true,
       loaded: true,
       deleted: true,
     };
+  }
+
+  async function waitForContainerPackingProjectState(page, timeoutMs, description, predicate) {
+    let latest = null;
+    return waitFor(async () => {
+      const result = await evaluate(
+        page,
+        `(() => {
+          const panel = document.querySelector('[aria-label="装箱分析"]');
+          const labels = panel ? Array.from(panel.querySelectorAll("label")) : [];
+          const fieldByLabel = (labelText, selector = "input, select, textarea") => {
+            const label = labels.find((item) =>
+              Array.from(item.querySelectorAll("span")).some((span) => (span.textContent || "").trim() === labelText));
+            return label?.querySelector(selector) || null;
+          };
+          const row = panel?.querySelector(".container-packing-cargo-table tbody tr:not(:has(.empty-cell))");
+          const select = fieldByLabel("已存方案", "select");
+          return {
+            panelFound: Boolean(panel),
+            projectName: fieldByLabel("方案名称")?.value || "",
+            cargoName: row?.querySelector("td:nth-child(2) input")?.value || "",
+            quantity: row?.querySelector("td:nth-child(7) input")?.value || "",
+            maxTopLoad: row?.querySelector("td:nth-child(11) input")?.value || "",
+            selectedProjectId: select?.value || "",
+            message: panel ? Array.from(panel.querySelectorAll(".inline-notice, .success-alert, .alert")).map((item) => item.innerText || "").join("\\n") : "",
+            optionText: select ? Array.from(select.options).map((option) => option.textContent || "").join("\\n") : "",
+            options: select ? Array.from(select.options).map((option) => ({ value: option.value, text: option.textContent || "" })) : [],
+          };
+        })()`,
+        true,
+      ).catch((error) => ({ value: { error: error.message } }));
+      latest = result.value ?? null;
+      return latest && predicate(latest) ? latest : null;
+    }, timeoutMs, () => `等待装柜方案状态超时: ${description} latest=${JSON.stringify(latest)}`);
+  }
+
+  async function setContainerPackingProjectSelection(page, { projectId, projectName, cargoName }) {
+    await evaluate(
+      page,
+      `((values) => {
+        const panel = document.querySelector('[aria-label="装箱分析"]');
+        if (!panel) throw new Error("装箱分析区域未找到。");
+        const setNativeValue = (control, value) => {
+          const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(control), "value");
+          if (descriptor && typeof descriptor.set === "function") descriptor.set.call(control, value);
+          else control.value = value;
+          control.focus();
+          control.dispatchEvent(new Event("input", { bubbles: true }));
+          control.dispatchEvent(new Event("change", { bubbles: true }));
+        };
+        const labels = Array.from(panel.querySelectorAll("label"));
+        const fieldByLabel = (labelText, selector = "input, select, textarea") => {
+          const label = labels.find((item) =>
+            Array.from(item.querySelectorAll("span")).some((span) => (span.textContent || "").trim() === labelText));
+          const control = label?.querySelector(selector);
+          if (!control) throw new Error("字段没有控件: " + labelText);
+          return control;
+        };
+        const row = panel.querySelector(".container-packing-cargo-table tbody tr:not(:has(.empty-cell))");
+        const cargoNameInput = row?.querySelector("td:nth-child(2) input");
+        setNativeValue(fieldByLabel("已存方案", "select"), values.projectId);
+        if (values.projectName != null) setNativeValue(fieldByLabel("方案名称"), values.projectName);
+        if (values.cargoName != null) {
+          if (!cargoNameInput) throw new Error("装柜货物名称输入框未找到。");
+          setNativeValue(cargoNameInput, values.cargoName);
+        }
+        return true;
+      })(${JSON.stringify({ projectId, projectName, cargoName })})`,
+      true,
+    );
+  }
+
+  async function clickContainerPackingProjectButton(page, text) {
+    const result = await evaluate(
+      page,
+      `((buttonText) => {
+        const panel = document.querySelector('[aria-label="装箱分析"]');
+        const button = panel ? Array.from(panel.querySelectorAll("button")).find((item) => (item.innerText || "").includes(buttonText)) : null;
+        if (!button) throw new Error("按钮未找到: " + buttonText);
+        if (button.disabled) throw new Error("按钮不可用: " + buttonText);
+        const actualText = button.innerText || buttonText;
+        button.click();
+        return { buttonText: actualText };
+      })(${JSON.stringify(text)})`,
+      true,
+    );
+    return result.value ?? { buttonText: text };
+  }
+
+  async function confirmContainerPackingProjectDeletion(page, timeoutMs) {
+    let latest = null;
+    return waitFor(async () => {
+      const result = await evaluate(
+        page,
+        `(() => {
+          const dialog = document.querySelector('.confirmation-dialog[role="dialog"]');
+          const confirmButton = dialog?.querySelector('button.confirmation-dialog-confirm');
+          const text = dialog ? dialog.innerText || dialog.textContent || "" : "";
+          if (!dialog || !confirmButton || confirmButton.disabled || !text.includes("删除装柜方案")) return null;
+          confirmButton.click();
+          return text;
+        })()`,
+        true,
+      ).catch((error) => ({ value: { error: error.message } }));
+      latest = result.value ?? null;
+      return typeof latest === "string" && latest ? latest : null;
+    }, timeoutMs, () => `等待删除装柜方案确认超时: latest=${JSON.stringify(latest)}`);
   }
 
   async function createSmokeJobCenterOutputJob(options, accessToken, tokenType, timeoutMs) {
@@ -1954,9 +1991,9 @@ export function createJobCenterSmokeScene(runtime) {
   async function waitForContainerPacking3dCanvas(page, timeoutMs, viewportName) {
     let latest = null;
     await waitFor(async () => {
-      const result = await evaluate(
+      const layoutResult = await evaluate(
         page,
-        `(async () => {
+        `(() => {
         const panel = document.querySelector('[aria-label="装箱分析"]');
         const visualization = panel ? panel.querySelector('[aria-label="装柜三维可视化"]') : null;
         const canvas = visualization ? visualization.querySelector('canvas[aria-label="装柜三维画布"]') : null;
@@ -1977,15 +2014,42 @@ export function createJobCenterSmokeScene(runtime) {
           };
         }
 
-        const snapshotEvent = new CustomEvent('exportdoc:capture-container-packing-scene', {
-          detail: { dataUrl: null },
-        });
-        canvas.dispatchEvent(snapshotEvent);
-        const dataUrl = snapshotEvent.detail.dataUrl;
-        if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/png;base64,')) {
-          return { passed: false, reason: 'snapshot-unavailable' };
-        }
+        return {
+          ready: true,
+          x: rect.left + window.scrollX,
+          y: rect.top + window.scrollY,
+          width: rect.width,
+          height: rect.height,
+        };
+      })()`,
+        true,
+      ).catch((error) => ({ value: { passed: false, reason: error.message } }));
+      const layout = layoutResult.value ?? null;
+      if (!layout?.ready) {
+        latest = layout;
+        return null;
+      }
 
+      const screenshot = await page.send("Page.captureScreenshot", {
+        format: "png",
+        captureBeyondViewport: false,
+        clip: {
+          x: layout.x,
+          y: layout.y,
+          width: layout.width,
+          height: layout.height,
+          scale: 1,
+        },
+      }).catch((error) => ({ data: "", error: error.message }));
+      if (!screenshot.data) {
+        latest = { passed: false, reason: screenshot.error || "snapshot-unavailable" };
+        return null;
+      }
+
+      const result = await evaluate(
+        page,
+        `(async () => {
+        const dataUrl = ${JSON.stringify("data:image/png;base64,")} + ${JSON.stringify(screenshot.data)};
         const renderedImage = new Image();
         renderedImage.src = dataUrl;
         if (typeof renderedImage.decode === 'function') {

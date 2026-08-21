@@ -30,8 +30,8 @@ export function createMasterDataSmokeScene(runtime) {
         };
 
         const customerNameEN = fieldByLabel('客户英文名');
-        const notifyPartyName = fieldByLabel('通知人');
-        if (!customerNameEN || !notifyPartyName) {
+        const notifyPartyMode = fieldByLabel('通知人方式');
+        if (!customerNameEN || !notifyPartyMode) {
           return false;
         }
 
@@ -41,7 +41,7 @@ export function createMasterDataSmokeScene(runtime) {
           bubbles: true,
           cancelable: true,
         }));
-        return document.activeElement === notifyPartyName;
+        return document.activeElement === notifyPartyMode;
       })()`,
       timeoutMs,
       "Timed out waiting for master data editor Enter-as-Tab keyboard flow.",

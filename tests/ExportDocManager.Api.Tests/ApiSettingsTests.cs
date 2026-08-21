@@ -128,6 +128,28 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
+        public void SettingsResponse_ShouldPreserveDefaultReportTemplates()
+        {
+            var settings = new AppSettings
+            {
+                ReportTemplateDefaults = new ReportTemplateDefaults
+                {
+                    ExportDocumentTemplatePath = "user:Export/customer-invoice.html",
+                    PaymentVoucherTemplatePath = "builtin:Internal/expense_reimbursement_template.html"
+                }
+            };
+
+            var response = ApiSettingsDtoFactory.FromSettings(settings);
+
+            Assert.Equal(
+                "user:Export/customer-invoice.html",
+                response.Settings.ReportTemplateDefaults.ExportDocumentTemplatePath);
+            Assert.Equal(
+                "builtin:Internal/expense_reimbursement_template.html",
+                response.Settings.ReportTemplateDefaults.PaymentVoucherTemplatePath);
+        }
+
+        [Fact]
         public void SettingsResponse_ShouldPreserveBatchExportItemOrder()
         {
             var settings = new AppSettings

@@ -103,7 +103,7 @@ export function authorizedJsonHeaders(options, accessToken, tokenType = "Bearer"
 }
 
 export function buildBatchExportSettingsDeepLinkUrl(webUrl) {
-  return buildSettingsSectionUrl(webUrl, "batchExport", "smokeBatchExportSettings");
+  return buildSettingsSectionUrl(webUrl, "documentOutput", "smokeBatchExportSettings");
 }
 
 export function buildDocumentEmailSettingsDeepLinkUrl(webUrl) {

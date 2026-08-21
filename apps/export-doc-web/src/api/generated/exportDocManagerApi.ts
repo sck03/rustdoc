@@ -3076,6 +3076,7 @@ export interface AppSettings {
   excelImportSchemes: ExcelImportSettings[];
   exchangeRate: ExchangeRateSettings;
   paymentTemplates: PaymentTemplateItem[];
+  reportTemplateDefaults: ReportTemplateDefaults;
   singleWindow: SingleWindowSettings;
   system: SystemSettings;
   webDav: WebDavSettings;
@@ -3364,6 +3365,11 @@ export interface PaymentTemplateItem {
   name: string;
   reportType: string;
   templatePath: string;
+}
+
+export interface ReportTemplateDefaults {
+  exportDocumentTemplatePath: string;
+  paymentVoucherTemplatePath: string;
 }
 
 export type SingleWindowBusinessType = "CustomsCoo" | "AgentConsignment";

@@ -88,7 +88,7 @@ internal static class ApiResourceGovernanceExtensions
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.GlobalLimiter = PartitionedRateLimiter.CreateChained(
-                PartitionedRateLimiter.Create<HttpContext, string>(CreateFixedWindowPartition),
+                PartitionedRateLimiter.Create<HttpContext, string>(CreateTokenBucketPartition),
                 PartitionedRateLimiter.Create<HttpContext, string>(CreateConcurrencyPartition));
             options.OnRejected = async (context, cancellationToken) =>
             {
@@ -123,7 +123,7 @@ internal static class ApiResourceGovernanceExtensions
         return app;
     }
 
-    private static RateLimitPartition<string> CreateFixedWindowPartition(HttpContext context)
+    private static RateLimitPartition<string> CreateTokenBucketPartition(HttpContext context)
     {
         ApiResourceProfile? profile = ApiResourcePolicyCatalog.Resolve(context);
         if (profile == null)
@@ -132,16 +132,19 @@ internal static class ApiResourceGovernanceExtensions
         }
 
         ApiResourceLimits limits = ApiResourcePolicyCatalog.GetLimits(profile.Value);
-        string clientKey = ResolveAddressKey(context);
+        int tokensPerPeriod = Math.Max(1, limits.RequestsPerMinute / 10);
+        string clientKey = ResolveClientKey(context, profile.Value);
         string partitionKey = $"{profile.Value}:{clientKey}";
-        return RateLimitPartition.GetFixedWindowLimiter(
+        return RateLimitPartition.GetTokenBucketLimiter(
             partitionKey,
-            _ => new FixedWindowRateLimiterOptions
+            _ => new TokenBucketRateLimiterOptions
             {
                 AutoReplenishment = true,
-                PermitLimit = limits.RequestsPerMinute,
+                TokenLimit = limits.RequestsPerMinute,
+                TokensPerPeriod = tokensPerPeriod,
                 QueueLimit = 0,
-                Window = TimeSpan.FromMinutes(1)
+                ReplenishmentPeriod = TimeSpan.FromMinutes(
+                    (double)tokensPerPeriod / limits.RequestsPerMinute)
             });
     }
 

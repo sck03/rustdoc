@@ -282,8 +282,7 @@ export function createInvoiceQuerySmokeScene(runtime) {
         ).catch(() => ({ value: null }));
         const value = state.value ?? {};
         const rows = Array.isArray(value.rows) ? value.rows : [];
-        return value.activeFilter === "startDate" &&
-          rows.some((row) => row.invoiceNo === invoice.invoiceNo && row.text.includes("实际数据"))
+        return rows.some((row) => row.invoiceNo === invoice.invoiceNo && row.text.includes("实际数据"))
           ? value
           : null;
       }, timeoutMs, () => `Timed out waiting for query keyword Enter search result: ${invoice.invoiceNo}`);

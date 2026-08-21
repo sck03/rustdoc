@@ -10,11 +10,9 @@ export function readSettingsCategoryFromSearch(
 ): SettingsCategoryKey {
   let category: SettingsCategoryKey;
   switch (readSettingsSection(search)) {
-    case "batchExport":
-    case "documentTemplates":
-    case "paymentTemplates":
-    case "documents":
-      category = "document-templates";
+    case "documentOutput":
+    case "paymentReports":
+      category = "report-output";
       break;
     case "excelImport":
       category = "excel-import";
@@ -54,12 +52,10 @@ export function readSettingsCategoryFromSearch(
 
 export function readSettingsPanelLabelFromSearch(search: string) {
   switch (readSettingsSection(search)) {
-    case "batchExport":
-    case "documentTemplates":
-    case "documents":
-      return "单证模板设置";
-    case "paymentTemplates":
-      return "付款/报销模板设置";
+    case "documentOutput":
+      return "发票单据包设置";
+    case "paymentReports":
+      return "付款/报销报表设置";
     case "excelImport":
       return "Excel 导入方案";
     case "exchangeRate":

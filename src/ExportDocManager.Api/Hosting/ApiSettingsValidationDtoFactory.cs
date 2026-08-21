@@ -60,6 +60,7 @@ namespace ExportDocManager.Api.Hosting
         private static void EnsureValidationObjects(AppSettings settings)
         {
             settings.System ??= new SystemSettings();
+            settings.ReportTemplateDefaults ??= new ReportTemplateDefaults();
             settings.BatchExport ??= new BatchExportSettings();
             settings.PaymentTemplates ??= new List<PaymentTemplateItem>();
             settings.ExcelImport ??= new ExcelImportSettings();

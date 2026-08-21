@@ -47,16 +47,17 @@ export function createSettingsBackupSmokeScene(runtime) {
     await page.send("Page.navigate", { url: templateUrl });
     const templateExpectedText = [
       "设置",
-      "模板设置",
-      "单证模板设置",
+      "报表与输出",
+      "默认报表模板",
+      "发票单据包设置",
       "文件命名规则",
       "文件夹命名规则",
       "默认合并 PDF",
       "默认生成 ZIP",
-      "新增单证",
+      "添加单据项",
       "导出项",
-      "付款/报销模板设置",
-      "新增模板",
+      "付款/报销报表设置",
+      "添加模板项",
       "付款/报销模板",
     ];
     const templatePageText = await waitForRuntimeDiagnostics(page, templateExpectedText, timeoutMs);
@@ -64,7 +65,7 @@ export function createSettingsBackupSmokeScene(runtime) {
     const batchExportSettingsCheck = await waitForPageExpression(
       page,
       `(() => {
-        const panel = document.querySelector('[aria-label="单证模板设置"]');
+        const panel = document.querySelector('[aria-label="发票单据包设置"]');
         const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
         const rows = panel ? Array.from(panel.querySelectorAll('tbody tr')).filter((row) => !row.querySelector('.empty-cell')) : [];
         const text = panel ? panel.innerText || '' : '';
@@ -79,7 +80,7 @@ export function createSettingsBackupSmokeScene(runtime) {
           text.includes('默认生成 ZIP') &&
           (rows.length === 0 || rows.every((row) => row.querySelector('select.batch-export-cell-input'))) &&
           !panel.querySelector('.batch-export-path-input') &&
-          buttons.some((button) => (button.innerText || '').includes('新增单证')));
+          buttons.some((button) => (button.innerText || '').includes('添加单据项')));
       })()`,
       timeoutMs,
       "Timed out waiting for the batch export settings panel.",
@@ -90,7 +91,7 @@ export function createSettingsBackupSmokeScene(runtime) {
     const paymentTemplateSettingsCheck = await waitForPageExpression(
       page,
       `(() => {
-        const panel = document.querySelector('[aria-label="付款/报销模板设置"]');
+        const panel = document.querySelector('[aria-label="付款/报销报表设置"]');
         const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
         const rows = panel ? Array.from(panel.querySelectorAll('tbody tr')).filter((row) => !row.querySelector('.empty-cell')) : [];
         const text = panel ? panel.innerText || '' : '';
@@ -100,7 +101,7 @@ export function createSettingsBackupSmokeScene(runtime) {
           text.includes('付款/报销模板') &&
           (rows.length === 0 || rows.every((row) => row.querySelector('select.batch-export-cell-input'))) &&
           !panel.querySelector('.batch-export-path-input') &&
-          buttons.some((button) => (button.innerText || '').includes('新增模板')));
+          buttons.some((button) => (button.innerText || '').includes('添加模板项')));
       })()`,
       timeoutMs,
       "Timed out waiting for the payment template settings panel.",
@@ -527,8 +528,8 @@ export function createSettingsBackupSmokeScene(runtime) {
 
   async function waitForBatchExportOrderInteractionCheck(page, timeoutMs) {
     return waitForTemplateOrderInteractionCheck(page, timeoutMs, {
-      panelLabel: "单证模板设置",
-      addButtonText: "新增单证",
+      panelLabel: "发票单据包设置",
+      addButtonText: "添加单据项",
       firstName: "Smoke Batch Export Alpha",
       secondName: "Smoke Batch Export Beta",
       description: "batch export item",
@@ -537,8 +538,8 @@ export function createSettingsBackupSmokeScene(runtime) {
 
   async function waitForPaymentTemplateOrderInteractionCheck(page, timeoutMs) {
     return waitForTemplateOrderInteractionCheck(page, timeoutMs, {
-      panelLabel: "付款/报销模板设置",
-      addButtonText: "新增模板",
+      panelLabel: "付款/报销报表设置",
+      addButtonText: "添加模板项",
       firstName: "Smoke Payment Template Alpha",
       secondName: "Smoke Payment Template Beta",
       description: "payment template",

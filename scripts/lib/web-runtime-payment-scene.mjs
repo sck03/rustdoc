@@ -188,7 +188,7 @@ export function createPaymentSmokeScene(runtime) {
         "输出 PDF",
         "生成 PDF",
         "打印",
-        "模板设置",
+        "报表设置",
         payment.invoiceNo,
       ];
 
@@ -206,8 +206,8 @@ export function createPaymentSmokeScene(runtime) {
         `(() => {
           const panel = document.querySelector('[aria-label="付款/报销单预览"]');
           const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
-          const button = buttons.find((element) => (element.innerText || '').includes('模板设置'));
-          return Boolean(button && !button.disabled && (button.title || '').includes('管理付款/报销模板'));
+          const button = buttons.find((element) => (element.innerText || '').includes('报表设置'));
+          return Boolean(button && !button.disabled && (button.title || '').includes('管理付款/报销报表设置'));
         })()`,
         timeoutMs,
         "Timed out waiting for the payment template settings button.",
@@ -247,13 +247,17 @@ export function createPaymentSmokeScene(runtime) {
         true,
       );
 
+      const defaultPreviewMarkers = paymentTemplateSettings.reimbursementPath &&
+        normalizePathForCompare(paymentTemplateSettings.defaultPath) === normalizePathForCompare(paymentTemplateSettings.reimbursementPath)
+        ? ["费用报销明细单", payment.payerName]
+        : [payment.invoiceNo, payment.payeeName];
       const previewFrameCheck = await waitForPageExpression(
         page,
         `(() => {
           const frame = document.querySelector('iframe[title="付款/报销单 HTML 预览"]');
           const srcdoc = frame ? (frame.getAttribute('srcdoc') || frame.srcdoc || '') : '';
-          return srcdoc.includes(${JSON.stringify(payment.invoiceNo)}) &&
-            srcdoc.includes(${JSON.stringify(payment.payeeName)});
+          const markers = ${JSON.stringify(defaultPreviewMarkers)};
+          return Boolean(frame && srcdoc && markers.every((marker) => srcdoc.includes(marker)));
         })()`,
         timeoutMs,
         `Timed out waiting for payment report preview HTML: ${payment.invoiceNo}`,
@@ -269,6 +273,40 @@ export function createPaymentSmokeScene(runtime) {
         })()`,
         timeoutMs,
         "Timed out waiting for the payment report print button to become available.",
+      );
+
+      await evaluate(
+        page,
+        `(() => {
+          const panel = document.querySelector('[aria-label="付款/报销单预览"]');
+          const select = panel ? panel.querySelector('select') : null;
+          const targetValue = ${JSON.stringify(paymentTemplateSettings.preferredPath)};
+          if (!select || !Array.from(select.options).some((option) => option.value === targetValue)) {
+            throw new Error('Payment voucher template option is not available for draft preview.');
+          }
+
+          const valueSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+          if (valueSetter) {
+            valueSetter.call(select, targetValue);
+          } else {
+            select.value = targetValue;
+          }
+          select.dispatchEvent(new Event('input', { bubbles: true }));
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          return select.value;
+        })()` ,
+        true,
+      );
+      await waitForPageExpression(
+        page,
+        `(() => {
+          const panel = document.querySelector('[aria-label="付款/报销单预览"]');
+          const select = panel ? panel.querySelector('select') : null;
+          return Boolean(select && select.value === ${JSON.stringify(paymentTemplateSettings.preferredPath)} &&
+            !panel.querySelector('iframe[title="付款/报销单 HTML 预览"]'));
+        })()`,
+        timeoutMs,
+        "Timed out waiting for the payment voucher template before draft preview.",
       );
 
       const draftProjectValue = `Smoke Payment Draft Project ${payment.id}`;
@@ -633,16 +671,16 @@ export function createPaymentSmokeScene(runtime) {
     await page.send("Page.navigate", { url: checkUrl });
     const expectedText = [
       "设置",
-      "付款/报销模板设置",
+      "付款/报销报表设置",
       "付款/报销模板",
-      "新增模板",
+      "添加模板项",
     ];
     const pageText = await waitForRuntimeDiagnostics(page, expectedText, timeoutMs);
     const panelCheck = await waitForPageExpression(
       page,
       `(() => {
-        const panel = document.querySelector('[aria-label="付款/报销模板设置"]');
-        if (!panel || !window.location.hash.includes('/settings?section=paymentTemplates')) {
+        const panel = document.querySelector('[aria-label="付款/报销报表设置"]');
+        if (!panel || !window.location.hash.includes('/settings?section=paymentReports')) {
           return false;
         }
 
@@ -718,6 +756,20 @@ export function createPaymentSmokeScene(runtime) {
       });
     }
 
+    const defaultTemplate = reimbursementTemplate ?? preferredTemplate;
+    const templateDefaults = cloneJson(
+      smokeSettings.reportTemplateDefaults ?? smokeSettings.ReportTemplateDefaults ?? {},
+    );
+    setRecordValueKeepingExistingCase(
+      templateDefaults,
+      ["paymentVoucherTemplatePath", "PaymentVoucherTemplatePath"],
+      defaultTemplate.templatePath,
+    );
+    setRecordValueKeepingExistingCase(
+      smokeSettings,
+      ["reportTemplateDefaults", "ReportTemplateDefaults"],
+      templateDefaults,
+    );
     setRecordValueKeepingExistingCase(smokeSettings, ["paymentTemplates", "PaymentTemplates"], paymentTemplates);
     await saveApiSettings(options, accessToken, tokenType, smokeSettings);
 
@@ -725,6 +777,7 @@ export function createPaymentSmokeScene(runtime) {
       originalSettings,
       preferredName,
       preferredPath: preferredTemplate.templatePath,
+      defaultPath: defaultTemplate.templatePath,
       reimbursementName: reimbursementTemplate ? reimbursementName : "",
       reimbursementPath: reimbursementTemplate?.templatePath ?? "",
       disabledName: disabledTemplate ? disabledName : "",
@@ -747,6 +800,7 @@ export function createPaymentSmokeScene(runtime) {
           })) : [];
           const preferredName = ${JSON.stringify(settings.preferredName)};
           const preferredPath = ${JSON.stringify(settings.preferredPath)};
+          const defaultPath = ${JSON.stringify(settings.defaultPath)};
           const reimbursementName = ${JSON.stringify(settings.reimbursementName)};
           const reimbursementPath = ${JSON.stringify(settings.reimbursementPath)};
           const disabledName = ${JSON.stringify(settings.disabledName)};
@@ -756,15 +810,15 @@ export function createPaymentSmokeScene(runtime) {
             options.some((option) => option.text.includes(reimbursementName) && option.value === reimbursementPath);
           const disabledLabelHidden = !disabledName || !options.some((option) => option.text.includes(disabledName));
           const disabledPathHidden = !disabledPath || !options.some((option) => option.value === disabledPath);
-          const selectedPreferred = Boolean(select && select.value === preferredPath);
+          const selectedDefault = Boolean(select && select.value === defaultPath);
           const sealControlAbsent = Boolean(panel && !panel.querySelector('.toggle-field, [aria-label*="章"], [title*="章"]'));
           return {
-            found: Boolean(preferredVisible && reimbursementVisible && disabledLabelHidden && disabledPathHidden && selectedPreferred && sealControlAbsent),
+            found: Boolean(preferredVisible && reimbursementVisible && disabledLabelHidden && disabledPathHidden && selectedDefault && sealControlAbsent),
             preferredVisible,
             reimbursementVisible,
             disabledLabelHidden,
             disabledPathHidden,
-            selectedPreferred,
+            selectedDefault,
             sealControlAbsent,
             selectedValue: select ? select.value : '',
             options,
@@ -927,7 +981,7 @@ export function createPaymentSmokeScene(runtime) {
   async function createSmokePayment(options, accessToken, tokenType) {
     const timestamp = Date.now();
     const invoiceNo = `SMOKE-PAY-${timestamp}`;
-    const paymentDate = `${new Date().toISOString().slice(0, 10)}T00:00:00`;
+    const paymentDate = new Date().toISOString().slice(0, 10);
     const body = {
       id: 0,
       invoiceNo,
@@ -1000,7 +1054,7 @@ export function createPaymentSmokeScene(runtime) {
   function buildPaymentTemplateSettingsDeepLinkUrl(webUrl) {
     const url = new URL(webUrl);
     url.searchParams.set("smokePaymentTemplateSettings", "1");
-    url.hash = "/settings?section=paymentTemplates";
+    url.hash = "/settings?section=paymentReports";
     return url.toString();
   }
 

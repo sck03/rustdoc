@@ -1,6 +1,6 @@
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
-import { BatchExportSettingsPanel, PaymentTemplateSettingsPanel } from "./DocumentTemplateSettingsPanels.tsx";
+import { BatchExportSettingsPanel, PaymentTemplateSettingsPanel, ReportTemplateDefaultsPanel } from "./DocumentTemplateSettingsPanels.tsx";
 import type { SettingsRecord } from "./settingsTypes.ts";
 
 export default function DocumentTemplateSettingsCategory({ settings, canManageSettings, isBusy, exportTemplates, exportTemplatesLoading, exportTemplateError, paymentTemplates, paymentTemplatesLoading, paymentTemplateError, onChange }: {
@@ -17,6 +17,7 @@ export default function DocumentTemplateSettingsCategory({ settings, canManageSe
 }) {
   return (
     <>
+      <ReportTemplateDefaultsPanel settings={settings} canManageSettings={canManageSettings} isBusy={isBusy} exportTemplates={exportTemplates} exportTemplatesLoading={exportTemplatesLoading} paymentTemplates={paymentTemplates} paymentTemplatesLoading={paymentTemplatesLoading} onChange={onChange} />
       <BatchExportSettingsPanel settings={settings} canManageSettings={canManageSettings} isBusy={isBusy} templates={exportTemplates} templatesLoading={exportTemplatesLoading} templateErrorMessage={exportTemplateError ? readApiError(exportTemplateError) : null} onChange={onChange} />
       <PaymentTemplateSettingsPanel settings={settings} canManageSettings={canManageSettings} isBusy={isBusy} templates={paymentTemplates} templatesLoading={paymentTemplatesLoading} templateErrorMessage={paymentTemplateError ? readApiError(paymentTemplateError) : null} onChange={onChange} />
     </>

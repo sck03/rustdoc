@@ -312,20 +312,26 @@ namespace ExportDocManager.Services.Reporting
             string normalizedCurrentPath = _catalogLoader.NormalizeStoredTemplatePath(currentTemplatePath);
             await _settingsService.UpdateAsync(settings =>
             {
+                bool changed = UpdateDefaultTemplateReference(
+                    settings.ReportTemplateDefaults,
+                    reportType,
+                    normalizedPreviousPath,
+                    normalizedPreviousAbsolutePath,
+                    normalizedCurrentPath);
                 if (reportType == ReportDocumentType.PaymentVoucher)
                 {
                     return UpdateTemplateReferences(
                         settings.PaymentTemplates,
                         normalizedPreviousPath,
                         normalizedPreviousAbsolutePath,
-                        normalizedCurrentPath);
+                        normalizedCurrentPath) || changed;
                 }
 
                 return UpdateTemplateReferences(
                     settings.BatchExport.Items,
                     normalizedPreviousPath,
                     normalizedPreviousAbsolutePath,
-                    normalizedCurrentPath);
+                    normalizedCurrentPath) || changed;
             }, cancellationToken).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -378,15 +384,7 @@ namespace ExportDocManager.Services.Reporting
             bool changed = false;
             foreach (var item in items.Where(item => item != null))
             {
-                string normalizedItemPath = _catalogLoader.NormalizeStoredTemplatePath(item.TemplatePath);
-                string normalizedItemAbsolutePath = _catalogLoader.NormalizeAbsoluteTemplatePath(item.TemplatePath);
-                bool matchesPreviousPath =
-                    (!string.IsNullOrWhiteSpace(previousTemplatePath) &&
-                     string.Equals(normalizedItemPath, previousTemplatePath, StringComparison.Ordinal)) ||
-                    (!string.IsNullOrWhiteSpace(previousAbsoluteTemplatePath) &&
-                     PhysicalPathComparison.Comparer.Equals(normalizedItemAbsolutePath, previousAbsoluteTemplatePath));
-
-                if (!matchesPreviousPath)
+                if (!TemplateReferenceMatches(item.TemplatePath, previousTemplatePath, previousAbsoluteTemplatePath))
                 {
                     continue;
                 }
@@ -402,6 +400,52 @@ namespace ExportDocManager.Services.Reporting
             }
 
             return changed;
+        }
+
+        private bool UpdateDefaultTemplateReference(
+            ReportTemplateDefaults defaults,
+            ReportDocumentType reportType,
+            string previousTemplatePath,
+            string previousAbsoluteTemplatePath,
+            string currentTemplatePath)
+        {
+            string configuredPath = reportType == ReportDocumentType.PaymentVoucher
+                ? defaults.PaymentVoucherTemplatePath
+                : defaults.ExportDocumentTemplatePath;
+            if (!TemplateReferenceMatches(configuredPath, previousTemplatePath, previousAbsoluteTemplatePath))
+            {
+                return false;
+            }
+
+            if (reportType == ReportDocumentType.PaymentVoucher)
+            {
+                defaults.PaymentVoucherTemplatePath = currentTemplatePath;
+            }
+            else
+            {
+                defaults.ExportDocumentTemplatePath = currentTemplatePath;
+            }
+
+            return true;
+        }
+
+        private bool TemplateReferenceMatches(
+            string templatePath,
+            string previousTemplatePath,
+            string previousAbsoluteTemplatePath)
+        {
+            if (string.IsNullOrWhiteSpace(templatePath))
+            {
+                return false;
+            }
+
+            string normalizedPath = _catalogLoader.NormalizeStoredTemplatePath(templatePath);
+            string normalizedAbsolutePath = _catalogLoader.NormalizeAbsoluteTemplatePath(templatePath);
+            return
+                (!string.IsNullOrWhiteSpace(previousTemplatePath) &&
+                 string.Equals(normalizedPath, previousTemplatePath, StringComparison.Ordinal)) ||
+                (!string.IsNullOrWhiteSpace(previousAbsoluteTemplatePath) &&
+                 PhysicalPathComparison.Comparer.Equals(normalizedAbsolutePath, previousAbsoluteTemplatePath));
         }
 
         private static ReportTemplateContentResult ToContentResult(ResolvedReportTemplate template, string content)

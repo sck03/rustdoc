@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { SlidersHorizontal } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { ApiInvoiceDetailDto, ApiReportHtmlPreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission, usePermissionCapabilities } from "../../app/PermissionAccessContext.tsx";
@@ -10,7 +10,9 @@ import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { PermissionNotice } from "../../ui/PageState.tsx";
 import { printReportPreviewHtml } from "../reports/printReportPreview.ts";
+import { readDefaultReportTemplatePath, resolveReportTemplatePath } from "../reports/reportTemplateSelectionModel.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
+import { createSettingsReturnState } from "../settings/settingsReturnNavigation.ts";
 import { InvoiceReportAdvancedExportPanel } from "./InvoiceReportAdvancedExportPanel.tsx";
 import { InvoiceReportPreviewCanvas } from "./InvoiceReportPreviewCanvas.tsx";
 import { InvoiceReportPreviewHeader } from "./InvoiceReportPreviewHeader.tsx";
@@ -42,6 +44,7 @@ export function InvoiceReportPreviewPanel({
   const reportDesignPermission = useModulePermission("document.reports");
   const excelPermission = useModulePermission("document.excel");
   const { canManageSettings } = usePermissionCapabilities();
+  const location = useLocation();
   const navigate = useNavigate();
   const [selectedTemplatePath, setSelectedTemplatePath] = useState("");
   const [withSeal, setWithSeal] = useState(true);
@@ -72,6 +75,10 @@ export function InvoiceReportPreviewPanel({
     staleTime: 5 * 60 * 1000,
   });
   const templates = templatesQuery.data ?? [];
+  const configuredTemplatePath = readDefaultReportTemplatePath(
+    settingsQuery.data?.settings,
+    "ExportDocument",
+  );
   const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
 
   function clearFeedback() {
@@ -122,13 +129,18 @@ export function InvoiceReportPreviewPanel({
   });
 
   useEffect(() => {
-    if (!templates.length) return;
-    const preferredTemplate = templates.find(
-      (template) => fileNameFromPath(template.templatePath) === "invoice_template.html",
-    ) ?? templates[0];
-    setSelectedTemplatePath((current) => current || preferredTemplate.templatePath);
-    setWithSeal((current) => selectedTemplatePath ? current : preferredTemplate.withSealDefault ?? true);
-  }, [selectedTemplatePath, templates]);
+    if (!templates.length || settingsQuery.isFetching) return;
+    const next = resolveReportTemplatePath({
+      templates,
+      currentPath: selectedTemplatePath,
+      configuredPath: configuredTemplatePath,
+      fallbackFileName: "invoice_template.html",
+    });
+    if (next !== selectedTemplatePath) {
+      setSelectedTemplatePath(next);
+      setWithSeal(templates.find((item) => item.templatePath === next)?.withSealDefault ?? true);
+    }
+  }, [configuredTemplatePath, selectedTemplatePath, settingsQuery.isFetching, templates]);
 
   useEffect(() => {
     setPreview(null);
@@ -271,7 +283,9 @@ export function InvoiceReportPreviewPanel({
         withSeal={withSeal}
         onExportBookingSheet={() => void fileExports.exportBookingSheetWithSaveDialog()}
         onExportPdf={() => void fileExports.exportPdfWithSaveDialog()}
-        onManageTemplates={() => navigate("/settings?section=documentTemplates")}
+        onManageTemplates={() => navigate("/settings?section=documentOutput", {
+          state: createSettingsReturnState(location, "返回发票"),
+        })}
         onOpenTemplateDesigner={openTemplateDesigner}
         onTemplateChange={handleTemplateChange}
         onWithSealChange={(value) => {
