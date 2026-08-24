@@ -132,13 +132,13 @@ export function PaymentReportPreviewPanel({
   });
 
   const pdfMutation = useMutation({
-    mutationFn: () => runAbortableOperation(async (signal) => {
+    mutationFn: (destinationPath?: string) => runAbortableOperation(async (signal) => {
       const job = desktopAvailable
         ? await client.startPaymentVoucherPdfSaveToPathJob({
             paymentId,
             body: {
               templatePath: selectedTemplatePath,
-              destinationPath: pdfDestinationPath.trim(),
+              destinationPath: (destinationPath ?? pdfDestinationPath).trim(),
             },
           }, { signal })
         : await client.startPaymentVoucherPdfDownloadJob({
@@ -167,6 +167,7 @@ export function PaymentReportPreviewPanel({
   const canPreview = reportOutputPermission.canOperate && hasPreviewSource && (templateViews.length === 0 || Boolean(selectedTemplatePath));
   const canPrintPreview = Boolean(preview?.html) && !isBusy;
   const canGeneratePdf = reportOutputPermission.canOperate && canUseSavedPaymentOutput && canPreview && (!desktopAvailable || Boolean(pdfDestinationPath.trim())) && !isBusy;
+  const canQuickGeneratePdf = reportOutputPermission.canOperate && canUseSavedPaymentOutput && canPreview && !isBusy;
   const canOpenTemplateDesigner = reportDesignPermission.canView && Boolean(selectedTemplatePath) && !isBusy;
   const templateMessage = templatesQuery.isError
     ? readApiError(templatesQuery.error)
@@ -209,6 +210,27 @@ export function PaymentReportPreviewPanel({
         setPdfDestinationPath(selected);
         setStatusMessage(null);
         setLastCreatedJobId(null);
+      }
+    } catch (error) {
+      setErrorMessage(readDesktopError(error));
+    }
+  }
+
+  async function exportPdfWithSaveDialog() {
+    if (!canQuickGeneratePdf) {
+      return;
+    }
+
+    if (!desktopAvailable) {
+      pdfMutation.mutate(undefined);
+      return;
+    }
+
+    try {
+      const selected = await selectSavePdfPath(buildPaymentReportPdfDefaultFileName(), defaultExportDirectory);
+      if (selected) {
+        setPdfDestinationPath(selected);
+        pdfMutation.mutate(selected);
       }
     } catch (error) {
       setErrorMessage(readDesktopError(error));
@@ -273,7 +295,7 @@ export function PaymentReportPreviewPanel({
                 <button
                   className="command-button secondary"
                   type="button"
-                  title="管理付款/报销报表设置"
+                  title="管理导出默认设置"
                   disabled={isBusy}
                   onClick={() => navigate("/settings?section=paymentReports", {
                     state: createSettingsReturnState(location, "返回付款/报销单"),
@@ -313,6 +335,16 @@ export function PaymentReportPreviewPanel({
           >
             <Printer size={17} aria-hidden="true" />
             <span>打印</span>
+          </button>
+          <button
+            className="command-button secondary"
+            type="button"
+            title={canUseSavedPaymentOutput ? (desktopAvailable ? "选择保存位置并生成 PDF" : "下载付款/报销 PDF") : "请先保存付款/报销单"}
+            disabled={!hasSavedPayment || !canQuickGeneratePdf}
+            onClick={() => void exportPdfWithSaveDialog()}
+          >
+            <FileDown size={17} aria-hidden="true" />
+            <span>导出 PDF</span>
           </button>
         </div>
       </div>
@@ -368,7 +400,7 @@ export function PaymentReportPreviewPanel({
             className="command-button secondary"
             type="button"
             disabled={!canGeneratePdf}
-            onClick={() => pdfMutation.mutate()}
+            onClick={() => pdfMutation.mutate(undefined)}
           >
             <FileDown size={17} aria-hidden="true" />
             <span>{desktopAvailable ? "生成 PDF" : "下载 PDF"}</span>

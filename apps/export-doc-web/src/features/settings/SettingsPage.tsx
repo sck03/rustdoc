@@ -116,20 +116,6 @@ export function SettingsPage({
     enabled: activeCategory === "maintenance",
   });
 
-  const exportTemplatesQuery = useQuery({
-    queryKey: queryKeys.reportTemplates("ExportDocument"),
-    queryFn: ({ signal }) => client.listReportTemplates({ reportType: "ExportDocument" }, { signal }),
-    enabled: activeCategory === "report-output",
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const paymentTemplatesQuery = useQuery({
-    queryKey: queryKeys.reportTemplates("PaymentVoucher"),
-    queryFn: ({ signal }) => client.listReportTemplates({ reportType: "PaymentVoucher" }, { signal }),
-    enabled: activeCategory === "report-output",
-    staleTime: 5 * 60 * 1000,
-  });
-
   const issuingAuthoritiesQuery = useQuery({
     queryKey: queryKeys.singleWindowCustomsCooIssuingAuthorities(),
     queryFn: ({ signal }) => client.getCustomsCooIssuingAuthorities({ signal }),
@@ -626,12 +612,6 @@ export function SettingsPage({
                   settings={settings}
                   canManageSettings={canManageSettings}
                   isBusy={isBusy}
-                  exportTemplates={exportTemplatesQuery.data ?? []}
-                  exportTemplatesLoading={exportTemplatesQuery.isFetching}
-                  exportTemplateError={exportTemplatesQuery.isError ? exportTemplatesQuery.error : null}
-                  paymentTemplates={paymentTemplatesQuery.data ?? []}
-                  paymentTemplatesLoading={paymentTemplatesQuery.isFetching}
-                  paymentTemplateError={paymentTemplatesQuery.isError ? paymentTemplatesQuery.error : null}
                   onChange={patchSetting}
                 />
               ) : null}

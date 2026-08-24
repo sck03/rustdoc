@@ -15,12 +15,11 @@ const navigationPath = path.join(repoRoot, "apps", "export-doc-web", "src", "fea
 const categoryCatalogPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "settings", "settingsCategoryCatalog.ts").replaceAll("\\", "/");
 const runtimeDiagnosticsPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "settings", "runtimeDiagnosticsModel.ts").replaceAll("\\", "/");
 const runtimeDependencyDiagnosticsPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "settings", "runtimeDependencyDiagnosticsModel.ts").replaceAll("\\", "/");
-const documentTemplateSettingsPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "settings", "DocumentTemplateSettingsPanels.tsx").replaceAll("\\", "/");
 const settingsReturnNavigationPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "settings", "settingsReturnNavigation.ts").replaceAll("\\", "/");
 const reportTemplateSelectionPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "reportTemplateSelectionModel.ts").replaceAll("\\", "/");
 const updaterEndpointModelPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "system", "updaterEndpointModel.ts").replaceAll("\\", "/");
 const masterDataModelPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "master-data", "masterDataModel.ts").replaceAll("\\", "/");
-fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as navigation from ${JSON.stringify(navigationPath)}; import * as categoryCatalog from ${JSON.stringify(categoryCatalogPath)}; import * as runtimeDiagnostics from ${JSON.stringify(runtimeDiagnosticsPath)}; import * as runtimeDependencyDiagnostics from ${JSON.stringify(runtimeDependencyDiagnosticsPath)}; import * as documentTemplateSettings from ${JSON.stringify(documentTemplateSettingsPath)}; import * as settingsReturnNavigation from ${JSON.stringify(settingsReturnNavigationPath)}; import * as reportTemplateSelection from ${JSON.stringify(reportTemplateSelectionPath)}; import * as updaterEndpointModel from ${JSON.stringify(updaterEndpointModelPath)}; import * as masterDataModel from ${JSON.stringify(masterDataModelPath)}; globalThis.__model = model; globalThis.__navigation = navigation; globalThis.__categoryCatalog = categoryCatalog; globalThis.__runtimeDiagnostics = runtimeDiagnostics; globalThis.__runtimeDependencyDiagnostics = runtimeDependencyDiagnostics; globalThis.__documentTemplateSettings = documentTemplateSettings; globalThis.__settingsReturnNavigation = settingsReturnNavigation; globalThis.__reportTemplateSelection = reportTemplateSelection; globalThis.__updaterEndpointModel = updaterEndpointModel; globalThis.__masterDataModel = masterDataModel;`, "utf8");
+fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as navigation from ${JSON.stringify(navigationPath)}; import * as categoryCatalog from ${JSON.stringify(categoryCatalogPath)}; import * as runtimeDiagnostics from ${JSON.stringify(runtimeDiagnosticsPath)}; import * as runtimeDependencyDiagnostics from ${JSON.stringify(runtimeDependencyDiagnosticsPath)}; import * as settingsReturnNavigation from ${JSON.stringify(settingsReturnNavigationPath)}; import * as reportTemplateSelection from ${JSON.stringify(reportTemplateSelectionPath)}; import * as updaterEndpointModel from ${JSON.stringify(updaterEndpointModelPath)}; import * as masterDataModel from ${JSON.stringify(masterDataModelPath)}; globalThis.__model = model; globalThis.__navigation = navigation; globalThis.__categoryCatalog = categoryCatalog; globalThis.__runtimeDiagnostics = runtimeDiagnostics; globalThis.__runtimeDependencyDiagnostics = runtimeDependencyDiagnostics; globalThis.__settingsReturnNavigation = settingsReturnNavigation; globalThis.__reportTemplateSelection = reportTemplateSelection; globalThis.__updaterEndpointModel = updaterEndpointModel; globalThis.__masterDataModel = masterDataModel;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -29,7 +28,6 @@ const navigation = globalThis.__navigation;
 const categoryCatalog = globalThis.__categoryCatalog;
 const runtimeDiagnostics = globalThis.__runtimeDiagnostics;
 const runtimeDependencyDiagnostics = globalThis.__runtimeDependencyDiagnostics;
-const documentTemplateSettings = globalThis.__documentTemplateSettings;
 const settingsReturnNavigation = globalThis.__settingsReturnNavigation;
 const reportTemplateSelection = globalThis.__reportTemplateSelection;
 const updaterEndpointModel = globalThis.__updaterEndpointModel;
@@ -56,6 +54,8 @@ assert(m.readExcelImportRecordNumber({ ItemsStartRow: "42" }, "itemsStartRow") =
 assert(m.readExcelImportRecordNumber({}, "itemsStartRow") === 20, "record number default");
 assert(navigation.readSettingsCategoryFromSearch("?section=paymentReports") === "report-output", "payment report category");
 assert(navigation.readSettingsCategoryFromSearch("?section=documentOutput") === "report-output", "document output category");
+assert(navigation.readSettingsPanelLabelFromSearch("?section=documentOutput") === "导出默认设置", "document output panel");
+assert(navigation.readSettingsPanelLabelFromSearch("?section=paymentReports") === "导出默认设置", "payment report panel");
 assert(navigation.readSettingsCategoryFromSearch("?section=paymentTemplates") === "runtime", "obsolete settings deep link is not retained");
 assert(navigation.readSettingsCategoryFromSearch("?section=users") === "runtime", "users moved to independent access-control page");
 assert(navigation.readSettingsCategoryFromSearch("?section=%20diagnostics%20") === "maintenance", "trimmed category");
@@ -95,19 +95,6 @@ const clearedNotifyParty = masterDataModel.applyCustomerFieldChange({
 }, "notifyPartyMode", "None");
 assert(clearedNotifyParty.notifyPartyName === "" && clearedNotifyParty.notifyPartyAddress === "", "notify mode change clears separate fields");
 assert(masterDataModel.normalizeCustomerRecord({ id: 10, notifyPartyMode: "Legacy" }, 10).notifyPartyMode === "None", "unknown notify mode is rejected at the UI boundary");
-
-const exportTemplateItems = documentTemplateSettings.readBatchExportItemsForSettings({
-  batchExport: { items: [{ name: "Export", templatePath: "invoice.html", reportType: "ExportDocument", showSeal: true }] },
-});
-assert(exportTemplateItems.length === 1 && exportTemplateItems[0].showSeal === true, "export templates preserve seal selection");
-const paymentTemplateItems = documentTemplateSettings.readPaymentTemplateItemsForSettings({
-  paymentTemplates: [{ name: "Payment", templatePath: "payment.html", reportType: "PaymentVoucher", showSeal: true }],
-});
-assert(paymentTemplateItems.length === 1 && !("showSeal" in paymentTemplateItems[0]), "payment templates omit seal data");
-const paymentTemplateRecord = documentTemplateSettings.toPaymentTemplateRecord({
-  name: " Payment ", templatePath: " payment.html ", reportType: "ExportDocument", isEnabled: true,
-});
-assert(!("showSeal" in paymentTemplateRecord), "payment template save omits seal data");
 
 const templatePaths = [
   { templatePath: "builtin:Export/invoice_template.html" },

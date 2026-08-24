@@ -31,41 +31,38 @@ export function InvoiceReportTemplateControls(p:Props){const {canConfigureOutput
           </label>
         </div>
         <div className="report-template-tools">
-          <div className="report-template-action-group report-template-action-group-primary">      {hasSavedInvoice ? (
-              <>
-                <button
-                  className="command-button secondary"
-                  type="button"
-                  title={desktopAvailable ? "选择保存位置并生成 PDF" : "当前平台请使用高级导出"}
-                  disabled={!canQuickGeneratePdf}
-                  onClick={p.onExportPdf}
-                >
-                  <FileDown size={17} aria-hidden="true" />
-                  <span>导出 PDF</span>
-                </button>
-                <button
-                  className="command-button secondary"
-                  type="button"
-                  title={desktopAvailable ? "选择保存位置并导出托单 Excel" : "当前平台请使用高级导出"}
-                  disabled={!canQuickGenerateBookingSheet}
-                  onClick={p.onExportBookingSheet}
-                >
-                  <FileSpreadsheet size={17} aria-hidden="true" />
-                  <span>导出托单</span>
-                </button>
-              </>
-            ) : null}
+          <div className="report-template-action-group report-template-action-group-primary">
+            <button
+              className="command-button secondary"
+              type="button"
+              title={hasSavedInvoice ? (desktopAvailable ? "选择保存位置并生成 PDF" : "当前平台请使用高级导出") : "请先保存发票"}
+              disabled={!hasSavedInvoice || !canQuickGeneratePdf}
+              onClick={p.onExportPdf}
+            >
+              <FileDown size={17} aria-hidden="true" />
+              <span>导出 PDF</span>
+            </button>
+            <button
+              className="command-button secondary"
+              type="button"
+              title={hasSavedInvoice ? (desktopAvailable ? "选择保存位置并导出托单 Excel" : "当前平台请使用高级导出") : "请先保存发票"}
+              disabled={!hasSavedInvoice || !canQuickGenerateBookingSheet}
+              onClick={p.onExportBookingSheet}
+            >
+              <FileSpreadsheet size={17} aria-hidden="true" />
+              <span>导出托单</span>
+            </button>
           </div>
           <div className="report-template-action-group">
             {showTemplateSettings ? <button
               className="command-button secondary"
               type="button"
-              title="管理报表默认值和单据包"
+              title="管理导出默认设置"
               disabled={isBusy}
               onClick={p.onManageTemplates}
             >
               <Settings size={17} aria-hidden="true" />
-              <span>报表与输出设置</span>
+              <span>导出默认设置</span>
             </button> : null}
             {showTemplateDesigner ? <button
               className="command-button secondary"

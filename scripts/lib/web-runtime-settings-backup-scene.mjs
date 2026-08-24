@@ -48,66 +48,29 @@ export function createSettingsBackupSmokeScene(runtime) {
     const templateExpectedText = [
       "设置",
       "报表与输出",
-      "默认报表模板",
-      "发票单据包设置",
+      "导出默认设置",
       "文件命名规则",
       "文件夹命名规则",
       "默认合并 PDF",
       "默认生成 ZIP",
-      "添加单据项",
-      "导出项",
-      "付款/报销报表设置",
-      "添加模板项",
-      "付款/报销模板",
     ];
     const templatePageText = await waitForRuntimeDiagnostics(page, templateExpectedText, timeoutMs);
 
-    const batchExportSettingsCheck = await waitForPageExpression(
+    const exportDefaultsCheck = await waitForPageExpression(
       page,
       `(() => {
-        const panel = document.querySelector('[aria-label="发票单据包设置"]');
-        const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
-        const rows = panel ? Array.from(panel.querySelectorAll('tbody tr')).filter((row) => !row.querySelector('.empty-cell')) : [];
+        const panel = document.querySelector('[aria-label="导出默认设置"]');
         const text = panel ? panel.innerText || '' : '';
         return Boolean(panel &&
-          panel.querySelector('.batch-export-items-toolbar') &&
-          panel.querySelector('.batch-export-items-table') &&
-          panel.querySelector('input[type="checkbox"]') &&
-          panel.querySelector('input') &&
+          panel.querySelectorAll('input').length === 4 &&
           text.includes('文件命名规则') &&
           text.includes('文件夹命名规则') &&
           text.includes('默认合并 PDF') &&
-          text.includes('默认生成 ZIP') &&
-          (rows.length === 0 || rows.every((row) => row.querySelector('select.batch-export-cell-input'))) &&
-          !panel.querySelector('.batch-export-path-input') &&
-          buttons.some((button) => (button.innerText || '').includes('添加单据项')));
+          text.includes('默认生成 ZIP'));
       })()`,
       timeoutMs,
-      "Timed out waiting for the batch export settings panel.",
+      "Timed out waiting for the export defaults settings panel.",
     );
-
-    const batchExportOrderInteractionCheck = await waitForBatchExportOrderInteractionCheck(page, timeoutMs);
-
-    const paymentTemplateSettingsCheck = await waitForPageExpression(
-      page,
-      `(() => {
-        const panel = document.querySelector('[aria-label="付款/报销报表设置"]');
-        const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
-        const rows = panel ? Array.from(panel.querySelectorAll('tbody tr')).filter((row) => !row.querySelector('.empty-cell')) : [];
-        const text = panel ? panel.innerText || '' : '';
-        return Boolean(panel &&
-          panel.querySelector('.batch-export-items-toolbar') &&
-          panel.querySelector('[aria-label="付款/报销模板"]') &&
-          text.includes('付款/报销模板') &&
-          (rows.length === 0 || rows.every((row) => row.querySelector('select.batch-export-cell-input'))) &&
-          !panel.querySelector('.batch-export-path-input') &&
-          buttons.some((button) => (button.innerText || '').includes('添加模板项')));
-      })()`,
-      timeoutMs,
-      "Timed out waiting for the payment template settings panel.",
-    );
-
-    const paymentTemplateOrderInteractionCheck = await waitForPaymentTemplateOrderInteractionCheck(page, timeoutMs);
 
     const excelUrl = buildSettingsSectionUrl(options.webUrl, "excelImport", "smokeExcelImportSettings");
     await page.send("Page.navigate", { url: excelUrl });
@@ -273,13 +236,10 @@ export function createSettingsBackupSmokeScene(runtime) {
         ...communicationExpectedText.map((value) => ({ section: "communication", value, found: includesText(communicationPageText, value) })),
       ],
       backupPanelCheck,
-      batchExportSettingsCheck,
-      batchExportOrderInteractionCheck,
+      exportDefaultsCheck,
       defaultExportDirectoryPickerCheck,
       excelImportSettingsCheck,
       exchangeRateSettingsCheck,
-      paymentTemplateSettingsCheck,
-      paymentTemplateOrderInteractionCheck,
       documentEmailServerSuggestionCheck,
       documentEmailSettingsCheck,
       textExcerpt: [
@@ -523,174 +483,6 @@ export function createSettingsBackupSmokeScene(runtime) {
       draftReady,
       clickResult: clickResult.value ?? null,
       appliedReady,
-    };
-  }
-
-  async function waitForBatchExportOrderInteractionCheck(page, timeoutMs) {
-    return waitForTemplateOrderInteractionCheck(page, timeoutMs, {
-      panelLabel: "发票单据包设置",
-      addButtonText: "添加单据项",
-      firstName: "Smoke Batch Export Alpha",
-      secondName: "Smoke Batch Export Beta",
-      description: "batch export item",
-    });
-  }
-
-  async function waitForPaymentTemplateOrderInteractionCheck(page, timeoutMs) {
-    return waitForTemplateOrderInteractionCheck(page, timeoutMs, {
-      panelLabel: "付款/报销报表设置",
-      addButtonText: "添加模板项",
-      firstName: "Smoke Payment Template Alpha",
-      secondName: "Smoke Payment Template Beta",
-      description: "payment template",
-    });
-  }
-
-  async function waitForTemplateOrderInteractionCheck(page, timeoutMs, config) {
-    const panelSelector = JSON.stringify(`[aria-label="${config.panelLabel}"]`);
-    const addButtonText = JSON.stringify(config.addButtonText);
-    const firstNameText = JSON.stringify(config.firstName);
-    const secondNameText = JSON.stringify(config.secondName);
-    const description = config.description;
-
-    const setup = await waitFor(async () => {
-      const result = await evaluate(
-        page,
-        `(() => {
-          const panel = document.querySelector(${panelSelector});
-          if (!panel) {
-            return null;
-          }
-
-          const rows = Array.from(panel.querySelectorAll('tbody tr'))
-            .filter((row) => !row.querySelector('.empty-cell'));
-          if (rows.length >= 2) {
-            return { rowCount: rows.length, requestedAdd: false };
-          }
-
-          const addButton = Array.from(panel.querySelectorAll('button'))
-            .find((button) => (button.innerText || '').includes(${addButtonText}));
-          if (!addButton || addButton.disabled) {
-            return null;
-          }
-
-          addButton.click();
-          addButton.click();
-          return { rowCount: rows.length, requestedAdd: true };
-        })()`,
-        true,
-      ).catch(() => ({ value: null }));
-
-      return result.value && result.value.rowCount >= 2 ? result.value : null;
-    }, timeoutMs, `Timed out preparing ${description}s for order interaction.`);
-
-    const before = await waitFor(async () => {
-      const result = await evaluate(
-        page,
-        `(() => {
-          const panel = document.querySelector(${panelSelector});
-          if (!panel) {
-            return null;
-          }
-
-          const rows = Array.from(panel.querySelectorAll('tbody tr'))
-            .filter((row) => !row.querySelector('.empty-cell'));
-          if (rows.length < 2) {
-            return null;
-          }
-
-          const setInputValue = (input, value) => {
-            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-            if (setter) {
-              setter.call(input, value);
-            } else {
-              input.value = value;
-            }
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-          };
-          const readNameInput = (row) => row.querySelector('input.batch-export-cell-input:not(.batch-export-path-input)');
-          const firstName = readNameInput(rows[0]);
-          const secondName = readNameInput(rows[1]);
-          if (!firstName || !secondName || firstName.disabled || secondName.disabled) {
-            return null;
-          }
-
-          setInputValue(firstName, ${firstNameText});
-          setInputValue(secondName, ${secondNameText});
-          return {
-            names: Array.from(panel.querySelectorAll('tbody tr'))
-              .filter((row) => !row.querySelector('.empty-cell'))
-              .slice(0, 2)
-              .map((row) => readNameInput(row)?.value || ''),
-          };
-        })()`,
-        true,
-      ).catch(() => ({ value: null }));
-
-      const names = result.value?.names ?? [];
-      return names[0] === config.firstName && names[1] === config.secondName
-        ? names
-        : null;
-    }, timeoutMs, `Timed out assigning sentinel names to ${description}s.`);
-
-    const moveAction = await evaluate(
-      page,
-      `(() => {
-        const panel = document.querySelector(${panelSelector});
-        const rows = panel
-          ? Array.from(panel.querySelectorAll('tbody tr')).filter((row) => !row.querySelector('.empty-cell'))
-          : [];
-        if (rows.length < 2) {
-          return { clicked: false, reason: 'not-enough-rows' };
-        }
-
-        const downButton = Array.from(rows[0].querySelectorAll('button'))
-          .find((button) => (button.title || '').includes('下移'));
-        if (!downButton || downButton.disabled) {
-          return { clicked: false, reason: 'down-button-disabled' };
-        }
-
-        downButton.click();
-        return { clicked: true };
-      })()`,
-      true,
-    );
-
-    if (!moveAction.value?.clicked) {
-      throw new Error(`Failed to click ${description} move-down action: ${JSON.stringify(moveAction.value)}`);
-    }
-
-    const after = await waitFor(async () => {
-      const result = await evaluate(
-        page,
-        `(() => {
-          const panel = document.querySelector(${panelSelector});
-          if (!panel) {
-            return null;
-          }
-
-          const readNameInput = (row) => row.querySelector('input.batch-export-cell-input:not(.batch-export-path-input)');
-          return Array.from(panel.querySelectorAll('tbody tr'))
-            .filter((row) => !row.querySelector('.empty-cell'))
-            .slice(0, 2)
-            .map((row) => readNameInput(row)?.value || '');
-        })()`,
-        true,
-      ).catch(() => ({ value: null }));
-
-      const names = result.value ?? [];
-      return names[0] === config.secondName && names[1] === config.firstName
-        ? names
-        : null;
-    }, timeoutMs, `Timed out waiting for ${description} order to change after move-down.`);
-
-    return {
-      panelLabel: config.panelLabel,
-      setup,
-      before,
-      after,
-      moved: true,
     };
   }
 

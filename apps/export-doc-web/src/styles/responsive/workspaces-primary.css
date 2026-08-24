@@ -1,4 +1,29 @@
 /* Responsive overrides loaded after workspace feature styles. */
+@media (min-width: 861px) and (max-width: 1320px) {
+  .settings-category-panel .field-grid,
+  .settings-category-panel .runtime-detail-grid,
+  .settings-category-panel .communication-settings-grid,
+  .settings-category-panel .maintenance-section-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-category-panel .communication-settings-grid .email-body-template-field,
+  .settings-category-panel .communication-settings-grid .webdav-password-setting,
+  .settings-category-panel .communication-settings-grid .webdav-enabled-setting {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .settings-category-panel .exchange-currency-manager {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-category-panel .exchange-currency-action-stack {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 860px) {
   .app-shell {
     grid-template-columns: 1fr;

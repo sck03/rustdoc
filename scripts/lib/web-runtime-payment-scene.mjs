@@ -185,6 +185,7 @@ export function createPaymentSmokeScene(runtime) {
         "金额和费用",
         "付款/报销单预览",
         "模板",
+        "导出 PDF",
         "输出 PDF",
         "生成 PDF",
         "打印",
@@ -207,7 +208,7 @@ export function createPaymentSmokeScene(runtime) {
           const panel = document.querySelector('[aria-label="付款/报销单预览"]');
           const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
           const button = buttons.find((element) => (element.innerText || '').includes('报表设置'));
-          return Boolean(button && !button.disabled && (button.title || '').includes('管理付款/报销报表设置'));
+          return Boolean(button && !button.disabled && (button.title || '').includes('管理导出默认设置'));
         })()`,
         timeoutMs,
         "Timed out waiting for the payment template settings button.",
@@ -671,15 +672,17 @@ export function createPaymentSmokeScene(runtime) {
     await page.send("Page.navigate", { url: checkUrl });
     const expectedText = [
       "设置",
-      "付款/报销报表设置",
-      "付款/报销模板",
-      "添加模板项",
+      "报表与输出",
+      "导出默认设置",
+      "文件命名规则",
+      "默认合并 PDF",
+      "默认生成 ZIP",
     ];
     const pageText = await waitForRuntimeDiagnostics(page, expectedText, timeoutMs);
     const panelCheck = await waitForPageExpression(
       page,
       `(() => {
-        const panel = document.querySelector('[aria-label="付款/报销报表设置"]');
+        const panel = document.querySelector('[aria-label="导出默认设置"]');
         if (!panel || !window.location.hash.includes('/settings?section=paymentReports')) {
           return false;
         }

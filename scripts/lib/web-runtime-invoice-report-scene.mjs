@@ -63,7 +63,7 @@ export function createInvoiceReportSmokeScene(runtime) {
       const reportExpectedText = [
         "报表预览",
         "模板",
-        "报表与输出设置",
+        "导出默认设置",
         "输出 PDF",
         "生成 PDF",
         "打印",
@@ -97,8 +97,8 @@ export function createInvoiceReportSmokeScene(runtime) {
         `(() => {
           const panel = document.querySelector('[aria-label="报表预览"]');
           const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
-          const button = buttons.find((element) => (element.innerText || '').includes('报表与输出设置'));
-          return Boolean(button && !button.disabled && (button.title || '').includes('管理报表默认值和单据包'));
+          const button = buttons.find((element) => (element.innerText || '').includes('导出默认设置'));
+          return Boolean(button && !button.disabled && (button.title || '').includes('管理导出默认设置'));
         })()`,
         timeoutMs,
         "Timed out waiting for the invoice batch export settings button.",

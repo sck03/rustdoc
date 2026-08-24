@@ -617,17 +617,16 @@ export function createInvoiceDocumentOutputSmokeScene(runtime) {
     const expectedText = [
       "设置",
       "报表与输出",
-      "默认报表模板",
-      "发票单据包设置",
+      "导出默认设置",
       "文件命名规则",
-      "导出项",
-      "添加单据项",
+      "默认合并 PDF",
+      "默认生成 ZIP",
     ];
     const pageText = await waitForRuntimeDiagnostics(page, expectedText, timeoutMs);
     const panelCheck = await waitForPageExpression(
       page,
       `(() => {
-        const panel = document.querySelector('[aria-label="发票单据包设置"]');
+        const panel = document.querySelector('[aria-label="导出默认设置"]');
         if (!panel || !window.location.hash.includes('/settings?section=documentOutput')) {
           return false;
         }

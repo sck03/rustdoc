@@ -53,9 +53,9 @@ export function readSettingsCategoryFromSearch(
 export function readSettingsPanelLabelFromSearch(search: string) {
   switch (readSettingsSection(search)) {
     case "documentOutput":
-      return "发票单据包设置";
+      return "导出默认设置";
     case "paymentReports":
-      return "付款/报销报表设置";
+      return "导出默认设置";
     case "excelImport":
       return "Excel 导入方案";
     case "exchangeRate":

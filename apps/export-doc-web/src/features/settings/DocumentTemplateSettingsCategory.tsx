@@ -1,25 +1,13 @@
-import type { ExportDocManagerApiClient } from "../../api/index.ts";
-import { readApiError } from "../../ui/formUtils.ts";
-import { BatchExportSettingsPanel, PaymentTemplateSettingsPanel, ReportTemplateDefaultsPanel } from "./DocumentTemplateSettingsPanels.tsx";
+import { BatchExportSettingsPanel } from "./DocumentTemplateSettingsPanels.tsx";
 import type { SettingsRecord } from "./settingsTypes.ts";
 
-export default function DocumentTemplateSettingsCategory({ settings, canManageSettings, isBusy, exportTemplates, exportTemplatesLoading, exportTemplateError, paymentTemplates, paymentTemplatesLoading, paymentTemplateError, onChange }: {
+export default function DocumentTemplateSettingsCategory({ settings, canManageSettings, isBusy, onChange }: {
   settings: SettingsRecord;
   canManageSettings: boolean;
   isBusy: boolean;
-  exportTemplates: Awaited<ReturnType<ExportDocManagerApiClient["listReportTemplates"]>>;
-  exportTemplatesLoading: boolean;
-  exportTemplateError: unknown;
-  paymentTemplates: Awaited<ReturnType<ExportDocManagerApiClient["listReportTemplates"]>>;
-  paymentTemplatesLoading: boolean;
-  paymentTemplateError: unknown;
   onChange: (path: string[], value: unknown) => void;
 }) {
   return (
-    <>
-      <ReportTemplateDefaultsPanel settings={settings} canManageSettings={canManageSettings} isBusy={isBusy} exportTemplates={exportTemplates} exportTemplatesLoading={exportTemplatesLoading} paymentTemplates={paymentTemplates} paymentTemplatesLoading={paymentTemplatesLoading} onChange={onChange} />
-      <BatchExportSettingsPanel settings={settings} canManageSettings={canManageSettings} isBusy={isBusy} templates={exportTemplates} templatesLoading={exportTemplatesLoading} templateErrorMessage={exportTemplateError ? readApiError(exportTemplateError) : null} onChange={onChange} />
-      <PaymentTemplateSettingsPanel settings={settings} canManageSettings={canManageSettings} isBusy={isBusy} templates={paymentTemplates} templatesLoading={paymentTemplatesLoading} templateErrorMessage={paymentTemplateError ? readApiError(paymentTemplateError) : null} onChange={onChange} />
-    </>
+    <BatchExportSettingsPanel settings={settings} canManageSettings={canManageSettings} isBusy={isBusy} onChange={onChange} />
   );
 }
