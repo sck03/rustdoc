@@ -22,6 +22,7 @@ const stylesRoot = path.join(repoRoot, "apps", "export-doc-web", "src");
 const reportWorkspaceCss = readCssGraph(path.join(stylesRoot, "reportWorkspace.css"));
 const responsiveOverridesCss = readCssGraph(path.join(stylesRoot, "responsiveOverrides.css"));
 const workspaceStateSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "reportTemplateWorkspaceState.ts"), "utf8");
+const userPanelSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "ReportTemplateUserPanel.tsx"), "utf8");
 const modelImportSpecifier = `./${path.relative(workspaceRoot, modelPath).replaceAll("\\", "/")}`;
 
 fs.mkdirSync(workspaceRoot, { recursive: true });
@@ -115,6 +116,9 @@ assertEqual(readUserTemplateIdFromSearch("?userTemplateId=invalid"), 0, "无效�
 assertMatch(workspaceStateSource, /hasUnappliedDesignerChanges\s*=\s*[\s\S]*?designerDraftContent\s*!==\s*content/, "新版画布草稿必须独立识别为未应用修改");
 assertMatch(workspaceStateSource, /hasUnsavedChanges\s*=\s*hasChanges\s*\|\|\s*hasUnappliedDesignerChanges/, "保存和离开保护必须同时覆盖源码与画布草稿");
 assertMatch(workspaceStateSource, /canSave\s*=\s*[\s\S]*?hasUnsavedChanges/, "画布草稿存在时顶部保存必须可用");
+if (/<details[^>]*template-user-panel[^>]*\bopen\b/u.test(userPanelSource)) {
+  throw new Error("我的 / 共享模板默认应保持折叠");
+}
 
 assertMatch(
   reportWorkspaceCss,
