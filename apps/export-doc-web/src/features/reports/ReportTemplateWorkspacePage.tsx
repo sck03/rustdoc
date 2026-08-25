@@ -541,7 +541,6 @@ export function ReportTemplateWorkspacePage({
     (isUserTemplate ? currentUserTemplate?.canEdit && canDesignTemplates : canManageTemplates),
   );
   const canSetDefault = Boolean(
-    !isUserTemplate &&
     selectedTemplatePath &&
     canManageTemplates &&
     !isBusy &&
@@ -725,6 +724,7 @@ export function ReportTemplateWorkspacePage({
   const currentTemplateName = persistedDisplayName || (selectedTemplatePath ? fileNameFromPath(selectedTemplatePath) : "未选择模板");
   const managementWorkspace = (
     <ReportTemplateManagementWorkspace
+       reportType={reportType}
        selectionPanel={selectionPanelProps}
        exportDefaultsPanel={{
          settings: exportDefaults.settings,
@@ -733,6 +733,7 @@ export function ReportTemplateWorkspacePage({
          isDirty: exportDefaults.isDirty,
          onChange: handleExportSettingsChange,
          onSave: handleSaveExportSettings,
+         templates,
        }}
       userPanel={canDesignTemplates ? {
         currentTemplate: currentUserTemplate,

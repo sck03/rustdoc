@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Errors;
 using Microsoft.Extensions.Logging;
@@ -176,6 +177,7 @@ public sealed class SmtpEmailService : IEmailService
         var builder = new BodyBuilder();
         if (isHtml)
         {
+            builder.TextBody = ConvertHtmlToPlainText(body);
             builder.HtmlBody = body ?? string.Empty;
         }
         else
@@ -190,6 +192,14 @@ public sealed class SmtpEmailService : IEmailService
 
         message.Body = builder.ToMessageBody();
         return message;
+    }
+
+    private static string ConvertHtmlToPlainText(string? html)
+    {
+        string value = html ?? string.Empty;
+        value = Regex.Replace(value, "<\\s*br\\s*/?\\s*>", "\\n", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        value = Regex.Replace(value, "<[^>]+>", string.Empty, RegexOptions.CultureInvariant);
+        return WebUtility.HtmlDecode(value).Trim();
     }
 
     private static MailboxAddress CreateMailboxAddress(string address, string? displayName = null)

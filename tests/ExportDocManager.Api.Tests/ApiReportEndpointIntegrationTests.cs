@@ -253,22 +253,65 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains("11.11", reimbursementPreview.Html, StringComparison.Ordinal);
             Assert.DoesNotContain("Report Payee", reimbursementPreview.Html, StringComparison.Ordinal);
 
+            var createUserTemplateResponse = await adminClient.PostAsJsonAsync(
+                "/api/reports/user-templates",
+                new
+                {
+                    reportType = "ExportDocument",
+                    name = "API Database Invoice Template",
+                    contentHtml = "<html><body>DATABASE {{ Invoice.InvoiceNo }}</body></html>",
+                    isActive = true,
+                    isShared = false,
+                    shareScope = "Private"
+                });
+            Assert.Equal(HttpStatusCode.Created, createUserTemplateResponse.StatusCode);
+            var createdUserTemplate = await ApiIntegrationTestHarness.ReadJsonAsync<ApiUserReportTemplateDto>(createUserTemplateResponse);
+            string userTemplateReference = $"user-template:{createdUserTemplate.Id}";
+
+            var createPaymentUserTemplateResponse = await adminClient.PostAsJsonAsync(
+                "/api/reports/user-templates",
+                new
+                {
+                    reportType = "PaymentVoucher",
+                    name = "API Database Payment Template",
+                    contentHtml = "<html><body>DATABASE {{ Payment.InvoiceNo }}</body></html>",
+                    isActive = true,
+                    isShared = false,
+                    shareScope = "Private"
+                });
+            Assert.Equal(HttpStatusCode.Created, createPaymentUserTemplateResponse.StatusCode);
+            var createdPaymentUserTemplate = await ApiIntegrationTestHarness.ReadJsonAsync<ApiUserReportTemplateDto>(createPaymentUserTemplateResponse);
+
             var templatesResponse = await adminClient.GetAsync("/api/reports/templates?reportType=ExportDocument");
             Assert.Equal(HttpStatusCode.OK, templatesResponse.StatusCode);
             using (var templatesDocument = JsonDocument.Parse(await templatesResponse.Content.ReadAsStringAsync()))
             {
                 Assert.Equal(JsonValueKind.Array, templatesDocument.RootElement.ValueKind);
+                Assert.Contains(
+                    templatesDocument.RootElement.EnumerateArray(),
+                    template => template.GetProperty("templatePath").GetString() == userTemplateReference);
                 Assert.All(
                     templatesDocument.RootElement.EnumerateArray(),
                     template =>
                     {
                         string clientPath = template.GetProperty("templatePath").GetString() ?? string.Empty;
                         Assert.True(clientPath.StartsWith("builtin:", StringComparison.OrdinalIgnoreCase) ||
-                                    clientPath.StartsWith("user:", StringComparison.OrdinalIgnoreCase));
+                                    clientPath.StartsWith("user:", StringComparison.OrdinalIgnoreCase) ||
+                                    clientPath.StartsWith("user-template:", StringComparison.OrdinalIgnoreCase));
                         Assert.DoesNotContain(harness.AppRoot, clientPath, StringComparison.OrdinalIgnoreCase);
                         Assert.DoesNotContain(harness.DataRoot, clientPath, StringComparison.OrdinalIgnoreCase);
                     });
             }
+
+            var paymentTemplatesResponse = await adminClient.GetAsync("/api/reports/templates?reportType=PaymentVoucher");
+            Assert.Equal(HttpStatusCode.OK, paymentTemplatesResponse.StatusCode);
+            var paymentTemplates = await ApiIntegrationTestHarness.ReadJsonAsync<ApiReportTemplateDto[]>(paymentTemplatesResponse);
+            Assert.Contains(paymentTemplates, template => template.TemplatePath == $"user-template:{createdPaymentUserTemplate.Id}");
+
+            var setDatabaseDefaultResponse = await adminClient.PutAsJsonAsync(
+                "/api/reports/templates/default",
+                new { reportType = "ExportDocument", templatePath = userTemplateReference });
+            Assert.Equal(HttpStatusCode.OK, setDatabaseDefaultResponse.StatusCode);
 
             var createTemplateResponse = await adminClient.PostAsJsonAsync(
                 "/api/reports/templates",

@@ -32,8 +32,8 @@ export function ReportTemplateSelectionPanel({
   onUserTemplateChange: (value: string) => void;
   onSetDefault: () => void;
 }) {
-  const selectedTemplateIsDefault = selectedUserTemplateId <= 0 &&
-    matchesTemplatePath(selectedTemplatePath, defaultTemplatePath);
+  const selectedTemplateIsDefault = matchesTemplatePath(selectedTemplatePath, defaultTemplatePath);
+  const fileTemplates = templates.filter((template) => !template.templatePath.startsWith("user-template:"));
 
   return (
     <div className="template-selection-panel">
@@ -50,8 +50,8 @@ export function ReportTemplateSelectionPanel({
           label="文件模板"
           className="template-select-field"
           value={selectedUserTemplateId > 0 ? "" : selectedTemplatePath}
-          disabled={isBusy || templates.length === 0}
-          options={templates.map((template) => ({
+          disabled={isBusy || fileTemplates.length === 0}
+          options={fileTemplates.map((template) => ({
             value: template.templatePath,
             label: `${matchesTemplatePath(template.templatePath, defaultTemplatePath) ? "默认 · " : ""}${template.displayName || fileNameFromPath(template.templatePath)}`,
           }))}
@@ -76,7 +76,7 @@ export function ReportTemplateSelectionPanel({
           { value: "", label: "选择用户模板" },
           ...userTemplates.map((template) => ({
             value: String(template.id),
-            label: `${template.canEdit ? "我的" : "共享"} · ${template.name}`,
+            label: `${matchesTemplatePath(`user-template:${template.id}`, defaultTemplatePath) ? "默认 · " : ""}${template.canEdit ? "我的" : "共享"} · ${template.name}`,
           })),
         ]}
         onChange={onUserTemplateChange}

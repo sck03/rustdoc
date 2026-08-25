@@ -28,13 +28,13 @@ const modelImportSpecifier = `./${path.relative(workspaceRoot, modelPath).replac
 fs.mkdirSync(workspaceRoot, { recursive: true });
 fs.writeFileSync(
   entryPath,
-  `export { readUserTemplateIdFromSearch, resolveDefaultTemplatePath, resolvePreviewSourceId } from ${JSON.stringify(modelImportSpecifier)};`,
+  `export { readUserTemplateIdFromKey, readUserTemplateIdFromSearch, resolveDefaultTemplatePath, resolvePreviewSourceId } from ${JSON.stringify(modelImportSpecifier)};`,
   "utf8",
 );
 
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, platform: "node", format: "esm" });
-const { readUserTemplateIdFromSearch, resolveDefaultTemplatePath, resolvePreviewSourceId } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
+const { readUserTemplateIdFromKey, readUserTemplateIdFromSearch, resolveDefaultTemplatePath, resolvePreviewSourceId } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
 
 const templates = [
   { templatePath: "E:/app/Templates/Export/custom.html" },
@@ -113,6 +113,8 @@ assertEqual(resolvePreviewSourceId(0, [0, -1, 6, 7]), 6, "应选择第一个有�
 assertEqual(resolvePreviewSourceId(0, []), 0, "无预览源时应保持未选择");
 assertEqual(readUserTemplateIdFromSearch("?userTemplateId=17"), 17, "用户模板深链应解析有效 ID");
 assertEqual(readUserTemplateIdFromSearch("?userTemplateId=invalid"), 0, "无效用户模板深链应回退");
+assertEqual(readUserTemplateIdFromKey("user-template:17"), 17, "统一用户模板引用应解析有效 ID");
+assertEqual(readUserTemplateIdFromKey("user:Export/template.html"), 0, "文件模板引用不应被解析为数据库模板");
 assertMatch(workspaceStateSource, /hasUnappliedDesignerChanges\s*=\s*[\s\S]*?designerDraftContent\s*!==\s*content/, "新版画布草稿必须独立识别为未应用修改");
 assertMatch(workspaceStateSource, /hasUnsavedChanges\s*=\s*hasChanges\s*\|\|\s*hasUnappliedDesignerChanges/, "保存和离开保护必须同时覆盖源码与画布草稿");
 assertMatch(workspaceStateSource, /canSave\s*=\s*[\s\S]*?hasUnsavedChanges/, "画布草稿存在时顶部保存必须可用");
@@ -127,6 +129,11 @@ assertMatch(
 );
 assertMatch(reportWorkspaceCss, /\.template-selection-panel\s*\{\s*grid-column:\s*1\s*\/\s*-1;/, "选择区应独占管理页首行");
 assertMatch(reportWorkspaceCss, /\.template-package-panel\s*\{\s*grid-column:\s*1\s*\/\s*-1;/, "模板包应独占管理页整行");
+assertMatch(
+  reportWorkspaceCss,
+  /\.report-export-default-item\s*\{[\s\S]*?grid-template-columns:\s*auto\s+minmax\(130px,\s*0\.8fr\)\s+minmax\(220px,\s*1\.5fr\)/,
+  "发票单据项应使用稳定网格，避免模板选择挤出容器",
+);
 assertMatch(
   responsiveOverridesCss,
   /@media\s*\(min-width:\s*861px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.template-selection-panel\s*\{\s*grid-column:\s*1\s*\/\s*-1/,
@@ -146,6 +153,11 @@ assertMatch(
   responsiveOverridesCss,
   /@container\s+report-workspace\s*\(max-width:\s*1160px\)[\s\S]*?\.template-package-panel\s*\{[\s\S]*?grid-column:\s*1\s*\/\s*-1;[\s\S]*?grid-row:\s*auto;/,
   "工作区实际变窄时模板包应独占整行，避免操作区拥挤",
+);
+assertMatch(
+  responsiveOverridesCss,
+  /@container\s+report-workspace\s*\(max-width:\s*820px\)[\s\S]*?\.report-export-default-item\s*\{[\s\S]*?grid-template-columns:\s*auto\s+minmax\(0,\s*1fr\)\s+repeat\(3,\s*30px\)/,
+  "窄工作区的发票单据项应改为可换行布局",
 );
 
 console.log("report-template-workspace-model tests passed");

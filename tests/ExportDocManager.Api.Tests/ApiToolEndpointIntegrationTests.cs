@@ -35,6 +35,9 @@ namespace ExportDocManager.Api.Tests
                 });
             using var anonymousClient = harness.CreateClient(desktopAccessToken: desktopToken);
 
+            var anonymousEmailDeliveriesResponse = await anonymousClient.GetAsync("/api/tools/email/deliveries");
+            Assert.Equal(HttpStatusCode.Unauthorized, anonymousEmailDeliveriesResponse.StatusCode);
+
             var anonymousOcrContentResponse = await anonymousClient.PostAsync(
                 "/api/tools/ocr/recognize-image-upload?sourceName=clipboard.png&sourceMimeType=image%2Fpng",
                 new ByteArrayContent([1, 2, 3]));
@@ -49,7 +52,11 @@ namespace ExportDocManager.Api.Tests
             Assert.False(emailStatus.IsConfigured);
             Assert.Contains("桌面可信令牌", emailStatus.StoragePolicy, StringComparison.Ordinal);
             Assert.Contains("局域网/容器浏览器不得读取服务器文件路径", emailStatus.StoragePolicy, StringComparison.Ordinal);
-            Assert.Contains("不写数据库", emailStatus.StoragePolicy, StringComparison.Ordinal);
+            Assert.Contains("投递状态和幂等键", emailStatus.StoragePolicy, StringComparison.Ordinal);
+
+            var emailDeliveriesResponse = await adminClient.GetAsync("/api/tools/email/deliveries");
+            Assert.Equal(HttpStatusCode.OK, emailDeliveriesResponse.StatusCode);
+            Assert.Empty(await ApiIntegrationTestHarness.ReadJsonAsync<ApiEmailDeliveryDto[]>(emailDeliveriesResponse));
 
             var invalidEmailSuggestionResponse = await adminClient.PostAsJsonAsync(
                 "/api/tools/email/server-suggestion",

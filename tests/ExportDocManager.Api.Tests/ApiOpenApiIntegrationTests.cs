@@ -265,6 +265,7 @@ public sealed class ApiOpenApiIntegrationTests
     private static void AssertCriticalRequestParameters(JsonElement paths)
     {
         AssertParameters(paths, "/api/auth/login", "post", (ApiRuntimeOptions.BootstrapTokenHeaderName, "header", false));
+        AssertParameters(paths, "/api/tools/email/send", "post", ("Idempotency-Key", "header", false));
         AssertParameters(
             paths,
             "/api/postgresql-maintenance/backups/upload-restore",

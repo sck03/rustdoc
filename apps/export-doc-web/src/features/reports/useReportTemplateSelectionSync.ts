@@ -8,6 +8,7 @@ import {
   fileNameFromPath,
   matchesTemplatePath,
   readPreferredPreviewSampleProfile,
+  readUserTemplateIdFromKey,
   resolveDefaultTemplatePath,
   resolvePreviewSourceId,
   type ReportTypeOption,
@@ -125,6 +126,19 @@ export function useReportTemplateSelectionSync({
       }),
     );
   }, [configuredTemplatePath, reportType, requestedTemplateFileName, selectedUserTemplateId, setSelectedTemplatePath, templates, templatesLoaded]);
+
+  useEffect(() => {
+    if (!templatesLoaded || !userTemplatesLoaded || selectedUserTemplateId > 0) {
+      return;
+    }
+
+    const configuredUserTemplateId = readUserTemplateIdFromKey(configuredTemplatePath);
+    const selectedUserTemplateKey = readUserTemplateIdFromKey(selectedTemplatePath);
+    const targetId = selectedUserTemplateKey || (!selectedTemplatePath ? configuredUserTemplateId : 0);
+    if (userTemplates.some((template) => template.id === targetId && template.isActive)) {
+      setSelectedUserTemplateId(targetId);
+    }
+  }, [configuredTemplatePath, selectedTemplatePath, selectedUserTemplateId, setSelectedUserTemplateId, templatesLoaded, userTemplates, userTemplatesLoaded]);
 
   useEffect(() => {
     if (requestedUserTemplateId <= 0 || !userTemplatesLoaded) {

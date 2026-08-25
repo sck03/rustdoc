@@ -77,4 +77,17 @@ namespace ExportDocManager.Api.Hosting
 
         public string StoragePolicy { get; init; } = string.Empty;
     }
+
+    public sealed record ApiEmailDeliveryDto(
+        string DeliveryId,
+        string JobId,
+        string Kind,
+        string Recipient,
+        string Subject,
+        int AttachmentCount,
+        string Status,
+        string ErrorMessage,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset? SentAt,
+        DateTimeOffset UpdatedAt);
 }

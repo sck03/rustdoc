@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Paperclip, RefreshCw, Send, Settings, Trash2 } from "lucide-react";
 import {
-  type ApiEmailSendResponse,
+  type ApiEmailDeliveryDto,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
@@ -32,9 +32,9 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
   const [body, setBody] = useState("");
   const [attachmentsText, setAttachmentsText] = useState("");
   const [message, setMessage] = useState<MessageState | null>(null);
-  const [sendResult, setSendResult] = useState<ApiEmailSendResponse | null>(null);
   const [lastSentDraftSnapshot, setLastSentDraftSnapshot] = useState("");
   const submittedDraftSnapshotRef = useRef("");
+  const deliveryAttemptRef = useRef({ snapshot: "", id: "" });
   const isDesktopRuntime = isDesktopBridgeAvailable();
 
   useEffect(() => {
@@ -50,6 +50,11 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
     queryKey: queryKeys.emailStatus(),
     queryFn: ({ signal }) => client.getEmailToolStatus({ signal }),
   });
+  const deliveriesQuery = useQuery({
+    queryKey: queryKeys.emailDeliveries(),
+    queryFn: ({ signal }) => client.listEmailDeliveries({ limit: 50 }, { signal }),
+    enabled: emailPermission.canView,
+  });
 
   useEffect(() => {
     if (statusQuery.isError) {
@@ -60,6 +65,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
   const sendMutation = useMutation({
     mutationFn: () =>
       client.sendEmail({
+        "Idempotency-Key": deliveryAttemptRef.current.id,
         body: {
           toAddress: toAddress.trim(),
           subject: subject.trim(),
@@ -68,7 +74,6 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
         },
       }),
     onSuccess: (response) => {
-      setSendResult(response);
       if (response.success) {
         setLastSentDraftSnapshot(submittedDraftSnapshotRef.current);
       }
@@ -76,10 +81,11 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
         kind: response.success ? "success" : "error",
         text: response.message || "邮件发送完成。",
       });
+      void deliveriesQuery.refetch();
     },
     onError: (error) => {
-      setSendResult(null);
       setMessage({ kind: "error", text: readApiError(error) });
+      void deliveriesQuery.refetch();
     },
   });
 
@@ -140,8 +146,10 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
     }
 
     setMessage(null);
-    setSendResult(null);
     submittedDraftSnapshotRef.current = currentDraftSnapshot;
+    if (deliveryAttemptRef.current.snapshot !== currentDraftSnapshot) {
+      deliveryAttemptRef.current = { snapshot: currentDraftSnapshot, id: crypto.randomUUID() };
+    }
     sendMutation.mutate();
   }
 
@@ -294,8 +302,56 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
           </section>
         )}
       </div>
+
+      <EmailDeliveryHistory
+        rows={deliveriesQuery.data ?? []}
+        isLoading={deliveriesQuery.isFetching}
+        onRefresh={() => void deliveriesQuery.refetch()}
+      />
     </section>
   );
+}
+
+function EmailDeliveryHistory({ rows, isLoading, onRefresh }: { rows: ApiEmailDeliveryDto[]; isLoading: boolean; onRefresh: () => void }) {
+  return (
+    <section className="form-section" aria-label="邮件投递记录">
+      <div className="section-header">
+        <div><h2>投递记录</h2><span>最近 {rows.length} 条</span></div>
+        <button className="icon-button" type="button" title="刷新投递记录" aria-label="刷新投递记录" disabled={isLoading} onClick={onRefresh}>
+          <RefreshCw size={17} aria-hidden="true" />
+        </button>
+      </div>
+      <ResponsiveTableFrame label="邮件投递记录">
+        <table>
+          <thead><tr><th>时间</th><th>来源</th><th>收件人</th><th>主题</th><th>附件</th><th>状态</th></tr></thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.deliveryId}>
+                <td>{formatDeliveryTime(row.createdAt)}</td>
+                <td>{row.kind === "ReportDocumentEmail" ? "发票单据" : "通用邮件"}</td>
+                <td>{row.recipient}</td>
+                <td title={row.errorMessage || row.subject}>{row.subject || "-"}</td>
+                <td>{row.attachmentCount}</td>
+                <td title={row.errorMessage}>{formatDeliveryStatus(row.status)}</td>
+              </tr>
+            ))}
+            {!rows.length ? <tr><td className="empty-cell small-empty" colSpan={6}>{isLoading ? "正在加载" : "暂无投递记录"}</td></tr> : null}
+          </tbody>
+        </table>
+      </ResponsiveTableFrame>
+    </section>
+  );
+}
+
+function formatDeliveryStatus(status: string) {
+  if (status === "Sent") return "已发送";
+  if (status === "Uncertain") return "结果不确定";
+  return "投递中";
+}
+
+function formatDeliveryTime(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
 }
 
 function DetailItem({ label, value, wide }: { label: string; value: string; wide?: boolean }) {

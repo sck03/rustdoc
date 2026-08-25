@@ -2,19 +2,44 @@ using ExportDocManager.Models;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using ExportDocManager.Services.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ExportDocManager.Api.Hosting
 {
     public static partial class ApiEndpointRouteBuilderExtensions
     {
         private const string EmailToolStoragePolicy =
-            "邮件工具只读取运行数据根 Config/appsettings.json 中的 SMTP 配置；任意本地附件路径只允许带桌面可信令牌的 Tauri 请求使用，局域网/容器浏览器不得读取服务器文件路径。发送过程不创建默认附件目录、不写数据库，也不把发票/报关数据域与付款/报销数据域按编号合并。";
+            "邮件工具读取运行数据根 Config/appsettings.json 中的 SMTP 配置，并在当前业务数据库保存投递状态和幂等键；任意本地附件路径只允许带桌面可信令牌的 Tauri 请求使用，局域网/容器浏览器不得读取服务器文件路径。发送过程不创建默认附件目录，也不把发票/报关数据域与付款/报销数据域按编号合并。";
 
         private const string EmailServerSuggestionStoragePolicy =
             "邮件服务器配置推断只在内存中返回建议，不保存 appsettings.json、不写数据库、不创建目录。";
 
         private static void MapEmailToolEndpoints(this IEndpointRouteBuilder endpoints)
         {
+            endpoints.MapGet("/api/tools/email/deliveries", async (
+                IEmailDeliveryStore deliveryStore,
+                int? limit,
+                CancellationToken cancellationToken) =>
+            {
+                var rows = await deliveryStore.ListRecentAsync(limit ?? 50, cancellationToken).ConfigureAwait(false);
+                return Results.Ok(rows.Select(item => new ApiEmailDeliveryDto(
+                    item.DeliveryId,
+                    item.JobId,
+                    item.Kind,
+                    item.Recipient,
+                    item.Subject,
+                    item.AttachmentCount,
+                    item.Status,
+                    item.ErrorMessage,
+                    item.CreatedAt,
+                    item.SentAt,
+                    item.UpdatedAt)));
+            })
+            .WithName("ListEmailDeliveries")
+            .Produces<IReadOnlyList<ApiEmailDeliveryDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
+
             endpoints.MapGet("/api/tools/email/status", async (
                 HttpContext context,
                 ISettingsService settingsService) =>
@@ -82,8 +107,10 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IEmailService emailService,
+                IEmailDeliveryStore deliveryStore,
                 ISettingsService settingsService,
                 ApiEmailSendRequest request,
+                [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
                 CancellationToken cancellationToken) =>
             {
 
@@ -109,12 +136,61 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    await emailService.SendEmailAsync(
-                        normalizedRequest.ToAddress,
-                        normalizedRequest.Subject,
-                        normalizedRequest.Body,
-                        normalizedRequest.AttachmentPaths.ToList(),
-                        cancellationToken);
+                    string deliveryId = string.IsNullOrWhiteSpace(idempotencyKey)
+                        ? Guid.NewGuid().ToString("N")
+                        : idempotencyKey.Trim();
+                    if (deliveryId.Length is < 8 or > 120)
+                    {
+                        return Results.BadRequest(new ApiErrorResponse("Idempotency-Key 长度无效。"));
+                    }
+
+                    var delivery = await deliveryStore.BeginAsync(
+                            deliveryId,
+                            EmailDeliveryFingerprint.Create([
+                                "EmailTool",
+                                normalizedRequest.ToAddress,
+                                normalizedRequest.Subject,
+                                normalizedRequest.Body,
+                                .. normalizedRequest.AttachmentPaths
+                            ]),
+                            string.Empty,
+                            "EmailTool",
+                            normalizedRequest.ToAddress,
+                            normalizedRequest.Subject,
+                            normalizedRequest.AttachmentPaths.Count,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    if (!delivery.ShouldSend)
+                    {
+                        return delivery.AlreadySent
+                            ? Results.Ok(new ApiEmailSendResponse
+                            {
+                                Success = true,
+                                Message = "邮件已发送（幂等请求）。",
+                                ToAddress = normalizedRequest.ToAddress,
+                                Subject = normalizedRequest.Subject,
+                                AttachmentCount = normalizedRequest.AttachmentPaths.Count,
+                                StoragePolicy = EmailToolStoragePolicy
+                            })
+                            : Results.Conflict(new ApiErrorResponse(delivery.ErrorMessage ?? "邮件已尝试投递，结果不确定。"));
+                    }
+
+                    try
+                    {
+                        await emailService.SendEmailAsync(
+                            normalizedRequest.ToAddress,
+                            normalizedRequest.Subject,
+                            normalizedRequest.Body,
+                            normalizedRequest.AttachmentPaths.ToList(),
+                            cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        await deliveryStore.MarkUncertainAsync(deliveryId, ex.Message, CancellationToken.None).ConfigureAwait(false);
+                        throw;
+                    }
+
+                    await deliveryStore.MarkSentAsync(deliveryId, CancellationToken.None).ConfigureAwait(false);
 
                     return Results.Ok(new ApiEmailSendResponse
                     {
@@ -135,6 +211,7 @@ namespace ExportDocManager.Api.Hosting
             .Produces<ApiEmailSendResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status409Conflict)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status503ServiceUnavailable);
 

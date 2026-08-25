@@ -133,11 +133,17 @@ namespace ExportDocManager.Api.Hosting
                 return emailValidation;
             }
 
+            if (string.IsNullOrWhiteSpace(emailRequest!.DeliveryId))
+            {
+                return Results.BadRequest(new ApiErrorResponse("邮件任务缺少投递键，不能安全重试。"));
+            }
+
             return ApiEndpointRouteBuilderExtensions.AcceptedBackgroundJob(
                 ApiEndpointRouteBuilderExtensions.EnqueueInvoiceDocumentEmailJob(
                     jobRunner,
                     requestedBy,
-                    emailRequest!.InvoiceId,
+                    emailRequest.DeliveryId,
+                    emailRequest.InvoiceId,
                     emailItems,
                     includeMergedPdf,
                     toAddress,

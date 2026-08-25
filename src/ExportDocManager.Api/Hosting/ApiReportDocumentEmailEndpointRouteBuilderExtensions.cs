@@ -9,7 +9,7 @@ namespace ExportDocManager.Api.Hosting
     public static partial class ApiEndpointRouteBuilderExtensions
     {
         private const string InvoiceDocumentEmailStoragePolicy =
-            "单据邮件发送只读取当前发票/报关数据域、客户邮箱和运行数据根 Config/appsettings.json SMTP 配置；临时 PDF 写运行数据根 Cache/ReportDocumentEmails 后自动清理，不读取付款/报销表，不创建默认附件或导出目录。";
+            "单据邮件发送只读取当前发票/报关数据域、客户邮箱和运行数据根 Config/appsettings.json SMTP 配置，并在当前业务数据库保存投递状态和幂等键；临时 PDF 写运行数据根 Cache/ReportDocumentEmails 后自动清理，不读取付款/报销表，不创建默认附件或导出目录。";
 
         private static void MapInvoiceDocumentEmailEndpoint(this IEndpointRouteBuilder endpoints)
         {
@@ -46,6 +46,7 @@ namespace ExportDocManager.Api.Hosting
                 return AcceptedBackgroundJob(EnqueueInvoiceDocumentEmailJob(
                     jobRunner,
                     user.Username,
+                    Guid.NewGuid().ToString("N"),
                     invoiceId,
                     normalizedItems,
                     includeMergedPdf,
@@ -109,6 +110,7 @@ namespace ExportDocManager.Api.Hosting
         internal static BackgroundJobSnapshot EnqueueInvoiceDocumentEmailJob(
             ApiBackgroundJobRunner jobRunner,
             string requestedBy,
+            string deliveryId,
             int invoiceId,
             IReadOnlyList<ApiInvoiceDocumentPackageItemRequest> items,
             bool includeMergedPdf,
@@ -168,14 +170,63 @@ namespace ExportDocManager.Api.Hosting
                             "正在发送单据邮件",
                             recipient);
 
-                        var emailService = provider.GetRequiredService<IEmailService>();
-                        await emailService.SendEmailAsync(
+                        var deliveryStore = provider.GetRequiredService<IEmailDeliveryStore>();
+                        var fingerprintParts = new List<string?>
+                        {
+                            "ReportDocumentEmail",
+                            invoiceId.ToString(System.Globalization.CultureInfo.InvariantCulture),
                             recipient,
                             emailSubject,
                             emailBody,
-                            attachments,
-                            jobContext.CancellationToken)
+                            includeMergedPdf ? "1" : "0"
+                        };
+                        foreach (var item in items)
+                        {
+                            fingerprintParts.Add(item.Name);
+                            fingerprintParts.Add(item.ReportType);
+                            fingerprintParts.Add(item.TemplatePath);
+                            fingerprintParts.Add(item.WithSeal ? "1" : "0");
+                        }
+
+                        var delivery = await deliveryStore.BeginAsync(
+                                deliveryId,
+                                EmailDeliveryFingerprint.Create(fingerprintParts),
+                                jobContext.JobId,
+                                "ReportDocumentEmail",
+                                recipient,
+                                emailSubject,
+                                attachments.Count,
+                                jobContext.CancellationToken)
                             .ConfigureAwait(false);
+                        if (!delivery.ShouldSend)
+                        {
+                            if (delivery.AlreadySent)
+                            {
+                                jobContext.Report(98, "单据邮件已发送（幂等跳过）", recipient);
+                                return string.Empty;
+                            }
+
+                            throw new ResourceConflictException(delivery.ErrorMessage ?? "邮件已尝试投递，结果不确定。");
+                        }
+
+                        var emailService = provider.GetRequiredService<IEmailService>();
+                        try
+                        {
+                            await emailService.SendEmailAsync(
+                                    recipient,
+                                    emailSubject,
+                                    emailBody,
+                                    attachments,
+                                    jobContext.CancellationToken)
+                                .ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            await deliveryStore.MarkUncertainAsync(deliveryId, ex.Message, CancellationToken.None).ConfigureAwait(false);
+                            throw;
+                        }
+
+                        await deliveryStore.MarkSentAsync(deliveryId, CancellationToken.None).ConfigureAwait(false);
 
                         jobContext.Report(
                             98,
@@ -192,6 +243,7 @@ namespace ExportDocManager.Api.Hosting
                 retryOperation: "StartInvoiceDocumentEmailJob",
                 retryRequestJson: SerializeBackgroundJobRetryRequest(new ApiInvoiceDocumentEmailJobRetryRequest
                 {
+                    DeliveryId = deliveryId,
                     InvoiceId = invoiceId,
                     Body = new ApiInvoiceDocumentEmailRequest
                     {
@@ -295,6 +347,8 @@ namespace ExportDocManager.Api.Hosting
 
         internal sealed class ApiInvoiceDocumentEmailJobRetryRequest
         {
+            public string DeliveryId { get; set; } = string.Empty;
+
             public int InvoiceId { get; set; }
 
             public ApiInvoiceDocumentEmailRequest Body { get; set; } = new();

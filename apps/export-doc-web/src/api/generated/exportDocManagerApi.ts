@@ -868,6 +868,20 @@ export interface ApiDownloadTicket {
   token: string;
 }
 
+export interface ApiEmailDeliveryDto {
+  attachmentCount: number;
+  createdAt: string;
+  deliveryId: string;
+  errorMessage: string;
+  jobId: string;
+  kind: string;
+  recipient: string;
+  sentAt?: string | null;
+  status: string;
+  subject: string;
+  updatedAt: string;
+}
+
 export interface ApiEmailSendRequest {
   attachmentPaths?: string[];
   body?: string;
@@ -4218,6 +4232,10 @@ export interface ListCustomsCooProducerProfilesRequest {
   keyword?: string;
 }
 
+export interface ListEmailDeliveriesRequest {
+  limit?: number;
+}
+
 export interface ListEmailTemplateVersionsRequest {
   id: number;
 }
@@ -4678,6 +4696,7 @@ export interface SearchSupplierProductOptionsRequest {
 }
 
 export interface SendEmailRequest {
+  "Idempotency-Key"?: string;
   body: ApiEmailSendRequest;
 }
 
@@ -6109,6 +6128,16 @@ export class ExportDocManagerApiClient {
     return this.request<ApiBackupListResponse>("GET", path, { init });
   }
 
+  public listEmailDeliveries(request: ListEmailDeliveriesRequest = {}, init?: ApiRequestInit): Promise<ApiEmailDeliveryDto[]> {
+    const path = "/api/tools/email/deliveries";
+    return this.request<ApiEmailDeliveryDto[]>("GET", path, {
+      query: {
+        "limit": request.limit,
+      },
+      init,
+    });
+  }
+
   public listEmailTemplateVariables(init?: ApiRequestInit): Promise<ApiEmailTemplateVariableDto[]> {
     const path = "/api/email-templates/variables";
     return this.request<ApiEmailTemplateVariableDto[]>("GET", path, { init });
@@ -7013,7 +7042,12 @@ export class ExportDocManagerApiClient {
     const path = "/api/tools/email/send";
     return this.request<ApiEmailSendResponse>("POST", path, {
       body: request.body,
-      init,
+      init: {
+        ...init,
+        headers: mergeHeaders(init?.headers, {
+          "Idempotency-Key": request["Idempotency-Key"] === undefined ? undefined : String(request["Idempotency-Key"]),
+        }),
+      },
     });
   }
 

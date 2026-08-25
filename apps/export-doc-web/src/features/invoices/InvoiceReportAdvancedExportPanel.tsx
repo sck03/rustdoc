@@ -2,7 +2,6 @@ import { Eye, FileArchive, FileDown, FileSpreadsheet, Save } from "lucide-react"
 import { DesktopIconButton, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { InvoiceDocumentEmailPanel } from "./InvoiceDocumentEmailPanel.tsx";
-import { InvoiceDocumentPackageConfig } from "./InvoiceDocumentPackageConfig.tsx";
 import { fileNameFromPath } from "./invoiceReportPreviewModel.ts";
 import type { InvoiceDocumentPackageWorkspace } from "./useInvoiceDocumentPackageWorkspace.ts";
 import type { InvoiceFileExportOperations } from "./useInvoiceFileExportOperations.ts";
@@ -14,8 +13,6 @@ type Props = {
   canGeneratePdf: boolean;
   canGenerateBookingSheet: boolean;
   canPreviewPackage: boolean;
-  canSavePackageConfig: boolean;
-  canEditPackageConfig: boolean;
   canGeneratePackage: boolean;
   canSendDocumentEmail: boolean;
   fileExports: InvoiceFileExportOperations;
@@ -31,8 +28,6 @@ export function InvoiceReportAdvancedExportPanel({
   canGeneratePdf,
   canGenerateBookingSheet,
   canPreviewPackage,
-  canSavePackageConfig,
-  canEditPackageConfig,
   canGeneratePackage,
   canSendDocumentEmail,
   fileExports,
@@ -102,29 +97,8 @@ export function InvoiceReportAdvancedExportPanel({
               <Eye size={17} aria-hidden="true" />
               <span>预览单据包</span>
             </button>
-            <button
-              className="command-button secondary"
-              type="button"
-              title="保存当前单据包配置"
-              disabled={!canSavePackageConfig}
-              onClick={documentPackage.saveConfig}
-            >
-              <Save size={17} aria-hidden="true" />
-              <span>保存配置</span>
-            </button>
           </div>
         </div>
-
-        <InvoiceDocumentPackageConfig
-          canEdit={canEditPackageConfig}
-          draft={documentPackage.configDraft}
-          templateOptions={documentPackage.templateOptions}
-          onAdd={documentPackage.addConfigItem}
-          onMove={documentPackage.moveConfigItem}
-          onRemove={documentPackage.removeConfigItem}
-          onUpdate={documentPackage.updateConfig}
-          onUpdateItem={documentPackage.updateConfigItem}
-        />
 
         <div className="document-package-template-list" aria-label="单据包模板">
           {documentPackage.packageTemplates.length === 0 ? (

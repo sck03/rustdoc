@@ -200,10 +200,6 @@ export function InvoiceReportPreviewPanel({
     && hasValidPackageSelection
     && Boolean(documentPackage.emailToAddress.trim())
     && !isBusy;
-  const canEditPackageConfig = canManageSettings && Boolean(settingsQuery.data?.settings) && !isBusy;
-  const canSavePackageConfig = canEditPackageConfig
-    && documentPackage.configDirty
-    && documentPackage.configDraft.items.length > 0;
   const canOpenTemplateManagement = (reportDesignPermission.canView || canManageSettings) && !isBusy;
   const templateMessage = templatesQuery.isError ? readApiError(templatesQuery.error) : null;
 
@@ -307,8 +303,6 @@ export function InvoiceReportPreviewPanel({
               canGeneratePdf={canGeneratePdf}
               canGenerateBookingSheet={canGenerateBookingSheet}
               canPreviewPackage={canPreviewPackage}
-              canSavePackageConfig={canSavePackageConfig}
-              canEditPackageConfig={canEditPackageConfig}
               canGeneratePackage={canGeneratePackage}
               canSendDocumentEmail={canSendDocumentEmail}
               fileExports={fileExports}

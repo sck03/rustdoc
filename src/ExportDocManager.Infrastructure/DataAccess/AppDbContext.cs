@@ -42,6 +42,7 @@ namespace ExportDocManager.DataAccess
         public DbSet<SupplierAssessment> SupplierAssessments { get; set; }
         public DbSet<EmailTemplate> EmailTemplates { get; set; }
         public DbSet<EmailTemplateVersion> EmailTemplateVersions { get; set; }
+        public DbSet<EmailDeliveryRecord> EmailDeliveryRecords { get; set; }
         public DbSet<UserReportTemplate> UserReportTemplates { get; set; }
         public DbSet<UserReportTemplateVersion> UserReportTemplateVersions { get; set; }
         public DbSet<SalesOpportunity> SalesOpportunities { get; set; }
@@ -259,6 +260,9 @@ namespace ExportDocManager.DataAccess
                 .WithMany()
                 .HasForeignKey(item => item.EmailTemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<EmailDeliveryRecord>().HasKey(item => item.DeliveryId);
+            modelBuilder.Entity<EmailDeliveryRecord>().HasIndex(item => new { item.OwnerUserId, item.CreatedAt });
+            modelBuilder.Entity<EmailDeliveryRecord>().HasIndex(item => new { item.Status, item.UpdatedAt });
             modelBuilder.Entity<SalesOpportunity>().HasIndex(item => item.CrmCustomerId);
             modelBuilder.Entity<SalesOpportunity>().HasIndex(item => item.ProductId);
             modelBuilder.Entity<SalesOpportunity>().HasIndex(item => new { item.OwnerUserId, item.Stage });

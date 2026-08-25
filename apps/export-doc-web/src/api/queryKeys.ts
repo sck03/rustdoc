@@ -49,6 +49,7 @@ export const queryKeys = {
   health: () => ["system", "health"] as const,
   licenseStatus: () => ["system", "license"] as const,
   emailStatus: () => ["tools", "email", "status"] as const,
+  emailDeliveries: () => ["tools", "email", "deliveries"] as const,
   excelToolBookingInvoices: (pageSize: number) => ["tools", "excel", "booking-invoices", { pageSize }] as const,
   cloudBackupStatus: () => ["backups", "cloud", "status"] as const,
   cloudBackupBackups: () => ["backups", "cloud", "backups"] as const,

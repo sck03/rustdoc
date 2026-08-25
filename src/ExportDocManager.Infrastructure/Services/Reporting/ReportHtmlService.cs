@@ -97,6 +97,28 @@ namespace ExportDocManager.Services.Reporting
                 }
             }
 
+            await using var userTemplateContext = await _contextFactory
+                .CreateDbContextAsync(cancellationToken)
+                .ConfigureAwait(false);
+            var userTemplates = await _accessScope
+                .ApplyUserReportTemplateScope(userTemplateContext.UserReportTemplates.AsNoTracking())
+                .Where(item => item.IsActive && item.ReportType == reportType.ToString())
+                .OrderBy(item => item.Name)
+                .Select(item => new { item.Id, item.Name })
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            foreach (var template in userTemplates)
+            {
+                result.Add(new ReportTemplateDescriptor
+                {
+                    ReportType = reportType,
+                    DisplayName = template.Name,
+                    TemplatePath = $"user-template:{template.Id}",
+                    WithSealDefault = reportType == ReportDocumentType.PaymentVoucher ? null : true
+                });
+            }
+
             if (result.Count == 0)
             {
                 string defaultPath = await GetTemplatePathAsync(reportType, cancellationToken).ConfigureAwait(false);
@@ -393,7 +415,11 @@ namespace ExportDocManager.Services.Reporting
             string? templatePath,
             CancellationToken cancellationToken)
         {
-            if (TryParseUserTemplateId(templatePath, out int userTemplateId))
+            string effectiveTemplatePath = string.IsNullOrWhiteSpace(templatePath)
+                ? await GetTemplatePathAsync(reportType, cancellationToken).ConfigureAwait(false)
+                : templatePath.Trim();
+
+            if (TryParseUserTemplateId(effectiveTemplatePath, out int userTemplateId))
             {
                 await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
                 var template = await _accessScope.ApplyUserReportTemplateScope(context.UserReportTemplates.AsNoTracking())
@@ -409,7 +435,7 @@ namespace ExportDocManager.Services.Reporting
                 return ($"user-template:{userTemplateId}", template.ContentHtml ?? string.Empty);
             }
 
-            string resolvedPath = await ResolveTemplatePathAsync(reportType, templatePath, cancellationToken).ConfigureAwait(false);
+            string resolvedPath = await ResolveTemplatePathAsync(reportType, effectiveTemplatePath, cancellationToken).ConfigureAwait(false);
             string content = await File.ReadAllTextAsync(resolvedPath, cancellationToken).ConfigureAwait(false);
             return (resolvedPath, content);
         }
@@ -484,21 +510,36 @@ namespace ExportDocManager.Services.Reporting
                 : _settingsService.Settings.ReportTemplateDefaults.ExportDocumentTemplatePath;
             if (!string.IsNullOrWhiteSpace(defaultTemplatePath))
             {
-                string resolvedDefaultPath = Path.GetFullPath(_pathResolver.ToAbsolutePath(defaultTemplatePath));
-                ReportTemplateConfig? configuredDefault;
-                lock (_configLock)
+                if (TryParseUserTemplateId(defaultTemplatePath, out int userTemplateId))
                 {
-                    configuredDefault = _templateConfigs.FirstOrDefault(config =>
-                        PhysicalPathComparison.AreSamePath(config.FileName, resolvedDefaultPath));
+                    await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+                    bool exists = await _accessScope.ApplyUserReportTemplateScope(context.UserReportTemplates.AsNoTracking())
+                        .AnyAsync(item => item.Id == userTemplateId && item.IsActive && item.ReportType == reportType.ToString(), cancellationToken)
+                        .ConfigureAwait(false);
+                    if (exists)
+                    {
+                        return $"user-template:{userTemplateId}";
+                    }
                 }
 
-                if (configuredDefault != null &&
-                    ReportTemplateCatalogLoader.ResolveCatalogReportType(
-                        configuredDefault.Type,
-                        configuredDefault.FileName) == reportType &&
-                    File.Exists(resolvedDefaultPath))
+                if (!TryParseUserTemplateId(defaultTemplatePath, out _))
                 {
-                    return resolvedDefaultPath;
+                    string resolvedDefaultPath = Path.GetFullPath(_pathResolver.ToAbsolutePath(defaultTemplatePath));
+                    ReportTemplateConfig? configuredDefault;
+                    lock (_configLock)
+                    {
+                        configuredDefault = _templateConfigs.FirstOrDefault(config =>
+                            PhysicalPathComparison.AreSamePath(config.FileName, resolvedDefaultPath));
+                    }
+
+                    if (configuredDefault != null &&
+                        ReportTemplateCatalogLoader.ResolveCatalogReportType(
+                            configuredDefault.Type,
+                            configuredDefault.FileName) == reportType &&
+                        File.Exists(resolvedDefaultPath))
+                    {
+                        return resolvedDefaultPath;
+                    }
                 }
             }
 

@@ -75,7 +75,7 @@ export function useReportTemplateWorkspaceQueries({
   const templateContentQuery = useQuery({
     queryKey: queryKeys.reportTemplateContent(reportType, selectedTemplatePath),
     queryFn: ({ signal }) => client.getReportTemplateContent({ reportType, templatePath: selectedTemplatePath }, { signal }),
-    enabled: enabled && Boolean(selectedTemplatePath) && selectedUserTemplateId <= 0,
+    enabled: enabled && Boolean(selectedTemplatePath) && selectedUserTemplateId <= 0 && !selectedTemplatePath.startsWith("user-template:"),
   });
 
   return {

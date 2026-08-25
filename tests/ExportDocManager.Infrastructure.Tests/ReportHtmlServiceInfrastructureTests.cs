@@ -61,6 +61,90 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task UserTemplateReference_ShouldListAndRenderAsConfiguredDefault()
+        {
+            string appRoot = CreateTempDirectory("report-user-template-app");
+            string dataRoot = CreateTempDirectory("report-user-template-data");
+
+            try
+            {
+                await using var factory = new TestDbContextFactory();
+                int invoiceId = await SeedInvoiceAsync(factory);
+                await using (var context = factory.CreateDbContext())
+                {
+                    context.UserReportTemplates.Add(new UserReportTemplate
+                    {
+                        Id = 41,
+                        ReportType = ReportDocumentType.ExportDocument.ToString(),
+                        Name = "数据库发票模板",
+                        ContentHtml = "<html><body>DB {{ Invoice.InvoiceNo }}</body></html>",
+                        IsActive = true
+                    });
+                    await context.SaveChangesAsync();
+                }
+
+                var settings = new StubSettingsService();
+                settings.Settings.ReportTemplateDefaults.ExportDocumentTemplatePath = "user-template:41";
+                var service = CreateService(factory, settings, new RuntimeAppPathProvider(appRoot, dataRoot));
+
+                var templates = await service.GetAvailableTemplatesAsync(ReportDocumentType.ExportDocument);
+                var databaseTemplate = Assert.Single(templates, item => item.TemplatePath == "user-template:41");
+                Assert.Equal("数据库发票模板", databaseTemplate.DisplayName);
+
+                var rendered = await service.RenderInvoiceReportAsync(invoiceId, ReportDocumentType.ExportDocument);
+                Assert.Equal("user-template:41", rendered.TemplatePath);
+                Assert.Contains("DB INV-HTML-001", rendered.Html, StringComparison.Ordinal);
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        [Fact]
+        public async Task PaymentUserTemplateReference_ShouldListAndRenderAsConfiguredDefault()
+        {
+            string appRoot = CreateTempDirectory("payment-user-template-app");
+            string dataRoot = CreateTempDirectory("payment-user-template-data");
+
+            try
+            {
+                await using var factory = new TestDbContextFactory();
+                int paymentId = await SeedPaymentWithMatchingInvoiceAsync(factory);
+                await using (var context = factory.CreateDbContext())
+                {
+                    context.UserReportTemplates.Add(new UserReportTemplate
+                    {
+                        Id = 42,
+                        ReportType = ReportDocumentType.PaymentVoucher.ToString(),
+                        Name = "数据库付款模板",
+                        ContentHtml = "<html><body>DB PAYMENT {{ Payment.InvoiceNo }}</body></html>",
+                        IsActive = true
+                    });
+                    await context.SaveChangesAsync();
+                }
+
+                var settings = new StubSettingsService();
+                settings.Settings.ReportTemplateDefaults.PaymentVoucherTemplatePath = "user-template:42";
+                var service = CreateService(factory, settings, new RuntimeAppPathProvider(appRoot, dataRoot));
+
+                var templates = await service.GetAvailableTemplatesAsync(ReportDocumentType.PaymentVoucher);
+                Assert.Contains(templates, item => item.TemplatePath == "user-template:42");
+
+                var rendered = await service.RenderPaymentVoucherAsync(paymentId);
+                Assert.Equal("user-template:42", rendered.TemplatePath);
+                Assert.Contains("DB PAYMENT", rendered.Html, StringComparison.Ordinal);
+                Assert.DoesNotContain("{{", rendered.Html, StringComparison.Ordinal);
+            }
+            finally
+            {
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        [Fact]
         public async Task RenderPaymentVoucherAsync_ShouldRejectInvoiceDomainFields()
         {
             string appRoot = CreateTempDirectory("payment-html-app");
@@ -1502,7 +1586,18 @@ namespace ExportDocManager.Infrastructure.Tests
             IDbContextFactory<AppDbContext> factory,
             ISettingsService settingsService,
             IAppPathProvider pathProvider) =>
-            new(factory, settingsService, pathProvider, TestAccessScope.Create());
+            new(
+                factory,
+                settingsService,
+                pathProvider,
+                TestAccessScope.Create(
+                    currentUserContext: new FixedCurrentUserContext(
+                        new User { Id = 1, Username = "admin", Role = "Admin" })));
+
+        private sealed class FixedCurrentUserContext(User user) : ExportDocManager.Services.Security.ICurrentUserContext
+        {
+            public User CurrentUser { get; } = user;
+        }
 
         private sealed class StubSettingsService : ISettingsService
         {

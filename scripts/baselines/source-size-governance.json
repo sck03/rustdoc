@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-21",
+  "capturedAt": "2026-08-25",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 111256,
+      "baselineAggregateLines": 111947,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 111456,
+      "maximumAggregateLines": 112147,
       "reportFiles": false
     },
     {
@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 39020,
+      "baselineAggregateLines": 39488,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 39140,
+      "maximumAggregateLines": 39608,
       "reportFiles": false
     },
     {

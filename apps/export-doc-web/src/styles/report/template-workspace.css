@@ -206,6 +206,68 @@
   min-width: 0;
 }
 
+.report-export-default-items {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--edm-neutral-250);
+}
+
+.report-export-default-items-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.report-export-default-items-header > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.report-export-default-items-header strong {
+  color: var(--edm-neutral-750);
+  font-size: var(--edm-font-size-sm);
+}
+
+.report-export-default-items-header small {
+  color: var(--edm-neutral-550);
+  font-size: var(--edm-font-size-xs);
+  font-weight: 700;
+}
+
+.report-export-default-items-list {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.report-export-default-item {
+  display: grid;
+  grid-template-columns: auto minmax(130px, 0.8fr) minmax(220px, 1.5fr) auto repeat(3, 30px);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  background: var(--edm-white);
+  border: 1px solid var(--edm-neutral-250);
+  border-radius: 6px;
+}
+
+.report-export-default-item > input:not([type="checkbox"]),
+.report-export-default-item > select {
+  min-width: 0;
+  width: 100%;
+}
+
+.report-export-default-item .settings-check {
+  white-space: nowrap;
+}
+
 .report-template-management-header p,
 .report-template-management-current {
   color: var(--edm-neutral-550);

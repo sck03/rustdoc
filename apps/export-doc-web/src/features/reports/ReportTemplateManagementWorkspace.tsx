@@ -6,6 +6,7 @@ import { ReportTemplateSelectionPanel } from "./ReportTemplateSelectionPanel.tsx
 import { ReportTemplateUserPanel } from "./ReportTemplateUserPanel.tsx";
 
 type Props = {
+  reportType: "ExportDocument" | "PaymentVoucher";
   adminPanel: ComponentProps<typeof ReportTemplateAdminPanel>;
   exportDefaultsPanel: ComponentProps<typeof ReportExportDefaultsPanel>;
   packagePanel: ComponentProps<typeof ReportTemplatePackagePanel>;
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export function ReportTemplateManagementWorkspace({
+  reportType,
   adminPanel,
   exportDefaultsPanel,
   packagePanel,
@@ -23,7 +25,7 @@ export function ReportTemplateManagementWorkspace({
   return (
     <div className="report-template-management-workspace">
       <ReportTemplateSelectionPanel {...selectionPanel} />
-      <ReportExportDefaultsPanel {...exportDefaultsPanel} />
+      {reportType === "ExportDocument" ? <ReportExportDefaultsPanel {...exportDefaultsPanel} /> : null}
       {userPanel ? <ReportTemplateUserPanel {...userPanel} /> : null}
       <ReportTemplateAdminPanel {...adminPanel} />
       <ReportTemplatePackagePanel {...packagePanel} />

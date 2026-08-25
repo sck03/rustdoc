@@ -443,7 +443,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             var databasePath = Path.Combine(
                 Path.GetTempPath(),
-                "edm-v8-schema-" + Guid.NewGuid().ToString("N") + ".db");
+                "edm-v9-schema-" + Guid.NewGuid().ToString("N") + ".db");
             using var factory = new SqliteFileDbContextFactory(databasePath);
 
             var service = new DatabaseInitializationService(
@@ -460,7 +460,7 @@ namespace ExportDocManager.Infrastructure.Tests
             int schemaVersion = await verifyContext.Database
                 .SqlQueryRaw<int>("SELECT \"Version\" AS \"Value\" FROM \"__ExportDocManagerSchema\" WHERE \"Id\" = 1")
                 .SingleAsync();
-            Assert.Equal(8, schemaVersion);
+            Assert.Equal(9, schemaVersion);
 
             var admin = await verifyContext.Users.SingleAsync(user => user.Username == "admin");
             Assert.True(PasswordHasher.VerifyPassword(admin.PasswordHash, string.Empty));

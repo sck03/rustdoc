@@ -192,6 +192,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IHsCodeImportService, UnsupportedHsCodeImportService>();
             services.AddSingleton<IAuditLogExcelExporter, UnsupportedAuditLogExcelExporter>();
             services.AddScoped<IEmailService, SmtpEmailService>();
+            services.AddScoped<IEmailDeliveryStore, EmailDeliveryStore>();
             services.AddScoped<IContainerLoadingService, ContainerLoadingService>();
             services.AddSingleton<IContainerPackingEngine, ContainerPackingEngine>();
 

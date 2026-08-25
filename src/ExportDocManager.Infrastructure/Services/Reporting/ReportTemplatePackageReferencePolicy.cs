@@ -51,6 +51,11 @@ namespace ExportDocManager.Services.Reporting
                 return string.Empty;
             }
 
+            if (templatePath.Trim().StartsWith("user-template:", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
             return TryNormalize(templatePath, reportType, out string normalizedPath)
                 ? normalizedPath
                 : throw new InvalidDataException($"默认 {reportType} 模板不存在或不属于受管模板目录。");

@@ -142,6 +142,12 @@ export function buildUserTemplateKey(id: number) {
   return `user-template:${id}`;
 }
 
+export function readUserTemplateIdFromKey(templatePath: string) {
+  const match = /^user-template:(\d+)$/i.exec(templatePath.trim());
+  const id = Number.parseInt(match?.[1] ?? "", 10);
+  return Number.isInteger(id) && id > 0 ? id : 0;
+}
+
 export function normalizeImportStrategy(value: string): TemplateImportStrategyOption {
   if (value === "Overwrite" || value === "AddOnly") {
     return value;

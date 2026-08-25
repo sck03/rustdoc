@@ -1,10 +1,13 @@
 using System.Text;
 using System.Text.Json;
+using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Time;
+using Microsoft.EntityFrameworkCore;
 using ExportDocManager.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,12 +24,16 @@ namespace ExportDocManager.Services.Reporting
         private readonly ISettingsService _settingsService;
         private readonly IBusinessClock _clock;
         private readonly ILogger<ReportTemplateService> _logger;
+        private readonly IDbContextFactory<AppDbContext>? _contextFactory;
+        private readonly BusinessDataAccessScope? _accessScope;
 
         public ReportTemplateService(
             IAppPathProvider pathProvider,
             ISettingsService settingsService,
             IBusinessClock? clock = null,
-            ILogger<ReportTemplateService>? logger = null)
+            ILogger<ReportTemplateService>? logger = null,
+            IDbContextFactory<AppDbContext>? contextFactory = null,
+            BusinessDataAccessScope? accessScope = null)
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
             ArgumentNullException.ThrowIfNull(settingsService);
@@ -35,6 +42,8 @@ namespace ExportDocManager.Services.Reporting
             _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver, _logger);
             _settingsService = settingsService;
             _clock = clock ?? BusinessClock.CreateSystem();
+            _contextFactory = contextFactory;
+            _accessScope = accessScope;
         }
 
         public async Task<ReportTemplateContentResult> CreateTemplateAsync(
@@ -183,6 +192,50 @@ namespace ExportDocManager.Services.Reporting
             string templatePath,
             CancellationToken cancellationToken = default)
         {
+            if (TryParseUserTemplateId(templatePath, out int userTemplateId))
+            {
+                if (_contextFactory == null || _accessScope == null)
+                {
+                    throw new InvalidOperationException("数据库报表模板服务尚未配置。");
+                }
+
+                await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+                var userTemplate = await _accessScope.ApplyUserReportTemplateScope(context.UserReportTemplates.AsNoTracking())
+                    .Where(item => item.Id == userTemplateId && item.IsActive && item.ReportType == reportType.ToString())
+                    .Select(item => new { item.Id, item.Name })
+                    .FirstOrDefaultAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                if (userTemplate == null)
+                {
+                    throw new ResourceNotFoundException("用户报表模板不存在、已停用或无权访问。");
+                }
+
+                await _settingsService.LoadAsync().ConfigureAwait(false);
+                string userStoredPath = $"user-template:{userTemplate.Id}";
+                await _settingsService.UpdateAsync(settings =>
+                {
+                    if (reportType == ReportDocumentType.PaymentVoucher)
+                    {
+                        if (string.Equals(settings.ReportTemplateDefaults.PaymentVoucherTemplatePath, userStoredPath, StringComparison.Ordinal)) return false;
+                        settings.ReportTemplateDefaults.PaymentVoucherTemplatePath = userStoredPath;
+                    }
+                    else
+                    {
+                        if (string.Equals(settings.ReportTemplateDefaults.ExportDocumentTemplatePath, userStoredPath, StringComparison.Ordinal)) return false;
+                        settings.ReportTemplateDefaults.ExportDocumentTemplatePath = userStoredPath;
+                    }
+                    return true;
+                }, cancellationToken).ConfigureAwait(false);
+
+                return new ReportTemplateCommandResult
+                {
+                    ReportType = reportType,
+                    TemplatePath = userStoredPath,
+                    StoragePolicy = StoragePolicy,
+                    Message = $"已将“{userTemplate.Name}”设为默认模板。"
+                };
+            }
+
             var current = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: true, cancellationToken)
                 .ConfigureAwait(false);
             string storedPath = _pathResolver.ToStoredPath(current.TemplatePath);
@@ -535,6 +588,16 @@ namespace ExportDocManager.Services.Reporting
                 Content = content ?? string.Empty,
                 StoragePolicy = StoragePolicy
             };
+        }
+
+        private static bool TryParseUserTemplateId(string? templatePath, out int id)
+        {
+            const string prefix = "user-template:";
+            id = 0;
+            return !string.IsNullOrWhiteSpace(templatePath) &&
+                   templatePath.Trim().StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                   int.TryParse(templatePath.Trim()[prefix.Length..], out id) &&
+                   id > 0;
         }
 
         private static ResolvedReportTemplate CreateResolvedTemplate(
