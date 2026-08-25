@@ -182,6 +182,17 @@ namespace ExportDocManager.Services.Reporting
             string newTemplatePath,
             CancellationToken cancellationToken = default);
 
+        Task<ReportTemplateContentResult> UpdateTemplateDisplayNameAsync(
+            ReportDocumentType reportType,
+            string templatePath,
+            string displayName,
+            CancellationToken cancellationToken = default);
+
+        Task<ReportTemplateCommandResult> SetDefaultTemplateAsync(
+            ReportDocumentType reportType,
+            string templatePath,
+            CancellationToken cancellationToken = default);
+
         Task<ReportTemplateCommandResult> DeleteTemplateAsync(
             ReportDocumentType reportType,
             string templatePath,

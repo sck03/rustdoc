@@ -5,37 +5,47 @@ export function ReportTemplateAdminPanel({
   currentTemplateLabel,
   newTemplateFileName,
   newTemplateDisplayName,
+  currentTemplateDisplayName,
   renameTemplateFileName,
-  renameLabel,
+  isUserTemplate,
   canManageTemplates,
   canCreate,
-  canRename,
+  canUpdateDisplayName,
+  canRenameFile,
   canDelete,
-  canEditRename,
+  canEditDisplayName,
+  canEditFileName,
   isBusy,
   onNewTemplateFileNameChange,
   onNewTemplateDisplayNameChange,
+  onCurrentTemplateDisplayNameChange,
   onRenameTemplateFileNameChange,
   onCreate,
-  onRename,
+  onUpdateDisplayName,
+  onRenameFile,
   onDelete,
 }: {
   currentTemplateLabel: string;
   newTemplateFileName: string;
   newTemplateDisplayName: string;
+  currentTemplateDisplayName: string;
   renameTemplateFileName: string;
-  renameLabel: string;
+  isUserTemplate: boolean;
   canManageTemplates: boolean;
   canCreate: boolean;
-  canRename: boolean;
+  canUpdateDisplayName: boolean;
+  canRenameFile: boolean;
   canDelete: boolean;
-  canEditRename: boolean;
+  canEditDisplayName: boolean;
+  canEditFileName: boolean;
   isBusy: boolean;
   onNewTemplateFileNameChange: (value: string) => void;
   onNewTemplateDisplayNameChange: (value: string) => void;
+  onCurrentTemplateDisplayNameChange: (value: string) => void;
   onRenameTemplateFileNameChange: (value: string) => void;
   onCreate: () => void;
-  onRename: () => void;
+  onUpdateDisplayName: () => void;
+  onRenameFile: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -54,7 +64,7 @@ export function ReportTemplateAdminPanel({
             onChange={onNewTemplateFileNameChange}
           />
           <TextField
-            label="标题"
+            label="显示名称"
             value={newTemplateDisplayName}
             disabled={!canManageTemplates || isBusy}
             onChange={onNewTemplateDisplayNameChange}
@@ -78,22 +88,36 @@ export function ReportTemplateAdminPanel({
               <Trash2 size={18} aria-hidden="true" />
             </button>
           </div>
-          <details className="template-inline-details">
+          <details className="template-inline-details" open>
             <summary>
               <Pencil size={15} aria-hidden="true" />
-              <span>重命名</span>
+              <span>名称与文件</span>
             </summary>
             <div className="template-inline-details-content">
               <TextField
-                label={renameLabel}
-                value={renameTemplateFileName}
-                disabled={!canEditRename}
-                onChange={onRenameTemplateFileNameChange}
+                label="显示名称"
+                value={currentTemplateDisplayName}
+                disabled={!canEditDisplayName}
+                onChange={onCurrentTemplateDisplayNameChange}
               />
-              <button className="command-button secondary" type="button" disabled={!canRename} onClick={onRename}>
+              <button className="command-button secondary" type="button" disabled={!canUpdateDisplayName} onClick={onUpdateDisplayName}>
                 <Pencil size={17} aria-hidden="true" />
-                <span>保存名称</span>
+                <span>保存显示名称</span>
               </button>
+              {!isUserTemplate ? (
+                <>
+                  <TextField
+                    label="文件名"
+                    value={renameTemplateFileName}
+                    disabled={!canEditFileName}
+                    onChange={onRenameTemplateFileNameChange}
+                  />
+                  <button className="command-button secondary" type="button" disabled={!canRenameFile} onClick={onRenameFile}>
+                    <Pencil size={17} aria-hidden="true" />
+                    <span>修改文件名</span>
+                  </button>
+                </>
+              ) : null}
             </div>
           </details>
         </section>

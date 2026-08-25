@@ -12,41 +12,6 @@
   min-height: 0;
 }
 
-.report-template-workspace-tabs {
-  display: inline-grid;
-  grid-template-columns: repeat(2, minmax(96px, 1fr));
-  width: fit-content;
-  min-height: 36px;
-  overflow: hidden;
-  border: 1px solid var(--edm-neutral-400);
-  border-radius: 8px;
-  background: var(--edm-neutral-150);
-}
-
-.report-template-workspace-tabs button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 0 14px;
-  color: var(--edm-neutral-650);
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.report-template-workspace-tabs button + button {
-  border-left: 1px solid var(--edm-neutral-400);
-}
-
-.report-template-workspace-tabs .segmented-active {
-  color: var(--edm-white);
-  background: var(--edm-primary-650);
-}
-
 .report-template-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -68,7 +33,7 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-.report-template-sidebar,
+.report-template-management-workspace,
 .report-template-editor,
 .report-template-new-designer,
 .report-template-preview {
@@ -132,16 +97,12 @@
   flex: 0 0 auto;
 }
 
-.report-template-sidebar {
+.report-template-management-workspace {
   display: grid;
-  grid-template-columns:
-    minmax(420px, 1.6fr)
-    minmax(220px, 1fr)
-    minmax(220px, 1fr)
-    minmax(120px, 0.55fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
-  gap: 10px;
-  padding: 12px;
+  gap: 12px;
+  padding: 14px;
   overflow: visible;
 }
 
@@ -154,13 +115,132 @@
   min-width: 0;
 }
 
-.template-selection-panel { grid-column: 1; grid-row: 1; }
-.template-user-panel { grid-column: 2; grid-row: 1; }
-.template-admin-panel { grid-column: 3; grid-row: 1; }
-.template-package-panel { grid-column: 4; grid-row: 1; }
+.template-selection-panel { grid-column: 1 / -1; }
+.report-export-defaults-panel { grid-column: 1 / -1; }
+.template-user-panel,
+.template-admin-panel { grid-column: auto; }
+.template-package-panel { grid-column: 1 / -1; }
 
-.report-template-mobile-selection {
-  display: none;
+.template-default-selection {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.template-default-selection .command-button {
+  margin-bottom: 1px;
+  white-space: nowrap;
+}
+
+.report-template-management-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 14px 16px;
+  background: var(--edm-white);
+  border: 1px solid var(--edm-neutral-300);
+  border-radius: 8px;
+}
+
+.report-template-management-header > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.report-template-management-header h1,
+.report-template-management-header p {
+  margin: 0;
+}
+
+.report-template-management-header h1 {
+  color: var(--edm-neutral-850);
+  font-size: var(--edm-font-size-xl);
+}
+
+.report-template-management-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.report-export-defaults-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px;
+  background: var(--edm-white);
+  border-bottom: 1px solid var(--edm-neutral-250);
+}
+
+.report-export-defaults-header > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.report-export-defaults-header strong {
+  color: var(--edm-neutral-750);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.report-export-defaults-header small {
+  color: var(--edm-neutral-550);
+  font-size: var(--edm-font-size-xs);
+  font-weight: 700;
+}
+
+.report-export-defaults-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.report-template-management-header p,
+.report-template-management-current {
+  color: var(--edm-neutral-550);
+  font-size: var(--edm-font-size-xs);
+  font-weight: 700;
+}
+
+.report-template-management-current {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-template-designer-toolbar {
+  gap: 12px;
+}
+
+.report-template-current-title {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.report-template-current-title small {
+  min-width: 0;
+  max-width: 320px;
+  overflow: hidden;
+  color: var(--edm-neutral-550);
+  font-size: var(--edm-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-template-designer-toolbar .segmented-control {
+  grid-template-columns: repeat(3, minmax(104px, 1fr));
 }
 
 .template-management-panel {

@@ -250,62 +250,81 @@ namespace ExportDocManager.Api.Hosting
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict);
 
-            endpoints.MapPost("/api/reports/templates/rename", async (
+            endpoints.MapPost("/api/reports/templates/rename", (
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
                 IReportTemplateService reportTemplateService,
                 ApiReportTemplateRenameRequest request,
-                CancellationToken cancellationToken) =>
-            {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
-                {
-                    return WriteForbidden("当前权限模板不允许重命名报表模板。");
-                }
-
-                if (request == null)
-                {
-                    return Results.BadRequest(new ApiErrorResponse("报表模板请求体不能为空。"));
-                }
-
-                if (!TryParseReportDocumentType(request.ReportType, out var parsedReportType))
-                {
-                    return Results.BadRequest(new ApiErrorResponse("报表类型无效。"));
-                }
-
-                try
-                {
-                    var result = await reportTemplateService.RenameTemplateAsync(
-                        parsedReportType,
-                        request.TemplatePath,
-                        request.NewTemplatePath,
-                        cancellationToken);
-                    return Results.Ok(ToApiReportTemplateContentDto(context, result));
-                }
-                catch (FileNotFoundException ex)
-                {
-                    return Results.NotFound(new ApiErrorResponse(ex.Message));
-                }
-                catch (UnauthorizedAccessException ex)
-                {
-                    return WriteForbidden(ex.Message);
-                }
-                catch (ArgumentException ex)
-                {
-                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
-                }
-                catch (IOException ex)
-                {
-                    return WriteServiceException(ex);
-                }
-                catch (InvalidOperationException ex)
-                {
-                    return WriteServiceException(ex);
-                }
-            })
+                CancellationToken cancellationToken) => ExecuteReportTemplateManagementAsync(
+                    context,
+                    authorizationService,
+                    request?.ReportType,
+                    request != null,
+                    "当前权限模板不允许重命名报表模板。",
+                    async parsedReportType => ToApiReportTemplateContentDto(
+                        context,
+                        await reportTemplateService.RenameTemplateAsync(
+                            parsedReportType,
+                            request!.TemplatePath,
+                            request!.NewTemplatePath,
+                            cancellationToken))))
             .WithName("RenameReportTemplate")
             .Produces<ApiReportTemplateContentDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+            endpoints.MapPut("/api/reports/templates/display-name", (
+                HttpContext context,
+                ApiAuthorizationService authorizationService,
+                IReportTemplateService reportTemplateService,
+                ApiReportTemplateMetadataRequest request,
+                CancellationToken cancellationToken) => ExecuteReportTemplateManagementAsync(
+                    context,
+                    authorizationService,
+                    request?.ReportType,
+                    request != null,
+                    "当前权限模板不允许修改报表模板显示名称。",
+                    async parsedReportType =>
+                    {
+                        var result = await reportTemplateService.UpdateTemplateDisplayNameAsync(
+                            parsedReportType,
+                            request!.TemplatePath,
+                            request!.DisplayName,
+                            cancellationToken);
+                        return ToApiReportTemplateContentDto(context, result);
+                    }))
+            .WithName("UpdateReportTemplateDisplayName")
+            .Produces<ApiReportTemplateContentDto>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+            endpoints.MapPut("/api/reports/templates/default", (
+                HttpContext context,
+                ApiAuthorizationService authorizationService,
+                IReportTemplateService reportTemplateService,
+                ApiReportTemplateMetadataRequest request,
+                CancellationToken cancellationToken) => ExecuteReportTemplateManagementAsync(
+                    context,
+                    authorizationService,
+                    request?.ReportType,
+                    request != null,
+                    "当前权限模板不允许设置默认报表模板。",
+                    async parsedReportType =>
+                    {
+                        var result = await reportTemplateService.SetDefaultTemplateAsync(
+                            parsedReportType,
+                            request!.TemplatePath,
+                            cancellationToken);
+                        return new ApiCommandResponse(true, result.Message);
+                    }))
+            .WithName("SetDefaultReportTemplate")
+            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
@@ -696,6 +715,52 @@ namespace ExportDocManager.Api.Hosting
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status409Conflict);
+        }
+
+        private static async Task<IResult> ExecuteReportTemplateManagementAsync(
+            HttpContext context,
+            ApiAuthorizationService authorizationService,
+            string? rawReportType,
+            bool requestAvailable,
+            string forbiddenMessage,
+            Func<ReportDocumentType, Task<object>> operation)
+        {
+            var user = ApiEndpointAuth.GetRequiredUser(context);
+            if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
+            {
+                return WriteForbidden(forbiddenMessage);
+            }
+
+            if (!requestAvailable)
+            {
+                return Results.BadRequest(new ApiErrorResponse("报表模板请求体不能为空。"));
+            }
+
+            if (!TryParseReportDocumentType(rawReportType, out var reportType))
+            {
+                return Results.BadRequest(new ApiErrorResponse("报表类型无效。"));
+            }
+
+            try
+            {
+                return Results.Ok(await operation(reportType));
+            }
+            catch (FileNotFoundException ex)
+            {
+                return Results.NotFound(new ApiErrorResponse(ex.Message));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return WriteForbidden(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new ApiErrorResponse(ex.Message));
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException)
+            {
+                return WriteServiceException(ex);
+            }
         }
 
         private static ApiReportTemplateContentDto ToApiReportTemplateContentDto(

@@ -2256,6 +2256,12 @@ export interface ApiReportTemplateFieldDto {
   value: string;
 }
 
+export interface ApiReportTemplateMetadataRequest {
+  displayName?: string;
+  reportType?: string;
+  templatePath?: string;
+}
+
 export interface ApiReportTemplatePackageExportRequest {
   packagePath?: string;
 }
@@ -4675,6 +4681,10 @@ export interface SendEmailRequest {
   body: ApiEmailSendRequest;
 }
 
+export interface SetDefaultReportTemplateRequest {
+  body: ApiReportTemplateMetadataRequest;
+}
+
 export interface StageServerMigrationRestoreRequest {
   "X-ExportDocManager-Restore-Confirmation": string;
   "X-ExportDocManager-Sensitive-Operation-Ticket": string;
@@ -4851,6 +4861,10 @@ export interface UpdatePortRequest {
 export interface UpdateProductRequest {
   id: number;
   body: ApiProductDto;
+}
+
+export interface UpdateReportTemplateDisplayNameRequest {
+  body: ApiReportTemplateMetadataRequest;
 }
 
 export interface UpdateSalesOpportunityRequest {
@@ -7003,6 +7017,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public setDefaultReportTemplate(request: SetDefaultReportTemplateRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
+    const path = "/api/reports/templates/default";
+    return this.request<ApiCommandResponse>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public stageServerMigrationRestore(request: StageServerMigrationRestoreRequest, init?: ApiRequestInit): Promise<ApiServerMigrationRestoreResponse> {
     const path = "/api/server-migration/restore";
     return this.request<ApiServerMigrationRestoreResponse>("POST", path, {
@@ -7319,6 +7341,14 @@ export class ExportDocManagerApiClient {
   public updateProduct(request: UpdateProductRequest, init?: ApiRequestInit): Promise<ApiProductDto> {
     const path = `/api/master-data/products/${encodePath(request.id)}`;
     return this.request<ApiProductDto>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public updateReportTemplateDisplayName(request: UpdateReportTemplateDisplayNameRequest, init?: ApiRequestInit): Promise<ApiReportTemplateContentDto> {
+    const path = "/api/reports/templates/display-name";
+    return this.request<ApiReportTemplateContentDto>("PUT", path, {
       body: request.body,
       init,
     });

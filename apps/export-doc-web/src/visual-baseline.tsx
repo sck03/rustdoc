@@ -199,7 +199,26 @@ function SingleWindowBaseline() { return <section className="editor-surface"><di
 function ReportBaseline() {
   const deviceMode = useWorkspaceDeviceMode();
   const isDesktop = getWorkspaceDeviceCapabilities(deviceMode).canUseDenseWorkbench;
-  return <section className="work-surface report-template-surface"><div className="report-template-sticky-header"><div className="editor-toolbar"><div className="editor-title">报表设计</div><div className="toolbar-actions"><button type="button" className="command-button secondary">刷新</button><button type="button" className="command-button secondary">预览</button><button type="button" className="command-button" disabled={!isDesktop}>保存</button></div></div><div className="report-template-workspace-tabs"><button type="button" className={isDesktop ? "segmented-active" : ""} disabled={!isDesktop}>设计</button><button type="button" className={isDesktop ? "" : "segmented-active"}>预览</button></div></div><WorkspaceDeviceNotice mode={deviceMode} phone="可选择模板、查看预览和进行轻量确认；完整设计与模板包导入导出请使用桌面端。" tablet="可选择模板、查看预览和进行现场确认；完整设计与模板包导入导出请使用桌面端。"/><div className={isDesktop ? "report-template-grid report-template-grid-design report-template-grid-new" : "report-template-mobile-selection"}><aside className="report-template-sidebar"><div className="template-selection-panel"><label>类型<select><option>出口单证</option></select></label><label>默认模板<select><option>invoice_template</option></select></label><label>我的 / 共享模板<select><option>未选择</option></select></label></div>{isDesktop ? <><details className="template-management-panel template-actions-panel template-user-panel" open><summary><span>我的模板</span><small>默认私有，可明确共享</small></summary><div className="template-management-content"><button type="button" className="secondary-button">复制当前模板</button></div></details><details className="template-management-panel template-actions-panel template-admin-panel"><summary><span>模板操作</span><small>invoice_template.html</small></summary></details><details className="template-management-panel template-package-panel"><summary><span>模板包</span><small>导入 / 导出</small></summary></details></> : null}</aside>{isDesktop ? <main className="report-template-new-designer"><div className="form-section" style={{minHeight:420}}><h2>模板画布</h2><div className="table-frame"><table><tbody><tr><td>EXPORTER</td><td>INVOICE NO.</td></tr><tr><td>CONSIGNEE</td><td>DATE</td></tr></tbody></table></div></div></main> : <main className="form-section report-template-preview-workspace" style={{minHeight:360}}><div className="section-header"><div><h2>模板预览</h2><p>当前设备保持查看和确认模式。</p></div></div><div className="report-preview-empty">选择模板后在此查看分页和换行效果</div></main>}</div></section>;
+  return <section className="work-surface report-template-surface">
+    <div className="report-template-sticky-header">
+      <div className="editor-toolbar report-template-designer-toolbar">
+        <button type="button" className="command-button secondary">返回模板管理</button>
+        <div className="editor-title report-template-current-title"><span>报表设计</span><small>当前模板：发票</small></div>
+        <div className="toolbar-actions">
+          <div className="segmented-control" role="tablist" aria-label="报表设计视图">
+            <button type="button" role="tab" aria-selected={isDesktop} className={isDesktop ? "segmented-active" : ""} disabled={!isDesktop}>可视化设计</button>
+            <button type="button" role="tab" aria-selected={false} disabled={!isDesktop}>高级 HTML</button>
+            <button type="button" role="tab" aria-selected={!isDesktop} className={isDesktop ? "" : "segmented-active"}>预览</button>
+          </div>
+          <button type="submit" className="command-button" disabled={!isDesktop}>保存</button>
+        </div>
+      </div>
+    </div>
+    <WorkspaceDeviceNotice mode={deviceMode} phone="当前设备提供模板预览；返回模板管理可切换模板，完整设计请使用桌面端。" tablet="可预览并使用高级 HTML；完整可视化设计仍建议使用更宽屏幕。"/>
+    {isDesktop
+      ? <main className="report-template-new-designer"><div className="form-section" style={{minHeight:420}}><h2>模板画布</h2><div className="table-frame"><table><tbody><tr><td>EXPORTER</td><td>INVOICE NO.</td></tr><tr><td>CONSIGNEE</td><td>DATE</td></tr></tbody></table></div></div></main>
+      : <main className="form-section report-template-preview-workspace" style={{minHeight:360}}><div className="section-header"><div><h2>模板预览</h2><p>当前设备保持查看和确认模式。</p></div></div><div className="report-preview-empty">当前模板将在此显示分页和换行效果</div></main>}
+  </section>;
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

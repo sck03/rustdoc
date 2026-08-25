@@ -64,7 +64,6 @@
     .nav-rail-item,
     .settings-category-item,
     .master-data-tab,
-    .report-template-workspace-tabs button,
     .segmented-control button,
     .density-toggle-button
   ) {
@@ -75,20 +74,6 @@
   .login-submit-button,
   .login-connection-settings summary {
     min-height: var(--edm-touch-target);
-  }
-
-  .report-template-mobile-selection {
-    display: block;
-    min-width: 0;
-    padding: 12px;
-    background: var(--edm-white);
-    border: 1px solid var(--edm-line);
-    border-radius: var(--edm-radius-md);
-    box-shadow: var(--edm-shadow-sm);
-  }
-
-  .report-template-mobile-selection .template-selection-panel {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .report-template-sticky-header .segmented-control,
@@ -143,30 +128,10 @@
     min-width: 0;
   }
 
-  .report-template-sidebar {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .report-template-mobile-selection {
-    display: block;
-    min-width: 0;
-    padding: 12px;
-    background: var(--edm-white);
-    border: 1px solid var(--edm-line);
-    border-radius: var(--edm-radius-md);
-    box-shadow: var(--edm-shadow-sm);
-  }
-
   .template-selection-panel {
-    grid-column: span 3;
+    grid-column: 1 / -1;
     grid-row: auto;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .template-actions-panel,
-  .template-package-panel {
-    grid-column: auto;
-    grid-row: auto;
   }
 
   .report-template-preview-toolbar {

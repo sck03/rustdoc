@@ -7,12 +7,14 @@ export function useReportTemplateWorkspaceQueries({
   client,
   reportType,
   enabled,
+  includeDesignerData,
   selectedUserTemplateId,
   selectedTemplatePath,
 }: {
   client: ExportDocManagerApiClient;
   reportType: ReportTypeOption;
   enabled: boolean;
+  includeDesignerData: boolean;
   selectedUserTemplateId: number;
   selectedTemplatePath: string;
 }) {
@@ -40,7 +42,7 @@ export function useReportTemplateWorkspaceQueries({
   const fieldCatalogQuery = useQuery({
     queryKey: queryKeys.reportTemplateFields(reportType),
     queryFn: ({ signal }) => client.getReportTemplateFieldCatalog({ reportType }, { signal }),
-    enabled,
+    enabled: enabled && includeDesignerData,
     staleTime: 60 * 60 * 1000,
   });
 
@@ -53,14 +55,14 @@ export function useReportTemplateWorkspaceQueries({
         sortColumn: "InvoiceDate",
         ascending: false,
       }, { signal }),
-    enabled: enabled && reportType === "ExportDocument",
+    enabled: enabled && includeDesignerData && reportType === "ExportDocument",
     staleTime: 60 * 1000,
   });
 
   const previewPaymentsQuery = useQuery({
     queryKey: queryKeys.reportTemplatePreviewPayments(previewSourcePageSize),
     queryFn: ({ signal }) => client.listPayments({ pageNumber: 1, pageSize: previewSourcePageSize }, { signal }),
-    enabled: enabled && reportType === "PaymentVoucher",
+    enabled: enabled && includeDesignerData && reportType === "PaymentVoucher",
     staleTime: 60 * 1000,
   });
 

@@ -103,7 +103,10 @@ export function authorizedJsonHeaders(options, accessToken, tokenType = "Bearer"
 }
 
 export function buildBatchExportSettingsDeepLinkUrl(webUrl) {
-  return buildSettingsSectionUrl(webUrl, "documentOutput", "smokeBatchExportSettings");
+  const url = new URL(webUrl);
+  url.searchParams.set("smokeBatchExportSettings", "1");
+  url.hash = "/reports/templates/manage?reportType=ExportDocument";
+  return url.toString();
 }
 
 export function buildDocumentEmailSettingsDeepLinkUrl(webUrl) {

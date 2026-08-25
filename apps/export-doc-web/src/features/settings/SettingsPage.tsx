@@ -2,14 +2,13 @@ import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
 import "../../styles/runtime-diagnostics.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft,
   ListChecks,
   RefreshCw,
   RotateCcw,
   Save,
   Trash2,
 } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import {
   ApiSettingsResponse,
   ApiSettingsValidationResponse,
@@ -34,11 +33,9 @@ import { useSettingsDraftSync } from "./useSettingsDraftSync.ts";
 import { systemDefaultPatches } from "./settingsDefaults.ts";
 import { findIssuingAuthority, parseIssuingAuthorityCode } from "./settingsIssuingAuthority.ts";
 import { SettingsCategoryNav, SettingsValidationPanel } from "./SettingsPagePanels.tsx";
-import { readSettingsReturnTarget } from "./settingsReturnNavigation.ts";
 
 const LazyMaintenanceSettingsPanels = lazy(() => import("./MaintenanceSettingsPanels.tsx"));
 const LazyRuntimeDatabaseSettingsPanel = lazy(() => import("./RuntimeDatabaseSettingsPanel.tsx"));
-const LazyDocumentTemplateSettingsCategory = lazy(() => import("./DocumentTemplateSettingsCategory.tsx"));
 const LazyExcelImportSettingsPanel = lazy(() => import("./ExcelImportSettingsPanel.tsx"));
 const LazyExchangeRateSettingsPanel = lazy(() => import("./ExchangeRateSettingsPanel.tsx"));
 const LazyCommunicationSettingsPanel = lazy(() => import("./CommunicationSettingsPanel.tsx"));
@@ -84,8 +81,6 @@ export function SettingsPage({
 }) {
   const requestConfirmation = useConfirmation();
   const location = useLocation();
-  const navigate = useNavigate();
-  const returnTarget = readSettingsReturnTarget(location.state);
   const availableSettingsCategories = filterSettingsCategories({
     canUseDocumentWorkspace,
   });
@@ -537,12 +532,6 @@ export function SettingsPage({
     saveMutation.mutate(settings);
   }
 
-  async function handleReturn() {
-    if (returnTarget && await confirmDiscardChanges(returnTarget.label)) {
-      navigate(returnTarget.path, { replace: true });
-    }
-  }
-
   return (
     <section className="editor-surface settings-surface" aria-label="设置">
       {message ? <InlineNotice tone="error" title="设置未保存">{message}</InlineNotice> : null}
@@ -554,12 +543,6 @@ export function SettingsPage({
           <div className="settings-command-strip">
             <div className="settings-command-heading">
               <div className="settings-command-heading-row">
-                {returnTarget ? (
-                  <button className="command-button secondary" type="button" onClick={() => void handleReturn()}>
-                    <ArrowLeft size={17} aria-hidden="true" />
-                    <span>{returnTarget.label}</span>
-                  </button>
-                ) : null}
                 <h2>{activeCategoryConfig.label}</h2>
               </div>
               {hasUnsavedChanges ? <span>有未保存修改</span> : null}
@@ -607,15 +590,6 @@ export function SettingsPage({
                   onSelectDefaultExportDirectory={() => void handleSelectDefaultExportDirectory()}
                 />
               ) : null}
-              {currentCategory === "report-output" ? (
-                <LazyDocumentTemplateSettingsCategory
-                  settings={settings}
-                  canManageSettings={canManageSettings}
-                  isBusy={isBusy}
-                  onChange={patchSetting}
-                />
-              ) : null}
-
               {currentCategory === "excel-import" ? (
                 <LazyExcelImportSettingsPanel
                   settings={settings}

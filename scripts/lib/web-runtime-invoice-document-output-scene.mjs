@@ -615,8 +615,7 @@ export function createInvoiceDocumentOutputSmokeScene(runtime) {
     const checkUrl = buildBatchExportSettingsDeepLinkUrl(options.webUrl);
     await page.send("Page.navigate", { url: checkUrl });
     const expectedText = [
-      "设置",
-      "报表与输出",
+      "报表模板管理",
       "导出默认设置",
       "文件命名规则",
       "默认合并 PDF",
@@ -627,7 +626,7 @@ export function createInvoiceDocumentOutputSmokeScene(runtime) {
       page,
       `(() => {
         const panel = document.querySelector('[aria-label="导出默认设置"]');
-        if (!panel || !window.location.hash.includes('/settings?section=documentOutput')) {
+        if (!panel || !window.location.hash.includes('/reports/templates/manage')) {
           return false;
         }
   

@@ -40,25 +40,13 @@ export function ReportDesignerPage({
   displayName,
   content,
   fieldCatalog,
-  canApplyTemplateContent,
-  canSaveTemplateContent,
-  hasTemplateChanges,
-  onApplyTemplateContent,
-  onSaveTemplateContent,
   onDesignerDraftContentChange,
-  onOpenSource,
 }: {
   reportType: ReportDesignerReportType;
   displayName: string;
   content: string;
   fieldCatalog?: ApiReportTemplateFieldCatalogResponse | null;
-  canApplyTemplateContent: boolean;
-  canSaveTemplateContent: boolean;
-  hasTemplateChanges: boolean;
-  onApplyTemplateContent: (nextContent: string) => void;
-  onSaveTemplateContent: (nextContent: string) => void;
   onDesignerDraftContentChange?: (nextContent: string) => void;
-  onOpenSource: () => void;
 }) {
   const [rightRailMode, setRightRailMode] = useState<ReportDesignerRightRailMode>("component");
   const initialSchema = useMemo(
@@ -73,19 +61,10 @@ export function ReportDesignerPage({
   const hasBlockingSchemaIssues = hasBlockingReportDesignerSchemaIssues(schemaIssues);
   const canInsertImage = reportType === "ExportDocument";
   const existingContentWithoutSchema = Boolean(content.trim()) && !hasReportDesignerSchema(content);
-  const hasUnappliedDesignerChanges = exportedHtml !== content;
 
   useEffect(() => {
     onDesignerDraftContentChange?.(exportedHtml);
   }, [exportedHtml, onDesignerDraftContentChange]);
-
-  function applyExportedTemplateContent() {
-    onApplyTemplateContent(exportedHtml);
-  }
-
-  function saveExportedTemplateContent() {
-    onSaveTemplateContent(exportedHtml);
-  }
 
   function resetToDefaultSchema() {
     history.commitState({
@@ -230,12 +209,7 @@ export function ReportDesignerPage({
       <ReportDesignerToolbar
         canUndo={history.canUndo}
         canRedo={history.canRedo}
-        canApply={canApplyTemplateContent && hasUnappliedDesignerChanges && !hasBlockingSchemaIssues}
-        canSave={canSaveTemplateContent && (hasUnappliedDesignerChanges || hasTemplateChanges) && !hasBlockingSchemaIssues}
-        onBack={onOpenSource}
         onReset={resetToDefaultSchema}
-        onApply={applyExportedTemplateContent}
-        onSave={saveExportedTemplateContent}
         onInsertText={insertTextBlock}
         onInsertRow={insertRowBlock}
         onInsertGrid={insertGridBlock}
@@ -256,7 +230,7 @@ export function ReportDesignerPage({
       </div>
       {existingContentWithoutSchema ? (
         <div className="new-report-designer-warning">
-          当前模板尚未包含可视化设计结构，系统已创建默认布局草稿。应用或保存前会再次确认，不会自动覆盖现有高级 HTML。
+          当前模板尚未包含可视化设计结构，系统已创建默认布局草稿。保存前会再次确认，不会自动覆盖现有高级 HTML。
         </div>
       ) : null}
       {schemaIssues.length > 0 ? (

@@ -9,15 +9,9 @@ export function ReportTemplateDesignWorkspace({
   displayName,
   content,
   fieldCatalog,
-  canApplyTemplateContent,
-  canSaveTemplateContent,
-  hasTemplateChanges,
   canFormatSource,
   sourceDisabled,
-  onApplyTemplateContent,
-  onSaveTemplateContent,
   onDesignerDraftContentChange,
-  onOpenSource,
   onFormatSource,
   onSourceContentChange,
 }: {
@@ -26,15 +20,9 @@ export function ReportTemplateDesignWorkspace({
   displayName: string;
   content: string;
   fieldCatalog?: ApiReportTemplateFieldCatalogResponse;
-  canApplyTemplateContent: boolean;
-  canSaveTemplateContent: boolean;
-  hasTemplateChanges: boolean;
   canFormatSource: boolean;
   sourceDisabled: boolean;
-  onApplyTemplateContent: (content: string) => void;
-  onSaveTemplateContent: (content: string) => void;
   onDesignerDraftContentChange: (content: string) => void;
-  onOpenSource: () => void;
   onFormatSource: () => void;
   onSourceContentChange: (content: string) => void;
 }) {
@@ -46,13 +34,7 @@ export function ReportTemplateDesignWorkspace({
           displayName={displayName}
           content={content}
           fieldCatalog={fieldCatalog}
-          canApplyTemplateContent={canApplyTemplateContent}
-          canSaveTemplateContent={canSaveTemplateContent}
-          hasTemplateChanges={hasTemplateChanges}
-          onApplyTemplateContent={onApplyTemplateContent}
-          onSaveTemplateContent={onSaveTemplateContent}
           onDesignerDraftContentChange={onDesignerDraftContentChange}
-          onOpenSource={onOpenSource}
         />
       </div>
     );

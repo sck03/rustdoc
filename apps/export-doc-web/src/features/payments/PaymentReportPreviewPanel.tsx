@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, FileDown, LayoutTemplate, Printer, RefreshCw, Save, Settings } from "lucide-react";
+import { Eye, FileDown, LayoutTemplate, Printer, RefreshCw, Save } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiPaymentDto, ApiPaymentReportHtmlPreviewResponse, ApiReportTemplateDto, AppSettings, ExportDocManagerApiClient } from "../../api/index.ts";
 
@@ -25,7 +25,7 @@ import {
   templatePathsMatch,
 } from "../reports/reportTemplateSelectionModel.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
-import { createSettingsReturnState } from "../settings/settingsReturnNavigation.ts";
+import { createReportTemplateReturnState } from "../reports/reportTemplateReturnNavigation.ts";
 import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 export function PaymentReportPreviewPanel({
@@ -168,7 +168,7 @@ export function PaymentReportPreviewPanel({
   const canPrintPreview = Boolean(preview?.html) && !isBusy;
   const canGeneratePdf = reportOutputPermission.canOperate && canUseSavedPaymentOutput && canPreview && (!desktopAvailable || Boolean(pdfDestinationPath.trim())) && !isBusy;
   const canQuickGeneratePdf = reportOutputPermission.canOperate && canUseSavedPaymentOutput && canPreview && !isBusy;
-  const canOpenTemplateDesigner = reportDesignPermission.canView && Boolean(selectedTemplatePath) && !isBusy;
+  const canOpenTemplateManagement = (reportDesignPermission.canView || canManageSettings) && !isBusy;
   const templateMessage = templatesQuery.isError
     ? readApiError(templatesQuery.error)
     : settingsQuery.isError
@@ -183,11 +183,7 @@ export function PaymentReportPreviewPanel({
     setErrorMessage(null);
   }
 
-  function openTemplateDesigner() {
-    if (!selectedTemplatePath) {
-      return;
-    }
-
+  function openTemplateManagement() {
     const params = new URLSearchParams({
       reportType,
     });
@@ -200,7 +196,9 @@ export function PaymentReportPreviewPanel({
       params.set("template", templateFileName);
     }
 
-    navigate(`/reports/templates?${params.toString()}`);
+    navigate(`/reports/templates/manage?${params.toString()}`, {
+      state: createReportTemplateReturnState(location, "返回付款/报销单"),
+    });
   }
 
   async function pickPdfDestination() {
@@ -289,33 +287,17 @@ export function PaymentReportPreviewPanel({
           >
             <RefreshCw size={17} aria-hidden="true" />
           </button>
-          {reportDesignPermission.canView ? (
-            <>
-              {canManageSettings ? (
-                <button
-                  className="command-button secondary"
-                  type="button"
-                  title="管理导出默认设置"
-                  disabled={isBusy}
-                  onClick={() => navigate("/settings?section=paymentReports", {
-                    state: createSettingsReturnState(location, "返回付款/报销单"),
-                  })}
-                >
-                  <Settings size={17} aria-hidden="true" />
-                  <span>报表设置</span>
-                </button>
-              ) : null}
+          {canOpenTemplateManagement ? (
               <button
                 className="command-button secondary"
                 type="button"
-                title="设计当前模板"
-                disabled={!canOpenTemplateDesigner}
-                onClick={openTemplateDesigner}
+                title="打开报表模板管理"
+                disabled={isBusy}
+                onClick={openTemplateManagement}
               >
                 <LayoutTemplate size={17} aria-hidden="true" />
-                <span>设计模板</span>
+                <span>报表模板管理</span>
               </button>
-            </>
           ) : null}
           <button
             className="command-button secondary"

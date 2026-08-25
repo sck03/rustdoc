@@ -160,7 +160,7 @@ for (const file of walk(root)) {
     }
   }
 
-  if (sourceRelativePath === "features/reports/ReportTemplateDesignerPage.tsx") {
+  if (sourceRelativePath === "features/reports/ReportTemplateWorkspacePage.tsx") {
     for (const reportDraftContract of ["useUnsavedChangesGuard", "designerDraftContent", "hasUnsavedChanges", "handleRefreshTemplates"]) {
       if (!sourceText.includes(reportDraftContract)) {
         failures.push(`${sourceRelativePath}: 报表设计器必须识别画布草稿并保护未保存切换：${reportDraftContract}`);
@@ -205,7 +205,7 @@ for (const file of walk(root)) {
     "features/single-window/AgentConsignmentPage.tsx": ["useSingleWindowLockedFields"],
     "features/single-window/SingleWindowReferenceCatalogPage.tsx": ["useReferenceCatalogExcelWorkspace"],
     "features/invoices/InvoiceListPage.tsx": ["useInvoiceListSingleWindowOperations"],
-    "features/reports/ReportTemplateDesignerPage.tsx": ["useReportTemplatePackageWorkspace"],
+    "features/reports/ReportTemplateWorkspacePage.tsx": ["useReportTemplatePackageWorkspace"],
     "features/invoices/InvoiceItemsEditor.tsx": ["useInvoiceItemsEditorInteraction", "InvoiceItemsEditorDialogs", "InvoiceItemsEditorProps"],
     "features/settings/SettingsPage.tsx": ["useSettingsMaintenanceActions", "useSettingsDraftSync"],
   };
@@ -324,7 +324,7 @@ if (globalWorkspaceManifest.includes("reportWorkspace.css")) {
   failures.push("styles/workspaces.css: 报表设计样式必须随 lazy route 加载");
 }
 for (const [sourceRelativePath, routeStyle] of [
-  ["features/reports/ReportTemplateDesignerPage.tsx", "../../styles/routes/reports.css"],
+  ["features/reports/ReportTemplateWorkspacePage.tsx", "../../styles/routes/reports.css"],
   ["features/single-window/SingleWindowPages.tsx", "../../styles/routes/single-window.css"],
   ["features/single-window/SingleWindowReferenceCatalogPage.tsx", "../../styles/routes/single-window.css"],
   ["features/single-window/CustomsCooPage.tsx", "../../styles/routes/single-window.css"],

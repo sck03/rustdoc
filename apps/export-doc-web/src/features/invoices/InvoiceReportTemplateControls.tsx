@@ -1,8 +1,8 @@
-import { FileDown, FileSpreadsheet, LayoutTemplate, Settings } from "lucide-react";
+import { FileDown, FileSpreadsheet, LayoutTemplate } from "lucide-react";
 import type { ApiReportTemplateDto } from "../../api/index.ts";
 import { fileNameFromPath } from "./invoiceReportPreviewModel.ts";
-type Props={canConfigureOutput:boolean;canOpenTemplateDesigner:boolean;canQuickGenerateBookingSheet:boolean;canQuickGeneratePdf:boolean;desktopAvailable:boolean;hasSavedInvoice:boolean;isBusy:boolean;showTemplateDesigner:boolean;showTemplateSettings:boolean;selectedTemplatePath:string;templates:ApiReportTemplateDto[];withSeal:boolean;onExportBookingSheet():void;onExportPdf():void;onManageTemplates():void;onOpenTemplateDesigner():void;onTemplateChange(value:string):void;onWithSealChange(value:boolean):void};
-export function InvoiceReportTemplateControls(p:Props){const {canConfigureOutput,canOpenTemplateDesigner,canQuickGenerateBookingSheet,canQuickGeneratePdf,desktopAvailable,hasSavedInvoice,isBusy,showTemplateDesigner,showTemplateSettings,selectedTemplatePath,templates,withSeal}=p;return (
+type Props={canConfigureOutput:boolean;canOpenTemplateManagement:boolean;canQuickGenerateBookingSheet:boolean;canQuickGeneratePdf:boolean;desktopAvailable:boolean;hasSavedInvoice:boolean;isBusy:boolean;selectedTemplatePath:string;templates:ApiReportTemplateDto[];withSeal:boolean;onExportBookingSheet():void;onExportPdf():void;onOpenTemplateManagement():void;onTemplateChange(value:string):void;onWithSealChange(value:boolean):void};
+export function InvoiceReportTemplateControls(p:Props){const {canConfigureOutput,canOpenTemplateManagement,canQuickGenerateBookingSheet,canQuickGeneratePdf,desktopAvailable,hasSavedInvoice,isBusy,selectedTemplatePath,templates,withSeal}=p;return (
       <div className="report-preview-controls">
         <div className="report-template-selector">
           <label className="report-template-inline-field">
@@ -54,26 +54,16 @@ export function InvoiceReportTemplateControls(p:Props){const {canConfigureOutput
             </button>
           </div>
           <div className="report-template-action-group">
-            {showTemplateSettings ? <button
+            <button
               className="command-button secondary"
               type="button"
-              title="管理导出默认设置"
-              disabled={isBusy}
-              onClick={p.onManageTemplates}
-            >
-              <Settings size={17} aria-hidden="true" />
-              <span>导出默认设置</span>
-            </button> : null}
-            {showTemplateDesigner ? <button
-              className="command-button secondary"
-              type="button"
-              title="设计当前模板"
-              disabled={!canOpenTemplateDesigner}
-              onClick={p.onOpenTemplateDesigner}
+              title="打开报表模板管理"
+              disabled={!canOpenTemplateManagement || isBusy}
+              onClick={p.onOpenTemplateManagement}
             >
               <LayoutTemplate size={17} aria-hidden="true" />
-              <span>设计模板</span>
-            </button> : null}
+              <span>报表模板管理</span>
+            </button>
           </div>
         </div>
       </div>

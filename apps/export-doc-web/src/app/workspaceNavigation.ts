@@ -109,7 +109,7 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     icon: Database,
     items: [
       { label: "主数据维护", to: "/master-data", icon: Database, isActive: isMasterDataRoute, workspace: "document", moduleKey: "document.master-data" },
-      { label: "报表设计", to: "/reports/templates", icon: ScrollText, isActive: isReportRoute, workspace: "document", moduleKey: "document.reports" },
+      { label: "报表模板管理", to: "/reports/templates/manage", icon: ScrollText, isActive: isReportRoute, workspace: "document", moduleKey: "document.reports" },
       { label: "Excel 模板", to: "/tools/excel", icon: FileSpreadsheet, isActive: isExcelToolsRoute, workspace: "document", moduleKey: "document.excel" },
       { label: "智能 OCR", to: "/tools/ocr", icon: ScanText, isActive: isSmartOcrRoute, workspace: "document", moduleKey: "document.ocr" },
       { label: "装箱模拟", to: "/tools/container-packing", icon: PackageCheck, isActive: isContainerPackingRoute, workspace: "document", moduleKey: "document.container-packing" },
@@ -221,7 +221,9 @@ export function getWorkspaceContext(pathname: string): WorkspaceContext {
     return createWorkspaceContext("资料与工具", "Excel 模板与托单", "导入业务数据、导出模板并生成订舱托单副本", FileSpreadsheet);
   }
   if (pathname.startsWith("/reports")) {
-    return createWorkspaceContext("资料与工具", "报表设计", "维护单据模板、可视化版式和打印预览", ScrollText);
+    return pathname.startsWith("/reports/templates/manage")
+      ? createWorkspaceContext("资料与工具", "报表模板管理", "维护模板默认值、名称、文件和模板包", ScrollText)
+      : createWorkspaceContext("资料与工具", "报表设计", "编辑当前模板的版式、HTML 和打印预览", ScrollText);
   }
   if (pathname.startsWith("/single-window")) {
     return getSingleWindowWorkspaceContext(pathname);

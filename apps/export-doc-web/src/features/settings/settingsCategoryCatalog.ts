@@ -1,6 +1,6 @@
-import { Cloud, Coins, Database, FileCog, FileSpreadsheet, Network, Wrench, type LucideIcon } from "lucide-react";
+import { Cloud, Coins, Database, FileSpreadsheet, Network, Wrench, type LucideIcon } from "lucide-react";
 
-export type SettingsCategoryKey = "runtime" | "report-output" | "excel-import" | "exchange-rate" | "communication" | "single-window" | "maintenance";
+export type SettingsCategoryKey = "runtime" | "excel-import" | "exchange-rate" | "communication" | "single-window" | "maintenance";
 export type SettingsCategoryConfig = {
   key: SettingsCategoryKey;
   label: string;
@@ -14,7 +14,6 @@ export type SettingsCategoryCapabilities = {
 
 export const settingsCategories: SettingsCategoryConfig[] = [
   { key: "runtime", label: "运行与数据库", icon: Database },
-  { key: "report-output", label: "报表与输出", icon: FileCog, requiresDocumentWorkspace: true },
   { key: "excel-import", label: "Excel 导入", icon: FileSpreadsheet, requiresDocumentWorkspace: true },
   { key: "exchange-rate", label: "汇率与币制", icon: Coins },
   { key: "communication", label: "邮件与备份", icon: Cloud },

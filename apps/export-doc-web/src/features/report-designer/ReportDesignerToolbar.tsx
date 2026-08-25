@@ -1,14 +1,9 @@
-import { Code2, Columns3, FileCheck2, FilePlus2, Grid2X2, Image as ImageIcon, ListFilter, Pilcrow, Redo2, RotateCcw, Save, Table2, Undo2 } from "lucide-react";
+import { Columns3, FilePlus2, Grid2X2, Image as ImageIcon, ListFilter, Pilcrow, Redo2, RotateCcw, Table2, Undo2 } from "lucide-react";
 
 export function ReportDesignerToolbar({
   canUndo,
   canRedo,
-  canApply,
-  canSave,
-  onBack,
   onReset,
-  onApply,
-  onSave,
   onInsertText,
   onInsertRow,
   onInsertGrid,
@@ -23,12 +18,7 @@ export function ReportDesignerToolbar({
 }: {
   canUndo: boolean;
   canRedo: boolean;
-  canApply: boolean;
-  canSave: boolean;
-  onBack: () => void;
   onReset: () => void;
-  onApply: () => void;
-  onSave: () => void;
   onInsertText: () => void;
   onInsertRow: () => void;
   onInsertGrid: () => void;
@@ -43,19 +33,7 @@ export function ReportDesignerToolbar({
 }) {
   return (
     <div className="new-report-designer-toolbar">
-      <button className="command-button secondary" type="button" onClick={onBack}>
-        <Code2 size={17} aria-hidden="true" />
-        <span>高级 HTML</span>
-      </button>
       <div className="new-report-designer-toolbar-actions">
-        <button className="command-button secondary" type="button" disabled={!canApply} onClick={onApply}>
-          <FileCheck2 size={17} aria-hidden="true" />
-          <span>应用到模板</span>
-        </button>
-        <button className="command-button" type="button" disabled={!canSave} onClick={onSave}>
-          <Save size={17} aria-hidden="true" />
-          <span>保存模板</span>
-        </button>
         <button className="command-button secondary" type="button" onClick={onInsertText}>
           <Pilcrow size={17} aria-hidden="true" />
           <span>文本</span>

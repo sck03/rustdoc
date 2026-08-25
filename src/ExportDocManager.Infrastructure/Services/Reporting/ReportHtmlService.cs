@@ -17,6 +17,7 @@ namespace ExportDocManager.Services.Reporting
         private readonly ReportTemplateCatalogLoader _catalogLoader;
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
+        private readonly ISettingsService _settingsService;
         private readonly IAppPathProvider _pathProvider;
         private readonly ILogger<ReportHtmlService> _logger;
 
@@ -37,6 +38,7 @@ namespace ExportDocManager.Services.Reporting
             ArgumentNullException.ThrowIfNull(settingsService);
             _contextFactory = contextFactory;
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
+            _settingsService = settingsService;
             _logger = logger ?? NullLogger<ReportHtmlService>.Instance;
             _entityLoader = new ReportEntityLoader(contextFactory, _accessScope);
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
@@ -475,6 +477,30 @@ namespace ExportDocManager.Services.Reporting
             CancellationToken cancellationToken = default)
         {
             await EnsureTemplateConfigLoadedAsync(cancellationToken).ConfigureAwait(false);
+
+            await _settingsService.LoadAsync().ConfigureAwait(false);
+            string defaultTemplatePath = reportType == ReportDocumentType.PaymentVoucher
+                ? _settingsService.Settings.ReportTemplateDefaults.PaymentVoucherTemplatePath
+                : _settingsService.Settings.ReportTemplateDefaults.ExportDocumentTemplatePath;
+            if (!string.IsNullOrWhiteSpace(defaultTemplatePath))
+            {
+                string resolvedDefaultPath = Path.GetFullPath(_pathResolver.ToAbsolutePath(defaultTemplatePath));
+                ReportTemplateConfig? configuredDefault;
+                lock (_configLock)
+                {
+                    configuredDefault = _templateConfigs.FirstOrDefault(config =>
+                        PhysicalPathComparison.AreSamePath(config.FileName, resolvedDefaultPath));
+                }
+
+                if (configuredDefault != null &&
+                    ReportTemplateCatalogLoader.ResolveCatalogReportType(
+                        configuredDefault.Type,
+                        configuredDefault.FileName) == reportType &&
+                    File.Exists(resolvedDefaultPath))
+                {
+                    return resolvedDefaultPath;
+                }
+            }
 
             string? configuredPath = null;
             lock (_configLock)

@@ -148,11 +148,10 @@ export function deriveReportTemplateWorkspaceState({
   const canCreateUserTemplate =
     canDesignTemplates && Boolean(newUserTemplateName.trim()) && Boolean(selectedTemplatePath) && !isBusy;
   const canRenameTemplate =
-    (isUserTemplate ? currentUserTemplate.canEdit && canDesignTemplates : canManageTemplates) &&
+    !isUserTemplate && canManageTemplates &&
     Boolean(selectedTemplatePath) &&
     Boolean(renameTemplateFileName.trim()) &&
-    renameTemplateFileName.trim() !==
-      (isUserTemplate ? currentUserTemplate.name : fileNameFromPath(selectedTemplatePath)) &&
+    renameTemplateFileName.trim() !== fileNameFromPath(selectedTemplatePath) &&
     !isBusy;
   const canDeleteTemplate = isUserTemplate
     ? currentUserTemplate.canEdit && canDesignTemplates && !isBusy

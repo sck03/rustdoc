@@ -68,7 +68,7 @@ namespace ExportDocManager.Services.Reporting
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            await SyncTemplateReferencesAsync(reportType, string.Empty, resolvedPath, cancellationToken).ConfigureAwait(false);
+            await SyncTemplateStateAsync(reportType, string.Empty, resolvedPath, title, cancellationToken).ConfigureAwait(false);
             return ToContentResult(CreateResolvedTemplate(reportType, resolvedPath, title), content);
         }
 
@@ -109,10 +109,11 @@ namespace ExportDocManager.Services.Reporting
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            await SyncTemplateReferencesAsync(
+            await SyncTemplateStateAsync(
                     reportType,
                     previousPath,
                     resolved.TemplatePath,
+                    resolved.DisplayName,
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -148,11 +149,74 @@ namespace ExportDocManager.Services.Reporting
 
             Directory.CreateDirectory(Path.GetDirectoryName(resolvedNewPath)!);
             File.Move(current.TemplatePath, resolvedNewPath, overwrite: false);
-            await SyncTemplateReferencesAsync(reportType, current.TemplatePath, resolvedNewPath, cancellationToken).ConfigureAwait(false);
+            await SyncTemplateStateAsync(
+                    reportType,
+                    current.TemplatePath,
+                    resolvedNewPath,
+                    current.DisplayName,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
             string content = await File.ReadAllTextAsync(resolvedNewPath, Encoding.UTF8, cancellationToken)
                 .ConfigureAwait(false);
-            return ToContentResult(CreateResolvedTemplate(reportType, resolvedNewPath), content);
+            return ToContentResult(CreateResolvedTemplate(reportType, resolvedNewPath, current.DisplayName), content);
+        }
+
+        public async Task<ReportTemplateContentResult> UpdateTemplateDisplayNameAsync(
+            ReportDocumentType reportType,
+            string templatePath,
+            string displayName,
+            CancellationToken cancellationToken = default)
+        {
+            var current = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: true, cancellationToken)
+                .ConfigureAwait(false);
+            string normalizedDisplayName = ReportTemplateCatalogLoader.NormalizeTemplateDisplayName(displayName, current.TemplatePath);
+            await RefreshTemplateCatalogAsync(current.TemplatePath, normalizedDisplayName, cancellationToken).ConfigureAwait(false);
+
+            string content = await File.ReadAllTextAsync(current.TemplatePath, Encoding.UTF8, cancellationToken)
+                .ConfigureAwait(false);
+            return ToContentResult(CreateResolvedTemplate(reportType, current.TemplatePath, normalizedDisplayName), content);
+        }
+
+        public async Task<ReportTemplateCommandResult> SetDefaultTemplateAsync(
+            ReportDocumentType reportType,
+            string templatePath,
+            CancellationToken cancellationToken = default)
+        {
+            var current = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: true, cancellationToken)
+                .ConfigureAwait(false);
+            string storedPath = _pathResolver.ToStoredPath(current.TemplatePath);
+
+            await _settingsService.LoadAsync().ConfigureAwait(false);
+            await _settingsService.UpdateAsync(settings =>
+            {
+                string configuredPath = reportType == ReportDocumentType.PaymentVoucher
+                    ? settings.ReportTemplateDefaults.PaymentVoucherTemplatePath
+                    : settings.ReportTemplateDefaults.ExportDocumentTemplatePath;
+                if (string.Equals(configuredPath, storedPath, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
+                if (reportType == ReportDocumentType.PaymentVoucher)
+                {
+                    settings.ReportTemplateDefaults.PaymentVoucherTemplatePath = storedPath;
+                }
+                else
+                {
+                    settings.ReportTemplateDefaults.ExportDocumentTemplatePath = storedPath;
+                }
+
+                return true;
+            }, cancellationToken).ConfigureAwait(false);
+
+            return new ReportTemplateCommandResult
+            {
+                ReportType = reportType,
+                TemplatePath = current.TemplatePath,
+                StoragePolicy = StoragePolicy,
+                Message = $"已将“{current.DisplayName}”设为默认模板。"
+            };
         }
 
         public async Task<ReportTemplateCommandResult> DeleteTemplateAsync(
@@ -165,7 +229,7 @@ namespace ExportDocManager.Services.Reporting
             EnsureTemplateLifecyclePath(current.TemplatePath);
 
             File.Delete(current.TemplatePath);
-            await SyncTemplateReferencesAsync(reportType, current.TemplatePath, string.Empty, cancellationToken).ConfigureAwait(false);
+            await SyncTemplateStateAsync(reportType, current.TemplatePath, string.Empty, null, cancellationToken).ConfigureAwait(false);
 
             return new ReportTemplateCommandResult
             {
@@ -299,10 +363,11 @@ namespace ExportDocManager.Services.Reporting
             };
         }
 
-        private async Task SyncTemplateReferencesAsync(
+        private async Task SyncTemplateStateAsync(
             ReportDocumentType reportType,
             string previousTemplatePath,
             string currentTemplatePath,
+            string? currentDisplayName,
             CancellationToken cancellationToken)
         {
             await _settingsService.LoadAsync().ConfigureAwait(false);
@@ -335,23 +400,34 @@ namespace ExportDocManager.Services.Reporting
             }, cancellationToken).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
-            await RefreshTemplateCatalogAsync(cancellationToken).ConfigureAwait(false);
+            await RefreshTemplateCatalogAsync(currentTemplatePath, currentDisplayName, cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task RefreshTemplateCatalogAsync(CancellationToken cancellationToken)
+        private async Task RefreshTemplateCatalogAsync(
+            string currentTemplatePath,
+            string? currentDisplayName,
+            CancellationToken cancellationToken)
         {
             string configPath = _pathResolver.GetUserConfigPath();
             var configs = await _catalogLoader.LoadResolvedConfigsAsync(cancellationToken).ConfigureAwait(false);
+            string normalizedCurrentPath = string.IsNullOrWhiteSpace(currentTemplatePath)
+                ? string.Empty
+                : Path.GetFullPath(currentTemplatePath);
             var rows = configs
                 .Where(config =>
                     config != null &&
                     !string.IsNullOrWhiteSpace(config.FileName) &&
-                    _pathResolver.IsUserTemplatePath(config.FileName))
+                    (_pathResolver.IsBuiltInTemplatePath(config.FileName) || _pathResolver.IsUserTemplatePath(config.FileName)))
                 .Select(config => new ReportTemplateConfig
                 {
                     Type = ReportTemplateCatalogLoader.NormalizeTemplateCatalogType(config.Type, config.FileName),
                     FileName = _pathResolver.ToStoredPath(config.FileName),
-                    Name = ReportTemplateCatalogLoader.NormalizeTemplateDisplayName(config.Name, config.FileName),
+                    Name = ReportTemplateCatalogLoader.NormalizeTemplateDisplayName(
+                        !string.IsNullOrWhiteSpace(normalizedCurrentPath) &&
+                        PhysicalPathComparison.AreSamePath(config.FileName, normalizedCurrentPath)
+                            ? currentDisplayName
+                            : config.Name,
+                        config.FileName),
                     WithSeal = ReportTemplateCatalogLoader.ResolveCatalogReportType(config.Type, config.FileName) == ReportDocumentType.PaymentVoucher
                         ? null
                         : config.WithSeal ?? true

@@ -87,7 +87,7 @@ assert(salesGroups.flatMap((group) => group.items).some((item) => item.to === "/
 assert(salesGroups.flatMap((group) => group.items).some((item) => item.to === "/crm/opportunities"), "sales opportunities visible for salesperson");
 assert(!salesGroups.flatMap((group) => group.items).some((item) => item.to === "/invoices"), "documents hidden for salesperson");
 assert(!salesGroups.flatMap((group) => group.items).some((item) => item.to === "/master-data"), "document master data hidden for salesperson");
-assert(!salesGroups.flatMap((group) => group.items).some((item) => ["/reports/templates", "/tools/excel", "/tools/ocr", "/tools/container-packing"].includes(item.to)), "document-only tools hidden for salesperson");
+assert(!salesGroups.flatMap((group) => group.items).some((item) => ["/reports/templates/manage", "/tools/excel", "/tools/ocr", "/tools/container-packing"].includes(item.to)), "document-only tools hidden for salesperson");
 assert(!salesGroups.flatMap((group) => group.items).some((item) => ["/system/update", "/system/license", "/audit-logs", "/settings"].includes(item.to)), "administrative navigation hidden for salesperson account");
 assert(salesGroups.flatMap((group) => group.items).some((item) => item.to === "/system/about"), "about remains visible for salesperson account");
 assert(salesEditionAdminGroups.flatMap((group) => group.items).some((item) => item.to === "/settings"), "sales edition administrator keeps settings");
@@ -100,7 +100,7 @@ assert(adminGroups.flatMap((group) => group.items).some((item) => item.to === "/
 assert(financeRoutes.includes("/payments"), "finance payments visible");
 assert(financeRoutes.includes("/query/invoices"), "finance query visible");
 assert(financeRoutes.includes("/tools/ocr"), "finance OCR visible");
-assert(financeRoutes.includes("/reports/templates"), "finance report designer visible");
+assert(financeRoutes.includes("/reports/templates/manage"), "finance report template management visible");
 assert(financeRoutes.includes("/tools/exchange-rates"), "finance exchange rate visible");
 assert(financeRoutes.includes("/tools/email"), "finance email visible");
 assert(financeRoutes.includes("/system/about"), "finance about visible");

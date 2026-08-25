@@ -233,7 +233,7 @@
     {
       "name": "report template management composition",
       "directory": "apps/export-doc-web/src/features/reports",
-      "filePattern": "^ReportTemplate(?:DesignerPage|ManagementSidebar)\\.tsx$",
+      "filePattern": "^ReportTemplateManagement(?:Header|Page|Workspace)\\.tsx$",
       "maximumLines": 830,
       "maximumAggregateLines": 900
     },

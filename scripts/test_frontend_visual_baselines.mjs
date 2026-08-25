@@ -225,21 +225,19 @@ try {
               const selectors = [".template-selection-panel", ".template-user-panel", ".template-admin-panel", ".template-package-panel"];
               const panels = selectors.map((selector) => document.querySelector(selector));
               const rects = panels.map((panel) => panel?.getBoundingClientRect()).filter(Boolean);
-              const selectionRect = rects[0];
-              const managementRects = rects.slice(1);
-              const workspaceWidth = document.querySelector(".report-template-surface")?.getBoundingClientRect().width ?? 0;
+              const currentTitle = document.querySelector(".report-template-current-title");
+              const currentTitleRect = currentTitle?.getBoundingClientRect();
               const overlapCount = rects.flatMap((rect, index) => rects.slice(index + 1).map((other) => ({ rect, other })))
                 .filter(({ rect, other }) => Math.min(rect.right, other.right) - Math.max(rect.left, other.left) > 1
                   && Math.min(rect.bottom, other.bottom) - Math.max(rect.top, other.top) > 1).length;
               const selectionFieldWidths = [...document.querySelectorAll(".template-selection-panel > label")]
                 .map((field) => field.getBoundingClientRect().width);
-              const responsivePlacementMatches = workspaceWidth <= 1160
-                ? managementRects.every((rect) => selectionRect && rect.top >= selectionRect.bottom - 1)
-                : managementRects.every((rect) => selectionRect && Math.abs(rect.top - selectionRect.top) <= 1);
+              const managementControlsAbsent = panels.every((panel) => panel === null);
+              const currentTitleFits = !currentTitleRect || currentTitleRect.right <= document.documentElement.clientWidth + 1;
               return {
                 overlapCount,
-                minimumSelectionFieldWidth: selectionFieldWidths.length > 0 ? Math.min(...selectionFieldWidths) : 0,
-                responsivePlacementMatches,
+                minimumSelectionFieldWidth: managementControlsAbsent ? 999 : selectionFieldWidths.length > 0 ? Math.min(...selectionFieldWidths) : 0,
+                responsivePlacementMatches: managementControlsAbsent && currentTitleFits,
               };
             })()
           : { overlapCount: 0, minimumSelectionFieldWidth: 999, responsivePlacementMatches: true };

@@ -45,12 +45,9 @@ export function createReportTemplateSmokeScene(runtime) {
       const selectedTemplateCheck = await waitForPageExpression(
         page,
         `(() => {
-          const select = document.querySelector(".template-select-field select");
-          if (!select) {
-            return false;
-          }
-          const selectedText = select.selectedOptions && select.selectedOptions[0] ? select.selectedOptions[0].textContent || "" : "";
-          return (select.value || "").includes(${JSON.stringify(check.templateFileName)}) || selectedText.includes(${JSON.stringify(check.templateFileName)});
+          const title = (document.querySelector(".report-template-current-title small")?.textContent || "").trim();
+          const params = new URLSearchParams(window.location.hash.split("?")[1] || "");
+          return params.get("template") === ${JSON.stringify(check.templateFileName)} && title.startsWith("当前模板：") && title !== "当前模板：报表模板";
         })()`,
         timeoutMs,
         `Timed out waiting for selected report template: ${check.reportType}/${check.templateFileName}`,
@@ -90,12 +87,12 @@ export function createReportTemplateSmokeScene(runtime) {
     await evaluate(
       page,
       `(() => {
-        const workspaceTabs = document.querySelector('[aria-label="模板工作区"]');
+        const workspaceTabs = document.querySelector('[aria-label="报表设计视图"]');
         const previewButton = workspaceTabs
           ? Array.from(workspaceTabs.querySelectorAll('button')).find((button) => (button.innerText || '').trim().includes('预览'))
           : null;
         if (!previewButton) {
-          throw new Error('Report template preview workspace tab was not found.');
+          throw new Error('Report template preview view was not found.');
         }
 
         previewButton.click();

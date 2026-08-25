@@ -9,9 +9,12 @@ export function useDefaultReportTemplateLifecycleMutations({
   selectedTemplatePath,
   newTemplateFileName,
   newTemplateDisplayName,
+  currentTemplateDisplayName,
   renameTemplateFileName,
   onCreated,
   onRenamed,
+  onDisplayNameUpdated,
+  onDefaultSet,
   onDeleted,
   onError,
 }: {
@@ -20,9 +23,12 @@ export function useDefaultReportTemplateLifecycleMutations({
   selectedTemplatePath: string;
   newTemplateFileName: string;
   newTemplateDisplayName: string;
+  currentTemplateDisplayName: string;
   renameTemplateFileName: string;
   onCreated: (created: ApiReportTemplateContentDto) => void;
   onRenamed: (renamed: ApiReportTemplateContentDto) => void;
+  onDisplayNameUpdated: (updated: ApiReportTemplateContentDto) => void;
+  onDefaultSet: (message: string) => void;
   onDeleted: () => void;
   onError: (error: unknown) => void;
 }) {
@@ -63,6 +69,38 @@ export function useDefaultReportTemplateLifecycleMutations({
     onError,
   });
 
+  const updateDisplayNameMutation = useMutation({
+    mutationFn: () =>
+      client.updateReportTemplateDisplayName({
+        body: {
+          reportType,
+          templatePath: selectedTemplatePath,
+          displayName: currentTemplateDisplayName.trim(),
+        },
+      }),
+    onSuccess: async (updated) => {
+      queryClient.setQueryData(queryKeys.reportTemplateContent(reportType, updated.templatePath), updated);
+      onDisplayNameUpdated(updated);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
+    },
+    onError,
+  });
+
+  const setDefaultTemplateMutation = useMutation({
+    mutationFn: () =>
+      client.setDefaultReportTemplate({
+        body: {
+          reportType,
+          templatePath: selectedTemplatePath,
+        },
+      }),
+    onSuccess: async (result) => {
+      onDefaultSet(result.message);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
+    },
+    onError,
+  });
+
   const deleteTemplateMutation = useMutation({
     mutationFn: () => client.deleteReportTemplate({ reportType, templatePath: selectedTemplatePath }),
     onSuccess: async () => {
@@ -73,5 +111,11 @@ export function useDefaultReportTemplateLifecycleMutations({
     onError,
   });
 
-  return { createTemplateMutation, renameTemplateMutation, deleteTemplateMutation };
+  return {
+    createTemplateMutation,
+    renameTemplateMutation,
+    updateDisplayNameMutation,
+    setDefaultTemplateMutation,
+    deleteTemplateMutation,
+  };
 }

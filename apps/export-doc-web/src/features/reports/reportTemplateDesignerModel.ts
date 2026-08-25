@@ -45,6 +45,11 @@ export function readTemplateFileNameFromSearch(search: string) {
   return new URLSearchParams(search).get("template")?.trim() ?? "";
 }
 
+export function readUserTemplateIdFromSearch(search: string) {
+  const value = Number.parseInt(new URLSearchParams(search).get("userTemplateId")?.trim() ?? "", 10);
+  return Number.isInteger(value) && value > 0 ? value : 0;
+}
+
 export function readSearchFromHash(hash = window.location.hash || "") {
   const queryStart = hash.indexOf("?");
   return queryStart >= 0 ? hash.slice(queryStart) : "";
@@ -72,12 +77,14 @@ export function resolveDefaultTemplatePath({
   templates,
   reportType,
   requestedTemplateFileName,
+  configuredTemplatePath = "",
   currentTemplatePath,
   userTemplateSelected,
 }: {
   templates: Array<{ templatePath: string }>;
   reportType: ReportTypeOption;
   requestedTemplateFileName: string;
+  configuredTemplatePath?: string;
   currentTemplatePath: string;
   userTemplateSelected: boolean;
 }) {
@@ -98,6 +105,13 @@ export function resolveDefaultTemplatePath({
 
   if (currentTemplatePath && templates.some((template) => matchesTemplatePath(template.templatePath, currentTemplatePath))) {
     return currentTemplatePath;
+  }
+
+  const configuredTemplate = configuredTemplatePath
+    ? templates.find((template) => matchesTemplatePath(template.templatePath, configuredTemplatePath))
+    : null;
+  if (configuredTemplate) {
+    return configuredTemplate.templatePath;
   }
 
   return (

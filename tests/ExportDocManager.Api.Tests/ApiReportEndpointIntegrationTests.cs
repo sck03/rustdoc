@@ -298,7 +298,7 @@ namespace ExportDocManager.Api.Tests
                     templatePath = createdTemplate.TemplatePath,
                     newTemplatePath = renamedTemplatePath
                 });
-            Assert.Equal(HttpStatusCode.OK, renameTemplateResponse.StatusCode);
+            Assert.True(renameTemplateResponse.StatusCode == HttpStatusCode.OK, await renameTemplateResponse.Content.ReadAsStringAsync());
             var renamedTemplate = await ApiIntegrationTestHarness.ReadJsonAsync<ApiReportTemplateContentDto>(renameTemplateResponse);
             Assert.Equal("user:Export/api_renamed_template.html", renamedTemplate.TemplatePath);
             Assert.False(File.Exists(createdTemplateFile));

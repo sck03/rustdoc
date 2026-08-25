@@ -105,21 +105,6 @@ export function useReportTemplateEditingActions({
     setDesignerMode(mode);
   }
 
-  async function handleApplyNewReportDesignerContent(nextContent: string) {
-    if (!selectedTemplatePath || !selectedTemplateContentActive || (isUserTemplate && !currentUserTemplateCanEdit)) {
-      return;
-    }
-    if (!await confirmStructuredTemplateOverwrite()) {
-      return;
-    }
-
-    setContent(nextContent);
-    setContentTemplatePath(selectedTemplatePath);
-    setPreview(null);
-    setMessage("可视化设计内容已应用到模板，保存后写入模板文件。");
-    setMessageType("success");
-  }
-
   async function handleSaveNewReportDesignerContent(nextContent: string) {
     if (!selectedTemplatePath || !selectedTemplateContentActive) {
       return;
@@ -197,7 +182,6 @@ export function useReportTemplateEditingActions({
   }
 
   return {
-    handleApplyNewReportDesignerContent,
     handleDesignerModeChange,
     handleFormatSource,
     handleRenderTemplatePreview,

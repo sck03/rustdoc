@@ -185,7 +185,7 @@
     overflow-x: visible;
   }
 
-  .report-template-sidebar {
+  .report-template-management-workspace {
     grid-template-columns: 1fr;
   }
 
@@ -211,10 +211,6 @@
   .template-management-actions,
   .template-management-panel > .command-button {
     flex: 1 1 140px;
-  }
-
-  .report-template-workspace-tabs {
-    width: 100%;
   }
 
   .report-template-preview-toolbar {

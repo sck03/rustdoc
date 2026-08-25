@@ -48,9 +48,9 @@ export function ReportTemplateUserPanel({
   onRestoreVersion: (versionNumber: number) => void;
 }) {
   return (
-    <details className="template-management-panel template-actions-panel template-user-panel" open aria-label="我的模板">
+    <details className="template-management-panel template-actions-panel template-user-panel" open aria-label="我的和共享模板">
       <summary>
-        <span>我的模板</span>
+        <span>我的 / 共享模板</span>
         <small>默认私有，可明确共享</small>
       </summary>
       <div className="template-management-content">

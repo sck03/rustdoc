@@ -47,6 +47,10 @@ const ReportTemplateDesignerPage = lazyNamed(
   () => import("../features/reports/ReportTemplateDesignerPage.tsx"),
   "ReportTemplateDesignerPage",
 );
+const ReportTemplateManagementPage = lazyNamed(
+  () => import("../features/reports/ReportTemplateManagementPage.tsx"),
+  "ReportTemplateManagementPage",
+);
 const JobCenterPage = lazyNamed(() => import("../features/jobs/JobCenterPage.tsx"), "JobCenterPage");
 const ExcelToolsPage = lazyNamed(() => import("../features/tools/excel/ExcelToolsPage.tsx"), "ExcelToolsPage");
 const SmartOcrPage = lazyNamed(() => import("../features/tools/SmartOcrPage.tsx"), "SmartOcrPage");
@@ -65,14 +69,12 @@ const SettingsPage = lazyNamed(() => import("../features/settings/SettingsPage.t
 
 export function AppWorkspaceRoutes({
   activeProduct,
-  apiBaseUrl,
   canManageAuditLogs,
   client,
   routeAccessAllowed,
   user,
 }: {
   activeProduct: ProductEditionPresentation;
-  apiBaseUrl: string;
   canManageAuditLogs: boolean;
   client: ExportDocManagerApiClient;
   routeAccessAllowed: boolean;
@@ -124,13 +126,24 @@ export function AppWorkspaceRoutes({
         <Route path="/single-window/coo/:invoiceId" element={<CustomsCooPage client={client} />} />
         <Route path="/single-window/acd/:invoiceId" element={<AgentConsignmentPage client={client} />} />
         <Route
-          path="/reports/templates"
+          path="/reports/templates/manage"
           element={
-            <ReportTemplateDesignerPage
-              apiBaseUrl={apiBaseUrl}
+            <ReportTemplateManagementPage
               client={client}
               canManageTemplates={hasModulePermission(user.capabilities.moduleAccess, "document.reports", "manage")}
               canDesignTemplates={hasModulePermission(user.capabilities.moduleAccess, "document.reports", "operate")}
+              canManageSettings={user.capabilities.canManageSettings === true}
+            />
+          }
+        />
+        <Route
+          path="/reports/templates"
+          element={
+            <ReportTemplateDesignerPage
+              client={client}
+              canManageTemplates={hasModulePermission(user.capabilities.moduleAccess, "document.reports", "manage")}
+              canDesignTemplates={hasModulePermission(user.capabilities.moduleAccess, "document.reports", "operate")}
+              canManageSettings={user.capabilities.canManageSettings === true}
             />
           }
         />

@@ -600,7 +600,6 @@ function App() {
       >
         <AppWorkspaceRoutes
           activeProduct={activeProduct}
-          apiBaseUrl={session.apiBaseUrl}
           canManageAuditLogs={canManageAuditLogs}
           client={client}
           routeAccessAllowed={routeAccessAllowed}

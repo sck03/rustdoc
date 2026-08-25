@@ -27,13 +27,13 @@ const modelImportSpecifier = `./${path.relative(workspaceRoot, modelPath).replac
 fs.mkdirSync(workspaceRoot, { recursive: true });
 fs.writeFileSync(
   entryPath,
-  `export { resolveDefaultTemplatePath, resolvePreviewSourceId } from ${JSON.stringify(modelImportSpecifier)};`,
+  `export { readUserTemplateIdFromSearch, resolveDefaultTemplatePath, resolvePreviewSourceId } from ${JSON.stringify(modelImportSpecifier)};`,
   "utf8",
 );
 
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, platform: "node", format: "esm" });
-const { resolveDefaultTemplatePath, resolvePreviewSourceId } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
+const { readUserTemplateIdFromSearch, resolveDefaultTemplatePath, resolvePreviewSourceId } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
 
 const templates = [
   { templatePath: "E:/app/Templates/Export/custom.html" },
@@ -86,6 +86,18 @@ assertEqual(
 );
 assertEqual(
   resolveDefaultTemplatePath({
+    templates,
+    reportType: "ExportDocument",
+    requestedTemplateFileName: "",
+    configuredTemplatePath: templates[0].templatePath,
+    currentTemplatePath: "",
+    userTemplateSelected: false,
+  }),
+  templates[0].templatePath,
+  "未指定深链时应采用已配置的默认模板",
+);
+assertEqual(
+  resolveDefaultTemplatePath({
     templates: [],
     reportType: "ExportDocument",
     requestedTemplateFileName: "",
@@ -98,21 +110,23 @@ assertEqual(
 assertEqual(resolvePreviewSourceId(9, [1, 2]), 9, "已有预览源应保持不变");
 assertEqual(resolvePreviewSourceId(0, [0, -1, 6, 7]), 6, "应选择第一个有效预览源");
 assertEqual(resolvePreviewSourceId(0, []), 0, "无预览源时应保持未选择");
+assertEqual(readUserTemplateIdFromSearch("?userTemplateId=17"), 17, "用户模板深链应解析有效 ID");
+assertEqual(readUserTemplateIdFromSearch("?userTemplateId=invalid"), 0, "无效用户模板深链应回退");
 assertMatch(workspaceStateSource, /hasUnappliedDesignerChanges\s*=\s*[\s\S]*?designerDraftContent\s*!==\s*content/, "新版画布草稿必须独立识别为未应用修改");
 assertMatch(workspaceStateSource, /hasUnsavedChanges\s*=\s*hasChanges\s*\|\|\s*hasUnappliedDesignerChanges/, "保存和离开保护必须同时覆盖源码与画布草稿");
 assertMatch(workspaceStateSource, /canSave\s*=\s*[\s\S]*?hasUnsavedChanges/, "画布草稿存在时顶部保存必须可用");
 
 assertMatch(
   reportWorkspaceCss,
-  /\.report-template-sidebar\s*\{[\s\S]*?grid-template-columns:\s*minmax\(420px,\s*1\.6fr\)\s*minmax\(220px,\s*1fr\)\s*minmax\(220px,\s*1fr\)\s*minmax\(120px,\s*0\.55fr\)/,
-  "宽屏模板选择、我的模板、模板操作和模板包应保持四栏",
+  /\.report-template-management-workspace\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+  "模板管理工作区应使用清晰的双栏布局",
 );
-assertMatch(reportWorkspaceCss, /\.template-selection-panel\s*\{\s*grid-column:\s*1;\s*grid-row:\s*1;/, "选择区应固定在宽屏第一列");
-assertMatch(reportWorkspaceCss, /\.template-package-panel\s*\{\s*grid-column:\s*4;\s*grid-row:\s*1;/, "模板包应固定在宽屏第四列而不是换行");
+assertMatch(reportWorkspaceCss, /\.template-selection-panel\s*\{\s*grid-column:\s*1\s*\/\s*-1;/, "选择区应独占管理页首行");
+assertMatch(reportWorkspaceCss, /\.template-package-panel\s*\{\s*grid-column:\s*1\s*\/\s*-1;/, "模板包应独占管理页整行");
 assertMatch(
   responsiveOverridesCss,
-  /@media\s*\(min-width:\s*861px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.report-template-sidebar\s*\{\s*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)[\s\S]*?\.template-selection-panel\s*\{\s*grid-column:\s*span 3/,
-  "中等宽度应让选择区独占首行，其余三个模板面板同排",
+  /@media\s*\(min-width:\s*861px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.template-selection-panel\s*\{\s*grid-column:\s*1\s*\/\s*-1/,
+  "中等宽度应继续让选择区独占首行",
 );
 assertMatch(
   responsiveOverridesCss,

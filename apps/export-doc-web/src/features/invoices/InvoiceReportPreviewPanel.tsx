@@ -12,7 +12,7 @@ import { PermissionNotice } from "../../ui/PageState.tsx";
 import { printReportPreviewHtml } from "../reports/printReportPreview.ts";
 import { readDefaultReportTemplatePath, resolveReportTemplatePath } from "../reports/reportTemplateSelectionModel.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
-import { createSettingsReturnState } from "../settings/settingsReturnNavigation.ts";
+import { createReportTemplateReturnState } from "../reports/reportTemplateReturnNavigation.ts";
 import { InvoiceReportAdvancedExportPanel } from "./InvoiceReportAdvancedExportPanel.tsx";
 import { InvoiceReportPreviewCanvas } from "./InvoiceReportPreviewCanvas.tsx";
 import { InvoiceReportPreviewHeader } from "./InvoiceReportPreviewHeader.tsx";
@@ -204,10 +204,7 @@ export function InvoiceReportPreviewPanel({
   const canSavePackageConfig = canEditPackageConfig
     && documentPackage.configDirty
     && documentPackage.configDraft.items.length > 0;
-  const canOpenTemplateDesigner = workspaceDeviceCapabilities.canUseDenseWorkbench
-    && reportDesignPermission.canView
-    && Boolean(selectedTemplatePath)
-    && !isBusy;
+  const canOpenTemplateManagement = (reportDesignPermission.canView || canManageSettings) && !isBusy;
   const templateMessage = templatesQuery.isError ? readApiError(templatesQuery.error) : null;
 
   function handleTemplateChange(value: string) {
@@ -219,13 +216,14 @@ export function InvoiceReportPreviewPanel({
     clearFeedback();
   }
 
-  function openTemplateDesigner() {
-    if (!selectedTemplatePath) return;
+  function openTemplateManagement() {
     const params = new URLSearchParams({ reportType: "ExportDocument" });
     if (hasSavedInvoice) params.set("invoiceId", String(invoiceId));
     const templateFileName = fileNameFromPath(selectedTemplatePath);
     if (templateFileName) params.set("template", templateFileName);
-    navigate(`/reports/templates?${params.toString()}`);
+    navigate(`/reports/templates/manage?${params.toString()}`, {
+      state: createReportTemplateReturnState(location, "返回发票"),
+    });
   }
 
   async function printPreview() {
@@ -270,23 +268,18 @@ export function InvoiceReportPreviewPanel({
       ) : null}
       <InvoiceReportTemplateControls
         canConfigureOutput={reportOutputPermission.canOperate}
-        canOpenTemplateDesigner={canOpenTemplateDesigner}
         canQuickGenerateBookingSheet={canQuickGenerateBookingSheet}
         canQuickGeneratePdf={canQuickGeneratePdf}
         desktopAvailable={desktopAvailable}
         hasSavedInvoice={hasSavedInvoice}
         isBusy={isBusy}
-        showTemplateDesigner={workspaceDeviceCapabilities.canUseDenseWorkbench && reportDesignPermission.canView}
-        showTemplateSettings={workspaceDeviceCapabilities.canUseAdvancedTools && canManageSettings}
+        canOpenTemplateManagement={canOpenTemplateManagement}
         selectedTemplatePath={selectedTemplatePath}
         templates={templates}
         withSeal={withSeal}
         onExportBookingSheet={() => void fileExports.exportBookingSheetWithSaveDialog()}
         onExportPdf={() => void fileExports.exportPdfWithSaveDialog()}
-        onManageTemplates={() => navigate("/settings?section=documentOutput", {
-          state: createSettingsReturnState(location, "返回发票"),
-        })}
-        onOpenTemplateDesigner={openTemplateDesigner}
+        onOpenTemplateManagement={openTemplateManagement}
         onTemplateChange={handleTemplateChange}
         onWithSealChange={(value) => {
           setWithSeal(value);

@@ -1,7 +1,7 @@
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { ReportTemplateWorkspacePage } from "./ReportTemplateWorkspacePage.tsx";
 
-export function ReportTemplateDesignerPage({
+export function ReportTemplateManagementPage({
   client,
   canManageTemplates,
   canDesignTemplates,
@@ -18,6 +18,7 @@ export function ReportTemplateDesignerPage({
       canManageTemplates={canManageTemplates}
       canDesignTemplates={canDesignTemplates}
       canManageSettings={canManageSettings}
+      view="management"
     />
   );
 }

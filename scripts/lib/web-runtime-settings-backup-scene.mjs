@@ -46,8 +46,7 @@ export function createSettingsBackupSmokeScene(runtime) {
     const templateUrl = buildBatchExportSettingsDeepLinkUrl(options.webUrl);
     await page.send("Page.navigate", { url: templateUrl });
     const templateExpectedText = [
-      "设置",
-      "报表与输出",
+      "报表模板管理",
       "导出默认设置",
       "文件命名规则",
       "文件夹命名规则",

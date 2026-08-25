@@ -355,7 +355,7 @@ function buildAuditExpression(isMobile) {
         .filter((element) => Number.parseFloat(getComputedStyle(element).fontSize) < 16)
         .map((element) => ({ tag: element.tagName, className: element.className, fontSize: getComputedStyle(element).fontSize }))
       : [];
-    const frequentTargetSelector = ".command-button, .primary-button, .secondary-button, .icon-button, .nav-group-button, .nav-item, .settings-category-item, .master-data-tab, .report-template-workspace-tabs button, .segmented-control button, .density-toggle-button, .login-submit-button, .login-connection-settings summary";
+    const frequentTargetSelector = ".command-button, .primary-button, .secondary-button, .icon-button, .nav-group-button, .nav-item, .settings-category-item, .master-data-tab, .segmented-control button, .density-toggle-button, .login-submit-button, .login-connection-settings summary";
     const mobileTouchTargetFailures = ${isMobile}
       ? [...document.querySelectorAll(frequentTargetSelector)].filter(visible)
         .filter((element) => {

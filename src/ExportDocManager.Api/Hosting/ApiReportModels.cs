@@ -295,6 +295,15 @@ namespace ExportDocManager.Api.Hosting
         public string NewTemplatePath { get; set; } = string.Empty;
     }
 
+    public sealed class ApiReportTemplateMetadataRequest
+    {
+        public string ReportType { get; set; } = "ExportDocument";
+
+        public string TemplatePath { get; set; } = string.Empty;
+
+        public string DisplayName { get; set; } = string.Empty;
+    }
+
     [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
     public sealed class ApiReportTemplatePreviewRequest
     {

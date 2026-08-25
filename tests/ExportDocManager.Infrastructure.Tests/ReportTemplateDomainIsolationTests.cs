@@ -168,9 +168,10 @@ public sealed class ReportTemplateDomainIsolationTests
         string appRoot = Path.Combine(root, "app");
         string dataRoot = Path.Combine(root, "data");
         Directory.CreateDirectory(appRoot);
+        var settingsService = new StubSettingsService(new AppSettings());
         var service = new ReportTemplateService(
             new RuntimeAppPathProvider(appRoot, dataRoot),
-            new StubSettingsService(new AppSettings()));
+            settingsService);
 
         try
         {
@@ -188,6 +189,10 @@ public sealed class ReportTemplateDomainIsolationTests
                 created.Content);
             Assert.Equal(created.Content, saved.Content);
             Assert.Null(saved.WithSealDefault);
+            await service.UpdateTemplateDisplayNameAsync(ReportDocumentType.PaymentVoucher, saved.TemplatePath, $"{displayName}（自定义）");
+            Assert.Equal($"{displayName}（自定义）", (await service.GetTemplateContentAsync(ReportDocumentType.PaymentVoucher, saved.TemplatePath)).DisplayName);
+            await service.SetDefaultTemplateAsync(ReportDocumentType.PaymentVoucher, saved.TemplatePath);
+            Assert.Equal($"user:Internal/{fileName}", settingsService.Settings.ReportTemplateDefaults.PaymentVoucherTemplatePath);
         }
         finally
         {

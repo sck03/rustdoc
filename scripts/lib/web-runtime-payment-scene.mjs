@@ -189,7 +189,7 @@ export function createPaymentSmokeScene(runtime) {
         "输出 PDF",
         "生成 PDF",
         "打印",
-        "报表设置",
+        "报表模板管理",
         payment.invoiceNo,
       ];
 
@@ -207,8 +207,8 @@ export function createPaymentSmokeScene(runtime) {
         `(() => {
           const panel = document.querySelector('[aria-label="付款/报销单预览"]');
           const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
-          const button = buttons.find((element) => (element.innerText || '').includes('报表设置'));
-          return Boolean(button && !button.disabled && (button.title || '').includes('管理导出默认设置'));
+          const button = buttons.find((element) => (element.innerText || '').includes('报表模板管理'));
+          return Boolean(button && !button.disabled && (button.title || '').includes('打开报表模板管理'));
         })()`,
         timeoutMs,
         "Timed out waiting for the payment template settings button.",
@@ -671,8 +671,7 @@ export function createPaymentSmokeScene(runtime) {
     const checkUrl = buildPaymentTemplateSettingsDeepLinkUrl(options.webUrl);
     await page.send("Page.navigate", { url: checkUrl });
     const expectedText = [
-      "设置",
-      "报表与输出",
+      "报表模板管理",
       "导出默认设置",
       "文件命名规则",
       "默认合并 PDF",
@@ -683,7 +682,7 @@ export function createPaymentSmokeScene(runtime) {
       page,
       `(() => {
         const panel = document.querySelector('[aria-label="导出默认设置"]');
-        if (!panel || !window.location.hash.includes('/settings?section=paymentReports')) {
+        if (!panel || !window.location.hash.includes('/reports/templates/manage')) {
           return false;
         }
 
@@ -1057,7 +1056,7 @@ export function createPaymentSmokeScene(runtime) {
   function buildPaymentTemplateSettingsDeepLinkUrl(webUrl) {
     const url = new URL(webUrl);
     url.searchParams.set("smokePaymentTemplateSettings", "1");
-    url.hash = "/settings?section=paymentReports";
+    url.hash = "/reports/templates/manage?reportType=PaymentVoucher";
     return url.toString();
   }
 

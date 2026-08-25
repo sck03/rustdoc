@@ -14,7 +14,7 @@ export function useReportTemplateSaveMutations({
   selectedUserTemplateId,
   userTemplates,
   content,
-  renameTemplateFileName,
+  userTemplateName,
   onDefaultTemplateSaved,
   onUserTemplateSaved,
   onError,
@@ -25,7 +25,7 @@ export function useReportTemplateSaveMutations({
   selectedUserTemplateId: number;
   userTemplates: ApiUserReportTemplateDto[];
   content: string;
-  renameTemplateFileName: string;
+  userTemplateName: string;
   onDefaultTemplateSaved: (saved: ApiReportTemplateContentDto) => void;
   onUserTemplateSaved: (saved: ApiUserReportTemplateDto) => void;
   onError: (error: unknown) => void;
@@ -63,7 +63,7 @@ export function useReportTemplateSaveMutations({
         body: {
           id: current.id,
           reportType,
-          name: renameTemplateFileName.trim() || current.name,
+          name: userTemplateName.trim() || current.name,
           contentHtml: nextContent ?? content,
           isActive: current.isActive,
           isShared: current.isShared,
