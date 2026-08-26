@@ -1,18 +1,17 @@
-import type { ApiInvoiceDocumentPackagePreviewResponse, ApiReportTemplateDto, ApiSettingsResponse, AppSettings } from "../../api/index.ts";
+import type { ApiInvoiceDocumentPackagePreviewResponse, ApiReportTemplateDto, AppSettings, BatchExportItem } from "../../api/index.ts";
+import { fileNameFromPath, resolveBatchExportItems } from "../reports/reportExportDefaultsModel.ts";
+
+export { fileNameFromPath };
 
 type SettingsLike = AppSettings | Record<string, unknown>;
 
 export type PackageTemplateView = { template: ApiReportTemplateDto; displayName: string; withSealDefault: boolean; initiallySelected: boolean };
-export type BatchExportItemSetting = { name: string; templatePath: string; isEnabled: boolean; showSeal: boolean; reportType: string };
+export type BatchExportItemSetting = BatchExportItem;
 export type BatchExportConfigDraft = { fileNamePattern: string; folderPattern: string; mergePdf: boolean; zipAfterExport: boolean; items: BatchExportItemSetting[] };
 export const DEFAULT_DOCUMENT_EMAIL_SUBJECT_TEMPLATE = "Export Documents for Invoice {InvoiceNo}";
 export const DEFAULT_DOCUMENT_EMAIL_BODY_TEMPLATE = "Dear Customer,\r\n\r\nPlease find the attached export documents.\r\n\r\nBest regards,";
 export const DEFAULT_BATCH_EXPORT_FILE_NAME_PATTERN = "{InvoiceNo}_{DocType}";
 export const DEFAULT_BATCH_EXPORT_FOLDER_PATTERN = "{InvoiceNo}_Docs_{Date}";
-
-export function fileNameFromPath(path: string) {
-  return path.split(/[\\/]/).filter(Boolean).pop() || path;
-}
 
 export function buildDocumentPackagePrintHtml(packagePreview: ApiInvoiceDocumentPackagePreviewResponse) {
   const headHtml = packagePreview.items
@@ -50,31 +49,12 @@ export function extractHtmlBody(html: string) {
   return html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? html;
 }
 
-export function createEmptyBatchExportConfigDraft(): BatchExportConfigDraft {
-  return {
-    fileNamePattern: DEFAULT_BATCH_EXPORT_FILE_NAME_PATTERN,
-    folderPattern: DEFAULT_BATCH_EXPORT_FOLDER_PATTERN,
-    mergePdf: true,
-    zipAfterExport: true,
-    items: [],
-  };
-}
-
 export function buildBatchExportConfigDraft(
   settings: SettingsLike | undefined,
   templates: ApiReportTemplateDto[],
 ): BatchExportConfigDraft {
   const batchExport = readBatchExportRecord(settings);
-  const configuredItems = readBatchExportItems(settings);
-  const items = configuredItems.length > 0
-    ? configuredItems
-    : templates.map((template) => ({
-        name: template.displayName || fileNameFromPath(template.templatePath),
-        templatePath: template.templatePath,
-        isEnabled: true,
-        showSeal: template.withSealDefault ?? true,
-        reportType: template.reportType || "ExportDocument",
-      }));
+  const items = resolveBatchExportItems(readBatchExportItems(settings), templates);
 
   return {
     fileNamePattern: readBatchExportPattern(batchExport, "outputFileNamePattern", "OutputFileNamePattern", DEFAULT_BATCH_EXPORT_FILE_NAME_PATTERN),
@@ -83,38 +63,6 @@ export function buildBatchExportConfigDraft(
     zipAfterExport: readBatchExportBoolean(batchExport, "zipAfterExport", "ZipAfterExport", true),
     items,
   };
-}
-
-export function buildSettingsWithBatchExportConfig(
-  settings: AppSettings,
-  draft: BatchExportConfigDraft,
-) : AppSettings {
-  return {
-    ...settings,
-    batchExport: {
-      ...settings.batchExport,
-      items: draft.items.map(toBatchExportItemRecord),
-      outputFileNamePattern: normalizeBatchExportPattern(draft.fileNamePattern, DEFAULT_BATCH_EXPORT_FILE_NAME_PATTERN),
-      outputFolderPattern: normalizeBatchExportPattern(draft.folderPattern, DEFAULT_BATCH_EXPORT_FOLDER_PATTERN),
-      mergePdf: draft.mergePdf,
-      zipAfterExport: draft.zipAfterExport,
-    },
-  };
-}
-
-export function toBatchExportItemRecord(item: BatchExportItemSetting) {
-  return {
-    name: item.name,
-    templatePath: item.templatePath,
-    isEnabled: item.isEnabled,
-    showSeal: item.showSeal,
-    reportType: item.reportType || "ExportDocument",
-  };
-}
-
-export function normalizeBatchExportPattern(value: string, fallback: string) {
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : fallback;
 }
 
 export function readBatchExportPattern(
@@ -135,10 +83,6 @@ export function readBatchExportBoolean(
 ) {
   const value = batchExport ? readRecordValue(batchExport, camelName, pascalName) : undefined;
   return typeof value === "boolean" ? value : fallback;
-}
-
-export function cloneSettings(settings: SettingsLike) {
-  return JSON.parse(JSON.stringify(settings)) as Record<string, unknown>;
 }
 
 export function buildDocumentEmailSubject(
@@ -238,45 +182,6 @@ export function buildPackageTemplateViewsFromItems(
   }
 
   return views;
-}
-
-export function buildTemplateSelectOptions(templates: ApiReportTemplateDto[]) {
-  const options: Array<{ value: string; label: string }> = [];
-  const usedPaths = new Set<string>();
-
-  function addOption(path: string, label: string) {
-    const normalized = normalizePathForMatch(path);
-    if (!path || usedPaths.has(normalized)) {
-      return;
-    }
-
-    usedPaths.add(normalized);
-    options.push({
-      value: path,
-      label: label || fileNameFromPath(path),
-    });
-  }
-
-  for (const template of templates) {
-    addOption(template.templatePath, template.displayName || fileNameFromPath(template.templatePath));
-  }
-
-  if (options.length === 0) {
-    options.push({ value: "", label: "暂无可用模板" });
-  }
-
-  return options;
-}
-
-export function findFirstUnusedTemplate(templates: ApiReportTemplateDto[], items: BatchExportItemSetting[]) {
-  return templates.find(
-    (template) => !items.some((item) => pathsReferToSameTemplate(item.templatePath, template.templatePath)),
-  ) ?? templates[0];
-}
-
-export function readTemplateDisplayName(templatePath: string, templates: ApiReportTemplateDto[]) {
-  const template = templates.find((item) => pathsReferToSameTemplate(item.templatePath, templatePath));
-  return template?.displayName || fileNameFromPath(templatePath) || "新单证";
 }
 
 export function readBatchExportItems(settings?: SettingsLike): BatchExportItemSetting[] {

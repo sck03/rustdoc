@@ -18,27 +18,43 @@ const modelPath = path.join(
   "reports",
   "reportTemplateDesignerModel.ts",
 );
+const exportDefaultsModelPath = path.join(
+  repoRoot,
+  "apps",
+  "export-doc-web",
+  "src",
+  "features",
+  "reports",
+  "reportExportDefaultsModel.ts",
+);
 const stylesRoot = path.join(repoRoot, "apps", "export-doc-web", "src");
 const reportWorkspaceCss = readCssGraph(path.join(stylesRoot, "reportWorkspace.css"));
 const responsiveOverridesCss = readCssGraph(path.join(stylesRoot, "responsiveOverrides.css"));
 const workspaceStateSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "reportTemplateWorkspaceState.ts"), "utf8");
 const userPanelSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "ReportTemplateUserPanel.tsx"), "utf8");
+const exportDefaultsPanelSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "ReportExportDefaultsPanel.tsx"), "utf8");
+const invoicePreviewModelSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "invoiceReportPreviewModel.ts"), "utf8");
+const invoicePackageWorkspaceSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "useInvoiceDocumentPackageWorkspace.ts"), "utf8");
 const modelImportSpecifier = `./${path.relative(workspaceRoot, modelPath).replaceAll("\\", "/")}`;
+const exportDefaultsModelImportSpecifier = `./${path.relative(workspaceRoot, exportDefaultsModelPath).replaceAll("\\", "/")}`;
 
 fs.mkdirSync(workspaceRoot, { recursive: true });
 fs.writeFileSync(
   entryPath,
-  `export { readUserTemplateIdFromKey, readUserTemplateIdFromSearch, resolveDefaultTemplatePath, resolvePreviewSourceId } from ${JSON.stringify(modelImportSpecifier)};`,
+  [
+    `export { readUserTemplateIdFromKey, readUserTemplateIdFromSearch, resolveDefaultTemplatePath, resolvePreviewSourceId } from ${JSON.stringify(modelImportSpecifier)};`,
+    `export { resolveBatchExportItems } from ${JSON.stringify(exportDefaultsModelImportSpecifier)};`,
+  ].join("\n"),
   "utf8",
 );
 
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, platform: "node", format: "esm" });
-const { readUserTemplateIdFromKey, readUserTemplateIdFromSearch, resolveDefaultTemplatePath, resolvePreviewSourceId } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
+const { readUserTemplateIdFromKey, readUserTemplateIdFromSearch, resolveBatchExportItems, resolveDefaultTemplatePath, resolvePreviewSourceId } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
 
 const templates = [
-  { templatePath: "E:/app/Templates/Export/custom.html" },
-  { templatePath: "E:/app/Templates/Export/invoice_template.html" },
+  { templatePath: "E:/app/Templates/Export/custom.html", displayName: "自定义发票", reportType: "ExportDocument", withSealDefault: false },
+  { templatePath: "E:/app/Templates/Export/invoice_template.html", displayName: "发票", reportType: "ExportDocument", withSealDefault: true },
 ];
 
 assertEqual(
@@ -115,12 +131,32 @@ assertEqual(readUserTemplateIdFromSearch("?userTemplateId=17"), 17, "用户模�
 assertEqual(readUserTemplateIdFromSearch("?userTemplateId=invalid"), 0, "无效用户模板深链应回退");
 assertEqual(readUserTemplateIdFromKey("user-template:17"), 17, "统一用户模板引用应解析有效 ID");
 assertEqual(readUserTemplateIdFromKey("user:Export/template.html"), 0, "文件模板引用不应被解析为数据库模板");
+const implicitItems = resolveBatchExportItems([], templates);
+assertEqual(implicitItems.length, templates.length, "空配置应显示全部可用发票模板");
+assertEqual(implicitItems.every((item) => item.isEnabled), true, "空配置的全部可用发票模板应默认启用");
+assertEqual(implicitItems[0].name, templates[0].displayName, "隐式单据项应使用模板显示名称");
+assertEqual(implicitItems[0].showSeal, false, "隐式单据项应沿用模板盖章默认值");
+const configuredItems = [{ name: "商业发票", templatePath: templates[1].templatePath, isEnabled: false, showSeal: false, reportType: "ExportDocument" }];
+const configuredSnapshot = JSON.stringify(configuredItems);
+const effectiveConfiguredItems = resolveBatchExportItems(configuredItems, templates);
+assertEqual(JSON.stringify(effectiveConfiguredItems), configuredSnapshot, "显式配置应保留名称、顺序、启用和盖章状态");
+assertEqual(JSON.stringify(configuredItems), configuredSnapshot, "解析默认单据项不得修改输入配置");
 assertMatch(workspaceStateSource, /hasUnappliedDesignerChanges\s*=\s*[\s\S]*?designerDraftContent\s*!==\s*content/, "新版画布草稿必须独立识别为未应用修改");
 assertMatch(workspaceStateSource, /hasUnsavedChanges\s*=\s*hasChanges\s*\|\|\s*hasUnappliedDesignerChanges/, "保存和离开保护必须同时覆盖源码与画布草稿");
 assertMatch(workspaceStateSource, /canSave\s*=\s*[\s\S]*?hasUnsavedChanges/, "画布草稿存在时顶部保存必须可用");
 if (/<details[^>]*template-user-panel[^>]*\bopen\b/u.test(userPanelSource)) {
   throw new Error("我的 / 共享模板默认应保持折叠");
 }
+assertMatch(exportDefaultsPanelSource, /resolveBatchExportItems\(settings\.batchExport\.items,\s*templates\)/, "管理页应显示与高级导出一致的有效单据项");
+assertMatch(invoicePreviewModelSource, /resolveBatchExportItems\(readBatchExportItems\(settings\),\s*templates\)/, "发票高级导出应复用有效单据项模型");
+if (/updateSettings\s*\(/u.test(invoicePackageWorkspaceSource)) {
+  throw new Error("发票高级导出不得重新保存全局单据包设置");
+}
+assertMatch(exportDefaultsPanelSource, /<details[^>]*className="report-export-default-items"/, "发票单据项应使用可折叠区域");
+if (/<details[^>]*className="report-export-default-items"[^>]*\bopen\b/u.test(exportDefaultsPanelSource)) {
+  throw new Error("发票单据项默认应保持折叠");
+}
+assertMatch(exportDefaultsPanelSource, /enabledCount[\s\S]*?mergePdf[\s\S]*?zipAfterExport/, "折叠摘要应显示启用数量及 PDF/ZIP 默认值");
 
 assertMatch(
   reportWorkspaceCss,

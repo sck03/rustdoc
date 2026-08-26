@@ -18,15 +18,9 @@ import {
   buildDocumentEmailSubject,
   buildDocumentPackageDefaultFileName,
   buildPackageTemplateViewsFromItems,
-  buildSettingsWithBatchExportConfig,
-  buildTemplateSelectOptions,
-  createEmptyBatchExportConfigDraft,
   fileNameFromPath,
-  findFirstUnusedTemplate,
   formatDateForBatchExport,
-  readTemplateDisplayName,
 } from "./invoiceReportPreviewModel.ts";
-import type { BatchExportConfigDraft, BatchExportItemSetting } from "./invoiceReportPreviewModel.ts";
 
 type PackageTemplateState = { selected: boolean; withSeal: boolean };
 type Feedback = {
@@ -72,8 +66,6 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
   const [includeMergedPdf, setIncludeMergedPdf] = useState(true);
   const [mergePdfTouched, setMergePdfTouched] = useState(false);
   const [templateState, setTemplateState] = useState<Record<string, PackageTemplateState>>({});
-  const [configDraft, setConfigDraft] = useState<BatchExportConfigDraft>(() => createEmptyBatchExportConfigDraft());
-  const [configDirty, setConfigDirty] = useState(false);
   const [emailToAddress, setEmailToAddress] = useState(defaultToAddress ?? "");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailSubjectTouched, setEmailSubjectTouched] = useState(false);
@@ -81,13 +73,13 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
   const [emailBodyTouched, setEmailBodyTouched] = useState(false);
   const [emailIncludeMergedPdf, setEmailIncludeMergedPdf] = useState(false);
 
-  const packageTemplates = useMemo(
-    () => buildPackageTemplateViewsFromItems(templates, configDraft.items),
-    [configDraft.items, templates],
+  const configDefaults = useMemo(
+    () => buildBatchExportConfigDraft(settingsResponse?.settings, templates),
+    [settingsResponse?.settings, templates],
   );
-  const templateOptions = useMemo(
-    () => buildTemplateSelectOptions(templates),
-    [templates],
+  const packageTemplates = useMemo(
+    () => buildPackageTemplateViewsFromItems(templates, configDefaults.items),
+    [configDefaults.items, templates],
   );
   const documentEmailDate = useMemo(() => formatDateForBatchExport(new Date()), [invoiceId]);
   const defaultEmailSubject = useMemo(
@@ -100,23 +92,18 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
   );
 
   useEffect(() => {
-    if (!configDirty) setConfigDraft(buildBatchExportConfigDraft(settingsResponse?.settings, templates));
-  }, [configDirty, settingsResponse?.settings, templates]);
-
-  useEffect(() => {
     if (!packageTemplates.length) return;
-    setTemplateState((current) => {
+    setTemplateState(() => {
       const next: Record<string, PackageTemplateState> = {};
       for (const entry of packageTemplates) {
-        const existing = current[entry.template.templatePath];
         next[entry.template.templatePath] = {
-          selected: configDirty ? existing?.selected ?? entry.initiallySelected : entry.initiallySelected,
-          withSeal: configDirty ? existing?.withSeal ?? entry.withSealDefault : entry.withSealDefault,
+          selected: entry.initiallySelected,
+          withSeal: entry.withSealDefault,
         };
       }
       return next;
     });
-  }, [configDirty, packageTemplates]);
+  }, [packageTemplates]);
 
   useEffect(() => {
     const nextAddress = defaultToAddress?.trim() ?? "";
@@ -129,11 +116,11 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     if (!emailBodyTouched) setEmailBody(defaultEmailBody);
   }, [defaultEmailBody, emailBodyTouched]);
   useEffect(() => {
-    if (!mergePdfTouched) setIncludeMergedPdf(configDraft.mergePdf);
-  }, [configDraft.mergePdf, mergePdfTouched]);
+    if (!mergePdfTouched) setIncludeMergedPdf(configDefaults.mergePdf);
+  }, [configDefaults.mergePdf, mergePdfTouched]);
   useEffect(() => {
-    if (!createZipTouched) setCreateZip(configDraft.zipAfterExport);
-  }, [configDraft.zipAfterExport, createZipTouched]);
+    if (!createZipTouched) setCreateZip(configDefaults.zipAfterExport);
+  }, [configDefaults.zipAfterExport, createZipTouched]);
 
   const selectedTemplates = packageTemplates
     .filter((entry) => templateState[entry.template.templatePath]?.selected)
@@ -148,7 +135,7 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     templatePath: template.templatePath,
     withSeal: templateState[template.templatePath]?.withSeal ?? template.withSealDefault,
   }));
-  const defaultFileName = buildDocumentPackageDefaultFileName(configDraft, invoiceNo, customerName, invoiceId);
+  const defaultFileName = buildDocumentPackageDefaultFileName(configDefaults, invoiceNo, customerName, invoiceId);
 
   const previewMutation = useMutation({
     mutationFn: () => runAbortableOperation((signal) =>
@@ -205,104 +192,9 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     },
     onError: (error) => feedback.showError(readApiError(error)),
   });
-  const saveConfigMutation = useMutation({
-    mutationFn: (draft: BatchExportConfigDraft) => runAbortableOperation((signal) => {
-      if (!settingsResponse) {
-        throw new Error("系统设置尚未加载完成，请稍后重试。");
-      }
-
-      return client.updateSettings({
-        body: { settings: buildSettingsWithBatchExportConfig(settingsResponse.settings, draft), updateSecrets: false },
-      }, { signal });
-    }),
-    onSuccess: async (response) => {
-      const nextDraft = buildBatchExportConfigDraft(response.settings, templates);
-      setConfigDraft(nextDraft);
-      setConfigDirty(false);
-      setMergePdfTouched(false);
-      setCreateZipTouched(false);
-      setIncludeMergedPdf(nextDraft.mergePdf);
-      setCreateZip(nextDraft.zipAfterExport);
-      feedback.showStatus(response.message || "单据包配置已保存。");
-      queryClient.setQueryData<ApiSettingsResponse>(queryKeys.settings(), {
-        secrets: response.secrets,
-        settings: response.settings,
-        storagePolicy: settingsResponse?.storagePolicy ?? "",
-      });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
-    },
-    onError: (error) => feedback.showError(readApiError(error)),
-  });
-
   function clearGeneratedOutput() {
     setPreview(null);
     feedback.clear();
-  }
-  function updateSelectionFromConfig(previousTemplatePath: string, item: BatchExportItemSetting) {
-    setTemplateState((current) => {
-      const next = { ...current };
-      if (previousTemplatePath && previousTemplatePath !== item.templatePath) delete next[previousTemplatePath];
-      if (item.templatePath) next[item.templatePath] = { selected: item.isEnabled, withSeal: item.showSeal };
-      return next;
-    });
-  }
-  function updateConfig(patch: Partial<Omit<BatchExportConfigDraft, "items">>) {
-    setConfigDraft((current) => ({ ...current, ...patch }));
-    setConfigDirty(true);
-    clearGeneratedOutput();
-  }
-  function updateConfigItem(index: number, patch: Partial<BatchExportItemSetting>) {
-    const previousItem = configDraft.items[index];
-    if (!previousItem) return;
-    const nextItem = { ...previousItem, ...patch };
-    if (patch.templatePath !== undefined && patch.name === undefined && !previousItem.name.trim()) {
-      nextItem.name = readTemplateDisplayName(patch.templatePath, templates);
-    }
-    setConfigDraft((current) => ({
-      ...current,
-      items: current.items.map((item, itemIndex) => itemIndex === index ? nextItem : item),
-    }));
-    updateSelectionFromConfig(previousItem.templatePath, nextItem);
-    setConfigDirty(true);
-    clearGeneratedOutput();
-  }
-  function addConfigItem() {
-    const template = findFirstUnusedTemplate(templates, configDraft.items);
-    const nextItem: BatchExportItemSetting = {
-      name: template?.displayName || fileNameFromPath(template?.templatePath ?? "") || "新单证",
-      templatePath: template?.templatePath ?? "",
-      isEnabled: true,
-      showSeal: template?.withSealDefault ?? true,
-      reportType: "ExportDocument",
-    };
-    setConfigDraft((current) => ({ ...current, items: [...current.items, nextItem] }));
-    updateSelectionFromConfig("", nextItem);
-    setConfigDirty(true);
-    clearGeneratedOutput();
-  }
-  function removeConfigItem(index: number) {
-    const removedItem = configDraft.items[index];
-    if (!removedItem) return;
-    setConfigDraft((current) => ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }));
-    setTemplateState((current) => {
-      const next = { ...current };
-      delete next[removedItem.templatePath];
-      return next;
-    });
-    setConfigDirty(true);
-    clearGeneratedOutput();
-  }
-  function moveConfigItem(index: number, offset: -1 | 1) {
-    const targetIndex = index + offset;
-    if (targetIndex < 0 || targetIndex >= configDraft.items.length) return;
-    setConfigDraft((current) => {
-      const items = [...current.items];
-      const [item] = items.splice(index, 1);
-      items.splice(targetIndex, 0, item);
-      return { ...current, items };
-    });
-    setConfigDirty(true);
-    clearGeneratedOutput();
   }
   async function pickDestination() {
     try {
@@ -324,17 +216,14 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     createZip,
     includeMergedPdf,
     templateState,
-    configDraft,
-    configDirty,
     packageTemplates,
-    templateOptions,
     selectedTemplates,
     defaultFileName,
     emailToAddress,
     emailSubject,
     emailBody,
     emailIncludeMergedPdf,
-    isPending: previewMutation.isPending || packageMutation.isPending || emailMutation.isPending || saveConfigMutation.isPending,
+    isPending: previewMutation.isPending || packageMutation.isPending || emailMutation.isPending,
     clearPreview: () => setPreview(null),
     changeTemplateSelected(templatePath: string, selected: boolean) {
       setTemplateState((current) => ({
@@ -350,12 +239,6 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
       }));
       clearGeneratedOutput();
     },
-    updateConfig,
-    updateConfigItem,
-    addConfigItem,
-    removeConfigItem,
-    moveConfigItem,
-    saveConfig: () => saveConfigMutation.mutate(configDraft),
     previewPackage: () => previewMutation.mutate(),
     generatePackage: () => packageMutation.mutate(),
     pickDestination,

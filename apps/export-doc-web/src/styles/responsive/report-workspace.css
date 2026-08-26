@@ -61,6 +61,15 @@
     flex-direction: column;
   }
 
+  .report-export-default-items-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .report-export-default-items-summary > small {
+    white-space: normal;
+  }
+
   .report-export-default-item {
     grid-template-columns: auto minmax(0, 1fr) repeat(3, 30px);
   }
