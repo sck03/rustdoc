@@ -40,6 +40,8 @@ Tauri CLI 由当前 Node 直接启动 `apps/export-doc-tauri/node_modules/@tauri
 
 公开仓库不提交 Chromium 二进制。`run-tests.ps1` 找不到程序根 Chromium 或 `EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE` 时，会明确跳过两个真实 PDF 浏览器测试；正式发布验收使用 `-RequireBrowserPdfTests`，缺少渲染器即失败。测试默认执行 restore，只有确认依赖已还原时才使用 `-NoRestore`。
 
+Windows x64 绿色版构建使用 `WebView2Runtime/` 下的微软官方 Evergreen Standalone Installer。该目录跟踪 `README.md` 和固定版本、大小、SHA-256、下载地址的 `webview2-runtime.json`，约 203 MiB 的安装器本身被 Git 忽略；`provision-webview2-runtime.ps1` 会复用已有安装器或按清单从微软 HTTPS 地址下载，并严格验证 Microsoft Authenticode 签名、文件元数据、体积和 SHA-256。便携程序在创建窗口前由 Rust 预检 Windows 10 1809（内部版本 17763）和 WebView2，缺失时经用户确认打开随包安装程序，安装完成后重新检测。安装器只进入绿色包，不重复进入使用 Evergreen bootstrapper 的 NSIS 安装版；不要把它放入 `App_Data`，也不要在程序目录中自动删除正式发布资产。
+
 当前不使用 `.github/dependabot.yml` 自动创建依赖更新 PR。NuGet、npm、Cargo、Docker 和 Actions 版本由维护者集中审查后人工升级，避免一次更新触发大量分支和云端构建。
 
 双击 `.cmd` 后窗口会一直保留，最后明确显示成功或失败及退出码，按任意键关闭。构建环境有问题时，错误信息不会一闪而过。

@@ -3,10 +3,13 @@ param(
     [Parameter(Mandatory = $true)][string]$PackageRoot,
     [Parameter(Mandatory = $true)][ValidateSet("Desktop", "Server", "Container")][string]$Profile,
     [Parameter(Mandatory = $true)][string]$RuntimeIdentifier,
-    [ValidateSet("Document", "Sales", "Full")][string]$Edition = "Full"
+    [ValidateSet("Document", "Sales", "Full")][string]$Edition = "Full",
+    [switch]$RequireWebView2RuntimeInstaller
 )
 
 $ErrorActionPreference = "Stop"
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $scriptRoot "lib\webview2-runtime-support.ps1")
 $root = [IO.Path]::GetFullPath($PackageRoot)
 if (-not (Test-Path -LiteralPath $root -PathType Container)) { throw "Package root does not exist: $root" }
 $requiresDocumentResources = $true
@@ -120,6 +123,24 @@ if ($Profile -eq "Desktop") {
     if ($playwrightRoots.Count -ne $expectedPlaywrightRootCount) {
         throw "Desktop/$Edition payload expected $expectedPlaywrightRootCount Playwright runtime root, found $($playwrightRoots.Count)."
     }
+}
+
+if ($RequireWebView2RuntimeInstaller) {
+    if ($Profile -ne "Desktop" -or $RuntimeIdentifier -ne "win-x64") {
+        throw "The bundled WebView2 Runtime installer is currently supported only for the Windows x64 desktop portable payload."
+    }
+
+    $webView2Root = Join-Path $root "WebView2Runtime"
+    $webView2Installer = Join-Path $webView2Root "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+    $webView2ManifestPath = Join-Path $webView2Root "webview2-runtime.json"
+    foreach ($requiredPath in @($webView2Installer, $webView2ManifestPath, (Join-Path $webView2Root "README.md"))) {
+        if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
+            throw "Windows x64 portable payload is missing a WebView2 prerequisite asset: $requiredPath"
+        }
+    }
+
+    $webView2Release = Read-ExportDocWebView2Release -ManifestPath $webView2ManifestPath
+    Assert-ExportDocWebView2Installer -Path $webView2Installer -Release $webView2Release | Out-Null
 }
 
 $moduleAssemblies = [ordered]@{

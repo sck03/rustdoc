@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-25",
+  "capturedAt": "2026-08-27",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -36,9 +36,9 @@
       ],
       "filePattern": "^.+\\.rs$",
       "maximumLines": 1000,
-      "baselineAggregateLines": 9445,
+      "baselineAggregateLines": 9909,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 9520,
+      "maximumAggregateLines": 9984,
       "reportFiles": false
     },
     {
@@ -56,9 +56,9 @@
       "directories": ["scripts", "deploy", ".github/workflows"],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 40377,
+      "baselineAggregateLines": 40538,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 40527,
+      "maximumAggregateLines": 40688,
       "reportFiles": false
     },
     {
@@ -166,6 +166,24 @@
       "filePattern": "^sidecar(?:_endpoint|_process|_shutdown)?\\.rs$",
       "maximumLines": 360,
       "maximumAggregateLines": 900
+    },
+    {
+      "name": "Windows desktop prerequisite module",
+      "directory": "apps/export-doc-tauri/src-tauri/src",
+      "filePattern": "^webview2_runtime\\.rs$",
+      "maximumLines": 450
+    },
+    {
+      "name": "Windows WebView2 provisioning entry",
+      "directory": "scripts",
+      "filePattern": "^provision-webview2-runtime\\.ps1$",
+      "maximumLines": 150
+    },
+    {
+      "name": "Windows WebView2 verification helper",
+      "directory": "scripts/lib",
+      "filePattern": "^webview2-runtime-support\\.ps1$",
+      "maximumLines": 120
     },
     {
       "name": "Excel analyzer Rust modules",

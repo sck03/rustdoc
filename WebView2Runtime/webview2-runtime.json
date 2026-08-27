@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "fileName": "MicrosoftEdgeWebView2RuntimeInstallerX64.exe",
+  "architecture": "x64",
+  "bytes": 213044432,
+  "sha256": "358a11cff88ce519301c3b60bcefe848f922688ab0a333fc0f18ddf83bb3b4f3",
+  "fileVersion": "1.3.263.3",
+  "source": "Microsoft official Evergreen Standalone Installer",
+  "sourceUrl": "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/89620190-81af-46a2-bb59-6228918a312e/MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+}

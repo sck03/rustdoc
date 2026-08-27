@@ -335,6 +335,7 @@ $resourcesRoot = Join-Path $artifactsRoot "tauri-bundle\resources"
 $mainExe = Join-Path $resolvedCargoTargetDir "release\export-doc-tauri.exe"
 $licenseExe = if ($IncludeLicenseKeygen) { Join-Path $resolvedLicenseCargoTargetDir "release\export-doc-license-keygen-tauri.exe" } else { $null }
 $mainWebView2Loader = Join-Path $resourcesRoot "WebView2Loader.dll"
+$webView2RuntimeRoot = Join-Path $repoRoot "WebView2Runtime"
 $licenseWebView2Loader = if ($IncludeLicenseKeygen) { Join-Path $resolvedLicenseCargoTargetDir "release\WebView2Loader.dll" } else { $null }
 $sourceEditionManifestPath = Join-Path $resourcesRoot "product-edition.json"
 if (-not (Test-Path -LiteralPath $sourceEditionManifestPath -PathType Leaf)) {
@@ -386,6 +387,9 @@ $includedEntries = @(
     "product-edition.json",
     "WebView2Loader.dll"
 )
+if (Test-Path -LiteralPath $webView2RuntimeRoot -PathType Container) {
+    $includedEntries += "WebView2Runtime"
+}
 if ([bool]$resourceProfile.documentResources) {
     $includedEntries += @("Templates", "Resources")
 }
@@ -399,7 +403,7 @@ if ([bool]$resourceProfile.excelAnalyzer) {
     $includedEntries += "Tools"
 }
 
-foreach ($entryName in @("sidecar", "Templates", "Resources", "OcrModels", "Browsers", "Tools", "Legal", "runtime-layout.json", "product-edition.json", "WebView2Loader.dll")) {
+foreach ($entryName in @("sidecar", "Templates", "Resources", "OcrModels", "Browsers", "Tools", "Legal", "WebView2Runtime", "runtime-layout.json", "product-edition.json", "WebView2Loader.dll")) {
     $entryDestination = Join-Path $resolvedOutputDir $entryName
     if (Test-Path -LiteralPath $entryDestination) {
         Remove-GeneratedEntry -Path $entryDestination -Root $resolvedOutputDir -Purpose "stale packaged $entryName entry" -QuarantineRoot $cleanupQuarantineRoot
@@ -414,7 +418,7 @@ foreach ($entryName in @("sidecar", "Templates", "Resources", "OcrModels", "Brow
         continue
     }
 
-    $entrySource = Join-Path $resourcesRoot $entryName
+    $entrySource = if ($entryName -eq "WebView2Runtime") { $webView2RuntimeRoot } else { Join-Path $resourcesRoot $entryName }
     Copy-RequiredEntry -Source $entrySource -Destination $entryDestination
 }
 

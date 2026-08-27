@@ -125,7 +125,8 @@ foreach ($edition in @("Document", "Sales", "Full")) {
         "-PackageRoot", $editionRoot,
         "-Profile", "Desktop",
         "-RuntimeIdentifier", "win-x64",
-        "-Edition", $edition
+        "-Edition", $edition,
+        "-RequireWebView2RuntimeInstaller"
     )
     $first = $false
 }

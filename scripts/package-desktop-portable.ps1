@@ -118,11 +118,16 @@ function Write-ChecksumManifest {
 function Invoke-PayloadVerification {
     param([string]$PayloadRoot)
 
-    & (Join-Path $PSScriptRoot "verify-package-payload.ps1") `
-        -PackageRoot $PayloadRoot `
-        -Profile Desktop `
-        -RuntimeIdentifier $RuntimeIdentifier `
-        -Edition $Edition
+    $arguments = @{
+        PackageRoot = $PayloadRoot
+        Profile = "Desktop"
+        RuntimeIdentifier = $RuntimeIdentifier
+        Edition = $Edition
+    }
+    if ($Platform -eq "windows") {
+        $arguments.RequireWebView2RuntimeInstaller = $true
+    }
+    & (Join-Path $PSScriptRoot "verify-package-payload.ps1") @arguments
 }
 
 function Resolve-MacOsBundleExecutable {
@@ -230,6 +235,7 @@ $archiveExtension = if ($Platform -eq "windows") { ".zip" } else { ".tar.gz" }
 
 switch ($Platform) {
     "windows" {
+        & (Join-Path $PSScriptRoot "provision-webview2-runtime.ps1")
         $sourceExecutable = Join-Path $releaseRoot "export-doc-tauri.exe"
         if (-not (Test-Path -LiteralPath $sourceExecutable -PathType Leaf)) {
             throw "Windows Tauri executable was not found: $sourceExecutable"
@@ -237,6 +243,7 @@ switch ($Platform) {
         $entryPoint = "ExportDocManager.exe"
         Copy-Item -LiteralPath $sourceExecutable -Destination (Join-Path $stagingRoot $entryPoint) -Force
         Copy-DirectoryContents -Source $resourceRoot -Destination $stagingRoot
+        Copy-Item -LiteralPath (Join-Path $repoRoot "WebView2Runtime") -Destination (Join-Path $stagingRoot "WebView2Runtime") -Recurse -Force
         $payloadVerificationRoot = $stagingRoot
         $launchExecutablePath = Join-Path $stagingRoot $entryPoint
     }
@@ -323,13 +330,14 @@ Copy-Item -LiteralPath $versionManifestPath -Destination (Join-Path $stagingRoot
     archiveFormat = $archiveExtension.TrimStart('.')
     selfContainedApi = $true
     bundledReportBrowser = [bool]$editionMetadata.resourceProfile.browserRenderer
+    bundledWebView2Installer = $Platform -eq "windows"
     systemSigned = $false
     notarized = $false
     dataRoot = "App_Data"
 } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $stagingRoot "portable-package.json") -Encoding utf8
 
 $launchInstruction = switch ($Platform) {
-    "windows" { "双击 ExportDocManager.exe。" }
+    "windows" { "双击 ExportDocManager.exe；程序会先检查 Windows 版本和 WebView2 Runtime，缺失时可使用随包的微软官方离线安装器。" }
     "linux" { "运行 ./$entryPoint；若系统没有 FUSE，可在本次启动前设置 APPIMAGE_EXTRACT_AND_RUN=1。" }
     "macos" { "打开 $entryPoint；当前阶段按要求未执行 Developer ID 签名或 Apple 公证。" }
 }
@@ -341,7 +349,7 @@ ExportDocManager 绿色便携版
 平台：$Platform $Architecture
 启动：$launchInstruction
 
-无需安装。首次启动会在解包目录旁创建 App_Data。
+程序本体无需安装。Windows 缺少 WebView2 Runtime 时，经你确认后会安装微软官方运行组件。首次启动会在解包目录旁创建 App_Data。
 备份或迁移时，请先退出程序，再复制完整解包目录。
 本交付包不预置数据库、密码、许可证、日志或用户配置。
 "@ | Set-Content -LiteralPath (Join-Path $stagingRoot "PORTABLE_README.txt") -Encoding utf8

@@ -28,6 +28,7 @@ mod sidecar_endpoint;
 mod sidecar_process;
 mod sidecar_shutdown;
 mod tauri_updater_commands;
+mod webview2_runtime;
 mod window;
 
 static RUNTIME_DIAGNOSTIC_LOG_ROOT: OnceLock<PathBuf> = OnceLock::new();
@@ -36,6 +37,20 @@ const DESKTOP_ACCESS_TOKEN_ENVIRONMENT_VARIABLE: &str = "EXPORTDOCMANAGER_DESKTO
 
 fn main() {
     install_panic_log_hook();
+    match webview2_runtime::ensure_available() {
+        Ok(webview2_runtime::StartupDecision::Continue) => {}
+        Ok(webview2_runtime::StartupDecision::Exit) => return,
+        Err(error) => {
+            let _ = write_tauri_error(&format!("Windows prerequisite check failed: {error}"));
+            let _ = rfd::MessageDialog::new()
+                .set_level(rfd::MessageLevel::Error)
+                .set_title("程序启动失败")
+                .set_description(format!("程序启动前检查失败：{error}"))
+                .set_buttons(rfd::MessageButtons::Ok)
+                .show();
+            std::process::exit(1);
+        }
+    }
     if let Err(error) = run_tauri_app() {
         let _ = write_tauri_error(&format!("Tauri startup failed: {error}"));
         let bootstrap_log_path = write_bootstrap_error(&error);

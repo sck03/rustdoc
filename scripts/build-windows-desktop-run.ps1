@@ -168,6 +168,7 @@ if (-not [string]::IsNullOrWhiteSpace($env:RUSTUP_HOME)) {
 }
 
 $powerShellExecutable = Resolve-ExportDocPowerShellExecutable
+$webView2Provisioner = Join-Path $scriptRoot "provision-webview2-runtime.ps1"
 
 if ($PreflightOnly) {
     [pscustomobject]@{
@@ -213,6 +214,11 @@ if (-not $SkipMainBuild) {
     Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments $mainBuildArgs
 }
 
+Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments @(
+    "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
+    "-File", $webView2Provisioner
+)
+
 if ($IncludeLicenseKeygen) {
     New-Item -ItemType Directory -Path $resolvedLicenseCargoTargetDir -Force | Out-Null
     $previousCargoTargetDir = $env:CARGO_TARGET_DIR
@@ -257,7 +263,8 @@ Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments @(
     "-PackageRoot", $resolvedOutputDir,
     "-Profile", "Desktop",
     "-RuntimeIdentifier", "win-x64",
-    "-Edition", $ProductEdition
+    "-Edition", $ProductEdition,
+    "-RequireWebView2RuntimeInstaller"
 )
 
 if (-not $SkipLaunchSmoke) {

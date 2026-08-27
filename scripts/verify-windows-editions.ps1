@@ -58,7 +58,8 @@ foreach ($edition in @("Document", "Sales", "Full")) {
         "-PackageRoot", $editionRoot,
         "-Profile", "Desktop",
         "-RuntimeIdentifier", "win-x64",
-        "-Edition", $edition
+        "-Edition", $edition,
+        "-RequireWebView2RuntimeInstaller"
     )
     $portableManifestPath = Join-Path $editionRoot "portable-runtime.json"
     $portableManifest = Get-Content -LiteralPath $portableManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json

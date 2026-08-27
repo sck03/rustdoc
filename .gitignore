@@ -26,6 +26,7 @@ Resources/Fonts/OpenSource/*.otf
 WebView2Runtime/**
 !WebView2Runtime/
 !WebView2Runtime/README.md
+!WebView2Runtime/webview2-runtime.json
 **/runtime-paths.json
 **/__codex_bin/
 **/__codex_obj/
