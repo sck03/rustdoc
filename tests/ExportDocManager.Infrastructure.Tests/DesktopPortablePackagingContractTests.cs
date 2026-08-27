@@ -33,8 +33,11 @@ public sealed class DesktopPortablePackagingContractTests
         string script = Read(root, "scripts", "package-desktop-portable.ps1");
 
         Assert.Contains("verify-package-payload.ps1", script, StringComparison.Ordinal);
-        Assert.Contains("-Profile Desktop", script, StringComparison.Ordinal);
-        Assert.Contains("-Edition $Edition", script, StringComparison.Ordinal);
+        Assert.Contains("Profile = \"Desktop\"", script, StringComparison.Ordinal);
+        Assert.Contains("Edition = $Edition", script, StringComparison.Ordinal);
+        Assert.Contains("$arguments.RequireWebView2RuntimeInstaller = $true", script, StringComparison.Ordinal);
+        Assert.Contains("provision-webview2-runtime.ps1", script, StringComparison.Ordinal);
+        Assert.Contains("bundledWebView2Installer = $Platform -eq \"windows\"", script, StringComparison.Ordinal);
         Assert.Contains("portable-runtime.json", script, StringComparison.Ordinal);
         Assert.Contains("portable-package.json", script, StringComparison.Ordinal);
         Assert.Contains("version.json", script, StringComparison.Ordinal);
