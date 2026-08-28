@@ -23,6 +23,7 @@ export function useBusinessDateSessionRefresh({
   setSession,
 }: BusinessDateSessionRefreshOptions) {
   const activeRefreshRef = useRef<Promise<void> | null>(null);
+  const skipInitialRefreshRef = useRef(true);
   const accessToken = session?.accessToken;
 
   const refreshCurrentUser = useCallback(() => {
@@ -60,6 +61,14 @@ export function useBusinessDateSessionRefresh({
   }, [accessToken, client, desktopContextLoading, queryClient, sessionRef, setSession]);
 
   useEffect(() => {
+    // The login response and desktop context already include the user object,
+    // so skip the immediate refresh on first mount to avoid a redundant
+    // /api/auth/me round-trip that delays the initial dashboard render.
+    // Subsequent mount changes (token rotation, reconnection) still refresh.
+    if (skipInitialRefreshRef.current) {
+      skipInitialRefreshRef.current = false;
+      return;
+    }
     void refreshCurrentUser();
   }, [refreshCurrentUser]);
 

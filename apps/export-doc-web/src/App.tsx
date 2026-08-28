@@ -417,6 +417,7 @@ function App() {
         apiBaseUrl,
         user: response.user,
       };
+      const defaultRoute = getDefaultWorkspaceRoute(response.user.capabilities);
       setSession(nextSession);
       setWorkspaceNotice(null);
       setSessionAttentionState(null);
@@ -427,7 +428,26 @@ function App() {
       setBootstrapToken("");
       queryClient.clear();
       setLoginState("ready");
-      navigate(getDefaultWorkspaceRoute(response.user.capabilities), { replace: true });
+      // Prefetch the dashboard data in parallel with route navigation so the
+      // landing page renders with data already cached instead of waiting for
+      // the lazy chunk to load before the first query can even start.
+      const prefetchClient = createExportDocManagerApiClient({
+        baseUrl: apiBaseUrl,
+        accessToken: () => nextSession.accessToken,
+        desktopAccessToken: () => desktopAccessToken,
+      });
+      if (defaultRoute === "/crm/dashboard") {
+        void queryClient.prefetchQuery({
+          queryKey: queryKeys.crmDashboard(),
+          queryFn: ({ signal }) => prefetchClient.getCrmDashboard({ signal }),
+        });
+      } else {
+        void queryClient.prefetchQuery({
+          queryKey: queryKeys.dashboard(),
+          queryFn: ({ signal }) => prefetchClient.getDashboard({ signal }),
+        });
+      }
+      navigate(defaultRoute, { replace: true });
     } catch (error) {
       setLoginState("error");
       setMessage(readApiError(error));

@@ -242,10 +242,11 @@ namespace ExportDocManager.Services.Infrastructure
             AppDbContext context,
             CancellationToken cancellationToken)
         {
-            await context.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", cancellationToken).ConfigureAwait(false);
-            await context.Database.ExecuteSqlRawAsync("PRAGMA synchronous=NORMAL;", cancellationToken).ConfigureAwait(false);
-            await context.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout=10000;", cancellationToken).ConfigureAwait(false);
-            await context.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys=ON;", cancellationToken).ConfigureAwait(false);
+            // SQLite executes multiple PRAGMA statements in a single batch,
+            // reducing four round-trips to one during first-login cold start.
+            await context.Database.ExecuteSqlRawAsync(
+                "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=10000; PRAGMA foreign_keys=ON;",
+                cancellationToken).ConfigureAwait(false);
         }
 
         private static AppDbContext CreatePostgreSqlContext(
