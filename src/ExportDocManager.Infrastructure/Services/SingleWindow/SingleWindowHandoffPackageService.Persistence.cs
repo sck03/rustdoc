@@ -4,7 +4,7 @@ namespace ExportDocManager.Services.SingleWindow
 {
     public sealed partial class SingleWindowHandoffPackageService
     {
-        private async Task<int> TryPersistCustomsCooDocumentAsync(
+        private async Task<SingleWindowDocumentPersistenceResult> TryPersistCustomsCooDocumentAsync(
             CooSourceSnapshot source,
             CooMappedDocument mapped,
             CancellationToken cancellationToken)
@@ -15,7 +15,7 @@ namespace ExportDocManager.Services.SingleWindow
                 cancellationToken);
         }
 
-        private async Task<int> TryPersistAgentConsignmentDocumentAsync(
+        private async Task<SingleWindowDocumentPersistenceResult> TryPersistAgentConsignmentDocumentAsync(
             AcdSourceSnapshot source,
             AcdMappedDocument mapped,
             CancellationToken cancellationToken)

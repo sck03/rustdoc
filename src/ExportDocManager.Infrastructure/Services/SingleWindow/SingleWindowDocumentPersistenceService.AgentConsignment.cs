@@ -39,79 +39,123 @@ namespace ExportDocManager.Services.SingleWindow
         async Task<int> IAgentConsignmentDocumentService.SaveAsync(AgentConsignmentDocument document, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(document);
+            bool attemptedInsert = false;
 
-            return await AppDbContextExecution.ExecuteInTransactionAsync(
-                _contextFactory,
-                async (context, _) =>
-                {
-                    var source = await LoadEditorSourceContextAsync(context, document.SourceInvoiceId, cancellationToken).ConfigureAwait(false);
-
-                    var defaultsDocument = CreateAgentConsignmentEditorDocument(
-                        document.SourceInvoiceId,
-                        source.Invoice,
-                        source.InvoiceItems,
-                        source.Customer,
-                        source.Exporter,
-                        null);
-                    var lockedFields = SingleWindowDraftStateHelper.BuildAgentConsignmentLockedFields(document, defaultsDocument);
-                    string baselineJson = SingleWindowDraftStateHelper.BuildAgentConsignmentSourceBaselineJson(defaultsDocument);
-
-                    var entity = await context.AgentConsignmentDocuments
-                        .FirstOrDefaultAsync(item => item.SourceInvoiceId == document.SourceInvoiceId, cancellationToken)
-                        .ConfigureAwait(false);
-
-                    entity ??= new AgentConsignmentDocument
+            try
+            {
+                return await AppDbContextExecution.ExecuteInTransactionAsync(
+                    _contextFactory,
+                    async (context, _) =>
                     {
-                        SourceInvoiceId = document.SourceInvoiceId
-                    };
+                        var source = await LoadEditorSourceContextAsync(context, document.SourceInvoiceId, cancellationToken).ConfigureAwait(false);
 
-                    entity.InvoiceNo = source.Invoice.InvoiceNo ?? string.Empty;
-                    entity.ContractNo = source.Invoice.ContractNo ?? string.Empty;
-                    entity.Status = SingleWindowDraftMetadataHelper.ResolveStatusForSave(document.Status);
-                    entity.CopCusCode = document.CopCusCode?.Trim() ?? string.Empty;
-                    entity.Sign = document.Sign?.Trim() ?? string.Empty;
-                    entity.OperType = string.IsNullOrWhiteSpace(document.OperType) ? "1" : document.OperType.Trim();
-                    entity.GName = document.GName?.Trim() ?? string.Empty;
-                    entity.CodeTS = document.CodeTS?.Trim() ?? string.Empty;
-                    entity.DeclTotal = document.DeclTotal?.Trim() ?? string.Empty;
-                    entity.IEDate = document.IEDate?.Trim() ?? string.Empty;
-                    entity.ListNo = document.ListNo?.Trim() ?? string.Empty;
-                    entity.TradeMode = document.TradeMode?.Trim() ?? string.Empty;
-                    entity.OriCountry = document.OriCountry?.Trim() ?? string.Empty;
-                    entity.TradeCode = document.TradeCode?.Trim() ?? string.Empty;
-                    entity.AgentCode = document.AgentCode?.Trim() ?? string.Empty;
-                    entity.Curr = document.Curr?.Trim() ?? string.Empty;
-                    entity.QtyOrWeight = document.QtyOrWeight?.Trim() ?? string.Empty;
-                    entity.PackingCondition = document.PackingCondition?.Trim() ?? string.Empty;
-                    entity.OtherNote = document.OtherNote?.Trim() ?? string.Empty;
-                    entity.ConsignTele = document.ConsignTele?.Trim() ?? string.Empty;
-                    entity.EntryId = document.EntryId?.Trim() ?? string.Empty;
-                    entity.ReceiveDate = document.ReceiveDate?.Trim() ?? string.Empty;
-                    entity.PaperInfo = document.PaperInfo?.Trim() ?? string.Empty;
-                    entity.OtherRecInfo = document.OtherRecInfo?.Trim() ?? string.Empty;
-                    entity.DeclarePrice = document.DeclarePrice?.Trim() ?? string.Empty;
-                    entity.PromiseNote = document.PromiseNote?.Trim() ?? string.Empty;
-                    entity.DeclTele = document.DeclTele?.Trim() ?? string.Empty;
-                    entity.WarningSummary = document.WarningSummary?.Trim() ?? string.Empty;
-                    entity.WarningCount = SingleWindowDraftMetadataHelper.CountWarnings(entity.WarningSummary);
-                    entity.DraftRevision = entity.Id <= 0 ? 1 : Math.Max(1, entity.DraftRevision + 1);
-                    entity.ManualLockedFieldsJson = SingleWindowDraftStateHelper.SerializeLockedFields(lockedFields);
-                    entity.SourceBaselineJson = baselineJson;
-                    entity.SourceBaselineHash = SingleWindowDraftStateHelper.ComputeBaselineHash(baselineJson);
-                    entity.LastGeneratedAt = _clock.UtcNow;
+                        var defaultsDocument = CreateAgentConsignmentEditorDocument(
+                            document.SourceInvoiceId,
+                            source.Invoice,
+                            source.InvoiceItems,
+                            source.Customer,
+                            source.Exporter,
+                            null);
+                        var lockedFields = SingleWindowDraftStateHelper.BuildAgentConsignmentLockedFields(document, defaultsDocument);
+                        string baselineJson = SingleWindowDraftStateHelper.BuildAgentConsignmentSourceBaselineJson(defaultsDocument);
 
-                    if (entity.Id <= 0)
-                    {
-                        await context.AgentConsignmentDocuments.AddAsync(entity, cancellationToken).ConfigureAwait(false);
-                    }
+                        var entity = await context.AgentConsignmentDocuments
+                            .FirstOrDefaultAsync(item => item.SourceInvoiceId == document.SourceInvoiceId, cancellationToken)
+                            .ConfigureAwait(false);
 
-                    await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                    return entity.Id;
-                },
-                cancellationToken).ConfigureAwait(false);
+                        bool isNew = entity == null;
+                        int currentRevision = entity == null
+                            ? 0
+                            : SingleWindowDraftConcurrency.ValidateExpectedRevision(
+                                entity,
+                                document.SourceInvoiceId,
+                                document.ExpectedDraftRevision);
+                        if (entity == null)
+                        {
+                            SingleWindowDraftConcurrency.ValidateNewExpectedRevision(
+                                document.SourceInvoiceId,
+                                document.ExpectedDraftRevision);
+                            entity = new AgentConsignmentDocument
+                            {
+                                SourceInvoiceId = document.SourceInvoiceId
+                            };
+                        }
+
+                        entity.InvoiceNo = source.Invoice.InvoiceNo ?? string.Empty;
+                        entity.ContractNo = source.Invoice.ContractNo ?? string.Empty;
+                        entity.Status = SingleWindowDraftMetadataHelper.ResolveStatusForSave(document.Status);
+                        entity.CopCusCode = document.CopCusCode?.Trim() ?? string.Empty;
+                        entity.Sign = document.Sign?.Trim() ?? string.Empty;
+                        entity.OperType = string.IsNullOrWhiteSpace(document.OperType) ? "1" : document.OperType.Trim();
+                        entity.GName = document.GName?.Trim() ?? string.Empty;
+                        entity.CodeTS = document.CodeTS?.Trim() ?? string.Empty;
+                        entity.DeclTotal = document.DeclTotal?.Trim() ?? string.Empty;
+                        entity.IEDate = document.IEDate?.Trim() ?? string.Empty;
+                        entity.ListNo = document.ListNo?.Trim() ?? string.Empty;
+                        entity.TradeMode = document.TradeMode?.Trim() ?? string.Empty;
+                        entity.OriCountry = document.OriCountry?.Trim() ?? string.Empty;
+                        entity.TradeCode = document.TradeCode?.Trim() ?? string.Empty;
+                        entity.AgentCode = document.AgentCode?.Trim() ?? string.Empty;
+                        entity.Curr = document.Curr?.Trim() ?? string.Empty;
+                        entity.QtyOrWeight = document.QtyOrWeight?.Trim() ?? string.Empty;
+                        entity.PackingCondition = document.PackingCondition?.Trim() ?? string.Empty;
+                        entity.OtherNote = document.OtherNote?.Trim() ?? string.Empty;
+                        entity.ConsignTele = document.ConsignTele?.Trim() ?? string.Empty;
+                        entity.EntryId = document.EntryId?.Trim() ?? string.Empty;
+                        entity.ReceiveDate = document.ReceiveDate?.Trim() ?? string.Empty;
+                        entity.PaperInfo = document.PaperInfo?.Trim() ?? string.Empty;
+                        entity.OtherRecInfo = document.OtherRecInfo?.Trim() ?? string.Empty;
+                        entity.DeclarePrice = document.DeclarePrice?.Trim() ?? string.Empty;
+                        entity.PromiseNote = document.PromiseNote?.Trim() ?? string.Empty;
+                        entity.DeclTele = document.DeclTele?.Trim() ?? string.Empty;
+                        entity.WarningSummary = document.WarningSummary?.Trim() ?? string.Empty;
+                        entity.WarningCount = SingleWindowDraftMetadataHelper.CountWarnings(entity.WarningSummary);
+                        entity.DraftRevision = isNew
+                            ? 1
+                            : checked(Math.Max(1, currentRevision + 1));
+                        entity.ManualLockedFieldsJson = SingleWindowDraftStateHelper.SerializeLockedFields(lockedFields);
+                        entity.SourceBaselineJson = baselineJson;
+                        entity.SourceBaselineHash = SingleWindowDraftStateHelper.ComputeBaselineHash(baselineJson);
+                        entity.LastGeneratedAt = _clock.UtcNow;
+
+                        if (isNew)
+                        {
+                            attemptedInsert = true;
+                            await context.AgentConsignmentDocuments.AddAsync(entity, cancellationToken).ConfigureAwait(false);
+                        }
+
+                        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                        return entity.Id;
+                    },
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                int currentRevision = await ReadCurrentAgentConsignmentRevisionAsync(
+                    document.SourceInvoiceId,
+                    cancellationToken).ConfigureAwait(false);
+                throw new SingleWindowDraftConcurrencyException(
+                    "单证草稿已被其他用户修改，请刷新后合并或重新保存。",
+                    document.SourceInvoiceId,
+                    currentRevision,
+                    ex);
+            }
+            catch (DbUpdateException ex) when (
+                attemptedInsert &&
+                IsSourceInvoiceUniqueConflict(ex, nameof(AppDbContext.AgentConsignmentDocuments)))
+            {
+                int currentRevision = await ReadCurrentAgentConsignmentRevisionAsync(
+                    document.SourceInvoiceId,
+                    cancellationToken).ConfigureAwait(false);
+                throw new SingleWindowDraftConcurrencyException(
+                    "单证草稿已在其他用户处创建，请刷新后继续。",
+                    document.SourceInvoiceId,
+                    currentRevision,
+                    ex);
+            }
         }
 
-        public async Task<int> UpsertAgentConsignmentDocumentAsync(
+        public async Task<SingleWindowDocumentPersistenceResult> UpsertAgentConsignmentDocumentAsync(
             AcdSourceSnapshot snapshot,
             AcdMappedDocument document,
             CancellationToken cancellationToken = default)
@@ -120,88 +164,133 @@ namespace ExportDocManager.Services.SingleWindow
             ArgumentNullException.ThrowIfNull(document);
 
             var invoice = snapshot.Invoice ?? throw new ServiceValidationException("报关代理委托来源发票不能为空。");
+            bool attemptedInsert = false;
 
-            return await AppDbContextExecution.ExecuteInTransactionAsync(
-                _contextFactory,
-                async (context, _) =>
-                {
-                    if (!await _businessDataAccessScope.CanAccessInvoiceAsync(
-                            context,
-                            invoice.Id,
-                            cancellationToken).ConfigureAwait(false))
+            try
+            {
+                return await AppDbContextExecution.ExecuteInTransactionAsync(
+                    _contextFactory,
+                    async (context, transactionToken) =>
                     {
-                        throw new PermissionDeniedException("无权限生成该发票的报关代理委托草稿。");
-                    }
-
-                    var entity = await context.AgentConsignmentDocuments
-                        .FirstOrDefaultAsync(item => item.SourceInvoiceId == invoice.Id, cancellationToken)
-                        .ConfigureAwait(false);
-
-                    if (entity == null)
-                    {
-                        entity = new AgentConsignmentDocument
+                        if (!await _businessDataAccessScope.CanAccessInvoiceAsync(
+                                context,
+                                invoice.Id,
+                                transactionToken).ConfigureAwait(false))
                         {
-                            SourceInvoiceId = invoice.Id
-                        };
-                        await context.AgentConsignmentDocuments.AddAsync(entity, cancellationToken).ConfigureAwait(false);
-                    }
+                            throw new PermissionDeniedException("无权限生成该发票的报关代理委托草稿。");
+                        }
 
-                    entity.InvoiceNo = invoice.InvoiceNo ?? string.Empty;
-                    entity.ContractNo = invoice.ContractNo ?? string.Empty;
-                    entity.Status = "Generated";
-                    entity.CopCusCode = document.CopCusCode;
-                    entity.Sign = document.Sign;
-                    entity.OperType = document.OperType;
-                    entity.GName = document.GName;
-                    entity.CodeTS = document.CodeTS;
-                    entity.DeclTotal = document.DeclTotal;
-                    entity.IEDate = document.IEDate;
-                    entity.ListNo = document.ListNo;
-                    entity.TradeMode = document.TradeMode;
-                    entity.OriCountry = document.OriCountry;
-                    entity.TradeCode = document.TradeCode;
-                    entity.AgentCode = document.AgentCode;
-                    entity.Curr = document.Curr;
-                    entity.QtyOrWeight = document.QtyOrWeight;
-                    entity.PackingCondition = document.PackingCondition;
-                    entity.OtherNote = document.OtherNote;
-                    entity.ConsignTele = document.ConsignTele;
-                    entity.EntryId = document.EntryId;
-                    entity.ReceiveDate = document.ReceiveDate;
-                    entity.PaperInfo = document.PaperInfo;
-                    entity.OtherRecInfo = document.OtherRecInfo;
-                    entity.DeclarePrice = document.DeclarePrice;
-                    entity.PromiseNote = document.PromiseNote;
-                    entity.DeclTele = document.DeclTele;
-                    entity.WarningCount = document.Warnings.Count;
-                    entity.WarningSummary = BuildWarningSummary(document.Warnings);
-                    if (entity.DraftRevision <= 0)
-                    {
-                        entity.DraftRevision = 1;
-                    }
+                        var entity = await context.AgentConsignmentDocuments
+                            .FirstOrDefaultAsync(item => item.SourceInvoiceId == invoice.Id, transactionToken)
+                            .ConfigureAwait(false);
 
-                    entity.ManualLockedFieldsJson ??= string.Empty;
-                    if (string.IsNullOrWhiteSpace(entity.SourceBaselineJson))
-                    {
-                        var baselineDocument = CreateAgentConsignmentDocumentFromMapped(
-                            invoice.Id,
-                            invoice,
-                            rawExistingDocument: null,
-                            mapped: document);
-                        entity.SourceBaselineJson = SingleWindowDraftStateHelper.BuildAgentConsignmentSourceBaselineJson(baselineDocument);
-                    }
+                        bool isNew = entity == null;
+                        int currentRevision = entity == null
+                            ? 0
+                            : SingleWindowDraftConcurrency.ValidateExpectedRevision(
+                                entity,
+                                invoice.Id,
+                                snapshot.ExistingDocument?.DraftRevision);
+                        if (entity == null)
+                        {
+                            SingleWindowDraftConcurrency.ValidateNewExpectedRevision(
+                                invoice.Id,
+                                snapshot.ExistingDocument?.DraftRevision);
+                            entity = new AgentConsignmentDocument
+                            {
+                                SourceInvoiceId = invoice.Id
+                            };
+                        }
 
-                    if (string.IsNullOrWhiteSpace(entity.SourceBaselineHash))
-                    {
-                        entity.SourceBaselineHash = SingleWindowDraftStateHelper.ComputeBaselineHash(entity.SourceBaselineJson);
-                    }
+                        entity.InvoiceNo = invoice.InvoiceNo ?? string.Empty;
+                        entity.ContractNo = invoice.ContractNo ?? string.Empty;
+                        entity.Status = "Generated";
+                        entity.CopCusCode = document.CopCusCode;
+                        entity.Sign = document.Sign;
+                        entity.OperType = document.OperType;
+                        entity.GName = document.GName;
+                        entity.CodeTS = document.CodeTS;
+                        entity.DeclTotal = document.DeclTotal;
+                        entity.IEDate = document.IEDate;
+                        entity.ListNo = document.ListNo;
+                        entity.TradeMode = document.TradeMode;
+                        entity.OriCountry = document.OriCountry;
+                        entity.TradeCode = document.TradeCode;
+                        entity.AgentCode = document.AgentCode;
+                        entity.Curr = document.Curr;
+                        entity.QtyOrWeight = document.QtyOrWeight;
+                        entity.PackingCondition = document.PackingCondition;
+                        entity.OtherNote = document.OtherNote;
+                        entity.ConsignTele = document.ConsignTele;
+                        entity.EntryId = document.EntryId;
+                        entity.ReceiveDate = document.ReceiveDate;
+                        entity.PaperInfo = document.PaperInfo;
+                        entity.OtherRecInfo = document.OtherRecInfo;
+                        entity.DeclarePrice = document.DeclarePrice;
+                        entity.PromiseNote = document.PromiseNote;
+                        entity.DeclTele = document.DeclTele;
+                        entity.WarningCount = document.Warnings.Count;
+                        entity.WarningSummary = BuildWarningSummary(document.Warnings);
+                        entity.DraftRevision = isNew
+                            ? 1
+                            : checked(Math.Max(1, currentRevision + 1));
 
-                    entity.LastGeneratedAt = _clock.UtcNow;
+                        entity.ManualLockedFieldsJson ??= string.Empty;
+                        if (string.IsNullOrWhiteSpace(entity.SourceBaselineJson))
+                        {
+                            var baselineDocument = CreateAgentConsignmentDocumentFromMapped(
+                                invoice.Id,
+                                invoice,
+                                rawExistingDocument: null,
+                                mapped: document);
+                            entity.SourceBaselineJson = SingleWindowDraftStateHelper.BuildAgentConsignmentSourceBaselineJson(baselineDocument);
+                        }
 
-                    await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                    return entity.Id;
-                },
-                cancellationToken).ConfigureAwait(false);
+                        if (string.IsNullOrWhiteSpace(entity.SourceBaselineHash))
+                        {
+                            entity.SourceBaselineHash = SingleWindowDraftStateHelper.ComputeBaselineHash(entity.SourceBaselineJson);
+                        }
+
+                        entity.LastGeneratedAt = _clock.UtcNow;
+
+                        if (isNew)
+                        {
+                            attemptedInsert = true;
+                            await context.AgentConsignmentDocuments.AddAsync(entity, transactionToken).ConfigureAwait(false);
+                        }
+
+                        await context.SaveChangesAsync(transactionToken).ConfigureAwait(false);
+                        return new SingleWindowDocumentPersistenceResult(
+                            entity.Id,
+                            entity.DraftRevision,
+                            entity.SourceBaselineHash ?? string.Empty);
+                    },
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                int currentRevision = await ReadCurrentAgentConsignmentRevisionAsync(
+                    invoice.Id,
+                    cancellationToken).ConfigureAwait(false);
+                throw new SingleWindowDraftConcurrencyException(
+                    "单证草稿已被其他用户修改，请刷新后合并或重新保存。",
+                    invoice.Id,
+                    currentRevision,
+                    ex);
+            }
+            catch (DbUpdateException ex) when (
+                attemptedInsert &&
+                IsSourceInvoiceUniqueConflict(ex, nameof(AppDbContext.AgentConsignmentDocuments)))
+            {
+                int currentRevision = await ReadCurrentAgentConsignmentRevisionAsync(
+                    invoice.Id,
+                    cancellationToken).ConfigureAwait(false);
+                throw new SingleWindowDraftConcurrencyException(
+                    "单证草稿已在其他用户处创建，请刷新后继续。",
+                    invoice.Id,
+                    currentRevision,
+                    ex);
+            }
         }
 
         private AgentConsignmentDocument CreateAgentConsignmentEditorDocument(

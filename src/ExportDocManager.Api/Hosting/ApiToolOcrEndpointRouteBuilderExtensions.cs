@@ -67,9 +67,12 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.NotFound(new ApiErrorResponse("OCR 图片目录不存在或已被移动。"));
                 }
-                catch (UnauthorizedAccessException)
+                catch (UnauthorizedAccessException ex)
                 {
-                    return WriteForbidden("没有权限读取所选 OCR 图片。请检查文件权限或重新选择图片。");
+                    // An ACL/IO failure is an infrastructure outage, not an
+                    // application permission decision.  Only the explicit
+                    // desktop-access check above is a 403.
+                    return WriteServiceException(ex);
                 }
                 catch (IOException ex)
                 {
@@ -131,9 +134,9 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.NotFound(new ApiErrorResponse("OCR 图片不存在或已被移动。"));
                 }
-                catch (UnauthorizedAccessException)
+                catch (UnauthorizedAccessException ex)
                 {
-                    return WriteForbidden("没有权限读取所选 OCR 图片。请检查文件权限或重新选择图片。");
+                    return WriteServiceException(ex);
                 }
                 catch (IOException ex)
                 {
@@ -146,7 +149,8 @@ namespace ExportDocManager.Api.Hosting
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound)
-            .Produces(StatusCodes.Status413PayloadTooLarge);
+            .Produces(StatusCodes.Status413PayloadTooLarge)
+            .Produces<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/tools/ocr/recognize-image-upload", async (
                 HttpContext context,

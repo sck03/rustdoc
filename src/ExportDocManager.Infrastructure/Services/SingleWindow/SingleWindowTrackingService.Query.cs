@@ -173,6 +173,9 @@ namespace ExportDocManager.Services.SingleWindow
                 UpdatedAt = batch.UpdatedAt,
                 LastReceiptAt = batch.LastReceiptAt,
                 LastClientDispatchAt = batch.LastClientDispatchAt,
+                ClientDispatchOperationId = batch.ClientDispatchOperationId,
+                ClientDispatchLeaseUntil = batch.ClientDispatchLeaseUntil,
+                ClientDispatchAttemptCount = batch.ClientDispatchAttemptCount,
                 PackageRecords = packageRecords,
                 ReceiptRecords = receiptRecords
             };

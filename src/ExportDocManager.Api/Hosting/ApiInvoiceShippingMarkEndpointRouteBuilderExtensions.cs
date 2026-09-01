@@ -80,10 +80,7 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
-                catch (UnauthorizedAccessException ex)
-                {
-                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
-                }
+                catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
                 catch (FileNotFoundException)
                 {
                     return Results.NotFound();

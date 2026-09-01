@@ -225,6 +225,14 @@ namespace ExportDocManager.Models.Entities
 
         public int DraftRevision { get; set; }
 
+        /// <summary>
+        /// Expected revision supplied by an editor during a save.  It is deliberately
+        /// not persisted; the API/application boundary uses it to perform a
+        /// compare-and-swap against <see cref="DraftRevision"/>.
+        /// </summary>
+        [NotMapped]
+        public int? ExpectedDraftRevision { get; set; }
+
         public string ManualLockedFieldsJson { get; set; } = string.Empty;
 
         public string SourceBaselineJson { get; set; } = string.Empty;

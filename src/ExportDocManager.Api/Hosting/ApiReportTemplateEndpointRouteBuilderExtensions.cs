@@ -70,10 +70,7 @@ namespace ExportDocManager.Api.Hosting
                         cancellationToken);
                     return Results.Ok(ToApiReportTemplateContentDto(context, result));
                 }
-                catch (UnauthorizedAccessException ex)
-                {
-                    return WriteForbidden(ex.Message);
-                }
+                catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
                 catch (ArgumentException ex)
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
@@ -167,10 +164,7 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.NotFound(new ApiErrorResponse(ex.Message));
                 }
-                catch (UnauthorizedAccessException ex)
-                {
-                    return WriteForbidden(ex.Message);
-                }
+                catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
                 catch (ArgumentException ex)
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
@@ -225,10 +219,7 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.NotFound(new ApiErrorResponse(ex.Message));
                 }
-                catch (UnauthorizedAccessException ex)
-                {
-                    return WriteForbidden(ex.Message);
-                }
+                catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
                 catch (ArgumentException ex)
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
@@ -363,10 +354,7 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.NotFound(new ApiErrorResponse(ex.Message));
                 }
-                catch (UnauthorizedAccessException ex)
-                {
-                    return WriteForbidden(ex.Message);
-                }
+                catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
                 catch (ArgumentException ex)
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
@@ -749,10 +737,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                return WriteForbidden(ex.Message);
-            }
+            catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
             catch (ArgumentException ex)
             {
                 return Results.BadRequest(new ApiErrorResponse(ex.Message));

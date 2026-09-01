@@ -159,6 +159,12 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
 
         public DateTimeOffset? LastClientDispatchAt { get; init; }
 
+        public string ClientDispatchOperationId { get; init; } = string.Empty;
+
+        public DateTimeOffset? ClientDispatchLeaseUntil { get; init; }
+
+        public int ClientDispatchAttemptCount { get; init; }
+
         public IReadOnlyList<SingleWindowOperationCenterPackageRecord> PackageRecords { get; init; } = [];
 
         public IReadOnlyList<SingleWindowOperationCenterReceiptRecord> ReceiptRecords { get; init; } = [];

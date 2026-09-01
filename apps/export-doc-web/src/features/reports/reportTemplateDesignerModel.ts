@@ -6,7 +6,7 @@ import {
 } from "../report-designer/reportDesignerPreviewSamples.ts";
 
 export type ReportTypeOption = "ExportDocument" | "PaymentVoucher";
-export type DesignerMode = "new" | "source";
+export type DesignerMode = "v3" | "advancedHtml";
 export type TemplateWorkspaceMode = "design" | "preview";
 export type TemplateImportStrategyOption = "Overwrite" | "Merge" | "AddOnly";
 export type TemplatePreviewMode = "sample" | "savedSource";

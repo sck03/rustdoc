@@ -100,10 +100,19 @@ namespace ExportDocManager.Services.Reporting
             string resolved = Path.IsPathRooted(packagePath)
                 ? Path.GetFullPath(packagePath)
                 : Path.GetFullPath(Path.Combine(_pathProvider.DataRoot, "TemplatePackages", packagePath));
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                resolved,
+                "模板包路径不能经过符号链接、目录联接或其他重解析点。");
             string? directory = Path.GetDirectoryName(resolved);
             if (!string.IsNullOrWhiteSpace(directory))
             {
+                PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                    directory,
+                    "模板包目录不能经过符号链接、目录联接或其他重解析点。");
                 Directory.CreateDirectory(directory);
+                PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                    directory,
+                    "模板包目录不能经过符号链接、目录联接或其他重解析点。");
             }
 
             return resolved;

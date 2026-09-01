@@ -251,7 +251,7 @@ namespace ExportDocManager.Services.Infrastructure
             {
                 if (Directory.Exists(path))
                 {
-                    Directory.Delete(path, recursive: true);
+                    AtomicFileHelper.TryDeleteDirectory(path);
                 }
             }
             catch

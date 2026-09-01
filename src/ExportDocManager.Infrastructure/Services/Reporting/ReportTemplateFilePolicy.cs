@@ -52,7 +52,7 @@ namespace ExportDocManager.Services.Reporting
             }
 
             string candidateName = Path.GetFileName(candidate);
-            foreach (string existingPath in Directory.EnumerateFiles(directory, "*", SearchOption.TopDirectoryOnly))
+            foreach (string existingPath in ControlledFileSystemEnumerator.EnumerateImmediateFiles(directory))
             {
                 if (!PortablePathKey.Comparer.Equals(Path.GetFileName(existingPath), candidateName))
                 {
@@ -78,7 +78,7 @@ namespace ExportDocManager.Services.Reporting
                 return [];
             }
 
-            string[] files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).ToArray();
+            IReadOnlyList<string> files = ControlledFileSystemEnumerator.EnumerateFiles(root);
             string? invalidTemplate = files.FirstOrDefault(path =>
                 string.Equals(Path.GetExtension(path), Extension, StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(Path.GetExtension(path), Extension, StringComparison.Ordinal));

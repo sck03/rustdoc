@@ -11,6 +11,7 @@ namespace ExportDocManager.Api.Hosting
 
             var dto = new ApiAgentConsignmentDocumentDto();
             CopyScalarProperties(document, dto);
+            dto.ExpectedDraftRevision = document.DraftRevision;
             return dto;
         }
 
@@ -23,6 +24,7 @@ namespace ExportDocManager.Api.Hosting
             var document = new AgentConsignmentDocument();
             CopyScalarProperties(dto, document);
             document.SourceInvoiceId = sourceInvoiceId;
+            document.ExpectedDraftRevision = dto.ExpectedDraftRevision;
             return document;
         }
     }

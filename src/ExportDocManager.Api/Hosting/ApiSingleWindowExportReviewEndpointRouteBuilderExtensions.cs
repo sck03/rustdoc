@@ -157,12 +157,7 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.NotFound(new ApiErrorResponse(ex.Message));
                 }
-                catch (UnauthorizedAccessException ex)
-                {
-                    return Results.Json(
-                        new ApiErrorResponse(ex.Message),
-                        statusCode: StatusCodes.Status403Forbidden);
-                }
+                catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
             })
             .WithName("RepairSingleWindowExportReviewGroups")
             .Produces<ApiSingleWindowRepairGroupsResponse>(StatusCodes.Status200OK)

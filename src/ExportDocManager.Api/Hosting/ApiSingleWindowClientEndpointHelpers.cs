@@ -74,12 +74,6 @@ namespace ExportDocManager.Api.Hosting
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Results.Json(
-                    new ApiErrorResponse(ex.Message),
-                    statusCode: StatusCodes.Status403Forbidden);
-            }
         }
 
         private static async Task<IResult> CollectSingleWindowReceiptFilesAsync(
@@ -107,12 +101,6 @@ namespace ExportDocManager.Api.Hosting
             catch (ResourceNotFoundException ex)
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Results.Json(
-                    new ApiErrorResponse(ex.Message),
-                    statusCode: StatusCodes.Status403Forbidden);
             }
         }
     }

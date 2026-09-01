@@ -461,6 +461,8 @@ public sealed class ApiOpenApiIntegrationTests
         AssertDateOnlyProperty(schemas, "ApiPaymentDto", "paymentDate");
         AssertDateOnlyProperty(schemas, "ApiSupplierAssessmentDto", "assessmentDate");
         AssertDateOnlyProperty(schemas, "ApiSupplierAssessmentSaveRequest", "assessmentDate");
+        AssertRequiredProperty(schemas, "ApiCustomsCooDocumentDto", "expectedDraftRevision");
+        AssertRequiredProperty(schemas, "ApiAgentConsignmentDocumentDto", "expectedDraftRevision");
     }
 
     private static void AssertNullableProperty(JsonElement schemas, string schemaName, string propertyName)
@@ -478,6 +480,15 @@ public sealed class ApiOpenApiIntegrationTests
         JsonElement property = schemas.GetProperty(schemaName).GetProperty("properties").GetProperty(propertyName);
         Assert.True(SchemaHasType(property, "string"), $"{schemaName}.{propertyName} is not a JSON string date.");
         Assert.Equal("date", property.GetProperty("format").GetString());
+    }
+
+    private static void AssertRequiredProperty(JsonElement schemas, string schemaName, string propertyName)
+    {
+        JsonElement schema = schemas.GetProperty(schemaName);
+        Assert.True(
+            schema.TryGetProperty("required", out JsonElement required) &&
+            required.EnumerateArray().Any(item => item.GetString() == propertyName),
+            $"{schemaName}.{propertyName} must be required in the public OpenAPI contract.");
     }
 
     private static bool SchemaAllowsNull(JsonElement schema) =>

@@ -157,7 +157,15 @@ namespace ExportDocManager.Services.SingleWindow
                 AplPromiseCode = document.AplPromiseCode,
                 WarningCount = document.WarningCount,
                 WarningSummary = document.WarningSummary,
+                DraftRevision = document.DraftRevision,
+                ExpectedDraftRevision = document.ExpectedDraftRevision,
+                ManualLockedFieldsJson = document.ManualLockedFieldsJson,
+                SourceBaselineJson = document.SourceBaselineJson,
+                SourceBaselineHash = document.SourceBaselineHash,
                 LastGeneratedAt = document.LastGeneratedAt,
+                SourceDiffCount = document.SourceDiffCount,
+                SourceDiffSummary = document.SourceDiffSummary,
+                ManualLockedFieldCount = document.ManualLockedFieldCount,
                 Items = document.Items?
                     .Select(item => new CustomsCooItem
                     {
@@ -285,7 +293,15 @@ namespace ExportDocManager.Services.SingleWindow
                 ConsignNo = document.ConsignNo,
                 WarningCount = document.WarningCount,
                 WarningSummary = document.WarningSummary,
-                LastGeneratedAt = document.LastGeneratedAt
+                DraftRevision = document.DraftRevision,
+                ExpectedDraftRevision = document.ExpectedDraftRevision,
+                ManualLockedFieldsJson = document.ManualLockedFieldsJson,
+                SourceBaselineJson = document.SourceBaselineJson,
+                SourceBaselineHash = document.SourceBaselineHash,
+                LastGeneratedAt = document.LastGeneratedAt,
+                SourceDiffCount = document.SourceDiffCount,
+                SourceDiffSummary = document.SourceDiffSummary,
+                ManualLockedFieldCount = document.ManualLockedFieldCount
             };
         }
 

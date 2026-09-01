@@ -13,7 +13,11 @@ namespace ExportDocManager.Services.Infrastructure
     /// </summary>
     internal static partial class DatabaseSchemaBaseline
     {
-        internal const int CurrentVersion = 9;
+        // The v10 empty-database baseline includes the V3 single-window draft
+        // concurrency and client-dispatch lease columns.  This project is still
+        // pre-production, so changing the baseline intentionally rejects older
+        // development databases instead of growing a compatibility migration tree.
+        internal const int CurrentVersion = 10;
         internal const string MetadataTableName = "__ExportDocManagerSchema";
         internal const string PostgreSqlTrigramFeatureName = "postgresql.pg_trgm";
         internal const int PostgreSqlTrigramFeatureVersion = 2;

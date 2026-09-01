@@ -43,8 +43,11 @@ export function useUserReportTemplateLifecycleMutations({
         body: {
           reportType,
           name: newTemplateName.trim(),
+          // A new template created from a built-in file starts as a clean V3
+          // A4 design. Cloning a user template preserves its explicit runtime,
+          // including advanced HTML when the owner chose that path.
           contentHtml: sourceUserTemplate ? content : "",
-          sourceTemplatePath: sourceUserTemplate ? "" : selectedTemplatePath,
+          sourceTemplatePath: sourceUserTemplate ? "" : "",
           isActive: true,
           isShared: newTemplateShareScope !== "Private",
           shareScope: newTemplateShareScope,

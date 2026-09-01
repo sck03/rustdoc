@@ -1,445 +1,222 @@
 using System.Net;
+using System.Text.Json;
 
-namespace ExportDocManager.Services.Reporting
+namespace ExportDocManager.Services.Reporting;
+
+/// <summary>
+/// Creates the smallest useful V3-only A4 starter.  The embedded schema is the
+/// persisted design source; the accompanying HTML is its generated render form.
+/// </summary>
+internal static class ReportTemplateStarterFactory
 {
-    internal static class ReportTemplateStarterFactory
+    public const string ExportInvoiceStarterPreset = "export-invoice";
+    public const string ExportPackingListStarterPreset = "export-packing-list";
+    public const string InternalPaymentVoucherStarterPreset = "internal-payment-voucher";
+    public const string InternalExpenseReimbursementStarterPreset = "internal-expense-reimbursement";
+
+    public static string Create(ReportDocumentType reportType, string title, string? templateIdentifier = null)
     {
-        public const string ExportInvoiceStarterPreset = "export-invoice";
-        public const string ExportPackingListStarterPreset = "export-packing-list";
-        public const string InternalPaymentVoucherStarterPreset = "internal-payment-voucher";
-        public const string InternalExpenseReimbursementStarterPreset = "internal-expense-reimbursement";
+        string preset = DetermineStarterPreset(reportType, templateIdentifier, title);
+        string heading = ResolveHeading(title, preset);
+        return BuildV3Html(reportType, preset, heading);
+    }
 
-        public static string Create(ReportDocumentType reportType, string title, string? templateIdentifier = null)
+    public static string DetermineStarterPreset(
+        ReportDocumentType reportType,
+        string? templateIdentifier,
+        string? title = null)
+    {
+        string identity = $"{templateIdentifier} {title}".ToLowerInvariant();
+        if (reportType == ReportDocumentType.PaymentVoucher)
         {
-            string starterPreset = DetermineStarterPreset(reportType, templateIdentifier, title);
-            string resolvedTitle = ResolveHeading(title, starterPreset, templateIdentifier);
-            return BuildTemplateHtml(starterPreset, resolvedTitle);
+            return identity.Contains("expense") || identity.Contains("reimbursement") || identity.Contains("报销")
+                ? InternalExpenseReimbursementStarterPreset
+                : InternalPaymentVoucherStarterPreset;
         }
 
-        public static string DetermineStarterPreset(
-            ReportDocumentType reportType,
-            string? templateIdentifier,
-            string? title = null)
+        return identity.Contains("packing") || identity.Contains("装箱")
+            ? ExportPackingListStarterPreset
+            : ExportInvoiceStarterPreset;
+    }
+
+    private static string ResolveHeading(string title, string preset)
+    {
+        if (!string.IsNullOrWhiteSpace(title) && !LooksLikeTechnicalTemplateName(title.ToLowerInvariant()))
         {
-            string identity = $"{templateIdentifier} {title}".ToLowerInvariant();
-            if (reportType == ReportDocumentType.PaymentVoucher)
+            return title.Trim();
+        }
+
+        return preset switch
+        {
+            ExportPackingListStarterPreset => "PACKING LIST",
+            InternalPaymentVoucherStarterPreset => "付款单（费用支付专用）",
+            InternalExpenseReimbursementStarterPreset => "费用报销明细单",
+            _ => "INVOICE"
+        };
+    }
+
+    private static bool LooksLikeTechnicalTemplateName(string value) =>
+        string.IsNullOrWhiteSpace(value) ||
+        value.Contains("invoice") ||
+        value.Contains("packing") ||
+        value.Contains("payment") ||
+        value.Contains("voucher") ||
+        value.Contains("expense") ||
+        value.Contains("reimbursement") ||
+        value.Contains('_');
+
+    private static string BuildV3Html(ReportDocumentType reportType, string preset, string heading)
+    {
+        bool isPayment = reportType == ReportDocumentType.PaymentVoucher;
+        string organizationField = isPayment ? "Payment.PayerName" : "Exporter.ExporterNameEN";
+        string counterpartyField = isPayment ? "Payment.PayeeName" : "Customer.CustomerNameEN";
+        string referenceField = isPayment ? "Payment.InvoiceNo" : "Invoice.InvoiceNo";
+        string amountField = isPayment ? "Payment.CNYAmount" : "Invoice.TotalAmount";
+        string schema = JsonSerializer.Serialize(new
+        {
+            version = 3,
+            reportType = reportType.ToString(),
+            page = new
             {
-                if (identity.Contains("expense") ||
-                    identity.Contains("reimbursement") ||
-                    identity.Contains("报销"))
+                size = "A4",
+                orientation = "Portrait",
+                widthHundredthMm = 21000,
+                heightHundredthMm = 29700,
+                marginTopHundredthMm = 800,
+                marginRightHundredthMm = 1000,
+                marginBottomHundredthMm = 800,
+                marginLeftHundredthMm = 1000,
+                fontFamily = "Arial, Noto Sans CJK SC, Microsoft YaHei",
+                fontSizePt = 9
+            },
+            grid = new { enabled = true, sizeHundredthMm = 500, snap = true },
+            layers = new object[]
+            {
+                Layer("header", "页眉", "Header", true, true, false, 2600, new object[]
                 {
-                    return InternalExpenseReimbursementStarterPreset;
-                }
-
-                return InternalPaymentVoucherStarterPreset;
+                    Text("title", heading, 1000, 900, 19000, 1000, 16, true, "Center"),
+                    Field("organization", organizationField, 1000, 2100, 19000, 700, 10, true, "Center")
+                }),
+                Layer("body", "主体", "Body", false, false, false, 0, new object[]
+                {
+                    Field("counterparty", counterpartyField, 1000, 3600, 9000, 700, 9, false, "Left", "往来方"),
+                    Field("reference", referenceField, 11000, 3600, 8000, 700, 9, false, "Right", "单据号"),
+                    Field("amount", amountField, 11000, 4600, 8000, 700, 9, true, "Right", isPayment ? "金额" : "总金额")
+                }),
+                Layer("footer", "页脚", "Footer", true, true, true, 800, Array.Empty<object>()),
+                Layer("overlay", "覆盖层", "Overlay", false, false, false, 0, Array.Empty<object>())
             }
+        });
 
-            return identity.Contains("packing") || identity.Contains("装箱")
-                ? ExportPackingListStarterPreset
-                : ExportInvoiceStarterPreset;
-        }
-
-        private static string ResolveHeading(string title, string starterPreset, string? templateIdentifier)
-        {
-            if (!string.IsNullOrWhiteSpace(title) && !LooksLikeTechnicalTemplateName(title.ToLowerInvariant()))
-            {
-                return title.Trim();
-            }
-
-            return starterPreset switch
-            {
-                ExportPackingListStarterPreset => "PACKING LIST",
-                InternalPaymentVoucherStarterPreset => "付款单（费用支付专用）",
-                InternalExpenseReimbursementStarterPreset => "费用报销明细单",
-                _ => "INVOICE"
-            };
-        }
-
-        private static bool LooksLikeTechnicalTemplateName(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return true;
-            }
-
-            return value.Contains("invoice") ||
-                   value.Contains("packing") ||
-                   value.Contains("payment") ||
-                   value.Contains("voucher") ||
-                   value.Contains("expense") ||
-                   value.Contains("reimbursement") ||
-                   value.Contains('_');
-        }
-
-        private static string BuildTemplateHtml(string starterPreset, string heading)
-        {
-            return starterPreset switch
-            {
-                ExportPackingListStarterPreset => BuildExportPackingListHtml(heading),
-                InternalPaymentVoucherStarterPreset => BuildInternalPaymentVoucherHtml(heading),
-                InternalExpenseReimbursementStarterPreset => BuildInternalExpenseReimbursementHtml(heading),
-                _ => BuildExportInvoiceHtml(heading)
-            };
-        }
-
-        private static string BuildExportInvoiceHtml(string heading)
-        {
-            string encodedHeading = WebUtility.HtmlEncode(heading);
-            return $$$"""
-<!DOCTYPE html>
+        string encodedHeading = WebUtility.HtmlEncode(heading);
+        const string template = """
+<!doctype html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <style>
-        @page { size: A4 portrait; margin: 15mm; }
-        body { font-family: {{{ReportFontPolicy.SansCssFamilyList}}}; font-size: 12px; margin: 0; }
-        .report-container { width: 100%; max-width: 980px; margin: 0 auto; }
-        .company { text-align: center; font-weight: bold; font-size: 24px; margin-top: 6px; }
-        .company-subtitle { text-align: center; font-size: 13px; margin: 2px 0 12px; }
-        .document-title { text-align: center; font-weight: bold; font-size: 22px; margin: 0 0 10px; }
-        .top-grid { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-        .top-grid td { padding: 4px 6px; vertical-align: top; }
-        .detail-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .detail-table th, .detail-table td { border: 1px solid #222; padding: 8px 10px; vertical-align: top; }
-        .detail-table th { text-align: left; font-size: 16px; }
-        .marks-col { width: 24%; }
-        .description-col { width: 56%; }
-        .amount-col { width: 20%; }
-        .marks-cell { white-space: pre-line; }
-        .total-row td { font-weight: bold; }
-        .amount-cell { text-align: right; white-space: nowrap; }
-    </style>
+  <meta charset="utf-8">
+  <style>
+    @page { size: A4 portrait; margin: 0; }
+    html, body { margin: 0; padding: 0; }
+    body { font-family: Arial, 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif; color: #1f2933; }
+    .edm-v3-page { position: relative; width: 210mm; min-height: 297mm; margin: 0 auto; box-sizing: border-box; }
+    .edm-v3-title { position: absolute; top: 9mm; left: 10mm; width: 190mm; font-size: 16pt; font-weight: 700; text-align: center; }
+    .edm-v3-organization { position: absolute; top: 21mm; left: 10mm; width: 190mm; font-size: 10pt; font-weight: 700; text-align: center; }
+    .edm-v3-row { position: absolute; top: 36mm; left: 10mm; right: 10mm; display: flex; justify-content: space-between; gap: 8mm; }
+    .edm-v3-amount { position: absolute; top: 46mm; right: 10mm; width: 80mm; font-weight: 700; text-align: right; }
+  </style>
 </head>
-<body data-edm-report-font="sans">
-    <div class="report-container">
-        <div class="company">{{ Exporter.ExporterNameEN | string.upcase }}</div>
-        <div class="company-subtitle">{{ Exporter.AddressEN }}</div>
-        <div class="document-title">{{{encodedHeading}}}</div>
-
-        <table class="top-grid">
-            <tr>
-                <td style="width:46%;">TO: {{ Customer.CustomerNameEN }}</td>
-                <td style="width:24%;"></td>
-                <td style="width:30%; text-align:right;">Invoice No.: {{ Invoice.InvoiceNo }}</td>
-            </tr>
-            <tr>
-                <td>{{ Customer.AddressEN }}</td>
-                <td></td>
-                <td style="text-align:right;">Contract No.: {{ Invoice.ContractNo }}</td>
-            </tr>
-            <tr>
-                <td>From: {{ Invoice.PortOfLoading }}</td>
-                <td>To: {{ Invoice.DestinationCountry }}</td>
-                <td style="text-align:right;">Date: {{ Invoice.InvoiceDate | date.to_string '%d %b %Y' }}</td>
-            </tr>
-            <tr>
-                <td>Payment Terms: {{ Invoice.PaymentTerms }}</td>
-                <td colspan="2">Issued by: {{ Exporter.ExporterNameEN }}</td>
-            </tr>
-        </table>
-
-        <table class="detail-table">
-            <thead>
-                <tr>
-                    <th class="marks-col">唛头 / Marks</th>
-                    <th class="description-col">货品名称 / Quantities and Descriptions</th>
-                    <th class="amount-col">总值 / Amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{ for item in items }}
-                {{ if for.first }}
-                <tr>
-                    <td rowspan="{{ items.size + 1 }}" class="marks-cell">{{ Invoice.ShippingMarks }}</td>
-                    <td></td>
-                    <td class="amount-cell">{{ Invoice.TradeTerms }} {{ Invoice.PortOfLoading }}</td>
-                </tr>
-                {{ end }}
-                <tr>
-                    <td>
-                        <div>{{ item.StyleName }}</div>
-                        <div>{{ item.PoNumber }}</div>
-                        <div>{{ item.StyleNo }} {{ item.Cartons }}{{ item.CtnUnitEN }} {{ item.Quantity }}{{ item.UnitEN }}</div>
-                    </td>
-                    <td class="amount-cell">
-                        <div>{{ Invoice.Currency }}{{ item.TotalPrice }}</div>
-                    </td>
-                </tr>
-                {{ end }}
-                <tr class="total-row">
-                    <td colspan="2">TOTAL:</td>
-                    <td class="amount-cell">{{ Invoice.Currency }}{{ Invoice.TotalAmount }}</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
+<body>
+<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA
+__SCHEMA__
+-->
+  <main class="edm-v3-page">
+    <div class="edm-v3-title">__HEADING__</div>
+    <div class="edm-v3-organization">{{ __ORGANIZATION__ }}</div>
+    <div class="edm-v3-row"><span>{{ __COUNTERPARTY__ }}</span><span>{{ __REFERENCE__ }}</span></div>
+    <div class="edm-v3-amount">{{ __AMOUNT__ }}</div>
+  </main>
 </body>
 </html>
 """;
-        }
+        return template
+            .Replace("__SCHEMA__", schema, StringComparison.Ordinal)
+            .Replace("__HEADING__", encodedHeading, StringComparison.Ordinal)
+            .Replace("__ORGANIZATION__", organizationField, StringComparison.Ordinal)
+            .Replace("__COUNTERPARTY__", counterpartyField, StringComparison.Ordinal)
+            .Replace("__REFERENCE__", referenceField, StringComparison.Ordinal)
+            .Replace("__AMOUNT__", amountField, StringComparison.Ordinal);
+    }
 
-        private static string BuildExportPackingListHtml(string heading)
+    private static object Layer(
+        string id,
+        string name,
+        string role,
+        bool repeatOnEveryPage,
+        bool keepTogether,
+        bool pinToPageBottom,
+        int minHeightHundredthMm,
+        object[] elements)
+    {
+        return new
         {
-            string encodedHeading = WebUtility.HtmlEncode(heading);
-            return $$$"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        @page { size: A4 portrait; margin: 15mm; }
-        body { font-family: {{{ReportFontPolicy.SansCssFamilyList}}}; font-size: 12px; margin: 0; }
-        .report-container { width: 100%; max-width: 1080px; margin: 0 auto; }
-        .company { text-align: center; font-weight: bold; font-size: 24px; margin-top: 6px; }
-        .company-subtitle { text-align: center; font-size: 13px; margin: 2px 0 12px; }
-        .document-title { text-align: center; font-weight: bold; font-size: 22px; margin: 0 0 10px; }
-        .top-grid { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-        .top-grid td { padding: 4px 6px; vertical-align: top; }
-        .detail-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .detail-table th, .detail-table td { border: 1px solid #222; padding: 8px 10px; vertical-align: top; }
-        .detail-table th { text-align: left; font-size: 16px; }
-        .marks-cell { white-space: pre-line; }
-        .total-row td { font-weight: bold; }
-        .number-cell { text-align: right; white-space: nowrap; }
-    </style>
-</head>
-<body data-edm-report-font="sans">
-    <div class="report-container">
-        <div class="company">{{ Exporter.ExporterNameEN | string.upcase }}</div>
-        <div class="company-subtitle">{{ Exporter.AddressEN }}</div>
-        <div class="document-title">{{{encodedHeading}}}</div>
+            id,
+            name,
+            role,
+            print = new { repeatOnEveryPage, keepTogether, pinToPageBottom, minHeightHundredthMm },
+            visible = true,
+            locked = false,
+            elements
+        };
+    }
 
-        <table class="top-grid">
-            <tr>
-                <td style="width:46%;">TO: {{ Customer.CustomerNameEN }}</td>
-                <td style="width:24%;"></td>
-                <td style="width:30%; text-align:right;">Invoice No.: {{ Invoice.InvoiceNo }}</td>
-            </tr>
-            <tr>
-                <td>{{ Customer.AddressEN }}</td>
-                <td></td>
-                <td style="text-align:right;">Contract No.: {{ Invoice.ContractNo }}</td>
-            </tr>
-            <tr>
-                <td></td>
-                <td></td>
-                <td style="text-align:right;">Date: {{ Invoice.InvoiceDate | date.to_string '%d %b %Y' }}</td>
-            </tr>
-        </table>
-
-        <table class="detail-table">
-            <thead>
-                <tr>
-                    <th>唛头 / Marks</th>
-                    <th>货品名称 / Quantities and Descriptions</th>
-                    <th>包装 / Package</th>
-                    <th>数量 / Quantity</th>
-                    <th>毛重 / G.W.</th>
-                    <th>净重 / N.W.</th>
-                    <th>体积 / Meas.</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{ for item in items }}
-                {{ if for.first }}
-                <tr>
-                    <td rowspan="{{ items.size }}" class="marks-cell">{{ Invoice.ShippingMarks }}</td>
-                    <td>
-                        <div>{{ item.StyleName }}</div>
-                        <div>{{ item.PoNumber }}</div>
-                        <div>{{ item.StyleNo }}</div>
-                    </td>
-                    <td>{{ item.Cartons }}{{ item.CtnUnitEN }}</td>
-                    <td>{{ item.Quantity }}{{ item.UnitEN }}</td>
-                    <td class="number-cell">{{ format_weight item.GWTotal }}KGS</td>
-                    <td class="number-cell">{{ format_weight item.NWTotal }}KGS</td>
-                    <td class="number-cell">{{ format_volume item.Volume }}CBM</td>
-                </tr>
-                {{ else }}
-                <tr>
-                    <td>
-                        <div>{{ item.StyleName }}</div>
-                        <div>{{ item.PoNumber }}</div>
-                        <div>{{ item.StyleNo }}</div>
-                    </td>
-                    <td>{{ item.Cartons }}{{ item.CtnUnitEN }}</td>
-                    <td>{{ item.Quantity }}{{ item.UnitEN }}</td>
-                    <td class="number-cell">{{ format_weight item.GWTotal }}KGS</td>
-                    <td class="number-cell">{{ format_weight item.NWTotal }}KGS</td>
-                    <td class="number-cell">{{ format_volume item.Volume }}CBM</td>
-                </tr>
-                {{ end }}
-                {{ end }}
-                <tr class="total-row">
-                    <td colspan="2">TOTAL:</td>
-                    <td class="number-cell">{{ Invoice.TotalCartons }}</td>
-                    <td class="number-cell">{{ Invoice.TotalQuantity }}</td>
-                    <td class="number-cell">{{ format_weight Invoice.TotalGrossWeight }}KGS</td>
-                    <td class="number-cell">{{ format_weight Invoice.TotalNetWeight }}KGS</td>
-                    <td class="number-cell">{{ format_volume Invoice.TotalVolume }}CBM</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</body>
-</html>
-""";
-        }
-
-        private static string BuildInternalPaymentVoucherHtml(string heading)
+    private static object Text(string id, string text, int x, int y, int width, int height, int fontSize, bool bold, string align)
+    {
+        return new
         {
-            string encodedHeading = WebUtility.HtmlEncode(heading);
-            return $$$"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        @page { size: A4 portrait; margin: 15mm; }
-        body { font-family: {{{ReportFontPolicy.SerifCssFamilyList}}}; font-size: 14px; margin: 0; }
-        .report-container { width: 100%; max-width: 980px; margin: 0 auto; }
-        .company { text-align: center; font-size: 28px; font-weight: bold; margin: 8px 0 6px; }
-        .document-title { text-align: center; font-size: 26px; letter-spacing: 2px; margin: 0 0 18px; }
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        td { border: 1px solid #222; padding: 10px 8px; vertical-align: middle; }
-        .plain-row td { border: none; padding: 4px 8px 10px; }
-        .section-title { width: 12%; text-align: center; font-size: 18px; }
-        .number { text-align: right; white-space: nowrap; font-weight: bold; }
-        .signature-row td { border: none; padding-top: 18px; }
-    </style>
-</head>
-<body data-edm-report-font="serif">
-    <div class="report-container">
-        <div class="company">{{ Payment.PayerName }}</div>
-        <div class="document-title">{{{encodedHeading}}}</div>
+            id,
+            type = "Text",
+            text,
+            xHundredthMm = x,
+            yHundredthMm = y,
+            widthHundredthMm = width,
+            heightHundredthMm = height,
+            rotationDeg = 0,
+            zIndex = 0,
+            visible = true,
+            locked = false,
+            outputEnabled = true,
+            style = new { fontSizePt = fontSize, bold, align }
+        };
+    }
 
-        <table>
-            <tr class="plain-row">
-                <td style="width:10%;">部门</td>
-                <td style="width:18%;">{{ Payment.Department }}</td>
-                <td style="width:24%;"></td>
-                <td style="width:18%;">业务参考号</td>
-                <td style="width:30%;">{{ Payment.InvoiceNo }}</td>
-            </tr>
-            <tr>
-                <td class="section-title" rowspan="4">用<br/>款<br/>事<br/>项</td>
-                <td>项目</td>
-                <td colspan="2">{{ Payment.Project }}</td>
-                <td colspan="2">出货日期 {{ Payment.ShipmentDate | date.to_string '%Y年%m月%d日' }}</td>
-            </tr>
-            <tr>
-                <td>美元</td>
-                <td>{{ Payment.USDAmount }}</td>
-                <td>人民币（大写）</td>
-                <td>{{ cny_amount_upper }}</td>
-                <td class="number">￥{{ Payment.CNYAmount }}</td>
-            </tr>
-            <tr>
-                <td colspan="2">支付单位 / 收款人 {{ Payment.PayeeName }}</td>
-                <td colspan="3">支付方式 {{ Payment.PaymentMethod }}</td>
-            </tr>
-            <tr>
-                <td colspan="2">开户行 {{ Payment.BankName }}</td>
-                <td colspan="3">账号 {{ Payment.AccountNo }}</td>
-            </tr>
-            <tr>
-                <td colspan="6">备注 {{ Payment.Notes }}</td>
-            </tr>
-            <tr class="signature-row">
-                <td colspan="2">业务经理签字</td>
-                <td colspan="2" style="text-align:center;">审批</td>
-                <td colspan="2" style="text-align:center;">复核</td>
-            </tr>
-        </table>
-    </div>
-</body>
-</html>
-""";
-        }
-
-        private static string BuildInternalExpenseReimbursementHtml(string heading)
+    private static object Field(
+        string id,
+        string fieldPath,
+        int x,
+        int y,
+        int width,
+        int height,
+        int fontSize,
+        bool bold,
+        string align,
+        string? label = null)
+    {
+        return new
         {
-            string encodedHeading = WebUtility.HtmlEncode(heading);
-            return $$$"""
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        @page { size: A4 portrait; margin: 15mm; }
-        body { font-family: {{{ReportFontPolicy.SerifCssFamilyList}}}; font-size: 14px; margin: 0; }
-        .report-container { width: 100%; max-width: 1040px; margin: 0 auto; }
-        .company { text-align: center; font-size: 28px; font-weight: bold; margin: 8px 0 6px; }
-        .document-title { text-align: center; font-size: 24px; letter-spacing: 6px; margin: 0 0 16px; }
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        td { border: 1px solid #222; padding: 10px 8px; vertical-align: middle; text-align: center; }
-        .plain-row td { border: none; padding: 4px 8px 10px; text-align: left; }
-        .left-label { text-align: left; }
-        .amount-cell { text-align: right; white-space: nowrap; font-weight: bold; }
-        .signature-row td { border: none; padding-top: 20px; text-align: center; }
-    </style>
-</head>
-<body data-edm-report-font="serif">
-    <div class="report-container">
-        <div class="company">{{ Payment.PayerName }}</div>
-        <div class="document-title">{{{encodedHeading}}}</div>
-
-        <table>
-            <tr class="plain-row">
-                <td style="width:14%;">业务科别</td>
-                <td style="width:26%;">{{ Payment.Department }}</td>
-                <td style="width:24%;"></td>
-                <td style="width:18%;">{{ if Payment.PaymentDate }}{{ Payment.PaymentDate | date.to_string '%Y年%m月%d日' }}{{ end }}</td>
-                <td style="width:18%;"></td>
-            </tr>
-            <tr>
-                <td>项目</td>
-                <td>差旅费</td>
-                <td>业务招待费</td>
-                <td>电话费</td>
-                <td>办公费</td>
-            </tr>
-            <tr>
-                <td>金额</td>
-                <td>{{ Payment.TravelExpense }}</td>
-                <td>{{ Payment.BusinessEntertainmentExpense }}</td>
-                <td>{{ Payment.TelephoneExpense }}</td>
-                <td>{{ Payment.OfficeExpense }}</td>
-            </tr>
-            <tr>
-                <td>项目</td>
-                <td>修理费</td>
-                <td>运杂费</td>
-                <td>检验费</td>
-                <td>其他</td>
-            </tr>
-            <tr>
-                <td>金额</td>
-                <td>{{ Payment.RepairExpense }}</td>
-                <td>{{ Payment.FreightMiscExpense }}</td>
-                <td>{{ Payment.InspectionExpense }}</td>
-                <td>{{ Payment.OtherExpense }}</td>
-            </tr>
-            <tr>
-                <td class="left-label">备注</td>
-                <td colspan="4" class="left-label">{{ Payment.Notes }}</td>
-            </tr>
-            <tr>
-                <td class="left-label">报销净额</td>
-                <td colspan="2" class="left-label">{{ cny_amount_upper }}</td>
-                <td>小计</td>
-                <td class="amount-cell">￥{{ Payment.CNYAmount }}</td>
-            </tr>
-            <tr class="signature-row">
-                <td>报销人</td>
-                <td colspan="2">主管签字</td>
-                <td colspan="2">审批签字</td>
-            </tr>
-        </table>
-    </div>
-</body>
-</html>
-""";
-        }
+            id,
+            type = "Field",
+            fieldPath,
+            label,
+            xHundredthMm = x,
+            yHundredthMm = y,
+            widthHundredthMm = width,
+            heightHundredthMm = height,
+            rotationDeg = 0,
+            zIndex = 0,
+            visible = true,
+            locked = false,
+            outputEnabled = true,
+            style = new { fontSizePt = fontSize, bold, align }
+        };
     }
 }

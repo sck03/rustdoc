@@ -287,6 +287,12 @@ if (-not $SkipLaunchSmoke) {
         )
     } finally {
         if (Test-Path -LiteralPath $smokeRoot) {
+            # The smoke host may finish its top-level process before its
+            # sidecar/WebView descendants release files under App_Data. Stop
+            # every process whose executable belongs to this package before
+            # attempting removal so a successful build does not quarantine a
+            # stale runtime directory or emit a misleading cleanup warning.
+            Stop-ExportDocProcessesUnderPath -RootPath $resolvedOutputDir
             Remove-ExportDocDirectoryWithRetry `
                 -Path $smokeRoot `
                 -AllowedRoot $artifactsRoot `

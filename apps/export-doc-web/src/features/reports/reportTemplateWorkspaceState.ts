@@ -15,7 +15,6 @@ import {
   buildUserTemplateKey,
   fileNameFromPath,
   matchesTemplatePath,
-  type DesignerMode,
   type ReportTypeOption,
   type TemplatePreviewMode,
 } from "./reportTemplateDesignerModel.ts";
@@ -53,7 +52,6 @@ export function deriveReportTemplateFeedback({
 
 export function deriveReportTemplateWorkspaceState({
   reportType,
-  designerMode,
   designerDraftContent,
   content,
   loadedContent,
@@ -77,10 +75,8 @@ export function deriveReportTemplateWorkspaceState({
   desktopAvailable,
   packageExportPath,
   packageImportPath,
-  templateContentFetching,
 }: {
   reportType: ReportTypeOption;
-  designerMode: DesignerMode;
   designerDraftContent: string;
   content: string;
   loadedContent: string;
@@ -104,7 +100,6 @@ export function deriveReportTemplateWorkspaceState({
   desktopAvailable: boolean;
   packageExportPath: string;
   packageImportPath: string;
-  templateContentFetching: boolean;
 }) {
   const isUserTemplate = currentUserTemplate !== null;
   const previewDocumentOptions =
@@ -115,7 +110,7 @@ export function deriveReportTemplateWorkspaceState({
   const selectedPreviewSourceValue = selectedPreviewSourceId > 0 ? String(selectedPreviewSourceId) : "";
   const selectedPreviewSourceLabel =
     previewDocumentOptions.find((option) => option.value === selectedPreviewSourceValue)?.label ?? "";
-  const previewContent = designerMode === "new" && designerDraftContent.trim() ? designerDraftContent : content;
+  const previewContent = designerDraftContent.trim() ? designerDraftContent : content;
   const isLocalSamplePreview =
     templatePreviewMode === "sample" && isLocalReportDesignerPreviewSample(templatePreviewSampleProfile);
   const localSamplePreviewHtml =
@@ -133,8 +128,7 @@ export function deriveReportTemplateWorkspaceState({
       : matchesTemplatePath(contentTemplatePath, selectedTemplatePath));
   const isBusy = busyFlags.some(Boolean);
   const hasChanges = content !== loadedContent;
-  const hasUnappliedDesignerChanges =
-    designerMode === "new" && Boolean(designerDraftContent.trim()) && designerDraftContent !== content;
+  const hasUnappliedDesignerChanges = Boolean(designerDraftContent.trim()) && designerDraftContent !== content;
   const hasUnsavedChanges = hasChanges || hasUnappliedDesignerChanges;
   const canPreviewRendered =
     Boolean(selectedTemplatePath) && (reportType === "PaymentVoucher" ? previewPaymentId > 0 : previewInvoiceId > 0);
@@ -187,6 +181,5 @@ export function deriveReportTemplateWorkspaceState({
     canImportPackageByPath: canManageTemplates && Boolean(packageImportPath.trim()) && !isBusy,
     canUploadPackage: canManageTemplates && !desktopAvailable && !isBusy,
     canSave,
-    canFormatSource: Boolean(selectedTemplatePath) && Boolean(content.trim()) && !templateContentFetching,
   };
 }

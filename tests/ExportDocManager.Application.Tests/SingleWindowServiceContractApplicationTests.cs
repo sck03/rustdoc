@@ -36,7 +36,7 @@ namespace ExportDocManager.Application.Tests
                     .GetMethod(nameof(IAgentConsignmentDocumentService.BuildDefaultsAsync))
                     ?.ReturnType);
             Assert.Equal(
-                typeof(Task<int>),
+                typeof(Task<SingleWindowDocumentPersistenceResult>),
                 typeof(ISingleWindowDocumentPersistenceService)
                     .GetMethod(nameof(ISingleWindowDocumentPersistenceService.UpsertCustomsCooDocumentAsync))
                     ?.ReturnType);

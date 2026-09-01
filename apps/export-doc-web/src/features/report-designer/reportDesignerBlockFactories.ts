@@ -198,6 +198,11 @@ export function createDetailTableBlock(): ReportBlock {
     type: "DetailTable",
     title: "Quantities and Descriptions",
     detailWidthMm: 132,
+    // Export documents commonly keep shipping marks in a non-repeating
+    // left band while the item rows repeat on the right.  Make that layout
+    // the friendly default; advanced users can remove or edit it in the
+    // layout properties panel.
+    sideBand: createDetailTableSideBand(),
     sourcePath: "Invoice.Items",
     repeatMode: "ScribanFor",
     print: createDetailTablePrintSettings(),

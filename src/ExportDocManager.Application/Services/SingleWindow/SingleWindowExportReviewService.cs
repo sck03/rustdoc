@@ -126,6 +126,11 @@ namespace ExportDocManager.Services.SingleWindow
             CancellationToken cancellationToken = default)
         {
             var document = await _customsCooDocumentService.GetOrCreateAsync(invoiceId, cancellationToken);
+            // Review repair is a write just like an editor save.  Bind the
+            // in-memory draft to the revision that was actually read so the
+            // persistence layer's compare-and-swap token rejects a concurrent
+            // edit instead of silently overwriting it.
+            document.ExpectedDraftRevision = document.DraftRevision;
             var defaults = await _customsCooDocumentService.BuildDefaultsAsync(invoiceId, cancellationToken);
             int repairedGroupCount = SingleWindowExportReviewRepairHelper.RepairCustomsCooGroups(
                 document,
@@ -146,6 +151,7 @@ namespace ExportDocManager.Services.SingleWindow
             CancellationToken cancellationToken = default)
         {
             var document = await _agentConsignmentDocumentService.GetOrCreateAsync(invoiceId, cancellationToken);
+            document.ExpectedDraftRevision = document.DraftRevision;
             var defaults = await _agentConsignmentDocumentService.BuildDefaultsAsync(invoiceId, cancellationToken);
             int repairedGroupCount = SingleWindowExportReviewRepairHelper.RepairAgentConsignmentGroups(
                 document,

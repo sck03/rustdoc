@@ -44,7 +44,10 @@ namespace ExportDocManager.Api.Hosting
 
                 if (Directory.Exists(directory))
                 {
-                    Directory.Delete(directory, recursive: true);
+                    // Use the controlled post-order deleter so a concurrently
+                    // inserted junction/symlink aborts cleanup instead of
+                    // allowing a recursive delete to cross the managed root.
+                    AtomicFileHelper.TryDeleteDirectory(directory);
                 }
                 else
                 {
@@ -124,12 +127,12 @@ namespace ExportDocManager.Api.Hosting
                             continue;
                         }
 
-                        Directory.Delete(fullDirectory, recursive: true);
+                        AtomicFileHelper.TryDeleteDirectory(fullDirectory);
                     }
 
                     if (!Directory.EnumerateFileSystemEntries(kindDirectory).Any())
                     {
-                        Directory.Delete(kindDirectory);
+                        AtomicFileHelper.TryDeleteDirectory(kindDirectory);
                     }
                 }
             }

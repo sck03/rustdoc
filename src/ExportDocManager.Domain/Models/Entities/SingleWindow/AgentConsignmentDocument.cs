@@ -99,6 +99,10 @@ namespace ExportDocManager.Models.Entities
 
         public int DraftRevision { get; set; }
 
+        /// <summary>Non-persisted compare-and-swap revision supplied by the editor.</summary>
+        [NotMapped]
+        public int? ExpectedDraftRevision { get; set; }
+
         public string ManualLockedFieldsJson { get; set; } = string.Empty;
 
         public string SourceBaselineJson { get; set; } = string.Empty;

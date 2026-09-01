@@ -39,12 +39,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Results.Json(
-                    new ApiErrorResponse(ex.Message),
-                    statusCode: StatusCodes.Status403Forbidden);
-            }
+            catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
         }
 
         private static async Task<IResult> SaveCustomsCooDocumentAsync(
@@ -64,6 +59,11 @@ namespace ExportDocManager.Api.Hosting
                 return Results.BadRequest(new ApiErrorResponse("请求体来源发票ID与路径ID不一致。"));
             }
 
+            if (request.ExpectedDraftRevision < 0)
+            {
+                return Results.BadRequest(new ApiErrorResponse("保存单证草稿必须携带有效的 ExpectedDraftRevision。请重新加载后再保存。"));
+            }
+
             try
             {
                 await settingsService.LoadAsync();
@@ -80,12 +80,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Results.Json(
-                    new ApiErrorResponse(ex.Message),
-                    statusCode: StatusCodes.Status403Forbidden);
-            }
+            catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
         }
 
         private static async Task<IResult> GetAgentConsignmentDocumentAsync(
@@ -107,12 +102,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Results.Json(
-                    new ApiErrorResponse(ex.Message),
-                    statusCode: StatusCodes.Status403Forbidden);
-            }
+            catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
         }
 
         private static async Task<IResult> GetCustomsCooLockedFieldsAsync(
@@ -135,12 +125,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Results.Json(
-                    new ApiErrorResponse(ex.Message),
-                    statusCode: StatusCodes.Status403Forbidden);
-            }
+            catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
         }
 
         private static async Task<IResult> UnlockCustomsCooFieldsAsync(
@@ -174,6 +159,10 @@ namespace ExportDocManager.Api.Hosting
 
                 if (changedCount > 0)
                 {
+                    // Unlocking is still a write against the same draft.  Carry
+                    // the revision read above so it cannot bypass compare-and-
+                    // swap protection and overwrite a concurrent edit.
+                    current.ExpectedDraftRevision = current.DraftRevision;
                     await documentService.SaveAsync(current, cancellationToken);
                     current = await documentService.GetOrCreateAsync(invoiceId, cancellationToken);
                 }
@@ -192,12 +181,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Results.Json(
-                    new ApiErrorResponse(ex.Message),
-                    statusCode: StatusCodes.Status403Forbidden);
-            }
+            catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
         }
 
         private static async Task<IResult> SaveAgentConsignmentDocumentAsync(
@@ -217,6 +201,11 @@ namespace ExportDocManager.Api.Hosting
                 return Results.BadRequest(new ApiErrorResponse("请求体来源发票ID与路径ID不一致。"));
             }
 
+            if (request.ExpectedDraftRevision < 0)
+            {
+                return Results.BadRequest(new ApiErrorResponse("保存单证草稿必须携带有效的 ExpectedDraftRevision。请重新加载后再保存。"));
+            }
+
             try
             {
                 await settingsService.LoadAsync();
@@ -233,12 +222,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Results.Json(
-                    new ApiErrorResponse(ex.Message),
-                    statusCode: StatusCodes.Status403Forbidden);
-            }
+            catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
         }
 
         private static async Task<IResult> GetAgentConsignmentLockedFieldsAsync(
@@ -261,12 +245,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Results.Json(
-                    new ApiErrorResponse(ex.Message),
-                    statusCode: StatusCodes.Status403Forbidden);
-            }
+            catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
         }
 
         private static async Task<IResult> UnlockAgentConsignmentFieldsAsync(
@@ -300,6 +279,7 @@ namespace ExportDocManager.Api.Hosting
 
                 if (changedCount > 0)
                 {
+                    current.ExpectedDraftRevision = current.DraftRevision;
                     await documentService.SaveAsync(current, cancellationToken);
                     current = await documentService.GetOrCreateAsync(invoiceId, cancellationToken);
                 }
@@ -318,12 +298,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 return Results.NotFound(new ApiErrorResponse(ex.Message));
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Results.Json(
-                    new ApiErrorResponse(ex.Message),
-                    statusCode: StatusCodes.Status403Forbidden);
-            }
+            catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
         }
 
         private static int RestoreCustomsCooLockedField(

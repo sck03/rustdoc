@@ -24,6 +24,7 @@ export interface ApiAgentConsignmentDocumentDto {
   declarePrice: string;
   draftRevision: number;
   entryId: string;
+  expectedDraftRevision: number;
   gName: string;
   id: number;
   ieDate: string;
@@ -590,6 +591,7 @@ export interface ApiCustomsCooDocumentDto {
   etpsTel: string;
   exhibitFlag: string;
   expDeclDate: string;
+  expectedDraftRevision: number;
   exporter: string;
   exporterEmail: string;
   exporterFax: string;
@@ -3451,6 +3453,9 @@ export interface SingleWindowOperationCenterDetail {
   batchId: number;
   batchReference: string;
   businessType: string;
+  clientDispatchAttemptCount: number;
+  clientDispatchLeaseUntil?: string | null;
+  clientDispatchOperationId: string;
   clientProfileName: string;
   companyScope: string;
   contractNo: string;

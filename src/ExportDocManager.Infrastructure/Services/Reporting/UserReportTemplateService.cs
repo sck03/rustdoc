@@ -72,6 +72,13 @@ namespace ExportDocManager.Services.Reporting
 
             string name = Required(request.Name, "模板名称");
             string content = request.ContentHtml ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                // New user templates start from the V3 A4 starter. Existing
+                // advanced HTML is copied only when the caller explicitly
+                // supplies it, so the two authoring paths remain independent.
+                content = ReportTemplateStarterFactory.Create(reportType, name);
+            }
             string shareScope = UserReportTemplateShareScope.Normalize(request.ShareScope);
             ReportTemplateContentPolicy.Validate(reportType, content);
             if (name.Length > 150 || content.Length > 2_000_000)

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.SingleWindow;
 
@@ -78,6 +79,44 @@ namespace ExportDocManager.Application.Tests
 
             Assert.Equal("SOURCE GOODS", source.Items[0].GoodsNameE);
             Assert.Equal("invoice.pdf", source.Attachments[0].FileName);
+        }
+
+        [Fact]
+        public void CloneDocuments_ShouldPreserveDraftConcurrencyAndSourceState()
+        {
+            var generatedAt = new DateTimeOffset(2026, 8, 31, 12, 34, 56, TimeSpan.Zero);
+            var coo = new CustomsCooDocument
+            {
+                DraftRevision = 7,
+                ExpectedDraftRevision = 7,
+                ManualLockedFieldsJson = "{\"fields\":[\"Producer\"]}",
+                SourceBaselineJson = "{\"Producer\":\"source\"}",
+                SourceBaselineHash = "coo-hash",
+                LastGeneratedAt = generatedAt,
+                SourceDiffCount = 2,
+                SourceDiffSummary = "Producer; DestCountry",
+                ManualLockedFieldCount = 1
+            };
+            var acd = new AgentConsignmentDocument
+            {
+                DraftRevision = 9,
+                ExpectedDraftRevision = 9,
+                ManualLockedFieldsJson = "{\"fields\":[\"GName\"]}",
+                SourceBaselineJson = "{\"GName\":\"source\"}",
+                SourceBaselineHash = "acd-hash",
+                LastGeneratedAt = generatedAt,
+                SourceDiffCount = 3,
+                SourceDiffSummary = "GName; Curr; TradeMode",
+                ManualLockedFieldCount = 1
+            };
+
+            var cooClone = Assert.IsType<CustomsCooDocument>(
+                SingleWindowSourceCloneHelper.CloneCustomsCooDocument(coo));
+            var acdClone = Assert.IsType<AgentConsignmentDocument>(
+                SingleWindowSourceCloneHelper.CloneAgentConsignmentDocument(acd));
+
+            Assert.Equal(JsonSerializer.Serialize(coo), JsonSerializer.Serialize(cooClone));
+            Assert.Equal(JsonSerializer.Serialize(acd), JsonSerializer.Serialize(acdClone));
         }
     }
 }

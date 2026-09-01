@@ -343,11 +343,10 @@ namespace ExportDocManager.Services.SingleWindow
                 return;
             }
 
-            Directory.CreateDirectory(rootPath);
-            Directory.CreateDirectory(Path.Combine(rootPath, "OutBox"));
-            Directory.CreateDirectory(Path.Combine(rootPath, "SentBox"));
-            Directory.CreateDirectory(Path.Combine(rootPath, "InBox"));
-            Directory.CreateDirectory(Path.Combine(rootPath, "FailBox"));
+            _ = SingleWindowClientProfilePathResolver.EnsureClientRoot(
+                rootPath,
+                createDirectories: true,
+                requireWritable: true);
         }
 
         private static string NormalizeRequired(string value, int maxLength, string fieldName)

@@ -110,6 +110,9 @@ export function normalizeCooDocumentForSave(document: ApiCustomsCooDocumentDto, 
     ...document,
     id: numberOrZero(document.id),
     sourceInvoiceId: invoiceId,
+    expectedDraftRevision: Number.isInteger(document.draftRevision) && document.draftRevision >= 0
+      ? document.draftRevision
+      : 0,
     items: document.items.map(normalizeCooItem).filter(isMeaningfulCooItem),
     nonpartyCorps: document.nonpartyCorps.map(normalizeNonpartyCorp).filter(isMeaningfulNonpartyCorp),
     attachments: document.attachments.map(normalizeAttachment),

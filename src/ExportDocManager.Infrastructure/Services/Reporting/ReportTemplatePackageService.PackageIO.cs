@@ -1,5 +1,5 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Security.Cryptography;
+using System.Text;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
@@ -19,7 +19,19 @@ namespace ExportDocManager.Services.Reporting
             int startPercent,
             int endPercent)
         {
-            Directory.CreateDirectory(targetRoot);
+            string fullSourceRoot = Path.GetFullPath(sourceRoot);
+            string fullTargetRoot = Path.GetFullPath(targetRoot);
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                fullSourceRoot,
+                "模板包源目录不能经过符号链接、目录联接或其他重解析点。");
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                fullTargetRoot,
+                "模板目标目录不能经过符号链接、目录联接或其他重解析点。");
+            Directory.CreateDirectory(fullTargetRoot);
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                fullTargetRoot,
+                fullTargetRoot,
+                "模板目标目录不能包含符号链接、目录联接或其他重解析点。");
 
             var files = sourceFiles ?? Array.Empty<string>();
             if (files.Count == 0)
@@ -31,13 +43,24 @@ namespace ExportDocManager.Services.Reporting
             for (int index = 0; index < files.Count; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                string file = files[index];
-                string relativePath = Path.GetRelativePath(sourceRoot, file);
-                string targetFile = Path.Combine(targetRoot, relativePath);
+                string file = PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    files[index],
+                    fullSourceRoot,
+                    "模板包源文件必须位于受管目录且不能经过链接类路径。");
+                string relativePath = PortablePathKey.NormalizeRelativePath(
+                    Path.GetRelativePath(fullSourceRoot, file));
+                string targetFile = PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    Path.Combine(fullTargetRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)),
+                    fullTargetRoot,
+                    "模板目标文件必须位于受管目录且不能经过链接类路径。");
                 string? targetDirectory = Path.GetDirectoryName(targetFile);
                 if (!string.IsNullOrWhiteSpace(targetDirectory))
                 {
                     Directory.CreateDirectory(targetDirectory);
+                    PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                        targetDirectory,
+                        fullTargetRoot,
+                        "模板目标子目录不能包含符号链接、目录联接或其他重解析点。");
                 }
 
                 if (!overwrite && File.Exists(targetFile))
@@ -63,181 +86,128 @@ namespace ExportDocManager.Services.Reporting
                         $"正在处理：{relativePath}",
                         OperationProgressReporter.Calculate(index + 1, files.Count, startPercent, endPercent));
                 }
-                catch (FileNotFoundException)
+                catch (FileNotFoundException ex)
                 {
+                    throw new InvalidDataException($"模板包复制源文件在操作期间消失：{relativePath}", ex);
                 }
-                catch (DirectoryNotFoundException)
+                catch (DirectoryNotFoundException ex)
                 {
+                    throw new InvalidDataException($"模板包复制源目录在操作期间消失：{relativePath}", ex);
                 }
             }
         }
 
-        private static async Task<TemplatePackageManifest> ReadManifestAsync(
-            string manifestPath,
+        private static async Task<TemplateFileManifestSummary> BuildFileManifestAsync(
+            string root,
             CancellationToken cancellationToken)
         {
-            if (!File.Exists(manifestPath))
+            IReadOnlyList<string> files = ControlledFileSystemEnumerator.EnumerateFiles(root, cancellationToken);
+            var entries = new List<TemplateFileManifest>(files.Count);
+            foreach (string file in files)
             {
-                throw new InvalidDataException("模板包缺少 config.json 配置清单。");
-            }
-
-            try
-            {
-                string json = await File.ReadAllTextAsync(manifestPath, cancellationToken).ConfigureAwait(false);
-                if (string.IsNullOrWhiteSpace(json))
+                cancellationToken.ThrowIfCancellationRequested();
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    file,
+                    root,
+                    "模板文件清单不能经过符号链接、目录联接或其他重解析点。");
+                string relativePath = PortablePathKey.NormalizeRelativePath(Path.GetRelativePath(root, file));
+                var info = new FileInfo(file);
+                if (!info.Exists || info.Length < 0)
                 {
-                    throw new InvalidDataException("模板包 config.json 配置清单为空。");
+                    throw new InvalidDataException($"模板文件在生成清单时不可用：{relativePath}");
                 }
 
-                var manifest = JsonSerializer.Deserialize<TemplatePackageManifest>(json, JsonOptions)
-                               ?? throw new InvalidDataException("模板包 config.json 配置清单为空。");
-                ValidateManifest(manifest);
-                return manifest;
+                await using var stream = new FileStream(
+                    file,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    81920,
+                    FileOptions.Asynchronous | FileOptions.SequentialScan);
+                string sha256 = Convert.ToHexString(
+                    await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false))
+                    .ToLowerInvariant();
+                entries.Add(new TemplateFileManifest(relativePath, info.Length, sha256));
             }
-            catch (JsonException ex)
-            {
-                throw new InvalidDataException($"模板包配置文件已损坏或不符合 {PackageSchemaVersion} 清单结构。", ex);
-            }
+
+            var ordered = entries
+                .OrderBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            long totalBytes = ordered.Aggregate(0L, (total, entry) => checked(total + entry.SizeBytes));
+            return new TemplateFileManifestSummary(
+                ordered,
+                ordered.Count,
+                totalBytes,
+                ComputeFilesDigest(ordered));
         }
 
-        private static void ValidateManifest(TemplatePackageManifest manifest)
+        private static async Task ValidateFileManifestAsync(
+            string root,
+            IReadOnlyList<string> sourceFiles,
+            TemplatePackageManifest manifest,
+            CancellationToken cancellationToken)
         {
-            if (!string.Equals(manifest.PackageVersion, PackageSchemaVersion, StringComparison.Ordinal))
+            if (manifest.Files == null || manifest.FileCount < 0 || manifest.TotalBytes < 0 ||
+                string.IsNullOrWhiteSpace(manifest.FilesDigest))
             {
-                throw new InvalidDataException($"模板包版本无效；当前仅接受 {PackageSchemaVersion} 清单。开发期旧格式请重新导出。");
+                throw new InvalidDataException("模板包 config.json 缺少完整的文件摘要清单。");
             }
 
-            if (manifest.Templates == null || manifest.TemplateDefaults == null ||
-                manifest.ExportTemplates == null || manifest.InternalTemplates == null)
+            var actual = await BuildFileManifestAsync(root, cancellationToken).ConfigureAwait(false);
+            if (actual.FileCount != manifest.FileCount ||
+                actual.TotalBytes != manifest.TotalBytes ||
+                !string.Equals(actual.FilesDigest, manifest.FilesDigest, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidDataException(
-                    $"模板包 {PackageSchemaVersion} 清单必须包含 Templates、TemplateDefaults、ExportTemplates 和 InternalTemplates。");
+                throw new InvalidDataException("模板包文件数量、大小或摘要与 config.json 不一致。");
             }
 
-            for (int index = 0; index < manifest.Templates.Count; index++)
+            var expectedByPath = manifest.Files.ToDictionary(
+                entry => PortablePathKey.NormalizeRelativePath(entry.Path),
+                PortablePathKey.Comparer);
+            if (expectedByPath.Count != manifest.Files.Count)
             {
-                var row = manifest.Templates[index]
-                          ?? throw new InvalidDataException($"模板包 Templates[{index}] 不能为空。");
-                if (string.IsNullOrWhiteSpace(row.Type) || string.IsNullOrWhiteSpace(row.FileName))
-                {
-                    throw new InvalidDataException($"模板包 Templates[{index}] 缺少 Type 或 FileName。");
-                }
+                throw new InvalidDataException("模板包文件清单包含重复或冲突路径。");
+            }
 
-                bool isExport = string.Equals(
-                    row.Type,
-                    ReportTemplateCatalogLoader.ExportTemplateCatalogType,
-                    StringComparison.OrdinalIgnoreCase);
-                bool isPayment = string.Equals(
-                    row.Type,
-                    ReportTemplateCatalogLoader.InternalTemplateCatalogType,
-                    StringComparison.OrdinalIgnoreCase);
-                if (!isExport && !isPayment)
+            foreach (var entry in actual.Files)
+            {
+                if (!expectedByPath.TryGetValue(entry.Path, out var expected) ||
+                    expected.SizeBytes != entry.SizeBytes ||
+                    !string.Equals(expected.Sha256, entry.Sha256, StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new InvalidDataException($"模板包 Templates[{index}] 的 Type 只能是 Export 或 Internal。");
-                }
-
-                if (isPayment && row.WithSeal.HasValue)
-                {
-                    throw new InvalidDataException($"模板包 Templates[{index}] 是付款报销模板，不得包含 WithSeal 印章配置。");
-                }
-
-                if (isExport && !row.WithSeal.HasValue)
-                {
-                    throw new InvalidDataException($"模板包 Templates[{index}] 是报关单证模板，缺少 WithSeal 配置。");
+                    throw new InvalidDataException($"模板包文件摘要不匹配：{entry.Path}");
                 }
             }
 
-            ValidateTemplateItems(
-                manifest.ExportTemplates,
-                ReportDocumentType.ExportDocument,
-                "ExportTemplates");
-            ValidateTemplateItems(
-                manifest.InternalTemplates,
-                ReportDocumentType.PaymentVoucher,
-                "InternalTemplates");
-        }
-
-        private static void ValidateTemplateItems<T>(
-            IReadOnlyList<T> items,
-            ReportDocumentType expectedReportType,
-            string propertyName)
-            where T : TemplateItemManifestBase
-        {
-            for (int index = 0; index < items.Count; index++)
+            var actualPaths = actual.Files.Select(entry => entry.Path).ToHashSet(PortablePathKey.Comparer);
+            if (expectedByPath.Keys.Any(path => !actualPaths.Contains(path)))
             {
-                var item = items[index]
-                           ?? throw new InvalidDataException($"模板包 {propertyName}[{index}] 不能为空。");
-                if (string.IsNullOrWhiteSpace(item.TemplatePath))
-                {
-                    throw new InvalidDataException($"模板包 {propertyName}[{index}] 缺少 TemplatePath。");
-                }
+                throw new InvalidDataException("模板包清单包含缺失文件。");
+            }
 
-                if (!string.Equals(item.ReportType, expectedReportType.ToString(), StringComparison.Ordinal))
-                {
-                    throw new InvalidDataException(
-                        $"模板包 {propertyName}[{index}] 的 ReportType 必须是 {expectedReportType}。");
-                }
+            // sourceFiles is supplied by the caller after its policy filtering; ensure no
+            // untracked payload slipped through under a different extension or casing.
+            var suppliedPaths = sourceFiles
+                .Select(path => PortablePathKey.NormalizeRelativePath(Path.GetRelativePath(root, path)))
+                .ToHashSet(PortablePathKey.Comparer);
+            if (!suppliedPaths.SetEquals(actualPaths))
+            {
+                throw new InvalidDataException("模板包存在未经过清单校验的文件。");
             }
         }
 
-        private sealed class TemplatePackageManifest
+        private static string ComputeFilesDigest(IEnumerable<TemplateFileManifest> entries)
         {
-            [JsonRequired]
-            public string PackageVersion { get; set; } = string.Empty;
+            var builder = new StringBuilder();
+            foreach (var entry in entries.OrderBy(item => item.Path, StringComparer.OrdinalIgnoreCase))
+            {
+                builder.Append(entry.Path).Append('\n')
+                    .Append(entry.SizeBytes).Append('\n')
+                    .Append(entry.Sha256).Append('\n');
+            }
 
-            [JsonRequired]
-            public DateTimeOffset ExportedAt { get; set; }
-
-            [JsonRequired]
-            public List<TemplateRowManifest> Templates { get; set; } = new();
-
-            [JsonRequired]
-            public ReportTemplateDefaultsManifest TemplateDefaults { get; set; } = new();
-
-            [JsonRequired]
-            public List<BatchExportItemManifest> ExportTemplates { get; set; } = new();
-
-            [JsonRequired]
-            public List<PaymentTemplateItemManifest> InternalTemplates { get; set; } = new();
-        }
-
-        private sealed class TemplateRowManifest
-        {
-            [JsonRequired]
-            public string Type { get; set; } = string.Empty;
-
-            [JsonRequired]
-            public string Name { get; set; } = string.Empty;
-
-            [JsonRequired]
-            public string FileName { get; set; } = string.Empty;
-
-            public bool? WithSeal { get; set; }
-        }
-
-        private abstract class TemplateItemManifestBase
-        {
-            [JsonRequired]
-            public string Name { get; set; } = string.Empty;
-
-            [JsonRequired]
-            public string TemplatePath { get; set; } = string.Empty;
-
-            [JsonRequired]
-            public string ReportType { get; set; } = string.Empty;
-
-            [JsonRequired]
-            public bool IsEnabled { get; set; } = true;
-        }
-
-        private sealed class BatchExportItemManifest : TemplateItemManifestBase
-        {
-            [JsonRequired]
-            public bool ShowSeal { get; set; } = true;
-        }
-
-        private sealed class PaymentTemplateItemManifest : TemplateItemManifestBase
-        {
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString())))
+                .ToLowerInvariant();
         }
     }
 }

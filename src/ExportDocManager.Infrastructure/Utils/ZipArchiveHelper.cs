@@ -28,13 +28,16 @@ namespace ExportDocManager.Utils
             ArgumentException.ThrowIfNullOrWhiteSpace(zipPath);
 
             var fullSourceDirectory = Path.GetFullPath(sourceDirectory);
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                fullSourceDirectory,
+                "待打包目录不能经过符号链接、目录联接或其他重解析点。");
             if (!Directory.Exists(fullSourceDirectory))
             {
                 throw new DirectoryNotFoundException($"目录不存在：{fullSourceDirectory}");
             }
 
-            var entries = Directory
-                .GetFiles(fullSourceDirectory, "*", SearchOption.AllDirectories)
+            var entries = ControlledFileSystemEnumerator
+                .EnumerateFiles(fullSourceDirectory, cancellationToken)
                 .Select(file => (
                     SourcePath: file,
                     EntryName: Path.GetRelativePath(fullSourceDirectory, file)));
@@ -83,6 +86,9 @@ namespace ExportDocManager.Utils
             foreach (var entry in normalizedEntries)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                    entry.SourcePath,
+                    "待打包文件不能经过符号链接、目录联接或其他重解析点。");
                 if (!File.Exists(entry.SourcePath))
                 {
                     throw new FileNotFoundException("待打包文件不存在。", entry.SourcePath);
@@ -123,7 +129,16 @@ namespace ExportDocManager.Utils
             }
 
             var fullTargetDirectory = Path.GetFullPath(targetDirectory);
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                fullPackagePath,
+                "压缩包路径不能经过符号链接、目录联接或其他重解析点。");
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                fullTargetDirectory,
+                "解压目标路径不能经过符号链接、目录联接或其他重解析点。");
             Directory.CreateDirectory(fullTargetDirectory);
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                fullTargetDirectory,
+                "解压目标路径不能经过符号链接、目录联接或其他重解析点。");
             limits ??= ZipExtractionLimits.Default;
             ValidateLimits(limits);
 
@@ -171,7 +186,15 @@ namespace ExportDocManager.Utils
                 cancellationToken.ThrowIfCancellationRequested();
                 var directoryPath = Path.GetFullPath(Path.Combine(fullTargetDirectory, normalizedNames[entry]));
                 EnsurePathWithinRoot(directoryPath, fullTargetDirectory);
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    directoryPath,
+                    fullTargetDirectory,
+                    "解压目标目录不能包含符号链接、目录联接或其他重解析点。");
                 Directory.CreateDirectory(directoryPath);
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    directoryPath,
+                    fullTargetDirectory,
+                    "解压目标目录不能包含符号链接、目录联接或其他重解析点。");
             }
 
             long extractedTotalBytes = 0;
@@ -184,8 +207,21 @@ namespace ExportDocManager.Utils
                 var directory = Path.GetDirectoryName(targetPath);
                 if (!string.IsNullOrWhiteSpace(directory))
                 {
+                    PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                        directory,
+                        fullTargetDirectory,
+                        "解压目标目录不能包含符号链接、目录联接或其他重解析点。");
                     Directory.CreateDirectory(directory);
+                    PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                        directory,
+                        fullTargetDirectory,
+                        "解压目标目录不能包含符号链接、目录联接或其他重解析点。");
                 }
+
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    targetPath,
+                    fullTargetDirectory,
+                    "解压目标文件不能包含符号链接、目录联接或其他重解析点。");
 
                 await AtomicFileHelper.WriteFileAtomicAsync(
                     targetPath,

@@ -8,6 +8,27 @@ import {
   type ReportDesignerSchemaIssue,
 } from "./reportDesignerSchemaValues.ts";
 
+/**
+ * Image bindings are deliberately narrower than ordinary field bindings.
+ * These fields are materialized by the server as data URIs; accepting an
+ * arbitrary business string here would turn the generated <img> into a
+ * browser-side URL fetch primitive (SSRF and data exfiltration risk).
+ */
+export const CONTROLLED_REPORT_IMAGE_FIELD_PATHS = [
+  "doc_seal_path",
+  "customs_seal_path",
+  "shipping_marks_image_data",
+] as const;
+
+export function isControlledReportImageFieldPath(fieldPath: string | undefined): fieldPath is typeof CONTROLLED_REPORT_IMAGE_FIELD_PATHS[number] {
+  const normalized = typeof fieldPath === "string" ? fieldPath.trim() : "";
+  return CONTROLLED_REPORT_IMAGE_FIELD_PATHS.some((candidate) => candidate === normalized);
+}
+
+export function getControlledReportImageFieldPaths(reportType: ReportDesignerReportType): readonly string[] {
+  return reportType === "ExportDocument" ? CONTROLLED_REPORT_IMAGE_FIELD_PATHS : [];
+}
+
 export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, issues: ReportDesignerSchemaIssue[]) {
   schema.sections.forEach((section, sectionIndex) => {
     section.blocks.forEach((block, blockIndex) => {
@@ -19,12 +40,12 @@ export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, iss
 
       switch (block.type) {
         case "Field":
-          validateFieldPathForReportType(schema.reportType, block.fieldPath, `${blockPath}.fieldPath`, issues);
+          validateReportTypeFieldPath(schema.reportType, block.fieldPath, `${blockPath}.fieldPath`, issues);
           break;
         case "Row":
           block.columns.forEach((column, columnIndex) => {
             if (column.contentKind === "Field") {
-              validateFieldPathForReportType(schema.reportType, column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
+              validateReportTypeFieldPath(schema.reportType, column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
             }
           });
           break;
@@ -32,20 +53,20 @@ export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, iss
           block.rows.forEach((row, rowIndex) => {
             row.cells.forEach((cell, cellIndex) => {
               if (cell.contentKind === "Field" || cell.contentKind === "CheckboxGroup") {
-                validateFieldPathForReportType(schema.reportType, cell.fieldPath, `${blockPath}.rows[${rowIndex}].cells[${cellIndex}].fieldPath`, issues);
+                validateReportTypeFieldPath(schema.reportType, cell.fieldPath, `${blockPath}.rows[${rowIndex}].cells[${cellIndex}].fieldPath`, issues);
               }
             });
           });
           break;
         case "Conditional":
-          validateFieldPathForReportType(schema.reportType, block.condition.fieldPath, `${blockPath}.condition.fieldPath`, issues);
+          validateReportTypeFieldPath(schema.reportType, block.condition.fieldPath, `${blockPath}.condition.fieldPath`, issues);
           if (block.content.kind === "Field") {
-            validateFieldPathForReportType(schema.reportType, block.content.fieldPath, `${blockPath}.content.fieldPath`, issues);
+            validateReportTypeFieldPath(schema.reportType, block.content.fieldPath, `${blockPath}.content.fieldPath`, issues);
           }
           break;
         case "Image":
           if (block.sourceKind === "Field") {
-            validateFieldPathForReportType(schema.reportType, block.fieldPath, `${blockPath}.fieldPath`, issues);
+            validateControlledReportImageFieldPath(schema.reportType, block.fieldPath, `${blockPath}.fieldPath`, issues);
           }
           break;
         case "DetailTable":
@@ -53,29 +74,29 @@ export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, iss
             issues.push(createIssue("error", blockPath, "付款/报销模板不能使用出口单据明细表；请用多列行组合付款或费用表格。"));
           }
           if (block.grouping) {
-            validateFieldPathForReportType(schema.reportType, block.grouping.fieldPath, `${blockPath}.grouping.fieldPath`, issues);
+            validateReportTypeFieldPath(schema.reportType, block.grouping.fieldPath, `${blockPath}.grouping.fieldPath`, issues);
             block.grouping.footer?.cells.forEach((cell, cellIndex) => {
               if (cell.contentKind === "Sum") {
-                validateFieldPathForReportType(schema.reportType, cell.fieldPath, `${blockPath}.grouping.footer.cells[${cellIndex}].fieldPath`, issues);
+                validateReportTypeFieldPath(schema.reportType, cell.fieldPath, `${blockPath}.grouping.footer.cells[${cellIndex}].fieldPath`, issues);
                 validateDetailTableItemFieldPath(cell.fieldPath, `${blockPath}.grouping.footer.cells[${cellIndex}].fieldPath`, issues);
               }
             });
           }
           block.columns.forEach((column, columnIndex) => {
-            validateFieldPathForReportType(schema.reportType, column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
+            validateReportTypeFieldPath(schema.reportType, column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
             column.content?.forEach((part, partIndex) => {
               if (part.kind === "Field") {
-                validateFieldPathForReportType(schema.reportType, part.fieldPath, `${blockPath}.columns[${columnIndex}].content[${partIndex}].fieldPath`, issues);
+                validateReportTypeFieldPath(schema.reportType, part.fieldPath, `${blockPath}.columns[${columnIndex}].content[${partIndex}].fieldPath`, issues);
               }
             });
           });
           block.summaryRow?.cells.forEach((cell, cellIndex) => {
             if (cell.contentKind === "Field") {
-              validateFieldPathForReportType(schema.reportType, cell.fieldPath, `${blockPath}.summaryRow.cells[${cellIndex}].fieldPath`, issues);
+              validateReportTypeFieldPath(schema.reportType, cell.fieldPath, `${blockPath}.summaryRow.cells[${cellIndex}].fieldPath`, issues);
             }
           });
           if (block.sideBand?.contentKind === "Field") {
-            validateFieldPathForReportType(schema.reportType, block.sideBand.fieldPath, `${blockPath}.sideBand.fieldPath`, issues);
+            validateReportTypeFieldPath(schema.reportType, block.sideBand.fieldPath, `${blockPath}.sideBand.fieldPath`, issues);
           }
           break;
         case "Text":
@@ -86,7 +107,33 @@ export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, iss
   });
 }
 
-function validateFieldPathForReportType(
+/** Validate an image field against the server-materialized image contract. */
+export function validateControlledReportImageFieldPath(
+  reportType: ReportDesignerReportType,
+  fieldPath: string,
+  path: string,
+  issues: ReportDesignerSchemaIssue[],
+) {
+  if (!fieldPath) return;
+  if (isControlledReportImageFieldPath(fieldPath) && getControlledReportImageFieldPaths(reportType).includes(fieldPath)) {
+    return;
+  }
+
+  issues.push(createIssue(
+    "error",
+    path,
+    "图片字段必须来自受控 data URI 字段（doc_seal_path、customs_seal_path 或 shipping_marks_image_data），不能绑定普通文本或外部 URL。",
+  ));
+}
+
+/**
+ * Validate one field reference against the report's data domain.
+ *
+ * V2 structured blocks and V3 standalone Field/Image elements must use this
+ * same rule.  Keeping the function public avoids a second, weaker V3-only
+ * allow-list that could drift from the tested block AST contract.
+ */
+export function validateReportTypeFieldPath(
   reportType: ReportDesignerReportType,
   fieldPath: string,
   path: string,

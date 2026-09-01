@@ -39,6 +39,37 @@ Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments @(
     "-RepositoryRoot", $repoRoot
 )
 
+function Clear-PortableRuntimeData {
+    param(
+        [Parameter(Mandatory = $true)][string]$EditionRoot
+    )
+
+    $resolvedEditionRoot = [System.IO.Path]::GetFullPath($EditionRoot).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar)
+    $outputPrefix = $outputRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $resolvedEditionRoot.StartsWith($outputPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Portable runtime cleanup escaped the edition output root: $resolvedEditionRoot"
+    }
+
+    $runtimeDataRoot = Join-Path $resolvedEditionRoot "App_Data"
+    if (-not (Test-Path -LiteralPath $runtimeDataRoot)) {
+        return
+    }
+
+    Stop-ExportDocProcessesUnderPath -RootPath $resolvedEditionRoot
+    # The launch smoke can leave WebView2 or sidecar writes racing its own
+    # cleanup.  The edition package is verified only after this final cleanup;
+    # release payloads must never inherit a prior smoke's runtime data.
+    Remove-ExportDocDirectoryWithRetry `
+        -Path $runtimeDataRoot `
+        -AllowedRoot $artifactsRoot `
+        -QuarantineRoot (Join-Path $artifactsRoot "runtime-cleanup-quarantine")
+    if (Test-Path -LiteralPath $runtimeDataRoot) {
+        throw "Portable launch-smoke runtime data remained before payload verification: $runtimeDataRoot"
+    }
+}
+
 if ($PreflightOnly) {
     foreach ($edition in @("Document", "Sales", "Full")) {
         $folderName = switch ($edition) {
@@ -100,6 +131,8 @@ foreach ($edition in @("Document", "Sales", "Full")) {
         $arguments += "-AllowSystemDrive"
     }
     Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments $arguments
+
+    Clear-PortableRuntimeData -EditionRoot $editionRoot
 
     $editionManifestPath = Join-Path $editionRoot "product-edition.json"
     $requiredFiles = @(

@@ -114,7 +114,10 @@ namespace ExportDocManager.Services.SingleWindow
                             companyScope = source.Invoice?.CompanyScope ?? string.Empty;
                             draftRevision = source.ExistingDocument?.DraftRevision ?? 0;
                             sourceBaselineHash = source.ExistingDocument?.SourceBaselineHash ?? string.Empty;
-                            sourceDocumentId = await TryPersistCustomsCooDocumentAsync(source, mapped, cancellationToken);
+                            var persisted = await TryPersistCustomsCooDocumentAsync(source, mapped, cancellationToken);
+                            sourceDocumentId = persisted.DocumentId;
+                            draftRevision = persisted.DraftRevision;
+                            sourceBaselineHash = persisted.SourceBaselineHash;
                             sourceDocumentType = sourceDocumentId > 0 ? nameof(CustomsCooDocument) : string.Empty;
                             break;
                         }
@@ -132,7 +135,10 @@ namespace ExportDocManager.Services.SingleWindow
                             companyScope = source.Invoice?.CompanyScope ?? string.Empty;
                             draftRevision = source.ExistingDocument?.DraftRevision ?? 0;
                             sourceBaselineHash = source.ExistingDocument?.SourceBaselineHash ?? string.Empty;
-                            sourceDocumentId = await TryPersistAgentConsignmentDocumentAsync(source, mapped, cancellationToken);
+                            var persisted = await TryPersistAgentConsignmentDocumentAsync(source, mapped, cancellationToken);
+                            sourceDocumentId = persisted.DocumentId;
+                            draftRevision = persisted.DraftRevision;
+                            sourceBaselineHash = persisted.SourceBaselineHash;
                             sourceDocumentType = sourceDocumentId > 0 ? nameof(AgentConsignmentDocument) : string.Empty;
                             break;
                         }

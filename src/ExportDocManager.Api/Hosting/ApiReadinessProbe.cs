@@ -27,17 +27,20 @@ public sealed class ApiReadinessProbe : IApiReadinessProbe
     private readonly IAppPathProvider _pathProvider;
     private readonly IBrowserRuntimeProbe? _browserRuntimeProbe;
     private readonly IBusinessClock _clock;
+    private readonly ApiBackgroundJobService? _backgroundJobService;
 
     public ApiReadinessProbe(
         IDbContextFactory<AppDbContext> contextFactory,
         IAppPathProvider pathProvider,
         IBrowserRuntimeProbe? browserRuntimeProbe = null,
-        IBusinessClock? clock = null)
+        IBusinessClock? clock = null,
+        ApiBackgroundJobService? backgroundJobService = null)
     {
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
         _browserRuntimeProbe = browserRuntimeProbe;
         _clock = clock ?? BusinessClock.CreateSystem();
+        _backgroundJobService = backgroundJobService;
     }
 
     public async Task<ApiReadinessSnapshot> CheckAsync(
@@ -65,14 +68,17 @@ public sealed class ApiReadinessProbe : IApiReadinessProbe
             browserReady = browserCheck.IsCompletedSuccessfully && browserCheck.Result;
         }
 
+        bool backgroundJobsReady = _backgroundJobService?.PersistenceStoreReady != false;
+
         var checks = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["database"] = databaseReady ? "ready" : "unavailable",
             ["runtimeDirectories"] = runtimeDirectoriesReady ? "ready" : "unavailable",
-            ["browser"] = browserReady ? "ready" : "unavailable"
+            ["browser"] = browserReady ? "ready" : "unavailable",
+            ["backgroundJobs"] = backgroundJobsReady ? "ready" : "unavailable"
         };
         return new ApiReadinessSnapshot(
-            databaseReady && runtimeDirectoriesReady && browserReady,
+            databaseReady && runtimeDirectoriesReady && browserReady && backgroundJobsReady,
             _clock.UtcNow,
             checks);
     }

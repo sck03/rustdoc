@@ -18,6 +18,7 @@ import {
   getReportDesignerPreviewSampleProfiles,
   type ReportDesignerPreviewSampleProfile,
 } from "../report-designer/reportDesignerPreviewSamples.ts";
+import { hasValidReportDesignerV3Schema } from "../report-designer/reportDesignerV3TemplateParser.ts";
 import { ReportTemplatePreviewWorkspace } from "./ReportTemplatePreviewWorkspace.tsx";
 import { ReportTemplateWorkspaceHeader } from "./ReportTemplateWorkspaceHeader.tsx";
 import { useReportTemplateSelectionSync } from "./useReportTemplateSelectionSync.ts";
@@ -103,7 +104,7 @@ export function ReportTemplateWorkspacePage({
   const [workspaceMode, setWorkspaceMode] = useState<TemplateWorkspaceMode>(() =>
     isLimitedReportView ? "preview" : "design",
   );
-  const [designerMode, setDesignerMode] = useState<DesignerMode>("new");
+  const [designerMode, setDesignerMode] = useState<DesignerMode>("v3");
   const [designerDraftContent, setDesignerDraftContent] = useState("");
   const [templatePreviewMode, setTemplatePreviewMode] = useState<TemplatePreviewMode>("sample");
   const [templatePreviewSampleProfile, setTemplatePreviewSampleProfile] = useState<ReportDesignerPreviewSampleProfile>(() =>
@@ -197,6 +198,7 @@ export function ReportTemplateWorkspacePage({
     setContentTemplatePath("");
     setLoadedContent("");
     setDesignerDraftContent("");
+    setDesignerMode("v3");
     setPreview(null);
   }, []);
 
@@ -207,6 +209,7 @@ export function ReportTemplateWorkspacePage({
     setRenameTemplateFileName(selected.name);
     setCurrentTemplateDisplayName(selected.name);
     setDesignerDraftContent("");
+    setDesignerMode(hasValidReportDesignerV3Schema(selected.contentHtml) ? "v3" : "advancedHtml");
     setPreview(null);
     setMessage(null);
     setMessageType(null);
@@ -215,6 +218,7 @@ export function ReportTemplateWorkspacePage({
   const handleDefaultTemplateLoaded = useCallback((template: NonNullable<typeof templateContentQuery.data>) => {
     applyLoadedContent(template.templatePath, template.content);
     setDesignerDraftContent("");
+    setDesignerMode(hasValidReportDesignerV3Schema(template.content) ? "v3" : "advancedHtml");
     setPreview(null);
     setMessage(null);
     setMessageType(null);
@@ -268,8 +272,7 @@ export function ReportTemplateWorkspacePage({
     }
   }, [isLimitedReportView, view]);
   const hasAppliedTemplateChanges = content !== loadedContent;
-  const hasUnappliedDesignerChanges =
-    designerMode === "new" && Boolean(designerDraftContent.trim()) && designerDraftContent !== content;
+  const hasUnappliedDesignerChanges = Boolean(designerDraftContent.trim()) && designerDraftContent !== content;
   const hasUnsavedTemplateChanges = Boolean(
     selectedTemplatePath && (hasAppliedTemplateChanges || hasUnappliedDesignerChanges),
   );
@@ -470,10 +473,8 @@ export function ReportTemplateWorkspacePage({
     canImportPackageByPath,
     canUploadPackage,
     canSave,
-    canFormatSource,
   } = deriveReportTemplateWorkspaceState({
     reportType,
-    designerMode,
     designerDraftContent,
     content,
     loadedContent,
@@ -521,7 +522,6 @@ export function ReportTemplateWorkspacePage({
     desktopAvailable,
     packageExportPath: packageWorkspace.exportPath,
     packageImportPath: packageWorkspace.importPath,
-    templateContentFetching: templateContentQuery.isFetching,
   });
   const { effectiveMessage, effectiveMessageType } = deriveReportTemplateFeedback({
     reportType,
@@ -545,6 +545,11 @@ export function ReportTemplateWorkspacePage({
     canManageTemplates &&
     !isBusy &&
     !matchesTemplatePath(selectedTemplatePath, defaultTemplatePath),
+  );
+  const canFormatSource = Boolean(
+    selectedTemplatePath &&
+    !isBusy &&
+    (isUserTemplate ? currentUserTemplate?.canEdit && canDesignTemplates : canManageTemplates),
   );
   const {
     handleDesignerModeChange,
@@ -681,7 +686,7 @@ export function ReportTemplateWorkspacePage({
     if (!canSave) {
       return;
     }
-    if (workspaceHasUnappliedDesignerChanges) {
+    if (designerMode === "v3" && workspaceHasUnappliedDesignerChanges) {
       void handleSaveNewReportDesignerContent(previewContent);
     } else if (isUserTemplate) {
       saveUserTemplateMutation.mutate(undefined);
@@ -835,6 +840,7 @@ export function ReportTemplateWorkspacePage({
           canPreview={canRenderTemplatePreview}
           canSave={canSave}
           designDisabled={isLimitedReportView}
+          v3Disabled={designerMode === "advancedHtml"}
           onBackToManagement={() => void handleBackToManagement()}
           onDesignerModeChange={handleDesignerModeChange}
           onPreview={handleRenderTemplatePreview}
@@ -844,14 +850,14 @@ export function ReportTemplateWorkspacePage({
           mode={workspaceDeviceMode}
           phone="当前设备提供模板预览；返回模板管理可切换模板，完整设计请使用桌面端。"
           tablet={workspaceDeviceCapabilities.canUseAdvancedTools
-            ? "可预览并使用高级 HTML；完整可视化设计仍建议使用更宽屏幕。"
-            : "当前设备提供模板预览；连接鼠标或触控板后可使用高级 HTML。"}
+            ? "可预览、使用 V3 可视化设计或高级 HTML；复杂版式建议继续使用高级 HTML。"
+            : "当前设备提供模板预览；连接鼠标或触控板后可使用 V3 可视化设计或高级 HTML。"}
         />
 
         <ReportTemplateFeedback message={effectiveMessage} type={effectiveMessageType} />
 
         {workspaceMode === "design" ? (
-          <div className={`report-template-grid report-template-grid-design report-template-grid-${designerMode}`}>
+          <div className="report-template-grid report-template-grid-design">
             <ReportTemplateDesignWorkspace
               designerMode={designerMode}
               reportType={reportType}
@@ -859,11 +865,7 @@ export function ReportTemplateWorkspacePage({
               content={content}
               fieldCatalog={fieldCatalogQuery.data}
               canFormatSource={canFormatSource}
-              sourceDisabled={
-                !selectedTemplatePath ||
-                templateContentQuery.isFetching ||
-                (isUserTemplate ? !currentUserTemplate?.canEdit : !canManageTemplates)
-              }
+              sourceDisabled={!canFormatSource}
               onDesignerDraftContentChange={setDesignerDraftContent}
               onFormatSource={handleFormatSource}
               onSourceContentChange={(nextContent) => {

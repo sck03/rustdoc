@@ -52,12 +52,20 @@
 
 .report-template-source-toolbar {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
   min-width: 0;
   padding: 10px;
   border-bottom: 1px solid var(--edm-neutral-250);
   background: var(--edm-white);
+}
+
+.report-template-source-mode-note {
+  margin-right: auto;
+  color: var(--edm-neutral-550);
+  font-size: var(--edm-font-size-xs);
+  line-height: 1.4;
 }
 
 .report-template-preview-workspace {
@@ -339,6 +347,10 @@
 }
 
 .report-template-designer-toolbar .segmented-control {
+  grid-template-columns: repeat(2, minmax(104px, 1fr));
+}
+
+.report-template-designer-toolbar .segmented-control.has-advanced-html {
   grid-template-columns: repeat(3, minmax(104px, 1fr));
 }
 

@@ -7,7 +7,6 @@ using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-
 namespace ExportDocManager.Services.SingleWindow
 {
     public sealed partial class ManualImportClientBridge
@@ -26,19 +25,32 @@ namespace ExportDocManager.Services.SingleWindow
                 profile,
                 stationKey,
                 cancellationToken);
-            string importRootPath = ResolveConfiguredRoot(profile, reservation.BusinessType);
-            var layout = ResolveBusinessLayout(importRootPath, createDirectories: true);
-            string stagingDirectory = Path.Combine(
-                _pathProvider.SingleWindowRoot,
-                "DispatchStaging",
-                $"{reservation.BatchReference}-{Guid.NewGuid():N}");
-            PathBoundaryHelper.EnsureWithinRoot(
-                stagingDirectory,
-                _pathProvider.SingleWindowRoot,
-                "单一窗口客户端派发暂存目录越界。");
+            SingleWindowClientFolderLayout? layout = null;
+            string stagingDirectory = string.Empty;
             IReadOnlyList<string> publishedFiles = [];
             try
             {
+                string importRootPath = ResolveConfiguredRoot(profile, reservation.BusinessType);
+                SingleWindowClientFolderLayout currentLayout = ResolveBusinessLayout(
+                    importRootPath,
+                    createDirectories: true);
+                layout = currentLayout;
+                await SetClientDispatchPathAsync(
+                    batchId,
+                    reservation.OperationId,
+                    currentLayout.OutBox,
+                    cancellationToken);
+                stagingDirectory = Path.Combine(
+                    _pathProvider.SingleWindowRoot,
+                    "DispatchStaging",
+                    $"{reservation.BatchReference}-{Guid.NewGuid():N}");
+                PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                    stagingDirectory,
+                    "单一窗口客户端派发暂存目录无效。");
+                PathBoundaryHelper.EnsureWithinRoot(
+                    stagingDirectory,
+                    _pathProvider.SingleWindowRoot,
+                    "单一窗口客户端派发暂存目录越界。");
                 await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 var batch = await _businessDataAccessScope
                     .ApplySubmissionBatchScope(context.SwSubmissionBatches, context)
@@ -52,36 +64,56 @@ namespace ExportDocManager.Services.SingleWindow
                     cancellationToken);
                 publishedFiles = await PublishPayloadFilesAsync(
                     stagedFiles,
-                    layout.OutBox,
+                    currentLayout.OutBox,
                     batch.BatchReference,
                     cancellationToken);
                 await CompleteClientDispatchAsync(
                     batchId,
                     profile,
                     stationKey,
-                    layout.OutBox,
+                    reservation.OperationId,
+                    currentLayout.OutBox,
                     publishedFiles.Count,
                     cancellationToken);
             }
             catch (Exception ex)
             {
-                foreach (string publishedFile in publishedFiles.Reverse())
+                if (ex is ClientDispatchPublicationException publicationException)
                 {
-                    AtomicFileHelper.TryDeleteFile(publishedFile);
+                    publishedFiles = publicationException.PublishedFiles;
                 }
-                await MarkClientDispatchFailedAsync(batchId, ex.Message, CancellationToken.None);
+                // A publish failure is reconciled conservatively.  Files that are
+                // already in the official OutBox are never removed automatically;
+                // the persisted failure state carries the directory for manual
+                // reconciliation before another attempt is allowed.
+                _logger.LogError(
+                    ex,
+                    "Single Window client dispatch {BatchId} operation {OperationId} failed after publishing {PublishedFileCount} file(s)",
+                    batchId,
+                    reservation.OperationId,
+                    publishedFiles.Count);
+                await MarkClientDispatchFailedAsync(
+                    batchId,
+                    reservation.OperationId,
+                    BuildDispatchFailureMessage(ex, publishedFiles.Count > 0),
+                    publishedFiles.Count > 0 ? layout?.OutBox : null,
+                    CancellationToken.None);
                 throw;
             }
             finally
             {
-                AtomicFileHelper.TryDeleteDirectory(stagingDirectory);
+                if (!string.IsNullOrWhiteSpace(stagingDirectory))
+                {
+                    AtomicFileHelper.TryDeleteDirectory(stagingDirectory);
+                }
             }
 
             return new SingleWindowClientDispatchResult
             {
                 BatchId = reservation.BatchId,
                 BatchReference = reservation.BatchReference,
-                TargetDirectory = layout.OutBox,
+                TargetDirectory = (layout ?? throw new InvalidOperationException(
+                    "客户端派发完成但未生成目标目录。")).OutBox,
                 ProfileName = profile.ProfileName,
                 PayloadFileCount = publishedFiles.Count,
                 AttachmentFileCount = reservation.AttachmentFileCount
@@ -114,20 +146,74 @@ namespace ExportDocManager.Services.SingleWindow
                         throw new ResourceConflictException(
                             "只有本机已导入且尚未派发，或上次派发已完整回滚的提交包可以写入官方客户端。");
                     }
+                    if (batch.Status == SingleWindowBatchStatusCatalog.ClientDispatchFailed &&
+                        !string.IsNullOrWhiteSpace(batch.ClientDispatchPath))
+                    {
+                        throw new ResourceConflictException(
+                            "上次派发已登记官方客户端目录，结果可能已被客户端读取；请人工核对 OutBox 后再决定是否重试。");
+                    }
 
+                    DateTimeOffset nowUtc = _clock.UtcNow;
+                    string operationId = $"SWD-{Guid.NewGuid():N}";
                     batch.Status = SingleWindowBatchStatusCatalog.ClientDispatching;
                     batch.ClientProfileName = profile.ProfileName;
                     batch.AssignedStationKey = stationKey;
                     batch.AssignedProfileKey = profile.ProfileKey;
                     batch.AssignedCardIdentifier = profile.CardIdentifier;
                     batch.LastError = string.Empty;
-                    batch.UpdatedAt = _clock.UtcNow;
-                    await context.SaveChangesAsync(token);
+                    batch.ClientDispatchOperationId = operationId;
+                    batch.ClientDispatchLeaseUntil = nowUtc.AddMinutes(10);
+                    batch.ClientDispatchAttemptCount = checked(batch.ClientDispatchAttemptCount + 1);
+                    batch.ClientDispatchPayloadDigest = batch.SubmitPackageDigest;
+                    batch.ClientDispatchPath = string.Empty;
+                    batch.UpdatedAt = nowUtc;
+                    try
+                    {
+                        await context.SaveChangesAsync(token);
+                    }
+                    catch (DbUpdateConcurrencyException exception)
+                    {
+                        throw new ServiceConcurrencyException(
+                            "该单一窗口批次正在被其他派发操作处理，请刷新后重试。",
+                            exception);
+                    }
                     return new ClientDispatchReservation(
                         batch.Id,
                         batch.BatchReference,
                         businessType,
-                        batch.AttachmentFileCount);
+                        batch.AttachmentFileCount,
+                        operationId,
+                        batch.PayloadFileCount,
+                        batch.SubmitPackageDigest);
+                },
+                IsolationLevel.Serializable,
+                cancellationToken);
+        }
+
+        private async Task SetClientDispatchPathAsync(
+            int batchId,
+            string operationId,
+            string outBoxPath,
+            CancellationToken cancellationToken)
+        {
+            await AppDbContextExecution.ExecuteInTransactionAsync(
+                _contextFactory,
+                async (context, token) =>
+                {
+                    var batch = await _businessDataAccessScope
+                        .ApplySubmissionBatchScope(context.SwSubmissionBatches, context)
+                        .FirstOrDefaultAsync(item => item.Id == batchId, token)
+                        ?? throw new ResourceNotFoundException("客户端派发批次在登记目标目录阶段不存在。");
+                    if (batch.Status != SingleWindowBatchStatusCatalog.ClientDispatching ||
+                        !string.Equals(batch.ClientDispatchOperationId, operationId, StringComparison.Ordinal))
+                    {
+                        throw new ServiceConcurrencyException("客户端派发操作已被其他请求接管，不能登记目标目录。");
+                    }
+
+                    batch.ClientDispatchPath = outBoxPath;
+                    batch.UpdatedAt = _clock.UtcNow;
+                    await context.SaveChangesAsync(token);
+                    return true;
                 },
                 IsolationLevel.Serializable,
                 cancellationToken);
@@ -137,6 +223,7 @@ namespace ExportDocManager.Services.SingleWindow
             int batchId,
             SwClientProfile profile,
             string stationKey,
+            string operationId,
             string outBoxPath,
             int payloadFileCount,
             CancellationToken cancellationToken)
@@ -158,11 +245,16 @@ namespace ExportDocManager.Services.SingleWindow
                     {
                         throw new ServiceConcurrencyException("客户端派发状态已被其他操作修改，不能确认完成。");
                     }
+                    if (!string.Equals(batch.ClientDispatchOperationId, operationId, StringComparison.Ordinal))
+                    {
+                        throw new ServiceConcurrencyException("客户端派发操作已被其他请求接管，不能确认完成。");
+                    }
 
                     DateTimeOffset nowUtc = _clock.UtcNow;
                     batch.Status = SingleWindowBatchStatusCatalog.QueuedToClient;
                     batch.ClientDispatchPath = outBoxPath;
                     batch.LastClientDispatchAt = nowUtc;
+                    batch.ClientDispatchLeaseUntil = null;
                     batch.LastError = string.Empty;
                     batch.UpdatedAt = nowUtc;
                     context.SwHandoffPackageRecords.Add(new SwHandoffPackageRecord
@@ -187,7 +279,16 @@ namespace ExportDocManager.Services.SingleWindow
                         CreatedAt = nowUtc,
                         ManifestJson = string.Empty
                     });
-                    await context.SaveChangesAsync(token);
+                    try
+                    {
+                        await context.SaveChangesAsync(token);
+                    }
+                    catch (DbUpdateConcurrencyException exception)
+                    {
+                        throw new ServiceConcurrencyException(
+                            "客户端派发状态已被其他操作修改，未确认本次派发。",
+                            exception);
+                    }
                     return true;
                 },
                 IsolationLevel.Serializable,
@@ -196,25 +297,34 @@ namespace ExportDocManager.Services.SingleWindow
 
         private async Task MarkClientDispatchFailedAsync(
             int batchId,
+            string operationId,
             string errorMessage,
+            string? publishedPath,
             CancellationToken cancellationToken)
         {
             try
             {
                 await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-                var batch = await context.SwSubmissionBatches
+                var batch = await _businessDataAccessScope
+                    .ApplySubmissionBatchScope(context.SwSubmissionBatches, context)
                     .FirstOrDefaultAsync(item => item.Id == batchId, cancellationToken);
-                if (batch == null || batch.Status != SingleWindowBatchStatusCatalog.ClientDispatching)
+                if (batch == null || batch.Status != SingleWindowBatchStatusCatalog.ClientDispatching ||
+                    !string.Equals(batch.ClientDispatchOperationId, operationId, StringComparison.Ordinal))
                 {
                     return;
                 }
 
                 batch.Status = SingleWindowBatchStatusCatalog.ClientDispatchFailed;
-                batch.LastError = string.IsNullOrWhiteSpace(errorMessage)
-                    ? "写入官方客户端目录失败。"
-                    : errorMessage.Trim()[..Math.Min(errorMessage.Trim().Length, 2000)];
+                batch.ClientDispatchLeaseUntil = null;
+                batch.ClientDispatchPath = publishedPath ?? string.Empty;
+                batch.LastError = TruncateDispatchError(errorMessage);
                 batch.UpdatedAt = _clock.UtcNow;
                 await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // A recovery or retry won the lease race.  Never downgrade its
+                // state with a late failure callback.
             }
             catch (Exception trackingException)
             {
@@ -223,6 +333,38 @@ namespace ExportDocManager.Services.SingleWindow
                     "Marking Single Window client dispatch {BatchId} as failed failed",
                     batchId);
             }
+        }
+
+        private static string BuildDispatchFailureMessage(Exception exception, bool publishedFilesRetained)
+        {
+            string prefix = publishedFilesRetained
+                ? "报文已写入官方客户端 OutBox，但派发状态确认失败；请先检查 OutBox，确认官方客户端是否已读取后再重试。"
+                : "写入官方客户端 OutBox 失败。";
+
+            // Only service exceptions whose messages are deliberately authored for
+            // users may cross the persistence boundary.  Raw IO, database and
+            // process messages can disclose paths, SQL or host details.
+            if (exception is UserVisibleInfrastructureException or
+                ServiceValidationException or
+                PermissionDeniedException or
+                ResourceConflictException)
+            {
+                string detail = exception.Message?.Trim() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(detail))
+                {
+                    return TruncateDispatchError($"{prefix} {detail}");
+                }
+            }
+
+            return prefix;
+        }
+
+        private static string TruncateDispatchError(string? value)
+        {
+            string normalized = string.IsNullOrWhiteSpace(value)
+                ? "写入官方客户端目录失败。"
+                : value.Trim();
+            return normalized.Length <= 2000 ? normalized : normalized[..2000];
         }
 
         private static string ResolveConfiguredRoot(
@@ -254,7 +396,6 @@ namespace ExportDocManager.Services.SingleWindow
             {
                 throw new PermissionDeniedException("该提交包不属于当前持卡机。");
             }
-
             if (!string.Equals(batch.AssignedProfileKey, profile.ProfileKey, StringComparison.Ordinal) ||
                 !string.Equals(batch.AssignedCardIdentifier, profile.CardIdentifier, StringComparison.Ordinal))
             {
@@ -292,6 +433,10 @@ namespace ExportDocManager.Services.SingleWindow
                 restoredDirectory,
                 _pathProvider.SingleWindowRoot,
                 "单一窗口提交包恢复目录越界。");
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                restoredDirectory,
+                _pathProvider.SingleWindowRoot,
+                "单一窗口提交包恢复目录无效。");
 
             if (Directory.Exists(restoredDirectory))
             {
@@ -303,6 +448,7 @@ namespace ExportDocManager.Services.SingleWindow
                 catch (Exception ex) when (ex is InvalidDataException or FileNotFoundException)
                 {
                     AtomicFileHelper.TryDeleteDirectory(restoredDirectory);
+                    EnsureWorkingDirectoryRemoved(restoredDirectory);
                 }
             }
 
@@ -310,6 +456,10 @@ namespace ExportDocManager.Services.SingleWindow
             Directory.CreateDirectory(restoredDirectory);
             try
             {
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    restoredDirectory,
+                    _pathProvider.SingleWindowRoot,
+                    "单一窗口提交包恢复目录无效。");
                 await ZipArchiveHelper.ExtractToDirectorySafeAsync(packagePath, restoredDirectory, cancellationToken);
                 var manifest = await ValidateWorkingDirectoryAsync(restoredDirectory, batch, cancellationToken);
                 return new SingleWindowWorkingPackage(restoredDirectory, manifest);
@@ -317,6 +467,7 @@ namespace ExportDocManager.Services.SingleWindow
             catch
             {
                 AtomicFileHelper.TryDeleteDirectory(restoredDirectory);
+                EnsureWorkingDirectoryRemoved(restoredDirectory);
                 throw;
             }
         }
@@ -326,17 +477,20 @@ namespace ExportDocManager.Services.SingleWindow
             SwSubmissionBatch batch,
             CancellationToken cancellationToken)
         {
-            if (!string.IsNullOrWhiteSpace(batch.SubmitPackagePath) && File.Exists(batch.SubmitPackagePath))
+            string? managedPath = TryResolveManagedSubmitPackagePath(
+                batch.SubmitPackagePath,
+                _pathProvider.SingleWindowRoot);
+            if (managedPath != null)
             {
                 string localDigest = await SingleWindowPackageIntegrity.ComputeFileSha256Async(
-                    batch.SubmitPackagePath,
+                    managedPath,
                     cancellationToken);
                 if (string.Equals(
                         localDigest,
                         batch.SubmitPackageArchiveSha256,
                         StringComparison.OrdinalIgnoreCase))
                 {
-                    return batch.SubmitPackagePath;
+                    return managedPath;
                 }
             }
 
@@ -365,11 +519,96 @@ namespace ExportDocManager.Services.SingleWindow
                 cachePath,
                 _pathProvider.SingleWindowRoot,
                 "单一窗口提交包缓存路径越界。");
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                cachePath,
+                _pathProvider.SingleWindowRoot,
+                "单一窗口提交包缓存路径无效。");
             await AtomicFileHelper.WriteFileAtomicAsync(
                 cachePath,
                 (tempPath, token) => File.WriteAllBytesAsync(tempPath, archive.Content, token),
                 cancellationToken);
             return cachePath;
+        }
+
+        /// <summary>
+        /// Database paths may originate from a desktop file picker.  They are
+        /// metadata only: dispatch can read a local package directly only when
+        /// the path is a normal file below the managed SingleWindow root.  Any
+        /// external, traversal, directory, or link-like path falls back to the
+        /// verified database archive instead of becoming a file-read primitive.
+        /// </summary>
+        internal static string? TryResolveManagedSubmitPackagePath(
+            string? storedPath,
+            string singleWindowRoot)
+        {
+            if (string.IsNullOrWhiteSpace(storedPath) || string.IsNullOrWhiteSpace(singleWindowRoot))
+            {
+                return null;
+            }
+
+            string raw = storedPath.Trim();
+            if (ContainsTraversalSegment(raw))
+            {
+                return null;
+            }
+
+            string root;
+            string candidate;
+            try
+            {
+                root = Path.GetFullPath(singleWindowRoot);
+                bool rooted = Path.IsPathRooted(raw);
+                if (rooted && !Path.IsPathFullyQualified(raw))
+                {
+                    return null;
+                }
+
+                candidate = Path.GetFullPath(rooted ? raw : Path.Combine(root, raw));
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                return null;
+            }
+
+            if (string.Equals(candidate, root, PathBoundaryHelper.PathComparison) ||
+                !PathBoundaryHelper.IsWithinRoot(candidate, root))
+            {
+                return null;
+            }
+
+            string fileName = Path.GetFileName(candidate);
+            if (!CrossPlatformFileNamePolicy.IsSafeFileName(fileName))
+            {
+                return null;
+            }
+
+            try
+            {
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    candidate,
+                    root,
+                    "单一窗口提交包本地路径无效。");
+                FileAttributes attributes = File.GetAttributes(candidate);
+                if ((attributes & FileAttributes.Directory) != 0 ||
+                    (attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    return null;
+                }
+
+                return File.Exists(candidate) ? candidate : null;
+            }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException or IOException or UnauthorizedAccessException)
+            {
+                return null;
+            }
+        }
+
+        private static bool ContainsTraversalSegment(string path)
+        {
+            string normalized = path.Replace('\\', '/');
+            return normalized.Split('/', StringSplitOptions.RemoveEmptyEntries)
+                .Any(segment => string.Equals(segment, ".", StringComparison.Ordinal) ||
+                                string.Equals(segment, "..", StringComparison.Ordinal));
         }
 
         private static async Task<SingleWindowPackageManifest> ValidateWorkingDirectoryAsync(
@@ -414,7 +653,13 @@ namespace ExportDocManager.Services.SingleWindow
             string batchReference,
             CancellationToken cancellationToken)
         {
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                outBoxDirectory,
+                "单一窗口派发暂存目录无效。");
             Directory.CreateDirectory(outBoxDirectory);
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                outBoxDirectory,
+                "单一窗口派发暂存目录无效。");
             var targetFiles = new List<string>();
             try
             {
@@ -461,7 +706,13 @@ namespace ExportDocManager.Services.SingleWindow
             CancellationToken cancellationToken,
             Action<int, string>? beforeCommit = null)
         {
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                outBoxDirectory,
+                "官方客户端 OutBox 目录无效。");
             Directory.CreateDirectory(outBoxDirectory);
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                outBoxDirectory,
+                "官方客户端 OutBox 目录无效。");
             var publishedFiles = new List<string>(stagedFiles?.Count ?? 0);
             var publishPlans = new List<(string PendingPath, string TargetPath)>(stagedFiles?.Count ?? 0);
             var reservedTargets = new HashSet<string>(PhysicalPathComparison.Comparer);
@@ -490,58 +741,61 @@ namespace ExportDocManager.Services.SingleWindow
                     cancellationToken.ThrowIfCancellationRequested();
                     var plan = publishPlans[index];
                     beforeCommit?.Invoke(index, plan.TargetPath);
+                    PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                        outBoxDirectory,
+                        "官方客户端 OutBox 目录无效。");
+                    PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                        plan.PendingPath,
+                        "官方客户端待发布文件路径无效。");
+                    PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                        plan.TargetPath,
+                        "官方客户端目标文件路径无效。");
                     File.Move(plan.PendingPath, plan.TargetPath, overwrite: false);
                     publishedFiles.Add(plan.TargetPath);
                 }
 
                 return publishedFiles;
             }
-            catch
+            catch (Exception exception)
             {
+                // File.Move is the commit point.  If an exception is raised after
+                // the move but before publishedFiles.Add (or if a filesystem
+                // callback observes the move and interrupts the operation), the
+                // target is still a committed official-client payload.  Inspect
+                // each plan before removing pending files so that narrow window
+                // cannot be mistaken for a fully rolled-back publish.
+                var reconciled = new HashSet<string>(publishedFiles, PhysicalPathComparison.Comparer);
+                foreach (var plan in publishPlans)
+                {
+                    if (reconciled.Contains(plan.TargetPath) ||
+                        !File.Exists(plan.TargetPath) ||
+                        File.Exists(plan.PendingPath))
+                    {
+                        continue;
+                    }
+
+                    reconciled.Add(plan.TargetPath);
+                }
+
                 foreach (var plan in publishPlans)
                 {
                     AtomicFileHelper.TryDeleteFile(plan.PendingPath);
                 }
-                foreach (string publishedFile in publishedFiles.AsEnumerable().Reverse())
+                // A file that has entered the official OutBox may already have
+                // been consumed.  Never delete it automatically; surface the
+                // committed paths so the caller can require reconciliation.
+                if (reconciled.Count > 0)
                 {
-                    AtomicFileHelper.TryDeleteFile(publishedFile);
+                    throw new ClientDispatchPublicationException(
+                        exception,
+                        publishPlans
+                            .Select(plan => plan.TargetPath)
+                            .Where(reconciled.Contains)
+                            .ToArray());
                 }
 
                 throw;
             }
-        }
-
-        private static string BuildOutBoxFilePath(
-            string outBoxDirectory,
-            string originalFileName,
-            string batchReference,
-            ISet<string>? reservedPaths = null)
-        {
-            string candidate = Path.Combine(outBoxDirectory, originalFileName);
-            if (!File.Exists(candidate) &&
-                !Directory.Exists(candidate) &&
-                !(reservedPaths?.Contains(candidate) ?? false))
-            {
-                return candidate;
-            }
-
-            string baseName = Path.GetFileNameWithoutExtension(originalFileName);
-            string extension = Path.GetExtension(originalFileName);
-            string safeBatchReference = string.IsNullOrWhiteSpace(batchReference)
-                ? Guid.NewGuid().ToString("N")[..17]
-                : batchReference.Trim();
-            candidate = Path.Combine(outBoxDirectory, $"{baseName}_{safeBatchReference}{extension}");
-            int suffix = 2;
-            while (File.Exists(candidate) ||
-                   Directory.Exists(candidate) ||
-                   (reservedPaths?.Contains(candidate) ?? false))
-            {
-                candidate = Path.Combine(
-                    outBoxDirectory,
-                    $"{baseName}_{safeBatchReference}_{suffix++}{extension}");
-            }
-
-            return candidate;
         }
 
         private sealed record SingleWindowWorkingPackage(
@@ -552,6 +806,22 @@ namespace ExportDocManager.Services.SingleWindow
             int BatchId,
             string BatchReference,
             SingleWindowBusinessType BusinessType,
-            int AttachmentFileCount);
+            int AttachmentFileCount,
+            string OperationId,
+            int PayloadFileCount,
+            string PayloadDigest);
+
+        private sealed class ClientDispatchPublicationException : Exception
+        {
+            public ClientDispatchPublicationException(
+                Exception innerException,
+                IReadOnlyList<string> publishedFiles)
+                : base("官方客户端 OutBox 仅完成了部分发布，必须人工核对后再重试。", innerException)
+            {
+                PublishedFiles = publishedFiles;
+            }
+
+            public IReadOnlyList<string> PublishedFiles { get; }
+        }
     }
 }

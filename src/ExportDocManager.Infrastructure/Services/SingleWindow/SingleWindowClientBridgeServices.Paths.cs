@@ -6,22 +6,16 @@ namespace ExportDocManager.Services.SingleWindow
             string rootPath,
             bool createDirectories)
         {
-            string normalizedRoot = SingleWindowClientProfilePathResolver.NormalizeClientRootPath(rootPath);
+            string normalizedRoot = SingleWindowClientProfilePathResolver.EnsureClientRoot(
+                rootPath,
+                createDirectories,
+                requireWritable: createDirectories);
             string bizRoot = normalizedRoot;
 
             string outBox = Path.Combine(bizRoot, "OutBox");
             string sentBox = Path.Combine(bizRoot, "SentBox");
             string inBox = Path.Combine(bizRoot, "InBox");
             string failBox = Path.Combine(bizRoot, "FailBox");
-
-            if (createDirectories)
-            {
-                Directory.CreateDirectory(bizRoot);
-                Directory.CreateDirectory(outBox);
-                Directory.CreateDirectory(sentBox);
-                Directory.CreateDirectory(inBox);
-                Directory.CreateDirectory(failBox);
-            }
 
             return new SingleWindowClientFolderLayout
             {

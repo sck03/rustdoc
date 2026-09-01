@@ -10,6 +10,8 @@
     "generate:api": "pwsh -ExecutionPolicy Bypass -File ../../scripts/generate-api-client.ps1",
     "test:new-report-designer-exporter": "node ../../scripts/test_new_report_designer_exporter.mjs",
     "test:new-report-designer-print": "node ../../scripts/test_new_report_designer_print_regression.mjs",
+    "test:report-designer-v3": "node ../../scripts/test_report_designer_v3_contract.mjs",
+    "test:report-designer-v3-print": "node ../../scripts/test_report_designer_v3_print_regression.mjs",
     "test:template-visual": "node ../../scripts/test_report_template_visual_regression.mjs",
     "test:template-pdf": "node ../../scripts/test_report_template_pdf_regression.mjs",
     "test:template-pdf-pixels": "node ../../scripts/test_report_template_pdf_pixel_regression.mjs",

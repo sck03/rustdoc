@@ -44,7 +44,7 @@ namespace ExportDocManager.Api.Hosting
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(_storePath) || !File.Exists(_storePath))
+            if (string.IsNullOrWhiteSpace(_storePath) || !TryConfirmPersistedStorePresence(out bool storeExists) || !storeExists)
             {
                 return;
             }
@@ -52,25 +52,52 @@ namespace ExportDocManager.Api.Hosting
             try
             {
                 string json = File.ReadAllText(_storePath);
-                var jobs = JsonSerializer.Deserialize<List<BackgroundJobSnapshot>>(json, PersistenceJsonOptions);
-                if (jobs == null || jobs.Count == 0)
+                var jobs = JsonSerializer.Deserialize<List<BackgroundJobSnapshot?>>(json, PersistenceJsonOptions);
+                if (jobs is null)
+                {
+                    // A literal JSON null is not an empty first-start store.  It
+                    // means the existing history cannot be validated, so expose
+                    // the failure through readiness instead of presenting a
+                    // silently incomplete catalog.
+                    MarkPersistenceLoadFailure("invalid-record");
+                    return;
+                }
+
+                if (jobs.Count == 0)
                 {
                     return;
                 }
 
                 bool needsRewrite = false;
                 var restartTime = _timeProvider.GetUtcNow();
-                foreach (var job in jobs)
+                var restoredJobs = new List<BackgroundJobSnapshot>(jobs.Count);
+                var jobIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (BackgroundJobSnapshot? job in jobs)
                 {
-                    if (job == null || string.IsNullOrWhiteSpace(job.JobId))
+                    if (job is null || string.IsNullOrWhiteSpace(job.JobId))
                     {
-                        continue;
+                        MarkPersistenceLoadFailure("invalid-record");
+                        return;
                     }
 
                     var normalized = NormalizeRestoredJob(job, restartTime, out bool changed);
                     normalized = CleanupRestoredFailedOutput(normalized, ref changed);
-                    _jobs[normalized.JobId] = normalized;
+                    if (!jobIds.Add(normalized.JobId))
+                    {
+                        // Duplicate IDs would otherwise make the last JSON item
+                        // overwrite an earlier one and leave the durable history
+                        // ambiguous.  Refuse the whole store until it is repaired.
+                        MarkPersistenceLoadFailure("invalid-record");
+                        return;
+                    }
+
+                    restoredJobs.Add(normalized);
                     needsRewrite |= changed;
+                }
+
+                foreach (BackgroundJobSnapshot restoredJob in restoredJobs)
+                {
+                    _jobs[restoredJob.JobId] = restoredJob;
                 }
 
                 if (needsRewrite)
@@ -82,14 +109,92 @@ namespace ExportDocManager.Api.Hosting
             }
             catch (IOException)
             {
-                // A corrupt or locked history file must not prevent the local API from starting.
+                MarkPersistenceLoadFailure("read-failed");
             }
             catch (UnauthorizedAccessException)
             {
+                MarkPersistenceLoadFailure("access-denied");
             }
             catch (JsonException)
             {
+                MarkPersistenceLoadFailure("invalid-json");
             }
+            catch (InvalidDataException)
+            {
+                MarkPersistenceLoadFailure("invalid-record");
+            }
+            catch (ArgumentException)
+            {
+                MarkPersistenceLoadFailure("invalid-store");
+            }
+            catch (NotSupportedException)
+            {
+                MarkPersistenceLoadFailure("invalid-store");
+            }
+            catch (OverflowException)
+            {
+                MarkPersistenceLoadFailure("invalid-record");
+            }
+            catch (System.Security.SecurityException)
+            {
+                MarkPersistenceLoadFailure("access-denied");
+            }
+        }
+
+        private bool TryConfirmPersistedStorePresence(out bool exists)
+        {
+            exists = false;
+            try
+            {
+                FileAttributes attributes = File.GetAttributes(_storePath);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    MarkPersistenceLoadFailure("unsafe-store");
+                    return false;
+                }
+
+                if ((attributes & FileAttributes.Directory) != 0)
+                {
+                    MarkPersistenceLoadFailure("invalid-store");
+                    return false;
+                }
+
+                exists = true;
+                return true;
+            }
+            catch (FileNotFoundException)
+            {
+                return true;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return true;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                MarkPersistenceLoadFailure("access-denied");
+                return false;
+            }
+            catch (IOException)
+            {
+                MarkPersistenceLoadFailure("read-failed");
+                return false;
+            }
+            catch (ArgumentException)
+            {
+                MarkPersistenceLoadFailure("invalid-path");
+                return false;
+            }
+            catch (NotSupportedException)
+            {
+                MarkPersistenceLoadFailure("invalid-path");
+                return false;
+            }
+        }
+
+        private void MarkPersistenceLoadFailure(string code)
+        {
+            _persistenceLoadFailureCode = string.IsNullOrWhiteSpace(code) ? "unavailable" : code;
         }
 
         private void PersistJob(BackgroundJobSnapshot job)
@@ -147,7 +252,40 @@ namespace ExportDocManager.Api.Hosting
                 }
 
                 string json = JsonSerializer.Serialize(jobs, PersistenceJsonOptions);
-                AtomicFileHelper.WriteAllTextAtomic(_storePath, json);
+                try
+                {
+                    AtomicFileHelper.WriteAllTextAtomic(_storePath, json);
+                }
+                catch (IOException)
+                {
+                    MarkPersistenceLoadFailure("write-failed");
+                    throw;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    MarkPersistenceLoadFailure("access-denied");
+                    throw;
+                }
+                catch (ArgumentException)
+                {
+                    MarkPersistenceLoadFailure("invalid-path");
+                    throw;
+                }
+                catch (NotSupportedException)
+                {
+                    MarkPersistenceLoadFailure("invalid-path");
+                    throw;
+                }
+                catch (InvalidDataException)
+                {
+                    MarkPersistenceLoadFailure("unsafe-store");
+                    throw;
+                }
+                catch (System.Security.SecurityException)
+                {
+                    MarkPersistenceLoadFailure("access-denied");
+                    throw;
+                }
                 long persistedAt = _timeProvider.GetUtcNow().UtcTicks;
                 foreach (var job in jobs)
                 {

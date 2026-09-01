@@ -24,6 +24,12 @@ namespace ExportDocManager.Api.Hosting
         private static IResult WriteServiceException(Exception exception) =>
             ApiServiceExceptionMapper.ToResult(exception);
 
+        private static JsonHttpResult<ApiErrorResponse> TypedServiceException(Exception exception)
+        {
+            ApiServiceError error = ApiServiceExceptionMapper.Map(exception, null);
+            return TypedResults.Json(error.ToResponse(), statusCode: error.StatusCode);
+        }
+
         private static IResult WriteValidation(string message) =>
             WriteServiceException(new ServiceValidationException(message));
 

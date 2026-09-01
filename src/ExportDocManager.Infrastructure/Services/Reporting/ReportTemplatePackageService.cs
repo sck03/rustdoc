@@ -1,52 +1,12 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
-using ExportDocManager.Services.Time;
 using ExportDocManager.Utils;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ExportDocManager.Services.Reporting
 {
     public sealed partial class ReportTemplatePackageService : IReportTemplatePackageService
     {
-        private const string PackageExtension = ".edtpl";
-        private const string PackageSchemaVersion = "1.2";
-
-        private const string StoragePolicy =
-            "模板包导出路径来自用户显式输入；相对路径解析到运行数据根 TemplatePackages/。只打包和导入运行数据根 Templates/ 下的用户模板，内置模板保持只读；临时文件使用运行数据根 Cache/TemplatePackages。";
-
-        private static readonly JsonSerializerOptions JsonOptions = new()
-        {
-            WriteIndented = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
-        };
-
-        private readonly IAppPathProvider _pathProvider;
-        private readonly ISettingsService _settingsService;
-        private readonly ReportTemplatePathResolver _pathResolver;
-        private readonly ReportTemplatePackageReferencePolicy _referencePolicy;
-        private readonly ReportTemplateCatalogLoader _catalogLoader;
-        private readonly ILogger<ReportTemplatePackageService> _logger;
-        private readonly IBusinessClock _clock;
-
-        public ReportTemplatePackageService(
-            IAppPathProvider pathProvider,
-            ISettingsService settingsService,
-            ILogger<ReportTemplatePackageService>? logger = null,
-            IBusinessClock? clock = null)
-        {
-            _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
-            _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
-            _pathResolver = new ReportTemplatePathResolver(pathProvider);
-            _referencePolicy = new ReportTemplatePackageReferencePolicy(_pathResolver);
-            _logger = logger ?? NullLogger<ReportTemplatePackageService>.Instance;
-            _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver, _logger);
-            _clock = clock ?? BusinessClock.CreateSystem();
-        }
-
         public async Task<ReportTemplatePackageExportResult> ExportAsync(
             string packagePath,
             IProgress<OperationProgressUpdate>? progress = null,
@@ -60,7 +20,14 @@ namespace ExportDocManager.Services.Reporting
                 "edtpl-export");
             string tempTemplates = Path.Combine(tempRoot, "Templates");
 
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                templatesRoot,
+                "模板目录不能经过符号链接、目录联接或其他重解析点。");
             Directory.CreateDirectory(templatesRoot);
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                templatesRoot,
+                templatesRoot,
+                "模板目录不能包含符号链接、目录联接或其他重解析点。");
             await _settingsService.LoadAsync().ConfigureAwait(false);
 
             try
@@ -68,11 +35,10 @@ namespace ExportDocManager.Services.Reporting
                 cancellationToken.ThrowIfCancellationRequested();
                 OperationProgressReporter.Report(progress, "正在扫描模板目录", "系统正在整理本次打包的模板文件。", 5);
 
-                var templateFiles = Directory.Exists(templatesRoot)
-                    ? Directory.GetFiles(templatesRoot, "*", SearchOption.AllDirectories)
-                        .Where(path => !string.Equals(Path.GetFileName(path), "report_templates.json", StringComparison.OrdinalIgnoreCase))
-                        .ToArray()
-                    : Array.Empty<string>();
+                var templateFiles = ControlledFileSystemEnumerator
+                    .EnumerateFiles(templatesRoot, cancellationToken)
+                    .Where(path => !string.Equals(Path.GetFileName(path), "report_templates.json", StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
                 await CopyFilesAsync(
                     templateFiles,
                     templatesRoot,
@@ -83,6 +49,10 @@ namespace ExportDocManager.Services.Reporting
                     "正在复制模板文件",
                     8,
                     46).ConfigureAwait(false);
+
+                var fileManifest = await BuildFileManifestAsync(
+                    tempTemplates,
+                    cancellationToken).ConfigureAwait(false);
 
                 cancellationToken.ThrowIfCancellationRequested();
                 OperationProgressReporter.Report(progress, "正在整理模板清单", "系统正在写入模板包配置清单。", 55);
@@ -111,7 +81,11 @@ namespace ExportDocManager.Services.Reporting
                             ReportDocumentType.PaymentVoucher)
                     },
                     ExportTemplates = BuildExportManifestItems(_settingsService.Settings.BatchExport?.Items),
-                    InternalTemplates = BuildPaymentManifestItems(_settingsService.Settings.PaymentTemplates)
+                    InternalTemplates = BuildPaymentManifestItems(_settingsService.Settings.PaymentTemplates),
+                    Files = fileManifest.Files.ToList(),
+                    FileCount = fileManifest.FileCount,
+                    TotalBytes = fileManifest.TotalBytes,
+                    FilesDigest = fileManifest.FilesDigest
                 };
 
                 string manifestPath = Path.Combine(tempRoot, "config.json");
@@ -183,10 +157,22 @@ namespace ExportDocManager.Services.Reporting
                 string manifestPath = Path.Combine(tempRoot, "config.json");
                 var manifest = await ReadManifestAsync(manifestPath, cancellationToken).ConfigureAwait(false);
 
+                PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                    templatesRoot,
+                    "模板目录不能经过符号链接、目录联接或其他重解析点。");
                 Directory.CreateDirectory(templatesRoot);
-                var sourceFiles = Directory.GetFiles(sourceTemplates, "*", SearchOption.AllDirectories)
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    templatesRoot,
+                    templatesRoot,
+                    "模板目录不能包含符号链接、目录联接或其他重解析点。");
+                var sourceFiles = ControlledFileSystemEnumerator.EnumerateFiles(sourceTemplates, cancellationToken)
                     .Where(path => !string.Equals(Path.GetFileName(path), "report_templates.json", StringComparison.OrdinalIgnoreCase))
                     .ToArray();
+                await ValidateFileManifestAsync(
+                    sourceTemplates,
+                    sourceFiles,
+                    manifest,
+                    cancellationToken).ConfigureAwait(false);
                 if (sourceFiles.Any(path =>
                         string.Equals(Path.GetExtension(path), ReportTemplateFilePolicy.Extension, StringComparison.OrdinalIgnoreCase) &&
                         !string.Equals(Path.GetExtension(path), ReportTemplateFilePolicy.Extension, StringComparison.Ordinal)))

@@ -17,7 +17,13 @@ namespace ExportDocManager.Utils
                 throw new ArgumentException("无法解析目标文件所在目录。", nameof(targetPath));
             }
 
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                targetDirectory,
+                "原子文件目标目录不能经过符号链接、目录联接或其他重解析点。");
             Directory.CreateDirectory(targetDirectory);
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                targetDirectory,
+                "原子文件目标目录不能经过符号链接、目录联接或其他重解析点。");
 
             var targetFileNameWithoutExtension = Path.GetFileNameWithoutExtension(fullTargetPath);
             var targetExtension = Path.GetExtension(fullTargetPath);
@@ -31,13 +37,82 @@ namespace ExportDocManager.Utils
 
             var fullSourcePath = Path.GetFullPath(sourcePath);
             var fullTargetPath = Path.GetFullPath(targetPath);
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                fullSourcePath,
+                "原子文件源路径不能经过符号链接、目录联接或其他重解析点。");
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                fullTargetPath,
+                "原子文件目标路径不能经过符号链接、目录联接或其他重解析点。");
             var targetDirectory = Path.GetDirectoryName(fullTargetPath);
             if (!string.IsNullOrWhiteSpace(targetDirectory))
             {
+                PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                    targetDirectory,
+                    "原子文件目标目录不能经过符号链接、目录联接或其他重解析点。");
                 Directory.CreateDirectory(targetDirectory);
+                PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                    targetDirectory,
+                    "原子文件目标目录不能经过符号链接、目录联接或其他重解析点。");
             }
 
             ReplaceFileWithRetry(fullSourcePath, fullTargetPath);
+        }
+
+        /// <summary>
+        /// Replaces a file without blocking a request thread while a desktop process has
+        /// the destination briefly open.  The source and destination must be siblings so
+        /// the rename remains a single-volume operation.
+        /// </summary>
+        public static async Task ReplaceFileAsync(
+            string sourcePath,
+            string targetPath,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+            ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
+
+            string fullSourcePath = Path.GetFullPath(sourcePath);
+            string fullTargetPath = Path.GetFullPath(targetPath);
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                fullSourcePath,
+                "原子文件源路径不能经过符号链接、目录联接或其他重解析点。");
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                fullTargetPath,
+                "原子文件目标路径不能经过符号链接、目录联接或其他重解析点。");
+            string? targetDirectory = Path.GetDirectoryName(fullTargetPath);
+            if (!string.IsNullOrWhiteSpace(targetDirectory))
+            {
+                PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                    targetDirectory,
+                    "原子文件目标目录不能经过符号链接、目录联接或其他重解析点。");
+                Directory.CreateDirectory(targetDirectory);
+                PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                    targetDirectory,
+                    "原子文件目标目录不能经过符号链接、目录联接或其他重解析点。");
+            }
+
+            for (int attempt = 0; attempt < ReplaceFileMaxAttempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    ReplaceFileOnce(fullSourcePath, fullTargetPath);
+                    return;
+                }
+                catch (IOException) when (attempt < ReplaceFileMaxAttempts - 1)
+                {
+                    await Task.Delay(ReplaceFileRetryDelayMilliseconds, cancellationToken).ConfigureAwait(false);
+                }
+                catch (UnauthorizedAccessException) when (attempt < ReplaceFileMaxAttempts - 1)
+                {
+                    await Task.Delay(ReplaceFileRetryDelayMilliseconds, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            // The final attempt deliberately propagates its original exception.  A caller
+            // must never observe a successful atomic write when the rename did not happen.
+            cancellationToken.ThrowIfCancellationRequested();
+            ReplaceFileOnce(fullSourcePath, fullTargetPath);
         }
 
         private static void ReplaceFileWithRetry(string fullSourcePath, string fullTargetPath)
@@ -46,15 +121,7 @@ namespace ExportDocManager.Utils
             {
                 try
                 {
-                    if (File.Exists(fullTargetPath))
-                    {
-                        File.Replace(fullSourcePath, fullTargetPath, destinationBackupFileName: null, ignoreMetadataErrors: true);
-                    }
-                    else
-                    {
-                        File.Move(fullSourcePath, fullTargetPath);
-                    }
-
+                    ReplaceFileOnce(fullSourcePath, fullTargetPath);
                     return;
                 }
                 catch (IOException) when (attempt < ReplaceFileMaxAttempts - 1)
@@ -65,6 +132,33 @@ namespace ExportDocManager.Utils
                 {
                     Thread.Sleep(ReplaceFileRetryDelayMilliseconds);
                 }
+            }
+        }
+
+        private static void ReplaceFileOnce(string fullSourcePath, string fullTargetPath)
+        {
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                fullSourcePath,
+                "原子文件源路径不能经过符号链接、目录联接或其他重解析点。");
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                fullTargetPath,
+                "原子文件目标路径不能经过符号链接、目录联接或其他重解析点。");
+            if (PhysicalPathComparison.Comparer.Equals(fullSourcePath, fullTargetPath))
+            {
+                throw new IOException("原子替换的源文件和目标文件不能相同。");
+            }
+
+            if (File.Exists(fullTargetPath))
+            {
+                File.Replace(
+                    fullSourcePath,
+                    fullTargetPath,
+                    destinationBackupFileName: null,
+                    ignoreMetadataErrors: true);
+            }
+            else
+            {
+                File.Move(fullSourcePath, fullTargetPath);
             }
         }
 
@@ -168,7 +262,7 @@ namespace ExportDocManager.Utils
                 cancellationToken.ThrowIfCancellationRequested();
                 var result = await writeTempFileAsync(tempPath, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
-                ReplaceFile(tempPath, targetPath);
+                await ReplaceFileAsync(tempPath, targetPath, cancellationToken).ConfigureAwait(false);
                 return result;
             }
             finally
@@ -205,6 +299,77 @@ namespace ExportDocManager.Utils
         public static void TryDeleteDirectory(string directoryPath)
         {
             TryDeleteDirectoryInternal(directoryPath, maxAttempts: 3, retryDelayMilliseconds: 50);
+        }
+
+        /// <summary>
+        /// Best-effort asynchronous cleanup for request/background-task finally blocks.
+        /// The boolean result is intentionally available to callers that need to log or
+        /// surface a degraded cleanup state; the legacy void helpers remain for simple
+        /// fire-and-forget cleanup sites.
+        /// </summary>
+        public static Task<bool> TryDeleteFileAsync(
+            string filePath,
+            CancellationToken cancellationToken = default) =>
+            TryDeleteFileAsyncCore(filePath, cancellationToken);
+
+        public static Task<bool> TryDeleteDirectoryAsync(
+            string directoryPath,
+            CancellationToken cancellationToken = default) =>
+            TryDeleteDirectoryAsyncCore(directoryPath, cancellationToken);
+
+        private static async Task<bool> TryDeleteFileAsyncCore(
+            string filePath,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(filePath)) return true;
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    if (!File.Exists(filePath)) return true;
+                    ResetFileAttributes(filePath);
+                    File.Delete(filePath);
+                    return !File.Exists(filePath);
+                }
+                catch (IOException) when (attempt < 2)
+                {
+                    await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+                }
+                catch (UnauthorizedAccessException) when (attempt < 2)
+                {
+                    await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            return !File.Exists(filePath);
+        }
+
+        private static async Task<bool> TryDeleteDirectoryAsyncCore(
+            string directoryPath,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(directoryPath)) return true;
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    if (!Directory.Exists(directoryPath)) return true;
+                    DeleteDirectoryTree(directoryPath);
+                    return !Directory.Exists(directoryPath);
+                }
+                catch (IOException) when (attempt < 2)
+                {
+                    await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+                }
+                catch (UnauthorizedAccessException) when (attempt < 2)
+                {
+                    await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            return !Directory.Exists(directoryPath);
         }
 
         private static void TryDeleteFileInternal(string filePath, int maxAttempts, int retryDelayMilliseconds)
@@ -260,8 +425,7 @@ namespace ExportDocManager.Utils
                         return;
                     }
 
-                    ResetDirectoryAttributes(directoryPath);
-                    Directory.Delete(directoryPath, recursive: true);
+                    DeleteDirectoryTree(directoryPath);
                     return;
                 }
                 catch when (attempt < maxAttempts - 1)
@@ -275,24 +439,80 @@ namespace ExportDocManager.Utils
             }
         }
 
-        private static void ResetDirectoryAttributes(string directoryPath)
+        private static void DeleteDirectoryTree(string directoryPath)
         {
             if (!Directory.Exists(directoryPath))
             {
                 return;
             }
 
-            foreach (var filePath in Directory.EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories))
+            // Do not use SearchOption.AllDirectories here.  It can follow a
+            // junction/symlink that is created between enumeration and delete,
+            // allowing cleanup of a temporary directory to reach outside its
+            // declared root.  An explicit post-order walk lets us reject every
+            // reparse point before touching or descending into it.
+            var pending = new Stack<(string Path, bool Exit)>();
+            pending.Push((Path.GetFullPath(directoryPath), Exit: false));
+            while (pending.Count > 0)
             {
-                ResetFileAttributes(filePath);
-            }
+                var (currentPath, exit) = pending.Pop();
+                FileAttributes attributes = File.GetAttributes(currentPath);
+                EnsureNotReparsePoint(currentPath, attributes);
 
-            foreach (var childDirectory in Directory.EnumerateDirectories(directoryPath, "*", SearchOption.AllDirectories))
+                if (exit)
+                {
+                    ResetFileAttributes(currentPath);
+                    // A non-recursive delete is important here: even if a
+                    // reparse point is swapped in after enumeration, the OS
+                    // removes only that directory entry and never traverses
+                    // the target of a junction/symlink.
+                    Directory.Delete(currentPath, recursive: false);
+                    continue;
+                }
+
+                if ((attributes & FileAttributes.Directory) == 0)
+                {
+                    ResetFileAttributes(currentPath);
+                    File.Delete(currentPath);
+                    continue;
+                }
+
+                pending.Push((currentPath, Exit: true));
+                var directory = new DirectoryInfo(currentPath);
+                IEnumerable<FileSystemInfo> entries = directory.EnumerateFileSystemInfos(
+                    "*",
+                    new EnumerationOptions
+                    {
+                        RecurseSubdirectories = false,
+                        IgnoreInaccessible = false,
+                        ReturnSpecialDirectories = false,
+                        AttributesToSkip = 0
+                    });
+
+                foreach (FileSystemInfo entry in entries.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).Reverse())
+                {
+                    string childPath = Path.GetFullPath(entry.FullName);
+                    FileAttributes childAttributes = File.GetAttributes(childPath);
+                    EnsureNotReparsePoint(childPath, childAttributes);
+                    if ((childAttributes & FileAttributes.Directory) != 0)
+                    {
+                        pending.Push((childPath, Exit: false));
+                    }
+                    else
+                    {
+                        ResetFileAttributes(childPath);
+                        File.Delete(childPath);
+                    }
+                }
+            }
+        }
+
+        private static void EnsureNotReparsePoint(string path, FileAttributes attributes)
+        {
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
             {
-                ResetFileAttributes(childDirectory);
+                throw new InvalidDataException($"清理目录不能包含符号链接、目录联接或其他重解析点：{path}");
             }
-
-            ResetFileAttributes(directoryPath);
         }
 
         private static void ResetFileAttributes(string path)

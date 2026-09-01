@@ -106,10 +106,7 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return TypedResults.Conflict(new ApiErrorResponse(ex.Message));
                 }
-                catch (UnauthorizedAccessException ex)
-                {
-                    return TypedForbidden(ex.Message);
-                }
+                catch (UnauthorizedAccessException ex) { return TypedServiceException(ex); }
             })
             .WithName("PurgeCancelledInvoice")
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);

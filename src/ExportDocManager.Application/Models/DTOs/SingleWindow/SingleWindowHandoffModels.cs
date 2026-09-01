@@ -213,8 +213,7 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
                         return;
                     }
 
-                    ResetDirectoryAttributes(directoryPath);
-                    Directory.Delete(directoryPath, recursive: true);
+                    DeleteDirectoryTree(directoryPath);
                     return;
                 }
                 catch when (attempt < maxAttempts - 1)
@@ -228,24 +227,74 @@ namespace ExportDocManager.Models.DTOs.SingleWindow
             }
         }
 
-        private static void ResetDirectoryAttributes(string directoryPath)
+        private static void DeleteDirectoryTree(string directoryPath)
         {
             if (!Directory.Exists(directoryPath))
             {
                 return;
             }
 
-            foreach (var filePath in Directory.EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories))
+            // Keep cleanup fail-closed: never recursively enumerate through a
+            // junction, symlink, or other reparse point that could target an
+            // unrelated directory.
+            var pending = new Stack<(string Path, bool Exit)>();
+            pending.Push((Path.GetFullPath(directoryPath), Exit: false));
+            while (pending.Count > 0)
             {
-                ResetFileAttributes(filePath);
-            }
+                var (currentPath, exit) = pending.Pop();
+                FileAttributes attributes = File.GetAttributes(currentPath);
+                EnsureNotReparsePoint(currentPath, attributes);
 
-            foreach (var childDirectory in Directory.EnumerateDirectories(directoryPath, "*", SearchOption.AllDirectories))
+                if (exit)
+                {
+                    ResetFileAttributes(currentPath);
+                    Directory.Delete(currentPath, recursive: false);
+                    continue;
+                }
+
+                if ((attributes & FileAttributes.Directory) == 0)
+                {
+                    ResetFileAttributes(currentPath);
+                    File.Delete(currentPath);
+                    continue;
+                }
+
+                pending.Push((currentPath, Exit: true));
+                var directory = new DirectoryInfo(currentPath);
+                IEnumerable<FileSystemInfo> entries = directory.EnumerateFileSystemInfos(
+                    "*",
+                    new EnumerationOptions
+                    {
+                        RecurseSubdirectories = false,
+                        IgnoreInaccessible = false,
+                        ReturnSpecialDirectories = false,
+                        AttributesToSkip = 0
+                    });
+
+                foreach (FileSystemInfo entry in entries.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).Reverse())
+                {
+                    string childPath = Path.GetFullPath(entry.FullName);
+                    FileAttributes childAttributes = File.GetAttributes(childPath);
+                    EnsureNotReparsePoint(childPath, childAttributes);
+                    if ((childAttributes & FileAttributes.Directory) != 0)
+                    {
+                        pending.Push((childPath, Exit: false));
+                    }
+                    else
+                    {
+                        ResetFileAttributes(childPath);
+                        File.Delete(childPath);
+                    }
+                }
+            }
+        }
+
+        private static void EnsureNotReparsePoint(string path, FileAttributes attributes)
+        {
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
             {
-                ResetFileAttributes(childDirectory);
+                throw new InvalidDataException($"清理目录不能包含符号链接、目录联接或其他重解析点：{path}");
             }
-
-            ResetFileAttributes(directoryPath);
         }
 
         private static void ResetFileAttributes(string path)

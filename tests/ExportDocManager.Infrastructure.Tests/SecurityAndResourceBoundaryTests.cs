@@ -4,6 +4,7 @@ using ExportDocManager.Services.Data;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.SingleWindow;
 using ExportDocManager.Services.Tools;
 using ExportDocManager.Utils;
 using PdfSharp.Drawing;
@@ -50,6 +51,147 @@ public sealed class SecurityAndResourceBoundaryTests
     public void PortablePathKey_ShouldRejectHostIndependentAbsolutePaths(string path)
     {
         Assert.Throws<InvalidDataException>(() => PortablePathKey.NormalizeRelativePath(path));
+    }
+
+    [Fact]
+    public void ControlledFileSystemEnumerator_ShouldEnumerateOnlySafeFiles()
+    {
+        string root = CreateTempDirectory("controlled-enumeration");
+        try
+        {
+            string nested = Path.Combine(root, "nested");
+            Directory.CreateDirectory(nested);
+            File.WriteAllText(Path.Combine(root, "b.txt"), "b");
+            File.WriteAllText(Path.Combine(nested, "a.txt"), "a");
+
+            IReadOnlyList<string> files = ControlledFileSystemEnumerator.EnumerateFiles(root);
+
+            Assert.Equal(2, files.Count);
+            Assert.Equal(
+                [Path.Combine(root, "b.txt"), Path.Combine(nested, "a.txt")],
+                files);
+            Assert.Single(ControlledFileSystemEnumerator.EnumerateImmediateFiles(root));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public void ControlledFileSystemEnumerator_ShouldRejectDirectorySymbolicLink()
+    {
+        string root = CreateTempDirectory("controlled-enumeration-link");
+        string outside = CreateTempDirectory("controlled-enumeration-outside");
+        try
+        {
+            File.WriteAllText(Path.Combine(outside, "secret.txt"), "secret");
+            string link = Path.Combine(root, "linked");
+            try
+            {
+                Directory.CreateSymbolicLink(link, outside);
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or PlatformNotSupportedException or IOException)
+            {
+                // Symbolic-link creation requires an elevated/dev-mode capability on
+                // some Windows runners.  The same assertion runs on capable hosts.
+                return;
+            }
+
+            Assert.Throws<InvalidDataException>(() => ControlledFileSystemEnumerator.EnumerateFiles(root));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+            DeleteDirectory(outside);
+        }
+    }
+
+    [Fact]
+    public void SingleWindowSubmitPackagePath_ShouldUseManagedFilesOnly()
+    {
+        string root = CreateTempDirectory("single-window-package-path");
+        string managed = Path.Combine(root, "Inbox", "batch.swpkg");
+        string outside = Path.Combine(Path.GetDirectoryName(root)!, $"outside-{Guid.NewGuid():N}.swpkg");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(managed)!);
+            File.WriteAllText(managed, "package");
+            File.WriteAllText(outside, "outside");
+
+            Assert.Equal(
+                Path.GetFullPath(managed),
+                ManualImportClientBridge.TryResolveManagedSubmitPackagePath(managed, root));
+            Assert.Equal(
+                Path.GetFullPath(managed),
+                ManualImportClientBridge.TryResolveManagedSubmitPackagePath(Path.Combine("Inbox", "batch.swpkg"), root));
+            Assert.Null(ManualImportClientBridge.TryResolveManagedSubmitPackagePath(outside, root));
+            Assert.Null(ManualImportClientBridge.TryResolveManagedSubmitPackagePath(Path.Combine(root, "..", Path.GetFileName(outside)), root));
+            Assert.Null(ManualImportClientBridge.TryResolveManagedSubmitPackagePath(Path.Combine(root, "Inbox"), root));
+
+            string link = Path.Combine(root, "Inbox", "linked.swpkg");
+            try
+            {
+                File.CreateSymbolicLink(link, outside);
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or PlatformNotSupportedException or IOException)
+            {
+                return;
+            }
+
+            Assert.Null(ManualImportClientBridge.TryResolveManagedSubmitPackagePath(link, root));
+        }
+        finally
+        {
+            if (File.Exists(outside)) File.Delete(outside);
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task AtomicFileHelper_ShouldNeverRecursivelyDeleteThroughDirectoryLink()
+    {
+        string root = CreateTempDirectory("atomic-cleanup-link");
+        string outside = CreateTempDirectory("atomic-cleanup-outside");
+        string outsideFile = Path.Combine(outside, "keep.txt");
+        string link = Path.Combine(root, "linked");
+        try
+        {
+            File.WriteAllText(outsideFile, "must remain");
+            try
+            {
+                Directory.CreateSymbolicLink(link, outside);
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or PlatformNotSupportedException or IOException)
+            {
+                return;
+            }
+
+            AtomicFileHelper.TryDeleteDirectory(root);
+            Assert.True(File.Exists(outsideFile));
+            Assert.True(Directory.Exists(root));
+
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                AtomicFileHelper.TryDeleteDirectoryAsync(root));
+            Assert.True(File.Exists(outsideFile));
+        }
+        finally
+        {
+            if (Directory.Exists(link))
+            {
+                Directory.Delete(link, recursive: false);
+            }
+
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+
+            if (Directory.Exists(outside))
+            {
+                Directory.Delete(outside, recursive: true);
+            }
+        }
     }
 
     [Fact]
@@ -397,6 +539,41 @@ public sealed class SecurityAndResourceBoundaryTests
         finally
         {
             DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public void TextLogCleanup_ShouldRejectLinkLikeChildrenBeforeDeletingAnything()
+    {
+        string root = CreateTempDirectory("text-log-link");
+        string outside = CreateTempDirectory("text-log-link-outside");
+        string link = Path.Combine(root, "linked");
+        try
+        {
+            string outsideLog = Path.Combine(outside, "outside.log");
+            File.WriteAllText(outsideLog, "must remain");
+            try
+            {
+                Directory.CreateSymbolicLink(link, outside);
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or PlatformNotSupportedException or IOException)
+            {
+                return;
+            }
+
+            Assert.Throws<InvalidDataException>(() =>
+                TextLogCleanupHelper.Clean(root, retentionDays: 1, retainedFileCount: 1));
+            Assert.True(File.Exists(outsideLog));
+        }
+        finally
+        {
+            if (Directory.Exists(link))
+            {
+                Directory.Delete(link, recursive: false);
+            }
+
+            DeleteDirectory(root);
+            DeleteDirectory(outside);
         }
     }
 

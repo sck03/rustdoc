@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 using ExportDocManager.Services.Errors;
@@ -15,9 +16,19 @@ namespace ExportDocManager.Services.Reporting;
 /// </summary>
 internal static class ReportTemplateContentPolicy
 {
+    internal enum RuntimeMode
+    {
+        AdvancedHtml = 0,
+        V3 = 3
+    }
+
     private const int MaximumTemplateCharacters = 2_000_000;
     internal const int MaximumRenderedHtmlCharacters = 32_000_000;
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
+    private static readonly Regex V3SchemaComment = new(
+        @"<!--\s*EXPORTDOC_REPORT_DESIGNER_SCHEMA\s*(?<json>[\s\S]*?)\s*-->",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        RegexTimeout);
 
     private static readonly FrozenSet<string> PaymentForbiddenRoots = new[]
     {
@@ -135,6 +146,117 @@ internal static class ReportTemplateContentPolicy
             throw new ArgumentException(
                 $"{domain}模板不能使用另一业务域字段：{string.Join("、", forbidden)}。",
                 nameof(content));
+        }
+
+        ValidateRuntimeMode(reportType, source);
+    }
+
+    /// <summary>
+    /// Determines the one runtime that owns a template. A document without a
+    /// designer comment is intentionally advanced HTML so existing hand-authored
+    /// layouts remain usable. A designer comment is authoritative; malformed or
+    /// non-V3 versions never fall back to a different runtime.
+    /// </summary>
+    internal static RuntimeMode DetectRuntimeMode(string source)
+    {
+        string value = source ?? string.Empty;
+        Match match;
+        try
+        {
+            match = V3SchemaComment.Match(value);
+        }
+        catch (RegexMatchTimeoutException ex)
+        {
+            throw new ArgumentException("报表模板设计结构读取超时。", nameof(source), ex);
+        }
+
+        if (!match.Success)
+        {
+            return RuntimeMode.AdvancedHtml;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(match.Groups["json"].Value);
+            JsonElement root = document.RootElement;
+            if (!root.TryGetProperty("version", out JsonElement version) ||
+                version.ValueKind != JsonValueKind.Number ||
+                !version.TryGetInt32(out int versionNumber))
+            {
+                throw new ArgumentException("报表模板设计结构缺少有效 version。", nameof(source));
+            }
+
+            if (versionNumber != 3)
+            {
+                throw new ArgumentException(
+                    "报表模板只支持 V3 设计结构；V2 已移除。需要复杂排版时请使用高级 HTML 模式。",
+                    nameof(source));
+            }
+
+            return RuntimeMode.V3;
+        }
+        catch (JsonException ex)
+        {
+            throw new ArgumentException("报表模板 V3 设计结构 JSON 无效。", nameof(source), ex);
+        }
+    }
+
+    private static void ValidateRuntimeMode(ReportDocumentType reportType, string source)
+    {
+        if (DetectRuntimeMode(source) == RuntimeMode.AdvancedHtml)
+        {
+            return;
+        }
+
+        ValidateV3Schema(reportType, source);
+    }
+
+    private static void ValidateV3Schema(ReportDocumentType reportType, string source)
+    {
+        Match match;
+        try
+        {
+            match = V3SchemaComment.Match(source);
+        }
+        catch (RegexMatchTimeoutException ex)
+        {
+            throw new ArgumentException("报表模板 V3 设计结构读取超时。", nameof(source), ex);
+        }
+
+        if (!match.Success)
+        {
+            throw new ArgumentException(
+                "该模板包含设计结构标记，但不是有效的 V3 A4 结构；V2 设计结构已移除。请使用高级 HTML，或在可视化设计器中创建新的 V3 A4 模板。",
+                nameof(source));
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(match.Groups["json"].Value);
+            JsonElement root = document.RootElement;
+            if (!root.TryGetProperty("version", out JsonElement version) || version.GetInt32() != 3)
+            {
+                throw new ArgumentException("报表模板只接受 version=3 的 V3 设计结构。", nameof(source));
+            }
+
+            if (!root.TryGetProperty("reportType", out JsonElement embeddedType) ||
+                !Enum.TryParse(embeddedType.GetString(), ignoreCase: true, out ReportDocumentType parsedType) ||
+                parsedType != reportType)
+            {
+                throw new ArgumentException(
+                    $"报表模板 V3 数据域与当前业务域不一致。当前要求 {reportType}。",
+                    nameof(source));
+            }
+
+            if (!root.TryGetProperty("page", out JsonElement page) ||
+                !string.Equals(page.TryGetProperty("size", out JsonElement size) ? size.GetString() : null, "A4", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("报表模板 V3 页面必须固定为 A4。", nameof(source));
+            }
+        }
+        catch (JsonException ex)
+        {
+            throw new ArgumentException("报表模板 V3 设计结构 JSON 无效。", nameof(source), ex);
         }
     }
 

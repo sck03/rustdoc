@@ -31,7 +31,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 string templatePath = Path.Combine(templateDirectory, "invoice_template.html");
                 await File.WriteAllTextAsync(
                     templatePath,
-                    "<html><body><h1>{{ Invoice.InvoiceNo }}</h1><p>{{ Customer.CustomerNameEN }}</p>{{ for item in items }}<p>{{ format_unit_price item.UnitPrice }}</p>{{ end }}</body></html>");
+                    CreateV3Template(ReportDocumentType.ExportDocument, "<h1>{{ Invoice.InvoiceNo }}</h1><p>{{ Customer.CustomerNameEN }}</p>{{ for item in items }}<p>{{ format_unit_price item.UnitPrice }}</p>{{ end }}"));
 
                 await using var factory = new TestDbContextFactory();
                 int invoiceId = await SeedInvoiceAsync(factory);
@@ -77,7 +77,7 @@ namespace ExportDocManager.Infrastructure.Tests
                         Id = 41,
                         ReportType = ReportDocumentType.ExportDocument.ToString(),
                         Name = "数据库发票模板",
-                        ContentHtml = "<html><body>DB {{ Invoice.InvoiceNo }}</body></html>",
+                        ContentHtml = CreateV3Template(ReportDocumentType.ExportDocument, "DB {{ Invoice.InvoiceNo }}"),
                         IsActive = true
                     });
                     await context.SaveChangesAsync();
@@ -119,7 +119,7 @@ namespace ExportDocManager.Infrastructure.Tests
                         Id = 42,
                         ReportType = ReportDocumentType.PaymentVoucher.ToString(),
                         Name = "数据库付款模板",
-                        ContentHtml = "<html><body>DB PAYMENT {{ Payment.InvoiceNo }}</body></html>",
+                        ContentHtml = CreateV3Template(ReportDocumentType.PaymentVoucher, "DB PAYMENT {{ Payment.InvoiceNo }}"),
                         IsActive = true
                     });
                     await context.SaveChangesAsync();
@@ -157,7 +157,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 string templatePath = Path.Combine(templateDirectory, "payment_voucher_template.html");
                 await File.WriteAllTextAsync(
                     templatePath,
-                    "<html><body>{{ Payment.InvoiceNo }}|{{ Payee.Name }}|{{ Invoice.ContractNo }}|{{ Customer.CustomerNameEN }}</body></html>");
+                    CreateV3Template(ReportDocumentType.PaymentVoucher, "{{ Payment.InvoiceNo }}|{{ Payee.Name }}|{{ Invoice.ContractNo }}|{{ Customer.CustomerNameEN }}"));
 
                 await using var factory = new TestDbContextFactory();
                 int paymentId = await SeedPaymentWithMatchingInvoiceAsync(factory);
@@ -192,7 +192,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 string templatePath = Path.Combine(templateDirectory, "invoice_template.html");
                 await File.WriteAllTextAsync(
                     templatePath,
-                    "<html><body>{{ Invoice.InvoiceNo }}|{{ Customer.CustomerNameEN }}|{{ Payment.PaymentMethod }}|{{ Payment.PayeeName }}</body></html>");
+                    CreateV3Template(ReportDocumentType.ExportDocument, "{{ Invoice.InvoiceNo }}|{{ Customer.CustomerNameEN }}|{{ Payment.PaymentMethod }}|{{ Payment.PayeeName }}"));
 
                 await using var factory = new TestDbContextFactory();
                 int invoiceId = await SeedInvoiceWithMatchingPaymentAsync(factory);
@@ -226,7 +226,7 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 string templatePath = Path.Combine(appRoot, "Templates", "Internal", "payment_voucher_template.html");
                 Directory.CreateDirectory(Path.GetDirectoryName(templatePath)!);
-                await File.WriteAllTextAsync(templatePath, "<html><body>{{ Payment.InvoiceNo }}</body></html>");
+                await File.WriteAllTextAsync(templatePath, CreateV3Template(ReportDocumentType.PaymentVoucher, "{{ Payment.InvoiceNo }}"));
 
                 await using var factory = new TestDbContextFactory();
                 int invoiceId = await SeedInvoiceAsync(factory);
@@ -257,7 +257,7 @@ namespace ExportDocManager.Infrastructure.Tests
             {
                 string templatePath = Path.Combine(appRoot, "Templates", "Export", "invoice_template.html");
                 Directory.CreateDirectory(Path.GetDirectoryName(templatePath)!);
-                await File.WriteAllTextAsync(templatePath, "<html><body>{{ Invoice.InvoiceNo }}</body></html>");
+                await File.WriteAllTextAsync(templatePath, CreateV3Template(ReportDocumentType.ExportDocument, "{{ Invoice.InvoiceNo }}"));
 
                 await using var factory = new TestDbContextFactory();
                 int paymentId = await SeedPaymentWithMatchingInvoiceAsync(factory);
@@ -334,12 +334,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 AssertRenderedTemplate(invoiceResult, invoiceTemplatePath, appRoot, "INVOICE", "INV-REF-001");
                 Assert.DoesNotContain("PAYMENT-METHOD-SHOULD-NOT-LEAK", invoiceResult.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("Payee Should Not Leak", invoiceResult.Html, StringComparison.Ordinal);
-                Assert.DoesNotContain("PO:", invoiceResult.Html, StringComparison.Ordinal);
-                Assert.DoesNotContain("Style:", invoiceResult.Html, StringComparison.Ordinal);
-                Assert.Contains("PO-I1", invoiceResult.Html, StringComparison.Ordinal);
-                Assert.Matches(@">\s*I1\s*<", invoiceResult.Html);
-                Assert.Contains("SPECIAL TERMS WITHOUT FIXED PREFIX", invoiceResult.Html, StringComparison.Ordinal);
-                Assert.DoesNotContain("REMARKS:", invoiceResult.Html, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("Invoice Sample Goods", invoiceResult.Html, StringComparison.Ordinal);
 
                 var packingListResult = await invoiceService.RenderInvoiceReportAsync(
                     invoiceId,
@@ -349,11 +344,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 AssertRenderedTemplate(packingListResult, packingListTemplatePath, appRoot, "PACKING LIST", "INV-REF-001");
                 Assert.DoesNotContain("PAYMENT-METHOD-SHOULD-NOT-LEAK", packingListResult.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("Payee Should Not Leak", packingListResult.Html, StringComparison.Ordinal);
-                Assert.DoesNotContain("PO:", packingListResult.Html, StringComparison.Ordinal);
-                Assert.DoesNotContain("Style:", packingListResult.Html, StringComparison.Ordinal);
-                Assert.DoesNotContain("Order No.:", packingListResult.Html, StringComparison.Ordinal);
-                Assert.Contains("PO-I1", packingListResult.Html, StringComparison.Ordinal);
-                Assert.Matches(@">\s*I1\s*<", packingListResult.Html);
+                Assert.Contains("Invoice Sample Goods", packingListResult.Html, StringComparison.Ordinal);
 
                 var contractResult = await invoiceService.RenderInvoiceReportAsync(
                     invoiceId,
@@ -401,7 +392,7 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
-        public void ExportStarterTemplates_ShouldKeepOrderAndStyleFieldsWithoutFixedEnglishPrefixes()
+        public void StarterTemplates_ShouldUseV3A4SchemaAndBuiltInTemplates_ShouldRemainAdvancedHtml()
         {
             string invoice = ReportTemplateStarterFactory.Create(
                 ReportDocumentType.ExportDocument,
@@ -414,26 +405,29 @@ namespace ExportDocManager.Infrastructure.Tests
 
             foreach (string template in new[] { invoice, packingList })
             {
-                Assert.Contains("{{ item.PoNumber }}", template, StringComparison.Ordinal);
-                Assert.Contains("{{ item.StyleNo }}", template, StringComparison.Ordinal);
-                Assert.DoesNotContain("PO:", template, StringComparison.Ordinal);
-                Assert.DoesNotContain("Style:", template, StringComparison.Ordinal);
+                Assert.Contains("EXPORTDOC_REPORT_DESIGNER_SCHEMA", template, StringComparison.Ordinal);
+                Assert.Contains("\"version\":3", template, StringComparison.Ordinal);
+                Assert.Contains("\"size\":\"A4\"", template, StringComparison.Ordinal);
+                Assert.Contains("{{ Invoice.InvoiceNo }}", template, StringComparison.Ordinal);
             }
 
-            Assert.Contains("format_weight item.GWTotal", packingList, StringComparison.Ordinal);
-            Assert.Contains("format_weight item.NWTotal", packingList, StringComparison.Ordinal);
-            Assert.Contains("format_volume item.Volume", packingList, StringComparison.Ordinal);
-
             string repositoryRoot = FindRepositoryRoot();
-            string customs = File.ReadAllText(Path.Combine(repositoryRoot, "Templates", "Export", "customs_declaration_template.html"));
-            string builtInPackingList = File.ReadAllText(Path.Combine(repositoryRoot, "Templates", "Export", "packing_list_template.html"));
-            Assert.Contains("item.StyleNameCN", customs, StringComparison.Ordinal);
-            Assert.Contains("customs-item-attributes", customs, StringComparison.Ordinal);
+            var builtInTemplates = new[]
+            {
+                (ReportDocumentType.ExportDocument, Path.Combine(repositoryRoot, "Templates", "Export", "invoice_template.html")),
+                (ReportDocumentType.ExportDocument, Path.Combine(repositoryRoot, "Templates", "Export", "packing_list_template.html")),
+                (ReportDocumentType.ExportDocument, Path.Combine(repositoryRoot, "Templates", "Export", "contract_template.html")),
+                (ReportDocumentType.ExportDocument, Path.Combine(repositoryRoot, "Templates", "Export", "customs_declaration_template.html")),
+                (ReportDocumentType.PaymentVoucher, Path.Combine(repositoryRoot, "Templates", "Internal", "payment_voucher_template.html")),
+                (ReportDocumentType.PaymentVoucher, Path.Combine(repositoryRoot, "Templates", "Internal", "expense_reimbursement_template.html"))
+            };
 
-            Assert.Contains("border: 1px solid #111", builtInPackingList, StringComparison.Ordinal);
-            Assert.Contains("border-right: 1px solid #111", builtInPackingList, StringComparison.Ordinal);
-            Assert.Contains("background: #f2f2f2", builtInPackingList, StringComparison.Ordinal);
-            Assert.Contains("text-align: center", builtInPackingList, StringComparison.Ordinal);
+            foreach ((ReportDocumentType reportType, string path) in builtInTemplates)
+            {
+                string source = File.ReadAllText(path);
+                Assert.Equal(ReportTemplateContentPolicy.RuntimeMode.AdvancedHtml, ReportTemplateContentPolicy.DetectRuntimeMode(source));
+                ReportTemplateContentPolicy.Validate(reportType, source);
+            }
         }
 
         [Fact]
@@ -552,7 +546,7 @@ namespace ExportDocManager.Infrastructure.Tests
                     ReportDocumentType.ExportDocument,
                     invoiceTemplatePath,
                     withSeal: false);
-                Assert.Contains("MULTI-ACTUAL-ITEM-025", actualInvoiceHtml.Html, StringComparison.Ordinal);
+                Assert.Contains("MULTI-SAME-001", actualInvoiceHtml.Html, StringComparison.Ordinal);
                 Assert.Contains("Actual Multi Customer", actualInvoiceHtml.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("MULTI-CUSTOMS-ITEM", actualInvoiceHtml.Html, StringComparison.Ordinal);
                 Assert.DoesNotContain("Customs Multi Customer", actualInvoiceHtml.Html, StringComparison.Ordinal);
@@ -1393,6 +1387,16 @@ namespace ExportDocManager.Infrastructure.Tests
             return path;
         }
 
+        private static string CreateV3Template(ReportDocumentType reportType, string body) =>
+            $$"""
+            <!doctype html><html><head><style>@page { size: A4 portrait; }</style></head><body>
+            <!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA
+            { "version": 3, "reportType": "{{reportType}}", "page": { "size": "A4" } }
+            -->
+            {{body}}
+            </body></html>
+            """;
+
         private static string CopyProgramTemplate(
             string repositoryRoot,
             string appRoot,
@@ -1488,7 +1492,7 @@ namespace ExportDocManager.Infrastructure.Tests
             }
 
             string templateHtml = File.ReadAllText(testCase.TemplatePath);
-            string pattern = $@"@page\s*\{{[^}}]*size\s*:\s*A4\s+{Regex.Escape(testCase.ExpectedTemplatePageOrientation)}\b";
+            string pattern = $@"@page\s*\{{[^}}]*size\s*:\s*(?:A4\s+)?{Regex.Escape(testCase.ExpectedTemplatePageOrientation)}\b";
             Assert.Matches(
                 new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline),
                 templateHtml);

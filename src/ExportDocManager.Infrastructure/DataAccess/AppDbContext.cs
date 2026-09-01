@@ -400,6 +400,9 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<CustomsCooDocument>()
                 .HasIndex(document => new { document.SourceInvoiceId, document.DraftRevision });
             modelBuilder.Entity<CustomsCooDocument>()
+                .Property(document => document.DraftRevision)
+                .IsConcurrencyToken();
+            modelBuilder.Entity<CustomsCooDocument>()
                 .HasMany(document => document.Items)
                 .WithOne(item => item.Document)
                 .HasForeignKey(item => item.DocumentId)
@@ -437,6 +440,9 @@ namespace ExportDocManager.DataAccess
                 .HasIndex(document => new { document.InvoiceNo, document.LastGeneratedAt });
             modelBuilder.Entity<AgentConsignmentDocument>()
                 .HasIndex(document => new { document.SourceInvoiceId, document.DraftRevision });
+            modelBuilder.Entity<AgentConsignmentDocument>()
+                .Property(document => document.DraftRevision)
+                .IsConcurrencyToken();
 
             modelBuilder.Entity<SwClientProfile>()
                 .HasIndex(profile => profile.ProfileKey)
@@ -463,6 +469,15 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<SwSubmissionBatch>()
                 .HasIndex(batch => new { batch.SourceInvoiceId, batch.BusinessType, batch.SubmissionVersion })
                 .IsUnique();
+            // A dispatch is a lease-based state machine.  Treat both lease and
+            // operation identity as concurrency tokens so a stale completion or
+            // failure callback can never overwrite recovery or a later retry.
+            modelBuilder.Entity<SwSubmissionBatch>()
+                .Property(batch => batch.ClientDispatchLeaseUntil)
+                .IsConcurrencyToken();
+            modelBuilder.Entity<SwSubmissionBatch>()
+                .Property(batch => batch.ClientDispatchOperationId)
+                .IsConcurrencyToken();
             modelBuilder.Entity<SwSubmissionBatch>()
                 .HasMany(batch => batch.ReceiptLogs)
                 .WithOne(log => log.Batch)

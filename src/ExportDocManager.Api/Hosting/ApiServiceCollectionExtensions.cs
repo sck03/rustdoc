@@ -92,6 +92,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddHostedService(provider => provider.GetRequiredService<ApiBackgroundJobRunner>());
             services.AddSingleton<ApiBackgroundJobRetryDispatcher>();
             services.AddHostedService<PostgreSqlAutomaticBackupHostedService>();
+            services.AddHostedService<SingleWindowClientDispatchRecoveryHostedService>();
             services.AddSingleton<IBackgroundJobService>(provider =>
                 provider.GetRequiredService<ApiBackgroundJobService>());
             services.AddSingleton<ICurrentUserContext, ApiCurrentUserContext>();

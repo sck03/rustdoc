@@ -16,8 +16,18 @@ namespace ExportDocManager.Api.Hosting
         private readonly TimeProvider _timeProvider;
         private readonly Lock _mutationLock = new();
         private readonly Lock _historyCleanupLock = new();
+        private volatile string? _persistenceLoadFailureCode;
 
         internal int PersistThrottleEntryCount => _lastPersistedUtcTicks.Count;
+
+        /// <summary>
+        /// A missing local history file is a valid first-start state.  Once an
+        /// existing history file cannot be read or validated, readiness must
+        /// fail instead of presenting an incomplete empty job catalog.
+        /// </summary>
+        internal bool PersistenceStoreReady => _persistenceLoadFailureCode is null;
+
+        internal string PersistenceStoreStatus => _persistenceLoadFailureCode ?? "ready";
 
         public ApiBackgroundJobService()
         {

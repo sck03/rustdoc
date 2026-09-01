@@ -424,7 +424,7 @@ namespace ExportDocManager.Api.Tests
                 Assert.Equal(HttpStatusCode.OK, uploadPackageResponse.StatusCode);
                 var uploadedPackage = await ApiIntegrationTestHarness.ReadJsonAsync<ApiReportTemplatePackageImportResponse>(uploadPackageResponse);
                 Assert.True(uploadedPackage.TemplateCount > 0);
-                Assert.Equal("1.2", uploadedPackage.PackageVersion);
+                Assert.Equal("1.3", uploadedPackage.PackageVersion);
                 Assert.Contains("Cache/TemplatePackages", uploadedPackage.StoragePolicy, StringComparison.Ordinal);
                 Assert.True(File.Exists(templatePath));
             }

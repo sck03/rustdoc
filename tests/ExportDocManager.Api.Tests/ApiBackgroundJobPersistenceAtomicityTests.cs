@@ -33,6 +33,126 @@ public sealed class ApiBackgroundJobPersistenceAtomicityTests
     }
 
     [Fact]
+    public async Task ExistingCorruptHistory_ShouldBeMarkedUnavailableInsteadOfLookingEmpty()
+    {
+        string root = CreateTestRoot("corrupt-history");
+        try
+        {
+            var paths = CreatePathProvider(root);
+            string storeDirectory = Path.Combine(paths.CacheRoot, "BackgroundJobs");
+            Directory.CreateDirectory(storeDirectory);
+            File.WriteAllText(Path.Combine(storeDirectory, "jobs.json"), "{not-json");
+
+            var service = new ApiBackgroundJobService(paths);
+
+            Assert.False(service.PersistenceStoreReady);
+            Assert.Equal("invalid-json", service.PersistenceStoreStatus);
+            Assert.Empty((await service.QueryAsync(new BackgroundJobQuery())).Items);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ExistingHistoryWithNullRecord_ShouldBeMarkedUnavailableInsteadOfPartiallyLoading()
+    {
+        string root = CreateTestRoot("null-record");
+        try
+        {
+            var paths = CreatePathProvider(root);
+            string storeDirectory = Path.Combine(paths.CacheRoot, "BackgroundJobs");
+            Directory.CreateDirectory(storeDirectory);
+            File.WriteAllText(
+                Path.Combine(storeDirectory, "jobs.json"),
+                "[{\"JobId\":\"valid-job\",\"Status\":\"Succeeded\"},null]");
+
+            var service = new ApiBackgroundJobService(paths);
+
+            Assert.False(service.PersistenceStoreReady);
+            Assert.Equal("invalid-record", service.PersistenceStoreStatus);
+            Assert.Empty((await service.QueryAsync(new BackgroundJobQuery())).Items);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ExistingHistoryWithMissingJobId_ShouldBeMarkedUnavailableInsteadOfPartiallyLoading()
+    {
+        string root = CreateTestRoot("missing-job-id");
+        try
+        {
+            var paths = CreatePathProvider(root);
+            string storeDirectory = Path.Combine(paths.CacheRoot, "BackgroundJobs");
+            Directory.CreateDirectory(storeDirectory);
+            File.WriteAllText(
+                Path.Combine(storeDirectory, "jobs.json"),
+                "[{\"JobId\":\"valid-job\",\"Status\":\"Succeeded\"},{\"Status\":\"Running\"}]");
+
+            var service = new ApiBackgroundJobService(paths);
+
+            Assert.False(service.PersistenceStoreReady);
+            Assert.Equal("invalid-record", service.PersistenceStoreStatus);
+            Assert.Empty((await service.QueryAsync(new BackgroundJobQuery())).Items);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ExistingHistoryWithDuplicateJobId_ShouldBeMarkedUnavailableInsteadOfOverwriting()
+    {
+        string root = CreateTestRoot("duplicate-job-id");
+        try
+        {
+            var paths = CreatePathProvider(root);
+            string storeDirectory = Path.Combine(paths.CacheRoot, "BackgroundJobs");
+            Directory.CreateDirectory(storeDirectory);
+            File.WriteAllText(
+                Path.Combine(storeDirectory, "jobs.json"),
+                "[{\"JobId\":\"same-job\",\"Status\":\"Succeeded\"},{\"JobId\":\"SAME-JOB\",\"Status\":\"Failed\"}]");
+
+            var service = new ApiBackgroundJobService(paths);
+
+            Assert.False(service.PersistenceStoreReady);
+            Assert.Equal("invalid-record", service.PersistenceStoreStatus);
+            Assert.Empty((await service.QueryAsync(new BackgroundJobQuery())).Items);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ExistingHistoryStoreDirectory_ShouldBeMarkedUnavailable()
+    {
+        string root = CreateTestRoot("store-directory");
+        try
+        {
+            var paths = CreatePathProvider(root);
+            string storePath = Path.Combine(paths.CacheRoot, "BackgroundJobs", "jobs.json");
+            Directory.CreateDirectory(storePath);
+
+            var service = new ApiBackgroundJobService(paths);
+
+            Assert.False(service.PersistenceStoreReady);
+            Assert.Equal("invalid-store", service.PersistenceStoreStatus);
+            Assert.Empty((await service.QueryAsync(new BackgroundJobQuery())).Items);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task Update_WhenPersistenceFails_ShouldRestorePreviousSnapshot()
     {
         string root = CreateTestRoot("update");
@@ -145,12 +265,18 @@ public sealed class ApiBackgroundJobPersistenceAtomicityTests
 
     private static void BlockPersistenceDirectory(RuntimeAppPathProvider paths)
     {
-        string persistenceRoot = Path.Combine(paths.CacheRoot, "BackgroundJobs");
-        if (Directory.Exists(persistenceRoot))
+        // Make the store path itself a directory.  This deterministically makes
+        // the atomic writer fail while leaving the parent cache directory usable;
+        // trying to replace the parent directory with a file is rejected by
+        // Windows before the service is exercised and makes the test depend on
+        // ACL/administrator behavior.
+        string storePath = Path.Combine(paths.CacheRoot, "BackgroundJobs", "jobs.json");
+        if (File.Exists(storePath))
         {
-            Directory.Delete(persistenceRoot, recursive: true);
+            File.Delete(storePath);
         }
-        File.WriteAllText(persistenceRoot, "block persistence directory recreation");
+
+        Directory.CreateDirectory(storePath);
     }
 
     private static string CreateTestRoot(string suffix)

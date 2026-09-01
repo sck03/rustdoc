@@ -110,10 +110,32 @@ public sealed class ReportTemplateDomainIsolationTests
     [InlineData("{{ ShowSeal }}")]
     public void PaymentTemplatePolicy_ShouldRejectEverySealReference(string content)
     {
+        string template = CreateV3Template(ReportDocumentType.PaymentVoucher, content);
         var error = Assert.Throws<ArgumentException>(() =>
-            ReportTemplateContentPolicy.Validate(ReportDocumentType.PaymentVoucher, content));
+            ReportTemplateContentPolicy.Validate(ReportDocumentType.PaymentVoucher, template));
 
         Assert.Contains("付款报销模板不提供印章数据", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TemplateContentPolicy_ShouldTreatSchemaFreeHtmlAsAdvancedHtml()
+    {
+        const string advancedHtml = "<!doctype html><html><head><style>@page { size: A4 landscape; }</style></head><body><table><tr><td>{{ Invoice.InvoiceNo }}</td></tr></table></body></html>";
+
+        Assert.Equal(ReportTemplateContentPolicy.RuntimeMode.AdvancedHtml, ReportTemplateContentPolicy.DetectRuntimeMode(advancedHtml));
+        ReportTemplateContentPolicy.Validate(ReportDocumentType.ExportDocument, advancedHtml);
+    }
+
+    [Fact]
+    public void TemplateContentPolicy_ShouldRejectRemovedV2SchemaWithoutHtmlFallback()
+    {
+        const string removedV2 = "<!doctype html><html><body><!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA { \"version\": 2, \"reportType\": \"ExportDocument\" } --><p>legacy</p></body></html>";
+
+        var error = Assert.Throws<ArgumentException>(() =>
+            ReportTemplateContentPolicy.Validate(ReportDocumentType.ExportDocument, removedV2));
+
+        Assert.Contains("V2", error.Message, StringComparison.Ordinal);
+        Assert.Contains("已移除", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -314,7 +336,7 @@ public sealed class ReportTemplateDomainIsolationTests
         {
             var preview = await service.PreviewTemplateContentAsync(
                 ReportDocumentType.PaymentVoucher,
-                "<html><body>{{ Payment.PayerName }}</body></html>",
+                CreateV3Template(ReportDocumentType.PaymentVoucher, "{{ Payment.PayerName }}"),
                 withSeal: true);
 
             Assert.Null(preview.WithSeal);
@@ -380,7 +402,7 @@ public sealed class ReportTemplateDomainIsolationTests
             var result = await service.SaveTemplateContentAsync(
                 reportType,
                 builtInPath,
-                "<html><body>updated</body></html>");
+                CreateV3Template(reportType, "updated"));
 
             string expectedStoredPath = $"user:{category}/{fileName}";
             Assert.Equal(Path.Combine(dataRoot, "Templates", category, fileName), result.TemplatePath);
@@ -488,7 +510,7 @@ public sealed class ReportTemplateDomainIsolationTests
             Path.Combine(packageSource, "config.json"),
             """
             {
-              "PackageVersion": "1.2",
+              "PackageVersion": "1.3",
               "ExportedAt": "2026-07-29T00:00:00",
               "Templates": [
                 {
@@ -510,7 +532,17 @@ public sealed class ReportTemplateDomainIsolationTests
                   "ReportType": "PaymentVoucher",
                   "IsEnabled": true
                 }
-              ]
+              ],
+              "Files": [
+                {
+                  "Path": "Internal/payment.html",
+                  "SizeBytes": 49,
+                  "Sha256": "4962d5e6a05a18aa84fef1d4e1cb37f1724687c175a05d4cc0ed4b82a0c8e67a"
+                }
+              ],
+              "FileCount": 1,
+              "TotalBytes": 49,
+              "FilesDigest": "fbd7af7d1b409747aed7a858a7862d3f8e546b8f68b69d1ac0d8123ce7afdd94"
             }
             """);
         ZipFile.CreateFromDirectory(packageSource, packagePath);
@@ -566,7 +598,7 @@ public sealed class ReportTemplateDomainIsolationTests
         {
             var error = await Assert.ThrowsAsync<InvalidDataException>(() => service.ImportAsync(packagePath));
 
-            Assert.Contains("当前仅接受 1.2", error.Message, StringComparison.Ordinal);
+            Assert.Contains("当前仅接受 1.3", error.Message, StringComparison.Ordinal);
             Assert.False(File.Exists(Path.Combine(dataRoot, "Templates", "Export", "invoice.html")));
         }
         finally
@@ -585,6 +617,16 @@ public sealed class ReportTemplateDomainIsolationTests
         Directory.CreateDirectory(path);
         return path;
     }
+
+    private static string CreateV3Template(ReportDocumentType reportType, string body) =>
+        $$"""
+        <!doctype html><html><head><style>@page { size: A4 portrait; }</style></head><body>
+        <!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA
+        { "version": 3, "reportType": "{{reportType}}", "page": { "size": "A4" } }
+        -->
+        {{body}}
+        </body></html>
+        """;
 
     private static readonly byte[] OnePixelPng = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");

@@ -135,6 +135,44 @@ namespace ExportDocManager.Infrastructure.Tests
         }
 
         [Fact]
+        public async Task SwSubmissionBatch_DispatchTokens_ShouldRejectStaleStateTransition()
+        {
+            await using var connection = new SqliteConnection("Data Source=:memory:");
+            await connection.OpenAsync();
+            var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
+            await using (var seed = new AppDbContext(options))
+            {
+                await seed.Database.EnsureCreatedAsync();
+                seed.SwSubmissionBatches.Add(new SwSubmissionBatch
+                {
+                    BatchReference = "DISPATCH-CONCURRENCY-001",
+                    BusinessType = "CustomsCoo",
+                    Status = SingleWindowBatchStatusCatalog.SubmitPackageImported,
+                    SubmitPackageDigest = "digest"
+                });
+                await seed.SaveChangesAsync();
+            }
+
+            await using var current = new AppDbContext(options);
+            await using var stale = new AppDbContext(options);
+            var currentBatch = await current.SwSubmissionBatches.SingleAsync();
+            var staleBatch = await stale.SwSubmissionBatches.SingleAsync();
+            currentBatch.Status = SingleWindowBatchStatusCatalog.ClientDispatching;
+            currentBatch.ClientDispatchOperationId = "SWD-current";
+            currentBatch.ClientDispatchLeaseUntil = DateTimeOffset.UtcNow.AddMinutes(5);
+            await current.SaveChangesAsync();
+
+            staleBatch.Status = SingleWindowBatchStatusCatalog.QueuedToClient;
+            staleBatch.ClientDispatchOperationId = "SWD-stale";
+            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => stale.SaveChangesAsync());
+
+            await using var verify = new AppDbContext(options);
+            var persisted = await verify.SwSubmissionBatches.SingleAsync();
+            Assert.Equal(SingleWindowBatchStatusCatalog.ClientDispatching, persisted.Status);
+            Assert.Equal("SWD-current", persisted.ClientDispatchOperationId);
+        }
+
+        [Fact]
         public async Task SqliteTemporalStorage_ShouldUseDateTextAndUtcTicks()
         {
             string databasePath = Path.Combine(
@@ -443,7 +481,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             var databasePath = Path.Combine(
                 Path.GetTempPath(),
-                "edm-v9-schema-" + Guid.NewGuid().ToString("N") + ".db");
+                "edm-v10-schema-" + Guid.NewGuid().ToString("N") + ".db");
             using var factory = new SqliteFileDbContextFactory(databasePath);
 
             var service = new DatabaseInitializationService(
@@ -460,7 +498,19 @@ namespace ExportDocManager.Infrastructure.Tests
             int schemaVersion = await verifyContext.Database
                 .SqlQueryRaw<int>("SELECT \"Version\" AS \"Value\" FROM \"__ExportDocManagerSchema\" WHERE \"Id\" = 1")
                 .SingleAsync();
-            Assert.Equal(9, schemaVersion);
+            Assert.Equal(DatabaseSchemaBaseline.CurrentVersion, schemaVersion);
+
+            var cooColumns = await verifyContext.Database
+                .SqlQueryRaw<string>("SELECT \"name\" AS \"Value\" FROM pragma_table_info('CustomsCooDocuments')")
+                .ToListAsync();
+            Assert.Contains(nameof(CustomsCooDocument.DraftRevision), cooColumns, StringComparer.Ordinal);
+
+            var dispatchColumns = await verifyContext.Database
+                .SqlQueryRaw<string>("SELECT \"name\" AS \"Value\" FROM pragma_table_info('SwSubmissionBatches')")
+                .ToListAsync();
+            Assert.Contains(nameof(SwSubmissionBatch.ClientDispatchOperationId), dispatchColumns, StringComparer.Ordinal);
+            Assert.Contains(nameof(SwSubmissionBatch.ClientDispatchLeaseUntil), dispatchColumns, StringComparer.Ordinal);
+            Assert.Contains(nameof(SwSubmissionBatch.ClientDispatchPayloadDigest), dispatchColumns, StringComparer.Ordinal);
 
             var admin = await verifyContext.Users.SingleAsync(user => user.Username == "admin");
             Assert.True(PasswordHasher.VerifyPassword(admin.PasswordHash, string.Empty));

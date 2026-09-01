@@ -49,7 +49,7 @@ export function ReportTemplateManagementView({
         />
         <WorkspaceDeviceNotice
           mode={workspaceDeviceMode}
-          phone="可选择和维护模板；可视化设计与高级 HTML 编辑请使用平板或桌面端。"
+          phone="可选择和维护模板；V3 可视化设计请使用平板或桌面端。"
           tablet="可管理模板和模板包；完整可视化设计建议使用更宽的桌面窗口。"
         />
         <ReportTemplateFeedback message={message} type={messageType} />

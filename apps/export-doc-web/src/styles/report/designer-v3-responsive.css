@@ -1,0 +1,68 @@
+/* Responsive behavior is isolated from the V3 component skin so each route
+   stylesheet stays small and the canvas rules remain easy to audit. */
+@media (max-width: 1180px) {
+  .report-designer-v3-layout {
+    grid-template-columns: minmax(190px, 220px) minmax(0, 1fr);
+  }
+
+  .report-designer-v3-inspector {
+    grid-column: 1 / -1;
+    max-height: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .report-designer-v3-workspace {
+    padding: 8px;
+  }
+
+  .report-designer-v3-header {
+    display: grid;
+  }
+
+  .report-designer-v3-header-actions {
+    justify-content: flex-start;
+  }
+
+  .report-designer-v3-toolbar-group-end {
+    margin-left: 0;
+  }
+
+  .report-designer-v3-arrangement-group {
+    width: 100%;
+    padding: 4px 0 0;
+    border-top: 1px solid var(--edm-neutral-250);
+    border-left: 0;
+  }
+
+  .report-designer-v3-layout {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .report-designer-v3-sidebar,
+  .report-designer-v3-inspector {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .report-designer-v3-canvas-column {
+    order: -1;
+    min-height: 0;
+  }
+
+  .report-designer-v3-canvas-scroll {
+    min-height: 460px;
+    padding: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .report-designer-v3-page,
+  .report-designer-v3-tool-button,
+  .report-designer-v3-palette-action {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}

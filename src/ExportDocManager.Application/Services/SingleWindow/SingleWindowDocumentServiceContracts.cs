@@ -3,6 +3,11 @@ using ExportDocManager.Models.Entities;
 
 namespace ExportDocManager.Services.SingleWindow
 {
+    public sealed record SingleWindowDocumentPersistenceResult(
+        int DocumentId,
+        int DraftRevision,
+        string SourceBaselineHash);
+
     public interface ICustomsCooDocumentService
     {
         Task<CustomsCooDocument> GetOrCreateAsync(int invoiceId, CancellationToken cancellationToken = default);
@@ -23,12 +28,12 @@ namespace ExportDocManager.Services.SingleWindow
 
     public interface ISingleWindowDocumentPersistenceService
     {
-        Task<int> UpsertCustomsCooDocumentAsync(
+        Task<SingleWindowDocumentPersistenceResult> UpsertCustomsCooDocumentAsync(
             CooSourceSnapshot snapshot,
             CooMappedDocument document,
             CancellationToken cancellationToken = default);
 
-        Task<int> UpsertAgentConsignmentDocumentAsync(
+        Task<SingleWindowDocumentPersistenceResult> UpsertAgentConsignmentDocumentAsync(
             AcdSourceSnapshot snapshot,
             AcdMappedDocument document,
             CancellationToken cancellationToken = default);

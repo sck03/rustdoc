@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using ClosedXML.Excel;
 using ExportDocManager.Api.Hosting;
+using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.DTOs.SingleWindow;
 using ExportDocManager.Services.Security;
 
@@ -94,6 +95,53 @@ namespace ExportDocManager.Api.Tests
                 Assert.True(root.TryGetProperty("rows", out var rows));
                 Assert.Equal(JsonValueKind.Array, rows.ValueKind);
             }
+        }
+
+        [Fact]
+        public async Task SingleWindowDocumentSaves_ShouldAdvanceRevisionAndRejectStaleEditors()
+        {
+            await using var harness = await ApiIntegrationTestHarness.StartAsync(
+                "edm-api-single-window-draft-cas",
+                "api-single-window-draft-cas.db");
+            using var anonymousClient = harness.CreateClient();
+            var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
+            using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+
+            using var invoiceResponse = await adminClient.PostAsJsonAsync(
+                "/api/invoices",
+                new
+                {
+                    invoiceNo = "SW-CAS-001",
+                    invoiceDate = "2026-08-31",
+                    shipmentDate = "2026-09-05",
+                    customerNameEN = "CAS Buyer",
+                    exporterNameEN = "CAS Exporter",
+                    totalAmount = 100m,
+                    items = new[] { new { styleName = "CAS ITEM", quantity = 10m, unitPrice = 10m, totalPrice = 100m } }
+                });
+            Assert.Equal(HttpStatusCode.Created, invoiceResponse.StatusCode);
+            var invoice = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(invoiceResponse);
+            int invoiceId = invoice.Id;
+            Assert.True(invoiceId > 0);
+
+            await AssertDraftCasAsync<ApiCustomsCooDocumentDto, ApiCustomsCooDocumentSaveResponse>(
+                adminClient,
+                $"/api/single-window/coo/{invoiceId}",
+                static response => response.Document,
+                static document => document.DraftRevision,
+                static (document, revision) => document.ExpectedDraftRevision = revision,
+                static (document, value) => document.Producer = value,
+                "CAS producer v1",
+                "CAS producer v2");
+            await AssertDraftCasAsync<ApiAgentConsignmentDocumentDto, ApiAgentConsignmentDocumentSaveResponse>(
+                adminClient,
+                $"/api/single-window/acd/{invoiceId}",
+                static response => response.Document,
+                static document => document.DraftRevision,
+                static (document, revision) => document.ExpectedDraftRevision = revision,
+                static (document, value) => document.OtherNote = value,
+                "CAS ACD v1",
+                "CAS ACD v2");
         }
 
         [Fact]
@@ -544,6 +592,50 @@ namespace ExportDocManager.Api.Tests
             }
 
             return rows;
+        }
+
+        private static T CloneDto<T>(T source)
+        {
+            string json = JsonSerializer.Serialize(source, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                ?? throw new InvalidOperationException("无法克隆单窗口测试 DTO。");
+        }
+
+        private static async Task AssertDraftCasAsync<TDocument, TSaveResponse>(
+            HttpClient client,
+            string path,
+            Func<TSaveResponse, TDocument> getDocument,
+            Func<TDocument, int> getRevision,
+            Action<TDocument, int> setExpectedRevision,
+            Action<TDocument, string> setChangedValue,
+            string firstValue,
+            string secondValue)
+        {
+            using var initialResponse = await client.GetAsync(path);
+            Assert.Equal(HttpStatusCode.OK, initialResponse.StatusCode);
+            var initial = await ApiIntegrationTestHarness.ReadJsonAsync<TDocument>(initialResponse);
+            Assert.Equal(0, getRevision(initial));
+
+            var firstRequest = CloneDto(initial);
+            setExpectedRevision(firstRequest, getRevision(initial));
+            setChangedValue(firstRequest, firstValue);
+            using var firstResponse = await client.PutAsJsonAsync(path, firstRequest);
+            Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+            var first = getDocument(await ApiIntegrationTestHarness.ReadJsonAsync<TSaveResponse>(firstResponse));
+            Assert.Equal(1, getRevision(first));
+
+            var staleRequest = CloneDto(first);
+            setExpectedRevision(staleRequest, getRevision(first));
+            var secondRequest = CloneDto(first);
+            setExpectedRevision(secondRequest, getRevision(first));
+            setChangedValue(secondRequest, secondValue);
+            using var secondResponse = await client.PutAsJsonAsync(path, secondRequest);
+            Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+            var second = getDocument(await ApiIntegrationTestHarness.ReadJsonAsync<TSaveResponse>(secondResponse));
+            Assert.Equal(2, getRevision(second));
+
+            using var staleResponse = await client.PutAsJsonAsync(path, staleRequest);
+            Assert.Equal(HttpStatusCode.Conflict, staleResponse.StatusCode);
         }
     }
 }

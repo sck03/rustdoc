@@ -16,9 +16,21 @@ namespace ExportDocManager.Services.Reporting
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
         }
 
-        public string GetBuiltInTemplatesBaseDirectory() => Path.GetFullPath(_pathProvider.TemplateRoot);
+        public string GetBuiltInTemplatesBaseDirectory()
+        {
+            string root = Path.GetFullPath(_pathProvider.TemplateRoot);
+            return PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                root,
+                "内置模板目录不能经过符号链接、目录联接或其他重解析点。");
+        }
 
-        public string GetUserTemplatesBaseDirectory() => Path.GetFullPath(_pathProvider.UserTemplateRoot);
+        public string GetUserTemplatesBaseDirectory()
+        {
+            string root = Path.GetFullPath(_pathProvider.UserTemplateRoot);
+            return PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                root,
+                "用户模板目录不能经过符号链接、目录联接或其他重解析点。");
+        }
 
         public string GetBuiltInTemplateDirectory(string category) =>
             Path.Combine(GetBuiltInTemplatesBaseDirectory(), NormalizeTemplateCategory(category));
@@ -26,7 +38,14 @@ namespace ExportDocManager.Services.Reporting
         public string EnsureTemplateDirectory(string category)
         {
             string directory = Path.Combine(GetUserTemplatesBaseDirectory(), NormalizeTemplateCategory(category));
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                directory,
+                "用户模板分类目录不能经过符号链接、目录联接或其他重解析点。");
             Directory.CreateDirectory(directory);
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                directory,
+                GetUserTemplatesBaseDirectory(),
+                "用户模板分类目录不能包含符号链接、目录联接或其他重解析点。");
             return directory;
         }
 
@@ -44,12 +63,20 @@ namespace ExportDocManager.Services.Reporting
             string userRoot = GetUserTemplatesBaseDirectory();
             if (IsPathWithinDirectory(selectedFullPath, userRoot))
             {
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    selectedFullPath,
+                    userRoot,
+                    "用户模板路径不能经过符号链接、目录联接或其他重解析点。");
                 return UserPathPrefix + NormalizeStoredRelativePath(Path.GetRelativePath(userRoot, selectedFullPath));
             }
 
             string builtInRoot = GetBuiltInTemplatesBaseDirectory();
             if (IsPathWithinDirectory(selectedFullPath, builtInRoot))
             {
+                PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                    selectedFullPath,
+                    builtInRoot,
+                    "内置模板路径不能经过符号链接、目录联接或其他重解析点。");
                 return BuiltInPathPrefix + NormalizeStoredRelativePath(Path.GetRelativePath(builtInRoot, selectedFullPath));
             }
 
@@ -73,17 +100,54 @@ namespace ExportDocManager.Services.Reporting
 
             if (Path.IsPathRooted(normalizedPath))
             {
-                return Path.GetFullPath(normalizedPath);
+                string absolutePath = Path.GetFullPath(normalizedPath);
+                string userRoot = GetUserTemplatesBaseDirectory();
+                if (IsPathWithinDirectory(absolutePath, userRoot))
+                {
+                    return PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                        absolutePath,
+                        userRoot,
+                        "用户模板路径不能经过符号链接、目录联接或其他重解析点。");
+                }
+
+                string builtInRoot = GetBuiltInTemplatesBaseDirectory();
+                if (IsPathWithinDirectory(absolutePath, builtInRoot))
+                {
+                    return PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                        absolutePath,
+                        builtInRoot,
+                        "内置模板路径不能经过符号链接、目录联接或其他重解析点。");
+                }
+
+                return absolutePath;
             }
 
             normalizedPath = StripTemplatesPrefix(normalizedPath);
-            string userCandidate = Path.GetFullPath(Path.Combine(GetUserTemplatesBaseDirectory(), normalizedPath));
+            string userRootCandidate = GetUserTemplatesBaseDirectory();
+            string userCandidate = Path.GetFullPath(Path.Combine(userRootCandidate, normalizedPath));
+            if (!IsPathWithinDirectory(userCandidate, userRootCandidate))
+            {
+                throw new PermissionDeniedException("模板路径不能离开受管模板目录。");
+            }
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                userCandidate,
+                userRootCandidate,
+                "用户模板路径不能经过符号链接、目录联接或其他重解析点。");
             if (File.Exists(userCandidate))
             {
                 return userCandidate;
             }
 
-            string builtInCandidate = Path.GetFullPath(Path.Combine(GetBuiltInTemplatesBaseDirectory(), normalizedPath));
+            string builtInRootCandidate = GetBuiltInTemplatesBaseDirectory();
+            string builtInCandidate = Path.GetFullPath(Path.Combine(builtInRootCandidate, normalizedPath));
+            if (!IsPathWithinDirectory(builtInCandidate, builtInRootCandidate))
+            {
+                throw new PermissionDeniedException("模板路径不能离开受管模板目录。");
+            }
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                builtInCandidate,
+                builtInRootCandidate,
+                "内置模板路径不能经过符号链接、目录联接或其他重解析点。");
             return File.Exists(builtInCandidate) ? builtInCandidate : userCandidate;
         }
 
@@ -107,6 +171,11 @@ namespace ExportDocManager.Services.Reporting
             {
                 throw new PermissionDeniedException("无法为内置模板创建安全的用户副本路径。");
             }
+
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                targetPath,
+                GetUserTemplatesBaseDirectory(),
+                "用户模板副本路径不能经过符号链接、目录联接或其他重解析点。");
 
             return targetPath;
         }
@@ -163,6 +232,11 @@ namespace ExportDocManager.Services.Reporting
             {
                 throw new PermissionDeniedException("模板路径不能离开受管模板目录。");
             }
+
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                candidate,
+                root,
+                "模板路径不能经过符号链接、目录联接或其他重解析点。");
 
             resolvedPath = candidate;
             return true;

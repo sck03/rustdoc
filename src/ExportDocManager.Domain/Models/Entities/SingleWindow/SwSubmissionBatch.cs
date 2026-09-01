@@ -75,6 +75,18 @@ namespace ExportDocManager.Models.Entities
 
         public DateTimeOffset? LastClientDispatchAt { get; set; }
 
+        /// <summary>Stable idempotency key for the in-progress client dispatch.</summary>
+        [MaxLength(64)]
+        public string ClientDispatchOperationId { get; set; } = string.Empty;
+
+        /// <summary>Lease expiry used to recover a process that crashed mid-dispatch.</summary>
+        public DateTimeOffset? ClientDispatchLeaseUntil { get; set; }
+
+        public int ClientDispatchAttemptCount { get; set; }
+
+        [MaxLength(64)]
+        public string ClientDispatchPayloadDigest { get; set; } = string.Empty;
+
         [MaxLength(40)]
         public string LastReceiptKind { get; set; } = string.Empty;
 

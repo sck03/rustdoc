@@ -168,6 +168,20 @@ namespace ExportDocManager.Api.Hosting
                 return Results.BadRequest(new ApiErrorResponse($"PDF 源文件不存在：{missingFile}"));
             }
 
+            try
+            {
+                foreach (string file in files)
+                {
+                    PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                        file,
+                        "PDF 源文件路径不能经过符号链接、目录联接或其他重解析点。");
+                }
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or ArgumentException or NotSupportedException)
+            {
+                return Results.BadRequest(new ApiErrorResponse("PDF 源文件路径不受支持。"));
+            }
+
             long totalBytes = 0;
             foreach (string file in files)
             {
@@ -279,6 +293,9 @@ namespace ExportDocManager.Api.Hosting
             long totalBytes = 0;
             foreach (string sourceFile in sourceFiles)
             {
+                PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                    sourceFile,
+                    "PDF 源文件路径不能经过符号链接、目录联接或其他重解析点。");
                 if (!File.Exists(sourceFile))
                 {
                     throw new FileNotFoundException("PDF 源文件不存在。", sourceFile);
@@ -307,7 +324,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 if (Directory.Exists(directoryPath))
                 {
-                    Directory.Delete(directoryPath, recursive: true);
+                    AtomicFileHelper.TryDeleteDirectory(directoryPath);
                 }
             }
             catch

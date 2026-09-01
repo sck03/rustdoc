@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { ApiReportTemplatePreviewResponse } from "../../api/index.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
-import { hasReportDesignerSchema } from "../report-designer/reportDesignerTemplateParser.ts";
+import { hasValidReportDesignerV3Schema } from "../report-designer/reportDesignerV3TemplateParser.ts";
 import type { ReportDesignerPreviewSampleProfile } from "../report-designer/reportDesignerPreviewSamples.ts";
 import { formatReportTemplateSource } from "./reportTemplateFormatter.ts";
 import {
@@ -80,23 +80,23 @@ export function useReportTemplateEditingActions({
   const requestConfirmation = useConfirmation();
 
   async function confirmStructuredTemplateOverwrite() {
-    if (!content.trim() || hasReportDesignerSchema(content)) {
+    if (!content.trim() || hasValidReportDesignerV3Schema(content)) {
       return true;
     }
 
     return requestConfirmation({
-      title: "启用可视化设计结构",
-      description: "当前模板尚未包含可视化设计结构。继续后将使用当前布局覆盖原有高级 HTML。",
-      details: ["建议在转换前导出模板包备份。"],
+      title: "转换为 V3 可视化模板",
+      description: "当前模板使用高级 HTML 运行时，适合复杂表格、合并单元格和精确分页。继续后会在内存中创建新的 A4 V3 草稿，原 HTML 只有在明确保存时才会被替换。",
+      details: ["如需保持原版式，请继续使用高级 HTML。", "建议在转换前导出模板包备份。"],
       confirmLabel: "确认启用",
     });
   }
 
   function handleDesignerModeChange(mode: DesignerMode) {
-    if (isLimitedReportView || mode === designerMode) {
+    if (isLimitedReportView || mode === designerMode || (mode === "v3" && designerMode === "advancedHtml")) {
       return;
     }
-    if (designerMode === "new" && workspaceHasUnappliedDesignerChanges) {
+    if (designerMode === "v3" && workspaceHasUnappliedDesignerChanges) {
       setContent(designerDraftContent);
       setContentTemplatePath(selectedTemplatePath);
       setPreview(null);

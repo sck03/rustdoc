@@ -416,7 +416,13 @@ namespace ExportDocManager.Services.SingleWindow
                 declaredPaths.Add(file.RelativePath.Replace('\\', '/'));
             }
 
-            foreach (string filePath in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+            // Never use Directory.EnumerateFiles(..., AllDirectories) for an
+            // untrusted package.  It can follow a junction/symlink between the
+            // attribute check and the recursive walk.  The controlled walker
+            // validates every directory entry and refuses link-like paths.
+            foreach (string filePath in ControlledFileSystemEnumerator.EnumerateFiles(
+                         root,
+                         errorMessage: "单一窗口交接包不能包含符号链接、目录联接或其他重解析点。"))
             {
                 string relativePath = Path.GetRelativePath(root, filePath).Replace('\\', '/');
                 if (!declaredPaths.Contains(relativePath))

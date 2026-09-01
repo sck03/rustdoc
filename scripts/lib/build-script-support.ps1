@@ -360,6 +360,63 @@ function Remove-ExportDocDirectoryWithRetry {
     }
 }
 
+function Stop-ExportDocProcessesUnderPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$RootPath
+    )
+
+    $resolvedRoot = [System.IO.Path]::GetFullPath($RootPath).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar)
+    $prefix = $resolvedRoot + [System.IO.Path]::DirectorySeparatorChar
+    foreach ($process in @(Get-Process -ErrorAction SilentlyContinue)) {
+        try {
+            $imagePath = $process.MainModule.FileName
+            if (-not [string]::IsNullOrWhiteSpace($imagePath) -and
+                ($imagePath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase) -or
+                 [string]::Equals($imagePath, $resolvedRoot, [System.StringComparison]::OrdinalIgnoreCase))) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
+        } catch {
+            # Access-denied or already-exited processes are harmless here; the
+            # directory retry below remains the authoritative cleanup check.
+        }
+    }
+
+    # Self-contained sidecars and WebView/Chromium helpers can be hosted by a
+    # generic executable (for example dotnet.exe) whose MainModule does not
+    # point at the package.  Use the Windows process command line as a second,
+    # bounded signal so those descendants release App_Data before cleanup.
+    if ([string]::Equals($env:OS, "Windows_NT", [System.StringComparison]::OrdinalIgnoreCase)) {
+        try {
+            $escapedRoot = [Regex]::Escape($resolvedRoot.Replace('/', '\'))
+            $knownRuntimeNames = @(
+                "ExportDocManager.Api.exe",
+                "ExportDocManager.exe",
+                "export-doc-tauri.exe",
+                "chrome.exe",
+                "chrome-headless-shell.exe",
+                "msedge.exe",
+                "msedgewebview2.exe",
+                "dotnet.exe"
+            )
+            Get-CimInstance Win32_Process -ErrorAction Stop |
+                Where-Object {
+                    $name = [string]$_.Name
+                    $commandLine = if ($null -ne $_.CommandLine) { [string]$_.CommandLine } else { "" }
+                    $knownRuntimeNames -contains $name -and
+                    $commandLine.Replace('/', '\') -match $escapedRoot
+                } |
+                ForEach-Object {
+                    Stop-Process -Id ([int]$_.ProcessId) -Force -ErrorAction SilentlyContinue
+                }
+        } catch {
+            # CIM is optional on constrained Windows images. The MainModule
+            # pass and the directory retry remain authoritative in that case.
+        }
+    }
+}
+
 function Test-ExportDocPauseEnabled {
     param([bool]$NoPauseRequested = $false)
 

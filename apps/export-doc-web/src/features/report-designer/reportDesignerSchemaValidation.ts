@@ -54,6 +54,13 @@ export type ReportDesignerSchemaValidationResult = {
   issues: ReportDesignerSchemaIssue[];
 };
 
+export type EmbeddedReportDesignerBlockValidationOptions = {
+  reportType: ReportDesignerReportType;
+  sectionType: ReportSection["type"];
+  path: string;
+  blockIds?: Set<string>;
+};
+
 export function normalizeReportDesignerSchema(input: unknown): ReportDesignerSchemaValidationResult {
   const issues: ReportDesignerSchemaIssue[] = [];
   if (!isRecord(input)) {
@@ -95,6 +102,61 @@ export function validateReportDesignerSchema(schema: ReportDesignerSchema) {
 
 export function hasBlockingReportDesignerSchemaIssues(issues: ReportDesignerSchemaIssue[]) {
   return issues.some((issue) => issue.severity === "error");
+}
+
+/**
+ * Normalize a structured block when it is embedded in a V3 Flow element.
+ *
+ * V3 owns the canvas geometry, but the block AST remains the single source of
+ * truth for rows, grids, conditions and detail tables.  Routing embedded
+ * blocks through the existing normalizer keeps all field, expression, border,
+ * size and placement rules in one place instead of creating a weaker V3-only
+ * validator.
+ */
+export function normalizeEmbeddedReportDesignerBlock(
+  value: unknown,
+  options: EmbeddedReportDesignerBlockValidationOptions,
+): { block: ReportBlock | null; issues: ReportDesignerSchemaIssue[] } {
+  const issues: ReportDesignerSchemaIssue[] = [];
+  const blockIds = options.blockIds ?? new Set<string>();
+  const block = normalizeBlock(value, options.path, blockIds, issues);
+  if (!block) {
+    return { block: null, issues };
+  }
+
+  const domainIssues: ReportDesignerSchemaIssue[] = [];
+  const syntheticSchema: ReportDesignerSchema = {
+    version: CURRENT_REPORT_DESIGNER_SCHEMA_VERSION,
+    reportType: options.reportType,
+    page: {
+      size: "A4",
+      orientation: "Portrait",
+      marginTopMm: 0,
+      marginRightMm: 0,
+      marginBottomMm: 0,
+      marginLeftMm: 0,
+      fontFamily: "Arial",
+      fontSizePt: 10,
+    },
+    sections: [{
+      id: "embedded-section",
+      type: options.sectionType,
+      print: createSectionPrintDefaults(options.sectionType),
+      blocks: [block],
+    }],
+  };
+  validateReportTypeFieldDomains(syntheticSchema, domainIssues);
+  const syntheticPrefix = "$.sections[0].blocks[0]";
+  issues.push(...domainIssues.map((issue) => ({
+    ...issue,
+    path: issue.path === syntheticPrefix
+      ? options.path
+      : issue.path.startsWith(`${syntheticPrefix}.`)
+        ? `${options.path}${issue.path.slice(syntheticPrefix.length)}`
+        : issue.path,
+  })));
+
+  return { block, issues };
 }
 
 function requireCurrentReportDesignerSchemaVersion(

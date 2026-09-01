@@ -275,7 +275,8 @@ namespace ExportDocManager.Api.Tests
                 return;
             }
 
-            await _app.StopAsync();
+            using var stopTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            await _app.StopAsync(stopTimeout.Token);
             await _app.DisposeAsync();
             _disposed = true;
         }
@@ -331,6 +332,12 @@ namespace ExportDocManager.Api.Tests
                 }
                 catch (IOException) when (attempt < 4)
                 {
+                    ClearSqlitePoolsForPath(path);
+                    Thread.Sleep(100);
+                }
+                catch (UnauthorizedAccessException) when (attempt < 4)
+                {
+                    ClearSqlitePoolsForPath(path);
                     Thread.Sleep(100);
                 }
             }
@@ -343,8 +350,57 @@ namespace ExportDocManager.Api.Tests
                 return;
             }
 
-            using var connection = new SqliteConnection(DbHelper.BuildConnectionString(databasePath));
-            SqliteConnection.ClearPool(connection);
+            ClearSqlitePoolsForPath(databasePath);
+            DeleteFileIfExists(databasePath + "-wal");
+            DeleteFileIfExists(databasePath + "-shm");
+        }
+
+        private static void ClearSqlitePoolsForPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            try
+            {
+                using var connection = new SqliteConnection(DbHelper.BuildConnectionString(path));
+                SqliteConnection.ClearPool(connection);
+                SqliteConnection.ClearAllPools();
+            }
+            catch (InvalidOperationException)
+            {
+                // The connection may already have been disposed during host shutdown.
+            }
+        }
+
+        private static void DeleteFileIfExists(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                try
+                {
+                    if (File.Exists(path))
+                    {
+                        File.Delete(path);
+                    }
+
+                    return;
+                }
+                catch (IOException) when (attempt < 4)
+                {
+                    Thread.Sleep(100);
+                }
+                catch (UnauthorizedAccessException) when (attempt < 4)
+                {
+                    Thread.Sleep(100);
+                }
+            }
         }
 
         private sealed class TestReadinessProbe : IApiReadinessProbe

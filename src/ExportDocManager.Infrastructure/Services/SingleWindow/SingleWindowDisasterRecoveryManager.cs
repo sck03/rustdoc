@@ -248,9 +248,19 @@ namespace ExportDocManager.Services.SingleWindow
             }
             if (Directory.Exists(safetyRoot))
             {
-                Directory.Delete(safetyRoot, recursive: true);
+                AtomicFileHelper.TryDeleteDirectory(safetyRoot);
+                if (Directory.Exists(safetyRoot))
+                {
+                    throw new IOException("灾难恢复安全备份目录无法安全清理。");
+                }
             }
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                safetyRoot,
+                "灾难恢复安全备份目录不能经过符号链接、目录联接或其他重解析点。");
             Directory.CreateDirectory(safetyRoot);
+            PathBoundaryHelper.EnsureNoLinkLikeComponents(
+                safetyRoot,
+                "灾难恢复安全备份目录不能经过符号链接、目录联接或其他重解析点。");
             RestrictDirectoryPermissions(safetyRoot);
             foreach (var file in marker.Files)
             {

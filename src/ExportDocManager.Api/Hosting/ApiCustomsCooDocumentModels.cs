@@ -80,6 +80,11 @@ namespace ExportDocManager.Api.Hosting
         public int WarningCount { get; set; }
         public string WarningSummary { get; set; } = string.Empty;
         public int DraftRevision { get; set; }
+        /// <summary>
+        /// Required compare-and-swap token. Responses return the current draft
+        /// revision so clients can round-trip it on the next save.
+        /// </summary>
+        public int ExpectedDraftRevision { get; set; }
         public DateTimeOffset? LastGeneratedAt { get; set; }
         public int SourceDiffCount { get; set; }
         public string SourceDiffSummary { get; set; } = string.Empty;

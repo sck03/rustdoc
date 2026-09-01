@@ -10,6 +10,7 @@ namespace ExportDocManager.Api.Hosting
 
             var dto = new ApiCustomsCooDocumentDto();
             CopyScalarProperties(document, dto);
+            dto.ExpectedDraftRevision = document.DraftRevision;
             dto.Items = (document.Items ?? [])
                 .Where(item => item != null)
                 .OrderBy(item => item.GNo)
@@ -36,6 +37,7 @@ namespace ExportDocManager.Api.Hosting
             var document = new CustomsCooDocument();
             CopyScalarProperties(dto, document);
             document.SourceInvoiceId = sourceInvoiceId;
+            document.ExpectedDraftRevision = dto.ExpectedDraftRevision;
             document.Items = (dto.Items ?? Array.Empty<ApiCustomsCooItemDto>())
                 .Where(item => item != null)
                 .Select(ToCustomsCooItem)

@@ -32,5 +32,11 @@ namespace ExportDocManager.Services.SingleWindow
         Task<SingleWindowReceiptCollectionResult> CollectReceiptFilesAsync(
             int batchId,
             CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Reconciles dispatch leases left by a crashed desktop process.  The method is
+        /// idempotent and returns the number of batches whose state changed.
+        /// </summary>
+        Task<int> RecoverExpiredDispatchesAsync(CancellationToken cancellationToken = default);
     }
 }

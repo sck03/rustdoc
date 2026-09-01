@@ -47,7 +47,14 @@ export function buildAgentConsignmentEditorOptions(catalog?: SingleWindowReferen
 }
 
 export function normalizeAgentConsignmentDocumentForSave(document: ApiAgentConsignmentDocumentDto, invoiceId: number): ApiAgentConsignmentDocumentDto {
-  return { ...document, id: numberOrZero(document.id), sourceInvoiceId: invoiceId };
+  return {
+    ...document,
+    id: numberOrZero(document.id),
+    sourceInvoiceId: invoiceId,
+    expectedDraftRevision: Number.isInteger(document.draftRevision) && document.draftRevision >= 0
+      ? document.draftRevision
+      : 0,
+  };
 }
 
 export function buildAgentConsignmentDocumentSnapshot(document: ApiAgentConsignmentDocumentDto, invoiceId: number) {

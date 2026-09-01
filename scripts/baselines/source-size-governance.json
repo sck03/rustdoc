@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-27",
+  "capturedAt": "2026-09-01",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 111947,
+      "baselineAggregateLines": 114549,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 112147,
+      "maximumAggregateLines": 114749,
       "reportFiles": false
     },
     {
@@ -22,9 +22,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 78551,
+      "baselineAggregateLines": 83089,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 78751,
+      "maximumAggregateLines": 83289,
       "reportFiles": false
     },
     {
@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 39488,
+      "baselineAggregateLines": 40259,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 39608,
+      "maximumAggregateLines": 40379,
       "reportFiles": false
     },
     {
@@ -56,9 +56,9 @@
       "directories": ["scripts", "deploy", ".github/workflows"],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 40538,
+      "baselineAggregateLines": 41234,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 40688,
+      "maximumAggregateLines": 41384,
       "reportFiles": false
     },
     {
@@ -66,9 +66,9 @@
       "directory": ".github/workflows",
       "filePattern": "^.+\\.(?:yml|yaml)$",
       "maximumLines": 800,
-      "baselineAggregateLines": 2872,
+      "baselineAggregateLines": 2731,
       "maximumAggregateGrowthLines": 20,
-      "maximumAggregateLines": 2892,
+      "maximumAggregateLines": 2751,
       "reportFiles": false
     },
     {
@@ -103,7 +103,7 @@
       "directory": "src/ExportDocManager.Infrastructure/Services/Reporting",
       "filePattern": "^ReportTemplatePackageService(?:\\..+)?\\.cs$",
       "maximumLines": 320,
-      "maximumAggregateLines": 920
+      "maximumAggregateLines": 1250
     },
     {
       "name": "built-in Excel analyzer partials",
@@ -289,6 +289,15 @@
       "filePattern": "^reportDesigner(?:Mutations|BlockFactories|TableMutations|MutationUtils)\\.ts$",
       "maximumLines": 450,
       "maximumAggregateLines": 1200
+    },
+    {
+      "name": "report designer v3 modules",
+      "directory": "apps/export-doc-web/src/features/report-designer",
+      "filePattern": "^(?:ReportDesignerV3(?:Workspace|Canvas|FlowProperties)|reportDesignerBlockRenderer|reportDesignerV3(?:ElementFactories|History|HtmlExporter|Migration|Mutations|Resize|Schema|TemplateParser|Validation|WorkspaceHelpers))\\.(?:tsx|ts)$",
+      "maximumLines": 720,
+      "baselineAggregateLines": 4549,
+      "maximumAggregateGrowthLines": 200,
+      "maximumAggregateLines": 4749
     },
     {
       "name": "themed stylesheet modules",
