@@ -205,6 +205,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IReportHtmlService, ReportHtmlService>();
             services.AddSingleton<IInvoiceProfitAnalysisService, InvoiceProfitAnalysisService>();
             services.AddScoped<IReportTemplateService, ReportTemplateService>();
+            services.AddScoped<IReportTemplateFileService, ReportTemplateFileService>();
             services.AddScoped<IUserReportTemplateService, UserReportTemplateService>();
             services.AddScoped<IReportTemplateStorageDiagnosticsService, ReportTemplateStorageDiagnosticsService>();
             services.AddScoped<IReportTemplatePackageService, ReportTemplatePackageService>();

@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "../../styles/routes/reports.css";
 import { useLocation } from "react-router-dom";
 import { ApiReportTemplatePreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -35,6 +35,7 @@ import { useReportTemplateSaveMutations } from "./useReportTemplateSaveMutations
 import { useUserReportTemplateLifecycleMutations } from "./useUserReportTemplateLifecycleMutations.ts";
 import { useDefaultReportTemplateLifecycleMutations } from "./useDefaultReportTemplateLifecycleMutations.ts";
 import { useReportTemplatePackageWorkspace } from "./useReportTemplatePackageWorkspace.ts";
+import { useReportTemplateFileWorkspace } from "./useReportTemplateFileWorkspace.ts";
 import { useReportTemplatePreviewMutations } from "./useReportTemplatePreviewMutations.ts";
 import {
   buildNewTemplateFileName,
@@ -57,6 +58,7 @@ import { useReportTemplateEditingActions } from "./useReportTemplateEditingActio
 import { readDefaultReportTemplatePath } from "./reportTemplateSelectionModel.ts";
 import { readReportTemplateReturnTarget } from "./reportTemplateReturnNavigation.ts";
 import { useReportExportDefaults } from "./useReportExportDefaults.ts";
+import { createReportTemplatePageActions } from "./reportTemplatePageActions.ts";
 export function ReportTemplateWorkspacePage({
   client,
   canManageTemplates,
@@ -228,6 +230,26 @@ export function ReportTemplateWorkspacePage({
     setRenameTemplateFileName(fileName);
     setCurrentTemplateDisplayName(displayName);
   }, []);
+
+  const handleTemplateFileImported = useCallback((template: NonNullable<typeof templateContentQuery.data>) => {
+    setSelectedTemplatePath(template.templatePath);
+    applyLoadedContent(template.templatePath, template.content);
+    setRenameTemplateFileName(fileNameFromPath(template.templatePath));
+    setCurrentTemplateDisplayName(template.displayName);
+    setDesignerDraftContent("");
+    setDesignerMode(hasValidReportDesignerV3Schema(template.content) ? "v3" : "advancedHtml");
+    setPreview(null);
+  }, [applyLoadedContent]);
+
+  const fileWorkspace = useReportTemplateFileWorkspace({
+    client,
+    reportType,
+    selectedTemplatePath,
+    defaultExportDirectory,
+    requestConfirmation,
+    onImported: handleTemplateFileImported,
+    showMessage: (nextMessage, nextType) => { setMessage(nextMessage); setMessageType(nextType); },
+  });
 
   useReportTemplateSelectionSync({
     requestedReportType,
@@ -472,6 +494,11 @@ export function ReportTemplateWorkspacePage({
     canImportPackage,
     canImportPackageByPath,
     canUploadPackage,
+    canExportTemplateFile,
+    canExportTemplateFileByPath,
+    canImportTemplateFile,
+    canImportTemplateFileByPath,
+    canUploadTemplateFile,
     canSave,
   } = deriveReportTemplateWorkspaceState({
     reportType,
@@ -503,6 +530,10 @@ export function ReportTemplateWorkspacePage({
       packageWorkspace.downloadPackageMutation.isPending,
       packageWorkspace.importPackageMutation.isPending,
       packageWorkspace.uploadPackageMutation.isPending,
+      fileWorkspace.exportFileMutation.isPending,
+      fileWorkspace.downloadFileMutation.isPending,
+      fileWorkspace.importFileMutation.isPending,
+      fileWorkspace.uploadFileMutation.isPending,
       saveMutation.isPending,
       saveUserTemplateMutation.isPending,
       createUserTemplateMutation.isPending,
@@ -522,6 +553,8 @@ export function ReportTemplateWorkspacePage({
     desktopAvailable,
     packageExportPath: packageWorkspace.exportPath,
     packageImportPath: packageWorkspace.importPath,
+    fileExportPath: fileWorkspace.exportPath,
+    fileImportPath: fileWorkspace.importPath,
   });
   const { effectiveMessage, effectiveMessageType } = deriveReportTemplateFeedback({
     reportType,
@@ -591,109 +624,48 @@ export function ReportTemplateWorkspacePage({
     setWorkspaceMode,
   });
 
-  function handleCreateTemplate() {
-    if (canCreateTemplate) {
-      createTemplateMutation.mutate();
-    }
-  }
-
-  function handleCreateUserTemplate() {
-    if (canCreateUserTemplate) {
-      createUserTemplateMutation.mutate();
-    }
-  }
-  async function handleToggleUserTemplateActive() {
-    if (!currentUserTemplate) {
-      return;
-    }
-
-    const action = currentUserTemplate.isActive ? "停用" : "重新启用";
-    if (await requestConfirmation({
-      title: `${action}模板`,
-      description: `确定${action}“${currentUserTemplate.name}”吗？`,
-      confirmLabel: `确认${action}`,
-    })) {
-      updateUserTemplateStatusMutation.mutate({ isActive: !currentUserTemplate.isActive });
-    }
-  }
-  async function handleRestoreUserTemplateVersion(versionNumber: number) {
-    if (await requestConfirmation({
-      title: `恢复到 V${versionNumber}`,
-      description: `确定恢复到 V${versionNumber} 吗？`,
-      details: ["当前未保存修改将被替换。", "现有历史版本仍会保留。"],
-      confirmLabel: "确认恢复",
-    })) {
-      restoreUserTemplateVersionMutation.mutate(versionNumber);
-    }
-  }
-  async function handleRenameTemplate() {
-    if (!canRenameTemplate || isUserTemplate) {
-      return;
-    }
-
-    if (hasUnsavedChanges && !await requestConfirmation({ title: "修改模板文件名", description: "当前模板有未保存修改，确定继续修改文件名吗？", details: ["文件名修改后，默认模板和导出设置中的引用会同步更新。"], confirmLabel: "继续修改" })) {
-      return;
-    }
-
-    renameTemplateMutation.mutate();
-  }
-  function handleUpdateDisplayName() {
-    if (!canUpdateDisplayName) {
-      return;
-    }
-
-    if (isUserTemplate) {
-      saveUserTemplateMutation.mutate(undefined);
-    } else {
-      updateDisplayNameMutation.mutate();
-    }
-  }
-
-  function handleSetDefaultTemplate() {
-    if (canSetDefault) {
-      setDefaultTemplateMutation.mutate();
-    }
-  }
-
-  function handleExportSettingsChange(path: string[], value: unknown) {
-    exportDefaults.onChange(path, value);
-    setMessage(null);
-    setMessageType(null);
-  }
-
-  function handleSaveExportSettings() {
-    exportDefaults.onSave();
-  }
-
-  async function handleDeleteTemplate() {
-    if (!canDeleteTemplate) {
-      return;
-    }
-
-    if (!await requestConfirmation({ title: "删除报表模板", description: "确定删除当前模板吗？", details: hasUnsavedChanges ? ["当前模板有未保存修改，这些修改将丢失。"] : undefined, confirmLabel: "确认删除", tone: "danger" })) {
-      return;
-    }
-
-    if (currentUserTemplate) {
-      deleteUserTemplateMutation.mutate(currentUserTemplate.id);
-    } else {
-      deleteTemplateMutation.mutate();
-    }
-  }
-
-  function handleSave(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canSave) {
-      return;
-    }
-    if (designerMode === "v3" && workspaceHasUnappliedDesignerChanges) {
-      void handleSaveNewReportDesignerContent(previewContent);
-    } else if (isUserTemplate) {
-      saveUserTemplateMutation.mutate(undefined);
-    } else {
-      saveMutation.mutate(undefined);
-    }
-  }
+  const {
+    handleCreateTemplate,
+    handleCreateUserTemplate,
+    handleToggleUserTemplateActive,
+    handleRestoreUserTemplateVersion,
+    handleRenameTemplate,
+    handleUpdateDisplayName,
+    handleSetDefaultTemplate,
+    handleExportSettingsChange,
+    handleSaveExportSettings,
+    handleDeleteTemplate,
+    handleSave,
+  } = createReportTemplatePageActions({
+    canCreateTemplate,
+    createTemplate: () => createTemplateMutation.mutate(),
+    canCreateUserTemplate,
+    createUserTemplate: () => createUserTemplateMutation.mutate(),
+    currentUserTemplate,
+    requestConfirmation,
+    updateUserTemplateStatus: (value) => updateUserTemplateStatusMutation.mutate(value),
+    restoreUserTemplateVersion: (version) => restoreUserTemplateVersionMutation.mutate(version),
+    canRenameTemplate,
+    isUserTemplate,
+    hasUnsavedChanges,
+    renameTemplate: () => renameTemplateMutation.mutate(),
+    canUpdateDisplayName,
+    updateDisplayName: () => isUserTemplate ? saveUserTemplateMutation.mutate(undefined) : updateDisplayNameMutation.mutate(),
+    canSetDefault,
+    setDefaultTemplate: () => setDefaultTemplateMutation.mutate(),
+    canDeleteTemplate,
+    deleteUserTemplate: () => deleteUserTemplateMutation.mutate(currentUserTemplate?.id ?? 0),
+    deleteTemplate: () => deleteTemplateMutation.mutate(),
+    canSave,
+    designerMode,
+    workspaceHasUnappliedDesignerChanges,
+    previewContent,
+    saveNewDesignerContent: handleSaveNewReportDesignerContent,
+    saveUserTemplate: () => saveUserTemplateMutation.mutate(undefined),
+    saveDefaultTemplate: () => saveMutation.mutate(undefined),
+    exportDefaults,
+    clearFeedback: () => { setMessage(null); setMessageType(null); },
+  });
 
   const { handleRefreshTemplates, handleBackToManagement, handleReturnToBusiness, handleOpenDesigner } =
     useReportTemplateWorkspaceNavigation({
@@ -808,6 +780,29 @@ export function ReportTemplateWorkspacePage({
         onImportPathChange: packageWorkspace.setImportPath,
         onChooseExportPath: packageWorkspace.chooseExportPath,
         onChooseImportPath: packageWorkspace.chooseImportPath,
+      }}
+      filePanel={{
+        desktopAvailable: fileWorkspace.desktopAvailable,
+        canManageTemplates,
+        isBusy,
+        exportPath: fileWorkspace.exportPath,
+        importPath: fileWorkspace.importPath,
+        uploadInputRef: fileWorkspace.uploadInputRef,
+        canExport: canExportTemplateFile,
+        canImport: canImportTemplateFile,
+        canUpload: canUploadTemplateFile,
+        canExportByPath: canExportTemplateFileByPath,
+        canImportByPath: canImportTemplateFileByPath,
+        onExport: () => fileWorkspace.exportFile(canExportTemplateFile),
+        onImport: () => void fileWorkspace.importFile(canImportTemplateFile, hasUnsavedChanges),
+        onUpload: () => fileWorkspace.chooseUpload(canUploadTemplateFile),
+        onUploadFileChange: (event) => void fileWorkspace.uploadFile(event, canUploadTemplateFile, hasUnsavedChanges),
+        onExportByPath: () => fileWorkspace.exportFile(canExportTemplateFileByPath),
+        onImportByPath: () => void fileWorkspace.importFile(canImportTemplateFileByPath, hasUnsavedChanges),
+        onExportPathChange: fileWorkspace.setExportPath,
+        onImportPathChange: fileWorkspace.setImportPath,
+        onChooseExportPath: fileWorkspace.chooseExportPath,
+        onChooseImportPath: fileWorkspace.chooseImportPath,
       }}
     />
   );

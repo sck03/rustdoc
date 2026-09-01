@@ -138,6 +138,10 @@ export function buildTemplatePackageFileName() {
   return `templates_${buildTimestamp(new Date())}.edtpl`;
 }
 
+export function buildTemplateFileName(reportType: ReportTypeOption) {
+  return `${reportType === "PaymentVoucher" ? "payment_voucher" : "export_document"}_template.html`;
+}
+
 export function buildUserTemplateKey(id: number) {
   return `user-template:${id}`;
 }

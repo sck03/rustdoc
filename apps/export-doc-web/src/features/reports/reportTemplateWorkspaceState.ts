@@ -75,6 +75,8 @@ export function deriveReportTemplateWorkspaceState({
   desktopAvailable,
   packageExportPath,
   packageImportPath,
+  fileExportPath,
+  fileImportPath,
 }: {
   reportType: ReportTypeOption;
   designerDraftContent: string;
@@ -100,6 +102,8 @@ export function deriveReportTemplateWorkspaceState({
   desktopAvailable: boolean;
   packageExportPath: string;
   packageImportPath: string;
+  fileExportPath: string;
+  fileImportPath: string;
 }) {
   const isUserTemplate = currentUserTemplate !== null;
   const previewDocumentOptions =
@@ -180,6 +184,16 @@ export function deriveReportTemplateWorkspaceState({
     canImportPackage: canManageTemplates && (desktopAvailable || Boolean(packageImportPath.trim())) && !isBusy,
     canImportPackageByPath: canManageTemplates && Boolean(packageImportPath.trim()) && !isBusy,
     canUploadPackage: canManageTemplates && !desktopAvailable && !isBusy,
+    canExportTemplateFile: !isUserTemplate && canManageTemplates && Boolean(selectedTemplatePath) &&
+      (desktopAvailable || Boolean(fileExportPath.trim())) && !isBusy,
+    canExportTemplateFileByPath: !isUserTemplate && canManageTemplates && Boolean(selectedTemplatePath) &&
+      Boolean(fileExportPath.trim()) && !isBusy,
+    canDownloadTemplateFile: !isUserTemplate && canManageTemplates && Boolean(selectedTemplatePath) && !isBusy,
+    canImportTemplateFile: !isUserTemplate && canManageTemplates && Boolean(selectedTemplatePath) &&
+      (desktopAvailable || Boolean(fileImportPath.trim())) && !isBusy,
+    canImportTemplateFileByPath: !isUserTemplate && canManageTemplates && Boolean(selectedTemplatePath) &&
+      Boolean(fileImportPath.trim()) && !isBusy,
+    canUploadTemplateFile: !isUserTemplate && canManageTemplates && Boolean(selectedTemplatePath) && !desktopAvailable && !isBusy,
     canSave,
   };
 }

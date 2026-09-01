@@ -37,7 +37,7 @@ for (const rule of baseline.rules ?? []) {
     });
   const entries = files.map((file) => ({
     file: path.relative(repositoryRoot, file).replaceAll(path.sep, "/"),
-    lines: readFileSync(file, "utf8").split(/\r?\n/u).length,
+    lines: countSourceLines(readFileSync(file, "utf8")),
   }));
   for (const entry of entries) {
     if (entry.lines > Number(rule.maximumLines)) {
@@ -86,4 +86,11 @@ function walk(directory) {
     else if (entry.isFile()) files.push(fullPath);
   }
   return files;
+}
+
+function countSourceLines(source) {
+  if (source.length === 0) return 0;
+  // A terminal newline terminates the final physical line; split() would add
+  // a synthetic empty line and make files fail the limit by one.
+  return source.match(/\r?\n/gu)?.length ?? 1;
 }

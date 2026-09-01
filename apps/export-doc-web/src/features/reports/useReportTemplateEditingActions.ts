@@ -93,7 +93,14 @@ export function useReportTemplateEditingActions({
   }
 
   function handleDesignerModeChange(mode: DesignerMode) {
-    if (isLimitedReportView || mode === designerMode || (mode === "v3" && designerMode === "advancedHtml")) {
+    if (isLimitedReportView || (mode === "v3" && designerMode === "advancedHtml")) {
+      return;
+    }
+    // The header keeps the selected designer mode while preview is open. A
+    // second click on that same tab therefore needs to restore the workspace,
+    // rather than being treated as a no-op.
+    if (mode === designerMode) {
+      setWorkspaceMode("design");
       return;
     }
     if (designerMode === "v3" && workspaceHasUnappliedDesignerChanges) {

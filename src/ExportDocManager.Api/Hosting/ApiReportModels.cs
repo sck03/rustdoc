@@ -411,6 +411,53 @@ namespace ExportDocManager.Api.Hosting
         public string StoragePolicy { get; }
     }
 
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+    public sealed class ApiReportTemplateFileExportRequest
+    {
+        public string ReportType { get; set; } = "ExportDocument";
+
+        public string TemplatePath { get; set; } = string.Empty;
+
+        public string FilePath { get; set; } = string.Empty;
+    }
+
+    public sealed class ApiReportTemplateFileExportResponse
+    {
+        public ApiReportTemplateFileExportResponse(
+            string filePath,
+            long bytes,
+            string storagePolicy)
+        {
+            FilePath = filePath ?? string.Empty;
+            Bytes = bytes;
+            StoragePolicy = storagePolicy ?? string.Empty;
+        }
+
+        public string FilePath { get; }
+
+        public long Bytes { get; }
+
+        public string StoragePolicy { get; }
+    }
+
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+    public sealed class ApiReportTemplateFileImportRequest
+    {
+        public string ReportType { get; set; } = "ExportDocument";
+
+        public string TemplatePath { get; set; } = string.Empty;
+
+        public string FilePath { get; set; } = string.Empty;
+    }
+
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+    public sealed class ApiReportTemplateFileDownloadRequest
+    {
+        public string ReportType { get; set; } = "ExportDocument";
+
+        public string TemplatePath { get; set; } = string.Empty;
+    }
+
     public sealed class ApiReportTemplateFieldDto
     {
         public ApiReportTemplateFieldDto(

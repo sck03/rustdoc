@@ -653,6 +653,8 @@ namespace ExportDocManager.Api.Hosting
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status409Conflict);
 
+            MapReportTemplateFileEndpoints(endpoints);
+
             endpoints.MapPost("/api/reports/templates/preview", async (
                 HttpContext context,
                 IReportTemplateService reportTemplateService,
@@ -807,6 +809,22 @@ namespace ExportDocManager.Api.Hosting
                 !string.Equals(extension, ".zip", StringComparison.OrdinalIgnoreCase))
             {
                 throw new ArgumentException("模板包文件只支持 .edtpl 或 .zip。");
+            }
+
+            return normalized;
+        }
+
+        private static string NormalizeUploadedReportTemplateFileName(string fileName)
+        {
+            string normalized = Path.GetFileName(fileName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                throw new ArgumentException("模板文件名不能为空。");
+            }
+
+            if (!string.Equals(Path.GetExtension(normalized), ".html", StringComparison.Ordinal))
+            {
+                throw new ArgumentException("模板文件只支持小写 .html 扩展名。");
             }
 
             return normalized;

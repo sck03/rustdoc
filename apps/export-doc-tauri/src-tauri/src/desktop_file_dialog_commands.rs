@@ -202,6 +202,14 @@ pub(crate) fn select_report_template_package_file() -> Result<Option<String>, St
 }
 
 #[tauri::command]
+pub(crate) fn select_report_template_file() -> Result<Option<String>, String> {
+    Ok(pick_file(
+        "选择报表模板文件",
+        &[("HTML 模板", &["html"]), ("全部文件", &["*"])],
+    ))
+}
+
+#[tauri::command]
 pub(crate) fn select_save_package_path(
     default_file_name: Option<String>,
     default_directory: Option<String>,
@@ -251,6 +259,27 @@ pub(crate) fn select_save_report_template_package_path(
     let mut dialog = rfd::FileDialog::new()
         .set_title("选择报表模板包保存位置")
         .add_filter("报表模板包", &["edtpl", "zip"]);
+
+    if let Some(file_name) = default_file_name
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+    {
+        dialog = dialog.set_file_name(file_name);
+    }
+
+    dialog = apply_default_directory(dialog, default_directory);
+
+    Ok(dialog.save_file().map(path_to_string))
+}
+
+#[tauri::command]
+pub(crate) fn select_save_report_template_file_path(
+    default_file_name: Option<String>,
+    default_directory: Option<String>,
+) -> Result<Option<String>, String> {
+    let mut dialog = rfd::FileDialog::new()
+        .set_title("选择报表模板文件保存位置")
+        .add_filter("HTML 模板", &["html"]);
 
     if let Some(file_name) = default_file_name
         .map(|value| value.trim().to_owned())

@@ -169,6 +169,10 @@ export async function selectReportTemplatePackageFile() {
   return invokeOptionalPath("select_report_template_package_file");
 }
 
+export async function selectReportTemplateFile() {
+  return invokeOptionalPath("select_report_template_file");
+}
+
 export async function selectSavePackagePath(defaultFileName?: string, defaultDirectory?: string) {
   const invoke = getInvoke();
   if (!invoke) {
@@ -200,6 +204,18 @@ export async function selectSaveReportTemplatePackagePath(defaultFileName?: stri
   }
 
   return invoke<string | null>("select_save_report_template_package_path", {
+    defaultFileName: normalizeOptionalPath(defaultFileName),
+    defaultDirectory: normalizeOptionalPath(defaultDirectory),
+  });
+}
+
+export async function selectSaveReportTemplateFilePath(defaultFileName?: string, defaultDirectory?: string) {
+  const invoke = getInvoke();
+  if (!invoke) {
+    return null;
+  }
+
+  return invoke<string | null>("select_save_report_template_file_path", {
     defaultFileName: normalizeOptionalPath(defaultFileName),
     defaultDirectory: normalizeOptionalPath(defaultDirectory),
   });

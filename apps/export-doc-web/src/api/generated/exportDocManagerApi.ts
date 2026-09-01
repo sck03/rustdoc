@@ -2272,6 +2272,29 @@ export interface ApiReportTemplateFieldDto {
   value: string;
 }
 
+export interface ApiReportTemplateFileDownloadRequest {
+  reportType?: string;
+  templatePath?: string;
+}
+
+export interface ApiReportTemplateFileExportRequest {
+  filePath?: string;
+  reportType?: string;
+  templatePath?: string;
+}
+
+export interface ApiReportTemplateFileExportResponse {
+  bytes: number;
+  filePath: string;
+  storagePolicy: string;
+}
+
+export interface ApiReportTemplateFileImportRequest {
+  filePath?: string;
+  reportType?: string;
+  templatePath?: string;
+}
+
 export interface ApiReportTemplateMetadataRequest {
   displayName?: string;
   reportType?: string;
@@ -4026,6 +4049,10 @@ export interface DownloadQueriedInvoicesRequest {
   body: ApiQueryInvoiceFilterRequest;
 }
 
+export interface DownloadReportTemplateFileRequest {
+  body: ApiReportTemplateFileDownloadRequest;
+}
+
 export interface DownloadSingleWindowReceiptPackageRequest {
   body: ApiSingleWindowReceiptPackageExportRequest;
 }
@@ -4164,6 +4191,10 @@ export interface ImportInvoiceTransferPackageRequest {
 
 export interface ImportLetterOfCreditDocumentRequest {
   body: ApiLetterOfCreditImportRequest;
+}
+
+export interface ImportReportTemplateFileRequest {
+  body: ApiReportTemplateFileImportRequest;
 }
 
 export interface ImportReportTemplatePackageRequest {
@@ -4662,6 +4693,10 @@ export interface SaveReportTemplateContentRequest {
   body: ApiReportTemplateSaveRequest;
 }
 
+export interface SaveReportTemplateFileToPathRequest {
+  body: ApiReportTemplateFileExportRequest;
+}
+
 export interface SaveReportTemplatePackageToPathRequest {
   body: ApiReportTemplatePackageExportRequest;
 }
@@ -4977,6 +5012,13 @@ export interface UploadLetterOfCreditDocumentRequest {
 export interface UploadOcrImageRequest {
   sourceName?: string;
   sourceMimeType?: string;
+  body: Blob;
+}
+
+export interface UploadReportTemplateFileRequest {
+  reportType?: string;
+  templatePath?: string;
+  fileName?: string;
   body: Blob;
 }
 
@@ -5676,6 +5718,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public downloadReportTemplateFile(request: DownloadReportTemplateFileRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = "/api/reports/templates/file/download";
+    return this.request<Blob>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public downloadReportTemplatePackage(init?: ApiRequestInit): Promise<Blob> {
     const path = "/api/reports/templates/package/download";
     return this.request<Blob>("POST", path, { init });
@@ -5973,6 +6023,14 @@ export class ExportDocManagerApiClient {
   public importLetterOfCreditDocument(request: ImportLetterOfCreditDocumentRequest, init?: ApiRequestInit): Promise<ApiLetterOfCreditImportResponse> {
     const path = "/api/tools/letter-of-credit/import";
     return this.request<ApiLetterOfCreditImportResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public importReportTemplateFile(request: ImportReportTemplateFileRequest, init?: ApiRequestInit): Promise<ApiReportTemplateContentDto> {
+    const path = "/api/reports/templates/file/import";
+    return this.request<ApiReportTemplateContentDto>("POST", path, {
       body: request.body,
       init,
     });
@@ -6961,6 +7019,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public saveReportTemplateFileToPath(request: SaveReportTemplateFileToPathRequest, init?: ApiRequestInit): Promise<ApiReportTemplateFileExportResponse> {
+    const path = "/api/reports/templates/file/save-to-path";
+    return this.request<ApiReportTemplateFileExportResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public saveReportTemplatePackageToPath(request: SaveReportTemplatePackageToPathRequest, init?: ApiRequestInit): Promise<ApiReportTemplatePackageExportResponse> {
     const path = "/api/reports/templates/package/save-to-path";
     return this.request<ApiReportTemplatePackageExportResponse>("POST", path, {
@@ -7551,6 +7617,19 @@ export class ExportDocManagerApiClient {
       query: {
         "sourceName": request.sourceName,
         "sourceMimeType": request.sourceMimeType,
+      },
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadReportTemplateFile(request: UploadReportTemplateFileRequest, init?: ApiRequestInit): Promise<ApiReportTemplateContentDto> {
+    const path = "/api/reports/templates/file/upload";
+    return this.request<ApiReportTemplateContentDto>("POST", path, {
+      query: {
+        "reportType": request.reportType,
+        "templatePath": request.templatePath,
+        "fileName": request.fileName,
       },
       body: request.body,
       init,

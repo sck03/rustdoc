@@ -106,6 +106,15 @@ namespace ExportDocManager.Services.Reporting
         public string StoragePolicy { get; init; } = string.Empty;
     }
 
+    public sealed class ReportTemplateFileExportResult
+    {
+        public string FilePath { get; init; } = string.Empty;
+
+        public long Bytes { get; init; }
+
+        public string StoragePolicy { get; init; } = string.Empty;
+    }
+
     public sealed class ReportTemplateFieldDescriptor
     {
         public ReportDocumentType ReportType { get; init; }
@@ -202,6 +211,21 @@ namespace ExportDocManager.Services.Reporting
             ReportDocumentType reportType,
             string content,
             bool withSeal = true,
+            CancellationToken cancellationToken = default);
+    }
+
+    public interface IReportTemplateFileService
+    {
+        Task<ReportTemplateFileExportResult> ExportAsync(
+            ReportDocumentType reportType,
+            string templatePath,
+            string filePath,
+            CancellationToken cancellationToken = default);
+
+        Task<ReportTemplateContentResult> ImportAsync(
+            ReportDocumentType reportType,
+            string templatePath,
+            string filePath,
             CancellationToken cancellationToken = default);
     }
 
