@@ -42,6 +42,7 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerPreviewSamples.ts"
 export * from ${JSON.stringify(importSpecifier("reportDesignerGridMutations.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerTableMutations.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerLayerBands.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerV3WorkspaceHelpers.tsx"))};
 `);
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 const api = await import(pathToFileURL(bundlePath).href);
@@ -140,6 +141,16 @@ assert(inspectorCss.includes("report-designer-v3-upload-button") && inspectorCss
 assert(workspaceSource.includes("onClick={openFieldPanel}"), "工具栏的选择字段按钮必须打开字段面板而不是静默插入首个字段");
 assert(workspaceSource.includes("report-designer-v3-zoom-select") && workspaceSource.includes("适合窗口"), "V3 工作区必须提供缩放预设和适合窗口操作");
 assert(workspaceSource.includes("fitRequest") && workspaceSource.includes("showGuides") && workspaceSource.includes("onFitZoom={handleFitZoom}"), "V3 工作区必须把适合窗口和参考线状态传递到画布");
+assert(canvasSource.includes("scroll.clientWidth - horizontalPadding") && canvasSource.includes("scroll.clientHeight - verticalPadding"), "适合窗口必须按画布真实内容区计算可用尺寸");
+assert(api.fitReportDesignerV3Zoom(720, 560, 800, 1120) === 0.5, "适合窗口不得重复扣除画布内边距");
+assert(
+  /\.report-designer-v3-preview-flow-content table\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/u.test(gridCss),
+  "画布内结构表格必须覆盖全站 table 最小宽度并限制在组件物理宽度内",
+);
+assert(
+  /\.report-designer-v3-preview-flow-content th\s*\{[^}]*position:\s*static;/u.test(gridCss),
+  "画布内表头必须隔离业务列表的 sticky 表头规则",
+);
 
 const conditionalText = "SPECIAL_TERMS_VISIBLE";
 const conditionalBlock = {

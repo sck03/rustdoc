@@ -625,13 +625,6 @@
   text-align: left;
 }
 
-.report-designer-v3-preview-flow-content table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-  font-size: inherit;
-}
-
 .report-designer-v3-preview-flow-content caption.edm-report-grid-title {
   padding: 2px;
   color: var(--edm-neutral-750);

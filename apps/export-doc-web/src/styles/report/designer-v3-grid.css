@@ -1,3 +1,24 @@
+.report-designer-v3-preview-flow-content table {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: inherit;
+}
+
+.report-designer-v3-preview-flow-content th {
+  position: static;
+  top: auto;
+  z-index: auto;
+  letter-spacing: normal;
+}
+
+.report-designer-v3-preview-flow-content tbody tr:nth-child(even),
+.report-designer-v3-preview-flow-content tbody tr:hover {
+  background: transparent;
+}
+
 .report-designer-v3-preview-flow-content .edm-report-grid td[data-report-grid-cell-id] {
   pointer-events: auto;
   cursor: cell;

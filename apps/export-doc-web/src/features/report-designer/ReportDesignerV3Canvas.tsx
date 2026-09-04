@@ -110,7 +110,9 @@ export function ReportDesignerV3Canvas({
     const styles = getComputedStyle(scroll);
     const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
     const verticalPadding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
-    onFitZoom(fitReportDesignerV3Zoom(scroll.clientWidth - horizontalPadding, scroll.clientHeight - verticalPadding, canvas.offsetWidth, canvas.offsetHeight));
+    const viewportWidth = Math.max(0, scroll.clientWidth - horizontalPadding);
+    const viewportHeight = Math.max(0, scroll.clientHeight - verticalPadding);
+    onFitZoom(fitReportDesignerV3Zoom(viewportWidth, viewportHeight, canvas.offsetWidth, canvas.offsetHeight));
   }, [fitRequest, onFitZoom]);
 
   function beginMove(event: ReactPointerEvent<HTMLDivElement>, element: ReportDesignerV3Element, layerId: string) {
