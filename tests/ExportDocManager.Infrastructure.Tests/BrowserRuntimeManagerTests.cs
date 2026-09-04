@@ -388,6 +388,54 @@ namespace ExportDocManager.Infrastructure.Tests
 
         [Fact]
         [Trait("Category", BrowserIntegrationCollection.Category)]
+        public async Task ChromiumPdfRenderer_ShouldMaterializeV3PageNumbers()
+        {
+            string root = FindRepositoryRoot();
+            string dataRoot = Path.Combine(root, ".codex-runtime", "BrowserRuntimeManagerTests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dataRoot);
+            var pathProvider = new RuntimeAppPathProvider(root, dataRoot);
+            await using var runtime = new BrowserRuntimeManager();
+            var renderer = new ChromiumHtmlToPdfService(pathProvider, runtime);
+            string destination = Path.Combine(dataRoot, "pdf", "v3-page-numbers.pdf");
+            string rows = string.Concat(Enumerable.Repeat("<div style=\"height:18mm\">PAGE-CONTENT</div>", 80));
+            string html = """
+                <!doctype html><html><head><style>
+                @page { size: 210mm 297mm; margin: 0; }
+                html, body { margin: 0; padding: 0; }
+                .edm-v3-page { position: relative; width: 210mm; min-height: 297mm; }
+                .edm-v3-repeat-layer { position: fixed; inset: 0; width: 210mm; height: 297mm; }
+                .edm-v3-element { position: absolute; }
+                </style></head><body>
+                <div class="edm-v3-page">__ROWS__</div>
+                <div class="edm-v3-repeat-layer">
+                  <div class="edm-v3-element" style="left:10mm;top:285mm;width:100mm;height:6mm">
+                    <span data-edm-v3-page-number>PG <span data-edm-v3-page-number-current>1</span> / <span data-edm-v3-page-number-total>1</span> END</span>
+                  </div>
+                </div>
+                </body></html>
+                """;
+            html = html.Replace("__ROWS__", rows, StringComparison.Ordinal);
+            try
+            {
+                await renderer.RenderAsync(html, destination);
+                using var document = PdfDocument.Open(destination);
+                Assert.True(document.NumberOfPages >= 4, "V3 page-number fixture must span multiple pages.");
+                var pageTexts = document.GetPages().Select(page => page.Text).ToArray();
+                Console.WriteLine(string.Join("\n---PAGE---\n", pageTexts));
+                Assert.DoesNotContain(pageTexts, text => text.Contains("0 / 0", StringComparison.Ordinal));
+                for (int pageNumber = 1; pageNumber <= document.NumberOfPages; pageNumber++)
+                {
+                    Assert.Contains($"PG {pageNumber} / {document.NumberOfPages} END", pageTexts[pageNumber - 1], StringComparison.Ordinal);
+                }
+            }
+            finally
+            {
+                // Keep the fixture temporarily while diagnosing page-number layout.
+            }
+        }
+
+        [Fact]
+        [Trait("Category", BrowserIntegrationCollection.Category)]
         public async Task I5a6BrowserParser_ShouldReadDynamicSearchTable()
         {
             string root = FindRepositoryRoot();

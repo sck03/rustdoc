@@ -3,7 +3,18 @@ import os from "node:os";
 const legacyWindowsMaximumBuild = 19040;
 
 export function buildChromiumSandboxArguments(runtime = detectChromiumRuntime()) {
-  return shouldDisableChromiumSandbox(runtime) ? ["--no-sandbox"] : [];
+  const argumentsList = shouldDisableChromiumSandbox(runtime) ? ["--no-sandbox"] : [];
+  if (requiresLegacyWindowsCompatibility(runtime)) {
+    argumentsList.push("--in-process-gpu");
+  }
+  return argumentsList;
+}
+
+export function requiresLegacyWindowsCompatibility(runtime = detectChromiumRuntime()) {
+  return runtime.platform === "win32" &&
+    Number.isInteger(runtime.windowsBuild) &&
+    runtime.windowsBuild >= 0 &&
+    runtime.windowsBuild <= legacyWindowsMaximumBuild;
 }
 
 export function shouldDisableChromiumSandbox(runtime = detectChromiumRuntime()) {

@@ -24,6 +24,7 @@ namespace ExportDocManager.Services.Reporting
         private readonly ISettingsService _settingsService;
         private readonly IBusinessClock _clock;
         private readonly ILogger<ReportTemplateService> _logger;
+        private readonly ReportTemplateV3ImageResourceHydrator _imageResourceHydrator;
         private readonly IDbContextFactory<AppDbContext>? _contextFactory;
         private readonly BusinessDataAccessScope? _accessScope;
 
@@ -33,7 +34,8 @@ namespace ExportDocManager.Services.Reporting
             IBusinessClock? clock = null,
             ILogger<ReportTemplateService>? logger = null,
             IDbContextFactory<AppDbContext>? contextFactory = null,
-            BusinessDataAccessScope? accessScope = null)
+            BusinessDataAccessScope? accessScope = null,
+            IReportTemplateImageResourceService? imageResourceService = null)
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
             ArgumentNullException.ThrowIfNull(settingsService);
@@ -44,6 +46,8 @@ namespace ExportDocManager.Services.Reporting
             _clock = clock ?? BusinessClock.CreateSystem();
             _contextFactory = contextFactory;
             _accessScope = accessScope;
+            _imageResourceHydrator = new ReportTemplateV3ImageResourceHydrator(
+                imageResourceService ?? new ReportTemplateImageResourceService(pathProvider));
         }
 
         public async Task<ReportTemplateContentResult> CreateTemplateAsync(
@@ -293,7 +297,7 @@ namespace ExportDocManager.Services.Reporting
             };
         }
 
-        public Task<ReportTemplatePreviewResult> PreviewTemplateContentAsync(
+        public async Task<ReportTemplatePreviewResult> PreviewTemplateContentAsync(
             ReportDocumentType reportType,
             string content,
             bool withSeal = true,
@@ -308,13 +312,14 @@ namespace ExportDocManager.Services.Reporting
             string html = reportType == ReportDocumentType.PaymentVoucher
                 ? RenderPaymentVoucherPreview(templateContent)
                 : RenderInvoicePreview(templateContent, effectiveWithSeal);
+            html = await _imageResourceHydrator.HydrateAsync(html, cancellationToken).ConfigureAwait(false);
 
-            return Task.FromResult(new ReportTemplatePreviewResult
+            return new ReportTemplatePreviewResult
             {
                 ReportType = reportType,
                 WithSeal = reportType == ReportDocumentType.PaymentVoucher ? null : effectiveWithSeal,
                 Html = html
-            });
+            };
         }
 
         private string ResolveTemplateLifecycleTargetPath(

@@ -135,6 +135,28 @@ namespace ExportDocManager.Services.Reporting
         public IReadOnlyList<ReportTemplateFieldDescriptor> Fields { get; init; } = Array.Empty<ReportTemplateFieldDescriptor>();
     }
 
+    public sealed class ReportTemplateImageResource
+    {
+        public string Id { get; init; } = string.Empty;
+
+        public string MediaType { get; init; } = string.Empty;
+
+        public long ByteLength { get; init; }
+
+        public string Sha256 { get; init; } = string.Empty;
+
+        public string AltText { get; init; } = string.Empty;
+
+        public string StoragePolicy { get; init; } = string.Empty;
+    }
+
+    public sealed class ReportTemplateImageResourceContent
+    {
+        public required ReportTemplateImageResource Resource { get; init; }
+
+        public byte[] Content { get; init; } = Array.Empty<byte>();
+    }
+
     public interface IReportHtmlService
     {
         Task<IReadOnlyList<ReportTemplateDescriptor>> GetAvailableTemplatesAsync(
@@ -251,5 +273,18 @@ namespace ExportDocManager.Services.Reporting
     public interface IReportTemplateFieldCatalogService
     {
         ReportTemplateFieldCatalog GetFieldCatalog(ReportDocumentType reportType);
+    }
+
+    public interface IReportTemplateImageResourceService
+    {
+        Task<ReportTemplateImageResource> StoreAsync(
+            Stream source,
+            string? fileName = null,
+            string? declaredMediaType = null,
+            CancellationToken cancellationToken = default);
+
+        Task<ReportTemplateImageResourceContent> ReadAsync(
+            string resourceId,
+            CancellationToken cancellationToken = default);
     }
 }

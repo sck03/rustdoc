@@ -35,7 +35,7 @@ export function reportBlockModelRole(block: ReportBlock) {
     case "Row":
       return "多列布局";
     case "Grid":
-      return "固定票据格";
+      return "普通表格";
     case "Conditional":
       return "条件 band";
     case "Image":
@@ -115,7 +115,7 @@ export function collectReportDesignerBlockFieldBindings(block: ReportBlock): Rep
         row.cells
           .filter((cell) => cell.contentKind === "Field" || cell.contentKind === "CheckboxGroup")
           .map((cell, cellIndex) => ({
-            label: cell.label || `票据格 ${rowIndex + 1}-${cellIndex + 1}`,
+            label: cell.label || `表格 ${rowIndex + 1}-${cellIndex + 1}`,
             fieldPath: cell.fieldPath,
           })),
       ));

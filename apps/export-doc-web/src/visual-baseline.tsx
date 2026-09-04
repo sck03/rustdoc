@@ -205,7 +205,7 @@ function ReportBaseline() {
         <button type="button" className="command-button secondary">返回模板管理</button>
         <div className="editor-title report-template-current-title"><span>报表设计</span><small>当前模板：发票</small></div>
         <div className="toolbar-actions">
-          <div className="segmented-control" role="tablist" aria-label="报表设计视图">
+          <div className="segmented-control report-template-view-tabs has-advanced-html" role="tablist" aria-label="报表设计视图">
             <button type="button" role="tab" aria-selected={isDesktop} className={isDesktop ? "segmented-active" : ""} disabled={!isDesktop}>可视化设计</button>
             <button type="button" role="tab" aria-selected={false} disabled={!isDesktop}>高级 HTML</button>
             <button type="button" role="tab" aria-selected={!isDesktop} className={isDesktop ? "" : "segmented-active"}>预览</button>

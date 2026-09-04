@@ -174,6 +174,20 @@ for (const file of walk(root)) {
         failures.push(`${sourceRelativePath}: 任务中心缺少危险操作确认或稳定反馈语义：${taskCenterContract}`);
       }
     }
+    for (const taskCenterFilterContract of [
+      "function applyFilters(nextKeyword = keyword, nextStatus = status)",
+      "function handleKeywordChange(value: string)",
+      "if (!value.trim()) applyFilters(value)",
+      "function handleRefresh()",
+      "hasPendingJobCenterFilters(keyword, committedKeyword, pageNumber)",
+      "applyFilters(keyword, value)",
+      'onClick={() => applyFilters("")}',
+      'title="刷新" aria-label="刷新" disabled={jobsQuery.isFetching || operations.isBusy} onClick={handleRefresh}',
+    ]) {
+      if (!sourceText.includes(taskCenterFilterContract)) {
+        failures.push(`${sourceRelativePath}: 任务筛选必须在清空、切换状态和刷新时应用当前输入：${taskCenterFilterContract}`);
+      }
+    }
     if (/\<tr[\s\S]{0,240}tabIndex=\{0\}/.test(sourceText)) {
       failures.push(`${sourceRelativePath}: 任务表格行没有直接动作，不应伪装成可键盘操作控件`);
     }

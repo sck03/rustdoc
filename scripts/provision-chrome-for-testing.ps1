@@ -217,6 +217,12 @@ function Test-ChromeExecutable {
     $process.StartInfo.RedirectStandardError = $true
     $process.StartInfo.CreateNoWindow = $true
     $process.StartInfo.ErrorDialog = $false
+    if ([System.OperatingSystem]::IsWindows() -and [Environment]::OSVersion.Version.Build -lt 19041) {
+        # Chromium's GPU child reports a misleading VERSION.dll loader dialog
+        # on Windows 10 1809/Server 2019; keep provisioning itself silent too.
+        [void]$process.StartInfo.ArgumentList.Add("--no-sandbox")
+        [void]$process.StartInfo.ArgumentList.Add("--in-process-gpu")
+    }
     $process.StartInfo.ArgumentList.Add("--version")
     try {
         if (-not $process.Start()) {

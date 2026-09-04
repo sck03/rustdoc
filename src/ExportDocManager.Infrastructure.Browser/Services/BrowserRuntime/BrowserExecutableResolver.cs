@@ -9,8 +9,6 @@ namespace ExportDocManager.Services.BrowserRuntime
     public sealed class BrowserExecutableResolver
     {
         public const string ChromiumExecutableEnvironmentVariable = "EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE";
-        private const uint SemFailCriticalErrors = 0x0001;
-        private const uint SemNoOpenFileErrorBox = 0x8000;
         private static readonly TimeSpan VersionProbeTimeout = TimeSpan.FromSeconds(5);
 
         private readonly IAppPathProvider _pathProvider;
@@ -42,20 +40,22 @@ namespace ExportDocManager.Services.BrowserRuntime
                         $"{ChromiumExecutableEnvironmentVariable} 指向的 Chromium 可执行文件不存在：{fullPath}");
                 }
 
+                string processPath = NormalizeProcessPath(fullPath);
+
                 lock (_cacheSync)
                 {
-                    if (string.Equals(_cachedExecutable, fullPath, PathComparison))
+                    if (string.Equals(_cachedExecutable, processPath, PathComparison))
                     {
-                        return fullPath;
+                        return processPath;
                     }
                 }
 
                 ValidateCandidateOrThrow(fullPath, explicitlyConfigured: true);
                 lock (_cacheSync)
                 {
-                    _cachedExecutable = fullPath;
+                    _cachedExecutable = processPath;
                 }
-                return fullPath;
+                return processPath;
             }
 
             lock (_cacheSync)
@@ -72,7 +72,7 @@ namespace ExportDocManager.Services.BrowserRuntime
                 try
                 {
                     ValidateCandidateOrThrow(candidate, explicitlyConfigured: false);
-                    string resolved = Path.GetFullPath(candidate);
+                    string resolved = NormalizeProcessPath(Path.GetFullPath(candidate));
                     lock (_cacheSync)
                     {
                         _cachedExecutable = resolved;
@@ -333,35 +333,34 @@ namespace ExportDocManager.Services.BrowserRuntime
                 ErrorDialog = false,
                 WorkingDirectory = Path.GetDirectoryName(executablePath)!
             };
+            if (ChromiumSandboxPolicy.ResolveNoSandboxSetting())
+            {
+                // Chromium 149 can show a misleading VERSION.dll loader dialog
+                // when its sandbox child cannot start on legacy Windows. Probe
+                // with the same compatibility policy used by the real host.
+                startInfo.ArgumentList.Add("--no-sandbox");
+            }
+            if (ChromiumSandboxPolicy.RequiresLegacyWindowsCompatibilityMode())
+            {
+                startInfo.ArgumentList.Add("--in-process-gpu");
+            }
             startInfo.ArgumentList.Add("--version");
 
             Process? process = null;
-            uint previousErrorMode = 0;
-            bool restoreErrorMode = false;
             try
             {
-                if (OperatingSystem.IsWindows())
+                var candidate = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
+                if (!ChromiumProcessLauncher.Start(candidate))
                 {
-                    restoreErrorMode = SetThreadErrorMode(
-                        SemFailCriticalErrors | SemNoOpenFileErrorBox,
-                        out previousErrorMode);
+                    candidate.Dispose();
+                    throw new InfrastructureServiceException("无法启动 Chromium 版本探针。");
                 }
-
-                process = Process.Start(startInfo) ??
-                          throw new InfrastructureServiceException("无法启动 Chromium 版本探针。");
+                process = candidate;
             }
             catch (Exception ex) when (ex is not InfrastructureServiceException)
             {
                 throw new InfrastructureServiceException("Chromium 加载失败，运行包可能缺少系统或随包依赖。", ex);
             }
-            finally
-            {
-                if (restoreErrorMode)
-                {
-                    SetThreadErrorMode(previousErrorMode, out _);
-                }
-            }
-
             using (process)
             {
                 try
@@ -487,6 +486,32 @@ namespace ExportDocManager.Services.BrowserRuntime
             return fullPath.Equals(fullRoot, PathComparison) || fullPath.StartsWith(prefix, PathComparison);
         }
 
+        private static string NormalizeProcessPath(string path)
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return path;
+            }
+
+            // Chromium's Windows process launcher accepts ordinary drive/UNC
+            // paths reliably.  Passing a verbatim (\\?\) executable path can
+            // start the browser and expose CDP, yet leave Playwright's print
+            // command waiting indefinitely on legacy Windows.  Keep verbatim
+            // paths for boundary validation, but remove the prefix at this
+            // process boundary (the bundled runtime paths are short enough for
+            // the Win32 form and UNC conversion preserves the share name).
+            const string extendedUncPrefix = @"\\?\UNC\";
+            const string extendedPathPrefix = @"\\?\";
+            if (path.StartsWith(extendedUncPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return @"\\" + path[extendedUncPrefix.Length..];
+            }
+
+            return path.StartsWith(extendedPathPrefix, StringComparison.OrdinalIgnoreCase)
+                ? path[extendedPathPrefix.Length..]
+                : path;
+        }
+
         private static StringComparer PathComparer => OperatingSystem.IsWindows()
             ? StringComparer.OrdinalIgnoreCase
             : StringComparer.Ordinal;
@@ -495,8 +520,5 @@ namespace ExportDocManager.Services.BrowserRuntime
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool SetThreadErrorMode(uint newMode, out uint oldMode);
     }
 }

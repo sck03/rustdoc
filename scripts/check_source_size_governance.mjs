@@ -90,7 +90,8 @@ function walk(directory) {
 
 function countSourceLines(source) {
   if (source.length === 0) return 0;
-  // A terminal newline terminates the final physical line; split() would add
-  // a synthetic empty line and make files fail the limit by one.
-  return source.match(/\r?\n/gu)?.length ?? 1;
+  const newlineCount = source.match(/\r?\n/gu)?.length ?? 0;
+  // A final newline terminates the last physical line; otherwise the last
+  // unterminated line still counts as a source line.
+  return newlineCount + (source.endsWith("\n") ? 0 : 1);
 }

@@ -139,6 +139,15 @@ namespace ExportDocManager.Api.Hosting
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized);
 
+            endpoints.MapGet("/api/reports/templates/v3/contract", () =>
+                Results.Ok(ApiReportTemplateV3ContractResponse.Create()))
+            .WithName("GetReportTemplateV3Contract")
+            .Produces<ApiReportTemplateV3ContractResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
+
+            MapReportTemplateImageResourceEndpoints(endpoints);
+
             endpoints.MapGet("/api/reports/templates/content", async (
                 HttpContext context,
                 IReportTemplateService reportTemplateService,

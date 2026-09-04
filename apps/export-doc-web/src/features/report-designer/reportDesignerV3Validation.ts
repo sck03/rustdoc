@@ -1,4 +1,12 @@
-import { isRecord, type ReportDesignerSchemaIssue } from "./reportDesignerSchemaValues.ts";
+import {
+  isRecord,
+  isReportDesignerCssColor,
+  isReportDesignerFieldPath,
+  isSafeReportDesignerCssFontFamily,
+  readEnum,
+  readNumber,
+  type ReportDesignerSchemaIssue,
+} from "./reportDesignerSchemaValues.ts";
 import { normalizeEmbeddedReportDesignerBlock } from "./reportDesignerSchemaValidation.ts";
 import {
   validateControlledReportImageFieldPath,
@@ -15,12 +23,18 @@ import {
   REPORT_DESIGNER_V3_MAX_TEXT_LENGTH,
   REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS,
   REPORT_DESIGNER_V3_MIN_ELEMENT_SIZE_HUNDREDTH_MM,
+  REPORT_DESIGNER_V3_CONTRACT_VERSION,
+  REPORT_DESIGNER_V3_AST_KIND,
+  REPORT_DESIGNER_V3_COORDINATE_UNIT,
+  REPORT_DESIGNER_V3_FLOW_TYPES,
+  REPORT_DESIGNER_V3_RELEASE_STATES,
   REPORT_DESIGNER_V3_VERSION,
   clampReportDesignerV3ElementToPage,
   reportDesignerV3ElementBounds,
   reportDesignerV3PageDimensions,
   type ReportDesignerV3Element,
   type ReportDesignerV3ElementStyle,
+  type ReportDesignerV3ImageResource,
   type ReportDesignerV3Layer,
   type ReportDesignerV3Page,
   type ReportDesignerV3Schema,
@@ -28,10 +42,8 @@ import {
 import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
 
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,119}$/;
-const colorPattern = /^#[0-9a-fA-F]{3,8}$/;
-const fontFamilyPattern = /^[A-Za-z0-9 \t"',._-]+$/;
-const fieldPathPattern = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/;
 const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
+const sha256Pattern = /^[0-9a-fA-F]{64}$/;
 export type ReportDesignerV3ValidationResult = {
   schema: ReportDesignerV3Schema | null;
   issues: ReportDesignerSchemaIssue[];
@@ -70,13 +82,20 @@ export function normalizeReportDesignerV3Schema(
   }
   validateBodyFlowOverlaps(layers, issues);
 
+  const resources = normalizeResources(input.resources, issues);
+  validateResourceReferences(layers, resources ?? [], issues);
   return {
     schema: {
       version: 3,
+      astKind: normalizeMarker(input.astKind, REPORT_DESIGNER_V3_AST_KIND, "$.astKind", issues),
+      coordinateUnit: normalizeMarker(input.coordinateUnit, REPORT_DESIGNER_V3_COORDINATE_UNIT, "$.coordinateUnit", issues),
       reportType,
       page,
       layers,
       grid,
+      contractVersion: normalizeMarker(input.contractVersion, REPORT_DESIGNER_V3_CONTRACT_VERSION, "$.contractVersion", issues),
+      resources,
+      release: normalizeRelease(input.release, issues),
       metadata: normalizeMetadata(input.metadata),
     },
     issues,
@@ -158,11 +177,14 @@ function normalizeLayers(
     const remaining = Math.max(0, REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS - totalElements);
     const elements = normalizeElements(rawLayer.elements, page, reportType, role, `${path}.elements`, ids, blockIds, remaining, issues);
     totalElements += elements.length;
+    const print = normalizeLayerPrint(rawLayer.print, role, `${path}.print`, issues);
+    const defaultDesignHeight = role === "Header" ? Math.max(1800, print.minHeightHundredthMm) : role === "Footer" ? Math.max(1400, print.minHeightHundredthMm) : 0;
     layers.push({
       id,
       name: typeof rawLayer.name === "string" && rawLayer.name.trim() ? rawLayer.name.trim().slice(0, 120) : role === "Header" ? "页眉" : role === "Footer" ? "页脚" : role === "Body" ? "主体" : "覆盖层",
       role,
-      print: normalizeLayerPrint(rawLayer.print, role, `${path}.print`, issues),
+      designHeightHundredthMm: rawLayer.designHeightHundredthMm === undefined ? defaultDesignHeight : readInteger(rawLayer.designHeightHundredthMm, defaultDesignHeight, 0, page?.heightHundredthMm ?? 29700, `${path}.designHeightHundredthMm`, issues),
+      print,
       visible: typeof rawLayer.visible === "boolean" ? rawLayer.visible : true,
       locked: typeof rawLayer.locked === "boolean" ? rawLayer.locked : false,
       elements,
@@ -179,6 +201,7 @@ function normalizeLayers(
       id: normalizeId("layer-overlay", "layer-overlay", ids, "$.layers.overlay.id", issues),
       name: "覆盖层",
       role: "Overlay",
+      designHeightHundredthMm: 0,
       print: createLegacyV3LayerPrintDefaults(),
       visible: true,
       locked: false,
@@ -273,6 +296,7 @@ function normalizeElement(
       }
       case "Image": {
         const sourceKind = readEnum(value.sourceKind, ["Field", "Resource"] as const, "Field", `${path}.sourceKind`, issues);
+        const purpose = value.purpose === "Stamp" ? "Stamp" : "Image";
         const rawFieldPath = typeof value.fieldPath === "string" && value.fieldPath.trim() ? value.fieldPath : undefined;
         const fieldPath = sourceKind === "Field" && rawFieldPath
           ? normalizeFieldPath(rawFieldPath, `${path}.fieldPath`, issues)
@@ -293,22 +317,37 @@ function normalizeElement(
         if (sourceKind === "Resource" && !resourceId) {
           issues.push({ severity: "warning", path: `${path}.resourceId`, message: "图片资源尚未上传，导出时会显示占位提示。" });
         }
+        if (purpose === "Stamp" && sourceKind !== "Field") {
+          issues.push({ severity: "error", path: `${path}.purpose`, message: "印章必须绑定受控图片字段，不能直接读取资源或外部地址。" });
+        }
+        if (purpose === "Stamp" && fieldPath && !["doc_seal_path", "customs_seal_path"].includes(fieldPath)) {
+          issues.push({ severity: "error", path: `${path}.fieldPath`, message: "印章只能绑定单证章或报关章受控字段。" });
+        }
         return {
           ...base,
           type: "Image",
           sourceKind,
+          purpose,
           fieldPath,
           resourceId,
           altText: normalizeOptionalString(value.altText, REPORT_DESIGNER_V3_MAX_ALT_TEXT_LENGTH, `${path}.altText`, issues),
           hideWhenSourceEmpty: typeof value.hideWhenSourceEmpty === "boolean" ? value.hideWhenSourceEmpty : true,
         };
       }
+      case "PageNumber":
+        return {
+          ...base,
+          type: "PageNumber",
+          format: readEnum(value.format, ["Current", "CurrentOfTotal"] as const, "CurrentOfTotal", `${path}.format`, issues),
+          prefix: normalizeOptionalString(value.prefix, 80, `${path}.prefix`, issues),
+          suffix: normalizeOptionalString(value.suffix, 80, `${path}.suffix`, issues),
+        };
       case "Rectangle":
         return { ...base, type: "Rectangle" };
       case "Line":
         return { ...base, type: "Line", direction: readEnum(value.direction, ["Horizontal", "Vertical"] as const, "Horizontal", `${path}.direction`, issues) };
       case "Flow": {
-        const flowKind = readEnum(value.flowKind, ["Row", "Grid", "Conditional", "DetailTable", "PageBreak"] as const, "Row", `${path}.flowKind`, issues);
+        const flowKind = readEnum(value.flowKind, REPORT_DESIGNER_V3_FLOW_TYPES, "Row", `${path}.flowKind`, issues);
         if (layerRole !== "Body" && (flowKind === "DetailTable" || flowKind === "PageBreak")) {
           issues.push({
             severity: "error",
@@ -397,10 +436,10 @@ function normalizeStyle(value: unknown, path: string, issues: ReportDesignerSche
   }
   if (value.fontSizePt !== undefined) style.fontSizePt = readNumber(value.fontSizePt, 10, 6, 96, `${path}.fontSizePt`, issues);
   if (typeof value.bold === "boolean") style.bold = value.bold;
-  if (typeof value.color === "string" && colorPattern.test(value.color.trim())) style.color = value.color.trim();
-  if (typeof value.backgroundColor === "string" && colorPattern.test(value.backgroundColor.trim())) style.backgroundColor = value.backgroundColor.trim();
+  if (typeof value.color === "string" && isReportDesignerCssColor(value.color)) style.color = value.color.trim();
+  if (typeof value.backgroundColor === "string" && isReportDesignerCssColor(value.backgroundColor)) style.backgroundColor = value.backgroundColor.trim();
   if (value.align === "Left" || value.align === "Center" || value.align === "Right") style.align = value.align;
-  if (typeof value.borderColor === "string" && colorPattern.test(value.borderColor.trim())) style.borderColor = value.borderColor.trim();
+  if (typeof value.borderColor === "string" && isReportDesignerCssColor(value.borderColor)) style.borderColor = value.borderColor.trim();
   if (value.borderWidthPx !== undefined) style.borderWidthPx = readNumber(value.borderWidthPx, 0, 0, 8, `${path}.borderWidthPx`, issues);
   if (value.borderStyle === "Solid" || value.borderStyle === "Dashed" || value.borderStyle === "None") style.borderStyle = value.borderStyle;
   if (value.paddingHundredthMm !== undefined) style.paddingHundredthMm = readInteger(value.paddingHundredthMm, 0, 0, 1000, `${path}.paddingHundredthMm`, issues);
@@ -422,6 +461,68 @@ function normalizeMetadata(value: unknown) {
     migratedFromVersion: typeof value.migratedFromVersion === "number" ? value.migratedFromVersion : undefined,
     migratedAt: typeof value.migratedAt === "string" ? value.migratedAt.slice(0, 64) : undefined,
   };
+}
+
+function normalizeMarker<T extends string>(value: unknown, expected: T, path: string, issues: ReportDesignerSchemaIssue[]): T {
+  if (value === undefined || value === expected) return expected;
+  issues.push({ severity: "error", path, message: `V3 契约标记无效，必须为 ${expected}。` });
+  return expected;
+}
+
+function validateResourceReferences(
+  layers: ReportDesignerV3Layer[],
+  resources: ReportDesignerV3ImageResource[],
+  issues: ReportDesignerSchemaIssue[],
+) {
+  const ids = new Set(resources.map((resource) => resource.id));
+  layers.forEach((layer, layerIndex) => layer.elements.forEach((element, elementIndex) => {
+    if (element.type !== "Image" || element.sourceKind !== "Resource" || !element.resourceId || ids.has(element.resourceId)) return;
+    issues.push({ severity: "error", path: `$.layers[${layerIndex}].elements[${elementIndex}].resourceId`, message: "图片必须引用 resources 清单中的受控资源 ID。" });
+  }));
+}
+
+function normalizeResources(value: unknown, issues: ReportDesignerSchemaIssue[]) {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) {
+    issues.push({ severity: "error", path: "$.resources", message: "图片资源清单必须是数组。" });
+    return undefined;
+  }
+  const ids = new Set<string>();
+  const invalid = (path: string, message: string) => {
+    issues.push({ severity: "error", path, message });
+    return [];
+  };
+  return value.slice(0, 1000).flatMap((item, index) => {
+    const path = `$.resources[${index}]`;
+    if (!isRecord(item)) return invalid(path, "图片资源必须是对象。");
+    const id = typeof item.id === "string" && resourceIdPattern.test(item.id.trim()) ? item.id.trim() : "";
+    if (!id || ids.has(id)) return invalid(`${path}.id`, "图片资源 ID 缺失或重复。");
+    ids.add(id);
+    const mediaType = ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(String(item.mediaType))
+      ? item.mediaType as ReportDesignerV3ImageResource["mediaType"] : undefined;
+    if (!mediaType) return invalid(`${path}.mediaType`, "图片资源只支持 PNG、JPEG、GIF 或 WebP。");
+    const sha256 = item.sha256 === undefined ? undefined : typeof item.sha256 === "string" && sha256Pattern.test(item.sha256.trim()) ? item.sha256.trim().toLowerCase() : undefined;
+    if (item.sha256 !== undefined && !sha256) issues.push({ severity: "error", path: `${path}.sha256`, message: "SHA-256 必须是 64 位十六进制字符串。" });
+    return [{ id, mediaType, byteLength: readOptionalInteger(item.byteLength, 0, 32 * 1024 * 1024), sha256, altText: normalizeOptionalString(item.altText, 200, `${path}.altText`, issues) }];
+  });
+}
+
+function normalizeRelease(value: unknown, issues: ReportDesignerSchemaIssue[]) {
+  if (value === undefined) return { state: "Draft" as const, revision: 0 };
+  if (!isRecord(value)) {
+    issues.push({ severity: "error", path: "$.release", message: "发布信息必须是对象。" });
+    return { state: "Draft" as const, revision: 0 };
+  }
+  const state = readEnum(value.state, REPORT_DESIGNER_V3_RELEASE_STATES, "Draft", "$.release.state", issues);
+  const revision = readInteger(value.revision, 0, 0, 2_000_000_000, "$.release.revision", issues);
+  const publishedAt = typeof value.publishedAt === "string" && value.publishedAt.trim() ? value.publishedAt.trim().slice(0, 64) : undefined;
+  if (state === "Published" && !publishedAt) issues.push({ severity: "error", path: "$.release.publishedAt", message: "已发布模板必须记录发布时间。" });
+  return { state, revision, publishedAt };
+}
+
+function readOptionalInteger(value: unknown, fallback: number, max: number) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? Math.min(max, Math.max(0, Math.round(parsed))) : fallback;
 }
 
 function validateBodyFlowOverlaps(
@@ -465,7 +566,7 @@ function normalizeFieldPath(value: unknown, path: string, issues: ReportDesigner
     issues.push({ severity: "error", path, message: `字段路径长度不能超过 ${REPORT_DESIGNER_V3_MAX_FIELD_PATH_LENGTH} 个字符。` });
     return "";
   }
-  if (fieldPathPattern.test(fieldPath)) return fieldPath;
+  if (isReportDesignerFieldPath(fieldPath)) return fieldPath;
   issues.push({ severity: "error", path, message: "字段名只能使用点分隔标识符。" });
   return "";
 }
@@ -498,7 +599,7 @@ function normalizeFontFamily(value: unknown, path: string, issues: ReportDesigne
     return "Arial, 'Microsoft YaHei', sans-serif";
   }
   const normalized = value.trim();
-  if (normalized.length > REPORT_DESIGNER_V3_MAX_FONT_FAMILY_LENGTH || !fontFamilyPattern.test(normalized)) {
+  if (normalized.length > REPORT_DESIGNER_V3_MAX_FONT_FAMILY_LENGTH || !isSafeReportDesignerCssFontFamily(normalized)) {
     issues.push({ severity: "warning", path, message: "字体名称包含不受支持的字符或过长，已使用安全默认字体。" });
     return "Arial, 'Microsoft YaHei', sans-serif";
   }
@@ -516,29 +617,5 @@ function normalizeId(value: unknown, fallback: string, ids: Set<string>, path: s
 }
 
 function readInteger(value: unknown, fallback: number, min: number, max: number, path: string, issues: ReportDesignerSchemaIssue[]) {
-  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
-  if (!Number.isFinite(parsed)) {
-    issues.push({ severity: "warning", path, message: "数字无效，已使用默认值。" });
-    return Math.round(fallback);
-  }
-  const normalized = Math.round(Math.min(max, Math.max(min, parsed)));
-  if (normalized !== parsed) issues.push({ severity: "warning", path, message: `数字已限制在 ${min}-${max}。` });
-  return normalized;
-}
-
-function readNumber(value: unknown, fallback: number, min: number, max: number, path: string, issues: ReportDesignerSchemaIssue[]) {
-  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
-  if (!Number.isFinite(parsed)) {
-    issues.push({ severity: "warning", path, message: "数字无效，已使用默认值。" });
-    return fallback;
-  }
-  const normalized = Math.min(max, Math.max(min, parsed));
-  if (normalized !== parsed) issues.push({ severity: "warning", path, message: `数字已限制在 ${min}-${max}。` });
-  return normalized;
-}
-
-function readEnum<T extends string>(value: unknown, allowed: readonly T[], fallback: T, path: string, issues: ReportDesignerSchemaIssue[]): T {
-  if (typeof value === "string" && allowed.includes(value as T)) return value as T;
-  issues.push({ severity: "warning", path, message: "枚举值无效，已使用默认值。" });
-  return fallback;
+  return Math.round(readNumber(value, fallback, min, max, path, issues));
 }

@@ -2295,6 +2295,15 @@ export interface ApiReportTemplateFileImportRequest {
   templatePath?: string;
 }
 
+export interface ApiReportTemplateImageResourceResponse {
+  altText: string;
+  byteLength: number;
+  id: string;
+  mediaType: string;
+  sha256: string;
+  storagePolicy: string;
+}
+
 export interface ApiReportTemplateMetadataRequest {
   displayName?: string;
   reportType?: string;
@@ -2352,6 +2361,65 @@ export interface ApiReportTemplateStorageStatusResponse {
   storagePolicy: string;
   templateRoot: string;
   writable: boolean;
+}
+
+export interface ApiReportTemplateV3ContractResponse {
+  astKind: string;
+  contractVersion: string;
+  coordinateUnit: string;
+  elementTypes: string[];
+  expressions: ApiReportTemplateV3ExpressionContract;
+  flowTypes: string[];
+  images: ApiReportTemplateV3ImageResourceContract;
+  layerRoles: string[];
+  limits: ApiReportTemplateV3LimitsContract;
+  page: ApiReportTemplateV3PageContract;
+  release: ApiReportTemplateV3ReleaseContract;
+  repeatBand: ApiReportTemplateV3RepeatBandContract;
+  reportTypes: string[];
+  schemaVersion: number;
+}
+
+export interface ApiReportTemplateV3ExpressionContract {
+  aggregateOperators: string[];
+  allowsDynamicEvaluation: boolean;
+  conditionOperators: string[];
+}
+
+export interface ApiReportTemplateV3ImageResourceContract {
+  allowsExternalUrl: boolean;
+  controlledFieldPaths: string[];
+  mediaTypes: string[];
+  policy: string;
+}
+
+export interface ApiReportTemplateV3LimitsContract {
+  maxElementsPerLayer: number;
+  maxLayers: number;
+  maxResourceBytes: number;
+  maxResources: number;
+  maxTotalElements: number;
+  minElementSizeHundredthMm: number;
+}
+
+export interface ApiReportTemplateV3PageContract {
+  coordinateUnit: string;
+  orientations: string[];
+  pageAndLayerRoles: string[];
+  size: string;
+}
+
+export interface ApiReportTemplateV3ReleaseContract {
+  publishedAtType: string;
+  revisionType: string;
+  states: string[];
+}
+
+export interface ApiReportTemplateV3RepeatBandContract {
+  detailTableSemantics: string;
+  layerRoles: string[];
+  persistedAsSeparateList: boolean;
+  source: string;
 }
 
 export interface ApiRuntimeDependencyInfo {
@@ -4053,6 +4121,10 @@ export interface DownloadReportTemplateFileRequest {
   body: ApiReportTemplateFileDownloadRequest;
 }
 
+export interface DownloadReportTemplateV3ImageResourceRequest {
+  resourceId: string;
+}
+
 export interface DownloadSingleWindowReceiptPackageRequest {
   body: ApiSingleWindowReceiptPackageExportRequest;
 }
@@ -5028,6 +5100,12 @@ export interface UploadReportTemplatePackageRequest {
   body: Blob;
 }
 
+export interface UploadReportTemplateV3ImageResourceRequest {
+  fileName?: string;
+  mediaType?: string;
+  body: Blob;
+}
+
 export interface UploadSingleWindowReceiptPackageRequest {
   fileName?: string;
   workingDirectory?: string;
@@ -5731,6 +5809,11 @@ export class ExportDocManagerApiClient {
     return this.request<Blob>("POST", path, { init });
   }
 
+  public downloadReportTemplateV3ImageResource(request: DownloadReportTemplateV3ImageResourceRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/reports/templates/v3/resources/${encodePath(request.resourceId)}`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
   public downloadSingleWindowReceiptPackage(request: DownloadSingleWindowReceiptPackageRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = "/api/single-window/receipts/download-package";
     return this.request<Blob>("POST", path, {
@@ -5941,6 +6024,11 @@ export class ExportDocManagerApiClient {
       },
       init,
     });
+  }
+
+  public getReportTemplateV3Contract(init?: ApiRequestInit): Promise<ApiReportTemplateV3ContractResponse> {
+    const path = "/api/reports/templates/v3/contract";
+    return this.request<ApiReportTemplateV3ContractResponse>("GET", path, { init });
   }
 
   public getServerMigrationStatus(init?: ApiRequestInit): Promise<ApiServerMigrationStatusResponse> {
@@ -7642,6 +7730,18 @@ export class ExportDocManagerApiClient {
       query: {
         "strategy": request.strategy,
         "fileName": request.fileName,
+      },
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadReportTemplateV3ImageResource(request: UploadReportTemplateV3ImageResourceRequest, init?: ApiRequestInit): Promise<ApiReportTemplateImageResourceResponse> {
+    const path = "/api/reports/templates/v3/resources/upload";
+    return this.request<ApiReportTemplateImageResourceResponse>("POST", path, {
+      query: {
+        "fileName": request.fileName,
+        "mediaType": request.mediaType,
       },
       body: request.body,
       init,

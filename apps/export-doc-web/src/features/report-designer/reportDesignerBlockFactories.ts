@@ -115,7 +115,7 @@ export function createGridBlock(reportType: ReportDesignerReportType = "ExportDo
   return {
     id: createReportBlockId("grid"),
     type: "Grid",
-    title: "固定票据表格",
+    title: "",
     columns: createGridColumns(4),
     rows: [
       createGridRow([
@@ -128,6 +128,10 @@ export function createGridBlock(reportType: ReportDesignerReportType = "ExportDo
         createGridCell("Text", "合并标签", "", 1, 1, { ...defaultTextStyle, bold: true, align: "Center" }),
         createGridCell("Text", "可在属性面板改为字段、勾选组、竖排文字或继续拆分单元格", "", 3, 1, { ...defaultTextStyle, align: "Left" }),
       ]),
+      createGridRow([
+        createGridCell("Text", "备注", "", 1, 1, { ...defaultTextStyle, bold: true, align: "Center" }),
+        createGridCell("Text", "", "", 3, 1, { ...defaultTextStyle, align: "Left" }),
+      ], 12),
     ],
     marginTopMm: 2,
     marginBottomMm: 2,

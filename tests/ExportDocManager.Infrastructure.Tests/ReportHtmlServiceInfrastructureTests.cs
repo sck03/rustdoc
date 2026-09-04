@@ -408,6 +408,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 Assert.Contains("EXPORTDOC_REPORT_DESIGNER_SCHEMA", template, StringComparison.Ordinal);
                 Assert.Contains("\"version\":3", template, StringComparison.Ordinal);
                 Assert.Contains("\"size\":\"A4\"", template, StringComparison.Ordinal);
+                Assert.Contains("\"designHeightHundredthMm\"", template, StringComparison.Ordinal);
                 Assert.Contains("{{ Invoice.InvoiceNo }}", template, StringComparison.Ordinal);
             }
 
@@ -500,6 +501,68 @@ namespace ExportDocManager.Infrastructure.Tests
                     });
 
                     AssertBuiltInPdfResult(result, testCase, appRoot, dataRoot);
+                }
+            }
+            finally
+            {
+                if (!ShouldRetainReportTestArtifacts())
+                {
+                    DeleteDirectoryIfExists(dataRoot);
+                }
+            }
+        }
+
+        [Fact]
+        [Trait("Category", BrowserIntegrationCollection.Category)]
+        public async Task RenderBuiltInInvoiceAndPackingTemplatesToPdf_ShouldNormalizeVerbatimWindowsAppRoot()
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return;
+            }
+
+            string repositoryRoot = FindRepositoryRoot();
+            string appRoot = repositoryRoot.StartsWith(@"\\?\", StringComparison.Ordinal)
+                ? repositoryRoot
+                : @"\\?\" + repositoryRoot;
+            string dataRoot = CreateTempDirectory("built-in-verbatim-report-pdf-data");
+
+            try
+            {
+                var pathProvider = new RuntimeAppPathProvider(appRoot, dataRoot);
+                Assert.True(ReportFontPolicy.Inspect(pathProvider).Complete, "Pinned report fonts must be available for verbatim-path PDF validation.");
+                await using var browserRuntime = new BrowserRuntimeManager();
+                await using var browserHost = new ManagedPlaywrightPdfBrowserHost(
+                    browserRuntime,
+                    new BrowserExecutableResolver(pathProvider),
+                    pathProvider);
+                await using var factory = new TestDbContextFactory();
+                int invoiceId = await SeedInvoiceWithMatchingPaymentAsync(factory);
+                var pdfRenderer = new ReportPdfRenderService(
+                    CreateService(factory, new StubSettingsService(), pathProvider),
+                    new ChromiumHtmlToPdfService(pathProvider, browserRuntime, browserHost));
+
+                foreach (string fileName in new[] { "invoice_template.html", "packing_list_template.html" })
+                {
+                    string templatePath = Path.Combine(appRoot, "Templates", "Export", fileName);
+                    string destinationPath = Path.Combine(dataRoot, "RenderedPdfs", fileName.Replace("_template.html", ".pdf", StringComparison.Ordinal));
+                    var result = await pdfRenderer.RenderInvoicePdfAsync(new ReportPdfRenderRequest
+                    {
+                        SourceId = invoiceId,
+                        ReportType = ReportDocumentType.ExportDocument,
+                        TemplatePath = templatePath,
+                        WithSeal = false,
+                        DestinationPath = destinationPath,
+                        DocumentTitle = fileName
+                    });
+
+                    Assert.Equal(templatePath, result.TemplatePath);
+                    Assert.True(File.Exists(result.DestinationPath), $"PDF was not created: {result.DestinationPath}");
+                    Assert.False(result.RendererPath.StartsWith(@"\\?\", StringComparison.Ordinal), "Chromium 进程不得接收 Windows verbatim 可执行路径。");
+                    var metrics = AnalyzePdf(result.DestinationPath);
+                    Assert.True(metrics.Bytes >= 1000, $"{fileName}: PDF 输出过小。");
+                    Assert.Equal(1, metrics.PageCount);
+                    Assert.Equal("portrait", metrics.FirstPageOrientation);
                 }
             }
             finally
@@ -1000,6 +1063,54 @@ namespace ExportDocManager.Infrastructure.Tests
                       "playwrightCompatible": true
                     }
                     """);
+                int probeCount = 0;
+                var resolver = new BrowserExecutableResolver(
+                    new RuntimeAppPathProvider(appRoot, dataRoot),
+                    _ => probeCount++);
+
+                Assert.Equal(Path.GetFullPath(executablePath), resolver.Resolve());
+                Assert.Equal(Path.GetFullPath(executablePath), resolver.Resolve());
+                Assert.Equal(1, probeCount);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(
+                    ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable,
+                    originalRendererPath);
+                DeleteDirectoryIfExists(appRoot);
+                DeleteDirectoryIfExists(dataRoot);
+            }
+        }
+
+        [Fact]
+        public void BrowserExecutableResolver_ShouldNormalizeVerbatimWindowsExecutablePath()
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return;
+            }
+
+            string appRoot = CreateTempDirectory("browser-verbatim-app");
+            string dataRoot = CreateTempDirectory("browser-verbatim-data");
+            string? originalRendererPath = Environment.GetEnvironmentVariable(
+                ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable);
+
+            try
+            {
+                string executablePath = Path.Combine(
+                    appRoot,
+                    "Browsers",
+                    "ChromeForTesting",
+                    "win64",
+                    "ChromeHeadlessShell",
+                    "chrome-headless-shell-win64",
+                    "chrome-headless-shell.exe");
+                WriteHeadlessShellBundle(executablePath);
+                string verbatimPath = @"\\?\" + executablePath;
+                Environment.SetEnvironmentVariable(
+                    ChromiumHtmlToPdfService.ChromiumExecutableEnvironmentVariable,
+                    verbatimPath);
+
                 int probeCount = 0;
                 var resolver = new BrowserExecutableResolver(
                     new RuntimeAppPathProvider(appRoot, dataRoot),

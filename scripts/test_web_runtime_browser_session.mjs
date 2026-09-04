@@ -91,6 +91,7 @@ const legacyWindowsArguments = buildChromeLaunchArguments(options, {
   windowsBuild: 17763,
 });
 assert(legacyWindowsArguments.includes("--no-sandbox"));
+assert(legacyWindowsArguments.includes("--in-process-gpu"));
 assert.equal(parseWindowsBuild("10.0.17763"), 17763);
 assert.equal(parseWindowsBuild("invalid"), null);
 assert.equal(shouldDisableChromiumSandbox({

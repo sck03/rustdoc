@@ -1,5 +1,4 @@
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
-import type { ReportDesignerDocumentState } from "./reportDesignerHistory.ts";
 import { normalizeRowColumnWidths } from "./reportDesignerMutations.ts";
 import type {
   ReportBlock,
@@ -48,50 +47,6 @@ export function filterDetailItemFieldGroups(fieldGroups: ReportDesignerFieldGrou
       fields: group.fields.filter((field) => field.value.startsWith("item.") || field.value.startsWith("Invoice.Items.")),
     }))
     .filter((group) => group.fields.length > 0);
-}
-
-export function updatePage(
-  documentState: ReportDesignerDocumentState,
-  pagePatch: Partial<ReportDesignerSchema["page"]>,
-): ReportDesignerDocumentState {
-  return {
-    ...documentState,
-    schema: {
-      ...documentState.schema,
-      page: {
-        ...documentState.schema.page,
-        ...pagePatch,
-      },
-    },
-  };
-}
-
-export function updateSectionPrint(
-  documentState: ReportDesignerDocumentState,
-  sectionId: string,
-  patch: Partial<ReportSection["print"]>,
-): ReportDesignerDocumentState {
-  return {
-    ...documentState,
-    schema: {
-      ...documentState.schema,
-      sections: documentState.schema.sections.map((section) =>
-        section.id === sectionId
-          ? {
-              ...section,
-              print: {
-                ...section.print,
-                ...patch,
-                repeatOnEveryPage: section.type === "Body" ? false : (patch.repeatOnEveryPage ?? section.print.repeatOnEveryPage),
-                pinToPageBottom: section.type === "Footer" ? (patch.pinToPageBottom ?? section.print.pinToPageBottom) : false,
-              },
-            }
-          : section,
-      ),
-    },
-    selectedBlockId: null,
-    selectedSectionId: sectionId,
-  };
 }
 
 export function normalizePageSize(value: string): ReportDesignerSchema["page"]["size"] {
@@ -204,4 +159,3 @@ export function createEmptyGroupFooterCell(columnId: string): ReportDetailTableG
     fieldPath: "",
   };
 }
-

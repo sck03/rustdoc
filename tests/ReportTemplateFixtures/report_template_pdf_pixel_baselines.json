@@ -13,8 +13,8 @@
   },
   "pages": {
     "customer-custom-invoice#1": {
-      "fingerprintHex": "e0000003ffc07ffffe7ffffe7ffffe7ffffe7ffffe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
-      "occupiedCells": 149,
+      "fingerprintHex": "e0000003ffc07ffffe7ffffe7ffffe7ffffe7ffffe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffff81",
+      "occupiedCells": 143,
       "paperBounds": {
         "left": 305,
         "top": 59,
@@ -23,14 +23,14 @@
       },
       "inkBounds": {
         "left": 328,
-        "top": 75,
+        "top": 74,
         "width": 544,
-        "height": 805
+        "height": 808
       }
     },
     "customer-payment-voucher#1": {
-      "fingerprintHex": "c0000000ff0000ff00ffffffffffffff0ff1ffffffff0001ffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffc1",
-      "occupiedCells": 207,
+      "fingerprintHex": "c0000000ff0000ff00ffffffffffffff0ff1ffffffff0001ffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fff801",
+      "occupiedCells": 202,
       "paperBounds": {
         "left": 306,
         "top": 59,
@@ -40,13 +40,13 @@
       "inkBounds": {
         "left": 333,
         "top": 77,
-        "width": 894,
-        "height": 644
+        "width": 904,
+        "height": 645
       }
     },
     "customer-compound-selector-invoice#1": {
-      "fingerprintHex": "e0000003ffc07ffffe7ffffe7ffffe7ffffe7ffffe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
-      "occupiedCells": 149,
+      "fingerprintHex": "e0000003ffc07ffffe7ffffe7ffffe7ffffe7ffffe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fffff1",
+      "occupiedCells": 146,
       "paperBounds": {
         "left": 305,
         "top": 59,
@@ -55,14 +55,14 @@
       },
       "inkBounds": {
         "left": 328,
-        "top": 75,
+        "top": 74,
         "width": 544,
-        "height": 805
+        "height": 808
       }
     },
     "built-in-invoice-template#1": {
-      "fingerprintHex": "e000007ffffc7ffffc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
-      "occupiedCells": 69,
+      "fingerprintHex": "e000007ffffc7ffffc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fffff9",
+      "occupiedCells": 67,
       "paperBounds": {
         "left": 305,
         "top": 59,
@@ -71,14 +71,14 @@
       },
       "inkBounds": {
         "left": 328,
-        "top": 75,
-        "width": 534,
-        "height": 805
+        "top": 74,
+        "width": 545,
+        "height": 808
       }
     },
     "built-in-invoice-template#2": {
-      "fingerprintHex": "e0000060ff00003c0060183e7c003e7ffffe7ffffe7ffffc7ffffe7ffffe7e003e7a00227e003e7a00227a00207a00207ffc207e00207e00207ffffe7ffffe7ffffe0f00007ffffc0002040002040002040003fc007e007e0000000000ffffff",
-      "occupiedCells": 362,
+      "fingerprintHex": "e0000060ff00003c0060183e7c003e48001e7c0f8e7ffffe7ffffc7ffffe7ffffe7e003262003e7e003e7e003e7a00207a00207ffc207e00207e00207ffffe7ffffe7ffffe7ffffc7ffe040002040002040003fc007e007e0000000000fffffb",
+      "occupiedCells": 370,
       "paperBounds": {
         "left": 305,
         "top": 429,
@@ -87,14 +87,14 @@
       },
       "inkBounds": {
         "left": 328,
-        "top": 445,
-        "width": 527,
-        "height": 805
+        "top": 444,
+        "width": 545,
+        "height": 808
       }
     },
     "built-in-packing-list-template#1": {
-      "fingerprintHex": "e000007ffffc7ffffc7ff800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
-      "occupiedCells": 81,
+      "fingerprintHex": "e000007ffffc7ffffc7ff800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fffff9",
+      "occupiedCells": 79,
       "paperBounds": {
         "left": 305,
         "top": 59,
@@ -103,14 +103,14 @@
       },
       "inkBounds": {
         "left": 328,
-        "top": 75,
-        "width": 534,
-        "height": 805
+        "top": 74,
+        "width": 545,
+        "height": 808
       }
     },
     "built-in-packing-list-template#2": {
-      "fingerprintHex": "e0000060ff00003c00603c3e7c007e7fff927ffffe7ffffe7ffffe680f827800027800027800026800027ffffe400ffe430ffe400fd67ffffe0000000000000000000000000003fc0002040002040002040003fc007e007e0000000000ffffff",
-      "occupiedCells": 289,
+      "fingerprintHex": "e0000060ff00003c00603c327c003e48003e00001e7fff827ffffe7feffe7ffffe680f827800027800027800026800027ffffe400ffe430ffe400fd67ffffe0000000000000003fc0002040002040002040003fc007e007e0000000000fffffb",
+      "occupiedCells": 294,
       "paperBounds": {
         "left": 305,
         "top": 429,
@@ -119,9 +119,9 @@
       },
       "inkBounds": {
         "left": 328,
-        "top": 445,
-        "width": 527,
-        "height": 805
+        "top": 444,
+        "width": 545,
+        "height": 808
       }
     },
     "built-in-contract-template#1": {
@@ -135,14 +135,14 @@
       },
       "inkBounds": {
         "left": 328,
-        "top": 75,
+        "top": 74,
         "width": 527,
-        "height": 806
+        "height": 807
       }
     },
     "built-in-customs-declaration-template#1": {
-      "fingerprintHex": "c00c00ffff00ff7e00c17e3efffffffffffffffffff9f181ffffffe1bdfde1fdfdffffffc1ff2581ffa581e525ffffffffffffffffffbffff98fffe1fffffff23ff1ffffff1f8000e00000000000000000000000000000000000000000ffffe1",
-      "occupiedCells": 457,
+      "fingerprintHex": "c00c00ffff00ff7e00c17e3efffffffffffffffffff9f181ffffffe1bdfde1fdfdffffffc1ff2581ffa581e525ffffffffffffffffffbffff98fffe1fffffff23ff1ffffff1f8000e00000000000000000000000000000000000000000ffff01",
+      "occupiedCells": 454,
       "paperBounds": {
         "left": 306,
         "top": 59,
@@ -151,14 +151,14 @@
       },
       "inkBounds": {
         "left": 333,
-        "top": 76,
-        "width": 904,
+        "top": 77,
+        "width": 905,
         "height": 645
       }
     },
     "built-in-customs-declaration-template#2": {
-      "fingerprintHex": "c00c00ffe01bffffffffffff8fffe1fffffffffc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffe1",
-      "occupiedCells": 142,
+      "fingerprintHex": "c00c00ffe01bffffffffffff8fffe1fffffffffc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffff01",
+      "occupiedCells": 139,
       "paperBounds": {
         "left": 306,
         "top": 59,
@@ -167,14 +167,14 @@
       },
       "inkBounds": {
         "left": 333,
-        "top": 76,
-        "width": 904,
+        "top": 77,
+        "width": 905,
         "height": 645
       }
     },
     "built-in-customs-declaration-template#3": {
-      "fingerprintHex": "c00c00ffffffffffffffffff8fffe1ffffffff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffe1",
-      "occupiedCells": 146,
+      "fingerprintHex": "c00c00ffffffffffffffffff8fffe1ffffffff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffff01",
+      "occupiedCells": 143,
       "paperBounds": {
         "left": 306,
         "top": 216,
@@ -183,14 +183,14 @@
       },
       "inkBounds": {
         "left": 333,
-        "top": 234,
-        "width": 904,
+        "top": 235,
+        "width": 905,
         "height": 644
       }
     },
     "built-in-payment-voucher-template#1": {
-      "fingerprintHex": "e0000001ff0000fc007fffff7fd2017fffe17fffe37ffff37ffedf7fffff7fffe17f1fe17f1e017ffff1719f00001a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
-      "occupiedCells": 261,
+      "fingerprintHex": "e0000001ff0000fc007fffff7fd2017fffe17fffe37ffff37ffedf7fffff7fffe17f1fe17f1e017ffff1719f00001a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fffffd",
+      "occupiedCells": 260,
       "paperBounds": {
         "left": 305,
         "top": 59,
@@ -199,9 +199,9 @@
       },
       "inkBounds": {
         "left": 328,
-        "top": 75,
+        "top": 74,
         "width": 544,
-        "height": 805
+        "height": 808
       }
     },
     "built-in-expense-reimbursement-template#1": {
@@ -217,7 +217,7 @@
         "left": 328,
         "top": 74,
         "width": 544,
-        "height": 806
+        "height": 808
       }
     },
     "structured-multi-table-page-break#1": {
@@ -231,9 +231,9 @@
       },
       "inkBounds": {
         "left": 328,
-        "top": 75,
-        "width": 534,
-        "height": 805
+        "top": 74,
+        "width": 545,
+        "height": 808
       }
     },
     "structured-multi-table-page-break#2": {
@@ -247,9 +247,9 @@
       },
       "inkBounds": {
         "left": 328,
-        "top": 75,
-        "width": 530,
-        "height": 805
+        "top": 74,
+        "width": 545,
+        "height": 808
       }
     },
     "structured-multi-table-page-break#3": {
@@ -263,14 +263,14 @@
       },
       "inkBounds": {
         "left": 328,
-        "top": 445,
-        "width": 530,
-        "height": 805
+        "top": 444,
+        "width": 545,
+        "height": 808
       }
     },
     "synthetic-page-break#1": {
-      "fingerprintHex": "e000007ffffe4000024000024000024000027ffffe7ffffe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffff",
-      "occupiedCells": 101,
+      "fingerprintHex": "e000007ffffe4000024000024000024000027ffffe7ffffe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fffffd",
+      "occupiedCells": 100,
       "paperBounds": {
         "left": 305,
         "top": 59,
@@ -279,9 +279,9 @@
       },
       "inkBounds": {
         "left": 328,
-        "top": 75,
-        "width": 534,
-        "height": 805
+        "top": 74,
+        "width": 545,
+        "height": 808
       }
     },
     "synthetic-page-break#2": {
@@ -295,9 +295,9 @@
       },
       "inkBounds": {
         "left": 328,
-        "top": 445,
-        "width": 530,
-        "height": 805
+        "top": 444,
+        "width": 545,
+        "height": 808
       }
     }
   }

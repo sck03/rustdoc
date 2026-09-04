@@ -65,7 +65,7 @@ async function main() {
     layers: [
       { id: "header", name: "页眉", role: "Header", print: { repeatOnEveryPage: true, keepTogether: true, pinToPageBottom: false, minHeightHundredthMm: 1200 }, visible: true, locked: false, elements: [{ id: "header-title", type: "Text", xHundredthMm: 1000, yHundredthMm: 700, widthHundredthMm: 19000, heightHundredthMm: 700, rotationDeg: 0, zIndex: 0, visible: true, locked: false, style: { fontSizePt: 14, bold: true, align: "Center" }, outputEnabled: true, text: "V3 INVOICE HEADER" }] },
       { id: "body", name: "主体", role: "Body", print: { repeatOnEveryPage: false, keepTogether: false, pinToPageBottom: false, minHeightHundredthMm: 0 }, visible: true, locked: false, elements: [{ id: "detail", type: "Flow", flowKind: "DetailTable", xHundredthMm: 1000, yHundredthMm: 4200, widthHundredthMm: 19000, heightHundredthMm: 5200, rotationDeg: 0, zIndex: 0, visible: true, locked: false, style: {}, outputEnabled: true, block: detailTable }] },
-      { id: "footer", name: "页脚", role: "Footer", print: { repeatOnEveryPage: true, keepTogether: true, pinToPageBottom: true, minHeightHundredthMm: 900 }, visible: true, locked: false, elements: [{ id: "footer-text", type: "Text", xHundredthMm: 1000, yHundredthMm: 28600, widthHundredthMm: 19000, heightHundredthMm: 600, rotationDeg: 0, zIndex: 0, visible: true, locked: false, style: { fontSizePt: 8, align: "Center" }, outputEnabled: true, text: "V3 INVOICE FOOTER" }] },
+      { id: "footer", name: "页脚", role: "Footer", print: { repeatOnEveryPage: true, keepTogether: true, pinToPageBottom: true, minHeightHundredthMm: 900 }, visible: true, locked: false, elements: [{ id: "footer-text", type: "Text", xHundredthMm: 1000, yHundredthMm: 28600, widthHundredthMm: 9000, heightHundredthMm: 600, rotationDeg: 0, zIndex: 0, visible: true, locked: false, style: { fontSizePt: 8, align: "Left" }, outputEnabled: true, text: "V3 INVOICE FOOTER" }, { id: "footer-page-number", type: "PageNumber", xHundredthMm: 11000, yHundredthMm: 28600, widthHundredthMm: 9000, heightHundredthMm: 600, rotationDeg: 0, zIndex: 1, visible: true, locked: false, style: { fontSizePt: 8, align: "Right" }, outputEnabled: true, format: "CurrentOfTotal", prefix: "第 ", suffix: " 页" }] },
       { id: "overlay", name: "覆盖层", role: "Overlay", print: { repeatOnEveryPage: false, keepTogether: false, pinToPageBottom: false, minHeightHundredthMm: 0 }, visible: true, locked: false, elements: [] },
     ],
   };
@@ -102,6 +102,10 @@ async function main() {
   const extracted = textResult.stdout;
   assert((extracted.match(/V3 INVOICE HEADER/g) ?? []).length >= 3, "V3 固定页眉没有在多页中重复。");
   assert((extracted.match(/V3 INVOICE FOOTER/g) ?? []).length >= 3, "V3 固定页脚没有在多页中重复。");
+  // CJK font extraction is not stable across bundled Chromium/font builds;
+  // assert the numeric payload instead of requiring the extracted glyphs for
+  // the surrounding Chinese prefix/suffix.
+  assert(/\d+\s*\/\s*\d+/.test(extracted), "V3 页码元素没有输出当前页/总页数。");
   assert(extracted.includes("Product 120"), "V3 明细流没有完整输出末行。");
   console.log(`report-designer-v3-print-regression test passed (${pageCount} pages)`);
 }

@@ -38,7 +38,10 @@
             top: 0;
         }
         .inline-info .left { flex: 0 0 68%; min-width: 0; }
-        .inline-info .right { flex: 0 0 32%; min-width: 0; text-align: right; }
+        .inline-info .right { --meta-label-column: 8em; --meta-value-column: 9em; --meta-column-gap: .35em; flex: 0 0 32%; min-width: 0; display: grid; justify-items: end; row-gap: .1em; align-items: baseline; text-align: right; }
+        .inline-info .right > .meta-row { display: grid; grid-template-columns: minmax(0, var(--meta-label-column)) minmax(0, var(--meta-value-column)); column-gap: var(--meta-column-gap); width: min(100%, calc(var(--meta-label-column) + var(--meta-value-column) + var(--meta-column-gap))); align-items: baseline; }
+        .inline-info .right .meta-label { min-width: 0; white-space: nowrap; text-align: right; }
+        .inline-info .right .meta-value { min-width: 0; overflow-wrap: anywhere; text-align: right; }
         .inline-info .right span { font-size: 9px; }
         .address { display: inline-block; max-width: 100%; white-space: pre-line; overflow-wrap: anywhere; font-size: 9px; }
         table { width: 100%; border: 1px solid #111; border-collapse: collapse; table-layout: fixed; margin-top: 10px; }
@@ -115,9 +118,9 @@
                     <span class="address">{{ Customer.AddressEN }}</span>
                 </div>
                 <div class="right">
-                    <span>Invoice No.: {{ Invoice.InvoiceNo }}</span><br>
-                    <span>Contract No.: {{ Invoice.ContractNo }}</span><br>
-                    <span>Date: {{ Invoice.InvoiceDate }}</span>
+                    <span class="meta-row"><span class="meta-label">Invoice No.:</span><span class="meta-value">{{ Invoice.InvoiceNo }}</span></span>
+                    <span class="meta-row"><span class="meta-label">Contract No.:</span><span class="meta-value">{{ Invoice.ContractNo }}</span></span>
+                    <span class="meta-row"><span class="meta-label">Date:</span><span class="meta-value">{{ Invoice.InvoiceDate }}</span></span>
                 </div>
             </div>
 

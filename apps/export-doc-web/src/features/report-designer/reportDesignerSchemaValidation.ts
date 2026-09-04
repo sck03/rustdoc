@@ -489,12 +489,12 @@ function normalizeGridBlock(
   const rawColumns = Array.isArray(value.columns) ? value.columns : [];
   const rawRows = Array.isArray(value.rows) ? value.rows : [];
   if (!Array.isArray(value.columns) || rawColumns.length === 0) {
-    issues.push(createIssue("error", `${path}.columns`, "票据表格至少需要一列。"));
+    issues.push(createIssue("error", `${path}.columns`, "普通表格至少需要一列。"));
     return null;
   }
 
   if (!Array.isArray(value.rows) || rawRows.length === 0) {
-    issues.push(createIssue("error", `${path}.rows`, "票据表格至少需要一行。"));
+    issues.push(createIssue("error", `${path}.rows`, "普通表格至少需要一行。"));
     return null;
   }
 
@@ -503,7 +503,7 @@ function normalizeGridBlock(
     .map((column, index) => normalizeGridColumn(column, `${path}.columns[${index}]`, columnIds, issues))
     .filter((column): column is ReportGridColumn => Boolean(column));
   if (columns.length === 0) {
-    issues.push(createIssue("error", `${path}.columns`, "票据表格没有可用列。"));
+    issues.push(createIssue("error", `${path}.columns`, "普通表格没有可用列。"));
     return null;
   }
 
@@ -512,7 +512,7 @@ function normalizeGridBlock(
     .map((row, index) => normalizeGridRow(row, columns.length, `${path}.rows[${index}]`, rowIds, issues))
     .filter((row): row is ReportGridRow => Boolean(row));
   if (rows.length === 0) {
-    issues.push(createIssue("error", `${path}.rows`, "票据表格没有可用行。"));
+    issues.push(createIssue("error", `${path}.rows`, "普通表格没有可用行。"));
     return null;
   }
 
@@ -537,7 +537,7 @@ function normalizeGridColumn(
   issues: ReportDesignerSchemaIssue[],
 ): ReportGridColumn | null {
   if (!isRecord(value)) {
-    issues.push(createIssue("error", path, "票据表格列必须是对象。"));
+    issues.push(createIssue("error", path, "普通表格列必须是对象。"));
     return null;
   }
 
@@ -563,13 +563,13 @@ function normalizeGridRow(
   issues: ReportDesignerSchemaIssue[],
 ): ReportGridRow | null {
   if (!isRecord(value)) {
-    issues.push(createIssue("error", path, "票据表格行必须是对象。"));
+    issues.push(createIssue("error", path, "普通表格行必须是对象。"));
     return null;
   }
 
   const rawCells = Array.isArray(value.cells) ? value.cells : [];
   if (!Array.isArray(value.cells) || rawCells.length === 0) {
-    issues.push(createIssue("error", `${path}.cells`, "票据表格行至少需要一个单元格。"));
+    issues.push(createIssue("error", `${path}.cells`, "普通表格行至少需要一个单元格。"));
     return null;
   }
 
@@ -578,7 +578,7 @@ function normalizeGridRow(
     .map((cell, index) => normalizeGridCell(cell, columnCount, `${path}.cells[${index}]`, cellIds, issues))
     .filter((cell): cell is ReportGridCell => Boolean(cell));
   if (cells.length === 0) {
-    issues.push(createIssue("error", `${path}.cells`, "票据表格行没有可用单元格。"));
+    issues.push(createIssue("error", `${path}.cells`, "普通表格行没有可用单元格。"));
     return null;
   }
 
@@ -597,7 +597,7 @@ function normalizeGridCell(
   issues: ReportDesignerSchemaIssue[],
 ): ReportGridCell | null {
   if (!isRecord(value)) {
-    issues.push(createIssue("error", path, "票据表格单元格必须是对象。"));
+    issues.push(createIssue("error", path, "普通表格单元格必须是对象。"));
     return null;
   }
 

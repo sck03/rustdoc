@@ -25,6 +25,8 @@ $root = Assert-RepositoryChildPath -Path $BrowserRoot -Purpose "Bundled browser 
 if (-not (Test-Path -LiteralPath $root -PathType Container)) {
     throw "Bundled browser root does not exist: $root"
 }
+$isWindowsPlatform = [Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+    [Runtime.InteropServices.OSPlatform]::Windows)
 $workRoot = Assert-RepositoryChildPath -Path (Join-Path $repoRoot ".codex-runtime/browser-pdf-check") -Purpose "Browser PDF verification workspace"
 $work = Assert-RepositoryChildPath -Path (Join-Path $workRoot ([Guid]::NewGuid().ToString("N"))) -Purpose "Browser PDF verification run"
 $browserCandidates = @(Get-ChildItem -LiteralPath $root -File -Recurse -ErrorAction Stop |
@@ -62,6 +64,7 @@ try {
         -Arguments @(
         "--headless",
         "--no-sandbox",
+        "--in-process-gpu",
         "--disable-gpu",
         "--disable-dev-shm-usage",
         "--disable-logging",

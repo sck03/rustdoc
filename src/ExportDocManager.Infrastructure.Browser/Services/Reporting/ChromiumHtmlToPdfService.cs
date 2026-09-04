@@ -244,6 +244,7 @@ namespace ExportDocManager.Services.Reporting
                                 .WaitAsync(ct)
                                 .ConfigureAwait(false);
                             await WaitForPageAssetsAsync(page, ct).ConfigureAwait(false);
+                            await PrepareV3PageNumbersAsync(page, ct).ConfigureAwait(false);
                             await page.PdfAsync(new PagePdfOptions
                             {
                                 Path = pdfPath,
@@ -290,6 +291,42 @@ namespace ExportDocManager.Services.Reporting
                 throw new ServiceValidationException($"报表中有 {brokenImageCount} 张图片加载或解码失败，已停止生成 PDF，避免输出缺图文件。");
             }
         }
+
+        private static async Task PrepareV3PageNumbersAsync(IPage page, CancellationToken cancellationToken) => await page.EvaluateAsync("""
+            () => {
+                const sources = Array.from(document.querySelectorAll('[data-edm-v3-page-number]'));
+                const pageElement = document.querySelector('.edm-v3-page');
+                if (sources.length === 0 || !pageElement || document.querySelector('.edm-v3-page-number-overlay')) return;
+                const pageRect = pageElement.getBoundingClientRect();
+                const style = getComputedStyle(pageElement);
+                const pageHeight = Number.parseFloat(style.minHeight) || Number.parseFloat(style.height) || pageRect.height;
+                if (!Number.isFinite(pageHeight) || pageHeight <= 0) return;
+                const documentElement = document.documentElement;
+                const scrollTop = window.scrollY || documentElement.scrollTop || 0;
+                const scrollHeight = Math.max(documentElement.scrollHeight, document.body?.scrollHeight || 0);
+                const pageCount = Math.max(1, Math.ceil((scrollHeight - pageRect.top - scrollTop) / pageHeight));
+                const overlay = document.createElement('div');
+                overlay.className = 'edm-v3-page-number-overlay';
+                Object.assign(overlay.style, { left: '0', top: '0', width: '100%', height: '0', pointerEvents: 'none' });
+                pageElement.appendChild(overlay);
+                for (const source of sources) {
+                    const sourceElement = source.closest('.edm-v3-element');
+                    if (!sourceElement) continue;
+                    const sourceRect = sourceElement.getBoundingClientRect();
+                    const repeated = Boolean(source.closest('.edm-v3-repeat-layer'));
+                    const left = sourceRect.left - pageRect.left;
+                    const top = sourceRect.top - pageRect.top + (repeated ? 0 : scrollTop);
+                    for (let pageIndex = 0, cloneCount = repeated ? pageCount : 1; pageIndex < cloneCount; pageIndex += 1) {
+                        const clone = sourceElement.cloneNode(true);
+                        Object.assign(clone.style, { position: 'absolute', left: `${left}px`, top: `${top + (repeated ? pageIndex * pageHeight : 0)}px`, margin: '0', visibility: 'visible', pointerEvents: 'none' });
+                        clone.querySelectorAll('[data-edm-v3-page-number-current]').forEach((node) => { node.textContent = String(pageIndex + 1); });
+                        clone.querySelectorAll('[data-edm-v3-page-number-total]').forEach((node) => { node.textContent = String(pageCount); });
+                        overlay.appendChild(clone);
+                    }
+                    sourceElement.style.visibility = 'hidden';
+                }
+            }
+            """).WaitAsync(cancellationToken).ConfigureAwait(false);
 
         private static TimeSpan ResolveRenderTimeout()
         {

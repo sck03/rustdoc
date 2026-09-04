@@ -64,6 +64,7 @@ function New-ExportDocProcessStartInfo {
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = Resolve-ExportDocExternalCommand -FilePath $FilePath
     $startInfo.UseShellExecute = $false
+    $startInfo.ErrorDialog = $false
     # Commands that are not captured must inherit the current console so CI and
     # local users see their native progress and failure output in real time.
     $startInfo.CreateNoWindow = $CaptureOutput

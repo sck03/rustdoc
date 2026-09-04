@@ -19,6 +19,7 @@ namespace ExportDocManager.Services.Reporting
         private readonly BusinessDataAccessScope _accessScope;
         private readonly ISettingsService _settingsService;
         private readonly IAppPathProvider _pathProvider;
+        private readonly ReportTemplateV3ImageResourceHydrator _imageResourceHydrator;
         private readonly ILogger<ReportHtmlService> _logger;
 
         private readonly SemaphoreSlim _templateConfigSemaphore = new(1, 1);
@@ -32,7 +33,8 @@ namespace ExportDocManager.Services.Reporting
             ISettingsService settingsService,
             IAppPathProvider pathProvider,
             BusinessDataAccessScope accessScope,
-            ILogger<ReportHtmlService>? logger = null)
+            ILogger<ReportHtmlService>? logger = null,
+            IReportTemplateImageResourceService? imageResourceService = null)
         {
             ArgumentNullException.ThrowIfNull(contextFactory);
             ArgumentNullException.ThrowIfNull(settingsService);
@@ -42,6 +44,8 @@ namespace ExportDocManager.Services.Reporting
             _logger = logger ?? NullLogger<ReportHtmlService>.Instance;
             _entityLoader = new ReportEntityLoader(contextFactory, _accessScope);
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            _imageResourceHydrator = new ReportTemplateV3ImageResourceHydrator(
+                imageResourceService ?? new ReportTemplateImageResourceService(pathProvider));
             _pathResolver = new ReportTemplatePathResolver(pathProvider);
             _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver, _logger);
         }
@@ -290,7 +294,8 @@ namespace ExportDocManager.Services.Reporting
                     withSeal,
                     _pathProvider,
                     _logger);
-                return ScribanReportTemplateRenderer.Render(templateContent, globals);
+                string rendered = ScribanReportTemplateRenderer.Render(templateContent, globals);
+                return await _imageResourceHydrator.HydrateAsync(rendered, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -341,7 +346,8 @@ namespace ExportDocManager.Services.Reporting
                     .ConfigureAwait(false);
 
                 var globals = ReportTemplateGlobalsBuilder.BuildPaymentVoucherGlobals(payment, payee);
-                return ScribanReportTemplateRenderer.Render(templateContent, globals);
+                string rendered = ScribanReportTemplateRenderer.Render(templateContent, globals);
+                return await _imageResourceHydrator.HydrateAsync(rendered, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

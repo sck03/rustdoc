@@ -34,6 +34,14 @@ export function createV3ImageElement(x = 1500, y = 1500): ReportDesignerV3Elemen
   });
 }
 
+export function createV3PageNumberElement(x = 1500, y = 27500): ReportDesignerV3Element {
+  return createBase("PageNumber", x, y, 5000, 700, { fontSizePt: 9, align: "Center" }, {
+    format: "CurrentOfTotal",
+    prefix: "",
+    suffix: "",
+  });
+}
+
 export function createV3FlowElement(
   block: Extract<ReportBlock, { type: "Row" | "Grid" | "Conditional" | "DetailTable" | "PageBreak" }>,
   x = 1500,

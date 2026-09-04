@@ -10,6 +10,15 @@ export const jobStatusOptions = [
   { value: "Canceled", label: "已取消" },
 ];
 
+export function commitJobCenterFilters(keyword: string, status: string) {
+  const normalizedKeyword = keyword.trim();
+  return { keyword: normalizedKeyword, committedKeyword: normalizedKeyword, status, pageNumber: 1 };
+}
+
+export function hasPendingJobCenterFilters(keyword: string, committedKeyword: string, pageNumber: number) {
+  return keyword.trim() !== committedKeyword.trim() || pageNumber !== 1;
+}
+
 export function hasActiveJobs(jobs?: BackgroundJobSnapshot[]) {
   return jobs?.some((job) => {
     const status = job.status?.toLowerCase();

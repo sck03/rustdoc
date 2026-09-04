@@ -98,6 +98,8 @@ export function exportReportDesignerV3SchemaToHtml(
     .edm-v3-flow-static { overflow: visible; }
     .edm-v3-flow > table, .edm-v3-flow > section { max-width: 100%; }
     .edm-v3-image { display: block; width: 100%; height: 100%; object-fit: contain; }
+    .edm-v3-page-number { white-space: pre; }
+    .edm-v3-page-number-overlay { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2000; }
     .edm-v3-image-placeholder { display: grid; place-items: center; width: 100%; height: 100%; padding: 1mm; color: #64748b; border: 1px dashed #94a3b8; font-size: 8pt; text-align: center; overflow-wrap: anywhere; }
     .edm-v3-rectangle { width: 100%; height: 100%; }
     .edm-v3-line { position: absolute; background: #334155; }
@@ -274,6 +276,8 @@ function renderElementContent(element: ReportDesignerV3Element) {
         return `<div class="edm-v3-field" style="${renderTextStyle(element)}">${element.label ? `${escapeHtml(element.label)}: ` : ""}${renderField(element.fieldPath, element.fallbackText)}</div>`;
       case "Image":
         return renderImage(element);
+      case "PageNumber":
+        return renderPageNumber(element);
       case "Rectangle":
         return `<div class="edm-v3-rectangle" style="${renderBoxStyle(element)}"></div>`;
       case "Line":
@@ -294,7 +298,17 @@ function renderImage(element: Extract<ReportDesignerV3Element, { type: "Image" }
 
   const requestedResource = element.resourceId?.trim();
   const resource = requestedResource && resourceIdPattern.test(requestedResource) ? requestedResource : undefined;
-  return `<div class="edm-v3-image-placeholder" role="img" aria-label="${escapeHtmlAttribute(element.altText ?? "未上传图片")}">${resource ? `受控资源：${escapeHtml(resource)}` : "图片资源未上传"}</div>`;
+  return resource
+    ? `<img class="edm-v3-image" data-edm-v3-resource-id="${escapeHtmlAttribute(resource)}" alt="${escapeHtmlAttribute(element.altText ?? "")}">`
+    : `<div class="edm-v3-image-placeholder" role="img" aria-label="${escapeHtmlAttribute(element.altText ?? "未上传图片")}">图片资源未上传</div>`;
+}
+
+function renderPageNumber(element: Extract<ReportDesignerV3Element, { type: "PageNumber" }>) {
+  const prefix = escapeHtml(element.prefix ?? "");
+  const suffix = escapeHtml(element.suffix ?? "");
+  const current = `<span class="edm-v3-page-number-current" data-edm-v3-page-number-current>1</span>`;
+  const total = `<span class="edm-v3-page-number-total" data-edm-v3-page-number-total>1</span>`;
+  return `<span class="edm-v3-page-number" data-edm-v3-page-number>${prefix}${current}${element.format === "CurrentOfTotal" ? ` / ${total}` : ""}${suffix}</span>`;
 }
 
 function renderElementPositionStyle(element: ReportDesignerV3Element, yOffset = 0) {
@@ -330,9 +344,18 @@ function renderBoxStyle(element: Extract<ReportDesignerV3Element, { type: "Recta
 }
 
 function renderLineStyle(element: Extract<ReportDesignerV3Element, { type: "Line" }>) {
-  return element.style.borderColor && colorPattern.test(element.style.borderColor)
-    ? `background-color: ${element.style.borderColor}`
-    : "";
+  const style = element.style;
+  if (style.borderStyle === "None") return "display: none";
+  const color = style.borderColor && colorPattern.test(style.borderColor) ? style.borderColor : "#334155";
+  const widthPx = Math.max(1, Math.min(8, style.borderWidthPx ?? 1));
+  if (style.borderStyle === "Dashed") {
+    return element.direction === "Horizontal"
+      ? `height: 0; border-top: ${widthPx}px dashed ${color}`
+      : `width: 0; border-left: ${widthPx}px dashed ${color}`;
+  }
+  return element.direction === "Horizontal"
+    ? `height: ${widthPx}px; background-color: ${color}`
+    : `width: ${widthPx}px; background-color: ${color}`;
 }
 
 function renderBorder(style: ReportDesignerV3Element["style"]) {

@@ -1,9 +1,10 @@
-import { useEffect, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type {
   ReportDesignerV3DocumentState,
   ReportDesignerV3ResizeDirection,
 } from "./reportDesignerV3Mutations.ts";
-import { moveSelectedV3Elements, resizeV3Element } from "./reportDesignerV3Mutations.ts";
+import { resolveV3MoveDelta } from "./reportDesignerV3Mutations.ts";
+import { resolveV3ResizeGeometry } from "./reportDesignerV3Resize.ts";
 import { renderReportDesignerBlockPreviewToHtml } from "./reportDesignerBlockRenderer.ts";
 import {
   hundredthMmToMm,
@@ -12,6 +13,9 @@ import {
   type ReportDesignerV3Element,
   type ReportDesignerV3Schema,
 } from "./reportDesignerV3Schema.ts";
+import { fitReportDesignerV3Zoom } from "./reportDesignerV3WorkspaceHelpers.tsx";
+import { reportDesignerLayerBandStyle } from "./reportDesignerLayerBands.ts";
+import { ReportDesignerLayerResizers } from "./ReportDesignerLayerResizers.tsx";
 
 export type ReportDesignerV3Transform =
   | { kind: "move" }
@@ -27,26 +31,36 @@ type Gesture = {
   transform: ReportDesignerV3Transform;
   captureTarget: HTMLElement | null;
   pendingAnimationFrame: number | null;
+  baseElements: Map<string, ReportDesignerV3Element>;
 };
 
 export function ReportDesignerV3Canvas({
   state,
   zoom,
+  fitRequest = 0,
+  showGuides = true,
+  onFitZoom,
   disabled = false,
   onSelect,
   onCommitTransform,
   onCancelTransform,
+  onCommitLayerBand,
   onClearSelection,
   }: {
-    state: ReportDesignerV3DocumentState;
+  state: ReportDesignerV3DocumentState;
   zoom: number;
+  fitRequest?: number;
+  showGuides?: boolean;
+  onFitZoom?: (zoom: number) => void;
   disabled?: boolean;
   onSelect: (elementId: string, additive: boolean) => void;
   onCommitTransform: (baseState: ReportDesignerV3DocumentState, transform: ReportDesignerV3Transform, deltaX: number, deltaY: number) => void;
   onCancelTransform: (baseState: ReportDesignerV3DocumentState) => void;
+  onCommitLayerBand: (role: "Header" | "Footer", heightHundredthMm: number) => void;
   onClearSelection: () => void;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const callbacksRef = useRef({ onCommitTransform, onCancelTransform });
   callbacksRef.current = { onCommitTransform, onCancelTransform };
@@ -54,6 +68,30 @@ export function ReportDesignerV3Canvas({
   const displayedWidthMm = page.widthMm * zoom;
   const displayedHeightMm = page.heightMm * zoom;
   const selectedSet = new Set(state.selectedIds);
+  const statusHint = useMemo(() => {
+    if (state.selectedIds.length === 1) {
+      const found = state.schema.layers.flatMap((l) => l.elements).find((el) => el.id === state.selectedIds[0]);
+      if (found) {
+        const typeLabel = found.type === "Text" ? "文本" : found.type === "Field" ? "字段" : found.type === "Image" ? "图片" : found.type === "Rectangle" ? "矩形" : found.type === "Line" ? "线条" : found.type === "Flow" ? "结构流" : found.type;
+        return `已选【${typeLabel}】X: ${hundredthMmToMm(found.xHundredthMm).toFixed(1)} mm, Y: ${hundredthMmToMm(found.yHundredthMm).toFixed(1)} mm, 宽: ${hundredthMmToMm(found.widthHundredthMm).toFixed(1)} mm, 高: ${hundredthMmToMm(found.heightHundredthMm).toFixed(1)} mm · 拖拽移动/角点缩放 · 方向键微移 · Ctrl+C 复制 · Del 删除`;
+      }
+    }
+    if (state.selectedIds.length > 1) {
+      return `已多选 ${state.selectedIds.length} 个元素 · 可在右侧属性栏批量对齐/分布/操作 · 方向键整体微移 · Ctrl+C 复制 · Del 删除`;
+    }
+    return "未选择元素 · 单击选中 · 按住 Ctrl/Shift 多选 · Ctrl+A 全选 · 拖动移动 · 拖拽角点缩放 · 单位: 毫米(mm)";
+  }, [state.selectedIds, state.schema]);
+
+  useEffect(() => {
+    if (fitRequest <= 0 || !onFitZoom) return;
+    const scroll = scrollRef.current;
+    const canvas = canvasRef.current;
+    if (!scroll || !canvas) return;
+    const styles = getComputedStyle(scroll);
+    const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+    const verticalPadding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+    onFitZoom(fitReportDesignerV3Zoom(scroll.clientWidth - horizontalPadding, scroll.clientHeight - verticalPadding, canvas.offsetWidth, canvas.offsetHeight));
+  }, [fitRequest, onFitZoom]);
 
   function beginMove(event: ReactPointerEvent<HTMLDivElement>, element: ReportDesignerV3Element, layerId: string) {
     if (event.button !== 0) return;
@@ -88,6 +126,7 @@ export function ReportDesignerV3Canvas({
       transform: { kind: "move" },
       captureTarget: event.currentTarget,
       pendingAnimationFrame: null,
+      baseElements: baseElementsFor(state.schema, selectedIds, true),
     };
     capturePointer(event.currentTarget, event.pointerId);
   }
@@ -114,25 +153,14 @@ export function ReportDesignerV3Canvas({
       transform: { kind: "resize", elementId, direction },
       captureTarget: event.currentTarget,
       pendingAnimationFrame: null,
+      baseElements: baseElementsFor(state.schema, [elementId]),
     };
     capturePointer(event.currentTarget, event.pointerId);
   }
 
-  function updateGesture(event: ReactPointerEvent<HTMLElement>) {
-    updateGestureAt(event.pointerId, event.clientX, event.clientY);
-  }
-
-  function finishGesture(event: ReactPointerEvent<HTMLElement>, cancelled = false) {
-    finishGestureAt(event.pointerId, event.clientX, event.clientY, cancelled);
-  }
-
-  function handleLostPointerCapture(event: ReactPointerEvent<HTMLElement>) {
-    const current = gesture.current;
-    if (!current || current.pointerId !== event.pointerId) return;
-    // Keep the gesture alive after capture is lost.  A window-level pointerup
-    // or pointercancel listener below will finish it even when an embedded
-    // WebView retargets the terminal event outside the canvas.
-  }
+  function updateGesture(event: ReactPointerEvent<HTMLElement>) { updateGestureAt(event.pointerId, event.clientX, event.clientY); }
+  function finishGesture(event: ReactPointerEvent<HTMLElement>, cancelled = false) { finishGestureAt(event.pointerId, event.clientX, event.clientY, cancelled); }
+  function handleLostPointerCapture(event: ReactPointerEvent<HTMLElement>) { if (gesture.current && gesture.current.pointerId === event.pointerId) { /* keep gesture alive */ } }
 
   function updateGestureAt(pointerId: number, clientX: number, clientY: number) {
     const current = gesture.current;
@@ -163,11 +191,11 @@ export function ReportDesignerV3Canvas({
         canvasRef.current,
         current.baseState.schema,
       );
-      applyTransientTransform(current.baseState, current.transform, delta.x, delta.y);
+      applyTransientTransform(current, delta.x, delta.y);
       callbacksRef.current.onCommitTransform(current.baseState, current.transform, delta.x, delta.y);
     } else {
       cancelScheduledPreview(current);
-      applyTransientTransform(current.baseState, current.transform, 0, 0);
+      applyTransientTransform(current, 0, 0);
       callbacksRef.current.onCancelTransform(current.baseState);
     }
     gesture.current = null;
@@ -178,7 +206,7 @@ export function ReportDesignerV3Canvas({
     const current = gesture.current;
     if (!current) return;
     cancelScheduledPreview(current);
-    applyTransientTransform(current.baseState, current.transform, 0, 0);
+    applyTransientTransform(current, 0, 0);
     callbacksRef.current.onCancelTransform(current.baseState);
     gesture.current = null;
     releasePointer(current.captureTarget, current.pointerId);
@@ -196,7 +224,7 @@ export function ReportDesignerV3Canvas({
         canvasRef.current,
         current.baseState.schema,
       );
-      applyTransientTransform(current.baseState, current.transform, delta.x, delta.y);
+      applyTransientTransform(current, delta.x, delta.y);
     });
   }
 
@@ -206,26 +234,25 @@ export function ReportDesignerV3Canvas({
     current.pendingAnimationFrame = null;
   }
 
-  function applyTransientTransform(
-    baseState: ReportDesignerV3DocumentState,
-    transform: ReportDesignerV3Transform,
-    deltaX: number,
-    deltaY: number,
-  ) {
-    const next = transform.kind === "move"
-      ? moveSelectedV3Elements(baseState, deltaX, deltaY)
-      : resizeV3Element(baseState, transform.elementId, transform.direction, deltaX, deltaY);
+  function applyTransientTransform(current: Gesture, deltaX: number, deltaY: number) {
     const page = canvasRef.current;
     if (!page) return;
-    for (const elementId of baseState.selectedIds) {
-      const located = findElement(next.schema, elementId);
+    const move = current.transform.kind === "move"
+      ? resolveV3MoveDelta(current.baseState, deltaX, deltaY)
+      : null;
+    for (const [elementId, baseElement] of current.baseElements) {
+      const geometry = move
+        ? { xHundredthMm: baseElement.xHundredthMm + move.dx, yHundredthMm: baseElement.yHundredthMm + move.dy, widthHundredthMm: baseElement.widthHundredthMm, heightHundredthMm: baseElement.heightHundredthMm, rotationDeg: baseElement.rotationDeg }
+        : current.transform.kind === "resize"
+          ? resolveV3ResizeGeometry(baseElement, current.transform.direction, deltaX, deltaY, current.baseState.schema.page)
+          : baseElement;
       const node = page.querySelector<HTMLElement>(`[data-v3-element-id="${CSS.escape(elementId)}"]`);
-      if (!located || !node) continue;
-      node.style.left = `${hundredthMmToMm(located.element.xHundredthMm)}mm`;
-      node.style.top = `${hundredthMmToMm(located.element.yHundredthMm)}mm`;
-      node.style.width = `${hundredthMmToMm(located.element.widthHundredthMm)}mm`;
-      node.style.height = `${hundredthMmToMm(located.element.heightHundredthMm)}mm`;
-      node.style.transform = located.element.rotationDeg ? `rotate(${located.element.rotationDeg}deg)` : "";
+      if (!node) continue;
+      node.style.left = `${hundredthMmToMm(geometry.xHundredthMm)}mm`;
+      node.style.top = `${hundredthMmToMm(geometry.yHundredthMm)}mm`;
+      node.style.width = `${hundredthMmToMm(geometry.widthHundredthMm)}mm`;
+      node.style.height = `${hundredthMmToMm(geometry.heightHundredthMm)}mm`;
+      node.style.transform = geometry.rotationDeg ? `rotate(${geometry.rotationDeg}deg)` : "";
     }
   }
 
@@ -266,22 +293,30 @@ export function ReportDesignerV3Canvas({
     <div className="report-designer-v3-canvas-shell">
       <div
         className="report-designer-v3-canvas-scroll"
+        ref={scrollRef}
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) onClearSelection();
         }}
       >
         <div
           className="report-designer-v3-page-frame"
-          style={{ width: `${displayedWidthMm}mm`, height: `${displayedHeightMm}mm` }}
+          style={{ width: `${displayedWidthMm}mm`, height: `${displayedHeightMm}mm`, "--v3-page-ratio": `${page.widthMm} / ${page.heightMm}` } as CSSProperties}
         >
           <div
             ref={canvasRef}
-            className={`report-designer-v3-page${state.schema.grid.enabled ? "" : " is-grid-hidden"}`}
+            className={`report-designer-v3-page${state.schema.grid.enabled ? "" : " is-grid-hidden"}${showGuides ? "" : " is-guides-hidden"}${disabled ? " is-read-only" : ""}`}
+            data-v3-page-canvas="true"
             style={{
               width: `${page.widthMm}mm`,
               height: `${page.heightMm}mm`,
               "--v3-grid-size": `${hundredthMmToMm(state.schema.grid.sizeHundredthMm)}mm`,
+              "--v3-page-ratio": `${page.widthMm} / ${page.heightMm}`,
               "--v3-zoom": zoom,
+              "--v3-margin-top": `${hundredthMmToMm(state.schema.page.marginTopHundredthMm)}mm`,
+              "--v3-margin-right": `${hundredthMmToMm(state.schema.page.marginRightHundredthMm)}mm`,
+              "--v3-margin-bottom": `${hundredthMmToMm(state.schema.page.marginBottomHundredthMm)}mm`,
+              "--v3-margin-left": `${hundredthMmToMm(state.schema.page.marginLeftHundredthMm)}mm`,
+              ...reportDesignerLayerBandStyle(state.schema),
               transform: `scale(${zoom})`,
               transformOrigin: "top left",
             } as CSSProperties}
@@ -292,11 +327,12 @@ export function ReportDesignerV3Canvas({
           onPointerDown={(event) => {
             if (event.target === event.currentTarget || (event.target instanceof HTMLElement && event.target.classList.contains("report-designer-v3-layer"))) onClearSelection();
           }}
+          aria-readonly={disabled || undefined}
           role="region"
           aria-label="v3 报表自由画布"
         >
           {state.schema.layers.filter((layer) => layer.visible).map((layer) => (
-            <div className={`report-designer-v3-layer report-designer-v3-layer-${layer.role.toLowerCase()}`} key={layer.id}>
+            <div className={`report-designer-v3-layer report-designer-v3-layer-${layer.role.toLowerCase()}${state.activeLayerId === layer.id ? " is-active" : ""}`} key={layer.id} data-v3-layer-id={layer.id} data-v3-layer-name={layer.name} data-v3-layer-role={layer.role} aria-label={layer.name} aria-current={state.activeLayerId === layer.id ? "true" : undefined} style={{ "--v3-layer-label-top": layer.role === "Body" ? "42%" : layer.role === "Footer" ? "calc(100% - 20px)" : "4px", "--v3-layer-label-left": layer.role === "Overlay" ? "auto" : "4px", "--v3-layer-label-right": layer.role === "Overlay" ? "4px" : "auto" } as CSSProperties}>
               {[...layer.elements]
                 .filter((element) => element.visible)
                 .sort((left, right) => left.zIndex - right.zIndex)
@@ -332,10 +368,11 @@ export function ReportDesignerV3Canvas({
                 })}
             </div>
           ))}
+          {showGuides ? <ReportDesignerLayerResizers schema={state.schema} disabled={disabled} onCommit={onCommitLayerBand} /> : null}
           </div>
         </div>
       </div>
-      <div className="report-designer-v3-canvas-hint">拖动元素移动；拖拽角点缩放；Shift/Ctrl/⌘ 可多选；坐标单位为毫米。</div>
+      <div className="report-designer-v3-canvas-hint">{statusHint}</div>
     </div>
   );
 }
@@ -353,10 +390,12 @@ function ElementPreview({ element }: { element: ReportDesignerV3Element }) {
       );
     case "Image":
       return <span className="report-designer-v3-preview-image">{element.sourceKind === "Field" ? `图片：${element.fieldPath ?? ""}` : element.resourceId ? `资源：${element.resourceId}` : "图片资源未上传"}</span>;
+    case "PageNumber":
+      return <span className="report-designer-v3-preview-page-number">{element.prefix ?? ""}第 1 / 1 页{element.suffix ?? ""}</span>;
     case "Rectangle":
       return null;
     case "Line":
-      return null;
+      return <span className={`report-designer-v3-preview-line report-designer-v3-preview-line-${element.direction.toLowerCase()}`} style={{ backgroundColor: element.style.borderColor ?? "var(--edm-neutral-700)", ...(element.direction === "Horizontal" ? { height: `${Math.max(1, element.style.borderWidthPx ?? 1)}px` } : { width: `${Math.max(1, element.style.borderWidthPx ?? 1)}px` }) }} aria-hidden="true" />;
     case "Flow":
       return (
         <div className="report-designer-v3-preview-flow" aria-label={`${element.flowKind} 结构预览`}>
@@ -407,13 +446,12 @@ function elementStyle(element: ReportDesignerV3Element): CSSProperties {
     backgroundColor: element.style.backgroundColor,
     textAlign: element.style.align?.toLowerCase() as CSSProperties["textAlign"],
     borderColor: element.style.borderColor,
-    borderWidth: element.style.borderWidthPx,
-    borderStyle: element.style.borderStyle === "Dashed" ? "dashed" : element.style.borderStyle === "None" ? "none" : element.style.borderWidthPx ? "solid" : undefined,
+    borderWidth: element.type === "Line" ? undefined : element.style.borderWidthPx,
+    borderStyle: element.type === "Line" ? undefined : element.style.borderStyle === "Dashed" ? "dashed" : element.style.borderStyle === "None" ? "none" : element.style.borderWidthPx ? "solid" : undefined,
     padding: element.style.paddingHundredthMm ? `${hundredthMmToMm(element.style.paddingHundredthMm)}mm` : undefined,
   };
   if (element.type === "Line") {
-    style.border = "0";
-    style.backgroundColor = element.style.borderColor ?? "#334155";
+    style.backgroundColor = "transparent";
   }
   return style;
 }
@@ -424,6 +462,17 @@ function findElement(schema: ReportDesignerV3Schema, id: string) {
     if (element) return { element, layer };
   }
   return null;
+}
+
+function baseElementsFor(schema: ReportDesignerV3Schema, ids: string[], movableOnly = false) {
+  const wanted = new Set(ids);
+  const result = new Map<string, ReportDesignerV3Element>();
+  for (const layer of schema.layers) {
+    for (const element of layer.elements) {
+      if (wanted.has(element.id) && (!movableOnly || (!element.locked && !layer.locked))) result.set(element.id, element);
+    }
+  }
+  return result;
 }
 
 function readDelta(

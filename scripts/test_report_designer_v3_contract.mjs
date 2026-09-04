@@ -13,6 +13,16 @@ const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modu
 fs.mkdirSync(workspaceRoot, { recursive: true });
 const sourceRoot = path.join(repoRoot, "apps/export-doc-web/src/features/report-designer");
 const workspaceSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerV3Workspace.tsx"), "utf8");
+const canvasSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerV3Canvas.tsx"), "utf8");
+const panelsSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerV3Panels.tsx"), "utf8");
+const gridPropertiesSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerGridProperties.tsx"), "utf8");
+const layerResizersSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerLayerResizers.tsx"), "utf8");
+const conditionalPropertiesSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerConditionalProperties.tsx"), "utf8");
+const propertyControlsSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerPropertyControls.tsx"), "utf8");
+const colorFieldSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerV3ColorField.tsx"), "utf8");
+const canvasCss = fs.readFileSync(path.join(repoRoot, "apps/export-doc-web/src/styles/report/designer-v3.css"), "utf8");
+const inspectorCss = fs.readFileSync(path.join(repoRoot, "apps/export-doc-web/src/styles/report/designer-v3-inspector.css"), "utf8");
+const bandsCss = fs.readFileSync(path.join(repoRoot, "apps/export-doc-web/src/styles/report/designer-v3-bands.css"), "utf8");
 const importSpecifier = (name) => {
   const relative = path.relative(workspaceRoot, path.join(sourceRoot, name)).replaceAll("\\", "/");
   return relative.startsWith(".") ? relative : `./${relative}`;
@@ -25,10 +35,34 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerV3Mutations.ts"))}
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3TemplateParser.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3TemplateAnalysis.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3HtmlExporter.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerBlockRenderer.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerPreviewSamples.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerGridMutations.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerLayerBands.ts"))};
 `);
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 const api = await import(pathToFileURL(bundlePath).href);
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
+
+function assertFixedRightMetadataLayout(source, templatePath) {
+  assert(
+    /class=["']meta-row["'][\s\S]*class=["']meta-label["'][\s\S]*class=["']meta-value["']/u.test(source),
+    `${templatePath} 的单据元数据必须使用固定标签列，空合同号不能导致标签漂移`,
+  );
+  assert(
+    source.includes("--meta-label-column: 8em") && source.includes("--meta-value-column: 9em") &&
+      source.includes("grid-template-columns: minmax(0, var(--meta-label-column)) minmax(0, var(--meta-value-column))") &&
+      source.includes("justify-items: end"),
+    `${templatePath} 的元数据必须使用固定列并整体靠右`,
+  );
+  assert(
+    source.includes(".inline-info .right > .meta-row { display: grid;") &&
+      source.includes(".inline-info .right .meta-label { min-width: 0; white-space: nowrap; text-align: right; }") &&
+      source.includes(".inline-info .right .meta-value { min-width: 0; overflow-wrap: anywhere; text-align: right; }") &&
+      !source.includes("meta-row { display: contents"),
+    `${templatePath} 的标签和值必须相邻右对齐，不能依赖 display: contents`,
+  );
+}
 
 const legacyA5 = {
   version: 2,
@@ -90,6 +124,84 @@ const maliciousFlow = api.normalizeReportDesignerV3Schema({
   }, ...migrated.schema.layers.slice(1)],
 });
 assert(maliciousFlow.issues.some((issue) => issue.severity === "error" && issue.path.includes("block")), "Flow 内嵌表达式必须经过统一白名单校验");
+
+assert(propertyControlsSource.includes("selectOnly?: boolean"), "字段控件必须支持条件编辑的严格下拉模式");
+assert(conditionalPropertiesSource.match(/selectOnly\s*\n/g)?.length >= 2, "条件字段和条件内容字段都必须使用下拉选项");
+assert(!conditionalPropertiesSource.includes("datalist") && !conditionalPropertiesSource.includes("表达式"), "条件编辑不得提供表达式输入，普通用户只能使用下拉字段");
+assert(panelsSource.includes("CommitTextField"), "V3 属性面板的文本编辑必须使用完成后提交控件");
+assert(propertyControlsSource.includes("当前值：") && propertyControlsSource.includes("需修正"), "V3 字段下拉必须保留非法当前值的可见修正提示");
+assert(panelsSource.includes('type="file"') && panelsSource.includes("选择图片并上传"), "图片属性栏必须提供直接选择文件并上传的入口");
+assert(panelsSource.includes("uploadReportTemplateV3ImageResource") && panelsSource.includes("已上传图片"), "图片属性栏必须调用受控资源 API 并支持下拉复用已绑定资源");
+assert(panelsSource.includes("无需填写资源 ID") && panelsSource.includes("最大 32 MB"), "图片上传必须说明自动绑定行为和文件大小边界");
+assert(inspectorCss.includes("report-designer-v3-upload-button") && inspectorCss.includes("report-designer-v3-upload-feedback.is-error"), "图片上传控件和错误反馈必须具有独立可见样式");
+assert(workspaceSource.includes("onClick={openFieldPanel}"), "工具栏的选择字段按钮必须打开字段面板而不是静默插入首个字段");
+assert(workspaceSource.includes("report-designer-v3-zoom-select") && workspaceSource.includes("适合窗口"), "V3 工作区必须提供缩放预设和适合窗口操作");
+assert(workspaceSource.includes("fitRequest") && workspaceSource.includes("showGuides") && workspaceSource.includes("onFitZoom={handleFitZoom}"), "V3 工作区必须把适合窗口和参考线状态传递到画布");
+
+const conditionalText = "SPECIAL_TERMS_VISIBLE";
+const conditionalBlock = {
+  id: "conditional-export-domain",
+  type: "Conditional",
+  condition: { fieldPath: "Invoice.SpecialTerms", operator: "HasValue", value: "" },
+  content: { kind: "Text", text: conditionalText, fieldPath: "", label: "", fallbackText: "" },
+  style: { fontSizePt: 9 },
+};
+const bodyLayer = migrated.schema.layers.find((layer) => layer.role === "Body");
+assert(bodyLayer, "条件显示回归需要主体图层");
+const conditionalFlow = {
+  id: "conditional-export-flow",
+  type: "Flow",
+  flowKind: "Conditional",
+  xHundredthMm: 1000,
+  yHundredthMm: 5000,
+  widthHundredthMm: 19000,
+  heightHundredthMm: 1000,
+  rotationDeg: 0,
+  zIndex: 5,
+  visible: true,
+  locked: false,
+  style: {},
+  outputEnabled: true,
+  block: conditionalBlock,
+};
+const conditionalSchema = {
+  ...migrated.schema,
+  reportType: "ExportDocument",
+  layers: migrated.schema.layers.map((layer) => layer.id === bodyLayer.id
+    ? { ...layer, elements: [...layer.elements, conditionalFlow] }
+    : layer),
+};
+const conditionalValidation = api.normalizeReportDesignerV3Schema(conditionalSchema, "ExportDocument");
+assert(!conditionalValidation.issues.some((issue) => issue.severity === "error" && issue.path.includes("conditional-export-flow")), "出口条件显示的合法字段应通过 V3 校验");
+const conditionalHtml = api.exportReportDesignerV3SchemaToHtml(conditionalSchema, "ExportDocument");
+assert(conditionalHtml.includes("{{ if Invoice.SpecialTerms }}") && conditionalHtml.includes(conditionalText), "V3 条件显示导出必须生成结构化白名单条件");
+const standardConditionalPreview = api.renderReportDesignerLocalPreviewSample(conditionalHtml.replace(/<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA[\s\S]*?-->/, ""), "exportStandard");
+const longConditionalPreview = api.renderReportDesignerLocalPreviewSample(conditionalHtml.replace(/<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA[\s\S]*?-->/, ""), "exportLongItems");
+assert(!standardConditionalPreview.includes(conditionalText), "空条件字段的本地预览不得显示条件内容");
+assert(longConditionalPreview.includes(conditionalText), "有值条件字段的本地预览必须显示条件内容");
+
+const conditionalFieldPreviewBlock = {
+  ...conditionalBlock,
+  id: "conditional-field-preview",
+  content: { kind: "Field", text: "", label: "Invoice", fieldPath: "Invoice.InvoiceNo", fallbackText: "NO_INVOICE_NO" },
+};
+const editorConditionalPreview = api.renderReportDesignerBlockPreviewToHtml(conditionalFieldPreviewBlock);
+assert(editorConditionalPreview.includes("{{ Invoice.InvoiceNo }}") && !editorConditionalPreview.includes("NO_INVOICE_NO"), "画布条件内容预览不得把字段占位文本和回退文本重复显示");
+const conditionalFieldHtml = api.renderReportDesignerBlockToHtml(conditionalFieldPreviewBlock);
+assert(conditionalFieldHtml.includes("{{ else }}NO_INVOICE_NO{{ end }}"), "条件内容字段的导出必须保留占位文本语义");
+
+const paymentConditionalSchema = {
+  ...conditionalSchema,
+  reportType: "PaymentVoucher",
+  layers: conditionalSchema.layers.map((layer) => layer.id === bodyLayer.id
+    ? { ...layer, elements: layer.elements.map((element) => element.id === conditionalFlow.id
+      ? { ...element, block: { ...conditionalBlock, condition: { ...conditionalBlock.condition, fieldPath: "Invoice.SpecialTerms" } } }
+      : element) }
+    : layer),
+};
+const paymentConditionalValidation = api.normalizeReportDesignerV3Schema(paymentConditionalSchema, "PaymentVoucher");
+assert(paymentConditionalValidation.issues.some((issue) => issue.severity === "error" && issue.path.includes("condition.fieldPath")), "付款模板条件字段混用 Invoice.* 必须被业务域校验阻断");
+assert(api.validateReportDesignerV3Export(paymentConditionalSchema, "PaymentVoucher").blocked, "付款模板条件域错误必须阻断导出");
 
 const manyElementsLayer = {
   ...migrated.schema.layers[0],
@@ -256,6 +368,47 @@ const normalizedBodyPrint = api.updateV3Layer(
 const normalizedBodyLayer = normalizedBodyPrint.schema.layers.find((layer) => layer.role === "Body");
 assert(normalizedBodyLayer.print.repeatOnEveryPage === false && normalizedBodyLayer.print.pinToPageBottom === false && normalizedBodyLayer.print.minHeightHundredthMm === 26000, "图层打印设置必须按角色和资源上限归一化");
 
+const bandState = {
+  ...invalidOrientation,
+  schema: {
+    ...invalidOrientation.schema,
+    layers: [
+      { id: "band-header", name: "页眉", role: "Header", designHeightHundredthMm: 1800, print: { repeatOnEveryPage: true, keepTogether: true, pinToPageBottom: false, minHeightHundredthMm: 0 }, visible: true, locked: false, elements: [] },
+      ...invalidOrientation.schema.layers,
+      { id: "band-footer", name: "页脚", role: "Footer", designHeightHundredthMm: 1400, print: { repeatOnEveryPage: true, keepTogether: true, pinToPageBottom: true, minHeightHundredthMm: 0 }, visible: true, locked: false, elements: [] },
+    ],
+  },
+};
+const initialBands = api.resolveReportDesignerLayerBands(bandState.schema);
+const hiddenHeaderState = api.updateV3Layer(bandState, "band-header", { visible: false });
+const hiddenHeaderBands = api.resolveReportDesignerLayerBands(hiddenHeaderState.schema);
+assert(hiddenHeaderBands.headerHeight === 0 && hiddenHeaderBands.bodyHeight > initialBands.bodyHeight, "隐藏页眉必须折叠设计带并把空间归还主体");
+const resizedHeader = api.setReportDesignerLayerRoleHeight(bandState, "Header", 4200);
+assert(api.resolveReportDesignerLayerBands(resizedHeader.schema).headerHeight === 4200, "页眉设计带必须支持独立精确高度");
+const clampedHeader = api.setReportDesignerLayerRoleHeight(bandState, "Header", 999999);
+const clampedBands = api.resolveReportDesignerLayerBands(clampedHeader.schema);
+assert(clampedBands.headerHeight + clampedBands.footerHeight + clampedBands.bodyHeight === bandState.schema.page.heightHundredthMm && clampedBands.bodyHeight >= api.REPORT_DESIGNER_MIN_BODY_BAND_HUNDREDTH_MM, "图层拖动必须保留 A4 页面边界和最小主体设计区");
+
+const baseGrid = {
+  id: "grid-contract",
+  type: "Grid",
+  columns: [{ id: "c1", widthPercent: 50 }, { id: "c2", widthPercent: 50 }],
+  rows: [
+    { id: "r1", heightMm: 9, cells: [{ id: "a", contentKind: "Text", text: "A", colSpan: 1, rowSpan: 1, fieldPath: "", checkboxOptions: [], style: {} }, { id: "b", contentKind: "Text", text: "B", colSpan: 1, rowSpan: 1, fieldPath: "", checkboxOptions: [], style: {} }] },
+    { id: "r2", heightMm: 9, cells: [{ id: "c", contentKind: "Text", text: "C", colSpan: 1, rowSpan: 1, fieldPath: "", checkboxOptions: [], style: {} }, { id: "d", contentKind: "Text", text: "D", colSpan: 1, rowSpan: 1, fieldPath: "", checkboxOptions: [], style: {} }] },
+  ],
+  border: {},
+  defaultCellStyle: {},
+};
+const mergedRight = api.mergeGridCellRight(baseGrid, "a");
+assert(mergedRight.rows[0].cells.length === 1 && mergedRight.rows[0].cells[0].colSpan === 2, "普通表格必须支持向右合并并移除被覆盖单元格");
+const splitRight = api.splitGridCell(mergedRight, "a");
+assert(splitRight.rows[0].cells.length === 2 && api.getGridCellLocations(splitRight).filter((cell) => cell.rowIndex === 0).length === 2, "合并单元格必须可恢复为独立单元格");
+const mergedDown = api.mergeGridCellDown(baseGrid, "a");
+assert(mergedDown.rows[0].cells[0].rowSpan === 2 && mergedDown.rows[1].cells.length === 1, "普通表格必须支持向下合并且保持目标行有效");
+const formGrid = api.applyGridPreset(baseGrid, "Form");
+assert(formGrid.rows.length === 3 && formGrid.columns.length === 4 && formGrid.rows[2].cells[1].colSpan === 3, "标签/内容预设必须生成可编辑的 4 列合并表单");
+
 const barrierElements = [
   { ...api.createV3TextElement(1000, 1000), id: "barrier-a", zIndex: 10 },
   { ...api.createV3TextElement(3000, 1000), id: "barrier-locked", zIndex: 20, locked: true },
@@ -337,9 +490,13 @@ for (const classicPath of [
   "Templates/Internal/payment_voucher_template.html",
   "Templates/Internal/expense_reimbursement_template.html",
 ]) {
-  const classic = api.parseReportDesignerV3FromHtml(fs.readFileSync(path.join(repoRoot, classicPath), "utf8"), classicPath.includes("Internal") ? "PaymentVoucher" : "ExportDocument");
+  const classicSource = fs.readFileSync(path.join(repoRoot, classicPath), "utf8");
+  const classic = api.parseReportDesignerV3FromHtml(classicSource, classicPath.includes("Internal") ? "PaymentVoucher" : "ExportDocument");
   assert(classic.sourceVersion === null && !classic.hadSchema, `${classicPath} 必须保持无 schema 的高级 HTML 模式`);
   assert(classic.migrated && classic.issues.some((issue) => issue.message.includes("高级 HTML")), `${classicPath} 打开时只能提示可选 V3 草稿，不能当作 V3 运行`);
+  if (classicPath.endsWith("invoice_template.html") || classicPath.endsWith("packing_list_template.html")) {
+    assertFixedRightMetadataLayout(classicSource, classicPath);
+  }
 }
 
 const brokenV3 = api.parseReportDesignerV3FromHtml(
@@ -470,6 +627,16 @@ assert(featureHtml.includes("edm-v3-repeat-layer-header") && featureHtml.include
 assert(featureHtml.includes("edm-v3-layer-keep-together"), "保持整段属性必须生成 keep-together 类");
 assert(featureHtml.includes("edm-v3-flow-item-pagebreak"), "Flow 页面断点必须保留结构化输出");
 assert(featureHtml.includes("top: 291mm"), "贴底页脚必须把内容底边对齐到 A4 物理页底");
+assert(featureHtml.includes("edm-v3-line-horizontal") && featureHtml.includes("height: 1px"), "线元素输出必须保持与预览一致的细线厚度");
+assert(canvasSource.includes("data-v3-layer-name={layer.name}") && canvasSource.includes("report-designer-v3-preview-line-"), "V3 画布必须标识图层并使用独立细线预览");
+assert(canvasSource.includes("--v3-page-ratio") && canvasCss.includes("aspect-ratio: var(--v3-page-ratio"), "V3 画布必须按 A4 物理宽高比渲染横竖版页面");
+assert(canvasCss.includes("report-designer-v3-layer::before") && canvasCss.includes("report-designer-v3-preview-line-horizontal"), "V3 画布样式必须显示图层标识和细线方向");
+assert(panelsSource.includes('label="普通表格"') && panelsSource.includes("明细表（自动重复）") && !panelsSource.includes('label="票据格"'), "组件入口必须清楚区分普通表格和自动重复明细表");
+assert(gridPropertiesSource.includes("new-report-grid-cell-picker") && gridPropertiesSource.includes("向右合并") && gridPropertiesSource.includes("向下合并") && gridPropertiesSource.includes("快速版式"), "普通表格属性栏必须提供可视化选格、预设和直接合并操作");
+assert(layerResizersSource.includes('role="separator"') && layerResizersSource.includes("onPointerMove") && bandsCss.includes("report-designer-v3-band-resizer"), "页眉页脚设计带必须支持可访问的画布拖拽调整");
+assert(colorFieldSource.includes("type=\"color\"") && colorFieldSource.includes("常用颜色") && colorFieldSource.includes("高级色值"), "V3 颜色编辑必须提供色板、原生颜色选择器和可选高级色值");
+assert(colorFieldSource.includes("aria-invalid={invalid}") && colorFieldSource.includes("请输入有效的颜色值"), "非法颜色值不能写入 schema，且必须给出明确提示");
+assert(inspectorCss.includes("report-designer-v3-color-palette") && inspectorCss.includes("report-designer-v3-color-clear"), "V3 颜色控件样式必须集中在 inspector 样式模块");
 
 const staticHeaderFlowSchema = {
   ...featureSchema,
@@ -520,6 +687,13 @@ assert(api.validateReportDesignerV3Export(overlappingBodySchema, "ExportDocument
 
 const controlledImageSchema = {
   ...featureSchema,
+  resources: [{
+    id: `img-${"a".repeat(64)}.png`,
+    mediaType: "image/png",
+    byteLength: 68,
+    sha256: "a".repeat(64),
+    altText: "印章",
+  }],
   layers: featureSchema.layers.map((layer, index) => index === 0
     ? {
         ...layer,
@@ -528,7 +702,7 @@ const controlledImageSchema = {
           id: "controlled-image",
           type: "Image",
           sourceKind: "Resource",
-          resourceId: "seal-2024",
+          resourceId: `img-${"a".repeat(64)}.png`,
           altText: "印章",
           hideWhenSourceEmpty: false,
         }],
@@ -536,7 +710,7 @@ const controlledImageSchema = {
     : { ...layer, elements: [] }),
 };
 const controlledImageHtml = api.exportReportDesignerV3SchemaToHtml(controlledImageSchema, "ExportDocument");
-assert(controlledImageHtml.includes("受控资源：seal-2024"), "资源图片必须以受控 resourceId 占位输出");
+assert(controlledImageHtml.includes(`data-edm-v3-resource-id="img-${"a".repeat(64)}.png"`), "资源图片必须以受控 resourceId 标记输出");
 assert(!controlledImageHtml.includes("src=\"http") && !controlledImageHtml.includes("src=\"https"), "受控图片不得产生任意外部 URL");
 
 for (const unsafeFieldPath of ["Invoice.LogoUrl", "Customer.Logo", "http://evil.example/image.png", "https://evil.example/image.png", "ShowSeal"]) {

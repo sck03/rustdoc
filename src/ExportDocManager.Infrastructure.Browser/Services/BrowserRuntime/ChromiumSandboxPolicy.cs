@@ -47,5 +47,8 @@ namespace ExportDocManager.Services.BrowserRuntime
                    version.Build >= 0 &&
                    version.Build < Windows10Version2004Build;
         }
+
+        internal static bool RequiresLegacyWindowsCompatibilityMode() =>
+            RequiresLegacyWindowsCompatibilityMode(OperatingSystem.IsWindows(), Environment.OSVersion.Version);
     }
 }

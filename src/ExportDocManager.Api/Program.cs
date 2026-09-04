@@ -44,6 +44,10 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
     options.ValueCountLimit = 1000;
 });
 builder.Services.AddExportDocManagerApiServices(pathProvider, databaseSettings, runtimeOptions);
+if (!DatabaseModeHelper.UsesPostgreSql(databaseSettings))
+{
+    builder.Services.AddHostedService<SqliteDatabaseWarmupHostedService>();
+}
 
 await using var app = builder.Build();
 if (args.Any(value => string.Equals(value, "--verify-ocr-runtime", StringComparison.OrdinalIgnoreCase)))

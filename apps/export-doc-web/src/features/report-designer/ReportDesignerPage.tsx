@@ -1,4 +1,4 @@
-import type { ApiReportTemplateFieldCatalogResponse } from "../../api/index.ts";
+import type { ApiReportTemplateFieldCatalogResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { ReportDesignerV3Workspace } from "./ReportDesignerV3Workspace.tsx";
 import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
 
@@ -12,6 +12,7 @@ export function ReportDesignerPage(props: {
   displayName: string;
   content: string;
   fieldCatalog?: ApiReportTemplateFieldCatalogResponse | null;
+  client?: ExportDocManagerApiClient;
   onDesignerDraftContentChange?: (nextContent: string) => void;
 }) {
   return <ReportDesignerV3Workspace {...props} />;

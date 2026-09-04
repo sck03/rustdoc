@@ -854,6 +854,7 @@ export function ReportTemplateWorkspacePage({
         {workspaceMode === "design" ? (
           <div className="report-template-grid report-template-grid-design">
             <ReportTemplateDesignWorkspace
+              client={client}
               designerMode={designerMode}
               reportType={reportType}
               displayName={currentUserTemplate?.name ?? currentTemplate?.displayName ?? ""}

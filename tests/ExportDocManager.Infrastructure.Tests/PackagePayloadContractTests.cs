@@ -564,6 +564,7 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("$($currentIdentity):(OI)(CI)(M)", windowsInitializer, StringComparison.Ordinal);
         Assert.Contains("ReparsePoint", windowsInitializer, StringComparison.Ordinal);
         Assert.Contains("ReparsePoint", windowsStarter, StringComparison.Ordinal);
+        Assert.Contains("if ($_.Name -eq \"chrome-headless-shell.exe\") { 0 } else { 1 }", windowsStarter, StringComparison.Ordinal);
         Assert.Contains("Directory]::GetParent", windowsInitializer, StringComparison.Ordinal);
         Assert.Contains("Directory]::GetParent", windowsStarter, StringComparison.Ordinal);
         Assert.Contains("PSVersionTable.PSVersion.Major -lt 7", windowsSetupLauncher, StringComparison.Ordinal);
@@ -579,6 +580,8 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("assert_safe_directory_path", linuxStarter, StringComparison.Ordinal);
         Assert.Contains("contains_control_character", linuxStarter, StringComparison.Ordinal);
         Assert.Contains("RuntimeVerification", linuxStarter, StringComparison.Ordinal);
+        Assert.Contains("-name chrome-headless-shell -print", linuxStarter, StringComparison.Ordinal);
+        Assert.Contains("-name chrome -print", linuxStarter, StringComparison.Ordinal);
         Assert.Contains("version.json", linuxStarter, StringComparison.Ordinal);
         Assert.Contains("ocr-${PACKAGE_VERSION}-${RUNTIME_ARCH}.ok", linuxStarter, StringComparison.Ordinal);
     }

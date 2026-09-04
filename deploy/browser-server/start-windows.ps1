@@ -127,6 +127,7 @@ if ([string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_BOOTSTRAP_TOKEN) -or $env
 
 $browser = Get-ChildItem -LiteralPath (Join-Path $root "Browsers") -File -Recurse -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -in @("chrome-headless-shell.exe", "chrome.exe") } |
+    Sort-Object @{ Expression = { if ($_.Name -eq "chrome-headless-shell.exe") { 0 } else { 1 } } }, "FullName" |
     Select-Object -First 1
 if ($null -eq $browser) {
     throw "内置 Chrome Headless Shell 不存在。"

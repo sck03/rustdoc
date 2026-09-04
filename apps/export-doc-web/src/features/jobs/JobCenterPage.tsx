@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Play, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Play, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { type BackgroundJobSnapshot, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -17,7 +17,9 @@ import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 import { InvoiceReportZipJobPanel, PdfMergeJobPanel } from "./JobCreationPanels.tsx";
 import { JobTable } from "./JobTable.tsx";
 import {
+  commitJobCenterFilters,
   hasActiveJobs,
+  hasPendingJobCenterFilters,
   jobStatusOptions,
   readPathLines,
 } from "./jobPresentation.ts";
@@ -134,26 +136,25 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
     operations.setReportTemplatePath(nextPath);
     operations.setReportWithSeal(preferredTemplate?.withSealDefault ?? true);
   }, [configuredReportTemplatePath, operations, reportTemplatePath, reportTemplatesQuery.data, settingsQuery.isFetching]);
-
-  function handleSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function applyFilters(nextKeyword = keyword, nextStatus = status) {
+    const next = commitJobCenterFilters(nextKeyword, nextStatus);
     clearFocusedJob();
-    setCommittedKeyword(keyword.trim());
-    setPageNumber(1);
-    operations.clearFeedback();
+    setKeyword(next.keyword); setCommittedKeyword(next.committedKeyword);
+    setStatus(next.status); setPageNumber(next.pageNumber); operations.clearFeedback();
   }
-
-  function changeStatus(value: string) {
-    clearFocusedJob();
-    setStatus(value);
-    setPageNumber(1);
-    operations.clearFeedback();
+  function handleSearch(event: FormEvent<HTMLFormElement>) { event.preventDefault(); applyFilters(); }
+  function handleKeywordChange(value: string) { setKeyword(value); if (!value.trim()) applyFilters(value); }
+  function changeStatus(value: string) { applyFilters(keyword, value); }
+  function handleRefresh() {
+    const normalizedKeyword = keyword.trim();
+    const hasPendingFilters = hasPendingJobCenterFilters(keyword, committedKeyword, pageNumber);
+    applyFilters(normalizedKeyword);
+    if (!hasPendingFilters) void jobsQuery.refetch();
   }
 
   function handlePageSizeChange(nextPageSize: number) {
+    applyFilters();
     setPageSize(normalizeListPageSize(nextPageSize));
-    setPageNumber(1);
-    operations.clearFeedback();
   }
 
   function focusJob(jobId: string, nextMessage: string) {
@@ -245,16 +246,19 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
       <div className="toolbar">
         <form className="search-form" onSubmit={handleSearch}>
           <Search size={17} aria-hidden="true" />
-          <input aria-label="搜索任务" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="任务号、标题、输出文件、错误" />
+          <input aria-label="搜索任务" value={keyword} onChange={(event) => handleKeywordChange(event.target.value)} placeholder="任务号、标题、输出文件、错误" />
         </form>
         <div className="filter-bar"><FilterSelect label="状态" value={status} options={jobStatusOptions} onChange={changeStatus} /></div>
         <div className="toolbar-actions">
+          <button className="icon-button" type="button" title="清除搜索" aria-label="清除搜索" disabled={jobsQuery.isFetching || operations.isBusy || (!keyword && !committedKeyword && !focusedJobId)} onClick={() => applyFilters("")}>
+            <X size={18} aria-hidden="true" />
+          </button>
           {workspaceDeviceCapabilities.canUseBatchOperations ? (
             <button className="command-button secondary" type="button" title="清理已完成、失败、已取消的任务记录" disabled={!jobPermission.canManage || isActionBusy || jobs.length === 0} onClick={() => void operations.handleClearFinishedJobs()}>
               <Trash2 size={17} aria-hidden="true" /><span>清理已结束</span>
             </button>
           ) : null}
-          <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={jobsQuery.isFetching || operations.isBusy} onClick={() => void jobsQuery.refetch()}>
+          <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={jobsQuery.isFetching || operations.isBusy} onClick={handleRefresh}>
             <RefreshCw size={18} aria-hidden="true" />
           </button>
         </div>

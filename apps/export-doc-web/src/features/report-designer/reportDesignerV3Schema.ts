@@ -8,6 +8,12 @@ import { reportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
 export { reportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
 export type { ReportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
 export const REPORT_DESIGNER_V3_VERSION = 3 as const;
+/** Public, descriptive contract version; the schema version remains numeric for compact persisted HTML. */
+export const REPORT_DESIGNER_V3_CONTRACT_VERSION = "3.0" as const;
+export const REPORT_DESIGNER_V3_AST_KIND = "ReportDocument" as const;
+export const REPORT_DESIGNER_V3_COORDINATE_UNIT = "hundredth-mm" as const;
+export const REPORT_DESIGNER_V3_FLOW_TYPES = ["Row", "Grid", "Conditional", "DetailTable", "PageBreak"] as const;
+export const REPORT_DESIGNER_V3_RELEASE_STATES = ["Draft", "Published", "Archived"] as const;
 export const HUNDREDTH_MM_PER_MM = 100;
 export const REPORT_DESIGNER_V3_MAX_LAYER_COUNT = 16;
 export const REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER = 1000;
@@ -23,10 +29,17 @@ export const A4_PORTRAIT_SIZE_HUNDREDTH_MM = Object.freeze({ width: 21000, heigh
 export const A4_LANDSCAPE_SIZE_HUNDREDTH_MM = Object.freeze({ width: 29700, height: 21000 });
 export type ReportDesignerV3Schema = {
   version: typeof REPORT_DESIGNER_V3_VERSION;
+  /** Explicit AST discriminator and coordinate unit keep persisted V3 self-describing. */
+  astKind?: typeof REPORT_DESIGNER_V3_AST_KIND;
+  coordinateUnit?: typeof REPORT_DESIGNER_V3_COORDINATE_UNIT;
   reportType: ReportDesignerReportType;
   page: ReportDesignerV3Page;
   layers: ReportDesignerV3Layer[];
   grid: ReportDesignerV3GridSettings;
+  /** Optional on older V3 documents; normalized documents always emit it. */
+  contractVersion?: typeof REPORT_DESIGNER_V3_CONTRACT_VERSION;
+  resources?: ReportDesignerV3ImageResource[];
+  release?: ReportDesignerV3Release;
   metadata?: {
     migratedFromVersion?: number;
     migratedAt?: string;
@@ -50,6 +63,7 @@ export type ReportDesignerV3Layer = {
   id: string;
   name: string;
   role: ReportDesignerV3LayerRole;
+  designHeightHundredthMm?: number;
   print: ReportDesignerV3LayerPrintSettings;
   visible: boolean;
   locked: boolean;
@@ -108,10 +122,18 @@ export type ReportDesignerV3FieldElement = ReportDesignerV3ElementBase & {
 export type ReportDesignerV3ImageElement = ReportDesignerV3ElementBase & {
   type: "Image";
   sourceKind: "Field" | "Resource";
+  /** Stamp is still an image binding, not a second resource/runtime. */
+  purpose?: "Image" | "Stamp";
   fieldPath?: string;
   resourceId?: string;
   altText?: string;
   hideWhenSourceEmpty: boolean;
+};
+export type ReportDesignerV3PageNumberElement = ReportDesignerV3ElementBase & {
+  type: "PageNumber";
+  format: "Current" | "CurrentOfTotal";
+  prefix?: string;
+  suffix?: string;
 };
 export type ReportDesignerV3RectangleElement = ReportDesignerV3ElementBase & {
   type: "Rectangle";
@@ -137,11 +159,24 @@ export type ReportDesignerV3Element =
   | ReportDesignerV3TextElement
   | ReportDesignerV3FieldElement
   | ReportDesignerV3ImageElement
+  | ReportDesignerV3PageNumberElement
   | ReportDesignerV3RectangleElement
   | ReportDesignerV3LineElement
   | ReportDesignerV3FlowElement;
 
 export type ReportDesignerV3ElementType = ReportDesignerV3Element["type"];
+export type ReportDesignerV3ImageResource = {
+  id: string;
+  mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+  byteLength?: number;
+  sha256?: string;
+  altText?: string;
+};
+export type ReportDesignerV3Release = {
+  state: (typeof REPORT_DESIGNER_V3_RELEASE_STATES)[number];
+  revision: number;
+  publishedAt?: string;
+};
 export function hundredthMmToMm(value: number) {
   return value / HUNDREDTH_MM_PER_MM;
 }
@@ -156,12 +191,14 @@ export function reportDesignerV3ElementText(element: ReportDesignerV3Element) {
       return element.label ? `${element.label}: {{ ${element.fieldPath} }}` : `{{ ${element.fieldPath} }}`;
     case "Image":
       return element.sourceKind === "Field" ? `图片字段 ${element.fieldPath ?? ""}` : `资源 ${element.resourceId ?? "未上传"}`;
+    case "PageNumber":
+      return element.format === "CurrentOfTotal" ? "页码/总页数" : "当前页码";
     case "Rectangle":
       return "矩形";
     case "Line":
       return element.direction === "Horizontal" ? "水平线" : "垂直线";
     case "Flow":
-      return element.flowKind === "DetailTable" ? "明细表" : element.flowKind === "Grid" ? "票据格" : `${element.flowKind} 流式组件`;
+      return element.flowKind === "DetailTable" ? "明细表（自动重复）" : element.flowKind === "Grid" ? "普通表格" : `${element.flowKind} 流式组件`;
   }
 }
 export function reportDesignerV3PageSize(page: ReportDesignerV3Page) {

@@ -17,6 +17,7 @@ type CommitOptions = {
 // count alone can still reserve too much memory after repeated bulk edits.
 export const REPORT_DESIGNER_V3_HISTORY_MAX_ENTRIES = 40;
 export const REPORT_DESIGNER_V3_HISTORY_MAX_ESTIMATED_BYTES = 12 * 1024 * 1024;
+const stateSizeCache = new WeakMap<object, number>();
 
 export function useReportDesignerV3History(initialSchema: ReportDesignerV3Schema) {
   const initialState = useMemo(() => createReportDesignerV3DocumentState(initialSchema), [initialSchema]);
@@ -46,11 +47,13 @@ export function useReportDesignerV3History(initialSchema: ReportDesignerV3Schema
     commitFrom(base: ReportDesignerV3DocumentState, next: ReportDesignerV3DocumentState) {
       if (next.schema === base.schema) return;
       lastCoalescedCommitAt.current = 0;
-      setHistory((current) => trimHistory({
-        past: [...current.past, base],
-        present: next,
-        future: [],
-      }));
+      setHistory((current) => {
+        // A delayed pointer-up must never append a snapshot based on a stale
+        // render.  The current present is the only authoritative base; if it
+        // changed during the gesture, discard that terminal commit safely.
+        if (current.present.schema !== base.schema) return current;
+        return trimHistory({ past: [...current.past, base], present: next, future: [] });
+      });
     },
     preview(next: ReportDesignerV3DocumentState) {
       setHistory((current) => ({ ...current, present: next }));
@@ -125,8 +128,12 @@ function estimateHistoryBytes(
 function estimateStateBytes(state: ReportDesignerV3DocumentState) {
   // This guard runs only at commit/undo boundaries, never while the pointer
   // moves, so an accurate-enough estimate cannot slow canvas dragging.
+  const cached = stateSizeCache.get(state.schema);
+  if (cached !== undefined) return cached;
   try {
-    return JSON.stringify(state.schema).length * 2;
+    const bytes = JSON.stringify(state.schema).length * 2;
+    stateSizeCache.set(state.schema, bytes);
+    return bytes;
   } catch {
     return REPORT_DESIGNER_V3_HISTORY_MAX_ESTIMATED_BYTES;
   }

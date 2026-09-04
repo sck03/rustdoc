@@ -233,26 +233,7 @@ internal static class ReportTemplateContentPolicy
         try
         {
             using JsonDocument document = JsonDocument.Parse(match.Groups["json"].Value);
-            JsonElement root = document.RootElement;
-            if (!root.TryGetProperty("version", out JsonElement version) || version.GetInt32() != 3)
-            {
-                throw new ArgumentException("报表模板只接受 version=3 的 V3 设计结构。", nameof(source));
-            }
-
-            if (!root.TryGetProperty("reportType", out JsonElement embeddedType) ||
-                !Enum.TryParse(embeddedType.GetString(), ignoreCase: true, out ReportDocumentType parsedType) ||
-                parsedType != reportType)
-            {
-                throw new ArgumentException(
-                    $"报表模板 V3 数据域与当前业务域不一致。当前要求 {reportType}。",
-                    nameof(source));
-            }
-
-            if (!root.TryGetProperty("page", out JsonElement page) ||
-                !string.Equals(page.TryGetProperty("size", out JsonElement size) ? size.GetString() : null, "A4", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new ArgumentException("报表模板 V3 页面必须固定为 A4。", nameof(source));
-            }
+            ReportTemplateV3SchemaValidator.Validate(reportType, document.RootElement);
         }
         catch (JsonException ex)
         {

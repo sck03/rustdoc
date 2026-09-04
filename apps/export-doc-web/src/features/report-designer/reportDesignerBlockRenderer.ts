@@ -18,7 +18,14 @@ export function renderReportDesignerBlockToHtml(block: ReportBlock) {
  * representative set of rows for visual editing and never gets persisted.
  */
 export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock) {
-  let html = renderBlock(block);
+  // The editor preview shows one representative content value.  Do not carry
+  // a conditional field's export fallback into this data-free rendering: the
+  // control tags are intentionally removed below, so doing so would display
+  // both the field token and the fallback at once.
+  const previewBlock = block.type === "Conditional" && block.content.kind === "Field"
+    ? { ...block, content: { ...block.content, fallbackText: undefined } }
+    : block;
+  let html = renderBlock(previewBlock);
   html = expandPreviewLoops(html);
   html = html.replace(/\{\{\s*(?:if|else|end|capture|assign|while|case|when)[\s\S]*?\}\}/gi, "");
   html = html.replace(/\{\{\s*\$?[A-Za-z_][A-Za-z0-9_]*\s*=\s*[\s\S]*?\}\}/g, "");
@@ -190,7 +197,7 @@ function renderConditionalBlock(block: Extract<ReportBlock, { type: "Conditional
   }
 
   const content = block.content.kind === "Field"
-    ? `${block.content.label ? `${escapeHtml(block.content.label)}: ` : ""}<span>${renderFieldExpression(block.content.fieldPath)}</span>`
+    ? `${block.content.label ? `${escapeHtml(block.content.label)}: ` : ""}<span>${renderFieldExpression(block.content.fieldPath, block.content.fallbackText)}</span>`
     : escapeHtml(block.content.text);
 
   return `{{ if ${condition} }}<div class="edm-conditional-block" style="${renderBoxStyle(block.style, block.border)}">${content}</div>{{ end }}`;
@@ -592,9 +599,11 @@ function renderDetailItemValueReference(fieldPath: string) {
   return isReportDesignerFieldPath(itemField) ? `item.${itemField}` : "";
 }
 
-function renderFieldExpression(fieldPath: string) {
+function renderFieldExpression(fieldPath: string, fallbackText?: string) {
   const normalized = fieldPath.trim();
-  return isReportDesignerFieldPath(normalized) ? `{{ ${normalized} }}` : "";
+  if (!isReportDesignerFieldPath(normalized)) return escapeHtml(fallbackText ?? "");
+  const expression = `{{ ${normalized} }}`;
+  return fallbackText ? `{{ if ${normalized} }}${expression}{{ else }}${escapeHtml(fallbackText)}{{ end }}` : expression;
 }
 
 function renderTextStyle(style: ReportTextStyle) {

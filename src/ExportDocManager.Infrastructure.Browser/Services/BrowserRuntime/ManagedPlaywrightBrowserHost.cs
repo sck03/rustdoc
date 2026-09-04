@@ -327,6 +327,7 @@ namespace ExportDocManager.Services.BrowserRuntime
                     RedirectStandardError = true,
                     RedirectStandardOutput = true,
                     CreateNoWindow = true,
+                    ErrorDialog = false,
                     WorkingDirectory = Path.GetDirectoryName(executable)!
                 },
                 EnableRaisingEvents = true
@@ -347,7 +348,7 @@ namespace ExportDocManager.Services.BrowserRuntime
             };
             process.Exited += (_, _) => endpointSource.TrySetException(
                 new InfrastructureServiceException("受控 Chromium 在建立连接前退出。"));
-            if (!process.Start()) throw new InfrastructureServiceException("无法启动受控 Chromium 进程。");
+            if (!ChromiumProcessLauncher.Start(process)) throw new InfrastructureServiceException("无法启动受控 Chromium 进程。");
             _process = process;
             _registration = _runtime.RegisterOwnedProcess(process, workload, "Managed Chromium browser");
             // Register ownership before starting asynchronous pipe readers. If
@@ -474,6 +475,12 @@ namespace ExportDocManager.Services.BrowserRuntime
             if (disableSandbox)
             {
                 arguments.Insert(1, "--no-sandbox");
+            }
+            if (ChromiumSandboxPolicy.RequiresLegacyWindowsCompatibilityMode())
+            {
+                // Chromium's GPU child can fail to load on Windows 10 1809 and
+                // surface a misleading VERSION.dll dialog even with --disable-gpu.
+                arguments.Insert(1, "--in-process-gpu");
             }
             if (disableDevShmUsage)
             {

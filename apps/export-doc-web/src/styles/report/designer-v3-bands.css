@@ -1,0 +1,69 @@
+.report-designer-v3-layer-header::after { top: 0; height: var(--v3-header-band-height); }
+.report-designer-v3-layer-body::after { top: var(--v3-header-band-height); height: calc(100% - var(--v3-header-band-height) - var(--v3-footer-band-height)); }
+.report-designer-v3-layer-footer::after { top: calc(100% - var(--v3-footer-band-height)); height: var(--v3-footer-band-height); }
+.report-designer-v3-layer-overlay::after { top: 0; height: 100%; }
+
+.report-designer-v3-layer-design-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 6px;
+}
+
+.report-designer-v3-layer-design-fields small,
+.report-designer-v3-layer-design-status {
+  color: var(--edm-neutral-550);
+  font-size: .625rem;
+  line-height: 1.35;
+}
+
+.report-designer-v3-layer-design-status {
+  padding: 4px 5px;
+  background: var(--edm-white);
+  border: 1px solid var(--edm-neutral-200);
+  border-radius: 4px;
+}
+
+.report-designer-v3-band-resizer {
+  position: absolute;
+  left: 0;
+  z-index: 100010;
+  width: 100%;
+  height: 9px;
+  transform: translateY(-50%);
+  cursor: row-resize;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.report-designer-v3-band-resizer::before {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  content: "";
+  background: color-mix(in srgb, var(--edm-primary-650) 70%, transparent);
+}
+
+.report-designer-v3-band-resizer span {
+  position: absolute;
+  top: 50%;
+  right: 5mm;
+  min-width: 18mm;
+  padding: 2px 5px;
+  transform: translateY(-50%);
+  color: var(--edm-primary-900);
+  background: var(--edm-white);
+  border: 1px solid var(--edm-primary-400);
+  border-radius: 4px;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.report-designer-v3-band-resizer:focus-visible span { outline: 2px solid var(--edm-primary-500); outline-offset: 2px; }
+.report-designer-v3-band-resizer-header { top: var(--v3-header-band-height); }
+.report-designer-v3-band-resizer-footer { top: calc(100% - var(--v3-footer-band-height)); }
+.report-designer-v3-page.is-read-only .report-designer-v3-band-resizer { pointer-events: none; }

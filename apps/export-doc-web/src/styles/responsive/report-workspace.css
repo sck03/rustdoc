@@ -24,11 +24,6 @@
     grid-column: auto;
     grid-row: auto;
   }
-
-  .template-package-panel {
-    grid-column: 1 / -1;
-    grid-row: auto;
-  }
 }
 
 @container report-workspace (max-width: 820px) {
@@ -124,7 +119,8 @@
   .template-selection-panel,
   .template-user-panel,
   .template-admin-panel,
-  .template-package-panel {
+  .template-package-panel,
+  .template-file-panel {
     grid-column: 1;
     grid-row: auto;
   }

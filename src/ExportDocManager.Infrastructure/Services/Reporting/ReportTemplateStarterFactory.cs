@@ -75,6 +75,9 @@ internal static class ReportTemplateStarterFactory
         string schema = JsonSerializer.Serialize(new
         {
             version = 3,
+            astKind = "ReportDocument",
+            coordinateUnit = "hundredth-mm",
+            contractVersion = "3.0",
             reportType = reportType.ToString(),
             page = new
             {
@@ -162,6 +165,7 @@ __SCHEMA__
             id,
             name,
             role,
+            designHeightHundredthMm = role == "Header" ? Math.Max(1800, minHeightHundredthMm) : role == "Footer" ? Math.Max(1400, minHeightHundredthMm) : 0,
             print = new { repeatOnEveryPage, keepTogether, pinToPageBottom, minHeightHundredthMm },
             visible = true,
             locked = false,

@@ -127,7 +127,8 @@
 .report-export-defaults-panel { grid-column: 1 / -1; }
 .template-user-panel,
 .template-admin-panel { grid-column: auto; }
-.template-package-panel { grid-column: 1 / -1; }
+.template-package-panel,
+.template-file-panel { grid-column: auto; }
 
 .template-default-selection {
   display: grid;

@@ -164,7 +164,11 @@ assertMatch(
   "模板管理工作区应使用清晰的双栏布局",
 );
 assertMatch(reportWorkspaceCss, /\.template-selection-panel\s*\{\s*grid-column:\s*1\s*\/\s*-1;/, "选择区应独占管理页首行");
-assertMatch(reportWorkspaceCss, /\.template-package-panel\s*\{\s*grid-column:\s*1\s*\/\s*-1;/, "模板包应独占管理页整行");
+assertMatch(
+  reportWorkspaceCss,
+  /\.template-package-panel\s*,\s*\.template-file-panel\s*\{\s*grid-column:\s*auto;/,
+  "模板包和单个模板文件应在管理网格中并排显示",
+);
 assertMatch(
   reportWorkspaceCss,
   /\.report-export-default-item\s*\{[\s\S]*?grid-template-columns:\s*auto\s+minmax\(130px,\s*0\.8fr\)\s+minmax\(220px,\s*1\.5fr\)/,
@@ -187,8 +191,8 @@ assertMatch(
 );
 assertMatch(
   responsiveOverridesCss,
-  /@container\s+report-workspace\s*\(max-width:\s*1160px\)[\s\S]*?\.template-package-panel\s*\{[\s\S]*?grid-column:\s*1\s*\/\s*-1;[\s\S]*?grid-row:\s*auto;/,
-  "工作区实际变窄时模板包应独占整行，避免操作区拥挤",
+  /@container\s+report-workspace\s*\(max-width:\s*820px\)[\s\S]*?\.template-package-panel\s*,\s*\.template-file-panel\s*\{[\s\S]*?grid-column:\s*1;/,
+  "工作区实际变窄时模板包和单个模板文件应堆叠",
 );
 assertMatch(
   responsiveOverridesCss,

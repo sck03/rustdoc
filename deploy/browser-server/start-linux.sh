@@ -136,7 +136,10 @@ if [ -z "${EXPORTDOCMANAGER_BOOTSTRAP_TOKEN:-}" ] || [ "${#EXPORTDOCMANAGER_BOOT
   exit 1
 fi
 
-BROWSER=$(find "$ROOT/Browsers" -type f \( -name chrome-headless-shell -o -name chrome \) -print -quit 2>/dev/null || true)
+BROWSER=$(find "$ROOT/Browsers" -type f -name chrome-headless-shell -print 2>/dev/null | LC_ALL=C sort | head -n 1 || true)
+if [ -z "$BROWSER" ]; then
+  BROWSER=$(find "$ROOT/Browsers" -type f -name chrome -print 2>/dev/null | LC_ALL=C sort | head -n 1 || true)
+fi
 if [ -z "$BROWSER" ]; then
   echo "内置 Chrome Headless Shell / Chromium ARM64 不存在。" >&2
   exit 1

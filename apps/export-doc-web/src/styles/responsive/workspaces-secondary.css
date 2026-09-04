@@ -196,7 +196,8 @@
   }
 
   .template-actions-panel,
-  .template-package-panel {
+  .template-package-panel,
+  .template-file-panel {
     grid-column: auto;
   }
 

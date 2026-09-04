@@ -81,3 +81,116 @@
   font-size: 0.6875rem;
   line-height: 1.45;
 }
+
+.report-designer-v3-color-field,
+.report-designer-v3-color-advanced {
+  display: grid;
+  gap: 5px;
+}
+
+.report-designer-v3-color-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.report-designer-v3-color-palette button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--edm-neutral-350);
+  border-radius: 4px;
+}
+
+.report-designer-v3-color-advanced {
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+}
+
+.report-designer-v3-color-clear {
+  padding: 3px 6px;
+}
+
+.report-designer-v3-image-editor {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--edm-neutral-200);
+}
+
+.report-designer-v3-resource-picker {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  background: var(--edm-neutral-50);
+  border: 1px solid var(--edm-neutral-250);
+  border-radius: 6px;
+}
+
+.report-designer-v3-upload-button {
+  justify-content: center;
+  width: 100%;
+}
+
+.report-designer-v3-resource-help,
+.report-designer-v3-resource-id {
+  color: var(--edm-neutral-550);
+  font-size: 0.6875rem;
+  line-height: 1.45;
+}
+
+.report-designer-v3-resource-id {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding-top: 5px;
+  border-top: 1px solid var(--edm-neutral-200);
+}
+
+.report-designer-v3-resource-id code {
+  overflow-wrap: anywhere;
+  color: var(--edm-neutral-750);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.625rem;
+}
+
+.report-designer-v3-upload-feedback {
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+}
+
+.report-designer-v3-upload-feedback.is-success {
+  color: var(--edm-success-800);
+  background: var(--edm-success-50);
+  border: 1px solid var(--edm-success-200);
+}
+
+.report-designer-v3-upload-feedback.is-error {
+  color: var(--edm-danger-800);
+  background: var(--edm-danger-50);
+  border: 1px solid var(--edm-danger-200);
+}
+
+.report-designer-v3-multi-section {
+  display: grid;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--edm-neutral-200);
+}
+
+.report-designer-v3-multi-section strong {
+  color: var(--edm-neutral-700);
+  font-size: 0.75rem;
+}
+
+.report-designer-v3-element-actions button.is-danger {
+  color: var(--edm-danger-600);
+}
+
+.report-designer-v3-element-actions button.is-danger:hover:not(:disabled) {
+  color: var(--edm-danger-800);
+  background: var(--edm-danger-50);
+  border-color: var(--edm-danger-300);
+}

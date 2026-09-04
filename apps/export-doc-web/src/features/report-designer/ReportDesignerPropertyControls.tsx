@@ -1,4 +1,4 @@
-import { type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useId } from "react";
+import { type ChangeEvent as ReactChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useEffect, useId, useState } from "react";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import type { ReportBorderStyle, ReportTextStyle } from "./reportDesignerSchema.ts";
 import { normalizeDesignerFieldPath } from "./reportDesignerMutations.ts";
@@ -11,39 +11,110 @@ import {
   roundDesignerWidth,
 } from "./reportDesignerPropertiesModel.ts";
 
+export type SelectOption = { value: string; label: string };
+
+/** Keep a damaged/removed persisted value visible until the user repairs it. */
+export function ensureCurrentSelectOption(options: SelectOption[], value: string): SelectOption[] {
+  if (!value || options.some((option) => option.value === value)) {
+    return options;
+  }
+
+  return [{ value, label: `当前值：${value}（需修正）` }, ...options];
+}
+
 export function FieldPathInput({
   label,
   value,
   fieldGroups,
   className,
+  selectOnly = false,
   onChange,
 }: {
   label: string;
   value: string;
   fieldGroups: ReportDesignerFieldGroup[];
   className?: string;
+  selectOnly?: boolean;
   onChange: (fieldPath: string) => void;
 }) {
   const listId = useId();
   const fields = fieldGroups.flatMap((group) => group.fields.map((field) => ({ ...field, category: group.category })));
+  const hasKnownValue = fields.some((field) => field.value === value);
 
   return (
     <label className={className}>
       <span>{label}</span>
-      <input
-        value={value}
-        list={listId}
-        onChange={(event) => onChange(normalizeDesignerFieldPath(event.target.value))}
-      />
-      <datalist id={listId}>
-        {fields.map((field) => (
-          <option key={`${field.category}-${field.value}`} value={field.value}>
-            {field.category} / {field.label}
-          </option>
-        ))}
-      </datalist>
+      {selectOnly ? (
+        <select
+          aria-invalid={value !== "" && !hasKnownValue ? true : undefined}
+          value={value}
+          onChange={(event) => onChange(normalizeDesignerFieldPath(event.target.value))}
+        >
+          <option value="">请选择字段</option>
+          {value && !hasKnownValue ? <option value={value}>当前值：{value}（需修正）</option> : null}
+          {fieldGroups.map((group) => (
+            <optgroup key={group.category} label={group.category}>
+              {group.fields.map((field) => (
+                <option key={`${group.category}-${field.value}`} value={field.value}>{field.label}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      ) : (
+        <>
+          <input
+            value={value}
+            list={listId}
+            onChange={(event) => onChange(normalizeDesignerFieldPath(event.target.value))}
+          />
+          <datalist id={listId}>
+            {fields.map((field) => (
+              <option key={`${field.category}-${field.value}`} value={field.value}>
+                {field.category} / {field.label}
+              </option>
+            ))}
+          </datalist>
+        </>
+      )}
     </label>
   );
+}
+
+/** Commit text after the user finishes editing so one field is one undo step. */
+export function CommitTextField({
+  value,
+  onCommit,
+  disabled = false,
+  multiline = false,
+  placeholder,
+  rows = 3,
+}: {
+  value: string;
+  onCommit: (value: string) => void;
+  disabled?: boolean;
+  multiline?: boolean;
+  placeholder?: string;
+  rows?: number;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  function commit() {
+    if (draft !== value) onCommit(draft);
+  }
+  const onChange = (event: ReactChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setDraft(event.target.value);
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setDraft(value);
+      event.currentTarget.blur();
+    } else if (event.key === "Enter" && (!multiline || event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      event.currentTarget.blur();
+    }
+  };
+  return multiline
+    ? <textarea disabled={disabled} placeholder={placeholder} rows={rows} value={draft} onChange={onChange} onBlur={commit} onKeyDown={onKeyDown} />
+    : <input type="text" disabled={disabled} placeholder={placeholder} value={draft} onChange={onChange} onBlur={commit} onKeyDown={onKeyDown} />;
 }
 
 export function ColumnWidthStrip({

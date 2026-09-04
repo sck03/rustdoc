@@ -1,4 +1,5 @@
 using ExportDocManager.Services.MasterData;
+using ExportDocManager.Services.Reporting;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -9,6 +10,7 @@ namespace ExportDocManager.Api.Hosting
         public const long SupplierImportBytes = 10L * 1024L * 1024L;
         public const long LetterOfCreditBytes = 25L * 1024L * 1024L;
         public const long ExporterSealImageBytes = ExporterSealFilePolicy.MaximumBytes;
+        public const long ReportTemplateImageResourceBytes = ReportTemplateV3ContractCatalog.MaxResourceBytes;
         public const long ExcelImportBytes = 25L * 1024L * 1024L;
         public const long PackageImportBytes = 50L * 1024L * 1024L;
         public const long HsCodeKnowledgePackageBytes = HsCodeKnowledgePackagePolicy.MaximumPackageBytes;

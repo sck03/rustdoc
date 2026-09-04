@@ -499,4 +499,35 @@ namespace ExportDocManager.Api.Hosting
 
         public IReadOnlyList<ApiReportTemplateFieldDto> Fields { get; }
     }
+
+    public sealed class ApiReportTemplateImageResourceResponse
+    {
+        public ApiReportTemplateImageResourceResponse(
+            string id,
+            string mediaType,
+            long byteLength,
+            string sha256,
+            string altText,
+            string storagePolicy)
+        {
+            Id = id ?? string.Empty;
+            MediaType = mediaType ?? string.Empty;
+            ByteLength = byteLength;
+            Sha256 = sha256 ?? string.Empty;
+            AltText = altText ?? string.Empty;
+            StoragePolicy = storagePolicy ?? string.Empty;
+        }
+
+        public string Id { get; }
+
+        public string MediaType { get; }
+
+        public long ByteLength { get; }
+
+        public string Sha256 { get; }
+
+        public string AltText { get; }
+
+        public string StoragePolicy { get; }
+    }
 }

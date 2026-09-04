@@ -1,7 +1,6 @@
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
-import { normalizeDesignerFieldPath } from "./reportDesignerMutations.ts";
 import type { ReportBlock, ReportConditionalContent, ReportConditionalRule } from "./reportDesignerSchema.ts";
-import { FieldPathInput } from "./ReportDesignerPropertyControls.tsx";
+import { CommitTextField, FieldPathInput } from "./ReportDesignerPropertyControls.tsx";
 import { normalizeConditionalContentKind, normalizeConditionalOperator } from "./reportDesignerPropertiesModel.ts";
 
 export function ConditionalBlockProperties({
@@ -45,6 +44,7 @@ export function ConditionalBlockProperties({
             label="条件字段"
             value={block.condition.fieldPath}
             fieldGroups={fieldGroups}
+            selectOnly
             onChange={(fieldPath) => updateCondition({ fieldPath })}
           />
           <label>
@@ -61,7 +61,7 @@ export function ConditionalBlockProperties({
           {block.condition.operator === "Equals" || block.condition.operator === "NotEquals" ? (
             <label>
               <span>比较值</span>
-              <input value={block.condition.value} onChange={(event) => updateCondition({ value: event.target.value })} />
+              <CommitTextField value={block.condition.value} onCommit={(value) => updateCondition({ value })} />
             </label>
           ) : null}
         </div>
@@ -85,24 +85,25 @@ export function ConditionalBlockProperties({
             <>
               <label>
                 <span>标签</span>
-                <input value={block.content.label ?? ""} onChange={(event) => updateContent({ label: event.target.value })} />
+                <CommitTextField value={block.content.label ?? ""} onCommit={(label) => updateContent({ label })} />
               </label>
               <FieldPathInput
                 className="new-report-property-wide"
                 label="字段"
                 value={block.content.fieldPath}
                 fieldGroups={fieldGroups}
+                selectOnly
                 onChange={(fieldPath) => updateContent({ fieldPath })}
               />
               <label className="new-report-property-wide">
                 <span>占位文本</span>
-                <input value={block.content.fallbackText ?? ""} onChange={(event) => updateContent({ fallbackText: event.target.value })} />
+                <CommitTextField value={block.content.fallbackText ?? ""} onCommit={(fallbackText) => updateContent({ fallbackText })} />
               </label>
             </>
           ) : (
             <label className="new-report-property-wide">
               <span>固定内容</span>
-              <textarea rows={4} value={block.content.text} onChange={(event) => updateContent({ text: event.target.value })} />
+              <CommitTextField value={block.content.text} multiline rows={4} onCommit={(text) => updateContent({ text })} />
             </label>
           )}
         </div>
@@ -110,4 +111,3 @@ export function ConditionalBlockProperties({
     </div>
   );
 }
-

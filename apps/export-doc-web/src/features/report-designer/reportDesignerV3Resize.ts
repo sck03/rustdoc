@@ -24,10 +24,35 @@ export function resizeV3Element(
   const located = findElement(state.schema, elementId);
   if (!located || located.element.locked || located.layer.locked) return state;
 
+  const geometry = resolveV3ResizeGeometry(located.element, direction, deltaX, deltaY, state.schema.page);
+  const resized = clampReportDesignerV3ElementToPage({
+    ...located.element,
+    ...geometry,
+  }, state.schema.page);
+  if (sameGeometry(located.element, resized)) return state;
+  return {
+    ...state,
+    schema: {
+      ...state.schema,
+      layers: state.schema.layers.map((layer) => layer.id === located.layer.id
+        ? { ...layer, elements: layer.elements.map((element) => element.id === elementId ? resized : element) }
+        : layer),
+    },
+  };
+}
+
+/** Resolve a single element's resize geometry without cloning a document. */
+export function resolveV3ResizeGeometry(
+  element: ReportDesignerV3Element,
+  direction: ReportDesignerV3ResizeDirection,
+  deltaX: number,
+  deltaY: number,
+  page: ReportDesignerV3Schema["page"],
+) {
   const minimum = REPORT_DESIGNER_V3_MIN_ELEMENT_SIZE_HUNDREDTH_MM;
-  const width = Math.max(minimum, finiteOr(located.element.widthHundredthMm, minimum));
-  const height = Math.max(minimum, finiteOr(located.element.heightHundredthMm, minimum));
-  const angle = finiteOr(located.element.rotationDeg, 0) * Math.PI / 180;
+  const width = Math.max(minimum, finiteOr(element.widthHundredthMm, minimum));
+  const height = Math.max(minimum, finiteOr(element.heightHundredthMm, minimum));
+  const angle = finiteOr(element.rotationDeg, 0) * Math.PI / 180;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
   const pageDeltaX = finiteOr(deltaX, 0);
@@ -56,28 +81,17 @@ export function resizeV3Element(
   const nextHeight = Math.max(minimum, bottom - top);
   const localCenterShiftX = (left + right - width) / 2;
   const localCenterShiftY = (top + bottom - height) / 2;
-  const oldCenterX = finiteOr(located.element.xHundredthMm, 0) + width / 2;
-  const oldCenterY = finiteOr(located.element.yHundredthMm, 0) + height / 2;
+  const oldCenterX = finiteOr(element.xHundredthMm, 0) + width / 2;
+  const oldCenterY = finiteOr(element.yHundredthMm, 0) + height / 2;
   const nextCenterX = oldCenterX + cos * localCenterShiftX - sin * localCenterShiftY;
   const nextCenterY = oldCenterY + sin * localCenterShiftX + cos * localCenterShiftY;
-  const resized = clampReportDesignerV3ElementToPage({
-    ...located.element,
+  return clampReportDesignerV3ElementToPage({
+    ...element,
     xHundredthMm: Math.round(nextCenterX - nextWidth / 2),
     yHundredthMm: Math.round(nextCenterY - nextHeight / 2),
     widthHundredthMm: Math.round(nextWidth),
     heightHundredthMm: Math.round(nextHeight),
-  }, state.schema.page);
-
-  if (sameGeometry(located.element, resized)) return state;
-  return {
-    ...state,
-    schema: {
-      ...state.schema,
-      layers: state.schema.layers.map((layer) => layer.id === located.layer.id
-        ? { ...layer, elements: layer.elements.map((element) => element.id === elementId ? resized : element) }
-        : layer),
-    },
-  };
+  }, page);
 }
 
 function findElement(schema: ReportDesignerV3Schema, elementId: string) {

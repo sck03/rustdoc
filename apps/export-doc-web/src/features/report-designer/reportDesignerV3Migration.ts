@@ -124,6 +124,7 @@ export function migrateReportDesignerSchemaV2ToV3(
       id: createUniqueId("layer-overlay", usedLayerIds),
       name: "覆盖层",
       role: "Overlay",
+      designHeightHundredthMm: 0,
       print: {
         repeatOnEveryPage: false,
         keepTogether: false,
@@ -234,6 +235,7 @@ function migrateSection(
     id: createUniqueId(`layer-${section.id}`, usedLayerIds),
     name: section.type === "Header" ? "页眉" : section.type === "Footer" ? "页脚" : "主体",
     role: section.type,
+    designHeightHundredthMm: section.type === "Header" ? Math.max(1800, cursorY - originY) : section.type === "Footer" ? Math.max(1400, cursorY - originY) : 0,
     print: {
       repeatOnEveryPage: section.type === "Body" ? false : section.print.repeatOnEveryPage,
       keepTogether: section.print.keepTogether,
