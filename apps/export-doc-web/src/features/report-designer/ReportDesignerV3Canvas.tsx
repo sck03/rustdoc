@@ -3,9 +3,12 @@ import type {
   ReportDesignerV3DocumentState,
   ReportDesignerV3ResizeDirection,
 } from "./reportDesignerV3Mutations.ts";
-import { resolveV3MoveDelta } from "./reportDesignerV3Mutations.ts";
+import {
+  createV3MoveConstraint,
+  resolveV3MoveDeltaFromConstraint,
+  type ReportDesignerV3MoveConstraint,
+} from "./reportDesignerGeometry.ts";
 import { resolveV3ResizeGeometry } from "./reportDesignerV3Resize.ts";
-import { renderReportDesignerBlockPreviewToHtml } from "./reportDesignerBlockRenderer.ts";
 import {
   hundredthMmToMm,
   reportDesignerV3ElementText,
@@ -16,6 +19,17 @@ import {
 import { fitReportDesignerV3Zoom } from "./reportDesignerV3WorkspaceHelpers.tsx";
 import { reportDesignerLayerBandStyle } from "./reportDesignerLayerBands.ts";
 import { ReportDesignerLayerResizers } from "./ReportDesignerLayerResizers.tsx";
+import {
+  ReportDesignerCanvasElementPreview,
+  ReportDesignerCanvasResizeHandles,
+  reportDesignerCanvasElementStyle,
+} from "./ReportDesignerCanvasElement.tsx";
+import {
+  findReportDesignerElementNodes,
+  prepareReportDesignerGestureNodes,
+  readReportDesignerGridCellId,
+  releaseReportDesignerGestureNodes,
+} from "./reportDesignerCanvasGesture.ts";
 
 export type ReportDesignerV3Transform =
   | { kind: "move" }
@@ -32,6 +46,8 @@ type Gesture = {
   captureTarget: HTMLElement | null;
   pendingAnimationFrame: number | null;
   baseElements: Map<string, ReportDesignerV3Element>;
+  elementNodes: Map<string, HTMLElement>;
+  moveConstraint: ReportDesignerV3MoveConstraint | null;
 };
 
 export function ReportDesignerV3Canvas({
@@ -42,6 +58,8 @@ export function ReportDesignerV3Canvas({
   onFitZoom,
   disabled = false,
   onSelect,
+  selectedGridCell,
+  onSelectGridCell,
   onCommitTransform,
   onCancelTransform,
   onCommitLayerBand,
@@ -54,6 +72,8 @@ export function ReportDesignerV3Canvas({
   onFitZoom?: (zoom: number) => void;
   disabled?: boolean;
   onSelect: (elementId: string, additive: boolean) => void;
+  selectedGridCell?: { elementId: string; cellId: string } | null;
+  onSelectGridCell?: (elementId: string, cellId: string) => void;
   onCommitTransform: (baseState: ReportDesignerV3DocumentState, transform: ReportDesignerV3Transform, deltaX: number, deltaY: number) => void;
   onCancelTransform: (baseState: ReportDesignerV3DocumentState) => void;
   onCommitLayerBand: (role: "Header" | "Footer", heightHundredthMm: number) => void;
@@ -103,6 +123,8 @@ export function ReportDesignerV3Canvas({
       : additive
         ? (alreadySelected ? state.selectedIds.filter((id) => id !== element.id) : [...state.selectedIds, element.id])
         : [element.id];
+    const gridCellId = readReportDesignerGridCellId(event.target);
+    if (gridCellId && element.type === "Flow" && element.flowKind === "Grid") onSelectGridCell?.(element.id, gridCellId);
     onSelect(element.id, additive);
     // A modifier click on an already selected element is a selection toggle,
     // not the start of a drag.  Starting a gesture here would preview a move
@@ -116,6 +138,8 @@ export function ReportDesignerV3Canvas({
       selectedIds,
       activeLayerId: layerId,
     };
+    const baseElements = baseElementsFor(state.schema, selectedIds, true);
+    const elementNodes = findReportDesignerElementNodes(canvasRef.current, baseElements.keys());
     gesture.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -126,8 +150,11 @@ export function ReportDesignerV3Canvas({
       transform: { kind: "move" },
       captureTarget: event.currentTarget,
       pendingAnimationFrame: null,
-      baseElements: baseElementsFor(state.schema, selectedIds, true),
+      baseElements,
+      elementNodes,
+      moveConstraint: createV3MoveConstraint(state.schema, baseElements.values()),
     };
+    prepareReportDesignerGestureNodes(elementNodes, "move");
     capturePointer(event.currentTarget, event.pointerId);
   }
 
@@ -143,6 +170,8 @@ export function ReportDesignerV3Canvas({
       activeLayerId: located.layer.id,
     };
     onSelect(elementId, false);
+    const baseElements = baseElementsFor(state.schema, [elementId]);
+    const elementNodes = findReportDesignerElementNodes(canvasRef.current, baseElements.keys());
     gesture.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -153,8 +182,11 @@ export function ReportDesignerV3Canvas({
       transform: { kind: "resize", elementId, direction },
       captureTarget: event.currentTarget,
       pendingAnimationFrame: null,
-      baseElements: baseElementsFor(state.schema, [elementId]),
+      baseElements,
+      elementNodes,
+      moveConstraint: null,
     };
+    prepareReportDesignerGestureNodes(elementNodes, "resize");
     capturePointer(event.currentTarget, event.pointerId);
   }
 
@@ -193,11 +225,13 @@ export function ReportDesignerV3Canvas({
       );
       applyTransientTransform(current, delta.x, delta.y);
       callbacksRef.current.onCommitTransform(current.baseState, current.transform, delta.x, delta.y);
+      if (current.transform.kind === "move") applyTransientTransform(current, 0, 0);
     } else {
       cancelScheduledPreview(current);
       applyTransientTransform(current, 0, 0);
       callbacksRef.current.onCancelTransform(current.baseState);
     }
+    releaseReportDesignerGestureNodes(current.elementNodes);
     gesture.current = null;
     releasePointer(current.captureTarget, current.pointerId);
   }
@@ -208,6 +242,7 @@ export function ReportDesignerV3Canvas({
     cancelScheduledPreview(current);
     applyTransientTransform(current, 0, 0);
     callbacksRef.current.onCancelTransform(current.baseState);
+    releaseReportDesignerGestureNodes(current.elementNodes);
     gesture.current = null;
     releasePointer(current.captureTarget, current.pointerId);
   }
@@ -235,19 +270,23 @@ export function ReportDesignerV3Canvas({
   }
 
   function applyTransientTransform(current: Gesture, deltaX: number, deltaY: number) {
-    const page = canvasRef.current;
-    if (!page) return;
     const move = current.transform.kind === "move"
-      ? resolveV3MoveDelta(current.baseState, deltaX, deltaY)
+      ? resolveV3MoveDeltaFromConstraint(current.moveConstraint, deltaX, deltaY, current.baseState.schema.grid.snap)
       : null;
     for (const [elementId, baseElement] of current.baseElements) {
-      const geometry = move
-        ? { xHundredthMm: baseElement.xHundredthMm + move.dx, yHundredthMm: baseElement.yHundredthMm + move.dy, widthHundredthMm: baseElement.widthHundredthMm, heightHundredthMm: baseElement.heightHundredthMm, rotationDeg: baseElement.rotationDeg }
-        : current.transform.kind === "resize"
-          ? resolveV3ResizeGeometry(baseElement, current.transform.direction, deltaX, deltaY, current.baseState.schema.page)
-          : baseElement;
-      const node = page.querySelector<HTMLElement>(`[data-v3-element-id="${CSS.escape(elementId)}"]`);
+      const node = current.elementNodes.get(elementId);
       if (!node) continue;
+      if (move) {
+        const rotation = baseElement.rotationDeg ? ` rotate(${baseElement.rotationDeg}deg)` : "";
+        const translate = move.dx || move.dy
+          ? `translate3d(${hundredthMmToMm(move.dx)}mm, ${hundredthMmToMm(move.dy)}mm, 0)`
+          : "";
+        node.style.transform = `${translate}${rotation}`.trim();
+        continue;
+      }
+      const geometry = current.transform.kind === "resize"
+        ? resolveV3ResizeGeometry(baseElement, current.transform.direction, deltaX, deltaY, current.baseState.schema.page)
+        : baseElement;
       node.style.left = `${hundredthMmToMm(geometry.xHundredthMm)}mm`;
       node.style.top = `${hundredthMmToMm(geometry.yHundredthMm)}mm`;
       node.style.width = `${hundredthMmToMm(geometry.widthHundredthMm)}mm`;
@@ -342,7 +381,7 @@ export function ReportDesignerV3Canvas({
                     <div
                       className={`report-designer-v3-element report-designer-v3-element-${element.type.toLowerCase()}${selected ? " is-selected" : ""}${element.locked || layer.locked ? " is-locked" : ""}`}
                       key={element.id}
-                      style={elementStyle(element)}
+                      style={reportDesignerCanvasElementStyle(element)}
                       data-v3-element-id={element.id}
                       onPointerDown={(event) => beginMove(event, element, layer.id)}
                       onKeyDown={(event) => {
@@ -358,9 +397,9 @@ export function ReportDesignerV3Canvas({
                       aria-disabled={element.locked || layer.locked}
                       aria-label={`${reportDesignerV3ElementText(element)}${element.locked ? "，已锁定" : ""}`}
                     >
-                      <ElementPreview element={element} />
+                      <ReportDesignerCanvasElementPreview element={element} selectedGridCellId={selectedGridCell?.elementId === element.id ? selectedGridCell.cellId : undefined} />
                       {selected && state.selectedIds.length === 1 && !element.locked && !layer.locked ? (
-                        <ResizeHandles elementId={element.id} onPointerDown={beginResize} />
+                        <ReportDesignerCanvasResizeHandles elementId={element.id} onPointerDown={beginResize} />
                       ) : null}
                       {selected && (element.locked || layer.locked) ? <span className="report-designer-v3-lock-badge">锁</span> : null}
                     </div>
@@ -375,85 +414,6 @@ export function ReportDesignerV3Canvas({
       <div className="report-designer-v3-canvas-hint">{statusHint}</div>
     </div>
   );
-}
-
-function ElementPreview({ element }: { element: ReportDesignerV3Element }) {
-  switch (element.type) {
-    case "Text":
-      return <span className="report-designer-v3-preview-text">{element.text || "文本"}</span>;
-    case "Field":
-      return (
-        <span className="report-designer-v3-preview-field">
-          {element.label ? `${element.label}: ` : ""}
-          {`{{ ${element.fieldPath || "字段"} }}`}
-        </span>
-      );
-    case "Image":
-      return <span className="report-designer-v3-preview-image">{element.sourceKind === "Field" ? `图片：${element.fieldPath ?? ""}` : element.resourceId ? `资源：${element.resourceId}` : "图片资源未上传"}</span>;
-    case "PageNumber":
-      return <span className="report-designer-v3-preview-page-number">{element.prefix ?? ""}第 1 / 1 页{element.suffix ?? ""}</span>;
-    case "Rectangle":
-      return null;
-    case "Line":
-      return <span className={`report-designer-v3-preview-line report-designer-v3-preview-line-${element.direction.toLowerCase()}`} style={{ backgroundColor: element.style.borderColor ?? "var(--edm-neutral-700)", ...(element.direction === "Horizontal" ? { height: `${Math.max(1, element.style.borderWidthPx ?? 1)}px` } : { width: `${Math.max(1, element.style.borderWidthPx ?? 1)}px` }) }} aria-hidden="true" />;
-    case "Flow":
-      return (
-        <div className="report-designer-v3-preview-flow" aria-label={`${element.flowKind} 结构预览`}>
-          <div
-            className="report-designer-v3-preview-flow-content"
-            dangerouslySetInnerHTML={{ __html: renderReportDesignerBlockPreviewToHtml(element.block) }}
-          />
-        </div>
-      );
-  }
-}
-
-function ResizeHandles({
-  elementId,
-  onPointerDown,
-}: {
-  elementId: string;
-  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>, elementId: string, direction: ReportDesignerV3ResizeDirection) => void;
-}) {
-  const directions: ReportDesignerV3ResizeDirection[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
-  return (
-    <>
-      {directions.map((direction) => (
-        <button
-          className={`report-designer-v3-handle report-designer-v3-handle-${direction}`}
-          key={direction}
-          type="button"
-          aria-label={`调整大小 ${direction}`}
-          onPointerDown={(event) => onPointerDown(event, elementId, direction)}
-        />
-      ))}
-    </>
-  );
-}
-
-function elementStyle(element: ReportDesignerV3Element): CSSProperties {
-  const style: CSSProperties = {
-    left: `${hundredthMmToMm(element.xHundredthMm)}mm`,
-    top: `${hundredthMmToMm(element.yHundredthMm)}mm`,
-    width: `${hundredthMmToMm(element.widthHundredthMm)}mm`,
-    height: `${hundredthMmToMm(element.heightHundredthMm)}mm`,
-    zIndex: element.zIndex,
-    transform: element.rotationDeg ? `rotate(${element.rotationDeg}deg)` : undefined,
-    fontFamily: element.style.fontFamily,
-    fontSize: element.style.fontSizePt ? `${element.style.fontSizePt}pt` : undefined,
-    fontWeight: element.style.bold ? 700 : undefined,
-    color: element.style.color,
-    backgroundColor: element.style.backgroundColor,
-    textAlign: element.style.align?.toLowerCase() as CSSProperties["textAlign"],
-    borderColor: element.style.borderColor,
-    borderWidth: element.type === "Line" ? undefined : element.style.borderWidthPx,
-    borderStyle: element.type === "Line" ? undefined : element.style.borderStyle === "Dashed" ? "dashed" : element.style.borderStyle === "None" ? "none" : element.style.borderWidthPx ? "solid" : undefined,
-    padding: element.style.paddingHundredthMm ? `${hundredthMmToMm(element.style.paddingHundredthMm)}mm` : undefined,
-  };
-  if (element.type === "Line") {
-    style.backgroundColor = "transparent";
-  }
-  return style;
 }
 
 function findElement(schema: ReportDesignerV3Schema, id: string) {

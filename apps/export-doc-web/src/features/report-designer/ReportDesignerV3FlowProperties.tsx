@@ -17,17 +17,21 @@ type EditableFlowBlock = Extract<ReportBlock, {
 export function ReportDesignerV3FlowProperties({
   block,
   fieldGroups,
+  selectedGridCellId,
+  onSelectGridCell,
   onCommit,
 }: {
   block: EditableFlowBlock;
   fieldGroups: ReportDesignerFieldGroup[];
+  selectedGridCellId?: string;
+  onSelectGridCell: (cellId: string) => void;
   onCommit: (block: EditableFlowBlock) => void;
 }) {
   switch (block.type) {
     case "Row":
       return <RowBlockProperties block={block} fieldGroups={fieldGroups} onCommit={asFlowCommit(onCommit, "Row")} />;
     case "Grid":
-      return <GridBlockProperties block={block} fieldGroups={fieldGroups} onCommit={asFlowCommit(onCommit, "Grid")} />;
+      return <GridBlockProperties block={block} fieldGroups={fieldGroups} selectedCellId={selectedGridCellId} onSelectCell={onSelectGridCell} onCommit={asFlowCommit(onCommit, "Grid")} />;
     case "Conditional":
       return <ConditionalBlockProperties block={block} fieldGroups={fieldGroups} onCommit={asFlowCommit(onCommit, "Conditional")} />;
     case "DetailTable":

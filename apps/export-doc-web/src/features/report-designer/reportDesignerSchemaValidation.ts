@@ -508,8 +508,9 @@ function normalizeGridBlock(
   }
 
   const rowIds = new Set<string>();
+  const cellIds = new Set<string>();
   const rows = rawRows
-    .map((row, index) => normalizeGridRow(row, columns.length, `${path}.rows[${index}]`, rowIds, issues))
+    .map((row, index) => normalizeGridRow(row, columns.length, `${path}.rows[${index}]`, rowIds, cellIds, issues))
     .filter((row): row is ReportGridRow => Boolean(row));
   if (rows.length === 0) {
     issues.push(createIssue("error", `${path}.rows`, "普通表格没有可用行。"));
@@ -560,6 +561,7 @@ function normalizeGridRow(
   columnCount: number,
   path: string,
   rowIds: Set<string>,
+  cellIds: Set<string>,
   issues: ReportDesignerSchemaIssue[],
 ): ReportGridRow | null {
   if (!isRecord(value)) {
@@ -573,7 +575,6 @@ function normalizeGridRow(
     return null;
   }
 
-  const cellIds = new Set<string>();
   const cells = rawCells
     .map((cell, index) => normalizeGridCell(cell, columnCount, `${path}.cells[${index}]`, cellIds, issues))
     .filter((cell): cell is ReportGridCell => Boolean(cell));

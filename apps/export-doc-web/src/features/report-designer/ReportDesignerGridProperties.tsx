@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Minus, Plus } from "lucide-react";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import {
@@ -18,22 +18,24 @@ import {
   resizeAdjacentGridColumnWidths,
   setGridRowsToUniformHeight,
   splitGridCell,
+  updateGridCellBorder,
 } from "./reportDesignerMutations.ts";
 import type { ReportBlock, ReportGridBlock, ReportGridCell } from "./reportDesignerSchema.ts";
 import { BorderEditor, ColumnWidthStrip, FieldPathInput, TextStyleEditor } from "./ReportDesignerPropertyControls.tsx";
 import { normalizeGridCellContentKind, normalizeNumber } from "./reportDesignerPropertiesModel.ts";
 
-export function GridBlockProperties({ block, fieldGroups, onCommit }: {
+export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSelectCell, onCommit }: {
   block: ReportGridBlock;
   fieldGroups: ReportDesignerFieldGroup[];
+  selectedCellId?: string;
+  onSelectCell: (cellId: string) => void;
   onCommit: (block: ReportBlock) => void;
 }) {
   const locations = useMemo(() => getGridCellLocations(block), [block]);
-  const [selectedCellId, setSelectedCellId] = useState(locations[0]?.cell.id ?? "");
   const selected = locations.find((location) => location.cell.id === selectedCellId) ?? locations[0];
   useEffect(() => {
-    if (selected && selected.cell.id !== selectedCellId) setSelectedCellId(selected.cell.id);
-  }, [selected, selectedCellId]);
+    if (selected && selected.cell.id !== selectedCellId) onSelectCell(selected.cell.id);
+  }, [onSelectCell, selected, selectedCellId]);
 
   function updateCell(update: (cell: ReportGridCell) => ReportGridCell) {
     if (!selected) return;
@@ -63,7 +65,7 @@ export function GridBlockProperties({ block, fieldGroups, onCommit }: {
         <label><span>快速版式</span><select value="" onChange={(event) => {
           if (!event.target.value) return;
           const next = applyGridPreset(block, event.target.value as "Blank" | "Form" | "Approval");
-          setSelectedCellId(next.rows[0].cells[0].id);
+          onSelectCell(next.rows[0].cells[0].id);
           onCommit(next);
         }}><option value="">选择...</option><option value="Blank">空白 3 × 3</option><option value="Form">标签/内容表单</option><option value="Approval">审批签字栏</option></select></label>
         <label><span>上距 (mm)</span><input type="number" min={0} max={30} step={0.5} value={block.marginTopMm ?? 0} onChange={(event) => onCommit({ ...block, marginTopMm: normalizeNumber(event.target.value, block.marginTopMm ?? 0) })} /></label>
@@ -85,7 +87,7 @@ export function GridBlockProperties({ block, fieldGroups, onCommit }: {
           <tbody>{block.rows.map((row, rowIndex) => <tr key={row.id}>{row.cells.map((cell) => {
             const location = locations.find((candidate) => candidate.cell.id === cell.id);
             if (!location) return null;
-            return <td key={cell.id} colSpan={location.colSpan} rowSpan={location.rowSpan}><button type="button" className={selected?.cell.id === cell.id ? "is-selected" : ""} aria-pressed={selected?.cell.id === cell.id} aria-label={`第 ${rowIndex + 1} 行，第 ${location.columnIndex + 1} 列`} onClick={() => setSelectedCellId(cell.id)}>{cellSummary(cell)}</button></td>;
+            return <td key={cell.id} colSpan={location.colSpan} rowSpan={location.rowSpan}><button type="button" className={selected?.cell.id === cell.id ? "is-selected" : ""} aria-pressed={selected?.cell.id === cell.id} aria-label={`第 ${rowIndex + 1} 行，第 ${location.columnIndex + 1} 列`} onClick={() => onSelectCell(cell.id)}>{cellSummary(cell)}</button></td>;
           })}</tr>)}</tbody>
         </table>
       </section>
@@ -106,19 +108,18 @@ export function GridBlockProperties({ block, fieldGroups, onCommit }: {
         {selected.cell.contentKind === "Field" || selected.cell.contentKind === "CheckboxGroup" ? <FieldPathInput className="new-report-property-wide" label={selected.cell.contentKind === "CheckboxGroup" ? "判断字段" : "业务字段"} value={selected.cell.fieldPath} fieldGroups={fieldGroups} onChange={(fieldPath) => updateCell((cell) => ({ ...cell, fieldPath }))} /> : null}
         {selected.cell.contentKind === "Field" ? <label><span>字段前标签（可选）</span><input value={selected.cell.label ?? ""} onChange={(event) => updateCell((cell) => ({ ...cell, label: event.target.value }))} /></label> : null}
         {selected.cell.contentKind === "CheckboxGroup" ? <label className="new-report-property-wide"><span>勾选项（每行：名称=值）</span><textarea rows={4} value={(selected.cell.checkboxOptions ?? []).map((option) => `${option.label}=${option.value}`).join("\n")} onChange={(event) => updateCheckboxOptions(event.target.value)} /></label> : null}
-        <details className="new-report-grid-cell-details"><summary>单元格样式与边框</summary><TextStyleEditor style={selected.cell.style} onChange={(style) => updateCell((cell) => ({ ...cell, style }))} /><BorderEditor border={selected.cell.border ?? block.border} onChange={(border) => updateCell((cell) => ({ ...cell, border }))} /></details>
+        <details className="new-report-grid-cell-details" open><summary>当前单元格样式与边框</summary><TextStyleEditor style={selected.cell.style} onChange={(style) => updateCell((cell) => ({ ...cell, style }))} /><BorderEditor border={selected.cell.border ?? block.border} onChange={(border) => onCommit(updateGridCellBorder(block, selected.cell.id, border))} /></details>
       </section> : null}
 
-      <details className="new-report-detail-style-group"><summary>列宽与整表样式</summary>
+      <details className="new-report-detail-style-group"><summary>列宽、行高与整表样式</summary>
         <ColumnWidthStrip columns={block.columns.map((column, index) => ({ id: column.id, title: `列 ${index + 1}`, width: column.widthPercent }))} minWidth={1} unit="%" onResizeBoundary={(leftColumnId, delta) => onCommit(resizeAdjacentGridColumnWidths(block, leftColumnId, delta))} />
         <div className="new-report-grid-structure-actions">
           <button className="command-button secondary" type="button" onClick={() => onCommit(distributeGridColumnWidths(block))}>等宽列</button>
           <button className="command-button secondary" type="button" disabled={!selectedRow} onClick={() => onCommit(setGridRowsToUniformHeight(block, selectedRow?.heightMm ?? 9))}>统一行高</button>
-          <button className="command-button secondary" type="button" onClick={() => onCommit(applyGridDefaultCellStyle(block))}>套用样式</button>
-          <button className="command-button secondary" type="button" onClick={() => onCommit(applyGridBorderToCells(block))}>套用边框</button>
         </div>
-        <TextStyleEditor style={block.defaultCellStyle} onChange={(defaultCellStyle) => onCommit({ ...block, defaultCellStyle })} />
-        <BorderEditor border={block.border} onChange={(border) => onCommit({ ...block, border })} />
+        <div className="new-report-designer-muted">修改整表样式会立即应用到全部单元格；之后仍可单独覆盖当前单元格。</div>
+        <TextStyleEditor style={block.defaultCellStyle} onChange={(defaultCellStyle) => onCommit(applyGridDefaultCellStyle({ ...block, defaultCellStyle }))} />
+        <BorderEditor border={block.border} onChange={(border) => onCommit(applyGridBorderToCells({ ...block, border }))} />
       </details>
     </div>
   );

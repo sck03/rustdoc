@@ -2,6 +2,7 @@
 @import "./styles/report/designer-navigation.css";
 @import "./styles/report/designer-canvas.css";
 @import "./styles/report/designer-v3.css";
+@import "./styles/report/designer-v3-grid.css";
 @import "./styles/report/designer-v3-bands.css";
 @import "./styles/report/designer-v3-inspector.css";
 @import "./styles/report/designer-v3-responsive.css";

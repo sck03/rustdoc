@@ -17,7 +17,7 @@ export function renderReportDesignerBlockToHtml(block: ReportBlock) {
  * The block AST remains the source of truth; this only expands one
  * representative set of rows for visual editing and never gets persisted.
  */
-export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock) {
+export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock, selectedGridCellId?: string) {
   // The editor preview shows one representative content value.  Do not carry
   // a conditional field's export fallback into this data-free rendering: the
   // control tags are intentionally removed below, so doing so would display
@@ -25,7 +25,7 @@ export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock) {
   const previewBlock = block.type === "Conditional" && block.content.kind === "Field"
     ? { ...block, content: { ...block.content, fallbackText: undefined } }
     : block;
-  let html = renderBlock(previewBlock);
+  let html = renderBlock(previewBlock, { preview: true, selectedGridCellId });
   html = expandPreviewLoops(html);
   html = html.replace(/\{\{\s*(?:if|else|end|capture|assign|while|case|when)[\s\S]*?\}\}/gi, "");
   html = html.replace(/\{\{\s*\$?[A-Za-z_][A-Za-z0-9_]*\s*=\s*[\s\S]*?\}\}/g, "");
@@ -46,7 +46,12 @@ function expandPreviewLoops(source: string) {
   return current;
 }
 
-function renderBlock(block: ReportBlock) {
+type BlockRenderOptions = {
+  preview?: boolean;
+  selectedGridCellId?: string;
+};
+
+function renderBlock(block: ReportBlock, options?: BlockRenderOptions) {
   switch (block.type) {
     case "Text":
       return `<div style="${renderBoxStyle(block.style, block.border)}">${escapeHtml(block.text)}</div>`;
@@ -55,7 +60,7 @@ function renderBlock(block: ReportBlock) {
     case "Row":
       return renderRowBlock(block);
     case "Grid":
-      return renderGridBlock(block);
+      return renderGridBlock(block, options);
     case "Conditional":
       return renderConditionalBlock(block);
     case "Image":
@@ -67,7 +72,7 @@ function renderBlock(block: ReportBlock) {
   }
 }
 
-function renderGridBlock(block: Extract<ReportBlock, { type: "Grid" }>) {
+function renderGridBlock(block: Extract<ReportBlock, { type: "Grid" }>, options?: BlockRenderOptions) {
   const columnWidthTotal = block.columns.reduce((sum, column) => sum + Math.max(1, column.widthPercent), 0);
   const colgroup = `<colgroup>${block.columns.map((column) => {
     const width = Math.round((Math.max(1, column.widthPercent) / columnWidthTotal) * 10000) / 100;
@@ -77,7 +82,10 @@ function renderGridBlock(block: Extract<ReportBlock, { type: "Grid" }>) {
     const colSpan = Math.max(1, Math.floor(cell.colSpan ?? 1));
     const rowSpan = Math.max(1, Math.floor(cell.rowSpan ?? 1));
     const spanAttributes = `${colSpan > 1 ? ` colspan="${colSpan}"` : ""}${rowSpan > 1 ? ` rowspan="${rowSpan}"` : ""}`;
-    return `<td${spanAttributes} style="${renderGridCellStyle(block, cell)}">${renderGridCellContent(cell)}</td>`;
+    const previewAttributes = options?.preview
+      ? ` data-report-grid-cell-id="${escapeHtml(cell.id)}"${options.selectedGridCellId === cell.id ? ' class="is-designer-selected-cell"' : ""}`
+      : "";
+    return `<td${spanAttributes}${previewAttributes} style="${renderGridCellStyle(block, cell)}">${renderGridCellContent(cell)}</td>`;
   }).join("")}</tr>`).join("");
 
   const caption = block.title ? `<caption class="edm-report-grid-title">${escapeHtml(block.title)}</caption>` : "";
@@ -95,13 +103,14 @@ function renderGridCellStyle(
   block: Extract<ReportBlock, { type: "Grid" }>,
   cell: Extract<ReportBlock, { type: "Grid" }>["rows"][number]["cells"][number],
 ) {
+  const style = { ...block.defaultCellStyle, ...cell.style };
   return [
-    renderTextStyle({ ...block.defaultCellStyle, ...cell.style }),
+    renderTextPresentation(style),
     cell.verticalText ? "writing-mode: vertical-rl" : "",
     cell.verticalText ? "text-orientation: upright" : "",
     "vertical-align: middle",
-    "padding: 1.2mm",
     renderBorderStyle(cell.border ?? block.border),
+    renderCellPadding(style, 1.2),
   ].filter(Boolean).join("; ");
 }
 
@@ -608,14 +617,29 @@ function renderFieldExpression(fieldPath: string, fallbackText?: string) {
 
 function renderTextStyle(style: ReportTextStyle) {
   return [
-    style.fontSizePt ? `font-size: ${style.fontSizePt}pt` : "",
-    style.bold ? "font-weight: 700" : "",
-    style.align ? `text-align: ${alignToCss(style.align)}` : "",
+    renderTextPresentation(style),
     style.marginTopMm ? `margin-top: ${style.marginTopMm}mm` : "",
     style.marginRightMm ? `margin-right: ${style.marginRightMm}mm` : "",
     style.marginBottomMm ? `margin-bottom: ${style.marginBottomMm}mm` : "",
     style.marginLeftMm ? `margin-left: ${style.marginLeftMm}mm` : "",
   ].filter(Boolean).join("; ");
+}
+
+function renderTextPresentation(style: ReportTextStyle) {
+  return [
+    style.fontSizePt ? `font-size: ${style.fontSizePt}pt` : "",
+    style.bold ? "font-weight: 700" : "",
+    style.align ? `text-align: ${alignToCss(style.align)}` : "",
+  ].filter(Boolean).join("; ");
+}
+
+function renderCellPadding(style: ReportTextStyle, fallbackMm: number) {
+  return [
+    `padding-top: ${style.marginTopMm ?? fallbackMm}mm`,
+    `padding-right: ${style.marginRightMm ?? fallbackMm}mm`,
+    `padding-bottom: ${style.marginBottomMm ?? fallbackMm}mm`,
+    `padding-left: ${style.marginLeftMm ?? fallbackMm}mm`,
+  ].join("; ");
 }
 
 function renderBoxStyle(style: ReportTextStyle, border?: ReportBorderStyle) {

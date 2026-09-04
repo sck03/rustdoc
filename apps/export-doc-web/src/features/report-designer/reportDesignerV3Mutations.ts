@@ -5,7 +5,12 @@ import {
   reportDesignerV3PageDimensions, type ReportDesignerV3Element,
   type ReportDesignerV3Layer, type ReportDesignerV3Page, type ReportDesignerV3Schema,
 } from "./reportDesignerV3Schema.ts";
-import { reportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
+import {
+  createV3MoveConstraint,
+  getElementBounds,
+  reportDesignerV3ElementBounds,
+  resolveV3MoveDeltaFromConstraint,
+} from "./reportDesignerGeometry.ts";
 import {
   createV3ElementId, createV3FieldElement, createV3FlowElement, createV3ImageElement,
   createV3LineElement, createV3PageNumberElement, createV3RectangleElement, createV3TextElement,
@@ -246,20 +251,9 @@ export function resolveV3MoveDelta(
   const movable = state.schema.layers.flatMap((layer) => layer.elements
     .filter((element) => selected.has(element.id) && !element.locked && !layer.locked));
   if (movable.length === 0) return { dx: 0, dy: 0, movable };
-  const grid = state.schema.grid.enabled && snap ? state.schema.grid.sizeHundredthMm : 1;
-  const anchor = movable[0];
-  const rawDx = grid > 1
-    ? snapToGrid(anchor.xHundredthMm + deltaX, grid) - snapToGrid(anchor.xHundredthMm, grid)
-    : Math.round(deltaX);
-  const rawDy = grid > 1
-    ? snapToGrid(anchor.yHundredthMm + deltaY, grid) - snapToGrid(anchor.yHundredthMm, grid)
-    : Math.round(deltaY);
-  const bounds = getElementBounds(movable.map((element) => ({ element })));
-  return {
-    dx: clampTranslation(Number.isFinite(rawDx) ? rawDx : 0, -bounds.left, state.schema.page.widthHundredthMm - bounds.right),
-    dy: clampTranslation(Number.isFinite(rawDy) ? rawDy : 0, -bounds.top, state.schema.page.heightHundredthMm - bounds.bottom),
-    movable,
-  };
+  const constraint = createV3MoveConstraint(state.schema, movable);
+  const delta = resolveV3MoveDeltaFromConstraint(constraint, deltaX, deltaY, snap);
+  return { ...delta, movable };
 }
 
 /**
@@ -567,28 +561,6 @@ function getMovableSelectedV3Elements(state: ReportDesignerV3DocumentState) {
     .map((element) => ({ element, layer })));
 }
 
-function getElementBounds(items: Array<{ element: ReportDesignerV3Element }>) {
-  return items.reduce((bounds, item) => {
-    const visual = reportDesignerV3ElementBounds(item.element);
-    return {
-      left: Math.min(bounds.left, visual.left),
-      top: Math.min(bounds.top, visual.top),
-      right: Math.max(bounds.right, visual.right),
-      bottom: Math.max(bounds.bottom, visual.bottom),
-    };
-  }, {
-    left: Number.POSITIVE_INFINITY,
-    top: Number.POSITIVE_INFINITY,
-    right: Number.NEGATIVE_INFINITY,
-    bottom: Number.NEGATIVE_INFINITY,
-  });
-}
-
-function clampTranslation(value: number, minimum: number, maximum: number) {
-  if (minimum > maximum) return 0;
-  return Math.min(maximum, Math.max(minimum, value));
-}
-
 function areV3ElementsEqual(left: ReportDesignerV3Element, right: ReportDesignerV3Element) {
   if (left === right) return true;
   const leftKeys = Object.keys(left) as Array<keyof ReportDesignerV3Element>;
@@ -618,10 +590,6 @@ function areStyleValuesEqual(
 function normalizeMargin(value: number, maximum: number) {
   const parsed = Number.isFinite(value) ? Math.round(value) : 0;
   return Math.min(Math.max(0, maximum), Math.max(0, parsed));
-}
-
-function snapToGrid(value: number, grid: number) {
-  return grid <= 1 ? Math.round(value) : Math.round(value / grid) * grid;
 }
 
 export function collectV3ValidationIssues(state: ReportDesignerV3DocumentState): ReportDesignerSchemaIssue[] {

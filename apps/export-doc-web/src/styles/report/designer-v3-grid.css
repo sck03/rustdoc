@@ -1,0 +1,15 @@
+.report-designer-v3-preview-flow-content .edm-report-grid td[data-report-grid-cell-id] {
+  pointer-events: auto;
+  cursor: cell;
+}
+
+.report-designer-v3-preview-flow-content .edm-report-grid td[data-report-grid-cell-id] > * {
+  pointer-events: none;
+}
+
+.report-designer-v3-preview-flow-content .edm-report-grid td.is-designer-selected-cell {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--edm-primary-600);
+  outline-offset: -2px;
+}

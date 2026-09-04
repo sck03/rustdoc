@@ -84,6 +84,7 @@ export function ReportDesignerV3Workspace({
   const [fieldFocusRequest, setFieldFocusRequest] = useState(0);
   const [capacityNotice, setCapacityNotice] = useState<string | null>(null);
   const [hasClipboard, setHasClipboard] = useState(false);
+  const [gridCellSelection, setGridCellSelection] = useState<{ elementId: string; cellId: string } | null>(null);
   const clipboardRef = useRef<ReportDesignerV3Element[]>([]);
   function copySelection() {
     const items = history.state.selectedIds
@@ -120,6 +121,9 @@ export function ReportDesignerV3Workspace({
     () => history.state.selectedIds.length === 1 ? findV3Element(history.state.schema, history.state.selectedIds[0]) : null,
     [history.state],
   );
+  const activeGridCellSelection = selected?.element.type === "Flow" && selected.element.flowKind === "Grid" && gridCellSelection?.elementId === selected.element.id
+    ? gridCellSelection
+    : null;
   const exportValidation = useMemo(
     () => validateReportDesignerV3Export(history.state.schema, reportType),
     [history.state.schema, reportType],
@@ -133,6 +137,7 @@ export function ReportDesignerV3Workspace({
   useEffect(() => {
     setMigrationAccepted(!legacyMigrationPending);
     setDraftEnabled(false);
+    setGridCellSelection(null);
     emittedContent.current = "";
     onDesignerDraftContentChange?.("");
   }, [legacyMigrationPending, content, reportType, onDesignerDraftContentChange]);
@@ -178,6 +183,9 @@ export function ReportDesignerV3Workspace({
   }
   function clearSelection() {
     history.select([], history.state.activeLayerId);
+  }
+  function selectGridCell(elementId: string, cellId: string) {
+    setGridCellSelection({ elementId, cellId });
   }
   function activeLayerId() {
     const active = history.state.schema.layers.find((layer) => layer.id === history.state.activeLayerId && layer.visible && !layer.locked);
@@ -469,18 +477,20 @@ export function ReportDesignerV3Workspace({
             <label><input type="checkbox" checked={history.state.schema.grid.snap} onChange={(event) => commit(updateV3Grid(history.state, { snap: event.target.checked }))} /> 吸附</label>
             <label><input type="checkbox" checked={showGuides} onChange={(event) => setShowGuides(event.target.checked)} /> 参考线</label>
           </div>
-           <ReportDesignerV3Canvas
-             state={history.state}
-             zoom={zoom}
-             fitRequest={fitRequest}
-             showGuides={showGuides}
-             onFitZoom={handleFitZoom}
-             disabled={!editingEnabled}
+          <ReportDesignerV3Canvas
+            state={history.state}
+            zoom={zoom}
+            fitRequest={fitRequest}
+            showGuides={showGuides}
+            onFitZoom={handleFitZoom}
+            disabled={!editingEnabled}
             onSelect={selectElement}
-             onCommitTransform={handleCommitTransform}
-             onCancelTransform={handleCancelTransform}
-             onCommitLayerBand={(role, height) => commit(setReportDesignerLayerRoleHeight(history.state, role, height))}
-             onClearSelection={clearSelection}
+            selectedGridCell={activeGridCellSelection}
+            onSelectGridCell={selectGridCell}
+            onCommitTransform={handleCommitTransform}
+            onCancelTransform={handleCancelTransform}
+            onCommitLayerBand={(role, height) => commit(setReportDesignerLayerRoleHeight(history.state, role, height))}
+            onClearSelection={clearSelection}
           />
         </main>
 
@@ -504,6 +514,8 @@ export function ReportDesignerV3Workspace({
               onCommit={commit}
               state={history.state}
               onFlowCommit={patchSelectedFlow}
+              selectedGridCellId={activeGridCellSelection?.cellId}
+              onSelectGridCell={(cellId) => selectGridCell(selected.element.id, cellId)}
               client={client}
               onImageResourceUploaded={bindImageResource}
               onZIndex={(direction) => commit(setV3ElementZIndex(history.state, selected.element.id, direction))}

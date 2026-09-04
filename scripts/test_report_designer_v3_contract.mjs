@@ -14,6 +14,7 @@ fs.mkdirSync(workspaceRoot, { recursive: true });
 const sourceRoot = path.join(repoRoot, "apps/export-doc-web/src/features/report-designer");
 const workspaceSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerV3Workspace.tsx"), "utf8");
 const canvasSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerV3Canvas.tsx"), "utf8");
+const canvasElementSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerCanvasElement.tsx"), "utf8");
 const panelsSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerV3Panels.tsx"), "utf8");
 const gridPropertiesSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerGridProperties.tsx"), "utf8");
 const layerResizersSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerLayerResizers.tsx"), "utf8");
@@ -21,6 +22,7 @@ const conditionalPropertiesSource = fs.readFileSync(path.join(sourceRoot, "Repor
 const propertyControlsSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerPropertyControls.tsx"), "utf8");
 const colorFieldSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerV3ColorField.tsx"), "utf8");
 const canvasCss = fs.readFileSync(path.join(repoRoot, "apps/export-doc-web/src/styles/report/designer-v3.css"), "utf8");
+const gridCss = fs.readFileSync(path.join(repoRoot, "apps/export-doc-web/src/styles/report/designer-v3-grid.css"), "utf8");
 const inspectorCss = fs.readFileSync(path.join(repoRoot, "apps/export-doc-web/src/styles/report/designer-v3-inspector.css"), "utf8");
 const bandsCss = fs.readFileSync(path.join(repoRoot, "apps/export-doc-web/src/styles/report/designer-v3-bands.css"), "utf8");
 const importSpecifier = (name) => {
@@ -38,6 +40,7 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerV3HtmlExporter.ts"
 export * from ${JSON.stringify(importSpecifier("reportDesignerBlockRenderer.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerPreviewSamples.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerGridMutations.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerTableMutations.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerLayerBands.ts"))};
 `);
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
@@ -397,7 +400,7 @@ const baseGrid = {
     { id: "r1", heightMm: 9, cells: [{ id: "a", contentKind: "Text", text: "A", colSpan: 1, rowSpan: 1, fieldPath: "", checkboxOptions: [], style: {} }, { id: "b", contentKind: "Text", text: "B", colSpan: 1, rowSpan: 1, fieldPath: "", checkboxOptions: [], style: {} }] },
     { id: "r2", heightMm: 9, cells: [{ id: "c", contentKind: "Text", text: "C", colSpan: 1, rowSpan: 1, fieldPath: "", checkboxOptions: [], style: {} }, { id: "d", contentKind: "Text", text: "D", colSpan: 1, rowSpan: 1, fieldPath: "", checkboxOptions: [], style: {} }] },
   ],
-  border: {},
+  border: { color: "#333333", widthPx: 1, style: "Solid", top: true, right: true, bottom: true, left: true },
   defaultCellStyle: {},
 };
 const mergedRight = api.mergeGridCellRight(baseGrid, "a");
@@ -408,6 +411,21 @@ const mergedDown = api.mergeGridCellDown(baseGrid, "a");
 assert(mergedDown.rows[0].cells[0].rowSpan === 2 && mergedDown.rows[1].cells.length === 1, "普通表格必须支持向下合并且保持目标行有效");
 const formGrid = api.applyGridPreset(baseGrid, "Form");
 assert(formGrid.rows.length === 3 && formGrid.columns.length === 4 && formGrid.rows[2].cells[1].colSpan === 3, "标签/内容预设必须生成可编辑的 4 列合并表单");
+assert(api.getGridCellLocations(formGrid).filter((location) => location.rowIndex === 0).map((location) => location.columnIndex).join(",") === "0,1,2,3", "普通表格同一行的后续列必须保留独立可选位置");
+const selectedBorder = { color: "#123456", widthPx: 2, style: "Dashed", top: true, right: false, bottom: true, left: false };
+const borderSyncedGrid = api.updateGridCellBorder(baseGrid, "b", selectedBorder);
+assert(borderSyncedGrid.rows[0].cells[1].border.right === false, "当前单元格边框开关必须写回所选单元格");
+assert(borderSyncedGrid.rows[0].cells[0].border.right === false, "折叠表格共享边必须同步相邻单元格，关闭边框后画布必须立即可见");
+assert(borderSyncedGrid.rows[1].cells[1].border.top === true && borderSyncedGrid.rows[1].cells[1].border.style === "Dashed", "共享边必须同步线型，虚线不能被相邻单元格的实线覆盖");
+const selectedGridPreview = api.renderReportDesignerBlockPreviewToHtml(borderSyncedGrid, "b");
+assert(selectedGridPreview.includes('data-report-grid-cell-id="a"') && selectedGridPreview.includes('data-report-grid-cell-id="b"'), "画布预览必须为每个普通表格单元格提供稳定命中标识");
+assert(selectedGridPreview.includes('class="is-designer-selected-cell"') && selectedGridPreview.includes("border-right: 0") && selectedGridPreview.includes("2px dashed #123456"), "画布预览必须即时显示所选单元格和边框线型/边开关");
+assert(!api.renderReportDesignerBlockToHtml(borderSyncedGrid).includes("data-report-grid-cell-id"), "编辑器单元格命中标识不得进入正式报表 HTML");
+const styledGrid = api.applyGridDefaultCellStyle({ ...baseGrid, defaultCellStyle: { fontSizePt: 15, bold: true, align: "Center", marginTopMm: 2, marginBottomMm: 3 } });
+const styledGridHtml = api.renderReportDesignerBlockToHtml(styledGrid);
+assert(styledGridHtml.includes("font-size: 15pt") && styledGridHtml.includes("font-weight: 700") && styledGridHtml.includes("text-align: center"), "整表字号、粗体和对齐必须立即进入每个单元格输出");
+assert(styledGridHtml.includes("padding-top: 2mm") && styledGridHtml.includes("padding-bottom: 3mm") && !styledGridHtml.includes("margin-top: 2mm"), "表格单元格上下距必须按有效内边距渲染，不能使用无效的 table-cell margin");
+assert(styledGridHtml.indexOf("padding: 2mm") < styledGridHtml.indexOf("padding-top: 2mm"), "单元格自定义内边距必须排在边框默认留白之后并取得最终优先级");
 
 const barrierElements = [
   { ...api.createV3TextElement(1000, 1000), id: "barrier-a", zIndex: 10 },
@@ -628,11 +646,15 @@ assert(featureHtml.includes("edm-v3-layer-keep-together"), "保持整段属性�
 assert(featureHtml.includes("edm-v3-flow-item-pagebreak"), "Flow 页面断点必须保留结构化输出");
 assert(featureHtml.includes("top: 291mm"), "贴底页脚必须把内容底边对齐到 A4 物理页底");
 assert(featureHtml.includes("edm-v3-line-horizontal") && featureHtml.includes("height: 1px"), "线元素输出必须保持与预览一致的细线厚度");
-assert(canvasSource.includes("data-v3-layer-name={layer.name}") && canvasSource.includes("report-designer-v3-preview-line-"), "V3 画布必须标识图层并使用独立细线预览");
+assert(canvasSource.includes("data-v3-layer-name={layer.name}") && canvasElementSource.includes("report-designer-v3-preview-line-"), "V3 画布必须标识图层并使用独立细线预览");
+assert(canvasSource.includes("createV3MoveConstraint") && canvasSource.includes("findReportDesignerElementNodes") && canvasSource.includes("translate3d"), "复杂模板拖动必须预计算边界、缓存元素节点并使用合成层位移");
 assert(canvasSource.includes("--v3-page-ratio") && canvasCss.includes("aspect-ratio: var(--v3-page-ratio"), "V3 画布必须按 A4 物理宽高比渲染横竖版页面");
 assert(canvasCss.includes("report-designer-v3-layer::before") && canvasCss.includes("report-designer-v3-preview-line-horizontal"), "V3 画布样式必须显示图层标识和细线方向");
 assert(panelsSource.includes('label="普通表格"') && panelsSource.includes("明细表（自动重复）") && !panelsSource.includes('label="票据格"'), "组件入口必须清楚区分普通表格和自动重复明细表");
 assert(gridPropertiesSource.includes("new-report-grid-cell-picker") && gridPropertiesSource.includes("向右合并") && gridPropertiesSource.includes("向下合并") && gridPropertiesSource.includes("快速版式"), "普通表格属性栏必须提供可视化选格、预设和直接合并操作");
+assert(gridPropertiesSource.includes("修改整表样式会立即应用到全部单元格") && !gridPropertiesSource.includes("套用样式") && !gridPropertiesSource.includes("套用边框"), "整表样式和边框必须即时应用，不能依赖容易漏掉的二次套用按钮");
+assert(panelsSource.includes('element.type !== "Flow" ? <ElementStyleEditor'), "Flow 结构组件不得再显示会被内部单元格样式覆盖的重复通用样式组");
+assert(gridCss.includes("data-report-grid-cell-id") && gridCss.includes("is-designer-selected-cell"), "画布样式必须支持单元格直接命中和选中反馈");
 assert(layerResizersSource.includes('role="separator"') && layerResizersSource.includes("onPointerMove") && bandsCss.includes("report-designer-v3-band-resizer"), "页眉页脚设计带必须支持可访问的画布拖拽调整");
 assert(colorFieldSource.includes("type=\"color\"") && colorFieldSource.includes("常用颜色") && colorFieldSource.includes("高级色值"), "V3 颜色编辑必须提供色板、原生颜色选择器和可选高级色值");
 assert(colorFieldSource.includes("aria-invalid={invalid}") && colorFieldSource.includes("请输入有效的颜色值"), "非法颜色值不能写入 schema，且必须给出明确提示");

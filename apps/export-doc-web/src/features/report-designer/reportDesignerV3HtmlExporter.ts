@@ -108,7 +108,7 @@ export function exportReportDesignerV3SchemaToHtml(
     .edm-report-row { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .edm-report-row td, .edm-report-grid td, .edm-report-grid th, .edm-detail-table td, .edm-detail-table th { overflow-wrap: anywhere; word-break: break-word; white-space: pre-wrap; }
     .edm-report-grid, .edm-detail-table, .edm-detail-layout { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    .edm-report-grid td, .edm-report-grid th, .edm-detail-table td, .edm-detail-table th, .edm-detail-layout td, .edm-detail-layout th { border: 1px solid #333; padding: 1mm; vertical-align: top; }
+    .edm-detail-table td, .edm-detail-table th, .edm-detail-layout td, .edm-detail-layout th { border: 1px solid #333; padding: 1mm; vertical-align: top; }
     .edm-detail-table thead { display: table-header-group; }
     .edm-detail-table tr { page-break-inside: avoid; break-inside: avoid; }
     .report-page-break-row { page-break-before: always; break-before: page; height: 0; }
