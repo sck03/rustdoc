@@ -29,11 +29,17 @@ namespace ExportDocManager.Api.Hosting
         bool CanUseSalesWorkspace,
         string ProductEdition,
         IReadOnlyList<string> EnabledModules,
-        IReadOnlyList<ApiModuleAccessDto> ModuleAccess);
+        IReadOnlyList<ApiModuleAccessDto> ModuleAccess,
+        IReadOnlyList<ApiPermissionGrantDto> Permissions);
 
     public sealed record ApiModuleAccessDto(
         string ModuleKey,
         string AccessLevel);
+
+    public sealed record ApiPermissionGrantDto(
+        string ResourceKey,
+        string Action,
+        string DataScope);
 
     public sealed record ApiErrorResponse(
         string Message,

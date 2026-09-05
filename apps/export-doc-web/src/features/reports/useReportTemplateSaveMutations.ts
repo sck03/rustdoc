@@ -58,16 +58,12 @@ export function useReportTemplateSaveMutations({
         throw new Error("当前共享模板只读，请先复制为自己的模板。");
       }
 
-      return client.updateUserReportTemplate({
+      return client.saveUserReportTemplateDraft({
         id: current.id,
         body: {
-          id: current.id,
           reportType,
           name: userTemplateName.trim() || current.name,
           contentHtml: nextContent ?? content,
-          isActive: current.isActive,
-          isShared: current.isShared,
-          shareScope: current.shareScope,
           expectedVersion: current.versionNumber,
         },
       });

@@ -12,6 +12,7 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/reports/templates", async (
                 HttpContext context,
+                ApiAuthorizationService authorizationService,
                 IReportHtmlService reportHtmlService,
                 string? reportType,
                 CancellationToken cancellationToken) =>
@@ -20,6 +21,10 @@ namespace ExportDocManager.Api.Hosting
                 if (!TryParseReportDocumentType(reportType, out var parsedReportType))
                 {
                     return Results.BadRequest(new ApiErrorResponse("报表类型无效。"));
+                }
+                if (!CanUseReportDocumentDomain(context, authorizationService, parsedReportType))
+                {
+                    return Results.StatusCode(StatusCodes.Status403Forbidden);
                 }
 
                 var templates = await reportHtmlService.GetAvailableTemplatesAsync(parsedReportType, cancellationToken);
@@ -30,27 +35,18 @@ namespace ExportDocManager.Api.Hosting
                     template.WithSealDefault)));
             })
             .WithName("ListReportTemplates")
-            .WithApiPermission(
-                PermissionModuleCatalog.DocumentReports,
-                selector: ApiPermissionSelector.ReportType)
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.View)
             .Produces<IReadOnlyList<ApiReportTemplateDto>>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status401Unauthorized);
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/reports/templates", async (
                 HttpContext context,
-                ApiAuthorizationService authorizationService,
                 IReportTemplateService reportTemplateService,
                 ApiReportTemplateCreateRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
-                {
-                    return WriteForbidden("当前权限模板不允许新建报表模板。");
-                }
-
                 if (request == null)
                 {
                     return Results.BadRequest(new ApiErrorResponse("报表模板请求体不能为空。"));
@@ -85,6 +81,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("CreateReportTemplate")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Publish)
             .Produces<ApiReportTemplateContentDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -93,18 +90,10 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/templates/storage-check", async (
                 HttpContext context,
-                ApiAuthorizationService authorizationService,
                 IReportTemplateStorageDiagnosticsService diagnosticsService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
-                {
-                    return WriteForbidden("当前权限模板不允许检查模板目录可写性。");
-                }
-
                 var result = await diagnosticsService.CheckAsync(cancellationToken);
                 return Results.Ok(new ApiReportTemplateStorageStatusResponse(
                     ApiResponsePathPolicy.Reveal(
@@ -116,12 +105,14 @@ namespace ExportDocManager.Api.Hosting
                     result.StoragePolicy));
             })
             .WithName("CheckReportTemplateStorage")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Publish)
             .Produces<ApiReportTemplateStorageStatusResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapGet("/api/reports/templates/fields", (
                 HttpContext context,
+                ApiAuthorizationService authorizationService,
                 IReportTemplateFieldCatalogService fieldCatalogService,
                 string? reportType) =>
             {
@@ -130,18 +121,25 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.BadRequest(new ApiErrorResponse("报表类型无效。"));
                 }
+                if (!CanUseReportDocumentDomain(context, authorizationService, parsedReportType))
+                {
+                    return Results.StatusCode(StatusCodes.Status403Forbidden);
+                }
 
                 var catalog = fieldCatalogService.GetFieldCatalog(parsedReportType);
                 return Results.Ok(ToApiReportTemplateFieldCatalogDto(catalog));
             })
             .WithName("GetReportTemplateFieldCatalog")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.View)
             .Produces<ApiReportTemplateFieldCatalogResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status401Unauthorized);
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapGet("/api/reports/templates/v3/contract", () =>
                 Results.Ok(ApiReportTemplateV3ContractResponse.Create()))
             .WithName("GetReportTemplateV3Contract")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.View)
             .Produces<ApiReportTemplateV3ContractResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
@@ -184,6 +182,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("GetReportTemplateContent")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.View)
             .Produces<ApiReportTemplateContentDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -193,18 +192,10 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPut("/api/reports/templates/content", async (
                 HttpContext context,
-                ApiAuthorizationService authorizationService,
                 IReportTemplateService reportTemplateService,
                 ApiReportTemplateSaveRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
-                {
-                    return WriteForbidden("当前权限模板不允许保存报表模板。");
-                }
-
                 if (request == null)
                 {
                     return Results.BadRequest(new ApiErrorResponse("报表模板请求体不能为空。"));
@@ -243,6 +234,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("SaveReportTemplateContent")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Publish)
             .Produces<ApiReportTemplateContentDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -252,15 +244,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/templates/rename", (
                 HttpContext context,
-                ApiAuthorizationService authorizationService,
                 IReportTemplateService reportTemplateService,
                 ApiReportTemplateRenameRequest request,
                 CancellationToken cancellationToken) => ExecuteReportTemplateManagementAsync(
-                    context,
-                    authorizationService,
                     request?.ReportType,
                     request != null,
-                    "当前权限模板不允许重命名报表模板。",
                     async parsedReportType => ToApiReportTemplateContentDto(
                         context,
                         await reportTemplateService.RenameTemplateAsync(
@@ -269,6 +257,7 @@ namespace ExportDocManager.Api.Hosting
                             request!.NewTemplatePath,
                             cancellationToken))))
             .WithName("RenameReportTemplate")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Publish)
             .Produces<ApiReportTemplateContentDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -278,15 +267,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPut("/api/reports/templates/display-name", (
                 HttpContext context,
-                ApiAuthorizationService authorizationService,
                 IReportTemplateService reportTemplateService,
                 ApiReportTemplateMetadataRequest request,
                 CancellationToken cancellationToken) => ExecuteReportTemplateManagementAsync(
-                    context,
-                    authorizationService,
                     request?.ReportType,
                     request != null,
-                    "当前权限模板不允许修改报表模板显示名称。",
                     async parsedReportType =>
                     {
                         var result = await reportTemplateService.UpdateTemplateDisplayNameAsync(
@@ -297,6 +282,7 @@ namespace ExportDocManager.Api.Hosting
                         return ToApiReportTemplateContentDto(context, result);
                     }))
             .WithName("UpdateReportTemplateDisplayName")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Publish)
             .Produces<ApiReportTemplateContentDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -305,16 +291,11 @@ namespace ExportDocManager.Api.Hosting
             .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapPut("/api/reports/templates/default", (
-                HttpContext context,
-                ApiAuthorizationService authorizationService,
                 IReportTemplateService reportTemplateService,
                 ApiReportTemplateMetadataRequest request,
                 CancellationToken cancellationToken) => ExecuteReportTemplateManagementAsync(
-                    context,
-                    authorizationService,
                     request?.ReportType,
                     request != null,
-                    "当前权限模板不允许设置默认报表模板。",
                     async parsedReportType =>
                     {
                         var result = await reportTemplateService.SetDefaultTemplateAsync(
@@ -324,6 +305,7 @@ namespace ExportDocManager.Api.Hosting
                         return new ApiCommandResponse(true, result.Message);
                     }))
             .WithName("SetDefaultReportTemplate")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Publish)
             .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -332,20 +314,11 @@ namespace ExportDocManager.Api.Hosting
             .Produces(StatusCodes.Status409Conflict);
 
             endpoints.MapDelete("/api/reports/templates/content", async (
-                HttpContext context,
-                ApiAuthorizationService authorizationService,
                 IReportTemplateService reportTemplateService,
                 string? reportType,
                 string? templatePath,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
-                {
-                    return WriteForbidden("当前权限模板不允许删除报表模板。");
-                }
-
                 if (!TryParseReportDocumentType(reportType, out var parsedReportType))
                 {
                     return Results.BadRequest(new ApiErrorResponse("报表类型无效。"));
@@ -378,6 +351,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("DeleteReportTemplate")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Archive)
             .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -387,19 +361,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/templates/package/save-to-path", async (
                 HttpContext context,
-                ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IReportTemplatePackageService packageService,
                 ApiReportTemplatePackageExportRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
-                {
-                    return WriteForbidden("当前权限模板不允许导出模板包。");
-                }
-
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
                     return WriteForbidden("该本机保存操作仅支持桌面版；浏览器版请下载模板包。");
@@ -432,6 +398,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("SaveReportTemplatePackageToPath")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Export)
             .Produces<ApiReportTemplatePackageExportResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -440,19 +407,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/templates/package/download", async (
                 HttpContext context,
-                ApiAuthorizationService authorizationService,
                 IReportTemplatePackageService packageService,
                 IAppPathProvider pathProvider,
                 IBusinessClock clock,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
-                {
-                    return WriteForbidden("当前权限模板不允许下载模板包。");
-                }
-
                 string tempRoot = RuntimeCachePathHelper.CreateUniqueDirectory(
                     pathProvider,
                     "TemplatePackages",
@@ -493,6 +452,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("DownloadReportTemplatePackage")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Export)
             .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -501,19 +461,11 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/templates/package/import", async (
                 HttpContext context,
-                ApiAuthorizationService authorizationService,
                 ApiDesktopAccessOptions desktopAccessOptions,
                 IReportTemplatePackageService packageService,
                 ApiReportTemplatePackageImportRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
-                {
-                    return WriteForbidden("当前权限模板不允许导入模板包。");
-                }
-
                 if (!ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions))
                 {
                     return WriteForbidden("该本机文件导入仅支持桌面版；浏览器版请上传模板包。");
@@ -566,6 +518,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("ImportReportTemplatePackage")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Import)
             .Produces<ApiReportTemplatePackageImportResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -575,20 +528,12 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapPost("/api/reports/templates/package/upload", async (
                 HttpContext context,
-                ApiAuthorizationService authorizationService,
                 IReportTemplatePackageService packageService,
                 IAppPathProvider pathProvider,
                 string? strategy,
                 string? fileName,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
-                {
-                    return WriteForbidden("当前权限模板不允许上传模板包。");
-                }
-
                 string rawStrategy = strategy ?? string.Empty;
                 if (!TryParseReportTemplateImportStrategy(
                     string.IsNullOrWhiteSpace(rawStrategy) ? "Merge" : rawStrategy,
@@ -656,6 +601,7 @@ namespace ExportDocManager.Api.Hosting
             })
             .Accepts<IFormFile>("application/octet-stream")
             .WithName("UploadReportTemplatePackage")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Import)
             .Produces<ApiReportTemplatePackageImportResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -710,6 +656,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("PreviewReportTemplateContent")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Design)
             .Produces<ApiReportTemplatePreviewResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -717,19 +664,10 @@ namespace ExportDocManager.Api.Hosting
         }
 
         private static async Task<IResult> ExecuteReportTemplateManagementAsync(
-            HttpContext context,
-            ApiAuthorizationService authorizationService,
             string? rawReportType,
             bool requestAvailable,
-            string forbiddenMessage,
             Func<ReportDocumentType, Task<object>> operation)
         {
-            var user = ApiEndpointAuth.GetRequiredUser(context);
-            if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Manage))
-            {
-                return WriteForbidden(forbiddenMessage);
-            }
-
             if (!requestAvailable)
             {
                 return Results.BadRequest(new ApiErrorResponse("报表模板请求体不能为空。"));
@@ -796,7 +734,7 @@ namespace ExportDocManager.Api.Hosting
 
         private static string BuildReportTemplatePackageFileName(DateTimeOffset now)
         {
-            return $"templates_{now:yyyyMMddHHmmss}.edtpl";
+            return $"templates_{now:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.edtpl";
         }
 
         private static string NormalizeUploadedReportTemplatePackageFileName(string fileName)

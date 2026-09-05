@@ -17,6 +17,7 @@ export function JobTable({
   isBusy,
   hasError,
   canOperate,
+  canRetry,
   canManage,
   canDownload,
   onMessage,
@@ -31,6 +32,7 @@ export function JobTable({
   isBusy: boolean;
   hasError: boolean;
   canOperate: boolean;
+  canRetry: (job: BackgroundJobSnapshot) => boolean;
   canManage: boolean;
   canDownload: boolean;
   onMessage: (message: string | null) => void;
@@ -70,7 +72,7 @@ export function JobTable({
                 <td>{formatDateTime(job.createdAt)}</td>
                 <td>{formatDateTime(job.completedAt)}</td>
                 <td><div className="job-row-actions">
-                  <button className="icon-button compact-icon-button" type="button" title="重试任务" aria-label="重试任务" disabled={!canOperate || isBusy || !job.canRetry} onClick={() => onRetry(job.jobId)}><RefreshCw size={16} aria-hidden="true" /></button>
+                  <button className="icon-button compact-icon-button" type="button" title="重试任务" aria-label="重试任务" disabled={isBusy || !job.canRetry || !canRetry(job)} onClick={() => onRetry(job.jobId)}><RefreshCw size={16} aria-hidden="true" /></button>
                   <button className="icon-button compact-icon-button" type="button" title="取消任务" aria-label="取消任务" disabled={!canOperate || isBusy || !job.canCancel} onClick={() => onCancel(job)}><Ban size={16} aria-hidden="true" /></button>
                   <button className="icon-button compact-icon-button" type="button" title="删除任务记录" aria-label="删除任务记录" disabled={!canManage || isBusy || !isTerminalJob(job.status)} onClick={() => onDelete(job)}><Trash2 size={16} aria-hidden="true" /></button>
                 </div></td>

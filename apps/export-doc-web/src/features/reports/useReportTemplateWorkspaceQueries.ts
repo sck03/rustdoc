@@ -8,6 +8,8 @@ export function useReportTemplateWorkspaceQueries({
   reportType,
   enabled,
   includeDesignerData,
+  canPreviewInvoiceSource,
+  canPreviewPaymentSource,
   selectedUserTemplateId,
   selectedTemplatePath,
 }: {
@@ -15,6 +17,8 @@ export function useReportTemplateWorkspaceQueries({
   reportType: ReportTypeOption;
   enabled: boolean;
   includeDesignerData: boolean;
+  canPreviewInvoiceSource: boolean;
+  canPreviewPaymentSource: boolean;
   selectedUserTemplateId: number;
   selectedTemplatePath: string;
 }) {
@@ -27,7 +31,7 @@ export function useReportTemplateWorkspaceQueries({
 
   const userTemplatesQuery = useQuery({
     queryKey: queryKeys.userReportTemplates(reportType),
-    queryFn: ({ signal }) => client.listUserReportTemplates({ reportType, includeInactive: true }, { signal }),
+    queryFn: ({ signal }) => client.listUserReportTemplates({ reportType, includeArchived: true }, { signal }),
     enabled,
     staleTime: 60 * 1000,
   });
@@ -55,14 +59,14 @@ export function useReportTemplateWorkspaceQueries({
         sortColumn: "InvoiceDate",
         ascending: false,
       }, { signal }),
-    enabled: enabled && includeDesignerData && reportType === "ExportDocument",
+    enabled: enabled && includeDesignerData && canPreviewInvoiceSource && reportType === "ExportDocument",
     staleTime: 60 * 1000,
   });
 
   const previewPaymentsQuery = useQuery({
     queryKey: queryKeys.reportTemplatePreviewPayments(previewSourcePageSize),
     queryFn: ({ signal }) => client.listPayments({ pageNumber: 1, pageSize: previewSourcePageSize }, { signal }),
-    enabled: enabled && includeDesignerData && reportType === "PaymentVoucher",
+    enabled: enabled && includeDesignerData && canPreviewPaymentSource && reportType === "PaymentVoucher",
     staleTime: 60 * 1000,
   });
 

@@ -16,6 +16,7 @@ namespace ExportDocManager.DataAccess
             bool usesPostgreSql = databaseSettings != null &&
                                   DatabaseModeHelper.UsesPostgreSql(databaseSettings);
 
+            SeedOrganizationDirectory(context);
             SeedPermissionTemplates(context, timeProvider ?? TimeProvider.System);
             int adminTemplateId = context.PermissionTemplates
                 .Where(template => template.Code == BuiltInPermissionTemplateCatalog.Admin)
@@ -42,6 +43,8 @@ namespace ExportDocManager.DataAccess
                     FullName = "System Administrator",
                     Role = UserRoleCatalog.Admin,
                     PermissionTemplateId = adminTemplateId,
+                    CompanyScope = OrganizationDirectoryDefaults.CompanyCode,
+                    DepartmentId = OrganizationDirectoryDefaults.DepartmentCode,
                     IsActive = true
                 };
                 context.Users.Add(admin);
@@ -196,13 +199,40 @@ namespace ExportDocManager.DataAccess
                     IsSystem = true,
                     IsActive = true,
                     UpdatedAt = timeProvider.GetUtcNow(),
-                    Modules = definition.GetModuleAccess()
-                        .Select(grant => new PermissionTemplateModule
+                    Grants = definition.Grants
+                        .Select(grant => new PermissionTemplateGrant
                         {
-                            ModuleKey = grant.Key,
-                            AccessLevel = grant.Value
+                            ResourceKey = grant.ResourceKey,
+                            Action = grant.Action,
+                            DataScope = grant.DataScope
                         })
                         .ToList()
+                });
+            }
+
+            context.SaveChanges();
+        }
+
+        private static void SeedOrganizationDirectory(AppDbContext context)
+        {
+            if (!context.OrganizationCompanies.Any())
+            {
+                context.OrganizationCompanies.Add(new OrganizationCompany
+                {
+                    Code = OrganizationDirectoryDefaults.CompanyCode,
+                    Name = "默认公司",
+                    IsActive = true
+                });
+            }
+
+            if (!context.OrganizationDepartments.Any())
+            {
+                context.OrganizationDepartments.Add(new OrganizationDepartment
+                {
+                    Code = OrganizationDirectoryDefaults.DepartmentCode,
+                    CompanyCode = OrganizationDirectoryDefaults.CompanyCode,
+                    Name = "综合部门",
+                    IsActive = true
                 });
             }
 

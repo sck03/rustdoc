@@ -345,7 +345,11 @@ public sealed class ApiOpenApiIntegrationTests
         AssertResponseSchema(paths, "/api/email-templates", "post", "201", "ApiEmailTemplateDto");
         AssertResponseSchema(paths, "/api/email-templates", "post", "400", "ApiErrorResponse");
         AssertResponseSchema(paths, "/api/email-templates", "post", "409", "ApiErrorResponse");
-        AssertResponseSchema(paths, "/api/email-templates/{id}", "put", "200", "ApiEmailTemplateDto");
+        AssertResponseSchema(paths, "/api/email-templates/{id}/draft", "put", "200", "ApiEmailTemplateDto");
+        AssertResponseSchema(paths, "/api/email-templates/{id}/publish", "post", "200", "ApiEmailTemplateDto");
+        AssertResponseSchema(paths, "/api/email-templates/{id}/share", "post", "200", "ApiEmailTemplateDto");
+        AssertResponseSchema(paths, "/api/email-templates/{id}/disable", "post", "200", "ApiEmailTemplateDto");
+        AssertResponseSchema(paths, "/api/email-templates/{id}/restore", "post", "200", "ApiEmailTemplateDto");
         AssertArrayResponseItemSchema(
             paths,
             "/api/email-templates/{id}/versions",
@@ -358,7 +362,7 @@ public sealed class ApiOpenApiIntegrationTests
             "post",
             "200",
             "ApiEmailTemplateDto");
-        AssertResponseSchema(paths, "/api/email-templates/{id}", "delete", "200", "ApiCommandResponse");
+        AssertResponseSchema(paths, "/api/email-templates/{id}", "delete", "200", "ApiEmailTemplateDto");
         AssertResponseSchema(
             paths,
             "/api/crm/opportunities",
@@ -375,7 +379,18 @@ public sealed class ApiOpenApiIntegrationTests
             "200",
             "ApiSalesOpportunityHistoryDto");
         AssertResponseSchema(paths, "/api/crm/opportunities/{id}", "put", "200", "ApiSalesOpportunityDto");
-        AssertResponseSchema(paths, "/api/crm/opportunities/{id}", "delete", "200", "ApiCommandResponse");
+        AssertResponseSchema(
+            paths,
+            "/api/crm/opportunities/{id}/transition",
+            "post",
+            "200",
+            "ApiSalesOpportunityDto");
+        AssertResponseSchema(
+            paths,
+            "/api/crm/opportunities/{id}/archive",
+            "post",
+            "200",
+            "ApiCommandResponse");
         AssertResponseSchema(paths, "/api/users", "get", "200", "ApiUserListResponse");
         AssertResponseSchema(paths, "/api/users", "get", "403", "ApiErrorResponse");
         AssertResponseSchema(paths, "/api/users", "post", "200", "ApiUserSaveResponse");

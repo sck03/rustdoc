@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
+using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 
 namespace ExportDocManager.Api.Hosting
@@ -49,6 +50,12 @@ namespace ExportDocManager.Api.Hosting
             settings.Email.DocumentEmailBodyTemplate = NormalizeTemplateText(
                 settings.Email.DocumentEmailBodyTemplate,
                 EmailConfig.DefaultDocumentEmailBodyTemplate);
+            settings.Email.RecipientAllowList = EmailRecipientPolicy.NormalizeRules(
+                settings.Email.RecipientAllowList,
+                "收件人白名单");
+            settings.Email.RecipientBlockList = EmailRecipientPolicy.NormalizeRules(
+                settings.Email.RecipientBlockList,
+                "收件人黑名单");
             settings.WebDav ??= new WebDavSettings();
             settings.AI ??= new AISettings();
             settings.SingleWindow ??= new SingleWindowSettings();

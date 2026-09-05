@@ -4,7 +4,6 @@ import { Play, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { type BackgroundJobSnapshot, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
@@ -25,14 +24,13 @@ import {
 } from "./jobPresentation.ts";
 import { normalizeJobId } from "./jobNavigation.ts";
 import { useJobCenterOperations } from "./useJobCenterOperations.ts";
+import { useJobPermissions } from "./useJobPermissions.ts";
 
 const invoiceReportType = "ExportDocument";
 const jobListViewStateStorageKey = "export-doc-manager.job-list-view-state.v1";
 
 export function JobCenterPage({ client }: { client: ExportDocManagerApiClient }) {
-  const jobPermission = useModulePermission("document.jobs");
-  const reportPermission = useModulePermission("document.reports");
-  const invoiceReportPermission = useModulePermission("document.invoice-reports");
+  const { jobPermission, reportPermission, canExportInvoiceZip, canRetryJob } = useJobPermissions();
   const workspaceDeviceProfile = useWorkspaceDeviceProfile();
   const workspaceDeviceMode = workspaceDeviceProfile.mode;
   const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
@@ -50,7 +48,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
     workspaceDeviceCapabilities.canImportExport
     && jobPermission.canOperate
     && reportPermission.canView
-    && invoiceReportPermission.canOperate;
+    && canExportInvoiceZip;
 
   const jobsQuery = useQuery({
     queryKey: queryKeys.jobs(pageNumber, pageSize, committedKeyword.trim(), status),
@@ -218,7 +216,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
               />
             </details>
           ) : <PermissionNotice>当前权限可使用普通后台任务，但未同时授予发票单据输出权限，批量报表 ZIP 已隐藏。</PermissionNotice>}
-          <details>
+          {reportPermission.canOperate ? <details>
             <summary><span>PDF 合并</span><small>{readPathLines(pdfSources).length} 个源文件</small></summary>
             {desktopAvailable ? (
               <PdfMergeJobPanel
@@ -239,7 +237,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
                 <div className="field-help">文件仅暂存在程序临时区，任务结束后自动清理。</div>
               </form>
             )}
-          </details>
+          </details> : null}
         </section>
       ) : null}
 
@@ -273,6 +271,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
         isBusy={jobsQuery.isPending || operations.isBusy}
         hasError={Boolean(errorMessage)}
         canOperate={jobPermission.canOperate}
+        canRetry={canRetryJob}
         canManage={jobPermission.canManage}
         canDownload={workspaceDeviceCapabilities.canImportExport}
         onMessage={operations.handleChildMessage}

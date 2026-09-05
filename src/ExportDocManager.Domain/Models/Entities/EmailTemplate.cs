@@ -12,8 +12,10 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(50)] public string Category { get; set; } = "通用";
         [MaxLength(300)] public string Subject { get; set; } = string.Empty;
         [MaxLength(10000)] public string BodyHtml { get; set; } = string.Empty;
-        public bool IsActive { get; set; } = true;
-        public bool IsShared { get; set; }
+        [Required, MaxLength(20)]
+        public string Status { get; set; } = TemplateLifecycleStatusCatalog.Draft;
+        [Required, MaxLength(20)]
+        public string ShareScope { get; set; } = TemplateShareScopeCatalog.Private;
         [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }

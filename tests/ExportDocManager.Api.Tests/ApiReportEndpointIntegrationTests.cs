@@ -259,13 +259,15 @@ namespace ExportDocManager.Api.Tests
                 {
                     reportType = "ExportDocument",
                     name = "API Database Invoice Template",
-                    contentHtml = "<html><body>DATABASE {{ Invoice.InvoiceNo }}</body></html>",
-                    isActive = true,
-                    isShared = false,
-                    shareScope = "Private"
+                    contentHtml = "<html><body>DATABASE {{ Invoice.InvoiceNo }}</body></html>"
                 });
             Assert.Equal(HttpStatusCode.Created, createUserTemplateResponse.StatusCode);
             var createdUserTemplate = await ApiIntegrationTestHarness.ReadJsonAsync<ApiUserReportTemplateDto>(createUserTemplateResponse);
+            var publishUserTemplateResponse = await adminClient.PostAsJsonAsync(
+                $"/api/reports/user-templates/{createdUserTemplate.Id}/publish",
+                new ApiUserReportTemplateLifecycleRequest(createdUserTemplate.VersionNumber));
+            Assert.Equal(HttpStatusCode.OK, publishUserTemplateResponse.StatusCode);
+            createdUserTemplate = await ApiIntegrationTestHarness.ReadJsonAsync<ApiUserReportTemplateDto>(publishUserTemplateResponse);
             string userTemplateReference = $"user-template:{createdUserTemplate.Id}";
 
             var createPaymentUserTemplateResponse = await adminClient.PostAsJsonAsync(
@@ -274,13 +276,15 @@ namespace ExportDocManager.Api.Tests
                 {
                     reportType = "PaymentVoucher",
                     name = "API Database Payment Template",
-                    contentHtml = "<html><body>DATABASE {{ Payment.InvoiceNo }}</body></html>",
-                    isActive = true,
-                    isShared = false,
-                    shareScope = "Private"
+                    contentHtml = "<html><body>DATABASE {{ Payment.InvoiceNo }}</body></html>"
                 });
             Assert.Equal(HttpStatusCode.Created, createPaymentUserTemplateResponse.StatusCode);
             var createdPaymentUserTemplate = await ApiIntegrationTestHarness.ReadJsonAsync<ApiUserReportTemplateDto>(createPaymentUserTemplateResponse);
+            var publishPaymentUserTemplateResponse = await adminClient.PostAsJsonAsync(
+                $"/api/reports/user-templates/{createdPaymentUserTemplate.Id}/publish",
+                new ApiUserReportTemplateLifecycleRequest(createdPaymentUserTemplate.VersionNumber));
+            Assert.Equal(HttpStatusCode.OK, publishPaymentUserTemplateResponse.StatusCode);
+            createdPaymentUserTemplate = await ApiIntegrationTestHarness.ReadJsonAsync<ApiUserReportTemplateDto>(publishPaymentUserTemplateResponse);
 
             var templatesResponse = await adminClient.GetAsync("/api/reports/templates?reportType=ExportDocument");
             Assert.Equal(HttpStatusCode.OK, templatesResponse.StatusCode);

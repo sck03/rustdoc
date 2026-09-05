@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import "../../styles/routes/reports.css";
 import { useLocation } from "react-router-dom";
 import { ApiReportTemplatePreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
-import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import {
@@ -31,6 +30,7 @@ import { ReportTemplateManagementWorkspace } from "./ReportTemplateManagementWor
 import { ReportTemplateManagementView } from "./ReportTemplateManagementView.tsx";
 import { useReportTemplateWorkspaceNavigation } from "./useReportTemplateWorkspaceNavigation.ts";
 import { useReportTemplateWorkspaceQueries } from "./useReportTemplateWorkspaceQueries.ts";
+import { useReportTemplateDocumentAccess } from "./useReportTemplateDocumentAccess.ts";
 import { useReportTemplateSaveMutations } from "./useReportTemplateSaveMutations.ts";
 import { useUserReportTemplateLifecycleMutations } from "./useUserReportTemplateLifecycleMutations.ts";
 import { useDefaultReportTemplateLifecycleMutations } from "./useDefaultReportTemplateLifecycleMutations.ts";
@@ -41,16 +41,15 @@ import {
   buildNewTemplateFileName,
   buildUserTemplateKey,
   fileNameFromPath,
-  matchesTemplatePath,
   readPreferredPreviewSampleProfile,
   readPreviewSourceIdFromSearch,
   readReportTypeFromSearch,
   readSearchFromHash,
   readTemplateFileNameFromSearch,
   readUserTemplateIdFromSearch,
-  reportTypeOptions,
   type DesignerMode,
   type ReportTypeOption,
+  type ReportTemplatePermissionAccess,
   type TemplatePreviewMode,
   type TemplateWorkspaceMode,
 } from "./reportTemplateDesignerModel.ts";
@@ -61,36 +60,30 @@ import { useReportExportDefaults } from "./useReportExportDefaults.ts";
 import { createReportTemplatePageActions } from "./reportTemplatePageActions.ts";
 export function ReportTemplateWorkspacePage({
   client,
-  canManageTemplates,
-  canDesignTemplates,
+  templateAccess,
   canManageSettings,
   view = "designer",
 }: {
   client: ExportDocManagerApiClient;
-  canManageTemplates: boolean;
-  canDesignTemplates: boolean;
+  templateAccess: ReportTemplatePermissionAccess;
   canManageSettings: boolean;
   view?: "designer" | "management";
 }) {
+  const canManageTemplates = templateAccess.publish;
+  const canDesignTemplates = templateAccess.design;
+  const canCloneTemplates = templateAccess.clone;
   const workspaceDeviceProfile = useWorkspaceDeviceProfile();
   const workspaceDeviceMode = workspaceDeviceProfile.mode;
   const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
   const isLimitedReportView = !workspaceDeviceCapabilities.canUseDenseWorkbench;
   const requestConfirmation = useConfirmation();
-  const invoiceOutputPermission = useModulePermission("document.invoice-reports");
-  const paymentOutputPermission = useModulePermission("document.payment-reports");
+  const { availableReportTypeOptions, invoicePreviewPermission, paymentPreviewPermission } =
+    useReportTemplateDocumentAccess(templateAccess.view);
   const location = useLocation();
   const returnTarget = readReportTemplateReturnTarget(location.state);
   const routeSearch = location.search || readSearchFromHash();
   const requestedReportType = useMemo(() => readReportTypeFromSearch(routeSearch), [routeSearch]);
-  const initialReportType: ReportTypeOption =
-    requestedReportType === "PaymentVoucher" && paymentOutputPermission.canView
-      ? "PaymentVoucher"
-      : requestedReportType === "ExportDocument" && invoiceOutputPermission.canView
-        ? "ExportDocument"
-        : invoiceOutputPermission.canView
-          ? "ExportDocument"
-          : "PaymentVoucher";
+  const initialReportType: ReportTypeOption = requestedReportType ?? availableReportTypeOptions[0]?.value ?? "ExportDocument";
   const requestedTemplateFileName = useMemo(() => readTemplateFileNameFromSearch(routeSearch), [routeSearch]);
   const requestedUserTemplateId = useMemo(() => readUserTemplateIdFromSearch(routeSearch), [routeSearch]);
   const requestedPreviewSourceId = useMemo(
@@ -122,20 +115,15 @@ export function ReportTemplateWorkspacePage({
   const [newTemplateFileName, setNewTemplateFileName] = useState(() => buildNewTemplateFileName(initialReportType));
   const [newTemplateDisplayName, setNewTemplateDisplayName] = useState("");
   const [newUserTemplateName, setNewUserTemplateName] = useState("");
-  const [newUserTemplateShareScope, setNewUserTemplateShareScope] = useState("Private");
   const [renameTemplateFileName, setRenameTemplateFileName] = useState("");
   const [currentTemplateDisplayName, setCurrentTemplateDisplayName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<"success" | "error" | null>(null);
   const desktopAvailable = isDesktopBridgeAvailable();
-  const availableReportTypeOptions = useMemo(
-    () => reportTypeOptions.filter((option) =>
-      option.value === "PaymentVoucher" ? paymentOutputPermission.canView : invoiceOutputPermission.canView,
-    ),
-    [invoiceOutputPermission.canView, paymentOutputPermission.canView],
-  );
-  const canUseCurrentReportType =
-    reportType === "PaymentVoucher" ? paymentOutputPermission.canView : invoiceOutputPermission.canView;
+  const canUseCurrentReportType = availableReportTypeOptions.some((option) => option.value === reportType);
+  const canPreviewSavedSource = reportType === "PaymentVoucher"
+    ? paymentPreviewPermission.allowed
+    : invoicePreviewPermission.allowed;
 
   const {
     templatesQuery,
@@ -151,6 +139,8 @@ export function ReportTemplateWorkspacePage({
     reportType,
     enabled: canUseCurrentReportType,
     includeDesignerData: view === "designer",
+    canPreviewInvoiceSource: invoicePreviewPermission.allowed,
+    canPreviewPaymentSource: paymentPreviewPermission.allowed,
     selectedUserTemplateId,
     selectedTemplatePath,
   });
@@ -320,7 +310,6 @@ export function ReportTemplateWorkspacePage({
     setNewTemplateFileName,
     setNewTemplateDisplayName,
     setNewUserTemplateName,
-    setNewUserTemplateShareScope,
     setRenameTemplateFileName,
     setTemplatePreviewSampleProfile,
     setPreviewInvoiceId,
@@ -346,14 +335,15 @@ export function ReportTemplateWorkspacePage({
       applyLoadedContent(syntheticPath, saved.contentHtml);
       setRenameTemplateFileName(saved.name);
       setCurrentTemplateDisplayName(saved.name);
-      showFeedback(saved.isShared ? "模板已保存并保持团队共享。" : "我的模板已保存。", "success");
+      showFeedback("草稿已保存；发布和共享状态已按草稿规则重置。", "success");
     },
     onError: (error) => showFeedback(readApiError(error), "error"),
   });
 
   const {
-    createUserTemplateMutation,
-    deleteUserTemplateMutation,
+    createBlankUserTemplateMutation,
+    cloneUserTemplateMutation,
+    archiveUserTemplateMutation,
     restoreUserTemplateVersionMutation,
     updateUserTemplateStatusMutation,
   } = useUserReportTemplateLifecycleMutations({
@@ -361,11 +351,8 @@ export function ReportTemplateWorkspacePage({
     reportType,
     selectedTemplatePath,
     selectedUserTemplateId,
-    userTemplates: userTemplatesQuery.data ?? [],
     currentUserTemplate,
-    content,
     newTemplateName: newUserTemplateName,
-    newTemplateShareScope: newUserTemplateShareScope,
     onCreated: (created) => {
       setSelectedUserTemplateId(created.id);
       setSelectedTemplatePath(buildUserTemplateKey(created.id));
@@ -373,16 +360,15 @@ export function ReportTemplateWorkspacePage({
       setRenameTemplateFileName(created.name);
       setCurrentTemplateDisplayName(created.name);
       setNewUserTemplateName("");
-      setNewUserTemplateShareScope("Private");
-      showFeedback(created.isShared ? "团队共享模板已创建。" : "我的私有模板已创建。", "success");
+      showFeedback("私有草稿已创建。", "success");
     },
-    onDeleted: async () => {
+    onArchived: async () => {
       setSelectedUserTemplateId(0);
       setSelectedTemplatePath("");
       clearLoadedTemplateContent();
       setRenameTemplateFileName("");
       setCurrentTemplateDisplayName("");
-      showFeedback("我的模板已删除。", "success");
+      showFeedback("模板已归档，可从归档列表恢复为草稿。", "success");
       await templatesQuery.refetch();
     },
     onRestored: (saved) => {
@@ -391,10 +377,17 @@ export function ReportTemplateWorkspacePage({
       setCurrentTemplateDisplayName(saved.name);
       showFeedback(`已恢复到版本 ${saved.versionNumber}，请检查后继续编辑。`, "success");
     },
-    onStatusUpdated: (saved) => {
+    onStatusUpdated: (saved, action) => {
       applyLoadedContent(buildUserTemplateKey(saved.id), saved.contentHtml);
       setCurrentTemplateDisplayName(saved.name);
-      showFeedback(!saved.isActive ? "模板已停用，不再用于预览和正式输出。" : `共享范围已更新：${reportTemplateShareScopeLabel(saved.shareScope)}`, "success");
+      const nextMessage = action.kind === "publish"
+        ? "模板已发布，可用于正式输出。"
+        : action.kind === "disable"
+          ? "模板已停用，不再用于正式输出。"
+          : action.kind === "restore"
+            ? saved.status === "Draft" ? "归档模板已恢复为私有草稿。" : "模板已恢复发布。"
+            : `共享范围已更新：${reportTemplateShareScopeLabel(saved.shareScope)}`;
+      showFeedback(nextMessage, "success");
     },
     onError: (error) => showFeedback(readApiError(error), "error"),
   });
@@ -475,7 +468,6 @@ export function ReportTemplateWorkspacePage({
     isUserTemplate,
     previewDocumentOptions,
     selectedPreviewSourceValue,
-    selectedPreviewSourceLabel,
     previewContent,
     isLocalSamplePreview,
     renderedPreviewHtml,
@@ -485,7 +477,8 @@ export function ReportTemplateWorkspacePage({
     hasUnsavedChanges,
     canRenderTemplatePreview,
     canCreateTemplate,
-    canCreateUserTemplate,
+    canCreateBlankUserTemplate,
+    canCloneUserTemplate,
     canRenameTemplate,
     canDeleteTemplate,
     canExportPackage,
@@ -500,6 +493,9 @@ export function ReportTemplateWorkspacePage({
     canImportTemplateFileByPath,
     canUploadTemplateFile,
     canSave,
+    canUpdateDisplayName,
+    canSetDefault,
+    canFormatSource,
   } = deriveReportTemplateWorkspaceState({
     reportType,
     designerDraftContent,
@@ -507,6 +503,10 @@ export function ReportTemplateWorkspacePage({
     loadedContent,
     contentTemplatePath,
     selectedTemplatePath,
+    currentTemplateDisplayName,
+    persistedDisplayName,
+    defaultTemplatePath,
+    canUseAdvancedTools: workspaceDeviceCapabilities.canUseAdvancedTools,
     selectedContentTemplatePath: templateContentQuery.data?.templatePath ?? "",
     currentUserTemplate,
     templatePreviewMode,
@@ -536,8 +536,9 @@ export function ReportTemplateWorkspacePage({
       fileWorkspace.uploadFileMutation.isPending,
       saveMutation.isPending,
       saveUserTemplateMutation.isPending,
-      createUserTemplateMutation.isPending,
-      deleteUserTemplateMutation.isPending,
+      createBlankUserTemplateMutation.isPending,
+      cloneUserTemplateMutation.isPending,
+      archiveUserTemplateMutation.isPending,
       restoreUserTemplateVersionMutation.isPending,
       updateUserTemplateStatusMutation.isPending,
       exportDefaults.isBusy,
@@ -547,6 +548,11 @@ export function ReportTemplateWorkspacePage({
     ],
     canManageTemplates,
     canDesignTemplates,
+    canCloneTemplates,
+    canArchiveTemplates: templateAccess.archive,
+    canImportTemplates: templateAccess.import,
+    canExportTemplates: templateAccess.export,
+    canPreviewSavedSource,
     newTemplateFileName,
     newUserTemplateName,
     renameTemplateFileName,
@@ -566,24 +572,6 @@ export function ReportTemplateWorkspacePage({
     message,
     messageType,
   });
-  const canUpdateDisplayName = Boolean(
-    selectedTemplatePath &&
-    currentTemplateDisplayName.trim() &&
-    currentTemplateDisplayName.trim() !== persistedDisplayName &&
-    !isBusy &&
-    (isUserTemplate ? currentUserTemplate?.canEdit && canDesignTemplates : canManageTemplates),
-  );
-  const canSetDefault = Boolean(
-    selectedTemplatePath &&
-    canManageTemplates &&
-    !isBusy &&
-    !matchesTemplatePath(selectedTemplatePath, defaultTemplatePath),
-  );
-  const canFormatSource = Boolean(
-    selectedTemplatePath &&
-    !isBusy &&
-    (isUserTemplate ? currentUserTemplate?.canEdit && canDesignTemplates : canManageTemplates),
-  );
   const {
     handleDesignerModeChange,
     handleFormatSource,
@@ -626,8 +614,9 @@ export function ReportTemplateWorkspacePage({
 
   const {
     handleCreateTemplate,
-    handleCreateUserTemplate,
-    handleToggleUserTemplateActive,
+    handleCreateBlankUserTemplate,
+    handleCloneUserTemplate,
+    handleUserTemplateLifecycleAction,
     handleRestoreUserTemplateVersion,
     handleRenameTemplate,
     handleUpdateDisplayName,
@@ -639,11 +628,13 @@ export function ReportTemplateWorkspacePage({
   } = createReportTemplatePageActions({
     canCreateTemplate,
     createTemplate: () => createTemplateMutation.mutate(),
-    canCreateUserTemplate,
-    createUserTemplate: () => createUserTemplateMutation.mutate(),
+    canCreateBlankUserTemplate,
+    createBlankUserTemplate: () => createBlankUserTemplateMutation.mutate(),
+    canCloneUserTemplate,
+    cloneUserTemplate: () => cloneUserTemplateMutation.mutate(),
     currentUserTemplate,
     requestConfirmation,
-    updateUserTemplateStatus: (value) => updateUserTemplateStatusMutation.mutate(value),
+    runUserTemplateLifecycleAction: (value) => updateUserTemplateStatusMutation.mutate(value),
     restoreUserTemplateVersion: (version) => restoreUserTemplateVersionMutation.mutate(version),
     canRenameTemplate,
     isUserTemplate,
@@ -654,7 +645,9 @@ export function ReportTemplateWorkspacePage({
     canSetDefault,
     setDefaultTemplate: () => setDefaultTemplateMutation.mutate(),
     canDeleteTemplate,
-    deleteUserTemplate: () => deleteUserTemplateMutation.mutate(currentUserTemplate?.id ?? 0),
+    deleteUserTemplate: () => {
+      if (currentUserTemplate) archiveUserTemplateMutation.mutate(currentUserTemplate);
+    },
     deleteTemplate: () => deleteTemplateMutation.mutate(),
     canSave,
     designerMode,
@@ -712,20 +705,24 @@ export function ReportTemplateWorkspacePage({
          onSave: handleSaveExportSettings,
          templates,
        }}
-      userPanel={canDesignTemplates ? {
+      userPanel={Object.values(templateAccess).some(Boolean) ? {
         currentTemplate: currentUserTemplate,
         versions: userTemplateVersionsQuery.data ?? [],
         versionsLoading: userTemplateVersionsQuery.isFetching,
         newTemplateName: newUserTemplateName,
-        newTemplateShareScope: newUserTemplateShareScope,
         isBusy,
-        canCreate: canCreateUserTemplate,
-        isUserTemplate,
+        allowCreateBlank: canDesignTemplates,
+        allowClone: canCloneTemplates,
+        canCreateBlank: canCreateBlankUserTemplate,
+        canClone: canCloneUserTemplate,
         onNewTemplateNameChange: setNewUserTemplateName,
-        onNewTemplateShareScopeChange: setNewUserTemplateShareScope,
-        onCreate: handleCreateUserTemplate,
-        onShareScopeChange: (shareScope) => updateUserTemplateStatusMutation.mutate({ shareScope }),
-        onToggleActive: handleToggleUserTemplateActive,
+        onCreateBlank: handleCreateBlankUserTemplate,
+        onClone: handleCloneUserTemplate,
+        onShareScopeChange: (shareScope) => void handleUserTemplateLifecycleAction({ kind: "share", shareScope }),
+        onPublish: () => void handleUserTemplateLifecycleAction({ kind: "publish" }),
+        onDisable: () => void handleUserTemplateLifecycleAction({ kind: "disable" }),
+        onRestore: () => void handleUserTemplateLifecycleAction({ kind: "restore" }),
+        onArchive: handleDeleteTemplate,
         onRestoreVersion: handleRestoreUserTemplateVersion,
       } : null}
       adminPanel={{
@@ -739,7 +736,7 @@ export function ReportTemplateWorkspacePage({
         canCreate: canCreateTemplate,
         canUpdateDisplayName,
         canRenameFile: !isUserTemplate && canRenameTemplate,
-        canDelete: canDeleteTemplate,
+        canDelete: !isUserTemplate && canDeleteTemplate,
         canEditDisplayName: isUserTemplate
           ? Boolean(currentUserTemplate?.canEdit) && canDesignTemplates && !isBusy
           : canManageTemplates && Boolean(selectedTemplatePath) && !isBusy,
@@ -756,7 +753,8 @@ export function ReportTemplateWorkspacePage({
       }}
       packagePanel={{
         desktopAvailable: packageWorkspace.desktopAvailable,
-        canManageTemplates,
+        canExportTemplates: templateAccess.export,
+        canImportTemplates: templateAccess.import,
         isBusy,
         importStrategy: packageWorkspace.importStrategy,
         exportPath: packageWorkspace.exportPath,
@@ -783,7 +781,8 @@ export function ReportTemplateWorkspacePage({
       }}
       filePanel={{
         desktopAvailable: fileWorkspace.desktopAvailable,
-        canManageTemplates,
+        canExportTemplates: templateAccess.export,
+        canImportTemplates: templateAccess.import,
         isBusy,
         exportPath: fileWorkspace.exportPath,
         importPath: fileWorkspace.importPath,
@@ -855,6 +854,11 @@ export function ReportTemplateWorkspacePage({
           <div className="report-template-grid report-template-grid-design">
             <ReportTemplateDesignWorkspace
               client={client}
+              editable={workspaceDeviceCapabilities.canUseAdvancedTools && (
+                isUserTemplate
+                  ? currentUserTemplate?.canEdit === true && canDesignTemplates
+                  : canManageTemplates
+              )}
               designerMode={designerMode}
               reportType={reportType}
               displayName={currentUserTemplate?.name ?? currentTemplate?.displayName ?? ""}

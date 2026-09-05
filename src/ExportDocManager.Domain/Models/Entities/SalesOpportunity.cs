@@ -13,6 +13,8 @@ namespace ExportDocManager.Models.Entities
         [Required, MaxLength(200)] public string Title { get; set; } = string.Empty;
         [MaxLength(30)] public string Stage { get; set; } = "线索";
         [MaxLength(100)] public string QuotationNo { get; set; } = string.Empty;
+        /// <summary>Canonical nullable key used for global quote tracking uniqueness.</summary>
+        [MaxLength(100)] public string? QuotationNoNormalized { get; set; }
         public decimal EstimatedAmount { get; set; }
         [MaxLength(3)] public string Currency { get; set; } = "USD";
         public int ProbabilityPercent { get; set; }
@@ -22,5 +24,7 @@ namespace ExportDocManager.Models.Entities
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
         [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
+        /// <summary>Soft-delete marker; history and audit rows remain queryable to administrators.</summary>
+        public bool IsDeleted { get; set; }
     }
 }

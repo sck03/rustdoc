@@ -1,22 +1,20 @@
 import { ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ReportTemplatePermissionAccess } from "./reportTemplateDesignerModel.ts";
 import { ReportTemplateWorkspacePage } from "./ReportTemplateWorkspacePage.tsx";
 
 export function ReportTemplateManagementPage({
   client,
-  canManageTemplates,
-  canDesignTemplates,
+  templateAccess,
   canManageSettings,
 }: {
   client: ExportDocManagerApiClient;
-  canManageTemplates: boolean;
-  canDesignTemplates: boolean;
+  templateAccess: ReportTemplatePermissionAccess;
   canManageSettings: boolean;
 }) {
   return (
     <ReportTemplateWorkspacePage
       client={client}
-      canManageTemplates={canManageTemplates}
-      canDesignTemplates={canDesignTemplates}
+      templateAccess={templateAccess}
       canManageSettings={canManageSettings}
       view="management"
     />

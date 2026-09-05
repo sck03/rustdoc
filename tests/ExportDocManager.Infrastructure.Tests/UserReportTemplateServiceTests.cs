@@ -1,7 +1,9 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Infrastructure.Tests
@@ -9,7 +11,7 @@ namespace ExportDocManager.Infrastructure.Tests
     public sealed class UserReportTemplateServiceTests
     {
         [Fact]
-        public async Task RegularUser_ShouldManageOwnTemplateAndReadSharedTemplateOnly()
+        public async Task Lifecycle_ShouldProtectSharedContentAndRequireExpectedVersion()
         {
             using var factory = new TestDbContextFactory();
             int sharedId;
@@ -21,120 +23,98 @@ namespace ExportDocManager.Infrastructure.Tests
                     ReportType = ReportDocumentType.ExportDocument.ToString(),
                     Name = "团队出口发票",
                     ContentHtml = "<html>{{ Invoice.InvoiceNo }}</html>",
-                    IsShared = true,
-                    ShareScope = UserReportTemplateShareScope.All
+                    Status = TemplateLifecycleStatusCatalog.Published,
+                    ShareScope = TemplateShareScopeCatalog.All,
+                    VersionNumber = 1
                 };
                 seedContext.UserReportTemplates.Add(sharedEntity);
+                seedContext.UserReportTemplateVersions.Add(new UserReportTemplateVersion
+                {
+                    Template = sharedEntity,
+                    VersionNumber = 1,
+                    ChangeType = "发布",
+                    Name = sharedEntity.Name,
+                    ContentHtml = sharedEntity.ContentHtml,
+                    Status = sharedEntity.Status,
+                    ShareScope = sharedEntity.ShareScope,
+                    ChangedBy = "owner"
+                });
                 await seedContext.SaveChangesAsync();
                 sharedId = sharedEntity.Id;
             }
 
-            var user = new User { Id = 7, Username = "document-user", Role = UserRoleCatalog.User };
-            var service = new UserReportTemplateService(
-                factory,
-                new BusinessDataAccessScope(new DatabaseConnectionSettings(), new FixedCurrentUserContext(user)));
-
+            var service = CreateService(factory, CreateTemplateUser(7));
             var shared = Assert.Single(await service.ListAsync(ReportDocumentType.ExportDocument, true));
             Assert.Equal(sharedId, shared.Id);
-            Assert.True(shared.IsShared);
+            Assert.Equal(TemplateLifecycleStatusCatalog.Published, shared.Status);
+            Assert.Equal(TemplateShareScopeCatalog.All, shared.ShareScope);
             Assert.False(shared.CanEdit);
-            await Assert.ThrowsAsync<KeyNotFoundException>(() => service.SaveAsync(
-                new UserReportTemplateSaveRequest(
-                    sharedId, shared.ReportType, shared.Name, shared.ContentHtml, true, true, UserReportTemplateShareScope.All)));
-            Assert.False(await service.DeleteAsync(sharedId));
+            await Assert.ThrowsAsync<ResourceNotFoundException>(() => service.SaveDraftAsync(
+                new UserReportTemplateDraftRequest(
+                    sharedId,
+                    shared.ReportType,
+                    shared.Name,
+                    shared.ContentHtml,
+                    shared.VersionNumber)));
 
-            var own = await service.SaveAsync(new UserReportTemplateSaveRequest(
+            var draft = await service.SaveDraftAsync(new UserReportTemplateDraftRequest(
                 0,
                 ReportDocumentType.ExportDocument.ToString(),
                 "我的出口发票",
-                shared.ContentHtml,
-                true,
-                false));
-            Assert.True(own.CanEdit);
-            Assert.False(own.IsShared);
-            Assert.Equal(user.Id, own.OwnerUserId);
+                shared.ContentHtml));
+            Assert.Equal(TemplateLifecycleStatusCatalog.Draft, draft.Status);
+            Assert.Equal(TemplateShareScopeCatalog.Private, draft.ShareScope);
+            Assert.True(draft.CanEdit);
+            Assert.True(draft.CanPublish);
 
-            var published = await service.SaveAsync(new UserReportTemplateSaveRequest(
-                own.Id, own.ReportType, own.Name, own.ContentHtml, true, true, UserReportTemplateShareScope.All, own.VersionNumber));
-            Assert.True(published.IsShared);
-            Assert.Equal(2, published.VersionNumber);
-            var versions = await service.ListVersionsAsync(own.Id);
-            Assert.Equal(new[] { 2, 1 }, versions.Select(item => item.VersionNumber));
-            var restored = await service.RestoreVersionAsync(own.Id, 1);
-            Assert.Equal(3, restored.VersionNumber);
-            Assert.False(restored.IsShared);
-            await Assert.ThrowsAsync<UserReportTemplateConcurrencyException>(() => service.SaveAsync(
-                new UserReportTemplateSaveRequest(own.Id, own.ReportType, own.Name, own.ContentHtml, true, false, UserReportTemplateShareScope.Private, 1)));
-            Assert.True(await service.DeleteAsync(own.Id));
-        }
+            var published = await service.PublishAsync(draft.Id, draft.VersionNumber);
+            var teamShared = await service.ShareAsync(
+                published.Id,
+                new UserReportTemplateShareRequest(TemplateShareScopeCatalog.All, published.VersionNumber));
+            Assert.Equal(TemplateShareScopeCatalog.All, teamShared.ShareScope);
 
-        [Fact]
-        public async Task Save_ShouldRejectCrossDomainTemplateFields()
-        {
-            using var factory = new TestDbContextFactory();
-            var user = new User { Id = 7, Username = "document-user", Role = UserRoleCatalog.User };
-            var service = new UserReportTemplateService(
-                factory,
-                new BusinessDataAccessScope(new DatabaseConnectionSettings(), new FixedCurrentUserContext(user)));
+            var disabled = await service.DisableAsync(teamShared.Id, teamShared.VersionNumber);
+            var restored = await service.RestoreAsync(disabled.Id, disabled.VersionNumber);
+            Assert.Equal(TemplateLifecycleStatusCatalog.Published, restored.Status);
+            await Assert.ThrowsAsync<UserReportTemplateConcurrencyException>(() =>
+                service.ArchiveAsync(restored.Id, disabled.VersionNumber));
 
-            await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(
-                new UserReportTemplateSaveRequest(
-                    0,
-                    ReportDocumentType.PaymentVoucher.ToString(),
-                    "错误付款模板",
-                    "{{ Invoice.InvoiceNo }}",
-                    true,
-                    false)));
+            var contentDraft = await service.SaveDraftAsync(new UserReportTemplateDraftRequest(
+                restored.Id,
+                restored.ReportType,
+                restored.Name,
+                "<html>V2 {{ Invoice.InvoiceNo }}</html>",
+                restored.VersionNumber));
+            Assert.Equal(TemplateLifecycleStatusCatalog.Draft, contentDraft.Status);
+            Assert.Equal(TemplateShareScopeCatalog.Private, contentDraft.ShareScope);
 
-            await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(
-                new UserReportTemplateSaveRequest(
-                    0,
-                    ReportDocumentType.ExportDocument.ToString(),
-                    "错误出口模板",
-                    "{{ Payment.InvoiceNo }}",
-                    true,
-                    false)));
-
-            await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(
-                new UserReportTemplateSaveRequest(
-                    0,
-                    ReportDocumentType.PaymentVoucher.ToString(),
-                    "错误付款索引模板",
-                    "{{ Exporter[\"ExporterNameCN\"] }}",
-                    true,
-                    false)));
-
-            await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(
-                new UserReportTemplateSaveRequest(
-                    0,
-                    ReportDocumentType.ExportDocument.ToString(),
-                    "错误出口索引模板",
-                    "{{ Payment[\"InvoiceNo\"] }}",
-                    true,
-                    false)));
+            var restoredVersion = await service.RestoreVersionAsync(
+                contentDraft.Id,
+                1,
+                contentDraft.VersionNumber);
+            Assert.Equal(TemplateLifecycleStatusCatalog.Draft, restoredVersion.Status);
+            Assert.Equal(shared.ContentHtml, restoredVersion.ContentHtml);
+            var archived = await service.ArchiveAsync(restoredVersion.Id, restoredVersion.VersionNumber);
+            Assert.Equal(TemplateLifecycleStatusCatalog.Archived, archived.Status);
+            Assert.Single(await service.ListAsync(ReportDocumentType.ExportDocument, includeArchived: false));
         }
 
         [Theory]
-        [InlineData("{{ this[\"Exporter\"] }}")]
-        [InlineData("{{ object.eval \"Exporter.ExporterNameCN\" }}")]
-        [InlineData("{{ \"{{ Exporter.ExporterNameCN }}\" | object.eval_template }}")]
-        [InlineData("{{ object[\"eval_template\"] \"{{ Exporter.ExporterNameCN }}\" }}")]
-        public async Task Save_ShouldRejectDynamicGlobalAccessAndEvaluation(string content)
+        [InlineData("PaymentVoucher", "{{ Invoice.InvoiceNo }}")]
+        [InlineData("ExportDocument", "{{ Payment.InvoiceNo }}")]
+        [InlineData("PaymentVoucher", "{{ Exporter[\"ExporterNameCN\"] }}")]
+        [InlineData("ExportDocument", "{{ Payment[\"InvoiceNo\"] }}")]
+        [InlineData("PaymentVoucher", "{{ this[\"Exporter\"] }}")]
+        [InlineData("PaymentVoucher", "{{ object.eval \"Exporter.ExporterNameCN\" }}")]
+        public async Task SaveDraft_ShouldRejectCrossDomainOrDynamicTemplateFields(
+            string reportType,
+            string content)
         {
             using var factory = new TestDbContextFactory();
-            var user = new User { Id = 7, Username = "document-user", Role = UserRoleCatalog.User };
-            var service = new UserReportTemplateService(
-                factory,
-                new BusinessDataAccessScope(new DatabaseConnectionSettings(), new FixedCurrentUserContext(user)));
+            var service = CreateService(factory, CreateTemplateUser(7));
 
-            await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(
-                new UserReportTemplateSaveRequest(
-                    0,
-                    ReportDocumentType.PaymentVoucher.ToString(),
-                    "动态访问模板",
-                    content,
-                    true,
-                    false)));
+            await Assert.ThrowsAsync<ArgumentException>(() => service.SaveDraftAsync(
+                new UserReportTemplateDraftRequest(0, reportType, "错误模板", content)));
         }
 
         [Theory]
@@ -143,112 +123,199 @@ namespace ExportDocManager.Infrastructure.Tests
         [InlineData("<iframe src=\"https://example.com\"></iframe>")]
         [InlineData("<img src=\"https://example.com/pixel.png\">")]
         [InlineData("<style>@import url('https://example.com/style.css');</style>")]
-        public async Task Save_ShouldRejectUnsafeBrowserContent(string unsafeContent)
+        public async Task SaveDraft_ShouldRejectUnsafeBrowserContent(string unsafeContent)
         {
             using var factory = new TestDbContextFactory();
-            var user = new User { Id = 7, Username = "document-user", Role = UserRoleCatalog.User };
-            var service = new UserReportTemplateService(
-                factory,
-                new BusinessDataAccessScope(new DatabaseConnectionSettings(), new FixedCurrentUserContext(user)));
+            var service = CreateService(factory, CreateTemplateUser(7));
 
-            await Assert.ThrowsAsync<ArgumentException>(() => service.SaveAsync(
-                new UserReportTemplateSaveRequest(
+            await Assert.ThrowsAsync<ArgumentException>(() => service.SaveDraftAsync(
+                new UserReportTemplateDraftRequest(
                     0,
                     ReportDocumentType.ExportDocument.ToString(),
                     "不安全模板",
-                    unsafeContent,
-                    true,
-                    false)));
+                    unsafeContent)));
         }
 
         [Fact]
-        public async Task SharedTemplates_ShouldRespectDepartmentCompanyAndActiveScopes()
+        public async Task SharedTemplates_ShouldRespectDepartmentCompanyAndPublishedStatus()
         {
             using var factory = new TestDbContextFactory();
             using (var seed = factory.CreateDbContext())
             {
                 seed.UserReportTemplates.AddRange(
-                    new UserReportTemplate
-                    {
-                        OwnerUserId = 8,
-                        ReportType = "ExportDocument",
-                        Name = "部门模板",
-                        ContentHtml = "department",
-                        IsShared = true,
-                        ShareScope = UserReportTemplateShareScope.Department,
-                        DepartmentId = "sales",
-                        CompanyScope = "acme"
-                    },
-                    new UserReportTemplate
-                    {
-                        OwnerUserId = 8,
-                        ReportType = "ExportDocument",
-                        Name = "公司模板",
-                        ContentHtml = "company",
-                        IsShared = true,
-                        ShareScope = UserReportTemplateShareScope.Company,
-                        CompanyScope = "acme"
-                    },
-                    new UserReportTemplate
-                    {
-                        OwnerUserId = 8,
-                        ReportType = "ExportDocument",
-                        Name = "全员模板",
-                        ContentHtml = "all",
-                        IsShared = true,
-                        ShareScope = UserReportTemplateShareScope.All
-                    },
-                    new UserReportTemplate
-                    {
-                        OwnerUserId = 8,
-                        ReportType = "ExportDocument",
-                        Name = "停用模板",
-                        ContentHtml = "inactive",
-                        IsShared = true,
-                        ShareScope = UserReportTemplateShareScope.All,
-                        IsActive = false
-                    });
+                    Shared("部门模板", TemplateShareScopeCatalog.Department, "sales", "acme"),
+                    Shared("公司模板", TemplateShareScopeCatalog.Company, string.Empty, "acme"),
+                    Shared("全员模板", TemplateShareScopeCatalog.All, string.Empty, string.Empty),
+                    Shared(
+                        "停用模板",
+                        TemplateShareScopeCatalog.All,
+                        string.Empty,
+                        string.Empty,
+                        TemplateLifecycleStatusCatalog.Disabled));
                 await seed.SaveChangesAsync();
             }
 
-            var user = new User { Id = 7, Username = "sales-user", Role = UserRoleCatalog.User, DepartmentId = "sales", CompanyScope = "acme" };
-            var service = new UserReportTemplateService(
-                factory,
-                new BusinessDataAccessScope(new DatabaseConnectionSettings(), new FixedCurrentUserContext(user)));
+            var user = CreateTemplateUser(7, "sales", "acme");
+            var service = CreateService(factory, user);
             var visible = await service.ListAsync(ReportDocumentType.ExportDocument);
             Assert.Equal(
                 new[] { "全员模板", "公司模板", "部门模板" },
                 visible.Select(item => item.Name).OrderBy(item => item, StringComparer.Ordinal));
 
-            var otherUser = new User { Id = 6, Username = "other-user", Role = UserRoleCatalog.User, DepartmentId = "finance", CompanyScope = "other" };
-            var otherService = new UserReportTemplateService(
-                factory,
-                new BusinessDataAccessScope(new DatabaseConnectionSettings(), new FixedCurrentUserContext(otherUser)));
-            var otherVisible = await otherService.ListAsync(ReportDocumentType.ExportDocument);
+            var otherUser = CreateTemplateUser(6, "finance", "other");
+            var otherVisible = await CreateService(factory, otherUser)
+                .ListAsync(ReportDocumentType.ExportDocument);
             Assert.Equal(new[] { "全员模板" }, otherVisible.Select(item => item.Name));
         }
 
-        private sealed class FixedCurrentUserContext : ICurrentUserContext
+        [Fact]
+        public async Task Clone_ShouldUseVisibleServerSourceAndKeepDesignPermissionIndependent()
         {
-            public FixedCurrentUserContext(User currentUser) => CurrentUser = currentUser;
-            public User CurrentUser { get; }
+            using var factory = new TestDbContextFactory();
+            int sharedId;
+            int privateId;
+            using (var seed = factory.CreateDbContext())
+            {
+                var shared = Shared(
+                    "可复制共享模板",
+                    TemplateShareScopeCatalog.All,
+                    string.Empty,
+                    string.Empty);
+                shared.ContentHtml = "<html>SERVER SOURCE {{ Invoice.InvoiceNo }}</html>";
+                var privateTemplate = Shared(
+                    "不可见私有模板",
+                    TemplateShareScopeCatalog.Private,
+                    "finance",
+                    "other",
+                    TemplateLifecycleStatusCatalog.Draft);
+                seed.UserReportTemplates.AddRange(shared, privateTemplate);
+                await seed.SaveChangesAsync();
+                sharedId = shared.Id;
+                privateId = privateTemplate.Id;
+            }
+
+            var cloneOnlyUser = CreateTemplateUser(
+                7,
+                allowedActions: [PermissionAction.View, PermissionAction.Clone]);
+            var service = CreateService(factory, cloneOnlyUser);
+            var cloned = await service.CloneAsync(new UserReportTemplateCloneRequest(
+                ReportDocumentType.ExportDocument.ToString(),
+                "共享模板副本",
+                SourceUserTemplateId: sharedId));
+
+            Assert.Equal("<html>SERVER SOURCE {{ Invoice.InvoiceNo }}</html>", cloned.ContentHtml);
+            Assert.Equal(TemplateLifecycleStatusCatalog.Draft, cloned.Status);
+            Assert.Equal(TemplateShareScopeCatalog.Private, cloned.ShareScope);
+            Assert.False(cloned.CanEdit);
+            await Assert.ThrowsAsync<PermissionDeniedException>(() => service.SaveDraftAsync(
+                new UserReportTemplateDraftRequest(
+                    0,
+                    ReportDocumentType.ExportDocument.ToString(),
+                    "绕过复制",
+                    "<html>CLIENT CONTENT</html>")));
+            await Assert.ThrowsAsync<ResourceNotFoundException>(() => service.CloneAsync(
+                new UserReportTemplateCloneRequest(
+                    ReportDocumentType.ExportDocument.ToString(),
+                    "越权副本",
+                    SourceUserTemplateId: privateId)));
+        }
+
+        private static UserReportTemplate Shared(
+            string name,
+            string shareScope,
+            string departmentId,
+            string companyScope,
+            string status = TemplateLifecycleStatusCatalog.Published) =>
+            new()
+            {
+                OwnerUserId = 8,
+                ReportType = ReportDocumentType.ExportDocument.ToString(),
+                Name = name,
+                ContentHtml = "<html>{{ Invoice.InvoiceNo }}</html>",
+                Status = status,
+                ShareScope = shareScope,
+                DepartmentId = departmentId,
+                CompanyScope = companyScope
+            };
+
+        private static UserReportTemplateService CreateService(TestDbContextFactory factory, User user) =>
+            new(
+                factory,
+                new BusinessDataAccessScope(
+                    CreatePostgreSqlSettings(),
+                    new FixedCurrentUserContext(user)));
+
+        private static User CreateTemplateUser(
+            int id,
+            string departmentId = "sales",
+            string companyScope = "acme",
+            IReadOnlyCollection<string>? allowedActions = null)
+        {
+            var actions = PermissionResourceCatalog.ByKey[PermissionResourceCatalog.ReportTemplates].Actions
+                .Where(action => allowedActions == null || allowedActions.Contains(action.Key, StringComparer.Ordinal));
+            return new User
+            {
+                Id = id,
+                Username = $"document-{id}",
+                Role = UserRoleCatalog.User,
+                DepartmentId = departmentId,
+                CompanyScope = companyScope,
+                EffectivePermissionGrants = actions
+                    .Select(action => new KeyValuePair<string, string>(
+                        PermissionResourceCatalog.CreateGrantKey(
+                            PermissionResourceCatalog.ReportTemplates,
+                            action.Key),
+                        action.Key == PermissionAction.View
+                            ? PermissionDataScope.Department
+                            : PermissionDataScope.Own))
+                    .Append(new KeyValuePair<string, string>(
+                        PermissionResourceCatalog.CreateGrantKey(
+                            PermissionModuleCatalog.DocumentInvoices,
+                            PermissionAction.View),
+                        PermissionDataScope.Own))
+                    .Append(new KeyValuePair<string, string>(
+                        PermissionResourceCatalog.CreateGrantKey(
+                            PermissionModuleCatalog.DocumentPayments,
+                            PermissionAction.View),
+                        PermissionDataScope.Own))
+                    .ToDictionary(item => item.Key, item => item.Value, StringComparer.OrdinalIgnoreCase)
+            };
+        }
+
+        private static DatabaseConnectionSettings CreatePostgreSqlSettings() => new()
+        {
+            Provider = DatabaseConnectionSettings.PostgreSqlProvider,
+            PostgreSqlHost = "127.0.0.1",
+            PostgreSqlDatabase = "test",
+            PostgreSqlUsername = "test"
+        };
+
+        private sealed class FixedCurrentUserContext(User currentUser) : ICurrentUserContext
+        {
+            public User CurrentUser { get; } = currentUser;
         }
 
         private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
         {
-            private readonly DbContextOptions<AppDbContext> _options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                .Options;
+            private readonly SqliteConnection _connection = new("Data Source=:memory:");
+            private readonly DbContextOptions<AppDbContext> _options;
+
+            public TestDbContextFactory()
+            {
+                _connection.Open();
+                _options = new DbContextOptionsBuilder<AppDbContext>()
+                    .UseSqlite(_connection)
+                    .Options;
+                using var context = CreateDbContext();
+                context.Database.EnsureCreated();
+            }
 
             public AppDbContext CreateDbContext() => new(_options);
+
             public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
                 Task.FromResult(CreateDbContext());
 
-            public void Dispose()
-            {
-                using var context = CreateDbContext();
-                context.Database.EnsureDeleted();
-            }
+            public void Dispose() => _connection.Dispose();
         }
     }
 }

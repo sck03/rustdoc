@@ -33,6 +33,80 @@ public sealed class EmailDeliveryStoreTests
     }
 
     [Fact]
+    public async Task DeliveryHistory_ShouldApplyDepartmentAndCompanyPermissionScopes()
+    {
+        using var factory = new TestDbContextFactory();
+        var databaseSettings = new DatabaseConnectionSettings
+        {
+            Provider = DatabaseConnectionSettings.PostgreSqlProvider
+        };
+        User viewer = CreateScopedUser(7, "viewer", "sales", "acme", PermissionDataScope.Department);
+        User departmentPeer = CreateScopedUser(8, "peer", "sales", "acme", PermissionDataScope.Own);
+        User companyPeer = CreateScopedUser(9, "finance", "finance", "acme", PermissionDataScope.Own);
+        User outsideCompany = CreateScopedUser(10, "outside", "sales", "other", PermissionDataScope.Own);
+
+        foreach (User sender in new[] { viewer, departmentPeer, companyPeer, outsideCompany })
+        {
+            var senderStore = new EmailDeliveryStore(
+                factory,
+                new BusinessDataAccessScope(databaseSettings, new FixedCurrentUserContext(sender)));
+            Assert.True((await senderStore.BeginAsync(
+                $"delivery-{sender.Id}",
+                EmailDeliveryFingerprint.Create([sender.Username, "scope-test"]),
+                string.Empty,
+                "EmailTool",
+                $"{sender.Username}@example.com",
+                sender.Username,
+                0)).ShouldSend);
+        }
+
+        var departmentStore = new EmailDeliveryStore(
+            factory,
+            new BusinessDataAccessScope(databaseSettings, new FixedCurrentUserContext(viewer)));
+        var departmentRows = await departmentStore.ListRecentAsync();
+        Assert.Equal(new[] { "peer", "viewer" }, departmentRows.Select(row => row.Subject).Order().ToArray());
+
+        viewer.EffectivePermissionGrants = CreateDeliveryHistoryGrant(PermissionDataScope.Company);
+        var companyRows = await departmentStore.ListRecentAsync();
+        Assert.Equal(new[] { "finance", "peer", "viewer" }, companyRows.Select(row => row.Subject).Order().ToArray());
+    }
+
+    [Fact]
+    public async Task DeliveryKey_ShouldBeIsolatedPerUser()
+    {
+        using var factory = new TestDbContextFactory();
+        var databaseSettings = new DatabaseConnectionSettings();
+        User firstUser = CreateScopedUser(7, "first", "sales", "acme", PermissionDataScope.Own);
+        User secondUser = CreateScopedUser(8, "second", "sales", "acme", PermissionDataScope.Own);
+        var firstStore = new EmailDeliveryStore(
+            factory,
+            new BusinessDataAccessScope(databaseSettings, new FixedCurrentUserContext(firstUser)));
+        var secondStore = new EmailDeliveryStore(
+            factory,
+            new BusinessDataAccessScope(databaseSettings, new FixedCurrentUserContext(secondUser)));
+
+        Assert.True((await firstStore.BeginAsync(
+            "shared-browser-key",
+            EmailDeliveryFingerprint.Create(["first"]),
+            string.Empty,
+            "EmailTool",
+            "first@example.com",
+            "First",
+            0)).ShouldSend);
+        Assert.True((await secondStore.BeginAsync(
+            "shared-browser-key",
+            EmailDeliveryFingerprint.Create(["second"]),
+            string.Empty,
+            "EmailTool",
+            "second@example.com",
+            "Second",
+            0)).ShouldSend);
+
+        await using var context = factory.CreateDbContext();
+        Assert.Equal(2, await context.EmailDeliveryRecords.CountAsync());
+    }
+
+    [Fact]
     public async Task UncertainDelivery_ShouldNeverBeAutomaticallyRetried()
     {
         using var factory = new TestDbContextFactory();
@@ -81,6 +155,30 @@ public sealed class EmailDeliveryStoreTests
     {
         public User CurrentUser { get; } = user;
     }
+
+    private static User CreateScopedUser(
+        int id,
+        string username,
+        string departmentId,
+        string companyScope,
+        string dataScope) =>
+        new()
+        {
+            Id = id,
+            Username = username,
+            DepartmentId = departmentId,
+            CompanyScope = companyScope,
+            PermissionTemplateId = 1,
+            EffectivePermissionGrants = CreateDeliveryHistoryGrant(dataScope)
+        };
+
+    private static IReadOnlyDictionary<string, string> CreateDeliveryHistoryGrant(string dataScope) =>
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [PermissionResourceCatalog.CreateGrantKey(
+                PermissionResourceCatalog.EmailDelivery,
+                PermissionAction.ViewDelivery)] = dataScope
+        };
 
     private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
     {

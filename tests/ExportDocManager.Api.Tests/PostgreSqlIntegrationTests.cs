@@ -103,15 +103,15 @@ namespace ExportDocManager.Api.Tests
                     factory,
                     new BusinessDataAccessScope(settings, new FixedCurrentUserContext(admin)));
                 var created = await crm.SaveCustomerAsync(new CrmCustomerSaveRequest(
-                    0, "PostgreSQL Customer", "CN", string.Empty, "潜在客户", "integration",
+                    0, "PostgreSQL Customer", "CN", string.Empty, "integration",
                     string.Empty, null));
                 var updated = await crm.SaveCustomerAsync(new CrmCustomerSaveRequest(
-                    created.Id, created.Name, created.CountryRegion, created.Website, "跟进中",
-                    created.Source, created.Notes, created.LinkedDocumentCustomerId, created.VersionNumber));
+                    created.Id, created.Name, created.CountryRegion, created.Website,
+                    created.Source, "updated", created.LinkedDocumentCustomerId, created.VersionNumber));
                 Assert.Equal(2, updated.VersionNumber);
                 await Assert.ThrowsAsync<BusinessConcurrencyException>(() => crm.SaveCustomerAsync(
                     new CrmCustomerSaveRequest(created.Id, created.Name, created.CountryRegion, created.Website,
-                        "暂停", created.Source, created.Notes, created.LinkedDocumentCustomerId,
+                        created.Source, created.Notes, created.LinkedDocumentCustomerId,
                         created.VersionNumber)));
 
                 var now = DateTime.UtcNow;

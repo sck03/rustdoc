@@ -25,7 +25,28 @@ public sealed partial class ReportTemplateImageResourceService : IReportTemplate
         Stream source,
         string? fileName = null,
         string? declaredMediaType = null,
+        CancellationToken cancellationToken = default) =>
+        await StoreCoreAsync(source, fileName, declaredMediaType, commit: null, cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<ReportTemplateImageResource> StoreAndCommitAsync(
+        Stream source,
+        string? fileName,
+        string? declaredMediaType,
+        Func<ReportTemplateImageResource, CancellationToken, Task> commit,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(commit);
+        return await StoreCoreAsync(source, fileName, declaredMediaType, commit, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<ReportTemplateImageResource> StoreCoreAsync(
+        Stream source,
+        string? fileName,
+        string? declaredMediaType,
+        Func<ReportTemplateImageResource, CancellationToken, Task>? commit,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(source);
         await using var buffer = new MemoryStream(capacity: 1024 * 1024);
@@ -53,12 +74,15 @@ public sealed partial class ReportTemplateImageResourceService : IReportTemplate
 
         string sha256 = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
         string resourceId = $"{ResourcePrefix}{sha256}.{format.Extension}";
+        var resource = CreateResource(resourceId, format.MediaType, byteLength, sha256, fileName);
 
         await _writeSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        bool created = false;
+        string targetPath = string.Empty;
         try
         {
             EnsureResourceRoot();
-            string targetPath = ResolveResourcePath(resourceId, requireExisting: false);
+            targetPath = ResolveResourcePath(resourceId, requireExisting: false);
 
             if (File.Exists(targetPath))
             {
@@ -83,18 +107,41 @@ public sealed partial class ReportTemplateImageResourceService : IReportTemplate
                         (temporaryPath, ct) => File.WriteAllBytesAsync(temporaryPath, content, ct),
                         cancellationToken)
                     .ConfigureAwait(false);
+                created = true;
                 PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
                     targetPath,
                     _resourceRoot,
                     "受控图片资源不能经过符号链接、目录联接或其他重解析点。");
             }
+
+            if (commit != null)
+            {
+                await commit(resource, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (Exception commitException) when (created)
+        {
+            try
+            {
+                if (!await AtomicFileHelper.TryDeleteFileAsync(targetPath, CancellationToken.None).ConfigureAwait(false))
+                {
+                    throw new IOException("新建资源文件仍然存在。");
+                }
+            }
+            catch (Exception cleanupException) when (cleanupException is IOException or UnauthorizedAccessException)
+            {
+                throw new UserVisibleInfrastructureException(
+                    "图片资源登记失败，且新建物理文件未能回收；再次上传同一图片可安全恢复登记。",
+                    new AggregateException(commitException, cleanupException));
+            }
+            throw;
         }
         finally
         {
             _writeSemaphore.Release();
         }
 
-        return CreateResource(resourceId, format.MediaType, byteLength, sha256, fileName);
+        return resource;
     }
 
     public async Task<ReportTemplateImageResourceContent> ReadAsync(
@@ -121,6 +168,36 @@ public sealed partial class ReportTemplateImageResourceService : IReportTemplate
             Resource = CreateResource(normalizedResourceId, actualFormat.MediaType, content.LongLength, actualHash, null),
             Content = content
         };
+    }
+
+    public async Task<bool> DeleteAsync(
+        string resourceId,
+        CancellationToken cancellationToken = default)
+    {
+        string path = ResolveResourcePath(resourceId, requireExisting: false);
+        await _writeSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return false;
+            }
+
+            PathBoundaryHelper.EnsureNoReparsePointsWithinRoot(
+                path,
+                _resourceRoot,
+                "受控图片资源不能经过符号链接、目录联接或其他重解析点。");
+            File.Delete(path);
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            throw new UserVisibleInfrastructureException("无法回收受控图片资源，请检查运行数据目录。", exception);
+        }
+        finally
+        {
+            _writeSemaphore.Release();
+        }
     }
 
     private void EnsureResourceRoot()

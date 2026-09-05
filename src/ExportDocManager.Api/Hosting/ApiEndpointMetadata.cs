@@ -25,7 +25,11 @@ internal sealed record ApiEndpointPermissionMetadata(
     string? ReadAccessLevel = null,
     string? WriteAccessLevel = null,
     ApiPermissionSelector Selector = ApiPermissionSelector.Fixed,
-    bool Disabled = false)
+    bool Disabled = false,
+    // Group metadata is inherited by child endpoints.  A concrete endpoint
+    // policy is marked as an override so resolution never depends on the
+    // framework's incidental metadata ordering.
+    bool OverridesParent = true)
 {
     public (string Module, string AccessLevel) Resolve(HttpContext context)
     {
@@ -59,8 +63,22 @@ internal sealed record ApiEndpointPermissionMetadata(
     }
 }
 
+internal sealed record ApiPermissionRequirement(string ResourceKey, string Action);
+
+internal sealed record ApiEndpointCapabilityMetadata(
+    IReadOnlyList<ApiPermissionRequirement> Requirements,
+    bool OverridesParent = true);
+
 internal static class ApiEndpointMetadataExtensions
 {
+    /// <summary>
+    /// Explicitly marks an endpoint (usually an identity or administrative
+    /// endpoint with its own handler-level authorization) as intentionally
+    /// outside the capability middleware.  Missing metadata is otherwise a
+    /// configuration error and is denied by the middleware.
+    /// </summary>
+    private sealed record ApiEndpointPermissionBypassMetadata;
+
     public static TBuilder WithApiAccess<TBuilder>(
         this TBuilder builder,
         ApiEndpointAccessMetadata metadata)
@@ -115,7 +133,32 @@ internal static class ApiEndpointMetadataExtensions
             writeModule,
             readAccessLevel,
             writeAccessLevel,
-            selector));
+            selector,
+            Disabled: false,
+            OverridesParent: true));
+    }
+
+    public static TBuilder WithApiCapability<TBuilder>(
+        this TBuilder builder,
+        string resourceKey,
+        string action)
+        where TBuilder : IEndpointConventionBuilder =>
+        builder.WithApiCapabilities(new ApiPermissionRequirement(resourceKey, action));
+
+    public static TBuilder WithApiCapabilities<TBuilder>(
+        this TBuilder builder,
+        params ApiPermissionRequirement[] requirements)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        if (requirements == null || requirements.Length == 0 ||
+            requirements.Any(requirement => !PermissionResourceCatalog.IsKnownAction(
+                requirement.ResourceKey, requirement.Action)))
+        {
+            throw new ArgumentException("端点能力要求不能为空且必须来自正式权限目录。", nameof(requirements));
+        }
+
+        return builder.WithMetadata(new ApiEndpointCapabilityMetadata(requirements));
     }
 
     public static RouteGroupBuilder MapPermissionGroup(
@@ -123,22 +166,104 @@ internal static class ApiEndpointMetadataExtensions
         string readModule,
         string? writeModule = null,
         string? writeAccessLevel = null) =>
-        endpoints.MapGroup(string.Empty).WithApiPermission(
+        endpoints.MapGroup(string.Empty).WithMetadata(new ApiEndpointPermissionMetadata(
             readModule,
             writeModule,
-            writeAccessLevel: writeAccessLevel);
+            WriteAccessLevel: writeAccessLevel,
+            OverridesParent: false));
 
     public static TBuilder AllowApiWithoutPermission<TBuilder>(this TBuilder builder)
         where TBuilder : IEndpointConventionBuilder =>
-        builder.WithMetadata(new ApiEndpointPermissionMetadata(string.Empty, Disabled: true));
+        builder.WithMetadata(new ApiEndpointPermissionBypassMetadata());
 
     public static ApiEndpointAccessMetadata? GetApiAccessMetadata(this Endpoint endpoint) =>
         Resolve(endpoint.Metadata.OfType<ApiEndpointAccessMetadata>());
 
-    public static ApiEndpointPermissionMetadata? GetApiPermissionMetadata(this Endpoint endpoint) =>
-        endpoint.Metadata.OfType<ApiEndpointPermissionMetadata>().LastOrDefault() is { Disabled: false } metadata
-            ? metadata
-            : null;
+    public static ApiEndpointPermissionMetadata? GetApiPermissionMetadata(this Endpoint endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+
+        // Endpoint metadata is an ordered list containing inherited group
+        // conventions and the concrete endpoint conventions.  Resolve the
+        // most specific active policy explicitly; do not silently pick a
+        // random/last item when multiple groups contribute metadata.
+        var items = endpoint.Metadata
+            .Select((value, index) => (value, index))
+            .Where(item => item.value is ApiEndpointPermissionMetadata)
+            .Select(item => (Metadata: (ApiEndpointPermissionMetadata)item.value, item.index))
+            .ToArray();
+        if (items.Length == 0)
+        {
+            return null;
+        }
+
+        var activeOverrides = items
+            .Where(item => !item.Metadata.Disabled && item.Metadata.OverridesParent)
+            .OrderBy(item => item.index)
+            .ToArray();
+        if (activeOverrides.Length > 0)
+        {
+            return activeOverrides[^1].Metadata;
+        }
+
+        return items
+            .Where(item => !item.Metadata.Disabled)
+            .OrderBy(item => item.index)
+            .Select(item => item.Metadata)
+            .LastOrDefault();
+    }
+
+    public static ApiEndpointCapabilityMetadata? GetApiCapabilityMetadata(this Endpoint endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        var policies = endpoint.Metadata
+            .OfType<ApiEndpointCapabilityMetadata>()
+            .ToArray();
+        if (policies.Length == 0)
+        {
+            return null;
+        }
+
+        // Capability metadata is conjunctive: group requirements and every
+        // concrete endpoint requirement must all succeed.  This differs from
+        // legacy module metadata, where a concrete endpoint intentionally
+        // replaces the HTTP-method-derived group policy.  Deduplication keeps
+        // repeated group conventions deterministic without weakening them.
+        var requirements = policies
+            .SelectMany(policy => policy.Requirements)
+            .DistinctBy(
+                requirement => PermissionResourceCatalog.CreateGrantKey(
+                    requirement.ResourceKey,
+                    requirement.Action),
+                StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return requirements.Length == 0
+            ? null
+            : new ApiEndpointCapabilityMetadata(requirements);
+    }
+
+    public static bool HasExplicitPermissionBypass(this Endpoint endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+
+        // A child permission policy must win over a bypass convention on a
+        // parent group.  Compare the last convention of either kind.
+        bool bypass = false;
+        for (int index = 0; index < endpoint.Metadata.Count; index++)
+        {
+            object metadata = endpoint.Metadata[index];
+            if (metadata is ApiEndpointPermissionMetadata or ApiEndpointCapabilityMetadata)
+            {
+                bypass = false;
+            }
+            else if (metadata is ApiEndpointPermissionBypassMetadata)
+            {
+                bypass = true;
+            }
+        }
+
+        return bypass;
+    }
 
     public static ApiEndpointAccessMetadata? GetApiAccessMetadata(this EndpointBuilder builder) =>
         Resolve(builder.Metadata.OfType<ApiEndpointAccessMetadata>());

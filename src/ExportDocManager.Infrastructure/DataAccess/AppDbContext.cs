@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using ExportDocManager.Models;
 using Microsoft.EntityFrameworkCore;
 using ExportDocManager.Models.Entities;
@@ -29,10 +30,13 @@ namespace ExportDocManager.DataAccess
         public DbSet<Unit> Units { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<User> Users { get; set; }
+        public DbSet<OrganizationCompany> OrganizationCompanies { get; set; }
+        public DbSet<OrganizationDepartment> OrganizationDepartments { get; set; }
         public DbSet<ApiUserSession> ApiUserSessions { get; set; }
         public DbSet<ApiBackgroundJobRecord> ApiBackgroundJobs { get; set; }
         public DbSet<PermissionTemplate> PermissionTemplates { get; set; }
-        public DbSet<PermissionTemplateModule> PermissionTemplateModules { get; set; }
+        public DbSet<PermissionTemplateGrant> PermissionTemplateGrants { get; set; }
+        public DbSet<BusinessImportPreview> BusinessImportPreviews { get; set; }
         public DbSet<CrmCustomer> CrmCustomers { get; set; }
         public DbSet<CrmContact> CrmContacts { get; set; }
         public DbSet<CrmFollowUp> CrmFollowUps { get; set; }
@@ -45,6 +49,10 @@ namespace ExportDocManager.DataAccess
         public DbSet<EmailDeliveryRecord> EmailDeliveryRecords { get; set; }
         public DbSet<UserReportTemplate> UserReportTemplates { get; set; }
         public DbSet<UserReportTemplateVersion> UserReportTemplateVersions { get; set; }
+        public DbSet<ReportTemplateImageResourceEntry> ReportTemplateImageResources { get; set; }
+        public DbSet<ReportTemplateImageResourceUploadClaim> ReportTemplateImageResourceUploadClaims { get; set; }
+        public DbSet<UserReportTemplateResourceReference> UserReportTemplateResourceReferences { get; set; }
+        public DbSet<UserReportTemplateVersionResourceReference> UserReportTemplateVersionResourceReferences { get; set; }
         public DbSet<SalesOpportunity> SalesOpportunities { get; set; }
         public DbSet<SalesOpportunityHistory> SalesOpportunityHistories { get; set; }
 
@@ -111,7 +119,64 @@ namespace ExportDocManager.DataAccess
                 {
                     updated.CurrentValue = now;
                 }
+
+                // Every aggregate that exposes VersionNumber participates in
+                // the same optimistic-concurrency contract.  Service methods
+                // may explicitly advance the value when several rows are
+                // changed in one operation; direct seed/import paths still get
+                // a deterministic initial value and ordinary edits cannot
+                // accidentally leave the token unchanged.
+                var version = entry.Properties.FirstOrDefault(property =>
+                    property.Metadata.Name == "VersionNumber" &&
+                    property.Metadata.ClrType == typeof(int));
+                if (version != null)
+                {
+                    if (entry.State == EntityState.Added && version.CurrentValue is int initial && initial <= 0)
+                    {
+                        version.CurrentValue = 1;
+                    }
+                    else if (entry.State == EntityState.Modified &&
+                             version.CurrentValue is int current &&
+                             version.OriginalValue is int original &&
+                             current == original &&
+                             original < int.MaxValue)
+                    {
+                        version.CurrentValue = original + 1;
+                    }
+                }
+
+                // Canonical keys are maintained at the persistence boundary so
+                // direct imports/seeding and all service paths share the same
+                // cross-provider uniqueness semantics.
+                switch (entry.Entity)
+                {
+                    case User user:
+                        user.UsernameNormalized = CanonicalKey(user.Username);
+                        break;
+                    case PermissionTemplate template:
+                        template.CodeNormalized = CanonicalKey(template.Code);
+                        break;
+                    case OrganizationCompany company when entry.State == EntityState.Added:
+                        company.Code = CanonicalKey(company.Code);
+                        break;
+                    case OrganizationDepartment department when entry.State == EntityState.Added:
+                        department.Code = CanonicalKey(department.Code);
+                        department.CompanyCode = CanonicalKey(department.CompanyCode);
+                        break;
+                    case SalesOpportunity opportunity:
+                        opportunity.QuotationNoNormalized = CanonicalNullableKey(opportunity.QuotationNo);
+                        break;
+                }
             }
+        }
+
+        private static string CanonicalKey(string? value) =>
+            (value ?? string.Empty).Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant();
+
+        private static string? CanonicalNullableKey(string? value)
+        {
+            string key = CanonicalKey(value);
+            return key.Length == 0 ? null : key;
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -169,6 +234,8 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<Customer>().HasIndex(c => c.CustomerNameEN);
             modelBuilder.Entity<Customer>().HasIndex(c => c.OwnerUserId);
             modelBuilder.Entity<Customer>().HasIndex(c => new { c.CompanyScope, c.DepartmentId });
+            modelBuilder.Entity<Payee>().HasIndex(item => item.OwnerUserId);
+            modelBuilder.Entity<Payee>().HasIndex(item => new { item.CompanyScope, item.DepartmentId });
             modelBuilder.Entity<AuditLog>().HasIndex(log => new { log.Timestamp, log.Id });
             modelBuilder.Entity<CrmCustomer>().HasIndex(item => item.Name);
             modelBuilder.Entity<CrmCustomer>().HasIndex(item => item.OwnerUserId);
@@ -238,12 +305,14 @@ namespace ExportDocManager.DataAccess
                 .WithMany()
                 .HasForeignKey(item => item.SupplierCompanyId)
                 .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<SupplierAssessment>()
+                .HasIndex(item => new { item.SupplierCompanyId, item.Status, item.AssessmentDate });
             modelBuilder.Entity<EmailTemplate>().HasIndex(item => new { item.OwnerUserId, item.Category, item.Name });
             modelBuilder.Entity<EmailTemplate>().HasIndex(item => new { item.CompanyScope, item.DepartmentId });
-            modelBuilder.Entity<EmailTemplate>().HasIndex(item => new { item.IsShared, item.IsActive });
+            modelBuilder.Entity<EmailTemplate>().HasIndex(item => new { item.Status, item.ShareScope });
             modelBuilder.Entity<UserReportTemplate>().HasIndex(item => new { item.ReportType, item.Name, item.OwnerUserId });
             modelBuilder.Entity<UserReportTemplate>().HasIndex(item => new { item.CompanyScope, item.DepartmentId });
-            modelBuilder.Entity<UserReportTemplate>().HasIndex(item => new { item.IsShared, item.IsActive, item.ReportType });
+            modelBuilder.Entity<UserReportTemplate>().HasIndex(item => new { item.Status, item.ShareScope, item.ReportType });
             modelBuilder.Entity<UserReportTemplateVersion>()
                 .HasIndex(item => new { item.UserReportTemplateId, item.VersionNumber })
                 .IsUnique();
@@ -252,6 +321,46 @@ namespace ExportDocManager.DataAccess
                 .WithMany()
                 .HasForeignKey(item => item.UserReportTemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<ReportTemplateImageResourceEntry>()
+                .HasIndex(item => item.Sha256)
+                .IsUnique();
+            modelBuilder.Entity<ReportTemplateImageResourceEntry>()
+                .HasIndex(item => new { item.RecycledAt, item.CreatedAt });
+            modelBuilder.Entity<ReportTemplateImageResourceUploadClaim>()
+                .HasKey(item => new { item.ResourceId, item.UserId });
+            modelBuilder.Entity<ReportTemplateImageResourceUploadClaim>()
+                .HasOne(item => item.Resource)
+                .WithMany()
+                .HasForeignKey(item => item.ResourceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<UserReportTemplateResourceReference>()
+                .HasKey(item => new { item.UserReportTemplateId, item.ResourceId, item.ReferenceKind });
+            modelBuilder.Entity<UserReportTemplateResourceReference>()
+                .HasIndex(item => new { item.ResourceId, item.ReferenceKind });
+            modelBuilder.Entity<UserReportTemplateResourceReference>()
+                .HasOne(item => item.Template)
+                .WithMany()
+                .HasForeignKey(item => item.UserReportTemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<UserReportTemplateResourceReference>()
+                .HasOne(item => item.Resource)
+                .WithMany()
+                .HasForeignKey(item => item.ResourceId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<UserReportTemplateVersionResourceReference>()
+                .HasKey(item => new { item.UserReportTemplateVersionId, item.ResourceId });
+            modelBuilder.Entity<UserReportTemplateVersionResourceReference>()
+                .HasIndex(item => item.ResourceId);
+            modelBuilder.Entity<UserReportTemplateVersionResourceReference>()
+                .HasOne(item => item.Version)
+                .WithMany()
+                .HasForeignKey(item => item.UserReportTemplateVersionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<UserReportTemplateVersionResourceReference>()
+                .HasOne(item => item.Resource)
+                .WithMany()
+                .HasForeignKey(item => item.ResourceId)
+                .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<EmailTemplateVersion>()
                 .HasIndex(item => new { item.EmailTemplateId, item.VersionNumber })
                 .IsUnique();
@@ -260,14 +369,16 @@ namespace ExportDocManager.DataAccess
                 .WithMany()
                 .HasForeignKey(item => item.EmailTemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
-            modelBuilder.Entity<EmailDeliveryRecord>().HasKey(item => item.DeliveryId);
+            modelBuilder.Entity<EmailDeliveryRecord>().HasKey(item => new { item.OwnerUserId, item.DeliveryId });
             modelBuilder.Entity<EmailDeliveryRecord>().HasIndex(item => new { item.OwnerUserId, item.CreatedAt });
+            modelBuilder.Entity<EmailDeliveryRecord>().HasIndex(item => new { item.CompanyScope, item.DepartmentId, item.CreatedAt });
             modelBuilder.Entity<EmailDeliveryRecord>().HasIndex(item => new { item.Status, item.UpdatedAt });
             modelBuilder.Entity<SalesOpportunity>().HasIndex(item => item.CrmCustomerId);
             modelBuilder.Entity<SalesOpportunity>().HasIndex(item => item.ProductId);
             modelBuilder.Entity<SalesOpportunity>().HasIndex(item => new { item.OwnerUserId, item.Stage });
             modelBuilder.Entity<SalesOpportunity>().HasIndex(item => new { item.CompanyScope, item.DepartmentId });
             modelBuilder.Entity<SalesOpportunity>().Property(item => item.EstimatedAmount).HasPrecision(18, 4);
+            modelBuilder.Entity<SalesOpportunity>().HasIndex(item => item.QuotationNoNormalized).IsUnique();
             modelBuilder.Entity<SalesOpportunity>().HasOne<CrmCustomer>().WithMany()
                 .HasForeignKey(item => item.CrmCustomerId).OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<SalesOpportunity>().HasOne<Product>().WithMany()
@@ -306,10 +417,21 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<HsCodeRemoteCandidate>().HasIndex(item => new { item.ReviewStatus, item.LastSeenAt });
             modelBuilder.Entity<HsCodeRemoteCandidate>().HasIndex(item => item.RawReportedHsCode);
 
-            modelBuilder.Entity<User>().HasIndex(u => u.Username).IsUnique();
+            modelBuilder.Entity<User>().HasIndex(u => u.UsernameNormalized).IsUnique();
             modelBuilder.Entity<User>().HasIndex(u => u.PermissionTemplateId);
+            modelBuilder.Entity<User>().HasIndex(u => u.CompanyScope);
+            modelBuilder.Entity<User>().HasIndex(u => u.DepartmentId);
             modelBuilder.Entity<User>().Property(u => u.DepartmentId).HasMaxLength(50);
             modelBuilder.Entity<User>().Property(u => u.CompanyScope).HasMaxLength(50);
+            modelBuilder.Entity<OrganizationCompany>().HasKey(item => item.Code);
+            modelBuilder.Entity<OrganizationCompany>().HasIndex(item => new { item.IsActive, item.Name });
+            modelBuilder.Entity<OrganizationDepartment>().HasKey(item => item.Code);
+            modelBuilder.Entity<OrganizationDepartment>().HasIndex(item => new { item.CompanyCode, item.IsActive, item.Name });
+            modelBuilder.Entity<OrganizationDepartment>()
+                .HasOne(item => item.Company)
+                .WithMany()
+                .HasForeignKey(item => item.CompanyCode)
+                .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<User>()
                 .HasOne(user => user.PermissionTemplate)
                 .WithMany()
@@ -333,15 +455,19 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<ApiBackgroundJobRecord>().HasIndex(job => job.RequestedByUserId);
             modelBuilder.Entity<ApiBackgroundJobRecord>().HasIndex(job => new { job.RequestedBy, job.CreatedAt });
             modelBuilder.Entity<ApiBackgroundJobRecord>().HasIndex(job => new { job.Status, job.CreatedAt });
-            modelBuilder.Entity<PermissionTemplate>().HasIndex(template => template.Code).IsUnique();
+            modelBuilder.Entity<PermissionTemplate>().HasIndex(template => template.CodeNormalized).IsUnique();
             modelBuilder.Entity<PermissionTemplate>().HasIndex(template => new { template.IsActive, template.Name });
-            modelBuilder.Entity<PermissionTemplateModule>()
-                .HasIndex(module => new { module.PermissionTemplateId, module.ModuleKey })
+            modelBuilder.Entity<BusinessImportPreview>()
+                .HasIndex(preview => new { preview.OwnerUserId, preview.Kind, preview.ExpiresAt });
+            modelBuilder.Entity<BusinessImportPreview>()
+                .HasIndex(preview => preview.ExpiresAt);
+            modelBuilder.Entity<PermissionTemplateGrant>()
+                .HasIndex(grant => new { grant.PermissionTemplateId, grant.ResourceKey, grant.Action })
                 .IsUnique();
-            modelBuilder.Entity<PermissionTemplateModule>()
-                .HasOne(module => module.PermissionTemplate)
-                .WithMany(template => template.Modules)
-                .HasForeignKey(module => module.PermissionTemplateId)
+            modelBuilder.Entity<PermissionTemplateGrant>()
+                .HasOne(grant => grant.PermissionTemplate)
+                .WithMany(template => template.Grants)
+                .HasForeignKey(grant => grant.PermissionTemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Payment Indexes

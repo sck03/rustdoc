@@ -41,7 +41,7 @@ namespace ExportDocManager.Infrastructure.Tests
                     new FixedCurrentUserContext(admin));
 
                 var exception = await Assert.ThrowsAsync<ResourceConflictException>(
-                    () => service.DeleteUserAsync(target.Id));
+                    () => service.DeleteUserAsync(target.Id, expectedVersion: target.VersionNumber));
                 Assert.Contains("停用账号", exception.Message, StringComparison.Ordinal);
             }
         }

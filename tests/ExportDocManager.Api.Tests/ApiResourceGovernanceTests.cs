@@ -1,6 +1,7 @@
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Routing.Patterns;
@@ -13,6 +14,7 @@ public sealed class ApiResourceGovernanceTests
     [Theory]
     [InlineData((int)ApiResourceProfile.Login, 120, 8)]
     [InlineData((int)ApiResourceProfile.Identity, 300, 16)]
+    [InlineData((int)ApiResourceProfile.EmailDelivery, 12, 2)]
     [InlineData((int)ApiResourceProfile.Interactive, 300, 64)]
     [InlineData((int)ApiResourceProfile.Workload, 90, 12)]
     [InlineData((int)ApiResourceProfile.Maintenance, 20, 2)]
@@ -42,6 +44,33 @@ public sealed class ApiResourceGovernanceTests
 
         Assert.NotEqual(firstIdentity, ApiResourceGovernanceExtensions.ResolveClientKey(context, ApiResourceProfile.Identity));
         Assert.Equal(login, ApiResourceGovernanceExtensions.ResolveClientKey(context, ApiResourceProfile.Login));
+    }
+
+    [Fact]
+    public void CapabilityMetadata_ShouldCombineGroupAndEndpointRequirements()
+    {
+        var builder = new RouteEndpointBuilder(
+            _ => Task.CompletedTask,
+            RoutePatternFactory.Parse("/capability-test"),
+            order: 0);
+        builder.Metadata.Add(new ApiEndpointCapabilityMetadata([
+            new(PermissionResourceCatalog.InvoiceOutput, PermissionAction.SendEmail)
+        ]));
+        builder.Metadata.Add(new ApiEndpointCapabilityMetadata([
+            new(PermissionResourceCatalog.EmailDelivery, PermissionAction.Send),
+            new(PermissionResourceCatalog.InvoiceOutput, PermissionAction.SendEmail)
+        ]));
+
+        ApiEndpointCapabilityMetadata metadata = Assert.IsType<ApiEndpointCapabilityMetadata>(
+            builder.Build().GetApiCapabilityMetadata());
+
+        Assert.Equal(2, metadata.Requirements.Count);
+        Assert.Contains(metadata.Requirements, requirement =>
+            requirement.ResourceKey == PermissionResourceCatalog.InvoiceOutput &&
+            requirement.Action == PermissionAction.SendEmail);
+        Assert.Contains(metadata.Requirements, requirement =>
+            requirement.ResourceKey == PermissionResourceCatalog.EmailDelivery &&
+            requirement.Action == PermissionAction.Send);
     }
 
     [Fact]

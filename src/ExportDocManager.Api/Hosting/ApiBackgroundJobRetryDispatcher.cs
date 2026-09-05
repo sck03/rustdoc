@@ -2,6 +2,8 @@ using System.Text.Json;
 using System.Diagnostics.CodeAnalysis;
 using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Security;
+using ExportDocManager.Models.Entities;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -18,10 +20,13 @@ namespace ExportDocManager.Api.Hosting
 
         public async Task<IResult> RetryAsync(
             BackgroundJobSnapshot sourceJob,
-            string requestedBy,
+            User user,
+            ApiAuthorizationService authorizationService,
             IInvoiceService invoiceService,
             CancellationToken cancellationToken)
         {
+            ArgumentNullException.ThrowIfNull(user);
+            ArgumentNullException.ThrowIfNull(authorizationService);
             if (!CanRetry(sourceJob))
             {
                 return Results.Json(
@@ -30,6 +35,14 @@ namespace ExportDocManager.Api.Hosting
             }
 
             string operation = NormalizeOperation(sourceJob.RetryOperation);
+            if (!CanExecuteRetryOperation(user, operation, authorizationService))
+            {
+                return Results.Json(
+                    new ApiErrorResponse("当前账号已不具备该任务对应的业务权限，不能重试。"),
+                    statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            string requestedBy = user.Username?.Trim() ?? string.Empty;
             switch (operation)
             {
                 case "StartPdfMergeJob":
@@ -71,6 +84,35 @@ namespace ExportDocManager.Api.Hosting
                         statusCode: StatusCodes.Status409Conflict);
             }
         }
+
+        private static bool CanExecuteRetryOperation(
+            User user,
+            string operation,
+            ApiAuthorizationService authorizationService) =>
+            operation switch
+            {
+                "StartPdfMergeJob" => authorizationService.CanUseModule(
+                    user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Operate),
+                "StartExcelTemplateExportJob" or
+                "StartBlankBookingSheetExportJob" or
+                "StartBookingSheetConvertJob" or
+                "StartInvoiceBookingSheetExportJob" => authorizationService.CanUseModule(
+                    user, PermissionModuleCatalog.DocumentExcel, PermissionAccessLevel.Operate),
+                "StartQueryInvoiceExportJob" => authorizationService.CanUseModule(
+                    user, PermissionModuleCatalog.DocumentQuery, PermissionAccessLevel.Operate),
+                "StartInvoiceReportPdfJob" => authorizationService.CanUsePermission(
+                    user, PermissionResourceCatalog.InvoiceOutput, PermissionAction.ExportPdf),
+                "StartPaymentVoucherPdfJob" => authorizationService.CanUsePermission(
+                    user, PermissionResourceCatalog.PaymentOutput, PermissionAction.ExportPdf),
+                "StartInvoiceReportPdfZipJob" or
+                "StartInvoiceDocumentPackageJob" => authorizationService.CanUsePermission(
+                    user, PermissionResourceCatalog.InvoiceOutput, PermissionAction.ExportZip),
+                "StartInvoiceDocumentEmailJob" => authorizationService.CanUsePermission(
+                    user, PermissionResourceCatalog.InvoiceOutput, PermissionAction.SendEmail) &&
+                    authorizationService.CanUsePermission(
+                        user, PermissionResourceCatalog.EmailDelivery, PermissionAction.Send),
+                _ => false
+            };
 
         private static string NormalizeOperation(string operation)
         {

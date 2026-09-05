@@ -67,7 +67,7 @@ export function formatDate(value?: string | null) {
   }
 
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("zh-CN");
+  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString("zh-CN");
 }
 
 export function formatAmount(value?: number, currency = "") {

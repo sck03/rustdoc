@@ -1,5 +1,8 @@
 using System.Threading.Tasks;
+using System.Data;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
@@ -45,12 +48,17 @@ namespace ExportDocManager.Services.Security
             }
 
             using var context = await _contextFactory.CreateDbContextAsync();
-            var normalizedUsername = (username ?? string.Empty).Trim().ToUpperInvariant();
+            var normalizedUsername = CanonicalKey(username);
+            if (normalizedUsername.Length == 0)
+            {
+                _ = PasswordHasher.VerifyPassword(DummyPasswordHash, password);
+                return null;
+            }
             var user = await context.Users
-                    .Include(item => item.PermissionTemplate!.Modules)
+                    .Include(item => item.PermissionTemplate!.Grants)
                     .AsNoTracking()
                     .FirstOrDefaultAsync(u =>
-                        u.IsActive && u.Username.ToUpper() == normalizedUsername);
+                        u.IsActive && u.UsernameNormalized == normalizedUsername);
 
             if (user == null)
             {
@@ -60,7 +68,7 @@ namespace ExportDocManager.Services.Security
 
             if (PasswordHasher.VerifyPassword(user.PasswordHash, password))
             {
-                UserPermissionAccessResolver.PopulateEffectiveModuleAccess(user);
+                UserPermissionAccessResolver.PopulateEffectivePermissions(user);
                 return user;
             }
 
@@ -70,15 +78,19 @@ namespace ExportDocManager.Services.Security
         public async Task<User?> GetUserByUsernameAsync(string username)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            var normalizedUsername = (username ?? string.Empty).Trim().ToUpperInvariant();
+            var normalizedUsername = CanonicalKey(username);
+            if (normalizedUsername.Length == 0)
+            {
+                return null;
+            }
             var user = await context.Users
-                    .Include(item => item.PermissionTemplate!.Modules)
+                    .Include(item => item.PermissionTemplate!.Grants)
                     .AsNoTracking()
                     .FirstOrDefaultAsync(item =>
-                        item.IsActive && item.Username.ToUpper() == normalizedUsername);
+                        item.IsActive && item.UsernameNormalized == normalizedUsername);
             if (user != null)
             {
-                UserPermissionAccessResolver.PopulateEffectiveModuleAccess(user);
+                UserPermissionAccessResolver.PopulateEffectivePermissions(user);
             }
 
             return user;
@@ -95,12 +107,12 @@ namespace ExportDocManager.Services.Security
 
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var user = await context.Users
-                .Include(item => item.PermissionTemplate!.Modules)
+                .Include(item => item.PermissionTemplate!.Grants)
                 .AsNoTracking()
                 .SingleOrDefaultAsync(item => item.Id == userId && item.IsActive, cancellationToken);
             if (user != null)
             {
-                UserPermissionAccessResolver.PopulateEffectiveModuleAccess(user);
+                UserPermissionAccessResolver.PopulateEffectivePermissions(user);
             }
 
             return user;
@@ -137,49 +149,95 @@ namespace ExportDocManager.Services.Security
                     normalized.Id == 0 ? "初始密码" : "重置密码");
             }
 
-            using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            await EnsureUsernameUniqueAsync(context, normalized, cancellationToken);
-            normalized.PermissionTemplateId = await ResolvePermissionTemplateIdAsync(
-                context,
-                normalized.Role,
-                normalized.PermissionTemplateId,
-                cancellationToken);
-
-            User savedUser;
-            if (normalized.Id == 0)
-            {
-                normalized.PasswordHash = PasswordHasher.HashPassword(normalizedPassword);
-                await context.Users.AddAsync(normalized, cancellationToken);
-                savedUser = normalized;
-            }
-            else
-            {
-                var existing = await context.Users
-                    .FirstOrDefaultAsync(item => item.Id == normalized.Id, cancellationToken)
-                    ?? throw new ResourceNotFoundException("未找到要保存的用户。");
-
-                PreventSelfLockout(normalized);
-                existing.Username = normalized.Username;
-                existing.FullName = normalized.FullName;
-                existing.Role = normalized.Role;
-                existing.PermissionTemplateId = normalized.PermissionTemplateId;
-                existing.DepartmentId = normalized.DepartmentId;
-                existing.CompanyScope = normalized.CompanyScope;
-                existing.IsActive = normalized.IsActive;
-
-                if (shouldSetPassword)
+            return await AppDbContextExecution.ExecuteInTransactionAsync(
+                _contextFactory,
+                async (context, token) =>
                 {
-                    existing.PasswordHash = PasswordHasher.HashPassword(normalizedPassword);
-                }
+                    await EnsureUsernameUniqueAsync(context, normalized, token);
+                    await ValidateOrganizationAssignmentAsync(context, normalized, token);
+                    int? currentTemplateId = normalized.Id > 0
+                        ? await context.Users.Where(item => item.Id == normalized.Id)
+                            .Select(item => item.PermissionTemplateId)
+                            .SingleOrDefaultAsync(token)
+                        : null;
+                    normalized.PermissionTemplateId = await ResolvePermissionTemplateIdAsync(
+                        context,
+                        normalized.Role,
+                        normalized.PermissionTemplateId,
+                        currentTemplateId,
+                        token);
 
-                savedUser = existing;
-            }
+                    User savedUser;
+                    if (normalized.Id == 0)
+                    {
+                        normalized.PasswordHash = PasswordHasher.HashPassword(normalizedPassword);
+                        normalized.VersionNumber = 1;
+                        await context.Users.AddAsync(normalized, token);
+                        savedUser = normalized;
+                    }
+                    else
+                    {
+                        if (normalized.VersionNumber <= 0)
+                        {
+                            throw new BusinessConcurrencyException("保存现有用户时必须提供版本号，请刷新后重试。");
+                        }
 
-            await context.SaveChangesAsync(cancellationToken);
-            return savedUser.Id;
+                        var existing = await context.Users
+                            .FirstOrDefaultAsync(item => item.Id == normalized.Id, token)
+                            ?? throw new ResourceNotFoundException("未找到要保存的用户。");
+                        if (existing.VersionNumber != normalized.VersionNumber)
+                        {
+                            throw new BusinessConcurrencyException("该用户已被其他管理员修改，请刷新后重试。");
+                        }
+
+                        PreventSelfLockout(normalized);
+                        if (IsActiveAdmin(existing) &&
+                            (!normalized.IsActive || !IsAdminRole(normalized.Role)))
+                        {
+                            await EnsureAnotherActiveAdminAsync(context, existing.Id, token);
+                        }
+
+                        context.Entry(existing).Property(item => item.VersionNumber).OriginalValue = normalized.VersionNumber;
+                        existing.VersionNumber++;
+                        existing.Username = normalized.Username;
+                        existing.FullName = normalized.FullName;
+                        existing.Role = normalized.Role;
+                        existing.PermissionTemplateId = normalized.PermissionTemplateId;
+                        existing.DepartmentId = normalized.DepartmentId;
+                        existing.CompanyScope = normalized.CompanyScope;
+                        existing.IsActive = normalized.IsActive;
+
+                        if (shouldSetPassword)
+                        {
+                            existing.PasswordHash = PasswordHasher.HashPassword(normalizedPassword);
+                        }
+
+                        savedUser = existing;
+                    }
+
+                    try
+                    {
+                        await context.SaveChangesAsync(token);
+                    }
+                    catch (DbUpdateConcurrencyException exception)
+                    {
+                        throw new BusinessConcurrencyException("该用户已被其他管理员修改，请刷新后重试。", exception);
+                    }
+                    catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
+                    {
+                        throw new ResourceConflictException("用户名已存在。", exception);
+                    }
+
+                    return savedUser.Id;
+                },
+                IsolationLevel.Serializable,
+                cancellationToken);
         }
 
-        public async Task<bool> DeleteUserAsync(int userId, CancellationToken cancellationToken = default)
+        public async Task<bool> DeleteUserAsync(
+            int userId,
+            CancellationToken cancellationToken = default,
+            int expectedVersion = 0)
         {
             EnsureCurrentUserCanManageUsers();
             if (userId <= 0)
@@ -198,11 +256,25 @@ namespace ExportDocManager.Services.Security
                         return false;
                     }
 
+                    if (expectedVersion <= 0 || user.VersionNumber != expectedVersion)
+                    {
+                        throw new BusinessConcurrencyException("该用户已被其他管理员修改，请刷新后重试。");
+                    }
+
                     await EnsureUserCanBeDeletedAsync(context, user, token);
+                    context.Entry(user).Property(item => item.VersionNumber).OriginalValue = expectedVersion;
                     context.Users.Remove(user);
-                    await context.SaveChangesAsync(token);
+                    try
+                    {
+                        await context.SaveChangesAsync(token);
+                    }
+                    catch (DbUpdateConcurrencyException exception)
+                    {
+                        throw new BusinessConcurrencyException("该用户已被其他管理员修改，请刷新后重试。", exception);
+                    }
                     return true;
                 },
+                IsolationLevel.Serializable,
                 cancellationToken);
         }
 
@@ -222,9 +294,10 @@ namespace ExportDocManager.Services.Security
                 FullName = (user.FullName ?? string.Empty).Trim(),
                 Role = UserRoleCatalog.Normalize(user.Role),
                 PermissionTemplateId = user.PermissionTemplateId,
-                DepartmentId = (user.DepartmentId ?? string.Empty).Trim(),
-                CompanyScope = (user.CompanyScope ?? string.Empty).Trim(),
-                IsActive = user.IsActive
+                DepartmentId = NormalizeOrganizationCode(user.DepartmentId),
+                CompanyScope = NormalizeOrganizationCode(user.CompanyScope),
+                IsActive = user.IsActive,
+                VersionNumber = user.Id > 0 ? user.VersionNumber : 1
             };
         }
 
@@ -233,16 +306,57 @@ namespace ExportDocManager.Services.Security
             User user,
             CancellationToken cancellationToken)
         {
-            string normalizedUsername = user.Username.ToUpperInvariant();
+            string normalizedUsername = CanonicalKey(user.Username);
             bool duplicate = await context.Users
                 .AsNoTracking()
                 .AnyAsync(
-                    item => item.Id != user.Id && item.Username.ToUpper() == normalizedUsername,
+                    item => item.Id != user.Id && item.UsernameNormalized == normalizedUsername,
                     cancellationToken);
             if (duplicate)
             {
                 throw new ResourceConflictException("用户名已存在。");
             }
+        }
+
+        private static async Task ValidateOrganizationAssignmentAsync(
+            AppDbContext context,
+            User user,
+            CancellationToken cancellationToken)
+        {
+            string companyCode = NormalizeOrganizationCode(user.CompanyScope);
+            string departmentCode = NormalizeOrganizationCode(user.DepartmentId);
+            if (companyCode.Length == 0 && departmentCode.Length == 0)
+            {
+                user.CompanyScope = null;
+                user.DepartmentId = null;
+                return;
+            }
+            if (companyCode.Length == 0)
+            {
+                throw new ServiceValidationException("选择部门前必须先选择所属公司。");
+            }
+
+            bool companyAvailable = await context.OrganizationCompanies.AsNoTracking()
+                .AnyAsync(item => item.Code == companyCode && item.IsActive, cancellationToken);
+            if (!companyAvailable)
+            {
+                throw new ServiceValidationException("选择的公司不存在或已停用。");
+            }
+
+            if (departmentCode.Length > 0)
+            {
+                bool departmentAvailable = await context.OrganizationDepartments.AsNoTracking()
+                    .AnyAsync(item => item.Code == departmentCode &&
+                        item.CompanyCode == companyCode && item.IsActive,
+                        cancellationToken);
+                if (!departmentAvailable)
+                {
+                    throw new ServiceValidationException("选择的部门不存在、已停用或不属于所选公司。");
+                }
+            }
+
+            user.CompanyScope = companyCode;
+            user.DepartmentId = departmentCode.Length == 0 ? null : departmentCode;
         }
 
         private void PreventSelfLockout(User normalized)
@@ -272,17 +386,7 @@ namespace ExportDocManager.Services.Security
 
             if (IsActiveAdmin(user))
             {
-                bool hasAnotherActiveAdmin = await context.Users
-                    .AsNoTracking()
-                    .AnyAsync(item =>
-                        item.Id != user.Id &&
-                        item.IsActive &&
-                        item.Role == UserRoleCatalog.Admin,
-                        cancellationToken);
-                if (!hasAnotherActiveAdmin)
-                {
-                    throw new ResourceConflictException("不能删除最后一个启用的管理员账号。");
-                }
+                await EnsureAnotherActiveAdminAsync(context, user.Id, cancellationToken);
             }
 
             bool hasBusinessData = await context.Invoices
@@ -329,7 +433,48 @@ namespace ExportDocManager.Services.Security
         private static bool IsActiveAdmin(User user)
         {
             return user.IsActive &&
-                   string.Equals(user.Role, UserRoleCatalog.Admin, StringComparison.Ordinal);
+                   IsAdminRole(user.Role);
+        }
+
+        private static bool IsAdminRole(string? role) =>
+            string.Equals(role, UserRoleCatalog.Admin, StringComparison.OrdinalIgnoreCase);
+
+        private static async Task EnsureAnotherActiveAdminAsync(
+            AppDbContext context,
+            int excludedUserId,
+            CancellationToken cancellationToken)
+        {
+            bool hasAnother = await context.Users
+                .AsNoTracking()
+                .AnyAsync(item => item.Id != excludedUserId && item.IsActive &&
+                    item.Role == UserRoleCatalog.Admin, cancellationToken);
+            if (!hasAnother)
+            {
+                throw new ResourceConflictException("不能停用或删除最后一个启用的管理员账号。");
+            }
+        }
+
+        private static string CanonicalKey(string? value) =>
+            (value ?? string.Empty).Trim().Normalize(System.Text.NormalizationForm.FormC).ToUpperInvariant();
+
+        private static string NormalizeOrganizationCode(string? value) => CanonicalKey(value);
+
+        private static bool IsUniqueConstraintViolation(Exception exception)
+        {
+            for (Exception? current = exception; current != null; current = current.InnerException)
+            {
+                if (current is PostgresException postgres && postgres.SqlState == PostgresErrorCodes.UniqueViolation)
+                {
+                    return true;
+                }
+
+                if (current is SqliteException sqlite && sqlite.SqliteErrorCode == 19)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void EnsureCurrentUserCanManageUsers()
@@ -349,6 +494,7 @@ namespace ExportDocManager.Services.Security
             AppDbContext context,
             string role,
             int? requestedTemplateId,
+            int? currentTemplateId,
             CancellationToken cancellationToken)
         {
             string? requiredCode = string.Equals(role, UserRoleCatalog.Admin, StringComparison.OrdinalIgnoreCase)
@@ -365,7 +511,8 @@ namespace ExportDocManager.Services.Security
             if (requestedTemplateId is > 0)
             {
                 bool available = await context.PermissionTemplates.AnyAsync(
-                    template => template.Id == requestedTemplateId && template.IsActive,
+                    template => template.Id == requestedTemplateId &&
+                        (template.IsActive || template.Id == currentTemplateId),
                     cancellationToken);
                 if (available) return requestedTemplateId.Value;
                 throw new ServiceValidationException("选择的权限模板不存在或已停用。");

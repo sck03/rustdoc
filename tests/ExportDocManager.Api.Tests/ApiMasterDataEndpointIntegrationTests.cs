@@ -149,9 +149,9 @@ namespace ExportDocManager.Api.Tests
                     Id = exporter.Id,
                     RowVersion = exporter.RowVersion
                 })).StatusCode);
-            Assert.Equal(HttpStatusCode.NotFound, (await userBClient.DeleteAsync(
+            Assert.Equal(HttpStatusCode.Forbidden, (await userBClient.DeleteAsync(
                 $"/api/master-data/customers/{customer.Id}")).StatusCode);
-            Assert.Equal(HttpStatusCode.NotFound, (await userBClient.DeleteAsync(
+            Assert.Equal(HttpStatusCode.Forbidden, (await userBClient.DeleteAsync(
                 $"/api/master-data/exporters/{exporter.Id}")).StatusCode);
 
             using var sealContent = CreateImageContent(

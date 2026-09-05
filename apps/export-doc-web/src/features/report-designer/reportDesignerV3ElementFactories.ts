@@ -28,6 +28,7 @@ export function createV3LineElement(x = 1500, y = 1500): ReportDesignerV3Element
 export function createV3ImageElement(x = 1500, y = 1500): ReportDesignerV3Element {
   return createBase("Image", x, y, 5000, 3500, { borderColor: "#94a3b8", borderWidthPx: 1, borderStyle: "Dashed" }, {
     sourceKind: "Resource",
+    purpose: "Image",
     resourceId: undefined,
     altText: "未上传图片",
     hideWhenSourceEmpty: true,

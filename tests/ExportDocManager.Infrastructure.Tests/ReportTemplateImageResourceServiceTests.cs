@@ -57,6 +57,33 @@ public sealed class ReportTemplateImageResourceServiceTests
         }
     }
 
+    [Fact]
+    public async Task StoreAndCommitAsync_ShouldRemoveNewFileWhenRegistrationFails()
+    {
+        string root = CreateTestRoot("image-resource-registration-rollback");
+        try
+        {
+            var service = CreateService(root);
+            await using var input = new MemoryStream(Png, writable: false);
+
+            await Assert.ThrowsAsync<ResourceConflictException>(() =>
+                service.StoreAndCommitAsync(
+                    input,
+                    "orphan.png",
+                    "image/png",
+                    (_, _) => throw new ResourceConflictException("simulated registration failure")));
+
+            string resourceDirectory = Path.Combine(root, "data", "Templates", "Resources", "V3");
+            Assert.Empty(Directory.Exists(resourceDirectory)
+                ? Directory.EnumerateFiles(resourceDirectory)
+                : []);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
     [Theory]
     [MemberData(nameof(SupportedImageFormats))]
     public async Task StoreAsync_ShouldDetectSupportedImageFormats(

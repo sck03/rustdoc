@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BellRing, Building2, ContactRound, Download, FolderOpen, Landmark, RefreshCw, Search } from "lucide-react";
 import { HashRouter } from "react-router-dom";
 import { WorkspaceShell } from "./app/WorkspaceShell.tsx";
+import { workspaceNavGroups } from "./app/workspaceNavigation.ts";
+import type { ApiUserDto } from "./api/index.ts";
 import { LoginPage } from "./features/auth/LoginPage.tsx";
 import { ConfirmationDialog } from "./ui/ConfirmationDialog.tsx";
 import { FrontendFatalErrorState } from "./ui/FrontendErrorBoundary.tsx";
@@ -17,6 +19,8 @@ import "./styles/visual-baseline.css";
 const visualSearch = new URLSearchParams(location.search);
 const page = visualSearch.get("page") ?? "dashboard";
 const fullProduct = getProductEditionPresentation("Full");
+const baselineNavItems = workspaceNavGroups.flatMap((group) => group.items);
+const baselineModules = [...new Set(baselineNavItems.flatMap((item) => item.moduleKey ? [item.moduleKey] : []))];
 const visualQueryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: false },
@@ -50,10 +54,23 @@ function BaselineApp() {
   if (page === "state-fatal") {
     return <FrontendFatalErrorState incidentId="WEB-20260722-TEST1" onRetry={() => undefined} onReload={() => undefined} />;
   }
-  const user = {
+  const user: ApiUserDto = {
     username: "admin", fullName: "系统管理员", role: "Admin",
-    capabilities: { canManageSettings: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, productEdition: "Full", enabledModules: undefined },
-  } as never;
+    id: 1, isActive: true, companyScope: "", departmentId: "",
+    businessDate: "2026-07-22", businessDateValidUntilUtc: "2026-07-22T16:00:00Z", businessTimeZone: "Asia/Shanghai",
+    capabilities: {
+      canManageSettings: true,
+      canManageUsers: true,
+      canViewAllBusinessData: true,
+      canUseDocumentWorkspace: true,
+      canUseSalesWorkspace: true,
+      productEdition: "Full",
+      enabledModules: baselineModules,
+      moduleAccess: baselineModules.map((moduleKey) => ({ moduleKey, accessLevel: "manage" })),
+      permissions: baselineNavItems.flatMap((item) => item.requiredPermissions ?? [])
+        .map((requirement) => ({ ...requirement, dataScope: "all" })),
+    },
+  };
   return <HashRouter><WorkspaceShell pathname={pathnameByPage[page] ?? "/dashboard"} apiBaseUrl="http://127.0.0.1:5188" isDesktopRuntime={page === "state-offline-local"} user={user} onLogout={() => undefined} connectivityOverride={page === "state-offline" || page === "state-offline-local" ? "offline" : "online"} serviceAvailabilityOverride={page === "state-service-unavailable" ? "unreachable" : "available"} notice={page === "state-route-redirect" ? { id: "permission", tone: "warning", title: "当前页面不可用", message: "当前权限模板未启用报表设计，系统已返回当前账号可以使用的工作区。" } : null} onDismissNotice={() => undefined}>
     {page === "query" ? <QueryBaseline/> : page === "invoice" ? <InvoiceBaseline/> : page === "invoiceParties" ? <InvoicePartiesBaseline/> : page === "hs" ? <HsBaseline/> : page === "singleWindow" ? <SingleWindowBaseline/> : page === "report" ? <ReportBaseline/> : page === "state-loading" ? <StateBaseline tone="loading"/> : page === "state-empty" ? <StateBaseline tone="empty"/> : page === "state-error" ? <StateBaseline tone="error"/> : page === "state-permission" ? <StateBaseline tone="permission"/> : page === "state-conflict" ? <ConflictBaseline/> : page === "state-feedback" ? <FeedbackBaseline/> : page === "dialog" ? <DialogBaseline/> : <DashboardBaseline/>}
   </WorkspaceShell></HashRouter>;

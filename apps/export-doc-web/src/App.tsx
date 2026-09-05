@@ -602,6 +602,7 @@ function App() {
   return (
     <PermissionAccessProvider
       grants={session.user.capabilities.moduleAccess}
+      permissions={session.user.capabilities.permissions}
       canManageSettings={session.user.capabilities.canManageSettings}
     >
       <WorkspaceShell

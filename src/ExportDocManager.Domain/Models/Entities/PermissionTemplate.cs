@@ -9,6 +9,9 @@ namespace ExportDocManager.Models.Entities
         [Required, MaxLength(50)]
         public string Code { get; set; } = string.Empty;
 
+        [Required, MaxLength(50)]
+        public string CodeNormalized { get; set; } = string.Empty;
+
         [Required, MaxLength(100)]
         public string Name { get; set; } = string.Empty;
 
@@ -21,20 +24,26 @@ namespace ExportDocManager.Models.Entities
 
         public DateTimeOffset UpdatedAt { get; set; }
 
-        public List<PermissionTemplateModule> Modules { get; set; } = [];
+        [ConcurrencyCheck]
+        public int VersionNumber { get; set; } = 1;
+
+        public List<PermissionTemplateGrant> Grants { get; set; } = [];
     }
 
-    public sealed class PermissionTemplateModule
+    public sealed class PermissionTemplateGrant
     {
         public int Id { get; set; }
 
         public int PermissionTemplateId { get; set; }
 
         [Required, MaxLength(100)]
-        public string ModuleKey { get; set; } = string.Empty;
+        public string ResourceKey { get; set; } = string.Empty;
 
         [Required, MaxLength(20)]
-        public string AccessLevel { get; set; } = "operate";
+        public string Action { get; set; } = string.Empty;
+
+        [Required, MaxLength(20)]
+        public string DataScope { get; set; } = "own";
 
         public PermissionTemplate? PermissionTemplate { get; set; }
     }

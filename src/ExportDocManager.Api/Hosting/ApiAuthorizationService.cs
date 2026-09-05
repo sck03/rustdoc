@@ -32,10 +32,11 @@ namespace ExportDocManager.Api.Hosting
 
         public bool CanManageDisasterRecovery(User user)
         {
-            return CanUseModule(
-                user,
-                PermissionModuleCatalog.SystemDisasterRecovery,
-                PermissionAccessLevel.Manage);
+            // Disaster recovery changes the complete installation and can
+            // replace the database and runtime files.  It is an identity
+            // capability, never a user-configurable module grant.
+            return IsAdministrator(user) &&
+                   string.Equals(_productEdition, ProductEditionCatalog.Full, StringComparison.OrdinalIgnoreCase);
         }
 
         public bool CanViewAllBusinessData(User user)
@@ -62,9 +63,14 @@ namespace ExportDocManager.Api.Hosting
                 return false;
             }
 
-            return GetEnabledModules(user).Any(moduleKey =>
-                PermissionModuleCatalog.ByKey.TryGetValue(moduleKey, out var definition) &&
-                definition.Workspace == "sales");
+            return GetPermissionGrants(user).Any(grant =>
+                PermissionResourceCatalog.ByKey.TryGetValue(grant.ResourceKey, out var definition) &&
+                definition.Workspace == "sales" &&
+                // A document or finance role may read shared mail templates while
+                // composing a document.  That dependency must not expose the sales
+                // workspace by itself; explicit template maintenance still does.
+                (grant.ResourceKey != PermissionResourceCatalog.EmailTemplates ||
+                 grant.Action != PermissionAction.View));
         }
 
         public bool CanUseModule(
@@ -72,6 +78,11 @@ namespace ExportDocManager.Api.Hosting
             string moduleKey,
             string requiredAccessLevel = PermissionAccessLevel.View)
         {
+            if (user == null || !PermissionAccessLevel.IsKnown(requiredAccessLevel))
+            {
+                return false;
+            }
+
             if (!PermissionModuleCatalog.ByKey.TryGetValue(moduleKey ?? string.Empty, out var definition))
             {
                 return false;
@@ -96,6 +107,61 @@ namespace ExportDocManager.Api.Hosting
             return AccessRank(grantedAccessLevel) >= AccessRank(requiredAccessLevel);
         }
 
+        public bool CanUsePermission(User user, string resourceKey, string action)
+        {
+            if (user == null || !PermissionResourceCatalog.IsKnownAction(resourceKey, action))
+            {
+                return false;
+            }
+
+            var resource = PermissionResourceCatalog.ByKey[resourceKey.Trim()];
+            if (!EditionIncludes(resource.Workspace))
+            {
+                return false;
+            }
+
+            if (RequiresAdministratorIdentity(resource.Key))
+            {
+                bool requiresFullEdition = resource.Key is
+                    PermissionResourceCatalog.SystemDisasterRecovery or
+                    PermissionResourceCatalog.SystemUsers or
+                    PermissionResourceCatalog.SystemPermissions or
+                    PermissionResourceCatalog.SystemAudit;
+                return IsAdministrator(user) &&
+                    (!requiresFullEdition ||
+                     string.Equals(_productEdition, ProductEditionCatalog.Full, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (IsAdministrator(user))
+            {
+                return true;
+            }
+
+            return GetPermissionGrants(user).Any(grant =>
+                string.Equals(grant.ResourceKey, resource.Key, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(grant.Action, action, StringComparison.OrdinalIgnoreCase));
+        }
+
+        public string GetDataScope(User user, string resourceKey, string action)
+        {
+            if (!CanUsePermission(user, resourceKey, action))
+            {
+                return string.Empty;
+            }
+
+            if (IsAdministrator(user) || RequiresAdministratorIdentity(resourceKey))
+            {
+                return PermissionDataScope.All;
+            }
+
+            return GetPermissionGrants(user)
+                .Where(grant => string.Equals(grant.ResourceKey, resourceKey, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(grant.Action, action, StringComparison.OrdinalIgnoreCase))
+                .Select(grant => grant.DataScope)
+                .OrderByDescending(PermissionDataScope.Rank)
+                .FirstOrDefault() ?? string.Empty;
+        }
+
         public IReadOnlyList<string> GetEnabledModules(User user)
         {
             return GetModuleAccess(user).Keys.ToArray();
@@ -103,21 +169,22 @@ namespace ExportDocManager.Api.Hosting
 
         public IReadOnlyDictionary<string, string> GetModuleAccess(User user)
         {
-            IEnumerable<KeyValuePair<string, string>> grants = IsAdministrator(user)
-                ? PermissionModuleCatalog.Modules.Select(module =>
-                    new KeyValuePair<string, string>(module.Key, PermissionAccessLevel.Manage))
-                : ReadUserModuleAccess(user);
-
-            return grants
-                .Where(grant => PermissionModuleCatalog.ByKey.TryGetValue(grant.Key, out var definition) &&
-                    (definition.Workspace == "common" ||
-                     definition.Workspace == "document" && ProductEditionCatalog.IncludesDocumentWorkspace(_productEdition) ||
-                     definition.Workspace == "sales" && ProductEditionCatalog.IncludesSalesWorkspace(_productEdition)))
-                .GroupBy(grant => grant.Key, StringComparer.OrdinalIgnoreCase)
+            return GetPermissionGrants(user)
+                .Where(grant => PermissionResourceCatalog.ByKey.TryGetValue(grant.ResourceKey, out var resource) &&
+                    PermissionModuleCatalog.ByKey.ContainsKey(resource.ModuleKey))
+                .Select(grant => new
+                {
+                    PermissionResourceCatalog.ByKey[grant.ResourceKey].ModuleKey,
+                    AccessLevel = PermissionResourceCatalog.GetNavigationAccessLevel(grant.ResourceKey, grant.Action)
+                })
+                .GroupBy(grant => grant.ModuleKey, StringComparer.OrdinalIgnoreCase)
                 .OrderBy(group => PermissionModuleCatalog.ByKey[group.Key].SortOrder)
                 .ToDictionary(
                     group => group.Key,
-                    group => PermissionAccessLevel.Normalize(group.Last().Value),
+                    group => group
+                        .Select(grant => PermissionAccessLevel.Normalize(grant.AccessLevel))
+                        .OrderByDescending(PermissionAccessLevel.Rank)
+                        .First(),
                     StringComparer.OrdinalIgnoreCase);
         }
 
@@ -125,6 +192,7 @@ namespace ExportDocManager.Api.Hosting
         {
             var moduleAccess = GetModuleAccess(user);
             var enabledModules = moduleAccess.Keys.ToArray();
+            var permissions = GetPermissionGrants(user);
             return new ApiUserCapabilitiesDto(
                 CanManageSettings(user),
                 CanManageUsers(user),
@@ -133,23 +201,59 @@ namespace ExportDocManager.Api.Hosting
                 CanUseSalesWorkspace(user),
                 _productEdition,
                 enabledModules,
-                moduleAccess.Select(grant => new ApiModuleAccessDto(grant.Key, grant.Value)).ToArray());
+                moduleAccess.Select(grant => new ApiModuleAccessDto(grant.Key, grant.Value)).ToArray(),
+                permissions.Select(grant => new ApiPermissionGrantDto(
+                    grant.ResourceKey, grant.Action, grant.DataScope)).ToArray());
         }
 
-        private static IEnumerable<KeyValuePair<string, string>> ReadUserModuleAccess(User user)
+        public IReadOnlyList<EffectivePermissionGrant> GetPermissionGrants(User user)
         {
-            if (user?.EffectiveModuleAccess?.Count > 0)
+            IEnumerable<EffectivePermissionGrant> grants;
+            if (IsAdministrator(user))
             {
-                return user.EffectiveModuleAccess;
+                grants = PermissionResourceCatalog.Resources.SelectMany(resource =>
+                    resource.Actions.Select(action => new EffectivePermissionGrant(
+                        resource.Key, action.Key, PermissionDataScope.All, "administrator")));
             }
-
-            if (user?.PermissionTemplateId != null)
+            else
             {
-                return [];
+                var effectiveGrants = UserPermissionAccessResolver.ResolveEffectiveGrants(user);
+                grants = PermissionResourceCatalog.Resources.SelectMany(resource =>
+                    resource.Actions.Select(action =>
+                    {
+                        string key = PermissionResourceCatalog.CreateGrantKey(resource.Key, action.Key);
+                        return effectiveGrants.TryGetValue(key, out string? scope)
+                            ? new EffectivePermissionGrant(resource.Key, action.Key, scope, "template")
+                            : null;
+                    }))
+                    .OfType<EffectivePermissionGrant>();
             }
-
-            return BuiltInPermissionTemplateCatalog.FindForRole(user?.Role ?? string.Empty).GetModuleAccess();
+            return grants
+                .Where(grant => PermissionResourceCatalog.ByKey.TryGetValue(grant.ResourceKey, out var resource) &&
+                    EditionIncludes(resource.Workspace) &&
+                    PermissionDataScope.IsKnown(grant.DataScope))
+                .GroupBy(grant => PermissionResourceCatalog.CreateGrantKey(grant.ResourceKey, grant.Action),
+                    StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.OrderByDescending(grant => PermissionDataScope.Rank(grant.DataScope)).First())
+                .OrderBy(grant => PermissionResourceCatalog.ByKey[grant.ResourceKey].SortOrder)
+                .ThenBy(grant => PermissionResourceCatalog.ByKey[grant.ResourceKey].Actions.Single(action =>
+                    string.Equals(action.Key, grant.Action, StringComparison.OrdinalIgnoreCase)).SortOrder)
+                .ToArray();
         }
+
+        private bool EditionIncludes(string workspace) =>
+            workspace == "common" ||
+            workspace == "document" && ProductEditionCatalog.IncludesDocumentWorkspace(_productEdition) ||
+            workspace == "sales" && ProductEditionCatalog.IncludesSalesWorkspace(_productEdition);
+
+        private static bool RequiresAdministratorIdentity(string resourceKey) => resourceKey is
+            PermissionResourceCatalog.SystemUsers or
+            PermissionResourceCatalog.SystemPermissions or
+            PermissionResourceCatalog.SystemSettings or
+            PermissionResourceCatalog.SystemAudit or
+            PermissionResourceCatalog.SystemBackup or
+            PermissionResourceCatalog.SystemDisasterRecovery or
+            PermissionResourceCatalog.EmailPolicy;
 
         private static int AccessRank(string accessLevel) =>
             !PermissionAccessLevel.IsKnown(accessLevel)

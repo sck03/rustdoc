@@ -135,7 +135,7 @@ export function useReportTemplateSelectionSync({
     const configuredUserTemplateId = readUserTemplateIdFromKey(configuredTemplatePath);
     const selectedUserTemplateKey = readUserTemplateIdFromKey(selectedTemplatePath);
     const targetId = selectedUserTemplateKey || (!selectedTemplatePath ? configuredUserTemplateId : 0);
-    if (userTemplates.some((template) => template.id === targetId && template.isActive)) {
+    if (userTemplates.some((template) => template.id === targetId && template.status === "Published")) {
       setSelectedUserTemplateId(targetId);
     }
   }, [configuredTemplatePath, selectedTemplatePath, selectedUserTemplateId, setSelectedUserTemplateId, templatesLoaded, userTemplates, userTemplatesLoaded]);

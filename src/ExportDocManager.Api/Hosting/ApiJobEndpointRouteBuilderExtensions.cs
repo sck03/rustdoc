@@ -352,7 +352,8 @@ namespace ExportDocManager.Api.Hosting
 
                 return await retryDispatcher.RetryAsync(
                     sourceJob,
-                    user.Username,
+                    user,
+                    authorizationService,
                     invoiceService,
                     cancellationToken);
             })
@@ -360,6 +361,7 @@ namespace ExportDocManager.Api.Hosting
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict);
         }

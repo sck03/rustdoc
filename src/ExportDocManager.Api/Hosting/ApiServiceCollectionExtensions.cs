@@ -154,6 +154,7 @@ namespace ExportDocManager.Api.Hosting
                     pathProvider,
                     provider.GetRequiredService<ILogger<DatabaseInitializationService>>()));
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IOrganizationDirectoryService, OrganizationDirectoryService>();
             services.AddScoped<IPermissionTemplateService, PermissionTemplateService>();
             services.AddScoped<BusinessDataAccessScope>();
             services.AddScoped<IItemService, ItemService>();
@@ -207,6 +208,7 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IReportTemplateService, ReportTemplateService>();
             services.AddScoped<IReportTemplateFileService, ReportTemplateFileService>();
             services.AddSingleton<IReportTemplateImageResourceService, ReportTemplateImageResourceService>();
+            services.AddScoped<IReportTemplateImageResourceAccessService, ReportTemplateImageResourceAccessService>();
             services.AddScoped<IUserReportTemplateService, UserReportTemplateService>();
             services.AddScoped<IReportTemplateStorageDiagnosticsService, ReportTemplateStorageDiagnosticsService>();
             services.AddScoped<IReportTemplatePackageService, ReportTemplatePackageService>();

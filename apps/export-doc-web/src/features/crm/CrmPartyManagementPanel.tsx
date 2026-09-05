@@ -14,14 +14,24 @@ type Props = {
   onReloadCustomers: (preferred?: ApiCrmCustomerDto) => Promise<void>;
   onReloadContacts: () => Promise<void>;
   onFeedback: (feedback: OperationFeedbackState) => void;
-  canOperate: boolean;
-  canManage: boolean;
+  canCreateCustomer: boolean;
+  canEditCustomer: boolean;
+  canDeactivateCustomer: boolean;
+  canDeleteCustomer: boolean;
+  canCreateContact: boolean;
+  canEditContact: boolean;
+  canSetPrimaryContact: boolean;
+  canDeleteContact: boolean;
 };
 
 export function CrmPartyManagementPanel(props: Props) {
   const requestConfirmation = useConfirmation();
   const runAbortableOperation = useAbortableOperation();
-  const { client, customers, contacts, customerId, onSelectCustomer, onReloadCustomers, onReloadContacts, onFeedback, canOperate, canManage } = props;
+  const {
+    client, customers, contacts, customerId, onSelectCustomer, onReloadCustomers, onReloadContacts, onFeedback,
+    canCreateCustomer, canEditCustomer, canDeactivateCustomer, canDeleteCustomer, canCreateContact, canEditContact,
+    canSetPrimaryContact, canDeleteContact,
+  } = props;
   const selectedCustomer = customers.find((item) => item.id === customerId);
   const [isNewCustomer, setIsNewCustomer] = useState(false);
   const [contactId, setContactId] = useState(0);
@@ -79,7 +89,7 @@ export function CrmPartyManagementPanel(props: Props) {
 
   async function saveCustomer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canOperate) return;
+    if (isNewCustomer ? !canCreateCustomer : !canEditCustomer) return;
     const form = new FormData(event.currentTarget);
     const id = isNewCustomer ? 0 : selectedCustomer?.id ?? 0;
     try {
@@ -88,7 +98,6 @@ export function CrmPartyManagementPanel(props: Props) {
         name: String(form.get("name") ?? ""),
         countryRegion: String(form.get("countryRegion") ?? ""),
         website: String(form.get("website") ?? ""),
-        status: String(form.get("status") ?? "潜在客户"),
         source: String(form.get("source") ?? ""),
         notes: String(form.get("notes") ?? ""),
         linkedDocumentCustomerId: selectedCustomer?.linkedDocumentCustomerId,
@@ -107,10 +116,40 @@ export function CrmPartyManagementPanel(props: Props) {
     }
   }
 
-  async function deleteCustomer() {
-    if (!canManage || !selectedCustomer || !await requestConfirmation({ title: "删除 CRM 客户", description: `确定删除 CRM 客户“${selectedCustomer.name}”吗？`, details: ["存在业务引用时服务端会拒绝删除。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmAndResetDrafts("删除客户")) return;
+  async function changeCustomerAvailability(restore: boolean) {
+    if (!canDeactivateCustomer || !selectedCustomer) return;
+    const action = restore ? "恢复" : "停用";
+    if (!await requestConfirmation({
+      title: `${action} CRM 客户`,
+      description: `确定${action}客户“${selectedCustomer.name}”吗？`,
+      details: restore ? ["恢复后客户状态将变为跟进中。"] : ["停用不会删除跟进或商机历史。"],
+      confirmLabel: `确认${action}`,
+      tone: restore ? undefined : "danger",
+    })) return;
     try {
-      await runAbortableOperation((signal) => client.deleteCrmCustomer({ id: selectedCustomer.id }, { signal }));
+      const saved = await runAbortableOperation((signal) => restore
+        ? client.restoreCrmCustomer(
+          { id: selectedCustomer.id, body: { expectedVersion: selectedCustomer.versionNumber } },
+          { signal },
+        )
+        : client.deactivateCrmCustomer(
+          { id: selectedCustomer.id, body: { expectedVersion: selectedCustomer.versionNumber } },
+          { signal },
+        ));
+      await onReloadCustomers(saved);
+      onFeedback(successFeedback(restore ? "CRM 客户已恢复为跟进中。" : "CRM 客户已停用，历史记录保持不变。"));
+    } catch (error) {
+      if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
+    }
+  }
+
+  async function deleteCustomer() {
+    if (!canDeleteCustomer || !selectedCustomer || !await requestConfirmation({ title: "删除 CRM 客户", description: `确定删除 CRM 客户“${selectedCustomer.name}”吗？`, details: ["存在业务引用时服务端会拒绝删除。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmAndResetDrafts("删除客户")) return;
+    try {
+      await runAbortableOperation((signal) => client.deleteCrmCustomer(
+        { id: selectedCustomer.id, expectedVersion: selectedCustomer.versionNumber },
+        { signal },
+      ));
       await onReloadCustomers();
       onFeedback(successFeedback("CRM 客户已删除。"));
     } catch (error) {
@@ -120,7 +159,7 @@ export function CrmPartyManagementPanel(props: Props) {
 
   async function saveContact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canOperate) return;
+    if (selectedContact ? !canEditContact : !canCreateContact) return;
     if (!activeCustomerId) return;
     const form = new FormData(event.currentTarget);
     const id = selectedContact?.id ?? 0;
@@ -132,7 +171,6 @@ export function CrmPartyManagementPanel(props: Props) {
       email: String(form.get("email") ?? ""),
       phone: String(form.get("phone") ?? ""),
       instantMessaging: String(form.get("instantMessaging") ?? ""),
-      isPrimary: form.get("isPrimary") === "on",
       expectedVersion: id > 0 ? selectedContact?.versionNumber ?? 0 : 0,
     };
     try {
@@ -148,11 +186,27 @@ export function CrmPartyManagementPanel(props: Props) {
     }
   }
 
+  async function setPrimaryContact() {
+    if (!canSetPrimaryContact || !selectedContact || selectedContact.isPrimary) return;
+    try {
+      const saved = await runAbortableOperation((signal) => client.setPrimaryCrmContact({
+        customerId: activeCustomerId,
+        id: selectedContact.id,
+        body: { expectedVersion: selectedContact.versionNumber },
+      }, { signal }));
+      await onReloadContacts();
+      setContactId(saved.id);
+      onFeedback(successFeedback("主要联系人已切换。"));
+    } catch (error) {
+      if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
+    }
+  }
+
   async function deleteContact() {
-    if (!canManage || !selectedContact || !await requestConfirmation({ title: "删除客户联系人", description: `确定删除联系人“${selectedContact.name}”吗？`, details: ["历史跟进记录仍会保留。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmAndResetDrafts("删除联系人")) return;
+    if (!canDeleteContact || !selectedContact || !await requestConfirmation({ title: "删除客户联系人", description: `确定删除联系人“${selectedContact.name}”吗？`, details: ["历史跟进记录仍会保留。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmAndResetDrafts("删除联系人")) return;
     try {
       await runAbortableOperation((signal) => client.deleteCrmContact(
-        { customerId: activeCustomerId, id: selectedContact.id },
+        { customerId: activeCustomerId, id: selectedContact.id, expectedVersion: selectedContact.versionNumber },
         { signal },
       ));
       setContactId(0);
@@ -168,7 +222,7 @@ export function CrmPartyManagementPanel(props: Props) {
       <form className="form-grid" key={isNewCustomer ? "new" : `${selectedCustomer?.id ?? "empty"}-${selectedCustomer?.versionNumber ?? 0}`} onSubmit={saveCustomer}>
         <div className="section-heading-row">
           <h3>{isNewCustomer ? "新建销售客户" : "客户资料"}</h3>
-          {canOperate ? <button className="secondary-button" type="button" onClick={() => void beginNewCustomer()}>新建</button> : null}
+          {canCreateCustomer ? <button className="secondary-button" type="button" onClick={() => void beginNewCustomer()}>新建</button> : null}
         </div>
         {!isNewCustomer ? (
           <label>选择客户<select value={customerId} onChange={(event) => void selectCustomer(Number(event.target.value))}>
@@ -176,43 +230,44 @@ export function CrmPartyManagementPanel(props: Props) {
             {customers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select></label>
         ) : null}
-        <fieldset className="permission-fieldset form-field-wide" disabled={!canOperate} onChangeCapture={() => setCustomerDraftDirty(true)}>
+        <fieldset className="permission-fieldset form-field-wide" disabled={isNewCustomer ? !canCreateCustomer : !canEditCustomer} onChangeCapture={() => setCustomerDraftDirty(true)}>
         <label>客户名称<input name="name" required maxLength={200} defaultValue={isNewCustomer ? "" : selectedCustomer?.name} /></label>
         <label>国家/地区<input name="countryRegion" maxLength={100} defaultValue={isNewCustomer ? "" : selectedCustomer?.countryRegion} /></label>
         <label>网站<input name="website" maxLength={300} defaultValue={isNewCustomer ? "" : selectedCustomer?.website} /></label>
-        <label>状态<select name="status" defaultValue={isNewCustomer ? "潜在客户" : selectedCustomer?.status || "潜在客户"}>
-          <option>潜在客户</option><option>跟进中</option><option>已成交</option><option>暂停</option><option>已流失</option>
-        </select></label>
+        {!isNewCustomer ? <label>当前状态<input value={selectedCustomer?.status ?? ""} readOnly /></label> : null}
         <label>来源<input name="source" maxLength={50} defaultValue={isNewCustomer ? "" : selectedCustomer?.source} /></label>
         <label className="form-field-wide">备注<textarea name="notes" maxLength={1000} defaultValue={isNewCustomer ? "" : selectedCustomer?.notes} /></label>
         </fieldset>
         <div className="form-actions">
-          {canOperate ? <button className="primary-button" type="submit">{isNewCustomer ? "建立客户" : "保存客户"}</button> : null}
-          {!isNewCustomer && selectedCustomer && canManage ? <button className="secondary-button danger-button" type="button" onClick={() => void deleteCustomer()}>删除客户</button> : null}
+          {(isNewCustomer ? canCreateCustomer : canEditCustomer) ? <button className="primary-button" type="submit">{isNewCustomer ? "建立客户" : "保存客户"}</button> : null}
+          {!isNewCustomer && selectedCustomer && canDeactivateCustomer && selectedCustomer.status !== "暂停" && selectedCustomer.status !== "已流失" ? <button className="secondary-button" type="button" onClick={() => void changeCustomerAvailability(false)}>停用客户</button> : null}
+          {!isNewCustomer && selectedCustomer && canDeactivateCustomer && (selectedCustomer.status === "暂停" || selectedCustomer.status === "已流失") ? <button className="secondary-button" type="button" onClick={() => void changeCustomerAvailability(true)}>恢复客户</button> : null}
+          {!isNewCustomer && selectedCustomer && canDeleteCustomer ? <button className="secondary-button danger-button" type="button" onClick={() => void deleteCustomer()}>删除客户</button> : null}
         </div>
       </form>
 
       <form className="form-grid" key={`${selectedContact?.id ?? "new"}-${selectedContact?.versionNumber ?? 0}-${activeCustomerId}`} onSubmit={saveContact}>
         <div className="section-heading-row">
           <h3>{selectedContact ? "联系人资料" : "添加联系人"}</h3>
-          {canOperate ? <button className="secondary-button" type="button" disabled={!activeCustomerId} onClick={() => void beginNewContact()}>新建</button> : null}
+          {canCreateContact ? <button className="secondary-button" type="button" disabled={!activeCustomerId} onClick={() => void beginNewContact()}>新建</button> : null}
         </div>
         {isNewCustomer ? <div className="context-strip form-field-wide"><strong>先保存新客户</strong><span>保存后即可为该客户添加联系人。</span></div> : null}
         <label>选择联系人<select value={contactId} disabled={!activeCustomerId} onChange={(event) => void selectContact(Number(event.target.value))}>
           <option value={0}>新联系人</option>
           {contacts.map((item) => <option key={item.id} value={item.id}>{item.name}{item.isPrimary ? " · 主要" : ""}</option>)}
         </select></label>
-        <fieldset className="permission-fieldset form-field-wide" disabled={!canOperate || !activeCustomerId} onChangeCapture={() => setContactDraftDirty(true)}>
+        <fieldset className="permission-fieldset form-field-wide" disabled={(selectedContact ? !canEditContact : !canCreateContact) || !activeCustomerId} onChangeCapture={() => setContactDraftDirty(true)}>
         <label>姓名<input name="contactName" required maxLength={100} defaultValue={selectedContact?.name} /></label>
         <label>职位<input name="title" maxLength={100} defaultValue={selectedContact?.title} /></label>
         <label>邮箱<input name="email" type="email" maxLength={200} defaultValue={selectedContact?.email} /></label>
         <label>电话<input name="phone" maxLength={100} defaultValue={selectedContact?.phone} /></label>
         <label>即时通讯<input name="instantMessaging" maxLength={100} defaultValue={selectedContact?.instantMessaging} /></label>
-        <label className="checkbox-field"><input name="isPrimary" type="checkbox" defaultChecked={selectedContact?.isPrimary ?? contacts.length === 0} />主要联系人</label>
+        {selectedContact ? <label>联系人角色<input value={selectedContact.isPrimary ? "主要联系人" : "普通联系人"} readOnly /></label> : null}
         </fieldset>
         <div className="form-actions">
-          {canOperate ? <button className="primary-button" type="submit" disabled={!activeCustomerId}>{selectedContact ? "保存联系人" : "添加联系人"}</button> : null}
-          {selectedContact && canManage ? <button className="secondary-button danger-button" type="button" onClick={() => void deleteContact()}>删除联系人</button> : null}
+          {(selectedContact ? canEditContact : canCreateContact) ? <button className="primary-button" type="submit" disabled={!activeCustomerId}>{selectedContact ? "保存联系人" : "添加联系人"}</button> : null}
+          {selectedContact && !selectedContact.isPrimary && canSetPrimaryContact ? <button className="secondary-button" type="button" onClick={() => void setPrimaryContact()}>设为主要联系人</button> : null}
+          {selectedContact && canDeleteContact ? <button className="secondary-button danger-button" type="button" onClick={() => void deleteContact()}>删除联系人</button> : null}
         </div>
       </form>
     </div>

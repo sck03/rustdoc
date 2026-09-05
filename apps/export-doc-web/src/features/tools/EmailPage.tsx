@@ -6,7 +6,8 @@ import {
   type ApiEmailDeliveryDto,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
-import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import { usePermission, usePermissionCapabilities } from "../../app/PermissionAccessContext.tsx";
+import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { isDesktopBridgeAvailable, selectEmailAttachmentFiles } from "../../desktop/desktopBridge.ts";
 import { readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
@@ -24,7 +25,9 @@ type MessageState = {
 };
 
 export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
-  const emailPermission = useModulePermission("common.email");
+  const sendPermission = usePermission(permissionResources.emailDelivery, permissionActions.send);
+  const deliveryViewPermission = usePermission(permissionResources.emailDelivery, permissionActions.viewDelivery);
+  const { canManageSettings } = usePermissionCapabilities();
   const location = useLocation();
   const navigate = useNavigate();
   const [toAddress, setToAddress] = useState("");
@@ -49,11 +52,12 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
   const statusQuery = useQuery({
     queryKey: queryKeys.emailStatus(),
     queryFn: ({ signal }) => client.getEmailToolStatus({ signal }),
+    enabled: deliveryViewPermission.allowed,
   });
   const deliveriesQuery = useQuery({
     queryKey: queryKeys.emailDeliveries(),
     queryFn: ({ signal }) => client.listEmailDeliveries({ limit: 50 }, { signal }),
-    enabled: emailPermission.canView,
+    enabled: deliveryViewPermission.allowed,
   });
 
   useEffect(() => {
@@ -81,11 +85,11 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
         kind: response.success ? "success" : "error",
         text: response.message || "邮件发送完成。",
       });
-      void deliveriesQuery.refetch();
+      if (deliveryViewPermission.allowed) void deliveriesQuery.refetch();
     },
     onError: (error) => {
       setMessage({ kind: "error", text: readApiError(error) });
-      void deliveriesQuery.refetch();
+      if (deliveryViewPermission.allowed) void deliveriesQuery.refetch();
     },
   });
 
@@ -102,11 +106,11 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
   });
   const hasDraftContent = Boolean(toAddress.trim() || subject.trim() || body.trim() || attachmentPaths.length);
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
-    isDirty: hasDraftContent && currentDraftSnapshot !== lastSentDraftSnapshot,
+    isDirty: sendPermission.allowed && hasDraftContent && currentDraftSnapshot !== lastSentDraftSnapshot,
     message: "当前邮件有尚未发送的内容。",
   });
   const isBusy = statusQuery.isFetching || sendMutation.isPending;
-  const canSend = emailPermission.canOperate && Boolean(status?.isConfigured && toAddress.trim()) && !isBusy;
+  const canSend = sendPermission.allowed && Boolean(status?.isConfigured && toAddress.trim()) && !isBusy;
   const statusLabel = status ? (status.isConfigured ? "SMTP 已配置" : "SMTP 未配置") : "读取中";
   const statusSummary = !status
     ? "正在读取邮件服务状态"
@@ -154,6 +158,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
   }
 
   async function openEmailSettings() {
+    if (!canManageSettings) return;
     if (await confirmDiscardChanges("打开邮件设置")) navigate("/settings?section=email");
   }
 
@@ -165,7 +170,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
           <span>{statusSummary}</span>
         </div>
         <div className="toolbar-actions">
-          {!status?.isConfigured ? (
+          {canManageSettings && status && !status.isConfigured ? (
             <button className="icon-button" type="button" title="配置邮件服务" aria-label="配置邮件服务" onClick={() => void openEmailSettings()}>
               <Settings size={18} aria-hidden="true" />
             </button>
@@ -183,7 +188,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
             <RefreshCw size={18} aria-hidden="true" />
           </button>
           {isDesktopRuntime ? (
-            <button className="icon-button" type="button" title="选择附件" aria-label="选择附件" disabled={isBusy || !emailPermission.canOperate} onClick={() => void pickAttachments()}>
+            <button className="icon-button" type="button" title="选择附件" aria-label="选择附件" disabled={isBusy || !sendPermission.allowed} onClick={() => void pickAttachments()}>
               <Paperclip size={18} aria-hidden="true" />
             </button>
           ) : null}
@@ -193,7 +198,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
         </div>
       </div>
 
-      {!emailPermission.canOperate ? <PermissionNotice>当前模板仅允许查看邮件服务状态，邮件编辑和发送已禁用。</PermissionNotice> : null}
+      {!sendPermission.allowed ? <PermissionNotice>当前模板仅允许查看邮件服务状态和授权范围内的投递记录，邮件编辑和发送已禁用。</PermissionNotice> : null}
       {message ? <InlineNotice tone={message.kind === "error" ? "error" : "success"}>{message.text}</InlineNotice> : null}
       <section className="form-section" aria-label="邮件状态">
         <div className="detail-grid email-status-detail-grid">
@@ -214,20 +219,20 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
               value={toAddress}
               type="email"
               autoComplete="email"
-              disabled={!emailPermission.canOperate}
+              disabled={!sendPermission.allowed}
               onChange={(event) => setToAddress(event.target.value)}
             />
           </label>
           <label>
             <span>主题</span>
-            <input value={subject} disabled={!emailPermission.canOperate} onChange={(event) => setSubject(event.target.value)} />
+            <input value={subject} disabled={!sendPermission.allowed} onChange={(event) => setSubject(event.target.value)} />
           </label>
           <div className="email-body-field email-rich-text-field">
             <span className="email-rich-text-field-label">正文</span>
-            <EmailRichTextEditor value={body} disabled={!emailPermission.canOperate} ariaLabel="待发送邮件正文" onChange={setBody} />
+            <EmailRichTextEditor value={body} disabled={!sendPermission.allowed} ariaLabel="待发送邮件正文" onChange={setBody} />
             <details className="email-html-advanced">
               <summary>高级 HTML</summary>
-              <textarea aria-label="待发送邮件高级 HTML" value={body} disabled={!emailPermission.canOperate} onChange={(event) => setBody(event.target.value)} />
+              <textarea aria-label="待发送邮件高级 HTML" value={body} disabled={!sendPermission.allowed} onChange={(event) => setBody(event.target.value)} />
             </details>
           </div>
         </section>
@@ -242,10 +247,10 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
           <PathTextAreaField
             label="附件路径"
             value={attachmentsText}
-            disabled={isBusy || !emailPermission.canOperate}
+            disabled={isBusy || !sendPermission.allowed}
             onChange={(value) => setAttachmentsText(value)}
             actions={
-              <button className="icon-button" type="button" title="选择附件" aria-label="选择附件" disabled={isBusy || !emailPermission.canOperate} onClick={() => void pickAttachments()}>
+              <button className="icon-button" type="button" title="选择附件" aria-label="选择附件" disabled={isBusy || !sendPermission.allowed} onClick={() => void pickAttachments()}>
                 <Paperclip size={16} aria-hidden="true" />
               </button>
             }
@@ -270,7 +275,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
                         className="icon-button compact-icon-button"
                         type="button"
                         title="移除附件" aria-label="移除附件"
-                        disabled={isBusy || !emailPermission.canOperate}
+                        disabled={isBusy || !sendPermission.allowed}
                         onClick={() => removeAttachment(path)}
                       >
                         <Trash2 size={15} aria-hidden="true" />
@@ -303,11 +308,13 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
         )}
       </div>
 
-      <EmailDeliveryHistory
-        rows={deliveriesQuery.data ?? []}
-        isLoading={deliveriesQuery.isFetching}
-        onRefresh={() => void deliveriesQuery.refetch()}
-      />
+      {deliveryViewPermission.allowed ? (
+        <EmailDeliveryHistory
+          rows={deliveriesQuery.data ?? []}
+          isLoading={deliveriesQuery.isFetching}
+          onRefresh={() => void deliveriesQuery.refetch()}
+        />
+      ) : null}
     </section>
   );
 }

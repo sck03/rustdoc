@@ -27,7 +27,7 @@ export function UserAndPermissionManagementPanel({
         </div>
         <span className="identity-management-security-note">
           <ShieldCheck size={18} aria-hidden="true" />
-          权限在用户重新登录后生效
+          权限变更立即生效，相关账号需重新登录
         </span>
       </div>
 
@@ -50,7 +50,7 @@ export function UserAndPermissionManagementPanel({
           onClick={() => setActiveTab("templates")}
         >
           <ShieldCheck size={18} aria-hidden="true" />
-          <span><strong>权限模板</strong><small>按岗位配置可见业务模块</small></span>
+          <span><strong>权限模板</strong><small>配置资源、动作和数据范围</small></span>
         </button>
       </div>
 

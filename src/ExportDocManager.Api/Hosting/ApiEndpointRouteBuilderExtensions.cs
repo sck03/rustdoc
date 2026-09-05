@@ -19,16 +19,24 @@ namespace ExportDocManager.Api.Hosting
             api.MapSystemEndpoints(runtimeOptions, databaseSettings);
             api.MapGroup(string.Empty)
                 .WithApiResourceProfile(ApiResourceProfile.Identity)
+                .AllowApiWithoutPermission()
                 .MapLicenseEndpoints();
             api.MapGroup(string.Empty)
                 .WithApiResourceProfile(ApiResourceProfile.Identity)
+                .AllowApiWithoutPermission()
                 .MapAuthEndpoints();
-            api.MapUserEndpoints();
-            api.MapPermissionTemplateEndpoints();
-            api.MapSettingsEndpoints();
+            // These endpoints perform their own capability checks (some of
+            // them combine product-edition and identity rules), so declare an
+            // explicit handler-owned bypass instead of relying on a missing
+            // metadata entry.
+            api.MapGroup(string.Empty).AllowApiWithoutPermission().MapUserEndpoints();
+            api.MapGroup(string.Empty).AllowApiWithoutPermission().MapOrganizationDirectoryEndpoints();
+            api.MapGroup(string.Empty).AllowApiWithoutPermission().MapPermissionTemplateEndpoints();
+            api.MapGroup(string.Empty).AllowApiWithoutPermission().MapSettingsEndpoints();
             var maintenance = api.MapGroup(string.Empty)
                 .WithApiResourceProfile(ApiResourceProfile.Maintenance)
-                .WithApiSecurityAudit("database-maintenance");
+                .WithApiSecurityAudit("database-maintenance")
+                .AllowApiWithoutPermission();
             maintenance.MapBackupEndpoints();
             maintenance.MapSharedDatabaseMaintenanceEndpoints();
             maintenance.MapServerMigrationEndpoints();
@@ -43,6 +51,7 @@ namespace ExportDocManager.Api.Hosting
             api.MapPermissionGroup(PermissionModuleCatalog.DocumentPayments).MapPaymentEndpoints();
             api.MapGroup(string.Empty)
                 .WithApiResourceProfile(ApiResourceProfile.Workload)
+                .AllowApiWithoutPermission()
                 .MapAuditLogEndpoints();
             api.MapGroup(string.Empty)
                 .WithApiResourceProfile(ApiResourceProfile.Streaming)

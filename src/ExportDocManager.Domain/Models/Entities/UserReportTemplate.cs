@@ -28,10 +28,10 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(50)]
         public string CompanyScope { get; set; } = string.Empty;
 
-        public bool IsShared { get; set; }
         [Required, MaxLength(20)]
-        public string ShareScope { get; set; } = "Private";
-        public bool IsActive { get; set; } = true;
+        public string ShareScope { get; set; } = TemplateShareScopeCatalog.Private;
+        [Required, MaxLength(20)]
+        public string Status { get; set; } = TemplateLifecycleStatusCatalog.Draft;
         [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }

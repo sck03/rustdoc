@@ -29,6 +29,7 @@ namespace ExportDocManager.Services.Reporting
         private readonly ReportTemplateCatalogLoader _catalogLoader;
         private readonly ILogger<ReportTemplatePackageService> _logger;
         private readonly IBusinessClock _clock;
+        private readonly ReportTemplateStorageCoordinator _storageCoordinator;
 
         public ReportTemplatePackageService(
             IAppPathProvider pathProvider,
@@ -43,6 +44,7 @@ namespace ExportDocManager.Services.Reporting
             _logger = logger ?? NullLogger<ReportTemplatePackageService>.Instance;
             _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver, _logger);
             _clock = clock ?? BusinessClock.CreateSystem();
+            _storageCoordinator = new ReportTemplateStorageCoordinator(pathProvider, settingsService, _logger);
         }
     }
 }

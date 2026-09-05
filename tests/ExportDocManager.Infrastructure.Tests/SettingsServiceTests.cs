@@ -1,14 +1,63 @@
 using System.Text.Json;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Infrastructure.Tests;
 
 [Collection(LocalSecretProtectionCollection.Name)]
 public sealed class SettingsServiceTests
 {
+    [Fact]
+    public async Task FileLock_WhenContended_ShouldTimeOutInsteadOfWaitingForever()
+    {
+        string root = CreateTempRoot();
+        try
+        {
+            string lockPath = Path.Combine(root, "settings.lock");
+            await using var owner = await CrossProcessFileLock.AcquireAsync(lockPath, TestContext.Current.CancellationToken);
+            await Assert.ThrowsAsync<ServiceTimeoutException>(() => CrossProcessFileLock.AcquireAsync(
+                lockPath, TestContext.Current.CancellationToken, TimeSpan.FromMilliseconds(100)));
+        }
+        finally { TryDeleteDirectory(root); }
+    }
+
+    [Fact]
+    public async Task FileLock_WhenOwnerReleases_ShouldAcquireWithoutReplacingTheLockFile()
+    {
+        string root = CreateTempRoot();
+        try
+        {
+            string lockPath = Path.Combine(root, "settings.lock");
+            using var owner = await CrossProcessFileLock.AcquireAsync(lockPath, TestContext.Current.CancellationToken);
+            var pending = CrossProcessFileLock.AcquireAsync(lockPath, TestContext.Current.CancellationToken);
+            Assert.False(pending.IsCompleted);
+            owner.Dispose();
+            await using var acquired = await pending.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal(lockPath, acquired.Name);
+            Assert.True(acquired.CanWrite);
+        }
+        finally { TryDeleteDirectory(root); }
+    }
+
+    [Fact]
+    public async Task FileLock_WhenCallerCancels_ShouldPreserveCancellation()
+    {
+        string root = CreateTempRoot();
+        try
+        {
+            string lockPath = Path.Combine(root, "settings.lock");
+            await using var owner = await CrossProcessFileLock.AcquireAsync(lockPath, TestContext.Current.CancellationToken);
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cancellation.CancelAfter(TimeSpan.FromMilliseconds(50));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => CrossProcessFileLock.AcquireAsync(lockPath, cancellation.Token));
+        }
+        finally { TryDeleteDirectory(root); }
+    }
+
     [Fact]
     public async Task LoadAsync_ShouldRejectPlaintextPostgreSqlPasswordWithoutCreatingKeyFile()
     {
@@ -304,6 +353,39 @@ public sealed class SettingsServiceTests
 
             Assert.Equal("Concurrent", service.Settings.System.AppName);
             Assert.Equal(64, service.Settings.System.ItemEntryBlankRowCount);
+        }
+        finally
+        {
+            TryDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ConcurrentUpdatesAcrossServiceInstances_ShouldReloadAndPreserveBothChanges()
+    {
+        string root = CreateTempRoot();
+        try
+        {
+            var paths = new RuntimeAppPathProvider(root, Path.Combine(root, "App_Data"));
+            var first = new SettingsService(paths);
+            var second = new SettingsService(paths);
+
+            await Task.WhenAll(
+                first.UpdateAsync(settings =>
+                {
+                    settings.System.AppName = "Cross-process-safe";
+                    return true;
+                }),
+                second.UpdateAsync(settings =>
+                {
+                    settings.System.ItemEntryBlankRowCount = 96;
+                    return true;
+                }));
+
+            var reader = new SettingsService(paths);
+            await reader.LoadAsync();
+            Assert.Equal("Cross-process-safe", reader.Settings.System.AppName);
+            Assert.Equal(96, reader.Settings.System.ItemEntryBlankRowCount);
         }
         finally
         {

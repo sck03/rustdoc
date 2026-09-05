@@ -20,6 +20,8 @@ import {
   REPORT_DESIGNER_V3_MAX_FONT_FAMILY_LENGTH,
   REPORT_DESIGNER_V3_MAX_LABEL_LENGTH,
   REPORT_DESIGNER_V3_MAX_LAYER_COUNT,
+  REPORT_DESIGNER_V3_MAX_RESOURCES,
+  REPORT_DESIGNER_V3_MAX_RESOURCE_BYTES,
   REPORT_DESIGNER_V3_MAX_TEXT_LENGTH,
   REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS,
   REPORT_DESIGNER_V3_MIN_ELEMENT_SIZE_HUNDREDTH_MM,
@@ -42,7 +44,7 @@ import {
 import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
 
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,119}$/;
-const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
+const resourceIdPattern = /^img-([0-9a-f]{64})\.(png|jpg|gif|webp)$/;
 const sha256Pattern = /^[0-9a-fA-F]{64}$/;
 export type ReportDesignerV3ValidationResult = {
   schema: ReportDesignerV3Schema | null;
@@ -83,6 +85,7 @@ export function normalizeReportDesignerV3Schema(
   validateBodyFlowOverlaps(layers, issues);
 
   const resources = normalizeResources(input.resources, issues);
+  if (resources === null) return { schema: null, issues };
   validateResourceReferences(layers, resources ?? [], issues);
   return {
     schema: {
@@ -158,15 +161,27 @@ function normalizeLayers(
     issues.push({ severity: "error", path: "$.layers", message: "v3 至少需要一个图层。" });
     return null;
   }
+  if (value.length > REPORT_DESIGNER_V3_MAX_LAYER_COUNT) {
+    issues.push({ severity: "error", path: "$.layers", message: `图层数量不能超过 ${REPORT_DESIGNER_V3_MAX_LAYER_COUNT}。` });
+    return null;
+  }
+  let totalElements = 0;
+  for (const [layerIndex, layer] of value.entries()) {
+    const count = isRecord(layer) && Array.isArray(layer.elements) ? layer.elements.length : 0;
+    if (count > REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER) {
+      issues.push({ severity: "error", path: `$.layers[${layerIndex}].elements`, message: `单个图层元素不能超过 ${REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER}。` });
+      return null;
+    }
+    totalElements += count;
+  }
+  if (totalElements > REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS) {
+    issues.push({ severity: "error", path: "$.layers", message: `元素总数不能超过 ${REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS}。` });
+    return null;
+  }
   const ids = new Set<string>();
   const blockIds = new Set<string>();
   const layers: ReportDesignerV3Layer[] = [];
-  const sourceLayers = value.slice(0, REPORT_DESIGNER_V3_MAX_LAYER_COUNT);
-  if (value.length > REPORT_DESIGNER_V3_MAX_LAYER_COUNT) {
-    issues.push({ severity: "warning", path: "$.layers", message: `图层数量超过 ${REPORT_DESIGNER_V3_MAX_LAYER_COUNT}，多余图层已忽略。` });
-  }
-  let totalElements = 0;
-  sourceLayers.forEach((rawLayer, layerIndex) => {
+  value.forEach((rawLayer, layerIndex) => {
     const path = `$.layers[${layerIndex}]`;
     if (!isRecord(rawLayer)) {
       issues.push({ severity: "error", path, message: "图层必须是对象。" });
@@ -174,9 +189,7 @@ function normalizeLayers(
     }
     const id = normalizeId(rawLayer.id, `layer-${layerIndex + 1}`, ids, `${path}.id`, issues);
     const role = readEnum(rawLayer.role, ["Header", "Body", "Footer", "Overlay"] as const, "Body", `${path}.role`, issues);
-    const remaining = Math.max(0, REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS - totalElements);
-    const elements = normalizeElements(rawLayer.elements, page, reportType, role, `${path}.elements`, ids, blockIds, remaining, issues);
-    totalElements += elements.length;
+    const elements = normalizeElements(rawLayer.elements, page, reportType, role, `${path}.elements`, ids, blockIds, issues);
     const print = normalizeLayerPrint(rawLayer.print, role, `${path}.print`, issues);
     const defaultDesignHeight = role === "Header" ? Math.max(1800, print.minHeightHundredthMm) : role === "Footer" ? Math.max(1400, print.minHeightHundredthMm) : 0;
     layers.push({
@@ -190,11 +203,8 @@ function normalizeLayers(
       elements,
     });
   });
-  if (totalElements >= REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS && value.length > 0) {
-    const suppliedCount = sourceLayers.reduce((sum, layer) => sum + (isRecord(layer) && Array.isArray(layer.elements) ? layer.elements.length : 0), 0);
-    if (suppliedCount > totalElements) {
-      issues.push({ severity: "warning", path: "$.layers", message: `元素总数超过 ${REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS}，多余元素已忽略。` });
-    }
+  if (!layers.some((layer) => layer.role === "Body")) {
+    issues.push({ severity: "error", path: "$.layers", message: "v3 至少需要一个主体图层。" });
   }
   if (!layers.some((layer) => layer.role === "Overlay") && layers.length < REPORT_DESIGNER_V3_MAX_LAYER_COUNT) {
     layers.push({
@@ -224,22 +234,13 @@ function normalizeElements(
   path: string,
   ids: Set<string>,
   blockIds: Set<string>,
-  remainingTotal: number,
   issues: ReportDesignerSchemaIssue[],
 ): ReportDesignerV3Element[] {
   if (!Array.isArray(value)) {
     issues.push({ severity: "error", path, message: "图层元素必须是数组。" });
     return [];
   }
-  const layerLimit = Math.min(REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER, remainingTotal);
-  const exceedsLayerLimit = value.length > REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER;
-  const exceedsTotalLimit = value.length > remainingTotal;
-  if (exceedsLayerLimit || exceedsTotalLimit) {
-    issues.push({ severity: "warning", path, message: exceedsTotalLimit
-      ? `模板元素总数达到 ${REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS}，该图层多余元素已忽略。`
-      : `单个图层元素超过 ${REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER}，多余元素已忽略。` });
-  }
-  return value.slice(0, layerLimit)
+  return value
     .map((rawElement, index) => normalizeElement(rawElement, page, reportType, layerRole, `${path}[${index}]`, ids, blockIds, issues))
     .filter((element): element is ReportDesignerV3Element => Boolean(element));
 }
@@ -296,7 +297,10 @@ function normalizeElement(
       }
       case "Image": {
         const sourceKind = readEnum(value.sourceKind, ["Field", "Resource"] as const, "Field", `${path}.sourceKind`, issues);
-        const purpose = value.purpose === "Stamp" ? "Stamp" : "Image";
+        const purpose = value.purpose === "Image" || value.purpose === "Stamp" ? value.purpose : "Image";
+        if (value.purpose !== "Image" && value.purpose !== "Stamp") {
+          issues.push({ severity: "error", path: `${path}.purpose`, message: "图片用途必须明确为 Image 或 Stamp。" });
+        }
         const rawFieldPath = typeof value.fieldPath === "string" && value.fieldPath.trim() ? value.fieldPath : undefined;
         const fieldPath = sourceKind === "Field" && rawFieldPath
           ? normalizeFieldPath(rawFieldPath, `${path}.fieldPath`, issues)
@@ -464,7 +468,7 @@ function normalizeMetadata(value: unknown) {
 }
 
 function normalizeMarker<T extends string>(value: unknown, expected: T, path: string, issues: ReportDesignerSchemaIssue[]): T {
-  if (value === undefined || value === expected) return expected;
+  if (value === expected) return expected;
   issues.push({ severity: "error", path, message: `V3 契约标记无效，必须为 ${expected}。` });
   return expected;
 }
@@ -487,12 +491,16 @@ function normalizeResources(value: unknown, issues: ReportDesignerSchemaIssue[])
     issues.push({ severity: "error", path: "$.resources", message: "图片资源清单必须是数组。" });
     return undefined;
   }
+  if (value.length > REPORT_DESIGNER_V3_MAX_RESOURCES) {
+    issues.push({ severity: "error", path: "$.resources", message: `图片资源数量不能超过 ${REPORT_DESIGNER_V3_MAX_RESOURCES} 个。` });
+    return null;
+  }
   const ids = new Set<string>();
   const invalid = (path: string, message: string) => {
     issues.push({ severity: "error", path, message });
     return [];
   };
-  return value.slice(0, 1000).flatMap((item, index) => {
+  return value.flatMap((item, index) => {
     const path = `$.resources[${index}]`;
     if (!isRecord(item)) return invalid(path, "图片资源必须是对象。");
     const id = typeof item.id === "string" && resourceIdPattern.test(item.id.trim()) ? item.id.trim() : "";
@@ -501,9 +509,21 @@ function normalizeResources(value: unknown, issues: ReportDesignerSchemaIssue[])
     const mediaType = ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(String(item.mediaType))
       ? item.mediaType as ReportDesignerV3ImageResource["mediaType"] : undefined;
     if (!mediaType) return invalid(`${path}.mediaType`, "图片资源只支持 PNG、JPEG、GIF 或 WebP。");
-    const sha256 = item.sha256 === undefined ? undefined : typeof item.sha256 === "string" && sha256Pattern.test(item.sha256.trim()) ? item.sha256.trim().toLowerCase() : undefined;
-    if (item.sha256 !== undefined && !sha256) issues.push({ severity: "error", path: `${path}.sha256`, message: "SHA-256 必须是 64 位十六进制字符串。" });
-    return [{ id, mediaType, byteLength: readOptionalInteger(item.byteLength, 0, 32 * 1024 * 1024), sha256, altText: normalizeOptionalString(item.altText, 200, `${path}.altText`, issues) }];
+    const byteLength = typeof item.byteLength === "number" && Number.isInteger(item.byteLength) &&
+      item.byteLength > 0 && item.byteLength <= REPORT_DESIGNER_V3_MAX_RESOURCE_BYTES
+      ? item.byteLength
+      : null;
+    if (byteLength === null) return invalid(`${path}.byteLength`, "图片资源大小必须是有效的正整数。");
+    const sha256 = typeof item.sha256 === "string" && sha256Pattern.test(item.sha256.trim())
+      ? item.sha256.trim().toLowerCase()
+      : "";
+    if (!sha256) return invalid(`${path}.sha256`, "SHA-256 必须是 64 位十六进制字符串。");
+    const idMatch = resourceIdPattern.exec(id);
+    const expectedExtension = mediaType === "image/jpeg" ? "jpg" : mediaType.slice("image/".length);
+    if (!idMatch || idMatch[1] !== sha256 || idMatch[2] !== expectedExtension) {
+      return invalid(`${path}.id`, "图片资源 ID 必须与媒体类型和 SHA-256 内容摘要一致。");
+    }
+    return [{ id, mediaType, byteLength, sha256, altText: normalizeOptionalString(item.altText, 200, `${path}.altText`, issues) }];
   });
 }
 
@@ -518,11 +538,6 @@ function normalizeRelease(value: unknown, issues: ReportDesignerSchemaIssue[]) {
   const publishedAt = typeof value.publishedAt === "string" && value.publishedAt.trim() ? value.publishedAt.trim().slice(0, 64) : undefined;
   if (state === "Published" && !publishedAt) issues.push({ severity: "error", path: "$.release.publishedAt", message: "已发布模板必须记录发布时间。" });
   return { state, revision, publishedAt };
-}
-
-function readOptionalInteger(value: unknown, fallback: number, max: number) {
-  const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(parsed) ? Math.min(max, Math.max(0, Math.round(parsed))) : fallback;
 }
 
 function validateBodyFlowOverlaps(

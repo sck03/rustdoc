@@ -23,6 +23,16 @@ import {
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
+import { permissionActions, permissionResources } from "./permissionCatalog.ts";
+
+export type WorkspacePermissionRequirement = {
+  resourceKey: string;
+  action: string;
+};
+
+type WorkspacePermissionGrant = WorkspacePermissionRequirement & {
+  dataScope?: string;
+};
 
 export type WorkspaceNavItem = {
   label: string;
@@ -34,6 +44,8 @@ export type WorkspaceNavItem = {
   requiresFullEdition?: boolean;
   workspace?: "document" | "sales";
   moduleKey?: string;
+  requiredPermissions?: WorkspacePermissionRequirement[];
+  permissionMatch?: "all" | "any";
 };
 
 export type WorkspaceCapabilities = {
@@ -43,6 +55,7 @@ export type WorkspaceCapabilities = {
   isDesktopRuntime?: boolean;
   productEdition?: unknown;
   enabledModules?: string[];
+  permissions?: WorkspacePermissionGrant[];
 };
 
 export type WorkspaceNavGroupConfig = {
@@ -68,7 +81,19 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     icon: LayoutDashboard,
     items: [
       { label: "单证概览", to: "/dashboard", icon: LayoutDashboard, isActive: isDashboardRoute, workspace: "document", moduleKey: "document.dashboard" },
-      { label: "销售概览", to: "/crm/dashboard", icon: LayoutDashboard, isActive: isCrmDashboardRoute, workspace: "sales", moduleKey: "sales.dashboard" },
+      {
+        label: "销售概览",
+        to: "/crm/dashboard",
+        icon: LayoutDashboard,
+        isActive: isCrmDashboardRoute,
+        workspace: "sales",
+        moduleKey: "sales.dashboard",
+        requiredPermissions: [
+          { resourceKey: permissionResources.salesDashboard, action: permissionActions.view },
+          { resourceKey: permissionResources.crmCustomers, action: permissionActions.view },
+          { resourceKey: permissionResources.salesOpportunities, action: permissionActions.view },
+        ],
+      },
     ],
   },
   {
@@ -76,10 +101,51 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     label: "客户与供应链",
     icon: ContactRound,
     items: [
-      { label: "客户跟进", to: "/crm/follow-ups", icon: ContactRound, isActive: isCustomerFollowUpRoute, workspace: "sales", moduleKey: "sales.crm" },
-      { label: "商机跟踪", to: "/crm/opportunities", icon: CircleDollarSign, isActive: isSalesOpportunityRoute, workspace: "sales", moduleKey: "sales.opportunities" },
-      { label: "邮件模板", to: "/crm/email-templates", icon: Mail, isActive: isEmailTemplateRoute, workspace: "sales", moduleKey: "sales.email-templates" },
-      { label: "供应商管理", to: "/suppliers", icon: Factory, isActive: isSupplierRoute, workspace: "sales", moduleKey: "sales.suppliers" },
+      {
+        label: "客户跟进",
+        to: "/crm/follow-ups",
+        icon: ContactRound,
+        isActive: isCustomerFollowUpRoute,
+        workspace: "sales",
+        moduleKey: "sales.crm",
+        requiredPermissions: [
+          { resourceKey: permissionResources.crmCustomers, action: permissionActions.view },
+          { resourceKey: permissionResources.crmFollowUps, action: permissionActions.view },
+        ],
+      },
+      {
+        label: "商机跟踪",
+        to: "/crm/opportunities",
+        icon: CircleDollarSign,
+        isActive: isSalesOpportunityRoute,
+        workspace: "sales",
+        moduleKey: "sales.opportunities",
+        requiredPermissions: [
+          { resourceKey: permissionResources.salesOpportunities, action: permissionActions.view },
+        ],
+      },
+      {
+        label: "邮件模板",
+        to: "/crm/email-templates",
+        icon: Mail,
+        isActive: isEmailTemplateRoute,
+        workspace: "sales",
+        moduleKey: "sales.email-templates",
+        requiredPermissions: [
+          { resourceKey: permissionResources.emailTemplates, action: permissionActions.view },
+        ],
+      },
+      {
+        label: "供应商管理",
+        to: "/suppliers",
+        icon: Factory,
+        isActive: isSupplierRoute,
+        workspace: "sales",
+        moduleKey: "sales.suppliers",
+        requiredPermissions: [
+          { resourceKey: permissionResources.suppliers, action: permissionActions.view },
+        ],
+      },
     ],
   },
   {
@@ -109,12 +175,33 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     icon: Database,
     items: [
       { label: "主数据维护", to: "/master-data", icon: Database, isActive: isMasterDataRoute, workspace: "document", moduleKey: "document.master-data" },
-      { label: "报表模板管理", to: "/reports/templates/manage", icon: ScrollText, isActive: isReportRoute, workspace: "document", moduleKey: "document.reports" },
+      {
+        label: "报表模板管理",
+        to: "/reports/templates/manage",
+        icon: ScrollText,
+        isActive: isReportRoute,
+        workspace: "document",
+        moduleKey: "document.reports",
+        requiredPermissions: [
+          { resourceKey: permissionResources.reportTemplates, action: permissionActions.view },
+        ],
+      },
       { label: "Excel 模板", to: "/tools/excel", icon: FileSpreadsheet, isActive: isExcelToolsRoute, workspace: "document", moduleKey: "document.excel" },
       { label: "智能 OCR", to: "/tools/ocr", icon: ScanText, isActive: isSmartOcrRoute, workspace: "document", moduleKey: "document.ocr" },
       { label: "装箱模拟", to: "/tools/container-packing", icon: PackageCheck, isActive: isContainerPackingRoute, workspace: "document", moduleKey: "document.container-packing" },
       { label: "今日汇率", to: "/tools/exchange-rates", icon: CircleDollarSign, isActive: isExchangeRateRoute, moduleKey: "common.exchange-rates" },
-      { label: "邮件发送", to: "/tools/email", icon: Mail, isActive: isEmailRoute, moduleKey: "common.email" },
+      {
+        label: "邮件发送",
+        to: "/tools/email",
+        icon: Mail,
+        isActive: isEmailRoute,
+        moduleKey: "common.email",
+        permissionMatch: "any",
+        requiredPermissions: [
+          { resourceKey: permissionResources.emailDelivery, action: permissionActions.send },
+          { resourceKey: permissionResources.emailDelivery, action: permissionActions.viewDelivery },
+        ],
+      },
     ],
   },
   {
@@ -133,9 +220,8 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
 ];
 
 export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
-  const enabledModules = Array.isArray(capabilities.enabledModules)
-    ? new Set(capabilities.enabledModules.map((moduleKey) => moduleKey.toLowerCase()))
-    : null;
+  if (!Array.isArray(capabilities.enabledModules)) return [];
+  const enabledModules = new Set(capabilities.enabledModules.map(normalizePermissionPart));
   return workspaceNavGroups
     .map((group) => ({
       ...group,
@@ -145,11 +231,37 @@ export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
         if (item.requiresFullEdition && !isFullProductEdition(capabilities.productEdition)) return false;
         if (item.workspace === "document" && capabilities.canUseDocumentWorkspace !== true) return false;
         if (item.workspace === "sales" && capabilities.canUseSalesWorkspace !== true) return false;
-        if (item.moduleKey && enabledModules && !enabledModules.has(item.moduleKey.toLowerCase())) return false;
+        if (item.moduleKey && !enabledModules.has(normalizePermissionPart(item.moduleKey))) return false;
+        if (!hasWorkspaceNavItemPermission(item, capabilities.permissions)) return false;
         return true;
       }),
     }))
     .filter((group) => group.items.length > 0);
+}
+
+export function hasWorkspacePathPermission(
+  pathname: string,
+  permissions: WorkspacePermissionGrant[] | undefined,
+) {
+  const item = workspaceNavGroups
+    .flatMap((group) => group.items)
+    .find((candidate) => candidate.isActive(pathname));
+  return !item || hasWorkspaceNavItemPermission(item, permissions);
+}
+
+export function hasWorkspaceNavItemPermission(
+  item: WorkspaceNavItem,
+  permissions: WorkspacePermissionGrant[] | undefined,
+) {
+  if (!item.requiredPermissions?.length) return true;
+  if (!Array.isArray(permissions)) return false;
+  const matches = (requirement: WorkspacePermissionRequirement) => permissions.some((grant) =>
+    normalizePermissionPart(grant.resourceKey) === normalizePermissionPart(requirement.resourceKey) &&
+    normalizePermissionPart(grant.action) === normalizePermissionPart(requirement.action) &&
+    isKnownDataScope(grant.dataScope));
+  return item.permissionMatch === "any"
+    ? item.requiredPermissions.some(matches)
+    : item.requiredPermissions.every(matches);
 }
 
 export function findActiveWorkspaceNavGroupKey(pathname: string, groups: WorkspaceNavGroupConfig[] = workspaceNavGroups) {
@@ -188,7 +300,7 @@ export function getWorkspaceContext(pathname: string): WorkspaceContext {
     return createWorkspaceContext("系统维护", "审计日志", "查询、导出与维护关键业务操作记录", ShieldCheck);
   }
   if (pathname.startsWith("/system/access-control")) {
-    return createWorkspaceContext("系统维护", "账号与权限", "维护登录账号、岗位、启停状态与模块权限模板", UsersRound);
+    return createWorkspaceContext("系统维护", "账号与权限", "维护账号、岗位、操作权限和数据范围", UsersRound);
   }
   if (pathname.startsWith("/tools/ocr")) {
     return createWorkspaceContext("资料与工具", "智能 OCR", "识别扫描件和图片文字，并保留本地离线处理", ScanText);
@@ -325,6 +437,15 @@ export function isDesktopOnlyRoute(pathname: string) {
 
 function isFullProductEdition(value: unknown) {
   return typeof value === "string" && value.trim().toLowerCase() === "full";
+}
+
+function normalizePermissionPart(value: unknown) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function isKnownDataScope(value: unknown) {
+  const normalized = normalizePermissionPart(value);
+  return normalized === "own" || normalized === "department" || normalized === "company" || normalized === "all";
 }
 
 function createWorkspaceContext(section: string, title: string, description: string, icon: LucideIcon): WorkspaceContext {

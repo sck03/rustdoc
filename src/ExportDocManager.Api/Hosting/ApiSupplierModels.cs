@@ -3,37 +3,31 @@ namespace ExportDocManager.Api.Hosting
     public sealed record ApiSupplierDto(int Id, string Name, string CountryRegion, string Category,
         string Website, string Status, string MainProducts, string Notes, int VersionNumber);
     public sealed record ApiSupplierSaveRequest(int Id, string Name, string CountryRegion, string Category,
-        string Website, string Status, string MainProducts, string Notes, int ExpectedVersion = 0);
+        string Website, string MainProducts, string Notes, int ExpectedVersion = 0);
     public sealed record ApiSupplierContactDto(int Id, int SupplierCompanyId, string Name, string Title,
         string Email, string Phone, string InstantMessaging, bool IsPrimary, int VersionNumber);
     public sealed record ApiSupplierContactSaveRequest(int Id, int SupplierCompanyId, string Name, string Title,
-        string Email, string Phone, string InstantMessaging, bool IsPrimary, int ExpectedVersion = 0);
+        string Email, string Phone, string InstantMessaging, int ExpectedVersion = 0);
+    public sealed record ApiSupplierLifecycleRequest(int ExpectedVersion);
     public sealed record ApiSupplierImportRowDto(int RowNumber, string Name, string CountryRegion, string Category,
         string Website, string Status, string MainProducts, string Notes, string ContactName, string ContactTitle,
         string ContactEmail, string ContactPhone, bool IsDuplicate, string Error);
-    public sealed record ApiSupplierImportPreviewDto(int TotalRows, int ValidRows, int DuplicateRows, IReadOnlyList<ApiSupplierImportRowDto> Rows);
-    public sealed record ApiSupplierImportRequest(IReadOnlyList<ApiSupplierImportRowDto> Rows);
+    public sealed record ApiSupplierImportPreviewDto(
+        int TotalRows, int ValidRows, int DuplicateRows, IReadOnlyList<ApiSupplierImportRowDto> Rows,
+        string PreviewId);
+    public sealed record ApiSupplierImportRequest(string PreviewId);
     public sealed record ApiSupplierImportResultDto(int CreatedSuppliers, int CreatedContacts, int SkippedRows);
-    public sealed record ApiSupplierBatchStatusRequest(IReadOnlyList<int> Ids, string Status);
-    public sealed record ApiSupplierBatchStatusResult(int AffectedCount, string Status);
-    public sealed record ApiSupplierDeleteResponse(
-        bool Success,
-        bool Deleted,
-        bool Deactivated,
-        string Message,
-        int ContactCount,
-        int ProductLinkCount,
-        int AssessmentCount);
     public sealed record ApiSupplierProductOptionDto(int Id, string ProductCode, string NameCN, string NameEN);
     public sealed record ApiSupplierProductLinkDto(int Id, int SupplierCompanyId, int ProductId, string ProductCode,
         string ProductNameCN, string ProductNameEN, string SupplierProductCode, decimal ReferencePrice,
         string Currency, int LeadTimeDays, string Status, int VersionNumber);
     public sealed record ApiSupplierProductLinkSaveRequest(int Id, int SupplierCompanyId, int ProductId,
-        string SupplierProductCode, decimal ReferencePrice, string Currency, int LeadTimeDays, string Status,
+        string SupplierProductCode, decimal ReferencePrice, string Currency, int LeadTimeDays,
         int ExpectedVersion = 0);
     public sealed record ApiSupplierAssessmentDto(int Id, int SupplierCompanyId, DateOnly AssessmentDate,
         string AssessmentKind, int QualityScore, int DeliveryScore, int ServiceScore, int PriceScore,
         decimal AverageScore, string Conclusion, string Notes, string AssessedBy,
+        string Status, string ConfirmedBy, DateTimeOffset? ConfirmedAt,
         DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int VersionNumber);
     public sealed record ApiSupplierAssessmentSaveRequest(int Id, int SupplierCompanyId, DateOnly AssessmentDate,
         string AssessmentKind, int QualityScore, int DeliveryScore, int ServiceScore, int PriceScore,

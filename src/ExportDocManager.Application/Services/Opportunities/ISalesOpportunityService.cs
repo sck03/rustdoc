@@ -9,10 +9,15 @@ namespace ExportDocManager.Services.Opportunities
         int VersionNumber);
 
     public sealed record SalesOpportunitySaveRequest(
-        int Id, int CrmCustomerId, int? ProductId, string Title, string Stage, string QuotationNo,
+        int Id, int CrmCustomerId, int? ProductId, string Title, string QuotationNo,
         decimal EstimatedAmount, string Currency, int ProbabilityPercent,
         DateOnly? ExpectedCloseDate, string NextAction, string Notes, string ChangeNote,
         int ExpectedVersion = 0);
+
+    public sealed record SalesOpportunityTransitionRequest(
+        string NextStage,
+        string ChangeNote,
+        int ExpectedVersion);
 
     public sealed record SalesOpportunityHistoryRecord(
         int Id, int SalesOpportunityId, int VersionNumber, string ChangeType, string Stage,
@@ -32,7 +37,14 @@ namespace ExportDocManager.Services.Opportunities
         Task<PagedResult<SalesOpportunityRecord>> QueryAsync(
             string? keyword, string? stage, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
         Task<SalesOpportunityRecord> SaveAsync(SalesOpportunitySaveRequest request, CancellationToken cancellationToken = default);
-        Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
+        Task<SalesOpportunityRecord> TransitionAsync(
+            int id,
+            SalesOpportunityTransitionRequest request,
+            CancellationToken cancellationToken = default);
+        Task<bool> ArchiveAsync(
+            int id,
+            CancellationToken cancellationToken = default,
+            int expectedVersion = 0);
         Task<IReadOnlyList<SalesOpportunityHistoryRecord>> ListHistoryAsync(int opportunityId, CancellationToken cancellationToken = default);
         Task<SalesOpportunityDashboard> GetDashboardAsync(CancellationToken cancellationToken = default);
     }

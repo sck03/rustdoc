@@ -78,7 +78,7 @@ namespace ExportDocManager.Infrastructure.Tests
                         ReportType = ReportDocumentType.ExportDocument.ToString(),
                         Name = "数据库发票模板",
                         ContentHtml = CreateV3Template(ReportDocumentType.ExportDocument, "DB {{ Invoice.InvoiceNo }}"),
-                        IsActive = true
+                        Status = TemplateLifecycleStatusCatalog.Published
                     });
                     await context.SaveChangesAsync();
                 }
@@ -120,7 +120,7 @@ namespace ExportDocManager.Infrastructure.Tests
                         ReportType = ReportDocumentType.PaymentVoucher.ToString(),
                         Name = "数据库付款模板",
                         ContentHtml = CreateV3Template(ReportDocumentType.PaymentVoucher, "DB PAYMENT {{ Payment.InvoiceNo }}"),
-                        IsActive = true
+                        Status = TemplateLifecycleStatusCatalog.Published
                     });
                     await context.SaveChangesAsync();
                 }
@@ -1502,7 +1502,38 @@ namespace ExportDocManager.Infrastructure.Tests
             $$"""
             <!doctype html><html><head><style>@page { size: A4 portrait; }</style></head><body>
             <!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA
-            { "version": 3, "reportType": "{{reportType}}", "page": { "size": "A4" } }
+            {
+              "version": 3,
+              "astKind": "ReportDocument",
+              "coordinateUnit": "hundredth-mm",
+              "contractVersion": "3.0",
+              "reportType": "{{reportType}}",
+              "page": {
+                "size": "A4",
+                "orientation": "Portrait",
+                "widthHundredthMm": 21000,
+                "heightHundredthMm": 29700,
+                "marginTopHundredthMm": 800,
+                "marginRightHundredthMm": 800,
+                "marginBottomHundredthMm": 800,
+                "marginLeftHundredthMm": 800,
+                "fontFamily": "Arial",
+                "fontSizePt": 9
+              },
+              "grid": { "enabled": true, "sizeHundredthMm": 500, "snap": true },
+              "layers": [
+                {
+                  "id": "body",
+                  "name": "主体",
+                  "role": "Body",
+                  "designHeightHundredthMm": 0,
+                  "print": { "repeatOnEveryPage": false, "keepTogether": false, "pinToPageBottom": false, "minHeightHundredthMm": 0 },
+                  "visible": true,
+                  "locked": false,
+                  "elements": []
+                }
+              ]
+            }
             -->
             {{body}}
             </body></html>

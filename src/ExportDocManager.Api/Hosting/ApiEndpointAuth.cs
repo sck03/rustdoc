@@ -163,25 +163,60 @@ namespace ExportDocManager.Api.Hosting
             ApiCurrentUserResolver currentUserResolver,
             ApiAuthorizationService authorizationService)
         {
-            var permission = context.GetEndpoint()?.GetApiPermissionMetadata();
-            if (permission == null)
+            var endpoint = context.GetEndpoint();
+            // Anonymous/system endpoints do not participate in capability
+            // evaluation.  Every authenticated API endpoint must, however,
+            // carry either an explicit capability policy or an explicit
+            // handler-owned bypass marker.  A missing policy is a deployment
+            // mistake and must fail closed rather than accidentally granting
+            // access to a newly added route.
+            if (endpoint == null ||
+                !(endpoint.GetApiAccessMetadata()?.RequiresAuthentication ?? false) ||
+                endpoint.HasExplicitPermissionBypass())
             {
                 await _next(context);
                 return;
             }
 
+            var capabilities = endpoint.GetApiCapabilityMetadata();
+            var permission = endpoint.GetApiPermissionMetadata();
+            if (capabilities == null && permission == null)
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await context.Response.WriteAsJsonAsync(
+                        new ApiErrorResponse("该接口未声明权限能力，访问已被拒绝。"),
+                        cancellationToken: context.RequestAborted)
+                    .ConfigureAwait(false);
+                return;
+            }
+
             var user = currentUserResolver.ResolveCached(context);
-            var requirement = permission.Resolve(context);
-            if (user is null || !authorizationService.CanUseModule(
-                    user,
-                    requirement.Module,
-                    requirement.AccessLevel))
+            // A concrete capability contract is the sole authorization fact
+            // for migrated endpoints. Legacy module/HTTP-method inference is
+            // retained only for endpoints that have not yet declared action
+            // metadata; evaluating both would create two diverging policies.
+            bool allowed = user != null && (capabilities != null
+                ? capabilities.Requirements.All(requirement => authorizationService.CanUsePermission(
+                    user, requirement.ResourceKey, requirement.Action))
+                : permission != null && CanUseLegacyModulePermission(
+                    context, user, permission, authorizationService));
+            if (!allowed)
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 return;
             }
 
             await _next(context);
+        }
+
+        private static bool CanUseLegacyModulePermission(
+            HttpContext context,
+            User user,
+            ApiEndpointPermissionMetadata permission,
+            ApiAuthorizationService authorizationService)
+        {
+            var requirement = permission.Resolve(context);
+            return authorizationService.CanUseModule(user, requirement.Module, requirement.AccessLevel);
         }
     }
 

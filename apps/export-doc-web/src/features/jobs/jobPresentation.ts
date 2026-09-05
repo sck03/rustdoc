@@ -26,6 +26,43 @@ export function hasActiveJobs(jobs?: BackgroundJobSnapshot[]) {
   }) ?? false;
 }
 
+export type JobRetryPermissionSet = {
+  canOperateJobs: boolean;
+  canOperateReports: boolean;
+  canOperateExcel: boolean;
+  canOperateQuery: boolean;
+  canExportInvoicePdf: boolean;
+  canExportPaymentPdf: boolean;
+  canExportInvoiceZip: boolean;
+  canSendInvoiceEmail: boolean;
+  canSendEmail: boolean;
+};
+
+export function hasJobRetryPermission(
+  retryOperation: string | undefined,
+  permissions: JobRetryPermissionSet,
+) {
+  if (!permissions.canOperateJobs) return false;
+  const operation = normalizeRetryOperation(retryOperation);
+  if (operation === "StartPdfMergeJob") return permissions.canOperateReports;
+  if ([
+    "StartExcelTemplateExportJob",
+    "StartBlankBookingSheetExportJob",
+    "StartBookingSheetConvertJob",
+    "StartInvoiceBookingSheetExportJob",
+  ].includes(operation)) return permissions.canOperateExcel;
+  if (operation === "StartQueryInvoiceExportJob") return permissions.canOperateQuery;
+  if (operation === "StartInvoiceReportPdfJob") return permissions.canExportInvoicePdf;
+  if (operation === "StartPaymentVoucherPdfJob") return permissions.canExportPaymentPdf;
+  if (["StartInvoiceReportPdfZipJob", "StartInvoiceDocumentPackageJob"].includes(operation)) {
+    return permissions.canExportInvoiceZip;
+  }
+  if (operation === "StartInvoiceDocumentEmailJob") {
+    return permissions.canSendInvoiceEmail && permissions.canSendEmail;
+  }
+  return false;
+}
+
 export function formatJobStatus(value?: string) {
   return jobStatusOptions.find((option) => option.value.toLowerCase() === value?.toLowerCase())?.label ?? value ?? "-";
 }
@@ -75,4 +112,9 @@ export function readPositiveIntegerTokens(value: string) {
 
 export function fileNameFromPath(value: string) {
   return value.split(/[\\/]/).filter(Boolean).at(-1) ?? value;
+}
+
+function normalizeRetryOperation(value: string | undefined) {
+  const normalized = value?.trim() ?? "";
+  return normalized ? normalized[0].toUpperCase() + normalized.slice(1) : "";
 }

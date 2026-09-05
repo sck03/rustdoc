@@ -2,6 +2,7 @@ using ExportDocManager.Models;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Utils;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Security;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ExportDocManager.Api.Hosting
@@ -36,6 +37,7 @@ namespace ExportDocManager.Api.Hosting
                     item.UpdatedAt)));
             })
             .WithName("ListEmailDeliveries")
+            .WithApiCapability(PermissionResourceCatalog.EmailDelivery, PermissionAction.ViewDelivery)
             .Produces<IReadOnlyList<ApiEmailDeliveryDto>>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
@@ -62,6 +64,7 @@ namespace ExportDocManager.Api.Hosting
                 });
             })
             .WithName("GetEmailToolStatus")
+            .WithApiCapability(PermissionResourceCatalog.EmailDelivery, PermissionAction.ViewDelivery)
             .Produces<ApiEmailStatusResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized);
 
@@ -99,6 +102,7 @@ namespace ExportDocManager.Api.Hosting
                 });
             })
             .WithName("SuggestEmailServerConfig")
+            .WithApiCapability(PermissionResourceCatalog.EmailPolicy, PermissionAction.Configure)
             .Produces<ApiEmailServerSuggestionResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized);
@@ -136,6 +140,9 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
+                    string recipient = EmailRecipientPolicy.ValidateAndNormalize(
+                        normalizedRequest.ToAddress,
+                        email);
                     string deliveryId = string.IsNullOrWhiteSpace(idempotencyKey)
                         ? Guid.NewGuid().ToString("N")
                         : idempotencyKey.Trim();
@@ -148,14 +155,14 @@ namespace ExportDocManager.Api.Hosting
                             deliveryId,
                             EmailDeliveryFingerprint.Create([
                                 "EmailTool",
-                                normalizedRequest.ToAddress,
+                                recipient,
                                 normalizedRequest.Subject,
                                 normalizedRequest.Body,
                                 .. normalizedRequest.AttachmentPaths
                             ]),
                             string.Empty,
                             "EmailTool",
-                            normalizedRequest.ToAddress,
+                            recipient,
                             normalizedRequest.Subject,
                             normalizedRequest.AttachmentPaths.Count,
                             cancellationToken)
@@ -167,7 +174,7 @@ namespace ExportDocManager.Api.Hosting
                             {
                                 Success = true,
                                 Message = "邮件已发送（幂等请求）。",
-                                ToAddress = normalizedRequest.ToAddress,
+                                ToAddress = recipient,
                                 Subject = normalizedRequest.Subject,
                                 AttachmentCount = normalizedRequest.AttachmentPaths.Count,
                                 StoragePolicy = EmailToolStoragePolicy
@@ -178,7 +185,7 @@ namespace ExportDocManager.Api.Hosting
                     try
                     {
                         await emailService.SendEmailAsync(
-                            normalizedRequest.ToAddress,
+                            recipient,
                             normalizedRequest.Subject,
                             normalizedRequest.Body,
                             normalizedRequest.AttachmentPaths.ToList(),
@@ -196,7 +203,7 @@ namespace ExportDocManager.Api.Hosting
                     {
                         Success = true,
                         Message = "邮件已发送。",
-                        ToAddress = normalizedRequest.ToAddress,
+                        ToAddress = recipient,
                         Subject = normalizedRequest.Subject,
                         AttachmentCount = normalizedRequest.AttachmentPaths.Count,
                         StoragePolicy = EmailToolStoragePolicy
@@ -208,10 +215,14 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("SendEmail")
+            .WithApiCapability(PermissionResourceCatalog.EmailDelivery, PermissionAction.Send)
+            .WithApiResourceProfile(ApiResourceProfile.EmailDelivery)
+            .WithApiSecurityAudit("email-delivery")
             .Produces<ApiEmailSendResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status429TooManyRequests)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status503ServiceUnavailable);
 
@@ -257,6 +268,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("TestEmailConnection")
+            .WithApiCapability(PermissionResourceCatalog.EmailPolicy, PermissionAction.Configure)
             .Produces<ApiEmailTestResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)

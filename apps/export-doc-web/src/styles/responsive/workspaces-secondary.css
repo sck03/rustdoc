@@ -27,8 +27,7 @@
   }
 
   .user-management-layout,
-  .permission-template-layout,
-  .permission-module-groups {
+  .permission-template-layout {
     grid-template-columns: 1fr;
   }
 

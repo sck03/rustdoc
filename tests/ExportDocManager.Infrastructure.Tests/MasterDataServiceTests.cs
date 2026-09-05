@@ -371,7 +371,7 @@ namespace ExportDocManager.Infrastructure.Tests
             var repository = CreateRepository(factory);
             var customerService = new CustomerService(factory, repository, TestAccessScope.Create());
             var exporterService = new ExporterService(factory, repository, TestAccessScope.Create());
-            var payeeService = new PayeeService(factory, repository);
+            var payeeService = new PayeeService(factory, repository, TestAccessScope.Create());
 
             int customerId = await customerService.SaveCustomerAsync(new Customer
             {
@@ -406,7 +406,7 @@ namespace ExportDocManager.Infrastructure.Tests
             using var factory = new SqliteTestDbContextFactory(new AuditInterceptor());
             var repository = CreateRepository(factory);
             var productService = new ProductService(factory, repository);
-            var payeeService = new PayeeService(factory, repository);
+            var payeeService = new PayeeService(factory, repository, TestAccessScope.Create());
             var auxiliaryService = new AuxiliaryService(factory, repository, repository);
             var hsCodeService = new HsCodeService(factory, repository);
 

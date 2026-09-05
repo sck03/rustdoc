@@ -57,6 +57,10 @@ export function deriveReportTemplateWorkspaceState({
   loadedContent,
   contentTemplatePath,
   selectedTemplatePath,
+  currentTemplateDisplayName,
+  persistedDisplayName,
+  defaultTemplatePath,
+  canUseAdvancedTools,
   selectedContentTemplatePath,
   currentUserTemplate,
   templatePreviewMode,
@@ -69,6 +73,11 @@ export function deriveReportTemplateWorkspaceState({
   busyFlags,
   canManageTemplates,
   canDesignTemplates,
+  canCloneTemplates,
+  canArchiveTemplates,
+  canImportTemplates,
+  canExportTemplates,
+  canPreviewSavedSource,
   newTemplateFileName,
   newUserTemplateName,
   renameTemplateFileName,
@@ -84,6 +93,10 @@ export function deriveReportTemplateWorkspaceState({
   loadedContent: string;
   contentTemplatePath: string;
   selectedTemplatePath: string;
+  currentTemplateDisplayName: string;
+  persistedDisplayName: string;
+  defaultTemplatePath: string;
+  canUseAdvancedTools: boolean;
   selectedContentTemplatePath: string;
   currentUserTemplate: ApiUserReportTemplateDto | null;
   templatePreviewMode: TemplatePreviewMode;
@@ -96,6 +109,11 @@ export function deriveReportTemplateWorkspaceState({
   busyFlags: boolean[];
   canManageTemplates: boolean;
   canDesignTemplates: boolean;
+  canCloneTemplates: boolean;
+  canArchiveTemplates: boolean;
+  canImportTemplates: boolean;
+  canExportTemplates: boolean;
+  canPreviewSavedSource: boolean;
   newTemplateFileName: string;
   newUserTemplateName: string;
   renameTemplateFileName: string;
@@ -138,13 +156,15 @@ export function deriveReportTemplateWorkspaceState({
     Boolean(selectedTemplatePath) && (reportType === "PaymentVoucher" ? previewPaymentId > 0 : previewInvoiceId > 0);
   const canRenderTemplatePreview =
     templatePreviewMode === "savedSource"
-      ? canPreviewRendered && !isBusy
+      ? canPreviewSavedSource && canPreviewRendered && !isBusy
       : isLocalSamplePreview
         ? Boolean(previewContent.trim()) && !isBusy
-        : Boolean(previewContent.trim()) && Boolean(selectedTemplatePath) && !isBusy;
+        : canDesignTemplates && Boolean(previewContent.trim()) && Boolean(selectedTemplatePath) && !isBusy;
   const canCreateTemplate = canManageTemplates && Boolean(newTemplateFileName.trim()) && !isBusy;
-  const canCreateUserTemplate =
-    canDesignTemplates && Boolean(newUserTemplateName.trim()) && Boolean(selectedTemplatePath) && !isBusy;
+  const canCreateBlankUserTemplate =
+    canDesignTemplates && Boolean(newUserTemplateName.trim()) && !isBusy;
+  const canCloneUserTemplate =
+    canCloneTemplates && Boolean(newUserTemplateName.trim()) && Boolean(selectedTemplatePath) && !isBusy;
   const canRenameTemplate =
     !isUserTemplate && canManageTemplates &&
     Boolean(selectedTemplatePath) &&
@@ -152,11 +172,10 @@ export function deriveReportTemplateWorkspaceState({
     renameTemplateFileName.trim() !== fileNameFromPath(selectedTemplatePath) &&
     !isBusy;
   const canDeleteTemplate = isUserTemplate
-    ? currentUserTemplate.canEdit && canDesignTemplates && !isBusy
-    : canManageTemplates && Boolean(selectedTemplatePath) && !isBusy;
-  const canSave =
+    ? currentUserTemplate.canArchive && !isBusy
+    : canArchiveTemplates && Boolean(selectedTemplatePath) && !isBusy;
+  const canEditCurrentTemplate =
     Boolean(selectedTemplatePath) &&
-    hasUnsavedChanges &&
     !isBusy &&
     (isUserTemplate ? currentUserTemplate.canEdit && canDesignTemplates : canManageTemplates);
 
@@ -175,25 +194,31 @@ export function deriveReportTemplateWorkspaceState({
     hasUnsavedChanges,
     canRenderTemplatePreview,
     canCreateTemplate,
-    canCreateUserTemplate,
+    canCreateBlankUserTemplate,
+    canCloneUserTemplate,
     canRenameTemplate,
     canDeleteTemplate,
-    canExportPackage: canManageTemplates && (desktopAvailable || Boolean(packageExportPath.trim())) && !isBusy,
-    canExportPackageByPath: canManageTemplates && Boolean(packageExportPath.trim()) && !isBusy,
-    canDownloadPackage: canManageTemplates && !desktopAvailable && !isBusy,
-    canImportPackage: canManageTemplates && (desktopAvailable || Boolean(packageImportPath.trim())) && !isBusy,
-    canImportPackageByPath: canManageTemplates && Boolean(packageImportPath.trim()) && !isBusy,
-    canUploadPackage: canManageTemplates && !desktopAvailable && !isBusy,
-    canExportTemplateFile: !isUserTemplate && canManageTemplates && Boolean(selectedTemplatePath) &&
+    canExportPackage: canExportTemplates && (desktopAvailable || Boolean(packageExportPath.trim())) && !isBusy,
+    canExportPackageByPath: canExportTemplates && Boolean(packageExportPath.trim()) && !isBusy,
+    canDownloadPackage: canExportTemplates && !desktopAvailable && !isBusy,
+    canImportPackage: canImportTemplates && (desktopAvailable || Boolean(packageImportPath.trim())) && !isBusy,
+    canImportPackageByPath: canImportTemplates && Boolean(packageImportPath.trim()) && !isBusy,
+    canUploadPackage: canImportTemplates && !desktopAvailable && !isBusy,
+    canExportTemplateFile: !isUserTemplate && canExportTemplates && Boolean(selectedTemplatePath) &&
       (desktopAvailable || Boolean(fileExportPath.trim())) && !isBusy,
-    canExportTemplateFileByPath: !isUserTemplate && canManageTemplates && Boolean(selectedTemplatePath) &&
+    canExportTemplateFileByPath: !isUserTemplate && canExportTemplates && Boolean(selectedTemplatePath) &&
       Boolean(fileExportPath.trim()) && !isBusy,
-    canDownloadTemplateFile: !isUserTemplate && canManageTemplates && Boolean(selectedTemplatePath) && !isBusy,
-    canImportTemplateFile: !isUserTemplate && canManageTemplates && Boolean(selectedTemplatePath) &&
+    canDownloadTemplateFile: !isUserTemplate && canExportTemplates && Boolean(selectedTemplatePath) && !isBusy,
+    canImportTemplateFile: !isUserTemplate && canImportTemplates && Boolean(selectedTemplatePath) &&
       (desktopAvailable || Boolean(fileImportPath.trim())) && !isBusy,
-    canImportTemplateFileByPath: !isUserTemplate && canManageTemplates && Boolean(selectedTemplatePath) &&
+    canImportTemplateFileByPath: !isUserTemplate && canImportTemplates && Boolean(selectedTemplatePath) &&
       Boolean(fileImportPath.trim()) && !isBusy,
-    canUploadTemplateFile: !isUserTemplate && canManageTemplates && Boolean(selectedTemplatePath) && !desktopAvailable && !isBusy,
-    canSave,
+    canUploadTemplateFile: !isUserTemplate && canImportTemplates && Boolean(selectedTemplatePath) && !desktopAvailable && !isBusy,
+    canSave: canEditCurrentTemplate && hasUnsavedChanges,
+    canUpdateDisplayName: canEditCurrentTemplate && Boolean(currentTemplateDisplayName.trim()) &&
+      currentTemplateDisplayName.trim() !== persistedDisplayName,
+    canSetDefault: Boolean(selectedTemplatePath) && canManageTemplates && !isBusy &&
+      !matchesTemplatePath(selectedTemplatePath, defaultTemplatePath),
+    canFormatSource: canEditCurrentTemplate && canUseAdvancedTools,
   };
 }

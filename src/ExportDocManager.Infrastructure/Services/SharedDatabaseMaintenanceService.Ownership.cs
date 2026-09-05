@@ -16,6 +16,7 @@ namespace ExportDocManager.Services.Infrastructure
             var otherBusinessGroups = CombineOwnerCounts(
                 await LoadOwnerCountsAsync(context.Customers.AsNoTracking(), cancellationToken).ConfigureAwait(false),
                 await LoadOwnerCountsAsync(context.Exporters.AsNoTracking(), cancellationToken).ConfigureAwait(false),
+                await LoadOwnerCountsAsync(context.Payees.AsNoTracking(), cancellationToken).ConfigureAwait(false),
                 await LoadOwnerCountsAsync(context.CrmCustomers.AsNoTracking(), cancellationToken).ConfigureAwait(false),
                 await LoadOwnerCountsAsync(context.CrmFollowUps.AsNoTracking(), cancellationToken).ConfigureAwait(false),
                 await LoadOwnerCountsAsync(context.SupplierCompanies.AsNoTracking(), cancellationToken).ConfigureAwait(false),
@@ -171,6 +172,20 @@ namespace ExportDocManager.Services.Infrastructure
                             token).ConfigureAwait(false);
                         updatedOtherBusinessData += await TransferOwnedRowsAsync(
                             context,
+                            context.Payees,
+                            request,
+                            (item, ownerUserId, department, company) =>
+                            {
+                                item.OwnerUserId = ownerUserId;
+                                item.DepartmentId = department;
+                                item.CompanyScope = company;
+                            },
+                            targetUser.Id,
+                            departmentId,
+                            companyScope,
+                            token).ConfigureAwait(false);
+                        updatedOtherBusinessData += await TransferOwnedRowsAsync(
+                            context,
                             context.CrmCustomers,
                             request,
                             (item, ownerUserId, department, company) =>
@@ -283,7 +298,7 @@ namespace ExportDocManager.Services.Infrastructure
 
         private static string NormalizeOwnershipScope(
             string requestedValue,
-            string fallbackValue,
+            string? fallbackValue,
             string fieldName)
         {
             string normalized = string.IsNullOrWhiteSpace(requestedValue)

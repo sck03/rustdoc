@@ -11,7 +11,8 @@ import {
   SingleWindowExportReview,
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import { useModulePermission, usePermission } from "../../app/PermissionAccessContext.tsx";
+import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
 import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import {
   isDesktopBridgeAvailable,
@@ -71,6 +72,10 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
   const invoicePermission = useModulePermission("document.invoices");
   const excelPermission = useModulePermission("document.excel");
   const singleWindowPermission = useModulePermission("document.single-window");
+  const invoicePackageExportPermission = usePermission(
+    permissionResources.invoiceOutput,
+    permissionActions.exportZip,
+  );
   const workspaceDeviceProfile = useWorkspaceDeviceProfile();
   const workspaceDeviceMode = workspaceDeviceProfile.mode;
   const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
@@ -338,7 +343,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
   }
 
   async function handleExportTransferPackage(invoice: ApiInvoiceListItemDto) {
-    if (!invoicePermission.canOperate || exportTransferPackageMutation.isPending) {
+    if (!invoicePackageExportPermission.allowed || exportTransferPackageMutation.isPending) {
       return;
     }
 
@@ -663,7 +668,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
         isBusy={isBusy}
         hasError={Boolean(invoicesQuery.isError)}
         canOperate={invoicePermission.canOperate && workspaceDeviceMode !== "phone"}
-        canExportPackage={invoicePermission.canOperate && workspaceDeviceCapabilities.canImportExport}
+        canExportPackage={invoicePackageExportPermission.allowed && workspaceDeviceCapabilities.canImportExport}
         canExportBookingSheet={excelPermission.canOperate && workspaceDeviceCapabilities.canImportExport}
         canUseSingleWindow={singleWindowPermission.canView}
         onOpen={(invoiceId) => navigate(`/invoices/${invoiceId}`)}

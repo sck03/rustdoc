@@ -25,19 +25,20 @@ export const REPORT_DESIGNER_V3_MAX_LABEL_LENGTH = 200;
 export const REPORT_DESIGNER_V3_MAX_ALT_TEXT_LENGTH = 200;
 export const REPORT_DESIGNER_V3_MAX_FIELD_PATH_LENGTH = 256;
 export const REPORT_DESIGNER_V3_MAX_FONT_FAMILY_LENGTH = 256;
+export const REPORT_DESIGNER_V3_MAX_RESOURCES = 1000;
+export const REPORT_DESIGNER_V3_MAX_RESOURCE_BYTES = 32 * 1024 * 1024;
 export const A4_PORTRAIT_SIZE_HUNDREDTH_MM = Object.freeze({ width: 21000, height: 29700 });
 export const A4_LANDSCAPE_SIZE_HUNDREDTH_MM = Object.freeze({ width: 29700, height: 21000 });
 export type ReportDesignerV3Schema = {
   version: typeof REPORT_DESIGNER_V3_VERSION;
   /** Explicit AST discriminator and coordinate unit keep persisted V3 self-describing. */
-  astKind?: typeof REPORT_DESIGNER_V3_AST_KIND;
-  coordinateUnit?: typeof REPORT_DESIGNER_V3_COORDINATE_UNIT;
+  astKind: typeof REPORT_DESIGNER_V3_AST_KIND;
+  coordinateUnit: typeof REPORT_DESIGNER_V3_COORDINATE_UNIT;
   reportType: ReportDesignerReportType;
   page: ReportDesignerV3Page;
   layers: ReportDesignerV3Layer[];
   grid: ReportDesignerV3GridSettings;
-  /** Optional on older V3 documents; normalized documents always emit it. */
-  contractVersion?: typeof REPORT_DESIGNER_V3_CONTRACT_VERSION;
+  contractVersion: typeof REPORT_DESIGNER_V3_CONTRACT_VERSION;
   resources?: ReportDesignerV3ImageResource[];
   release?: ReportDesignerV3Release;
   metadata?: {
@@ -123,7 +124,7 @@ export type ReportDesignerV3ImageElement = ReportDesignerV3ElementBase & {
   type: "Image";
   sourceKind: "Field" | "Resource";
   /** Stamp is still an image binding, not a second resource/runtime. */
-  purpose?: "Image" | "Stamp";
+  purpose: "Image" | "Stamp";
   fieldPath?: string;
   resourceId?: string;
   altText?: string;
@@ -168,8 +169,8 @@ export type ReportDesignerV3ElementType = ReportDesignerV3Element["type"];
 export type ReportDesignerV3ImageResource = {
   id: string;
   mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
-  byteLength?: number;
-  sha256?: string;
+  byteLength: number;
+  sha256: string;
   altText?: string;
 };
 export type ReportDesignerV3Release = {

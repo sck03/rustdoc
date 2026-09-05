@@ -4,6 +4,7 @@ import {
   getRequiredModule,
   getRequiredRouteAccessLevel,
   getRequiredWorkspace,
+  hasWorkspacePathPermission,
   isAdminOnlyRoute,
   isDesktopOnlyRoute,
   isFullEditionOnlyRoute,
@@ -43,5 +44,9 @@ export function isWorkspaceModuleAccessAllowed(pathname: string, user: ApiUserDt
     requiredModule,
     getRequiredRouteAccessLevel(pathname),
   );
-  return workspaceAllowed && moduleAllowed;
+  const capabilityAllowed = hasWorkspacePathPermission(
+    pathname,
+    user.capabilities.permissions,
+  );
+  return workspaceAllowed && moduleAllowed && capabilityAllowed;
 }

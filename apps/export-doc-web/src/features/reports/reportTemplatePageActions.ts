@@ -2,17 +2,20 @@ import type { FormEvent } from "react";
 import type { ApiUserReportTemplateDto } from "../../api/index.ts";
 import type { ConfirmationRequest } from "../../ui/ConfirmationProvider.tsx";
 import type { DesignerMode } from "./reportTemplateDesignerModel.ts";
+import type { UserReportTemplateLifecycleAction } from "./useUserReportTemplateLifecycleMutations.ts";
 
 type Confirm = (request: ConfirmationRequest) => Promise<boolean>;
 
 export function createReportTemplatePageActions({
   canCreateTemplate,
   createTemplate,
-  canCreateUserTemplate,
-  createUserTemplate,
+  canCreateBlankUserTemplate,
+  createBlankUserTemplate,
+  canCloneUserTemplate,
+  cloneUserTemplate,
   currentUserTemplate,
   requestConfirmation,
-  updateUserTemplateStatus,
+  runUserTemplateLifecycleAction,
   restoreUserTemplateVersion,
   canRenameTemplate,
   isUserTemplate,
@@ -37,11 +40,13 @@ export function createReportTemplatePageActions({
 }: {
   canCreateTemplate: boolean;
   createTemplate: () => void;
-  canCreateUserTemplate: boolean;
-  createUserTemplate: () => void;
+  canCreateBlankUserTemplate: boolean;
+  createBlankUserTemplate: () => void;
+  canCloneUserTemplate: boolean;
+  cloneUserTemplate: () => void;
   currentUserTemplate: ApiUserReportTemplateDto | null;
   requestConfirmation: Confirm;
-  updateUserTemplateStatus: (value: { isActive?: boolean; shareScope?: string }) => void;
+  runUserTemplateLifecycleAction: (value: UserReportTemplateLifecycleAction) => void;
   restoreUserTemplateVersion: (version: number) => void;
   canRenameTemplate: boolean;
   isUserTemplate: boolean;
@@ -71,19 +76,34 @@ export function createReportTemplatePageActions({
     if (canCreateTemplate) createTemplate();
   }
 
-  function handleCreateUserTemplate() {
-    if (canCreateUserTemplate) createUserTemplate();
+  function handleCreateBlankUserTemplate() {
+    if (canCreateBlankUserTemplate) createBlankUserTemplate();
   }
 
-  async function handleToggleUserTemplateActive() {
+  function handleCloneUserTemplate() {
+    if (canCloneUserTemplate) cloneUserTemplate();
+  }
+
+  async function handleUserTemplateLifecycleAction(action: UserReportTemplateLifecycleAction) {
     if (!currentUserTemplate) return;
-    const action = currentUserTemplate.isActive ? "停用" : "重新启用";
+    const label = action.kind === "publish"
+      ? "发布"
+      : action.kind === "disable"
+        ? "停用"
+        : action.kind === "restore"
+          ? "恢复"
+          : "调整共享范围";
     if (await requestConfirmation({
-      title: `${action}模板`,
-      description: `确定${action}“${currentUserTemplate.name}”吗？`,
-      confirmLabel: `确认${action}`,
+      title: `${label}模板`,
+      description: `确定${label}“${currentUserTemplate.name}”吗？`,
+      details: action.kind === "publish"
+        ? ["发布后模板才可用于正式输出；后续内容修改会重新回到私有草稿。"]
+        : action.kind === "restore" && currentUserTemplate.status === "Archived"
+          ? ["归档模板恢复后将回到私有草稿状态。"]
+          : undefined,
+      confirmLabel: `确认${label}`,
     })) {
-      updateUserTemplateStatus({ isActive: !currentUserTemplate.isActive });
+      runUserTemplateLifecycleAction(action);
     }
   }
 
@@ -128,11 +148,12 @@ export function createReportTemplatePageActions({
 
   async function handleDeleteTemplate() {
     if (!canDeleteTemplate) return;
+    const isArchive = Boolean(currentUserTemplate);
     if (!await requestConfirmation({
-      title: "删除报表模板",
-      description: "确定删除当前模板吗？",
+      title: isArchive ? "归档报表模板" : "删除报表模板",
+      description: isArchive ? "确定归档当前模板吗？" : "确定删除当前模板吗？",
       details: hasUnsavedChanges ? ["当前模板有未保存修改，这些修改将丢失。"] : undefined,
-      confirmLabel: "确认删除",
+      confirmLabel: isArchive ? "确认归档" : "确认删除",
       tone: "danger",
     })) return;
     if (currentUserTemplate) deleteUserTemplate();
@@ -153,8 +174,9 @@ export function createReportTemplatePageActions({
 
   return {
     handleCreateTemplate,
-    handleCreateUserTemplate,
-    handleToggleUserTemplateActive,
+    handleCreateBlankUserTemplate,
+    handleCloneUserTemplate,
+    handleUserTemplateLifecycleAction,
     handleRestoreUserTemplateVersion,
     handleRenameTemplate,
     handleUpdateDisplayName,

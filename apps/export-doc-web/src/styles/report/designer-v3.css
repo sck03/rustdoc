@@ -168,6 +168,10 @@
   min-height: 620px;
 }
 
+.report-designer-v3-layout.is-read-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .report-designer-v3-sidebar,
 .report-designer-v3-inspector {
   display: grid;

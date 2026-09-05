@@ -193,6 +193,7 @@ namespace ExportDocManager.Api.Hosting
             })
             .WithName("RunShutdownMaintenance")
             .WithApiAccess(false, true, false)
+            .AllowApiWithoutPermission()
             .WithApiResourceProfile(ApiResourceProfile.Maintenance)
             .WithApiSecurityAudit("shutdown-maintenance")
             .Produces<ApiShutdownMaintenanceResponse>(StatusCodes.Status200OK)
@@ -239,6 +240,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("CleanupSystemLogs")
+            .AllowApiWithoutPermission()
             .WithApiResourceProfile(ApiResourceProfile.Maintenance)
             .WithApiSecurityAudit("log-maintenance")
             .Produces<ApiSystemLogCleanupResponse>(StatusCodes.Status200OK)

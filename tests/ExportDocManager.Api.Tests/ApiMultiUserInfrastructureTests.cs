@@ -24,12 +24,13 @@ namespace ExportDocManager.Api.Tests
                     Code = "test-session-template",
                     Name = "Session Template",
                     IsActive = true,
-                    Modules =
+                    Grants =
                     [
-                        new PermissionTemplateModule
+                        new PermissionTemplateGrant
                         {
-                            ModuleKey = PermissionModuleCatalog.DocumentInvoices,
-                            AccessLevel = PermissionAccessLevel.View
+                            ResourceKey = PermissionModuleCatalog.DocumentInvoices,
+                            Action = PermissionAction.View,
+                            DataScope = PermissionDataScope.Own
                         }
                     ]
                 };
@@ -70,8 +71,11 @@ namespace ExportDocManager.Api.Tests
             var validated = await service.ValidateAsync(issued.AccessToken);
             Assert.Equal("team-user", validated?.Username);
             Assert.Equal(
-                PermissionAccessLevel.View,
-                validated?.EffectiveModuleAccess[PermissionModuleCatalog.DocumentInvoices]);
+                PermissionDataScope.Own,
+                validated?.EffectivePermissionGrants[
+                    PermissionResourceCatalog.CreateGrantKey(
+                        PermissionModuleCatalog.DocumentInvoices,
+                        PermissionAction.View)]);
             Assert.Equal(1, await service.RevokeUserSessionsAsync(userId));
             Assert.Null(await service.ValidateAsync(issued.AccessToken));
             Assert.Equal(0, await service.RevokeUserSessionsAsync(userId));
@@ -758,7 +762,10 @@ namespace ExportDocManager.Api.Tests
             public Task<int> SaveUserAsync(User user, string resetPassword = "", CancellationToken cancellationToken = default) =>
                 throw new NotSupportedException();
 
-            public Task<bool> DeleteUserAsync(int userId, CancellationToken cancellationToken = default) =>
+            public Task<bool> DeleteUserAsync(
+                int userId,
+                CancellationToken cancellationToken = default,
+                int expectedVersion = 0) =>
                 throw new NotSupportedException();
 
             private User? GetActive(string username) =>

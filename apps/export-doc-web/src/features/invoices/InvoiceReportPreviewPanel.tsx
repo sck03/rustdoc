@@ -4,7 +4,8 @@ import { SlidersHorizontal } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { ApiInvoiceDetailDto, ApiReportHtmlPreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { useModulePermission, usePermissionCapabilities } from "../../app/PermissionAccessContext.tsx";
+import { useModulePermission, usePermission, usePermissionCapabilities } from "../../app/PermissionAccessContext.tsx";
+import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
 import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -40,8 +41,13 @@ export function InvoiceReportPreviewPanel({
   defaultToAddress,
   hasUnsavedDraftChanges = false,
 }: Props) {
-  const reportOutputPermission = useModulePermission("document.invoice-reports");
-  const reportDesignPermission = useModulePermission("document.reports");
+  const previewPermission = usePermission(permissionResources.invoiceOutput, permissionActions.preview);
+  const printPermission = usePermission(permissionResources.invoiceOutput, permissionActions.print);
+  const pdfPermission = usePermission(permissionResources.invoiceOutput, permissionActions.exportPdf);
+  const zipPermission = usePermission(permissionResources.invoiceOutput, permissionActions.exportZip);
+  const emailPermission = usePermission(permissionResources.invoiceOutput, permissionActions.sendEmail);
+  const emailSendPermission = usePermission(permissionResources.emailDelivery, permissionActions.send);
+  const templateViewPermission = usePermission(permissionResources.reportTemplates, permissionActions.view);
   const excelPermission = useModulePermission("document.excel");
   const { canManageSettings } = usePermissionCapabilities();
   const location = useLocation();
@@ -65,13 +71,13 @@ export function InvoiceReportPreviewPanel({
   const templatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates("ExportDocument"),
     queryFn: ({ signal }) => client.listReportTemplates({ reportType: "ExportDocument" }, { signal }),
-    enabled: hasPreviewSource && reportOutputPermission.canView,
+    enabled: hasPreviewSource && templateViewPermission.allowed,
     staleTime: 5 * 60 * 1000,
   });
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
     queryFn: ({ signal }) => client.getSettings({ signal }),
-    enabled: hasPreviewSource && (reportOutputPermission.canOperate || canManageSettings),
+    enabled: hasPreviewSource && (templateViewPermission.allowed || canManageSettings),
     staleTime: 5 * 60 * 1000,
   });
   const templates = templatesQuery.data ?? [];
@@ -170,37 +176,39 @@ export function InvoiceReportPreviewPanel({
     fileExports.isPending ||
     documentPackage.isPending ||
     isPrinting;
-  const canPreview = reportOutputPermission.canOperate
+  const canPreview = previewPermission.allowed
     && hasPreviewSource
     && (templates.length === 0 || Boolean(selectedTemplatePath));
   const selectedTemplateCount = documentPackage.selectedTemplates.length;
   const hasValidPackageSelection = selectedTemplateCount > 0 && selectedTemplateCount <= 20;
-  const canPreviewPackage = reportOutputPermission.canOperate && canUseSavedInvoiceOutput && hasValidPackageSelection && !isBusy;
-  const canPrintPreview = workspaceDeviceCapabilities.canImportExport
+  const canPreviewPackage = previewPermission.allowed && canUseSavedInvoiceOutput && hasValidPackageSelection && !isBusy;
+  const canPrintPreview = printPermission.allowed && workspaceDeviceCapabilities.canImportExport
     && (Boolean(preview?.html) || Boolean(documentPackage.preview?.items.some((item) => item.html)))
     && !isBusy;
-  const canGeneratePdf = reportOutputPermission.canOperate
+  const canGeneratePdf = pdfPermission.allowed
     && canUseSavedInvoiceOutput
-    && canPreview
+    && Boolean(selectedTemplatePath)
     && (!desktopAvailable || Boolean(fileExports.pdfDestinationPath.trim()))
     && !isBusy;
-  const canQuickGeneratePdf = reportOutputPermission.canOperate && canUseSavedInvoiceOutput && canPreview && !isBusy;
+  const canQuickGeneratePdf = pdfPermission.allowed && canUseSavedInvoiceOutput && Boolean(selectedTemplatePath) && !isBusy;
   const canGenerateBookingSheet = excelPermission.canOperate
     && canUseSavedInvoiceOutput
     && (!desktopAvailable || Boolean(fileExports.bookingSheetDestinationPath.trim()))
     && !isBusy;
   const canQuickGenerateBookingSheet = excelPermission.canOperate && canUseSavedInvoiceOutput && !isBusy;
-  const canGeneratePackage = reportOutputPermission.canOperate
+  const canGeneratePackage = zipPermission.allowed
     && canUseSavedInvoiceOutput
     && hasValidPackageSelection
     && (!desktopAvailable || Boolean(documentPackage.destinationPath.trim()))
     && !isBusy;
-  const canSendDocumentEmail = reportOutputPermission.canOperate
+  const canSendDocumentEmail = emailPermission.allowed
+    && emailSendPermission.allowed
     && canUseSavedInvoiceOutput
     && hasValidPackageSelection
     && Boolean(documentPackage.emailToAddress.trim())
     && !isBusy;
-  const canOpenTemplateManagement = (reportDesignPermission.canView || canManageSettings) && !isBusy;
+  const canOpenTemplateManagement = (templateViewPermission.allowed || canManageSettings) && !isBusy;
+  const hasAdvancedOutput = pdfPermission.allowed || zipPermission.allowed || emailPermission.allowed || excelPermission.canOperate;
   const templateMessage = templatesQuery.isError ? readApiError(templatesQuery.error) : null;
 
   function handleTemplateChange(value: string) {
@@ -247,7 +255,7 @@ export function InvoiceReportPreviewPanel({
       <InvoiceReportPreviewHeader
         canPreview={canPreview}
         canPrint={canPrintPreview}
-        canRefreshTemplates={reportOutputPermission.canView}
+        canRefreshTemplates={templateViewPermission.allowed}
         errorMessage={errorMessage}
         hasSavedInvoice={hasSavedInvoice && workspaceDeviceCapabilities.canImportExport}
         hasUnsavedDraftChanges={hasUnsavedDraftChanges}
@@ -259,11 +267,11 @@ export function InvoiceReportPreviewPanel({
         onPrint={() => void printPreview()}
         onRefresh={() => void templatesQuery.refetch()}
       />
-      {!reportOutputPermission.canOperate ? (
-        <PermissionNotice>当前模板仅允许查看发票，未授予报表预览和单据输出操作权限。</PermissionNotice>
+      {!previewPermission.allowed ? (
+        <PermissionNotice>当前账号未授予发票报表预览权限；打印、PDF、ZIP 和邮件外发仍按各自动作权限独立控制。</PermissionNotice>
       ) : null}
       <InvoiceReportTemplateControls
-        canConfigureOutput={reportOutputPermission.canOperate}
+        canConfigureOutput={templateViewPermission.allowed}
         canQuickGenerateBookingSheet={canQuickGenerateBookingSheet}
         canQuickGeneratePdf={canQuickGeneratePdf}
         desktopAvailable={desktopAvailable}
@@ -285,7 +293,7 @@ export function InvoiceReportPreviewPanel({
         }}
       />
 
-      {hasSavedInvoice && reportOutputPermission.canOperate && workspaceDeviceCapabilities.canImportExport ? (
+      {hasSavedInvoice && hasAdvancedOutput && workspaceDeviceCapabilities.canImportExport ? (
         <details
           className="report-export-advanced"
           open={showExportAdvanced}

@@ -239,7 +239,7 @@ namespace ExportDocManager.Api.Hosting
 
             var user = await context.Users
                 .Include(item => item.PermissionTemplate)
-                .ThenInclude(template => template!.Modules)
+                .ThenInclude(template => template!.Grants)
                 .AsNoTracking()
                 .SingleOrDefaultAsync(item => item.Id == session.UserId && item.IsActive, cancellationToken);
             if (user == null)
@@ -250,7 +250,7 @@ namespace ExportDocManager.Api.Hosting
                 return null;
             }
 
-            UserPermissionAccessResolver.PopulateEffectiveModuleAccess(user);
+            UserPermissionAccessResolver.PopulateEffectivePermissions(user);
 
             if (now - session.LastAccessAt >= LastAccessWriteInterval)
             {

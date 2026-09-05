@@ -2,6 +2,7 @@ using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
 using ExportDocManager.Services.Time;
@@ -51,6 +52,7 @@ namespace ExportDocManager.Api.Hosting
                     destinationPath));
             })
             .WithName("StartInvoiceDocumentPackageSaveToPathJob")
+            .WithApiCapability(PermissionResourceCatalog.InvoiceOutput, PermissionAction.ExportZip)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -94,6 +96,7 @@ namespace ExportDocManager.Api.Hosting
                     destinationPath));
             })
             .WithName("StartInvoiceDocumentPackageDownloadJob")
+            .WithApiCapability(PermissionResourceCatalog.InvoiceOutput, PermissionAction.ExportZip)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized);

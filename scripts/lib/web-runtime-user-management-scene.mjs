@@ -31,7 +31,22 @@ export function createUserManagementSmokeScene(runtime) {
     const fullName = `Smoke UI User ${suffix}`;
     const updatedFullName = `Smoke UI Updated ${suffix}`;
     const departmentId = `UI-${suffix.slice(-6)}`;
-    const companyScope = "SMOKE-HQ";
+    const companyScope = `UI-${suffix}`;
+    const saveOrganizationEntry = async (kind, draft, update = false) => {
+      const response = await fetch(new URL(
+        `/api/organization-directory/${kind}${update ? `/${encodeURIComponent(draft.code)}` : ""}`,
+        ensureTrailingSlash(options.apiBaseUrl),
+      ), {
+        method: update ? "PUT" : "POST",
+        headers: { ...authorizedHeaders(options, accessToken, tokenType), "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+        signal: AbortSignal.timeout(Math.min(timeoutMs, 10000)),
+      });
+      if (!response.ok) throw new Error(`Organization fixture ${kind} failed: HTTP ${response.status}`);
+      return response.json();
+    };
+    const company = await saveOrganizationEntry("companies", { code: companyScope, name: `Smoke UI Company ${suffix}`, isActive: true, expectedVersion: 0 });
+    const department = await saveOrganizationEntry("departments", { code: departmentId, companyCode: companyScope, name: `Smoke UI Department ${suffix}`, isActive: true, expectedVersion: 0 });
 
     const checkUrl = new URL(options.webUrl);
     checkUrl.searchParams.set("smokeUserManagement", "1");
@@ -125,7 +140,7 @@ export function createUserManagementSmokeScene(runtime) {
           return false;
         }
         const readField = (labelText) => {
-          const labels = Array.from(section.querySelectorAll('label'));
+          const labels = Array.from(section.querySelectorAll('.user-management-form-grid label'));
           const label = labels.find((item) => Array.from(item.querySelectorAll('span')).some((span) => (span.textContent || '').trim() === labelText));
           const control = label && label.querySelector('input, select, textarea');
           return control ? control.value || '' : '';
@@ -133,8 +148,8 @@ export function createUserManagementSmokeScene(runtime) {
         return readField('账号') === ${JSON.stringify(username)} &&
           readField('姓名') === ${JSON.stringify(updatedFullName)} &&
           readField('角色') === 'User' &&
-          readField('部门') === ${JSON.stringify(departmentId)} &&
-          readField('公司范围') === ${JSON.stringify(companyScope)};
+          readField('所属部门') === ${JSON.stringify(departmentId)} &&
+          readField('所属公司') === ${JSON.stringify(companyScope)};
       })()`,
       timeoutMs,
       `Timed out waiting for updated user form fields: ${username}`,
@@ -157,6 +172,9 @@ export function createUserManagementSmokeScene(runtime) {
       timeoutMs,
       `Timed out waiting for API-deleted user to disappear: ${username}`,
     );
+
+    await saveOrganizationEntry("departments", { ...department, isActive: false, expectedVersion: department.versionNumber }, true);
+    await saveOrganizationEntry("companies", { ...company, isActive: false, expectedVersion: company.versionNumber }, true);
 
     return {
       username,
@@ -262,7 +280,7 @@ export function createUserManagementSmokeScene(runtime) {
         };
 
         const fieldByLabel = (labelText) => {
-          const labels = Array.from(section.querySelectorAll("label"));
+          const labels = Array.from(section.querySelectorAll(".user-management-form-grid label"));
           const label = labels.find((item) =>
             Array.from(item.querySelectorAll("span")).some((span) => (span.textContent || "").trim() === labelText));
           if (!label) {
@@ -280,7 +298,7 @@ export function createUserManagementSmokeScene(runtime) {
         };
 
         const setCheckbox = (labelText, checked) => {
-          const labels = Array.from(section.querySelectorAll("label"));
+          const labels = Array.from(section.querySelectorAll(".user-management-form-grid label"));
           const label = labels.find((item) =>
             Array.from(item.querySelectorAll("span")).some((span) => (span.textContent || "").trim() === labelText));
           if (!label) {
@@ -309,11 +327,11 @@ export function createUserManagementSmokeScene(runtime) {
           return button;
         };
 
-        const waitForButton = async (predicate, description) => {
+        const waitForButton = async (predicate, description, root = section) => {
           const deadline = Date.now() + 8000;
           let latestReason = "";
           while (Date.now() < deadline) {
-            const button = Array.from(section.querySelectorAll("button")).find(predicate);
+            const button = Array.from(root.querySelectorAll("button")).find(predicate);
             if (button && !button.disabled) {
               return button;
             }
@@ -352,8 +370,8 @@ export function createUserManagementSmokeScene(runtime) {
               username: readFieldValue("账号"),
               fullName: readFieldValue("姓名"),
               role: readFieldValue("角色"),
-              departmentId: readFieldValue("部门"),
-              companyScope: readFieldValue("公司范围"),
+              departmentId: readFieldValue("所属部门"),
+              companyScope: readFieldValue("所属公司"),
               resetPasswordLength: String(readFieldValue("初始/重置密码") || "").length,
               deleteDisabled: readDeleteButtonDisabled()
             };
@@ -373,6 +391,12 @@ export function createUserManagementSmokeScene(runtime) {
             .find((row) => (row.cells && row.cells[0] ? row.cells[0].innerText.trim() : "") === username);
         };
 
+        const setOrganization = async () => {
+          setField("所属公司", payload.companyScope);
+          await waitForFormState((state) => state.companyScope === payload.companyScope, "公司目录选中");
+          setField("所属部门", payload.departmentId);
+        };
+
         if (payload.action === "create") {
           await waitForIdle();
           await clickButtonByTitle("新建用户");
@@ -380,8 +404,7 @@ export function createUserManagementSmokeScene(runtime) {
           setField("账号", payload.username);
           setField("姓名", payload.fullName);
           setField("角色", payload.role);
-          setField("部门", payload.departmentId);
-          setField("公司范围", payload.companyScope);
+          await setOrganization();
           setField("初始/重置密码", payload.password);
           setCheckbox("启用账号", true);
           await waitForFormState(
@@ -404,8 +427,7 @@ export function createUserManagementSmokeScene(runtime) {
           await waitForFormState((state) => state.username === payload.username && state.deleteDisabled === false, "选中待更新用户");
           setField("姓名", payload.fullName);
           setField("角色", payload.role);
-          setField("部门", payload.departmentId);
-          setField("公司范围", payload.companyScope);
+          await setOrganization();
           setField("初始/重置密码", "");
           await waitForFormState(
             (state) => state.username === payload.username &&
@@ -431,6 +453,7 @@ export function createUserManagementSmokeScene(runtime) {
             (item) => item.classList.contains("confirmation-dialog-confirm") &&
               (item.textContent || "").includes("删除账号"),
             "确认删除账号",
+            document,
           );
           confirmButton.click();
           return { action: payload.action, submitted: true, username: payload.username };
@@ -458,7 +481,7 @@ export function createUserManagementSmokeScene(runtime) {
             username: row.cells && row.cells[0] ? row.cells[0].innerText.trim() : ""
           }));
           const readField = (labelText) => {
-            const labels = Array.from(section?.querySelectorAll('label') || []);
+            const labels = Array.from(section?.querySelectorAll('.user-management-form-grid label') || []);
             const label = labels.find((item) =>
               Array.from(item.querySelectorAll('span')).some((span) => (span.textContent || '').trim() === labelText));
             const control = label && label.querySelector('input, select, textarea');
@@ -475,8 +498,8 @@ export function createUserManagementSmokeScene(runtime) {
               username: readField('账号'),
               fullName: readField('姓名'),
               role: readField('角色'),
-              departmentId: readField('部门'),
-              companyScope: readField('公司范围'),
+              departmentId: readField('所属部门'),
+              companyScope: readField('所属公司'),
               resetPasswordLength: String(readField('初始/重置密码') || '').length,
               isActive: readField('启用账号')
             },

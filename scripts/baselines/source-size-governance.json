@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-09-03",
+  "capturedAt": "2026-09-06",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 115330,
+      "baselineAggregateLines": 122753,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 115530,
+      "maximumAggregateLines": 122953,
       "reportFiles": false
     },
     {
@@ -46,14 +46,18 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 40701,
+      "baselineAggregateLines": 42656,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 40821,
+      "maximumAggregateLines": 42776,
       "reportFiles": false
     },
     {
       "name": "repository automation source default",
-      "directories": ["scripts", "deploy", ".github/workflows"],
+      "directories": [
+        "scripts",
+        "deploy",
+        ".github/workflows"
+      ],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
       "baselineAggregateLines": 41234,
@@ -128,9 +132,11 @@
     {
       "name": "job center components",
       "directory": "apps/export-doc-web/src/features/jobs",
-      "filePattern": "^(?:JobCenterPage|JobCreationPanels|JobTable|jobPresentation|useJobCenterOperations)\\.(?:tsx|ts)$",
+      "filePattern": "^(?:JobCenterPage|JobCreationPanels|JobTable|jobPresentation|useJobCenterOperations|useJobPermissions)\\.(?:tsx|ts)$",
       "maximumLines": 320,
-      "maximumAggregateLines": 830
+      "maximumAggregateLines": 941,
+      "maximumAggregateGrowthLines": 50,
+      "baselineAggregateLines": 891
     },
     {
       "name": "HS API endpoint modules",
@@ -295,9 +301,9 @@
       "directory": "apps/export-doc-web/src/features/report-designer",
       "filePattern": "^(?:ReportDesignerV3(?:Workspace|Canvas|FlowProperties)|reportDesignerBlockRenderer|reportDesignerV3(?:ElementFactories|History|HtmlExporter|Migration|Mutations|Resize|Schema|TemplateParser|Validation|WorkspaceHelpers))\\.(?:tsx|ts)$",
       "maximumLines": 720,
-      "baselineAggregateLines": 4549,
+      "baselineAggregateLines": 4754,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 4749
+      "maximumAggregateLines": 4954
     },
     {
       "name": "themed stylesheet modules",

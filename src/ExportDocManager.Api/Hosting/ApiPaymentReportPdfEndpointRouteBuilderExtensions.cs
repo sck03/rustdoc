@@ -43,6 +43,7 @@ namespace ExportDocManager.Api.Hosting
                     destinationPath));
             })
             .WithName("StartPaymentVoucherPdfSaveToPathJob")
+            .WithApiCapability(PermissionResourceCatalog.PaymentOutput, PermissionAction.ExportPdf)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -80,6 +81,7 @@ namespace ExportDocManager.Api.Hosting
                     destinationPath));
             })
             .WithName("StartPaymentVoucherPdfDownloadJob")
+            .WithApiCapability(PermissionResourceCatalog.PaymentOutput, PermissionAction.ExportPdf)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized);

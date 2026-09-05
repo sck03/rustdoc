@@ -49,6 +49,8 @@ export function CommunicationSettingsPanel({ client, settings, secrets, canManag
             <TextSetting settings={settings} path={["email", "fromDisplayName"]} label="发件人名称" onChange={onChange} />
             <TextSetting settings={settings} path={["email", "documentEmailSubjectTemplate"]} label="单据邮件主题" onChange={onChange} />
             <TextAreaSetting className="email-body-template-field" settings={settings} path={["email", "documentEmailBodyTemplate"]} label="单据邮件正文" onChange={onChange} />
+            <TextAreaSetting settings={settings} path={["email", "recipientAllowList"]} label="收件人白名单（每行邮箱或域名，留空不限制）" onChange={onChange} />
+            <TextAreaSetting settings={settings} path={["email", "recipientBlockList"]} label="收件人黑名单（每行邮箱或域名，优先拒绝）" onChange={onChange} />
             <TextSetting settings={settings} path={["webDav", "url"]} label="WebDAV 地址" onChange={onChange} />
             <TextSetting settings={settings} path={["webDav", "userName"]} label="WebDAV 用户" onChange={onChange} />
             <TextSetting className="webdav-password-setting" disabled={!updateSecrets} placeholder={secrets?.webDavPasswordSet ? "已保存，勾选后可更新" : ""} settings={settings} path={["webDav", "password"]} label="WebDAV 密码" onChange={onChange} />

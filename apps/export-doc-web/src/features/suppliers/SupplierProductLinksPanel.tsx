@@ -9,19 +9,22 @@ import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { FormGuidance } from "../../ui/PageState.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 
 export function SupplierProductLinksPanel({
   client,
   supplierId,
   supplierName,
-  canOperate,
-  canManage,
+  canEdit,
+  canDeactivate,
+  canDelete,
 }: {
   client: ExportDocManagerApiClient;
   supplierId: number;
   supplierName: string;
-  canOperate: boolean;
-  canManage: boolean;
+  canEdit: boolean;
+  canDeactivate: boolean;
+  canDelete: boolean;
 }) {
   const navigate = useNavigate();
   const requestConfirmation = useConfirmation();
@@ -29,6 +32,11 @@ export function SupplierProductLinksPanel({
   const [options, setOptions] = useState<ApiSupplierProductOptionDto[]>([]);
   const [selectedId, setSelectedId] = useState(0);
   const [keyword, setKeyword] = useState("");
+  const [linkPageNumber, setLinkPageNumber] = useState(1);
+  const [linkPageSize, setLinkPageSize] = useState(20);
+  const [linkTotalCount, setLinkTotalCount] = useState(0);
+  const [linkTotalPages, setLinkTotalPages] = useState(1);
+  const [productOptionTotal, setProductOptionTotal] = useState(0);
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
   const [view, setView] = useState<"directory" | "editor">("directory");
   const [draftDirty, setDraftDirty] = useState(false);
@@ -43,17 +51,31 @@ export function SupplierProductLinksPanel({
     return [{ id: selected.productId, productCode: selected.productCode, nameCN: selected.productNameCN, nameEN: selected.productNameEN }, ...options];
   }, [options, selected]);
 
-  async function loadLinks(preferredId?: number, signal?: AbortSignal) {
+  async function loadLinks(preferred?: ApiSupplierProductLinkDto, signal?: AbortSignal) {
     if (!supplierId) { setLinks([]); setSelectedId(0); return; }
-    const rows = await client.listSupplierProductLinks({ supplierId }, { signal });
+    const page = await client.querySupplierProductLinks(
+      { supplierId, pageNumber: linkPageNumber, pageSize: linkPageSize },
+      { signal },
+    );
     if (signal?.aborted) return;
+    const rows = preferred && !page.items.some((item) => item.id === preferred.id)
+      ? [preferred, ...page.items]
+      : page.items;
     setLinks(rows);
-    setSelectedId(preferredId && rows.some((item) => item.id === preferredId) ? preferredId : 0);
+    setLinkTotalCount(page.totalCount);
+    setLinkTotalPages(page.totalPages);
+    setSelectedId(preferred && rows.some((item) => item.id === preferred.id) ? preferred.id : 0);
   }
 
   async function searchProducts(searchKeyword = keyword, signal?: AbortSignal) {
-    const result = await client.searchSupplierProductOptions({ keyword: searchKeyword.trim() }, { signal });
-    if (!signal?.aborted) setOptions(result);
+    const result = await client.searchSupplierProductOptions(
+      { keyword: searchKeyword.trim(), pageNumber: 1, pageSize: 100 },
+      { signal },
+    );
+    if (!signal?.aborted) {
+      setOptions(result.items);
+      setProductOptionTotal(result.totalCount);
+    }
   }
 
   useEffect(() => {
@@ -64,7 +86,7 @@ export function SupplierProductLinksPanel({
     void Promise.all([loadLinks(undefined, controller.signal), searchProducts("", controller.signal)])
       .catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); });
     return () => controller.abort();
-  }, [client, supplierId]);
+  }, [client, linkPageNumber, linkPageSize, supplierId]);
 
   async function changeView(nextView: "directory" | "editor") {
     if (nextView === view) return true;
@@ -83,7 +105,7 @@ export function SupplierProductLinksPanel({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canOperate || !supplierId) return;
+    if (!canEdit || !supplierId) return;
     const form = new FormData(event.currentTarget);
     const id = selected?.id ?? 0;
     const body = {
@@ -94,24 +116,51 @@ export function SupplierProductLinksPanel({
       referencePrice: Number(form.get("referencePrice") ?? 0),
       currency: String(form.get("currency") ?? "CNY").trim().toUpperCase(),
       leadTimeDays: Number(form.get("leadTimeDays") ?? 0),
-      status: String(form.get("linkStatus") ?? "供货中"),
       expectedVersion: id > 0 ? selected?.versionNumber ?? 0 : 0,
     };
     try {
       const saved = id
         ? await client.updateSupplierProductLink({ supplierId, id, body })
         : await client.createSupplierProductLink({ supplierId, body });
-      await loadLinks(saved.id);
+      await loadLinks(saved);
       setDraftDirty(false);
       setView("editor");
       setFeedback(successFeedback(id ? "供货关系已更新。" : "供货关系已建立。"));
     } catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
 
-  async function remove() {
-    if (!canManage || !selected || !await requestConfirmation({ title: "删除供货关系", description: `确定删除“${selected.productCode || selected.productNameCN}”的供货关系吗？`, details: ["供应商和商品主数据将保留。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除供货关系")) return;
+  async function changeAvailability(restore: boolean) {
+    if (!canDeactivate || !selected) return;
+    const label = restore ? "恢复供货关系" : "停用供货关系";
+    if (!await requestConfirmation({
+      title: label,
+      description: restore
+        ? `确定恢复“${selected.productCode || selected.productNameCN}”的供货关系吗？`
+        : `确定停用“${selected.productCode || selected.productNameCN}”的供货关系吗？`,
+      details: ["供应商和产品主数据不会被修改。"],
+      confirmLabel: label,
+      tone: restore ? undefined : "danger",
+    })) return;
     try {
-      await client.deleteSupplierProductLink({ supplierId, id: selected.id });
+      const request = {
+        supplierId,
+        id: selected.id,
+        body: { expectedVersion: selected.versionNumber },
+      };
+      const saved = restore
+        ? await client.restoreSupplierProductLink(request)
+        : await client.deactivateSupplierProductLink(request);
+      await loadLinks(saved);
+      setFeedback(successFeedback(restore ? "供货关系已恢复。" : "供货关系已停用。"));
+    } catch (error) {
+      setFeedback(requestErrorFeedback(error));
+    }
+  }
+
+  async function remove() {
+    if (!canDelete || !selected || !await requestConfirmation({ title: "删除供货关系", description: `确定删除“${selected.productCode || selected.productNameCN}”的供货关系吗？`, details: ["供应商和商品主数据将保留。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除供货关系")) return;
+    try {
+      await client.deleteSupplierProductLink({ supplierId, id: selected.id, expectedVersion: selected.versionNumber });
       await loadLinks();
       setDraftDirty(false);
       setView("directory");
@@ -126,31 +175,32 @@ export function SupplierProductLinksPanel({
   }
 
   return <section className="form-section supplier-product-workspace">
-    <div className="section-header"><div><h3>{view === "directory" ? "供应产品目录" : selected ? "编辑供货关系" : "新增供货关系"}</h3><p>为 {supplierName || "当前供应商"} 维护独立供货关系，不修改产品主数据。</p></div><span>{links.length} 项</span></div>
+    <div className="section-header"><div><h3>{view === "directory" ? "供应产品目录" : selected ? "编辑供货关系" : "新增供货关系"}</h3><p>为 {supplierName || "当前供应商"} 维护独立供货关系，不修改产品主数据。</p></div><span>{linkTotalCount} 项</span></div>
     <OperationFeedback feedback={feedback} />
     {view === "directory" ? <>
-      <div className="section-header-actions supplier-product-directory-actions"><span>每条关系只记录当前供应商的报价、货号和交期。</span>{canOperate ? <button className="primary-button" type="button" onClick={() => void openEditor(0)}>新增供货关系</button> : null}</div>
+      <div className="section-header-actions supplier-product-directory-actions"><span>每条关系只记录当前供应商的报价、货号和交期。</span>{canEdit ? <button className="primary-button" type="button" onClick={() => void openEditor(0)}>新增供货关系</button> : null}</div>
       <ResponsiveTableFrame label="供应商供货关系" mobileLayout="scroll"><table className="data-table"><thead><tr><th>产品</th><th>供应商货号</th><th>参考价</th><th>交期</th><th>状态</th><th /></tr></thead><tbody>
-        {links.map((item) => <tr key={item.id}><td><TablePrimaryText value={item.productNameCN || item.productNameEN || "未命名"} secondary={item.productCode || "无产品货号"} /></td><td><TablePrimaryText value={item.supplierProductCode} /></td><td>{item.currency} {item.referencePrice.toFixed(2)}</td><td>{item.leadTimeDays ? `${item.leadTimeDays} 天` : "未设置"}</td><td><BusinessStatusBadge value={item.status} /></td><td><button className="secondary-button" type="button" onClick={() => void openEditor(item.id)}>{canOperate ? "编辑" : "查看"}</button></td></tr>)}
-        {!links.length ? <tr><td className="empty-cell" colSpan={6}><div className="empty-cell-content"><strong>尚未关联供应产品</strong><span>{canOperate ? "需要记录供应商货号、参考价或交期时，再建立供货关系。" : "当前供应商还没有供货关系。"}</span>{canOperate ? <button className="primary-button" type="button" onClick={() => void openEditor(0)}>新增第一条供货关系</button> : null}</div></td></tr> : null}
+        {links.map((item) => <tr key={item.id}><td><TablePrimaryText value={item.productNameCN || item.productNameEN || "未命名"} secondary={item.productCode || "无产品货号"} /></td><td><TablePrimaryText value={item.supplierProductCode} /></td><td>{item.currency} {item.referencePrice.toFixed(2)}</td><td>{item.leadTimeDays ? `${item.leadTimeDays} 天` : "未设置"}</td><td><BusinessStatusBadge value={item.status} /></td><td><button className="secondary-button" type="button" onClick={() => void openEditor(item.id)}>{canEdit ? "编辑" : "查看"}</button></td></tr>)}
+        {!links.length ? <tr><td className="empty-cell" colSpan={6}><div className="empty-cell-content"><strong>尚未关联供应产品</strong><span>{canEdit ? "需要记录供应商货号、参考价或交期时，再建立供货关系。" : "当前供应商还没有供货关系。"}</span>{canEdit ? <button className="primary-button" type="button" onClick={() => void openEditor(0)}>新增第一条供货关系</button> : null}</div></td></tr> : null}
       </tbody></table></ResponsiveTableFrame>
+      <ListPaginationControls pageNumber={linkPageNumber} totalPages={linkTotalPages} totalCount={linkTotalCount} pageSize={linkPageSize} pageSizeOptions={[20, 50, 100]} isBusy={false} onPageChange={setLinkPageNumber} onPageSizeChange={(value) => { setLinkPageSize(value); setLinkPageNumber(1); }} />
     </> : null}
     {view === "editor" ? <form className="form-grid" key={`${selected?.id ?? "new"}-${selected?.versionNumber ?? 0}-${supplierId}`} onSubmit={save}>
       <div className="section-heading-row"><h4>{selected ? "编辑供货关系" : "新增供货关系"}</h4><button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回供应产品目录</button></div>
       <div className="form-field-wide context-strip"><strong>{supplierName}</strong><span>这里只建立供应商与现有产品的关系，不会修改产品主数据。</span></div>
-      {!productOptions.length ? <FormGuidance className="form-field-wide" title="先建立产品资料" description="供货关系必须关联现有产品。建立产品后返回此处即可继续。" action={canOperate ? <button className="secondary-button" type="button" onClick={() => void openProductDirectory()}>打开产品资料</button> : undefined} /> : null}
-      <fieldset className="permission-fieldset form-field-wide" disabled={!canOperate} onChangeCapture={(event) => {
+      {!productOptions.length ? <FormGuidance className="form-field-wide" title="先建立产品资料" description="供货关系必须关联现有产品。建立产品后返回此处即可继续。" action={canEdit ? <button className="secondary-button" type="button" onClick={() => void openProductDirectory()}>打开产品资料</button> : undefined} /> : null}
+      <fieldset className="permission-fieldset form-field-wide" disabled={!canEdit} onChangeCapture={(event) => {
         if (!(event.target instanceof Element) || !event.target.closest("[data-draft-ignore]")) setDraftDirty(true);
       }}>
-      <label className="form-field-wide">查找产品<div className="toolbar" data-draft-ignore><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="输入产品货号或名称" /><button className="secondary-button" type="button" onClick={() => { productSearchController.current?.abort(); const controller = new AbortController(); productSearchController.current = controller; void searchProducts(keyword, controller.signal).catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); }); }}>查找</button></div></label>
+      <label className="form-field-wide">查找产品<div className="toolbar" data-draft-ignore><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="输入产品货号或名称" /><button className="secondary-button" type="button" onClick={() => { productSearchController.current?.abort(); const controller = new AbortController(); productSearchController.current = controller; void searchProducts(keyword, controller.signal).catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); }); }}>查找</button></div>{productOptionTotal > options.length ? <small>匹配 {productOptionTotal} 项，当前显示前 {options.length} 项；请继续输入货号或名称缩小范围。</small> : null}</label>
       <label className="form-field-wide">产品<select name="productId" required defaultValue={selected?.productId ?? ""}><option value="">请选择产品</option>{productOptions.map((item) => <option key={item.id} value={item.id}>{item.productCode || "无货号"} · {item.nameCN || item.nameEN || "未命名"}</option>)}</select></label>
       <label>供应商货号<input name="supplierProductCode" defaultValue={selected?.supplierProductCode} /></label>
       <label>参考价<input name="referencePrice" type="number" min="0" step="0.0001" defaultValue={selected?.referencePrice ?? 0} /></label>
       <label>币种<input name="currency" maxLength={3} defaultValue={selected?.currency ?? "CNY"} /></label>
       <label>交期（天）<input name="leadTimeDays" type="number" min="0" max="3650" defaultValue={selected?.leadTimeDays ?? 0} /></label>
-      <label>供货状态<select name="linkStatus" defaultValue={selected?.status ?? "供货中"}><option>供货中</option><option>备选</option><option>暂停</option><option>停用</option></select></label>
+      {selected ? <label>供货状态<input value={selected.status} readOnly /></label> : null}
       </fieldset>
-      <div className="form-actions">{canOperate ? <button className="primary-button" type="submit" disabled={!supplierId || !productOptions.length}>保存供货关系</button> : null}{selected && canManage ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除关联</button> : null}</div>
+      <div className="form-actions">{canEdit ? <button className="primary-button" type="submit" disabled={!supplierId || !productOptions.length}>保存供货关系</button> : null}{selected && canDeactivate && selected.status !== "停用" && selected.status !== "暂停" ? <button className="secondary-button" type="button" onClick={() => void changeAvailability(false)}>停用供货关系</button> : null}{selected && canDeactivate && (selected.status === "停用" || selected.status === "暂停") ? <button className="secondary-button" type="button" onClick={() => void changeAvailability(true)}>恢复供货关系</button> : null}{selected && canDelete ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除关联</button> : null}</div>
     </form> : null}
   </section>;
 }

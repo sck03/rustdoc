@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ExportDocManager.Services.Reporting
 {
-    public sealed class ReportTemplateService : IReportTemplateService
+    public sealed partial class ReportTemplateService : IReportTemplateService
     {
         private const string StoragePolicy =
             "内置模板从程序根 Templates/ 只读加载；新建、编辑副本、重命名、删除和模板包导入统一写入运行数据根 Templates/。不会改写已安装程序资源，也不会使用系统用户配置目录或系统级共享数据目录。";
@@ -25,6 +25,7 @@ namespace ExportDocManager.Services.Reporting
         private readonly IBusinessClock _clock;
         private readonly ILogger<ReportTemplateService> _logger;
         private readonly ReportTemplateV3ImageResourceHydrator _imageResourceHydrator;
+        private readonly ReportTemplateStorageCoordinator _storageCoordinator;
         private readonly IDbContextFactory<AppDbContext>? _contextFactory;
         private readonly BusinessDataAccessScope? _accessScope;
 
@@ -46,6 +47,7 @@ namespace ExportDocManager.Services.Reporting
             _clock = clock ?? BusinessClock.CreateSystem();
             _contextFactory = contextFactory;
             _accessScope = accessScope;
+            _storageCoordinator = new ReportTemplateStorageCoordinator(pathProvider, settingsService, _logger);
             _imageResourceHydrator = new ReportTemplateV3ImageResourceHydrator(
                 imageResourceService ?? new ReportTemplateImageResourceService(pathProvider));
         }
@@ -56,33 +58,39 @@ namespace ExportDocManager.Services.Reporting
             string? displayName = null,
             CancellationToken cancellationToken = default)
         {
-            string resolvedPath = ResolveTemplateLifecycleTargetPath(
-                reportType,
-                templatePath,
-                BuildDefaultTemplateFileName(reportType));
-
-            ReportTemplateFilePolicy.EnsureNoPortableCollision(resolvedPath);
-
-            if (File.Exists(resolvedPath))
+            DemandReportTypeAccess(reportType);
+            return await _storageCoordinator.ExecuteMutationAsync(async transaction =>
             {
-                throw new ResourceConflictException("目标模板已存在。");
-            }
+                string resolvedPath = ResolveTemplateLifecycleTargetPath(
+                    reportType,
+                    templatePath,
+                    BuildDefaultTemplateFileName(reportType));
 
-            string title = string.IsNullOrWhiteSpace(displayName)
-                ? Path.GetFileNameWithoutExtension(resolvedPath)
-                : displayName.Trim();
-            string content = ReportTemplateStarterFactory.Create(reportType, title, resolvedPath);
-            ReportTemplateContentPolicy.Validate(reportType, content);
+                ReportTemplateFilePolicy.EnsureNoPortableCollision(resolvedPath);
 
-            await AtomicFileHelper.WriteAllTextAtomicAsync(
-                    resolvedPath,
-                    content,
-                    Encoding.UTF8,
-                    cancellationToken)
-                .ConfigureAwait(false);
+                if (File.Exists(resolvedPath))
+                {
+                    throw new ResourceConflictException("目标模板已存在。");
+                }
 
-            await SyncTemplateStateAsync(reportType, string.Empty, resolvedPath, title, cancellationToken).ConfigureAwait(false);
-            return ToContentResult(CreateResolvedTemplate(reportType, resolvedPath, title), content);
+                string title = string.IsNullOrWhiteSpace(displayName)
+                    ? Path.GetFileNameWithoutExtension(resolvedPath)
+                    : displayName.Trim();
+                string content = ReportTemplateStarterFactory.Create(reportType, title, resolvedPath);
+                ReportTemplateContentPolicy.Validate(reportType, content);
+
+                await AtomicFileHelper.WriteAllTextAtomicAsync(
+                        resolvedPath,
+                        content,
+                        Encoding.UTF8,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                transaction.MarkTemplatesChanged();
+
+                transaction.MarkSettingsChanged();
+                await SyncTemplateStateAsync(reportType, string.Empty, resolvedPath, title, cancellationToken).ConfigureAwait(false);
+                return ToContentResult(CreateResolvedTemplate(reportType, resolvedPath, title), content);
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<ReportTemplateContentResult> GetTemplateContentAsync(
@@ -90,12 +98,16 @@ namespace ExportDocManager.Services.Reporting
             string templatePath,
             CancellationToken cancellationToken = default)
         {
-            var resolved = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: true, cancellationToken)
-                .ConfigureAwait(false);
-            string content = await File.ReadAllTextAsync(resolved.TemplatePath, Encoding.UTF8, cancellationToken)
-                .ConfigureAwait(false);
+            DemandReportTypeAccess(reportType);
+            return await _storageCoordinator.ExecuteReadAsync(async () =>
+            {
+                var resolved = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: true, cancellationToken)
+                    .ConfigureAwait(false);
+                string content = await File.ReadAllTextAsync(resolved.TemplatePath, Encoding.UTF8, cancellationToken)
+                    .ConfigureAwait(false);
 
-            return ToContentResult(resolved, content);
+                return ToContentResult(resolved, content);
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<ReportTemplateContentResult> SaveTemplateContentAsync(
@@ -104,33 +116,39 @@ namespace ExportDocManager.Services.Reporting
             string content,
             CancellationToken cancellationToken = default)
         {
+            DemandReportTypeAccess(reportType);
             ReportTemplateContentPolicy.Validate(reportType, content ?? string.Empty);
-            var resolved = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: false, cancellationToken)
-                .ConfigureAwait(false);
-            string previousPath = resolved.TemplatePath;
-            if (_pathResolver.IsBuiltInTemplatePath(previousPath))
+            return await _storageCoordinator.ExecuteMutationAsync(async transaction =>
             {
-                string userCopyPath = _pathResolver.GetUserCopyPath(previousPath);
-                Directory.CreateDirectory(Path.GetDirectoryName(userCopyPath)!);
-                resolved = CreateResolvedTemplate(reportType, userCopyPath, resolved.DisplayName);
-            }
+                var resolved = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: false, cancellationToken)
+                    .ConfigureAwait(false);
+                string previousPath = resolved.TemplatePath;
+                if (_pathResolver.IsBuiltInTemplatePath(previousPath))
+                {
+                    string userCopyPath = _pathResolver.GetUserCopyPath(previousPath);
+                    Directory.CreateDirectory(Path.GetDirectoryName(userCopyPath)!);
+                    resolved = CreateResolvedTemplate(reportType, userCopyPath, resolved.DisplayName);
+                }
 
-            await AtomicFileHelper.WriteAllTextAtomicAsync(
-                    resolved.TemplatePath,
-                    content ?? string.Empty,
-                    Encoding.UTF8,
-                    cancellationToken)
-                .ConfigureAwait(false);
+                await AtomicFileHelper.WriteAllTextAtomicAsync(
+                        resolved.TemplatePath,
+                        content ?? string.Empty,
+                        Encoding.UTF8,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                transaction.MarkTemplatesChanged();
 
-            await SyncTemplateStateAsync(
-                    reportType,
-                    previousPath,
-                    resolved.TemplatePath,
-                    resolved.DisplayName,
-                    cancellationToken)
-                .ConfigureAwait(false);
+                transaction.MarkSettingsChanged();
+                await SyncTemplateStateAsync(
+                        reportType,
+                        previousPath,
+                        resolved.TemplatePath,
+                        resolved.DisplayName,
+                        cancellationToken)
+                    .ConfigureAwait(false);
 
-            return ToContentResult(resolved, content ?? string.Empty);
+                return ToContentResult(resolved, content ?? string.Empty);
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<ReportTemplateContentResult> RenameTemplateAsync(
@@ -139,40 +157,49 @@ namespace ExportDocManager.Services.Reporting
             string newTemplatePath,
             CancellationToken cancellationToken = default)
         {
-            var current = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: true, cancellationToken)
-                .ConfigureAwait(false);
-            EnsureTemplateLifecyclePath(current.TemplatePath);
-
-            string resolvedNewPath = ResolveTemplateLifecycleTargetPath(
-                reportType,
-                newTemplatePath,
-                Path.GetFileName(current.TemplatePath));
-            if (PhysicalPathComparison.AreSamePath(current.TemplatePath, resolvedNewPath))
+            DemandReportTypeAccess(reportType);
+            return await _storageCoordinator.ExecuteMutationAsync(async transaction =>
             {
-                string unchangedContent = await File.ReadAllTextAsync(current.TemplatePath, Encoding.UTF8, cancellationToken)
+                var current = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: true, cancellationToken)
                     .ConfigureAwait(false);
-                return ToContentResult(current, unchangedContent);
-            }
+                EnsureTemplateLifecyclePath(current.TemplatePath);
+                var catalogSnapshot = await _catalogLoader.LoadResolvedConfigsAsync(cancellationToken).ConfigureAwait(false);
 
-            ReportTemplateFilePolicy.EnsureNoPortableCollision(resolvedNewPath, current.TemplatePath);
-            if (File.Exists(resolvedNewPath))
-            {
-                throw new ResourceConflictException("目标模板已存在。");
-            }
-
-            Directory.CreateDirectory(Path.GetDirectoryName(resolvedNewPath)!);
-            File.Move(current.TemplatePath, resolvedNewPath, overwrite: false);
-            await SyncTemplateStateAsync(
+                string resolvedNewPath = ResolveTemplateLifecycleTargetPath(
                     reportType,
-                    current.TemplatePath,
-                    resolvedNewPath,
-                    current.DisplayName,
-                    cancellationToken)
-                .ConfigureAwait(false);
+                    newTemplatePath,
+                    Path.GetFileName(current.TemplatePath));
+                if (PhysicalPathComparison.AreSamePath(current.TemplatePath, resolvedNewPath))
+                {
+                    string unchangedContent = await File.ReadAllTextAsync(current.TemplatePath, Encoding.UTF8, cancellationToken)
+                        .ConfigureAwait(false);
+                    return ToContentResult(current, unchangedContent);
+                }
 
-            string content = await File.ReadAllTextAsync(resolvedNewPath, Encoding.UTF8, cancellationToken)
-                .ConfigureAwait(false);
-            return ToContentResult(CreateResolvedTemplate(reportType, resolvedNewPath, current.DisplayName), content);
+                ReportTemplateFilePolicy.EnsureNoPortableCollision(resolvedNewPath, current.TemplatePath);
+                if (File.Exists(resolvedNewPath))
+                {
+                    throw new ResourceConflictException("目标模板已存在。");
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(resolvedNewPath)!);
+                File.Move(current.TemplatePath, resolvedNewPath, overwrite: false);
+                transaction.MarkTemplatesChanged();
+                transaction.MarkSettingsChanged();
+                await SyncTemplateStateAsync(
+                        reportType,
+                        current.TemplatePath,
+                        resolvedNewPath,
+                        current.DisplayName,
+                        cancellationToken,
+                        catalogSnapshot,
+                        current.TemplatePath)
+                    .ConfigureAwait(false);
+
+                string content = await File.ReadAllTextAsync(resolvedNewPath, Encoding.UTF8, cancellationToken)
+                    .ConfigureAwait(false);
+                return ToContentResult(CreateResolvedTemplate(reportType, resolvedNewPath, current.DisplayName), content);
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<ReportTemplateContentResult> UpdateTemplateDisplayNameAsync(
@@ -181,14 +208,19 @@ namespace ExportDocManager.Services.Reporting
             string displayName,
             CancellationToken cancellationToken = default)
         {
-            var current = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: true, cancellationToken)
-                .ConfigureAwait(false);
-            string normalizedDisplayName = ReportTemplateCatalogLoader.NormalizeTemplateDisplayName(displayName, current.TemplatePath);
-            await RefreshTemplateCatalogAsync(current.TemplatePath, normalizedDisplayName, cancellationToken).ConfigureAwait(false);
+            DemandReportTypeAccess(reportType);
+            return await _storageCoordinator.ExecuteMutationAsync(async transaction =>
+            {
+                var current = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: true, cancellationToken)
+                    .ConfigureAwait(false);
+                string normalizedDisplayName = ReportTemplateCatalogLoader.NormalizeTemplateDisplayName(displayName, current.TemplatePath);
+                transaction.MarkTemplatesChanged();
+                await RefreshTemplateCatalogAsync(current.TemplatePath, normalizedDisplayName, cancellationToken).ConfigureAwait(false);
 
-            string content = await File.ReadAllTextAsync(current.TemplatePath, Encoding.UTF8, cancellationToken)
-                .ConfigureAwait(false);
-            return ToContentResult(CreateResolvedTemplate(reportType, current.TemplatePath, normalizedDisplayName), content);
+                string content = await File.ReadAllTextAsync(current.TemplatePath, Encoding.UTF8, cancellationToken)
+                    .ConfigureAwait(false);
+                return ToContentResult(CreateResolvedTemplate(reportType, current.TemplatePath, normalizedDisplayName), content);
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<ReportTemplateCommandResult> SetDefaultTemplateAsync(
@@ -196,84 +228,92 @@ namespace ExportDocManager.Services.Reporting
             string templatePath,
             CancellationToken cancellationToken = default)
         {
-            if (TryParseUserTemplateId(templatePath, out int userTemplateId))
+            DemandReportTypeAccess(reportType);
+            return await _storageCoordinator.ExecuteMutationAsync(async transaction =>
             {
-                if (_contextFactory == null || _accessScope == null)
+                if (TryParseUserTemplateId(templatePath, out int userTemplateId))
                 {
-                    throw new InvalidOperationException("数据库报表模板服务尚未配置。");
+                    if (_contextFactory == null || _accessScope == null)
+                    {
+                        throw new InvalidOperationException("数据库报表模板服务尚未配置。");
+                    }
+
+                    await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+                    var userTemplate = await _accessScope.ApplyUserReportTemplateScope(context.UserReportTemplates.AsNoTracking())
+                        .Where(item => item.Id == userTemplateId &&
+                                       item.Status == TemplateLifecycleStatusCatalog.Published &&
+                                       item.ReportType == reportType.ToString())
+                        .Select(item => new { item.Id, item.Name })
+                        .FirstOrDefaultAsync(cancellationToken)
+                        .ConfigureAwait(false);
+                    if (userTemplate == null)
+                    {
+                        throw new ResourceNotFoundException("用户报表模板不存在、已停用或无权访问。");
+                    }
+
+                    await _settingsService.LoadAsync(cancellationToken).ConfigureAwait(false);
+                    string userStoredPath = $"user-template:{userTemplate.Id}";
+                    transaction.MarkSettingsChanged();
+                    await _settingsService.UpdateAsync(settings =>
+                    {
+                        if (reportType == ReportDocumentType.PaymentVoucher)
+                        {
+                            if (string.Equals(settings.ReportTemplateDefaults.PaymentVoucherTemplatePath, userStoredPath, StringComparison.Ordinal)) return false;
+                            settings.ReportTemplateDefaults.PaymentVoucherTemplatePath = userStoredPath;
+                        }
+                        else
+                        {
+                            if (string.Equals(settings.ReportTemplateDefaults.ExportDocumentTemplatePath, userStoredPath, StringComparison.Ordinal)) return false;
+                            settings.ReportTemplateDefaults.ExportDocumentTemplatePath = userStoredPath;
+                        }
+                        return true;
+                    }, cancellationToken).ConfigureAwait(false);
+
+                    return new ReportTemplateCommandResult
+                    {
+                        ReportType = reportType,
+                        TemplatePath = userStoredPath,
+                        StoragePolicy = StoragePolicy,
+                        Message = $"已将“{userTemplate.Name}”设为默认模板。"
+                    };
                 }
 
-                await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-                var userTemplate = await _accessScope.ApplyUserReportTemplateScope(context.UserReportTemplates.AsNoTracking())
-                    .Where(item => item.Id == userTemplateId && item.IsActive && item.ReportType == reportType.ToString())
-                    .Select(item => new { item.Id, item.Name })
-                    .FirstOrDefaultAsync(cancellationToken)
+                var current = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: true, cancellationToken)
                     .ConfigureAwait(false);
-                if (userTemplate == null)
-                {
-                    throw new ResourceNotFoundException("用户报表模板不存在、已停用或无权访问。");
-                }
+                string storedPath = _pathResolver.ToStoredPath(current.TemplatePath);
 
-                await _settingsService.LoadAsync().ConfigureAwait(false);
-                string userStoredPath = $"user-template:{userTemplate.Id}";
+                await _settingsService.LoadAsync(cancellationToken).ConfigureAwait(false);
+                transaction.MarkSettingsChanged();
                 await _settingsService.UpdateAsync(settings =>
                 {
+                    string configuredPath = reportType == ReportDocumentType.PaymentVoucher
+                        ? settings.ReportTemplateDefaults.PaymentVoucherTemplatePath
+                        : settings.ReportTemplateDefaults.ExportDocumentTemplatePath;
+                    if (string.Equals(configuredPath, storedPath, StringComparison.Ordinal))
+                    {
+                        return false;
+                    }
+
                     if (reportType == ReportDocumentType.PaymentVoucher)
                     {
-                        if (string.Equals(settings.ReportTemplateDefaults.PaymentVoucherTemplatePath, userStoredPath, StringComparison.Ordinal)) return false;
-                        settings.ReportTemplateDefaults.PaymentVoucherTemplatePath = userStoredPath;
+                        settings.ReportTemplateDefaults.PaymentVoucherTemplatePath = storedPath;
                     }
                     else
                     {
-                        if (string.Equals(settings.ReportTemplateDefaults.ExportDocumentTemplatePath, userStoredPath, StringComparison.Ordinal)) return false;
-                        settings.ReportTemplateDefaults.ExportDocumentTemplatePath = userStoredPath;
+                        settings.ReportTemplateDefaults.ExportDocumentTemplatePath = storedPath;
                     }
+
                     return true;
                 }, cancellationToken).ConfigureAwait(false);
 
                 return new ReportTemplateCommandResult
                 {
                     ReportType = reportType,
-                    TemplatePath = userStoredPath,
+                    TemplatePath = current.TemplatePath,
                     StoragePolicy = StoragePolicy,
-                    Message = $"已将“{userTemplate.Name}”设为默认模板。"
+                    Message = $"已将“{current.DisplayName}”设为默认模板。"
                 };
-            }
-
-            var current = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: true, cancellationToken)
-                .ConfigureAwait(false);
-            string storedPath = _pathResolver.ToStoredPath(current.TemplatePath);
-
-            await _settingsService.LoadAsync().ConfigureAwait(false);
-            await _settingsService.UpdateAsync(settings =>
-            {
-                string configuredPath = reportType == ReportDocumentType.PaymentVoucher
-                    ? settings.ReportTemplateDefaults.PaymentVoucherTemplatePath
-                    : settings.ReportTemplateDefaults.ExportDocumentTemplatePath;
-                if (string.Equals(configuredPath, storedPath, StringComparison.Ordinal))
-                {
-                    return false;
-                }
-
-                if (reportType == ReportDocumentType.PaymentVoucher)
-                {
-                    settings.ReportTemplateDefaults.PaymentVoucherTemplatePath = storedPath;
-                }
-                else
-                {
-                    settings.ReportTemplateDefaults.ExportDocumentTemplatePath = storedPath;
-                }
-
-                return true;
             }, cancellationToken).ConfigureAwait(false);
-
-            return new ReportTemplateCommandResult
-            {
-                ReportType = reportType,
-                TemplatePath = current.TemplatePath,
-                StoragePolicy = StoragePolicy,
-                Message = $"已将“{current.DisplayName}”设为默认模板。"
-            };
         }
 
         public async Task<ReportTemplateCommandResult> DeleteTemplateAsync(
@@ -281,20 +321,35 @@ namespace ExportDocManager.Services.Reporting
             string templatePath,
             CancellationToken cancellationToken = default)
         {
-            var current = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: true, cancellationToken)
-                .ConfigureAwait(false);
-            EnsureTemplateLifecyclePath(current.TemplatePath);
-
-            File.Delete(current.TemplatePath);
-            await SyncTemplateStateAsync(reportType, current.TemplatePath, string.Empty, null, cancellationToken).ConfigureAwait(false);
-
-            return new ReportTemplateCommandResult
+            DemandReportTypeAccess(reportType);
+            return await _storageCoordinator.ExecuteMutationAsync(async transaction =>
             {
-                ReportType = reportType,
-                TemplatePath = current.TemplatePath,
-                StoragePolicy = StoragePolicy,
-                Message = "模板已删除。"
-            };
+                var current = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: true, cancellationToken)
+                    .ConfigureAwait(false);
+                EnsureTemplateLifecyclePath(current.TemplatePath);
+                var catalogSnapshot = await _catalogLoader.LoadResolvedConfigsAsync(cancellationToken).ConfigureAwait(false);
+
+                File.Delete(current.TemplatePath);
+                transaction.MarkTemplatesChanged();
+                transaction.MarkSettingsChanged();
+                await SyncTemplateStateAsync(
+                        reportType,
+                        current.TemplatePath,
+                        string.Empty,
+                        null,
+                        cancellationToken,
+                        catalogSnapshot,
+                        current.TemplatePath)
+                    .ConfigureAwait(false);
+
+                return new ReportTemplateCommandResult
+                {
+                    ReportType = reportType,
+                    TemplatePath = current.TemplatePath,
+                    StoragePolicy = StoragePolicy,
+                    Message = "模板已删除。"
+                };
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<ReportTemplatePreviewResult> PreviewTemplateContentAsync(
@@ -303,6 +358,7 @@ namespace ExportDocManager.Services.Reporting
             bool withSeal = true,
             CancellationToken cancellationToken = default)
         {
+            DemandReportTypeAccess(reportType);
             cancellationToken.ThrowIfCancellationRequested();
             ReportTemplateContentPolicy.Validate(reportType, content ?? string.Empty);
             string templateContent = ScribanReportTemplateRenderer.PreprocessHtmlTemplate(
@@ -426,9 +482,11 @@ namespace ExportDocManager.Services.Reporting
             string previousTemplatePath,
             string currentTemplatePath,
             string? currentDisplayName,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IReadOnlyList<ReportTemplateConfig>? catalogSnapshot = null,
+            string? removedTemplatePath = null)
         {
-            await _settingsService.LoadAsync().ConfigureAwait(false);
+            await _settingsService.LoadAsync(cancellationToken).ConfigureAwait(false);
 
             string normalizedPreviousPath = _catalogLoader.NormalizeStoredTemplatePath(previousTemplatePath);
             string normalizedPreviousAbsolutePath = _catalogLoader.NormalizeAbsoluteTemplatePath(previousTemplatePath);
@@ -458,23 +516,37 @@ namespace ExportDocManager.Services.Reporting
             }, cancellationToken).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
-            await RefreshTemplateCatalogAsync(currentTemplatePath, currentDisplayName, cancellationToken).ConfigureAwait(false);
+            await RefreshTemplateCatalogAsync(
+                    currentTemplatePath,
+                    currentDisplayName,
+                    cancellationToken,
+                    catalogSnapshot,
+                    removedTemplatePath)
+                .ConfigureAwait(false);
         }
 
         private async Task RefreshTemplateCatalogAsync(
             string currentTemplatePath,
             string? currentDisplayName,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IReadOnlyList<ReportTemplateConfig>? catalogSnapshot = null,
+            string? removedTemplatePath = null)
         {
             string configPath = _pathResolver.GetUserConfigPath();
-            var configs = await _catalogLoader.LoadResolvedConfigsAsync(cancellationToken).ConfigureAwait(false);
+            var configs = catalogSnapshot ??
+                await _catalogLoader.LoadResolvedConfigsAsync(cancellationToken).ConfigureAwait(false);
             string normalizedCurrentPath = string.IsNullOrWhiteSpace(currentTemplatePath)
                 ? string.Empty
                 : Path.GetFullPath(currentTemplatePath);
+            string normalizedRemovedPath = string.IsNullOrWhiteSpace(removedTemplatePath)
+                ? string.Empty
+                : Path.GetFullPath(removedTemplatePath);
             var rows = configs
                 .Where(config =>
                     config != null &&
                     !string.IsNullOrWhiteSpace(config.FileName) &&
+                    (normalizedRemovedPath.Length == 0 ||
+                     !PhysicalPathComparison.AreSamePath(config.FileName, normalizedRemovedPath)) &&
                     (_pathResolver.IsBuiltInTemplatePath(config.FileName) || _pathResolver.IsUserTemplatePath(config.FileName)))
                 .Select(config => new ReportTemplateConfig
                 {
@@ -491,6 +563,28 @@ namespace ExportDocManager.Services.Reporting
                         : config.WithSeal ?? true
                 })
                 .ToList();
+            if (normalizedCurrentPath.Length > 0 &&
+                !rows.Any(config => PhysicalPathComparison.AreSamePath(
+                    _pathResolver.ToAbsolutePath(config.FileName),
+                    normalizedCurrentPath)))
+            {
+                rows.Add(new ReportTemplateConfig
+                {
+                    Type = ReportTemplateCatalogLoader.NormalizeTemplateCatalogType(null, normalizedCurrentPath),
+                    FileName = _pathResolver.ToStoredPath(normalizedCurrentPath),
+                    Name = ReportTemplateCatalogLoader.NormalizeTemplateDisplayName(
+                        currentDisplayName,
+                        normalizedCurrentPath),
+                    WithSeal = ReportTemplateCatalogLoader.ResolveCatalogReportType(null, normalizedCurrentPath) ==
+                               ReportDocumentType.PaymentVoucher
+                        ? null
+                        : true
+                });
+            }
+            rows = rows
+                .OrderBy(config => config.Type, StringComparer.Ordinal)
+                .ThenBy(config => config.FileName, StringComparer.Ordinal)
+                .ToList();
             var root = new ReportTemplateConfigRoot { Reports = rows };
             string json = JsonSerializer.Serialize(root, ReportTemplateCatalogLoader.JsonOptions);
 
@@ -500,6 +594,16 @@ namespace ExportDocManager.Services.Reporting
                     Encoding.UTF8,
                     cancellationToken)
                 .ConfigureAwait(false);
+        }
+
+        private void DemandReportTypeAccess(ReportDocumentType reportType)
+        {
+            if (_accessScope?.CurrentUser != null)
+            {
+                _accessScope.DemandPermission(
+                    ReportDocumentAccessCatalog.GetSourceResource(reportType),
+                    PermissionAction.View);
+            }
         }
 
         private bool UpdateTemplateReferences(
@@ -639,117 +743,7 @@ namespace ExportDocManager.Services.Reporting
             string prefix = reportType == ReportDocumentType.PaymentVoucher
                 ? "internal_template"
                 : "export_template";
-            return $"{prefix}_{_clock.Now:yyyyMMddHHmmss}.html";
-        }
-
-        private string RenderInvoicePreview(string templateContent, bool withSeal)
-        {
-            var invoice = BuildSampleInvoice();
-            var customer = new Customer
-            {
-                CustomerNameEN = "SAMPLE CUSTOMER LTD.",
-                AddressEN = "88 Sample Road, Hamburg, Germany",
-                ContactPerson = "M. Buyer",
-                Email = "buyer@example.com",
-                Phone = "+49 40 0000 0000"
-            };
-            var exporter = BuildSampleExporter();
-            var globals = ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(
-                invoice,
-                customer,
-                exporter,
-                withSeal,
-                logger: _logger);
-            return ScribanReportTemplateRenderer.Render(templateContent, globals);
-        }
-
-        private static string RenderPaymentVoucherPreview(string templateContent)
-        {
-            var sampleDate = new DateOnly(2026, 6, 15);
-            var payee = new Payee
-            {
-                Name = "Sample Payee",
-                BankName = "Sample Bank",
-                RMBAccount = "6222 0000 1111 2222",
-                Notes = "Sample beneficiary"
-            };
-            var payment = new Payment
-            {
-                Id = 1001,
-                InvoiceNo = "PREVIEW-INTERNAL-001",
-                PaymentDate = sampleDate,
-                ShipmentDate = sampleDate.AddDays(-3),
-                PayerName = "示例付款单位",
-                PayeeName = payee.Name,
-                PaymentMethod = "Bank Transfer",
-                USDAmount = 100m,
-                CNYAmount = 720m,
-                Notes = "Sample payment voucher.",
-                BankName = payee.BankName,
-                AccountNo = payee.RMBAccount
-            };
-
-            var globals = ReportTemplateGlobalsBuilder.BuildPaymentVoucherGlobals(payment, payee);
-            return ScribanReportTemplateRenderer.Render(templateContent, globals);
-        }
-
-        private static Invoice BuildSampleInvoice()
-        {
-            var sampleDate = new DateOnly(2026, 6, 15);
-            var invoice = new Invoice
-            {
-                InvoiceNo = "PREVIEW-EXPORT-001",
-                ContractNo = "CN-2026-001",
-                InvoiceDate = sampleDate,
-                ShipmentDate = sampleDate.AddDays(10),
-                CustomerNameEN = "SAMPLE CUSTOMER LTD.",
-                ExporterNameEN = "SAMPLE EXPORTER CO., LTD.",
-                PortOfLoading = "NINGBO",
-                PortOfDestination = "HAMBURG",
-                DestinationCountry = "GERMANY",
-                Currency = "USD",
-                PaymentTerms = "T/T",
-                TradeTerms = "FOB"
-            };
-            invoice.Items =
-            [
-                new Item
-                {
-                    StyleNo = "SKU-001",
-                    StyleName = "Sample Jacket",
-                    StyleNameCN = "样例夹克",
-                    Quantity = 120,
-                    UnitEN = "PCS",
-                    UnitCN = "件",
-                    Cartons = 10,
-                    CtnUnitEN = "CTNS",
-                    UnitPrice = 12.5m,
-                    TotalPrice = 1500m,
-                    GWPerCtn = 18m,
-                    NWPerCtn = 16m,
-                    GWTotal = 180m,
-                    NWTotal = 160m,
-                    Volume = 2.4m
-                }
-            ];
-            invoice.CalculateTotals();
-            return invoice;
-        }
-
-        private static Exporter BuildSampleExporter()
-        {
-            return new Exporter
-            {
-                ExporterNameEN = "SAMPLE EXPORTER CO., LTD.",
-                ExporterNameCN = "样例出口公司",
-                AddressEN = "99 Export Avenue, Ningbo, China",
-                AddressCN = "宁波市样例出口路 99 号",
-                ContactPerson = "Export Team",
-                Phone = "+86 574 0000 0000",
-                BankName = "Sample Bank Ningbo Branch",
-                BankAccount = "1234567890",
-                SwiftCode = "SAMPLECNXXX"
-            };
+            return $"{prefix}_{_clock.Now:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.html";
         }
 
         private sealed class ResolvedReportTemplate

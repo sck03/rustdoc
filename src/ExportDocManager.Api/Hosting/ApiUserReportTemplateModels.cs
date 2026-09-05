@@ -5,11 +5,15 @@ namespace ExportDocManager.Api.Hosting
         string ReportType,
         string Name,
         string ContentHtml,
-        bool IsActive,
-        bool IsShared,
+        string Status,
         string ShareScope,
         int VersionNumber,
         bool CanEdit,
+        bool CanPublish,
+        bool CanShare,
+        bool CanDisable,
+        bool CanRestore,
+        bool CanArchive,
         int? OwnerUserId);
 
     public sealed record ApiUserReportTemplateVersionDto(
@@ -19,21 +23,29 @@ namespace ExportDocManager.Api.Hosting
         string ChangeType,
         string Name,
         string ContentHtml,
-        bool IsActive,
-        bool IsShared,
+        string Status,
         string ShareScope,
         string ChangedBy,
         DateTimeOffset CreatedAt,
         bool CanRestore);
 
-    public sealed record ApiUserReportTemplateSaveRequest(
-        int Id = 0,
+    public sealed record ApiUserReportTemplateCreateRequest(
+        string ReportType = "",
+        string Name = "",
+        string ContentHtml = "");
+
+    public sealed record ApiUserReportTemplateDraftRequest(
         string ReportType = "",
         string Name = "",
         string ContentHtml = "",
-        bool IsActive = true,
-        bool IsShared = false,
-        string ShareScope = "Private",
-        int ExpectedVersion = 0,
+        int ExpectedVersion = 0);
+
+    public sealed record ApiUserReportTemplateCloneRequest(
+        string ReportType = "",
+        string Name = "",
         string SourceTemplatePath = "");
+
+    public sealed record ApiUserReportTemplateLifecycleRequest(int ExpectedVersion);
+
+    public sealed record ApiUserReportTemplateShareRequest(string ShareScope, int ExpectedVersion);
 }

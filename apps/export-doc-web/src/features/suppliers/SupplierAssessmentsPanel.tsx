@@ -12,13 +12,15 @@ import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
 type AssessmentView = "directory" | "analytics" | "editor";
 
-export function SupplierAssessmentsPanel({ businessDate, client, supplierId, supplierName, canOperate, canManage }: {
+export function SupplierAssessmentsPanel({ businessDate, client, supplierId, supplierName, canCreate, canEdit, canApprove, canDelete }: {
   businessDate: string;
   client: ExportDocManagerApiClient;
   supplierId: number;
   supplierName: string;
-  canOperate: boolean;
-  canManage: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canApprove: boolean;
+  canDelete: boolean;
 }) {
   const requestConfirmation = useConfirmation();
   const [rows, setRows] = useState<ApiSupplierAssessmentDto[]>([]);
@@ -65,7 +67,7 @@ export function SupplierAssessmentsPanel({ businessDate, client, supplierId, sup
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canOperate) return;
+    if (selected ? !canEdit || selected.status === "Confirmed" : !canCreate) return;
     const form = new FormData(event.currentTarget);
     const id = selected?.id ?? 0;
     const assessmentDate = text(form, "assessmentDate");
@@ -95,10 +97,32 @@ export function SupplierAssessmentsPanel({ businessDate, client, supplierId, sup
     }
   }
 
-  async function remove() {
-    if (!canManage || !selected || !await requestConfirmation({ title: "删除供应商评价", description: `确定删除 ${selected.assessmentDate} 的供应商评价吗？`, confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除供应商评价")) return;
+  async function confirmAssessment() {
+    if (!canApprove || !selected || selected.status === "Confirmed" ||
+        !await requestConfirmation({
+          title: "确认供应商评价",
+          description: `确认 ${selected.assessmentDate} 的供应商评价吗？`,
+          details: ["确认后将作为审计记录保留，不能继续修改或删除；更正请新建复评。"],
+          confirmLabel: "确认评价",
+        }) || !await confirmDiscardChanges("确认供应商评价")) return;
     try {
-      await client.deleteSupplierAssessment({ supplierId, id: selected.id });
+      const saved = await client.confirmSupplierAssessment({
+        supplierId,
+        id: selected.id,
+        expectedVersion: selected.versionNumber,
+      });
+      await load(saved.id);
+      setDraftDirty(false);
+      setFeedback(successFeedback("供应商评价已确认并锁定。"));
+    } catch (error) {
+      setFeedback(requestErrorFeedback(error));
+    }
+  }
+
+  async function remove() {
+    if (!canDelete || !selected || selected.status === "Confirmed" || !await requestConfirmation({ title: "删除供应商评价", description: `确定删除 ${selected.assessmentDate} 的供应商评价草稿吗？`, confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除供应商评价")) return;
+    try {
+      await client.deleteSupplierAssessment({ supplierId, id: selected.id, expectedVersion: selected.versionNumber });
       await load();
       setDraftDirty(false);
       setView("directory");
@@ -120,11 +144,11 @@ export function SupplierAssessmentsPanel({ businessDate, client, supplierId, sup
     <TaskViewTabs idPrefix={tabsId} value={view} label="供应商评价工作区" onChange={changeView} items={[
       { id: "directory", label: "评价记录" },
       { id: "analytics", label: "趋势分析" },
-      { id: "editor", label: selected ? canOperate ? "编辑评价" : "查看评价" : "记录评价", disabled: !selected && !canOperate },
+      { id: "editor", label: selected ? canEdit && selected.status !== "Confirmed" ? "编辑评价" : "查看评价" : "记录评价", disabled: !selected && !canCreate },
     ]} />
     {view === "directory" ? <div {...getTaskViewPanelProps(tabsId, "directory")}>
       <div className="section-header-actions supplier-assessment-actions">
-        {canOperate ? <button className="primary-button" type="button" onClick={() => void openEditor(0)}>记录新评价</button> : null}
+        {canCreate ? <button className="primary-button" type="button" onClick={() => void openEditor(0)}>记录新评价</button> : null}
       </div>
       <ResponsiveTableFrame label="供应商评价记录" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr>
         <th>日期与类型</th><th>综合分</th><th data-table-priority="secondary">质量</th><th data-table-priority="secondary">交期</th>
@@ -135,19 +159,19 @@ export function SupplierAssessmentsPanel({ businessDate, client, supplierId, sup
           <td><strong>{item.averageScore.toFixed(2)}</strong> / 5</td>
           <td data-table-priority="secondary">{item.qualityScore}</td><td data-table-priority="secondary">{item.deliveryScore}</td>
           <td data-table-priority="secondary">{item.serviceScore}</td><td data-table-priority="secondary">{item.priceScore}</td>
-          <td><BusinessStatusBadge value={item.conclusion} /></td><td><TablePrimaryText value={item.notes || "-"} secondary={item.assessedBy || undefined} /></td>
-          <td><button className="secondary-button" type="button" onClick={() => void openEditor(item.id)}>{canOperate ? "编辑" : "查看"}</button></td>
+          <td><div className="table-row-actions"><BusinessStatusBadge value={item.conclusion} /><BusinessStatusBadge value={item.status === "Confirmed" ? "已确认" : "草稿"} /></div></td><td><TablePrimaryText value={item.notes || "-"} secondary={item.status === "Confirmed" ? `${item.confirmedBy || item.assessedBy || "-"} · 已确认` : item.assessedBy || undefined} /></td>
+          <td><button className="secondary-button" type="button" onClick={() => void openEditor(item.id)}>{canEdit && item.status !== "Confirmed" ? "编辑" : "查看"}</button></td>
         </tr>)}
         {!rows.length ? <tr><td className="empty-cell" colSpan={9}><div className="empty-cell-content"><strong>尚未记录供应商评价</strong>
           <span>完成样品、订单或阶段合作后，再用四项评分留下可复核依据。</span>
-          {canOperate ? <button className="primary-button" type="button" onClick={() => void openEditor(0)}>记录第一次评价</button> : null}
+          {canCreate ? <button className="primary-button" type="button" onClick={() => void openEditor(0)}>记录第一次评价</button> : null}
         </div></td></tr> : null}
       </tbody></table></ResponsiveTableFrame>
     </div> : view === "analytics" ? <div {...getTaskViewPanelProps(tabsId, "analytics")}><SupplierAssessmentAnalytics rows={rows} supplierName={supplierName}
-      onCreate={canOperate ? () => void openEditor(0) : undefined} /></div> : <form className="form-grid" key={`${selected?.id ?? "new"}-${selected?.versionNumber ?? 0}-${supplierId}`} onSubmit={save} {...getTaskViewPanelProps(tabsId, "editor")}>
-      <div className="section-heading-row"><h4>{selected ? canOperate ? "编辑评价" : "查看评价" : "记录新评价"}</h4><button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回评价记录</button></div>
+      onCreate={canCreate ? () => void openEditor(0) : undefined} /></div> : <form className="form-grid" key={`${selected?.id ?? "new"}-${selected?.versionNumber ?? 0}-${supplierId}`} onSubmit={save} {...getTaskViewPanelProps(tabsId, "editor")}>
+      <div className="section-heading-row"><h4>{selected ? canEdit && selected.status !== "Confirmed" ? "编辑评价" : "查看评价" : "记录新评价"}</h4><button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回评价记录</button></div>
       <div className="form-field-wide context-strip"><strong>{supplierName}</strong><span>1 分表示明显不足，5 分表示表现优秀。</span></div>
-      <fieldset className="permission-fieldset form-field-wide" disabled={!canOperate} onChangeCapture={() => setDraftDirty(true)}>
+      <fieldset className="permission-fieldset form-field-wide" disabled={selected ? !canEdit || selected.status === "Confirmed" : !canCreate} onChangeCapture={() => setDraftDirty(true)}>
       <label>评价日期<input name="assessmentDate" type="date" required max={today} defaultValue={selected?.assessmentDate ?? today} /></label>
       <label>评价类型<select name="assessmentKind" defaultValue={selected?.assessmentKind ?? "定期评价"}><option>定期评价</option><option>订单复盘</option><option>样品评估</option><option>其它</option></select></label>
       <ScoreField name="qualityScore" label="质量评分" value={selected?.qualityScore ?? 4} />
@@ -157,7 +181,7 @@ export function SupplierAssessmentsPanel({ businessDate, client, supplierId, sup
       <label>评价结论<select name="conclusion" defaultValue={selected?.conclusion ?? "合格"}><option>优先合作</option><option>合格</option><option>观察</option><option>暂停合作</option></select></label>
       <label className="form-field-wide">评价备注<textarea name="notes" maxLength={1000} defaultValue={selected?.notes} placeholder="记录事实、改进事项和下次复核重点" /></label>
       </fieldset>
-      <div className="form-actions">{canOperate ? <button className="primary-button" type="submit">保存评价</button> : null}{selected && canManage ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除</button> : null}</div>
+      <div className="form-actions">{(selected ? canEdit && selected.status !== "Confirmed" : canCreate) ? <button className="primary-button" type="submit">保存评价草稿</button> : null}{selected && canApprove && selected.status !== "Confirmed" ? <button className="primary-button" type="button" onClick={() => void confirmAssessment()}>确认评价</button> : null}{selected && canDelete && selected.status !== "Confirmed" ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除草稿</button> : null}</div>
     </form>}
   </section>;
 }

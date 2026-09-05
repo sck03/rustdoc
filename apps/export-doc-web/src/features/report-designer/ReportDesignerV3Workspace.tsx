@@ -64,6 +64,7 @@ export function ReportDesignerV3Workspace({
   content,
   fieldCatalog,
   client,
+  editable,
   onDesignerDraftContentChange,
 }: {
   reportType: ReportDesignerReportType;
@@ -71,6 +72,7 @@ export function ReportDesignerV3Workspace({
   content: string;
   fieldCatalog?: ApiReportTemplateFieldCatalogResponse | null;
   client?: ExportDocManagerApiClient;
+  editable: boolean;
   onDesignerDraftContentChange?: (nextContent: string) => void;
 }) {
   const parsed = useMemo(() => parseReportDesignerV3FromHtml(content, reportType), [content, reportType]);
@@ -142,7 +144,7 @@ export function ReportDesignerV3Workspace({
     onDesignerDraftContentChange?.("");
   }, [legacyMigrationPending, content, reportType, onDesignerDraftContentChange]);
   useEffect(() => {
-    if (!migrationAccepted || !draftEnabled) return;
+    if (!editable || !migrationAccepted || !draftEnabled) return;
     if (exportValidation.blocked || !exportedHtml.trim()) {
       // Never publish an empty string as a usable draft.  Clearing the last
       // emitted value keeps the original `content` intact and disables the
@@ -156,9 +158,10 @@ export function ReportDesignerV3Workspace({
     if (emittedContent.current === exportedHtml) return;
     emittedContent.current = exportedHtml;
     onDesignerDraftContentChange?.(exportedHtml);
-  }, [draftEnabled, exportValidation.blocked, exportedHtml, migrationAccepted, onDesignerDraftContentChange]);
-  const editingEnabled = !legacyMigrationPending || migrationAccepted;
+  }, [draftEnabled, editable, exportValidation.blocked, exportedHtml, migrationAccepted, onDesignerDraftContentChange]);
+  const editingEnabled = editable && (!legacyMigrationPending || migrationAccepted);
   function enableDraftEditing() {
+    if (!editable) return;
     setMigrationAccepted(true);
     setDraftEnabled(true);
   }
@@ -379,6 +382,7 @@ export function ReportDesignerV3Workspace({
           <span className="report-designer-v3-eyebrow">V3 自由画布</span>
           <h2>{displayName || "报表模板"}</h2>
           <p>A4 固定页面 · {history.state.schema.page.orientation === "Landscape" ? "横版 297 × 210 mm" : "竖版 210 × 297 mm"} · 坐标精度 0.01 mm</p>
+          {!editable ? <small>只读预览：当前权限或设备不支持设计操作。</small> : null}
         </div>
         <div className="report-designer-v3-header-actions">
            <button className="command-button secondary" type="button" onClick={() => { history.reset(parsed.schema); setDraftEnabled(false); setMigrationAccepted(!parsed.migrated); onDesignerDraftContentChange?.(""); }}>
@@ -405,15 +409,18 @@ export function ReportDesignerV3Workspace({
       {legacyMigrationPending && !migrationAccepted ? (
         <div className="report-designer-v3-notice warning" role="status">
           <strong>{migrationNoticeTitle(parsed.sourceVersion, parsed.issues.some((issue) => issue.severity === "error"))}</strong>
-          <span>{migrationNoticeDescription(parsed.sourceVersion)} 当前可只读浏览、选择元素和调整视图；确认后才允许修改。</span>
-          <button className="command-button secondary" type="button" onClick={enableDraftEditing}>
-            开始 V3 编辑
-          </button>
+          <span>{migrationNoticeDescription(parsed.sourceVersion)} 当前仅提供只读浏览；具备编辑权限时确认后才允许修改。</span>
+          {editable ? (
+            <button className="command-button secondary" type="button" onClick={enableDraftEditing}>
+              开始 V3 编辑
+            </button>
+          ) : null}
         </div>
       ) : null}
       {capacityNotice ? <div className="report-designer-v3-notice warning" role="status"><strong>已达到设计器限制</strong><span>{capacityNotice}</span></div> : null}
       <div className="report-designer-v3-editing-surface">
       <div className="report-designer-v3-toolbar" role="toolbar" aria-label="设计器工具栏">
+        {editingEnabled ? <>
         <div className="report-designer-v3-toolbar-group" role="group" aria-label="插入基础元素">
           <ToolbarButton label="文本" icon={<Pilcrow size={15} />} onClick={insertionActions.text} disabled={!editingEnabled} />
           <ToolbarButton label="选择字段" icon={<Braces size={15} />} onClick={openFieldPanel} />
@@ -447,6 +454,7 @@ export function ReportDesignerV3Workspace({
           <ToolbarButton label="水平分布" icon={<ArrowLeftRight size={15} />} onClick={() => distributeSelection("horizontal")} disabled={history.state.selectedIds.length < 3 || !editingEnabled} />
           <ToolbarButton label="垂直分布" icon={<ArrowUpDown size={15} />} onClick={() => distributeSelection("vertical")} disabled={history.state.selectedIds.length < 3 || !editingEnabled} />
         </div>
+        </> : null}
         <div className="report-designer-v3-toolbar-group report-designer-v3-toolbar-group-end" role="group" aria-label="视图缩放">
           <ToolbarButton label="缩小" icon={<ZoomOut size={15} />} onClick={() => setZoom((value) => clampReportDesignerV3Zoom(value - 0.05))} />
           <select className="report-designer-v3-zoom-select" aria-label="选择缩放比例" value={String(zoomPercent)} onChange={(event) => setZoom(clampReportDesignerV3Zoom(Number(event.target.value) / 100))}>{zoomOptions.map((value) => <option key={value} value={value}>{value}%</option>)}</select>
@@ -455,8 +463,8 @@ export function ReportDesignerV3Workspace({
           <ToolbarButton label="适合窗口" icon={<Maximize2 size={15} />} onClick={() => setFitRequest((value) => value + 1)} />
         </div>
       </div>
-      <div className="report-designer-v3-layout">
-        <aside className="report-designer-v3-sidebar">
+      <div className={`report-designer-v3-layout${editingEnabled ? "" : " is-read-only"}`}>
+        {editingEnabled ? <aside className="report-designer-v3-sidebar">
           <div className="report-designer-v3-sidebar-tabs" role="tablist" aria-label="设计器资源面板">
             <TabButton active={sidebarTab === "components"} label="组件" onClick={() => setSidebarTab("components")} />
             <TabButton active={sidebarTab === "fields"} label="字段" onClick={() => setSidebarTab("fields")} />
@@ -467,21 +475,23 @@ export function ReportDesignerV3Workspace({
             <FieldPanel query={fieldQuery} groups={visibleFieldGroups} focusRequest={fieldFocusRequest} onQueryChange={setFieldQuery} onInsert={insertField} canEdit={editingEnabled} />
           ) : null}
           {sidebarTab === "layers" ? <LayerPanel state={history.state} onSelect={selectLayer} onCommit={commit} canEdit={editingEnabled} /> : null}
-        </aside>
+        </aside> : null}
 
         <main className="report-designer-v3-canvas-column">
           <div className="report-designer-v3-canvas-meta">
             <span>页面：A4 {history.state.schema.page.orientation === "Landscape" ? "横版" : "竖版"}</span>
             <span>{pageSize.widthMm} × {pageSize.heightMm} mm</span>
-            <label><input type="checkbox" checked={history.state.schema.grid.enabled} onChange={(event) => commit(updateV3Grid(history.state, { enabled: event.target.checked }))} /> 网格</label>
-            <label><input type="checkbox" checked={history.state.schema.grid.snap} onChange={(event) => commit(updateV3Grid(history.state, { snap: event.target.checked }))} /> 吸附</label>
-            <label><input type="checkbox" checked={showGuides} onChange={(event) => setShowGuides(event.target.checked)} /> 参考线</label>
+            {editingEnabled ? <>
+              <label><input type="checkbox" checked={history.state.schema.grid.enabled} onChange={(event) => commit(updateV3Grid(history.state, { enabled: event.target.checked }))} /> 网格</label>
+              <label><input type="checkbox" checked={history.state.schema.grid.snap} onChange={(event) => commit(updateV3Grid(history.state, { snap: event.target.checked }))} /> 吸附</label>
+              <label><input type="checkbox" checked={showGuides} onChange={(event) => setShowGuides(event.target.checked)} /> 参考线</label>
+            </> : null}
           </div>
           <ReportDesignerV3Canvas
             state={history.state}
             zoom={zoom}
             fitRequest={fitRequest}
-            showGuides={showGuides}
+            showGuides={editingEnabled && showGuides}
             onFitZoom={handleFitZoom}
             disabled={!editingEnabled}
             onSelect={selectElement}
@@ -494,7 +504,7 @@ export function ReportDesignerV3Workspace({
           />
         </main>
 
-        <aside className="report-designer-v3-inspector">
+        {editingEnabled ? <aside className="report-designer-v3-inspector">
           {history.state.selectedIds.length > 1 ? (
             <MultiElementInspector
               state={history.state}
@@ -524,7 +534,7 @@ export function ReportDesignerV3Workspace({
           ) : (
             <PageInspector state={history.state} onCommit={commit} canEdit={editingEnabled} />
           )}
-        </aside>
+        </aside> : null}
       </div>
       </div>
     </section>

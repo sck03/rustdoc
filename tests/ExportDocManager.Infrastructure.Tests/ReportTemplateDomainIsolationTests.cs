@@ -138,6 +138,44 @@ public sealed class ReportTemplateDomainIsolationTests
         Assert.Contains("已移除", error.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("\"astKind\": \"ReportDocument\",", "", "$.astKind")]
+    [InlineData("\"coordinateUnit\": \"hundredth-mm\",", "", "$.coordinateUnit")]
+    [InlineData("\"contractVersion\": \"3.0\",", "", "$.contractVersion")]
+    [InlineData("\"layers\": [", "\"removedLayers\": [", "$.layers")]
+    public void TemplateContentPolicy_ShouldRejectIncompleteCanonicalV3(
+        string requiredFragment,
+        string replacement,
+        string expectedPath)
+    {
+        string template = CreateV3Template(ReportDocumentType.ExportDocument, string.Empty)
+            .Replace(requiredFragment, replacement, StringComparison.Ordinal);
+
+        var error = Assert.Throws<ArgumentException>(() =>
+            ReportTemplateContentPolicy.Validate(ReportDocumentType.ExportDocument, template));
+
+        Assert.Contains(expectedPath, error.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("\"purpose\": \"Image\",", "", "purpose")]
+    [InlineData("\"byteLength\": 68,", "", "byteLength")]
+    [InlineData("\"sha256\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"", "\"removedSha256\": \"x\"", "sha256")]
+    [InlineData("\"resourceId\": \"img-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png\"", "\"resourceId\": \"img-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.png\"", "resourceId")]
+    public void TemplateContentPolicy_ShouldRejectIncompleteOrUnboundV3Image(
+        string requiredFragment,
+        string replacement,
+        string expectedMessage)
+    {
+        string template = CreateV3ImageTemplate()
+            .Replace(requiredFragment, replacement, StringComparison.Ordinal);
+
+        var error = Assert.Throws<ArgumentException>(() =>
+            ReportTemplateContentPolicy.Validate(ReportDocumentType.ExportDocument, template));
+
+        Assert.Contains(expectedMessage, error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task BuiltInPaymentTemplates_ShouldSaveAsUserCopiesWithoutExporterFields()
     {
@@ -244,6 +282,40 @@ public sealed class ReportTemplateDomainIsolationTests
                     "已存在模板"));
 
             Assert.Equal("目标模板已存在。", error.Message);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task CreateTemplateAsync_AcrossServiceInstances_ShouldSerializeAndReturnOneConflict()
+    {
+        string root = CreateTestRoot("template-create-cross-instance-conflict");
+        string appRoot = Path.Combine(root, "app");
+        string dataRoot = Path.Combine(root, "data");
+        Directory.CreateDirectory(appRoot);
+        var paths = new RuntimeAppPathProvider(appRoot, dataRoot);
+        var first = new ReportTemplateService(paths, new SettingsService(paths));
+        var second = new ReportTemplateService(paths, new SettingsService(paths));
+
+        try
+        {
+            Exception?[] outcomes = await Task.WhenAll(
+                Record.ExceptionAsync(() => first.CreateTemplateAsync(
+                    ReportDocumentType.PaymentVoucher,
+                    "Internal/concurrent.html",
+                    "并发模板")).AsTask(),
+                Record.ExceptionAsync(() => second.CreateTemplateAsync(
+                    ReportDocumentType.PaymentVoucher,
+                    "Internal/concurrent.html",
+                    "并发模板")).AsTask());
+
+            Assert.Single(outcomes, outcome => outcome is null);
+            var conflict = Assert.Single(outcomes.OfType<ResourceConflictException>());
+            Assert.Equal("目标模板已存在。", conflict.Message);
+            Assert.True(File.Exists(Path.Combine(dataRoot, "Templates", "Internal", "concurrent.html")));
         }
         finally
         {
@@ -607,6 +679,141 @@ public sealed class ReportTemplateDomainIsolationTests
         }
     }
 
+    [Fact]
+    public async Task CatalogLoad_ShouldRejectDamagedConfigurationWithoutBuiltInFallback()
+    {
+        string root = CreateTestRoot("catalog-damaged-config");
+        string appRoot = Path.Combine(root, "app");
+        string dataRoot = Path.Combine(root, "data");
+        string builtInPath = Path.Combine(appRoot, "Templates", "Export", "invoice_template.html");
+        string configPath = Path.Combine(dataRoot, "Templates", "report_templates.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(builtInPath)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(configPath)!);
+        await File.WriteAllTextAsync(builtInPath, "<html><body>built-in</body></html>");
+        await File.WriteAllTextAsync(configPath, "{ damaged-json");
+
+        try
+        {
+            var loader = new ReportTemplateCatalogLoader(
+                new ReportTemplatePathResolver(new RuntimeAppPathProvider(appRoot, dataRoot)));
+
+            var error = await Assert.ThrowsAsync<InvalidDataException>(() => loader.LoadResolvedConfigsAsync());
+
+            Assert.Contains("拒绝回退", error.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task CatalogLoad_ShouldRejectMissingConfiguredTemplate()
+    {
+        string root = CreateTestRoot("catalog-missing-template");
+        string appRoot = Path.Combine(root, "app");
+        string dataRoot = Path.Combine(root, "data");
+        string configPath = Path.Combine(dataRoot, "Templates", "report_templates.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(configPath)!);
+        await File.WriteAllTextAsync(
+            configPath,
+            """
+            {
+              "reports": [
+                {
+                  "type": "Export",
+                  "fileName": "user:Export/missing.html",
+                  "name": "缺失模板"
+                }
+              ]
+            }
+            """);
+
+        try
+        {
+            var loader = new ReportTemplateCatalogLoader(
+                new ReportTemplatePathResolver(new RuntimeAppPathProvider(appRoot, dataRoot)));
+
+            var error = await Assert.ThrowsAsync<FileNotFoundException>(() => loader.LoadResolvedConfigsAsync());
+
+            Assert.Contains("配置引用的文件不存在", error.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task CreateTemplateAsync_WhenSettingsWriteFails_ShouldRollbackTemplateAndCatalog()
+    {
+        string root = CreateTestRoot("template-create-transaction-rollback");
+        string appRoot = Path.Combine(root, "app");
+        string dataRoot = Path.Combine(root, "data");
+        Directory.CreateDirectory(appRoot);
+        var settings = new AppSettings();
+        var service = new ReportTemplateService(
+            new RuntimeAppPathProvider(appRoot, dataRoot),
+            new FailOnceSettingsService(settings));
+
+        try
+        {
+            await Assert.ThrowsAsync<IOException>(() => service.CreateTemplateAsync(
+                ReportDocumentType.ExportDocument,
+                "Export/transaction.html",
+                "事务模板"));
+
+            Assert.False(File.Exists(Path.Combine(dataRoot, "Templates", "Export", "transaction.html")));
+            Assert.False(File.Exists(Path.Combine(dataRoot, "Templates", "report_templates.json")));
+            Assert.Equal(string.Empty, settings.ReportTemplateDefaults.ExportDocumentTemplatePath);
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task TemplatePackageImport_WhenSettingsWriteFails_ShouldRestoreWholeTemplateRoot()
+    {
+        string root = CreateTestRoot("template-package-transaction-rollback");
+        string sourceRoot = Path.Combine(root, "source");
+        string targetRoot = Path.Combine(root, "target");
+        string sourceData = Path.Combine(sourceRoot, "data");
+        string targetData = Path.Combine(targetRoot, "data");
+        string sourceTemplate = Path.Combine(sourceData, "Templates", "Export", "incoming.html");
+        string targetTemplate = Path.Combine(targetData, "Templates", "Export", "keep.html");
+        Directory.CreateDirectory(Path.GetDirectoryName(sourceTemplate)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(targetTemplate)!);
+        await File.WriteAllTextAsync(sourceTemplate, "<html><body>{{ Invoice.InvoiceNo }}</body></html>");
+        await File.WriteAllTextAsync(targetTemplate, "<html><body>keep</body></html>");
+
+        var sourceSettings = new AppSettings();
+        var sourcePaths = new RuntimeAppPathProvider(Path.Combine(sourceRoot, "app"), sourceData);
+        var exporter = new ReportTemplatePackageService(sourcePaths, new StubSettingsService(sourceSettings));
+        string packagePath = Path.Combine(root, "transaction.edtpl");
+        await exporter.ExportAsync(packagePath);
+
+        byte[] originalTemplate = await File.ReadAllBytesAsync(targetTemplate);
+        var targetSettings = new AppSettings();
+        var importer = new ReportTemplatePackageService(
+            new RuntimeAppPathProvider(Path.Combine(targetRoot, "app"), targetData),
+            new FailOnceSettingsService(targetSettings));
+
+        try
+        {
+            await Assert.ThrowsAsync<IOException>(() => importer.ImportAsync(packagePath));
+
+            Assert.Equal(originalTemplate, await File.ReadAllBytesAsync(targetTemplate));
+            Assert.False(File.Exists(Path.Combine(targetData, "Templates", "Export", "incoming.html")));
+            Assert.False(File.Exists(Path.Combine(targetData, "Templates", "report_templates.json")));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
     private static string CreateTestRoot(string suffix)
     {
         string path = Path.Combine(
@@ -622,11 +829,57 @@ public sealed class ReportTemplateDomainIsolationTests
         $$"""
         <!doctype html><html><head><style>@page { size: A4 portrait; }</style></head><body>
         <!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA
-        { "version": 3, "reportType": "{{reportType}}", "page": { "size": "A4" } }
+        {
+          "version": 3,
+          "astKind": "ReportDocument",
+          "coordinateUnit": "hundredth-mm",
+          "contractVersion": "3.0",
+          "reportType": "{{reportType}}",
+          "page": {
+            "size": "A4",
+            "orientation": "Portrait",
+            "widthHundredthMm": 21000,
+            "heightHundredthMm": 29700,
+            "marginTopHundredthMm": 800,
+            "marginRightHundredthMm": 800,
+            "marginBottomHundredthMm": 800,
+            "marginLeftHundredthMm": 800,
+            "fontFamily": "Arial",
+            "fontSizePt": 9
+          },
+          "grid": { "enabled": true, "sizeHundredthMm": 500, "snap": true },
+          "layers": [
+            {
+              "id": "body",
+              "name": "主体",
+              "role": "Body",
+              "designHeightHundredthMm": 0,
+              "print": { "repeatOnEveryPage": false, "keepTogether": false, "pinToPageBottom": false, "minHeightHundredthMm": 0 },
+              "visible": true,
+              "locked": false,
+              "elements": []
+            }
+          ]
+        }
         -->
         {{body}}
         </body></html>
         """;
+
+    private static string CreateV3ImageTemplate()
+    {
+        const string resourceId = "img-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png";
+        string template = CreateV3Template(ReportDocumentType.ExportDocument, string.Empty);
+        template = template.Replace(
+            "\"grid\": { \"enabled\": true, \"sizeHundredthMm\": 500, \"snap\": true },",
+            "\"grid\": { \"enabled\": true, \"sizeHundredthMm\": 500, \"snap\": true },\n" +
+            $"          \"resources\": [{{ \"id\": \"{resourceId}\", \"mediaType\": \"image/png\", \"byteLength\": 68, \"sha256\": \"{new string('a', 64)}\" }}],",
+            StringComparison.Ordinal);
+        return template.Replace(
+            "\"elements\": []",
+            $"\"elements\": [{{ \"id\": \"image\", \"type\": \"Image\", \"sourceKind\": \"Resource\", \"purpose\": \"Image\", \"resourceId\": \"{resourceId}\", \"xHundredthMm\": 1000, \"yHundredthMm\": 1000, \"widthHundredthMm\": 1000, \"heightHundredthMm\": 1000 }}]",
+            StringComparison.Ordinal);
+    }
 
     private static readonly byte[] OnePixelPng = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
@@ -680,6 +933,34 @@ public sealed class ReportTemplateDomainIsolationTests
 
             SaveCount++;
             return Task.FromResult(true);
+        }
+    }
+
+    private sealed class FailOnceSettingsService : ISettingsService
+    {
+        private bool _failed;
+
+        public FailOnceSettingsService(AppSettings settings)
+        {
+            Settings = settings;
+        }
+
+        public AppSettings Settings { get; }
+
+        public Task LoadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<bool> UpdateAsync(
+            Func<AppSettings, bool> update,
+            CancellationToken cancellationToken = default)
+        {
+            bool changed = update(Settings);
+            if (!_failed)
+            {
+                _failed = true;
+                throw new IOException("Injected settings persistence failure.");
+            }
+
+            return Task.FromResult(changed);
         }
     }
 }

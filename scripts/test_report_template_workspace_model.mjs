@@ -27,6 +27,15 @@ const exportDefaultsModelPath = path.join(
   "reports",
   "reportExportDefaultsModel.ts",
 );
+const workspaceStateModelPath = path.join(
+  repoRoot,
+  "apps",
+  "export-doc-web",
+  "src",
+  "features",
+  "reports",
+  "reportTemplateWorkspaceState.ts",
+);
 const stylesRoot = path.join(repoRoot, "apps", "export-doc-web", "src");
 const reportWorkspaceCss = readCssGraph(path.join(stylesRoot, "reportWorkspace.css"));
 const responsiveOverridesCss = readCssGraph(path.join(stylesRoot, "responsiveOverrides.css"));
@@ -37,20 +46,27 @@ const invoicePreviewModelSource = fs.readFileSync(path.join(repoRoot, "apps", "e
 const invoicePackageWorkspaceSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "useInvoiceDocumentPackageWorkspace.ts"), "utf8");
 const modelImportSpecifier = `./${path.relative(workspaceRoot, modelPath).replaceAll("\\", "/")}`;
 const exportDefaultsModelImportSpecifier = `./${path.relative(workspaceRoot, exportDefaultsModelPath).replaceAll("\\", "/")}`;
+const workspaceStateModelImportSpecifier = `./${path.relative(workspaceRoot, workspaceStateModelPath).replaceAll("\\", "/")}`;
 
 fs.mkdirSync(workspaceRoot, { recursive: true });
 fs.writeFileSync(
   entryPath,
   [
-    `export { readUserTemplateIdFromKey, readUserTemplateIdFromSearch, resolveDefaultTemplatePath, resolvePreviewSourceId } from ${JSON.stringify(modelImportSpecifier)};`,
+    `export { buildUserTemplateClonePayload, buildUserTemplateCreatePayload, readUserTemplateIdFromKey, readUserTemplateIdFromSearch, resolveDefaultTemplatePath, resolvePreviewSourceId, resolveReportTypeOptions } from ${JSON.stringify(modelImportSpecifier)};`,
     `export { resolveBatchExportItems } from ${JSON.stringify(exportDefaultsModelImportSpecifier)};`,
+    `export { deriveReportTemplateWorkspaceState } from ${JSON.stringify(workspaceStateModelImportSpecifier)};`,
   ].join("\n"),
   "utf8",
 );
 
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, platform: "node", format: "esm" });
-const { readUserTemplateIdFromKey, readUserTemplateIdFromSearch, resolveBatchExportItems, resolveDefaultTemplatePath, resolvePreviewSourceId } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
+const { buildUserTemplateClonePayload, buildUserTemplateCreatePayload, deriveReportTemplateWorkspaceState, readUserTemplateIdFromKey, readUserTemplateIdFromSearch, resolveBatchExportItems, resolveDefaultTemplatePath, resolvePreviewSourceId, resolveReportTypeOptions } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
+
+assertEqual(resolveReportTypeOptions(true, false, true)[0]?.value, "PaymentVoucher", "财务账号应默认进入获准的付款报表域");
+assertEqual(resolveReportTypeOptions(true, false, true).length, 1, "财务账号不得看到出口报表域");
+assertEqual(resolveReportTypeOptions(false, true, true).length, 0, "没有模板权限时业务权限不得单独开放模板域");
+assertEqual(resolveReportTypeOptions(true, false, false).length, 0, "通用模板权限不得越过业务数据域");
 
 const templates = [
   { templatePath: "E:/app/Templates/Export/custom.html", displayName: "自定义发票", reportType: "ExportDocument", withSealDefault: false },
@@ -131,6 +147,30 @@ assertEqual(readUserTemplateIdFromSearch("?userTemplateId=17"), 17, "用户模�
 assertEqual(readUserTemplateIdFromSearch("?userTemplateId=invalid"), 0, "无效用户模板深链应回退");
 assertEqual(readUserTemplateIdFromKey("user-template:17"), 17, "统一用户模板引用应解析有效 ID");
 assertEqual(readUserTemplateIdFromKey("user:Export/template.html"), 0, "文件模板引用不应被解析为数据库模板");
+const blankCreate = buildUserTemplateCreatePayload({
+  reportType: "ExportDocument",
+  name: "  新建空白模板  ",
+});
+assertEqual(blankCreate.contentHtml, "", "新建空白模板不得夹带当前编辑内容");
+assertEqual("sourceTemplatePath" in blankCreate, false, "新建命令不得混入复制来源");
+assertEqual(blankCreate.name, "新建空白模板", "新模板名称应在提交前规范化");
+const builtInClone = buildUserTemplateClonePayload({
+  reportType: "ExportDocument",
+  selectedTemplatePath: "  builtin:Export/invoice_template.html  ",
+  selectedUserTemplateId: 0,
+  name: "  内置模板副本  ",
+});
+assertEqual(builtInClone.sourceTemplatePath, "builtin:Export/invoice_template.html", "内置模板复制只提交受管引用");
+assertEqual("contentHtml" in builtInClone, false, "复制命令不得上传浏览器模板正文");
+const userClone = buildUserTemplateClonePayload({
+  reportType: "ExportDocument",
+  selectedTemplatePath: "ignored-stale-reference",
+  selectedUserTemplateId: 17,
+  name: "副本",
+});
+assertEqual(userClone.sourceTemplatePath, "user-template:17", "用户模板复制必须提交稳定 ID 引用");
+assertEqual("contentHtml" in userClone, false, "用户模板复制不得信任当前浏览器正文");
+assertEqual("shareScope" in userClone, false, "复制模板必须先创建为私有草稿，不能混入共享状态");
 const implicitItems = resolveBatchExportItems([], templates);
 assertEqual(implicitItems.length, templates.length, "空配置应显示全部可用发票模板");
 assertEqual(implicitItems.every((item) => item.isEnabled), true, "空配置的全部可用发票模板应默认启用");
@@ -141,9 +181,90 @@ const configuredSnapshot = JSON.stringify(configuredItems);
 const effectiveConfiguredItems = resolveBatchExportItems(configuredItems, templates);
 assertEqual(JSON.stringify(effectiveConfiguredItems), configuredSnapshot, "显式配置应保留名称、顺序、启用和盖章状态");
 assertEqual(JSON.stringify(configuredItems), configuredSnapshot, "解析默认单据项不得修改输入配置");
+
+const baseWorkspaceStateInput = {
+  reportType: "ExportDocument",
+  designerDraftContent: "",
+  content: "<html>{{ Invoice.InvoiceNo }}</html>",
+  loadedContent: "<html>{{ Invoice.InvoiceNo }}</html>",
+  contentTemplatePath: "builtin:Export/invoice_template.html",
+  selectedTemplatePath: "builtin:Export/invoice_template.html",
+  selectedContentTemplatePath: "builtin:Export/invoice_template.html",
+  currentUserTemplate: null,
+  templatePreviewMode: "savedSource",
+  templatePreviewSampleProfile: "apiSample",
+  previewHtml: "",
+  previewInvoices: [],
+  previewPayments: [],
+  previewInvoiceId: 7,
+  previewPaymentId: 0,
+  busyFlags: [],
+  canManageTemplates: false,
+  canDesignTemplates: false,
+  currentTemplateDisplayName: "Template",
+  persistedDisplayName: "Template",
+  defaultTemplatePath: "",
+  canUseAdvancedTools: true,
+  canCloneTemplates: false,
+  canArchiveTemplates: false,
+  canImportTemplates: false,
+  canExportTemplates: false,
+  canPreviewSavedSource: false,
+  newTemplateFileName: "",
+  newUserTemplateName: "",
+  renameTemplateFileName: "",
+  desktopAvailable: false,
+  packageExportPath: "",
+  packageImportPath: "",
+  fileExportPath: "",
+  fileImportPath: "",
+};
+const exportOnlyWorkspaceState = deriveReportTemplateWorkspaceState({
+  ...baseWorkspaceStateInput,
+  canExportTemplates: true,
+});
+assertEqual(exportOnlyWorkspaceState.canDownloadPackage, true, "仅导出权限应允许下载模板包");
+assertEqual(exportOnlyWorkspaceState.canDownloadTemplateFile, true, "仅导出权限应允许下载所选文件模板");
+assertEqual(exportOnlyWorkspaceState.canUploadPackage, false, "仅导出权限不得串权到模板包导入");
+assertEqual(exportOnlyWorkspaceState.canDeleteTemplate, false, "仅导出权限不得串权到模板归档");
+
+const importOnlyWorkspaceState = deriveReportTemplateWorkspaceState({
+  ...baseWorkspaceStateInput,
+  canImportTemplates: true,
+});
+assertEqual(importOnlyWorkspaceState.canUploadPackage, true, "仅导入权限应允许上传模板包");
+assertEqual(importOnlyWorkspaceState.canUploadTemplateFile, true, "仅导入权限应允许上传所选文件模板");
+assertEqual(importOnlyWorkspaceState.canDownloadPackage, false, "仅导入权限不得串权到模板包导出");
+assertEqual(importOnlyWorkspaceState.canDeleteTemplate, false, "仅导入权限不得串权到模板归档");
+
+const archiveOnlyWorkspaceState = deriveReportTemplateWorkspaceState({
+  ...baseWorkspaceStateInput,
+  canArchiveTemplates: true,
+});
+assertEqual(archiveOnlyWorkspaceState.canDeleteTemplate, true, "仅归档权限应允许归档所选文件模板");
+assertEqual(archiveOnlyWorkspaceState.canUploadPackage, false, "仅归档权限不得串权到模板包导入");
+assertEqual(archiveOnlyWorkspaceState.canDownloadPackage, false, "仅归档权限不得串权到模板包导出");
+
+const deniedSavedSourcePreviewState = deriveReportTemplateWorkspaceState(baseWorkspaceStateInput);
+assertEqual(deniedSavedSourcePreviewState.canRenderTemplatePreview, false, "缺少对应单据预览权限时不得预览已保存业务数据");
+const deniedApiSamplePreviewState = deriveReportTemplateWorkspaceState({
+  ...baseWorkspaceStateInput,
+  templatePreviewMode: "sample",
+});
+assertEqual(deniedApiSamplePreviewState.canRenderTemplatePreview, false, "缺少设计权限时不得调用后端样例渲染");
+const localSamplePreviewState = deriveReportTemplateWorkspaceState({
+  ...baseWorkspaceStateInput,
+  templatePreviewMode: "sample",
+  templatePreviewSampleProfile: "exportStandard",
+});
+assertEqual(localSamplePreviewState.canRenderTemplatePreview, true, "只读用户仍可使用不读取业务数据的本地 V3 样例");
 assertMatch(workspaceStateSource, /hasUnappliedDesignerChanges\s*=\s*[\s\S]*?designerDraftContent\s*!==\s*content/, "新版画布草稿必须独立识别为未应用修改");
 assertMatch(workspaceStateSource, /hasUnsavedChanges\s*=\s*hasChanges\s*\|\|\s*hasUnappliedDesignerChanges/, "保存和离开保护必须同时覆盖源码与画布草稿");
-assertMatch(workspaceStateSource, /canSave\s*=\s*[\s\S]*?hasUnsavedChanges/, "画布草稿存在时顶部保存必须可用");
+const dirtyDesignerInput = { ...baseWorkspaceStateInput, designerDraftContent: "<html>Changed</html>", canManageTemplates: true };
+const dirtyDesignerState = deriveReportTemplateWorkspaceState(dirtyDesignerInput);
+assertEqual(dirtyDesignerState.canSave, true, "获准编辑且存在画布草稿时顶部保存必须可用");
+assertEqual(deriveReportTemplateWorkspaceState({ ...dirtyDesignerInput, busyFlags: [true] }).canSave, false, "请求进行中不得重复保存");
+assertEqual(deriveReportTemplateWorkspaceState({ ...dirtyDesignerInput, canManageTemplates: false }).canSave, false, "撤销编辑权限后不得保存草稿");
 if (/<details[^>]*template-user-panel[^>]*\bopen\b/u.test(userPanelSource)) {
   throw new Error("我的 / 共享模板默认应保持折叠");
 }

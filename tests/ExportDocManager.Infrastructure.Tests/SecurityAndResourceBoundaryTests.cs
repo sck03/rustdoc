@@ -1,5 +1,7 @@
 using System.IO.Compression;
 using System.Text;
+using ExportDocManager.Models;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Data;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
@@ -264,6 +266,58 @@ public sealed class SecurityAndResourceBoundaryTests
         {
             DeleteDirectory(root);
         }
+    }
+
+    [Fact]
+    public void EmailAttachmentPolicy_ShouldRejectUnsupportedAndSpoofedTypes()
+    {
+        string root = CreateTempDirectory("email-attachment-types");
+        try
+        {
+            string executable = Path.Combine(root, "payload.exe");
+            string spoofedPdf = Path.Combine(root, "payload.pdf");
+            string validPdf = Path.Combine(root, "document.pdf");
+            File.WriteAllBytes(executable, [0x4D, 0x5A]);
+            File.WriteAllText(spoofedPdf, "not a pdf", Encoding.UTF8);
+            File.WriteAllBytes(validPdf, "%PDF-1.7\n"u8.ToArray());
+
+            Assert.Throws<ServiceValidationException>(() =>
+                EmailAttachmentPolicy.ValidateAndNormalize([executable]));
+            Assert.Throws<ServiceValidationException>(() =>
+                EmailAttachmentPolicy.ValidateAndNormalize([spoofedPdf]));
+            Assert.Equal(
+                Path.GetFullPath(validPdf),
+                Assert.Single(EmailAttachmentPolicy.ValidateAndNormalize([validPdf])));
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public void EmailRecipientPolicy_ShouldApplyAddressAndDomainRulesFailClosed()
+    {
+        var config = new EmailConfig
+        {
+            RecipientAllowList = "@example.com\nrecipient@partner.test",
+            RecipientBlockList = "blocked@example.com\n@blocked.example.com"
+        };
+
+        Assert.Equal(
+            "sales@sub.example.com",
+            EmailRecipientPolicy.ValidateAndNormalize("Sales <sales@sub.example.com>", config));
+        Assert.Equal(
+            "recipient@partner.test",
+            EmailRecipientPolicy.ValidateAndNormalize("recipient@partner.test", config));
+        Assert.Throws<PermissionDeniedException>(() =>
+            EmailRecipientPolicy.ValidateAndNormalize("blocked@example.com", config));
+        Assert.Throws<PermissionDeniedException>(() =>
+            EmailRecipientPolicy.ValidateAndNormalize("user@blocked.example.com", config));
+        Assert.Throws<PermissionDeniedException>(() =>
+            EmailRecipientPolicy.ValidateAndNormalize("user@outside.test", config));
+        Assert.Throws<ServiceValidationException>(() =>
+            EmailRecipientPolicy.NormalizeRules("@bad/domain", "收件人白名单"));
     }
 
     [Fact]

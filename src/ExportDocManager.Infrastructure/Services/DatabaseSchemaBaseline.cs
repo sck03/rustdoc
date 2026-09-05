@@ -13,11 +13,15 @@ namespace ExportDocManager.Services.Infrastructure
     /// </summary>
     internal static partial class DatabaseSchemaBaseline
     {
-        // The v10 empty-database baseline includes the V3 single-window draft
-        // concurrency and client-dispatch lease columns.  This project is still
-        // pre-production, so changing the baseline intentionally rejects older
-        // development databases instead of growing a compatibility migration tree.
-        internal const int CurrentVersion = 10;
+        // The v14 empty-database baseline makes resource/action/data-scope
+        // grants the sole persisted permission contract; adds normalized
+        // identity keys, organization master data and optimistic concurrency;
+        // and stores import previews, template lifecycle history and owned
+        // report-image references as server-governed records.
+        // This project is still pre-production,
+        // so changing the baseline intentionally rejects older development
+        // databases instead of growing a compatibility migration tree.
+        internal const int CurrentVersion = 14;
         internal const string MetadataTableName = "__ExportDocManagerSchema";
         internal const string PostgreSqlTrigramFeatureName = "postgresql.pg_trgm";
         internal const int PostgreSqlTrigramFeatureVersion = 2;
@@ -204,6 +208,10 @@ namespace ExportDocManager.Services.Infrastructure
                     ON "Exporters" ("OwnerUserId");
                 CREATE INDEX IF NOT EXISTS "IX_Exporters_CompanyScope_DepartmentId"
                     ON "Exporters" ("CompanyScope", "DepartmentId");
+                CREATE INDEX IF NOT EXISTS "IX_Payees_OwnerUserId"
+                    ON "Payees" ("OwnerUserId");
+                CREATE INDEX IF NOT EXISTS "IX_Payees_CompanyScope_DepartmentId"
+                    ON "Payees" ("CompanyScope", "DepartmentId");
                 CREATE INDEX IF NOT EXISTS "IX_Items_InvoiceId_StyleNo"
                     ON "Items" ("InvoiceId", "StyleNo");
                 CREATE INDEX IF NOT EXISTS "IX_Items_HSCode"

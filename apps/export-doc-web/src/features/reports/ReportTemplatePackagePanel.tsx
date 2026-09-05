@@ -11,7 +11,8 @@ import {
 
 export function ReportTemplatePackagePanel({
   desktopAvailable,
-  canManageTemplates,
+  canExportTemplates,
+  canImportTemplates,
   isBusy,
   importStrategy,
   exportPath,
@@ -37,7 +38,8 @@ export function ReportTemplatePackagePanel({
   onChooseImportPath,
 }: {
   desktopAvailable: boolean;
-  canManageTemplates: boolean;
+  canExportTemplates: boolean;
+  canImportTemplates: boolean;
   isBusy: boolean;
   importStrategy: TemplateImportStrategyOption;
   exportPath: string;
@@ -86,7 +88,7 @@ export function ReportTemplatePackagePanel({
           <SelectField
             label="策略"
             value={importStrategy}
-            disabled={!canManageTemplates || isBusy}
+            disabled={!canImportTemplates || isBusy}
             options={importStrategyOptions}
             onChange={(value) => onImportStrategyChange(normalizeImportStrategy(value))}
           />
@@ -112,10 +114,10 @@ export function ReportTemplatePackagePanel({
               <PathField
                 label="导出路径"
                 value={exportPath}
-                disabled={!canManageTemplates || isBusy}
+                disabled={!canExportTemplates || isBusy}
                 onChange={onExportPathChange}
                 actions={
-                  <DesktopIconButton title="选择导出位置" disabled={!canManageTemplates || isBusy} onClick={onChooseExportPath}>
+                  <DesktopIconButton title="选择导出位置" disabled={!canExportTemplates || isBusy} onClick={onChooseExportPath}>
                     <FolderOpen size={15} aria-hidden="true" />
                   </DesktopIconButton>
                 }
@@ -127,10 +129,10 @@ export function ReportTemplatePackagePanel({
               <PathField
                 label="导入路径"
                 value={importPath}
-                disabled={!canManageTemplates || isBusy}
+                disabled={!canImportTemplates || isBusy}
                 onChange={onImportPathChange}
                 actions={
-                  <DesktopIconButton title="选择导入包" disabled={!canManageTemplates || isBusy} onClick={onChooseImportPath}>
+                  <DesktopIconButton title="选择导入包" disabled={!canImportTemplates || isBusy} onClick={onChooseImportPath}>
                     <FolderOpen size={15} aria-hidden="true" />
                   </DesktopIconButton>
                 }

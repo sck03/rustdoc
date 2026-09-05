@@ -481,7 +481,7 @@ namespace ExportDocManager.Infrastructure.Tests
         {
             var databasePath = Path.Combine(
                 Path.GetTempPath(),
-                "edm-v10-schema-" + Guid.NewGuid().ToString("N") + ".db");
+                "edm-current-schema-" + Guid.NewGuid().ToString("N") + ".db");
             using var factory = new SqliteFileDbContextFactory(databasePath);
 
             var service = new DatabaseInitializationService(

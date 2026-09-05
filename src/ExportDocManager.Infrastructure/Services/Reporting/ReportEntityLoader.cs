@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -72,33 +73,80 @@ namespace ExportDocManager.Services.Reporting
         {
             await using var dbContext = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
-            var payee = payment.PayeeId > 0
-                ? await dbContext.Payees.AsNoTracking().FirstOrDefaultAsync(x => x.Id == payment.PayeeId, cancellationToken).ConfigureAwait(false)
-                : null;
+            if (payment.PayeeId <= 0)
+            {
+                return null;
+            }
+
+            var payee = await _accessScope.ApplyPayeeScope(dbContext.Payees.AsNoTracking())
+                .FirstOrDefaultAsync(x => x.Id == payment.PayeeId, cancellationToken)
+                .ConfigureAwait(false);
+            if (payee == null && _accessScope.ShouldFilterBusinessData())
+            {
+                bool exists = await dbContext.Payees.AsNoTracking()
+                    .AnyAsync(x => x.Id == payment.PayeeId, cancellationToken)
+                    .ConfigureAwait(false);
+                if (exists)
+                {
+                    throw new PermissionDeniedException("付款报表关联的收款对象不在当前账号的数据范围内。");
+                }
+            }
 
             return payee;
         }
 
-        private static async Task<Customer> LoadCustomerAsync(
+        private async Task<Customer> LoadCustomerAsync(
             AppDbContext dbContext,
             Invoice invoice,
             CancellationToken cancellationToken)
         {
-            var customer = invoice.CustomerId > 0
-                ? await dbContext.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == invoice.CustomerId, cancellationToken).ConfigureAwait(false)
-                : null;
+            if (invoice.CustomerId <= 0)
+            {
+                return new Customer();
+            }
+
+            var customer = await _accessScope
+                .ApplyCustomerScope(dbContext.Customers.AsNoTracking())
+                .FirstOrDefaultAsync(c => c.Id == invoice.CustomerId, cancellationToken)
+                .ConfigureAwait(false);
+            if (customer == null && _accessScope.ShouldFilterBusinessData())
+            {
+                bool exists = await dbContext.Customers.AsNoTracking()
+                    .AnyAsync(c => c.Id == invoice.CustomerId, cancellationToken)
+                    .ConfigureAwait(false);
+                if (exists)
+                {
+                    throw new PermissionDeniedException("报表关联的客户不在当前账号的数据范围内。");
+                }
+            }
 
             return customer ?? new Customer();
         }
 
-        private static async Task<Exporter> LoadExporterAsync(
+        private async Task<Exporter> LoadExporterAsync(
             AppDbContext dbContext,
             Invoice invoice,
             CancellationToken cancellationToken)
         {
-            var exporter = invoice.ExporterId > 0
-                ? await dbContext.Exporters.AsNoTracking().FirstOrDefaultAsync(e => e.Id == invoice.ExporterId, cancellationToken).ConfigureAwait(false)
-                : null;
+            if (invoice.ExporterId <= 0)
+            {
+                return new Exporter();
+            }
+
+            var exporter = await _accessScope
+                .ApplyExporterScope(dbContext.Exporters.AsNoTracking())
+                .FirstOrDefaultAsync(e => e.Id == invoice.ExporterId, cancellationToken)
+                .ConfigureAwait(false);
+            if (exporter == null && _accessScope.ShouldFilterBusinessData())
+            {
+                bool exists = await dbContext.Exporters.AsNoTracking()
+                    .AnyAsync(e => e.Id == invoice.ExporterId, cancellationToken)
+                    .ConfigureAwait(false);
+                if (exists)
+                {
+                    throw new PermissionDeniedException("报表关联的出口商不在当前账号的数据范围内。");
+                }
+            }
 
             return exporter ?? new Exporter();
         }

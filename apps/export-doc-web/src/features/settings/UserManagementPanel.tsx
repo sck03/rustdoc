@@ -8,9 +8,11 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { OrganizationDirectoryPanel } from "./OrganizationDirectoryPanel.tsx";
 
 type UserDraft = {
   id: number;
+  versionNumber: number;
   username: string;
   fullName: string;
   role: string;
@@ -53,7 +55,12 @@ export function UserManagementPanel({
 
   const roles = useMemo(() => usersQuery.data?.roles?.filter(Boolean) ?? ["Admin", "User", "Sales", "Finance"], [usersQuery.data?.roles]);
   const users = usersQuery.data?.users ?? [];
-  const permissionTemplates = usersQuery.data?.permissionTemplates?.filter((template) => template.isActive) ?? [];
+  const permissionTemplates = usersQuery.data?.permissionTemplates ?? [];
+  const companies = usersQuery.data?.companies ?? [];
+  const departments = usersQuery.data?.departments ?? [];
+  const availableCompanies = companies.filter((item) => item.isActive || item.code === draft.companyScope);
+  const availableDepartments = departments.filter((item) =>
+    item.companyCode === draft.companyScope && (item.isActive || item.code === draft.departmentId));
   const selectedTemplate = permissionTemplates.find((template) => template.id === draft.permissionTemplateId);
   const selectedRole = getRolePresentation(draft.role);
 
@@ -98,7 +105,8 @@ export function UserManagementPanel({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => client.deleteUserAccount({ id }),
+    mutationFn: (target: { id: number; expectedVersion: number }) =>
+      client.deleteUserAccount(target),
     onSuccess: async (response) => {
       const emptyDraft = createEmptyDraft("User");
       setSelectedUserId(null);
@@ -190,6 +198,19 @@ export function UserManagementPanel({
     setSuccessMessage(null);
   }
 
+  function changeCompany(companyScope: string) {
+    setDraft((current) => {
+      const departmentStillValid = departments.some((item) =>
+        item.code === current.departmentId && item.companyCode === companyScope && item.isActive);
+      return {
+        ...current,
+        companyScope,
+        departmentId: departmentStillValid ? current.departmentId : "",
+      };
+    });
+    setSuccessMessage(null);
+  }
+
   function saveUser() {
     setMessage(null);
     setSuccessMessage(null);
@@ -218,6 +239,7 @@ export function UserManagementPanel({
       companyScope: draft.companyScope.trim(),
       isActive: draft.isActive,
       resetPassword: draft.resetPassword,
+      expectedVersion: draft.id > 0 ? draft.versionNumber : 0,
     });
   }
 
@@ -345,8 +367,8 @@ export function UserManagementPanel({
             >
               <option value="">按角色默认模板</option>
               {permissionTemplates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}{template.isSystem ? "（内置）" : ""}
+                <option key={template.id} value={template.id} disabled={!template.isActive && template.id !== draft.permissionTemplateId}>
+                  {template.name}{template.isSystem ? "（内置）" : ""}{!template.isActive ? "（已停用）" : ""}
                 </option>
               ))}
             </select>
@@ -359,12 +381,32 @@ export function UserManagementPanel({
             </small>
           </label>
           <label>
-            <span>部门</span>
-            <input value={draft.departmentId} disabled={isBusy} onChange={(event) => patchDraft("departmentId", event.target.value)} />
+            <span>所属公司</span>
+            <select value={draft.companyScope} disabled={isBusy} onChange={(event) => changeCompany(event.target.value)}>
+              <option value="">未分配公司</option>
+              {availableCompanies.map((company) => (
+                <option key={company.code} value={company.code}>
+                  {company.name}（{company.code}）{!company.isActive ? "（已停用）" : ""}
+                </option>
+              ))}
+            </select>
+            <small className="field-help">公司代码是数据范围授权键，不能自由输入。</small>
           </label>
           <label>
-            <span>公司范围</span>
-            <input value={draft.companyScope} disabled={isBusy} onChange={(event) => patchDraft("companyScope", event.target.value)} />
+            <span>所属部门</span>
+            <select
+              value={draft.departmentId}
+              disabled={isBusy || !draft.companyScope}
+              onChange={(event) => patchDraft("departmentId", event.target.value)}
+            >
+              <option value="">未分配部门</option>
+              {availableDepartments.map((department) => (
+                <option key={department.code} value={department.code}>
+                  {department.name}（{department.code}）{!department.isActive ? "（已停用）" : ""}
+                </option>
+              ))}
+            </select>
+            <small className="field-help">部门必须属于所选公司；公司变更时会清除不匹配的部门。</small>
           </label>
           <label>
             <span>初始/重置密码</span>
@@ -387,6 +429,8 @@ export function UserManagementPanel({
         </div>
       </div>
 
+      <OrganizationDirectoryPanel client={client} />
+
       {deleteTarget ? (
         <ConfirmationDialog
           title="删除账号"
@@ -400,7 +444,7 @@ export function UserManagementPanel({
           onCancel={() => setDeleteTarget(null)}
           onConfirm={() => {
             if (deleteTarget.id > 0) {
-              deleteMutation.mutate(deleteTarget.id, {
+              deleteMutation.mutate({ id: deleteTarget.id, expectedVersion: deleteTarget.versionNumber }, {
                 onSettled: () => setDeleteTarget(null),
               });
             }
@@ -416,6 +460,7 @@ export default UserManagementPanel;
 function createDraftFromUser(user: ApiUserAccountDto): UserDraft {
   return {
     id: user.id,
+    versionNumber: user.versionNumber ?? 1,
     username: user.username ?? "",
     fullName: user.fullName ?? "",
     role: user.role || "User",
@@ -430,6 +475,7 @@ function createDraftFromUser(user: ApiUserAccountDto): UserDraft {
 function createEmptyDraft(role: string): UserDraft {
   return {
     id: 0,
+    versionNumber: 0,
     username: "",
     fullName: "",
     role: role || "User",
@@ -478,6 +524,8 @@ function upsertUserList(
   return {
     roles,
     permissionTemplates: current?.permissionTemplates ?? [],
+    companies: current?.companies ?? [],
+    departments: current?.departments ?? [],
     users: nextUsers.sort((left, right) => {
       if (left.isActive !== right.isActive) {
         return left.isActive ? -1 : 1;

@@ -14,7 +14,11 @@ namespace ExportDocManager.Models.Entities
         public int PriceScore { get; set; }
         [Required, MaxLength(30)] public string Conclusion { get; set; } = "合格";
         [MaxLength(1000)] public string Notes { get; set; } = string.Empty;
+        [Required, MaxLength(20)] public string Status { get; set; } = SupplierAssessmentStatusCatalog.Draft;
+        public int? OwnerUserId { get; set; }
         [MaxLength(100)] public string AssessedBy { get; set; } = string.Empty;
+        [MaxLength(100)] public string ConfirmedBy { get; set; } = string.Empty;
+        public DateTimeOffset? ConfirmedAt { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
         [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;

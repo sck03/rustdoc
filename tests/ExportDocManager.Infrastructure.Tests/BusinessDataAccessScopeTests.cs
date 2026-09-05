@@ -8,6 +8,38 @@ namespace ExportDocManager.Infrastructure.Tests
 {
     public class BusinessDataAccessScopeTests
     {
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task ApplyInvoiceScope_WhenExplicitPermissionsOmitInvoices_ShouldNotInheritRoleDefaults(
+            bool hasAssignedTemplate)
+        {
+            using var factory = new TestDbContextFactory();
+            using var context = factory.CreateDbContext();
+            context.Invoices.Add(new Invoice { InvoiceNo = "OWN-RESTRICTED", OwnerUserId = 7 });
+            await context.SaveChangesAsync();
+
+            var user = new User { Id = 7, Username = "restricted", Role = "User" };
+            if (hasAssignedTemplate)
+            {
+                user.PermissionTemplateId = 23;
+            }
+            else
+            {
+                user.EffectivePermissionGrants = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    [PermissionResourceCatalog.CreateGrantKey(
+                        PermissionResourceCatalog.ReportTemplates, PermissionAction.Clone)] = PermissionDataScope.Own
+                };
+            }
+
+            var scope = new BusinessDataAccessScope(
+                CreatePostgreSqlModeSettings(), new FixedCurrentUserContext(user));
+
+            Assert.Empty(await scope.ApplyInvoiceScope(context.Invoices.AsNoTracking()).ToListAsync());
+            Assert.False(scope.HasPermission(PermissionResourceCatalog.ReportTemplates, PermissionAction.Design));
+        }
+
         [Fact]
         public async Task ApplyInvoiceScope_WhenPostgreSqlRegularUser_ShouldFilterOwnedRows()
         {
@@ -89,6 +121,9 @@ namespace ExportDocManager.Infrastructure.Tests
                 seedContext.Exporters.AddRange(
                     new Exporter { ExporterNameEN = "Own Exporter", OwnerUserId = 7 },
                     new Exporter { ExporterNameEN = "Foreign Exporter", OwnerUserId = 8 });
+                seedContext.Payees.AddRange(
+                    new Payee { Name = "Own Payee", OwnerUserId = 7 },
+                    new Payee { Name = "Foreign Payee", OwnerUserId = 8 });
                 await seedContext.SaveChangesAsync();
             }
 
@@ -103,9 +138,13 @@ namespace ExportDocManager.Infrastructure.Tests
             var exporter = Assert.Single(await scope
                 .ApplyExporterScope(context.Exporters.AsNoTracking())
                 .ToListAsync());
+            var payee = Assert.Single(await scope
+                .ApplyPayeeScope(context.Payees.AsNoTracking())
+                .ToListAsync());
 
             Assert.Equal("Own Customer", customer.CustomerNameEN);
             Assert.Equal("Own Exporter", exporter.ExporterNameEN);
+            Assert.Equal("Own Payee", payee.Name);
         }
 
         [Fact]
@@ -123,9 +162,11 @@ namespace ExportDocManager.Infrastructure.Tests
                 }));
             var customer = new Customer { CustomerNameEN = "Customer" };
             var exporter = new Exporter { ExporterNameEN = "Exporter" };
+            var payee = new Payee { Name = "Payee" };
 
             scope.ApplyOwner(customer);
             scope.ApplyOwner(exporter);
+            scope.ApplyOwner(payee);
 
             Assert.Equal(9, customer.OwnerUserId);
             Assert.Equal("DOC", customer.DepartmentId);
@@ -133,6 +174,9 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal(9, exporter.OwnerUserId);
             Assert.Equal("DOC", exporter.DepartmentId);
             Assert.Equal("CN", exporter.CompanyScope);
+            Assert.Equal(9, payee.OwnerUserId);
+            Assert.Equal("DOC", payee.DepartmentId);
+            Assert.Equal("CN", payee.CompanyScope);
         }
 
         [Fact]
@@ -142,9 +186,27 @@ namespace ExportDocManager.Infrastructure.Tests
             using (var seedContext = factory.CreateDbContext())
             {
                 seedContext.EmailTemplates.AddRange(
-                    new EmailTemplate { OwnerUserId = 7, Name = "我的模板", IsShared = false },
-                    new EmailTemplate { OwnerUserId = 8, Name = "团队模板", IsShared = true },
-                    new EmailTemplate { OwnerUserId = 8, Name = "他人私有模板", IsShared = false });
+                    new EmailTemplate
+                    {
+                        OwnerUserId = 7,
+                        Name = "我的模板",
+                        Status = TemplateLifecycleStatusCatalog.Draft,
+                        ShareScope = TemplateShareScopeCatalog.Private
+                    },
+                    new EmailTemplate
+                    {
+                        OwnerUserId = 8,
+                        Name = "团队模板",
+                        Status = TemplateLifecycleStatusCatalog.Published,
+                        ShareScope = TemplateShareScopeCatalog.All
+                    },
+                    new EmailTemplate
+                    {
+                        OwnerUserId = 8,
+                        Name = "他人私有模板",
+                        Status = TemplateLifecycleStatusCatalog.Published,
+                        ShareScope = TemplateShareScopeCatalog.Private
+                    });
                 await seedContext.SaveChangesAsync();
             }
 

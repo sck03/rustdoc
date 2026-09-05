@@ -1,7 +1,8 @@
 import { type ComponentType, lazy, type LazyExoticComponent, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../api/index.ts";
-import { hasModulePermission } from "./PermissionAccessContext.tsx";
+import { hasPermission } from "./PermissionAccessContext.tsx";
+import { permissionActions, permissionResources, resolveReportTemplateAccess } from "./permissionCatalog.ts";
 import { getDefaultWorkspaceRoute, type ProductEditionPresentation } from "./productEdition.ts";
 import { PageState } from "../ui/PageState.tsx";
 
@@ -85,6 +86,12 @@ export function AppWorkspaceRoutes({
   }
 
   const defaultRoute = getDefaultWorkspaceRoute(user.capabilities);
+  const permissions = user.capabilities.permissions;
+  const canViewSalesDashboard = hasPermission(permissions, permissionResources.salesDashboard, permissionActions.view) &&
+    hasPermission(permissions, permissionResources.crmCustomers, permissionActions.view) &&
+    hasPermission(permissions, permissionResources.salesOpportunities, permissionActions.view);
+  const reportTemplateAccess = resolveReportTemplateAccess((action) =>
+    hasPermission(permissions, permissionResources.reportTemplates, action));
   return (
     <Suspense fallback={<RouteLoadingPanel />}>
       <Routes>
@@ -92,20 +99,21 @@ export function AppWorkspaceRoutes({
         <Route path="/dashboard" element={user.capabilities.canUseDocumentWorkspace
           ? <DashboardPage client={client} />
           : <Navigate to={defaultRoute} replace />} />
-        <Route path="/crm/dashboard" element={user.capabilities.canUseSalesWorkspace
-          ? <SalesDashboardPage client={client} />
+        <Route path="/crm/dashboard" element={canViewSalesDashboard
+          ? <SalesDashboardPage businessTimeZone={user.businessTimeZone} client={client} />
           : <Navigate to="/dashboard" replace />} />
-        <Route path="/suppliers" element={user.capabilities.canUseSalesWorkspace
+        <Route path="/suppliers" element={hasPermission(permissions, permissionResources.suppliers, permissionActions.view)
           ? <SupplierDirectoryPage businessDate={user.businessDate} client={client} />
           : <Navigate to="/dashboard" replace />} />
-        <Route path="/crm/email-templates" element={user.capabilities.canUseSalesWorkspace
+        <Route path="/crm/email-templates" element={hasPermission(permissions, permissionResources.emailTemplates, permissionActions.view)
           ? <EmailTemplatePage client={client} />
           : <Navigate to="/dashboard" replace />} />
-        <Route path="/crm/opportunities" element={user.capabilities.canUseSalesWorkspace
-          ? <SalesOpportunityPage client={client} />
+        <Route path="/crm/opportunities" element={hasPermission(permissions, permissionResources.salesOpportunities, permissionActions.view)
+          ? <SalesOpportunityPage businessTimeZone={user.businessTimeZone} client={client} />
           : <Navigate to="/dashboard" replace />} />
-        <Route path="/crm/follow-ups" element={user.capabilities.canUseSalesWorkspace
-          ? <CustomerFollowUpPage client={client} />
+        <Route path="/crm/follow-ups" element={hasPermission(permissions, permissionResources.crmCustomers, permissionActions.view) &&
+          hasPermission(permissions, permissionResources.crmFollowUps, permissionActions.view)
+          ? <CustomerFollowUpPage businessTimeZone={user.businessTimeZone} client={client} />
           : <Navigate to="/dashboard" replace />} />
         <Route path="/invoices" element={<InvoiceListPage client={client} />} />
         <Route path="/invoices/new" element={<InvoiceEditorPage businessDate={user.businessDate} client={client} mode="new" />} />
@@ -128,23 +136,21 @@ export function AppWorkspaceRoutes({
         <Route
           path="/reports/templates/manage"
           element={
-            <ReportTemplateManagementPage
+            reportTemplateAccess.view ? <ReportTemplateManagementPage
               client={client}
-              canManageTemplates={hasModulePermission(user.capabilities.moduleAccess, "document.reports", "manage")}
-              canDesignTemplates={hasModulePermission(user.capabilities.moduleAccess, "document.reports", "operate")}
+              templateAccess={reportTemplateAccess}
               canManageSettings={user.capabilities.canManageSettings === true}
-            />
+            /> : <Navigate to="/dashboard" replace />
           }
         />
         <Route
           path="/reports/templates"
           element={
-            <ReportTemplateDesignerPage
+            reportTemplateAccess.view ? <ReportTemplateDesignerPage
               client={client}
-              canManageTemplates={hasModulePermission(user.capabilities.moduleAccess, "document.reports", "manage")}
-              canDesignTemplates={hasModulePermission(user.capabilities.moduleAccess, "document.reports", "operate")}
+              templateAccess={reportTemplateAccess}
               canManageSettings={user.capabilities.canManageSettings === true}
-            />
+            /> : <Navigate to="/dashboard" replace />
           }
         />
         <Route path="/jobs" element={<JobCenterPage client={client} />} />

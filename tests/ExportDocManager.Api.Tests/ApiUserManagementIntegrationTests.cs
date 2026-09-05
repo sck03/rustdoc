@@ -21,10 +21,10 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, catalogResponse.StatusCode);
             var catalog = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPermissionTemplateCatalogResponse>(catalogResponse);
             var adminTemplate = Assert.Single(catalog.Templates, template => template.Code == BuiltInPermissionTemplateCatalog.Admin);
-            Assert.Contains(catalog.Modules, module =>
-                module.Key == PermissionModuleCatalog.DocumentHsKnowledge &&
-                module.Name == "HS 编码知识" &&
-                !module.IsTechnical);
+            Assert.Contains(catalog.Resources, resource =>
+                resource.Key == PermissionModuleCatalog.DocumentHsKnowledge &&
+                resource.Name == "HS 编码知识" &&
+                !resource.IsTechnical);
 
             var immutableAdminResponse = await adminClient.PutAsJsonAsync(
                 $"/api/permission-templates/{adminTemplate.Id}",
@@ -35,7 +35,8 @@ namespace ExportDocManager.Api.Tests
                     name = adminTemplate.Name,
                     description = adminTemplate.Description,
                     isActive = true,
-                    modules = adminTemplate.Modules
+                    grants = adminTemplate.Grants,
+                    expectedVersion = adminTemplate.VersionNumber
                 });
             Assert.Equal(HttpStatusCode.Conflict, immutableAdminResponse.StatusCode);
 
@@ -47,9 +48,14 @@ namespace ExportDocManager.Api.Tests
                     name = "仅关于",
                     description = "最小只读账号",
                     isActive = true,
-                    modules = new[]
+                    grants = new[]
                     {
-                        new { moduleKey = PermissionModuleCatalog.SystemAbout, accessLevel = PermissionAccessLevel.View }
+                        new
+                        {
+                            resourceKey = PermissionModuleCatalog.SystemAbout,
+                            action = PermissionAction.View,
+                            dataScope = PermissionDataScope.All
+                        }
                     }
                 });
             Assert.Equal(HttpStatusCode.OK, createTemplateResponse.StatusCode);
@@ -86,24 +92,34 @@ namespace ExportDocManager.Api.Tests
                     name = createdTemplate.Name,
                     description = createdTemplate.Description,
                     isActive = true,
-                    modules = new[]
+                    grants = new[]
                     {
-                        new { moduleKey = PermissionModuleCatalog.CommonEmail, accessLevel = PermissionAccessLevel.Operate }
-                    }
+                        new
+                        {
+                            resourceKey = PermissionResourceCatalog.EmailDelivery,
+                            action = PermissionAction.Send,
+                            dataScope = PermissionDataScope.Own
+                        }
+                    },
+                    expectedVersion = createdTemplate.VersionNumber
                 });
             Assert.Equal(HttpStatusCode.OK, updateTemplateResponse.StatusCode);
+            var updatedTemplate = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPermissionTemplateDto>(updateTemplateResponse);
             Assert.Equal(new[] { PermissionModuleCatalog.SystemAbout }, firstLogin.User.Capabilities.EnabledModules);
             Assert.Equal(HttpStatusCode.Unauthorized, (await templateUserClient.GetAsync("/api/auth/me")).StatusCode);
 
             var secondLogin = await harness.LoginAsync(anonymousClient, "template-user", "template-pass");
             Assert.Equal(new[] { PermissionModuleCatalog.CommonEmail }, secondLogin.User.Capabilities.EnabledModules);
 
-            var inUseDeleteResponse = await adminClient.DeleteAsync($"/api/permission-templates/{createdTemplate.Id}");
+            var inUseDeleteResponse = await adminClient.DeleteAsync(
+                $"/api/permission-templates/{createdTemplate.Id}?expectedVersion={updatedTemplate.VersionNumber}");
             Assert.Equal(HttpStatusCode.Conflict, inUseDeleteResponse.StatusCode);
 
-            var deleteUserResponse = await adminClient.DeleteAsync($"/api/users/{createdUser.User.Id}");
+            var deleteUserResponse = await adminClient.DeleteAsync(
+                $"/api/users/{createdUser.User.Id}?expectedVersion={createdUser.User.VersionNumber}");
             Assert.Equal(HttpStatusCode.OK, deleteUserResponse.StatusCode);
-            var deleteTemplateResponse = await adminClient.DeleteAsync($"/api/permission-templates/{createdTemplate.Id}");
+            var deleteTemplateResponse = await adminClient.DeleteAsync(
+                $"/api/permission-templates/{createdTemplate.Id}?expectedVersion={updatedTemplate.VersionNumber}");
             Assert.Equal(HttpStatusCode.OK, deleteTemplateResponse.StatusCode);
         }
 
@@ -120,11 +136,11 @@ namespace ExportDocManager.Api.Tests
             var catalogResponse = await adminClient.GetAsync("/api/permission-templates");
             var catalog = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPermissionTemplateCatalogResponse>(catalogResponse);
             Assert.All(
-                catalog.Modules.Where(module =>
-                    module.Key == PermissionModuleCatalog.DocumentReferenceData ||
-                    module.Key == PermissionModuleCatalog.DocumentCustomOptions ||
-                    module.Key == PermissionModuleCatalog.DocumentPaymentReports),
-                module => Assert.True(module.IsTechnical));
+                catalog.Resources.Where(resource =>
+                    resource.Key == PermissionModuleCatalog.DocumentReferenceData ||
+                    resource.Key == PermissionModuleCatalog.DocumentCustomOptions ||
+                    resource.Key == PermissionResourceCatalog.EmailPolicy),
+                resource => Assert.True(resource.IsTechnical));
 
             var createResponse = await adminClient.PostAsJsonAsync(
                 "/api/permission-templates",
@@ -134,26 +150,32 @@ namespace ExportDocManager.Api.Tests
                     name = "付款经办",
                     description = "仅配置业务模块",
                     isActive = true,
-                    modules = new[]
+                    grants = new[]
                     {
-                        new { moduleKey = PermissionModuleCatalog.DocumentPayments, accessLevel = PermissionAccessLevel.Operate },
-                        new { moduleKey = PermissionModuleCatalog.DocumentInvoices, accessLevel = PermissionAccessLevel.View },
-                        new { moduleKey = PermissionModuleCatalog.SalesOpportunities, accessLevel = PermissionAccessLevel.Manage },
-                        new { moduleKey = PermissionModuleCatalog.SalesSuppliers, accessLevel = PermissionAccessLevel.Operate }
+                        new { resourceKey = PermissionModuleCatalog.DocumentPayments, action = PermissionAction.Operate, dataScope = PermissionDataScope.Department },
+                        new { resourceKey = PermissionModuleCatalog.DocumentInvoices, action = PermissionAction.View, dataScope = PermissionDataScope.Own },
+                        new { resourceKey = PermissionResourceCatalog.SalesOpportunities, action = PermissionAction.View, dataScope = PermissionDataScope.Department },
+                        new { resourceKey = PermissionResourceCatalog.Suppliers, action = PermissionAction.View, dataScope = PermissionDataScope.Company }
                     }
                 });
             Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
             var created = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPermissionTemplateDto>(createResponse);
-            var grants = created.Modules.ToDictionary(module => module.ModuleKey, module => module.AccessLevel);
+            Assert.Contains(created.EffectiveGrants, grant =>
+                grant.ResourceKey == PermissionModuleCatalog.DocumentCustomOptions &&
+                grant.Action == PermissionAction.Operate &&
+                grant.DataScope == PermissionDataScope.Department &&
+                grant.Source == "dependency");
+            Assert.Contains(created.EffectiveGrants, grant =>
+                grant.ResourceKey == PermissionModuleCatalog.DocumentReferenceData &&
+                grant.Action == PermissionAction.View);
+            Assert.Contains(created.EffectiveGrants, grant =>
+                grant.ResourceKey == PermissionModuleCatalog.CommonProductReference &&
+                grant.Action == PermissionAction.View);
+            Assert.DoesNotContain(created.EffectiveGrants, grant =>
+                grant.ResourceKey == PermissionResourceCatalog.PaymentOutput);
 
-            Assert.Equal(PermissionAccessLevel.Operate, grants[PermissionModuleCatalog.DocumentPayments]);
-            Assert.Equal(PermissionAccessLevel.Operate, grants[PermissionModuleCatalog.DocumentPaymentReports]);
-            Assert.Equal(PermissionAccessLevel.Operate, grants[PermissionModuleCatalog.DocumentCustomOptions]);
-            Assert.Equal(PermissionAccessLevel.View, grants[PermissionModuleCatalog.DocumentReferenceData]);
-            Assert.Equal(PermissionAccessLevel.View, grants[PermissionModuleCatalog.CommonProductReference]);
-            Assert.DoesNotContain(PermissionModuleCatalog.DocumentMasterData, grants.Keys);
-
-            var deleteResponse = await adminClient.DeleteAsync($"/api/permission-templates/{created.Id}");
+            var deleteResponse = await adminClient.DeleteAsync(
+                $"/api/permission-templates/{created.Id}?expectedVersion={created.VersionNumber}");
             Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
         }
 
@@ -181,7 +203,9 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, (await financeClient.GetAsync("/api/tools/email/status")).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await financeClient.GetAsync("/api/reports/templates?reportType=ExportDocument")).StatusCode);
             Assert.Equal(HttpStatusCode.OK, (await financeClient.GetAsync("/api/reports/templates?reportType=PaymentVoucher")).StatusCode);
-            Assert.Equal(HttpStatusCode.OK, (await financeClient.PostAsync("/api/reports/templates/storage-check", null)).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await financeClient.GetAsync("/api/reports/templates/fields?reportType=ExportDocument")).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await financeClient.GetAsync("/api/reports/templates/fields?reportType=PaymentVoucher")).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await financeClient.PostAsync("/api/reports/templates/storage-check", null)).StatusCode);
 
             (HttpMethod Method, string Path)[] forbiddenRequests =
             [
@@ -297,6 +321,15 @@ namespace ExportDocManager.Api.Tests
             var listAfterCreate = await GetUsersAsync(adminClient);
             Assert.Contains(listAfterCreate.Users, user => user.Id == created.User.Id);
 
+            var createCompanyResponse = await adminClient.PostAsJsonAsync(
+                "/api/organization-directory/companies",
+                new { code = "HQ", name = "总部公司", isActive = true });
+            Assert.Equal(HttpStatusCode.Created, createCompanyResponse.StatusCode);
+            var createDepartmentResponse = await adminClient.PostAsJsonAsync(
+                "/api/organization-directory/departments",
+                new { code = "FIN", companyCode = "HQ", name = "财务部", isActive = true });
+            Assert.Equal(HttpStatusCode.Created, createDepartmentResponse.StatusCode);
+
             var updateResponse = await adminClient.PutAsJsonAsync(
                 $"/api/users/{created.User.Id}",
                 new
@@ -307,7 +340,8 @@ namespace ExportDocManager.Api.Tests
                     departmentId = "FIN",
                     companyScope = "HQ",
                     isActive = true,
-                    resetPassword = string.Empty
+                    resetPassword = string.Empty,
+                    expectedVersion = created.User.VersionNumber
                 });
             Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
             var updated = await ApiIntegrationTestHarness.ReadJsonAsync<ApiUserSaveResponse>(updateResponse);
@@ -315,6 +349,28 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(UserRoleCatalog.User, updated.User.Role);
             Assert.Equal("FIN", updated.User.DepartmentId);
             Assert.Equal("HQ", updated.User.CompanyScope);
+
+            var invalidOrganizationResponse = await adminClient.PutAsJsonAsync(
+                $"/api/users/{created.User.Id}",
+                new
+                {
+                    username = "finance-api",
+                    fullName = "Finance Operator",
+                    role = UserRoleCatalog.User,
+                    departmentId = "UNKNOWN",
+                    companyScope = "HQ",
+                    isActive = true,
+                    resetPassword = string.Empty,
+                    expectedVersion = updated.User.VersionNumber
+                });
+            Assert.Equal(HttpStatusCode.BadRequest, invalidOrganizationResponse.StatusCode);
+
+            var directoryResponse = await adminClient.GetAsync("/api/organization-directory");
+            Assert.Equal(HttpStatusCode.OK, directoryResponse.StatusCode);
+            var directory = await ApiIntegrationTestHarness.ReadJsonAsync<ApiOrganizationDirectoryResponse>(directoryResponse);
+            Assert.Contains(directory.Companies, item => item.Code == "HQ" && item.Name == "总部公司");
+            Assert.Contains(directory.Departments, item =>
+                item.Code == "FIN" && item.CompanyCode == "HQ" && item.Name == "财务部");
 
             var operatorLogin = await harness.LoginAsync(anonymousClient, "finance-api", "finance-pass");
             Assert.False(operatorLogin.User.Capabilities.CanManageUsers);
@@ -324,7 +380,8 @@ namespace ExportDocManager.Api.Tests
             var forbiddenAuditLogResponse = await operatorClient.GetAsync("/api/audit-logs");
             Assert.Equal(HttpStatusCode.Forbidden, forbiddenAuditLogResponse.StatusCode);
 
-            var deleteResponse = await adminClient.DeleteAsync($"/api/users/{created.User.Id}");
+            var deleteResponse = await adminClient.DeleteAsync(
+                $"/api/users/{created.User.Id}?expectedVersion={updated.User.VersionNumber}");
             Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
 
             var listAfterDelete = await GetUsersAsync(adminClient);

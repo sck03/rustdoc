@@ -15,8 +15,20 @@ namespace ExportDocManager.Infrastructure.Tests
             using var factory = new TestDbContextFactory();
             using (var context = factory.CreateDbContext())
             {
-                var owned = new SupplierCompany { OwnerUserId = 7, Name = "Owned Supplier", Status = "合作中" };
-                var other = new SupplierCompany { OwnerUserId = 8, Name = "Other Supplier", Status = "合作中" };
+                var owned = new SupplierCompany
+                {
+                    OwnerUserId = 7,
+                    CompanyScope = "acme",
+                    Name = "Owned Supplier",
+                    Status = "合作中"
+                };
+                var other = new SupplierCompany
+                {
+                    OwnerUserId = 8,
+                    CompanyScope = "other",
+                    Name = "Other Supplier",
+                    Status = "合作中"
+                };
                 context.SupplierCompanies.AddRange(owned, other);
                 await context.SaveChangesAsync();
                 context.SupplierAssessments.AddRange(
@@ -29,7 +41,10 @@ namespace ExportDocManager.Infrastructure.Tests
                         DeliveryScore = 3,
                         ServiceScore = 5,
                         PriceScore = 4,
-                        Conclusion = "合格"
+                        Conclusion = "合格",
+                        Status = SupplierAssessmentStatusCatalog.Confirmed,
+                        ConfirmedBy = "manager",
+                        ConfirmedAt = DateTimeOffset.UtcNow
                     },
                     new SupplierAssessment
                     {
@@ -40,12 +55,21 @@ namespace ExportDocManager.Infrastructure.Tests
                         DeliveryScore = 1,
                         ServiceScore = 1,
                         PriceScore = 1,
-                        Conclusion = "暂停合作"
+                        Conclusion = "暂停合作",
+                        Status = SupplierAssessmentStatusCatalog.Confirmed,
+                        ConfirmedBy = "manager",
+                        ConfirmedAt = DateTimeOffset.UtcNow
                     });
                 await context.SaveChangesAsync();
             }
 
-            var currentUser = new FixedCurrentUserContext(new User { Id = 7, Username = "sales", Role = "Sales" });
+            var currentUser = new FixedCurrentUserContext(new User
+            {
+                Id = 7,
+                Username = "sales",
+                Role = "Sales",
+                CompanyScope = "acme"
+            });
             var service = new SupplierAssessmentService(factory,
                 new BusinessDataAccessScope(CreatePostgreSqlModeSettings(), currentUser),
                 BusinessClock.CreateSystem());

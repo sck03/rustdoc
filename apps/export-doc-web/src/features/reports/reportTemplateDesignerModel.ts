@@ -1,4 +1,10 @@
-import type { ApiInvoiceListItemDto, ApiPaymentDto } from "../../api/index.ts";
+import type {
+  ApiInvoiceListItemDto,
+  ApiPaymentDto,
+  ApiUserReportTemplateCloneRequest,
+  ApiUserReportTemplateCreateRequest,
+  ApiUserReportTemplateDto,
+} from "../../api/index.ts";
 import { formatAmount, formatDate, readNumber } from "../../ui/formUtils.ts";
 import {
   getReportDesignerPreviewSampleProfiles,
@@ -8,6 +14,8 @@ import {
 export type ReportTypeOption = "ExportDocument" | "PaymentVoucher";
 export type DesignerMode = "v3" | "advancedHtml";
 export type TemplateWorkspaceMode = "design" | "preview";
+
+export type { ReportTemplatePermissionAccess } from "../../app/permissionCatalog.ts";
 export type TemplateImportStrategyOption = "Overwrite" | "Merge" | "AddOnly";
 export type TemplatePreviewMode = "sample" | "savedSource";
 
@@ -15,6 +23,11 @@ export const reportTypeOptions: Array<{ value: ReportTypeOption; label: string }
   { value: "ExportDocument", label: "出口单据" },
   { value: "PaymentVoucher", label: "付款凭证" },
 ];
+
+export function resolveReportTypeOptions(canViewTemplates: boolean, canViewInvoices: boolean, canViewPayments: boolean) {
+  return reportTypeOptions.filter((option) => canViewTemplates &&
+    (option.value === "ExportDocument" ? canViewInvoices : canViewPayments));
+}
 
 export const importStrategyOptions: Array<{ value: TemplateImportStrategyOption; label: string }> = [
   { value: "Merge", label: "合并" },
@@ -144,6 +157,40 @@ export function buildTemplateFileName(reportType: ReportTypeOption) {
 
 export function buildUserTemplateKey(id: number) {
   return `user-template:${id}`;
+}
+
+export function buildUserTemplateCreatePayload({
+  reportType,
+  name,
+}: {
+  reportType: ReportTypeOption;
+  name: string;
+}): ApiUserReportTemplateCreateRequest {
+  return {
+    reportType,
+    name: name.trim(),
+    contentHtml: "",
+  };
+}
+
+export function buildUserTemplateClonePayload({
+  reportType,
+  selectedTemplatePath,
+  selectedUserTemplateId,
+  name,
+}: {
+  reportType: ReportTypeOption;
+  selectedTemplatePath: string;
+  selectedUserTemplateId: number;
+  name: string;
+}): ApiUserReportTemplateCloneRequest {
+  return {
+    reportType,
+    name: name.trim(),
+    sourceTemplatePath: selectedUserTemplateId > 0
+      ? buildUserTemplateKey(selectedUserTemplateId)
+      : selectedTemplatePath.trim(),
+  };
 }
 
 export function readUserTemplateIdFromKey(templatePath: string) {

@@ -93,7 +93,7 @@ namespace ExportDocManager.Services.Crm
     public sealed class UnsupportedCrmCustomerImportService : ICrmCustomerImportService
     {
         public Task<CrmCustomerImportPreview> PreviewAsync(Stream input, string fileName, CancellationToken cancellationToken = default) => Task.FromException<CrmCustomerImportPreview>(UnsupportedCapability.Excel());
-        public Task<CrmCustomerImportResult> ImportAsync(IReadOnlyList<CrmCustomerImportRow> rows, CancellationToken cancellationToken = default) => Task.FromException<CrmCustomerImportResult>(UnsupportedCapability.Excel());
+        public Task<CrmCustomerImportResult> ImportAsync(string previewId, CancellationToken cancellationToken = default) => Task.FromException<CrmCustomerImportResult>(UnsupportedCapability.Excel());
     }
 
     public sealed class UnsupportedCrmCustomerExportService : ICrmCustomerExportService
@@ -107,7 +107,7 @@ namespace ExportDocManager.Services.Suppliers
     public sealed class UnsupportedSupplierFileService : ISupplierFileService
     {
         public Task<SupplierImportPreview> PreviewAsync(Stream input, string fileName, CancellationToken cancellationToken = default) => Task.FromException<SupplierImportPreview>(UnsupportedCapability.Excel());
-        public Task<SupplierImportResult> ImportAsync(IReadOnlyList<SupplierImportRow> rows, CancellationToken cancellationToken = default) => Task.FromException<SupplierImportResult>(UnsupportedCapability.Excel());
+        public Task<SupplierImportResult> ImportAsync(string previewId, CancellationToken cancellationToken = default) => Task.FromException<SupplierImportResult>(UnsupportedCapability.Excel());
         public Task<byte[]> ExportAsync(string? keyword, string? status, CancellationToken cancellationToken = default) => Task.FromException<byte[]>(UnsupportedCapability.Excel());
     }
 }

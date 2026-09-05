@@ -5,128 +5,185 @@ namespace ExportDocManager.Application.Tests
     public class PermissionModuleCatalogTests
     {
         [Fact]
-        public void ExpandDependencies_ShouldAddPaymentSupportingCapabilities()
+        public void ExpandDependencies_ShouldAddDocumentSupportWithoutGrantingOutput()
         {
-            var result = PermissionModuleCatalog.ExpandDependencies(
+            var result = PermissionResourceCatalog.ExpandDependencies(
             [
-                new(PermissionModuleCatalog.DocumentPayments, PermissionAccessLevel.Operate)
+                new(PermissionModuleCatalog.DocumentPayments, PermissionAction.Operate,
+                    PermissionDataScope.Department)
             ]);
 
-            Assert.Equal(PermissionAccessLevel.Operate, result[PermissionModuleCatalog.DocumentPayments]);
-            Assert.Equal(PermissionAccessLevel.Operate, result[PermissionModuleCatalog.DocumentPaymentReports]);
-            Assert.Equal(PermissionAccessLevel.Operate, result[PermissionModuleCatalog.DocumentCustomOptions]);
-            Assert.Equal(PermissionAccessLevel.View, result[PermissionModuleCatalog.DocumentReferenceData]);
+            AssertGrant(result, PermissionModuleCatalog.DocumentPayments, PermissionAction.Operate,
+                PermissionDataScope.Department, "template");
+            AssertGrant(result, PermissionModuleCatalog.DocumentCustomOptions, PermissionAction.Operate,
+                PermissionDataScope.Department, "dependency");
+            AssertGrant(result, PermissionModuleCatalog.DocumentReferenceData, PermissionAction.View,
+                PermissionDataScope.Department, "dependency");
+            Assert.DoesNotContain(result, grant => grant.ResourceKey == PermissionResourceCatalog.PaymentOutput);
         }
 
         [Fact]
-        public void ExpandDependencies_ShouldLimitQueryReferenceDataToView()
+        public void ExpandDependencies_ShouldRequireEmailCapabilityForDocumentEmailOutput()
         {
-            var result = PermissionModuleCatalog.ExpandDependencies(
+            var result = PermissionResourceCatalog.ExpandDependencies(
             [
-                new(PermissionModuleCatalog.DocumentQuery, PermissionAccessLevel.Manage)
+                new(PermissionResourceCatalog.InvoiceOutput, PermissionAction.SendEmail,
+                    PermissionDataScope.Company)
             ]);
 
-            Assert.Equal(PermissionAccessLevel.Manage, result[PermissionModuleCatalog.DocumentQuery]);
-            Assert.Equal(PermissionAccessLevel.View, result[PermissionModuleCatalog.DocumentReferenceData]);
+            AssertGrant(result, PermissionResourceCatalog.EmailDelivery, PermissionAction.Send,
+                PermissionDataScope.Company, "dependency");
+            AssertGrant(result, PermissionResourceCatalog.ReportTemplates, PermissionAction.View,
+                PermissionDataScope.Company, "dependency");
+            AssertGrant(result, PermissionModuleCatalog.DocumentInvoices, PermissionAction.View,
+                PermissionDataScope.Company, "dependency");
+            AssertGrant(result, PermissionResourceCatalog.EmailDelivery, PermissionAction.ViewDelivery,
+                PermissionDataScope.Company, "dependency");
         }
 
         [Fact]
-        public void ExpandDependencies_ShouldPreserveExplicitHigherTechnicalAccess()
+        public void ExpandDependencies_ShouldAllowSenderToReadDeliveryOutcomeWithinSameScope()
         {
-            var result = PermissionModuleCatalog.ExpandDependencies(
+            var result = PermissionResourceCatalog.ExpandDependencies(
             [
-                new(PermissionModuleCatalog.DocumentPayments, PermissionAccessLevel.View),
-                new(PermissionModuleCatalog.DocumentReferenceData, PermissionAccessLevel.Manage)
+                new(PermissionResourceCatalog.EmailDelivery, PermissionAction.Send,
+                    PermissionDataScope.Department)
             ]);
 
-            Assert.Equal(PermissionAccessLevel.Manage, result[PermissionModuleCatalog.DocumentReferenceData]);
+            AssertGrant(result, PermissionResourceCatalog.EmailDelivery, PermissionAction.Send,
+                PermissionDataScope.Department, "template");
+            AssertGrant(result, PermissionResourceCatalog.EmailDelivery, PermissionAction.ViewDelivery,
+                PermissionDataScope.Department, "dependency");
+        }
+
+        [Fact]
+        public void ExpandDependencies_ShouldMakePrintDependOnPreviewAndTemplateRead()
+        {
+            var result = PermissionResourceCatalog.ExpandDependencies(
+            [
+                new(PermissionResourceCatalog.PaymentOutput, PermissionAction.Print,
+                    PermissionDataScope.Own)
+            ]);
+
+            AssertGrant(result, PermissionResourceCatalog.PaymentOutput, PermissionAction.Preview,
+                PermissionDataScope.Own, "dependency");
+            AssertGrant(result, PermissionResourceCatalog.ReportTemplates, PermissionAction.View,
+                PermissionDataScope.Own, "dependency");
+            AssertGrant(result, PermissionModuleCatalog.DocumentPayments, PermissionAction.View,
+                PermissionDataScope.Own, "dependency");
+        }
+
+        [Fact]
+        public void ExpandDependencies_ShouldAddCustomerAndProductReadsForSalesOpportunity()
+        {
+            var result = PermissionResourceCatalog.ExpandDependencies(
+            [
+                new(PermissionResourceCatalog.SalesOpportunities, PermissionAction.Edit,
+                    PermissionDataScope.Department)
+            ]);
+
+            AssertGrant(result, PermissionResourceCatalog.CrmCustomers, PermissionAction.View,
+                PermissionDataScope.Department, "dependency");
+            AssertGrant(result, PermissionModuleCatalog.CommonProductReference, PermissionAction.View,
+                PermissionDataScope.Department, "dependency");
         }
 
         [Theory]
-        [InlineData(PermissionAccessLevel.View, PermissionAccessLevel.View)]
-        [InlineData(PermissionAccessLevel.Operate, PermissionAccessLevel.Operate)]
-        [InlineData(PermissionAccessLevel.Manage, PermissionAccessLevel.Operate)]
-        public void ExpandDependencies_ShouldAddMasterDataReadAndCandidateCapabilities(
-            string masterDataAccess,
-            string expectedCustomOptionAccess)
+        [InlineData("unknown", PermissionAction.View, PermissionDataScope.Own)]
+        [InlineData(PermissionResourceCatalog.CrmCustomers, "unknown", PermissionDataScope.Own)]
+        [InlineData(PermissionResourceCatalog.CrmCustomers, PermissionAction.View, "unknown")]
+        public void NormalizeGrant_ShouldRejectUnknownContractValues(
+            string resourceKey,
+            string action,
+            string dataScope)
         {
-            var result = PermissionModuleCatalog.ExpandDependencies(
-            [
-                new(PermissionModuleCatalog.DocumentMasterData, masterDataAccess)
-            ]);
-
-            Assert.Equal(masterDataAccess, result[PermissionModuleCatalog.DocumentMasterData]);
-            Assert.Equal(PermissionAccessLevel.View, result[PermissionModuleCatalog.DocumentReferenceData]);
-            Assert.Equal(PermissionAccessLevel.View, result[PermissionModuleCatalog.CommonProductReference]);
-            Assert.Equal(expectedCustomOptionAccess, result[PermissionModuleCatalog.DocumentCustomOptions]);
-            Assert.DoesNotContain(PermissionModuleCatalog.DocumentHsKnowledge, result.Keys);
-        }
-
-        [Theory]
-        [InlineData(PermissionModuleCatalog.DocumentInvoices)]
-        [InlineData(PermissionModuleCatalog.SalesOpportunities)]
-        [InlineData(PermissionModuleCatalog.SalesSuppliers)]
-        public void ExpandDependencies_ShouldAddSharedProductReferenceWithoutGrantingMasterDataMaintenance(
-            string businessModule)
-        {
-            var result = PermissionModuleCatalog.ExpandDependencies(
-            [
-                new(businessModule, PermissionAccessLevel.Manage)
-            ]);
-
-            Assert.Equal(PermissionAccessLevel.View, result[PermissionModuleCatalog.CommonProductReference]);
-            Assert.DoesNotContain(PermissionModuleCatalog.DocumentMasterData, result.Keys);
+            Assert.Throws<ArgumentException>(() => PermissionResourceCatalog.NormalizeGrant(
+                new PermissionGrantRecord(resourceKey, action, dataScope)));
         }
 
         [Fact]
-        public void FinanceTemplate_ShouldExpandTechnicalModulesWithoutDeclaringThemAsBusinessNavigation()
+        public void SalesTemplate_ShouldUseLeastPrivilegeBusinessDefaults()
         {
-            var finance = BuiltInPermissionTemplateCatalog.FindForRole(BuiltInPermissionTemplateCatalog.Finance);
-            var grants = finance.GetModuleAccess();
+            var sales = BuiltInPermissionTemplateCatalog.FindForRole(BuiltInPermissionTemplateCatalog.Sales);
+            var grants = sales.GetEffectivePermissions();
 
-            Assert.DoesNotContain(
-                finance.ModuleKeys,
-                moduleKey => PermissionModuleCatalog.ByKey[moduleKey].IsTechnical);
-            Assert.Equal(PermissionAccessLevel.Manage, grants[PermissionModuleCatalog.DocumentReports]);
-            Assert.Equal(PermissionAccessLevel.Manage, grants[PermissionModuleCatalog.DocumentPaymentReports]);
-            Assert.Equal(PermissionAccessLevel.Operate, grants[PermissionModuleCatalog.DocumentCustomOptions]);
-            Assert.Equal(PermissionAccessLevel.View, grants[PermissionModuleCatalog.DocumentReferenceData]);
+            AssertGrant(grants, PermissionResourceCatalog.CrmCustomers, PermissionAction.Edit,
+                PermissionDataScope.Own, "template");
+            AssertGrant(grants, PermissionResourceCatalog.Suppliers, PermissionAction.View,
+                PermissionDataScope.Company, "template");
+            Assert.DoesNotContain(grants, grant =>
+                grant.ResourceKey == PermissionResourceCatalog.CrmCustomers &&
+                grant.Action is PermissionAction.Delete or PermissionAction.Export);
+            Assert.DoesNotContain(grants, grant => grant.ResourceKey is
+                PermissionResourceCatalog.SystemUsers or
+                PermissionResourceCatalog.SystemPermissions or
+                PermissionResourceCatalog.SystemSettings or
+                PermissionResourceCatalog.SystemAudit or
+                PermissionResourceCatalog.SystemBackup or
+                PermissionResourceCatalog.SystemDisasterRecovery or
+                PermissionResourceCatalog.EmailPolicy);
+            Assert.DoesNotContain(grants, grant =>
+                grant.ResourceKey == PermissionResourceCatalog.EmailTemplates &&
+                grant.Action == PermissionAction.Edit);
         }
 
         [Fact]
-        public void DocumentTemplate_ShouldKeepHsKnowledgeReadOnlyAlongsideScopedMasterDataMaintenance()
+        public void SalesManagerTemplate_ShouldRemainDepartmentScoped()
         {
-            var document = BuiltInPermissionTemplateCatalog.FindForRole(BuiltInPermissionTemplateCatalog.Document);
-            var grants = document.GetModuleAccess();
+            var manager = BuiltInPermissionTemplateCatalog.Templates.Single(template =>
+                template.Code == BuiltInPermissionTemplateCatalog.SalesManager);
+            var grants = manager.GetEffectivePermissions();
 
-            Assert.Equal(PermissionAccessLevel.View, grants[PermissionModuleCatalog.DocumentHsKnowledge]);
-            Assert.Equal(PermissionAccessLevel.Manage, grants[PermissionModuleCatalog.DocumentMasterData]);
-            Assert.Contains(PermissionModuleCatalog.DocumentHsKnowledge, document.ModuleKeys);
-            Assert.Contains(PermissionModuleCatalog.DocumentMasterData, document.ModuleKeys);
+            AssertGrant(grants, PermissionResourceCatalog.CrmCustomers, PermissionAction.Export,
+                PermissionDataScope.Department, "template");
+            AssertGrant(grants, PermissionResourceCatalog.SalesOpportunities, PermissionAction.Archive,
+                PermissionDataScope.Department, "template");
+            Assert.DoesNotContain(grants, grant => grant.DataScope == PermissionDataScope.All &&
+                grant.ResourceKey.StartsWith("sales.", StringComparison.Ordinal));
         }
 
         [Fact]
-        public void DocumentTemplate_ShouldExposeDeclarationDictionaryAsAnIndependentModule()
+        public void DisasterRecovery_ShouldRemainAdministratorIdentityOnly()
         {
-            var document = BuiltInPermissionTemplateCatalog.FindForRole(BuiltInPermissionTemplateCatalog.Document);
-            var grants = document.GetModuleAccess();
-
-            Assert.Contains(PermissionModuleCatalog.DocumentDeclarationDictionary, document.ModuleKeys);
-            Assert.Equal(PermissionAccessLevel.Operate, grants[PermissionModuleCatalog.DocumentDeclarationDictionary]);
-            Assert.NotEqual(PermissionModuleCatalog.DocumentSingleWindow, PermissionModuleCatalog.DocumentDeclarationDictionary);
-        }
-
-        [Fact]
-        public void DisasterRecovery_ShouldRemainTechnicalAndAdminManaged()
-        {
-            var module = PermissionModuleCatalog.ByKey[PermissionModuleCatalog.SystemDisasterRecovery];
+            var resource = PermissionResourceCatalog.ByKey[PermissionResourceCatalog.SystemDisasterRecovery];
             var admin = BuiltInPermissionTemplateCatalog.FindForRole(BuiltInPermissionTemplateCatalog.Admin);
-            var grants = admin.GetModuleAccess();
 
-            Assert.True(module.IsTechnical);
-            Assert.Equal("系统", module.Group);
-            Assert.Equal(PermissionAccessLevel.Manage, grants[PermissionModuleCatalog.SystemDisasterRecovery]);
-            Assert.Contains(PermissionModuleCatalog.SystemDisasterRecovery, admin.ModuleKeys);
+            Assert.True(resource.IsTechnical);
+            Assert.Contains(admin.Grants, grant =>
+                grant.ResourceKey == PermissionResourceCatalog.SystemDisasterRecovery &&
+                grant.Action == PermissionAction.Manage);
+        }
+
+        [Fact]
+        public void ResourceCatalog_ShouldKeepUniqueKeysActionsAndStableSortOrder()
+        {
+            Assert.Equal(
+                PermissionResourceCatalog.Resources.Count,
+                PermissionResourceCatalog.Resources.Select(resource => resource.Key)
+                    .Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.Equal(
+                PermissionResourceCatalog.Resources.Select(resource => resource.SortOrder).Order().ToArray(),
+                PermissionResourceCatalog.Resources.Select(resource => resource.SortOrder).ToArray());
+            Assert.All(PermissionResourceCatalog.Resources, resource => Assert.Equal(
+                resource.Actions.Count,
+                resource.Actions.Select(action => action.Key).Distinct(StringComparer.OrdinalIgnoreCase).Count()));
+        }
+
+        [Fact]
+        public void ResourceCatalog_ShouldExposeOnlyImplementedSpecializedActions()
+        {
+            Assert.DoesNotContain(PermissionResourceCatalog.ByKey[PermissionResourceCatalog.CrmCustomers].Actions,
+                action => action.Key == PermissionAction.Assign);
+            Assert.DoesNotContain(PermissionResourceCatalog.ByKey[PermissionResourceCatalog.CrmFollowUps].Actions,
+                action => action.Key == PermissionAction.Export);
+            Assert.DoesNotContain(PermissionResourceCatalog.ByKey[PermissionResourceCatalog.SalesOpportunities].Actions,
+                action => action.Key is PermissionAction.Assign or PermissionAction.Approve or PermissionAction.Import or PermissionAction.Export);
+            Assert.DoesNotContain(PermissionResourceCatalog.ByKey[PermissionResourceCatalog.SalesQuotes].Actions,
+                action => action.Key is PermissionAction.Approve or PermissionAction.Export);
+            Assert.DoesNotContain(PermissionResourceCatalog.ByKey[PermissionResourceCatalog.ReportResources].Actions,
+                action => action.Key == PermissionAction.Delete);
+            Assert.DoesNotContain(PermissionResourceCatalog.ByKey[PermissionResourceCatalog.PaymentOutput].Actions,
+                action => action.Key is PermissionAction.ExportZip or PermissionAction.SendEmail);
         }
 
         [Fact]
@@ -134,13 +191,25 @@ namespace ExportDocManager.Application.Tests
         {
             Assert.Equal(
                 PermissionModuleCatalog.Modules.Count,
-                PermissionModuleCatalog.Modules
-                    .Select(module => module.Key)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Count());
+                PermissionModuleCatalog.Modules.Select(module => module.Key)
+                    .Distinct(StringComparer.OrdinalIgnoreCase).Count());
             Assert.Equal(
                 PermissionModuleCatalog.Modules.Select(module => module.SortOrder).Order().ToArray(),
                 PermissionModuleCatalog.Modules.Select(module => module.SortOrder).ToArray());
+        }
+
+        private static void AssertGrant(
+            IEnumerable<EffectivePermissionGrant> grants,
+            string resourceKey,
+            string action,
+            string dataScope,
+            string source)
+        {
+            Assert.Contains(grants, grant =>
+                grant.ResourceKey == resourceKey &&
+                grant.Action == action &&
+                grant.DataScope == dataScope &&
+                grant.Source == source);
         }
     }
 }

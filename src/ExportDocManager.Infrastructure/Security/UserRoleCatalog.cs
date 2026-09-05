@@ -1,3 +1,5 @@
+using ExportDocManager.Services.Errors;
+
 namespace ExportDocManager.Services.Security
 {
     public static class UserRoleCatalog
@@ -15,12 +17,15 @@ namespace ExportDocManager.Services.Security
             Sales
         ];
 
+        public static bool IsKnown(string role) =>
+            Roles.Any(item => string.Equals(item, role?.Trim(), StringComparison.OrdinalIgnoreCase));
+
         public static string Normalize(string role)
         {
             var normalized = (role ?? string.Empty).Trim();
             return Roles.FirstOrDefault(item =>
                        string.Equals(item, normalized, StringComparison.OrdinalIgnoreCase))
-                   ?? User;
+                   ?? throw new ServiceValidationException("用户角色无效，请从角色目录中重新选择。");
         }
     }
 }

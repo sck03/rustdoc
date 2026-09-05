@@ -16,6 +16,7 @@ namespace ExportDocManager.Services.Infrastructure
         private static readonly JsonSerializerOptions PersistedSerializerOptions = new() { WriteIndented = true };
 
         private readonly string _filePath;
+        private readonly string _lockFilePath;
         private readonly LocalSecretProtector _secretProtector;
         private readonly SemaphoreSlim _mutationGate = new(1, 1);
         private AppSettings _settings = Normalize(new AppSettings());
@@ -31,6 +32,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             ArgumentNullException.ThrowIfNull(pathProvider);
             _filePath = ResolveSettingsPath(pathProvider, filePath);
+            _lockFilePath = Path.Combine(pathProvider.DataRoot, "Locks", "appsettings.lock");
             _secretProtector = new LocalSecretProtector(pathProvider);
         }
 
@@ -39,43 +41,10 @@ namespace ExportDocManager.Services.Infrastructure
             await _mutationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                if (!File.Exists(_filePath))
-                {
-                    Volatile.Write(ref _settings, Normalize(new AppSettings()));
-                    return;
-                }
-
-                string json;
-                try
-                {
-                    json = await File.ReadAllTextAsync(_filePath, cancellationToken).ConfigureAwait(false);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    throw new InvalidDataException($"无法读取设置文件 {_filePath}。", ex);
-                }
-
-                AppSettings loaded;
-                try
-                {
-                    loaded = JsonSerializer.Deserialize<AppSettings>(json, SnapshotSerializerOptions)
-                        ?? throw new InvalidDataException("设置文件内容为空。");
-                }
-                catch (JsonException ex)
-                {
-                    throw new InvalidDataException($"设置文件 JSON 损坏：{_filePath}。", ex);
-                }
-
-                try
-                {
-                    loaded = Normalize(loaded);
-                    UnprotectSecrets(loaded);
-                    Volatile.Write(ref _settings, loaded);
-                }
-                catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or IOException or UnauthorizedAccessException or ArgumentException)
-                {
-                    throw new InvalidDataException($"设置文件包含无效配置：{_filePath}。{ex.Message}", ex);
-                }
+                await using var fileLock = await CrossProcessFileLock
+                    .AcquireAsync(_lockFilePath, cancellationToken)
+                    .ConfigureAwait(false);
+                await LoadUnsafeAsync(cancellationToken).ConfigureAwait(false);
             }
             finally
             {
@@ -92,6 +61,13 @@ namespace ExportDocManager.Services.Infrastructure
             await _mutationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
+                await using var fileLock = await CrossProcessFileLock
+                    .AcquireAsync(_lockFilePath, cancellationToken)
+                    .ConfigureAwait(false);
+                // A different API process may have committed settings after this
+                // instance last loaded them.  Reload under the process-wide file
+                // lock so an unrelated field is never lost by a stale snapshot.
+                await LoadUnsafeAsync(cancellationToken).ConfigureAwait(false);
                 var candidate = Clone(Volatile.Read(ref _settings));
                 if (!update(candidate))
                 {
@@ -106,6 +82,47 @@ namespace ExportDocManager.Services.Infrastructure
             finally
             {
                 _mutationGate.Release();
+            }
+        }
+
+        private async Task LoadUnsafeAsync(CancellationToken cancellationToken)
+        {
+            if (!File.Exists(_filePath))
+            {
+                Volatile.Write(ref _settings, Normalize(new AppSettings()));
+                return;
+            }
+
+            string json;
+            try
+            {
+                json = await File.ReadAllTextAsync(_filePath, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                throw new InvalidDataException($"无法读取设置文件 {_filePath}。", ex);
+            }
+
+            AppSettings loaded;
+            try
+            {
+                loaded = JsonSerializer.Deserialize<AppSettings>(json, SnapshotSerializerOptions)
+                    ?? throw new InvalidDataException("设置文件内容为空。");
+            }
+            catch (JsonException ex)
+            {
+                throw new InvalidDataException($"设置文件 JSON 损坏：{_filePath}。", ex);
+            }
+
+            try
+            {
+                loaded = Normalize(loaded);
+                UnprotectSecrets(loaded);
+                Volatile.Write(ref _settings, loaded);
+            }
+            catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                throw new InvalidDataException($"设置文件包含无效配置：{_filePath}。{ex.Message}", ex);
             }
         }
 

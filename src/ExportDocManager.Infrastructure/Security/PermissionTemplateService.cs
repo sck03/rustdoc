@@ -1,3 +1,6 @@
+using System.Data;
+using Microsoft.Data.Sqlite;
+using Npgsql;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
@@ -25,7 +28,7 @@ namespace ExportDocManager.Services.Security
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             return (await context.PermissionTemplates
                     .AsNoTracking()
-                    .Include(template => template.Modules)
+                    .Include(template => template.Grants)
                     .OrderByDescending(template => template.IsSystem)
                     .ThenBy(template => template.Name)
                     .ToListAsync(cancellationToken))
@@ -45,81 +48,140 @@ namespace ExportDocManager.Services.Security
                 throw new ServiceValidationException("权限模板名称不能为空。");
             }
 
-            var modules = NormalizeModules(request.Modules);
-            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            bool duplicateCode = await context.PermissionTemplates.AnyAsync(
-                template => template.Id != request.Id && template.Code == code,
+            return await AppDbContextExecution.ExecuteInTransactionAsync(
+                _contextFactory,
+                async (context, token) =>
+                {
+                    string normalizedCode = CanonicalKey(code);
+                    bool duplicateCode = await context.PermissionTemplates.AnyAsync(
+                        template => template.Id != request.Id && template.CodeNormalized == normalizedCode,
+                        token);
+                    if (duplicateCode)
+                    {
+                        throw new ResourceConflictException("权限模板代码已存在。");
+                    }
+
+                    PermissionTemplate template;
+                    if (request.Id <= 0)
+                    {
+                        if (request.ExpectedVersion != 0)
+                        {
+                            throw new BusinessConcurrencyException("新建权限模板不能携带旧版本号，请刷新后重试。");
+                        }
+
+                        template = new PermissionTemplate
+                        {
+                            Code = code,
+                            IsSystem = false,
+                            VersionNumber = 1
+                        };
+                        context.PermissionTemplates.Add(template);
+                    }
+                    else
+                    {
+                        if (request.ExpectedVersion <= 0)
+                        {
+                            throw new BusinessConcurrencyException("保存现有权限模板时必须提供版本号，请刷新后重试。");
+                        }
+
+                        template = await context.PermissionTemplates
+                            .Include(item => item.Grants)
+                            .FirstOrDefaultAsync(item => item.Id == request.Id, token)
+                            ?? throw new ResourceNotFoundException("未找到权限模板。");
+                        if (template.VersionNumber != request.ExpectedVersion)
+                        {
+                            throw new BusinessConcurrencyException("该权限模板已被其他管理员修改，请刷新后重试。");
+                        }
+
+                        if (template.IsSystem &&
+                            string.Equals(template.Code, BuiltInPermissionTemplateCatalog.Admin, StringComparison.OrdinalIgnoreCase))
+                        {
+                            throw new ResourceConflictException("系统管理员模板不可修改。");
+                        }
+
+                        context.Entry(template).Property(item => item.VersionNumber).OriginalValue = request.ExpectedVersion;
+                        template.VersionNumber++;
+                        context.PermissionTemplateGrants.RemoveRange(template.Grants);
+                        template.Grants.Clear();
+                        if (!template.IsSystem)
+                        {
+                            template.Code = code;
+                        }
+                    }
+
+                    var grants = NormalizeGrants(request.Grants);
+                    template.Name = name;
+                    template.Description = (request.Description ?? string.Empty).Trim();
+                    template.IsActive = template.IsSystem || request.IsActive;
+                    template.UpdatedAt = _clock.UtcNow;
+                    template.Grants.AddRange(grants.Select(grant => new PermissionTemplateGrant
+                    {
+                        ResourceKey = grant.ResourceKey,
+                        Action = grant.Action,
+                        DataScope = grant.DataScope
+                    }));
+
+                    try
+                    {
+                        await context.SaveChangesAsync(token);
+                    }
+                    catch (DbUpdateConcurrencyException exception)
+                    {
+                        throw new BusinessConcurrencyException("该权限模板已被其他管理员修改，请刷新后重试。", exception);
+                    }
+                    catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
+                    {
+                        throw new ResourceConflictException("权限模板代码已存在。", exception);
+                    }
+
+                    return ToRecord(template);
+                },
+                IsolationLevel.Serializable,
                 cancellationToken);
-            if (duplicateCode)
-            {
-                throw new ResourceConflictException("权限模板代码已存在。");
-            }
-
-            PermissionTemplate template;
-            if (request.Id <= 0)
-            {
-                template = new PermissionTemplate
-                {
-                    Code = code,
-                    IsSystem = false
-                };
-                context.PermissionTemplates.Add(template);
-            }
-            else
-            {
-                template = await context.PermissionTemplates
-                    .Include(item => item.Modules)
-                    .FirstOrDefaultAsync(item => item.Id == request.Id, cancellationToken)
-                    ?? throw new ResourceNotFoundException("未找到权限模板。");
-                if (template.IsSystem &&
-                    string.Equals(template.Code, BuiltInPermissionTemplateCatalog.Admin, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new ResourceConflictException("系统管理员模板不可修改。");
-                }
-
-                context.PermissionTemplateModules.RemoveRange(template.Modules);
-                template.Modules.Clear();
-                if (!template.IsSystem)
-                {
-                    template.Code = code;
-                }
-            }
-
-            template.Name = name;
-            template.Description = (request.Description ?? string.Empty).Trim();
-            template.IsActive = template.IsSystem || request.IsActive;
-            template.UpdatedAt = _clock.UtcNow;
-            template.Modules = modules.Select(module => new PermissionTemplateModule
-            {
-                ModuleKey = module.ModuleKey,
-                AccessLevel = module.AccessLevel
-            }).ToList();
-
-            await context.SaveChangesAsync(cancellationToken);
-            return ToRecord(template);
         }
 
-        public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
+        public async Task<bool> DeleteAsync(
+            int id,
+            CancellationToken cancellationToken = default,
+            int expectedVersion = 0)
         {
             if (id <= 0) return false;
-            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            var template = await context.PermissionTemplates
-                .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
-            if (template == null) return false;
-            if (template.IsSystem)
-            {
-                throw new ResourceConflictException("系统内置权限模板不可删除。");
-            }
+            return await AppDbContextExecution.ExecuteInTransactionAsync(
+                _contextFactory,
+                async (context, token) =>
+                {
+                    var template = await context.PermissionTemplates
+                        .FirstOrDefaultAsync(item => item.Id == id, token);
+                    if (template == null) return false;
+                    if (expectedVersion <= 0 || template.VersionNumber != expectedVersion)
+                    {
+                        throw new BusinessConcurrencyException("该权限模板已被其他管理员修改，请刷新后重试。");
+                    }
+                    if (template.IsSystem)
+                    {
+                        throw new ResourceConflictException("系统内置权限模板不可删除。");
+                    }
 
-            bool inUse = await context.Users.AnyAsync(user => user.PermissionTemplateId == id, cancellationToken);
-            if (inUse)
-            {
-                throw new ResourceConflictException("权限模板仍有用户使用，不能删除。");
-            }
+                    bool inUse = await context.Users.AnyAsync(user => user.PermissionTemplateId == id, token);
+                    if (inUse)
+                    {
+                        throw new ResourceConflictException("权限模板仍有用户使用，不能删除。");
+                    }
 
-            context.PermissionTemplates.Remove(template);
-            await context.SaveChangesAsync(cancellationToken);
-            return true;
+                    context.Entry(template).Property(item => item.VersionNumber).OriginalValue = expectedVersion;
+                    context.PermissionTemplates.Remove(template);
+                    try
+                    {
+                        await context.SaveChangesAsync(token);
+                    }
+                    catch (DbUpdateConcurrencyException exception)
+                    {
+                        throw new BusinessConcurrencyException("该权限模板已被其他管理员修改，请刷新后重试。", exception);
+                    }
+                    return true;
+                },
+                IsolationLevel.Serializable,
+                cancellationToken);
         }
 
         public async Task<IReadOnlyList<int>> ListAssignedUserIdsAsync(
@@ -148,14 +210,30 @@ namespace ExportDocManager.Services.Security
                 template.IsSystem,
                 template.IsActive,
                 template.UpdatedAt,
-                template.Modules
-                    .OrderBy(module => PermissionModuleCatalog.ByKey.TryGetValue(module.ModuleKey, out var definition)
-                        ? definition.SortOrder
-                        : int.MaxValue)
-                    .Select(module => new PermissionTemplateModuleRecord(
-                        module.ModuleKey,
-                        PermissionAccessLevel.Normalize(module.AccessLevel)))
-                    .ToArray());
+                NormalizePersistedGrants(template.Grants),
+                PermissionResourceCatalog.ExpandDependencies(NormalizePersistedGrants(template.Grants)),
+                template.VersionNumber);
+
+        private static string CanonicalKey(string? value) =>
+            (value ?? string.Empty).Trim().Normalize(System.Text.NormalizationForm.FormC).ToUpperInvariant();
+
+        private static bool IsUniqueConstraintViolation(Exception exception)
+        {
+            for (Exception? current = exception; current != null; current = current.InnerException)
+            {
+                if (current is PostgresException postgres && postgres.SqlState == PostgresErrorCodes.UniqueViolation)
+                {
+                    return true;
+                }
+
+                if (current is SqliteException sqlite && sqlite.SqliteErrorCode == 19)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         private static string NormalizeCode(string value)
         {
@@ -174,28 +252,65 @@ namespace ExportDocManager.Services.Security
             return code;
         }
 
-        private static IReadOnlyList<PermissionTemplateModuleRecord> NormalizeModules(
-            IReadOnlyList<PermissionTemplateModuleRecord> modules)
+        private static IReadOnlyList<PermissionGrantRecord> NormalizeGrants(
+            IReadOnlyList<PermissionGrantRecord> grants)
         {
-            var submitted = modules ?? [];
-            var invalidAccessLevel = submitted.FirstOrDefault(module =>
-                PermissionModuleCatalog.IsKnown(module.ModuleKey) &&
-                !PermissionAccessLevel.IsKnown(module.AccessLevel));
-            if (invalidAccessLevel != null)
+            var submitted = grants ?? [];
+            var invalidGrant = submitted.FirstOrDefault(grant =>
+                !PermissionResourceCatalog.IsKnownAction(grant.ResourceKey, grant.Action) ||
+                !PermissionDataScope.IsKnown(grant.DataScope));
+            if (invalidGrant != null)
             {
-                throw new ServiceValidationException($"模块 {invalidAccessLevel.ModuleKey} 的访问级别无效。");
+                throw new ServiceValidationException(
+                    $"权限 {invalidGrant.ResourceKey}/{invalidGrant.Action} 或其数据范围无效，请刷新权限目录后重试。");
             }
 
-            var normalized = submitted
-                .Where(module => PermissionModuleCatalog.IsKnown(module.ModuleKey))
-                .GroupBy(module => module.ModuleKey.Trim(), StringComparer.OrdinalIgnoreCase)
-                .Select(group => new PermissionTemplateModuleRecord(
-                    group.Key,
-                    PermissionAccessLevel.Normalize(group.Last().AccessLevel)))
-                .ToArray();
+            var technicalGrant = submitted.FirstOrDefault(grant =>
+                PermissionResourceCatalog.ByKey.TryGetValue(grant.ResourceKey?.Trim() ?? string.Empty, out var resource) &&
+                resource.IsTechnical);
+            if (technicalGrant != null)
+            {
+                throw new ServiceValidationException(
+                    $"{PermissionResourceCatalog.ByKey[technicalGrant.ResourceKey.Trim()].Name} 是系统身份或技术依赖能力，不能由岗位模板直接授予。");
+            }
 
-            return PermissionModuleCatalog.ExpandDependencies(normalized)
-                .Select(grant => new PermissionTemplateModuleRecord(grant.Key, grant.Value))
+            var duplicate = submitted
+                .GroupBy(grant => PermissionResourceCatalog.CreateGrantKey(grant.ResourceKey, grant.Action),
+                    StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault(group => group.Count() > 1);
+            if (duplicate != null)
+            {
+                var item = duplicate.First();
+                throw new ServiceValidationException($"权限 {item.ResourceKey}/{item.Action} 被重复提交。");
+            }
+
+            return submitted
+                .Select(PermissionResourceCatalog.NormalizeGrant)
+                .OrderBy(grant => PermissionResourceCatalog.ByKey[grant.ResourceKey].SortOrder)
+                .ThenBy(grant => PermissionResourceCatalog.ByKey[grant.ResourceKey].Actions.Single(action =>
+                    string.Equals(action.Key, grant.Action, StringComparison.OrdinalIgnoreCase)).SortOrder)
+                .ToArray();
+        }
+
+        private static IReadOnlyList<PermissionGrantRecord> NormalizePersistedGrants(
+            IEnumerable<PermissionTemplateGrant> grants)
+        {
+            return grants
+                .Where(grant => PermissionResourceCatalog.IsKnownAction(grant.ResourceKey, grant.Action) &&
+                    PermissionDataScope.IsKnown(grant.DataScope))
+                .GroupBy(grant => PermissionResourceCatalog.CreateGrantKey(grant.ResourceKey, grant.Action),
+                    StringComparer.OrdinalIgnoreCase)
+                // Duplicate/corrupt rows fail closed to the narrowest scope.
+                .Select(group => new PermissionGrantRecord(
+                    PermissionResourceCatalog.ByKey[group.First().ResourceKey].Key,
+                    PermissionResourceCatalog.ByKey[group.First().ResourceKey].Actions.Single(action =>
+                        string.Equals(action.Key, group.First().Action, StringComparison.OrdinalIgnoreCase)).Key,
+                    group.Select(item => PermissionDataScope.Normalize(item.DataScope))
+                        .OrderBy(PermissionDataScope.Rank)
+                        .First()))
+                .OrderBy(grant => PermissionResourceCatalog.ByKey[grant.ResourceKey].SortOrder)
+                .ThenBy(grant => PermissionResourceCatalog.ByKey[grant.ResourceKey].Actions.Single(action =>
+                    string.Equals(action.Key, grant.Action, StringComparison.OrdinalIgnoreCase)).SortOrder)
                 .ToArray();
         }
     }

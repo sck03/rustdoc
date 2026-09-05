@@ -5,7 +5,8 @@ import { PathField } from "../../ui/PathField.tsx";
 
 export function ReportTemplateFilePanel({
   desktopAvailable,
-  canManageTemplates,
+  canExportTemplates,
+  canImportTemplates,
   isBusy,
   exportPath,
   importPath,
@@ -27,7 +28,8 @@ export function ReportTemplateFilePanel({
   onChooseImportPath,
 }: {
   desktopAvailable: boolean;
-  canManageTemplates: boolean;
+  canExportTemplates: boolean;
+  canImportTemplates: boolean;
   isBusy: boolean;
   exportPath: string;
   importPath: string;
@@ -92,10 +94,10 @@ export function ReportTemplateFilePanel({
               <PathField
                 label="导出路径"
                 value={exportPath}
-                disabled={!canManageTemplates || isBusy}
+                disabled={!canExportTemplates || isBusy}
                 onChange={onExportPathChange}
                 actions={
-                  <DesktopIconButton title="选择文件导出位置" disabled={!canManageTemplates || isBusy} onClick={onChooseExportPath}>
+                  <DesktopIconButton title="选择文件导出位置" disabled={!canExportTemplates || isBusy} onClick={onChooseExportPath}>
                     <FolderOpen size={15} aria-hidden="true" />
                   </DesktopIconButton>
                 }
@@ -107,10 +109,10 @@ export function ReportTemplateFilePanel({
               <PathField
                 label="导入路径"
                 value={importPath}
-                disabled={!canManageTemplates || isBusy}
+                disabled={!canImportTemplates || isBusy}
                 onChange={onImportPathChange}
                 actions={
-                  <DesktopIconButton title="选择导入文件" disabled={!canManageTemplates || isBusy} onClick={onChooseImportPath}>
+                  <DesktopIconButton title="选择导入文件" disabled={!canImportTemplates || isBusy} onClick={onChooseImportPath}>
                     <FolderOpen size={15} aria-hidden="true" />
                   </DesktopIconButton>
                 }

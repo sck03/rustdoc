@@ -12,6 +12,7 @@ internal enum ApiResourceProfile
     Interactive,
     Login,
     Identity,
+    EmailDelivery,
     Workload,
     Maintenance,
     Streaming
@@ -24,6 +25,7 @@ internal static class ApiResourcePolicyCatalog
     public const string InteractiveTimeoutPolicy = "api-interactive";
     public const string LoginTimeoutPolicy = "api-login";
     public const string IdentityTimeoutPolicy = "api-identity";
+    public const string EmailDeliveryTimeoutPolicy = "api-email-delivery";
     public const string WorkloadTimeoutPolicy = "api-workload";
     public const string MaintenanceTimeoutPolicy = "api-maintenance";
     public const string StreamingTimeoutPolicy = "api-streaming";
@@ -32,6 +34,7 @@ internal static class ApiResourcePolicyCatalog
     {
         ApiResourceProfile.Login => LoginTimeoutPolicy,
         ApiResourceProfile.Identity => IdentityTimeoutPolicy,
+        ApiResourceProfile.EmailDelivery => EmailDeliveryTimeoutPolicy,
         ApiResourceProfile.Workload => WorkloadTimeoutPolicy,
         ApiResourceProfile.Maintenance => MaintenanceTimeoutPolicy,
         ApiResourceProfile.Streaming => StreamingTimeoutPolicy,
@@ -42,6 +45,7 @@ internal static class ApiResourcePolicyCatalog
     {
         ApiResourceProfile.Login => new(120, 8, 4),
         ApiResourceProfile.Identity => new(300, 16, 8),
+        ApiResourceProfile.EmailDelivery => new(12, 2, 0),
         ApiResourceProfile.Workload => new(90, 12, 4),
         ApiResourceProfile.Maintenance => new(20, 2, 1),
         ApiResourceProfile.Streaming => new(60, 12, 4),
@@ -80,6 +84,7 @@ internal static class ApiResourceGovernanceExtensions
             options.AddPolicy(ApiResourcePolicyCatalog.InteractiveTimeoutPolicy, TimeSpan.FromMinutes(1));
             options.AddPolicy(ApiResourcePolicyCatalog.LoginTimeoutPolicy, TimeSpan.FromSeconds(20));
             options.AddPolicy(ApiResourcePolicyCatalog.IdentityTimeoutPolicy, TimeSpan.FromSeconds(30));
+            options.AddPolicy(ApiResourcePolicyCatalog.EmailDeliveryTimeoutPolicy, TimeSpan.FromSeconds(90));
             options.AddPolicy(ApiResourcePolicyCatalog.WorkloadTimeoutPolicy, TimeSpan.FromMinutes(5));
             options.AddPolicy(ApiResourcePolicyCatalog.MaintenanceTimeoutPolicy, TimeSpan.FromMinutes(35));
             options.AddPolicy(ApiResourcePolicyCatalog.StreamingTimeoutPolicy, TimeSpan.FromMinutes(30));

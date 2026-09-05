@@ -42,7 +42,7 @@ public sealed class SmtpEmailService : IEmailService
         var config = Config;
         string smtpHost = RequireValue(config.SmtpHost, "SMTP 服务器未配置，请先到“系统设置 > 邮件设置”中填写。");
         string fromAddress = ResolveFromAddress(config);
-        string recipientAddress = RequireValue(to, "收件人地址不能为空。");
+        string recipientAddress = EmailRecipientPolicy.ValidateAndNormalize(to, config);
         var attachmentPaths = EmailAttachmentPolicy.ValidateAndNormalize(attachments ?? []);
         var message = BuildMessage(
             fromAddress,

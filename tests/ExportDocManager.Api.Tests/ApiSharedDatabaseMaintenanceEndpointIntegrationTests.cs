@@ -23,6 +23,31 @@ namespace ExportDocManager.Api.Tests
             var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
             using var adminClient = harness.CreateClient(adminLogin.AccessToken);
 
+            foreach (var company in new[]
+                     {
+                         new { code = "HQ", name = "总部公司", isActive = true },
+                         new { code = "CN", name = "中国公司", isActive = true }
+                     })
+            {
+                var response = await adminClient.PostAsJsonAsync(
+                    "/api/organization-directory/companies",
+                    company);
+                Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            }
+
+            foreach (var department in new[]
+                     {
+                         new { code = "OPS", companyCode = "HQ", name = "运营部", isActive = true },
+                         new { code = "DOC", companyCode = "CN", name = "单证部", isActive = true },
+                         new { code = "OLD", companyCode = "CN", name = "停用账号部门", isActive = true }
+                     })
+            {
+                var response = await adminClient.PostAsJsonAsync(
+                    "/api/organization-directory/departments",
+                    department);
+                Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            }
+
             var createOperatorResponse = await adminClient.PostAsJsonAsync("/api/users", new
             {
                 username = "shared-operator",

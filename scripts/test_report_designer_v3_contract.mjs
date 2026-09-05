@@ -227,7 +227,7 @@ const manyElementsLayer = {
   })),
 };
 const capped = api.normalizeReportDesignerV3Schema({ ...migrated.schema, layers: [manyElementsLayer, ...migrated.schema.layers.slice(1)] });
-assert(capped.schema?.layers[0].elements.length === api.REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER, "图层元素上限必须实际截断");
+assert(capped.schema === null && api.hasBlockingReportDesignerV3SchemaIssues(capped.issues), "V3 超出单图层容量必须拒绝，不能截断为可保存模板");
 
 const legacyOverflow = api.migrateReportDesignerSchemaV2ToV3({
   ...legacyA5,
@@ -265,7 +265,20 @@ const manyLayers = Array.from({ length: api.REPORT_DESIGNER_V3_MAX_LAYER_COUNT +
   elements: [],
 }));
 const cappedLayers = api.normalizeReportDesignerV3Schema({ ...migrated.schema, layers: manyLayers });
-assert(cappedLayers.schema?.layers.length <= api.REPORT_DESIGNER_V3_MAX_LAYER_COUNT, "图层上限不能生成第 17 层或更多图层");
+assert(cappedLayers.schema === null && api.hasBlockingReportDesignerV3SchemaIssues(cappedLayers.issues), "超出图层容量必须明确拒绝，不能丢弃图层");
+const totalOverflow = api.normalizeReportDesignerV3Schema({
+  ...migrated.schema,
+  layers: Array.from({ length: Math.floor(api.REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS / api.REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER) + 1 }, (_, index) => ({
+    ...manyElementsLayer,
+    id: `total-cap-${index}`,
+    elements: manyElementsLayer.elements.slice(0, api.REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER),
+  })),
+});
+assert(totalOverflow.schema === null && api.hasBlockingReportDesignerV3SchemaIssues(totalOverflow.issues), "跨图层总容量超限必须拒绝");
+const resourceOverflow = api.normalizeReportDesignerV3Schema({
+  ...migrated.schema, resources: Array.from({ length: api.REPORT_DESIGNER_V3_MAX_RESOURCES + 1 }, () => ({})),
+});
+assert(resourceOverflow.schema === null && api.hasBlockingReportDesignerV3SchemaIssues(resourceOverflow.issues), "图片清单超限必须拒绝，不能截断资源引用");
 
 let state = api.createReportDesignerV3DocumentState(migrated.schema);
 const layerId = state.activeLayerId;
@@ -598,6 +611,9 @@ const featureBase = {
 };
 const featureSchema = {
   version: 3,
+  astKind: "ReportDocument",
+  coordinateUnit: "hundredth-mm",
+  contractVersion: "3.0",
   reportType: "ExportDocument",
   page: {
     size: "A4",
@@ -735,6 +751,7 @@ const controlledImageSchema = {
           id: "controlled-image",
           type: "Image",
           sourceKind: "Resource",
+          purpose: "Image",
           resourceId: `img-${"a".repeat(64)}.png`,
           altText: "印章",
           hideWhenSourceEmpty: false,

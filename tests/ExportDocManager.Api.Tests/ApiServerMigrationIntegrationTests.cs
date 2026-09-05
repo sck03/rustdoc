@@ -309,6 +309,8 @@ namespace ExportDocManager.Api.Tests
         {
             ApiLoginResponse initial = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
             using var initialAdminClient = harness.CreateClient(initial.AccessToken);
+            var usersResponse = await initialAdminClient.GetFromJsonAsync<ApiUserListResponse>("/api/users");
+            var currentAdmin = Assert.Single(usersResponse!.Users, user => user.Id == initial.User.Id);
             var updateResponse = await initialAdminClient.PutAsJsonAsync(
                 $"/api/users/{initial.User.Id}",
                 new
@@ -320,7 +322,8 @@ namespace ExportDocManager.Api.Tests
                     departmentId = string.Empty,
                     companyScope = string.Empty,
                     isActive = true,
-                    resetPassword = AdminPassword
+                    resetPassword = AdminPassword,
+                    expectedVersion = currentAdmin.VersionNumber
                 });
             Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
             return await harness.LoginAsync(anonymousClient, "admin", AdminPassword);

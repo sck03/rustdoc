@@ -35,6 +35,7 @@ namespace ExportDocManager.Api.Hosting
                     ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
             })
             .WithName("ListDatabaseBackups")
+            .WithApiCapability(PermissionResourceCatalog.SystemBackup, PermissionAction.Manage)
             .Produces<ApiBackupListResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
@@ -54,6 +55,7 @@ namespace ExportDocManager.Api.Hosting
                 return AcceptedBackgroundJob(EnqueueDatabaseBackupJob(jobRunner, user.Username));
             })
             .WithName("CreateDatabaseBackup")
+            .WithApiCapability(PermissionResourceCatalog.SystemBackup, PermissionAction.Manage)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
@@ -97,6 +99,7 @@ namespace ExportDocManager.Api.Hosting
                     list.StoragePolicy));
             })
             .WithName("CleanupDatabaseBackups")
+            .WithApiCapability(PermissionResourceCatalog.SystemBackup, PermissionAction.Manage)
             .Produces<ApiBackupCreateResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -137,6 +140,7 @@ namespace ExportDocManager.Api.Hosting
                     backupPath));
             })
             .WithName("RestoreDatabaseBackup")
+            .WithApiCapability(PermissionResourceCatalog.SystemBackup, PermissionAction.Manage)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -168,6 +172,7 @@ namespace ExportDocManager.Api.Hosting
                     status.StoragePolicy));
             })
             .WithName("GetDisasterRecoveryStatus")
+            .WithApiCapability(PermissionResourceCatalog.SystemDisasterRecovery, PermissionAction.Manage)
             .Produces<ApiDisasterRecoveryStatusResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
@@ -202,6 +207,7 @@ namespace ExportDocManager.Api.Hosting
                     request.Password));
             })
             .WithName("CreateDisasterRecoveryPackage")
+            .WithApiCapability(PermissionResourceCatalog.SystemDisasterRecovery, PermissionAction.Manage)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -246,6 +252,7 @@ namespace ExportDocManager.Api.Hosting
                     request.Password));
             })
             .WithName("RestoreDisasterRecoveryPackage")
+            .WithApiCapability(PermissionResourceCatalog.SystemDisasterRecovery, PermissionAction.Manage)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -283,6 +290,7 @@ namespace ExportDocManager.Api.Hosting
                     CloudBackupStoragePolicy));
             })
             .WithName("GetCloudBackupStatus")
+            .WithApiCapability(PermissionResourceCatalog.SystemBackup, PermissionAction.Manage)
             .Produces<ApiCloudBackupStatusResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
@@ -326,6 +334,7 @@ namespace ExportDocManager.Api.Hosting
                     CloudBackupStoragePolicy));
             })
             .WithName("TestCloudBackupConnection")
+            .WithApiCapability(PermissionResourceCatalog.SystemBackup, PermissionAction.Manage)
             .Produces<ApiCloudBackupCommandResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
@@ -367,6 +376,7 @@ namespace ExportDocManager.Api.Hosting
                 return AcceptedBackgroundJob(EnqueueCloudBackupUploadJob(jobRunner, user.Username));
             })
             .WithName("UploadLatestDatabaseBackupToCloud")
+            .WithApiCapability(PermissionResourceCatalog.SystemBackup, PermissionAction.Manage)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
@@ -424,6 +434,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("ListCloudDatabaseBackups")
+            .WithApiCapability(PermissionResourceCatalog.SystemBackup, PermissionAction.Manage)
             .Produces<ApiCloudBackupListResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
@@ -472,6 +483,7 @@ namespace ExportDocManager.Api.Hosting
                     remoteFileName));
             })
             .WithName("DownloadCloudDatabaseBackup")
+            .WithApiCapability(PermissionResourceCatalog.SystemBackup, PermissionAction.Manage)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)

@@ -184,15 +184,14 @@ namespace ExportDocManager.Api.Tests
                 StringComparison.Ordinal);
             Assert.DoesNotContain(
                 ".Produces",
-                File.ReadAllText(Path.Combine(hostingRoot, "ApiEmailTemplateEndpointRouteBuilderExtensions.cs")),
-                StringComparison.Ordinal);
-            Assert.DoesNotContain(
-                ".Produces",
                 File.ReadAllText(Path.Combine(hostingRoot, "ApiSalesOpportunityEndpointRouteBuilderExtensions.cs")),
                 StringComparison.Ordinal);
 
             foreach (string fileName in new[]
             {
+                // JSON 403 responses use the typed error helper because
+                // ForbidHttpResult requires an ASP.NET authentication scheme.
+                "ApiEmailTemplateEndpointRouteBuilderExtensions.cs",
                 "ApiInvoiceDataMaintenanceEndpointRouteBuilderExtensions.cs",
                 "ApiPermissionTemplateEndpointRouteBuilderExtensions.cs",
                 "ApiUserEndpointRouteBuilderExtensions.cs"

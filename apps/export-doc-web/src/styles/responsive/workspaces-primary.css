@@ -35,8 +35,7 @@
     flex-direction: column;
   }
 
-  .identity-management-tabs,
-  .permission-level-guide {
+  .identity-management-tabs {
     grid-template-columns: 1fr;
   }
 

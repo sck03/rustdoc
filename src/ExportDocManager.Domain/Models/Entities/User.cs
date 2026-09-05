@@ -11,6 +11,15 @@ namespace ExportDocManager.Models.Entities
         [MaxLength(50)]
         public string Username { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Canonical key used by the database uniqueness constraint.  Keeping
+        /// the display value separate means usernames remain readable while
+        /// uniqueness is deterministic on every supported provider.
+        /// </summary>
+        [Required]
+        [MaxLength(50)]
+        public string UsernameNormalized { get; set; } = string.Empty;
+
         [Required]
         [MaxLength(255)]
         public string PasswordHash { get; set; } = string.Empty;
@@ -29,15 +38,22 @@ namespace ExportDocManager.Models.Entities
         public PermissionTemplate? PermissionTemplate { get; set; }
 
         [NotMapped]
-        public IReadOnlyDictionary<string, string> EffectiveModuleAccess { get; set; } =
+        public IReadOnlyDictionary<string, string> EffectivePermissionGrants { get; set; } =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         [MaxLength(50)]
-        public string DepartmentId { get; set; } = string.Empty;
+        public string? DepartmentId { get; set; }
 
         [MaxLength(50)]
-        public string CompanyScope { get; set; } = string.Empty;
+        public string? CompanyScope { get; set; }
 
         public bool IsActive { get; set; } = true;
+
+        /// <summary>
+        /// Application-managed optimistic concurrency token.  Account edits
+        /// and deletes must carry the value returned by the last read.
+        /// </summary>
+        [ConcurrencyCheck]
+        public int VersionNumber { get; set; } = 1;
     }
 }

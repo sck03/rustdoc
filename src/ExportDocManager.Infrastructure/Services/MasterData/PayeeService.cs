@@ -9,6 +9,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using ExportDocManager.Utils;
+using ExportDocManager.Services.Security;
 
 namespace ExportDocManager.Services.MasterData
 {
@@ -16,13 +17,16 @@ namespace ExportDocManager.Services.MasterData
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly IPayeeReadRepository _payeeReadRepository;
+        private readonly BusinessDataAccessScope _accessScope;
 
         public PayeeService(
             IDbContextFactory<AppDbContext> contextFactory,
-            IPayeeReadRepository payeeReadRepository)
+            IPayeeReadRepository payeeReadRepository,
+            BusinessDataAccessScope accessScope)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _payeeReadRepository = payeeReadRepository ?? throw new ArgumentNullException(nameof(payeeReadRepository));
+            _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
         }
 
         public async Task<int> SavePayeeAsync(
@@ -37,10 +41,22 @@ namespace ExportDocManager.Services.MasterData
                 using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
                 if (payee.Id == 0)
                 {
+                    _accessScope.ApplyOwner(payee);
                     await context.Payees.AddAsync(payee, cancellationToken);
                 }
                 else
                 {
+                    var existing = await _accessScope.ApplyPayeeScope(context.Payees)
+                        .AsNoTracking()
+                        .SingleOrDefaultAsync(item => item.Id == payee.Id, cancellationToken);
+                    if (existing == null)
+                    {
+                        throw new ResourceNotFoundException("收款对象不存在或不属于当前账号。");
+                    }
+
+                    payee.OwnerUserId = existing.OwnerUserId;
+                    payee.DepartmentId = existing.DepartmentId;
+                    payee.CompanyScope = existing.CompanyScope;
                     context.Payees.Update(payee);
                 }
                 await context.SaveChangesAsync(cancellationToken);
@@ -67,7 +83,8 @@ namespace ExportDocManager.Services.MasterData
             try
             {
                 using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-                var entity = await context.Payees.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+                var entity = await _accessScope.ApplyPayeeScope(context.Payees)
+                    .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
                 if (entity == null)
                 {
                     return false;

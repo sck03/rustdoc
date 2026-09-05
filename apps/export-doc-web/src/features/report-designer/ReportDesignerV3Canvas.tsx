@@ -117,6 +117,7 @@ export function ReportDesignerV3Canvas({
 
   function beginMove(event: ReactPointerEvent<HTMLDivElement>, element: ReportDesignerV3Element, layerId: string) {
     if (event.button !== 0) return;
+    if (disabled) return;
     event.stopPropagation();
     const additive = event.shiftKey || event.ctrlKey || event.metaKey;
     const alreadySelected = state.selectedIds.includes(element.id);
@@ -132,7 +133,6 @@ export function ReportDesignerV3Canvas({
     // not the start of a drag.  Starting a gesture here would preview a move
     // while simultaneously removing the element from the selection.
     if (additive && alreadySelected) return;
-    if (disabled) return;
     const layer = state.schema.layers.find((candidate) => candidate.id === layerId);
     if (element.locked || layer?.locked) return;
     const baseState: ReportDesignerV3DocumentState = {
@@ -366,7 +366,7 @@ export function ReportDesignerV3Canvas({
           onPointerCancel={(event) => finishGesture(event, true)}
           onLostPointerCapture={handleLostPointerCapture}
           onPointerDown={(event) => {
-            if (event.target === event.currentTarget || (event.target instanceof HTMLElement && event.target.classList.contains("report-designer-v3-layer"))) onClearSelection();
+            if (!disabled && (event.target === event.currentTarget || (event.target instanceof HTMLElement && event.target.classList.contains("report-designer-v3-layer")))) onClearSelection();
           }}
           aria-readonly={disabled || undefined}
           role="region"
@@ -387,20 +387,20 @@ export function ReportDesignerV3Canvas({
                       data-v3-element-id={element.id}
                       onPointerDown={(event) => beginMove(event, element, layer.id)}
                       onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
+                        if (!disabled && (event.key === "Enter" || event.key === " ")) {
                           event.preventDefault();
                           onSelect(element.id, event.shiftKey || event.ctrlKey || event.metaKey);
                         }
                       }}
                       title={`${reportDesignerV3ElementText(element)}${element.locked ? "（已锁定）" : ""}`}
-                      role="button"
-                      tabIndex={0}
-                      aria-pressed={selected}
-                      aria-disabled={element.locked || layer.locked}
+                      role={disabled ? "img" : "button"}
+                      tabIndex={disabled ? -1 : 0}
+                      aria-pressed={disabled ? undefined : selected}
+                      aria-disabled={!disabled && (element.locked || layer.locked) || undefined}
                       aria-label={`${reportDesignerV3ElementText(element)}${element.locked ? "，已锁定" : ""}`}
                     >
                       <ReportDesignerCanvasElementPreview element={element} selectedGridCellId={selectedGridCell?.elementId === element.id ? selectedGridCell.cellId : undefined} />
-                      {selected && state.selectedIds.length === 1 && !element.locked && !layer.locked ? (
+                      {!disabled && selected && state.selectedIds.length === 1 && !element.locked && !layer.locked ? (
                         <ReportDesignerCanvasResizeHandles elementId={element.id} onPointerDown={beginResize} />
                       ) : null}
                       {selected && (element.locked || layer.locked) ? <span className="report-designer-v3-lock-badge">锁</span> : null}

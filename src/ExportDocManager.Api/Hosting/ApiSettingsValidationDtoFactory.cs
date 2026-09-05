@@ -264,6 +264,33 @@ namespace ExportDocManager.Api.Hosting
                     messages.Add(Warning("email.fromAddress", "邮件设置未填写发件人地址。", false));
                 }
             }
+
+            ValidateRecipientRules(
+                normalized.RecipientAllowList,
+                "email.recipientAllowList",
+                "收件人白名单",
+                messages);
+            ValidateRecipientRules(
+                normalized.RecipientBlockList,
+                "email.recipientBlockList",
+                "收件人黑名单",
+                messages);
+        }
+
+        private static void ValidateRecipientRules(
+            string? rules,
+            string propertyName,
+            string fieldName,
+            ICollection<ApiSettingsValidationMessageDto> messages)
+        {
+            try
+            {
+                _ = EmailRecipientPolicy.NormalizeRules(rules, fieldName);
+            }
+            catch (ServiceValidationException exception)
+            {
+                messages.Add(Error(propertyName, exception.Message, false));
+            }
         }
 
         private static void AddWebDavValidationMessages(

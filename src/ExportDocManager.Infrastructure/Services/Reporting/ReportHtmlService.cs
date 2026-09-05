@@ -21,6 +21,7 @@ namespace ExportDocManager.Services.Reporting
         private readonly IAppPathProvider _pathProvider;
         private readonly ReportTemplateV3ImageResourceHydrator _imageResourceHydrator;
         private readonly ILogger<ReportHtmlService> _logger;
+        private readonly ReportTemplateStorageCoordinator _storageCoordinator;
 
         private readonly SemaphoreSlim _templateConfigSemaphore = new(1, 1);
         private readonly Lock _configLock = new();
@@ -48,12 +49,21 @@ namespace ExportDocManager.Services.Reporting
                 imageResourceService ?? new ReportTemplateImageResourceService(pathProvider));
             _pathResolver = new ReportTemplatePathResolver(pathProvider);
             _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver, _logger);
+            _storageCoordinator = new ReportTemplateStorageCoordinator(pathProvider, settingsService, _logger);
         }
 
-        public async Task<IReadOnlyList<ReportTemplateDescriptor>> GetAvailableTemplatesAsync(
+        public Task<IReadOnlyList<ReportTemplateDescriptor>> GetAvailableTemplatesAsync(
             ReportDocumentType reportType,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default) =>
+            _storageCoordinator.ExecuteReadAsync(
+                () => GetAvailableTemplatesCoreAsync(reportType, cancellationToken),
+                cancellationToken);
+
+        private async Task<IReadOnlyList<ReportTemplateDescriptor>> GetAvailableTemplatesCoreAsync(
+            ReportDocumentType reportType,
+            CancellationToken cancellationToken)
         {
+            DemandReportTypeAccess(reportType);
             await EnsureTemplateConfigLoadedAsync(cancellationToken).ConfigureAwait(false);
             var result = new List<ReportTemplateDescriptor>();
 
@@ -106,7 +116,8 @@ namespace ExportDocManager.Services.Reporting
                 .ConfigureAwait(false);
             var userTemplates = await _accessScope
                 .ApplyUserReportTemplateScope(userTemplateContext.UserReportTemplates.AsNoTracking())
-                .Where(item => item.IsActive && item.ReportType == reportType.ToString())
+                .Where(item => item.Status == TemplateLifecycleStatusCatalog.Published &&
+                               item.ReportType == reportType.ToString())
                 .OrderBy(item => item.Name)
                 .Select(item => new { item.Id, item.Name })
                 .ToListAsync(cancellationToken)
@@ -139,6 +150,18 @@ namespace ExportDocManager.Services.Reporting
             }
 
             return result;
+        }
+
+        private void DemandReportTypeAccess(ReportDocumentType reportType)
+        {
+            // A missing current-user context represents an explicit internal
+            // system operation. Authenticated API requests always carry one.
+            if (_accessScope.CurrentUser != null)
+            {
+                _accessScope.DemandPermission(
+                    ReportDocumentAccessCatalog.GetSourceResource(reportType),
+                    PermissionAction.View);
+            }
         }
 
         public async Task<ReportHtmlRenderResult> RenderInvoiceReportAsync(
@@ -416,7 +439,15 @@ namespace ExportDocManager.Services.Reporting
             return resolvedTemplatePath;
         }
 
-        private async Task<(string Path, string Content)> LoadTemplateAsync(
+        private Task<(string Path, string Content)> LoadTemplateAsync(
+            ReportDocumentType reportType,
+            string? templatePath,
+            CancellationToken cancellationToken) =>
+            _storageCoordinator.ExecuteReadAsync(
+                () => LoadTemplateCoreAsync(reportType, templatePath, cancellationToken),
+                cancellationToken);
+
+        private async Task<(string Path, string Content)> LoadTemplateCoreAsync(
             ReportDocumentType reportType,
             string? templatePath,
             CancellationToken cancellationToken)
@@ -429,7 +460,9 @@ namespace ExportDocManager.Services.Reporting
             {
                 await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
                 var template = await _accessScope.ApplyUserReportTemplateScope(context.UserReportTemplates.AsNoTracking())
-                    .Where(item => item.Id == userTemplateId && item.IsActive && item.ReportType == reportType.ToString())
+                    .Where(item => item.Id == userTemplateId &&
+                                   item.Status == TemplateLifecycleStatusCatalog.Published &&
+                                   item.ReportType == reportType.ToString())
                     .Select(item => new { item.Id, item.ContentHtml })
                     .FirstOrDefaultAsync(cancellationToken)
                     .ConfigureAwait(false);
@@ -471,31 +504,14 @@ namespace ExportDocManager.Services.Reporting
                     return;
                 }
 
-                try
-                {
-                    var configs = (await _catalogLoader.LoadResolvedConfigsAsync(cancellationToken).ConfigureAwait(false)).ToList();
-                    var cache = _catalogLoader.BuildTemplatePathCache(configs);
+                var configs = (await _catalogLoader.LoadResolvedConfigsAsync(cancellationToken).ConfigureAwait(false)).ToList();
+                var cache = _catalogLoader.BuildTemplatePathCache(configs);
 
-                    lock (_configLock)
-                    {
-                        _templatePathCache = cache;
-                        _templateConfigs = configs;
-                        _templateConfigLoaded = true;
-                    }
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                lock (_configLock)
                 {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "加载报表模板配置失败，本次使用内置模板并在下次请求时重试");
-                    lock (_configLock)
-                    {
-                        _templatePathCache = new Dictionary<ReportDocumentType, string>();
-                        _templateConfigs = new List<ReportTemplateConfig>();
-                        _templateConfigLoaded = false;
-                    }
+                    _templatePathCache = cache;
+                    _templateConfigs = configs;
+                    _templateConfigLoaded = true;
                 }
             }
             finally
@@ -520,7 +536,9 @@ namespace ExportDocManager.Services.Reporting
                 {
                     await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
                     bool exists = await _accessScope.ApplyUserReportTemplateScope(context.UserReportTemplates.AsNoTracking())
-                        .AnyAsync(item => item.Id == userTemplateId && item.IsActive && item.ReportType == reportType.ToString(), cancellationToken)
+                        .AnyAsync(item => item.Id == userTemplateId &&
+                                          item.Status == TemplateLifecycleStatusCatalog.Published &&
+                                          item.ReportType == reportType.ToString(), cancellationToken)
                         .ConfigureAwait(false);
                     if (exists)
                     {

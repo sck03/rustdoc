@@ -74,6 +74,7 @@ export const queryKeys = {
   reportTemplatePreviewPayments: (pageSize: number) => ["reports", "templates", "preview-sources", "payments", { pageSize }] as const,
   settings: () => ["settings"] as const,
   users: () => ["users"] as const,
+  organizationDirectory: () => ["organization-directory"] as const,
   permissionTemplates: () => ["permission-templates"] as const,
   singleWindowAgentConsignmentDocument: (invoiceId: number) => ["single-window", "acd", invoiceId, "document"] as const,
   singleWindowAgentConsignmentExportReview: (invoiceId: number) =>

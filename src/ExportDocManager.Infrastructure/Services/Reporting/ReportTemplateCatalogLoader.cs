@@ -64,7 +64,7 @@ namespace ExportDocManager.Services.Reporting
                 }
                 else
                 {
-                    _logger?.LogWarning("报表模板配置文件格式无效");
+                    throw new InvalidDataException("报表模板配置文件格式无效，已拒绝回退到其它模板。");
                 }
             }
 
@@ -88,10 +88,14 @@ namespace ExportDocManager.Services.Reporting
                 }
 
                 var fullPath = Path.GetFullPath(row.FileName);
-                if (!File.Exists(fullPath) ||
-                    (!_pathResolver.IsBuiltInTemplatePath(fullPath) && !_pathResolver.IsUserTemplatePath(fullPath)))
+                if (!File.Exists(fullPath))
                 {
-                    continue;
+                    throw new FileNotFoundException("报表模板配置引用的文件不存在。", fullPath);
+                }
+
+                if (!_pathResolver.IsBuiltInTemplatePath(fullPath) && !_pathResolver.IsUserTemplatePath(fullPath))
+                {
+                    throw new InvalidDataException("报表模板配置引用了受管模板目录之外的文件。");
                 }
 
                 string catalogType = DetermineTemplateCatalogType(fullPath);

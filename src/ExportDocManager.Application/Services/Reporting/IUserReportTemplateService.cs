@@ -7,22 +7,37 @@ namespace ExportDocManager.Services.Reporting
         string ReportType,
         string Name,
         string ContentHtml,
-        bool IsActive,
-        bool IsShared,
+        string Status,
         string ShareScope,
         int VersionNumber,
         bool CanEdit,
+        bool CanPublish,
+        bool CanShare,
+        bool CanDisable,
+        bool CanRestore,
+        bool CanArchive,
         int? OwnerUserId);
 
-    public sealed record UserReportTemplateSaveRequest(
+    public sealed record UserReportTemplateDraftRequest(
         int Id,
         string ReportType,
         string Name,
         string ContentHtml,
-        bool IsActive,
-        bool IsShared,
-        string ShareScope = UserReportTemplateShareScope.Private,
         int ExpectedVersion = 0);
+
+    /// <summary>
+    /// The API composition root resolves built-in file content before calling
+    /// this command. Database template sources are resolved again by ID inside
+    /// the service so their visibility cannot be forged by a client payload.
+    /// Exactly one source must be supplied.
+    /// </summary>
+    public sealed record UserReportTemplateCloneRequest(
+        string ReportType,
+        string Name,
+        int SourceUserTemplateId = 0,
+        string ServerResolvedContentHtml = "");
+
+    public sealed record UserReportTemplateShareRequest(string ShareScope, int ExpectedVersion);
 
     public sealed record UserReportTemplateVersionRecord(
         int Id,
@@ -31,8 +46,7 @@ namespace ExportDocManager.Services.Reporting
         string ChangeType,
         string Name,
         string ContentHtml,
-        bool IsActive,
-        bool IsShared,
+        string Status,
         string ShareScope,
         string ChangedBy,
         DateTimeOffset CreatedAt,
@@ -49,12 +63,31 @@ namespace ExportDocManager.Services.Reporting
     {
         Task<IReadOnlyList<UserReportTemplateRecord>> ListAsync(
             ReportDocumentType reportType,
-            bool includeInactive = false,
+            bool includeArchived = false,
             CancellationToken cancellationToken = default);
 
-        Task<UserReportTemplateRecord> SaveAsync(
-            UserReportTemplateSaveRequest request,
+        Task<UserReportTemplateRecord> SaveDraftAsync(
+            UserReportTemplateDraftRequest request,
             CancellationToken cancellationToken = default);
+
+        Task<UserReportTemplateRecord> CloneAsync(
+            UserReportTemplateCloneRequest request,
+            CancellationToken cancellationToken = default);
+
+        Task<UserReportTemplateRecord> PublishAsync(
+            int id, int expectedVersion, CancellationToken cancellationToken = default);
+
+        Task<UserReportTemplateRecord> ShareAsync(
+            int id, UserReportTemplateShareRequest request, CancellationToken cancellationToken = default);
+
+        Task<UserReportTemplateRecord> DisableAsync(
+            int id, int expectedVersion, CancellationToken cancellationToken = default);
+
+        Task<UserReportTemplateRecord> RestoreAsync(
+            int id, int expectedVersion, CancellationToken cancellationToken = default);
+
+        Task<UserReportTemplateRecord> ArchiveAsync(
+            int id, int expectedVersion, CancellationToken cancellationToken = default);
 
         Task<IReadOnlyList<UserReportTemplateVersionRecord>> ListVersionsAsync(
             int id,
@@ -63,8 +96,7 @@ namespace ExportDocManager.Services.Reporting
         Task<UserReportTemplateRecord> RestoreVersionAsync(
             int id,
             int versionNumber,
+            int expectedVersion,
             CancellationToken cancellationToken = default);
-
-        Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
     }
 }

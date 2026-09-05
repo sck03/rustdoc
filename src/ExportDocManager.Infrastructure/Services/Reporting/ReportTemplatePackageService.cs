@@ -7,10 +7,18 @@ namespace ExportDocManager.Services.Reporting
 {
     public sealed partial class ReportTemplatePackageService : IReportTemplatePackageService
     {
-        public async Task<ReportTemplatePackageExportResult> ExportAsync(
+        public Task<ReportTemplatePackageExportResult> ExportAsync(
             string packagePath,
             IProgress<OperationProgressUpdate>? progress = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default) =>
+            _storageCoordinator.ExecuteReadAsync(
+                () => ExportCoreAsync(packagePath, progress, cancellationToken),
+                cancellationToken);
+
+        private async Task<ReportTemplatePackageExportResult> ExportCoreAsync(
+            string packagePath,
+            IProgress<OperationProgressUpdate>? progress,
+            CancellationToken cancellationToken)
         {
             string targetPath = NormalizeExportPackagePath(packagePath);
             string templatesRoot = _pathResolver.GetUserTemplatesBaseDirectory();
@@ -116,11 +124,21 @@ namespace ExportDocManager.Services.Reporting
             }
         }
 
-        public async Task<ReportTemplatePackageImportResult> ImportAsync(
+        public Task<ReportTemplatePackageImportResult> ImportAsync(
             string packagePath,
             ReportTemplateImportStrategy strategy = ReportTemplateImportStrategy.Overwrite,
             IProgress<OperationProgressUpdate>? progress = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default) =>
+            _storageCoordinator.ExecuteMutationAsync(
+                transaction => ImportCoreAsync(packagePath, strategy, progress, transaction, cancellationToken),
+                cancellationToken);
+
+        private async Task<ReportTemplatePackageImportResult> ImportCoreAsync(
+            string packagePath,
+            ReportTemplateImportStrategy strategy,
+            IProgress<OperationProgressUpdate>? progress,
+            ReportTemplateStorageCoordinator.ReportTemplateStorageMutation transaction,
+            CancellationToken cancellationToken)
         {
             string sourcePackagePath = NormalizeImportPackagePath(packagePath);
             if (!File.Exists(sourcePackagePath))
@@ -200,6 +218,7 @@ namespace ExportDocManager.Services.Reporting
                     ReportTemplateFilePolicy.ValidateExistingTemplatePath(sourceFile);
                     ReportTemplateFilePolicy.EnsureNoPortableCollision(targetFile);
                 }
+                transaction.MarkTemplatesChanged();
                 await CopyFilesAsync(
                     sourceFiles,
                     sourceTemplates,
@@ -245,6 +264,7 @@ namespace ExportDocManager.Services.Reporting
 
                 cancellationToken.ThrowIfCancellationRequested();
                 OperationProgressReporter.Report(progress, "正在保存模板配置", "正在写入默认模板、单据包和付款报表设置。", 90);
+                transaction.MarkSettingsChanged();
                 await _settingsService.UpdateAsync(settings =>
                 {
                     settings.ReportTemplateDefaults.ExportDocumentTemplatePath = ReportTemplatePackageReferencePolicy.MergeDefault(

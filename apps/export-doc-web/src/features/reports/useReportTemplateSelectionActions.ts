@@ -19,7 +19,6 @@ export function useReportTemplateSelectionActions({
   setNewTemplateFileName,
   setNewTemplateDisplayName,
   setNewUserTemplateName,
-  setNewUserTemplateShareScope,
   setRenameTemplateFileName,
   setTemplatePreviewSampleProfile,
   setPreviewInvoiceId,
@@ -38,7 +37,6 @@ export function useReportTemplateSelectionActions({
   setNewTemplateFileName: Dispatch<SetStateAction<string>>;
   setNewTemplateDisplayName: Dispatch<SetStateAction<string>>;
   setNewUserTemplateName: Dispatch<SetStateAction<string>>;
-  setNewUserTemplateShareScope: Dispatch<SetStateAction<string>>;
   setRenameTemplateFileName: Dispatch<SetStateAction<string>>;
   setTemplatePreviewSampleProfile: Dispatch<SetStateAction<ReportDesignerPreviewSampleProfile>>;
   setPreviewInvoiceId: Dispatch<SetStateAction<number>>;
@@ -66,7 +64,6 @@ export function useReportTemplateSelectionActions({
     setNewTemplateFileName(buildNewTemplateFileName(nextReportType));
     setNewTemplateDisplayName("");
     setNewUserTemplateName("");
-    setNewUserTemplateShareScope("Private");
     setRenameTemplateFileName("");
     setTemplatePreviewSampleProfile(readPreferredPreviewSampleProfile(nextReportType));
   }

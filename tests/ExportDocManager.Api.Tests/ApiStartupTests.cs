@@ -633,7 +633,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Contains(
                 capabilities.ModuleAccess,
                 grant => grant.ModuleKey == PermissionModuleCatalog.DocumentReports &&
-                         grant.AccessLevel == PermissionAccessLevel.Manage);
+                         grant.AccessLevel == PermissionAccessLevel.Operate);
         }
 
         [Fact]
@@ -644,7 +644,7 @@ namespace ExportDocManager.Api.Tests
             {
                 Role = UserRoleCatalog.User,
                 PermissionTemplateId = 99,
-                EffectiveModuleAccess = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                EffectivePermissionGrants = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             });
 
             Assert.Empty(capabilities.EnabledModules);
@@ -659,9 +659,11 @@ namespace ExportDocManager.Api.Tests
             var user = new User
             {
                 Role = UserRoleCatalog.User,
-                EffectiveModuleAccess = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                EffectivePermissionGrants = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    [PermissionModuleCatalog.DocumentPayments] = PermissionAccessLevel.View
+                    [PermissionResourceCatalog.CreateGrantKey(
+                        PermissionModuleCatalog.DocumentPayments,
+                        PermissionAction.View)] = PermissionDataScope.Own
                 }
             };
 
@@ -1713,7 +1715,8 @@ namespace ExportDocManager.Api.Tests
 
                 var result = await dispatcher.RetryAsync(
                     sourceJob,
-                    "admin",
+                    new User { Id = 1, Username = "admin", Role = UserRoleCatalog.Admin },
+                    new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full }),
                     new ThrowingInvoiceService(),
                     CancellationToken.None);
                 var response = ReadResult(result);
@@ -1765,7 +1768,8 @@ namespace ExportDocManager.Api.Tests
 
             var result = await dispatcher.RetryAsync(
                 sourceJob,
-                "admin",
+                new User { Id = 1, Username = "admin", Role = UserRoleCatalog.Admin },
+                new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full }),
                 new ThrowingInvoiceService(),
                 CancellationToken.None);
             var response = ReadResult(result);
@@ -1773,6 +1777,50 @@ namespace ExportDocManager.Api.Tests
 
             Assert.Equal(StatusCodes.Status409Conflict, response.StatusCode);
             Assert.Contains("无法重试", error.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task ApiBackgroundJobRetryDispatcher_ShouldRecheckCurrentOperationPermission()
+        {
+            var jobService = new ApiBackgroundJobService();
+            var services = new ServiceCollection();
+            using var provider = services.BuildServiceProvider();
+            var runner = new ApiBackgroundJobRunner(
+                jobService,
+                provider.GetRequiredService<IServiceScopeFactory>(),
+                NullLogger<ApiBackgroundJobRunner>.Instance);
+            var dispatcher = new ApiBackgroundJobRetryDispatcher(runner);
+            var sourceJob = new BackgroundJobSnapshot
+            {
+                JobId = "failed-after-permission-revocation",
+                Kind = "InvoiceReportPdf",
+                Title = "权限已撤销的任务",
+                Status = BackgroundJobStatusCatalog.Failed,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CanRetry = true,
+                RetryOperation = "StartInvoiceReportPdfJob",
+                RetryRequestJson = "{}"
+            };
+            var user = new User
+            {
+                Id = 7,
+                Username = "operator",
+                Role = UserRoleCatalog.User,
+                PermissionTemplateId = 12,
+                EffectivePermissionGrants = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            };
+
+            var result = await dispatcher.RetryAsync(
+                sourceJob,
+                user,
+                new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full }),
+                new ThrowingInvoiceService(),
+                CancellationToken.None);
+            var response = ReadResult(result);
+            var error = Assert.IsType<ApiErrorResponse>(response.Value);
+
+            Assert.Equal(StatusCodes.Status403Forbidden, response.StatusCode);
+            Assert.Contains("已不具备", error.Message, StringComparison.Ordinal);
         }
 
         [Fact]
@@ -2543,7 +2591,10 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<bool> DeleteUserAsync(int userId, CancellationToken cancellationToken = default)
+            public Task<bool> DeleteUserAsync(
+                int userId,
+                CancellationToken cancellationToken = default,
+                int expectedVersion = 0)
             {
                 throw new NotSupportedException();
             }

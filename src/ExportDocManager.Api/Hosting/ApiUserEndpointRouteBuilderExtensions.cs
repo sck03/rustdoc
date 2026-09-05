@@ -17,6 +17,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 IUserService userService,
                 IPermissionTemplateService permissionTemplateService,
+                IOrganizationDirectoryService organizationDirectoryService,
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.GetRequiredUser(context);
@@ -30,10 +31,13 @@ namespace ExportDocManager.Api.Hosting
                 {
                     var users = await userService.GetUsersAsync(cancellationToken);
                     var templates = await permissionTemplateService.ListAsync(cancellationToken);
+                    var organizations = await organizationDirectoryService.ListAsync(cancellationToken);
                     return TypedResults.Ok(new ApiUserListResponse(
                         users.Select(ApiUserManagementDtoFactory.FromUser).ToArray(),
                         UserRoleCatalog.Roles,
-                        templates.Select(ToPermissionTemplateOptionDto).ToArray()));
+                        templates.Select(ToPermissionTemplateOptionDto).ToArray(),
+                        organizations.Companies.Select(ToOrganizationCompanyDto).ToArray(),
+                        organizations.Departments.Select(ToOrganizationDepartmentDto).ToArray()));
                 }
                 catch (PermissionDeniedException ex)
                 {
@@ -41,6 +45,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("ListUsers")
+            .WithApiCapability(PermissionResourceCatalog.SystemUsers, PermissionAction.Manage)
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/users", async Task<Results<
@@ -105,6 +110,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("createUserAccount")
+            .WithApiCapability(PermissionResourceCatalog.SystemUsers, PermissionAction.Manage)
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
             endpoints.MapPut("/api/users/{id:int}", async Task<Results<
@@ -175,6 +181,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("updateUserAccount")
+            .WithApiCapability(PermissionResourceCatalog.SystemUsers, PermissionAction.Manage)
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
             endpoints.MapDelete("/api/users/{id:int}", async Task<Results<
@@ -189,6 +196,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 IUserService userService,
                 int id,
+                int? expectedVersion,
                 CancellationToken cancellationToken) =>
             {
                 var user = ApiEndpointAuth.GetRequiredUser(context);
@@ -205,7 +213,7 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
-                    bool deleted = await userService.DeleteUserAsync(id, cancellationToken);
+                    bool deleted = await userService.DeleteUserAsync(id, cancellationToken, expectedVersion ?? 0);
                     if (deleted)
                     {
                         await tokenService.RevokeUserSessionsAsync(id, cancellationToken);
@@ -228,10 +236,17 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("deleteUserAccount")
+            .WithApiCapability(PermissionResourceCatalog.SystemUsers, PermissionAction.Manage)
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
         }
 
         private static ApiPermissionTemplateOptionDto ToPermissionTemplateOptionDto(PermissionTemplateRecord template) =>
             new(template.Id, template.Code, template.Name, template.IsSystem, template.IsActive);
+
+        private static ApiOrganizationCompanyDto ToOrganizationCompanyDto(OrganizationCompanyRecord item) =>
+            new(item.Code, item.Name, item.IsActive, item.VersionNumber);
+
+        private static ApiOrganizationDepartmentDto ToOrganizationDepartmentDto(OrganizationDepartmentRecord item) =>
+            new(item.Code, item.CompanyCode, item.Name, item.IsActive, item.VersionNumber);
     }
 }

@@ -44,5 +44,13 @@ namespace ExportDocManager.Models
         [DisplayName("单据邮件默认正文")]
         [Description("从发票页发送单据附件时的默认正文，支持占位符：{InvoiceNo} {Customer} {Date}")]
         public string DocumentEmailBodyTemplate { get; set; } = DefaultDocumentEmailBodyTemplate;
+
+        [DisplayName("收件人白名单")]
+        [Description("可选；每行填写一个完整邮箱或域名。填写后只允许向名单内收件人发送，域名规则同时包含其子域名。")]
+        public string RecipientAllowList { get; set; } = string.Empty;
+
+        [DisplayName("收件人黑名单")]
+        [Description("可选；每行填写一个完整邮箱或域名。黑名单优先于白名单，域名规则同时包含其子域名。")]
+        public string RecipientBlockList { get; set; } = string.Empty;
     }
 }

@@ -13,6 +13,7 @@ export function ReportDesignerPage(props: {
   content: string;
   fieldCatalog?: ApiReportTemplateFieldCatalogResponse | null;
   client?: ExportDocManagerApiClient;
+  editable: boolean;
   onDesignerDraftContentChange?: (nextContent: string) => void;
 }) {
   return <ReportDesignerV3Workspace {...props} />;

@@ -21,30 +21,38 @@ export function ReportTemplateUserPanel({
   versions,
   versionsLoading,
   newTemplateName,
-  newTemplateShareScope,
   isBusy,
-  canCreate,
-  isUserTemplate,
+  allowCreateBlank,
+  allowClone,
+  canCreateBlank,
+  canClone,
   onNewTemplateNameChange,
-  onNewTemplateShareScopeChange,
-  onCreate,
+  onCreateBlank,
+  onClone,
   onShareScopeChange,
-  onToggleActive,
+  onPublish,
+  onDisable,
+  onRestore,
+  onArchive,
   onRestoreVersion,
 }: {
   currentTemplate: ApiUserReportTemplateDto | null;
   versions: ApiUserReportTemplateVersionDto[];
   versionsLoading: boolean;
   newTemplateName: string;
-  newTemplateShareScope: string;
   isBusy: boolean;
-  canCreate: boolean;
-  isUserTemplate: boolean;
+  allowCreateBlank: boolean;
+  allowClone: boolean;
+  canCreateBlank: boolean;
+  canClone: boolean;
   onNewTemplateNameChange: (value: string) => void;
-  onNewTemplateShareScopeChange: (value: string) => void;
-  onCreate: () => void;
+  onCreateBlank: () => void;
+  onClone: () => void;
   onShareScopeChange: (value: string) => void;
-  onToggleActive: () => void;
+  onPublish: () => void;
+  onDisable: () => void;
+  onRestore: () => void;
+  onArchive: () => void;
   onRestoreVersion: (versionNumber: number) => void;
 }) {
   return (
@@ -54,22 +62,26 @@ export function ReportTemplateUserPanel({
         <small>默认私有，可明确共享</small>
       </summary>
       <div className="template-management-content">
-        <section className="template-management-section" aria-label="复制为我的模板">
+        <section className="template-management-section" aria-label="创建我的模板">
           <div className="template-management-section-title">
-            <strong>{currentTemplate?.canEdit ? "复制当前模板" : "从当前模板创建"}</strong>
+            <strong>创建我的模板</strong>
           </div>
           <TextField label="新模板名称" value={newTemplateName} disabled={isBusy} onChange={onNewTemplateNameChange} />
-          <SelectField
-            label="共享范围"
-            value={newTemplateShareScope}
-            disabled={isBusy}
-            options={reportTemplateShareScopeOptions}
-            onChange={onNewTemplateShareScopeChange}
-          />
-          <button className="command-button secondary" type="button" disabled={!canCreate} onClick={onCreate}>
-            <Plus size={17} aria-hidden="true" />
-            <span>{isUserTemplate ? "复制为我的模板" : "参考当前默认模板创建"}</span>
-          </button>
+          <small>新建和复制都会生成私有草稿；复制内容由服务端从当前模板读取，不接收客户端回传正文。</small>
+          <div className="template-management-actions">
+            {allowCreateBlank ? (
+              <button className="command-button secondary" type="button" disabled={!canCreateBlank} onClick={onCreateBlank}>
+                <Plus size={17} aria-hidden="true" />
+                <span>新建空白模板</span>
+              </button>
+            ) : null}
+            {allowClone ? (
+              <button className="command-button secondary" type="button" disabled={!canClone} onClick={onClone}>
+                <Plus size={17} aria-hidden="true" />
+                <span>复制当前模板</span>
+              </button>
+            ) : null}
+          </div>
         </section>
 
         {currentTemplate ? (
@@ -78,38 +90,53 @@ export function ReportTemplateUserPanel({
               <strong>{currentTemplate.canEdit ? "当前为我的模板" : "当前为他人共享模板"}</strong>
             </div>
             <div className="template-status-chips" aria-label="模板状态">
-              <span className={`template-status-chip ${currentTemplate.isActive ? "active" : "inactive"}`}>
-                {currentTemplate.isActive ? "已启用" : "已停用"}
+              <span className={`template-status-chip ${currentTemplate.status === "Published" ? "active" : "inactive"}`}>
+                {reportTemplateStatusLabel(currentTemplate.status)}
               </span>
-              <span className={`template-status-chip ${currentTemplate.isShared ? "shared" : "private"}`}>
+              <span className={`template-status-chip ${currentTemplate.shareScope !== "Private" ? "shared" : "private"}`}>
                 {reportTemplateShareScopeLabel(currentTemplate.shareScope)}
               </span>
               <span className="template-status-chip version">V{currentTemplate.versionNumber}</span>
             </div>
             <small>
               {currentTemplate.canEdit
-                ? currentTemplate.isShared
+                ? currentTemplate.shareScope !== "Private"
                   ? "符合共享范围的团队成员可查看和复制，只有你可以修改或删除。"
-                  : "仅你自己可见和使用。"
+                  : "当前内容仅你自己可见；正式输出需要先发布。"
                 : "共享模板只读；复制后可自行修改。"}
             </small>
-            {currentTemplate.canEdit ? (
+            {currentTemplate.canPublish || currentTemplate.canShare || currentTemplate.canDisable ||
+            currentTemplate.canRestore || currentTemplate.canArchive ? (
               <div className="template-management-actions template-publish-actions">
-                <SelectField
-                  label="共享范围"
-                  value={currentTemplate.shareScope}
-                  disabled={isBusy}
-                  options={reportTemplateShareScopeOptions}
-                  onChange={onShareScopeChange}
-                />
-                <button
-                  className={`command-button compact-button ${currentTemplate.isActive ? "danger-button" : "secondary"}`}
-                  type="button"
-                  disabled={isBusy}
-                  onClick={onToggleActive}
-                >
-                  {currentTemplate.isActive ? "停用模板" : "重新启用"}
-                </button>
+                {currentTemplate.canShare ? (
+                  <SelectField
+                    label="共享范围"
+                    value={currentTemplate.shareScope}
+                    disabled={isBusy}
+                    options={reportTemplateShareScopeOptions}
+                    onChange={onShareScopeChange}
+                  />
+                ) : null}
+                {currentTemplate.canPublish ? (
+                  <button className="command-button compact-button primary" type="button" disabled={isBusy} onClick={onPublish}>
+                    发布模板
+                  </button>
+                ) : null}
+                {currentTemplate.canDisable ? (
+                  <button className="command-button compact-button danger-button" type="button" disabled={isBusy} onClick={onDisable}>
+                    停用模板
+                  </button>
+                ) : null}
+                {currentTemplate.canRestore ? (
+                  <button className="command-button compact-button secondary" type="button" disabled={isBusy} onClick={onRestore}>
+                    {currentTemplate.status === "Archived" ? "恢复为草稿" : "恢复发布"}
+                  </button>
+                ) : null}
+                {currentTemplate.canArchive ? (
+                  <button className="command-button compact-button danger-button" type="button" disabled={isBusy} onClick={onArchive}>
+                    归档模板
+                  </button>
+                ) : null}
               </div>
             ) : null}
             <details className="template-inline-details">
@@ -144,4 +171,14 @@ export function ReportTemplateUserPanel({
       </div>
     </details>
   );
+}
+
+function reportTemplateStatusLabel(value?: string) {
+  switch (value) {
+    case "Draft": return "草稿";
+    case "Published": return "已发布";
+    case "Disabled": return "已停用";
+    case "Archived": return "已归档";
+    default: return "状态异常";
+  }
 }

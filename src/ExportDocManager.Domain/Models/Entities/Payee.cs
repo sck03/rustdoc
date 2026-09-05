@@ -5,6 +5,9 @@ namespace ExportDocManager.Models.Entities
     public class Payee
     {
         public int Id { get; set; }
+        public int? OwnerUserId { get; set; }
+        public string DepartmentId { get; set; } = string.Empty;
+        public string CompanyScope { get; set; } = string.Empty;
         public string? Category { get; set; }
         public string? Name { get; set; }
         public string? BankName { get; set; }

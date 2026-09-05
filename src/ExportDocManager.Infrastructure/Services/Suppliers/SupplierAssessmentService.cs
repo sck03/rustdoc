@@ -1,5 +1,7 @@
+using System.Data;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
@@ -8,8 +10,10 @@ namespace ExportDocManager.Services.Suppliers
 {
     public sealed class SupplierAssessmentService : ISupplierAssessmentService
     {
-        private static readonly string[] AllowedKinds = ["定期评价", "订单复盘", "样品评估", "其它"];
-        private static readonly string[] AllowedConclusions = ["优先合作", "合格", "观察", "暂停合作"];
+        private static readonly IReadOnlySet<string> AllowedKinds =
+            SupplierAssessmentCatalog.Kinds.ToHashSet(StringComparer.Ordinal);
+        private static readonly IReadOnlySet<string> AllowedConclusions =
+            SupplierAssessmentCatalog.Conclusions.ToHashSet(StringComparer.Ordinal);
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
         private readonly IBusinessClock _clock;
@@ -28,12 +32,20 @@ namespace ExportDocManager.Services.Suppliers
             int supplierCompanyId, CancellationToken cancellationToken = default)
         {
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            if (!await CanAccessSupplierAsync(context, supplierCompanyId, cancellationToken)) return [];
+            if (!await CanAccessSupplierAsync(
+                    context,
+                    supplierCompanyId,
+                    PermissionAction.View,
+                    cancellationToken)) return [];
 
+            int currentUserId = _accessScope.CurrentUser?.Id ?? 0;
+            bool canApprove = await CanAccessSupplierAsync(
+                context, supplierCompanyId, PermissionAction.Approve, cancellationToken);
             var rows = await context.SupplierAssessments.AsNoTracking()
-                .Where(item => item.SupplierCompanyId == supplierCompanyId)
+                .Where(item => item.SupplierCompanyId == supplierCompanyId &&
+                    (item.Status == SupplierAssessmentStatusCatalog.Confirmed ||
+                     item.OwnerUserId == currentUserId || canApprove))
                 .OrderByDescending(item => item.Id)
-                .Take(500)
                 .ToListAsync(cancellationToken);
             return rows.OrderByDescending(item => item.AssessmentDate).ThenByDescending(item => item.Id)
                 .Select(ToRecord).ToArray();
@@ -43,54 +55,67 @@ namespace ExportDocManager.Services.Suppliers
             CancellationToken cancellationToken = default)
         {
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            var suppliers = await _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking())
-                .Select(item => new { item.Id, item.Name, item.Status, item.Category })
-                .ToListAsync(cancellationToken);
-            if (suppliers.Count == 0)
+            var suppliers = _accessScope.ApplySupplierScopeForPermission(
+                context.SupplierCompanies.AsNoTracking(),
+                PermissionResourceCatalog.SupplierAssessments,
+                PermissionAction.View);
+            int totalSuppliers = await suppliers.CountAsync(cancellationToken);
+            if (totalSuppliers == 0)
                 return new SupplierAssessmentOverview(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, []);
 
-            int[] supplierIds = suppliers.Select(item => item.Id).ToArray();
-            var assessmentSummaries = await context.SupplierAssessments.AsNoTracking()
-                .Where(item => supplierIds.Contains(item.SupplierCompanyId))
-                .GroupBy(item => item.SupplierCompanyId)
-                .Select(item => new
+            var assessmentSummaries =
+                from assessment in context.SupplierAssessments.AsNoTracking()
+                    .Where(item => item.Status == SupplierAssessmentStatusCatalog.Confirmed)
+                join supplier in suppliers on assessment.SupplierCompanyId equals supplier.Id
+                group new { assessment, supplier } by new
                 {
-                    SupplierCompanyId = item.Key,
-                    AssessmentCount = item.Count(),
-                    LatestAssessmentId = item
-                        .OrderByDescending(assessment => assessment.AssessmentDate)
-                        .ThenByDescending(assessment => assessment.Id)
-                        .Select(assessment => assessment.Id)
+                    supplier.Id,
+                    supplier.Name,
+                    supplier.Status,
+                    supplier.Category
+                }
+                into groupRows
+                select new
+                {
+                    SupplierCompanyId = groupRows.Key.Id,
+                    SupplierName = groupRows.Key.Name,
+                    SupplierStatus = groupRows.Key.Status,
+                    groupRows.Key.Category,
+                    AssessmentCount = groupRows.Count(),
+                    LatestAssessmentId = groupRows
+                        .OrderByDescending(row => row.assessment.AssessmentDate)
+                        .ThenByDescending(row => row.assessment.Id)
+                        .Select(row => row.assessment.Id)
                         .First()
-                })
+                };
+
+            var items = await (from summary in assessmentSummaries
+                               join latest in context.SupplierAssessments.AsNoTracking()
+                                   on summary.LatestAssessmentId equals latest.Id
+                               select new SupplierAssessmentOverviewItem(
+                                   summary.SupplierCompanyId,
+                                   summary.SupplierName,
+                                   summary.SupplierStatus,
+                                   summary.Category,
+                                   summary.AssessmentCount,
+                                   latest.AssessmentDate,
+                                   latest.AssessmentKind,
+                                   latest.QualityScore,
+                                   latest.DeliveryScore,
+                                   latest.ServiceScore,
+                                   latest.PriceScore,
+                                   (latest.QualityScore + latest.DeliveryScore + latest.ServiceScore + latest.PriceScore) / 4m,
+                                   latest.Conclusion,
+                                   latest.Notes))
                 .ToListAsync(cancellationToken);
 
-            int[] latestAssessmentIds = assessmentSummaries
-                .Select(item => item.LatestAssessmentId)
-                .ToArray();
-            var latestAssessments = await context.SupplierAssessments.AsNoTracking()
-                .Where(item => latestAssessmentIds.Contains(item.Id))
-                .ToDictionaryAsync(item => item.Id, cancellationToken);
-            var summariesBySupplier = assessmentSummaries
-                .ToDictionary(item => item.SupplierCompanyId);
-
-            var items = suppliers.Where(item => summariesBySupplier.ContainsKey(item.Id)).Select(supplier =>
-            {
-                var summary = summariesBySupplier[supplier.Id];
-                var latest = latestAssessments[summary.LatestAssessmentId];
-                return new SupplierAssessmentOverviewItem(
-                    supplier.Id, supplier.Name, supplier.Status, supplier.Category, summary.AssessmentCount,
-                    latest.AssessmentDate, latest.AssessmentKind,
-                    latest.QualityScore, latest.DeliveryScore, latest.ServiceScore, latest.PriceScore,
-                    Average(latest.QualityScore, latest.DeliveryScore, latest.ServiceScore, latest.PriceScore),
-                    latest.Conclusion, latest.Notes);
-            }).OrderBy(item => ConclusionPriority(item.Conclusion))
+            items = items.OrderBy(item => ConclusionPriority(item.Conclusion))
                 .ThenByDescending(item => item.LatestAssessmentDate)
                 .ThenBy(item => item.SupplierName, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+                .ToList();
 
             return new SupplierAssessmentOverview(
-                suppliers.Count, items.Length, suppliers.Count - items.Length,
+                totalSuppliers, items.Count, totalSuppliers - items.Count,
                 items.Count(item => item.Conclusion == "优先合作"),
                 items.Count(item => item.Conclusion == "合格"),
                 items.Count(item => item.Conclusion == "观察"),
@@ -109,7 +134,12 @@ namespace ExportDocManager.Services.Suppliers
             Validate(request);
 
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            if (!await CanAccessSupplierAsync(context, request.SupplierCompanyId, cancellationToken))
+            string writeAction = request.Id <= 0 ? PermissionAction.Create : PermissionAction.Edit;
+            if (!await CanAccessSupplierAsync(
+                    context,
+                    request.SupplierCompanyId,
+                    writeAction,
+                    cancellationToken))
                 throw new KeyNotFoundException("供应商不存在或无权访问。");
 
             bool isNew = request.Id <= 0;
@@ -121,6 +151,8 @@ namespace ExportDocManager.Services.Suppliers
                 : new SupplierAssessment
                 {
                     SupplierCompanyId = request.SupplierCompanyId,
+                    Status = SupplierAssessmentStatusCatalog.Draft,
+                    OwnerUserId = _accessScope.CurrentUser?.Id,
                     CreatedAt = now,
                     UpdatedAt = now,
                     VersionNumber = 1
@@ -128,6 +160,8 @@ namespace ExportDocManager.Services.Suppliers
 
             if (!isNew)
             {
+                if (entity.Status == SupplierAssessmentStatusCatalog.Confirmed)
+                    throw new ResourceConflictException("已确认的供应商评价不可修改；如需更正，请新建一条复评记录。");
                 EnsureExpectedVersion(request.ExpectedVersion, entity.VersionNumber);
                 context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = request.ExpectedVersion;
                 entity.VersionNumber++;
@@ -149,23 +183,80 @@ namespace ExportDocManager.Services.Suppliers
             return ToRecord(entity);
         }
 
-        public async Task<bool> DeleteAsync(
-            int supplierCompanyId, int id, CancellationToken cancellationToken = default)
-        {
-            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            if (!await CanAccessSupplierAsync(context, supplierCompanyId, cancellationToken)) return false;
-            var entity = await context.SupplierAssessments.FirstOrDefaultAsync(
-                item => item.Id == id && item.SupplierCompanyId == supplierCompanyId,
+        public Task<SupplierAssessmentRecord> ConfirmAsync(
+            int supplierCompanyId,
+            int id,
+            int expectedVersion,
+            CancellationToken cancellationToken = default) =>
+            AppDbContextExecution.ExecuteInTransactionAsync(
+                _contextFactory,
+                async (context, token) =>
+                {
+                    if (!await CanAccessSupplierAsync(
+                            context,
+                            supplierCompanyId,
+                            PermissionAction.Approve,
+                            token))
+                        throw new KeyNotFoundException("供应商不存在或无权确认评价。");
+
+                    var entity = await context.SupplierAssessments.FirstOrDefaultAsync(
+                            item => item.Id == id && item.SupplierCompanyId == supplierCompanyId,
+                            token)
+                        ?? throw new KeyNotFoundException("供应商评价不存在。");
+                    EnsureExpectedVersion(expectedVersion, entity.VersionNumber);
+                    if (entity.Status == SupplierAssessmentStatusCatalog.Confirmed)
+                        return ToRecord(entity);
+
+                    context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = expectedVersion;
+                    entity.Status = SupplierAssessmentStatusCatalog.Confirmed;
+                    entity.ConfirmedBy = _accessScope.CurrentUser?.Username?.Trim() ?? string.Empty;
+                    entity.ConfirmedAt = _clock.UtcNow;
+                    entity.UpdatedAt = entity.ConfirmedAt.Value;
+                    entity.VersionNumber++;
+                    await SaveWithConcurrencyAsync(context, token);
+                    return ToRecord(entity);
+                },
+                IsolationLevel.Serializable,
                 cancellationToken);
-            if (entity == null) return false;
-            context.SupplierAssessments.Remove(entity);
-            await SaveWithConcurrencyAsync(context, cancellationToken);
-            return true;
-        }
+
+        public Task<bool> DeleteAsync(
+            int supplierCompanyId,
+            int id,
+            CancellationToken cancellationToken = default,
+            int expectedVersion = 0) =>
+            AppDbContextExecution.ExecuteInTransactionAsync(
+                _contextFactory,
+                async (context, token) =>
+                {
+                    if (!await CanAccessSupplierAsync(
+                            context,
+                            supplierCompanyId,
+                            PermissionAction.Delete,
+                            token)) return false;
+                    var entity = await context.SupplierAssessments.FirstOrDefaultAsync(
+                        item => item.Id == id && item.SupplierCompanyId == supplierCompanyId,
+                        token);
+                    if (entity == null) return false;
+                    if (entity.Status == SupplierAssessmentStatusCatalog.Confirmed)
+                        throw new ResourceConflictException("已确认的供应商评价属于审计记录，不能删除。");
+                    EnsureExpectedVersion(expectedVersion, entity.VersionNumber);
+                    context.Entry(entity).Property(item => item.VersionNumber).OriginalValue = expectedVersion;
+                    context.SupplierAssessments.Remove(entity);
+                    await SaveWithConcurrencyAsync(context, token);
+                    return true;
+                },
+                IsolationLevel.Serializable,
+                cancellationToken);
 
         private Task<bool> CanAccessSupplierAsync(
-            AppDbContext context, int supplierCompanyId, CancellationToken cancellationToken) =>
-            _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking())
+            AppDbContext context,
+            int supplierCompanyId,
+            string action,
+            CancellationToken cancellationToken) =>
+            _accessScope.ApplySupplierScopeForPermission(
+                    context.SupplierCompanies.AsNoTracking(),
+                    PermissionResourceCatalog.SupplierAssessments,
+                    action)
                 .AnyAsync(item => item.Id == supplierCompanyId, cancellationToken);
 
         private void Validate(SupplierAssessmentSaveRequest request)
@@ -191,7 +282,8 @@ namespace ExportDocManager.Services.Suppliers
             item.Id, item.SupplierCompanyId, item.AssessmentDate, item.AssessmentKind,
             item.QualityScore, item.DeliveryScore, item.ServiceScore, item.PriceScore,
             Math.Round((item.QualityScore + item.DeliveryScore + item.ServiceScore + item.PriceScore) / 4m, 2),
-            item.Conclusion, item.Notes, item.AssessedBy, item.CreatedAt, item.UpdatedAt,
+            item.Conclusion, item.Notes, item.AssessedBy, item.Status, item.ConfirmedBy, item.ConfirmedAt,
+            item.CreatedAt, item.UpdatedAt,
             item.VersionNumber);
 
         private static void EnsureExpectedVersion(int expectedVersion, int currentVersion)
@@ -227,10 +319,10 @@ namespace ExportDocManager.Services.Suppliers
 
         private static int ConclusionPriority(string conclusion) => conclusion switch
         {
-            "暂停合作" => 0,
-            "观察" => 1,
-            "合格" => 2,
-            "优先合作" => 3,
+            SupplierAssessmentCatalog.Paused => 0,
+            SupplierAssessmentCatalog.Watch => 1,
+            SupplierAssessmentCatalog.Qualified => 2,
+            SupplierAssessmentCatalog.Preferred => 3,
             _ => 4
         };
     }

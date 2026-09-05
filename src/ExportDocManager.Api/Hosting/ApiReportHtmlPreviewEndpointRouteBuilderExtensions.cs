@@ -70,6 +70,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("PreviewInvoiceReportHtml")
+            .WithApiCapability(PermissionResourceCatalog.InvoiceOutput, PermissionAction.Preview)
             .Produces<ApiReportHtmlPreviewResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -135,6 +136,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("PreviewInvoiceReportDraftHtml")
+            .WithApiCapability(PermissionResourceCatalog.InvoiceOutput, PermissionAction.Preview)
             .Produces<ApiReportHtmlPreviewResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -209,6 +211,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("PreviewInvoiceDocumentPackageHtml")
+            .WithApiCapability(PermissionResourceCatalog.InvoiceOutput, PermissionAction.Preview)
             .Produces<ApiInvoiceDocumentPackagePreviewResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -265,6 +268,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("PreviewPaymentVoucherDraftHtml")
+            .WithApiCapability(PermissionResourceCatalog.PaymentOutput, PermissionAction.Preview)
             .Produces<ApiPaymentReportHtmlPreviewResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -321,6 +325,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("PreviewPaymentVoucherHtml")
+            .WithApiCapability(PermissionResourceCatalog.PaymentOutput, PermissionAction.Preview)
             .Produces<ApiPaymentReportHtmlPreviewResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)

@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
@@ -23,7 +24,12 @@ namespace ExportDocManager.Api.Hosting
                     authorizationService.CanManageSettings(user),
                     ApiResponsePathPolicy.CanReveal(context, desktopAccessOptions)));
             })
-            .WithName("GetSettings");
+            .WithName("GetSettings")
+            // Every authenticated client needs the sanitized runtime settings
+            // projection. The handler only reveals secrets and local paths to
+            // administrators, so this is an intentional authenticated bypass,
+            // not a missing permission declaration.
+            .AllowApiWithoutPermission();
 
             endpoints.MapPost("/api/settings/validate", async Task<Results<
                 Ok<ApiSettingsValidationResponse>,
@@ -57,6 +63,7 @@ namespace ExportDocManager.Api.Hosting
                     revealLocalPaths: false));
             })
             .WithName("ValidateSettings")
+            .WithApiCapability(PermissionResourceCatalog.SystemSettings, PermissionAction.Manage)
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
             endpoints.MapPut("/api/settings", async Task<Results<
@@ -126,6 +133,7 @@ namespace ExportDocManager.Api.Hosting
                         : "设置已保存。"));
             })
             .WithName("UpdateSettings")
+            .WithApiCapability(PermissionResourceCatalog.SystemSettings, PermissionAction.Manage)
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden)
             .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
         }

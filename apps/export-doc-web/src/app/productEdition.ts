@@ -1,3 +1,5 @@
+import { filterWorkspaceNavGroups, type WorkspaceCapabilities } from "./workspaceNavigation.ts";
+
 export type ProductEdition = "Document" | "Sales" | "Full";
 
 export type ProductEditionPresentation = {
@@ -49,22 +51,32 @@ export function getProductEditionPresentation(value: unknown) {
   return presentations[normalizeProductEdition(value)];
 }
 
-export function getDefaultWorkspaceRoute(capabilities: {
-  canUseDocumentWorkspace?: boolean;
-  canUseSalesWorkspace?: boolean;
-  enabledModules?: string[];
-}) {
-  const enabled = new Set((capabilities.enabledModules ?? []).map((moduleKey) => moduleKey.toLowerCase()));
-  if (enabled.size > 0) {
-    if (enabled.has("document.dashboard")) return "/dashboard";
-    if (enabled.has("sales.dashboard")) return "/crm/dashboard";
-    if (enabled.has("document.payments")) return "/payments";
-    if (enabled.has("document.query")) return "/query/invoices";
-    if (enabled.has("system.about")) return "/system/about";
-    return "/access-denied";
-  }
-  if (Array.isArray(capabilities.enabledModules)) return "/access-denied";
-  return capabilities.canUseSalesWorkspace === true && capabilities.canUseDocumentWorkspace !== true
-    ? "/crm/dashboard"
-    : "/dashboard";
+export function getDefaultWorkspaceRoute(capabilities: WorkspaceCapabilities) {
+  if (!Array.isArray(capabilities.enabledModules)) return "/access-denied";
+
+  const availableRoutes = new Set(
+    filterWorkspaceNavGroups(capabilities)
+      .flatMap((group) => group.items)
+      .map((item) => item.to),
+  );
+  const preferredRoutes = [
+    "/dashboard",
+    "/crm/dashboard",
+    "/payments",
+    "/query/invoices",
+    "/invoices",
+    "/crm/follow-ups",
+    "/crm/opportunities",
+    "/suppliers",
+    "/crm/email-templates",
+    "/reports/templates/manage",
+    "/jobs",
+    "/master-data",
+    "/single-window/operation-center",
+    "/tools/exchange-rates",
+    "/tools/email",
+    "/system/about",
+    "/settings",
+  ];
+  return preferredRoutes.find((route) => availableRoutes.has(route)) ?? "/access-denied";
 }

@@ -19,7 +19,8 @@ namespace ExportDocManager.Api.Hosting
                 user.PermissionTemplate?.Name ?? string.Empty,
                 user.DepartmentId ?? string.Empty,
                 user.CompanyScope ?? string.Empty,
-                user.IsActive);
+                user.IsActive,
+                user.VersionNumber);
         }
 
         public static User ToUser(ApiUserSaveRequest request, int id)
@@ -35,7 +36,8 @@ namespace ExportDocManager.Api.Hosting
                 PermissionTemplateId = request.PermissionTemplateId,
                 DepartmentId = request.DepartmentId ?? string.Empty,
                 CompanyScope = request.CompanyScope ?? string.Empty,
-                IsActive = request.IsActive
+                IsActive = request.IsActive,
+                VersionNumber = id > 0 ? request.ExpectedVersion : 1
             };
         }
     }

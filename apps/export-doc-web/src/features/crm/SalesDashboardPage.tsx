@@ -9,8 +9,9 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
+import { formatBusinessDateTime } from "../../ui/businessTime.ts";
 
-export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClient }) {
+export function SalesDashboardPage({ businessTimeZone, client }: { businessTimeZone: string; client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
   const query = useQuery({ queryKey: queryKeys.crmDashboard(), queryFn: ({ signal }) => client.getCrmDashboard({ signal }) });
   const dashboard = query.data;
@@ -86,7 +87,7 @@ export function SalesDashboardPage({ client }: { client: ExportDocManagerApiClie
                 <td className="strong-cell">{item.customerName}</td>
                 <td data-table-priority="secondary">{item.contactName || "-"}</td>
                 <td>{item.nextAction || item.summary}</td>
-                <td>{formatDateTime(item.nextFollowUpAt)}</td>
+                <td>{formatBusinessDateTime(item.nextFollowUpAt, businessTimeZone, "未设置")}</td>
               </tr>)}
               {!query.isFetching && !query.isError && (dashboard?.upcomingFollowUps.length ?? 0) === 0 ? <tr><td className="empty-cell" colSpan={4}>暂无待跟进事项</td></tr> : null}
             </tbody>
@@ -127,11 +128,6 @@ function formatDate(value?: string | null) {
   if (!value) return "未设置";
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   return match ? `${Number(match[1])}/${Number(match[2])}/${Number(match[3])}` : value;
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return "未设置";
-  return new Date(value).toLocaleString("zh-CN", { hour12: false });
 }
 
 function handleRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, action: () => void) {

@@ -63,6 +63,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("SaveInvoiceTransferPackageToPath")
+            .WithApiCapability(PermissionResourceCatalog.InvoiceOutput, PermissionAction.ExportZip)
             .Produces<ApiInvoiceTransferExportResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -120,6 +121,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("DownloadInvoiceTransferPackage")
+            .WithApiCapability(PermissionResourceCatalog.InvoiceOutput, PermissionAction.ExportZip)
             .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)

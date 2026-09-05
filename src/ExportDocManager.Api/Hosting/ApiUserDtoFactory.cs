@@ -40,8 +40,8 @@ namespace ExportDocManager.Api.Hosting
                 FullName = user.FullName ?? string.Empty,
                 Role = user.Role ?? string.Empty,
                 PermissionTemplateId = user.PermissionTemplateId,
-                EffectiveModuleAccess = new Dictionary<string, string>(
-                    user.EffectiveModuleAccess ?? new Dictionary<string, string>(),
+                EffectivePermissionGrants = new Dictionary<string, string>(
+                    user.EffectivePermissionGrants ?? new Dictionary<string, string>(),
                     StringComparer.OrdinalIgnoreCase),
                 DepartmentId = user.DepartmentId ?? string.Empty,
                 CompanyScope = user.CompanyScope ?? string.Empty,

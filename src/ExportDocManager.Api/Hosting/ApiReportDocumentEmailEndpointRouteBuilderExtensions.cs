@@ -2,6 +2,7 @@ using ExportDocManager.Models;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
 namespace ExportDocManager.Api.Hosting
@@ -55,9 +56,16 @@ namespace ExportDocManager.Api.Hosting
                     body));
             })
             .WithName("StartInvoiceDocumentEmailJob")
+            .WithApiCapabilities(
+                new(PermissionResourceCatalog.InvoiceOutput, PermissionAction.SendEmail),
+                new(PermissionResourceCatalog.EmailDelivery, PermissionAction.Send))
+            .WithApiResourceProfile(ApiResourceProfile.EmailDelivery)
+            .WithApiSecurityAudit("report-document-email-delivery")
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status429TooManyRequests)
             .Produces(StatusCodes.Status503ServiceUnavailable);
         }
 
@@ -162,6 +170,7 @@ namespace ExportDocManager.Api.Hosting
                             .ConfigureAwait(false);
                         var jobSettingsService = provider.GetRequiredService<ISettingsService>();
                         var emailConfig = jobSettingsService.Settings?.Email ?? new EmailConfig();
+                        recipient = EmailRecipientPolicy.ValidateAndNormalize(recipient, emailConfig);
                         string emailSubject = BuildInvoiceDocumentEmailSubject(subject, emailConfig, documentSet);
                         string emailBody = BuildInvoiceDocumentEmailBody(body, emailConfig, documentSet);
 

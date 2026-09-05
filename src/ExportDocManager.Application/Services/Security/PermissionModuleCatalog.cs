@@ -4,6 +4,10 @@ namespace ExportDocManager.Services.Security
 {
     public static class PermissionAccessLevel
     {
+        // `none` is an internal, fail-closed value used when a persisted
+        // record is corrupt or a client sends an unknown value.  It is not an
+        // assignable option and therefore remains excluded from Levels.
+        public const string None = "none";
         public const string View = "view";
         public const string Operate = "operate";
         public const string Manage = "manage";
@@ -15,13 +19,14 @@ namespace ExportDocManager.Services.Security
 
         public static string Normalize(string value) =>
             Levels.FirstOrDefault(level => string.Equals(level, value?.Trim(), StringComparison.OrdinalIgnoreCase))
-            ?? View;
+            ?? None;
 
         public static int Rank(string value) => Normalize(value) switch
         {
             Manage => 3,
             Operate => 2,
-            _ => 1
+            View => 1,
+            _ => 0
         };
 
         public static string Min(string left, string right) =>
@@ -43,17 +48,10 @@ namespace ExportDocManager.Services.Security
         string Code,
         string Name,
         string Description,
-        IReadOnlyList<string> ModuleKeys,
-        IReadOnlyDictionary<string, string>? AccessOverrides = null)
+        IReadOnlyList<PermissionGrantRecord> Grants)
     {
-        public string GetAccessLevel(string moduleKey) =>
-            AccessOverrides != null && AccessOverrides.TryGetValue(moduleKey, out var accessLevel)
-                ? PermissionAccessLevel.Normalize(accessLevel)
-                : PermissionAccessLevel.Manage;
-
-        public IReadOnlyDictionary<string, string> GetModuleAccess() =>
-            PermissionModuleCatalog.ExpandDependencies(ModuleKeys.Select(moduleKey =>
-                new PermissionTemplateModuleRecord(moduleKey, GetAccessLevel(moduleKey))));
+        public IReadOnlyList<EffectivePermissionGrant> GetEffectivePermissions() =>
+            PermissionResourceCatalog.ExpandDependencies(Grants);
     }
 
     public static class PermissionModuleCatalog
@@ -85,7 +83,6 @@ namespace ExportDocManager.Services.Security
         public const string CommonEmail = "common.email";
         public const string SystemDisasterRecovery = "system.disaster-recovery";
         public const string SystemAbout = "system.about";
-        public const string FinanceDashboard = "finance.dashboard";
 
         public static readonly IReadOnlyList<PermissionModuleDefinition> Modules =
         [
@@ -124,62 +121,6 @@ namespace ExportDocManager.Services.Security
         public static bool IsKnown(string moduleKey) =>
             !string.IsNullOrWhiteSpace(moduleKey) && ByKey.ContainsKey(moduleKey.Trim());
 
-        private static readonly FrozenDictionary<string, IReadOnlyList<PermissionModuleDependency>> Dependencies =
-            new Dictionary<string, IReadOnlyList<PermissionModuleDependency>>(StringComparer.OrdinalIgnoreCase)
-            {
-                [DocumentInvoices] =
-                [
-                    new(DocumentReferenceData, PermissionAccessLevel.View),
-                    new(CommonProductReference, PermissionAccessLevel.View),
-                    new(DocumentCustomOptions, PermissionAccessLevel.Operate),
-                    new(DocumentInvoiceReports, PermissionAccessLevel.Manage)
-                ],
-                [DocumentPayments] =
-                [
-                    new(DocumentReferenceData, PermissionAccessLevel.View),
-                    new(DocumentCustomOptions, PermissionAccessLevel.Operate),
-                    new(DocumentPaymentReports, PermissionAccessLevel.Manage)
-                ],
-                [DocumentQuery] = [new(DocumentReferenceData, PermissionAccessLevel.View)],
-                [DocumentMasterData] =
-                [
-                    new(DocumentReferenceData, PermissionAccessLevel.View),
-                    new(CommonProductReference, PermissionAccessLevel.View),
-                    new(DocumentCustomOptions, PermissionAccessLevel.Operate)
-                ],
-                [SalesOpportunities] = [new(CommonProductReference, PermissionAccessLevel.View)],
-                [SalesSuppliers] = [new(CommonProductReference, PermissionAccessLevel.View)]
-            }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
-
-        public static IReadOnlyDictionary<string, string> ExpandDependencies(
-            IEnumerable<PermissionTemplateModuleRecord> modules)
-        {
-            var expanded = (modules ?? [])
-                .Where(module => IsKnown(module.ModuleKey) && PermissionAccessLevel.IsKnown(module.AccessLevel))
-                .GroupBy(module => module.ModuleKey.Trim(), StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(
-                    group => group.Key,
-                    group => PermissionAccessLevel.Normalize(group.Last().AccessLevel),
-                    StringComparer.OrdinalIgnoreCase);
-
-            foreach (var source in expanded.ToArray())
-            {
-                if (!Dependencies.TryGetValue(source.Key, out var dependencies)) continue;
-                foreach (var dependency in dependencies)
-                {
-                    string dependencyAccess = PermissionAccessLevel.Min(source.Value, dependency.MaximumAccessLevel);
-                    expanded[dependency.ModuleKey] = expanded.TryGetValue(dependency.ModuleKey, out var currentAccess)
-                        ? PermissionAccessLevel.Max(currentAccess, dependencyAccess)
-                        : dependencyAccess;
-                }
-            }
-
-            return expanded
-                .OrderBy(item => ByKey[item.Key].SortOrder)
-                .ToDictionary(item => item.Key, item => item.Value, StringComparer.OrdinalIgnoreCase);
-        }
-
-        private sealed record PermissionModuleDependency(string ModuleKey, string MaximumAccessLevel);
     }
 
     public static class BuiltInPermissionTemplateCatalog
@@ -187,56 +128,156 @@ namespace ExportDocManager.Services.Security
         public const string Admin = "Admin";
         public const string Document = "User";
         public const string Sales = "Sales";
+        public const string SalesManager = "SalesManager";
         public const string Finance = "Finance";
-
-        private static readonly string[] CommonModules =
-        [
-            PermissionModuleCatalog.CommonExchangeRates,
-            PermissionModuleCatalog.CommonEmail,
-            PermissionModuleCatalog.SystemAbout
-        ];
-
-        private static readonly string[] DocumentModules = PermissionModuleCatalog.Modules
-            .Where(module => module.Workspace == "document" && !module.IsTechnical)
-            .Select(module => module.Key)
-            .Concat(CommonModules)
-            .ToArray();
-
-        private static readonly string[] SalesModules = PermissionModuleCatalog.Modules
-            .Where(module => module.Workspace == "sales")
-            .Select(module => module.Key)
-            .Concat(CommonModules)
-            .ToArray();
 
         public static readonly IReadOnlyList<BuiltInPermissionTemplateDefinition> Templates =
         [
             new(Admin, "系统管理员", "全部已实现业务模块；系统维护能力仍由管理员身份保护。",
-                PermissionModuleCatalog.Modules.Select(module => module.Key).ToArray()),
-            new(Document, "单证人员", "单证业务、本人客户与出口商资料、HS 编码查询和通用工具。", DocumentModules,
-                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    // Ordinary document users may create and maintain their own templates.
-                    // Global file-template lifecycle and administrator maintenance still require Manage.
-                    [PermissionModuleCatalog.DocumentReports] = PermissionAccessLevel.Operate,
-                    [PermissionModuleCatalog.DocumentHsKnowledge] = PermissionAccessLevel.View,
-                    [PermissionModuleCatalog.DocumentDeclarationDictionary] = PermissionAccessLevel.Operate
-                }),
-            new(Sales, "业务人员", "销售、供应商和通用工具。", SalesModules),
-            new(Finance, "财务人员", "付款报销、单据查询、报表设计、汇率、邮件、OCR 和关于。",
-                [
-                    PermissionModuleCatalog.DocumentPayments,
-                    PermissionModuleCatalog.DocumentQuery,
-                    PermissionModuleCatalog.DocumentOcr,
-                    PermissionModuleCatalog.DocumentReports,
-                    PermissionModuleCatalog.CommonExchangeRates,
-                    PermissionModuleCatalog.CommonEmail,
-                    PermissionModuleCatalog.SystemAbout
-                ])
+                PermissionResourceCatalog.Resources
+                    .SelectMany(resource => resource.Actions.Select(action =>
+                        new PermissionGrantRecord(resource.Key, action.Key, PermissionDataScope.All)))
+                    .ToArray()),
+            new(Document, "单证人员", "单证业务、本人业务数据、本人报表模板和通用工具。",
+                BuildDocumentGrants()),
+            new(Sales, "业务人员", "维护本人客户、跟进和商机；供应商及共享主数据默认只读。",
+                BuildSalesGrants(PermissionDataScope.Own, supervisor: false)),
+            new(SalesManager, "销售主管", "管理部门客户、跟进、商机、供应商和共享模板；系统能力仍禁止。",
+                BuildSalesGrants(PermissionDataScope.Department, supervisor: true)),
+            new(Finance, "财务人员", "维护本人付款报销，使用报表、汇率、邮件和 OCR。",
+                BuildFinanceGrants())
         ];
 
-        public static BuiltInPermissionTemplateDefinition FindForRole(string role) =>
-            Templates.FirstOrDefault(template =>
-                string.Equals(template.Code, role?.Trim(), StringComparison.OrdinalIgnoreCase))
-            ?? Templates.First(template => template.Code == Document);
+        private static IReadOnlyList<PermissionGrantRecord> BuildDocumentGrants() =>
+        [
+            .. Preset(PermissionModuleCatalog.DocumentDashboard, PermissionAccessLevel.View),
+            .. Preset(PermissionModuleCatalog.DocumentInvoices, PermissionAccessLevel.Operate),
+            .. Preset(PermissionModuleCatalog.DocumentQuery, PermissionAccessLevel.View),
+            .. Preset(PermissionModuleCatalog.DocumentPayments, PermissionAccessLevel.Operate),
+            .. Preset(PermissionModuleCatalog.DocumentJobs, PermissionAccessLevel.Operate),
+            .. Preset(PermissionModuleCatalog.DocumentSingleWindow, PermissionAccessLevel.Operate),
+            .. Preset(PermissionModuleCatalog.DocumentDeclarationDictionary, PermissionAccessLevel.Operate),
+            .. Preset(PermissionModuleCatalog.DocumentHsKnowledge, PermissionAccessLevel.View),
+            .. Preset(PermissionModuleCatalog.DocumentMasterData, PermissionAccessLevel.Operate),
+            .. Preset(PermissionModuleCatalog.DocumentExcel, PermissionAccessLevel.Operate),
+            .. Preset(PermissionModuleCatalog.DocumentOcr, PermissionAccessLevel.Operate),
+            .. Preset(PermissionModuleCatalog.DocumentContainerPacking, PermissionAccessLevel.Operate),
+            .. Preset(PermissionModuleCatalog.CommonExchangeRates, PermissionAccessLevel.View),
+            .. Preset(PermissionModuleCatalog.SystemAbout, PermissionAccessLevel.View),
+            new(PermissionResourceCatalog.ReportTemplates, PermissionAction.View, PermissionDataScope.Department),
+            .. Grant(PermissionResourceCatalog.ReportTemplates, PermissionDataScope.Own,
+                PermissionAction.Design, PermissionAction.Clone),
+            new(PermissionResourceCatalog.ReportResources, PermissionAction.View, PermissionDataScope.Department),
+            new(PermissionResourceCatalog.ReportResources, PermissionAction.Upload, PermissionDataScope.Own),
+            new(PermissionResourceCatalog.EmailTemplates, PermissionAction.View, PermissionDataScope.Department),
+            .. Grant(PermissionResourceCatalog.InvoiceOutput, PermissionDataScope.Own,
+                PermissionAction.Preview, PermissionAction.Print, PermissionAction.ExportPdf, PermissionAction.ExportZip,
+                PermissionAction.SendEmail),
+            .. Grant(PermissionResourceCatalog.PaymentOutput, PermissionDataScope.Own,
+                PermissionAction.Preview, PermissionAction.Print, PermissionAction.ExportPdf),
+            .. Grant(PermissionResourceCatalog.EmailDelivery, PermissionDataScope.Own,
+                PermissionAction.Send, PermissionAction.ViewDelivery)
+        ];
+
+        private static IReadOnlyList<PermissionGrantRecord> BuildSalesGrants(string scope, bool supervisor)
+        {
+            var grants = new List<PermissionGrantRecord>(
+            [
+                new(PermissionResourceCatalog.SalesDashboard, PermissionAction.View, scope),
+                .. Grant(PermissionResourceCatalog.CrmCustomers, scope,
+                    PermissionAction.View, PermissionAction.Create, PermissionAction.Edit, PermissionAction.Deactivate),
+                .. Grant(PermissionResourceCatalog.CrmContacts, scope,
+                    PermissionAction.View, PermissionAction.Create, PermissionAction.Edit, PermissionAction.SetPrimary),
+                .. Grant(PermissionResourceCatalog.CrmFollowUps, scope,
+                    PermissionAction.View, PermissionAction.Create, PermissionAction.Edit, PermissionAction.Complete),
+                .. Grant(PermissionResourceCatalog.SalesOpportunities, scope,
+                    PermissionAction.View, PermissionAction.Create, PermissionAction.Edit, PermissionAction.Transition),
+                .. Grant(PermissionResourceCatalog.SalesQuotes, scope,
+                    PermissionAction.View, PermissionAction.Create, PermissionAction.Edit),
+                new(PermissionResourceCatalog.Suppliers, PermissionAction.View,
+                    supervisor ? scope : PermissionDataScope.Company),
+                new(PermissionResourceCatalog.SupplierContacts, PermissionAction.View,
+                    supervisor ? scope : PermissionDataScope.Company),
+                new(PermissionResourceCatalog.SupplierProductLinks, PermissionAction.View,
+                    supervisor ? scope : PermissionDataScope.Company),
+                new(PermissionResourceCatalog.SupplierAssessments, PermissionAction.View,
+                    supervisor ? scope : PermissionDataScope.Company),
+                new(PermissionResourceCatalog.EmailTemplates, PermissionAction.View,
+                    PermissionDataScope.Department),
+                .. Grant(PermissionResourceCatalog.EmailDelivery, scope,
+                    PermissionAction.Send, PermissionAction.ViewDelivery),
+                .. Preset(PermissionModuleCatalog.CommonProductReference, PermissionAccessLevel.View,
+                    PermissionDataScope.All),
+                .. Preset(PermissionModuleCatalog.CommonExchangeRates, PermissionAccessLevel.View,
+                    PermissionDataScope.All),
+                .. Preset(PermissionModuleCatalog.SystemAbout, PermissionAccessLevel.View,
+                    PermissionDataScope.All)
+            ]);
+
+            if (supervisor)
+            {
+                grants.AddRange(Grant(PermissionResourceCatalog.CrmCustomers, scope,
+                    PermissionAction.Export));
+                grants.AddRange(Grant(PermissionResourceCatalog.CrmFollowUps, scope,
+                    PermissionAction.Restore, PermissionAction.Assign));
+                grants.AddRange(Grant(PermissionResourceCatalog.SalesOpportunities, scope,
+                    PermissionAction.Archive));
+                grants.AddRange(Grant(PermissionResourceCatalog.Suppliers, scope,
+                    PermissionAction.Create, PermissionAction.Edit, PermissionAction.Admit,
+                    PermissionAction.Deactivate, PermissionAction.Import, PermissionAction.Export));
+                grants.AddRange(Grant(PermissionResourceCatalog.SupplierContacts, scope,
+                    PermissionAction.Create, PermissionAction.Edit, PermissionAction.SetPrimary));
+                grants.AddRange(Grant(PermissionResourceCatalog.SupplierProductLinks, scope,
+                    PermissionAction.Edit, PermissionAction.Deactivate));
+                grants.AddRange(Grant(PermissionResourceCatalog.SupplierAssessments, scope,
+                    PermissionAction.Create, PermissionAction.Edit, PermissionAction.Approve));
+                grants.AddRange(Grant(PermissionResourceCatalog.EmailTemplates, scope,
+                    PermissionAction.Edit, PermissionAction.Publish, PermissionAction.Share, PermissionAction.Deactivate,
+                    PermissionAction.Restore));
+            }
+
+            return grants;
+        }
+
+        private static IReadOnlyList<PermissionGrantRecord> BuildFinanceGrants() =>
+        [
+            .. Preset(PermissionModuleCatalog.DocumentPayments, PermissionAccessLevel.Operate),
+            .. Preset(PermissionModuleCatalog.DocumentQuery, PermissionAccessLevel.View),
+            .. Preset(PermissionModuleCatalog.DocumentOcr, PermissionAccessLevel.Operate),
+            .. Preset(PermissionModuleCatalog.CommonExchangeRates, PermissionAccessLevel.View,
+                PermissionDataScope.All),
+            .. Preset(PermissionModuleCatalog.SystemAbout, PermissionAccessLevel.View,
+                PermissionDataScope.All),
+            new(PermissionResourceCatalog.ReportTemplates, PermissionAction.View, PermissionDataScope.Department),
+            .. Grant(PermissionResourceCatalog.ReportTemplates, PermissionDataScope.Own,
+                PermissionAction.Design, PermissionAction.Clone),
+            new(PermissionResourceCatalog.ReportResources, PermissionAction.View, PermissionDataScope.Department),
+            new(PermissionResourceCatalog.ReportResources, PermissionAction.Upload, PermissionDataScope.Own),
+            new(PermissionResourceCatalog.EmailTemplates, PermissionAction.View, PermissionDataScope.Department),
+            .. Grant(PermissionResourceCatalog.PaymentOutput, PermissionDataScope.Own,
+                PermissionAction.Preview, PermissionAction.Print, PermissionAction.ExportPdf),
+            .. Grant(PermissionResourceCatalog.EmailDelivery, PermissionDataScope.Own,
+                PermissionAction.Send, PermissionAction.ViewDelivery)
+        ];
+
+        private static IReadOnlyList<PermissionGrantRecord> Preset(
+            string resourceKey,
+            string accessLevel,
+            string scope = PermissionDataScope.Own) =>
+            PermissionResourceCatalog.CreatePreset(resourceKey, accessLevel, scope);
+
+        private static IReadOnlyList<PermissionGrantRecord> Grant(
+            string resourceKey,
+            string scope,
+            params string[] actions) =>
+            actions.Select(action => new PermissionGrantRecord(resourceKey, action, scope)).ToArray();
+
+        public static BuiltInPermissionTemplateDefinition FindForRole(string role)
+        {
+            string normalizedRole = (role ?? string.Empty).Trim();
+            return Templates.SingleOrDefault(template =>
+                       string.Equals(template.Code, normalizedRole, StringComparison.OrdinalIgnoreCase))
+                   ?? throw new ArgumentException("用户角色没有对应的内置权限模板。", nameof(role));
+        }
     }
 }

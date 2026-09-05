@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Errors;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Security
@@ -24,6 +25,8 @@ namespace ExportDocManager.Services.Security
 
         public User? CurrentUser => _currentUserContext?.CurrentUser;
 
+        public bool UsesPostgreSql => DatabaseModeHelper.UsesPostgreSql(_settings);
+
         public bool ShouldFilterBusinessData(User? user = null)
         {
             user ??= _currentUserContext?.CurrentUser;
@@ -33,7 +36,64 @@ namespace ExportDocManager.Services.Security
 
         public static bool CanViewAllBusinessData(User? user)
         {
-            return string.Equals(user?.Role?.Trim(), "Admin", StringComparison.OrdinalIgnoreCase);
+            return string.Equals(user?.Role?.Trim(), UserRoleCatalog.Admin, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public bool HasPermission(string resourceKey, string action, User? user = null)
+        {
+            user ??= _currentUserContext?.CurrentUser;
+            return PermissionDataScope.IsKnown(ResolveDataScope(user, resourceKey, action));
+        }
+
+        public void DemandPermission(string resourceKey, string action, User? user = null)
+        {
+            if (!HasPermission(resourceKey, action, user))
+            {
+                throw new PermissionDeniedException($"当前账号没有权限执行 {resourceKey}/{action}。");
+            }
+        }
+
+        public bool IsOwnedByCurrentUser(int? ownerUserId, User? user = null)
+        {
+            user ??= _currentUserContext?.CurrentUser;
+            return !DatabaseModeHelper.UsesPostgreSql(_settings) ||
+                   user?.Id > 0 && ownerUserId == user.Id;
+        }
+
+        public bool CanAccessOwnedBusinessRecord(
+            int? ownerUserId,
+            string? departmentId,
+            string? companyScope,
+            string resourceKey,
+            string action,
+            User? user = null)
+        {
+            user ??= _currentUserContext?.CurrentUser;
+            string dataScope = ResolveDataScope(user, resourceKey, action);
+            if (!PermissionDataScope.IsKnown(dataScope))
+            {
+                return false;
+            }
+
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings))
+            {
+                return true;
+            }
+
+            return dataScope switch
+            {
+                PermissionDataScope.All => true,
+                PermissionDataScope.Company =>
+                    !string.IsNullOrWhiteSpace(user?.CompanyScope) &&
+                    string.Equals(companyScope?.Trim(), user.CompanyScope.Trim(), StringComparison.Ordinal),
+                PermissionDataScope.Department =>
+                    !string.IsNullOrWhiteSpace(user?.CompanyScope) &&
+                    !string.IsNullOrWhiteSpace(user.DepartmentId) &&
+                    string.Equals(companyScope?.Trim(), user.CompanyScope.Trim(), StringComparison.Ordinal) &&
+                    string.Equals(departmentId?.Trim(), user.DepartmentId.Trim(), StringComparison.Ordinal),
+                PermissionDataScope.Own => user?.Id > 0 && ownerUserId == user.Id,
+                _ => false
+            };
         }
 
         public IQueryable<Invoice> ApplyInvoiceScope(IQueryable<Invoice> query, User? user = null)
@@ -41,7 +101,7 @@ namespace ExportDocManager.Services.Security
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
 
-            if (!ShouldFilterBusinessData(user))
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings))
             {
                 return query;
             }
@@ -49,19 +109,16 @@ namespace ExportDocManager.Services.Security
             int userId = user?.Id ?? 0;
             string departmentId = NormalizeScope(user?.DepartmentId);
             string companyScope = NormalizeScope(user?.CompanyScope);
-            if (userId > 0 &&
-                CanManageModule(user, PermissionModuleCatalog.DocumentInvoices) &&
-                !string.IsNullOrWhiteSpace(departmentId) &&
-                !string.IsNullOrWhiteSpace(companyScope))
+            return ResolveDataScope(user, PermissionModuleCatalog.DocumentInvoices, PermissionAction.View) switch
             {
-                return query.Where(invoice =>
-                    invoice.OwnerUserId == userId ||
-                    invoice.DepartmentId == departmentId && invoice.CompanyScope == companyScope);
-            }
-
-            return userId > 0
-                ? query.Where(invoice => invoice.OwnerUserId == userId)
-                : query.Where(_ => false);
+                PermissionDataScope.All => query,
+                PermissionDataScope.Company when companyScope.Length > 0 =>
+                    query.Where(item => item.CompanyScope == companyScope),
+                PermissionDataScope.Department when departmentId.Length > 0 && companyScope.Length > 0 =>
+                    query.Where(item => item.DepartmentId == departmentId && item.CompanyScope == companyScope),
+                PermissionDataScope.Own when userId > 0 => query.Where(item => item.OwnerUserId == userId),
+                _ => query.Where(_ => false)
+            };
         }
 
         public IQueryable<Payment> ApplyPaymentScope(IQueryable<Payment> query, User? user = null)
@@ -69,99 +126,261 @@ namespace ExportDocManager.Services.Security
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
 
-            if (!ShouldFilterBusinessData(user))
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings))
             {
                 return query;
             }
 
             int userId = user?.Id ?? 0;
-            return userId > 0
-                ? query.Where(payment => payment.OwnerUserId == userId)
-                : query.Where(_ => false);
+            string departmentId = NormalizeScope(user?.DepartmentId);
+            string companyScope = NormalizeScope(user?.CompanyScope);
+            return ResolveDataScope(user, PermissionModuleCatalog.DocumentPayments, PermissionAction.View) switch
+            {
+                PermissionDataScope.All => query,
+                PermissionDataScope.Company when companyScope.Length > 0 => query.Where(item => item.CompanyScope == companyScope),
+                PermissionDataScope.Department when departmentId.Length > 0 && companyScope.Length > 0 =>
+                    query.Where(item => item.DepartmentId == departmentId && item.CompanyScope == companyScope),
+                PermissionDataScope.Own when userId > 0 => query.Where(item => item.OwnerUserId == userId),
+                _ => query.Where(_ => false)
+            };
         }
 
         public IQueryable<CrmCustomer> ApplyCrmCustomerScope(
             IQueryable<CrmCustomer> query,
+            User? user = null,
+            string action = PermissionAction.View)
+            => ApplyCrmCustomerScopeForPermission(
+                query,
+                PermissionResourceCatalog.CrmCustomers,
+                action,
+                user);
+
+        public IQueryable<CrmCustomer> ApplyCrmCustomerScopeForPermission(
+            IQueryable<CrmCustomer> query,
+            string resourceKey,
+            string action,
             User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
 
-            if (!ShouldFilterBusinessData(user))
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings))
             {
                 return query;
             }
 
             int userId = user?.Id ?? 0;
-            return userId > 0
-                ? query.Where(item => item.OwnerUserId == userId)
-                : query.Where(_ => false);
+            string departmentId = NormalizeScope(user?.DepartmentId);
+            string companyScope = NormalizeScope(user?.CompanyScope);
+            return ResolveDataScope(user, resourceKey, action) switch
+            {
+                PermissionDataScope.All => query,
+                PermissionDataScope.Company when companyScope.Length > 0 => query.Where(item => item.CompanyScope == companyScope),
+                PermissionDataScope.Department when departmentId.Length > 0 && companyScope.Length > 0 =>
+                    query.Where(item => item.DepartmentId == departmentId && item.CompanyScope == companyScope),
+                PermissionDataScope.Own when userId > 0 => query.Where(item => item.OwnerUserId == userId),
+                _ => query.Where(_ => false)
+            };
         }
 
         public IQueryable<Customer> ApplyCustomerScope(IQueryable<Customer> query, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
-            if (!ShouldFilterBusinessData(user)) return query;
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings)) return query;
             int userId = user?.Id ?? 0;
-            return userId > 0
-                ? query.Where(item => item.OwnerUserId == userId)
-                : query.Where(_ => false);
+            string departmentId = NormalizeScope(user?.DepartmentId);
+            string companyScope = NormalizeScope(user?.CompanyScope);
+            return ResolveDataScope(user, PermissionModuleCatalog.DocumentInvoices, PermissionAction.View) switch
+            {
+                PermissionDataScope.All => query,
+                PermissionDataScope.Company when companyScope.Length > 0 => query.Where(item => item.CompanyScope == companyScope),
+                PermissionDataScope.Department when departmentId.Length > 0 && companyScope.Length > 0 =>
+                    query.Where(item => item.DepartmentId == departmentId && item.CompanyScope == companyScope),
+                PermissionDataScope.Own when userId > 0 => query.Where(item => item.OwnerUserId == userId),
+                _ => query.Where(_ => false)
+            };
         }
 
         public IQueryable<Exporter> ApplyExporterScope(IQueryable<Exporter> query, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
-            if (!ShouldFilterBusinessData(user)) return query;
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings)) return query;
             int userId = user?.Id ?? 0;
-            return userId > 0
-                ? query.Where(item => item.OwnerUserId == userId)
-                : query.Where(_ => false);
+            string departmentId = NormalizeScope(user?.DepartmentId);
+            string companyScope = NormalizeScope(user?.CompanyScope);
+            return ResolveDataScope(user, PermissionModuleCatalog.DocumentInvoices, PermissionAction.View) switch
+            {
+                PermissionDataScope.All => query,
+                PermissionDataScope.Company when companyScope.Length > 0 => query.Where(item => item.CompanyScope == companyScope),
+                PermissionDataScope.Department when departmentId.Length > 0 && companyScope.Length > 0 =>
+                    query.Where(item => item.DepartmentId == departmentId && item.CompanyScope == companyScope),
+                PermissionDataScope.Own when userId > 0 => query.Where(item => item.OwnerUserId == userId),
+                _ => query.Where(_ => false)
+            };
         }
 
-        public IQueryable<CrmFollowUp> ApplyCrmFollowUpScope(IQueryable<CrmFollowUp> query, User? user = null)
+        public IQueryable<Payee> ApplyPayeeScope(IQueryable<Payee> query, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
-            if (!ShouldFilterBusinessData(user)) return query;
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings)) return query;
             int userId = user?.Id ?? 0;
-            return userId > 0 ? query.Where(item => item.OwnerUserId == userId) : query.Where(_ => false);
+            string departmentId = NormalizeScope(user?.DepartmentId);
+            string companyScope = NormalizeScope(user?.CompanyScope);
+            return ResolveDataScope(user, PermissionModuleCatalog.DocumentPayments, PermissionAction.View) switch
+            {
+                PermissionDataScope.All => query,
+                PermissionDataScope.Company when companyScope.Length > 0 => query.Where(item => item.CompanyScope == companyScope),
+                PermissionDataScope.Department when departmentId.Length > 0 && companyScope.Length > 0 =>
+                    query.Where(item => item.DepartmentId == departmentId && item.CompanyScope == companyScope),
+                PermissionDataScope.Own when userId > 0 => query.Where(item => item.OwnerUserId == userId),
+                _ => query.Where(_ => false)
+            };
         }
 
-        public IQueryable<SupplierCompany> ApplySupplierScope(IQueryable<SupplierCompany> query, User? user = null)
+        public IQueryable<CrmFollowUp> ApplyCrmFollowUpScope(
+            IQueryable<CrmFollowUp> query,
+            User? user = null,
+            string action = PermissionAction.View)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
-            if (!ShouldFilterBusinessData(user)) return query;
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings)) return query;
             int userId = user?.Id ?? 0;
-            return userId > 0 ? query.Where(item => item.OwnerUserId == userId) : query.Where(_ => false);
+            string departmentId = NormalizeScope(user?.DepartmentId);
+            string companyScope = NormalizeScope(user?.CompanyScope);
+            return ResolveDataScope(user, PermissionResourceCatalog.CrmFollowUps, action) switch
+            {
+                PermissionDataScope.All => query,
+                PermissionDataScope.Company when companyScope.Length > 0 => query.Where(item => item.CompanyScope == companyScope),
+                PermissionDataScope.Department when departmentId.Length > 0 && companyScope.Length > 0 =>
+                    query.Where(item => item.DepartmentId == departmentId && item.CompanyScope == companyScope),
+                PermissionDataScope.Own when userId > 0 => query.Where(item => item.OwnerUserId == userId),
+                _ => query.Where(_ => false)
+            };
         }
 
-        public IQueryable<EmailTemplate> ApplyEmailTemplateScope(IQueryable<EmailTemplate> query, User? user = null)
+        public IQueryable<SupplierCompany> ApplySupplierScope(
+            IQueryable<SupplierCompany> query,
+            User? user = null,
+            string action = PermissionAction.View)
+            => ApplySupplierScopeForPermission(
+                query,
+                PermissionResourceCatalog.Suppliers,
+                action,
+                user);
+
+        public IQueryable<SupplierCompany> ApplySupplierScopeForPermission(
+            IQueryable<SupplierCompany> query,
+            string resourceKey,
+            string action,
+            User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
-            if (!ShouldFilterBusinessData(user)) return query;
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings)) return query;
             int userId = user?.Id ?? 0;
-            return userId > 0 ? query.Where(item => item.OwnerUserId == userId || item.IsShared) : query.Where(_ => false);
+            string departmentId = NormalizeScope(user?.DepartmentId);
+            string companyScope = NormalizeScope(user?.CompanyScope);
+            return ResolveDataScope(user, resourceKey, action) switch
+            {
+                PermissionDataScope.All => query,
+                PermissionDataScope.Company when companyScope.Length > 0 => query.Where(item => item.CompanyScope == companyScope),
+                PermissionDataScope.Department when departmentId.Length > 0 && companyScope.Length > 0 =>
+                    query.Where(item => item.DepartmentId == departmentId && item.CompanyScope == companyScope),
+                PermissionDataScope.Own when userId > 0 => query.Where(item => item.OwnerUserId == userId),
+                _ => query.Where(_ => false)
+            };
+        }
+
+        public IQueryable<EmailTemplate> ApplyEmailTemplateScope(
+            IQueryable<EmailTemplate> query,
+            User? user = null,
+            string action = PermissionAction.View)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            user ??= _currentUserContext?.CurrentUser;
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings)) return query;
+            if (CanViewAllBusinessData(user)) return query;
+            int userId = user?.Id ?? 0;
+            string departmentId = NormalizeScope(user?.DepartmentId);
+            string companyScope = NormalizeScope(user?.CompanyScope);
+            return ResolveDataScope(user, PermissionResourceCatalog.EmailTemplates, action) switch
+            {
+                PermissionDataScope.All when userId > 0 => query.Where(item =>
+                    item.OwnerUserId == userId ||
+                    item.Status == TemplateLifecycleStatusCatalog.Published &&
+                    item.ShareScope != TemplateShareScopeCatalog.Private),
+                PermissionDataScope.Company when userId > 0 => query.Where(item =>
+                    item.OwnerUserId == userId ||
+                    item.Status == TemplateLifecycleStatusCatalog.Published &&
+                    (item.ShareScope == TemplateShareScopeCatalog.All ||
+                     companyScope != string.Empty &&
+                     item.ShareScope == TemplateShareScopeCatalog.Company &&
+                     item.CompanyScope == companyScope)),
+                PermissionDataScope.Department when userId > 0 => query.Where(item =>
+                    item.OwnerUserId == userId ||
+                    item.Status == TemplateLifecycleStatusCatalog.Published &&
+                    (item.ShareScope == TemplateShareScopeCatalog.All ||
+                     companyScope != string.Empty &&
+                     item.ShareScope == TemplateShareScopeCatalog.Company &&
+                     item.CompanyScope == companyScope ||
+                     companyScope != string.Empty && departmentId != string.Empty &&
+                     item.ShareScope == TemplateShareScopeCatalog.Department &&
+                     item.DepartmentId == departmentId && item.CompanyScope == companyScope)),
+                PermissionDataScope.Own when userId > 0 => query.Where(item => item.OwnerUserId == userId),
+                _ => query.Where(_ => false)
+            };
         }
 
         public IQueryable<EmailTemplate> ApplyOwnedEmailTemplateScope(IQueryable<EmailTemplate> query, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
-            if (!ShouldFilterBusinessData(user)) return query;
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings) || CanViewAllBusinessData(user)) return query;
             int userId = user?.Id ?? 0;
             return userId > 0 ? query.Where(item => item.OwnerUserId == userId) : query.Where(_ => false);
         }
 
-        public IQueryable<UserReportTemplate> ApplyUserReportTemplateScope(
-            IQueryable<UserReportTemplate> query,
+        public IQueryable<EmailDeliveryRecord> ApplyEmailDeliveryScope(
+            IQueryable<EmailDeliveryRecord> query,
             User? user = null)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings) || CanViewAllBusinessData(user)) return query;
+            int userId = user?.Id ?? 0;
+            string departmentId = NormalizeScope(user?.DepartmentId);
+            string companyScope = NormalizeScope(user?.CompanyScope);
+            return ResolveDataScope(
+                user,
+                PermissionResourceCatalog.EmailDelivery,
+                PermissionAction.ViewDelivery) switch
+            {
+                PermissionDataScope.All => query,
+                PermissionDataScope.Company when companyScope.Length > 0 =>
+                    query.Where(item => item.CompanyScope == companyScope),
+                PermissionDataScope.Department when departmentId.Length > 0 && companyScope.Length > 0 =>
+                    query.Where(item => item.DepartmentId == departmentId && item.CompanyScope == companyScope),
+                PermissionDataScope.Own when userId > 0 => query.Where(item => item.OwnerUserId == userId),
+                _ => query.Where(_ => false)
+            };
+        }
+
+        public IQueryable<UserReportTemplate> ApplyUserReportTemplateScope(
+            IQueryable<UserReportTemplate> query,
+            User? user = null,
+            string action = PermissionAction.View)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            user ??= _currentUserContext?.CurrentUser;
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings))
+            {
+                return query;
+            }
+
             if (CanViewAllBusinessData(user))
             {
                 return query;
@@ -170,14 +389,30 @@ namespace ExportDocManager.Services.Security
             int userId = user?.Id ?? 0;
             string departmentId = NormalizeScope(user?.DepartmentId);
             string companyScope = NormalizeScope(user?.CompanyScope);
-            return userId > 0
-                ? query.Where(item => item.OwnerUserId == userId ||
-                    (item.IsActive && item.IsShared &&
-                     (item.ShareScope == "All" ||
-                      item.ShareScope == "Company" && companyScope != "" && item.CompanyScope == companyScope ||
-                      item.ShareScope == "Department" && departmentId != "" && item.DepartmentId == departmentId &&
-                        (item.CompanyScope == "" || companyScope == "" || item.CompanyScope == companyScope))))
-                : query.Where(_ => false);
+            return ResolveDataScope(user, PermissionResourceCatalog.ReportTemplates, action) switch
+            {
+                PermissionDataScope.All when userId > 0 => query.Where(item =>
+                    item.OwnerUserId == userId ||
+                    item.Status == TemplateLifecycleStatusCatalog.Published &&
+                    item.ShareScope != TemplateShareScopeCatalog.Private),
+                PermissionDataScope.Company when userId > 0 => query.Where(item =>
+                    item.OwnerUserId == userId ||
+                    item.Status == TemplateLifecycleStatusCatalog.Published &&
+                    (item.ShareScope == TemplateShareScopeCatalog.All ||
+                     companyScope != string.Empty &&
+                     item.ShareScope == TemplateShareScopeCatalog.Company && item.CompanyScope == companyScope)),
+                PermissionDataScope.Department when userId > 0 =>
+                    query.Where(item => item.OwnerUserId == userId ||
+                        item.Status == TemplateLifecycleStatusCatalog.Published &&
+                        (item.ShareScope == TemplateShareScopeCatalog.All ||
+                         companyScope != string.Empty &&
+                         item.ShareScope == TemplateShareScopeCatalog.Company && item.CompanyScope == companyScope ||
+                         companyScope != string.Empty && departmentId != string.Empty &&
+                         item.ShareScope == TemplateShareScopeCatalog.Department && item.DepartmentId == departmentId &&
+                         item.CompanyScope == companyScope)),
+                PermissionDataScope.Own when userId > 0 => query.Where(item => item.OwnerUserId == userId),
+                _ => query.Where(_ => false)
+            };
         }
 
         public IQueryable<UserReportTemplate> ApplyOwnedUserReportTemplateScope(
@@ -186,7 +421,7 @@ namespace ExportDocManager.Services.Security
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
-            if (CanViewAllBusinessData(user))
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings) || CanViewAllBusinessData(user))
             {
                 return query;
             }
@@ -197,13 +432,48 @@ namespace ExportDocManager.Services.Security
                 : query.Where(_ => false);
         }
 
-        public IQueryable<SalesOpportunity> ApplySalesOpportunityScope(IQueryable<SalesOpportunity> query, User? user = null)
+        public IQueryable<SalesOpportunity> ApplySalesOpportunityScope(
+            IQueryable<SalesOpportunity> query,
+            User? user = null,
+            bool includeDeleted = false,
+            string action = PermissionAction.View)
+            => ApplySalesOpportunityScopeForPermission(
+                query,
+                PermissionResourceCatalog.SalesOpportunities,
+                action,
+                user,
+                includeDeleted);
+
+        public IQueryable<SalesOpportunity> ApplySalesOpportunityScopeForPermission(
+            IQueryable<SalesOpportunity> query,
+            string resourceKey,
+            string action,
+            User? user = null,
+            bool includeDeleted = false)
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
-            if (!ShouldFilterBusinessData(user)) return query;
+            // Archived opportunities remain available to their audit/history
+            // endpoints, but ordinary lists and aggregates must never mix them
+            // into active pipeline figures. Callers that explicitly render
+            // history can opt in with includeDeleted=true.
+            if (!includeDeleted)
+            {
+                query = query.Where(item => !item.IsDeleted);
+            }
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings)) return query;
             int userId = user?.Id ?? 0;
-            return userId > 0 ? query.Where(item => item.OwnerUserId == userId) : query.Where(_ => false);
+            string departmentId = NormalizeScope(user?.DepartmentId);
+            string companyScope = NormalizeScope(user?.CompanyScope);
+            return ResolveDataScope(user, resourceKey, action) switch
+            {
+                PermissionDataScope.All => query,
+                PermissionDataScope.Company when companyScope.Length > 0 => query.Where(item => item.CompanyScope == companyScope),
+                PermissionDataScope.Department when departmentId.Length > 0 && companyScope.Length > 0 =>
+                    query.Where(item => item.DepartmentId == departmentId && item.CompanyScope == companyScope),
+                PermissionDataScope.Own when userId > 0 => query.Where(item => item.OwnerUserId == userId),
+                _ => query.Where(_ => false)
+            };
         }
 
         public IQueryable<ContainerProject> ApplyContainerProjectScope(
@@ -212,9 +482,19 @@ namespace ExportDocManager.Services.Security
         {
             ArgumentNullException.ThrowIfNull(query);
             user ??= _currentUserContext?.CurrentUser;
-            if (!ShouldFilterBusinessData(user)) return query;
+            if (!DatabaseModeHelper.UsesPostgreSql(_settings)) return query;
             int userId = user?.Id ?? 0;
-            return userId > 0 ? query.Where(item => item.OwnerUserId == userId) : query.Where(_ => false);
+            string departmentId = NormalizeScope(user?.DepartmentId);
+            string companyScope = NormalizeScope(user?.CompanyScope);
+            return ResolveDataScope(user, PermissionModuleCatalog.DocumentContainerPacking, PermissionAction.View) switch
+            {
+                PermissionDataScope.All => query,
+                PermissionDataScope.Company when companyScope.Length > 0 => query.Where(item => item.CompanyScope == companyScope),
+                PermissionDataScope.Department when departmentId.Length > 0 && companyScope.Length > 0 =>
+                    query.Where(item => item.DepartmentId == departmentId && item.CompanyScope == companyScope),
+                PermissionDataScope.Own when userId > 0 => query.Where(item => item.OwnerUserId == userId),
+                _ => query.Where(_ => false)
+            };
         }
 
         public IQueryable<SwSubmissionBatch> ApplySubmissionBatchScope(
@@ -328,6 +608,16 @@ namespace ExportDocManager.Services.Security
             exporter.CompanyScope = NormalizeScope(user.CompanyScope);
         }
 
+        public void ApplyOwner(Payee payee, User? user = null)
+        {
+            ArgumentNullException.ThrowIfNull(payee);
+            user ??= _currentUserContext?.CurrentUser;
+            if (user == null || user.Id <= 0 || payee.OwnerUserId.HasValue) return;
+            payee.OwnerUserId = user.Id;
+            payee.DepartmentId = NormalizeScope(user.DepartmentId);
+            payee.CompanyScope = NormalizeScope(user.CompanyScope);
+        }
+
         public void ApplyOwner(CrmFollowUp followUp, User? user = null)
         {
             ArgumentNullException.ThrowIfNull(followUp);
@@ -397,11 +687,16 @@ namespace ExportDocManager.Services.Security
             return (value ?? string.Empty).Trim();
         }
 
-        private static bool CanManageModule(User? user, string moduleKey)
+        public static string ResolveDataScope(User? user, string resourceKey, string action)
         {
-            return user?.EffectiveModuleAccess != null &&
-                user.EffectiveModuleAccess.TryGetValue(moduleKey, out string? accessLevel) &&
-                PermissionAccessLevel.Rank(accessLevel) >= PermissionAccessLevel.Rank(PermissionAccessLevel.Manage);
+            if (!PermissionResourceCatalog.IsKnownAction(resourceKey, action)) return string.Empty;
+            if (CanViewAllBusinessData(user)) return PermissionDataScope.All;
+
+            string key = PermissionResourceCatalog.CreateGrantKey(resourceKey, action);
+            var grants = UserPermissionAccessResolver.ResolveEffectiveGrants(user);
+            return grants.TryGetValue(key, out string? scope) && PermissionDataScope.IsKnown(scope)
+                ? PermissionDataScope.Normalize(scope)
+                : string.Empty;
         }
     }
 }

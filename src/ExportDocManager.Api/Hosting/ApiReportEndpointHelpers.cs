@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Reporting;
+using ExportDocManager.Services.Security;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -14,5 +15,14 @@ namespace ExportDocManager.Api.Hosting
 
             return Enum.TryParse(reportType.Trim(), true, out parsedReportType);
         }
+
+        private static bool CanUseReportDocumentDomain(
+            HttpContext context,
+            ApiAuthorizationService authorizationService,
+            ReportDocumentType reportType) =>
+            authorizationService.CanUsePermission(
+                ApiEndpointAuth.GetRequiredUser(context),
+                ReportDocumentAccessCatalog.GetSourceResource(reportType),
+                PermissionAction.View);
     }
 }

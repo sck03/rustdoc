@@ -1,3 +1,4 @@
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
 
@@ -12,236 +13,365 @@ namespace ExportDocManager.Api.Hosting
                 ApiAuthorizationService authorizationService,
                 IUserReportTemplateService service,
                 string? reportType,
-                bool? includeInactive,
+                bool? includeArchived,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanUseModule(
-                        user,
-                        PermissionModuleCatalog.DocumentReports,
-                        PermissionAccessLevel.View))
-                {
-                    return WriteForbidden("当前权限模板不允许查看报表模板。");
-                }
-
-                if (!Enum.TryParse<ReportDocumentType>(reportType, true, out var parsedReportType))
+                if (!Enum.TryParse(reportType, true, out ReportDocumentType parsedReportType))
                 {
                     return Results.BadRequest(new ApiErrorResponse("报表类型无效。"));
                 }
 
-                var rows = await service.ListAsync(parsedReportType, includeInactive ?? false, cancellationToken);
+                if (includeArchived == true && !authorizationService.CanUsePermission(
+                        ApiEndpointAuth.GetRequiredUser(context),
+                        PermissionResourceCatalog.ReportTemplates,
+                        PermissionAction.Restore))
+                {
+                    return Results.StatusCode(StatusCodes.Status403Forbidden);
+                }
+
+                var rows = await service.ListAsync(parsedReportType, includeArchived ?? false, cancellationToken);
                 return Results.Ok(rows.Select(ToApiDto));
             })
             .WithName("ListUserReportTemplates")
-            .Produces<IReadOnlyList<ApiUserReportTemplateDto>>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status400BadRequest)
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.View)
+            .Produces<IReadOnlyList<ApiUserReportTemplateDto>>()
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/reports/user-templates", async (
-                HttpContext context,
-                ApiAuthorizationService authorizationService,
                 IUserReportTemplateService service,
-                IReportTemplateService fileTemplateService,
-                ApiUserReportTemplateSaveRequest request,
+                ApiUserReportTemplateCreateRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanUseModule(
-                        user,
-                        PermissionModuleCatalog.DocumentReports,
-                        PermissionAccessLevel.Operate))
+                if (request is null)
                 {
-                    return WriteForbidden("当前权限模板不允许新建设计模板。");
-                }
-
-                if (request == null || request.Id > 0)
-                {
-                    return Results.BadRequest(new ApiErrorResponse("新增报表模板不能包含已有 ID。"));
+                    return Results.BadRequest(new ApiErrorResponse("新增报表模板请求不能为空。"));
                 }
 
                 try
                 {
-                    string content = request.ContentHtml ?? string.Empty;
-                    if (string.IsNullOrWhiteSpace(content) &&
-                        !string.IsNullOrWhiteSpace(request.SourceTemplatePath))
+                    var saved = await service.SaveDraftAsync(
+                        new UserReportTemplateDraftRequest(
+                            0,
+                            request.ReportType,
+                            request.Name,
+                            request.ContentHtml ?? string.Empty),
+                        cancellationToken);
+                    return Results.Created($"/api/reports/user-templates/{saved.Id}", ToApiDto(saved));
+                }
+                catch (Exception exception) when (
+                    exception is ServiceException or ArgumentException or FileNotFoundException)
+                {
+                    return WriteServiceException(exception);
+                }
+            })
+            .WithName("CreateUserReportTemplate")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Design)
+            .Produces<ApiUserReportTemplateDto>(StatusCodes.Status201Created)
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces<ApiErrorResponse>(StatusCodes.Status404NotFound)
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
+
+            endpoints.MapPost("/api/reports/user-templates/clone", async (
+                HttpContext context,
+                IUserReportTemplateService service,
+                IReportHtmlService reportHtmlService,
+                IReportTemplateService fileTemplateService,
+                ApiUserReportTemplateCloneRequest request,
+                CancellationToken cancellationToken) =>
+            {
+                if (request is null)
+                {
+                    return Results.BadRequest(new ApiErrorResponse("复制报表模板请求不能为空。"));
+                }
+                if (!Enum.TryParse(request.ReportType, true, out ReportDocumentType reportType))
+                {
+                    return Results.BadRequest(new ApiErrorResponse("报表类型无效。"));
+                }
+
+                string sourceReference = (request.SourceTemplatePath ?? string.Empty)
+                    .Trim()
+                    .Replace('\\', '/');
+                if (sourceReference.Length == 0)
+                {
+                    return Results.BadRequest(new ApiErrorResponse("复制来源模板不能为空。"));
+                }
+
+                try
+                {
+                    UserReportTemplateCloneRequest command;
+                    if (TryParseUserReportTemplateReference(sourceReference, out int sourceUserTemplateId))
                     {
-                        if (!Enum.TryParse<ReportDocumentType>(request.ReportType, true, out var reportType))
+                        command = new UserReportTemplateCloneRequest(
+                            request.ReportType,
+                            request.Name,
+                            SourceUserTemplateId: sourceUserTemplateId);
+                    }
+                    else
+                    {
+                        if (!sourceReference.StartsWith("builtin:", StringComparison.OrdinalIgnoreCase))
                         {
-                            return Results.BadRequest(new ApiErrorResponse("报表类型无效。"));
+                            return Results.BadRequest(new ApiErrorResponse("只能从正式内置模板或有权查看的用户模板复制。"));
+                        }
+
+                        var availableTemplates = await reportHtmlService
+                            .GetAvailableTemplatesAsync(reportType, cancellationToken);
+                        var sourceDescriptor = availableTemplates.FirstOrDefault(template =>
+                            string.Equals(
+                                ToApiReportTemplatePath(context, template.TemplatePath),
+                                sourceReference,
+                                StringComparison.OrdinalIgnoreCase));
+                        if (sourceDescriptor == null)
+                        {
+                            return Results.NotFound(new ApiErrorResponse("复制来源模板不存在或不在正式模板清单中。"));
                         }
 
                         var source = await fileTemplateService.GetTemplateContentAsync(
                             reportType,
-                            request.SourceTemplatePath,
+                            sourceDescriptor.TemplatePath,
                             cancellationToken);
-                        content = source.Content;
+                        command = new UserReportTemplateCloneRequest(
+                            request.ReportType,
+                            request.Name,
+                            ServerResolvedContentHtml: source.Content);
                     }
 
-                    var saved = await service.SaveAsync(ToSaveRequest(request, 0, content), cancellationToken);
+                    var saved = await service.CloneAsync(command, cancellationToken);
                     return Results.Created($"/api/reports/user-templates/{saved.Id}", ToApiDto(saved));
                 }
-                catch (ArgumentException ex)
+                catch (Exception exception) when (
+                    exception is ServiceException or ArgumentException or IOException or InvalidOperationException)
                 {
-                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
-                }
-                catch (FileNotFoundException ex)
-                {
-                    return Results.NotFound(new ApiErrorResponse(ex.Message));
+                    return WriteServiceException(exception);
                 }
             })
-            .WithName("CreateUserReportTemplate")
+            .WithName("CloneUserReportTemplate")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Clone)
             .Produces<ApiUserReportTemplateDto>(StatusCodes.Status201Created)
-            .Produces(StatusCodes.Status400BadRequest)
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status404NotFound);
+            .Produces<ApiErrorResponse>(StatusCodes.Status404NotFound)
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
-            endpoints.MapPut("/api/reports/user-templates/{id:int}", async (
-                HttpContext context,
-                ApiAuthorizationService authorizationService,
+            endpoints.MapPut("/api/reports/user-templates/{id:int}/draft", async (
                 IUserReportTemplateService service,
                 int id,
-                ApiUserReportTemplateSaveRequest request,
+                ApiUserReportTemplateDraftRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanUseModule(
-                        user,
-                        PermissionModuleCatalog.DocumentReports,
-                        PermissionAccessLevel.Operate))
-                {
-                    return WriteForbidden("当前权限模板不允许修改设计模板。");
-                }
-
-                if (request == null || id <= 0)
+                if (request is null || id <= 0)
                 {
                     return Results.BadRequest(new ApiErrorResponse("报表模板 ID 无效。"));
                 }
 
-                try
-                {
-                    return Results.Ok(ToApiDto(await service.SaveAsync(
-                        ToSaveRequest(request, id, request.ContentHtml), cancellationToken)));
-                }
-                catch (ArgumentException ex)
-                {
-                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
-                }
-                catch (KeyNotFoundException)
-                {
-                    return Results.NotFound();
-                }
-                catch (UserReportTemplateConcurrencyException ex)
-                {
-                    return Results.Conflict(new ApiErrorResponse(ex.Message));
-                }
+                return await ExecuteUserReportTemplateCommandAsync(
+                    () => service.SaveDraftAsync(
+                        ToDraftRequest(request, id, request.ContentHtml),
+                        cancellationToken));
             })
-            .WithName("UpdateUserReportTemplate")
-            .Produces<ApiUserReportTemplateDto>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status400BadRequest)
+            .WithName("SaveUserReportTemplateDraft")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Design)
+            .Produces<ApiUserReportTemplateDto>()
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status404NotFound);
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
+
+            endpoints.MapPost("/api/reports/user-templates/{id:int}/publish", async (
+                IUserReportTemplateService service,
+                int id,
+                ApiUserReportTemplateLifecycleRequest request,
+                CancellationToken cancellationToken) =>
+                await ExecuteUserReportTemplateCommandAsync(
+                    () => service.PublishAsync(id, request?.ExpectedVersion ?? 0, cancellationToken)))
+            .WithName("PublishUserReportTemplate")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Publish)
+            .Produces<ApiUserReportTemplateDto>()
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
+
+            endpoints.MapPost("/api/reports/user-templates/{id:int}/share", async (
+                IUserReportTemplateService service,
+                int id,
+                ApiUserReportTemplateShareRequest request,
+                CancellationToken cancellationToken) =>
+                await ExecuteUserReportTemplateCommandAsync(
+                    () => service.ShareAsync(
+                        id,
+                        new UserReportTemplateShareRequest(
+                            request?.ShareScope ?? string.Empty,
+                            request?.ExpectedVersion ?? 0),
+                        cancellationToken)))
+            .WithName("ShareUserReportTemplate")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Share)
+            .Produces<ApiUserReportTemplateDto>()
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
+
+            endpoints.MapPost("/api/reports/user-templates/{id:int}/disable", async (
+                IUserReportTemplateService service,
+                int id,
+                ApiUserReportTemplateLifecycleRequest request,
+                CancellationToken cancellationToken) =>
+                await ExecuteUserReportTemplateCommandAsync(
+                    () => service.DisableAsync(id, request?.ExpectedVersion ?? 0, cancellationToken)))
+            .WithName("DisableUserReportTemplate")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Deactivate)
+            .Produces<ApiUserReportTemplateDto>()
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
+
+            endpoints.MapPost("/api/reports/user-templates/{id:int}/restore", async (
+                IUserReportTemplateService service,
+                int id,
+                ApiUserReportTemplateLifecycleRequest request,
+                CancellationToken cancellationToken) =>
+                await ExecuteUserReportTemplateCommandAsync(
+                    () => service.RestoreAsync(id, request?.ExpectedVersion ?? 0, cancellationToken)))
+            .WithName("RestoreUserReportTemplate")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Restore)
+            .Produces<ApiUserReportTemplateDto>()
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
             endpoints.MapDelete("/api/reports/user-templates/{id:int}", async (
-                HttpContext context,
-                ApiAuthorizationService authorizationService,
                 IUserReportTemplateService service,
                 int id,
+                int expectedVersion,
                 CancellationToken cancellationToken) =>
-            {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanUseModule(
-                        user,
-                        PermissionModuleCatalog.DocumentReports,
-                        PermissionAccessLevel.Operate))
-                {
-                    return WriteForbidden("当前权限模板不允许删除设计模板。");
-                }
-
-                try
-                {
-                    return await service.DeleteAsync(id, cancellationToken)
-                        ? Results.Ok(new ApiCommandResponse(true, "报表模板已删除。"))
-                        : Results.NotFound();
-                }
-                catch (UserReportTemplateConcurrencyException ex)
-                {
-                    return Results.Conflict(new ApiErrorResponse(ex.Message));
-                }
-            })
-            .WithName("DeleteUserReportTemplate")
-            .WithApiPermission(
-                PermissionModuleCatalog.DocumentReports,
-                writeAccessLevel: PermissionAccessLevel.Operate)
-            .Produces<ApiCommandResponse>(StatusCodes.Status200OK)
+                await ExecuteUserReportTemplateCommandAsync(
+                    () => service.ArchiveAsync(id, expectedVersion, cancellationToken)))
+            .WithName("ArchiveUserReportTemplate")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Archive)
+            .Produces<ApiUserReportTemplateDto>()
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status404NotFound);
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
 
             endpoints.MapGet("/api/reports/user-templates/{id:int}/versions", async (
-                HttpContext context,
-                ApiAuthorizationService authorizationService,
                 IUserReportTemplateService service,
                 int id,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.View))
-                    return WriteForbidden("当前权限模板不允许查看模板历史。");
-                if (id <= 0) return Results.BadRequest(new ApiErrorResponse("报表模板 ID 无效。"));
+                if (id <= 0)
+                {
+                    return Results.BadRequest(new ApiErrorResponse("报表模板 ID 无效。"));
+                }
                 var rows = await service.ListVersionsAsync(id, cancellationToken);
                 return rows.Count == 0 ? Results.NotFound() : Results.Ok(rows.Select(ToApiVersionDto));
-            }).WithName("ListUserReportTemplateVersions")
-            .Produces<IReadOnlyList<ApiUserReportTemplateVersionDto>>(StatusCodes.Status200OK)
+            })
+            .WithName("ListUserReportTemplateVersions")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.View)
+            .Produces<IReadOnlyList<ApiUserReportTemplateVersionDto>>()
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapPost("/api/reports/user-templates/{id:int}/versions/{versionNumber:int}/restore", async (
-                HttpContext context,
-                ApiAuthorizationService authorizationService,
                 IUserReportTemplateService service,
                 int id,
                 int versionNumber,
+                ApiUserReportTemplateLifecycleRequest request,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-                if (!authorizationService.CanUseModule(user, PermissionModuleCatalog.DocumentReports, PermissionAccessLevel.Operate))
-                    return WriteForbidden("当前权限模板不允许恢复历史版本。");
                 if (id <= 0 || versionNumber <= 0)
-                    return Results.BadRequest(new ApiErrorResponse("报表模板历史版本无效。"));
-                try
                 {
-                    return Results.Ok(ToApiDto(await service.RestoreVersionAsync(id, versionNumber, cancellationToken)));
+                    return Results.BadRequest(new ApiErrorResponse("报表模板历史版本无效。"));
                 }
-                catch (KeyNotFoundException) { return Results.NotFound(); }
-                catch (ArgumentException ex) { return Results.BadRequest(new ApiErrorResponse(ex.Message)); }
-            }).WithName("RestoreUserReportTemplateVersion")
-            .Produces<ApiUserReportTemplateDto>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status400BadRequest)
+                return await ExecuteUserReportTemplateCommandAsync(
+                    () => service.RestoreVersionAsync(
+                        id,
+                        versionNumber,
+                        request?.ExpectedVersion ?? 0,
+                        cancellationToken));
+            })
+            .WithName("RestoreUserReportTemplateVersion")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Restore)
+            .Produces<ApiUserReportTemplateDto>()
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status404NotFound);
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
+        }
+
+        private static async Task<IResult> ExecuteUserReportTemplateCommandAsync(
+            Func<Task<UserReportTemplateRecord>> command)
+        {
+            try
+            {
+                return Results.Ok(ToApiDto(await command()));
+            }
+            catch (Exception exception) when (exception is ServiceException or ArgumentException)
+            {
+                return WriteServiceException(exception);
+            }
         }
 
         private static ApiUserReportTemplateDto ToApiDto(UserReportTemplateRecord item) =>
-            new(item.Id, item.ReportType, item.Name, item.ContentHtml, item.IsActive,
-                item.IsShared, item.ShareScope, item.VersionNumber, item.CanEdit, item.OwnerUserId);
+            new(
+                item.Id,
+                item.ReportType,
+                item.Name,
+                item.ContentHtml,
+                item.Status,
+                item.ShareScope,
+                item.VersionNumber,
+                item.CanEdit,
+                item.CanPublish,
+                item.CanShare,
+                item.CanDisable,
+                item.CanRestore,
+                item.CanArchive,
+                item.OwnerUserId);
 
-        private static UserReportTemplateSaveRequest ToSaveRequest(
-            ApiUserReportTemplateSaveRequest item,
+        private static UserReportTemplateDraftRequest ToDraftRequest(
+            ApiUserReportTemplateDraftRequest item,
             int id,
             string contentHtml) =>
-            new(id, item.ReportType, item.Name, contentHtml, item.IsActive, item.IsShared, item.ShareScope, item.ExpectedVersion);
+            new(id, item.ReportType, item.Name, contentHtml, item.ExpectedVersion);
+
+        private static bool TryParseUserReportTemplateReference(string reference, out int id)
+        {
+            const string prefix = "user-template:";
+            id = 0;
+            return reference.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                   int.TryParse(reference[prefix.Length..], out id) &&
+                   id > 0;
+        }
 
         private static ApiUserReportTemplateVersionDto ToApiVersionDto(UserReportTemplateVersionRecord item) =>
-            new(item.Id, item.UserReportTemplateId, item.VersionNumber, item.ChangeType, item.Name,
-                item.ContentHtml, item.IsActive, item.IsShared, item.ShareScope, item.ChangedBy, item.CreatedAt, item.CanRestore);
+            new(
+                item.Id,
+                item.UserReportTemplateId,
+                item.VersionNumber,
+                item.ChangeType,
+                item.Name,
+                item.ContentHtml,
+                item.Status,
+                item.ShareScope,
+                item.ChangedBy,
+                item.CreatedAt,
+                item.CanRestore);
     }
 }

@@ -10,9 +10,11 @@ import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 
-export function CrmCustomerDirectoryPanel({ client, canOperate, onCreateCustomer, onSelectCustomer }: {
+export function CrmCustomerDirectoryPanel({ client, canCreate, canDeactivate, canExport, onCreateCustomer, onSelectCustomer }: {
   client: ExportDocManagerApiClient;
-  canOperate: boolean;
+  canCreate: boolean;
+  canDeactivate: boolean;
+  canExport: boolean;
   onCreateCustomer: () => void;
   onSelectCustomer: (customer: ApiCrmCustomerDto) => void;
 }) {
@@ -38,7 +40,7 @@ export function CrmCustomerDirectoryPanel({ client, canOperate, onCreateCustomer
   }
 
   async function updateBatchStatus(targetStatus: string) {
-    if (!canOperate) return;
+    if (!canDeactivate) return;
     if (!selectedIds.length) { setFeedback(warningFeedback("请先勾选 CRM 客户。")); return; }
     try {
       const result = await client.updateCrmCustomerBatchStatus({ body: { ids: selectedIds, status: targetStatus } });
@@ -56,23 +58,23 @@ export function CrmCustomerDirectoryPanel({ client, canOperate, onCreateCustomer
   }
 
   return <section className="form-section">
-    <div className="section-header"><div><h3>客户目录</h3><p className="section-description">查找销售客户并进入联系人资料。</p></div><div className="section-header-actions"><span>共 {page?.totalCount ?? 0} 家</span>{canOperate ? <button className="primary-button" type="button" onClick={onCreateCustomer}>新建客户</button> : null}</div></div>
+    <div className="section-header"><div><h3>客户目录</h3><p className="section-description">查找销售客户并进入联系人资料。</p></div><div className="section-header-actions"><span>共 {page?.totalCount ?? 0} 家</span>{canCreate ? <button className="primary-button" type="button" onClick={onCreateCustomer}>新建客户</button> : null}</div></div>
     <form className="toolbar" onSubmit={search}>
       <input value={inputKeyword} onChange={(event) => setInputKeyword(event.target.value)} placeholder="搜索名称、国家、网站、来源或备注" />
       <select value={status} onChange={(event) => { setStatus(event.target.value); setPageNumber(1); }}>
         <option value="">全部状态</option><option>潜在客户</option><option>跟进中</option><option>已成交</option><option>暂停</option><option>已流失</option>
       </select>
       <button className="secondary-button" type="submit">搜索</button>
-      <button className="secondary-button" type="button" onClick={() => void exportRows()}>导出当前筛选</button>
-      {canOperate ? <select aria-label="批量客户状态" defaultValue="" onChange={(event) => { if (event.target.value) void updateBatchStatus(event.target.value); event.target.value = ""; }}>
+      {canExport ? <button className="secondary-button" type="button" onClick={() => void exportRows()}>导出当前筛选</button> : null}
+      {canDeactivate ? <select aria-label="批量客户状态" defaultValue="" onChange={(event) => { if (event.target.value) void updateBatchStatus(event.target.value); event.target.value = ""; }}>
         <option value="">批量修改状态...</option><option>潜在客户</option><option>跟进中</option><option>已成交</option><option>暂停</option><option>已流失</option>
       </select> : null}
     </form>
     <OperationFeedback feedback={feedback} />
     {pageQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(pageQuery.error))} /> : null}
-    <ResponsiveTableFrame label="CRM 客户目录" mobileLayout="scroll" busy={pageQuery.isFetching}><table className="data-table responsive-data-table"><thead><tr>{canOperate ? <th><input type="checkbox" aria-label="选择本页 CRM 客户" checked={(page?.items.length ?? 0) > 0 && page!.items.every((item) => selectedIds.includes(item.id))} onChange={(event) => setSelectedIds(event.target.checked ? Array.from(new Set([...selectedIds, ...(page?.items.map((item) => item.id) ?? [])])) : selectedIds.filter((id) => !page?.items.some((item) => item.id === id)))} /></th> : null}<th>客户</th><th data-table-priority="secondary">国家/地区</th><th>状态</th><th data-table-priority="secondary">来源</th><th /></tr></thead>
-      <tbody>{(page?.items ?? []).map((item) => <tr key={item.id}>{canOperate ? <td><input type="checkbox" aria-label={`选择客户 ${item.name}`} checked={selectedIds.includes(item.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id))} /></td> : null}<td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.countryRegion || "-"}</td><td><BusinessStatusBadge value={item.status} /></td><td data-table-priority="secondary">{item.source || "-"}</td><td><button className="secondary-button" type="button" onClick={() => onSelectCustomer(item)}>打开</button></td></tr>)}
-        {!pageQuery.isFetching && !pageQuery.isError && !page?.items.length ? <tr><td className="empty-cell" colSpan={canOperate ? 6 : 5}><div className="empty-cell-content"><strong>暂无销售客户</strong><span>{canOperate ? "先建立客户和主要联系人，之后即可记录跟进与商机。" : "当前没有可查看的销售客户。"}</span>{canOperate ? <button className="primary-button" type="button" onClick={onCreateCustomer}>建立第一位客户</button> : null}</div></td></tr> : null}
+    <ResponsiveTableFrame label="CRM 客户目录" mobileLayout="scroll" busy={pageQuery.isFetching}><table className="data-table responsive-data-table"><thead><tr>{canDeactivate ? <th><input type="checkbox" aria-label="选择本页 CRM 客户" checked={(page?.items.length ?? 0) > 0 && page!.items.every((item) => selectedIds.includes(item.id))} onChange={(event) => setSelectedIds(event.target.checked ? Array.from(new Set([...selectedIds, ...(page?.items.map((item) => item.id) ?? [])])) : selectedIds.filter((id) => !page?.items.some((item) => item.id === id)))} /></th> : null}<th>客户</th><th data-table-priority="secondary">国家/地区</th><th>状态</th><th data-table-priority="secondary">来源</th><th /></tr></thead>
+      <tbody>{(page?.items ?? []).map((item) => <tr key={item.id}>{canDeactivate ? <td><input type="checkbox" aria-label={`选择客户 ${item.name}`} checked={selectedIds.includes(item.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? Array.from(new Set([...current, item.id])) : current.filter((id) => id !== item.id))} /></td> : null}<td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.countryRegion || "-"}</td><td><BusinessStatusBadge value={item.status} /></td><td data-table-priority="secondary">{item.source || "-"}</td><td><button className="secondary-button" type="button" onClick={() => onSelectCustomer(item)}>打开</button></td></tr>)}
+        {!pageQuery.isFetching && !pageQuery.isError && !page?.items.length ? <tr><td className="empty-cell" colSpan={canDeactivate ? 6 : 5}><div className="empty-cell-content"><strong>暂无销售客户</strong><span>{canCreate ? "先建立客户和主要联系人，之后即可记录跟进与商机。" : "当前没有可查看的销售客户。"}</span>{canCreate ? <button className="primary-button" type="button" onClick={onCreateCustomer}>建立第一位客户</button> : null}</div></td></tr> : null}
       </tbody>
     </table></ResponsiveTableFrame>
     <ListPaginationControls pageNumber={pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={pageQuery.isFetching} onPageChange={setPageNumber} onPageSizeChange={(value) => { setPageSize(value); setPageNumber(1); }} />

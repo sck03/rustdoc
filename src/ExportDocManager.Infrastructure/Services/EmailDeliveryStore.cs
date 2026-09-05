@@ -34,21 +34,26 @@ public sealed class EmailDeliveryStore : IEmailDeliveryStore
             throw new ArgumentOutOfRangeException(nameof(attachmentCount));
         }
 
+        var currentUser = _accessScope.CurrentUser;
+        int ownerUserId = currentUser?.Id ?? 0;
         await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-        var existing = await context.EmailDeliveryRecords.SingleOrDefaultAsync(item => item.DeliveryId == key, cancellationToken).ConfigureAwait(false);
+        var existing = await context.EmailDeliveryRecords.SingleOrDefaultAsync(
+            item => item.OwnerUserId == ownerUserId && item.DeliveryId == key,
+            cancellationToken).ConfigureAwait(false);
         if (existing != null)
         {
             return ResolveExisting(existing, fingerprint);
         }
 
-        var currentUser = _accessScope.CurrentUser;
         context.EmailDeliveryRecords.Add(new EmailDeliveryRecord
         {
             DeliveryId = key,
             RequestFingerprint = fingerprint,
             JobId = Truncate(jobId, 120),
             Kind = Truncate(kind, 80),
-            OwnerUserId = currentUser?.Id ?? 0,
+            OwnerUserId = ownerUserId,
+            DepartmentId = Truncate(currentUser?.DepartmentId, 50),
+            CompanyScope = Truncate(currentUser?.CompanyScope, 50),
             RequestedBy = Truncate(currentUser?.Username, 100),
             Recipient = Truncate(recipient, 320),
             Subject = Truncate(subject, 300),
@@ -63,7 +68,9 @@ public sealed class EmailDeliveryStore : IEmailDeliveryStore
         catch (DbUpdateException)
         {
             context.ChangeTracker.Clear();
-            var winner = await context.EmailDeliveryRecords.AsNoTracking().SingleOrDefaultAsync(item => item.DeliveryId == key, cancellationToken).ConfigureAwait(false);
+            var winner = await context.EmailDeliveryRecords.AsNoTracking().SingleOrDefaultAsync(
+                item => item.OwnerUserId == ownerUserId && item.DeliveryId == key,
+                cancellationToken).ConfigureAwait(false);
             if (winner == null)
             {
                 throw;
@@ -91,13 +98,8 @@ public sealed class EmailDeliveryStore : IEmailDeliveryStore
     {
         int pageSize = Math.Clamp(limit, 1, 100);
         await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-        var query = context.EmailDeliveryRecords.AsNoTracking();
-        var currentUser = _accessScope.CurrentUser;
-        if (_accessScope.ShouldFilterBusinessData(currentUser))
-        {
-            int userId = currentUser?.Id ?? 0;
-            query = query.Where(item => item.OwnerUserId == userId);
-        }
+        var query = _accessScope.ApplyEmailDeliveryScope(
+            context.EmailDeliveryRecords.AsNoTracking());
 
         return await query
             .OrderByDescending(item => item.CreatedAt)
@@ -120,8 +122,11 @@ public sealed class EmailDeliveryStore : IEmailDeliveryStore
 
     private async Task UpdateAsync(string deliveryId, Action<EmailDeliveryRecord> update, CancellationToken cancellationToken)
     {
+        int ownerUserId = _accessScope.CurrentUser?.Id ?? 0;
         await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-        var record = await context.EmailDeliveryRecords.SingleOrDefaultAsync(item => item.DeliveryId == deliveryId, cancellationToken).ConfigureAwait(false);
+        var record = await context.EmailDeliveryRecords.SingleOrDefaultAsync(
+            item => item.OwnerUserId == ownerUserId && item.DeliveryId == deliveryId,
+            cancellationToken).ConfigureAwait(false);
         if (record == null) return;
         update(record);
         await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

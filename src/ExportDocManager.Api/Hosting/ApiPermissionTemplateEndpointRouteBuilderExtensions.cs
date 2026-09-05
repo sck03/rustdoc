@@ -13,26 +13,19 @@ namespace ExportDocManager.Api.Hosting
                 UnauthorizedHttpResult,
                 JsonHttpResult<ApiErrorResponse>>> (
                 HttpContext context,
-                IApiSessionTokenService tokenService,
-                ApiAuthorizationService authorizationService,
                 IPermissionTemplateService service,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanManageUsers(user))
-                {
-                    return TypedForbidden("只有全功能版管理员可以管理权限模板。");
-                }
-
                 var templates = await service.ListAsync(cancellationToken);
                 return TypedResults.Ok(new ApiPermissionTemplateCatalogResponse(
-                    PermissionModuleCatalog.Modules.Select(ToApiDto).ToArray(),
+                    PermissionResourceCatalog.Resources.Select(ToApiDto).ToArray(),
                     templates.Select(ToApiDto).ToArray(),
+                    PermissionDataScope.Values,
                     PermissionAccessLevel.Levels,
-                    "模板修改后，使用该模板的登录会话立即失效；服务端按产品版本、模板和数据归属计算最终权限。"));
+                    "模板修改后现有会话立即失效；服务端按资源、动作、数据范围、技术依赖和产品版本计算最终权限。"));
             })
             .WithName("ListPermissionTemplates")
+            .WithApiCapability(PermissionResourceCatalog.SystemPermissions, PermissionAction.Manage)
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
             endpoints.MapPost("/api/permission-templates", async Task<Results<
@@ -44,19 +37,18 @@ namespace ExportDocManager.Api.Hosting
                 Conflict<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
-                ApiAuthorizationService authorizationService,
                 IPermissionTemplateService service,
                 ApiPermissionTemplateSaveRequest request,
                 CancellationToken cancellationToken) =>
                 await SavePermissionTemplateAsync(
                     context,
                     tokenService,
-                    authorizationService,
                     service,
                     request,
                     null,
                     cancellationToken))
             .WithName("CreatePermissionTemplate")
+            .WithApiCapability(PermissionResourceCatalog.SystemPermissions, PermissionAction.Manage)
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
             endpoints.MapPut("/api/permission-templates/{id:int}", async Task<Results<
@@ -68,7 +60,6 @@ namespace ExportDocManager.Api.Hosting
                 Conflict<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
-                ApiAuthorizationService authorizationService,
                 IPermissionTemplateService service,
                 int id,
                 ApiPermissionTemplateSaveRequest request,
@@ -76,12 +67,12 @@ namespace ExportDocManager.Api.Hosting
                 await SavePermissionTemplateAsync(
                     context,
                     tokenService,
-                    authorizationService,
                     service,
                     request,
                     id,
                     cancellationToken))
             .WithName("UpdatePermissionTemplate")
+            .WithApiCapability(PermissionResourceCatalog.SystemPermissions, PermissionAction.Manage)
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
 
             endpoints.MapDelete("/api/permission-templates/{id:int}", async Task<Results<
@@ -92,21 +83,14 @@ namespace ExportDocManager.Api.Hosting
                 Conflict<ApiErrorResponse>>> (
                 HttpContext context,
                 IApiSessionTokenService tokenService,
-                ApiAuthorizationService authorizationService,
                 IPermissionTemplateService service,
                 int id,
+                int? expectedVersion,
                 CancellationToken cancellationToken) =>
             {
-                var user = ApiEndpointAuth.GetRequiredUser(context);
-
-                if (!authorizationService.CanManageUsers(user))
-                {
-                    return TypedForbidden("只有全功能版管理员可以管理权限模板。");
-                }
-
                 try
                 {
-                    bool deleted = await service.DeleteAsync(id, cancellationToken);
+                    bool deleted = await service.DeleteAsync(id, cancellationToken, expectedVersion ?? 0);
                     return deleted
                         ? TypedResults.Ok(new ApiCommandResponse(true, "权限模板已删除。"))
                         : TypedResults.NotFound(new ApiErrorResponse("未找到权限模板。"));
@@ -117,6 +101,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("DeletePermissionTemplate")
+            .WithApiCapability(PermissionResourceCatalog.SystemPermissions, PermissionAction.Manage)
             .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden);
         }
 
@@ -129,19 +114,11 @@ namespace ExportDocManager.Api.Hosting
             Conflict<ApiErrorResponse>>> SavePermissionTemplateAsync(
             HttpContext context,
             IApiSessionTokenService tokenService,
-            ApiAuthorizationService authorizationService,
             IPermissionTemplateService service,
             ApiPermissionTemplateSaveRequest request,
             int? id,
             CancellationToken cancellationToken)
         {
-            var user = ApiEndpointAuth.GetRequiredUser(context);
-
-            if (!authorizationService.CanManageUsers(user))
-            {
-                return TypedForbidden("只有全功能版管理员可以管理权限模板。");
-            }
-
             if (request is null)
             {
                 return TypedResults.BadRequest(new ApiErrorResponse("权限模板请求不能为空。"));
@@ -156,8 +133,9 @@ namespace ExportDocManager.Api.Hosting
                         request.Name,
                         request.Description,
                         request.IsActive,
-                        (request.Modules ?? []).Select(module =>
-                            new PermissionTemplateModuleRecord(module.ModuleKey, module.AccessLevel)).ToArray()),
+                        (request.Grants ?? []).Select(grant =>
+                            new PermissionGrantRecord(grant.ResourceKey, grant.Action, grant.DataScope)).ToArray(),
+                        request.ExpectedVersion),
                     cancellationToken);
                 var assignedUserIds = await service.ListAssignedUserIdsAsync(saved.Id, cancellationToken);
                 foreach (int userId in assignedUserIds)
@@ -184,8 +162,12 @@ namespace ExportDocManager.Api.Hosting
             }
         }
 
-        private static ApiPermissionModuleDefinitionDto ToApiDto(PermissionModuleDefinition module) =>
-            new(module.Key, module.Name, module.Group, module.Workspace, module.SortOrder, module.IsTechnical);
+        private static ApiPermissionResourceDefinitionDto ToApiDto(PermissionResourceDefinition resource) =>
+            new(resource.Key, resource.Name, resource.Group, resource.Workspace, resource.ModuleKey,
+                resource.SortOrder, resource.IsTechnical, resource.SupportsDataScope,
+                resource.Actions.Select(action => new ApiPermissionActionDefinitionDto(
+                    action.Key, action.Name, action.Description, action.SortOrder,
+                    action.NavigationAccessLevel)).ToArray());
 
         private static ApiPermissionTemplateDto ToApiDto(PermissionTemplateRecord template) =>
             new(
@@ -196,7 +178,11 @@ namespace ExportDocManager.Api.Hosting
                 template.IsSystem,
                 template.IsActive,
                 template.UpdatedAt,
-                template.Modules.Select(module =>
-                    new ApiPermissionTemplateModuleDto(module.ModuleKey, module.AccessLevel)).ToArray());
+                template.Grants.Select(grant =>
+                    new ApiPermissionGrantDto(grant.ResourceKey, grant.Action, grant.DataScope)).ToArray(),
+                template.EffectiveGrants.Select(grant => new ApiEffectivePermissionGrantDto(
+                    grant.ResourceKey, grant.Action, grant.DataScope, grant.Source,
+                    grant.SourceResourceKey)).ToArray(),
+                template.VersionNumber);
     }
 }

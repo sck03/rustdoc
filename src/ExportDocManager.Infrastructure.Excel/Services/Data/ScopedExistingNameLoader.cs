@@ -23,7 +23,7 @@ internal static class ScopedExistingNameLoader
             .Where(name => name.Length > 0)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var existingNames = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (string[] batch in normalizedCandidates.Chunk(QueryBatchSize))
         {
@@ -32,12 +32,15 @@ internal static class ScopedExistingNameLoader
                 .Where(name => batch.Contains(name.ToUpper()))
                 .ToArrayAsync(cancellationToken)
                 .ConfigureAwait(false);
-            existingNames.UnionWith(matches);
+            foreach (string match in matches)
+            {
+                existingNames.Add(Normalize(match));
+            }
         }
 
         return existingNames;
     }
 
     private static string Normalize(string? value) =>
-        (value ?? string.Empty).Trim().ToUpperInvariant();
+        (value ?? string.Empty).Trim().Normalize(System.Text.NormalizationForm.FormC).ToUpperInvariant();
 }

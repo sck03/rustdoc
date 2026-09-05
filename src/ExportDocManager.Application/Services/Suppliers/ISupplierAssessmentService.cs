@@ -4,6 +4,7 @@ namespace ExportDocManager.Services.Suppliers
         int Id, int SupplierCompanyId, DateOnly AssessmentDate, string AssessmentKind,
         int QualityScore, int DeliveryScore, int ServiceScore, int PriceScore,
         decimal AverageScore, string Conclusion, string Notes, string AssessedBy,
+        string Status, string ConfirmedBy, DateTimeOffset? ConfirmedAt,
         DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int VersionNumber);
 
     public sealed record SupplierAssessmentSaveRequest(
@@ -35,7 +36,16 @@ namespace ExportDocManager.Services.Suppliers
         Task<SupplierAssessmentRecord> SaveAsync(
             SupplierAssessmentSaveRequest request, CancellationToken cancellationToken = default);
 
+        Task<SupplierAssessmentRecord> ConfirmAsync(
+            int supplierCompanyId,
+            int id,
+            int expectedVersion,
+            CancellationToken cancellationToken = default);
+
         Task<bool> DeleteAsync(
-            int supplierCompanyId, int id, CancellationToken cancellationToken = default);
+            int supplierCompanyId,
+            int id,
+            CancellationToken cancellationToken = default,
+            int expectedVersion = 0);
     }
 }

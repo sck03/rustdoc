@@ -15,17 +15,24 @@ namespace ExportDocManager.Api.Hosting
         DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int VersionNumber);
 
     public sealed record ApiCrmCustomerSaveRequest(
-        int Id, string Name, string CountryRegion, string Website, string Status,
+        int Id, string Name, string CountryRegion, string Website,
         string Source, string Notes, int? LinkedDocumentCustomerId = null, int ExpectedVersion = 0);
 
     public sealed record ApiCrmContactSaveRequest(
         int Id, int CrmCustomerId, string Name, string Title, string Email,
-        string Phone, string InstantMessaging, bool IsPrimary, int ExpectedVersion = 0);
+        string Phone, string InstantMessaging, int ExpectedVersion = 0);
 
     public sealed record ApiCrmFollowUpSaveRequest(
         int Id, int CrmCustomerId, int? CrmContactId = null, string Type = "", string Summary = "",
         string NextAction = "", DateTimeOffset? FollowedUpAt = null, DateTimeOffset? NextFollowUpAt = null,
-        bool IsCompleted = false, int ExpectedVersion = 0);
+        int ExpectedVersion = 0);
+
+    public sealed record ApiCrmLifecycleRequest(int ExpectedVersion);
+
+    public sealed record ApiCrmFollowUpTransferRequest(
+        int CrmCustomerId,
+        int? CrmContactId,
+        int ExpectedVersion);
 
     public sealed record ApiCrmDashboardDto(
         int CustomerCount,
@@ -48,9 +55,10 @@ namespace ExportDocManager.Api.Hosting
         string ContactEmail, string ContactPhone, bool IsDuplicate, string Error);
 
     public sealed record ApiCrmCustomerImportPreviewDto(
-        int TotalRows, int ValidRows, int DuplicateRows, IReadOnlyList<ApiCrmCustomerImportRowDto> Rows);
+        int TotalRows, int ValidRows, int DuplicateRows, IReadOnlyList<ApiCrmCustomerImportRowDto> Rows,
+        string PreviewId);
 
-    public sealed record ApiCrmCustomerImportRequest(IReadOnlyList<ApiCrmCustomerImportRowDto> Rows);
+    public sealed record ApiCrmCustomerImportRequest(string PreviewId);
 
     public sealed record ApiCrmCustomerImportResultDto(
         int CreatedCustomers, int CreatedContacts, int SkippedDuplicates);

@@ -54,6 +54,7 @@ namespace ExportDocManager.Api.Hosting
                     status.RestoreUpdatedAtUtc));
             })
             .WithName("GetServerMigrationStatus")
+            .WithApiCapability(PermissionResourceCatalog.SystemDisasterRecovery, PermissionAction.Manage)
             .Produces<ApiServerMigrationStatusResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
@@ -112,6 +113,7 @@ namespace ExportDocManager.Api.Hosting
                     ticket.ExpiresAtUtc));
             })
             .WithName("AuthorizeServerMigrationOperation")
+            .WithApiCapability(PermissionResourceCatalog.SystemDisasterRecovery, PermissionAction.Manage)
             .Produces<ApiSensitiveOperationAuthorizationResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -151,6 +153,7 @@ namespace ExportDocManager.Api.Hosting
                         requireSessionBinding: !ApiEndpointAuth.HasValidDesktopAccess(context, desktopAccessOptions)));
             })
             .WithName("CreatePostgreSqlPhysicalBackupDownloadTicket")
+            .WithApiCapability(PermissionResourceCatalog.SystemDisasterRecovery, PermissionAction.Manage)
             .Produces<ApiDownloadTicket>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
@@ -190,6 +193,7 @@ namespace ExportDocManager.Api.Hosting
                         enableRangeProcessing: true);
             })
             .WithName("DownloadPostgreSqlPhysicalBackupWithTicket")
+            .WithApiCapability(PermissionResourceCatalog.SystemDisasterRecovery, PermissionAction.Manage)
             .WithApiAccess(false, true, false)
             .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
             .Produces(StatusCodes.Status404NotFound)
@@ -263,6 +267,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("RestorePostgreSqlPhysicalBackup")
+            .WithApiCapability(PermissionResourceCatalog.SystemDisasterRecovery, PermissionAction.Manage)
             .Produces<ApiServerMigrationRestoreResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -334,6 +339,7 @@ namespace ExportDocManager.Api.Hosting
             })
             .Accepts<IFormFile>("application/octet-stream")
             .WithName("UploadAndRestorePostgreSqlPhysicalBackup")
+            .WithApiCapability(PermissionResourceCatalog.SystemDisasterRecovery, PermissionAction.Manage)
             .Produces<ApiServerMigrationRestoreResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -414,6 +420,7 @@ namespace ExportDocManager.Api.Hosting
                 return AcceptedBackgroundJob(job);
             })
             .WithName("CreateServerMigrationPackage")
+            .WithApiCapability(PermissionResourceCatalog.SystemDisasterRecovery, PermissionAction.Manage)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -494,6 +501,7 @@ namespace ExportDocManager.Api.Hosting
             })
             .Accepts<IFormFile>("application/octet-stream")
             .WithName("StageServerMigrationRestore")
+            .WithApiCapability(PermissionResourceCatalog.SystemDisasterRecovery, PermissionAction.Manage)
             .Produces<ApiServerMigrationRestoreResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)

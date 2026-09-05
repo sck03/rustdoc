@@ -135,9 +135,8 @@ namespace ExportDocManager.Services.Infrastructure
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var keyword = TextSearchHelper.NormalizeFilter(query?.Keyword);
-            IQueryable<Payee> payeeQuery = context.Payees
-                .AsNoTracking()
-                .AsQueryable()
+            IQueryable<Payee> payeeQuery = _accessScope.ApplyPayeeScope(context.Payees
+                .AsNoTracking())
                 .ApplyKeywordSearch(
                     context,
                     keyword,
@@ -166,7 +165,7 @@ namespace ExportDocManager.Services.Infrastructure
             int pageNumber = Math.Max(1, normalized.PageNumber);
             int pageSize = Math.Clamp(normalized.PageSize <= 0 ? 50 : normalized.PageSize, 1, 200);
             string keyword = TextSearchHelper.NormalizeFilter(normalized.Keyword);
-            var rows = context.Payees.AsNoTracking()
+            var rows = _accessScope.ApplyPayeeScope(context.Payees.AsNoTracking())
                 .ApplyKeywordSearch(context, keyword, payee => payee.Category, payee => payee.Name, payee => payee.BankName,
                     payee => payee.RMBAccount, payee => payee.USDAccount, payee => payee.ContactPerson, payee => payee.Phone, payee => payee.Notes)
                 .OrderBy(payee => payee.Category).ThenBy(payee => payee.Name).ThenBy(payee => payee.Id);
@@ -185,8 +184,7 @@ namespace ExportDocManager.Services.Infrastructure
             }
 
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            return await context.Payees
-                .AsNoTracking()
+            return await _accessScope.ApplyPayeeScope(context.Payees.AsNoTracking())
                 .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
         }
 

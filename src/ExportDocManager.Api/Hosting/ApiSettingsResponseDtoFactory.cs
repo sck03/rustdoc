@@ -64,6 +64,8 @@ namespace ExportDocManager.Api.Hosting
                 clone.Email.UserName = string.Empty;
                 clone.Email.FromAddress = string.Empty;
                 clone.Email.FromDisplayName = string.Empty;
+                clone.Email.RecipientAllowList = string.Empty;
+                clone.Email.RecipientBlockList = string.Empty;
                 clone.WebDav.Url = string.Empty;
                 clone.WebDav.UserName = string.Empty;
                 clone.WebDav.Enabled = false;

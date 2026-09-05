@@ -47,6 +47,7 @@ namespace ExportDocManager.Api.Hosting
                     destinationPath));
             })
             .WithName("StartInvoiceReportPdfZipSaveToPathJob")
+            .WithApiCapability(PermissionResourceCatalog.InvoiceOutput, PermissionAction.ExportZip)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -86,6 +87,7 @@ namespace ExportDocManager.Api.Hosting
                     destinationPath));
             })
             .WithName("StartInvoiceReportPdfZipDownloadJob")
+            .WithApiCapability(PermissionResourceCatalog.InvoiceOutput, PermissionAction.ExportZip)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized);

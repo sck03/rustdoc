@@ -1,20 +1,27 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiUserReportTemplateDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
+import {
+  buildUserTemplateClonePayload,
+  buildUserTemplateCreatePayload,
+  type ReportTypeOption,
+} from "./reportTemplateDesignerModel.ts";
+
+export type UserReportTemplateLifecycleAction =
+  | { kind: "publish" }
+  | { kind: "share"; shareScope: string }
+  | { kind: "disable" }
+  | { kind: "restore" };
 
 export function useUserReportTemplateLifecycleMutations({
   client,
   reportType,
   selectedTemplatePath,
   selectedUserTemplateId,
-  userTemplates,
   currentUserTemplate,
-  content,
   newTemplateName,
-  newTemplateShareScope,
   onCreated,
-  onDeleted,
+  onArchived,
   onRestored,
   onStatusUpdated,
   onError,
@@ -23,100 +30,113 @@ export function useUserReportTemplateLifecycleMutations({
   reportType: ReportTypeOption;
   selectedTemplatePath: string;
   selectedUserTemplateId: number;
-  userTemplates: ApiUserReportTemplateDto[];
   currentUserTemplate: ApiUserReportTemplateDto | null;
-  content: string;
   newTemplateName: string;
-  newTemplateShareScope: string;
   onCreated: (created: ApiUserReportTemplateDto) => void;
-  onDeleted: () => void | Promise<void>;
+  onArchived: () => void | Promise<void>;
   onRestored: (saved: ApiUserReportTemplateDto) => void;
-  onStatusUpdated: (saved: ApiUserReportTemplateDto) => void;
+  onStatusUpdated: (saved: ApiUserReportTemplateDto, action: UserReportTemplateLifecycleAction) => void;
   onError: (error: unknown) => void;
 }) {
   const queryClient = useQueryClient();
 
-  const createUserTemplateMutation = useMutation({
-    mutationFn: () => {
-      const sourceUserTemplate = userTemplates.find((template) => template.id === selectedUserTemplateId);
-      return client.createUserReportTemplate({
-        body: {
-          reportType,
-          name: newTemplateName.trim(),
-          // A new template created from a built-in file starts as a clean V3
-          // A4 design. Cloning a user template preserves its explicit runtime,
-          // including advanced HTML when the owner chose that path.
-          contentHtml: sourceUserTemplate ? content : "",
-          sourceTemplatePath: sourceUserTemplate ? "" : "",
-          isActive: true,
-          isShared: newTemplateShareScope !== "Private",
-          shareScope: newTemplateShareScope,
-          expectedVersion: 0,
-        },
-      });
-    },
-    onSuccess: async (created) => {
-      queryClient.setQueryData<ApiUserReportTemplateDto[]>(
-        queryKeys.userReportTemplates(reportType),
-        (current) => [...(current ?? []).filter((item) => item.id !== created.id), created],
-      );
-      onCreated(created);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
-    },
+  async function invalidateTemplateQueries(saved?: ApiUserReportTemplateDto) {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
+    if (saved) {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplateVersions(saved.id) });
+    }
+  }
+
+  async function handleCreated(created: ApiUserReportTemplateDto) {
+    queryClient.setQueryData<ApiUserReportTemplateDto[]>(
+      queryKeys.userReportTemplates(reportType),
+      (current) => [...(current ?? []).filter((item) => item.id !== created.id), created],
+    );
+    onCreated(created);
+    await invalidateTemplateQueries(created);
+  }
+
+  const createBlankUserTemplateMutation = useMutation({
+    mutationFn: () => client.createUserReportTemplate({
+      body: buildUserTemplateCreatePayload({
+        reportType,
+        name: newTemplateName,
+      }),
+    }),
+    onSuccess: handleCreated,
     onError,
   });
 
-  const deleteUserTemplateMutation = useMutation({
-    mutationFn: (id: number) => client.deleteUserReportTemplate({ id }),
-    onSuccess: async () => {
-      await onDeleted();
-      await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
+  const cloneUserTemplateMutation = useMutation({
+    mutationFn: () => client.cloneUserReportTemplate({
+      body: buildUserTemplateClonePayload({
+        reportType,
+        selectedTemplatePath,
+        selectedUserTemplateId,
+        name: newTemplateName,
+      }),
+    }),
+    onSuccess: handleCreated,
+    onError,
+  });
+
+  const archiveUserTemplateMutation = useMutation({
+    mutationFn: (template: ApiUserReportTemplateDto) =>
+      client.archiveUserReportTemplate({ id: template.id, expectedVersion: template.versionNumber }),
+    onSuccess: async (saved) => {
+      await onArchived();
+      await invalidateTemplateQueries(saved);
     },
     onError,
   });
 
   const restoreUserTemplateVersionMutation = useMutation({
-    mutationFn: (versionNumber: number) =>
-      client.restoreUserReportTemplateVersion({ id: selectedUserTemplateId, versionNumber }),
+    mutationFn: (versionNumber: number) => {
+      if (!currentUserTemplate) {
+        throw new Error("当前未选择可恢复的报表模板。");
+      }
+      return client.restoreUserReportTemplateVersion({
+        id: currentUserTemplate.id,
+        versionNumber,
+        body: { expectedVersion: currentUserTemplate.versionNumber },
+      });
+    },
     onSuccess: async (saved) => {
       onRestored(saved);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplateVersions(saved.id) });
+      await invalidateTemplateQueries(saved);
     },
     onError,
   });
 
   const updateUserTemplateStatusMutation = useMutation({
-    mutationFn: (next: { isActive?: boolean; shareScope?: string }) => {
-      if (!currentUserTemplate || !currentUserTemplate.canEdit) {
-        throw new Error("当前模板只读，无法修改发布状态。");
+    mutationFn: (action: UserReportTemplateLifecycleAction) => {
+      if (!currentUserTemplate) {
+        throw new Error("当前未选择可操作的报表模板。");
       }
-
-      return client.updateUserReportTemplate({
-        id: currentUserTemplate.id,
-        body: {
-          id: currentUserTemplate.id,
-          reportType,
-          name: currentUserTemplate.name,
-          contentHtml: content,
-          isActive: next.isActive ?? currentUserTemplate.isActive,
-          isShared: next.shareScope ? next.shareScope !== "Private" : currentUserTemplate.isShared,
-          shareScope: next.shareScope ?? currentUserTemplate.shareScope,
-          expectedVersion: currentUserTemplate.versionNumber,
-        },
-      });
+      const id = currentUserTemplate.id;
+      const expectedVersion = currentUserTemplate.versionNumber;
+      switch (action.kind) {
+        case "publish":
+          return client.publishUserReportTemplate({ id, body: { expectedVersion } });
+        case "share":
+          return client.shareUserReportTemplate({ id, body: { shareScope: action.shareScope, expectedVersion } });
+        case "disable":
+          return client.disableUserReportTemplate({ id, body: { expectedVersion } });
+        case "restore":
+          return client.restoreUserReportTemplate({ id, body: { expectedVersion } });
+      }
     },
-    onSuccess: async (saved) => {
-      onStatusUpdated(saved);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplateVersions(saved.id) });
+    onSuccess: async (saved, action) => {
+      onStatusUpdated(saved, action);
+      await invalidateTemplateQueries(saved);
     },
     onError,
   });
 
   return {
-    createUserTemplateMutation,
-    deleteUserTemplateMutation,
+    createBlankUserTemplateMutation,
+    cloneUserTemplateMutation,
+    archiveUserTemplateMutation,
     restoreUserTemplateVersionMutation,
     updateUserTemplateStatusMutation,
   };

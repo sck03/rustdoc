@@ -10,12 +10,45 @@ namespace ExportDocManager.Api.Hosting
         string PermissionTemplateName,
         string DepartmentId,
         string CompanyScope,
-        bool IsActive);
+        bool IsActive,
+        int VersionNumber = 1);
 
     public sealed record ApiUserListResponse(
         IReadOnlyList<ApiUserAccountDto> Users,
         IReadOnlyList<string> Roles,
-        IReadOnlyList<ApiPermissionTemplateOptionDto> PermissionTemplates);
+        IReadOnlyList<ApiPermissionTemplateOptionDto> PermissionTemplates,
+        IReadOnlyList<ApiOrganizationCompanyDto> Companies,
+        IReadOnlyList<ApiOrganizationDepartmentDto> Departments);
+
+    public sealed record ApiOrganizationCompanyDto(
+        string Code,
+        string Name,
+        bool IsActive,
+        int VersionNumber);
+
+    public sealed record ApiOrganizationDepartmentDto(
+        string Code,
+        string CompanyCode,
+        string Name,
+        bool IsActive,
+        int VersionNumber);
+
+    public sealed record ApiOrganizationDirectoryResponse(
+        IReadOnlyList<ApiOrganizationCompanyDto> Companies,
+        IReadOnlyList<ApiOrganizationDepartmentDto> Departments);
+
+    public sealed record ApiOrganizationCompanySaveRequest(
+        string Code,
+        string Name,
+        bool IsActive,
+        int ExpectedVersion = 0);
+
+    public sealed record ApiOrganizationDepartmentSaveRequest(
+        string Code,
+        string CompanyCode,
+        string Name,
+        bool IsActive,
+        int ExpectedVersion = 0);
 
     public sealed record ApiUserSaveRequest(
         string Username,
@@ -25,7 +58,8 @@ namespace ExportDocManager.Api.Hosting
         string DepartmentId,
         string CompanyScope,
         bool IsActive,
-        string ResetPassword);
+        string ResetPassword,
+        int ExpectedVersion = 0);
 
     public sealed record ApiUserSaveResponse(
         bool Success,
@@ -39,17 +73,30 @@ namespace ExportDocManager.Api.Hosting
         bool IsSystem,
         bool IsActive);
 
-    public sealed record ApiPermissionModuleDefinitionDto(
+    public sealed record ApiPermissionActionDefinitionDto(
+        string Key,
+        string Name,
+        string Description,
+        int SortOrder,
+        string PresetLevel);
+
+    public sealed record ApiPermissionResourceDefinitionDto(
         string Key,
         string Name,
         string Group,
         string Workspace,
-        int SortOrder,
-        bool IsTechnical);
-
-    public sealed record ApiPermissionTemplateModuleDto(
         string ModuleKey,
-        string AccessLevel);
+        int SortOrder,
+        bool IsTechnical,
+        bool SupportsDataScope,
+        IReadOnlyList<ApiPermissionActionDefinitionDto> Actions);
+
+    public sealed record ApiEffectivePermissionGrantDto(
+        string ResourceKey,
+        string Action,
+        string DataScope,
+        string Source,
+        string SourceResourceKey);
 
     public sealed record ApiPermissionTemplateDto(
         int Id,
@@ -59,11 +106,14 @@ namespace ExportDocManager.Api.Hosting
         bool IsSystem,
         bool IsActive,
         DateTimeOffset UpdatedAt,
-        IReadOnlyList<ApiPermissionTemplateModuleDto> Modules);
+        IReadOnlyList<ApiPermissionGrantDto> Grants,
+        IReadOnlyList<ApiEffectivePermissionGrantDto> EffectiveGrants,
+        int VersionNumber = 1);
 
     public sealed record ApiPermissionTemplateCatalogResponse(
-        IReadOnlyList<ApiPermissionModuleDefinitionDto> Modules,
+        IReadOnlyList<ApiPermissionResourceDefinitionDto> Resources,
         IReadOnlyList<ApiPermissionTemplateDto> Templates,
+        IReadOnlyList<string> DataScopes,
         IReadOnlyList<string> AccessLevels,
         string ApplyPolicy);
 
@@ -73,5 +123,6 @@ namespace ExportDocManager.Api.Hosting
         string Name,
         string Description,
         bool IsActive,
-        IReadOnlyList<ApiPermissionTemplateModuleDto> Modules);
+        IReadOnlyList<ApiPermissionGrantDto> Grants,
+        int ExpectedVersion = 0);
 }

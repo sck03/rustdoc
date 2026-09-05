@@ -17,17 +17,22 @@ namespace ExportDocManager.Services.Crm
         DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int VersionNumber);
 
     public sealed record CrmCustomerSaveRequest(
-        int Id, string Name, string CountryRegion, string Website, string Status,
+        int Id, string Name, string CountryRegion, string Website,
         string Source, string Notes, int? LinkedDocumentCustomerId, int ExpectedVersion = 0);
 
     public sealed record CrmContactSaveRequest(
         int Id, int CrmCustomerId, string Name, string Title, string Email,
-        string Phone, string InstantMessaging, bool IsPrimary, int ExpectedVersion = 0);
+        string Phone, string InstantMessaging, int ExpectedVersion = 0);
 
     public sealed record CrmFollowUpSaveRequest(
         int Id, int CrmCustomerId, int? CrmContactId, string Type, string Summary,
         string NextAction, DateTimeOffset? FollowedUpAt, DateTimeOffset? NextFollowUpAt,
-        bool IsCompleted, int ExpectedVersion = 0);
+        int ExpectedVersion = 0);
+
+    public sealed record CrmFollowUpTransferRequest(
+        int CrmCustomerId,
+        int? CrmContactId,
+        int ExpectedVersion);
 
     public sealed record CrmDashboardRecord(
         int CustomerCount,
@@ -56,7 +61,8 @@ namespace ExportDocManager.Services.Crm
         int TotalRows,
         int ValidRows,
         int DuplicateRows,
-        IReadOnlyList<CrmCustomerImportRow> Rows);
+        IReadOnlyList<CrmCustomerImportRow> Rows,
+        string PreviewId = "");
 
     public sealed record CrmCustomerImportResult(
         int CreatedCustomers,
@@ -70,23 +76,38 @@ namespace ExportDocManager.Services.Crm
     {
         Task<PagedResult<CrmCustomerRecord>> QueryCustomersAsync(string? keyword, string? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
         Task<CrmCustomerRecord> SaveCustomerAsync(CrmCustomerSaveRequest request, CancellationToken cancellationToken = default);
-        Task<bool> DeleteCustomerAsync(int id, CancellationToken cancellationToken = default);
+        Task<CrmCustomerRecord> DeactivateCustomerAsync(int id, int expectedVersion, CancellationToken cancellationToken = default);
+        Task<CrmCustomerRecord> RestoreCustomerAsync(int id, int expectedVersion, CancellationToken cancellationToken = default);
+        Task<bool> DeleteCustomerAsync(
+            int id,
+            CancellationToken cancellationToken = default,
+            int expectedVersion = 0);
         Task<int> UpdateCustomerStatusAsync(IReadOnlyList<int> ids, string status, CancellationToken cancellationToken = default);
         Task<CrmEmailVariableDraft> GetEmailVariableDraftAsync(int crmCustomerId, CancellationToken cancellationToken = default);
-        Task<IReadOnlyList<CrmContactRecord>> ListContactsAsync(int crmCustomerId, CancellationToken cancellationToken = default);
+        Task<PagedResult<CrmContactRecord>> QueryContactsAsync(int crmCustomerId, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
         Task<CrmContactRecord> SaveContactAsync(CrmContactSaveRequest request, CancellationToken cancellationToken = default);
-        Task<bool> DeleteContactAsync(int crmCustomerId, int id, CancellationToken cancellationToken = default);
-        Task<IReadOnlyList<CrmFollowUpRecord>> ListFollowUpsAsync(int? crmCustomerId, bool includeCompleted, int limit, CancellationToken cancellationToken = default);
+        Task<CrmContactRecord> SetPrimaryContactAsync(int crmCustomerId, int id, int expectedVersion, CancellationToken cancellationToken = default);
+        Task<bool> DeleteContactAsync(
+            int crmCustomerId,
+            int id,
+            CancellationToken cancellationToken = default,
+            int expectedVersion = 0);
         Task<PagedResult<CrmFollowUpRecord>> QueryFollowUpsAsync(int? crmCustomerId, bool includeCompleted, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
         Task<CrmFollowUpRecord> SaveFollowUpAsync(CrmFollowUpSaveRequest request, CancellationToken cancellationToken = default);
-        Task<bool> DeleteFollowUpAsync(int id, CancellationToken cancellationToken = default);
+        Task<CrmFollowUpRecord> CompleteFollowUpAsync(int id, int expectedVersion, CancellationToken cancellationToken = default);
+        Task<CrmFollowUpRecord> RestoreFollowUpAsync(int id, int expectedVersion, CancellationToken cancellationToken = default);
+        Task<CrmFollowUpRecord> TransferFollowUpAsync(int id, CrmFollowUpTransferRequest request, CancellationToken cancellationToken = default);
+        Task<bool> DeleteFollowUpAsync(
+            int id,
+            CancellationToken cancellationToken = default,
+            int expectedVersion = 0);
         Task<CrmDashboardRecord> GetDashboardAsync(CancellationToken cancellationToken = default);
     }
 
     public interface ICrmCustomerImportService
     {
         Task<CrmCustomerImportPreview> PreviewAsync(Stream input, string fileName, CancellationToken cancellationToken = default);
-        Task<CrmCustomerImportResult> ImportAsync(IReadOnlyList<CrmCustomerImportRow> rows, CancellationToken cancellationToken = default);
+        Task<CrmCustomerImportResult> ImportAsync(string previewId, CancellationToken cancellationToken = default);
     }
 
     public interface ICrmCustomerExportService

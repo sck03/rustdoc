@@ -1,6 +1,11 @@
 import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { normalizeReportDesignerV3Schema } from "./reportDesignerV3Validation.ts";
-import type { ReportDesignerV3Schema } from "./reportDesignerV3Schema.ts";
+import {
+  REPORT_DESIGNER_V3_AST_KIND,
+  REPORT_DESIGNER_V3_CONTRACT_VERSION,
+  REPORT_DESIGNER_V3_COORDINATE_UNIT,
+  type ReportDesignerV3Schema,
+} from "./reportDesignerV3Schema.ts";
 
 const schemaCommentPattern = /<!--\s*EXPORTDOC_REPORT_DESIGNER_SCHEMA\s*([\s\S]*?)\s*-->/i;
 
@@ -21,7 +26,10 @@ export function hasValidReportDesignerV3Schema(content: string) {
   if (!match) return false;
   try {
     const parsed = JSON.parse(match[1]) as unknown;
-    return isRecordWithVersion(parsed, 3);
+    if (!isRecordWithVersion(parsed, 3)) return false;
+    const normalized = normalizeReportDesignerV3Schema(parsed);
+    return normalized.schema !== null &&
+      !normalized.issues.some((issue) => issue.severity === "error");
   } catch {
     return false;
   }
@@ -102,6 +110,9 @@ function createReplacementDraft(
 function createEmptyReportDesignerV3Schema(reportType: ReportDesignerReportType): ReportDesignerV3Schema {
   return {
     version: 3,
+    astKind: REPORT_DESIGNER_V3_AST_KIND,
+    coordinateUnit: REPORT_DESIGNER_V3_COORDINATE_UNIT,
+    contractVersion: REPORT_DESIGNER_V3_CONTRACT_VERSION,
     reportType,
     page: {
       size: "A4",

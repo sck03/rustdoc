@@ -17,11 +17,11 @@ namespace ExportDocManager.Models.Entities
 
         [Required]
         public string ContentHtml { get; set; } = string.Empty;
-        public bool IsActive { get; set; }
-        public bool IsShared { get; set; }
+        [Required, MaxLength(20)]
+        public string ShareScope { get; set; } = TemplateShareScopeCatalog.Private;
 
         [Required, MaxLength(20)]
-        public string ShareScope { get; set; } = "Private";
+        public string Status { get; set; } = TemplateLifecycleStatusCatalog.Draft;
 
         [MaxLength(100)]
         public string ChangedBy { get; set; } = string.Empty;

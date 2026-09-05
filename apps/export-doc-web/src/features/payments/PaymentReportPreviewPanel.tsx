@@ -5,7 +5,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ApiPaymentDto, ApiPaymentReportHtmlPreviewResponse, ApiReportTemplateDto, AppSettings, ExportDocManagerApiClient } from "../../api/index.ts";
 
 type SettingsLike = AppSettings | Record<string, unknown>;
-import { useModulePermission, usePermissionCapabilities } from "../../app/PermissionAccessContext.tsx";
+import { usePermission, usePermissionCapabilities } from "../../app/PermissionAccessContext.tsx";
+import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { isDesktopBridgeAvailable, selectSavePdfPath } from "../../desktop/desktopBridge.ts";
 import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
@@ -39,8 +40,10 @@ export function PaymentReportPreviewPanel({
   paymentDraft?: ApiPaymentDto;
   hasUnsavedDraftChanges?: boolean;
 }) {
-  const reportOutputPermission = useModulePermission("document.payment-reports");
-  const reportDesignPermission = useModulePermission("document.reports");
+  const previewPermission = usePermission(permissionResources.paymentOutput, permissionActions.preview);
+  const printPermission = usePermission(permissionResources.paymentOutput, permissionActions.print);
+  const pdfPermission = usePermission(permissionResources.paymentOutput, permissionActions.exportPdf);
+  const templateViewPermission = usePermission(permissionResources.reportTemplates, permissionActions.view);
   const { canManageSettings } = usePermissionCapabilities();
   const queryClient = useQueryClient();
   const runAbortableOperation = useAbortableOperation();
@@ -62,7 +65,7 @@ export function PaymentReportPreviewPanel({
   const templatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates(reportType),
     queryFn: ({ signal }) => client.listReportTemplates({ reportType }, { signal }),
-    enabled: hasPreviewSource && reportOutputPermission.canView,
+    enabled: hasPreviewSource && templateViewPermission.allowed,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -164,11 +167,11 @@ export function PaymentReportPreviewPanel({
   });
 
   const isBusy = templatesQuery.isFetching || settingsQuery.isFetching || previewMutation.isPending || pdfMutation.isPending || isPrinting;
-  const canPreview = reportOutputPermission.canOperate && hasPreviewSource && (templateViews.length === 0 || Boolean(selectedTemplatePath));
-  const canPrintPreview = Boolean(preview?.html) && !isBusy;
-  const canGeneratePdf = reportOutputPermission.canOperate && canUseSavedPaymentOutput && canPreview && (!desktopAvailable || Boolean(pdfDestinationPath.trim())) && !isBusy;
-  const canQuickGeneratePdf = reportOutputPermission.canOperate && canUseSavedPaymentOutput && canPreview && !isBusy;
-  const canOpenTemplateManagement = (reportDesignPermission.canView || canManageSettings) && !isBusy;
+  const canPreview = previewPermission.allowed && hasPreviewSource && (templateViews.length === 0 || Boolean(selectedTemplatePath));
+  const canPrintPreview = printPermission.allowed && Boolean(preview?.html) && !isBusy;
+  const canGeneratePdf = pdfPermission.allowed && canUseSavedPaymentOutput && Boolean(selectedTemplatePath) && (!desktopAvailable || Boolean(pdfDestinationPath.trim())) && !isBusy;
+  const canQuickGeneratePdf = pdfPermission.allowed && canUseSavedPaymentOutput && Boolean(selectedTemplatePath) && !isBusy;
+  const canOpenTemplateManagement = (templateViewPermission.allowed || canManageSettings) && !isBusy;
   const templateMessage = templatesQuery.isError
     ? readApiError(templatesQuery.error)
     : settingsQuery.isError
@@ -332,8 +335,8 @@ export function PaymentReportPreviewPanel({
       </div>
 
       {templateMessage ? <InlineNotice tone="warning" title="报表模板提示">{templateMessage}</InlineNotice> : null}
-      {!reportOutputPermission.canOperate ? (
-        <PermissionNotice>当前模板未授予付款报销单据预览和输出操作权限。</PermissionNotice>
+      {!previewPermission.allowed ? (
+        <PermissionNotice>当前账号未授予付款报销单据预览权限；打印和 PDF 导出仍按各自动作权限独立控制。</PermissionNotice>
       ) : null}
       {errorMessage ? <InlineNotice tone="error" title="付款报表生成失败">{errorMessage}</InlineNotice> : null}
       {statusMessage ? (
@@ -348,7 +351,7 @@ export function PaymentReportPreviewPanel({
         <SelectField
           label="模板"
           value={selectedTemplatePath}
-          disabled={isBusy || !reportOutputPermission.canOperate || templateViews.length === 0}
+          disabled={isBusy || !templateViewPermission.allowed || templateViews.length === 0}
           options={templateViews.map((template) => ({
             value: template.templatePath,
             label: template.displayName,
@@ -362,7 +365,7 @@ export function PaymentReportPreviewPanel({
           {desktopAvailable ? <PathField
             label="输出 PDF"
             value={pdfDestinationPath}
-            disabled={isBusy || !reportOutputPermission.canOperate}
+            disabled={isBusy || !pdfPermission.allowed}
             onChange={(value) => {
               setPdfDestinationPath(value);
               setStatusMessage(null);

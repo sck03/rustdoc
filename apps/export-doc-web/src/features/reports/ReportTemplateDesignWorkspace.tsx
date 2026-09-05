@@ -10,6 +10,7 @@ export function ReportTemplateDesignWorkspace({
   content,
   fieldCatalog,
   client,
+  editable,
   canFormatSource,
   sourceDisabled,
   onDesignerDraftContentChange,
@@ -22,6 +23,7 @@ export function ReportTemplateDesignWorkspace({
   content: string;
   fieldCatalog?: ApiReportTemplateFieldCatalogResponse;
   client: ExportDocManagerApiClient;
+  editable: boolean;
   canFormatSource: boolean;
   sourceDisabled: boolean;
   onDesignerDraftContentChange: (content: string) => void;
@@ -57,6 +59,7 @@ export function ReportTemplateDesignWorkspace({
         content={content}
         fieldCatalog={fieldCatalog}
         client={client}
+        editable={editable}
         onDesignerDraftContentChange={onDesignerDraftContentChange}
       />
     </div>

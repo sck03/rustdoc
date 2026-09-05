@@ -1,6 +1,6 @@
 namespace ExportDocManager.Services.Security
 {
-    public sealed record PermissionTemplateModuleRecord(string ModuleKey, string AccessLevel);
+    public sealed record PermissionGrantRecord(string ResourceKey, string Action, string DataScope);
 
     public sealed record PermissionTemplateRecord(
         int Id,
@@ -10,7 +10,9 @@ namespace ExportDocManager.Services.Security
         bool IsSystem,
         bool IsActive,
         DateTimeOffset UpdatedAt,
-        IReadOnlyList<PermissionTemplateModuleRecord> Modules);
+        IReadOnlyList<PermissionGrantRecord> Grants,
+        IReadOnlyList<EffectivePermissionGrant> EffectiveGrants,
+        int VersionNumber = 1);
 
     public sealed record PermissionTemplateSaveRequest(
         int Id,
@@ -18,7 +20,8 @@ namespace ExportDocManager.Services.Security
         string Name,
         string Description,
         bool IsActive,
-        IReadOnlyList<PermissionTemplateModuleRecord> Modules);
+        IReadOnlyList<PermissionGrantRecord> Grants,
+        int ExpectedVersion = 0);
 
     public interface IPermissionTemplateService
     {
@@ -32,6 +35,9 @@ namespace ExportDocManager.Services.Security
             int templateId,
             CancellationToken cancellationToken = default);
 
-        Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
+        Task<bool> DeleteAsync(
+            int id,
+            CancellationToken cancellationToken = default,
+            int expectedVersion = 0);
     }
 }

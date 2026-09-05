@@ -283,7 +283,42 @@ namespace ExportDocManager.Services.Reporting
             string? declaredMediaType = null,
             CancellationToken cancellationToken = default);
 
+        Task<ReportTemplateImageResource> StoreAndCommitAsync(
+            Stream source,
+            string? fileName,
+            string? declaredMediaType,
+            Func<ReportTemplateImageResource, CancellationToken, Task> commit,
+            CancellationToken cancellationToken = default);
+
         Task<ReportTemplateImageResourceContent> ReadAsync(
+            string resourceId,
+            CancellationToken cancellationToken = default);
+
+        Task<bool> DeleteAsync(
+            string resourceId,
+            CancellationToken cancellationToken = default);
+    }
+
+    /// <summary>
+    /// Resolves whether a managed V3 image is referenced by a template visible
+    /// to the current user. Resource IDs are content-addressed, but that does
+    /// not make the global resource directory an authorization boundary.
+    /// </summary>
+    public interface IReportTemplateImageResourceAccessService
+    {
+        Task RegisterUploadAsync(
+            ReportTemplateImageResource resource,
+            CancellationToken cancellationToken = default);
+
+        Task<bool> CanReadAsync(
+            string resourceId,
+            CancellationToken cancellationToken = default);
+
+        Task<bool> RecycleAsync(
+            string resourceId,
+            CancellationToken cancellationToken = default);
+
+        Task RollbackRecycleAsync(
             string resourceId,
             CancellationToken cancellationToken = default);
     }

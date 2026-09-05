@@ -29,7 +29,7 @@ export function SupplierAssessmentOverview({ client, onOpenSupplier }: {
   }), [filter, overview]);
 
   if (!overview) return <section className="form-section supplier-procurement-overview">
-    <div className="section-header"><div><h3>采购概览</h3><p className="section-description">汇总每家供应商的最新一次人工评价，不生成自动排名。</p></div></div>
+    <div className="section-header"><div><h3>采购概览</h3><p className="section-description">汇总每家供应商最新一次已确认人工评价，不生成自动排名。</p></div></div>
     <OperationFeedback feedback={feedback} />
     {!feedback ? <p className="muted-text">正在读取供应商评价...</p> : null}
   </section>;
@@ -41,7 +41,7 @@ export function SupplierAssessmentOverview({ client, onOpenSupplier }: {
 
   const coverage = Math.round(overview.assessedSuppliers / overview.totalSuppliers * 100);
   return <section className="form-section supplier-procurement-overview">
-    <div className="section-header"><div><h3>采购概览</h3><p className="section-description">只使用每家供应商最新一次人工评价，帮助发现待关注对象；综合分不代表自动采购排名。</p></div><span>{overview.assessedSuppliers} / {overview.totalSuppliers} 家已评价</span></div>
+    <div className="section-header"><div><h3>采购概览</h3><p className="section-description">只使用每家供应商最新一次已确认人工评价，帮助发现待关注对象；综合分不代表自动采购排名。</p></div><span>{overview.assessedSuppliers} / {overview.totalSuppliers} 家已确认评价</span></div>
     <OperationFeedback feedback={feedback} />
     <div className="supplier-assessment-summary-grid">
       <Summary label="评价覆盖" value={`${coverage}%`} detail={`${overview.unassessedSuppliers} 家尚无评价`} tone="info" />

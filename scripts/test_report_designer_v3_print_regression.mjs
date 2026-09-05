@@ -59,6 +59,9 @@ async function main() {
   };
   const schema = {
     version: 3,
+    astKind: "ReportDocument",
+    coordinateUnit: "hundredth-mm",
+    contractVersion: "3.0",
     reportType: "ExportDocument",
     page: { size: "A4", orientation: "Portrait", widthHundredthMm: 21000, heightHundredthMm: 29700, marginTopHundredthMm: 1000, marginRightHundredthMm: 1000, marginBottomHundredthMm: 1000, marginLeftHundredthMm: 1000, fontFamily: "Arial, sans-serif", fontSizePt: 9 },
     grid: { enabled: true, sizeHundredthMm: 500, snap: true },

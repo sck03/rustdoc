@@ -10,18 +10,46 @@ internal static class ReportTemplateV3SchemaValidator
     private static readonly Regex Field = new("^[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex Color = new("^#[0-9a-fA-F]{3,8}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex Hash = new("^[0-9a-fA-F]{64}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex ResourceId = new("^img-(?<hash>[0-9a-f]{64})\\.(?<extension>png|jpg|gif|webp)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly string[] PageMargins = ["marginTopHundredthMm", "marginRightHundredthMm", "marginBottomHundredthMm", "marginLeftHundredthMm"];
     public static void Validate(ReportDocumentType reportType, JsonElement root)
     {
         Object(root, "V3 设计结构必须是对象。");
-        if (RequiredInt(root, "version", "$.version") != ReportTemplateV3ContractCatalog.SchemaVersion) throw Error("$.version 必须为 3。");
-        Marker(root, "astKind", ReportTemplateV3ContractCatalog.AstKind, "$.astKind"); Marker(root, "coordinateUnit", ReportTemplateV3ContractCatalog.CoordinateUnit, "$.coordinateUnit"); Marker(root, "contractVersion", ReportTemplateV3ContractCatalog.ContractVersion, "$.contractVersion");
+        if (RequiredInt(root, "version", "$.version") != ReportTemplateV3ContractCatalog.SchemaVersion)
+        {
+            throw Error("$.version 必须为 3。");
+        }
+
+        // V3.0 is self-describing. A partially supplied marker set is never
+        // treated as an older document because that would make the same JSON
+        // use different validation rules depending on which marker was added.
+        RequiredMarker(root, "astKind", ReportTemplateV3ContractCatalog.AstKind, "$.astKind");
+        RequiredMarker(root, "coordinateUnit", ReportTemplateV3ContractCatalog.CoordinateUnit, "$.coordinateUnit");
+        RequiredMarker(root, "contractVersion", ReportTemplateV3ContractCatalog.ContractVersion, "$.contractVersion");
+
         var embedded = RequiredString(root, "reportType", "$.reportType");
-        if (!Enum.TryParse<ReportDocumentType>(embedded, true, out var parsed) || parsed != reportType) throw Error("V3 模板数据域与当前报表类型不一致。");
+        if (!Enum.TryParse<ReportDocumentType>(embedded, true, out var parsed) || parsed != reportType)
+        {
+            throw Error("V3 模板数据域与当前报表类型不一致。");
+        }
+
         var page = RequiredObject(root, "page", "$.page");
-        if (!string.Equals(RequiredString(page, "size", "$.page.size"), ReportTemplateV3ContractCatalog.PageSize, StringComparison.OrdinalIgnoreCase)) throw Error("报表模板 V3 页面必须固定为 A4。");
-        if (!root.TryGetProperty("layers", out var layers)) return;
-        ValidatePage(page); var resourceIds = ValidateResources(root); ValidateRelease(root); if (root.TryGetProperty("grid", out var grid)) ValidateGrid(grid); ValidateLayers(reportType, layers, page, resourceIds);
+        if (!string.Equals(
+                RequiredString(page, "size", "$.page.size"),
+                ReportTemplateV3ContractCatalog.PageSize,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw Error("报表模板 V3 页面必须固定为 A4。");
+        }
+
+        ValidatePage(page);
+        HashSet<string> resourceIds = ValidateResources(root);
+        ValidateRelease(root);
+        var grid = RequiredObject(root, "grid", "$.grid");
+        ValidateGrid(grid);
+
+        var layers = RequiredArray(root, "layers", "$.layers");
+        ValidateLayers(reportType, layers, page, resourceIds);
     }
     private static void ValidatePage(JsonElement page)
     {
@@ -29,19 +57,31 @@ internal static class ReportTemplateV3SchemaValidator
         var expected = ReportTemplateV3ContractCatalog.A4Dimensions(orientation); if (RequiredInt(page, "widthHundredthMm", "$.page.widthHundredthMm") != expected.WidthHundredthMm || RequiredInt(page, "heightHundredthMm", "$.page.heightHundredthMm") != expected.HeightHundredthMm) throw Error("V3 页面尺寸必须与 A4 方向一致，单位为 1/100 mm。");
         foreach (var name in PageMargins) if (page.TryGetProperty(name, out var value) && (!Integer(value) || value.GetInt32() is < 0 or > 6000)) throw Error($"$.page.{name}无效。");
     }
-    private static HashSet<string>? ValidateResources(JsonElement root)
+    private static HashSet<string> ValidateResources(JsonElement root)
     {
-        if (!root.TryGetProperty("resources", out var resources)) return null;
+        if (!root.TryGetProperty("resources", out var resources)) return [];
         Array(resources, "$.resources");
         if (resources.GetArrayLength() > ReportTemplateV3ContractCatalog.MaxResources) throw Error("V3 图片资源数量超过上限。");
         var ids = new HashSet<string>(StringComparer.Ordinal); int index = 0;
         foreach (var resource in resources.EnumerateArray())
         {
             var path = $"$.resources[{index++}]"; Object(resource, "图片资源必须是对象。"); var id = RequiredString(resource, "id", $"{path}.id");
-            if (!Id.IsMatch(id) || !ids.Add(id)) throw Error("V3 图片资源 ID 缺失、格式无效或重复。");
-            if (!ReportTemplateV3ContractCatalog.ImageMediaTypes.Contains(RequiredString(resource, "mediaType", $"{path}.mediaType"), StringComparer.Ordinal)) throw Error("V3 图片资源媒体类型不受支持。");
-            if (resource.TryGetProperty("byteLength", out var bytes) && (!Integer(bytes) || bytes.GetInt64() is < 0 or > ReportTemplateV3ContractCatalog.MaxResourceBytes)) throw Error("V3 图片资源大小无效。");
-            if (resource.TryGetProperty("sha256", out var hash) && (hash.ValueKind != JsonValueKind.String || !Hash.IsMatch(hash.GetString() ?? string.Empty))) throw Error("V3 图片资源 SHA-256 无效。");
+            var idMatch = ResourceId.Match(id);
+            if (!idMatch.Success || !ids.Add(id)) throw Error("V3 图片资源 ID 缺失、格式无效或重复。");
+            string mediaType = RequiredString(resource, "mediaType", $"{path}.mediaType");
+            if (!ReportTemplateV3ContractCatalog.ImageMediaTypes.Contains(mediaType, StringComparer.Ordinal)) throw Error("V3 图片资源媒体类型不受支持。");
+            if (!resource.TryGetProperty("byteLength", out _)) throw Error($"{path}.byteLength 缺失。");
+            if (resource.TryGetProperty("byteLength", out var bytes) && (!Integer(bytes) || bytes.GetInt64() is <= 0 or > ReportTemplateV3ContractCatalog.MaxResourceBytes)) throw Error("V3 图片资源大小无效。");
+            if (!resource.TryGetProperty("sha256", out _)) throw Error($"{path}.sha256 缺失。");
+            string sha256 = RequiredString(resource, "sha256", $"{path}.sha256");
+            if (!Hash.IsMatch(sha256)) throw Error("V3 图片资源 SHA-256 无效。");
+            string expectedExtension = mediaType == "image/jpeg" ? "jpg" : mediaType["image/".Length..];
+            if (!string.Equals(idMatch.Groups["hash"].Value, sha256, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(idMatch.Groups["extension"].Value, expectedExtension, StringComparison.Ordinal))
+            {
+                throw Error("V3 图片资源 ID 必须与媒体类型和 SHA-256 内容摘要一致。");
+            }
+            if (resource.TryGetProperty("altText", out var altText) && (altText.ValueKind != JsonValueKind.String || (altText.GetString() ?? string.Empty).Length > 200)) throw Error("V3 图片资源 altText 无效。");
         }
         return ids;
     }
@@ -58,7 +98,7 @@ internal static class ReportTemplateV3SchemaValidator
         Object(grid, "网格设置必须是对象。"); BoolIfPresent(grid, "enabled", "$.grid.enabled"); BoolIfPresent(grid, "snap", "$.grid.snap");
         if (grid.TryGetProperty("sizeHundredthMm", out var size) && (!Integer(size) || size.GetInt32() is < 100 or > 5000)) throw Error("V3 网格间距无效。");
     }
-    private static void ValidateLayers(ReportDocumentType reportType, JsonElement layers, JsonElement page, HashSet<string>? resourceIds)
+    private static void ValidateLayers(ReportDocumentType reportType, JsonElement layers, JsonElement page, HashSet<string> resourceIds)
     {
         Array(layers, "$.layers");
         if (layers.GetArrayLength() is 0 or > ReportTemplateV3ContractCatalog.MaxLayers) throw Error("V3 图层数量超出允许范围。");
@@ -83,7 +123,7 @@ internal static class ReportTemplateV3SchemaValidator
         if (role == "Body" && (Bool(print, "repeatOnEveryPage") || Bool(print, "pinToPageBottom"))) throw Error("V3 主体图层不能重复或贴底。");
         if (print.TryGetProperty("minHeightHundredthMm", out var height) && (!Integer(height) || height.GetInt32() is < 0 or > 26000)) throw Error("V3 图层最小高度无效。");
     }
-    private static void ValidateElement(ReportDocumentType reportType, string role, JsonElement element, string path, JsonElement page, HashSet<string> ids, HashSet<string> blockIds, HashSet<string>? resourceIds)
+    private static void ValidateElement(ReportDocumentType reportType, string role, JsonElement element, string path, JsonElement page, HashSet<string> ids, HashSet<string> blockIds, HashSet<string> resourceIds)
     {
         Object(element, "元素必须是对象。"); var id = RequiredString(element, "id", $"{path}.id");
         if (!Id.IsMatch(id) || !ids.Add(id)) throw Error("V3 元素 ID 缺失、格式无效或重复。");
@@ -103,12 +143,12 @@ internal static class ReportTemplateV3SchemaValidator
             case "Flow": ValidateFlow(reportType, role, element, path, blockIds); break;
         }
     }
-    private static void ValidateImage(ReportDocumentType reportType, JsonElement element, string path, HashSet<string>? resourceIds)
+    private static void ValidateImage(ReportDocumentType reportType, JsonElement element, string path, HashSet<string> resourceIds)
     {
         var source = RequiredString(element, "sourceKind", $"{path}.sourceKind");
         if (source is not ("Field" or "Resource")) throw Error("V3 图片来源无效。");
-        var purpose = element.TryGetProperty("purpose", out var value) ? value.GetString() : null;
-        if (purpose is not (null or "Image" or "Stamp")) throw Error("V3 图片用途无效。");
+        string purpose = RequiredString(element, "purpose", $"{path}.purpose");
+        if (purpose is not ("Image" or "Stamp")) throw Error("V3 图片用途无效。");
         if (source == "Field")
         {
             var field = RequiredString(element, "fieldPath", $"{path}.fieldPath"); ValidateControlledImage(reportType, field, $"{path}.fieldPath");
@@ -117,7 +157,7 @@ internal static class ReportTemplateV3SchemaValidator
         else
         {
             var id = RequiredString(element, "resourceId", $"{path}.resourceId");
-            if (!Id.IsMatch(id) || resourceIds is null || !resourceIds.Contains(id)) throw Error("V3 图片必须引用受控资源清单中的 resourceId。");
+            if (!ResourceId.IsMatch(id) || !resourceIds.Contains(id)) throw Error("V3 图片必须引用受控资源清单中的 resourceId。");
             if (purpose == "Stamp") throw Error("V3 印章不能直接绑定资源。");
         }
     }
@@ -160,9 +200,17 @@ internal static class ReportTemplateV3SchemaValidator
     {
         if (!value.TryGetProperty(name, out var text) || text.ValueKind != JsonValueKind.String || (text.GetString() ?? string.Empty).Length > ReportTemplateV3ContractCatalog.MaxTextLength) throw Error($"{path}.{name} 缺失或过长。");
     }
-    private static void Marker(JsonElement parent, string name, string expected, string path)
+    private static void RequiredMarker(JsonElement parent, string name, string expected, string path)
     {
-        if (parent.TryGetProperty(name, out var value) && RequiredString(value, path) != expected) throw Error($"{path} 不受支持。");
+        if (!parent.TryGetProperty(name, out var value))
+        {
+            throw Error($"{path} 缺失。");
+        }
+
+        if (!string.Equals(RequiredString(value, path), expected, StringComparison.Ordinal))
+        {
+            throw Error($"{path} 不受支持。");
+        }
     }
     private static JsonElement RequiredObject(JsonElement parent, string name, string path) { if (!parent.TryGetProperty(name, out var value)) throw Error($"{path} 缺失。"); Object(value, "V3 属性必须是对象。"); return value; }
     private static JsonElement RequiredArray(JsonElement parent, string name, string path) { if (!parent.TryGetProperty(name, out var value)) throw Error($"{path} 缺失。"); Array(value, path); return value; }

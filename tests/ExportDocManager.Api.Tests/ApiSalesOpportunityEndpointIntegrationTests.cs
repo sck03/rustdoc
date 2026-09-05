@@ -19,7 +19,7 @@ namespace ExportDocManager.Api.Tests
             using var client = harness.CreateClient(login.AccessToken);
 
             var customerResponse = await client.PostAsJsonAsync("/api/crm/customers", new ApiCrmCustomerSaveRequest(
-                0, "Opportunity Customer", "US", string.Empty, "跟进中", "展会", string.Empty, null));
+                0, "Opportunity Customer", "US", string.Empty, "展会", string.Empty, null));
             var customer = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCrmCustomerDto>(customerResponse);
             int productId;
             await using (var context = CreateContext(harness.DatabasePath))
@@ -29,42 +29,67 @@ namespace ExportDocManager.Api.Tests
             }
 
             var createResponse = await client.PostAsJsonAsync("/api/crm/opportunities", new ApiSalesOpportunitySaveRequest(
-                0, customer.Id, productId, "秋季订单", "已报价", "QT-OPP-001", 12500m, "USD", 60,
+                0, customer.Id, productId, "秋季订单", "QT-OPP-001", 12500m, "USD", 60,
                 DateOnly.FromDateTime(DateTime.Today.AddDays(30)), "确认样品", "只做销售跟踪", "首次报价"));
             Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
             var opportunity = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSalesOpportunityDto>(createResponse);
             Assert.Equal("OPP-001", opportunity.ProductCode);
+            Assert.Equal("线索", opportunity.Stage);
+            Assert.Equal(["需求确认"], opportunity.AllowedNextStages);
 
             var duplicateResponse = await client.PostAsJsonAsync("/api/crm/opportunities", new ApiSalesOpportunitySaveRequest(
-                0, customer.Id, null, "重复报价", "线索", "QT-OPP-001", 1m, "USD", 10, null, string.Empty, string.Empty, string.Empty));
+                0, customer.Id, null, "重复报价", "QT-OPP-001", 1m, "USD", 10, null, string.Empty, string.Empty, string.Empty));
             Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
 
+            var invalidTransitionResponse = await client.PostAsJsonAsync(
+                $"/api/crm/opportunities/{opportunity.Id}/transition",
+                new ApiSalesOpportunityTransitionRequest("谈判中", "不得跳级", opportunity.VersionNumber));
+            Assert.Equal(HttpStatusCode.BadRequest, invalidTransitionResponse.StatusCode);
+            var qualificationResponse = await client.PostAsJsonAsync(
+                $"/api/crm/opportunities/{opportunity.Id}/transition",
+                new ApiSalesOpportunityTransitionRequest("需求确认", "需求已确认", opportunity.VersionNumber));
+            Assert.Equal(HttpStatusCode.OK, qualificationResponse.StatusCode);
+            var qualifiedOpportunity = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSalesOpportunityDto>(qualificationResponse);
+            var quotedResponse = await client.PostAsJsonAsync(
+                $"/api/crm/opportunities/{opportunity.Id}/transition",
+                new ApiSalesOpportunityTransitionRequest("已报价", "报价已发出", qualifiedOpportunity.VersionNumber));
+            Assert.Equal(HttpStatusCode.OK, quotedResponse.StatusCode);
+            var quotedOpportunity = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSalesOpportunityDto>(quotedResponse);
+
             var updateResponse = await client.PutAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}",
-                new ApiSalesOpportunitySaveRequest(opportunity.Id, customer.Id, productId, "秋季订单", "谈判中", "QT-OPP-001",
+                new ApiSalesOpportunitySaveRequest(opportunity.Id, customer.Id, productId, "秋季订单", "QT-OPP-001",
                     13000m, "USD", 75, opportunity.ExpectedCloseDate, "确认付款条件", "报价仍不是正式发票",
-                    "客户要求调整付款条件", opportunity.VersionNumber));
+                    "客户要求调整付款条件", quotedOpportunity.VersionNumber));
             Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
             var updatedOpportunity = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSalesOpportunityDto>(updateResponse);
-            Assert.Equal("谈判中", updatedOpportunity.Stage);
+            Assert.Equal("已报价", updatedOpportunity.Stage);
+            var negotiatingResponse = await client.PostAsJsonAsync(
+                $"/api/crm/opportunities/{opportunity.Id}/transition",
+                new ApiSalesOpportunityTransitionRequest("谈判中", "进入付款条件谈判", updatedOpportunity.VersionNumber));
+            Assert.Equal(HttpStatusCode.OK, negotiatingResponse.StatusCode);
+            var negotiatingOpportunity = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSalesOpportunityDto>(negotiatingResponse);
+            Assert.Equal("谈判中", negotiatingOpportunity.Stage);
             var staleResponse = await client.PutAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}",
-                new ApiSalesOpportunitySaveRequest(opportunity.Id, customer.Id, productId, "过期修改", "已报价",
+                new ApiSalesOpportunitySaveRequest(opportunity.Id, customer.Id, productId, "过期修改",
                     opportunity.QuotationNo, opportunity.EstimatedAmount, opportunity.Currency,
                     opportunity.ProbabilityPercent, opportunity.ExpectedCloseDate, opportunity.NextAction,
-                    opportunity.Notes, "过期版本", opportunity.VersionNumber));
+                    opportunity.Notes, "过期版本", updatedOpportunity.VersionNumber));
             Assert.Equal(HttpStatusCode.Conflict, staleResponse.StatusCode);
             var noteResponse = await client.PutAsJsonAsync($"/api/crm/opportunities/{opportunity.Id}",
-                new ApiSalesOpportunitySaveRequest(opportunity.Id, customer.Id, productId, updatedOpportunity.Title,
-                    updatedOpportunity.Stage, updatedOpportunity.QuotationNo, updatedOpportunity.EstimatedAmount,
-                    updatedOpportunity.Currency, updatedOpportunity.ProbabilityPercent, updatedOpportunity.ExpectedCloseDate,
-                    updatedOpportunity.NextAction, updatedOpportunity.Notes, "补充客户会议记录",
-                    updatedOpportunity.VersionNumber));
+                new ApiSalesOpportunitySaveRequest(opportunity.Id, customer.Id, productId, negotiatingOpportunity.Title,
+                    negotiatingOpportunity.QuotationNo, negotiatingOpportunity.EstimatedAmount,
+                    negotiatingOpportunity.Currency, negotiatingOpportunity.ProbabilityPercent, negotiatingOpportunity.ExpectedCloseDate,
+                    negotiatingOpportunity.NextAction, negotiatingOpportunity.Notes, "补充客户会议记录",
+                    negotiatingOpportunity.VersionNumber));
             Assert.Equal(HttpStatusCode.OK, noteResponse.StatusCode);
+            var notedOpportunity = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSalesOpportunityDto>(noteResponse);
             var history = await client.GetFromJsonAsync<List<ApiSalesOpportunityHistoryDto>>($"/api/crm/opportunities/{opportunity.Id}/history");
-            Assert.Equal(3, history?.Count);
+            Assert.Equal(6, history?.Count);
             Assert.Equal("进展备注", history![0].ChangeType);
             Assert.Equal("补充客户会议记录", history[0].ChangeNote);
-            Assert.Equal("阶段与报价更新", history[1].ChangeType);
-            Assert.Equal("创建", history[2].ChangeType);
+            Assert.Equal("阶段变更", history[1].ChangeType);
+            Assert.Equal("报价更新", history[2].ChangeType);
+            Assert.Equal("创建", history[5].ChangeType);
 
             var dashboard = await client.GetFromJsonAsync<ApiCrmDashboardDto>("/api/crm/dashboard");
             Assert.Equal(1, dashboard?.OpportunityStages.Single(item => item.Stage == "谈判中").Count);
@@ -74,7 +99,8 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(9750m, usd.WeightedAmount);
             Assert.Equal(opportunity.Id, Assert.Single(dashboard.UpcomingOpportunityClosings).Id);
 
-            Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync($"/api/crm/customers/{customer.Id}")).StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync(
+                $"/api/crm/customers/{customer.Id}?expectedVersion={customer.VersionNumber}")).StatusCode);
             Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync($"/api/master-data/products/{productId}")).StatusCode);
             var page = await client.GetFromJsonAsync<ApiPagedResponse<ApiSalesOpportunityDto>>("/api/crm/opportunities?keyword=秋季&pageNumber=1&pageSize=10");
             var preserved = Assert.Single(page!.Items);
@@ -82,8 +108,24 @@ namespace ExportDocManager.Api.Tests
             var invoices = await client.GetFromJsonAsync<ApiPagedResponse<ApiInvoiceListItemDto>>("/api/invoices?pageNumber=1&pageSize=10");
             Assert.Empty(invoices?.Items ?? []);
 
-            Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync($"/api/crm/opportunities/{opportunity.Id}")).StatusCode);
-            Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync($"/api/crm/customers/{customer.Id}")).StatusCode);
+            var archiveResponse = await client.PostAsJsonAsync(
+                $"/api/crm/opportunities/{opportunity.Id}/archive",
+                new ApiSalesOpportunityLifecycleRequest(notedOpportunity.VersionNumber));
+            Assert.Equal(HttpStatusCode.OK, archiveResponse.StatusCode);
+            Assert.Empty((await client.GetFromJsonAsync<ApiPagedResponse<ApiSalesOpportunityDto>>(
+                "/api/crm/opportunities?pageNumber=1&pageSize=10"))!.Items);
+            var archivedHistory = await client.GetFromJsonAsync<List<ApiSalesOpportunityHistoryDto>>(
+                $"/api/crm/opportunities/{opportunity.Id}/history");
+            Assert.Equal("归档", archivedHistory![0].ChangeType);
+            Assert.Equal(7, archivedHistory.Count);
+            var dashboardAfterArchive = await client.GetFromJsonAsync<ApiCrmDashboardDto>("/api/crm/dashboard");
+            Assert.All(dashboardAfterArchive!.OpportunityStages, stage => Assert.Equal(0, stage.Count));
+            Assert.Empty(dashboardAfterArchive.OpportunityCurrencies);
+            Assert.Empty(dashboardAfterArchive.UpcomingOpportunityClosings);
+            var archivedCustomerDelete = await client.DeleteAsync(
+                $"/api/crm/customers/{customer.Id}?expectedVersion={customer.VersionNumber}");
+            Assert.Equal(HttpStatusCode.Conflict, archivedCustomerDelete.StatusCode);
+            Assert.Contains("商机历史", await archivedCustomerDelete.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         }
 
         [Fact]
@@ -97,12 +139,12 @@ namespace ExportDocManager.Api.Tests
             using var client = harness.CreateClient(login.AccessToken);
 
             var customerResponse = await client.PostAsJsonAsync("/api/crm/customers", new ApiCrmCustomerSaveRequest(
-                0, "Precision Customer", "CN", string.Empty, "跟进中", "测试", string.Empty, null));
+                0, "Precision Customer", "CN", string.Empty, "测试", string.Empty, null));
             var customer = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCrmCustomerDto>(customerResponse);
             const decimal estimatedAmount = 99999999999999.1234m;
             const int probabilityPercent = 37;
             var createResponse = await client.PostAsJsonAsync("/api/crm/opportunities", new ApiSalesOpportunitySaveRequest(
-                0, customer.Id, null, "高精度金额商机", "谈判中", "QT-PRECISION-001", estimatedAmount,
+                0, customer.Id, null, "高精度金额商机", "QT-PRECISION-001", estimatedAmount,
                 "usd", probabilityPercent, null, string.Empty, string.Empty, "验证金额精度"));
             Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 

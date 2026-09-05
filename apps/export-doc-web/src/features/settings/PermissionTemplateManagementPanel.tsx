@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from "lucide-react";
 import type {
-  ApiPermissionModuleDefinitionDto,
+  ApiEffectivePermissionGrantDto,
+  ApiPermissionResourceDefinitionDto,
   ApiPermissionTemplateDto,
   ApiPermissionTemplateSaveRequest,
   ExportDocManagerApiClient,
@@ -15,26 +16,30 @@ import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
 type TemplateDraft = {
   id: number;
+  versionNumber: number;
   code: string;
   name: string;
   description: string;
   isSystem: boolean;
   isActive: boolean;
-  moduleAccess: Record<string, string>;
+  grants: Record<string, string>;
 };
 
-const accessLevelLabels: Record<string, string> = {
-  "": "不开放",
+const scopeLabels: Record<string, string> = {
+  own: "本人",
+  department: "部门",
+  company: "公司",
+  all: "全部",
+};
+
+const presetLabels: Record<string, string> = {
+  "": "自定义/不开放",
   view: "仅查看",
-  operate: "可操作",
-  manage: "可管理",
+  operate: "日常操作",
+  manage: "完整管理",
 };
 
-const accessLevelDescriptions = [
-  { level: "view", label: "仅查看", description: "可以浏览列表、详情和查询结果" },
-  { level: "operate", label: "可操作", description: "可以新增、修改和执行日常业务" },
-  { level: "manage", label: "可管理", description: "包含删除、模板维护等管理操作" },
-];
+const presetRanks: Record<string, number> = { view: 1, operate: 2, manage: 3 };
 
 export function PermissionTemplateManagementPanel({
   client,
@@ -57,46 +62,42 @@ export function PermissionTemplateManagementPanel({
     enabled: canManageUsers,
   });
   const templates = catalogQuery.data?.templates ?? [];
-  const businessModules = useMemo(
-    () => (catalogQuery.data?.modules ?? []).filter((module) => !module.isTechnical),
-    [catalogQuery.data],
-  );
-  const businessModuleKeys = useMemo(() => new Set(businessModules.map((module) => module.key)), [businessModules]);
-  const moduleGroups = useMemo(() => {
-    const groups = new Map<string, ApiPermissionModuleDefinitionDto[]>();
-    for (const module of businessModules) {
-      const group = groups.get(module.group) ?? [];
-      group.push(module);
-      groups.set(module.group, group);
+  const resources = catalogQuery.data?.resources ?? [];
+  const assignableResources = useMemo(() => resources.filter((resource) => !resource.isTechnical), [resources]);
+  const technicalResources = useMemo(() => resources.filter((resource) => resource.isTechnical), [resources]);
+  const resourceByKey = useMemo(() => new Map(resources.map((resource) => [resource.key, resource])), [resources]);
+  const resourceGroups = useMemo(() => {
+    const groups = new Map<string, ApiPermissionResourceDefinitionDto[]>();
+    for (const resource of assignableResources) {
+      const group = groups.get(resource.group) ?? [];
+      group.push(resource);
+      groups.set(resource.group, group);
     }
     return [...groups.entries()];
-  }, [businessModules]);
+  }, [assignableResources]);
+  const selectedTemplate = templates.find((template) => template.id === selectedId);
 
   useEffect(() => {
-    if (selectedId == null && templates.length > 0) {
-      applyTemplate(templates[0]);
-    }
+    if (selectedId == null && templates.length > 0) applyTemplate(templates[0]);
   }, [selectedId, templates]);
 
   useEffect(() => {
-    if (catalogQuery.isError) {
-      setMessage(readApiError(catalogQuery.error));
-      setSuccessMessage(null);
-    }
+    if (!catalogQuery.isError) return;
+    setMessage(readApiError(catalogQuery.error));
+    setSuccessMessage(null);
   }, [catalogQuery.error, catalogQuery.isError]);
 
   const saveMutation = useMutation({
-    mutationFn: (body: ApiPermissionTemplateSaveRequest) =>
-      draft.id > 0
-        ? client.updatePermissionTemplate({ id: draft.id, body })
-        : client.createPermissionTemplate({ body }),
+    mutationFn: (body: ApiPermissionTemplateSaveRequest) => draft.id > 0
+      ? client.updatePermissionTemplate({ id: draft.id, body })
+      : client.createPermissionTemplate({ body }),
     onSuccess: async (saved) => {
       const savedDraft = createDraftFromTemplate(saved);
       setSelectedId(saved.id);
       setDraft(savedDraft);
       setPersistedDraftSnapshot(buildTemplateDraftSnapshot(savedDraft));
       setMessage(null);
-      setSuccessMessage("权限模板已保存；已登录用户重新登录后生效。");
+      setSuccessMessage("权限模板已保存；使用该模板的现有会话已立即撤销，相关用户需要重新登录。");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.permissionTemplates() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.users() }),
@@ -109,7 +110,7 @@ export function PermissionTemplateManagementPanel({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => client.deletePermissionTemplate({ id }),
+    mutationFn: (target: { id: number; expectedVersion: number }) => client.deletePermissionTemplate(target),
     onSuccess: async (response) => {
       setSelectedId(null);
       setDraft(createEmptyDraft());
@@ -129,8 +130,7 @@ export function PermissionTemplateManagementPanel({
 
   const currentDraftSnapshot = useMemo(() => buildTemplateDraftSnapshot(draft), [draft]);
   const hasUnsavedTemplateChanges = Boolean(
-    canManageUsers &&
-    selectedId != null &&
+    canManageUsers && selectedId != null &&
     (persistedDraftSnapshot == null || currentDraftSnapshot !== persistedDraftSnapshot),
   );
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
@@ -141,8 +141,7 @@ export function PermissionTemplateManagementPanel({
   if (!canManageUsers) return null;
   const isAdminTemplate = draft.isSystem && draft.code.toLowerCase() === "admin";
   const isBusy = catalogQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
-  const enabledBusinessModuleCount = Object.entries(draft.moduleAccess)
-    .filter(([moduleKey, accessLevel]) => businessModuleKeys.has(moduleKey) && Boolean(accessLevel)).length;
+  const enabledActionCount = Object.keys(draft.grants).length;
 
   function applyTemplate(template: ApiPermissionTemplateDto) {
     const nextDraft = createDraftFromTemplate(template);
@@ -154,18 +153,12 @@ export function PermissionTemplateManagementPanel({
   }
 
   async function selectTemplate(template: ApiPermissionTemplateDto) {
-    if (template.id === selectedId || !await confirmDiscardChanges(`切换到权限模板“${template.name}”`)) {
-      return;
-    }
-
+    if (template.id === selectedId || !await confirmDiscardChanges(`切换到权限模板“${template.name}”`)) return;
     applyTemplate(template);
   }
 
   async function beginNew() {
-    if (!await confirmDiscardChanges("新建权限模板")) {
-      return;
-    }
-
+    if (!await confirmDiscardChanges("新建权限模板")) return;
     const emptyDraft = createEmptyDraft();
     setSelectedId(0);
     setDraft(emptyDraft);
@@ -180,6 +173,7 @@ export function PermissionTemplateManagementPanel({
     setDraft((current) => ({
       ...current,
       id: 0,
+      versionNumber: 0,
       code: `custom-${suffix}`,
       name: `${current.name || "权限模板"} 副本`,
       isSystem: false,
@@ -202,51 +196,73 @@ export function PermissionTemplateManagementPanel({
       name: draft.name.trim(),
       description: draft.description.trim(),
       isActive: draft.isActive,
-      modules: Object.entries(draft.moduleAccess)
-        .filter(([moduleKey, accessLevel]) => businessModuleKeys.has(moduleKey) && Boolean(accessLevel))
-        .map(([moduleKey, accessLevel]) => ({ moduleKey, accessLevel })),
+      grants: Object.entries(draft.grants).map(([key, dataScope]) => {
+        const [resourceKey, action] = splitGrantKey(key);
+        return { resourceKey, action, dataScope };
+      }),
+      expectedVersion: draft.id > 0 ? draft.versionNumber : 0,
     });
   }
 
   async function refreshTemplates() {
-    if (!await confirmDiscardChanges("刷新权限模板")) {
-      return;
-    }
-
+    if (!await confirmDiscardChanges("刷新权限模板")) return;
     const result = await catalogQuery.refetch();
-    if (selectedId && selectedId > 0) {
-      const refreshedTemplate = result.data?.templates.find((template) => template.id === selectedId);
-      if (refreshedTemplate) {
-        applyTemplate(refreshedTemplate);
-      }
-    }
+    if (!selectedId || selectedId <= 0) return;
+    const refreshed = result.data?.templates.find((template) => template.id === selectedId);
+    if (refreshed) applyTemplate(refreshed);
   }
 
   async function deleteSelected() {
-    if (draft.id <= 0 || draft.isSystem) return;
-    if (!await confirmDiscardChanges("删除当前权限模板")) return;
+    if (draft.id <= 0 || draft.isSystem || !await confirmDiscardChanges("删除当前权限模板")) return;
     const persistedTemplate = templates.find((template) => template.id === draft.id);
     if (!persistedTemplate) return;
-    if (!await requestConfirmation({ title: "删除权限模板", description: `确定删除权限模板“${persistedTemplate.name}”吗？`, details: ["正在被账号使用的模板不会被删除。"], confirmLabel: "确认删除", tone: "danger" })) return;
+    if (!await requestConfirmation({
+      title: "删除权限模板",
+      description: `确定删除权限模板“${persistedTemplate.name}”吗？`,
+      details: ["正在被账号使用的模板不会被删除。"],
+      confirmLabel: "确认删除",
+      tone: "danger",
+    })) return;
     applyTemplate(persistedTemplate);
-    deleteMutation.mutate(persistedTemplate.id);
+    deleteMutation.mutate({ id: persistedTemplate.id, expectedVersion: persistedTemplate.versionNumber });
   }
 
-  function patchAccess(moduleKey: string, accessLevel: string) {
-    setDraft((current) => ({
-      ...current,
-      moduleAccess: { ...current.moduleAccess, [moduleKey]: accessLevel },
-    }));
+  function toggleAction(resource: ApiPermissionResourceDefinitionDto, action: string, enabled: boolean) {
+    const key = grantKey(resource.key, action);
+    setDraft((current) => {
+      const grants = { ...current.grants };
+      if (enabled) grants[key] = resource.supportsDataScope ? grants[key] || "own" : "all";
+      else delete grants[key];
+      return { ...current, grants };
+    });
+    setSuccessMessage(null);
+  }
+
+  function patchScope(resourceKey: string, action: string, dataScope: string) {
+    setDraft((current) => ({ ...current, grants: { ...current.grants, [grantKey(resourceKey, action)]: dataScope } }));
+    setSuccessMessage(null);
+  }
+
+  function applyPreset(resource: ApiPermissionResourceDefinitionDto, level: string) {
+    setDraft((current) => {
+      const grants = Object.fromEntries(Object.entries(current.grants).filter(([key]) => splitGrantKey(key)[0] !== resource.key));
+      if (level) {
+        const defaultScope = firstResourceScope(current.grants, resource.key) || (resource.supportsDataScope ? "own" : "all");
+        for (const action of resource.actions) {
+          if ((presetRanks[action.presetLevel] ?? 0) <= (presetRanks[level] ?? 0)) {
+            grants[grantKey(resource.key, action.key)] = defaultScope;
+          }
+        }
+      }
+      return { ...current, grants };
+    });
     setSuccessMessage(null);
   }
 
   return (
     <section className="form-section permission-template-section" aria-label="权限模板">
       <div className="section-header">
-        <div>
-          <h2>权限模板</h2>
-          <p className="section-description">按岗位选择业务模块即可；未授权的页面和操作会自动隐藏或停用。</p>
-        </div>
+        <div><h2>岗位与权限模板</h2><p className="section-description">权限事实由业务资源、具体动作和数据范围共同组成。</p></div>
         <div className="toolbar-actions">
           <button className="icon-button" type="button" title="刷新模板" aria-label="刷新模板" disabled={isBusy} onClick={() => void refreshTemplates()}><RefreshCw size={18} /></button>
           <button className="icon-button" type="button" title="新建模板" aria-label="新建模板" disabled={isBusy} onClick={() => void beginNew()}><Plus size={18} /></button>
@@ -257,71 +273,128 @@ export function PermissionTemplateManagementPanel({
       </div>
 
       {catalogQuery.data?.applyPolicy ? <div className="permission-apply-policy"><ShieldCheck size={17} /><span>{catalogQuery.data.applyPolicy}</span></div> : null}
-      <div className="permission-business-note">
-        这里只显示业务模块。基础资料读取、候选项和单据输出等技术权限会由系统自动补齐，无需管理员理解或逐项配置。
-      </div>
       {message ? <InlineNotice tone="error" title="权限模板操作失败">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
 
       <div className="permission-template-layout">
-        <div className="permission-template-list" role="listbox" aria-label="权限模板目录">
+        <div className="permission-template-list" role="group" aria-label="权限模板目录">
           {templates.map((template) => (
-            <button
-              key={template.id}
-              type="button"
-              className={template.id === selectedId ? "permission-template-card selected" : "permission-template-card"}
-              onClick={() => void selectTemplate(template)}
-            >
-              <span><strong>{template.name}</strong>{template.isSystem ? <small>内置</small> : null}</span>
+            <button key={template.id} type="button" aria-pressed={template.id === selectedId} className={template.id === selectedId ? "permission-template-card selected" : "permission-template-card"} onClick={() => void selectTemplate(template)}>
+              <span><strong>{template.name}</strong>{template.isSystem ? <small>内置</small> : null}{!template.isActive ? <small>停用</small> : null}</span>
               <small>{template.description || "自定义岗位权限"}</small>
             </button>
           ))}
         </div>
 
         <div className="permission-template-editor">
-          {isAdminTemplate ? <PermissionNotice>系统管理员模板固定拥有全部功能，不能在此修改。</PermissionNotice> : null}
+          {isAdminTemplate ? <PermissionNotice>系统管理员模板由管理员身份固定授予全部能力，不能委托或修改。</PermissionNotice> : null}
           <div className="field-grid permission-template-meta-grid">
             <label><span>模板名称</span><input value={draft.name} disabled={isBusy || isAdminTemplate} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>
-            <label className="permission-template-count"><span>已开放业务模块</span><strong>{enabledBusinessModuleCount} 个</strong><small>技术支撑权限由系统自动处理</small></label>
+            <label className="permission-template-count"><span>已授权动作</span><strong>{enabledActionCount} 项</strong><small>每项均有明确数据范围</small></label>
             <label className="permission-template-description"><span>说明</span><input value={draft.description} disabled={isBusy || isAdminTemplate} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} /></label>
             <label className="settings-check"><input type="checkbox" checked={draft.isActive} disabled={isBusy || draft.isSystem} onChange={(event) => setDraft((current) => ({ ...current, isActive: event.target.checked }))} /><span>启用模板</span></label>
           </div>
 
-          <div className="permission-level-guide" aria-label="权限级别说明">
-            {accessLevelDescriptions.map((item) => (
-              <div key={item.level}><strong>{item.label}</strong><span>{item.description}</span></div>
+          <div className="permission-business-note">
+            “仅查看 / 日常操作 / 完整管理”只用于快速勾选；保存的真实权限始终是下方每个动作及其数据范围。
+            页面所需的查看权限齐全后，导航菜单才会自动显示；取消后菜单、直接网址、页面按钮和 API 会同步拒绝。
+          </div>
+          <div className="permission-resource-groups">
+            {resourceGroups.map(([groupName, groupResources]) => (
+              <section className="permission-resource-group" key={groupName} aria-label={groupName}>
+                <h3>{groupName}</h3>
+                {groupResources.map((resource) => (
+                  <div className="permission-resource-card" key={resource.key}>
+                    <div className="permission-resource-header">
+                      <strong>{resource.name}</strong>
+                      <label><span>快捷预设</span><select disabled={isBusy || isAdminTemplate} value={detectPreset(draft.grants, resource)} onChange={(event) => applyPreset(resource, event.target.value)}>{Object.entries(presetLabels).map(([value, label]) => <option key={value || "custom"} value={value}>{label}</option>)}</select></label>
+                    </div>
+                    <div className="permission-action-list">
+                      {resource.actions.map((action) => {
+                        const key = grantKey(resource.key, action.key);
+                        const enabled = Object.prototype.hasOwnProperty.call(draft.grants, key);
+                        return (
+                          <div className="permission-action-row" key={action.key}>
+                            <label className="permission-action-toggle"><input type="checkbox" checked={enabled} disabled={isBusy || isAdminTemplate} onChange={(event) => toggleAction(resource, action.key, event.target.checked)} /><span><strong>{action.name}</strong><small>{action.description}</small></span></label>
+                            {resource.supportsDataScope ? <select aria-label={`${resource.name}${action.name}数据范围`} value={draft.grants[key] ?? "own"} disabled={!enabled || isBusy || isAdminTemplate} onChange={(event) => patchScope(resource.key, action.key, event.target.value)}>{(catalogQuery.data?.dataScopes ?? []).map((scope) => <option key={scope} value={scope}>{scopeLabels[scope] ?? scope}</option>)}</select> : <span className="permission-global-scope">全局</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </section>
             ))}
           </div>
 
-          <div className="permission-module-groups">
-            {moduleGroups.map(([groupName, modules]) => (
-              <div className="permission-module-group" key={groupName}>
-                <h3>{groupName}</h3>
-                <div className="permission-module-list">
-                  {modules.map((module) => (
-                    <label className="permission-module-row" key={module.key}>
-                      <span><strong>{module.name}</strong></span>
-                      <select value={draft.moduleAccess[module.key] ?? ""} disabled={isBusy || isAdminTemplate} onChange={(event) => patchAccess(module.key, event.target.value)}>
-                        {["", ...(catalogQuery.data?.accessLevels ?? [])].map((level) => <option key={level || "none"} value={level}>{accessLevelLabels[level] ?? level}</option>)}
-                      </select>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          <EffectivePermissionSummary effectiveGrants={selectedTemplate?.effectiveGrants ?? []} resourceByKey={resourceByKey} />
+          <TechnicalPermissionCatalog
+            resources={technicalResources}
+            effectiveGrants={selectedTemplate?.effectiveGrants ?? []}
+          />
 
           <details className="permission-advanced-details">
             <summary>高级信息</summary>
-            <label>
-              <span>模板代码</span>
-              <input value={draft.code} disabled={isBusy || draft.isSystem} onChange={(event) => setDraft((current) => ({ ...current, code: event.target.value }))} />
-              <small>用于系统内部识别；一般无需修改。</small>
-            </label>
+            <label><span>模板代码</span><input value={draft.code} disabled={isBusy || draft.isSystem} onChange={(event) => setDraft((current) => ({ ...current, code: event.target.value }))} /><small>用于系统内部识别；一般无需修改。</small></label>
           </details>
         </div>
       </div>
     </section>
+  );
+}
+
+function TechnicalPermissionCatalog({
+  resources,
+  effectiveGrants,
+}: {
+  resources: ApiPermissionResourceDefinitionDto[];
+  effectiveGrants: ApiEffectivePermissionGrantDto[];
+}) {
+  const effectiveKeys = new Set(effectiveGrants.map((grant) => grantKey(grant.resourceKey, grant.action)));
+  return (
+    <details className="permission-effective-details permission-technical-details">
+      <summary>身份限定与技术依赖模块（只读，共 {resources.length} 个）</summary>
+      <p>这些模块用于基础资料读取、输出链路和系统维护。岗位模板不能直接授予；业务动作会按最小范围自动继承，系统维护仍要求管理员身份。</p>
+      <div className="permission-technical-grid">
+        {resources.map((resource) => {
+          const activeActions = resource.actions.filter((action) =>
+            effectiveKeys.has(grantKey(resource.key, action.key)));
+          return (
+            <section key={resource.key} className="permission-technical-card">
+              <div><strong>{resource.name}</strong><small>{resource.group}</small></div>
+              <span>{activeActions.length > 0 ? `当前生效 ${activeActions.length} 项` : "当前未生效"}</span>
+              <ul>{resource.actions.map((action) => (
+                <li key={action.key} className={effectiveKeys.has(grantKey(resource.key, action.key)) ? "active" : ""}>
+                  {action.name}
+                </li>
+              ))}</ul>
+            </section>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
+function EffectivePermissionSummary({
+  effectiveGrants,
+  resourceByKey,
+}: {
+  effectiveGrants: ApiEffectivePermissionGrantDto[];
+  resourceByKey: ReadonlyMap<string, ApiPermissionResourceDefinitionDto>;
+}) {
+  const inherited = effectiveGrants.filter((grant) => grant.source !== "template" || resourceByKey.get(grant.resourceKey)?.isTechnical);
+  return (
+    <details className="permission-effective-details" open>
+      <summary>最终有效权限与技术依赖（只读）</summary>
+      <p>这里显示最近一次保存后由服务端计算的继承结果；修改草稿后保存即可刷新。</p>
+      {inherited.length === 0 ? <span className="empty-inline">没有额外技术依赖。</span> : <ul>{inherited.map((grant) => {
+        const resource = resourceByKey.get(grant.resourceKey);
+        const action = resource?.actions.find((item) => item.key === grant.action);
+        const source = grant.sourceResourceKey ? resourceByKey.get(grant.sourceResourceKey)?.name || grant.sourceResourceKey : "岗位模板";
+        return <li key={`${grant.resourceKey}:${grant.action}`}><strong>{resource?.name || grant.resourceKey} · {action?.name || grant.action}</strong><span>{scopeLabels[grant.dataScope] ?? grant.dataScope}；来源：{grant.source === "dependency" ? `继承自 ${source}` : source}</span></li>;
+      })}</ul>}
+    </details>
   );
 }
 
@@ -330,49 +403,49 @@ export default PermissionTemplateManagementPanel;
 function createDraftFromTemplate(template: ApiPermissionTemplateDto): TemplateDraft {
   return {
     id: template.id,
+    versionNumber: template.versionNumber ?? 1,
     code: template.code,
     name: template.name,
     description: template.description ?? "",
     isSystem: template.isSystem,
     isActive: template.isActive,
-    moduleAccess: Object.fromEntries(template.modules.map((module) => [module.moduleKey, module.accessLevel])),
+    grants: Object.fromEntries(template.grants.map((grant) => [grantKey(grant.resourceKey, grant.action), grant.dataScope])),
   };
 }
 
 function createEmptyDraft(): TemplateDraft {
-  return {
-    id: 0,
-    code: createCustomTemplateCode(),
-    name: "新权限模板",
-    description: "",
-    isSystem: false,
-    isActive: true,
-    moduleAccess: {},
-  };
+  return { id: 0, versionNumber: 0, code: createCustomTemplateCode(), name: "新权限模板", description: "", isSystem: false, isActive: true, grants: {} };
 }
 
 function buildTemplateDraftSnapshot(draft: TemplateDraft) {
-  return JSON.stringify({
-    id: draft.id,
-    code: draft.code,
-    name: draft.name,
-    description: draft.description,
-    isSystem: draft.isSystem,
-    isActive: draft.isActive,
-    moduleAccess: Object.fromEntries(
-      Object.entries(draft.moduleAccess).sort(([left], [right]) => left.localeCompare(right)),
-    ),
-  });
+  return JSON.stringify({ ...draft, grants: Object.fromEntries(Object.entries(draft.grants).sort(([left], [right]) => left.localeCompare(right))) });
+}
+
+function grantKey(resourceKey: string, action: string) {
+  return `${resourceKey}\u001f${action}`;
+}
+
+function splitGrantKey(key: string) {
+  const [resourceKey = "", action = ""] = key.split("\u001f", 2);
+  return [resourceKey, action] as const;
+}
+
+function firstResourceScope(grants: Record<string, string>, resourceKey: string) {
+  return Object.entries(grants).find(([key]) => splitGrantKey(key)[0] === resourceKey)?.[1] ?? "";
+}
+
+function detectPreset(grants: Record<string, string>, resource: ApiPermissionResourceDefinitionDto) {
+  const enabled = resource.actions.filter((action) => Object.prototype.hasOwnProperty.call(grants, grantKey(resource.key, action.key)));
+  if (enabled.length === 0) return "";
+  for (const level of ["view", "operate", "manage"]) {
+    const expected = resource.actions.filter((action) => (presetRanks[action.presetLevel] ?? 0) <= presetRanks[level]);
+    if (expected.length === enabled.length && expected.every((action) => enabled.includes(action))) return level;
+  }
+  return "";
 }
 
 function createCustomTemplateCode() {
   const now = new Date();
-  const compact = [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-    String(now.getHours()).padStart(2, "0"),
-    String(now.getMinutes()).padStart(2, "0"),
-  ].join("");
+  const compact = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0"), String(now.getHours()).padStart(2, "0"), String(now.getMinutes()).padStart(2, "0")].join("");
   return `custom-${compact}`;
 }

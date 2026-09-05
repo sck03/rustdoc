@@ -55,6 +55,7 @@ namespace ExportDocManager.Api.Hosting
                 return Results.Ok(ApiAuditLogDtoFactory.FromPagedAuditLogs(result));
             })
             .WithName("ListAuditLogs")
+            .WithApiCapability(PermissionResourceCatalog.SystemAudit, PermissionAction.View)
             .Produces<ApiPagedResponse<ApiAuditLogDto>>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized);
 
@@ -103,6 +104,7 @@ namespace ExportDocManager.Api.Hosting
                     AuditLogStoragePolicy));
             })
             .WithName("SaveAuditLogsToPath")
+            .WithApiCapability(PermissionResourceCatalog.SystemAudit, PermissionAction.Manage)
             .Produces<ApiAuditLogCommandResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -163,6 +165,7 @@ namespace ExportDocManager.Api.Hosting
                 }
             })
             .WithName("DownloadAuditLogs")
+            .WithApiCapability(PermissionResourceCatalog.SystemAudit, PermissionAction.Manage)
             .Produces<byte[]>(StatusCodes.Status200OK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -201,6 +204,7 @@ namespace ExportDocManager.Api.Hosting
                     AuditLogStoragePolicy));
             })
             .WithName("DeleteAuditLogsByCriteria")
+            .WithApiCapability(PermissionResourceCatalog.SystemAudit, PermissionAction.Manage)
             .Produces<ApiAuditLogCommandResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -250,6 +254,7 @@ namespace ExportDocManager.Api.Hosting
                     AuditLogStoragePolicy));
             })
             .WithName("CleanupAuditLogs")
+            .WithApiCapability(PermissionResourceCatalog.SystemAudit, PermissionAction.Manage)
             .Produces<ApiAuditLogCommandResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)

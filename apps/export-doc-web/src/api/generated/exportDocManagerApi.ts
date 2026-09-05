@@ -389,7 +389,6 @@ export interface ApiCrmContactSaveRequest {
   expectedVersion?: number;
   id: number;
   instantMessaging: string;
-  isPrimary: boolean;
   name: string;
   phone: string;
   title: string;
@@ -419,13 +418,14 @@ export interface ApiCrmCustomerDto {
 
 export interface ApiCrmCustomerImportPreviewDto {
   duplicateRows: number;
+  previewId: string;
   rows: ApiCrmCustomerImportRowDto[];
   totalRows: number;
   validRows: number;
 }
 
 export interface ApiCrmCustomerImportRequest {
-  rows: ApiCrmCustomerImportRowDto[];
+  previewId: string;
 }
 
 export interface ApiCrmCustomerImportResultDto {
@@ -458,7 +458,6 @@ export interface ApiCrmCustomerSaveRequest {
   name: string;
   notes: string;
   source: string;
-  status: string;
   website: string;
 }
 
@@ -504,11 +503,20 @@ export interface ApiCrmFollowUpSaveRequest {
   expectedVersion?: number;
   followedUpAt?: string | null;
   id: number;
-  isCompleted?: boolean;
   nextAction?: string;
   nextFollowUpAt?: string | null;
   summary?: string;
   type?: string;
+}
+
+export interface ApiCrmFollowUpTransferRequest {
+  crmContactId: number | null;
+  crmCustomerId: number;
+  expectedVersion: number;
+}
+
+export interface ApiCrmLifecycleRequest {
+  expectedVersion: number;
 }
 
 export interface ApiCustomOptionListResponse {
@@ -870,6 +878,14 @@ export interface ApiDownloadTicket {
   token: string;
 }
 
+export interface ApiEffectivePermissionGrantDto {
+  action: string;
+  dataScope: string;
+  resourceKey: string;
+  source: string;
+  sourceResourceKey: string;
+}
+
 export interface ApiEmailDeliveryDto {
   attachmentCount: number;
   createdAt: string;
@@ -924,16 +940,34 @@ export interface ApiEmailStatusResponse {
   storagePolicy: string;
 }
 
+export interface ApiEmailTemplateDraftRequest {
+  bodyHtml?: string;
+  category?: string;
+  expectedVersion?: number;
+  name?: string;
+  subject?: string;
+}
+
 export interface ApiEmailTemplateDto {
   bodyHtml: string;
+  canArchive: boolean;
+  canDisable: boolean;
   canEdit: boolean;
+  canPublish: boolean;
+  canRestore: boolean;
+  canShare: boolean;
   category: string;
   id: number;
-  isActive: boolean;
-  isShared: boolean;
   name: string;
+  ownerUserId?: number | null;
+  shareScope: string;
+  status: string;
   subject: string;
   versionNumber: number;
+}
+
+export interface ApiEmailTemplateLifecycleRequest {
+  expectedVersion: number;
 }
 
 export interface ApiEmailTemplatePreviewDto {
@@ -948,15 +982,9 @@ export interface ApiEmailTemplatePreviewRequest {
   variables: Record<string, unknown>;
 }
 
-export interface ApiEmailTemplateSaveRequest {
-  bodyHtml: string;
-  category: string;
-  expectedVersion?: number;
-  id: number;
-  isActive: boolean;
-  isShared: boolean;
-  name: string;
-  subject: string;
+export interface ApiEmailTemplateShareRequest {
+  expectedVersion: number;
+  shareScope: string;
 }
 
 export interface ApiEmailTemplateVariableDto {
@@ -975,9 +1003,9 @@ export interface ApiEmailTemplateVersionDto {
   createdAt: string;
   emailTemplateId: number;
   id: number;
-  isActive: boolean;
-  isShared: boolean;
   name: string;
+  shareScope: string;
+  status: string;
   subject: string;
   versionNumber: number;
 }
@@ -1776,6 +1804,41 @@ export interface ApiOcrRecognizeImageResponse {
   storagePolicy: string;
 }
 
+export interface ApiOrganizationCompanyDto {
+  code: string;
+  isActive: boolean;
+  name: string;
+  versionNumber: number;
+}
+
+export interface ApiOrganizationCompanySaveRequest {
+  code: string;
+  expectedVersion?: number;
+  isActive: boolean;
+  name: string;
+}
+
+export interface ApiOrganizationDepartmentDto {
+  code: string;
+  companyCode: string;
+  isActive: boolean;
+  name: string;
+  versionNumber: number;
+}
+
+export interface ApiOrganizationDepartmentSaveRequest {
+  code: string;
+  companyCode: string;
+  expectedVersion?: number;
+  isActive: boolean;
+  name: string;
+}
+
+export interface ApiOrganizationDirectoryResponse {
+  companies: ApiOrganizationCompanyDto[];
+  departments: ApiOrganizationDepartmentDto[];
+}
+
 export interface ApiPackedCargoItemDto {
   baseHeight: number;
   colorArgb: number;
@@ -1802,6 +1865,16 @@ export interface ApiPagedResponseOfApiAuditLogDto {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   items: ApiAuditLogDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface ApiPagedResponseOfApiCrmContactDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiCrmContactDto[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
@@ -1928,10 +2001,40 @@ export interface ApiPagedResponseOfApiSalesOpportunityDto {
   totalPages: number;
 }
 
+export interface ApiPagedResponseOfApiSupplierContactDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiSupplierContactDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface ApiPagedResponseOfApiSupplierDto {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   items: ApiSupplierDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface ApiPagedResponseOfApiSupplierProductLinkDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiSupplierProductLinkDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface ApiPagedResponseOfApiSupplierProductOptionDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiSupplierProductOptionDto[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
@@ -2038,36 +2141,51 @@ export interface ApiPdfMergeRequest {
   sourceFiles?: string[];
 }
 
-export interface ApiPermissionModuleDefinitionDto {
+export interface ApiPermissionActionDefinitionDto {
+  description: string;
+  key: string;
+  name: string;
+  presetLevel: string;
+  sortOrder: number;
+}
+
+export interface ApiPermissionGrantDto {
+  action: string;
+  dataScope: string;
+  resourceKey: string;
+}
+
+export interface ApiPermissionResourceDefinitionDto {
+  actions: ApiPermissionActionDefinitionDto[];
   group: string;
   isTechnical: boolean;
   key: string;
+  moduleKey: string;
   name: string;
   sortOrder: number;
+  supportsDataScope: boolean;
   workspace: string;
 }
 
 export interface ApiPermissionTemplateCatalogResponse {
   accessLevels: string[];
   applyPolicy: string;
-  modules: ApiPermissionModuleDefinitionDto[];
+  dataScopes: string[];
+  resources: ApiPermissionResourceDefinitionDto[];
   templates: ApiPermissionTemplateDto[];
 }
 
 export interface ApiPermissionTemplateDto {
   code: string;
   description: string;
+  effectiveGrants: ApiEffectivePermissionGrantDto[];
+  grants: ApiPermissionGrantDto[];
   id: number;
   isActive: boolean;
   isSystem: boolean;
-  modules: ApiPermissionTemplateModuleDto[];
   name: string;
   updatedAt: string;
-}
-
-export interface ApiPermissionTemplateModuleDto {
-  accessLevel: string;
-  moduleKey: string;
+  versionNumber: number;
 }
 
 export interface ApiPermissionTemplateOptionDto {
@@ -2081,9 +2199,10 @@ export interface ApiPermissionTemplateOptionDto {
 export interface ApiPermissionTemplateSaveRequest {
   code: string;
   description: string;
+  expectedVersion?: number;
+  grants: ApiPermissionGrantDto[];
   id: number;
   isActive: boolean;
-  modules: ApiPermissionTemplateModuleDto[];
   name: string;
 }
 
@@ -2451,6 +2570,7 @@ export interface ApiSalesOpportunityCurrencySummaryDto {
 }
 
 export interface ApiSalesOpportunityDto {
+  allowedNextStages: string[];
   crmCustomerId: number;
   currency: string;
   customerName: string;
@@ -2485,6 +2605,10 @@ export interface ApiSalesOpportunityHistoryDto {
   versionNumber: number;
 }
 
+export interface ApiSalesOpportunityLifecycleRequest {
+  expectedVersion: number;
+}
+
 export interface ApiSalesOpportunitySaveRequest {
   changeNote?: string;
   crmCustomerId: number;
@@ -2498,13 +2622,18 @@ export interface ApiSalesOpportunitySaveRequest {
   probabilityPercent?: number;
   productId?: number | null;
   quotationNo?: string;
-  stage?: string;
   title?: string;
 }
 
 export interface ApiSalesOpportunityStageSummaryDto {
   count: number;
   stage: string;
+}
+
+export interface ApiSalesOpportunityTransitionRequest {
+  changeNote: string;
+  expectedVersion: number;
+  nextStage: string;
 }
 
 export interface ApiSensitiveOperationAuthorizationRequest {
@@ -2851,6 +2980,8 @@ export interface ApiSupplierAssessmentDto {
   assessmentKind: string;
   averageScore: number;
   conclusion: string;
+  confirmedAt?: string | null;
+  confirmedBy: string;
   createdAt: string;
   deliveryScore: number;
   id: number;
@@ -2858,6 +2989,7 @@ export interface ApiSupplierAssessmentDto {
   priceScore: number;
   qualityScore: number;
   serviceScore: number;
+  status: string;
   supplierCompanyId: number;
   updatedAt: string;
   versionNumber: number;
@@ -2909,16 +3041,6 @@ export interface ApiSupplierAssessmentSaveRequest {
   supplierCompanyId: number;
 }
 
-export interface ApiSupplierBatchStatusRequest {
-  ids: number[];
-  status: string;
-}
-
-export interface ApiSupplierBatchStatusResult {
-  affectedCount: number;
-  status: string;
-}
-
 export interface ApiSupplierContactDto {
   email: string;
   id: number;
@@ -2936,21 +3058,10 @@ export interface ApiSupplierContactSaveRequest {
   expectedVersion?: number;
   id: number;
   instantMessaging: string;
-  isPrimary: boolean;
   name: string;
   phone: string;
   supplierCompanyId: number;
   title: string;
-}
-
-export interface ApiSupplierDeleteResponse {
-  assessmentCount: number;
-  contactCount: number;
-  deactivated: boolean;
-  deleted: boolean;
-  message: string;
-  productLinkCount: number;
-  success: boolean;
 }
 
 export interface ApiSupplierDto {
@@ -2967,13 +3078,14 @@ export interface ApiSupplierDto {
 
 export interface ApiSupplierImportPreviewDto {
   duplicateRows: number;
+  previewId: string;
   rows: ApiSupplierImportRowDto[];
   totalRows: number;
   validRows: number;
 }
 
 export interface ApiSupplierImportRequest {
-  rows: ApiSupplierImportRowDto[];
+  previewId: string;
 }
 
 export interface ApiSupplierImportResultDto {
@@ -2999,6 +3111,10 @@ export interface ApiSupplierImportRowDto {
   website: string;
 }
 
+export interface ApiSupplierLifecycleRequest {
+  expectedVersion: number;
+}
+
 export interface ApiSupplierProductLinkDto {
   currency: string;
   id: number;
@@ -3021,7 +3137,6 @@ export interface ApiSupplierProductLinkSaveRequest {
   leadTimeDays: number;
   productId: number;
   referencePrice: number;
-  status: string;
   supplierCompanyId: number;
   supplierProductCode: string;
 }
@@ -3041,7 +3156,6 @@ export interface ApiSupplierSaveRequest {
   mainProducts: string;
   name: string;
   notes: string;
-  status: string;
   website: string;
 }
 
@@ -3091,6 +3205,7 @@ export interface ApiUserAccountDto {
   permissionTemplateName: string;
   role: string;
   username: string;
+  versionNumber: number;
 }
 
 export interface ApiUserCapabilitiesDto {
@@ -3101,6 +3216,7 @@ export interface ApiUserCapabilitiesDto {
   canViewAllBusinessData: boolean;
   enabledModules: string[];
   moduleAccess: ApiModuleAccessDto[];
+  permissions: ApiPermissionGrantDto[];
   productEdition: string;
 }
 
@@ -3119,34 +3235,56 @@ export interface ApiUserDto {
 }
 
 export interface ApiUserListResponse {
+  companies: ApiOrganizationCompanyDto[];
+  departments: ApiOrganizationDepartmentDto[];
   permissionTemplates: ApiPermissionTemplateOptionDto[];
   roles: string[];
   users: ApiUserAccountDto[];
 }
 
+export interface ApiUserReportTemplateCloneRequest {
+  name?: string;
+  reportType?: string;
+  sourceTemplatePath?: string;
+}
+
+export interface ApiUserReportTemplateCreateRequest {
+  contentHtml?: string;
+  name?: string;
+  reportType?: string;
+}
+
+export interface ApiUserReportTemplateDraftRequest {
+  contentHtml?: string;
+  expectedVersion?: number;
+  name?: string;
+  reportType?: string;
+}
+
 export interface ApiUserReportTemplateDto {
+  canArchive: boolean;
+  canDisable: boolean;
   canEdit: boolean;
+  canPublish: boolean;
+  canRestore: boolean;
+  canShare: boolean;
   contentHtml: string;
   id: number;
-  isActive: boolean;
-  isShared: boolean;
   name: string;
   ownerUserId?: number | null;
   reportType: string;
   shareScope: string;
+  status: string;
   versionNumber: number;
 }
 
-export interface ApiUserReportTemplateSaveRequest {
-  contentHtml?: string;
-  expectedVersion?: number;
-  id?: number;
-  isActive?: boolean;
-  isShared?: boolean;
-  name?: string;
-  reportType?: string;
-  shareScope?: string;
-  sourceTemplatePath?: string;
+export interface ApiUserReportTemplateLifecycleRequest {
+  expectedVersion: number;
+}
+
+export interface ApiUserReportTemplateShareRequest {
+  expectedVersion: number;
+  shareScope: string;
 }
 
 export interface ApiUserReportTemplateVersionDto {
@@ -3156,10 +3294,9 @@ export interface ApiUserReportTemplateVersionDto {
   contentHtml: string;
   createdAt: string;
   id: number;
-  isActive: boolean;
-  isShared: boolean;
   name: string;
   shareScope: string;
+  status: string;
   userReportTemplateId: number;
   versionNumber: number;
 }
@@ -3167,6 +3304,7 @@ export interface ApiUserReportTemplateVersionDto {
 export interface ApiUserSaveRequest {
   companyScope: string;
   departmentId: string;
+  expectedVersion?: number;
   fullName: string;
   isActive: boolean;
   permissionTemplateId: number | null;
@@ -3249,6 +3387,8 @@ export interface EmailConfig {
   fromAddress: string;
   fromDisplayName: string;
   password: string;
+  recipientAllowList: string;
+  recipientBlockList: string;
   smtpHost: string;
   smtpPort: number;
   userName: string;
@@ -3766,12 +3906,32 @@ export interface ActivateSingleWindowClientProfileRequest {
   profileKey: string;
 }
 
+export interface AdmitSupplierRequest {
+  id: number;
+  body: ApiSupplierLifecycleRequest;
+}
+
 export interface AnalyzeContainerPackingRequest {
   body: ApiContainerPackingAnalyzeRequest;
 }
 
 export interface AnalyzeInvoiceProfitRequest {
   body: ApiInvoiceProfitAnalysisRequest;
+}
+
+export interface ArchiveEmailTemplateRequest {
+  id: number;
+  expectedVersion: number;
+}
+
+export interface ArchiveSalesOpportunityRequest {
+  id: number;
+  body: ApiSalesOpportunityLifecycleRequest;
+}
+
+export interface ArchiveUserReportTemplateRequest {
+  id: number;
+  expectedVersion: number;
 }
 
 export interface AuthorizeServerMigrationOperationRequest {
@@ -3824,12 +3984,27 @@ export interface CloneInvoiceAsTypeRequest {
   body: ApiInvoiceCloneTypeRequest;
 }
 
+export interface CloneUserReportTemplateRequest {
+  body: ApiUserReportTemplateCloneRequest;
+}
+
 export interface CollectSingleWindowClientReceiptsRequest {
   body: ApiSingleWindowReceiptCollectionRequest;
 }
 
 export interface CommitHsCodesImportRequest {
   body: ApiHsCodeImportCommitRequest;
+}
+
+export interface CompleteCrmFollowUpRequest {
+  id: number;
+  body: ApiCrmLifecycleRequest;
+}
+
+export interface ConfirmSupplierAssessmentRequest {
+  supplierId: number;
+  id: number;
+  expectedVersion?: number;
 }
 
 export interface CreateCrmContactRequest {
@@ -3858,7 +4033,7 @@ export interface CreateDisasterRecoveryPackageRequest {
 }
 
 export interface CreateEmailTemplateRequest {
-  body: ApiEmailTemplateSaveRequest;
+  body: ApiEmailTemplateDraftRequest;
 }
 
 export interface CreateExporterRequest {
@@ -3875,6 +4050,14 @@ export interface CreateInvoiceRequest {
 
 export interface CreateJobDownloadTicketRequest {
   jobId: string;
+}
+
+export interface CreateOrganizationCompanyRequest {
+  body: ApiOrganizationCompanySaveRequest;
+}
+
+export interface CreateOrganizationDepartmentRequest {
+  body: ApiOrganizationDepartmentSaveRequest;
 }
 
 export interface CreatePayeeRequest {
@@ -3941,7 +4124,23 @@ export interface CreateUnitRequest {
 }
 
 export interface CreateUserReportTemplateRequest {
-  body: ApiUserReportTemplateSaveRequest;
+  body: ApiUserReportTemplateCreateRequest;
+}
+
+export interface DeactivateCrmCustomerRequest {
+  id: number;
+  body: ApiCrmLifecycleRequest;
+}
+
+export interface DeactivateSupplierRequest {
+  id: number;
+  body: ApiSupplierLifecycleRequest;
+}
+
+export interface DeactivateSupplierProductLinkRequest {
+  supplierId: number;
+  id: number;
+  body: ApiSupplierLifecycleRequest;
 }
 
 export interface DeleteAuditLogsByCriteriaRequest {
@@ -3959,14 +4158,17 @@ export interface DeleteContainerPackingProjectRequest {
 export interface DeleteCrmContactRequest {
   customerId: number;
   id: number;
+  expectedVersion?: number;
 }
 
 export interface DeleteCrmCustomerRequest {
   id: number;
+  expectedVersion?: number;
 }
 
 export interface DeleteCrmFollowUpRequest {
   id: number;
+  expectedVersion?: number;
 }
 
 export interface DeleteCustomerRequest {
@@ -3974,10 +4176,6 @@ export interface DeleteCustomerRequest {
 }
 
 export interface DeleteCustomsCooProducerProfileRequest {
-  id: number;
-}
-
-export interface DeleteEmailTemplateRequest {
   id: number;
 }
 
@@ -4019,6 +4217,7 @@ export interface DeletePaymentRequest {
 
 export interface DeletePermissionTemplateRequest {
   id: number;
+  expectedVersion?: number;
 }
 
 export interface DeletePortRequest {
@@ -4034,35 +4233,41 @@ export interface DeleteReportTemplateRequest {
   templatePath?: string;
 }
 
-export interface DeleteSalesOpportunityRequest {
-  id: number;
-}
-
 export interface DeleteSupplierRequest {
   id: number;
+  expectedVersion?: number;
 }
 
 export interface DeleteSupplierAssessmentRequest {
   supplierId: number;
   id: number;
+  expectedVersion?: number;
 }
 
 export interface DeleteSupplierContactRequest {
   supplierId: number;
   id: number;
+  expectedVersion?: number;
 }
 
 export interface DeleteSupplierProductLinkRequest {
   supplierId: number;
   id: number;
+  expectedVersion?: number;
 }
 
 export interface DeleteUnitRequest {
   id: number;
 }
 
-export interface DeleteUserReportTemplateRequest {
+export interface DisableEmailTemplateRequest {
   id: number;
+  body: ApiEmailTemplateLifecycleRequest;
+}
+
+export interface DisableUserReportTemplateRequest {
+  id: number;
+  body: ApiUserReportTemplateLifecycleRequest;
 }
 
 export interface DiscoverHsCodeHistoryCandidatesRequest {
@@ -4312,16 +4517,6 @@ export interface ListContainerPackingProjectsRequest {
   limit?: number;
 }
 
-export interface ListCrmContactsRequest {
-  customerId: number;
-}
-
-export interface ListCrmFollowUpsRequest {
-  crmCustomerId?: number;
-  includeCompleted?: boolean;
-  limit?: number;
-}
-
 export interface ListCustomOptionsRequest {
   optionType: string;
 }
@@ -4351,7 +4546,7 @@ export interface ListEmailTemplateVersionsRequest {
 export interface ListEmailTemplatesRequest {
   keyword?: string;
   category?: string;
-  includeInactive?: boolean;
+  includeArchived?: boolean;
 }
 
 export interface ListExchangeRatesRequest {
@@ -4473,14 +4668,6 @@ export interface ListSupplierAssessmentsRequest {
   supplierId: number;
 }
 
-export interface ListSupplierContactsRequest {
-  supplierId: number;
-}
-
-export interface ListSupplierProductLinksRequest {
-  supplierId: number;
-}
-
 export interface ListUnitsRequest {
   keyword?: string;
 }
@@ -4497,7 +4684,7 @@ export interface ListUserReportTemplateVersionsRequest {
 
 export interface ListUserReportTemplatesRequest {
   reportType?: string;
-  includeInactive?: boolean;
+  includeArchived?: boolean;
 }
 
 export interface LoginRequest {
@@ -4602,9 +4789,25 @@ export interface PreviewUploadedInvoiceTransferPackageRequest {
   body: Blob;
 }
 
+export interface PublishEmailTemplateRequest {
+  id: number;
+  body: ApiEmailTemplateLifecycleRequest;
+}
+
+export interface PublishUserReportTemplateRequest {
+  id: number;
+  body: ApiUserReportTemplateLifecycleRequest;
+}
+
 export interface PurgeCancelledInvoiceRequest {
   id: number;
   body: ApiInvoicePurgeRequest;
+}
+
+export interface QueryCrmContactsRequest {
+  customerId: number;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface QueryCrmCustomersRequest {
@@ -4628,6 +4831,18 @@ export interface QuerySalesOpportunitiesRequest {
   pageSize?: number;
 }
 
+export interface QuerySupplierContactsRequest {
+  supplierId: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface QuerySupplierProductLinksRequest {
+  supplierId: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 export interface QuerySuppliersRequest {
   keyword?: string;
   status?: string;
@@ -4645,6 +4860,10 @@ export interface RecordHsCodeKnowledgeFeedbackRequest {
 
 export interface RecordInvoiceHsCodeKnowledgeFeedbackRequest {
   body: HsCodeKnowledgeFeedbackInput;
+}
+
+export interface RecycleReportTemplateV3ImageResourceRequest {
+  resourceId: string;
 }
 
 export interface RegisterLicenseRequest {
@@ -4669,6 +4888,16 @@ export interface ResolveRemoteHsCodeDetailRequest {
   body: ApiHsCodeDto;
 }
 
+export interface RestoreCrmCustomerRequest {
+  id: number;
+  body: ApiCrmLifecycleRequest;
+}
+
+export interface RestoreCrmFollowUpRequest {
+  id: number;
+  body: ApiCrmLifecycleRequest;
+}
+
 export interface RestoreDatabaseBackupRequest {
   body: ApiBackupRestoreRequest;
 }
@@ -4677,18 +4906,41 @@ export interface RestoreDisasterRecoveryPackageRequest {
   body: ApiDisasterRecoveryRestoreRequest;
 }
 
+export interface RestoreEmailTemplateRequest {
+  id: number;
+  body: ApiEmailTemplateLifecycleRequest;
+}
+
 export interface RestoreEmailTemplateVersionRequest {
   id: number;
   versionNumber: number;
+  body: ApiEmailTemplateLifecycleRequest;
 }
 
 export interface RestorePostgreSqlPhysicalBackupRequest {
   body: ApiPostgreSqlDatabaseRestoreRequest;
 }
 
+export interface RestoreSupplierRequest {
+  id: number;
+  body: ApiSupplierLifecycleRequest;
+}
+
+export interface RestoreSupplierProductLinkRequest {
+  supplierId: number;
+  id: number;
+  body: ApiSupplierLifecycleRequest;
+}
+
+export interface RestoreUserReportTemplateRequest {
+  id: number;
+  body: ApiUserReportTemplateLifecycleRequest;
+}
+
 export interface RestoreUserReportTemplateVersionRequest {
   id: number;
   versionNumber: number;
+  body: ApiUserReportTemplateLifecycleRequest;
 }
 
 export interface RetryJobRequest {
@@ -4748,6 +5000,11 @@ export interface SaveCustomsCooSubmitPackageToPathRequest {
   body: ApiSingleWindowSubmitPackageRequest;
 }
 
+export interface SaveEmailTemplateDraftRequest {
+  id: number;
+  body: ApiEmailTemplateDraftRequest;
+}
+
 export interface SaveHsCodeKnowledgeExampleRequest {
   body: HsCodeExampleInput;
 }
@@ -4789,6 +5046,11 @@ export interface SaveSupportPackageToRuntimeRequest {
   body: ApiSupportPackageRequest;
 }
 
+export interface SaveUserReportTemplateDraftRequest {
+  id: number;
+  body: ApiUserReportTemplateDraftRequest;
+}
+
 export interface SearchHsCodeKnowledgeRequest {
   query?: string;
   maxResults?: number;
@@ -4805,6 +5067,8 @@ export interface SearchRemoteHsCodesRequest {
 
 export interface SearchSupplierProductOptionsRequest {
   keyword?: string;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface SendEmailRequest {
@@ -4814,6 +5078,28 @@ export interface SendEmailRequest {
 
 export interface SetDefaultReportTemplateRequest {
   body: ApiReportTemplateMetadataRequest;
+}
+
+export interface SetPrimaryCrmContactRequest {
+  customerId: number;
+  id: number;
+  body: ApiCrmLifecycleRequest;
+}
+
+export interface SetPrimarySupplierContactRequest {
+  supplierId: number;
+  id: number;
+  body: ApiSupplierLifecycleRequest;
+}
+
+export interface ShareEmailTemplateRequest {
+  id: number;
+  body: ApiEmailTemplateShareRequest;
+}
+
+export interface ShareUserReportTemplateRequest {
+  id: number;
+  body: ApiUserReportTemplateShareRequest;
 }
 
 export interface StageServerMigrationRestoreRequest {
@@ -4895,6 +5181,11 @@ export interface SuggestEmailServerConfigRequest {
   body: ApiEmailServerSuggestionRequest;
 }
 
+export interface TransferCrmFollowUpRequest {
+  id: number;
+  body: ApiCrmFollowUpTransferRequest;
+}
+
 export interface TransferSharedDatabaseOwnershipRequest {
   body: ApiSharedDatabaseOwnershipTransferRequest;
 }
@@ -4902,6 +5193,11 @@ export interface TransferSharedDatabaseOwnershipRequest {
 export interface TransitionInvoiceStatusRequest {
   id: number;
   body: ApiInvoiceStatusTransitionRequest;
+}
+
+export interface TransitionSalesOpportunityRequest {
+  id: number;
+  body: ApiSalesOpportunityTransitionRequest;
 }
 
 export interface UnlockAgentConsignmentFieldsRequest {
@@ -4949,11 +5245,6 @@ export interface UpdateCustomsCooProducerProfileRequest {
   body: ApiCustomsCooProducerProfileSaveRequest;
 }
 
-export interface UpdateEmailTemplateRequest {
-  id: number;
-  body: ApiEmailTemplateSaveRequest;
-}
-
 export interface UpdateExporterRequest {
   id: number;
   body: ApiExporterDto;
@@ -4967,6 +5258,16 @@ export interface UpdateHsCodeRequest {
 export interface UpdateInvoiceRequest {
   id: number;
   body: ApiInvoiceDetailDto;
+}
+
+export interface UpdateOrganizationCompanyRequest {
+  code: string;
+  body: ApiOrganizationCompanySaveRequest;
+}
+
+export interface UpdateOrganizationDepartmentRequest {
+  code: string;
+  body: ApiOrganizationDepartmentSaveRequest;
 }
 
 export interface UpdatePayeeRequest {
@@ -5022,10 +5323,6 @@ export interface UpdateSupplierAssessmentRequest {
   body: ApiSupplierAssessmentSaveRequest;
 }
 
-export interface UpdateSupplierBatchStatusRequest {
-  body: ApiSupplierBatchStatusRequest;
-}
-
 export interface UpdateSupplierContactRequest {
   supplierId: number;
   id: number;
@@ -5041,11 +5338,6 @@ export interface UpdateSupplierProductLinkRequest {
 export interface UpdateUnitRequest {
   id: number;
   body: ApiUnitDto;
-}
-
-export interface UpdateUserReportTemplateRequest {
-  id: number;
-  body: ApiUserReportTemplateSaveRequest;
 }
 
 export interface UploadAndRestorePostgreSqlPhysicalBackupRequest {
@@ -5130,6 +5422,7 @@ export interface CreateUserAccountRequest {
 
 export interface DeleteUserAccountRequest {
   id: number;
+  expectedVersion?: number;
 }
 
 export interface UpdateUserAccountRequest {
@@ -5195,6 +5488,14 @@ export class ExportDocManagerApiClient {
     return this.request<ApiSingleWindowClientProfilesResponse>("POST", path, { init });
   }
 
+  public admitSupplier(request: AdmitSupplierRequest, init?: ApiRequestInit): Promise<ApiSupplierDto> {
+    const path = `/api/suppliers/${encodePath(request.id)}/admit`;
+    return this.request<ApiSupplierDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public analyzeContainerPacking(request: AnalyzeContainerPackingRequest, init?: ApiRequestInit): Promise<ApiContainerPackingAnalyzeResponse> {
     const path = "/api/tools/container-packing/analyze";
     return this.request<ApiContainerPackingAnalyzeResponse>("POST", path, {
@@ -5207,6 +5508,34 @@ export class ExportDocManagerApiClient {
     const path = "/api/invoices/profit-analysis";
     return this.request<ApiInvoiceProfitAnalysisResponse>("POST", path, {
       body: request.body,
+      init,
+    });
+  }
+
+  public archiveEmailTemplate(request: ArchiveEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
+    const path = `/api/email-templates/${encodePath(request.id)}`;
+    return this.request<ApiEmailTemplateDto>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
+  }
+
+  public archiveSalesOpportunity(request: ArchiveSalesOpportunityRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
+    const path = `/api/crm/opportunities/${encodePath(request.id)}/archive`;
+    return this.request<ApiCommandResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public archiveUserReportTemplate(request: ArchiveUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
+    const path = `/api/reports/user-templates/${encodePath(request.id)}`;
+    return this.request<ApiUserReportTemplateDto>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
       init,
     });
   }
@@ -5307,6 +5636,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public cloneUserReportTemplate(request: CloneUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
+    const path = "/api/reports/user-templates/clone";
+    return this.request<ApiUserReportTemplateDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public collectSingleWindowClientReceipts(request: CollectSingleWindowClientReceiptsRequest, init?: ApiRequestInit): Promise<SingleWindowReceiptCollectionResult> {
     const path = "/api/single-window/client/collect-receipts";
     return this.request<SingleWindowReceiptCollectionResult>("POST", path, {
@@ -5319,6 +5656,24 @@ export class ExportDocManagerApiClient {
     const path = "/api/master-data/hs-codes/import-commit";
     return this.request<ApiHsCodeImportCommitResponse>("POST", path, {
       body: request.body,
+      init,
+    });
+  }
+
+  public completeCrmFollowUp(request: CompleteCrmFollowUpRequest, init?: ApiRequestInit): Promise<ApiCrmFollowUpDto> {
+    const path = `/api/crm/follow-ups/${encodePath(request.id)}/complete`;
+    return this.request<ApiCrmFollowUpDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public confirmSupplierAssessment(request: ConfirmSupplierAssessmentRequest, init?: ApiRequestInit): Promise<ApiSupplierAssessmentDto> {
+    const path = `/api/suppliers/${encodePath(request.supplierId)}/assessments/${encodePath(request.id)}/confirm`;
+    return this.request<ApiSupplierAssessmentDto>("POST", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
       init,
     });
   }
@@ -5411,6 +5766,22 @@ export class ExportDocManagerApiClient {
   public createJobDownloadTicket(request: CreateJobDownloadTicketRequest, init?: ApiRequestInit): Promise<ApiDownloadTicket> {
     const path = `/api/jobs/${encodePath(request.jobId)}/download-ticket`;
     return this.request<ApiDownloadTicket>("POST", path, { init });
+  }
+
+  public createOrganizationCompany(request: CreateOrganizationCompanyRequest, init?: ApiRequestInit): Promise<ApiOrganizationCompanyDto> {
+    const path = "/api/organization-directory/companies";
+    return this.request<ApiOrganizationCompanyDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public createOrganizationDepartment(request: CreateOrganizationDepartmentRequest, init?: ApiRequestInit): Promise<ApiOrganizationDepartmentDto> {
+    const path = "/api/organization-directory/departments";
+    return this.request<ApiOrganizationDepartmentDto>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public createPayee(request: CreatePayeeRequest, init?: ApiRequestInit): Promise<ApiPayeeDto> {
@@ -5548,6 +5919,30 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public deactivateCrmCustomer(request: DeactivateCrmCustomerRequest, init?: ApiRequestInit): Promise<ApiCrmCustomerDto> {
+    const path = `/api/crm/customers/${encodePath(request.id)}/deactivate`;
+    return this.request<ApiCrmCustomerDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deactivateSupplier(request: DeactivateSupplierRequest, init?: ApiRequestInit): Promise<ApiSupplierDto> {
+    const path = `/api/suppliers/${encodePath(request.id)}/deactivate`;
+    return this.request<ApiSupplierDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deactivateSupplierProductLink(request: DeactivateSupplierProductLinkRequest, init?: ApiRequestInit): Promise<ApiSupplierProductLinkDto> {
+    const path = `/api/suppliers/${encodePath(request.supplierId)}/products/${encodePath(request.id)}/deactivate`;
+    return this.request<ApiSupplierProductLinkDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public deleteAuditLogsByCriteria(request: DeleteAuditLogsByCriteriaRequest, init?: ApiRequestInit): Promise<ApiAuditLogCommandResponse> {
     const path = "/api/audit-logs/delete";
     return this.request<ApiAuditLogCommandResponse>("POST", path, {
@@ -5568,17 +5963,32 @@ export class ExportDocManagerApiClient {
 
   public deleteCrmContact(request: DeleteCrmContactRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/crm/customers/${encodePath(request.customerId)}/contacts/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
   }
 
   public deleteCrmCustomer(request: DeleteCrmCustomerRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/crm/customers/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
   }
 
   public deleteCrmFollowUp(request: DeleteCrmFollowUpRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/crm/follow-ups/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
   }
 
   public deleteCustomer(request: DeleteCustomerRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
@@ -5588,11 +5998,6 @@ export class ExportDocManagerApiClient {
 
   public deleteCustomsCooProducerProfile(request: DeleteCustomsCooProducerProfileRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/single-window/coo/producer-profiles/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
-  }
-
-  public deleteEmailTemplate(request: DeleteEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
-    const path = `/api/email-templates/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
@@ -5649,7 +6054,12 @@ export class ExportDocManagerApiClient {
 
   public deletePermissionTemplate(request: DeletePermissionTemplateRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/permission-templates/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
   }
 
   public deletePort(request: DeletePortRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
@@ -5673,29 +6083,44 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public deleteSalesOpportunity(request: DeleteSalesOpportunityRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
-    const path = `/api/crm/opportunities/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
-  }
-
-  public deleteSupplier(request: DeleteSupplierRequest, init?: ApiRequestInit): Promise<ApiSupplierDeleteResponse> {
+  public deleteSupplier(request: DeleteSupplierRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/suppliers/${encodePath(request.id)}`;
-    return this.request<ApiSupplierDeleteResponse>("DELETE", path, { init });
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
   }
 
   public deleteSupplierAssessment(request: DeleteSupplierAssessmentRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/assessments/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
   }
 
   public deleteSupplierContact(request: DeleteSupplierContactRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/contacts/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
   }
 
   public deleteSupplierProductLink(request: DeleteSupplierProductLinkRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/products/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
   }
 
   public deleteUnit(request: DeleteUnitRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
@@ -5703,9 +6128,20 @@ export class ExportDocManagerApiClient {
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteUserReportTemplate(request: DeleteUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
-    const path = `/api/reports/user-templates/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
+  public disableEmailTemplate(request: DisableEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
+    const path = `/api/email-templates/${encodePath(request.id)}/disable`;
+    return this.request<ApiEmailTemplateDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public disableUserReportTemplate(request: DisableUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
+    const path = `/api/reports/user-templates/${encodePath(request.id)}/disable`;
+    return this.request<ApiUserReportTemplateDto>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public discoverHsCodeHistoryCandidates(request: DiscoverHsCodeHistoryCandidatesRequest = {}, init?: ApiRequestInit): Promise<HsCodeHistoryCandidatePage> {
@@ -5985,6 +6421,11 @@ export class ExportDocManagerApiClient {
     return this.request<ApiLicenseStatusResponse>("GET", path, { init });
   }
 
+  public getOrganizationDirectory(init?: ApiRequestInit): Promise<ApiOrganizationDirectoryResponse> {
+    const path = "/api/organization-directory";
+    return this.request<ApiOrganizationDirectoryResponse>("GET", path, { init });
+  }
+
   public getPayee(request: GetPayeeRequest, init?: ApiRequestInit): Promise<ApiPayeeDto> {
     const path = `/api/master-data/payees/${encodePath(request.id)}`;
     return this.request<ApiPayeeDto>("GET", path, { init });
@@ -6220,23 +6661,6 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listCrmContacts(request: ListCrmContactsRequest, init?: ApiRequestInit): Promise<ApiCrmContactDto[]> {
-    const path = `/api/crm/customers/${encodePath(request.customerId)}/contacts`;
-    return this.request<ApiCrmContactDto[]>("GET", path, { init });
-  }
-
-  public listCrmFollowUps(request: ListCrmFollowUpsRequest = {}, init?: ApiRequestInit): Promise<ApiCrmFollowUpDto[]> {
-    const path = "/api/crm/follow-ups";
-    return this.request<ApiCrmFollowUpDto[]>("GET", path, {
-      query: {
-        "crmCustomerId": request.crmCustomerId,
-        "includeCompleted": request.includeCompleted,
-        "limit": request.limit,
-      },
-      init,
-    });
-  }
-
   public listCustomOptions(request: ListCustomOptionsRequest, init?: ApiRequestInit): Promise<ApiCustomOptionListResponse> {
     const path = `/api/custom-options/${encodePath(request.optionType)}`;
     return this.request<ApiCustomOptionListResponse>("GET", path, { init });
@@ -6305,7 +6729,7 @@ export class ExportDocManagerApiClient {
       query: {
         "keyword": request.keyword,
         "category": request.category,
-        "includeInactive": request.includeInactive,
+        "includeArchived": request.includeArchived,
       },
       init,
     });
@@ -6545,21 +6969,6 @@ export class ExportDocManagerApiClient {
     return this.request<ApiSupplierAssessmentDto[]>("GET", path, { init });
   }
 
-  public listSupplierContacts(request: ListSupplierContactsRequest, init?: ApiRequestInit): Promise<ApiSupplierContactDto[]> {
-    const path = `/api/suppliers/${encodePath(request.supplierId)}/contacts`;
-    return this.request<ApiSupplierContactDto[]>("GET", path, { init });
-  }
-
-  public listSupplierProductLinks(request: ListSupplierProductLinksRequest, init?: ApiRequestInit): Promise<ApiSupplierProductLinkDto[]> {
-    const path = `/api/suppliers/${encodePath(request.supplierId)}/products`;
-    return this.request<ApiSupplierProductLinkDto[]>("GET", path, { init });
-  }
-
-  public listSuppliers(init?: ApiRequestInit): Promise<ApiSupplierDto[]> {
-    const path = "/api/suppliers";
-    return this.request<ApiSupplierDto[]>("GET", path, { init });
-  }
-
   public listUnits(request: ListUnitsRequest = {}, init?: ApiRequestInit): Promise<ApiUnitDto[]> {
     const path = "/api/master-data/units";
     return this.request<ApiUnitDto[]>("GET", path, {
@@ -6592,7 +7001,7 @@ export class ExportDocManagerApiClient {
     return this.request<ApiUserReportTemplateDto[]>("GET", path, {
       query: {
         "reportType": request.reportType,
-        "includeInactive": request.includeInactive,
+        "includeArchived": request.includeArchived,
       },
       init,
     });
@@ -6801,10 +7210,37 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public publishEmailTemplate(request: PublishEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
+    const path = `/api/email-templates/${encodePath(request.id)}/publish`;
+    return this.request<ApiEmailTemplateDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public publishUserReportTemplate(request: PublishUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
+    const path = `/api/reports/user-templates/${encodePath(request.id)}/publish`;
+    return this.request<ApiUserReportTemplateDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public purgeCancelledInvoice(request: PurgeCancelledInvoiceRequest, init?: ApiRequestInit): Promise<ApiInvoicePurgeResponse> {
     const path = `/api/system/data-maintenance/invoices/${encodePath(request.id)}/purge`;
     return this.request<ApiInvoicePurgeResponse>("POST", path, {
       body: request.body,
+      init,
+    });
+  }
+
+  public queryCrmContacts(request: QueryCrmContactsRequest, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiCrmContactDto> {
+    const path = `/api/crm/customers/${encodePath(request.customerId)}/contacts`;
+    return this.request<ApiPagedResponseOfApiCrmContactDto>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
       init,
     });
   }
@@ -6848,6 +7284,28 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public querySupplierContacts(request: QuerySupplierContactsRequest, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiSupplierContactDto> {
+    const path = `/api/suppliers/${encodePath(request.supplierId)}/contacts`;
+    return this.request<ApiPagedResponseOfApiSupplierContactDto>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public querySupplierProductLinks(request: QuerySupplierProductLinksRequest, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiSupplierProductLinkDto> {
+    const path = `/api/suppliers/${encodePath(request.supplierId)}/products`;
+    return this.request<ApiPagedResponseOfApiSupplierProductLinkDto>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
   public querySuppliers(request: QuerySuppliersRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiSupplierDto> {
     const path = "/api/suppliers/page";
     return this.request<ApiPagedResponseOfApiSupplierDto>("GET", path, {
@@ -6883,6 +7341,11 @@ export class ExportDocManagerApiClient {
       body: request.body,
       init,
     });
+  }
+
+  public recycleReportTemplateV3ImageResource(request: RecycleReportTemplateV3ImageResourceRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
+    const path = `/api/reports/templates/v3/resources/${encodePath(request.resourceId)}`;
+    return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
   public registerLicense(request: RegisterLicenseRequest, init?: ApiRequestInit): Promise<ApiLicenseRegisterResponse> {
@@ -6935,6 +7398,22 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public restoreCrmCustomer(request: RestoreCrmCustomerRequest, init?: ApiRequestInit): Promise<ApiCrmCustomerDto> {
+    const path = `/api/crm/customers/${encodePath(request.id)}/restore`;
+    return this.request<ApiCrmCustomerDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public restoreCrmFollowUp(request: RestoreCrmFollowUpRequest, init?: ApiRequestInit): Promise<ApiCrmFollowUpDto> {
+    const path = `/api/crm/follow-ups/${encodePath(request.id)}/restore`;
+    return this.request<ApiCrmFollowUpDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public restoreDatabaseBackup(request: RestoreDatabaseBackupRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/backup/restore";
     return this.request<BackgroundJobSnapshot>("POST", path, {
@@ -6951,9 +7430,20 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public restoreEmailTemplate(request: RestoreEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
+    const path = `/api/email-templates/${encodePath(request.id)}/restore`;
+    return this.request<ApiEmailTemplateDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public restoreEmailTemplateVersion(request: RestoreEmailTemplateVersionRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
     const path = `/api/email-templates/${encodePath(request.id)}/versions/${encodePath(request.versionNumber)}/restore`;
-    return this.request<ApiEmailTemplateDto>("POST", path, { init });
+    return this.request<ApiEmailTemplateDto>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public restorePostgreSqlPhysicalBackup(request: RestorePostgreSqlPhysicalBackupRequest, init?: ApiRequestInit): Promise<ApiServerMigrationRestoreResponse> {
@@ -6964,9 +7454,36 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public restoreSupplier(request: RestoreSupplierRequest, init?: ApiRequestInit): Promise<ApiSupplierDto> {
+    const path = `/api/suppliers/${encodePath(request.id)}/restore`;
+    return this.request<ApiSupplierDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public restoreSupplierProductLink(request: RestoreSupplierProductLinkRequest, init?: ApiRequestInit): Promise<ApiSupplierProductLinkDto> {
+    const path = `/api/suppliers/${encodePath(request.supplierId)}/products/${encodePath(request.id)}/restore`;
+    return this.request<ApiSupplierProductLinkDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public restoreUserReportTemplate(request: RestoreUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
+    const path = `/api/reports/user-templates/${encodePath(request.id)}/restore`;
+    return this.request<ApiUserReportTemplateDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public restoreUserReportTemplateVersion(request: RestoreUserReportTemplateVersionRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
     const path = `/api/reports/user-templates/${encodePath(request.id)}/versions/${encodePath(request.versionNumber)}/restore`;
-    return this.request<ApiUserReportTemplateDto>("POST", path, { init });
+    return this.request<ApiUserReportTemplateDto>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public retryJob(request: RetryJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
@@ -7075,6 +7592,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public saveEmailTemplateDraft(request: SaveEmailTemplateDraftRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
+    const path = `/api/email-templates/${encodePath(request.id)}/draft`;
+    return this.request<ApiEmailTemplateDto>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public saveHsCodeKnowledgeExample(request: SaveHsCodeKnowledgeExampleRequest, init?: ApiRequestInit): Promise<HsCodeDeclarationExample> {
     const path = "/api/master-data/hs-knowledge/examples";
     return this.request<HsCodeDeclarationExample>("POST", path, {
@@ -7155,6 +7680,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public saveUserReportTemplateDraft(request: SaveUserReportTemplateDraftRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
+    const path = `/api/reports/user-templates/${encodePath(request.id)}/draft`;
+    return this.request<ApiUserReportTemplateDto>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public searchHsCodeKnowledge(request: SearchHsCodeKnowledgeRequest = {}, init?: ApiRequestInit): Promise<HsCodeKnowledgeSearchResponse> {
     const path = "/api/master-data/hs-knowledge/search";
     return this.request<HsCodeKnowledgeSearchResponse>("GET", path, {
@@ -7187,11 +7720,13 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public searchSupplierProductOptions(request: SearchSupplierProductOptionsRequest = {}, init?: ApiRequestInit): Promise<ApiSupplierProductOptionDto[]> {
+  public searchSupplierProductOptions(request: SearchSupplierProductOptionsRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiSupplierProductOptionDto> {
     const path = "/api/suppliers/product-options";
-    return this.request<ApiSupplierProductOptionDto[]>("GET", path, {
+    return this.request<ApiPagedResponseOfApiSupplierProductOptionDto>("GET", path, {
       query: {
         "keyword": request.keyword,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
       },
       init,
     });
@@ -7213,6 +7748,38 @@ export class ExportDocManagerApiClient {
   public setDefaultReportTemplate(request: SetDefaultReportTemplateRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/reports/templates/default";
     return this.request<ApiCommandResponse>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public setPrimaryCrmContact(request: SetPrimaryCrmContactRequest, init?: ApiRequestInit): Promise<ApiCrmContactDto> {
+    const path = `/api/crm/customers/${encodePath(request.customerId)}/contacts/${encodePath(request.id)}/set-primary`;
+    return this.request<ApiCrmContactDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public setPrimarySupplierContact(request: SetPrimarySupplierContactRequest, init?: ApiRequestInit): Promise<ApiSupplierContactDto> {
+    const path = `/api/suppliers/${encodePath(request.supplierId)}/contacts/${encodePath(request.id)}/set-primary`;
+    return this.request<ApiSupplierContactDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public shareEmailTemplate(request: ShareEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
+    const path = `/api/email-templates/${encodePath(request.id)}/share`;
+    return this.request<ApiEmailTemplateDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public shareUserReportTemplate(request: ShareUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
+    const path = `/api/reports/user-templates/${encodePath(request.id)}/share`;
+    return this.request<ApiUserReportTemplateDto>("POST", path, {
       body: request.body,
       init,
     });
@@ -7379,6 +7946,14 @@ export class ExportDocManagerApiClient {
     return this.request<ApiEmailTestResponse>("POST", path, { init });
   }
 
+  public transferCrmFollowUp(request: TransferCrmFollowUpRequest, init?: ApiRequestInit): Promise<ApiCrmFollowUpDto> {
+    const path = `/api/crm/follow-ups/${encodePath(request.id)}/transfer`;
+    return this.request<ApiCrmFollowUpDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public transferSharedDatabaseOwnership(request: TransferSharedDatabaseOwnershipRequest, init?: ApiRequestInit): Promise<ApiSharedDatabaseOwnershipTransferResponse> {
     const path = "/api/shared-database/ownership/transfer";
     return this.request<ApiSharedDatabaseOwnershipTransferResponse>("POST", path, {
@@ -7390,6 +7965,14 @@ export class ExportDocManagerApiClient {
   public transitionInvoiceStatus(request: TransitionInvoiceStatusRequest, init?: ApiRequestInit): Promise<ApiInvoiceSaveResponse> {
     const path = `/api/invoices/${encodePath(request.id)}/status`;
     return this.request<ApiInvoiceSaveResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public transitionSalesOpportunity(request: TransitionSalesOpportunityRequest, init?: ApiRequestInit): Promise<ApiSalesOpportunityDto> {
+    const path = `/api/crm/opportunities/${encodePath(request.id)}/transition`;
+    return this.request<ApiSalesOpportunityDto>("POST", path, {
       body: request.body,
       init,
     });
@@ -7467,14 +8050,6 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateEmailTemplate(request: UpdateEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
-    const path = `/api/email-templates/${encodePath(request.id)}`;
-    return this.request<ApiEmailTemplateDto>("PUT", path, {
-      body: request.body,
-      init,
-    });
-  }
-
   public updateExporter(request: UpdateExporterRequest, init?: ApiRequestInit): Promise<ApiExporterDto> {
     const path = `/api/master-data/exporters/${encodePath(request.id)}`;
     return this.request<ApiExporterDto>("PUT", path, {
@@ -7494,6 +8069,22 @@ export class ExportDocManagerApiClient {
   public updateInvoice(request: UpdateInvoiceRequest, init?: ApiRequestInit): Promise<ApiInvoiceSaveResponse> {
     const path = `/api/invoices/${encodePath(request.id)}`;
     return this.request<ApiInvoiceSaveResponse>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public updateOrganizationCompany(request: UpdateOrganizationCompanyRequest, init?: ApiRequestInit): Promise<ApiOrganizationCompanyDto> {
+    const path = `/api/organization-directory/companies/${encodePath(request.code)}`;
+    return this.request<ApiOrganizationCompanyDto>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public updateOrganizationDepartment(request: UpdateOrganizationDepartmentRequest, init?: ApiRequestInit): Promise<ApiOrganizationDepartmentDto> {
+    const path = `/api/organization-directory/departments/${encodePath(request.code)}`;
+    return this.request<ApiOrganizationDepartmentDto>("PUT", path, {
       body: request.body,
       init,
     });
@@ -7587,14 +8178,6 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public updateSupplierBatchStatus(request: UpdateSupplierBatchStatusRequest, init?: ApiRequestInit): Promise<ApiSupplierBatchStatusResult> {
-    const path = "/api/suppliers/batch-status";
-    return this.request<ApiSupplierBatchStatusResult>("POST", path, {
-      body: request.body,
-      init,
-    });
-  }
-
   public updateSupplierContact(request: UpdateSupplierContactRequest, init?: ApiRequestInit): Promise<ApiSupplierContactDto> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/contacts/${encodePath(request.id)}`;
     return this.request<ApiSupplierContactDto>("PUT", path, {
@@ -7614,14 +8197,6 @@ export class ExportDocManagerApiClient {
   public updateUnit(request: UpdateUnitRequest, init?: ApiRequestInit): Promise<ApiUnitDto> {
     const path = `/api/master-data/units/${encodePath(request.id)}`;
     return this.request<ApiUnitDto>("PUT", path, {
-      body: request.body,
-      init,
-    });
-  }
-
-  public updateUserReportTemplate(request: UpdateUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
-    const path = `/api/reports/user-templates/${encodePath(request.id)}`;
-    return this.request<ApiUserReportTemplateDto>("PUT", path, {
       body: request.body,
       init,
     });
@@ -7792,7 +8367,12 @@ export class ExportDocManagerApiClient {
 
   public deleteUserAccount(request: DeleteUserAccountRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/users/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
   }
 
   public getCurrentUser(init?: ApiRequestInit): Promise<ApiUserDto> {
