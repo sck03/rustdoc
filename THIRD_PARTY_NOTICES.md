@@ -681,14 +681,14 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | @types/webxr | 0.5.24 | MIT | web |
 | npm | @vitejs/plugin-react | 5.2.0 | MIT | web |
 | npm | axe-core | 4.13.0 | MPL-2.0 | web |
-| npm | baseline-browser-mapping | 2.10.38 | Apache-2.0 | web |
-| npm | browserslist | 4.28.4 | MIT | web |
-| npm | caniuse-lite | 1.0.30001799 | CC-BY-4.0 | web |
+| npm | baseline-browser-mapping | 2.11.21 | Apache-2.0 | web |
+| npm | browserslist | 4.28.9 | MIT | web |
+| npm | caniuse-lite | 1.0.30001810 | CC-BY-4.0 | web |
 | npm | convert-source-map | 2.0.0 | MIT | web |
 | npm | cookie | 1.1.1 | MIT | web |
 | npm | csstype | 3.2.3 | MIT | web |
 | npm | debug | 4.4.3 | MIT | web |
-| npm | electron-to-chromium | 1.5.376 | ISC | web |
+| npm | electron-to-chromium | 1.5.422 | ISC | web |
 | npm | esbuild | 0.28.1 | MIT | web |
 | npm | escalade | 3.2.0 | MIT | web |
 | npm | fdir | 6.5.0 | MIT | web |
@@ -703,7 +703,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | meshoptimizer | 1.1.1 | MIT | web |
 | npm | ms | 2.1.3 | MIT | web |
 | npm | nanoid | 3.3.18 | MIT | web |
-| npm | node-releases | 2.0.48 | MIT | web |
+| npm | node-releases | 2.0.54 | MIT | web |
 | npm | picocolors | 1.1.1 | ISC | web |
 | npm | picomatch | 4.0.5 | MIT | web |
 | npm | pixelmatch | 7.2.0 | ISC | web |
@@ -723,7 +723,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | tinyglobby | 0.2.17 | MIT | web |
 | npm | typescript | 5.9.3 | Apache-2.0 | web |
 | npm | undici-types | 6.21.0 | MIT | web |
-| npm | update-browserslist-db | 1.2.3 | MIT | web |
+| npm | update-browserslist-db | 1.3.2 | MIT | web |
 | npm | vite | 7.3.6 | MIT | web |
 | npm | yallist | 3.1.1 | ISC | web |
 | nuget | bblanchon.PDFium.Linux | 152.0.7961 | Apache-2.0 | ExportDocManager.Api.Tests.csproj, ExportDocManager.Api.csproj, ExportDocManager.ApiClientGenerator.csproj, ExportDocManager.Infrastructure.PdfOcr.csproj, ExportDocManager.Infrastructure.Tests.csproj |

@@ -115,14 +115,14 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | @types/webxr | 0.5.24 | MIT | web |
 | @vitejs/plugin-react | 5.2.0 | MIT | web |
 | axe-core | 4.13.0 | MPL-2.0 | web |
-| baseline-browser-mapping | 2.10.38 | Apache-2.0 | web |
-| browserslist | 4.28.4 | MIT | web |
-| caniuse-lite | 1.0.30001799 | CC-BY-4.0 | web |
+| baseline-browser-mapping | 2.11.21 | Apache-2.0 | web |
+| browserslist | 4.28.9 | MIT | web |
+| caniuse-lite | 1.0.30001810 | CC-BY-4.0 | web |
 | convert-source-map | 2.0.0 | MIT | web |
 | cookie | 1.1.1 | MIT | web |
 | csstype | 3.2.3 | MIT | web |
 | debug | 4.4.3 | MIT | web |
-| electron-to-chromium | 1.5.376 | ISC | web |
+| electron-to-chromium | 1.5.422 | ISC | web |
 | esbuild | 0.28.1 | MIT | web |
 | escalade | 3.2.0 | MIT | web |
 | fdir | 6.5.0 | MIT | web |
@@ -137,7 +137,7 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | meshoptimizer | 1.1.1 | MIT | web |
 | ms | 2.1.3 | MIT | web |
 | nanoid | 3.3.18 | MIT | web |
-| node-releases | 2.0.48 | MIT | web |
+| node-releases | 2.0.54 | MIT | web |
 | picocolors | 1.1.1 | ISC | web |
 | picomatch | 4.0.5 | MIT | web |
 | pixelmatch | 7.2.0 | ISC | web |
@@ -157,7 +157,7 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | tinyglobby | 0.2.17 | MIT | web |
 | typescript | 5.9.3 | Apache-2.0 | web |
 | undici-types | 6.21.0 | MIT | web |
-| update-browserslist-db | 1.2.3 | MIT | web |
+| update-browserslist-db | 1.3.2 | MIT | web |
 | vite | 7.3.6 | MIT | web |
 | yallist | 3.1.1 | ISC | web |
 
