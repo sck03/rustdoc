@@ -23,7 +23,8 @@ const permissionAccessPath = path
 const workspaceDevicePath = path
   .join(repoRoot, "apps", "export-doc-web", "src", "app", "workspaceDevice.ts")
   .replaceAll("\\", "/");
-fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as product from ${JSON.stringify(productEditionPath)}; import * as permission from ${JSON.stringify(permissionAccessPath)}; import * as device from ${JSON.stringify(workspaceDevicePath)}; globalThis.__model = model; globalThis.__product = product; globalThis.__permission = permission; globalThis.__device = device;`, "utf8");
+const schemePath = path.join(repoRoot, "apps/export-doc-web/src/features/settings/permissionSchemeModel.ts").replaceAll("\\", "/");
+fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as product from ${JSON.stringify(productEditionPath)}; import * as permission from ${JSON.stringify(permissionAccessPath)}; import * as device from ${JSON.stringify(workspaceDevicePath)}; import * as scheme from ${JSON.stringify(schemePath)}; globalThis.__model = model; globalThis.__product = product; globalThis.__permission = permission; globalThis.__device = device; globalThis.__scheme = scheme;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -34,6 +35,16 @@ const permission = globalThis.__permission;
 const device = globalThis.__device;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const permissionGrant = (resourceKey, action, dataScope = "own") => ({ resourceKey, action, dataScope });
+const scheme = globalThis.__scheme;
+const savedGrants = [permissionGrant("sales.customers", "view", "department"), permissionGrant("common.product-reference", "view", "all")];
+const originalGrants = JSON.stringify(savedGrants);
+const editableGrants = scheme.getEditableSchemeGrants(savedGrants, new Map([
+  ["sales.customers", { isTechnical: false }], ["common.product-reference", { isTechnical: true }],
+]));
+assert(editableGrants[scheme.grantKey("sales.customers", "view")] === "department", "scheme drafts retain configured business scopes");
+assert(!(scheme.grantKey("common.product-reference", "view") in editableGrants), "copy/save payloads must exclude read-only technical grants");
+assert(JSON.stringify(savedGrants) === originalGrants, "scheme projections must not mutate the server snapshot");
+assert(scheme.grantKey("unknown", "view") in scheme.getEditableSchemeGrants([permissionGrant("unknown", "view")], new Map()), "unknown grants must reach server validation rather than being silently discarded");
 const salesPermissions = [
   permissionGrant("sales.dashboard", "view"),
   permissionGrant("sales.customers", "view"),

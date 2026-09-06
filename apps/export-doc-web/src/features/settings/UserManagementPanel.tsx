@@ -269,7 +269,7 @@ export function UserManagementPanel({
       <div className="section-header">
         <div>
           <h2>账号管理</h2>
-          <p className="section-description">创建和维护登录账号，并通过岗位与权限模板控制界面导航和业务操作。</p>
+          <p className="section-description">创建和维护登录账号，并通过岗位与权限方案控制界面导航和业务操作。</p>
         </div>
         <div className="toolbar-actions">
           <button className="icon-button" type="button" title="刷新用户" aria-label="刷新用户" disabled={isBusy} onClick={() => void refreshUsers()}>
@@ -299,7 +299,7 @@ export function UserManagementPanel({
                 <th>账号</th>
                 <th>姓名</th>
                 <th>角色</th>
-                <th>权限模板</th>
+                <th>权限方案</th>
                 <th>状态</th>
               </tr>
             </thead>
@@ -359,13 +359,13 @@ export function UserManagementPanel({
             <small className="field-help">{selectedRole.description}</small>
           </label>
           <label>
-            <span>权限模板</span>
+            <span>权限方案</span>
             <select
               value={draft.permissionTemplateId ?? ""}
               disabled={isBusy || draft.role.toLowerCase() === "admin"}
               onChange={(event) => patchDraft("permissionTemplateId", Number(event.target.value) || null)}
             >
-              <option value="">按角色默认模板</option>
+              <option value="">按角色默认方案</option>
               {permissionTemplates.map((template) => (
                 <option key={template.id} value={template.id} disabled={!template.isActive && template.id !== draft.permissionTemplateId}>
                   {template.name}{template.isSystem ? "（内置）" : ""}{!template.isActive ? "（已停用）" : ""}
@@ -377,7 +377,7 @@ export function UserManagementPanel({
                 ? "系统管理员固定使用内置管理员权限"
                 : selectedTemplate?.name
                   ? `当前使用：${selectedTemplate.name}`
-                  : "未指定时自动使用该岗位的内置模板"}
+                  : "未指定时自动使用该岗位的内置方案"}
             </small>
           </label>
           <label>
@@ -505,7 +505,7 @@ function getRolePresentation(role?: string) {
   const normalized = role?.trim() || "User";
   return rolePresentation[normalized] ?? {
     label: normalized,
-    description: "使用管理员为该岗位配置的权限模板",
+    description: "使用管理员为该岗位配置的权限方案",
   };
 }
 
