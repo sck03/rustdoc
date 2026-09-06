@@ -1,6 +1,4 @@
 using System.Data;
-using Microsoft.Data.Sqlite;
-using Npgsql;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
@@ -129,7 +127,7 @@ namespace ExportDocManager.Services.Security
                     {
                         throw new BusinessConcurrencyException("该权限模板已被其他管理员修改，请刷新后重试。", exception);
                     }
-                    catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
+                    catch (DbUpdateException exception) when (RelationalExceptionClassifier.IsUniqueConstraintViolation(exception))
                     {
                         throw new ResourceConflictException("权限模板代码已存在。", exception);
                     }
@@ -216,24 +214,6 @@ namespace ExportDocManager.Services.Security
 
         private static string CanonicalKey(string? value) =>
             (value ?? string.Empty).Trim().Normalize(System.Text.NormalizationForm.FormC).ToUpperInvariant();
-
-        private static bool IsUniqueConstraintViolation(Exception exception)
-        {
-            for (Exception? current = exception; current != null; current = current.InnerException)
-            {
-                if (current is PostgresException postgres && postgres.SqlState == PostgresErrorCodes.UniqueViolation)
-                {
-                    return true;
-                }
-
-                if (current is SqliteException sqlite && sqlite.SqliteErrorCode == 19)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
 
         private static string NormalizeCode(string value)
         {

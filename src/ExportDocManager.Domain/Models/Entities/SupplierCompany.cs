@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ExportDocManager.Models.Entities
 {
-    public sealed class SupplierCompany
+    public sealed class SupplierCompany : IBusinessOwnedEntity
     {
         public int Id { get; set; }
         public int? OwnerUserId { get; set; }

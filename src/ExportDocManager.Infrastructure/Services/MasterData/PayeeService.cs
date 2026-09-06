@@ -54,6 +54,7 @@ namespace ExportDocManager.Services.MasterData
                         throw new ResourceNotFoundException("收款对象不存在或不属于当前账号。");
                     }
 
+                    _accessScope.DemandRecordAccess(existing, PermissionModuleCatalog.DocumentMasterData, PermissionAction.Operate);
                     payee.OwnerUserId = existing.OwnerUserId;
                     payee.DepartmentId = existing.DepartmentId;
                     payee.CompanyScope = existing.CompanyScope;
@@ -90,6 +91,7 @@ namespace ExportDocManager.Services.MasterData
                     return false;
                 }
 
+                _accessScope.DemandRecordAccess(entity, PermissionModuleCatalog.DocumentMasterData, PermissionAction.Manage);
                 context.Payees.Remove(entity);
                 await context.SaveChangesAsync(cancellationToken);
                 return true;

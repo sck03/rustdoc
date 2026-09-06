@@ -252,6 +252,7 @@ namespace ExportDocManager.Services.Core
                             throw new ResourceNotFoundException("目标发票已不存在或当前账号无权修改，请刷新后重试。");
                         }
 
+                        _businessDataAccessScope.DemandRecordAccess(existingInvoiceForMutation, PermissionModuleCatalog.DocumentInvoices, PermissionAction.Operate);
                         if (!InvoiceStatusCatalog.IsEditable(existingInvoiceForMutation.Status))
                         {
                             throw new ResourceConflictException("目标发票已锁定，请先反审核回草稿后再导入覆盖或追加明细。");
@@ -333,18 +334,25 @@ namespace ExportDocManager.Services.Core
                 throw new ResourceNotFoundException("未找到要导出的发票。");
             }
 
+            _businessDataAccessScope.DemandRecordAccess(invoice, PermissionResourceCatalog.InvoiceOutput, PermissionAction.ExportZip);
             var items = await context.Items.AsNoTracking().Where(x => x.InvoiceId == invoiceId).ToListAsync(cancellationToken);
 
             Customer? customer = null;
             Exporter? exporter = null;
             if (invoice.CustomerId > 0)
             {
-                customer = await context.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == invoice.CustomerId, cancellationToken);
+                customer = await _businessDataAccessScope.ApplyCustomerScope(context.Customers.AsNoTracking())
+                    .FirstOrDefaultAsync(c => c.Id == invoice.CustomerId, cancellationToken);
+                if (customer == null && await context.Customers.AnyAsync(c => c.Id == invoice.CustomerId, cancellationToken))
+                    throw new PermissionDeniedException("单据包关联的客户不在当前账号的数据范围内。");
             }
 
             if (invoice.ExporterId > 0)
             {
-                exporter = await context.Exporters.AsNoTracking().FirstOrDefaultAsync(e => e.Id == invoice.ExporterId, cancellationToken);
+                exporter = await _businessDataAccessScope.ApplyExporterScope(context.Exporters.AsNoTracking())
+                    .FirstOrDefaultAsync(e => e.Id == invoice.ExporterId, cancellationToken);
+                if (exporter == null && await context.Exporters.AnyAsync(e => e.Id == invoice.ExporterId, cancellationToken))
+                    throw new PermissionDeniedException("单据包关联的出口商不在当前账号的数据范围内。");
             }
 
             return new InvoiceTransferPackage

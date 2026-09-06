@@ -118,6 +118,8 @@ namespace ExportDocManager.Services.Tools
                             .SingleOrDefaultAsync(existingProject => existingProject.Id == project.Id, token)
                             ?? throw new ResourceNotFoundException("要保存的装柜方案不存在，可能已被删除或不属于当前账号。");
 
+                        _accessScope.DemandRecordAccess(targetProject, PermissionModuleCatalog.DocumentContainerPacking, PermissionAction.Operate);
+
                         if (project.VersionNumber <= 0)
                         {
                             throw new ServiceValidationException("装柜方案缺少并发版本，请重新加载后再保存。");
@@ -168,6 +170,7 @@ namespace ExportDocManager.Services.Tools
                 .SingleOrDefaultAsync(item => item.Id == projectId, cancellationToken);
             if (project != null)
             {
+                _accessScope.DemandRecordAccess(project, PermissionModuleCatalog.DocumentContainerPacking, PermissionAction.Manage);
                 context.ContainerProjects.Remove(project);
                 await context.SaveChangesAsync(cancellationToken);
             }

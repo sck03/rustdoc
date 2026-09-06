@@ -4,6 +4,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Errors;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,6 +36,8 @@ namespace ExportDocManager.Services.Core
                             return false;
                         }
 
+                        _businessDataAccessScope.DemandRecordAccess(invoice, PermissionModuleCatalog.DocumentInvoices, PermissionAction.Manage);
+
                         if (!InvoiceStatusCatalog.IsEditable(invoice.Status))
                         {
                             throw new InvoiceConflictException(
@@ -56,7 +59,7 @@ namespace ExportDocManager.Services.Core
             {
                 throw new InvoiceConflictException("删除失败：该发票数据已被其他用户修改或删除，请刷新后重试。");
             }
-            catch (InvoiceConflictException)
+            catch (ServiceException)
             {
                 throw;
             }
@@ -98,6 +101,9 @@ namespace ExportDocManager.Services.Core
                         {
                             throw new DbUpdateConcurrencyException();
                         }
+
+                        _businessDataAccessScope.DemandRecordAccess(invoice, PermissionModuleCatalog.DocumentInvoices,
+                            targetStatus == InvoiceStatusCatalog.Cancelled ? PermissionAction.Manage : PermissionAction.Operate);
 
                         if (!InvoiceStatusCatalog.IsKnown(targetStatus) ||
                             !InvoiceStatusCatalog.CanTransition(invoice.Status, targetStatus))
@@ -169,6 +175,8 @@ namespace ExportDocManager.Services.Core
                         {
                             throw new DbUpdateConcurrencyException();
                         }
+
+                        _businessDataAccessScope.DemandRecordAccess(invoice, PermissionModuleCatalog.DocumentInvoices, PermissionAction.Manage);
 
                         if (InvoiceStatusCatalog.IsCancelled(invoice.Status))
                         {
@@ -252,20 +260,15 @@ namespace ExportDocManager.Services.Core
                     throw new InvoiceValidationException("更新发票必须提交版本号，请刷新后重试。");
                 }
 
-                if (!await _businessDataAccessScope.CanAccessInvoiceAsync(
-                        context,
-                        invoice.Id,
-                        cancellationToken).ConfigureAwait(false))
-                {
-                    throw new PermissionDeniedException("无权限修改该发票。");
-                }
-
-                existingStatus = await _businessDataAccessScope
+                var existing = await _businessDataAccessScope
                     .ApplyInvoiceScope(context.Invoices.AsNoTracking())
-                    .Where(item => item.Id == invoice.Id)
-                    .Select(item => item.Status)
-                    .FirstOrDefaultAsync(cancellationToken)
-                    ?? throw new ResourceNotFoundException("要保存的发票已不存在，请刷新后重试。");
+                    .SingleOrDefaultAsync(item => item.Id == invoice.Id, cancellationToken)
+                    ?? throw new PermissionDeniedException("无权限修改该发票。");
+                _businessDataAccessScope.DemandRecordAccess(existing, PermissionModuleCatalog.DocumentInvoices, PermissionAction.Operate);
+                invoice.OwnerUserId = existing.OwnerUserId;
+                invoice.DepartmentId = existing.DepartmentId;
+                invoice.CompanyScope = existing.CompanyScope;
+                existingStatus = existing.Status;
                 if (!InvoiceStatusCatalog.IsEditable(existingStatus))
                 {
                     throw new InvoiceConflictException("当前发票已锁定，请先反审核后再编辑。");

@@ -57,7 +57,7 @@ namespace ExportDocManager.Services.Infrastructure
                 DetailText = "系统正在准备导出数据。"
             });
 
-            int totalCount = await _queryReadRepository.CountAsync(query, cancellationToken);
+            int totalCount = await _queryReadRepository.CountExportAsync(query, cancellationToken);
             if (totalCount > MaximumExportRows)
             {
                 throw new ServiceValidationException(

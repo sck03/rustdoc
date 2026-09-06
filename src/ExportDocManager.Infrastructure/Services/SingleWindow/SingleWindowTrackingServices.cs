@@ -7,9 +7,7 @@ using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Time;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace ExportDocManager.Services.SingleWindow
 {
@@ -300,22 +298,9 @@ namespace ExportDocManager.Services.SingleWindow
             return $"{prefix}-{versionText}-{_clock.UtcNow:yyyyMMddHHmmss}-{guidPart}".ToUpperInvariant();
         }
 
-        private static bool IsReservationConcurrencyConflict(Exception exception)
-        {
-            if (exception is PostgresException postgres && postgres.SqlState is "40001" or "23505")
-            {
-                return true;
-            }
-
-            if (exception is SqliteException sqlite && sqlite.SqliteErrorCode is 5 or 19)
-            {
-                return true;
-            }
-
-            return exception is DbUpdateException updateException &&
-                   updateException.InnerException != null &&
-                   IsReservationConcurrencyConflict(updateException.InnerException);
-        }
+        private static bool IsReservationConcurrencyConflict(Exception exception) =>
+            RelationalExceptionClassifier.IsWriteContention(exception) ||
+            RelationalExceptionClassifier.IsUniqueConstraintViolation(exception);
 
         private static string Truncate(string value, int maxLength)
         {

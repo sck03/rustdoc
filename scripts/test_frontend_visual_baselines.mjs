@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
 import { captureScreenshot, createPageSession, evaluate, getFreePort, startChrome } from "./lib/web-runtime-browser-session.mjs";
+import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const webRoot = path.join(repositoryRoot, "apps", "export-doc-web");
@@ -16,7 +17,7 @@ const outputRoot = path.join(repositoryRoot, "artifacts", "frontend-visual-basel
 const approvedRoot = path.join(webRoot, "visual-baselines", "approved");
 const diffRoot = path.join(outputRoot, "diffs");
 const profileRoot = path.join(repositoryRoot, ".codex-runtime", "visual-baseline-chrome");
-const browserExecutable = path.join(repositoryRoot, "Browsers", "ChromeForTesting", "win64", "ChromeHeadlessShell", "chrome-headless-shell-win64", "chrome-headless-shell.exe");
+const browserExecutable = locateChromeForTesting(repositoryRoot, "headless-shell");
 const axeSource = readFileSync(path.join(webRoot, "node_modules", "axe-core", "axe.min.js"), "utf8");
 const updateApprovedBaselines = process.env.UPDATE_FRONTEND_VISUAL_BASELINES === "1";
 // Headless Chromium can shift sub-pixel glyph and one-pixel border rasterization between
@@ -384,6 +385,31 @@ try {
           return { mobileNavigationInteractionPassed: opened && closed };
         })()`, true);
         mobileNavigationInteractionValue = mobileNavigationInteraction.value ?? { mobileNavigationInteractionPassed: false };
+      }
+      if (pageName === "dialog") {
+        const keyboard = await evaluate(page, `(() => {
+          const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+          const buttons = [...dialog.querySelectorAll('button:not(:disabled)')];
+          const hidden = document.createElement('button');
+          hidden.hidden = true;
+          dialog.append(hidden);
+          buttons.at(-1).focus();
+          const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+          document.activeElement.dispatchEvent(tab);
+          const wrapped = tab.defaultPrevented && document.activeElement === buttons[0];
+          hidden.remove();
+          buttons.forEach(button => { button.disabled = true; });
+          dialog.focus();
+          const emptyTab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+          dialog.dispatchEvent(emptyTab);
+          const emptyTrapped = emptyTab.defaultPrevented && document.activeElement === dialog;
+          buttons.forEach(button => { button.disabled = false; });
+          document.activeElement.blur();
+          return { wrapped, emptyTrapped };
+        })()`, true);
+        if (!keyboard.value?.wrapped || !keyboard.value?.emptyTrapped) {
+          throw new Error(`Dialog keyboard regression at ${viewport.name}: ${JSON.stringify(keyboard.value)}`);
+        }
       }
       const screenshotPath = path.join(outputRoot, `${pageName}-${viewport.name}.png`);
       await captureScreenshot(page, screenshotPath, { captureBeyondViewport: false });

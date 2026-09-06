@@ -38,6 +38,8 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
+                    await DemandReportOutputAccessAsync(context.RequestServices, ReportDocumentType.ExportDocument,
+                        [invoiceId], PermissionAction.Preview, cancellationToken);
                     var result = await reportHtmlService.RenderInvoiceReportAsync(
                         invoiceId,
                         reportType,
@@ -107,6 +109,8 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     var invoice = ApiInvoiceDtoFactory.ToInvoiceForSave(request.Invoice);
+                    if (invoice.Id > 0) await DemandReportOutputAccessAsync(context.RequestServices, ReportDocumentType.ExportDocument,
+                        [invoice.Id], PermissionAction.Preview, cancellationToken);
                     var result = await reportHtmlService.RenderInvoiceReportDraftAsync(
                         invoice,
                         reportType,
@@ -169,6 +173,8 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
+                    await DemandReportOutputAccessAsync(context.RequestServices, ReportDocumentType.ExportDocument,
+                        [invoiceId], PermissionAction.Preview, cancellationToken);
                     var previews = new List<ApiInvoiceDocumentPackagePreviewItemResponse>();
                     foreach (var item in normalizedItems)
                     {
@@ -242,6 +248,8 @@ namespace ExportDocManager.Api.Hosting
                 try
                 {
                     var payment = ApiPaymentDtoFactory.ToPaymentForSave(request.Payment);
+                    if (payment.Id > 0) await DemandReportOutputAccessAsync(context.RequestServices, ReportDocumentType.PaymentVoucher,
+                        [payment.Id], PermissionAction.Preview, cancellationToken);
                     var result = await reportHtmlService.RenderPaymentVoucherDraftAsync(
                         payment,
                         request.TemplatePath,
@@ -296,6 +304,8 @@ namespace ExportDocManager.Api.Hosting
 
                 try
                 {
+                    await DemandReportOutputAccessAsync(context.RequestServices, ReportDocumentType.PaymentVoucher,
+                        [paymentId], PermissionAction.Preview, cancellationToken);
                     var result = await reportHtmlService.RenderPaymentVoucherAsync(
                         paymentId,
                         request.TemplatePath,

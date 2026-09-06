@@ -156,6 +156,8 @@ namespace ExportDocManager.Api.Hosting
                 requestedBy,
                 async (provider, jobContext) =>
                 {
+                    await DemandReportOutputAccessAsync(provider, ReportDocumentType.ExportDocument,
+                        [invoiceId], PermissionAction.ExportPdf, jobContext.CancellationToken);
                     jobContext.Report(
                         15,
                         "正在渲染报表 HTML",

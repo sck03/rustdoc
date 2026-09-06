@@ -6,7 +6,7 @@ namespace ExportDocManager.Models.Entities
     /// Represents a customer entity.
     /// 代表一个客户实体。
     /// </summary>
-    public class Customer
+    public class Customer : IBusinessOwnedEntity
     {
         public int Id { get; set; }
         public int? OwnerUserId { get; set; }

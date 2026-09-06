@@ -7,7 +7,7 @@ namespace ExportDocManager.Models.Entities
     /// File-based built-in templates remain available for desktop editions;
     /// this entity is the authoritative store for user-created web/container templates.
     /// </summary>
-    public sealed class UserReportTemplate
+    public sealed class UserReportTemplate : ISharedBusinessTemplate
     {
         public int Id { get; set; }
 

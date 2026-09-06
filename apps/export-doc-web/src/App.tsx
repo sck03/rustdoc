@@ -28,7 +28,7 @@ import {
   type WebSessionState,
   writeStoredSession,
 } from "./app/webSessionStorage.ts";
-import { openSessionChannel, type SessionChannelMessage } from "./app/sessionChannel.ts";
+import { isCurrentSession, openSessionChannel, shouldAcceptSessionUpdate, type SessionChannelMessage } from "./app/sessionChannel.ts";
 import { useBusinessDateSessionRefresh } from "./app/useBusinessDateSessionRefresh.ts";
 import { prefetchLandingDashboard } from "./app/loginPrefetch.ts";
 import { isDashboardRoute, isAdminOnlyRoute, isDesktopOnlyRoute, isFullEditionOnlyRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
@@ -52,7 +52,7 @@ function App() {
   const [username, setUsername] = useState(() => isDesktopBridgeAvailable() ? "admin" : "");
   const [password, setPassword] = useState("");
   const [bootstrapToken, setBootstrapToken] = useState("");
-  const [session, setSession] = useState<SessionState | null>(() => readStoredSession());
+  const [session, setSessionState] = useState<SessionState | null>(() => readStoredSession());
   const [loginState, setLoginState] = useState<LoadState>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [workspaceNotice, setWorkspaceNotice] = useState<WorkspaceNotice | null>(null);
@@ -67,9 +67,21 @@ function App() {
   const hasUnsavedChanges = useHasUnsavedChanges();
   const sessionChannelRef = useRef<ReturnType<typeof openSessionChannel>>(null);
   const sessionRef = useRef<SessionState | null>(session);
+  const sessionActionRef = useRef<symbol | null>(null);
   const apiBaseUrlRef = useRef(apiBaseUrl);
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
-  sessionRef.current = session;
+  const setSession = useCallback((nextSession: SessionState | null) => {
+    sessionRef.current = nextSession;
+    setSessionState(nextSession);
+    if (nextSession) writeStoredSession(nextSession);
+    else clearStoredSession();
+  }, []);
+  const resetSessionAttention = useCallback((state: "expired" | null = null) => {
+    setSessionAttentionState(state);
+    setSessionActionError(null);
+    setSessionActionBusy(false);
+    setReauthPassword("");
+  }, []);
   apiBaseUrlRef.current = apiBaseUrl;
   hasUnsavedChangesRef.current = hasUnsavedChanges;
   const isDesktopRuntime = isDesktopBridgeAvailable();
@@ -127,42 +139,37 @@ function App() {
   }, [confirmDiscardChanges, isDesktopRuntime]);
 
   const endSession = useCallback((reason: string | null, broadcast = true) => {
-    const currentApiBaseUrl = sessionRef.current?.apiBaseUrl ?? apiBaseUrlRef.current;
+    const previousSession = sessionRef.current;
+    sessionActionRef.current = null;
     setSession(null);
     setMessage(reason);
     setWorkspaceNotice(null);
-    setSessionAttentionState(null);
-    setSessionActionError(null);
-    setSessionActionBusy(false);
-    setReauthPassword("");
+    resetSessionAttention();
     setLoginState("idle");
-    clearStoredSession();
     queryClient.clear();
-    if (broadcast) {
-      sessionChannelRef.current?.post({ type: "session-cleared", apiBaseUrl: currentApiBaseUrl });
+    if (broadcast && previousSession) {
+      sessionChannelRef.current?.post({ type: "session-cleared", apiBaseUrl: previousSession.apiBaseUrl, accessToken: previousSession.accessToken });
     }
     navigate("/", { replace: true });
-  }, [navigate, queryClient]);
+  }, [navigate, queryClient, resetSessionAttention, setSession]);
 
   const expireSession = useCallback((reason: string) => {
     const currentSession = sessionRef.current;
     if (currentSession && hasUnsavedChangesRef.current) {
       clearStoredSession();
       setWorkspaceNotice(null);
-      setSessionAttentionState("expired");
-      setSessionActionError(null);
-      setSessionActionBusy(false);
-      setReauthPassword("");
+      resetSessionAttention("expired");
       sessionChannelRef.current?.post({
         type: "session-expired",
         apiBaseUrl: currentSession.apiBaseUrl,
+        accessToken: currentSession.accessToken,
         reason,
       });
       return;
     }
 
     endSession(reason);
-  }, [endSession]);
+  }, [endSession, resetSessionAttention]);
 
   useEffect(() => {
     const channel = openSessionChannel((event: SessionChannelMessage) => {
@@ -175,21 +182,23 @@ function App() {
       }
 
       if (event.type === "session-updated") {
+        const previousSession = sessionRef.current;
+        if (!shouldAcceptSessionUpdate(previousSession, event)) return;
+        sessionActionRef.current = null;
         setSession(event.session);
-        writeStoredSession(event.session);
-        setSessionAttentionState(null);
-        setSessionActionError(null);
-        queryClient.clear();
-        navigate(getDefaultWorkspaceRoute(event.session.user.capabilities), { replace: true });
+        resetSessionAttention();
+        if (!previousSession || JSON.stringify(previousSession.user.capabilities) !== JSON.stringify(event.session.user.capabilities)) {
+          queryClient.clear();
+        }
+        if (!previousSession) navigate(getDefaultWorkspaceRoute(event.session.user.capabilities), { replace: true });
         return;
       }
 
+      if (event.accessToken !== sessionRef.current?.accessToken) return;
+
       if (event.type === "session-expired" && sessionRef.current && hasUnsavedChangesRef.current) {
         clearStoredSession();
-        setSessionAttentionState("expired");
-        setSessionActionError(null);
-        setSessionActionBusy(false);
-        setReauthPassword("");
+        resetSessionAttention("expired");
         return;
       }
 
@@ -207,7 +216,7 @@ function App() {
         sessionChannelRef.current = null;
       }
     };
-  }, [endSession, navigate, queryClient]);
+  }, [endSession, navigate, queryClient, resetSessionAttention, setSession]);
 
   const client = useMemo(
     () =>
@@ -238,7 +247,6 @@ function App() {
         if (nextApiBaseUrl) {
           setApiBaseUrl(nextApiBaseUrl);
           if (sessionRef.current && sessionRef.current.apiBaseUrl !== nextApiBaseUrl) {
-            clearStoredSession();
             queryClient.clear();
             setSession(null);
           }
@@ -264,7 +272,7 @@ function App() {
     return () => {
       isStale = true;
     };
-  }, [queryClient]);
+  }, [queryClient, setSession]);
 
   useEffect(() => {
     if (session) {
@@ -394,6 +402,10 @@ function App() {
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (sessionActionRef.current) return;
+    const action = Symbol();
+    sessionActionRef.current = action;
+    const previousSession = sessionRef.current;
     setLoginState("loading");
     setMessage(null);
 
@@ -412,6 +424,7 @@ function App() {
           ? { "X-ExportDocManager-Bootstrap-Token": bootstrapToken.trim() }
           : undefined,
       });
+      if (sessionActionRef.current !== action || !isCurrentSession(sessionRef.current, previousSession)) return;
       const nextSession: SessionState = {
         accessToken: response.accessToken,
         expiresAt: response.expiresAt,
@@ -421,17 +434,13 @@ function App() {
       const defaultRoute = getDefaultWorkspaceRoute(response.user.capabilities);
       setSession(nextSession);
       setWorkspaceNotice(null);
-      setSessionAttentionState(null);
-      setSessionActionError(null);
-      writeStoredSession(nextSession);
-      sessionChannelRef.current?.post({ type: "session-updated", session: nextSession });
+      resetSessionAttention();
+      sessionChannelRef.current?.post({ type: "session-updated", session: nextSession, previousAccessToken: null });
       setPassword("");
       setBootstrapToken("");
       queryClient.clear();
       setLoginState("ready");
-      // Prefetch the dashboard data in parallel with route navigation so the
-      // landing page renders with data already cached instead of waiting for
-      // the lazy chunk to load before the first query can even start.
+      // Warm the landing page query while its route chunk loads.
       if (defaultRoute === "/dashboard" || defaultRoute === "/crm/dashboard") {
         prefetchLandingDashboard({
           queryClient,
@@ -445,8 +454,11 @@ function App() {
       }
       navigate(defaultRoute, { replace: true });
     } catch (error) {
+      if (sessionActionRef.current !== action || !isCurrentSession(sessionRef.current, previousSession)) return;
       setLoginState("error");
       setMessage(readApiError(error));
+    } finally {
+      if (sessionActionRef.current === action) sessionActionRef.current = null;
     }
   }
 
@@ -462,57 +474,47 @@ function App() {
     endSession(null);
   }
 
-  async function handleRenewSession() {
-    if (!session || sessionActionBusy) return;
+  async function handleRefreshSession(reauthenticate = false) {
+    const previousSession = sessionRef.current;
+    if (!previousSession || sessionActionRef.current || (reauthenticate && !reauthPassword)) return;
+    const action = Symbol();
+    sessionActionRef.current = action;
     setSessionActionBusy(true);
     setSessionActionError(null);
     try {
-      const response = await client.renewSession();
+      const response = reauthenticate
+        ? await createExportDocManagerApiClient({
+          baseUrl: previousSession.apiBaseUrl,
+          desktopAccessToken: () => desktopAccessToken,
+        }).login({ body: { username: previousSession.user.username, password: reauthPassword } })
+        : await client.renewSession();
+      if (sessionActionRef.current !== action || !isCurrentSession(sessionRef.current, previousSession)) return;
+      if (response.user.id !== previousSession.user.id) {
+        throw new Error("账号身份已变化，请放弃当前草稿后重新登录。");
+      }
       const nextSession: SessionState = {
         accessToken: response.accessToken,
         expiresAt: response.expiresAt,
-        apiBaseUrl: session.apiBaseUrl,
+        apiBaseUrl: previousSession.apiBaseUrl,
         user: response.user,
       };
+      if (JSON.stringify(previousSession.user.capabilities) !== JSON.stringify(nextSession.user.capabilities)) {
+        queryClient.clear();
+      }
       setSession(nextSession);
-      writeStoredSession(nextSession);
-      sessionChannelRef.current?.post({ type: "session-updated", session: nextSession });
-      setSessionAttentionState(null);
-      setReauthPassword("");
-    } catch (error) {
-      setSessionActionError(readApiError(error));
-    } finally {
-      setSessionActionBusy(false);
-    }
-  }
-
-  async function handleReauthenticate() {
-    if (!session || sessionActionBusy || !reauthPassword) return;
-    setSessionActionBusy(true);
-    setSessionActionError(null);
-    const loginClient = createExportDocManagerApiClient({
-      baseUrl: session.apiBaseUrl,
-      desktopAccessToken: () => desktopAccessToken,
-    });
-    try {
-      const response = await loginClient.login({
-        body: { username: session.user.username, password: reauthPassword },
+      sessionChannelRef.current?.post({
+        type: "session-updated", session: nextSession, previousAccessToken: previousSession.accessToken,
       });
-      const nextSession: SessionState = {
-        accessToken: response.accessToken,
-        expiresAt: response.expiresAt,
-        apiBaseUrl: session.apiBaseUrl,
-        user: response.user,
-      };
-      setSession(nextSession);
-      writeStoredSession(nextSession);
-      sessionChannelRef.current?.post({ type: "session-updated", session: nextSession });
-      setSessionAttentionState(null);
-      setReauthPassword("");
+      resetSessionAttention();
     } catch (error) {
-      setSessionActionError(readApiError(error));
+      if (sessionActionRef.current === action && isCurrentSession(sessionRef.current, previousSession)) {
+        setSessionActionError(readApiError(error));
+      }
     } finally {
-      setSessionActionBusy(false);
+      if (sessionActionRef.current === action) {
+        sessionActionRef.current = null;
+        setSessionActionBusy(false);
+      }
     }
   }
 
@@ -573,8 +575,8 @@ function App() {
         password: reauthPassword,
         errorMessage: sessionActionError,
         onPasswordChange: setReauthPassword,
-        onContinue: () => { void handleRenewSession(); },
-        onReauthenticate: () => { void handleReauthenticate(); },
+        onContinue: () => { void handleRefreshSession(); },
+        onReauthenticate: () => { void handleRefreshSession(true); },
         onDiscardAndLogout: () => { void handleDiscardExpiredDraftAndLogout(); },
       }
     : null;

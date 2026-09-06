@@ -31,7 +31,7 @@ namespace ExportDocManager.Services.Infrastructure
             QueryPageQuery query,
             CancellationToken cancellationToken = default);
 
-        Task<int> CountAsync(
+        Task<int> CountExportAsync(
             QueryPageQuery query,
             CancellationToken cancellationToken = default);
 

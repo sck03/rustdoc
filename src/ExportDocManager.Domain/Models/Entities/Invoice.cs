@@ -10,7 +10,7 @@ namespace ExportDocManager.Models.Entities
     /// Represents an invoice entity.
     /// 代表一个发票实体。
     /// </summary>
-    public class Invoice
+    public class Invoice : IBusinessOwnedEntity
     {
         public int Id { get; set; }
         public int? OwnerUserId { get; set; }

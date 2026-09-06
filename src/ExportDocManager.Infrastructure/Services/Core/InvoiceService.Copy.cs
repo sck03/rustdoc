@@ -6,6 +6,7 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
+using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -36,6 +37,7 @@ namespace ExportDocManager.Services.Core
                             return null;
                         }
 
+                        _businessDataAccessScope.DemandRecordAccess(originalInvoice, PermissionModuleCatalog.DocumentInvoices, PermissionAction.Operate);
                         var newInvoice = CreateInvoiceClone(originalInvoice, newInvoiceNo, cloneOptions);
                         newInvoice.OwnerUserId = null;
                         _businessDataAccessScope.ApplyOwner(newInvoice);
@@ -58,6 +60,14 @@ namespace ExportDocManager.Services.Core
                         return newInvoice;
                     },
                     cancellationToken);
+            }
+            catch (DbUpdateException ex) when (RelationalExceptionClassifier.IsUniqueConstraintViolation(ex))
+            {
+                throw new InvoiceConflictException("同一公司范围内的发票号和类型已存在，请使用其他单号。");
+            }
+            catch (ServiceException)
+            {
+                throw;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -91,6 +101,7 @@ namespace ExportDocManager.Services.Core
                             return null;
                         }
 
+                        _businessDataAccessScope.DemandRecordAccess(originalInvoice, PermissionModuleCatalog.DocumentInvoices, PermissionAction.Operate);
                         if (string.Equals(originalInvoice.Type?.Trim(), normalizedTargetType, StringComparison.Ordinal))
                         {
                             throw new ServiceValidationException("目标发票类型必须与源发票类型不同。");
@@ -135,6 +146,10 @@ namespace ExportDocManager.Services.Core
                         return newInvoice;
                     },
                     cancellationToken);
+            }
+            catch (DbUpdateException ex) when (RelationalExceptionClassifier.IsUniqueConstraintViolation(ex))
+            {
+                throw new InvoiceConflictException("同一公司范围内的发票号和类型已存在，请使用其他单号。");
             }
             catch (ServiceException)
             {

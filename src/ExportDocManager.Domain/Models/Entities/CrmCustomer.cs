@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ExportDocManager.Models.Entities
 {
-    public sealed class CrmCustomer
+    public sealed class CrmCustomer : IBusinessOwnedEntity
     {
         public int Id { get; set; }
         public int? LinkedDocumentCustomerId { get; set; }
@@ -35,7 +35,7 @@ namespace ExportDocManager.Models.Entities
         [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
     }
 
-    public sealed class CrmFollowUp
+    public sealed class CrmFollowUp : IBusinessOwnedEntity
     {
         public int Id { get; set; }
         public int CrmCustomerId { get; set; }

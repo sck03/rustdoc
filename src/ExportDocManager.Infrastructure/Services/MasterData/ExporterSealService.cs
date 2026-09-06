@@ -53,6 +53,7 @@ namespace ExportDocManager.Services.MasterData
                 throw new ResourceNotFoundException("出口商不存在。");
             }
 
+            _accessScope.DemandRecordAccess(exporter, PermissionModuleCatalog.DocumentMasterData, PermissionAction.Operate);
             string sealRoot = GetExporterSealRoot(exporterId, createDirectory: true);
             string prefix = sealKind == ExporterSealKind.Document ? "document" : "customs";
             string managedPath = Path.Combine(sealRoot, $"{prefix}-{Guid.NewGuid():N}{imageExtension}");

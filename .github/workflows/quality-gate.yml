@@ -116,6 +116,7 @@ jobs:
           npm --prefix apps/export-doc-web run test:business-status-model
           npm --prefix apps/export-doc-web run test:service-availability-model
           npm --prefix apps/export-doc-web run test:session-expiry-model
+          npm --prefix apps/export-doc-web run test:session-channel
           npm --prefix apps/export-doc-web run test:invoice-text-normalization
           npm --prefix apps/export-doc-web run test:invoice-list-models
           npm --prefix apps/export-doc-web run test:settings-models

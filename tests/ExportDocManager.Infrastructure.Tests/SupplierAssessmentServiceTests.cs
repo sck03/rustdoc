@@ -12,7 +12,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task Overview_WhenPostgreSqlRegularUser_ShouldOnlyAggregateOwnedSuppliers()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             using (var context = factory.CreateDbContext())
             {
                 var owned = new SupplierCompany
@@ -92,26 +92,6 @@ namespace ExportDocManager.Infrastructure.Tests
             PostgreSqlUsername = "test_user"
         };
 
-        private sealed class FixedCurrentUserContext : ICurrentUserContext
-        {
-            public FixedCurrentUserContext(User currentUser) => CurrentUser = currentUser;
-            public User CurrentUser { get; }
-        }
 
-        private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-        {
-            private readonly DbContextOptions<AppDbContext> _options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                .Options;
-
-            public AppDbContext CreateDbContext() => new(_options);
-            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
-                Task.FromResult(CreateDbContext());
-            public void Dispose()
-            {
-                using var context = CreateDbContext();
-                context.Database.EnsureDeleted();
-            }
-        }
     }
 }

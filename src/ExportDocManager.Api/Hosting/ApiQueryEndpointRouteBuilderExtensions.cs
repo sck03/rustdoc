@@ -2,6 +2,7 @@ using System.Globalization;
 using ExportDocManager.Models.DTOs;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Time;
+using ExportDocManager.Services.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
@@ -93,6 +94,7 @@ namespace ExportDocManager.Api.Hosting
                     destinationPath));
             })
             .WithName("SaveQueriedInvoicesToPath")
+            .WithApiCapability(PermissionModuleCatalog.DocumentQuery, PermissionAction.Operate)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
@@ -123,6 +125,7 @@ namespace ExportDocManager.Api.Hosting
                     destinationPath));
             })
             .WithName("DownloadQueriedInvoices")
+            .WithApiCapability(PermissionModuleCatalog.DocumentQuery, PermissionAction.Operate)
             .Produces<BackgroundJobSnapshot>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized);

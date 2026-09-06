@@ -12,7 +12,7 @@ public sealed class ReportEntityLoaderScopeTests
     [Fact]
     public async Task PaymentVoucher_WhenPayeeIsOutsidePaymentScope_ShouldFailClosed()
     {
-        await using var factory = new TestDbContextFactory();
+        await using var factory = new InMemoryTestDatabase();
         int paymentId;
         await using (var context = await factory.CreateDbContextAsync())
         {
@@ -69,27 +69,5 @@ public sealed class ReportEntityLoaderScopeTests
         PostgreSqlUsername = "test_user"
     };
 
-    private sealed class FixedCurrentUserContext(User user) : ICurrentUserContext
-    {
-        public User CurrentUser { get; } = user;
-    }
 
-    private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IAsyncDisposable
-    {
-        private readonly DbContextOptions<AppDbContext> _options =
-            new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                .Options;
-
-        public AppDbContext CreateDbContext() => new(_options);
-
-        public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(CreateDbContext());
-
-        public async ValueTask DisposeAsync()
-        {
-            await using var context = CreateDbContext();
-            await context.Database.EnsureDeletedAsync();
-        }
-    }
 }

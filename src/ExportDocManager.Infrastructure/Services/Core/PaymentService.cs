@@ -35,20 +35,24 @@ namespace ExportDocManager.Services.Core
             await using var context = await _contextFactory
                 .CreateDbContextAsync(cancellationToken)
                 .ConfigureAwait(false);
+            if (payment.PayeeId > 0 && !await _businessDataAccessScope.ApplyPayeeScope(context.Payees.AsNoTracking())
+                .AnyAsync(item => item.Id == payment.PayeeId, cancellationToken))
+            {
+                throw new PermissionDeniedException("收款对象不存在或不在当前账号的数据范围内。");
+            }
             if (payment.Id == 0)
             {
                 context.Payments.Add(payment);
             }
             else
             {
-                if (!await _businessDataAccessScope.CanAccessPaymentAsync(
-                        context,
-                        payment.Id,
-                        cancellationToken).ConfigureAwait(false))
-                {
-                    throw new PermissionDeniedException("无权限修改该付款记录。");
-                }
-
+                var existing = await _businessDataAccessScope.ApplyPaymentScope(context.Payments.AsNoTracking())
+                    .SingleOrDefaultAsync(item => item.Id == payment.Id, cancellationToken)
+                    ?? throw new PermissionDeniedException("无权限修改该付款记录。");
+                _businessDataAccessScope.DemandRecordAccess(existing, PermissionModuleCatalog.DocumentPayments, PermissionAction.Operate);
+                payment.OwnerUserId = existing.OwnerUserId;
+                payment.DepartmentId = existing.DepartmentId;
+                payment.CompanyScope = existing.CompanyScope;
                 context.Payments.Update(payment);
             }
             try
@@ -80,6 +84,7 @@ namespace ExportDocManager.Services.Core
                 return false;
             }
 
+            _businessDataAccessScope.DemandRecordAccess(entity, PermissionModuleCatalog.DocumentPayments, PermissionAction.Manage);
             context.Payments.Remove(entity);
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return true;

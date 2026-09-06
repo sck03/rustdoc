@@ -13,7 +13,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task Lifecycle_ShouldProtectSharedContentAndRequireExpectedVersion()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             int sharedId;
             using (var seedContext = factory.CreateDbContext())
             {
@@ -110,7 +110,7 @@ namespace ExportDocManager.Infrastructure.Tests
             string reportType,
             string content)
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             var service = CreateService(factory, CreateTemplateUser(7));
 
             await Assert.ThrowsAsync<ArgumentException>(() => service.SaveDraftAsync(
@@ -125,7 +125,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [InlineData("<style>@import url('https://example.com/style.css');</style>")]
         public async Task SaveDraft_ShouldRejectUnsafeBrowserContent(string unsafeContent)
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             var service = CreateService(factory, CreateTemplateUser(7));
 
             await Assert.ThrowsAsync<ArgumentException>(() => service.SaveDraftAsync(
@@ -139,7 +139,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task SharedTemplates_ShouldRespectDepartmentCompanyAndPublishedStatus()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             using (var seed = factory.CreateDbContext())
             {
                 seed.UserReportTemplates.AddRange(
@@ -171,7 +171,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task Clone_ShouldUseVisibleServerSourceAndKeepDesignPermissionIndependent()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             int sharedId;
             int privateId;
             using (var seed = factory.CreateDbContext())
@@ -238,7 +238,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 CompanyScope = companyScope
             };
 
-        private static UserReportTemplateService CreateService(TestDbContextFactory factory, User user) =>
+        private static UserReportTemplateService CreateService(SqliteTestDatabase factory, User user) =>
             new(
                 factory,
                 new BusinessDataAccessScope(
@@ -290,32 +290,6 @@ namespace ExportDocManager.Infrastructure.Tests
             PostgreSqlUsername = "test"
         };
 
-        private sealed class FixedCurrentUserContext(User currentUser) : ICurrentUserContext
-        {
-            public User CurrentUser { get; } = currentUser;
-        }
 
-        private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-        {
-            private readonly SqliteConnection _connection = new("Data Source=:memory:");
-            private readonly DbContextOptions<AppDbContext> _options;
-
-            public TestDbContextFactory()
-            {
-                _connection.Open();
-                _options = new DbContextOptionsBuilder<AppDbContext>()
-                    .UseSqlite(_connection)
-                    .Options;
-                using var context = CreateDbContext();
-                context.Database.EnsureCreated();
-            }
-
-            public AppDbContext CreateDbContext() => new(_options);
-
-            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
-                Task.FromResult(CreateDbContext());
-
-            public void Dispose() => _connection.Dispose();
-        }
     }
 }

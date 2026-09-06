@@ -9,7 +9,7 @@ namespace ExportDocManager.DataAccess
             Contains(exception, current =>
                 current is PostgresException postgres &&
                     postgres.SqlState == PostgresErrorCodes.UniqueViolation ||
-                current is SqliteException sqlite && sqlite.SqliteErrorCode == 19);
+                current is SqliteException sqlite && sqlite.SqliteExtendedErrorCode is 1555 or 2067);
 
         public static bool IsWriteContention(Exception exception) =>
             Contains(exception, current =>

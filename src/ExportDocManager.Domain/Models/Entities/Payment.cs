@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ExportDocManager.Models.Entities
 {
-    public class Payment
+    public class Payment : IBusinessOwnedEntity
     {
         public int Id { get; set; }
         public int? OwnerUserId { get; set; }

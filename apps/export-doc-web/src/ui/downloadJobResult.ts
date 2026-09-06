@@ -29,7 +29,8 @@ export async function waitForJobCompletion(
   acceptedJob: BackgroundJobSnapshot,
   options: BackgroundJobWaitOptions = {},
 ) {
-  const timeoutMs = options.timeoutMs ?? 180_000;
+  const requestedTimeout = options.timeoutMs ?? 180_000;
+  const timeoutMs = Number.isFinite(requestedTimeout) ? Math.max(0, Math.min(2_147_483_647, requestedTimeout)) : 180_000;
   const requestedPollInterval = options.pollIntervalMs ?? 1_000;
   const initialPollIntervalMs = Number.isFinite(requestedPollInterval)
     ? Math.min(30_000, Math.max(500, requestedPollInterval))
@@ -39,33 +40,44 @@ export async function waitForJobCompletion(
     ? Math.min(30_000, Math.max(initialPollIntervalMs, requestedMaximumPollInterval))
     : Math.max(initialPollIntervalMs, 5_000);
   const signal = options.signal;
-  const startedAt = Date.now();
+  const deadline = performance.now() + timeoutMs;
+  const remainingTime = () => Math.max(0, deadline - performance.now());
+  const timeoutError = () => new Error(options.timeoutMessage || "后台任务仍在运行，可稍后到任务中心查看结果。");
   let currentPollIntervalMs = initialPollIntervalMs;
   let job = acceptedJob;
 
   while (!terminalStatuses.has(job.status.toLowerCase())) {
     throwIfAborted(signal);
-    if (Date.now() - startedAt >= timeoutMs) {
-      throw new Error(options.timeoutMessage || "后台任务仍在运行，可稍后到任务中心查看结果。");
-    }
+    if (remainingTime() <= 0) throw timeoutError();
 
     if (typeof document !== "undefined" && document.hidden) {
-      await waitForDocumentVisibility(Math.max(0, timeoutMs - (Date.now() - startedAt)), signal);
+      await waitForDocumentVisibility(remainingTime(), signal);
       continue;
     }
 
-    await delay(currentPollIntervalMs, signal);
+    const remainingMs = remainingTime();
+    const canPollAfterDelay = remainingMs > currentPollIntervalMs;
+    await delay(Math.ceil(Math.min(currentPollIntervalMs, remainingMs)), signal);
+    throwIfAborted(signal);
+    if (!canPollAfterDelay || remainingTime() <= 0) throw timeoutError();
     if (typeof document !== "undefined" && document.hidden) {
       continue;
     }
 
-    job = await client.getJob({ jobId: job.jobId }, { signal });
+    try {
+      job = await client.getJob({ jobId: job.jobId }, { signal, timeoutMs: Math.ceil(remainingTime()) });
+    } catch (error) {
+      throwIfAborted(signal);
+      if (remainingTime() <= 0 || (error instanceof Error && error.name === "TimeoutError")) throw timeoutError();
+      throw error;
+    }
     currentPollIntervalMs = Math.min(
       maximumPollIntervalMs,
       Math.ceil(currentPollIntervalMs * 1.5),
     );
   }
 
+  throwIfAborted(signal);
   if (job.status.toLowerCase() !== "succeeded") {
     throw new Error(job.errorMessage || job.detailText || "后台任务执行失败。");
   }

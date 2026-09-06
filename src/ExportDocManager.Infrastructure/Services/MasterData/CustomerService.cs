@@ -52,6 +52,7 @@ namespace ExportDocManager.Services.MasterData
                         .AsNoTracking()
                         .SingleOrDefaultAsync(item => item.Id == customer.Id, cancellationToken);
                     if (existing == null) throw new ResourceNotFoundException("客户不存在或不属于当前账号。");
+                    _accessScope.DemandRecordAccess(existing, PermissionModuleCatalog.DocumentMasterData, PermissionAction.Operate);
                     customer.OwnerUserId = existing.OwnerUserId;
                     customer.DepartmentId = existing.DepartmentId;
                     customer.CompanyScope = existing.CompanyScope;
@@ -97,6 +98,7 @@ namespace ExportDocManager.Services.MasterData
                     return false;
                 }
 
+                _accessScope.DemandRecordAccess(entity, PermissionModuleCatalog.DocumentMasterData, PermissionAction.Manage);
                 context.Customers.Remove(entity);
                 await context.SaveChangesAsync(cancellationToken);
                 return true;

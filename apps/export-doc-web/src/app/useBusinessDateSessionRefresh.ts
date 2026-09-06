@@ -1,9 +1,9 @@
-import { type Dispatch, type SetStateAction, useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import type { ExportDocManagerApiClient } from "../api/index.ts";
 import { notifyAuthenticationFailure } from "../api/authenticationFailureEvents.ts";
 import { calculateBusinessDateRefreshDelay } from "../api/businessDateRefreshModel.ts";
-import { type WebSessionState, writeStoredSession } from "./webSessionStorage.ts";
+import type { WebSessionState } from "./webSessionStorage.ts";
 
 type BusinessDateSessionRefreshOptions = {
   client: ExportDocManagerApiClient;
@@ -11,7 +11,7 @@ type BusinessDateSessionRefreshOptions = {
   queryClient: QueryClient;
   session: WebSessionState | null;
   sessionRef: { current: WebSessionState | null };
-  setSession: Dispatch<SetStateAction<WebSessionState | null>>;
+  setSession: (session: WebSessionState) => void;
 };
 
 export function useBusinessDateSessionRefresh({
@@ -46,10 +46,9 @@ export function useBusinessDateSessionRefresh({
         }
         const nextSession = { ...currentSession, user };
         setSession(nextSession);
-        writeStoredSession(nextSession);
       })
       .catch((error) => {
-        notifyAuthenticationFailure(error);
+        if (sessionRef.current?.accessToken === accessToken) notifyAuthenticationFailure(error);
       })
       .finally(() => {
         if (activeRefreshRef.current === refresh) {

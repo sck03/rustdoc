@@ -25,7 +25,7 @@ namespace ExportDocManager.Infrastructure.Tests
 
             foreach (var seedOwnedRow in seedOwnedRows)
             {
-                using var factory = new TestDbContextFactory();
+                using var factory = new InMemoryTestDatabase(ignoreTransactions: true);
                 var admin = new User { Id = 1, Username = "admin", PasswordHash = "hash", FullName = "Admin", Role = UserRoleCatalog.Admin, IsActive = true };
                 var target = new User { Id = 2, Username = "operator", PasswordHash = "hash", FullName = "Operator", Role = UserRoleCatalog.User, IsActive = true };
                 using (var context = factory.CreateDbContext())
@@ -46,28 +46,6 @@ namespace ExportDocManager.Infrastructure.Tests
             }
         }
 
-        private sealed class FixedCurrentUserContext : ICurrentUserContext
-        {
-            public FixedCurrentUserContext(User user) => CurrentUser = user;
-            public User CurrentUser { get; }
-        }
 
-        private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-        {
-            private readonly DbContextOptions<AppDbContext> _options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning))
-                .Options;
-
-            public AppDbContext CreateDbContext() => new(_options);
-            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
-                Task.FromResult(CreateDbContext());
-
-            public void Dispose()
-            {
-                using var context = CreateDbContext();
-                context.Database.EnsureDeleted();
-            }
-        }
     }
 }

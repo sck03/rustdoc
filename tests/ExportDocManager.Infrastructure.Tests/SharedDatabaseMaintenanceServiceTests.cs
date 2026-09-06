@@ -53,7 +53,7 @@ public sealed class SharedDatabaseMaintenanceServiceTests
     public void RestorePlanScript_ShouldMakeRestoreAndOwnershipChangesTransactional()
     {
         string root = Path.Combine(Path.GetTempPath(), $"export-doc-restore-script-{Guid.NewGuid():N}");
-        using var factory = new TestDbContextFactory();
+        using var factory = new InMemoryTestDatabase();
         var pathProvider = new TestAppPathProvider(root, Path.Combine(root, "App_Data"));
         var service = new SharedDatabaseMaintenanceService(
             factory,
@@ -155,7 +155,7 @@ public sealed class SharedDatabaseMaintenanceServiceTests
 
         try
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             var pathProvider = new TestAppPathProvider(root, Path.Combine(root, "App_Data"));
             Directory.CreateDirectory(pathProvider.LogRoot);
             Directory.CreateDirectory(pathProvider.ConfigRoot);
@@ -247,7 +247,7 @@ public sealed class SharedDatabaseMaintenanceServiceTests
 
         try
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             var pathProvider = new TestAppPathProvider(root, Path.Combine(root, "App_Data"));
             var service = new SharedDatabaseMaintenanceService(
                 factory,
@@ -283,24 +283,6 @@ public sealed class SharedDatabaseMaintenanceServiceTests
         }
     }
 
-    private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-    {
-        private readonly DbContextOptions<AppDbContext> _options =
-            new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                .Options;
-
-        public AppDbContext CreateDbContext() => new(_options);
-
-        public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(CreateDbContext());
-
-        public void Dispose()
-        {
-            using AppDbContext context = CreateDbContext();
-            context.Database.EnsureDeleted();
-        }
-    }
 
     private static int CountOccurrences(string value, string token)
     {

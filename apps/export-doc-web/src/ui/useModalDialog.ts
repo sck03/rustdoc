@@ -1,6 +1,13 @@
 import { useEffect, useRef, type RefObject } from "react";
 
 const inertBranchStates = new WeakMap<HTMLElement, { count: number; previousInert: boolean }>();
+const focusableSelector = 'button, [href], input, select, textarea, [tabindex], summary, [contenteditable="true"]';
+
+function isFocusable(element: HTMLElement) {
+  return element.tabIndex >= 0 && !element.matches(":disabled") &&
+    !element.closest('[hidden], [inert], [aria-hidden="true"]') &&
+    element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden";
+}
 
 type ModalDialogOptions = {
   active?: boolean;
@@ -33,9 +40,13 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
   }, [canClose, initialFocusRef]);
 
   useEffect(() => {
-    if (!active) {
+    const dialog = dialogRef.current;
+    if (!active || !dialog) {
       return undefined;
     }
+
+    const previousTabIndex = dialog.getAttribute("tabindex");
+    if (previousTabIndex === null) dialog.tabIndex = -1;
 
     const previouslyFocusedElement = document.activeElement instanceof HTMLElement
       ? document.activeElement
@@ -43,22 +54,16 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
     const restoreInertBranches = setBackgroundBranchesInert(dialogRef.current);
     const focusInitialElement = window.requestAnimationFrame(() => {
       const preferred = initialFocusRefRef.current?.current;
-      if (preferred && !preferred.hasAttribute("disabled")) {
+      if (preferred && dialog.contains(preferred) && isFocusable(preferred)) {
         preferred.focus();
         return;
       }
 
-      dialogRef.current?.querySelector<HTMLElement>(
-        'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
-      )?.focus();
+      (getFocusableElements()[0] ?? dialog).focus();
     });
 
     function getFocusableElements() {
-      return Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
-        ) ?? [],
-      );
+      return Array.from(dialog?.querySelectorAll<HTMLElement>(focusableSelector) ?? []).filter(isFocusable);
     }
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -66,7 +71,8 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
       // A confirmation dialog may be opened from inside this dialog.  Only
       // the topmost dialog that owns focus should consume Escape/Tab; this
       // keeps a parent dialog from closing or cycling focus underneath it.
-      if (!dialogRef.current || (activeElement && !dialogRef.current.contains(activeElement))) {
+      if (!(activeElement instanceof Element) ||
+        activeElement.closest('[role="dialog"], [role="alertdialog"], dialog') !== dialog) {
         return;
       }
 
@@ -86,15 +92,16 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
       const focusable = getFocusableElements();
       if (focusable.length === 0) {
         event.preventDefault();
+        dialog?.focus();
         return;
       }
 
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      if (event.shiftKey && (activeElement === first || activeElement === dialog)) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
+      } else if (!event.shiftKey && (activeElement === last || activeElement === dialog)) {
         event.preventDefault();
         first.focus();
       }
@@ -105,6 +112,7 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
       window.cancelAnimationFrame(focusInitialElement);
       window.removeEventListener("keydown", handleKeyDown);
       restoreInertBranches();
+      if (previousTabIndex === null) dialog.removeAttribute("tabindex");
       previouslyFocusedElement?.focus();
     };
   }, [active]);

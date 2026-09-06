@@ -12,7 +12,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task SavePaymentAsync_ShouldApplyCurrentUserOwnership()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             var settings = new DatabaseConnectionSettings();
             var service = new PaymentService(
                 factory,
@@ -40,7 +40,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task PaymentService_WhenPostgreSqlRegularUser_ShouldBlockForeignRows()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             using (var seedContext = factory.CreateDbContext())
             {
                 seedContext.Payments.AddRange(
@@ -72,7 +72,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task SavePaymentAsync_ShouldAllowBlankBusinessFieldsAndZeroAmounts()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             var service = new PaymentService(factory, TestAccessScope.Create());
 
             int paymentId = await service.SavePaymentAsync(new Payment());
@@ -110,42 +110,6 @@ namespace ExportDocManager.Infrastructure.Tests
             };
         }
 
-        private sealed class FixedCurrentUserContext : ICurrentUserContext
-        {
-            public FixedCurrentUserContext(User currentUser)
-            {
-                CurrentUser = currentUser;
-            }
 
-            public User CurrentUser { get; }
-        }
-
-        private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-        {
-            private readonly DbContextOptions<AppDbContext> _options;
-
-            public TestDbContextFactory()
-            {
-                _options = new DbContextOptionsBuilder<AppDbContext>()
-                    .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                    .Options;
-            }
-
-            public AppDbContext CreateDbContext()
-            {
-                return new AppDbContext(_options);
-            }
-
-            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
-            {
-                return Task.FromResult(CreateDbContext());
-            }
-
-            public void Dispose()
-            {
-                using var context = CreateDbContext();
-                context.Database.EnsureDeleted();
-            }
-        }
     }
 }

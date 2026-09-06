@@ -139,6 +139,8 @@ namespace ExportDocManager.Api.Hosting
                 requestedBy,
                 async (provider, jobContext) =>
                 {
+                    await DemandReportOutputAccessAsync(provider, ReportDocumentType.PaymentVoucher,
+                        [paymentId], PermissionAction.ExportPdf, jobContext.CancellationToken);
                     jobContext.Report(
                         15,
                         "正在渲染付款/报销单",

@@ -16,7 +16,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task HsCodeReferenceSave_ShouldNotDowngradeOrOverwriteActiveAnnualTariff()
         {
-            using var factory = new SqliteTestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             var repository = CreateRepository(factory);
             var service = CreateHsCodeService(factory, repository);
             await using (var context = factory.CreateDbContext())
@@ -54,7 +54,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task HsCodeManualSave_ShouldCreateReferenceOnlyAndRejectActivePromotion()
         {
-            using var factory = new SqliteTestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             var service = new HsCodeService(factory, CreateRepository(factory));
 
             await Assert.ThrowsAsync<ServiceValidationException>(() => service.SaveAsync(new HsCode
@@ -86,7 +86,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task HsCodeNumericKeyword_ShouldMatchOnlyCodePrefix()
         {
-            using var factory = new SqliteTestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             var repository = CreateRepository(factory);
             var service = CreateHsCodeService(factory, repository);
             await service.SaveAsync(new HsCode { Code = "6109100000", Name = "棉制针织T恤衫" });
@@ -101,7 +101,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task HsCodeImport_ShouldDetectNonStandardHeaderAndPreserveExistingNonEmptyFields()
         {
-            using var factory = new SqliteTestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             var repository = CreateRepository(factory);
             var service = CreateHsCodeService(factory, repository);
             await service.SaveAsync(new HsCode
@@ -149,7 +149,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task HsCodeCompleteSnapshot_ShouldMarkMissingCodeWithoutDeletingIt()
         {
-            using var factory = new SqliteTestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             var repository = CreateRepository(factory);
             var service = CreateHsCodeService(factory, repository);
             await service.SaveAsync(new HsCode { Code = "8517000000", Name = "旧通信设备", Unit = "台" });
@@ -180,7 +180,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task HsCodeImport_ShouldCommitMoreThanOneDatabaseBatch()
         {
-            using var factory = new SqliteTestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             var service = CreateHsCodeService(factory, CreateRepository(factory));
             string path = CreateHsCodeWorkbook(workbook =>
             {
@@ -218,7 +218,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task HsCodeImport_ShouldRecognizeSpecificationElementsAndChineseTariffColumns()
         {
-            using var factory = new SqliteTestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             var repository = CreateRepository(factory);
             var service = CreateHsCodeService(factory, repository);
             string path = CreateHsCodeWorkbook(workbook =>
@@ -287,7 +287,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task CustomerService_ShouldNormalizeAndReturnSavedCustomer()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             var service = new CustomerService(factory, CreateRepository(factory), TestAccessScope.Create());
 
             await service.SaveCustomerAsync(new Customer
@@ -309,7 +309,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task ProductService_ShouldNormalizeCodeHsCodeAndUnits()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             var service = new ProductService(factory, CreateRepository(factory));
 
             await service.AddProductAsync(new Product
@@ -334,7 +334,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task AuxiliaryService_ShouldNormalizePortsAndUnits()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             var repository = CreateRepository(factory);
             var service = new AuxiliaryService(factory, repository, repository);
 
@@ -367,7 +367,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task MasterDataDeleteServices_ShouldRemoveExistingRowsWithRowVersion()
         {
-            using var factory = new SqliteTestDbContextFactory(new AuditInterceptor());
+            using var factory = new SqliteTestDatabase(new AuditInterceptor());
             var repository = CreateRepository(factory);
             var customerService = new CustomerService(factory, repository, TestAccessScope.Create());
             var exporterService = new ExporterService(factory, repository, TestAccessScope.Create());
@@ -403,7 +403,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task SharedMasterDataUpdates_ShouldRejectStaleConcurrentEditors()
         {
-            using var factory = new SqliteTestDbContextFactory(new AuditInterceptor());
+            using var factory = new SqliteTestDatabase(new AuditInterceptor());
             var repository = CreateRepository(factory);
             var productService = new ProductService(factory, repository);
             var payeeService = new PayeeService(factory, repository, TestAccessScope.Create());
@@ -458,75 +458,5 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("其他用户", hsConflict.Message);
         }
 
-        private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-        {
-            private readonly DbContextOptions<AppDbContext> _options;
-
-            public TestDbContextFactory()
-            {
-                _options = new DbContextOptionsBuilder<AppDbContext>()
-                    .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                    .Options;
-            }
-
-            public AppDbContext CreateDbContext()
-            {
-                return new AppDbContext(_options);
-            }
-
-            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
-            {
-                return Task.FromResult(CreateDbContext());
-            }
-
-            public void Dispose()
-            {
-                using var context = CreateDbContext();
-                context.Database.EnsureDeleted();
-            }
-        }
-
-        private sealed class SqliteTestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-        {
-            private readonly SqliteConnection _connection;
-            private readonly DbContextOptions<AppDbContext> _options;
-
-            public SqliteTestDbContextFactory(params IInterceptor[] interceptors)
-            {
-                _connection = new SqliteConnection("Data Source=:memory:");
-                _connection.Open();
-
-                var builder = new DbContextOptionsBuilder<AppDbContext>()
-                    .UseSqlite(_connection);
-
-                if (interceptors != null && interceptors.Length > 0)
-                {
-                    builder.AddInterceptors(interceptors);
-                }
-
-                _options = builder.Options;
-
-                using var context = CreateDbContext();
-                context.Database.EnsureCreated();
-            }
-
-            public AppDbContext CreateDbContext()
-            {
-                return new AppDbContext(_options);
-            }
-
-            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
-            {
-                return Task.FromResult(CreateDbContext());
-            }
-
-            public void Dispose()
-            {
-                using var context = CreateDbContext();
-                context.Database.EnsureDeleted();
-                _connection.Dispose();
-                SqliteConnection.ClearAllPools();
-            }
-        }
     }
 }

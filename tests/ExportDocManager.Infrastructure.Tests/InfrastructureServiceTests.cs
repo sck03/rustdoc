@@ -10,7 +10,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task CustomOptionService_ShouldReturnTrimmedDistinctValues()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             using (var context = factory.CreateDbContext())
             {
                 context.CustomOptions.AddRange(
@@ -28,7 +28,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task CustomOptionService_ShouldBoundReturnedHistoryToLatestFiveHundredValues()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             using (var context = factory.CreateDbContext())
             {
                 var createdAt = new DateTimeOffset(2026, 4, 1, 8, 0, 0, TimeSpan.Zero);
@@ -49,27 +49,5 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal("Value-504", options[^1]);
         }
 
-        private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-        {
-            private readonly DbContextOptions<AppDbContext> _options;
-
-            public TestDbContextFactory()
-            {
-                _options = new DbContextOptionsBuilder<AppDbContext>()
-                    .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                    .Options;
-            }
-
-            public AppDbContext CreateDbContext()
-            {
-                return new AppDbContext(_options);
-            }
-
-            public void Dispose()
-            {
-                using var context = CreateDbContext();
-                context.Database.EnsureDeleted();
-            }
-        }
     }
 }

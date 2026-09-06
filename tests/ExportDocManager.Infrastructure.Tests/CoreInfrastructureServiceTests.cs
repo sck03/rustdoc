@@ -11,7 +11,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task ItemService_SaveItemsAsync_ShouldNormalizeAndRemoveMissingRows()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase(ignoreTransactions: true);
             int invoiceId;
             int existingItemId;
             await using (var context = await factory.CreateDbContextAsync())
@@ -55,7 +55,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task InvoicePartyResolver_ShouldReuseExistingCustomerByNormalizedName()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase(ignoreTransactions: true);
             await using (var context = await factory.CreateDbContextAsync())
             {
                 context.Customers.Add(new Customer
@@ -77,33 +77,5 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal(1, await resolveContext.Customers.CountAsync());
         }
 
-        private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-        {
-            private readonly DbContextOptions<AppDbContext> _options;
-
-            public TestDbContextFactory()
-            {
-                _options = new DbContextOptionsBuilder<AppDbContext>()
-                    .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                    .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning))
-                    .Options;
-            }
-
-            public AppDbContext CreateDbContext()
-            {
-                return new AppDbContext(_options);
-            }
-
-            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
-            {
-                return Task.FromResult(CreateDbContext());
-            }
-
-            public void Dispose()
-            {
-                using var context = CreateDbContext();
-                context.Database.EnsureDeleted();
-            }
-        }
     }
 }

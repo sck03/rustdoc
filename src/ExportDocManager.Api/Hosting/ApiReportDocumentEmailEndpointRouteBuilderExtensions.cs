@@ -2,6 +2,7 @@ using ExportDocManager.Models;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
+using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
 
@@ -132,6 +133,8 @@ namespace ExportDocManager.Api.Hosting
                 requestedBy,
                 async (provider, jobContext) =>
                 {
+                    await DemandReportOutputAccessAsync(provider, ReportDocumentType.ExportDocument,
+                        [invoiceId], PermissionAction.SendEmail, jobContext.CancellationToken);
                     var pathProvider = provider.GetRequiredService<IAppPathProvider>();
                     string tempRoot = Path.Combine(
                         pathProvider.CacheRoot,

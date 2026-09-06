@@ -13,7 +13,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task Lifecycle_ShouldSeparateContentSharingAndConcurrency()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             int sharedId;
             using (var seedContext = factory.CreateDbContext())
             {
@@ -116,7 +116,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task SaveAndPreview_ShouldSanitizeDangerousEmailHtmlAndKeepBusinessFormatting()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new SqliteTestDatabase();
             var service = CreateService(factory, CreateTemplateUser(7));
 
             var saved = await service.SaveDraftAsync(new EmailTemplateDraftRequest(
@@ -150,7 +150,7 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Contains("QT-001&quot; onclick=&quot;alert(1)", preview.BodyHtml, StringComparison.Ordinal);
         }
 
-        private static EmailTemplateService CreateService(TestDbContextFactory factory, User user) =>
+        private static EmailTemplateService CreateService(SqliteTestDatabase factory, User user) =>
             new(
                 factory,
                 new BusinessDataAccessScope(
@@ -184,32 +184,6 @@ namespace ExportDocManager.Infrastructure.Tests
             PostgreSqlUsername = "test_user"
         };
 
-        private sealed class FixedCurrentUserContext(User currentUser) : ICurrentUserContext
-        {
-            public User CurrentUser { get; } = currentUser;
-        }
 
-        private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-        {
-            private readonly SqliteConnection _connection = new("Data Source=:memory:");
-            private readonly DbContextOptions<AppDbContext> _options;
-
-            public TestDbContextFactory()
-            {
-                _connection.Open();
-                _options = new DbContextOptionsBuilder<AppDbContext>()
-                    .UseSqlite(_connection)
-                    .Options;
-                using var context = CreateDbContext();
-                context.Database.EnsureCreated();
-            }
-
-            public AppDbContext CreateDbContext() => new(_options);
-
-            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
-                Task.FromResult(CreateDbContext());
-
-            public void Dispose() => _connection.Dispose();
-        }
     }
 }

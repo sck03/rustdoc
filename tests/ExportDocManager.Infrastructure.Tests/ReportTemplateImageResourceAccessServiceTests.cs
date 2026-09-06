@@ -26,7 +26,7 @@ public sealed class ReportTemplateImageResourceAccessServiceTests
     [Fact]
     public async Task CanReadAsync_ShouldUsePersistedVisibleTemplateRelations()
     {
-        using var factory = new TestDbContextFactory();
+        using var factory = new InMemoryTestDatabase();
         const string ownResourceId = "img-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png";
         const string privateResourceId = "img-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.png";
         const string sharedResourceId = "img-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.png";
@@ -68,7 +68,7 @@ public sealed class ReportTemplateImageResourceAccessServiceTests
     [Fact]
     public async Task UploadClaim_ShouldAuthorizeOwnerAndRecycleOnlyWhenUnreferenced()
     {
-        using var factory = new TestDbContextFactory();
+        using var factory = new InMemoryTestDatabase();
         const string resourceId = "img-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png";
         var service = new ReportTemplateImageResourceAccessService(
             factory,
@@ -112,7 +112,7 @@ public sealed class ReportTemplateImageResourceAccessServiceTests
     [Fact]
     public async Task RollbackRecycleAsync_ShouldRestoreClaimForPhysicalDeleteRetry()
     {
-        using var factory = new TestDbContextFactory();
+        using var factory = new InMemoryTestDatabase();
         const string resourceId = "img-ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.png";
         var service = new ReportTemplateImageResourceAccessService(
             factory,
@@ -231,26 +231,5 @@ public sealed class ReportTemplateImageResourceAccessServiceTests
         PostgreSqlUsername = "test"
     };
 
-    private sealed class FixedCurrentUserContext(User user) : ICurrentUserContext
-    {
-        public User CurrentUser { get; } = user;
-    }
 
-    private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-    {
-        private readonly DbContextOptions<AppDbContext> _options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-            .Options;
-
-        public AppDbContext CreateDbContext() => new(_options);
-
-        public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(CreateDbContext());
-
-        public void Dispose()
-        {
-            using var context = CreateDbContext();
-            context.Database.EnsureDeleted();
-        }
-    }
 }

@@ -11,7 +11,7 @@ public sealed class EmailDeliveryStoreTests
     [Fact]
     public async Task DeliveryKey_ShouldPreventDuplicateSendAndPreserveHistory()
     {
-        using var factory = new TestDbContextFactory();
+        using var factory = new InMemoryTestDatabase();
         var accessScope = new BusinessDataAccessScope(
             new DatabaseConnectionSettings(),
             new FixedCurrentUserContext(new User { Id = 7, Username = "sender" }));
@@ -35,7 +35,7 @@ public sealed class EmailDeliveryStoreTests
     [Fact]
     public async Task DeliveryHistory_ShouldApplyDepartmentAndCompanyPermissionScopes()
     {
-        using var factory = new TestDbContextFactory();
+        using var factory = new InMemoryTestDatabase();
         var databaseSettings = new DatabaseConnectionSettings
         {
             Provider = DatabaseConnectionSettings.PostgreSqlProvider
@@ -74,7 +74,7 @@ public sealed class EmailDeliveryStoreTests
     [Fact]
     public async Task DeliveryKey_ShouldBeIsolatedPerUser()
     {
-        using var factory = new TestDbContextFactory();
+        using var factory = new InMemoryTestDatabase();
         var databaseSettings = new DatabaseConnectionSettings();
         User firstUser = CreateScopedUser(7, "first", "sales", "acme", PermissionDataScope.Own);
         User secondUser = CreateScopedUser(8, "second", "sales", "acme", PermissionDataScope.Own);
@@ -109,7 +109,7 @@ public sealed class EmailDeliveryStoreTests
     [Fact]
     public async Task UncertainDelivery_ShouldNeverBeAutomaticallyRetried()
     {
-        using var factory = new TestDbContextFactory();
+        using var factory = new InMemoryTestDatabase();
         var store = new EmailDeliveryStore(factory, new BusinessDataAccessScope(new DatabaseConnectionSettings()));
         string fingerprint = EmailDeliveryFingerprint.Create(["buyer@example.com", "Docs"]);
 
@@ -125,7 +125,7 @@ public sealed class EmailDeliveryStoreTests
     [Fact]
     public async Task DeliveryKey_ShouldRejectDifferentMessageContent()
     {
-        using var factory = new TestDbContextFactory();
+        using var factory = new InMemoryTestDatabase();
         var store = new EmailDeliveryStore(factory, new BusinessDataAccessScope(new DatabaseConnectionSettings()));
 
         Assert.True((await store.BeginAsync(
@@ -151,10 +151,6 @@ public sealed class EmailDeliveryStoreTests
         Assert.Contains("另一封邮件", conflict.ErrorMessage, StringComparison.Ordinal);
     }
 
-    private sealed class FixedCurrentUserContext(User user) : ICurrentUserContext
-    {
-        public User CurrentUser { get; } = user;
-    }
 
     private static User CreateScopedUser(
         int id,
@@ -180,18 +176,4 @@ public sealed class EmailDeliveryStoreTests
                 PermissionAction.ViewDelivery)] = dataScope
         };
 
-    private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-    {
-        private readonly DbContextOptions<AppDbContext> _options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-            .Options;
-
-        public AppDbContext CreateDbContext() => new(_options);
-        public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) => Task.FromResult(CreateDbContext());
-        public void Dispose()
-        {
-            using var context = CreateDbContext();
-            context.Database.EnsureDeleted();
-        }
-    }
 }

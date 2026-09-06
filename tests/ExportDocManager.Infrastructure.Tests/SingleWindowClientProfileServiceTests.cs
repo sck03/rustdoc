@@ -15,7 +15,7 @@ namespace ExportDocManager.Infrastructure.Tests
             string root = CreateTempRoot();
             try
             {
-                using var factory = new TestDbContextFactory();
+                using var factory = new InMemoryTestDatabase();
                 var service = CreateService(factory, root);
 
                 await service.SaveAsync(CreateUpdate("公司 A / 卡 A", "公司 A", "CARD-A"));
@@ -61,7 +61,7 @@ namespace ExportDocManager.Infrastructure.Tests
             string root = CreateTempRoot();
             try
             {
-                using var factory = new TestDbContextFactory();
+                using var factory = new InMemoryTestDatabase();
                 var service = CreateService(factory, root);
                 var saves = Enumerable.Range(1, 6)
                     .Select(index => service.SaveAsync(CreateUpdate(
@@ -88,7 +88,7 @@ namespace ExportDocManager.Infrastructure.Tests
             string root = CreateTempRoot();
             try
             {
-                using var factory = new TestDbContextFactory();
+                using var factory = new InMemoryTestDatabase();
                 var service = CreateService(factory, root);
                 string sharedRoot = Path.Combine(root, "OfficialClient", "CompanyA");
 
@@ -129,7 +129,7 @@ namespace ExportDocManager.Infrastructure.Tests
             string root = CreateTempRoot();
             try
             {
-                using var factory = new TestDbContextFactory();
+                using var factory = new InMemoryTestDatabase();
                 var service = CreateService(factory, root);
                 await service.SaveAsync(CreateUpdate("公司 A / 卡 A", "公司 A", "CARD-A"));
                 var profile = await service.GetActiveAsync();
@@ -172,7 +172,7 @@ namespace ExportDocManager.Infrastructure.Tests
             string root = CreateTempRoot();
             try
             {
-                using var factory = new TestDbContextFactory();
+                using var factory = new InMemoryTestDatabase();
                 var pathProvider = new RuntimeAppPathProvider(root, Path.Combine(root, "App_Data"));
                 var service = new SingleWindowClientProfileService(
                     factory,
@@ -274,26 +274,5 @@ namespace ExportDocManager.Infrastructure.Tests
             }
         }
 
-        private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-        {
-            private readonly DbContextOptions<AppDbContext> _options =
-                new DbContextOptionsBuilder<AppDbContext>()
-                    .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                    .Options;
-
-            public AppDbContext CreateDbContext() => new(_options);
-
-            public Task<AppDbContext> CreateDbContextAsync(
-                CancellationToken cancellationToken = default)
-            {
-                return Task.FromResult(CreateDbContext());
-            }
-
-            public void Dispose()
-            {
-                using var context = CreateDbContext();
-                context.Database.EnsureDeleted();
-            }
-        }
     }
 }

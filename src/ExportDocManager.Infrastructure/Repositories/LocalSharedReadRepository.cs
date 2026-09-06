@@ -116,7 +116,7 @@ namespace ExportDocManager.Services.Infrastructure
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var normalizedQuery = Normalize(query);
             var invoiceQuery = BuildQueryFormQuery(context, normalizedQuery);
-            invoiceQuery = ApplyInvoiceAccessScope(invoiceQuery);
+            invoiceQuery = ApplyQueryAccessScope(invoiceQuery, PermissionAction.View);
 
             var totalCount = await invoiceQuery.CountAsync(cancellationToken);
             var items = await invoiceQuery
@@ -127,13 +127,13 @@ namespace ExportDocManager.Services.Infrastructure
             return new PagedResult<Invoice>(items, totalCount, normalizedQuery.PageNumber, normalizedQuery.PageSize);
         }
 
-        public async Task<int> CountAsync(
+        public async Task<int> CountExportAsync(
             QueryPageQuery query,
             CancellationToken cancellationToken = default)
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var normalizedQuery = Normalize(query);
-            return await ApplyInvoiceAccessScope(BuildQueryFormQuery(context, normalizedQuery))
+            return await ApplyQueryAccessScope(BuildQueryFormQuery(context, normalizedQuery), PermissionAction.Operate)
                 .CountAsync(cancellationToken);
         }
 
@@ -145,7 +145,7 @@ namespace ExportDocManager.Services.Infrastructure
         {
             using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var normalizedQuery = Normalize(query);
-            var rows = await ApplyInvoiceAccessScope(BuildQueryFormQuery(context, normalizedQuery))
+            var rows = await ApplyQueryAccessScope(BuildQueryFormQuery(context, normalizedQuery), PermissionAction.Operate)
                 .Skip(Math.Max(0, skip))
                 .Take(Math.Clamp(take, 1, 1000))
                 .Select(invoice => new
@@ -516,6 +516,14 @@ namespace ExportDocManager.Services.Infrastructure
                     : query.OrderByDescending(invoice => invoice.TotalAmount).ThenByDescending(invoice => invoice.Id),
                 _ => query.OrderByDescending(invoice => invoice.InvoiceDate).ThenByDescending(invoice => invoice.Id)
             };
+        }
+
+        private IQueryable<Invoice> ApplyQueryAccessScope(IQueryable<Invoice> query, string action)
+        {
+            if (_businessDataAccessScope.UsesPostgreSql)
+                _businessDataAccessScope.DemandPermission(PermissionModuleCatalog.DocumentQuery, action);
+            return _businessDataAccessScope.ApplyInvoiceScopeForPermission(
+                ApplyInvoiceAccessScope(query), PermissionModuleCatalog.DocumentQuery, action);
         }
 
         private IQueryable<Invoice> ApplyInvoiceAccessScope(IQueryable<Invoice> query)

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 namespace ExportDocManager.Models.Entities
 {
-    public class ContainerProject
+    public class ContainerProject : IBusinessOwnedEntity
     {
         public int Id { get; set; }
         public int? OwnerUserId { get; set; }

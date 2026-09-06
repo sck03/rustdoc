@@ -13,7 +13,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task LocalSharedReadRepository_WhenPostgreSqlRegularUser_ShouldFilterOwnedRows()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             await using (var context = await factory.CreateDbContextAsync())
             {
                 context.Invoices.AddRange(
@@ -60,7 +60,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task LocalSharedReadRepository_WhenPostgreSqlAdmin_ShouldReturnAllRows()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             await using (var context = await factory.CreateDbContextAsync())
             {
                 context.Invoices.AddRange(
@@ -84,7 +84,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task QueryExportBatch_ShouldProjectStableScopedRowsWithoutRepeatedCounts()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             await using (var context = await factory.CreateDbContextAsync())
             {
                 context.Invoices.AddRange(
@@ -99,10 +99,21 @@ namespace ExportDocManager.Infrastructure.Tests
                 factory,
                 new BusinessDataAccessScope(
                     settings,
-                    new FixedCurrentUserContext(new User { Id = 7, Username = "operator", Role = "User" })));
+                    new FixedCurrentUserContext(new User
+                    {
+                        Id = 7,
+                        Username = "operator",
+                        Role = "User",
+                        EffectivePermissionGrants = new Dictionary<string, string>
+                        {
+                            [PermissionResourceCatalog.CreateGrantKey(PermissionModuleCatalog.DocumentInvoices, PermissionAction.View)] = PermissionDataScope.Own,
+                            [PermissionResourceCatalog.CreateGrantKey(PermissionModuleCatalog.DocumentQuery, PermissionAction.View)] = PermissionDataScope.Own,
+                            [PermissionResourceCatalog.CreateGrantKey(PermissionModuleCatalog.DocumentQuery, PermissionAction.Operate)] = PermissionDataScope.Own
+                        }
+                    })));
             var query = new QueryPageQuery();
 
-            int count = await repository.CountAsync(query);
+            int count = await repository.CountExportAsync(query);
             var first = await repository.QueryExportBatchAsync(query, skip: 0, take: 1);
             var second = await repository.QueryExportBatchAsync(query, skip: 1, take: 1);
 
@@ -220,43 +231,7 @@ namespace ExportDocManager.Infrastructure.Tests
             };
         }
 
-        private sealed class FixedCurrentUserContext : ICurrentUserContext
-        {
-            public FixedCurrentUserContext(User currentUser)
-            {
-                CurrentUser = currentUser;
-            }
 
-            public User CurrentUser { get; }
-        }
-
-        private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-        {
-            private readonly DbContextOptions<AppDbContext> _options;
-
-            public TestDbContextFactory()
-            {
-                _options = new DbContextOptionsBuilder<AppDbContext>()
-                    .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                    .Options;
-            }
-
-            public AppDbContext CreateDbContext()
-            {
-                return new AppDbContext(_options);
-            }
-
-            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
-            {
-                return Task.FromResult(CreateDbContext());
-            }
-
-            public void Dispose()
-            {
-                using var context = CreateDbContext();
-                context.Database.EnsureDeleted();
-            }
-        }
 
         private sealed class SqliteTestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
         {

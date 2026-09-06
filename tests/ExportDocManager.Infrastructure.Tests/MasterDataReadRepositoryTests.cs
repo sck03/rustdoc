@@ -11,7 +11,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task QueryAsync_ShouldSearchCustomersAcrossContactFields()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             await using (var context = await factory.CreateDbContextAsync())
             {
                 context.Customers.AddRange(
@@ -41,7 +41,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task SharedMasterDataQueryPageAsync_ShouldReturnStableDatabasePages()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             await using (var context = await factory.CreateDbContextAsync())
             {
                 foreach (int index in Enumerable.Range(1, 25))
@@ -83,7 +83,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task GetByIdAsync_ShouldFindRecordsBeyondDefaultListLimit()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             int payeeId;
             int portId;
             int unitId;
@@ -112,7 +112,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task QueryPageAsync_ShouldMatchFormattedHsCodeByNormalizedCode()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             await using (var context = await factory.CreateDbContextAsync())
             {
                 context.HsCodes.AddRange(
@@ -139,7 +139,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task HsCodeQueryPageAsync_ShouldClampInternalPageSize()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             await using (var context = await factory.CreateDbContextAsync())
             {
                 context.HsCodes.AddRange(Enumerable.Range(1, 205).Select(index => new HsCode
@@ -165,7 +165,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task ProductQueryPageAsync_ShouldPageAndFilterInDatabaseOrder()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             await using (var context = await factory.CreateDbContextAsync())
             {
                 for (int index = 1; index <= 25; index++)
@@ -198,32 +198,5 @@ namespace ExportDocManager.Infrastructure.Tests
         private static LocalMasterDataReadRepository CreateRepository(IDbContextFactory<AppDbContext> factory) =>
             new(factory, TestAccessScope.Create());
 
-        private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-        {
-            private readonly DbContextOptions<AppDbContext> _options;
-
-            public TestDbContextFactory()
-            {
-                _options = new DbContextOptionsBuilder<AppDbContext>()
-                    .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                    .Options;
-            }
-
-            public AppDbContext CreateDbContext()
-            {
-                return new AppDbContext(_options);
-            }
-
-            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
-            {
-                return Task.FromResult(CreateDbContext());
-            }
-
-            public void Dispose()
-            {
-                using var context = CreateDbContext();
-                context.Database.EnsureDeleted();
-            }
-        }
     }
 }

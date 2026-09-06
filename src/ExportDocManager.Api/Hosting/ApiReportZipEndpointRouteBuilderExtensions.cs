@@ -166,6 +166,8 @@ namespace ExportDocManager.Api.Hosting
                 requestedBy,
                 async (provider, jobContext) =>
                 {
+                    await DemandReportOutputAccessAsync(provider, ReportDocumentType.ExportDocument,
+                        invoiceIds, PermissionAction.ExportZip, jobContext.CancellationToken);
                     var pathProvider = provider.GetRequiredService<IAppPathProvider>();
                     string tempRoot = Path.Combine(
                         pathProvider.CacheRoot,

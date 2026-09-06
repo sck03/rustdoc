@@ -14,7 +14,7 @@ namespace ExportDocManager.Infrastructure.Tests
         public async Task ApplyInvoiceScope_WhenExplicitPermissionsOmitInvoices_ShouldNotInheritRoleDefaults(
             bool hasAssignedTemplate)
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             using var context = factory.CreateDbContext();
             context.Invoices.Add(new Invoice { InvoiceNo = "OWN-RESTRICTED", OwnerUserId = 7 });
             await context.SaveChangesAsync();
@@ -43,7 +43,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task ApplyInvoiceScope_WhenPostgreSqlRegularUser_ShouldFilterOwnedRows()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             using (var seedContext = factory.CreateDbContext())
             {
                 seedContext.Invoices.AddRange(
@@ -112,7 +112,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task CustomerAndExporterScopes_WhenPostgreSqlRegularUser_ShouldFilterOwnedRows()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             using (var seedContext = factory.CreateDbContext())
             {
                 seedContext.Customers.AddRange(
@@ -182,7 +182,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task EmailTemplateScopes_WhenPostgreSqlRegularUser_ShouldReadSharedButEditOwnedOnly()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             using (var seedContext = factory.CreateDbContext())
             {
                 seedContext.EmailTemplates.AddRange(
@@ -227,7 +227,7 @@ namespace ExportDocManager.Infrastructure.Tests
         [Fact]
         public async Task SingleWindowScopes_WhenPostgreSqlRegularUser_ShouldFilterBySourceInvoiceOwner()
         {
-            using var factory = new TestDbContextFactory();
+            using var factory = new InMemoryTestDatabase();
             using (var seedContext = factory.CreateDbContext())
             {
                 var ownInvoice = new Invoice
@@ -281,6 +281,122 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal("OWN-SW", batch.InvoiceNo);
         }
 
+        [Theory]
+        [InlineData(PermissionDataScope.Department)]
+        [InlineData(PermissionDataScope.Company)]
+        [InlineData(PermissionDataScope.All)]
+        [InlineData(PermissionDataScope.Own)]
+        [InlineData("")]
+        public async Task SharedTemplateScopes_ShouldRespectTheSharingAudienceAtEveryPermissionScope(string dataScope)
+        {
+            using var factory = new InMemoryTestDatabase();
+            using var context = factory.CreateDbContext();
+            var templates = new[]
+            {
+                ("own", 7, "C1", "D1", TemplateShareScopeCatalog.Private, TemplateLifecycleStatusCatalog.Draft),
+                ("all", 8, "C2", "D2", TemplateShareScopeCatalog.All, TemplateLifecycleStatusCatalog.Published),
+                ("company", 8, "C1", "D2", TemplateShareScopeCatalog.Company, TemplateLifecycleStatusCatalog.Published),
+                ("department", 8, "C1", "D1", TemplateShareScopeCatalog.Department, TemplateLifecycleStatusCatalog.Published),
+                ("other-company", 8, "C2", "D1", TemplateShareScopeCatalog.Company, TemplateLifecycleStatusCatalog.Published),
+                ("other-department", 8, "C1", "D2", TemplateShareScopeCatalog.Department, TemplateLifecycleStatusCatalog.Published),
+                ("same-department-code-other-company", 8, "C2", "D1", TemplateShareScopeCatalog.Department, TemplateLifecycleStatusCatalog.Published),
+                ("private", 8, "C1", "D1", TemplateShareScopeCatalog.Private, TemplateLifecycleStatusCatalog.Published),
+                ("draft", 8, "C1", "D1", TemplateShareScopeCatalog.All, TemplateLifecycleStatusCatalog.Draft),
+                ("disabled", 8, "C1", "D1", TemplateShareScopeCatalog.All, TemplateLifecycleStatusCatalog.Disabled),
+                ("unknown-share", 8, "C1", "D1", "unknown", TemplateLifecycleStatusCatalog.Published)
+            };
+            foreach (var (name, owner, company, department, sharing, status) in templates)
+            {
+                context.EmailTemplates.Add(new EmailTemplate
+                {
+                    Name = name,
+                    OwnerUserId = owner,
+                    CompanyScope = company,
+                    DepartmentId = department,
+                    ShareScope = sharing,
+                    Status = status
+                });
+                context.UserReportTemplates.Add(new UserReportTemplate
+                {
+                    Name = name,
+                    OwnerUserId = owner,
+                    CompanyScope = company,
+                    DepartmentId = department,
+                    ShareScope = sharing,
+                    Status = status
+                });
+            }
+            await context.SaveChangesAsync();
+            var user = new User
+            {
+                Id = 7,
+                Role = UserRoleCatalog.User,
+                CompanyScope = "C1",
+                DepartmentId = "D1",
+                EffectivePermissionGrants = new Dictionary<string, string>
+                {
+                    [PermissionResourceCatalog.CreateGrantKey(PermissionResourceCatalog.EmailTemplates, PermissionAction.View)] = dataScope,
+                    [PermissionResourceCatalog.CreateGrantKey(PermissionResourceCatalog.ReportTemplates, PermissionAction.View)] = dataScope
+                }
+            };
+            var scope = new BusinessDataAccessScope(CreatePostgreSqlModeSettings(), new FixedCurrentUserContext(user));
+            string[] expected = dataScope switch
+            {
+                "" => [],
+                PermissionDataScope.Own => ["own"],
+                _ => ["all", "company", "department", "own"]
+            };
+
+            Assert.Equal(expected, await scope.ApplyEmailTemplateScope(context.EmailTemplates)
+                .OrderBy(item => item.Name).Select(item => item.Name).ToArrayAsync());
+            Assert.Equal(expected, await scope.ApplyUserReportTemplateScope(context.UserReportTemplates)
+                .OrderBy(item => item.Name).Select(item => item.Name).ToArrayAsync());
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void BusinessScopes_ShouldRemainServerSideQueriesForBothDatabaseProviders(bool usePostgreSql)
+        {
+            var options = new DbContextOptionsBuilder<AppDbContext>();
+            if (usePostgreSql) options.UseNpgsql("Host=localhost;Database=scope_contract;Username=test");
+            else options.UseSqlite("Data Source=:memory:");
+            using var context = new AppDbContext(options.Options);
+            var user = new User
+            {
+                Id = 7,
+                Role = UserRoleCatalog.User,
+                CompanyScope = "C1",
+                DepartmentId = "D1",
+                EffectivePermissionGrants = PermissionResourceCatalog.Resources
+                    .SelectMany(resource => resource.Actions.Select(action => new KeyValuePair<string, string>(
+                        PermissionResourceCatalog.CreateGrantKey(resource.Key, action.Key), PermissionDataScope.Department)))
+                    .ToDictionary(item => item.Key, item => item.Value)
+            };
+            var scope = new BusinessDataAccessScope(CreatePostgreSqlModeSettings(), new FixedCurrentUserContext(user));
+            IQueryable<int>[] queries =
+            [
+                scope.ApplyInvoiceScope(context.Invoices).Select(item => item.Id),
+                scope.ApplyPaymentScope(context.Payments).Select(item => item.Id),
+                scope.ApplyCustomerScope(context.Customers).Select(item => item.Id),
+                scope.ApplyExporterScope(context.Exporters).Select(item => item.Id),
+                scope.ApplyPayeeScope(context.Payees).Select(item => item.Id),
+                scope.ApplyCrmCustomerScope(context.CrmCustomers).Select(item => item.Id),
+                scope.ApplyCrmFollowUpScope(context.CrmFollowUps).Select(item => item.Id),
+                scope.ApplySupplierScope(context.SupplierCompanies).Select(item => item.Id),
+                scope.ApplySalesOpportunityScope(context.SalesOpportunities).Select(item => item.Id),
+                scope.ApplyContainerProjectScope(context.ContainerProjects).Select(item => item.Id),
+                scope.ApplyEmailTemplateScope(context.EmailTemplates).Select(item => item.Id),
+                scope.ApplyUserReportTemplateScope(context.UserReportTemplates).Select(item => item.Id),
+                scope.ApplyOwnedEmailTemplateScope(context.EmailTemplates).Select(item => item.Id),
+                scope.ApplyOwnedUserReportTemplateScope(context.UserReportTemplates).Select(item => item.Id)
+            ];
+            foreach (var query in queries)
+            {
+                Assert.Contains("WHERE", query.ToQueryString(), StringComparison.Ordinal);
+            }
+        }
+
         private static DatabaseConnectionSettings CreatePostgreSqlModeSettings()
         {
             return new DatabaseConnectionSettings
@@ -292,42 +408,6 @@ namespace ExportDocManager.Infrastructure.Tests
             };
         }
 
-        private sealed class FixedCurrentUserContext : ICurrentUserContext
-        {
-            public FixedCurrentUserContext(User currentUser)
-            {
-                CurrentUser = currentUser;
-            }
 
-            public User CurrentUser { get; }
-        }
-
-        private sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>, IDisposable
-        {
-            private readonly DbContextOptions<AppDbContext> _options;
-
-            public TestDbContextFactory()
-            {
-                _options = new DbContextOptionsBuilder<AppDbContext>()
-                    .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-                    .Options;
-            }
-
-            public AppDbContext CreateDbContext()
-            {
-                return new AppDbContext(_options);
-            }
-
-            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
-            {
-                return Task.FromResult(CreateDbContext());
-            }
-
-            public void Dispose()
-            {
-                using var context = CreateDbContext();
-                context.Database.EnsureDeleted();
-            }
-        }
     }
 }

@@ -67,6 +67,7 @@ namespace ExportDocManager.Services.MasterData
                     }
                     previousDocSealPath = existing.DocSealPath;
                     previousCustomsSealPath = existing.CustomsSealPath;
+                    _accessScope.DemandRecordAccess(existing, PermissionModuleCatalog.DocumentMasterData, PermissionAction.Operate);
                     exporter.OwnerUserId = existing.OwnerUserId;
                     exporter.DepartmentId = existing.DepartmentId;
                     exporter.CompanyScope = existing.CompanyScope;
@@ -121,6 +122,7 @@ namespace ExportDocManager.Services.MasterData
                     return false;
                 }
 
+                _accessScope.DemandRecordAccess(entity, PermissionModuleCatalog.DocumentMasterData, PermissionAction.Manage);
                 context.Exporters.Remove(entity);
                 await context.SaveChangesAsync(cancellationToken);
                 _exporterSealService?.DeleteAllManagedSeals(id);
