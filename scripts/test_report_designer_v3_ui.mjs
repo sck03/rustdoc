@@ -177,9 +177,10 @@ try {
   assert(!await read(page,'document.body.innerText.includes("当前草稿不能保存")'));
   results.push({test:'detail insertion from header goes to body',passed:true});
   await click(page,'.report-designer-v3-inspector .report-designer-property-section summary');
-  await read(page, `Array.from(document.querySelectorAll('.report-designer-v3-inspector label')).find(label=>label.textContent.trim()==='Y (mm)').querySelector('input').focus()`);
-  await key(page,'a',primaryModifier); await page.send('Input.insertText',{text:'0'}); await key(page,'Enter');
+  await read(page, `(() => {const input=Array.from(document.querySelectorAll('.report-designer-v3-inspector label')).find(label=>label.textContent.trim()==='Y (mm)').querySelector('input');input.focus();input.select()})()`);
+  await page.send('Input.insertText',{text:'0'}); await key(page,'Enter');
   assert.equal(await read(page, `Array.from(document.querySelectorAll('.report-designer-v3-inspector label')).find(label=>label.textContent.trim()==='Y (mm)').querySelector('input').value`),'60');
+  assert.equal(await read(page,'window.__designerSchema.layers.flatMap(layer=>layer.elements).filter(element=>element.flowKind==="DetailTable").at(-1).yHundredthMm'),6000);
   results.push({test:'coordinate editor displays canonical body bounds',passed:true});
   const detailWidth=await read(page,'window.__designerSchema.layers.flatMap(layer=>layer.elements).filter(element=>element.flowKind==="DetailTable").at(-1).widthHundredthMm');
   await read(page,'document.querySelector("button[aria-label=调整右边尺寸]").focus()');
