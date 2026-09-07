@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string[]]$Editions = @("Document", "Sales", "Full"),
+    [string[]]$Editions,
     [string]$CargoTargetDir,
     [switch]$AllowSystemDrive,
     [switch]$PreflightOnly,
@@ -17,15 +17,14 @@ trap {
     exit 1
 }
 
+if (-not $PSBoundParameters.ContainsKey("Editions")) { $Editions = @(Get-ExportDocProductEditionNames) }
 $Editions = @($Editions |
     ForEach-Object { $_ -split "," } |
     ForEach-Object { $_.Trim() } |
     Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+    ForEach-Object { Resolve-ExportDocProductEdition -Edition $_ } |
     Select-Object -Unique)
-$invalidEditions = @($Editions | Where-Object { $_ -notin @("Document", "Sales", "Full") })
-if ($Editions.Count -eq 0 -or $invalidEditions.Count -gt 0) {
-    throw "Editions must contain one or more of: Document, Sales, Full. Invalid values: $($invalidEditions -join ', ')"
-}
+if ($Editions.Count -eq 0) { throw "Editions must contain at least one product edition." }
 
 function Resolve-FullPath {
     param([Parameter(Mandatory = $true)][string]$Path)

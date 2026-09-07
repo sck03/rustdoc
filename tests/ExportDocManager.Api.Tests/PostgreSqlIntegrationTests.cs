@@ -191,6 +191,8 @@ namespace ExportDocManager.Api.Tests
                 });
                 Assert.Equal(3, queryPage.TotalCount);
                 Assert.DoesNotContain(queryPage.Items, invoice => invoice.InvoiceNo == "PG-DASH-PREVIOUS");
+                await OfficePostgreSqlScenarios.RunAsync(factory, settings, admin);
+                await PersonnelPostgreSqlScenarios.RunAsync(factory, settings);
             }
             finally
             {

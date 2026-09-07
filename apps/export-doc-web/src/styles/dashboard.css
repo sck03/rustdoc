@@ -446,6 +446,7 @@
 
 .pager-buttons {
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .page-size-control {
@@ -453,6 +454,7 @@
   display: inline-flex;
   gap: 6px;
   min-height: 34px;
+  white-space: nowrap;
 }
 
 .page-jump-control {
@@ -463,6 +465,7 @@
 }
 
 .page-size-control select {
+  width: auto;
   height: 32px;
   min-width: 76px;
   padding: 0 8px;

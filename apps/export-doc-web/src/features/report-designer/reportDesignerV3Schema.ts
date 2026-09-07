@@ -199,8 +199,13 @@ export function reportDesignerV3ElementText(element: ReportDesignerV3Element) {
     case "Line":
       return element.direction === "Horizontal" ? "水平线" : "垂直线";
     case "Flow":
-      return element.flowKind === "DetailTable" ? "明细表（自动重复）" : element.flowKind === "Grid" ? "普通表格" : `${element.flowKind} 流式组件`;
+      return ({ DetailTable: "明细表（自动重复）", Grid: "普通表格", Row: "多列行", Conditional: "条件块", PageBreak: "分页符" })[element.flowKind];
   }
+}
+
+const elementKindLabels = { Text: "文本", Field: "字段", Image: "图片", PageNumber: "页码", Rectangle: "矩形", Line: "线条" };
+export function reportDesignerV3ElementKindLabel(element: ReportDesignerV3Element) {
+  return element.type === "Flow" ? reportDesignerV3ElementText(element) : elementKindLabels[element.type];
 }
 export function reportDesignerV3PageSize(page: ReportDesignerV3Page) {
   const size = page.orientation === "Landscape"

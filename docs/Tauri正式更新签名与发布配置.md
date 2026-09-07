@@ -1,14 +1,14 @@
 # Tauri 正式更新签名与发布配置
 
-> 更新日期：2026-07-31
+> 更新日期：2026-09-08
 >
-> 当前状态：Document、Sales、Full 已使用独立 identifier、更新清单和 Release 资产；`publish_release=true` 强制 updater 包签名。正式公钥、带密码私钥和真实三平台升级尚待项目所有者配置与验收。Windows Authenticode、macOS Developer ID 与 Apple 公证属于另一条系统级信任链，当前阶段暂缓。
+> 当前状态：Document、Sales、Full、Administration 已使用独立 identifier、更新清单和 Release 资产；`publish_release=true` 强制 updater 包签名。正式公钥、带密码私钥和真实三平台升级尚待项目所有者配置与验收。Windows Authenticode、macOS Developer ID 与 Apple 公证属于另一条系统级信任链，当前阶段暂缓。
 
 ## 1. 当前信任模型
 
 - `system.updaterEndpoint` 是管理员可保存的“更新清单位置”，支持 GitHub、自建 HTTPS 服务器和受控公司内网 HTTP 服务器。
 - 更新中心只显示当前生效地址，并引导管理员到“设置 -> 运行与数据库 -> 软件更新”修改；普通业务账号看不到该地址，也不能保存系统设置。
-- updater 公钥不是运行配置。它按 Document、Sales、Full 产品版分别由正式构建写入安装包，React、API 请求、`appsettings.json`、数据库和 Tauri IPC 都不能传入或替换公钥。
+- updater 公钥不是运行配置。它按 Document、Sales、Full、Administration 产品版分别由正式构建写入安装包，React、API 请求、`appsettings.json`、数据库和 Tauri IPC 都不能传入或替换公钥。
 - updater 私钥和私钥密码只存在于发布侧，绝不能进入客户端、服务器运行目录、数据库、容器镜像或源码仓库。
 - 每个产品版只读取自己的 `latest-*.json` 和资产；更新地址被误改最多改变查询位置并造成不可用，攻击者仍必须持有对应产品版正式私钥才能生成客户端认可的安装包签名。
 - 更新只替换程序安装内容；SQLite/PostgreSQL 数据、授权、日志、备份和用户输出继续遵守运行数据根策略。
@@ -49,12 +49,13 @@ http://updates.internal:8080/export-doc/latest.json
 
 ## 4. 一次性生成正式密钥
 
-正式密钥应由项目所有者在可信电脑上按产品版手工生成一次，不能由每次 CI 临时生成。三个产品版应使用可独立轮换的密钥材料，例如：
+正式密钥应由项目所有者在可信电脑上按产品版手工生成一次，不能由每次 CI 临时生成。四个产品版应使用可独立轮换的密钥材料，例如：
 
 ```powershell
 npm --prefix apps/export-doc-tauri run tauri -- signer generate -w D:\ExportDocManager-Secrets\document-updater.key
 npm --prefix apps/export-doc-tauri run tauri -- signer generate -w D:\ExportDocManager-Secrets\sales-updater.key
 npm --prefix apps/export-doc-tauri run tauri -- signer generate -w D:\ExportDocManager-Secrets\full-updater.key
+npm --prefix apps/export-doc-tauri run tauri -- signer generate -w D:\ExportDocManager-Secrets\administration-updater.key
 ```
 
 命令会提示设置私钥密码，常见输出为：
@@ -63,6 +64,7 @@ npm --prefix apps/export-doc-tauri run tauri -- signer generate -w D:\ExportDocM
 document-updater.key / document-updater.key.pub
 sales-updater.key / sales-updater.key.pub
 full-updater.key / full-updater.key.pub
+administration-updater.key / administration-updater.key.pub
 ```
 
 生成后应：
@@ -84,12 +86,16 @@ full-updater.key / full-updater.key.pub
 EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_DOCUMENT
 EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_SALES
 EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_FULL
+EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_ADMINISTRATION
 ```
 
 可选 Variables：
 
 ```text
-EXPORTDOCMANAGER_UPDATER_ENDPOINT
+EXPORTDOCMANAGER_UPDATER_ENDPOINT_DOCUMENT
+EXPORTDOCMANAGER_UPDATER_ENDPOINT_SALES
+EXPORTDOCMANAGER_UPDATER_ENDPOINT_FULL
+EXPORTDOCMANAGER_UPDATER_ENDPOINT_ADMINISTRATION
 EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT
 ```
 
@@ -102,10 +108,12 @@ TAURI_SIGNING_PRIVATE_KEY_SALES
 TAURI_SIGNING_PRIVATE_KEY_PASSWORD_SALES
 TAURI_SIGNING_PRIVATE_KEY_FULL
 TAURI_SIGNING_PRIVATE_KEY_PASSWORD_FULL
+TAURI_SIGNING_PRIVATE_KEY_ADMINISTRATION
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD_ADMINISTRATION
 ```
 
-- 公钥配置填对应产品版公钥文件完整内容，不允许三版构建误读其它产品版的信任材料。
-- `EXPORTDOCMANAGER_UPDATER_ENDPOINT` 可留空；留空时正式安装包只内置公钥，由管理员安装后配置地址。
+- 公钥配置填对应产品版公钥文件完整内容，不允许四版构建误读其它产品版的信任材料。
+- 对应产品版的 `EXPORTDOCMANAGER_UPDATER_ENDPOINT_<产品版>` 可留空；在 GitHub 正式构建中，构建器按产品版和稳定／预发布通道生成默认 Release 更新地址。其它构建环境可以由管理员安装后配置地址，公钥仍固定在包内。
 - 如确需把 HTTP 地址直接内置为安装包默认地址，必须同时把 `EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT` 明确设为 `true`。运行时由管理员填写内网 HTTP 地址不需要修改公钥。
 - `publish_release=true` 缺少对应产品版公钥、私钥或私钥密码会在构建前失败；默认地址不再是正式签名构建的必填项。
 
@@ -144,8 +152,8 @@ Windows MSI、Linux DEB、macOS DMG 可以作为人工安装资产同时发布�
 
 ## 9. 正式启用前验收
 
-- [ ] 项目所有者为三个产品版分别生成带密码密钥对，并完成至少一次离线恢复演练。
-- [ ] 三组 GitHub 公钥 Variable、私钥 Secret 和私钥密码 Secret 已配置。
+- [ ] 项目所有者为四个产品版分别生成带密码密钥对，并完成至少一次离线恢复演练。
+- [ ] 四组 GitHub 公钥 Variable、私钥 Secret 和私钥密码 Secret 已配置。
 - [ ] 管理员分别验证 GitHub HTTPS、自建 HTTPS、可信内网 HTTP 和空地址回退行为。
 - [ ] Windows x64、Linux x64/ARM64、macOS Apple Silicon ARM64 的平台键与更新产物核对完成。
 - [ ] 正确签名升级、清单不可达、下载中断、签名篡改、版本相同和离线场景验证完成。

@@ -35,6 +35,7 @@ import { ReportDesignerV3Canvas, type ReportDesignerV3Transform } from "./Report
 import { setReportDesignerLayerRoleHeight } from "./reportDesignerLayerBands.ts";
 import type { ReportBlock, ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { createConditionalBlock, createDetailTableBlock, createGridBlock, createPageBreakBlock, createRowBlock } from "./reportDesignerBlockFactories.ts";
+import { updateGridCell } from "./reportDesignerGridMutations.ts";
 import {
   countElements,
   clampReportDesignerV3Zoom,
@@ -89,24 +90,26 @@ export function ReportDesignerV3Workspace({
   const [gridCellSelection, setGridCellSelection] = useState<{ elementId: string; cellId: string } | null>(null);
   const clipboardRef = useRef<ReportDesignerV3Element[]>([]);
   function copySelection() {
-    const items = history.state.selectedIds
-      .map((id) => findV3Element(history.state.schema, id)?.element)
+    const current = historyRef.current.state;
+    const items = current.selectedIds
+      .map((id) => findV3Element(current.schema, id)?.element)
       .filter((el): el is ReportDesignerV3Element => Boolean(el));
     if (items.length > 0) { clipboardRef.current = items; setHasClipboard(true); }
   }
   function pasteClipboard() {
-    if (!editingEnabled) return;
+    if (!editingEnabledRef.current) return;
     if (clipboardRef.current.length > 0) {
-      const next = pasteV3Elements(history.state, clipboardRef.current, activeLayerId() ?? undefined);
-      if (next === history.state) {
-        setCapacityNotice(getV3ElementCapacityIssue(history.state, undefined, Math.max(1, clipboardRef.current.length)) ?? "当前图层无法容纳更多元素。");
+      const current = historyRef.current.state;
+      const next = pasteV3Elements(current, clipboardRef.current, current.activeLayerId ?? undefined);
+      if (next === current) {
+        setCapacityNotice(getV3ElementCapacityIssue(current, undefined, Math.max(1, clipboardRef.current.length)) ?? "当前图层无法容纳更多元素。");
         return;
       }
       setCapacityNotice(null);
-      commit(next);
+      commitRef.current(next);
       return;
     }
-    duplicateSelection();
+    duplicateSelectionRef.current();
   }
   // Converting advanced HTML (or a damaged/removed V2 structure) is explicit;
   // opening a template must never create a dirty V3 draft.
@@ -298,16 +301,29 @@ export function ReportDesignerV3Workspace({
   }
 
   function handleCommitTransform(baseState: ReportDesignerV3DocumentState, transform: ReportDesignerV3Transform, deltaX: number, deltaY: number) {
-    if (!editingEnabled) return;
+    if (!editingEnabled || historyRef.current.state.schema !== baseState.schema) return;
     const next = transform.kind === "move"
       ? moveSelectedV3Elements(baseState, deltaX, deltaY)
       : resizeV3Element(baseState, transform.elementId, transform.direction, deltaX, deltaY);
-    history.commitFrom(baseState, next);
+    if (next.schema !== baseState.schema) {
+      setDraftEnabled(true);
+      historyRef.current.commitFrom(baseState, next);
+    }
   }
 
   function handleCancelTransform(baseState: ReportDesignerV3DocumentState) {
     if (!editingEnabled) return;
-    history.preview(baseState);
+    if (history.state.schema === baseState.schema) history.select(baseState.selectedIds, baseState.activeLayerId);
+  }
+  function commitCanvasText(elementId: string, cellId: string | undefined, text: string) {
+    if (!editingEnabled) return;
+    const current = historyRef.current.state;
+    const element = findV3Element(current.schema, elementId)?.element;
+    if (element?.type === "Text") commit(updateV3Element(current, elementId, { text }));
+    if (element?.type === "Flow" && element.block.type === "Grid" && cellId) {
+      const block = updateGridCell(element.block, cellId, (cell) => cell.contentKind === "Text" ? { ...cell, text } : cell);
+      commit(updateV3Element(current, elementId, { block }));
+    }
   }
   // Keyboard listeners are installed once per workspace.  Refs keep the
   // handler on the hot path stable while still reading the latest history and
@@ -319,7 +335,7 @@ export function ReportDesignerV3Workspace({
   duplicateSelectionRef.current = duplicateSelection;
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (isEditableTarget(event.target)) return;
+      if (event.defaultPrevented || isEditableTarget(event.target)) return;
       const currentHistory = historyRef.current;
       const canEdit = editingEnabledRef.current;
       const modifier = event.ctrlKey || event.metaKey;
@@ -379,7 +395,7 @@ export function ReportDesignerV3Workspace({
     <section className="report-designer-v3-workspace" aria-label="报表模板 V3 自由画布设计器">
       <header className="report-designer-v3-header">
         <div>
-          <span className="report-designer-v3-eyebrow">V3 自由画布</span>
+            <span className="report-designer-v3-eyebrow">可视化排版</span>
           <h2>{displayName || "报表模板"}</h2>
           <p>A4 固定页面 · {history.state.schema.page.orientation === "Landscape" ? "横版 297 × 210 mm" : "竖版 210 × 297 mm"} · 坐标精度 0.01 mm</p>
           {!editable ? <small>只读预览：当前权限或设备不支持设计操作。</small> : null}
@@ -501,6 +517,7 @@ export function ReportDesignerV3Workspace({
             onCancelTransform={handleCancelTransform}
             onCommitLayerBand={(role, height) => commit(setReportDesignerLayerRoleHeight(history.state, role, height))}
             onClearSelection={clearSelection}
+            onCommitText={commitCanvasText}
           />
         </main>
 

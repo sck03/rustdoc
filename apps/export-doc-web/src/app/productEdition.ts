@@ -1,6 +1,6 @@
 import { filterWorkspaceNavGroups, type WorkspaceCapabilities } from "./workspaceNavigation.ts";
 
-export type ProductEdition = "Document" | "Sales" | "Full";
+export type ProductEdition = "Document" | "Sales" | "Full" | "Administration";
 
 export type ProductEditionPresentation = {
   edition: ProductEdition;
@@ -9,10 +9,19 @@ export type ProductEditionPresentation = {
   editionName: string;
   loginTagline: string;
   englishName: string;
-  defaultRoute: "/dashboard" | "/crm/dashboard";
+  defaultRoute: "/dashboard" | "/crm/dashboard" | "/office/people";
 };
 
 const presentations: Record<ProductEdition, ProductEditionPresentation> = {
+  Administration: {
+    edition: "Administration",
+    productName: "外贸业务综合管理系统",
+    displayName: "外贸业务综合管理系统（行政版）",
+    editionName: "行政版",
+    loginTagline: "人员、会议室与物品管理工作台",
+    englishName: "Foreign Trade Business Management System",
+    defaultRoute: "/office/people",
+  },
   Document: {
     edition: "Document",
     productName: "外贸业务综合管理系统",
@@ -43,7 +52,7 @@ const presentations: Record<ProductEdition, ProductEditionPresentation> = {
 };
 
 export function normalizeProductEdition(value: unknown): ProductEdition {
-  if (value === "Document" || value === "Sales") return value;
+  if (value === "Document" || value === "Sales" || value === "Administration") return value;
   return "Full";
 }
 
@@ -60,6 +69,7 @@ export function getDefaultWorkspaceRoute(capabilities: WorkspaceCapabilities) {
       .map((item) => item.to),
   );
   const preferredRoutes = [
+    ...(capabilities.usesOfficeRegister ? ["/office/people", "/office/meeting-rooms", "/office/supplies"] : []),
     "/dashboard",
     "/crm/dashboard",
     "/payments",
@@ -74,6 +84,9 @@ export function getDefaultWorkspaceRoute(capabilities: WorkspaceCapabilities) {
     "/master-data",
     "/single-window/operation-center",
     "/tools/exchange-rates",
+    "/office/meeting-rooms",
+    "/office/supplies",
+    "/office/people",
     "/tools/email",
     "/system/about",
     "/settings",

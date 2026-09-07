@@ -67,6 +67,9 @@ const AboutPage = lazyNamed(() => import("../features/system/AboutPage.tsx"), "A
 const AuditLogPage = lazyNamed(() => import("../features/audit-logs/AuditLogPage.tsx"), "AuditLogPage");
 const AccessControlPage = lazyNamed(() => import("../features/access-control/AccessControlPage.tsx"), "AccessControlPage");
 const SettingsPage = lazyNamed(() => import("../features/settings/SettingsPage.tsx"), "SettingsPage");
+const MeetingRoomsPage = lazyNamed(() => import("../features/office/MeetingRoomsPage.tsx"), "MeetingRoomsPage");
+const OfficeSuppliesPage = lazyNamed(() => import("../features/office/OfficeSuppliesPage.tsx"), "OfficeSuppliesPage");
+const PersonnelPage = lazyNamed(() => import("../features/office/PersonnelPage.tsx"), "PersonnelPage");
 
 export function AppWorkspaceRoutes({
   activeProduct,
@@ -116,6 +119,9 @@ export function AppWorkspaceRoutes({
           ? <CustomerFollowUpPage businessTimeZone={user.businessTimeZone} client={client} />
           : <Navigate to="/dashboard" replace />} />
         <Route path="/invoices" element={<InvoiceListPage client={client} />} />
+        <Route path="/office/meeting-rooms" element={<MeetingRoomsPage client={client} user={user} />} />
+        <Route path="/office/supplies" element={<OfficeSuppliesPage client={client} user={user} />} />
+        <Route path="/office/people" element={<PersonnelPage client={client} user={user} />} />
         <Route path="/invoices/new" element={<InvoiceEditorPage businessDate={user.businessDate} client={client} mode="new" />} />
         <Route path="/invoices/:invoiceId" element={<InvoiceEditorPage businessDate={user.businessDate} client={client} mode="edit" />} />
         <Route path="/query/invoices" element={<QueryPage businessDate={user.businessDate} client={client} />} />

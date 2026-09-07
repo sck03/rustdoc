@@ -1,0 +1,83 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
+
+const repo = path.resolve(import.meta.dirname, "..");
+const web = path.join(repo, "apps/export-doc-web");
+const require = createRequire(path.join(web, "package.json"));
+const output = path.join(repo, ".codex-runtime/office-model-tests");
+fs.mkdirSync(output, { recursive: true });
+const source = name => JSON.stringify(path.join(web, "src", name).replaceAll("\\", "/"));
+const bundle = path.join(output, "model.mjs");
+await require("esbuild").build({ stdin: { contents: `
+  export * as office from ${source("features/office/officeModel.ts")};
+  export * as personnel from ${source("features/office/personnelModel.ts")};
+  export * as navigation from ${source("app/workspaceNavigation.ts")};
+  export { getDefaultWorkspaceRoute } from ${source("app/productEdition.ts")};
+  export { isRouteAccessAllowed } from ${source("app/routeAccess.ts")};
+  export { createRequestKey } from ${source("ui/createRequestKey.ts")};
+`, loader: "ts", resolveDir: web }, bundle: true, platform: "node", format: "esm", outfile: bundle, logLevel: "silent" });
+const { office, personnel, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey } = await import(pathToFileURL(bundle).href);
+const grants = scope => ["office.rooms", "office.supplies"].flatMap(resourceKey =>
+  ["view", "create", "cancel", "approve", "issue", "return", "restock", "manage"].map(action => ({ resourceKey, action, dataScope: scope })));
+const user = { id: 1, companyScope: "C1", departmentId: "D1", businessDate: "2026-09-07",
+  capabilities: { enabledModules: ["office.rooms", "office.supplies", "system.about"], permissions: grants("own"), productEdition: "Full" } };
+const row = { id: 7, meetingRoomId: 2, ownerUserId: 2, departmentId: "D2", status: "Pending", requiresKey: true,
+  startsAt: "2026-09-07T08:00:00Z", endsAt: "2026-09-07T09:00:00Z" };
+assert.deepEqual(office.officeRequestActions(row, user, "rooms"), [], "viewing a record does not allow operations beyond own scope");
+const manager = { ...user, capabilities: { ...user.capabilities, permissions: grants("company") } };
+assert.deepEqual(office.officeRequestActions(row, manager, "rooms").map(entry => entry.action), ["approve", "reject", "cancel"]);
+assert(!office.officeRequestActions({ ...row, ownerUserId: 1 }, manager, "rooms").some(entry => entry.action === "approve"), "self approval must not be offered");
+assert(!office.officeAccess({ ...user, capabilities: { permissions: grants("unknown") } }, "rooms").allows("approve"));
+assert.equal(office.officeStatus({ ...row, status: "InUse" }, user.businessDate, Date.parse(row.endsAt)), "超时未归还");
+assert.equal(office.officeStatus({ status: "Issued", isReturnable: true, returnDueDate: "2026-09-06", quantity: 2, returnedQuantity: 1 }, user.businessDate), "逾期未归还");
+assert.equal(office.officeStatus({ status: "Issued", isReturnable: true, returnDueDate: "2026-09-08", quantity: 2, returnedQuantity: 1 }, user.businessDate), "部分归还");
+assert.deepEqual(office.officeDayRange("2026-09-08", "Asia/Shanghai"), { from: "2026-09-07T16:00:00.000Z", to: "2026-09-08T16:00:00.000Z" });
+for (const [day, hours] of [["2026-03-08", 23], ["2026-11-01", 25]]) {
+  const range = office.officeDayRange(day, "America/New_York");
+  assert.equal((Date.parse(range.to) - Date.parse(range.from)) / 3600000, hours, "calendar days must honor daylight saving time");
+}
+assert.equal(office.officeDayRange("2026-02-30", "Asia/Shanghai"), null);
+assert.equal(office.shiftOfficeBookingEnd("2026-03-08T02:30", "America/New_York"), "");
+assert.equal(office.shiftOfficeBookingEnd("2026-09-07T10:30", "Asia/Shanghai"), "2026-09-07T11:30");
+assert.equal(getDefaultWorkspaceRoute(user.capabilities), "/office/meeting-rooms", "office-only employees need a usable landing page");
+assert(navigation.filterWorkspaceNavGroups(user.capabilities).some(group => group.key === "office"));
+assert(!navigation.filterWorkspaceNavGroups({ ...user.capabilities, isDesktopRuntime: true }).some(group => group.key === "office"));
+for (const pathname of ["/office/meeting-rooms", "/office/supplies"]) {
+  const args = { pathname, user, canManageSystem: false, isFullEdition: true, isDesktopRuntime: false };
+  assert(isRouteAccessAllowed(args));
+  assert(!isRouteAccessAllowed({ ...args, isDesktopRuntime: true }), "desktop deep links must be denied even with a stale capability snapshot");
+  assert(!isRouteAccessAllowed({ ...args, user: { ...user, capabilities: { ...user.capabilities, enabledModules: [] } } }));
+}
+const descriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+const personnelUser = { ...user, capabilities: { ...user.capabilities, enabledModules: ["office.people"], permissions: [{resourceKey:"office.people",action:"view",dataScope:"company"}] } };
+assert.equal(getDefaultWorkspaceRoute(personnelUser.capabilities), "/office/people");
+assert(isRouteAccessAllowed({ pathname:"/office/people",user:personnelUser,canManageSystem:false,isFullEdition:false,isDesktopRuntime:false }));
+assert(!isRouteAccessAllowed({ pathname:"/office/people",user:personnelUser,canManageSystem:true,isFullEdition:true,isDesktopRuntime:true }));
+assert(!personnel.canViewPersonnelDetails(personnelUser));
+assert(personnel.canViewPersonnelDetails({ ...personnelUser, capabilities:{permissions:[{resourceKey:"office.people",action:"view-details",dataScope:"department"}]} }));
+assert.deepEqual(personnel.personnelWorkflows({ canTransition:false,employee:{status:"Active"} }), []);
+assert.deepEqual(personnel.personnelWorkflows({ canTransition:true,employee:{status:"Departed"} }), ["rehire"]);
+assert.deepEqual(personnel.personnelReminders({ employee:{status:"Probation"},probationEndsOn:"2026-09-07",contractEndsOn:"2026-10-08" },"2026-09-07"), ["试用期即将到期：2026-09-07"]);
+assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=15&applicantUserId=7&employeeId=5")), {requestId:15,applicantUserId:7,employeeId:5});
+assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=-1&applicantUserId=2147483648&employeeId=0")), {requestId:undefined,applicantUserId:undefined,employeeId:undefined});
+const registerUser = { ...manager, capabilities: { ...manager.capabilities, productEdition:"Administration", usesOfficeRegister:true,
+  canManageSettings:true, canManageUsers:true, enabledModules:["office.rooms","office.supplies","office.people","system.about"],
+  permissions:[...grants("all"), {resourceKey:"office.people",action:"view",dataScope:"all"}] } };
+assert.equal(getDefaultWorkspaceRoute(registerUser.capabilities), "/office/people");
+assert.equal(navigation.filterWorkspaceNavGroups({ ...registerUser.capabilities, isDesktopRuntime:true }).find(group=>group.key==='office').items.length,3);
+for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supplies", "/system/access-control"]) {
+  assert(isRouteAccessAllowed({ pathname, user:registerUser, canManageSystem:true, isDesktopRuntime:true }));
+}
+assert(!isRouteAccessAllowed({pathname:"/invoices",user:registerUser,canManageSystem:true,isDesktopRuntime:true}));
+assert.equal(office.officeRequestActions({...row,status:"Approved"},registerUser,"rooms").find(item=>item.action==='cancel').label,"取消登记");
+const crypto = globalThis.crypto;
+try {
+  Object.defineProperty(globalThis, "crypto", { configurable: true, value: { getRandomValues: crypto.getRandomValues.bind(crypto) } });
+  const keys = Array.from({ length: 32 }, createRequestKey);
+  assert.equal(new Set(keys).size, keys.length);
+  assert(keys.every(key => /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(key)));
+} finally { Object.defineProperty(globalThis, "crypto", descriptor); }
+process.stdout.write("Office models, permissions, business time and intranet request keys passed.\n");

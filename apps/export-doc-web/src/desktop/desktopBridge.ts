@@ -1,10 +1,11 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import type { ProductEdition } from "../app/productEdition.ts";
 
 export type DesktopRuntimeContext = {
   apiBaseUrl: string;
   desktopAccessToken: string;
-  productEdition: "Document" | "Sales" | "Full";
+  productEdition: ProductEdition;
   platform: string;
   singleWindowStationCapable: boolean;
 };

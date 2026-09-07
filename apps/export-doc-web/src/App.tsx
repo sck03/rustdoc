@@ -31,7 +31,7 @@ import {
 import { isCurrentSession, openSessionChannel, shouldAcceptSessionUpdate, type SessionChannelMessage } from "./app/sessionChannel.ts";
 import { useBusinessDateSessionRefresh } from "./app/useBusinessDateSessionRefresh.ts";
 import { prefetchLandingDashboard } from "./app/loginPrefetch.ts";
-import { isDashboardRoute, isAdminOnlyRoute, isDesktopOnlyRoute, isFullEditionOnlyRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
+import { isDashboardRoute, isAdminOnlyRoute, isDesktopOnlyRoute, isSystemAdministrationRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
 import {
   getDefaultWorkspaceRoute,
   getProductEditionPresentation,
@@ -89,8 +89,7 @@ function App() {
   const sessionApiBaseUrl = session?.apiBaseUrl;
   const workspacePathname = session ? location.pathname : "/dashboard";
   const canManageSystem = session?.user.capabilities?.canManageSettings === true;
-  const isFullEdition = session?.user.capabilities?.productEdition?.trim().toLowerCase() === "full";
-  const canManageAuditLogs = canManageSystem && isFullEdition;
+  const canManageAuditLogs = canManageSystem && session?.user.capabilities.canManageUsers === true;
   const activeProduct = getProductEditionPresentation(
     session?.user.capabilities?.productEdition ?? desktopProductEdition,
   );
@@ -539,7 +538,7 @@ function App() {
 
     const hasAdminAccess = !isAdminOnlyRoute(location.pathname) || canManageSystem;
     const hasRuntimeAccess = !isDesktopOnlyRoute(location.pathname) || isDesktopRuntime;
-    const hasEditionAccess = !isFullEditionOnlyRoute(location.pathname) || isFullEdition;
+    const hasEditionAccess = !isSystemAdministrationRoute(location.pathname) || canManageAuditLogs;
     if (hasAdminAccess && hasRuntimeAccess && hasEditionAccess) return;
 
     const restriction = !hasAdminAccess
@@ -554,7 +553,7 @@ function App() {
       message: `${restriction}系统已返回当前账号可以使用的工作区。`,
     });
     navigate(getDefaultWorkspaceRoute(session.user.capabilities), { replace: true });
-  }, [canManageSystem, isDesktopRuntime, isFullEdition, location.pathname, navigate, session]);
+  }, [canManageSystem, isDesktopRuntime, canManageAuditLogs, location.pathname, navigate, session]);
 
   const isBusy = loginState === "loading" || desktopContextLoading;
   const loginProduct = getProductEditionPresentation(desktopProductEdition);
@@ -563,7 +562,6 @@ function App() {
     user: session.user,
     canManageSystem,
     isDesktopRuntime,
-    isFullEdition,
   });
   const sessionAttention: WorkspaceSessionAttention | null = sessionAttentionState
     ? {

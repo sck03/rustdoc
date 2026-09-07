@@ -28,13 +28,13 @@ assert.deepEqual(
 );
 assert.equal(editionCatalog.schemaVersion, 1);
 const editionEntries = Object.entries(editionCatalog.editions || {});
-assert.deepEqual(editionEntries.map(([name]) => name).sort(), ["Document", "Full", "Sales"]);
-assert.equal(new Set(editionEntries.map(([, value]) => value.identifier)).size, 3, "each product edition requires a unique identifier");
-assert.equal(new Set(editionEntries.map(([, value]) => value.releaseTagPrefix)).size, 3, "each product edition requires a unique release tag prefix");
-assert.equal(new Set(editionEntries.map(([, value]) => value.stableManifestAsset)).size, 3, "each product edition requires a unique stable manifest");
-assert.equal(new Set(editionEntries.map(([, value]) => value.stableChannelTag)).size, 3, "each product edition requires a unique stable channel tag");
+assert.deepEqual(editionEntries.map(([name]) => name).sort(), ["Administration", "Document", "Full", "Sales"]);
+assert.equal(new Set(editionEntries.map(([, value]) => value.identifier)).size, editionEntries.length, "each product edition requires a unique identifier");
+assert.equal(new Set(editionEntries.map(([, value]) => value.releaseTagPrefix)).size, editionEntries.length, "each product edition requires a unique release tag prefix");
+assert.equal(new Set(editionEntries.map(([, value]) => value.stableManifestAsset)).size, editionEntries.length, "each product edition requires a unique stable manifest");
+assert.equal(new Set(editionEntries.map(([, value]) => value.stableChannelTag)).size, editionEntries.length, "each product edition requires a unique stable channel tag");
 for (const requiredBuildContract of [
-  "product-editions.json",
+  "product-editions.mjs",
   "editionMetadata.productName",
   "editionMetadata.identifier",
   "EXPORTDOCMANAGER_UPDATER_ENDPOINT",
@@ -57,6 +57,7 @@ for (const requiredWorkflowContract of [
   "TAURI_SIGNING_PRIVATE_KEY_DOCUMENT",
   "TAURI_SIGNING_PRIVATE_KEY_SALES",
   "TAURI_SIGNING_PRIVATE_KEY_FULL",
+  "TAURI_SIGNING_PRIVATE_KEY_ADMINISTRATION",
   "Publish immutable edition release and update channel",
   "publish-tauri-updater-manifest.ps1",
   "-Edition ${{ inputs.edition }}",
@@ -78,6 +79,12 @@ assert.deepEqual(editionCatalog.editions.Sales.resourceProfile, {
   documentResources: false,
   excelAnalyzer: false,
 });
+assert.deepEqual(editionCatalog.editions.Administration.resourceProfile, editionCatalog.editions.Sales.resourceProfile);
+assert.equal(editionCatalog.editions.Administration.dependencyProfile, "core");
+assert.equal(editionCatalog.editions.Sales.dependencyProfile, "core");
+assert.match(releaseWorkflow, /secrets\[format\('TAURI_SIGNING_PRIVATE_KEY_\{0\}', steps\.edition\.outputs\.key\)\]/u,
+  "updater signing must use the selected edition key without falling back to another product");
+assert.doesNotMatch(releaseWorkflow, /inputs\.include_browser/u, "desktop resource capabilities must come from the product catalog");
 for (const requiredPortableContract of [
   "smoke-tauri-desktop.ps1",
   "UsePortableDataRoot = $true",

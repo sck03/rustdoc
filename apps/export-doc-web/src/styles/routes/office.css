@@ -1,0 +1,66 @@
+@layer route {
+  .office-workspace { display: grid; gap: 18px; min-width: 0; }
+  .office-workspace p, .office-dialog p { margin: 0; overflow-wrap: anywhere; }
+  .office-tabs { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--edm-neutral-200); }
+  .office-tabs button { min-height: 40px; border-radius: 8px; padding: 8px 16px; }
+  .office-tabs button[aria-pressed="true"] { background: var(--edm-primary-600); color: var(--edm-white); border-color: var(--edm-primary-600); }
+  .office-toolbar, .office-search, .office-card-actions, .office-card-heading, .office-card-detail, .office-period {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0;
+  }
+  .office-toolbar { gap: 12px; }
+  .office-search { flex: 1 1 260px; }
+  .office-search input { flex: 1 1 150px; width: 0; min-width: 100px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--edm-neutral-350); border-radius: 8px; background: var(--edm-white); color: var(--edm-neutral-850); }
+  .office-toolbar .checkbox-field { margin: 0; flex: 0 0 auto; }
+  .office-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .office-filter select { width: auto; min-width: 150px; }
+  .office-resource-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; }
+  .office-resource-card, .office-request-card { display: grid; align-content: start; gap: 12px; min-width: 0; padding: 18px; border: 1px solid var(--edm-neutral-250); border-radius: 12px; background: var(--edm-white); }
+  .office-card-heading { gap: 8px; }
+  .office-card-heading h2 { font-size: 1.05rem; line-height: 1.5; flex: 1 1 120px; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+  .office-card-detail { color: var(--edm-neutral-700); }
+  .office-card-detail svg { flex-shrink: 0; }
+  .office-card-description { min-height: 2.5em; white-space: pre-wrap; }
+  .office-card-actions { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--edm-neutral-200); }
+  .office-card-actions button { min-height: 38px; }
+  .office-muted { color: var(--edm-neutral-650); font-size: 0.875rem; line-height: 1.6; }
+  .office-badge { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; line-height: 1.4; color: var(--edm-neutral-750); background: var(--edm-neutral-100); }
+  .office-badge[data-state="Pending"] { background: var(--edm-warning-100); color: var(--edm-warning-800); }
+  .office-badge[data-state="Approved"], .office-badge[data-state="InUse"] { background: var(--edm-primary-100); color: var(--edm-primary-800); }
+  .office-badge[data-state="Available"], .office-badge[data-state="Completed"], .office-badge[data-state="Returned"] { background: var(--edm-success-100); color: var(--edm-success-800); }
+  .office-badge[data-state="Rejected"] { background: var(--edm-danger-100); color: var(--edm-danger-700); }
+  .office-stock-number { font-size: 0.95rem; }
+  .office-stock-number strong { font-size: 1.6rem; font-variant-numeric: tabular-nums; color: var(--edm-neutral-850); }
+  .office-request-list { display: grid; gap: 14px; }
+  .office-period { font-variant-numeric: tabular-nums; }
+  .office-dialog-backdrop { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 20px; background: color-mix(in srgb, var(--edm-primary-950) 44%, transparent); }
+  .office-dialog { display: flex; flex-direction: column; min-width: 0; width: min(100%, 760px); max-height: calc(100dvh - 40px); border-radius: 14px; background: var(--edm-white); color: var(--edm-neutral-850); border: 1px solid var(--edm-neutral-250); }
+  .office-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--edm-neutral-200); }
+  .office-dialog-header h2 { font-size: 1.125rem; margin: 0; overflow-wrap: anywhere; }
+  .office-dialog-header button { flex-shrink: 0; }
+  .office-dialog-body { display: grid; gap: 16px; min-height: 0; padding: 20px; overflow-y: auto; overscroll-behavior: contain; }
+  .office-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 0; min-width: 0; border: 0; }
+  .office-field { display: grid; gap: 7px; min-width: 0; align-content: start; }
+  .office-field > span { font-size: 0.9rem; font-weight: 600; color: var(--edm-neutral-750); }
+  .office-field input, .office-field select, .office-field textarea { width: 100%; min-width: 0; min-height: 40px; box-sizing: border-box; }
+  .office-field textarea { resize: vertical; }
+  .office-field-wide { grid-column: 1 / -1; }
+  .office-form-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 20px; }
+  .office-availability { padding: 14px; background: var(--edm-neutral-50); border-radius: 10px; border: 1px solid var(--edm-neutral-200); }
+  .office-availability h3 { margin: 0 0 10px; font-size: 0.95rem; }
+  .office-slot-list, .office-history { list-style: none; display: grid; gap: 10px; margin: 0; padding: 0; }
+  .office-slot-list li { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; font-size: 0.85rem; line-height: 1.6; }
+  .office-slot-list span { overflow-wrap: anywhere; }
+  .office-slot-list strong { white-space: nowrap; color: var(--edm-neutral-700); }
+  .office-history li { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--edm-neutral-250); border-radius: 10px; overflow-wrap: anywhere; }
+  .office-history time { font-size: 0.85rem; color: var(--edm-neutral-650); }
+  @media (max-width: 600px) {
+    .office-form-grid { grid-template-columns: minmax(0, 1fr); }
+    .office-resource-card, .office-request-card { padding: 14px; }
+    .office-dialog-backdrop { padding: 8px; }
+    .office-dialog { max-height: calc(100dvh - 16px); }
+    .office-dialog-header, .office-dialog-body { padding: 14px; }
+    .office-search { flex-basis: 100%; }
+    .office-card-actions button { flex: 1 1 auto; }
+    .office-period { align-items: flex-start; flex-direction: column; gap: 4px; }
+  }
+}

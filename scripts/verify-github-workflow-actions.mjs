@@ -141,18 +141,18 @@ if (!new RegExp(`channel\\s*=\\s*["']${requiredRustToolchain.replaceAll(".", "\\
 for (const runtimeIdentifier of runtimeIdentifiers) {
   const lockRoot = path.join(repositoryRoot, "eng", "nuget-runtime-locks", runtimeIdentifier);
   const fullLock = JSON.parse(readFileSync(path.join(lockRoot, "ExportDocManager.Api.packages.lock.json"), "utf8"));
-  const salesLock = JSON.parse(readFileSync(path.join(lockRoot, "ExportDocManager.Api.sales.packages.lock.json"), "utf8"));
+  const coreLock = JSON.parse(readFileSync(path.join(lockRoot, "ExportDocManager.Api.core.packages.lock.json"), "utf8"));
   const fullGraph = fullLock.dependencies?.["net10.0"] ?? {};
-  const salesGraph = salesLock.dependencies?.["net10.0"] ?? {};
-  if (Object.keys(salesGraph).length >= Object.keys(fullGraph).length) {
-    failures.push(`${runtimeIdentifier}: Sales API runtime graph must remain smaller than Full.`);
+  const coreGraph = coreLock.dependencies?.["net10.0"] ?? {};
+  if (Object.keys(coreGraph).length >= Object.keys(fullGraph).length) {
+    failures.push(`${runtimeIdentifier}: Core API runtime graph must remain smaller than Full.`);
   }
   for (const dependency of fullOnlyRuntimeDependencies) {
     if (!(dependency in fullGraph)) {
       failures.push(`${runtimeIdentifier}: Full API runtime graph is missing ${dependency}.`);
     }
-    if (dependency in salesGraph) {
-      failures.push(`${runtimeIdentifier}: Sales API runtime graph must not include ${dependency}.`);
+    if (dependency in coreGraph) {
+      failures.push(`${runtimeIdentifier}: Core API runtime graph must not include ${dependency}.`);
     }
   }
 }

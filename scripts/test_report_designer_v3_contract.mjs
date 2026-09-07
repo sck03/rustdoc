@@ -40,6 +40,8 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerV3HtmlExporter.ts"
 export * from ${JSON.stringify(importSpecifier("reportDesignerBlockRenderer.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerPreviewSamples.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerGridMutations.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerBlockFactories.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerV3Regions.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerTableMutations.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerLayerBands.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3WorkspaceHelpers.tsx"))};
@@ -441,9 +443,9 @@ const borderSyncedGrid = api.updateGridCellBorder(baseGrid, "b", selectedBorder)
 assert(borderSyncedGrid.rows[0].cells[1].border.right === false, "当前单元格边框开关必须写回所选单元格");
 assert(borderSyncedGrid.rows[0].cells[0].border.right === false, "折叠表格共享边必须同步相邻单元格，关闭边框后画布必须立即可见");
 assert(borderSyncedGrid.rows[1].cells[1].border.top === true && borderSyncedGrid.rows[1].cells[1].border.style === "Dashed", "共享边必须同步线型，虚线不能被相邻单元格的实线覆盖");
-const selectedGridPreview = api.renderReportDesignerBlockPreviewToHtml(borderSyncedGrid, "b");
+const selectedGridPreview = api.renderReportDesignerBlockPreviewToHtml(borderSyncedGrid);
 assert(selectedGridPreview.includes('data-report-grid-cell-id="a"') && selectedGridPreview.includes('data-report-grid-cell-id="b"'), "画布预览必须为每个普通表格单元格提供稳定命中标识");
-assert(selectedGridPreview.includes('class="is-designer-selected-cell"') && selectedGridPreview.includes("border-right: 0") && selectedGridPreview.includes("2px dashed #123456"), "画布预览必须即时显示所选单元格和边框线型/边开关");
+assert(!selectedGridPreview.includes('class="is-designer-selected-cell"') && selectedGridPreview.includes("border-right: 0") && selectedGridPreview.includes("2px dashed #123456"), "预览 HTML 只承载内容与边框，选区由画布更新，不能重建整表");
 assert(!api.renderReportDesignerBlockToHtml(borderSyncedGrid).includes("data-report-grid-cell-id"), "编辑器单元格命中标识不得进入正式报表 HTML");
 const styledGrid = api.applyGridDefaultCellStyle({ ...baseGrid, defaultCellStyle: { fontSizePt: 15, bold: true, align: "Center", marginTopMm: 2, marginBottomMm: 3 } });
 const styledGridHtml = api.renderReportDesignerBlockToHtml(styledGrid);
@@ -674,7 +676,7 @@ assert(featureHtml.includes("edm-v3-flow-item-pagebreak"), "Flow 页面断点必
 assert(featureHtml.includes("top: 291mm"), "贴底页脚必须把内容底边对齐到 A4 物理页底");
 assert(featureHtml.includes("edm-v3-line-horizontal") && featureHtml.includes("height: 1px"), "线元素输出必须保持与预览一致的细线厚度");
 assert(canvasSource.includes("data-v3-layer-name={layer.name}") && canvasElementSource.includes("report-designer-v3-preview-line-"), "V3 画布必须标识图层并使用独立细线预览");
-assert(canvasSource.includes("createV3MoveConstraint") && canvasSource.includes("findReportDesignerElementNodes") && canvasSource.includes("translate3d"), "复杂模板拖动必须预计算边界、缓存元素节点并使用合成层位移");
+assert(canvasSource.includes("createV3RegionMoveConstraint") && canvasSource.includes("findReportDesignerElementNodes") && canvasSource.includes("translate3d"), "复杂模板拖动必须预计算边界、缓存元素节点并使用合成层位移");
 assert(canvasSource.includes("--v3-page-ratio") && canvasCss.includes("aspect-ratio: var(--v3-page-ratio"), "V3 画布必须按 A4 物理宽高比渲染横竖版页面");
 assert(canvasCss.includes("report-designer-v3-layer::before") && canvasCss.includes("report-designer-v3-preview-line-horizontal"), "V3 画布样式必须显示图层标识和细线方向");
 assert(panelsSource.includes('label="普通表格"') && panelsSource.includes("明细表（自动重复）") && !panelsSource.includes('label="票据格"'), "组件入口必须清楚区分普通表格和自动重复明细表");
@@ -802,5 +804,48 @@ const unsafeImageSchema = {
 };
 const unsafeImageHtml = api.exportReportDesignerV3SchemaToHtml(unsafeImageSchema, "ExportDocument");
 assert(!unsafeImageHtml.includes("evil.example") && !unsafeImageHtml.includes("https://"), "非法资源标识必须被清理，不能进入导出 HTML");
+
+{
+  const schema = api.parseReportDesignerV3FromHtml("", "ExportDocument").schema;
+  schema.layers.forEach(layer => { layer.elements = []; if (layer.role === "Header") layer.designHeightHundredthMm = 6000; });
+  const header = schema.layers.find(layer => layer.role === "Header");
+  const body = schema.layers.find(layer => layer.role === "Body");
+  const overlay = schema.layers.find(layer => layer.role === "Overlay");
+  const state = api.createReportDesignerV3DocumentState(schema);
+  assert(state.activeLayerId === body.id, "工作区应默认在主体中开始编辑");
+  const grid = api.createV3FlowElement(api.createGridBlock(), 1000, 700);
+  const inserted = api.insertV3Element(state, header.id, grid);
+  const moved = api.moveSelectedV3Elements(inserted, 0, 7000, false);
+  const located = api.findV3Element(moved.schema, grid.id);
+  assert(located.layer.role === "Body" && located.element.yHundredthMm === 7700, "跨分界拖动必须同步真实归属并保持页面坐标");
+  assert(moved.activeLayerId === body.id && moved.selectedIds[0] === grid.id, "跨区域后选区和活动区域必须一致");
+  assert(api.findV3Element(inserted.schema, grid.id).layer.role === "Header", "区域移动必须保留原快照供撤销使用");
+  assert(api.exportReportDesignerV3SchemaToHtml(moved.schema).includes('edm-v3-flow-item-grid'), "移到主体的普通表格必须进入正式流式输出");
+  const coordinateMove = api.updateV3Element(moved, grid.id, { yHundredthMm: 700 });
+  assert(api.findV3Element(coordinateMove.schema, grid.id).layer.role === "Header", "属性坐标与拖动必须共用区域判断");
+  const incorrectOwnership = { ...inserted, schema: { ...inserted.schema, layers: inserted.schema.layers.map(layer => layer.id === header.id
+    ? { ...layer, elements: [{ ...grid, yHundredthMm: 10000 }] } : layer) } };
+  const repaired = api.moveV3SelectionToRegion(incorrectOwnership, body.id);
+  assert(api.findV3Element(repaired.schema, grid.id).element.yHundredthMm === 10000, "明确切换区域不得让已在目标区域内的元素跳位");
+  for (const block of [api.createDetailTableBlock(), api.createPageBreakBlock()]) {
+    const flow = api.createV3FlowElement(block);
+    const added = api.insertV3Element(state, header.id, flow);
+    assert(api.findV3Element(added.schema, flow.id).layer.role === "Body", "主体业务组件不能继承页眉插入上下文");
+    assert(api.findV3Element(added.schema, flow.id).element.yHundredthMm >= 6000, "主体业务组件必须位于真实主体分界之后");
+    assert(api.moveV3SelectionToRegion(added, header.id) === added, "明细和分页符不能被显式移入页眉");
+    const edited = api.updateV3Element(added, flow.id, { yHundredthMm: 0 });
+    assert(api.findV3Element(edited.schema, flow.id).element.yHundredthMm >= 6000, "精确坐标不能把主体专属元素放到页眉");
+    const pasted = api.pasteV3Elements(state, [flow], header.id);
+    assert(api.findV3Element(pasted.schema, pasted.selectedIds[0]).layer.role === "Body", "粘贴同样必须保持主体专属约束");
+  }
+  const lockedBody = { ...inserted, schema: { ...inserted.schema, layers: inserted.schema.layers.map(layer => layer.id === body.id ? { ...layer, locked: true } : layer) } };
+  assert(api.moveSelectedV3Elements(lockedBody, 0, 7000, false) === lockedBody, "目标区域锁定时不得部分提交移动");
+  const fullBody = { ...inserted, schema: { ...inserted.schema, layers: inserted.schema.layers.map(layer => layer.id === body.id
+    ? { ...layer, elements: Array.from({ length: 1000 }, (_, index) => ({ ...api.createV3TextElement(), id: 'capacity-'+index })) } : layer) } };
+  assert(api.moveSelectedV3Elements(fullBody, 0, 7000, false) === fullBody, "跨区域容量失败必须保留完整原快照");
+  const watermark = api.insertV3Element(state, overlay.id, api.createV3TextElement());
+  const shifted = api.moveSelectedV3Elements(watermark, 0, 7000, false);
+  assert(api.findV3Element(shifted.schema, shifted.selectedIds[0]).layer.id === overlay.id, "覆盖层元素不得因拖动自动改变打印语义");
+}
 
 console.log("report-designer-v3-contract test passed");

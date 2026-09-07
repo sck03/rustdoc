@@ -27,6 +27,8 @@ on:
       - "Directory.Packages.props"
       - "src/ExportDocManager.Infrastructure/**"
       - "tests/ExportDocManager.Api.Tests/PostgreSqlIntegrationTests.cs"
+      - "tests/ExportDocManager.Api.Tests/OfficePostgreSqlScenarios.cs"
+      - "tests/ExportDocManager.Api.Tests/PersonnelPostgreSqlScenarios.cs"
       - "tests/ExportDocManager.Infrastructure.Tests/**"
       - ".github/workflows/postgresql-integration-validation.yml"
   pull_request:
@@ -34,6 +36,8 @@ on:
       - "Directory.Packages.props"
       - "src/ExportDocManager.Infrastructure/**"
       - "tests/ExportDocManager.Api.Tests/PostgreSqlIntegrationTests.cs"
+      - "tests/ExportDocManager.Api.Tests/OfficePostgreSqlScenarios.cs"
+      - "tests/ExportDocManager.Api.Tests/PersonnelPostgreSqlScenarios.cs"
       - "tests/ExportDocManager.Infrastructure.Tests/**"
       - ".github/workflows/postgresql-integration-validation.yml"
 

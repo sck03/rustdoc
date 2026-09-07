@@ -70,7 +70,9 @@ label {
 }
 
 label input,
-label select {
+label select,
+.remote-select-field input,
+.remote-select-field select {
   width: 100%;
   height: 38px;
   padding: 0 10px;
@@ -83,7 +85,9 @@ label select {
 
 label input:disabled,
 label select:disabled,
-label textarea:disabled {
+label textarea:disabled,
+.remote-select-field input:disabled,
+.remote-select-field select:disabled {
   color: var(--edm-ink-500);
   background: var(--edm-neutral-100);
   border-color: var(--edm-neutral-350);
@@ -92,6 +96,8 @@ label textarea:disabled {
 label input:focus,
 label select:focus,
 label textarea:focus,
+.remote-select-field input:focus,
+.remote-select-field select:focus,
 .search-form:focus-within {
   border-color: var(--edm-primary-600);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--edm-primary-650) 14%, transparent);

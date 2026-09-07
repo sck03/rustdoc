@@ -7,7 +7,8 @@ import {
   hasWorkspacePathPermission,
   isAdminOnlyRoute,
   isDesktopOnlyRoute,
-  isFullEditionOnlyRoute,
+  isOfficeRoute,
+  isSystemAdministrationRoute,
 } from "./workspaceNavigation.ts";
 
 export function isRouteAccessAllowed({
@@ -15,18 +16,17 @@ export function isRouteAccessAllowed({
   user,
   canManageSystem,
   isDesktopRuntime,
-  isFullEdition,
 }: {
   pathname: string;
   user: ApiUserDto;
   canManageSystem: boolean;
   isDesktopRuntime: boolean;
-  isFullEdition: boolean;
 }) {
   const workspaceAndModuleAllowed = isWorkspaceModuleAccessAllowed(pathname, user);
   const adminAllowed = !isAdminOnlyRoute(pathname) || canManageSystem;
-  const runtimeAllowed = !isDesktopOnlyRoute(pathname) || isDesktopRuntime;
-  const editionAllowed = !isFullEditionOnlyRoute(pathname) || isFullEdition;
+  const runtimeAllowed = (!isDesktopOnlyRoute(pathname) || isDesktopRuntime) &&
+    (!isOfficeRoute(pathname) || !isDesktopRuntime || user.capabilities.usesOfficeRegister);
+  const editionAllowed = !isSystemAdministrationRoute(pathname) || user.capabilities.canManageUsers;
   return workspaceAndModuleAllowed && adminAllowed && runtimeAllowed && editionAllowed;
 }
 

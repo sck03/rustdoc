@@ -1,16 +1,19 @@
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Office;
 
 namespace ExportDocManager.Api.Hosting
 {
     public sealed class ApiAuthorizationService
     {
         private readonly string _productEdition;
+        private readonly bool _networkMode;
 
         public ApiAuthorizationService(ApiRuntimeOptions runtimeOptions)
         {
             ArgumentNullException.ThrowIfNull(runtimeOptions);
             _productEdition = ProductEditionCatalog.Normalize(runtimeOptions.ProductEdition);
+            _networkMode = runtimeOptions.NetworkMode;
         }
 
         public bool CanManageSettings(User user)
@@ -21,13 +24,13 @@ namespace ExportDocManager.Api.Hosting
         public bool CanManageUsers(User user)
         {
             return IsAdministrator(user) &&
-                   string.Equals(_productEdition, ProductEditionCatalog.Full, StringComparison.OrdinalIgnoreCase);
+                   ProductEditionCatalog.IncludesSystemAdministration(_productEdition);
         }
 
         public bool CanManageAuditLogs(User user)
         {
             return IsAdministrator(user) &&
-                   string.Equals(_productEdition, ProductEditionCatalog.Full, StringComparison.OrdinalIgnoreCase);
+                   ProductEditionCatalog.IncludesSystemAdministration(_productEdition);
         }
 
         public bool CanManageDisasterRecovery(User user)
@@ -36,7 +39,7 @@ namespace ExportDocManager.Api.Hosting
             // replace the database and runtime files.  It is an identity
             // capability, never a user-configurable module grant.
             return IsAdministrator(user) &&
-                   string.Equals(_productEdition, ProductEditionCatalog.Full, StringComparison.OrdinalIgnoreCase);
+                   ProductEditionCatalog.IncludesSystemAdministration(_productEdition);
         }
 
         public bool CanViewAllBusinessData(User user)
@@ -115,21 +118,14 @@ namespace ExportDocManager.Api.Hosting
             }
 
             var resource = PermissionResourceCatalog.ByKey[resourceKey.Trim()];
-            if (!EditionIncludes(resource.Workspace))
+            if (!IsPermissionAvailable(resource.Key, action))
             {
                 return false;
             }
 
             if (RequiresAdministratorIdentity(resource.Key))
             {
-                bool requiresFullEdition = resource.Key is
-                    PermissionResourceCatalog.SystemDisasterRecovery or
-                    PermissionResourceCatalog.SystemUsers or
-                    PermissionResourceCatalog.SystemPermissions or
-                    PermissionResourceCatalog.SystemAudit;
-                return IsAdministrator(user) &&
-                    (!requiresFullEdition ||
-                     string.Equals(_productEdition, ProductEditionCatalog.Full, StringComparison.OrdinalIgnoreCase));
+                return IsAdministrator(user);
             }
 
             if (IsAdministrator(user))
@@ -203,7 +199,8 @@ namespace ExportDocManager.Api.Hosting
                 enabledModules,
                 moduleAccess.Select(grant => new ApiModuleAccessDto(grant.Key, grant.Value)).ToArray(),
                 permissions.Select(grant => new ApiPermissionGrantDto(
-                    grant.ResourceKey, grant.Action, grant.DataScope)).ToArray());
+                    grant.ResourceKey, grant.Action, grant.DataScope)).ToArray(),
+                OfficeMode == OfficeOperatingMode.LocalRegister);
         }
 
         public IReadOnlyList<EffectivePermissionGrant> GetPermissionGrants(User user)
@@ -229,8 +226,7 @@ namespace ExportDocManager.Api.Hosting
                     .OfType<EffectivePermissionGrant>();
             }
             return grants
-                .Where(grant => PermissionResourceCatalog.ByKey.TryGetValue(grant.ResourceKey, out var resource) &&
-                    EditionIncludes(resource.Workspace) &&
+                .Where(grant => IsPermissionAvailable(grant.ResourceKey, grant.Action) &&
                     PermissionDataScope.IsKnown(grant.DataScope))
                 .GroupBy(grant => PermissionResourceCatalog.CreateGrantKey(grant.ResourceKey, grant.Action),
                     StringComparer.OrdinalIgnoreCase)
@@ -241,10 +237,16 @@ namespace ExportDocManager.Api.Hosting
                 .ToArray();
         }
 
-        private bool EditionIncludes(string workspace) =>
-            workspace == "common" ||
-            workspace == "document" && ProductEditionCatalog.IncludesDocumentWorkspace(_productEdition) ||
-            workspace == "sales" && ProductEditionCatalog.IncludesSalesWorkspace(_productEdition);
+        public OfficeOperatingMode OfficeMode => ProductEditionCatalog.OfficeMode(_productEdition, _networkMode);
+
+        public bool IsResourceAvailable(PermissionResourceDefinition resource) =>
+            ProductEditionCatalog.IncludesResource(_productEdition, resource, _networkMode);
+
+        public bool IsPermissionAvailable(string resourceKey, string action) =>
+            PermissionResourceCatalog.IsKnownAction(resourceKey, action) &&
+            PermissionResourceCatalog.ByKey.TryGetValue(resourceKey, out var resource) && IsResourceAvailable(resource) &&
+            !(OfficeMode == OfficeOperatingMode.LocalRegister && resource.Workspace == "office" &&
+                action is PermissionAction.Approve or PermissionAction.Assign);
 
         private static bool RequiresAdministratorIdentity(string resourceKey) => resourceKey is
             PermissionResourceCatalog.SystemUsers or

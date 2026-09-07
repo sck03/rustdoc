@@ -19,7 +19,8 @@ import type {
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
-import { CommitTextField, ensureCurrentSelectOption, type SelectOption } from "./ReportDesignerPropertyControls.tsx";
+import { CommitTextField, DesignerCheckbox as CheckRow, ensureCurrentSelectOption, type SelectOption } from "./ReportDesignerPropertyControls.tsx";
+import { moveV3SelectionToRegion, requiresV3BodyRegion, v3RegionNames } from "./reportDesignerV3Regions.ts";
 import { ReportDesignerV3ColorField } from "./ReportDesignerV3ColorField.tsx";
 import { ReportDesignerV3FlowProperties } from "./ReportDesignerV3FlowProperties.tsx";
 import { reportDesignerLayerHeight, resolveReportDesignerLayerBands, setReportDesignerLayerHeight } from "./reportDesignerLayerBands.ts";
@@ -34,6 +35,7 @@ import {
 import {
   hundredthMmToMm,
   reportDesignerV3ElementText,
+  reportDesignerV3ElementKindLabel,
   type ReportDesignerV3Element,
   type ReportDesignerV3ElementStyle,
   type ReportDesignerV3ImageResource,
@@ -88,7 +90,7 @@ export function ComponentPalette({ reportType, actions, canEdit = true }: { repo
       <PaletteSection title="打印">
         <PaletteAction label="分页符" onClick={actions.pageBreak} icon={<FilePlus2 size={15} aria-hidden="true" />} disabled={!canEdit} />
       </PaletteSection>
-      <div className="report-designer-v3-help">先选中元素，再在右侧输入精确坐标。页面始终是 A4，横竖版切换会自动限制元素在页面内。</div>
+      <div className="report-designer-v3-help">双击文字或单元格直接编辑，也可选中后按 F2。拖动移动，拖动边角调大小；更多设置在右侧。</div>
       <div className="report-designer-v3-report-type">当前数据域：{reportType === "PaymentVoucher" ? "付款/报销" : "出口单据"}</div>
     </div>
   );
@@ -189,7 +191,7 @@ function LayerRow({ layer, state, onSelect, onCommit, canEdit }: { layer: Report
                 onCommit({ ...state, selectedIds: [element.id], activeLayerId: layer.id });
                 focusDesignerNode(`[data-v3-element-id="${CSS.escape(element.id)}"]`);
               }}>
-                <span><strong>{element.type}</strong> {reportDesignerV3ElementText(element) || element.type}</span>
+                <span>{element.type !== "Flow" ? <strong>{reportDesignerV3ElementKindLabel(element)} </strong> : null}{reportDesignerV3ElementText(element) || reportDesignerV3ElementKindLabel(element)}</span>
                 <small>{element.locked ? "已锁定" : `${hundredthMmToMm(element.xHundredthMm).toFixed(1)}, ${hundredthMmToMm(element.yHundredthMm).toFixed(1)} mm`}</small>
               </button>
             ))}
@@ -299,6 +301,7 @@ export function MultiElementInspector({
   return (
     <div className="report-designer-v3-inspector-content">
       <InspectorTitle title="多选属性" subtitle={`已选中 ${selectedCount} 个元素`} />
+      <RegionSelector state={state} onCommit={onCommit} disabled={!canEdit || allLocked} />
       <div className="report-designer-v3-element-type-badge">批量操作</div>
       <div className="report-designer-v3-multi-section">
         <strong>对齐排列</strong>
@@ -345,7 +348,7 @@ export function MultiElementInspector({
               }}
               title="点击单独选中此元素"
             >
-              <span><strong>{element.type}</strong> {reportDesignerV3ElementText(element) || element.type}</span>
+              <span>{element.type !== "Flow" ? <strong>{reportDesignerV3ElementKindLabel(element)} </strong> : null}{reportDesignerV3ElementText(element) || reportDesignerV3ElementKindLabel(element)}</span>
               <small>{hundredthMmToMm(element.xHundredthMm).toFixed(1)}, {hundredthMmToMm(element.yHundredthMm).toFixed(1)} mm</small>
             </button>
           ))}
@@ -388,8 +391,10 @@ export function ElementInspector({
   const editable = canEdit && !element.locked && !layer.locked;
   return (
     <div className="report-designer-v3-inspector-content">
-      <InspectorTitle title="元素属性" subtitle={reportDesignerV3ElementText(element) || element.type} />
-      <div className="report-designer-v3-element-type-badge">{element.type}{element.type === "Flow" ? ` · ${element.flowKind}` : ""}</div>
+      <InspectorTitle title={element.type === "Flow" ? reportDesignerV3ElementText(element) : "元素属性"} subtitle={`${v3RegionNames[layer.role]}区域${element.locked || layer.locked ? " · 已锁定" : ""}`} />
+      <RegionSelector state={state} onCommit={onCommit} disabled={!editable} />
+      <details className="report-designer-property-section" open={element.type !== "Flow"}>
+      <summary>位置与大小 <small>{hundredthMmToMm(element.widthHundredthMm)} × {hundredthMmToMm(element.heightHundredthMm)} mm</small></summary>
       <div className="report-designer-v3-inspector-grid">
         <NumberField label="X (mm)" value={hundredthMmToMm(element.xHundredthMm)} disabled={!editable} onCommit={(value) => onPatch({ xHundredthMm: Math.round(value * 100) })} />
         <NumberField label="Y (mm)" value={hundredthMmToMm(element.yHundredthMm)} disabled={!editable} onCommit={(value) => onPatch({ yHundredthMm: Math.round(value * 100) })} />
@@ -397,14 +402,17 @@ export function ElementInspector({
         <NumberField label="高 (mm)" value={hundredthMmToMm(element.heightHundredthMm)} min={4} disabled={!editable} onCommit={(value) => onPatch({ heightHundredthMm: Math.round(value * 100) })} />
         <NumberField label="旋转角度 (°)" value={element.rotationDeg} min={-360} max={360} disabled={!editable} onCommit={(value) => onPatch({ rotationDeg: Math.round(value * 100) / 100 })} />
       </div>
+      </details>
       <ElementContentEditor element={element} reportType={state.schema.reportType} resources={state.schema.resources ?? []} fieldGroups={fieldGroups} editable={editable} client={client} onPatch={onPatch} onFlowCommit={onFlowCommit} selectedGridCellId={selectedGridCellId} onSelectGridCell={onSelectGridCell} onImageResourceUploaded={onImageResourceUploaded} />
       {element.type !== "Flow" ? <ElementStyleEditor style={element.style} editable={editable} onPatch={onPatchStyle} /> : null}
+      <details className="report-designer-property-section"><summary>排列与输出</summary>
       <div className="report-designer-v3-element-actions">
         {(["back", "backward", "forward", "front"] as const).map((direction) => <button key={direction} type="button" onClick={() => onZIndex(direction)} disabled={!editable}>{direction === "back" ? "置底" : direction === "backward" ? "后移" : direction === "forward" ? "前移" : "置顶"}</button>)}
       </div>
       <CheckRow checked={element.visible} disabled={!canEdit} onChange={(checked) => onCommit(updateV3Element(state, element.id, { visible: checked }))}>在画布中显示</CheckRow>
       <CheckRow checked={element.outputEnabled} disabled={!canEdit} onChange={(checked) => onCommit(updateV3Element(state, element.id, { outputEnabled: checked }))}>参与打印输出</CheckRow>
       <CheckRow checked={element.locked} disabled={!canEdit || layer.locked} onChange={(checked) => onCommit(updateV3Element(state, element.id, { locked: checked }))}>锁定元素</CheckRow>
+      </details>
       {layer.locked ? <div className="report-designer-v3-lock-note"><Lock size={14} aria-hidden="true" />图层已锁定，请先在图层面板解锁。</div> : null}
     </div>
   );
@@ -429,7 +437,7 @@ function ElementContentEditor({ element, reportType, resources, fieldGroups, edi
     case "Line":
       return <SelectField label="方向" value={element.direction} options={[{ value: "Horizontal", label: "水平" }, { value: "Vertical", label: "垂直" }]} disabled={!editable} onChange={(direction) => onPatch({ direction: direction === "Vertical" ? "Vertical" : "Horizontal" })} />;
     case "Flow":
-      return <><div className="report-designer-v3-inspector-tip">结构化业务组件的内容和样式在下方统一编辑；普通表格也可直接点击画布单元格切换选区。</div><fieldset className="report-designer-v3-flow-editor" disabled={!editable}><ReportDesignerV3FlowProperties block={element.block} fieldGroups={fieldGroups} selectedGridCellId={selectedGridCellId} onSelectGridCell={onSelectGridCell} onCommit={onFlowCommit} /></fieldset></>;
+      return <fieldset className="report-designer-v3-flow-editor" aria-label="表格与内容属性" disabled={!editable}><ReportDesignerV3FlowProperties block={element.block} fieldGroups={fieldGroups} selectedGridCellId={selectedGridCellId} onSelectGridCell={onSelectGridCell} onCommit={onFlowCommit} /></fieldset>;
     case "Rectangle":
       return null;
   }
@@ -531,12 +539,19 @@ function InspectorTitle({ title, subtitle }: { title: string; subtitle: string }
   return <div className="report-designer-v3-inspector-title"><strong>{title}</strong><span>{subtitle}</span></div>;
 }
 
-function CheckRow({ checked, disabled = false, onChange, children }: { checked: boolean; disabled?: boolean; onChange: (checked: boolean) => void; children: ReactNode }) {
-  return <label className="report-designer-v3-check-row"><input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /><span>{children}</span></label>;
+function RegionSelector({ state, onCommit, disabled }: { state: ReportDesignerV3DocumentState; onCommit: (next: ReportDesignerV3DocumentState) => void; disabled: boolean }) {
+  const located = state.selectedIds.map((id) => findV3Element(state.schema, id)).filter((item): item is LocatedElement => item !== null);
+  const ids = new Set(located.map((item) => item.layer.id));
+  const bodyOnly = located.some((item) => requiresV3BodyRegion(item.element));
+  return <div className="report-designer-region-control"><label><span>所在区域</span><select aria-label="元素所在区域" disabled={disabled} value={ids.size === 1 ? located[0].layer.id : ""} onChange={(event) => onCommit(moveV3SelectionToRegion(state, event.target.value))}>
+    {ids.size !== 1 ? <option value="" disabled>多个区域</option> : null}
+    {state.schema.layers.map((layer) => <option key={layer.id} value={layer.id} disabled={layer.locked || !layer.visible || (bodyOnly && layer.role !== "Body")}>{layer.name}{layer.locked ? "（已锁定）" : !layer.visible ? "（已隐藏）" : ""}</option>)}
+  </select></label><small>{bodyOnly ? "自动重复明细和分页符放在主体区域。" : "跨区域拖动时自动更新；覆盖层用于水印等固定内容。"}</small></div>;
 }
 
 function NumberField({ label, value, onCommit, min = 0, max = 1000, disabled = false }: { label: string; value: number; onCommit: (value: number) => void; min?: number; max?: number; disabled?: boolean }) {
   const [draft, setDraft] = useState(formatNumber(value));
+  const [focused, setFocused] = useState(false);
   const cancelOnBlur = useRef(false);
   useEffect(() => setDraft(formatNumber(value)), [value]);
   function commit() {
@@ -551,7 +566,7 @@ function NumberField({ label, value, onCommit, min = 0, max = 1000, disabled = f
     setDraft(formatNumber(next));
     if (next !== value) onCommit(next);
   }
-  return <label><span>{label}</span><input type="number" inputMode="decimal" step="0.01" min={min} max={max} disabled={disabled} value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelOnBlur.current = true; setDraft(formatNumber(value)); event.currentTarget.blur(); } else if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} /></label>;
+  return <label><span>{label}</span><input type="number" inputMode="decimal" step="0.01" min={min} max={max} disabled={disabled} value={focused ? draft : formatNumber(value)} onFocus={() => { setFocused(true); setDraft(formatNumber(value)); }} onChange={(event) => setDraft(event.target.value)} onBlur={() => { setFocused(false); commit(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelOnBlur.current = true; setDraft(formatNumber(value)); event.currentTarget.blur(); } else if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} /></label>;
 }
 
 export function focusDesignerNode(selector: string) {

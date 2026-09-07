@@ -2,6 +2,9 @@
 .report-designer-v3-layer-body::after { top: var(--v3-header-band-height); height: calc(100% - var(--v3-header-band-height) - var(--v3-footer-band-height)); }
 .report-designer-v3-layer-footer::after { top: calc(100% - var(--v3-footer-band-height)); height: var(--v3-footer-band-height); }
 .report-designer-v3-layer-overlay::after { top: 0; height: 100%; }
+.report-designer-v3-layer-body { --v3-layer-label-top: calc(var(--v3-header-band-height) + 4px); }
+.report-designer-v3-layer-footer { --v3-layer-label-top: calc(100% - var(--v3-footer-band-height) + 4px); }
+.report-designer-v3-layer-overlay { --v3-layer-label-left: auto; --v3-layer-label-right: 4px; }
 
 .report-designer-v3-layer-design-fields {
   display: grid;

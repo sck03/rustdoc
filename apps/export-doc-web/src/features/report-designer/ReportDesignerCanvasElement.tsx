@@ -1,4 +1,5 @@
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import { memo, useLayoutEffect, useMemo, useRef, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import type { ReportBlock } from "./reportDesignerSchema.ts";
 import { renderReportDesignerBlockPreviewToHtml } from "./reportDesignerBlockRenderer.ts";
 import type { ReportDesignerV3ResizeDirection } from "./reportDesignerV3Mutations.ts";
 import {
@@ -6,7 +7,7 @@ import {
   type ReportDesignerV3Element,
 } from "./reportDesignerV3Schema.ts";
 
-export function ReportDesignerCanvasElementPreview({ element, selectedGridCellId }: {
+export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCanvasElementPreview({ element, selectedGridCellId }: {
   element: ReportDesignerV3Element;
   selectedGridCellId?: string;
 }) {
@@ -31,21 +32,32 @@ export function ReportDesignerCanvasElementPreview({ element, selectedGridCellId
     case "Flow":
       return (
         <div className="report-designer-v3-preview-flow" aria-label={`${element.flowKind} 结构预览`}>
-          <div
-            className="report-designer-v3-preview-flow-content"
-            dangerouslySetInnerHTML={{ __html: renderReportDesignerBlockPreviewToHtml(element.block, selectedGridCellId) }}
-          />
+          <FlowPreview block={element.block} selectedCellId={selectedGridCellId} />
         </div>
       );
   }
+});
+
+function FlowPreview({ block, selectedCellId }: { block: ReportBlock; selectedCellId?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const html = useMemo(() => ({ __html: renderReportDesignerBlockPreviewToHtml(block) }), [block]);
+  useLayoutEffect(() => {
+    if (!selectedCellId) return;
+    const cell = ref.current?.querySelector(`[data-report-grid-cell-id="${CSS.escape(selectedCellId)}"]`);
+    cell?.classList.add("is-designer-selected-cell");
+    return () => cell?.classList.remove("is-designer-selected-cell");
+  }, [html, selectedCellId]);
+  return <div ref={ref} className="report-designer-v3-preview-flow-content" dangerouslySetInnerHTML={html} />;
 }
 
 export function ReportDesignerCanvasResizeHandles({
   elementId,
   onPointerDown,
+  onKeyDown,
 }: {
   elementId: string;
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>, elementId: string, direction: ReportDesignerV3ResizeDirection) => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>, elementId: string, direction: ReportDesignerV3ResizeDirection) => void;
 }) {
   const directions: ReportDesignerV3ResizeDirection[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
   return (
@@ -55,8 +67,10 @@ export function ReportDesignerCanvasResizeHandles({
           className={`report-designer-v3-handle report-designer-v3-handle-${direction}`}
           key={direction}
           type="button"
-          aria-label={`调整大小 ${direction}`}
+          aria-label={`调整${({ nw: "左上角", n: "上边", ne: "右上角", e: "右边", se: "右下角", s: "下边", sw: "左下角", w: "左边" })[direction]}尺寸`}
+          title="拖动调整尺寸，也可使用方向键；Shift 加大步长"
           onPointerDown={(event) => onPointerDown(event, elementId, direction)}
+          onKeyDown={(event) => onKeyDown(event, elementId, direction)}
         />
       ))}
     </>

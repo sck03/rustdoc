@@ -61,6 +61,7 @@ function BaselineApp() {
     capabilities: {
       canManageSettings: true,
       canManageUsers: true,
+      usesOfficeRegister: false,
       canViewAllBusinessData: true,
       canUseDocumentWorkspace: true,
       canUseSalesWorkspace: true,

@@ -14,7 +14,7 @@ $runner = Join-Path $scriptRoot "run-tauri-local.ps1"
 $results = New-Object System.Collections.Generic.List[object]
 $powerShellExecutable = Resolve-ExportDocPowerShellExecutable
 
-foreach ($edition in @("Document", "Sales", "Full")) {
+foreach ($edition in (Get-ExportDocProductEditionNames)) {
     $startedAt = Get-Date
     Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments @(
         "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",

@@ -30,9 +30,6 @@ on:
       edition:
         required: true
         type: string
-      include_browser:
-        required: true
-        type: boolean
       publish_release:
         required: true
         type: boolean
@@ -48,6 +45,10 @@ on:
       TAURI_SIGNING_PRIVATE_KEY_FULL:
         required: false
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD_FULL:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_ADMINISTRATION:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD_ADMINISTRATION:
         required: false
 
 concurrency:
@@ -76,10 +77,8 @@ jobs:
       EXPORTDOCMANAGER_TAURI_RID: ${{ inputs.runtime_identifier }}
       EXPORTDOCMANAGER_RUST_TARGET: ${{ inputs.rust_target }}
       EXPORTDOCMANAGER_PRODUCT_EDITION: ${{ inputs.edition }}
-      EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER: ${{ inputs.include_browser && 'false' || 'true' }}
+      EXPORTDOCMANAGER_ALLOW_MISSING_BROWSER: 'false'
       EXPORTDOCMANAGER_REQUIRE_SIGNED_UPDATER: ${{ inputs.publish_release && 'true' || 'false' }}
-      EXPORTDOCMANAGER_UPDATER_ENDPOINT: ${{ inputs.edition == 'Document' && vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT_DOCUMENT || inputs.edition == 'Sales' && vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT_SALES || vars.EXPORTDOCMANAGER_UPDATER_ENDPOINT_FULL }}
-      EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY: ${{ inputs.edition == 'Document' && vars.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_DOCUMENT || inputs.edition == 'Sales' && vars.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_SALES || vars.EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_FULL }}
       EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT: ${{ vars.EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT }}
 
     steps:
@@ -89,6 +88,18 @@ jobs:
       - name: Verify public repository boundary
         shell: pwsh
         run: ./scripts/github/verify-public-source.ps1
+
+      - name: Resolve product capabilities
+        id: edition
+        shell: pwsh
+        run: |
+          . ./scripts/lib/product-editions.ps1
+          $edition = Resolve-ExportDocProductEdition -Edition $env:EXPORTDOCMANAGER_PRODUCT_EDITION
+          $catalog = Get-Content ./scripts/product-editions.json -Raw | ConvertFrom-Json
+          $profile = $catalog.editions.$edition.resourceProfile
+          "key=$($edition.ToUpperInvariant())" >> $env:GITHUB_OUTPUT
+          "browser=$($profile.browserRenderer.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "ocr=$($profile.ocr.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
       - name: Install Linux desktop packaging dependencies
         if: runner.os == 'Linux'
@@ -159,7 +170,7 @@ jobs:
         run: cargo fetch --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml --locked --target ${{ inputs.rust_target }}
 
       - name: Provision Chrome Headless Shell
-        if: inputs.include_browser && inputs.chrome_platform != 'chromium-linux-arm64'
+        if: steps.edition.outputs.browser == 'true' && inputs.chrome_platform != 'chromium-linux-arm64'
         shell: pwsh
         run: >-
           ./scripts/provision-chrome-for-testing.ps1
@@ -167,12 +178,12 @@ jobs:
           -Platform ${{ inputs.chrome_platform }}
 
       - name: Provision Chromium ARM64
-        if: inputs.include_browser && inputs.chrome_platform == 'chromium-linux-arm64'
+        if: steps.edition.outputs.browser == 'true' && inputs.chrome_platform == 'chromium-linux-arm64'
         shell: pwsh
         run: ./scripts/provision-playwright-chromium-arm64.ps1
 
       - name: Verify staged Chrome Headless Shell
-        if: inputs.include_browser
+        if: steps.edition.outputs.browser == 'true'
         shell: pwsh
         run: |
           $browserRoot = if ('${{ inputs.chrome_platform }}' -eq 'chromium-linux-arm64') { Join-Path $env:GITHUB_WORKSPACE 'Browsers/ChromiumArm64' } else { Join-Path $env:GITHUB_WORKSPACE "Browsers/ChromeForTesting/${{ inputs.chrome_platform }}" }
@@ -192,7 +203,7 @@ jobs:
           Write-Host "Chrome Headless Shell staged at $($browser.FullName)"
 
       - name: Verify bundled browser PDF generation
-        if: inputs.include_browser
+        if: steps.edition.outputs.browser == 'true'
         shell: pwsh
         run: ./scripts/verify-bundled-browser-pdf.ps1 -BrowserRoot ./Browsers
 
@@ -210,8 +221,10 @@ jobs:
         if: inputs.publish_release
         shell: pwsh
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.edition == 'Document' && secrets.TAURI_SIGNING_PRIVATE_KEY_DOCUMENT || inputs.edition == 'Sales' && secrets.TAURI_SIGNING_PRIVATE_KEY_SALES || secrets.TAURI_SIGNING_PRIVATE_KEY_FULL }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.edition == 'Document' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_DOCUMENT || inputs.edition == 'Sales' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_SALES || secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_FULL }}
+          EXPORTDOCMANAGER_UPDATER_ENDPOINT: ${{ vars[format('EXPORTDOCMANAGER_UPDATER_ENDPOINT_{0}', steps.edition.outputs.key)] }}
+          EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY: ${{ vars[format('EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY_{0}', steps.edition.outputs.key)] }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets[format('TAURI_SIGNING_PRIVATE_KEY_{0}', steps.edition.outputs.key)] }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets[format('TAURI_SIGNING_PRIVATE_KEY_PASSWORD_{0}', steps.edition.outputs.key)] }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY)) { throw "请配置仓库变量 EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY。" }
           if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) { throw "请配置仓库 Secret TAURI_SIGNING_PRIVATE_KEY。" }
@@ -223,7 +236,7 @@ jobs:
           exit $LASTEXITCODE
 
       - name: Verify bundled Chrome Headless Shell resource
-        if: inputs.include_browser
+        if: steps.edition.outputs.browser == 'true'
         shell: pwsh
         run: |
           $resourceRoot = Join-Path $env:GITHUB_WORKSPACE "artifacts/tauri-bundle/resources/Browsers"
@@ -243,7 +256,7 @@ jobs:
           Write-Host "Chrome Headless Shell bundled from $($browser.FullName)"
 
       - name: Verify bundled Rust PP-OCRv6 runtime
-        if: inputs.edition != 'Sales'
+        if: steps.edition.outputs.ocr == 'true'
         shell: pwsh
         run: |
           $resourceRoot = Join-Path $env:GITHUB_WORKSPACE "artifacts/tauri-bundle/resources"
@@ -321,7 +334,7 @@ jobs:
           - 架构：`${{ inputs.architecture }}`
           - 版本：`${{ steps.version.outputs.value }}`
           - 产品版：`${{ inputs.edition }}`
-          - 内置报表浏览器：`${{ inputs.include_browser }}`
+          - 内置报表浏览器：`${{ steps.edition.outputs.browser }}`
           - 安装版：`保留现有 Tauri bundle 产物`
           - 绿色便携版：`${{ inputs.platform == 'windows' && 'ZIP' || 'tar.gz' }}`，首次运行在解包目录旁创建 `App_Data`
           - 发布到 GitHub Release：`${{ inputs.publish_release }}`

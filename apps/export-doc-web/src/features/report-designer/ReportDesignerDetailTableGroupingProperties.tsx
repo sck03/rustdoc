@@ -7,7 +7,7 @@ import {
   normalizeGroupFooterContentKind,
   normalizeNumber,
 } from "./reportDesignerPropertiesModel.ts";
-import { FieldPathInput, TextStyleEditor } from "./ReportDesignerPropertyControls.tsx";
+import { DesignerCheckbox, FieldPathInput, TextStyleEditor } from "./ReportDesignerPropertyControls.tsx";
 
 export function ReportDesignerDetailTableGroupingProperties({
   block,
@@ -77,30 +77,12 @@ export function ReportDesignerDetailTableGroupingProperties({
                 onChange={(event) => onCommit({ ...block, grouping: { ...block.grouping!, label: event.target.value } })}
               />
             </label>
-            <label className="new-report-checkbox-label">
-              <span>显示字段值</span>
-              <input
-                type="checkbox"
-                checked={block.grouping.showFieldValue}
-                onChange={(event) => onCommit({ ...block, grouping: { ...block.grouping!, showFieldValue: event.target.checked } })}
-              />
-            </label>
-            <label className="new-report-checkbox-label">
-              <span>与后续明细靠拢</span>
-              <input
-                type="checkbox"
-                checked={block.grouping.keepTogether}
-                onChange={(event) => onCommit({ ...block, grouping: { ...block.grouping!, keepTogether: event.target.checked } })}
-              />
-            </label>
-            <label className="new-report-checkbox-label">
-              <span>每组另起页</span>
-              <input
-                type="checkbox"
-                checked={Boolean(block.grouping.pageBreakBefore)}
-                onChange={(event) => onCommit({ ...block, grouping: { ...block.grouping!, pageBreakBefore: event.target.checked } })}
-              />
-            </label>
+            <DesignerCheckbox checked={block.grouping.showFieldValue}
+                onChange={(checked) => onCommit({ ...block, grouping: { ...block.grouping!, showFieldValue: checked } })}>显示字段值</DesignerCheckbox>
+            <DesignerCheckbox checked={block.grouping.keepTogether}
+                onChange={(checked) => onCommit({ ...block, grouping: { ...block.grouping!, keepTogether: checked } })}>与后续明细靠拢</DesignerCheckbox>
+            <DesignerCheckbox checked={Boolean(block.grouping.pageBreakBefore)}
+                onChange={(checked) => onCommit({ ...block, grouping: { ...block.grouping!, pageBreakBefore: checked } })}>每组另起页</DesignerCheckbox>
             <div className="new-report-property-wide">
               <div className="new-report-designer-muted">分组表头样式</div>
               <TextStyleEditor style={block.grouping.style} onChange={(style) => onCommit({ ...block, grouping: { ...block.grouping!, style } })} />

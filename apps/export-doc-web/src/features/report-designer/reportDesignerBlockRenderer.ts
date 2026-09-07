@@ -17,7 +17,7 @@ export function renderReportDesignerBlockToHtml(block: ReportBlock) {
  * The block AST remains the source of truth; this only expands one
  * representative set of rows for visual editing and never gets persisted.
  */
-export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock, selectedGridCellId?: string) {
+export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock) {
   // The editor preview shows one representative content value.  Do not carry
   // a conditional field's export fallback into this data-free rendering: the
   // control tags are intentionally removed below, so doing so would display
@@ -25,7 +25,7 @@ export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock, selec
   const previewBlock = block.type === "Conditional" && block.content.kind === "Field"
     ? { ...block, content: { ...block.content, fallbackText: undefined } }
     : block;
-  let html = renderBlock(previewBlock, { preview: true, selectedGridCellId });
+  let html = renderBlock(previewBlock, true);
   html = expandPreviewLoops(html);
   html = html.replace(/\{\{\s*(?:if|else|end|capture|assign|while|case|when)[\s\S]*?\}\}/gi, "");
   html = html.replace(/\{\{\s*\$?[A-Za-z_][A-Za-z0-9_]*\s*=\s*[\s\S]*?\}\}/g, "");
@@ -46,12 +46,7 @@ function expandPreviewLoops(source: string) {
   return current;
 }
 
-type BlockRenderOptions = {
-  preview?: boolean;
-  selectedGridCellId?: string;
-};
-
-function renderBlock(block: ReportBlock, options?: BlockRenderOptions) {
+function renderBlock(block: ReportBlock, preview = false) {
   switch (block.type) {
     case "Text":
       return `<div style="${renderBoxStyle(block.style, block.border)}">${escapeHtml(block.text)}</div>`;
@@ -60,7 +55,7 @@ function renderBlock(block: ReportBlock, options?: BlockRenderOptions) {
     case "Row":
       return renderRowBlock(block);
     case "Grid":
-      return renderGridBlock(block, options);
+      return renderGridBlock(block, preview);
     case "Conditional":
       return renderConditionalBlock(block);
     case "Image":
@@ -72,7 +67,7 @@ function renderBlock(block: ReportBlock, options?: BlockRenderOptions) {
   }
 }
 
-function renderGridBlock(block: Extract<ReportBlock, { type: "Grid" }>, options?: BlockRenderOptions) {
+function renderGridBlock(block: Extract<ReportBlock, { type: "Grid" }>, preview: boolean) {
   const columnWidthTotal = block.columns.reduce((sum, column) => sum + Math.max(1, column.widthPercent), 0);
   const colgroup = `<colgroup>${block.columns.map((column) => {
     const width = Math.round((Math.max(1, column.widthPercent) / columnWidthTotal) * 10000) / 100;
@@ -82,8 +77,8 @@ function renderGridBlock(block: Extract<ReportBlock, { type: "Grid" }>, options?
     const colSpan = Math.max(1, Math.floor(cell.colSpan ?? 1));
     const rowSpan = Math.max(1, Math.floor(cell.rowSpan ?? 1));
     const spanAttributes = `${colSpan > 1 ? ` colspan="${colSpan}"` : ""}${rowSpan > 1 ? ` rowspan="${rowSpan}"` : ""}`;
-    const previewAttributes = options?.preview
-      ? ` data-report-grid-cell-id="${escapeHtml(cell.id)}"${options.selectedGridCellId === cell.id ? ' class="is-designer-selected-cell"' : ""}`
+    const previewAttributes = preview
+      ? ` data-report-grid-cell-id="${escapeHtml(cell.id)}"`
       : "";
     return `<td${spanAttributes}${previewAttributes} style="${renderGridCellStyle(block, cell)}">${renderGridCellContent(cell)}</td>`;
   }).join("")}</tr>`).join("");

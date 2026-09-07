@@ -12,6 +12,30 @@ export type ReportGridCellLocation = {
   colSpan: number;
 };
 
+export function updateGridCell(block: ReportGridBlock, cellId: string, update: (cell: ReportGridCell) => ReportGridCell): ReportGridBlock {
+  let changed = false;
+  const rows = block.rows.map((row) => {
+    const index = row.cells.findIndex((cell) => cell.id === cellId);
+    if (index < 0) return row;
+    const next = update(row.cells[index]);
+    if (next === row.cells[index]) return row;
+    changed = true;
+    const cells = row.cells.slice();
+    cells[index] = next;
+    return { ...row, cells };
+  });
+  return changed ? { ...block, rows } : block;
+}
+
+export function adjacentGridCell(block: ReportGridBlock, cellId: string, direction: "left" | "right" | "up" | "down") {
+  const locations = getGridCellLocations(block);
+  const current = locations.find((location) => location.cell.id === cellId);
+  if (!current) return null;
+  const row = direction === "up" ? current.rowIndex - 1 : direction === "down" ? current.rowIndex + current.rowSpan : current.rowIndex;
+  const column = direction === "left" ? current.columnIndex - 1 : direction === "right" ? current.columnIndex + current.colSpan : current.columnIndex;
+  return locations.find((location) => row >= location.rowIndex && row < location.rowIndex + location.rowSpan && column >= location.columnIndex && column < location.columnIndex + location.colSpan) ?? null;
+}
+
 export function getGridCellLocations(block: ReportGridBlock): ReportGridCellLocation[] {
   const rowCount = block.rows.length;
   const columnCount = block.columns.length;

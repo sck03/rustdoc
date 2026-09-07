@@ -15,6 +15,9 @@ export const permissionResources = {
   reportResources: "document.report-resources",
   invoiceOutput: "document.invoice-output",
   paymentOutput: "document.payment-output",
+  officeRooms: "office.rooms",
+  officeSupplies: "office.supplies",
+  officePeople: "office.people",
 } as const;
 
 export const permissionActions = {
@@ -46,6 +49,11 @@ export const permissionActions = {
   sendEmail: "send-email",
   send: "send",
   viewDelivery: "view-delivery",
+  cancel: "cancel",
+  issue: "issue",
+  return: "return",
+  restock: "restock",
+  manage: "manage",
 } as const;
 
 export function resolveReportTemplateAccess(hasAccess: (action: string) => boolean) {

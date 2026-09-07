@@ -11,6 +11,7 @@ namespace ExportDocManager.Api.Tests
         [InlineData(ProductEditionCatalog.Document, true, false)]
         [InlineData(ProductEditionCatalog.Sales, false, true)]
         [InlineData(ProductEditionCatalog.Full, true, true)]
+        [InlineData(ProductEditionCatalog.Administration, false, false)]
         public async Task ProductEdition_ShouldGateDocumentAndSalesEndpoints(
             string edition,
             bool documentAllowed,
@@ -29,11 +30,9 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(edition, currentUser.Capabilities.ProductEdition);
             Assert.Equal(documentAllowed, currentUser.Capabilities.CanUseDocumentWorkspace);
             Assert.Equal(salesAllowed, currentUser.Capabilities.CanUseSalesWorkspace);
-            bool fullEditionAdministrationAllowed = string.Equals(
-                edition,
-                ProductEditionCatalog.Full,
-                StringComparison.OrdinalIgnoreCase);
-            Assert.Equal(fullEditionAdministrationAllowed, currentUser.Capabilities.CanManageUsers);
+            bool administrationAllowed = edition is ProductEditionCatalog.Full or ProductEditionCatalog.Administration;
+            Assert.Equal(administrationAllowed, currentUser.Capabilities.CanManageUsers);
+            Assert.Equal(edition == ProductEditionCatalog.Administration, currentUser.Capabilities.UsesOfficeRegister);
 
             var documentResponse = await client.GetAsync("/api/invoices?pageNumber=1&pageSize=5");
             Assert.Equal(documentAllowed ? HttpStatusCode.OK : HttpStatusCode.Forbidden, documentResponse.StatusCode);
@@ -54,10 +53,10 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(salesAllowed ? HttpStatusCode.OK : HttpStatusCode.Forbidden, emailTemplatesResponse.StatusCode);
 
             var usersResponse = await client.GetAsync("/api/users");
-            Assert.Equal(fullEditionAdministrationAllowed ? HttpStatusCode.OK : HttpStatusCode.Forbidden, usersResponse.StatusCode);
+            Assert.Equal(administrationAllowed ? HttpStatusCode.OK : HttpStatusCode.Forbidden, usersResponse.StatusCode);
 
             var auditLogsResponse = await client.GetAsync("/api/audit-logs?pageNumber=1&pageSize=5");
-            Assert.Equal(fullEditionAdministrationAllowed ? HttpStatusCode.OK : HttpStatusCode.Forbidden, auditLogsResponse.StatusCode);
+            Assert.Equal(administrationAllowed ? HttpStatusCode.OK : HttpStatusCode.Forbidden, auditLogsResponse.StatusCode);
         }
     }
 }

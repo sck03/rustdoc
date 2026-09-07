@@ -30,6 +30,14 @@ namespace ExportDocManager.DataAccess
         public DbSet<Unit> Units { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<User> Users { get; set; }
+        public DbSet<MeetingRoom> MeetingRooms { get; set; }
+        public DbSet<MeetingBooking> MeetingBookings { get; set; }
+        public DbSet<OfficeSupply> OfficeSupplies { get; set; }
+        public DbSet<OfficeSupplyRequest> OfficeSupplyRequests { get; set; }
+        public DbSet<OfficeRequestEvent> OfficeRequestEvents { get; set; }
+        public DbSet<OfficeStockMovement> OfficeStockMovements { get; set; }
+        public DbSet<PersonnelEmployee> PersonnelEmployees { get; set; }
+        public DbSet<PersonnelEvent> PersonnelEvents { get; set; }
         public DbSet<OrganizationCompany> OrganizationCompanies { get; set; }
         public DbSet<OrganizationDepartment> OrganizationDepartments { get; set; }
         public DbSet<ApiUserSession> ApiUserSessions { get; set; }
@@ -165,6 +173,15 @@ namespace ExportDocManager.DataAccess
                         break;
                     case SalesOpportunity opportunity:
                         opportunity.QuotationNoNormalized = CanonicalNullableKey(opportunity.QuotationNo);
+                        break;
+                    case MeetingRoom room:
+                        room.NameNormalized = CanonicalKey(room.Name);
+                        break;
+                    case OfficeSupply supply:
+                        supply.NameNormalized = CanonicalKey(supply.Name);
+                        break;
+                    case PersonnelEmployee employee:
+                        employee.EmployeeNumberNormalized = CanonicalKey(employee.EmployeeNumber);
                         break;
                 }
             }
@@ -693,6 +710,8 @@ namespace ExportDocManager.DataAccess
             paymentEntity.Property(p => p.DepartmentId).HasMaxLength(50);
             paymentEntity.Property(p => p.CompanyScope).HasMaxLength(50);
 
+            OfficeModelConfiguration.Configure(modelBuilder);
+            PersonnelModelConfiguration.Configure(modelBuilder);
             ConfigureTemporalStorage(modelBuilder);
         }
 

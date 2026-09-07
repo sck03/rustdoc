@@ -8,7 +8,7 @@ import {
 } from "./reportDesignerMutations.ts";
 import type { ReportBlock, ReportDetailTableBlock } from "./reportDesignerSchema.ts";
 import { normalizeNumber } from "./reportDesignerPropertiesModel.ts";
-import { ColumnWidthStrip, FieldPathInput, TextStyleEditor } from "./ReportDesignerPropertyControls.tsx";
+import { DesignerCheckbox, ColumnWidthStrip, FieldPathInput, TextStyleEditor } from "./ReportDesignerPropertyControls.tsx";
 
 export function ReportDesignerDetailTableLayoutProperties({
   block,
@@ -25,15 +25,15 @@ export function ReportDesignerDetailTableLayoutProperties({
     <>
       <div className="new-report-property-readout">
         <span>数据源</span>
-        <strong>{block.sourcePath}</strong>
+        <strong>商品明细 · 每条商品一行</strong>
       </div>
       <label>
-        <span>右侧标题</span>
+        <span>明细标题</span>
         <input value={block.title ?? ""} onChange={(event) => onCommit({ ...block, title: event.target.value })} />
       </label>
       {block.sideBand ? (
         <label>
-          <span>右侧宽度(mm)</span>
+          <span>明细区宽度(mm)</span>
           <input
             type="number"
             min={40}
@@ -52,10 +52,10 @@ export function ReportDesignerDetailTableLayoutProperties({
               等分列宽
             </button>
             <button className="command-button secondary" type="button" onClick={() => onCommit(applyDetailTableBorderToColumns(block))}>
-              套用边框
+              统一边框
             </button>
             <button className="command-button secondary" type="button" onClick={() => onCommit(clearDetailTableColumnBorders(block))}>
-              清除覆盖
+              恢复默认
             </button>
           </div>
         </div>
@@ -73,45 +73,33 @@ export function ReportDesignerDetailTableLayoutProperties({
           unit="mm"
           onResizeBoundary={(leftColumnId, delta) => onCommit(resizeAdjacentDetailTableColumnWidths(block, leftColumnId, delta))}
         />
-        <div className="new-report-designer-muted">批量动作只调整结构化列属性，不写入任意 HTML/CSS 片段。</div>
+        <div className="new-report-designer-muted">拖动列之间的分隔线调整宽度，松开后应用；方向键可微调。</div>
       </div>
       <div className="new-report-detail-style-group">
         <div className="new-report-detail-column-title">
           <strong>打印分页</strong>
         </div>
         <div className="new-report-property-grid">
-          <label className="new-report-checkbox-label">
-            <span>跨页重复表头</span>
-            <input
-              type="checkbox"
-              checked={block.print.repeatHeaderOnPageBreak}
-              onChange={(event) =>
+          <DesignerCheckbox checked={block.print.repeatHeaderOnPageBreak}
+              onChange={(checked) =>
                 onCommit({
                   ...block,
                   print: {
                     ...block.print,
-                    repeatHeaderOnPageBreak: event.target.checked,
+                    repeatHeaderOnPageBreak: checked,
                   },
                 })
-              }
-            />
-          </label>
-          <label className="new-report-checkbox-label">
-            <span>明细行避免截断</span>
-            <input
-              type="checkbox"
-              checked={block.print.keepRowsTogether}
-              onChange={(event) =>
+              }>跨页重复表头</DesignerCheckbox>
+          <DesignerCheckbox checked={block.print.keepRowsTogether}
+              onChange={(checked) =>
                 onCommit({
                   ...block,
                   print: {
                     ...block.print,
-                    keepRowsTogether: event.target.checked,
+                    keepRowsTogether: checked,
                   },
                 })
-              }
-            />
-          </label>
+              }>明细行避免截断</DesignerCheckbox>
         </div>
       </div>
       <div className="new-report-detail-style-group">

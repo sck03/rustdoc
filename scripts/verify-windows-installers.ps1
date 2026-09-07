@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string[]]$ExpectedEditions = @("Document", "Sales", "Full")
+    [string[]]$ExpectedEditions
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,15 +11,14 @@ trap {
     exit 1
 }
 
+if (-not $PSBoundParameters.ContainsKey("ExpectedEditions")) { $ExpectedEditions = @(Get-ExportDocProductEditionNames) }
 $ExpectedEditions = @($ExpectedEditions |
     ForEach-Object { $_ -split "," } |
     ForEach-Object { $_.Trim() } |
     Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+    ForEach-Object { Resolve-ExportDocProductEdition -Edition $_ } |
     Select-Object -Unique)
-$invalidEditions = @($ExpectedEditions | Where-Object { $_ -notin @("Document", "Sales", "Full") })
-if ($ExpectedEditions.Count -eq 0 -or $invalidEditions.Count -gt 0) {
-    throw "ExpectedEditions must contain one or more of: Document, Sales, Full. Invalid values: $($invalidEditions -join ', ')"
-}
+if ($ExpectedEditions.Count -eq 0) { throw "ExpectedEditions must contain at least one product edition." }
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
 $outputRoot = Join-Path $repoRoot "artifacts\windows-installers"

@@ -1,17 +1,21 @@
-import { useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import type {
-  ReportDesignerV3DocumentState,
-  ReportDesignerV3ResizeDirection,
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { getGridCellLocations } from "./reportDesignerGridMutations.ts";
+import { ReportDesignerCanvasTextEditor, type ReportDesignerTextEdit } from "./ReportDesignerCanvasTextEditor.tsx";
+import {
+  findV3Element,
+  type ReportDesignerV3DocumentState,
+  type ReportDesignerV3ResizeDirection,
 } from "./reportDesignerV3Mutations.ts";
 import {
-  createV3MoveConstraint,
   resolveV3MoveDeltaFromConstraint,
   type ReportDesignerV3MoveConstraint,
 } from "./reportDesignerGeometry.ts";
+import { createV3RegionMoveConstraint } from "./reportDesignerV3Regions.ts";
 import { resolveV3ResizeGeometry } from "./reportDesignerV3Resize.ts";
 import {
   hundredthMmToMm,
   reportDesignerV3ElementText,
+  reportDesignerV3ElementKindLabel,
   reportDesignerV3PageSize,
   type ReportDesignerV3Element,
   type ReportDesignerV3Schema,
@@ -48,6 +52,7 @@ type Gesture = {
   baseElements: Map<string, ReportDesignerV3Element>;
   elementNodes: Map<string, HTMLElement>;
   moveConstraint: ReportDesignerV3MoveConstraint | null;
+  coordinateScale: { x: number; y: number };
 };
 
 export function ReportDesignerV3Canvas({
@@ -64,6 +69,7 @@ export function ReportDesignerV3Canvas({
   onCancelTransform,
   onCommitLayerBand,
   onClearSelection,
+  onCommitText,
   }: {
   state: ReportDesignerV3DocumentState;
   zoom: number;
@@ -78,12 +84,14 @@ export function ReportDesignerV3Canvas({
   onCancelTransform: (baseState: ReportDesignerV3DocumentState) => void;
   onCommitLayerBand: (role: "Header" | "Footer", heightHundredthMm: number) => void;
   onClearSelection: () => void;
+  onCommitText: (elementId: string, cellId: string | undefined, text: string) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
-  const callbacksRef = useRef({ onCommitTransform, onCancelTransform });
-  callbacksRef.current = { onCommitTransform, onCancelTransform };
+  const [textEdit, setTextEdit] = useState<ReportDesignerTextEdit | null>(null);
+  const callbacksRef = useRef({ onCommitTransform, onCancelTransform, schema: state.schema });
+  callbacksRef.current = { onCommitTransform, onCancelTransform, schema: state.schema };
   const page = reportDesignerV3PageSize(state.schema.page);
   const displayedWidthMm = page.widthMm * zoom;
   const displayedHeightMm = page.heightMm * zoom;
@@ -92,7 +100,7 @@ export function ReportDesignerV3Canvas({
     if (state.selectedIds.length === 1) {
       const found = state.schema.layers.flatMap((l) => l.elements).find((el) => el.id === state.selectedIds[0]);
       if (found) {
-        const typeLabel = found.type === "Text" ? "文本" : found.type === "Field" ? "字段" : found.type === "Image" ? "图片" : found.type === "Rectangle" ? "矩形" : found.type === "Line" ? "线条" : found.type === "Flow" ? "结构流" : found.type;
+        const typeLabel = reportDesignerV3ElementKindLabel(found);
         return `已选【${typeLabel}】X: ${hundredthMmToMm(found.xHundredthMm).toFixed(1)} mm, Y: ${hundredthMmToMm(found.yHundredthMm).toFixed(1)} mm, 宽: ${hundredthMmToMm(found.widthHundredthMm).toFixed(1)} mm, 高: ${hundredthMmToMm(found.heightHundredthMm).toFixed(1)} mm · 拖拽移动/角点缩放 · 方向键微移 · Ctrl+C 复制 · Del 删除`;
       }
     }
@@ -141,6 +149,8 @@ export function ReportDesignerV3Canvas({
       activeLayerId: layerId,
     };
     const baseElements = baseElementsFor(state.schema, selectedIds, true);
+    const coordinateScale = readCoordinateScale(canvasRef.current, state.schema);
+    if (!coordinateScale) return;
     const elementNodes = findReportDesignerElementNodes(canvasRef.current, baseElements.keys());
     gesture.current = {
       pointerId: event.pointerId,
@@ -154,17 +164,52 @@ export function ReportDesignerV3Canvas({
       pendingAnimationFrame: null,
       baseElements,
       elementNodes,
-      moveConstraint: createV3MoveConstraint(state.schema, baseElements.values()),
+      moveConstraint: createV3RegionMoveConstraint(state.schema, baseElements.values()),
+      coordinateScale,
     };
     prepareReportDesignerGestureNodes(elementNodes, "move");
     capturePointer(event.currentTarget, event.pointerId);
+  }
+
+  function beginTextEdit(target: EventTarget | null, element: ReportDesignerV3Element) {
+    const located = findV3Element(state.schema, element.id);
+    const canvas = canvasRef.current;
+    if (disabled || !canvas || !located || element.locked || located.layer.locked) return;
+    const cellId = readReportDesignerGridCellId(target) ??
+      (selectedGridCell?.elementId === element.id ? selectedGridCell.cellId : undefined);
+    const cell = element.type === "Flow" && element.block.type === "Grid" && cellId
+      ? getGridCellLocations(element.block).find((location) => location.cell.id === cellId)?.cell : undefined;
+    const text = element.type === "Text" ? element.text : cell?.contentKind === "Text" ? cell.text : undefined;
+    if (text === undefined || !(target instanceof Element)) return;
+    const elementNode = target.closest("[data-v3-element-id]");
+    const node = cellId ? elementNode?.querySelector(`[data-report-grid-cell-id="${CSS.escape(cellId)}"]`) : elementNode;
+    if (!node) return;
+    const rect = node.getBoundingClientRect();
+    const pageRect = canvas.getBoundingClientRect();
+    const scale = pageRect.width / canvas.offsetWidth;
+    const width = Math.min(canvas.offsetWidth, Math.max(rect.width / scale, 140 / zoom));
+    const height = Math.min(canvas.offsetHeight, Math.max(rect.height / scale, 44 / zoom));
+    setTextEdit({ elementId: element.id, cellId, text, width, height,
+      left: Math.max(0, Math.min((rect.left - pageRect.left) / scale, canvas.offsetWidth - width)),
+      top: Math.max(0, Math.min((rect.top - pageRect.top) / scale, canvas.offsetHeight - height)),
+    });
+  }
+
+  function finishTextEdit(text?: string) {
+    if (!textEdit) return;
+    const edit = textEdit;
+    setTextEdit(null);
+    if (text !== undefined && text !== edit.text) onCommitText(edit.elementId, edit.cellId, text);
+    requestAnimationFrame(() => {
+      findReportDesignerElementNodes(canvasRef.current, [edit.elementId]).get(edit.elementId)?.focus({ preventScroll: true });
+    });
   }
 
   function beginResize(event: ReactPointerEvent<HTMLButtonElement>, elementId: string, direction: ReportDesignerV3ResizeDirection) {
     event.preventDefault();
     event.stopPropagation();
     if (disabled) return;
-    const located = findElement(state.schema, elementId);
+    const located = findV3Element(state.schema, elementId);
     if (!located || located.element.locked || located.layer.locked) return;
     const baseState: ReportDesignerV3DocumentState = {
       ...state,
@@ -173,6 +218,8 @@ export function ReportDesignerV3Canvas({
     };
     onSelect(elementId, false);
     const baseElements = baseElementsFor(state.schema, [elementId]);
+    const coordinateScale = readCoordinateScale(canvasRef.current, state.schema);
+    if (!coordinateScale) return;
     const elementNodes = findReportDesignerElementNodes(canvasRef.current, baseElements.keys());
     gesture.current = {
       pointerId: event.pointerId,
@@ -187,12 +234,22 @@ export function ReportDesignerV3Canvas({
       baseElements,
       elementNodes,
       moveConstraint: null,
+      coordinateScale,
     };
     prepareReportDesignerGestureNodes(elementNodes, "resize");
     capturePointer(event.currentTarget, event.pointerId);
   }
 
   function updateGesture(event: ReactPointerEvent<HTMLElement>) { updateGestureAt(event.pointerId, event.clientX, event.clientY); }
+  function resizeByKeyboard(event: ReactKeyboardEvent<HTMLButtonElement>, elementId: string, direction: ReportDesignerV3ResizeDirection) {
+    const step = event.shiftKey ? 1000 : 100;
+    const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
+    const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
+    if (!dx && !dy) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!disabled) callbacksRef.current.onCommitTransform(state, { kind: "resize", elementId, direction }, dx, dy);
+  }
   function finishGesture(event: ReactPointerEvent<HTMLElement>, cancelled = false) { finishGestureAt(event.pointerId, event.clientX, event.clientY, cancelled); }
   function handleLostPointerCapture(event: ReactPointerEvent<HTMLElement>) { if (gesture.current && gesture.current.pointerId === event.pointerId) { /* keep gesture alive */ } }
 
@@ -222,15 +279,14 @@ export function ReportDesignerV3Canvas({
         current.startY,
         finalX,
         finalY,
-        canvasRef.current,
-        current.baseState.schema,
+        current.coordinateScale,
       );
       applyTransientTransform(current, delta.x, delta.y);
       callbacksRef.current.onCommitTransform(current.baseState, current.transform, delta.x, delta.y);
-      if (current.transform.kind === "move") applyTransientTransform(current, 0, 0);
+      restoreCommittedGeometry(current);
     } else {
       cancelScheduledPreview(current);
-      applyTransientTransform(current, 0, 0);
+      restoreCommittedGeometry(current);
       callbacksRef.current.onCancelTransform(current.baseState);
     }
     releaseReportDesignerGestureNodes(current.elementNodes);
@@ -242,7 +298,7 @@ export function ReportDesignerV3Canvas({
     const current = gesture.current;
     if (!current) return;
     cancelScheduledPreview(current);
-    applyTransientTransform(current, 0, 0);
+    restoreCommittedGeometry(current);
     callbacksRef.current.onCancelTransform(current.baseState);
     releaseReportDesignerGestureNodes(current.elementNodes);
     gesture.current = null;
@@ -258,8 +314,7 @@ export function ReportDesignerV3Canvas({
         current.startY,
         current.lastX,
         current.lastY,
-        canvasRef.current,
-        current.baseState.schema,
+        current.coordinateScale,
       );
       applyTransientTransform(current, delta.x, delta.y);
     });
@@ -269,6 +324,14 @@ export function ReportDesignerV3Canvas({
     if (current.pendingAnimationFrame === null) return;
     cancelAnimationFrame(current.pendingAnimationFrame);
     current.pendingAnimationFrame = null;
+  }
+
+  function restoreCommittedGeometry(current: Gesture) {
+    const elements = baseElementsFor(callbacksRef.current.schema, [...current.baseElements.keys()]);
+    for (const [id, element] of elements) {
+      const node = current.elementNodes.get(id);
+      if (node) paintGeometry(node, element);
+    }
   }
 
   function applyTransientTransform(current: Gesture, deltaX: number, deltaY: number) {
@@ -289,13 +352,17 @@ export function ReportDesignerV3Canvas({
       const geometry = current.transform.kind === "resize"
         ? resolveV3ResizeGeometry(baseElement, current.transform.direction, deltaX, deltaY, current.baseState.schema.page)
         : baseElement;
-      node.style.left = `${hundredthMmToMm(geometry.xHundredthMm)}mm`;
-      node.style.top = `${hundredthMmToMm(geometry.yHundredthMm)}mm`;
-      node.style.width = `${hundredthMmToMm(geometry.widthHundredthMm)}mm`;
-      node.style.height = `${hundredthMmToMm(geometry.heightHundredthMm)}mm`;
-      node.style.transform = geometry.rotationDeg ? `rotate(${geometry.rotationDeg}deg)` : "";
+      paintGeometry(node, geometry);
     }
   }
+
+  useEffect(() => {
+    cancelGesture();
+  }, [zoom]);
+
+  useLayoutEffect(() => {
+    if (gesture.current && gesture.current.baseState.schema !== state.schema) cancelGesture();
+  }, [state.schema]);
 
   useEffect(() => {
     const handleWindowPointerMove = (event: PointerEvent) => {
@@ -321,11 +388,13 @@ export function ReportDesignerV3Canvas({
     window.addEventListener("pointerup", handleWindowPointerUp);
     window.addEventListener("pointercancel", handleWindowPointerCancel);
     window.addEventListener("blur", cancelGesture);
+    window.addEventListener("resize", cancelGesture);
     return () => {
       window.removeEventListener("pointermove", handleWindowPointerMove);
       window.removeEventListener("pointerup", handleWindowPointerUp);
       window.removeEventListener("pointercancel", handleWindowPointerCancel);
       window.removeEventListener("blur", cancelGesture);
+      window.removeEventListener("resize", cancelGesture);
       cancelGesture();
     };
   }, []);
@@ -373,7 +442,7 @@ export function ReportDesignerV3Canvas({
           aria-label="v3 报表自由画布"
         >
           {state.schema.layers.filter((layer) => layer.visible).map((layer) => (
-            <div className={`report-designer-v3-layer report-designer-v3-layer-${layer.role.toLowerCase()}${state.activeLayerId === layer.id ? " is-active" : ""}`} key={layer.id} data-v3-layer-id={layer.id} data-v3-layer-name={layer.name} data-v3-layer-role={layer.role} aria-label={layer.name} aria-current={state.activeLayerId === layer.id ? "true" : undefined} style={{ "--v3-layer-label-top": layer.role === "Body" ? "42%" : layer.role === "Footer" ? "calc(100% - 20px)" : "4px", "--v3-layer-label-left": layer.role === "Overlay" ? "auto" : "4px", "--v3-layer-label-right": layer.role === "Overlay" ? "4px" : "auto" } as CSSProperties}>
+            <div className={`report-designer-v3-layer report-designer-v3-layer-${layer.role.toLowerCase()}${state.activeLayerId === layer.id ? " is-active" : ""}`} key={layer.id} data-v3-layer-id={layer.id} data-v3-layer-name={layer.name} data-v3-layer-role={layer.role} role="group" aria-label={layer.name} aria-current={state.activeLayerId === layer.id ? "true" : undefined}>
               {[...layer.elements]
                 .filter((element) => element.visible)
                 .sort((left, right) => left.zIndex - right.zIndex)
@@ -386,22 +455,26 @@ export function ReportDesignerV3Canvas({
                       style={reportDesignerCanvasElementStyle(element)}
                       data-v3-element-id={element.id}
                       onPointerDown={(event) => beginMove(event, element, layer.id)}
+                      onDoubleClick={(event) => { event.stopPropagation(); beginTextEdit(event.target, element); }}
                       onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
+                        if (!disabled && event.key === "F2") { event.preventDefault(); beginTextEdit(event.currentTarget, element); }
                         if (!disabled && (event.key === "Enter" || event.key === " ")) {
                           event.preventDefault();
                           onSelect(element.id, event.shiftKey || event.ctrlKey || event.metaKey);
                         }
                       }}
                       title={`${reportDesignerV3ElementText(element)}${element.locked ? "（已锁定）" : ""}`}
-                      role={disabled ? "img" : "button"}
+                      role={disabled ? "img" : "group"}
+                      aria-roledescription={disabled ? undefined : "可移动画布组件"}
                       tabIndex={disabled ? -1 : 0}
-                      aria-pressed={disabled ? undefined : selected}
+                      aria-current={!disabled && selected ? "true" : undefined}
                       aria-disabled={!disabled && (element.locked || layer.locked) || undefined}
                       aria-label={`${reportDesignerV3ElementText(element)}${element.locked ? "，已锁定" : ""}`}
                     >
                       <ReportDesignerCanvasElementPreview element={element} selectedGridCellId={selectedGridCell?.elementId === element.id ? selectedGridCell.cellId : undefined} />
                       {!disabled && selected && state.selectedIds.length === 1 && !element.locked && !layer.locked ? (
-                        <ReportDesignerCanvasResizeHandles elementId={element.id} onPointerDown={beginResize} />
+                        <ReportDesignerCanvasResizeHandles elementId={element.id} onPointerDown={beginResize} onKeyDown={resizeByKeyboard} />
                       ) : null}
                       {selected && (element.locked || layer.locked) ? <span className="report-designer-v3-lock-badge">锁</span> : null}
                     </div>
@@ -410,6 +483,7 @@ export function ReportDesignerV3Canvas({
             </div>
           ))}
           {showGuides ? <ReportDesignerLayerResizers schema={state.schema} disabled={disabled} onCommit={onCommitLayerBand} /> : null}
+          {textEdit ? <ReportDesignerCanvasTextEditor key={`${textEdit.elementId}:${textEdit.cellId ?? ""}`} edit={textEdit} zoom={zoom} onCancel={() => finishTextEdit()} onCommit={finishTextEdit} /> : null}
           </div>
         </div>
       </div>
@@ -418,12 +492,12 @@ export function ReportDesignerV3Canvas({
   );
 }
 
-function findElement(schema: ReportDesignerV3Schema, id: string) {
-  for (const layer of schema.layers) {
-    const element = layer.elements.find((candidate) => candidate.id === id);
-    if (element) return { element, layer };
-  }
-  return null;
+function paintGeometry(node: HTMLElement, geometry: Pick<ReportDesignerV3Element, "xHundredthMm" | "yHundredthMm" | "widthHundredthMm" | "heightHundredthMm" | "rotationDeg">) {
+  node.style.left = `${hundredthMmToMm(geometry.xHundredthMm)}mm`;
+  node.style.top = `${hundredthMmToMm(geometry.yHundredthMm)}mm`;
+  node.style.width = `${hundredthMmToMm(geometry.widthHundredthMm)}mm`;
+  node.style.height = `${hundredthMmToMm(geometry.heightHundredthMm)}mm`;
+  node.style.transform = geometry.rotationDeg ? `rotate(${geometry.rotationDeg}deg)` : "";
 }
 
 function baseElementsFor(schema: ReportDesignerV3Schema, ids: string[], movableOnly = false) {
@@ -437,19 +511,22 @@ function baseElementsFor(schema: ReportDesignerV3Schema, ids: string[], movableO
   return result;
 }
 
+function readCoordinateScale(canvas: HTMLDivElement | null, schema: ReportDesignerV3Schema) {
+  const rect = canvas?.getBoundingClientRect();
+  if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+  return { x: schema.page.widthHundredthMm / rect.width, y: schema.page.heightHundredthMm / rect.height };
+}
+
 function readDelta(
   startX: number,
   startY: number,
   currentX: number,
   currentY: number,
-  canvas: HTMLDivElement | null,
-  schema: ReportDesignerV3Schema,
+  scale: { x: number; y: number },
 ) {
-  const rect = canvas?.getBoundingClientRect();
-  if (!rect || rect.width <= 0 || rect.height <= 0) return { x: 0, y: 0 };
   return {
-    x: Math.round(((currentX - startX) / rect.width) * schema.page.widthHundredthMm),
-    y: Math.round(((currentY - startY) / rect.height) * schema.page.heightHundredthMm),
+    x: Math.round((currentX - startX) * scale.x),
+    y: Math.round((currentY - startY) * scale.y),
   };
 }
 

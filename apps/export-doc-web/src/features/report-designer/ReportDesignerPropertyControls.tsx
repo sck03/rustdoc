@@ -1,7 +1,8 @@
-import { type ChangeEvent as ReactChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useEffect, useId, useState } from "react";
+import { type ChangeEvent as ReactChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import type { ReportBorderStyle, ReportTextStyle } from "./reportDesignerSchema.ts";
 import { normalizeDesignerFieldPath } from "./reportDesignerMutations.ts";
+import { resizeAdjacentWidths } from "./reportDesignerTableMutations.ts";
 import {
   formatDesignerWidth,
   normalizeAlign,
@@ -12,6 +13,23 @@ import {
 } from "./reportDesignerPropertiesModel.ts";
 
 export type SelectOption = { value: string; label: string };
+
+export function DesignerCheckbox({ checked, disabled = false, onChange, children }: { checked: boolean; disabled?: boolean; onChange: (checked: boolean) => void; children: ReactNode }) {
+  return <label className="checkbox-field report-designer-checkbox"><input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /><span>{children}</span></label>;
+}
+
+export function DesignerPropertyTabs<T extends string>({ value, options, onChange, children }: { value: T; options: readonly { value: T; label: string }[]; onChange: (value: T) => void; children: ReactNode }) {
+  const id = useId();
+  return <div className="report-designer-property-tabs"><div role="tablist" aria-label="属性分类">
+    {options.map((option, index) => <button key={option.value} id={`${id}-${option.value}`} type="button" role="tab" tabIndex={option.value === value ? 0 : -1} aria-selected={option.value === value} aria-controls={`${id}-panel`} onClick={() => onChange(option.value)} onKeyDown={(event) => {
+      const next = event.key === "ArrowRight" ? (index + 1) % options.length : event.key === "ArrowLeft" ? (index + options.length - 1) % options.length : event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : -1;
+      if (next < 0) return;
+      event.preventDefault();
+      onChange(options[next].value);
+      (event.currentTarget.parentElement?.children[next] as HTMLElement | undefined)?.focus();
+    }}>{option.label}</button>)}
+  </div><div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${value}`}>{children}</div></div>;
+}
 
 /** Keep a damaged/removed persisted value visible until the user repairs it. */
 export function ensureCurrentSelectOption(options: SelectOption[], value: string): SelectOption[] {
@@ -97,14 +115,19 @@ export function CommitTextField({
   rows?: number;
 }) {
   const [draft, setDraft] = useState(value);
+  const cancelOnBlur = useRef(false);
   useEffect(() => setDraft(value), [value]);
   function commit() {
+    if (cancelOnBlur.current) { cancelOnBlur.current = false; return; }
     if (draft !== value) onCommit(draft);
   }
   const onChange = (event: ReactChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setDraft(event.target.value);
   const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (event.nativeEvent.isComposing) return;
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation();
+      cancelOnBlur.current = true;
       setDraft(value);
       event.currentTarget.blur();
     } else if (event.key === "Enter" && (!multiline || event.ctrlKey || event.metaKey)) {
@@ -128,6 +151,10 @@ export function ColumnWidthStrip({
   minWidth: number;
   onResizeBoundary: (leftColumnId: string, delta: number) => void;
 }) {
+  const cancelDrag = useRef<() => void>(() => undefined);
+  const latest = useRef({ columns, onResizeBoundary });
+  latest.current = { columns, onResizeBoundary };
+  useEffect(() => () => cancelDrag.current(), []);
   const safeColumns = columns.filter((column) => Number.isFinite(column.width) && column.width > 0);
   if (safeColumns.length === 0) {
     return null;
@@ -144,36 +171,73 @@ export function ColumnWidthStrip({
   });
 
   function startResize(event: ReactPointerEvent<HTMLButtonElement>, leftColumnId: string) {
-    const stripElement = event.currentTarget.closest(".new-report-column-width-strip");
-    if (!(stripElement instanceof HTMLElement)) {
-      return;
-    }
-
-    const rect = stripElement.getBoundingClientRect();
-    if (rect.width <= 0 || totalWidth <= 0) {
-      return;
-    }
-
+    if (event.button !== 0) return;
+    const strip = event.currentTarget.closest<HTMLElement>(".new-report-column-width-strip");
+    const rect = strip?.getBoundingClientRect();
+    if (!strip || !rect || rect.width <= 0 || totalWidth <= 0) return;
     event.preventDefault();
     event.stopPropagation();
-    const startClientX = event.clientX;
-    const pixelsPerUnit = rect.width / totalWidth;
+    cancelDrag.current();
+    const startX = event.clientX;
+    const stripWidth = rect.width;
+    const pointerId = event.pointerId;
+    const handle = event.currentTarget;
+    const segments = new Map(Array.from(strip.querySelectorAll<HTMLElement>("[data-column-id]")).map((node) => [node.dataset.columnId ?? "", { node, label: node.querySelector("strong") }]));
+    const baseWidths = safeColumns.map((column) => column.width).join(",");
+    let delta = 0;
+    let frame: number | null = null;
+    let settled = false;
 
-    function handlePointerMove(nativeEvent: globalThis.PointerEvent) {
-      nativeEvent.preventDefault();
-      const delta = (nativeEvent.clientX - startClientX) / pixelsPerUnit;
-      onResizeBoundary(leftColumnId, roundDesignerWidth(delta));
+    function paint(values: typeof safeColumns) {
+      let offset = 0;
+      const total = values.reduce((sum, column) => sum + column.width, 0);
+      for (const column of values) {
+        const segment = segments.get(column.id);
+        if (segment) {
+          const { node, label } = segment;
+          node.style.flex = `${column.width} 1 0`;
+          if (label) label.textContent = `${formatDesignerWidth(column.width)}${unit}`;
+        }
+        offset += column.width;
+        if (column.id === leftColumnId && total > 0) handle.style.left = `${offset / total * 100}%`;
+      }
     }
-
-    function stopResize() {
-      document.removeEventListener("pointermove", handlePointerMove);
-      document.removeEventListener("pointerup", stopResize);
-      document.removeEventListener("pointercancel", stopResize);
+    function preview() {
+      frame = null;
+      paint(resizeAdjacentWidths(safeColumns, leftColumnId, delta, minWidth, "width"));
     }
-
-    document.addEventListener("pointermove", handlePointerMove);
-    document.addEventListener("pointerup", stopResize);
-    document.addEventListener("pointercancel", stopResize);
+    function move(native: PointerEvent) {
+      if (native.pointerId !== pointerId) return;
+      delta = roundDesignerWidth((native.clientX - startX) * totalWidth / stripWidth);
+      if (frame === null) frame = requestAnimationFrame(preview);
+    }
+    function finish(commit: boolean, native?: PointerEvent) {
+      if (settled || (native && native.pointerId !== pointerId)) return;
+      settled = true;
+      if (native && commit) delta = roundDesignerWidth((native.clientX - startX) * totalWidth / stripWidth);
+      if (frame !== null) cancelAnimationFrame(frame);
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      document.removeEventListener("pointercancel", cancel);
+      document.removeEventListener("keydown", keyDown, true);
+      window.removeEventListener("blur", cancel);
+      cancelDrag.current = () => undefined;
+      paint(latest.current.columns);
+      if (commit && delta !== 0 && latest.current.columns.map((column) => column.width).join(",") === baseWidths) {
+        latest.current.onResizeBoundary(leftColumnId, delta);
+      }
+    }
+    const up = (native: PointerEvent) => finish(true, native);
+    const cancel = (native?: Event) => { if (!(native instanceof PointerEvent) || native.pointerId === pointerId) finish(false); };
+    const keyDown = (native: KeyboardEvent) => {
+      if (native.key === "Escape") { native.preventDefault(); native.stopPropagation(); cancel(); }
+    };
+    cancelDrag.current = cancel;
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+    document.addEventListener("pointercancel", cancel);
+    document.addEventListener("keydown", keyDown, true);
+    window.addEventListener("blur", cancel);
   }
 
   function handleBoundaryKeyDown(
@@ -196,6 +260,7 @@ export function ColumnWidthStrip({
         {safeColumns.map((column, index) => (
           <div
             className="new-report-column-width-segment"
+            data-column-id={column.id}
             key={column.id}
             style={{ flex: `${Math.max(minWidth, column.width)} 1 0` }}
             title={`${column.title}: ${formatDesignerWidth(column.width)}${unit}`}
@@ -269,22 +334,10 @@ export function BorderEditor({
             <option value="None">无边框</option>
           </select>
         </label>
-        <label className="new-report-checkbox-label">
-          <span>上边</span>
-          <input type="checkbox" checked={Boolean(current.top)} onChange={(event) => update({ top: event.target.checked })} />
-        </label>
-        <label className="new-report-checkbox-label">
-          <span>右边</span>
-          <input type="checkbox" checked={Boolean(current.right)} onChange={(event) => update({ right: event.target.checked })} />
-        </label>
-        <label className="new-report-checkbox-label">
-          <span>下边</span>
-          <input type="checkbox" checked={Boolean(current.bottom)} onChange={(event) => update({ bottom: event.target.checked })} />
-        </label>
-        <label className="new-report-checkbox-label">
-          <span>左边</span>
-          <input type="checkbox" checked={Boolean(current.left)} onChange={(event) => update({ left: event.target.checked })} />
-        </label>
+        <DesignerCheckbox checked={Boolean(current.top)} onChange={(checked) => update({ top: checked })}>上边</DesignerCheckbox>
+        <DesignerCheckbox checked={Boolean(current.right)} onChange={(checked) => update({ right: checked })}>右边</DesignerCheckbox>
+        <DesignerCheckbox checked={Boolean(current.bottom)} onChange={(checked) => update({ bottom: checked })}>下边</DesignerCheckbox>
+        <DesignerCheckbox checked={Boolean(current.left)} onChange={(checked) => update({ left: checked })}>左边</DesignerCheckbox>
       </div>
     </div>
   );
@@ -321,14 +374,8 @@ export function TextStyleEditor({
           <option value="Right">右</option>
         </select>
       </label>
-      <label className="new-report-checkbox-label">
-        <span>加粗</span>
-        <input
-          type="checkbox"
-          checked={Boolean(style.bold)}
-          onChange={(event) => onChange({ ...style, bold: event.target.checked })}
-        />
-      </label>
+      <DesignerCheckbox checked={Boolean(style.bold)}
+          onChange={(checked) => onChange({ ...style, bold: checked })}>加粗</DesignerCheckbox>
       <label>
         <span>上距(mm)</span>
         <input

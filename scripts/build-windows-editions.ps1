@@ -18,6 +18,7 @@ trap {
 }
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
+$editions = @(Get-ExportDocProductEditionNames)
 $artifactsRoot = Join-Path $repoRoot "artifacts"
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $artifactsRoot "windows-desktop-run"
@@ -71,12 +72,8 @@ function Clear-PortableRuntimeData {
 }
 
 if ($PreflightOnly) {
-    foreach ($edition in @("Document", "Sales", "Full")) {
-        $folderName = switch ($edition) {
-            "Document" { "ExportDocManager-Document" }
-            "Sales" { "ExportDocManager-Sales" }
-            default { "ExportDocManager" }
-        }
+    foreach ($edition in $editions) {
+        $folderName = if ($edition -eq "Full") { "ExportDocManager" } else { "ExportDocManager-$edition" }
         $arguments = @(
             "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
             "-File", $builder,
@@ -109,12 +106,8 @@ if (-not $IncludeLicenseKeygen) {
     }
 }
 
-foreach ($edition in @("Document", "Sales", "Full")) {
-    $folderName = switch ($edition) {
-        "Document" { "ExportDocManager-Document" }
-        "Sales" { "ExportDocManager-Sales" }
-        default { "ExportDocManager" }
-    }
+foreach ($edition in $editions) {
+    $folderName = if ($edition -eq "Full") { "ExportDocManager" } else { "ExportDocManager-$edition" }
     $editionRoot = Join-Path $outputRoot $folderName
 
     $arguments = @(

@@ -7,6 +7,7 @@ using ExportDocManager.Services.EmailTemplates;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Opportunities;
+using ExportDocManager.Services.Office;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.SingleWindow;
@@ -157,6 +158,14 @@ namespace ExportDocManager.Api.Hosting
             services.AddScoped<IOrganizationDirectoryService, OrganizationDirectoryService>();
             services.AddScoped<IPermissionTemplateService, PermissionTemplateService>();
             services.AddScoped<BusinessDataAccessScope>();
+            services.AddScoped(provider => new OfficeServiceContext(
+                provider.GetRequiredService<IDbContextFactory<AppDbContext>>(),
+                provider.GetRequiredService<BusinessDataAccessScope>(),
+                provider.GetRequiredService<IBusinessClock>(),
+                provider.GetRequiredService<ApiAuthorizationService>().OfficeMode));
+            services.AddScoped<IMeetingRoomService, MeetingRoomService>();
+            services.AddScoped<IOfficeSupplyService, OfficeSupplyService>();
+            services.AddScoped<IPersonnelService, PersonnelService>();
             services.AddScoped<IItemService, ItemService>();
             services.AddScoped<IInvoicePartyResolver, InvoicePartyResolver>();
             services.AddScoped<IInvoiceService, InvoiceService>();

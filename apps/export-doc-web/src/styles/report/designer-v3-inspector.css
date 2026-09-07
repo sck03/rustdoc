@@ -51,6 +51,93 @@
   gap: 8px;
 }
 
+.report-designer-v3-flow-editor {
+  min-inline-size: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.report-designer-property-section,
+.report-designer-region-control {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.report-designer-property-section {
+  padding: 8px 0;
+  border-top: 1px solid var(--edm-neutral-200);
+}
+
+.report-designer-property-section > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--edm-neutral-750);
+  font-size: .75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.report-designer-property-section > summary::before { content: "▸"; }
+.report-designer-property-section[open] > summary::before { content: "▾"; }
+.report-designer-property-section > summary small { margin-left: auto; color: var(--edm-neutral-550); font-weight: 400; }
+.report-designer-region-control small { color: var(--edm-neutral-550); font-size: .6875rem; line-height: 1.5; }
+
+.report-designer-checkbox {
+  min-height: 32px;
+  gap: 6px;
+  align-self: end;
+  font-size: .75rem;
+}
+
+.report-designer-checkbox input[type="checkbox"] {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  padding: 0;
+  accent-color: var(--edm-primary-650);
+}
+
+.report-designer-property-tabs,
+.report-designer-property-tabs > [role="tabpanel"] {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.report-designer-property-tabs > [role="tablist"] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  padding: 3px;
+  border-radius: 7px;
+  background: var(--edm-neutral-100);
+  border: 1px solid var(--edm-neutral-250);
+}
+
+.report-designer-property-tabs [role="tab"] {
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--edm-neutral-650);
+  font-size: .75rem;
+  cursor: pointer;
+}
+
+.report-designer-property-tabs [role="tab"][aria-selected="true"] {
+  background: var(--edm-white);
+  color: var(--edm-primary-800);
+  font-weight: 700;
+}
+
 .report-designer-v3-style-editor {
   display: grid;
   gap: 8px;

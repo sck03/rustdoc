@@ -213,8 +213,8 @@ namespace ExportDocManager.Services.Security
             IQueryable<ContainerProject> query, User? user = null)
             => ApplyBusinessScope(query, PermissionModuleCatalog.DocumentContainerPacking, PermissionAction.View, user);
 
-        private IQueryable<TEntity> ApplyBusinessScope<TEntity>(
-            IQueryable<TEntity> query, string resourceKey, string action, User? user)
+        public IQueryable<TEntity> ApplyBusinessScope<TEntity>(
+            IQueryable<TEntity> query, string resourceKey, string action, User? user = null)
             where TEntity : class, IBusinessOwnedEntity
         {
             ArgumentNullException.ThrowIfNull(query);

@@ -158,15 +158,7 @@ pub(crate) fn start_sidecar(paths: &RuntimePaths) -> Result<SidecarLaunch, Box<d
 }
 
 fn resolve_product_edition() -> &'static str {
-    normalize_product_edition(option_env!("EXPORTDOCMANAGER_PRODUCT_EDITION"))
-}
-
-fn normalize_product_edition(value: Option<&str>) -> &'static str {
-    match value {
-        Some("Document") => "Document",
-        Some("Sales") => "Sales",
-        _ => "Full",
-    }
+    env!("EXPORTDOCMANAGER_PRODUCT_EDITION")
 }
 
 pub(crate) fn stop_sidecar(app: &tauri::AppHandle) {
@@ -239,11 +231,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn normalizes_product_edition_for_sidecar_launch() {
-        assert_eq!(normalize_product_edition(Some("Document")), "Document");
-        assert_eq!(normalize_product_edition(Some("Sales")), "Sales");
-        assert_eq!(normalize_product_edition(Some("Full")), "Full");
-        assert_eq!(normalize_product_edition(Some("unknown")), "Full");
-        assert_eq!(normalize_product_edition(None), "Full");
+    fn sidecar_edition_matches_the_package_catalog() {
+        let catalog: serde_json::Value =
+            serde_json::from_str(include_str!("../../../../scripts/product-editions.json"))
+                .unwrap();
+        assert!(catalog["editions"].get(resolve_product_edition()).is_some());
     }
 }

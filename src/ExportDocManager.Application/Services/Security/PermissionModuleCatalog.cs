@@ -81,6 +81,9 @@ namespace ExportDocManager.Services.Security
         public const string CommonProductReference = "common.product-reference";
         public const string CommonExchangeRates = "common.exchange-rates";
         public const string CommonEmail = "common.email";
+        public const string OfficeRooms = "office.rooms";
+        public const string OfficeSupplies = "office.supplies";
+        public const string OfficePeople = "office.people";
         public const string SystemDisasterRecovery = "system.disaster-recovery";
         public const string SystemAbout = "system.about";
 
@@ -112,7 +115,10 @@ namespace ExportDocManager.Services.Security
             new(CommonExchangeRates, "今日汇率", "通用工具", "common", 300),
             new(CommonEmail, "邮件发送", "通用工具", "common", 310),
             new(SystemDisasterRecovery, "灾难恢复", "系统", "common", 315, true),
-            new(SystemAbout, "关于系统", "系统", "common", 320)
+            new(SystemAbout, "关于系统", "系统", "common", 320),
+            new(OfficeRooms, "会议室预约", "公司行政", "office", 330),
+            new(OfficeSupplies, "物品领用", "公司行政", "office", 340),
+            new(OfficePeople, "人员信息管理", "公司行政", "office", 350)
         ];
 
         public static readonly IReadOnlyDictionary<string, PermissionModuleDefinition> ByKey =
@@ -130,6 +136,9 @@ namespace ExportDocManager.Services.Security
         public const string Sales = "Sales";
         public const string SalesManager = "SalesManager";
         public const string Finance = "Finance";
+        public const string OfficeEmployee = "OfficeEmployee";
+        public const string OfficeManager = "OfficeManager";
+        public const string PersonnelManager = "PersonnelManager";
 
         public static readonly IReadOnlyList<BuiltInPermissionTemplateDefinition> Templates =
         [
@@ -145,11 +154,24 @@ namespace ExportDocManager.Services.Security
             new(SalesManager, "销售主管", "管理部门客户、跟进、商机、供应商和共享模板；系统能力仍禁止。",
                 BuildSalesGrants(PermissionDataScope.Department, supervisor: true)),
             new(Finance, "财务人员", "维护本人付款报销，使用报表、汇率、邮件和 OCR。",
-                BuildFinanceGrants())
+                BuildFinanceGrants()),
+            new(OfficeEmployee, "公司员工", "团队模式下预约会议室、申请领用和查看本人记录。",
+                [.. OfficeEmployeeGrants(), .. Preset(PermissionModuleCatalog.SystemAbout, PermissionAccessLevel.View)]),
+            new(OfficeManager, "行政管理员", "管理本公司会议室、审批、实物交接和库存；不能审批自己的申请。",
+                [new(PermissionResourceCatalog.OfficePeople, PermissionAction.View, PermissionDataScope.Company),
+                    .. PermissionResourceCatalog.Resources.Where(resource => resource.Key is PermissionResourceCatalog.OfficeRooms or PermissionResourceCatalog.OfficeSupplies)
+                    .SelectMany(resource => resource.Actions.Select(action => new PermissionGrantRecord(resource.Key, action.Key, PermissionDataScope.Company))),
+                    .. Preset(PermissionModuleCatalog.SystemAbout, PermissionAccessLevel.View)]),
+            new(PersonnelManager, "人事管理员", "维护本公司人员档案和任职变动；账号创建、权限分配和关联仍由系统管理员负责。",
+                [.. OfficeEmployeeGrants(),
+                    .. Grant(PermissionResourceCatalog.OfficePeople, PermissionDataScope.Company,
+                        PermissionAction.ViewDetails, PermissionAction.Create, PermissionAction.Edit, PermissionAction.Transition),
+                    .. Preset(PermissionModuleCatalog.SystemAbout, PermissionAccessLevel.View)])
         ];
 
         private static IReadOnlyList<PermissionGrantRecord> BuildDocumentGrants() =>
         [
+            .. OfficeEmployeeGrants(),
             .. Preset(PermissionModuleCatalog.DocumentDashboard, PermissionAccessLevel.View),
             .. Preset(PermissionModuleCatalog.DocumentInvoices, PermissionAccessLevel.Operate),
             .. Preset(PermissionModuleCatalog.DocumentQuery, PermissionAccessLevel.View),
@@ -183,6 +205,7 @@ namespace ExportDocManager.Services.Security
         {
             var grants = new List<PermissionGrantRecord>(
             [
+                .. OfficeEmployeeGrants(),
                 new(PermissionResourceCatalog.SalesDashboard, PermissionAction.View, scope),
                 .. Grant(PermissionResourceCatalog.CrmCustomers, scope,
                     PermissionAction.View, PermissionAction.Create, PermissionAction.Edit, PermissionAction.Deactivate),
@@ -241,6 +264,7 @@ namespace ExportDocManager.Services.Security
 
         private static IReadOnlyList<PermissionGrantRecord> BuildFinanceGrants() =>
         [
+            .. OfficeEmployeeGrants(),
             .. Preset(PermissionModuleCatalog.DocumentPayments, PermissionAccessLevel.Operate),
             .. Preset(PermissionModuleCatalog.DocumentQuery, PermissionAccessLevel.View),
             .. Preset(PermissionModuleCatalog.DocumentOcr, PermissionAccessLevel.Operate),
@@ -259,6 +283,12 @@ namespace ExportDocManager.Services.Security
             .. Grant(PermissionResourceCatalog.EmailDelivery, PermissionDataScope.Own,
                 PermissionAction.Send, PermissionAction.ViewDelivery)
         ];
+
+        private static IEnumerable<PermissionGrantRecord> OfficeEmployeeGrants() =>
+            new[] { new PermissionGrantRecord(PermissionResourceCatalog.OfficePeople, PermissionAction.View, PermissionDataScope.Company) }
+            .Concat(new[] { PermissionModuleCatalog.OfficeRooms, PermissionModuleCatalog.OfficeSupplies }
+                .SelectMany(resource => Grant(resource, PermissionDataScope.Own,
+                    PermissionAction.View, PermissionAction.Create, PermissionAction.Cancel)));
 
         private static IReadOnlyList<PermissionGrantRecord> Preset(
             string resourceKey,

@@ -261,9 +261,9 @@
 }
 
 .report-designer-v3-field-search,
-.report-designer-v3-inspector-content label,
+.report-designer-v3-inspector-content label:not(.checkbox-field),
 .report-designer-v3-wide-field,
-.report-designer-v3-inspector-grid label {
+.report-designer-v3-inspector-grid label:not(.checkbox-field) {
   display: grid;
   gap: 4px;
   min-width: 0;
@@ -278,7 +278,7 @@
 }
 
 .report-designer-v3-field-search input,
-.report-designer-v3-inspector-content input,
+.report-designer-v3-inspector-content input:not([type="checkbox"]):not([type="radio"]),
 .report-designer-v3-inspector-content select,
 .report-designer-v3-inspector-content textarea {
   width: 100%;
@@ -454,8 +454,7 @@
   font-weight: 800;
 }
 
-.report-designer-v3-canvas-meta label,
-.report-designer-v3-check-row {
+.report-designer-v3-canvas-meta label {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -464,8 +463,7 @@
   font-weight: 700;
 }
 
-.report-designer-v3-canvas-meta input,
-.report-designer-v3-check-row input {
+.report-designer-v3-canvas-meta input {
   width: 15px;
   height: 15px;
   margin: 0;

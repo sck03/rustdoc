@@ -22,7 +22,7 @@ param(
 
     [string]$CargoTargetDir,
 
-    [ValidateSet("Document", "Sales", "Full")]
+    [ValidateNotNullOrEmpty()]
     [string]$ProductEdition = "Full",
 
     [string]$Config,
@@ -209,6 +209,7 @@ if ($IsWindows -and [string]::IsNullOrWhiteSpace($MsysUcrtBinDir)) {
 }
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
+$ProductEdition = Resolve-ExportDocProductEdition -Edition $ProductEdition
 $tauriRoot = Join-Path $repoRoot "apps\export-doc-tauri"
 $webRoot = Join-Path $repoRoot "apps\export-doc-web"
 $srcTauriRoot = Join-Path $tauriRoot "src-tauri"

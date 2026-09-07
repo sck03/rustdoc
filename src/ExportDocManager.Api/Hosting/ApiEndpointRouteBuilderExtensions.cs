@@ -67,6 +67,9 @@ namespace ExportDocManager.Api.Hosting
             api.MapPermissionGroup(PermissionModuleCatalog.SalesSuppliers).MapSupplierEndpoints();
             api.MapPermissionGroup(PermissionModuleCatalog.SalesEmailTemplates).MapEmailTemplateEndpoints();
             api.MapPermissionGroup(PermissionModuleCatalog.SalesOpportunities).MapSalesOpportunityEndpoints();
+            api.MapMeetingRoomEndpoints();
+            api.MapOfficeSupplyEndpoints();
+            api.MapPersonnelEndpoints();
             workloads.MapSingleWindowEndpoints();
 
             return endpoints;

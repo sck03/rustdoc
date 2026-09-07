@@ -37,6 +37,7 @@ namespace ExportDocManager.Services.Security
     public static class PermissionAction
     {
         public const string View = "view";
+        public const string ViewDetails = "view-details";
         public const string Create = "create";
         public const string Edit = "edit";
         public const string Operate = "operate";
@@ -67,6 +68,10 @@ namespace ExportDocManager.Services.Security
         public const string Send = "send";
         public const string ViewDelivery = "view-delivery";
         public const string Configure = "configure";
+        public const string Cancel = "cancel";
+        public const string Issue = "issue";
+        public const string Return = "return";
+        public const string Restock = "restock";
     }
 
     public sealed record PermissionActionDefinition(
@@ -119,6 +124,9 @@ namespace ExportDocManager.Services.Security
         public const string SystemAudit = "system.audit";
         public const string SystemBackup = "system.backup";
         public const string SystemDisasterRecovery = "system.disaster-recovery";
+        public const string OfficeRooms = PermissionModuleCatalog.OfficeRooms;
+        public const string OfficeSupplies = PermissionModuleCatalog.OfficeSupplies;
+        public const string OfficePeople = PermissionModuleCatalog.OfficePeople;
 
         private static PermissionActionDefinition Action(
             string key,
@@ -153,11 +161,25 @@ namespace ExportDocManager.Services.Security
             PermissionModuleCatalog.DocumentInvoiceReports,
             PermissionModuleCatalog.DocumentPaymentReports,
             PermissionModuleCatalog.CommonEmail,
+            PermissionModuleCatalog.OfficeRooms,
+            PermissionModuleCatalog.OfficeSupplies,
+            PermissionModuleCatalog.OfficePeople,
             PermissionModuleCatalog.SystemDisasterRecovery
         };
 
         private static readonly IReadOnlyList<PermissionResourceDefinition> ResourceDefinitions =
         [
+            OfficeResource(OfficeRooms, "会议室预约", 330, false),
+            OfficeResource(OfficeSupplies, "物品领用", 340, true),
+            new(OfficePeople, "人员信息管理", "公司行政", "office", OfficePeople, 350, false, true,
+            [
+                Action(PermissionAction.View, "公司通讯录", "查看在职人员的工作信息和联系方式", 10, PermissionAccessLevel.View),
+                Action(PermissionAction.ViewDetails, "人事档案与记录", "查看入职日期、个人联系方式、紧急联系人和人事记录", 20),
+                Action(PermissionAction.Create, "入职登记", "创建人员档案，工号在公司内唯一", 30),
+                Action(PermissionAction.Edit, "维护档案", "维护联系方式、用工类型和合同日期", 40),
+                Action(PermissionAction.Transition, "转正、调岗与离职", "办理任职变动及离职交接，同步关联账号组织范围并撤销会话", 50, PermissionAccessLevel.Manage),
+                Action(PermissionAction.Assign, "关联账号", "仅系统管理员可关联同公司普通账号，不授予登录或权限管理能力", 60, PermissionAccessLevel.Manage)
+            ]),
             .. PermissionModuleCatalog.Modules
                 .Where(module => !ReplacedModuleKeys.Contains(module.Key))
                 .Select(StandardModule),
@@ -547,6 +569,19 @@ namespace ExportDocManager.Services.Security
                 Action(PermissionAction.ExportPdf, "PDF", "导出 PDF", 30),
                 Action(PermissionAction.ExportZip, "ZIP", "批量导出 ZIP", 40, PermissionAccessLevel.Manage),
                 Action(PermissionAction.SendEmail, "邮件外发", "通过邮件外发单据", 50, PermissionAccessLevel.Manage)
+            ]);
+
+        private static PermissionResourceDefinition OfficeResource(string key, string name, int order, bool supplies) =>
+            new(key, name, "公司行政", "office", key, order, false, true,
+            [
+                ViewAction,
+                Action(PermissionAction.Create, "申请", "提交本人申请", 20),
+                Action(PermissionAction.Cancel, "取消", "取消尚未交接的申请", 30),
+                Action(PermissionAction.Approve, "审批", "审批范围内其他人的申请", 40, PermissionAccessLevel.Manage),
+                Action(PermissionAction.Issue, supplies ? "发放" : "钥匙交接", "确认申请人到场并登记交接", 50, PermissionAccessLevel.Manage),
+                Action(PermissionAction.Return, "归还登记", "确认实物归还并登记", 60, PermissionAccessLevel.Manage),
+                .. supplies ? new[] { Action(PermissionAction.Restock, "库存补充", "登记入库及查看库存流水", 70, PermissionAccessLevel.Manage) } : [],
+                Action(PermissionAction.Manage, "资源管理", "维护本公司资源；申请数据范围不扩大公司边界", 80, PermissionAccessLevel.Manage)
             ]);
 
         private static PermissionResourceDefinition SystemResource(string key, string name, int sortOrder) =>

@@ -3,13 +3,15 @@ param(
     [Parameter(Mandatory = $true)][string]$PackageRoot,
     [Parameter(Mandatory = $true)][ValidateSet("Desktop", "Server", "Container")][string]$Profile,
     [Parameter(Mandatory = $true)][string]$RuntimeIdentifier,
-    [ValidateSet("Document", "Sales", "Full")][string]$Edition = "Full",
+    [ValidateNotNullOrEmpty()][string]$Edition = "Full",
     [switch]$RequireWebView2RuntimeInstaller
 )
 
 $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptRoot "lib\webview2-runtime-support.ps1")
+. (Join-Path $scriptRoot "lib\product-editions.ps1")
+$Edition = Resolve-ExportDocProductEdition -Edition $Edition
 $root = [IO.Path]::GetFullPath($PackageRoot)
 if (-not (Test-Path -LiteralPath $root -PathType Container)) { throw "Package root does not exist: $root" }
 $requiresDocumentResources = $true

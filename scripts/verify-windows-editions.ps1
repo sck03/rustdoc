@@ -27,12 +27,8 @@ Invoke-ExportDocExternal -FilePath $powerShellExecutable -Arguments @(
     "-RepositoryRoot", $repoRoot
 )
 
-foreach ($edition in @("Document", "Sales", "Full")) {
-    $folderName = switch ($edition) {
-        "Document" { "ExportDocManager-Document" }
-        "Sales" { "ExportDocManager-Sales" }
-        default { "ExportDocManager" }
-    }
+foreach ($edition in (Get-ExportDocProductEditionNames)) {
+    $folderName = if ($edition -eq "Full") { "ExportDocManager" } else { "ExportDocManager-$edition" }
     $editionRoot = Join-Path $outputRoot $folderName
     $editionManifestPath = Join-Path $editionRoot "product-edition.json"
     $requiredFiles = @(
@@ -80,8 +76,8 @@ foreach ($edition in @("Document", "Sales", "Full")) {
     })
 }
 
-if (@($results | Select-Object -ExpandProperty MainExecutableSha256 -Unique).Count -ne 3) {
-    throw "The three edition executables do not have distinct SHA256 hashes. Build-time product edition may not have been applied."
+if (@($results | Select-Object -ExpandProperty MainExecutableSha256 -Unique).Count -ne $results.Count) {
+    throw "The edition executables do not have distinct SHA256 hashes. Build-time product edition may not have been applied."
 }
 
 $licenseKeygen = Join-Path $outputRoot "KEY\ExportDocLicenseKeyGen.exe"

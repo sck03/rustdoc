@@ -2,14 +2,12 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { normalizeProductEdition, productEditionCatalog as editionCatalog } from "./lib/product-editions.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tauriRoot = path.join(repositoryRoot, "apps", "export-doc-tauri");
 const generatedRoot = path.join(repositoryRoot, "artifacts", "tauri-updater-config");
 const tauriCliPath = path.join(tauriRoot, "node_modules", "@tauri-apps", "cli", "tauri.js");
-const editionCatalog = JSON.parse(
-  readFileSync(path.join(repositoryRoot, "scripts", "product-editions.json"), "utf8"),
-);
 const buildArguments = process.argv.slice(2);
 const productEdition = normalizeProductEdition(process.env.EXPORTDOCMANAGER_PRODUCT_EDITION);
 const editionMetadata = editionCatalog.editions?.[productEdition];
@@ -131,14 +129,6 @@ function deepMerge(base, overlay) {
 
 function isObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function normalizeProductEdition(value) {
-  const normalized = String(value || "Full").trim().toLowerCase();
-  if (normalized === "document") return "Document";
-  if (normalized === "sales") return "Sales";
-  if (normalized === "full") return "Full";
-  throw new Error(`Unsupported product edition: ${value}`);
 }
 
 function resolveUpdaterEndpoint(configuredEndpoint, metadata, version) {

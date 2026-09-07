@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-09-06",
+  "capturedAt": "2026-09-08",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 122753,
+      "baselineAggregateLines": 124504,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 122953,
+      "maximumAggregateLines": 124704,
       "reportFiles": false
     },
     {
@@ -22,9 +22,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 83286,
+      "baselineAggregateLines": 85105,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 83486,
+      "maximumAggregateLines": 85305,
       "reportFiles": false
     },
     {
@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 42656,
+      "baselineAggregateLines": 43937,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 42776,
+      "maximumAggregateLines": 44057,
       "reportFiles": false
     },
     {
@@ -70,10 +70,26 @@
       "directory": ".github/workflows",
       "filePattern": "^.+\\.(?:yml|yaml)$",
       "maximumLines": 800,
-      "baselineAggregateLines": 2731,
+      "baselineAggregateLines": 2753,
       "maximumAggregateGrowthLines": 20,
-      "maximumAggregateLines": 2751,
+      "maximumAggregateLines": 2773,
       "reportFiles": false
+    },
+    {
+      "name": "office collaboration services",
+      "directory": "src/ExportDocManager.Infrastructure/Services/Office",
+      "filePattern": "^.+\\.cs$",
+      "maximumLines": 300,
+      "maximumAggregateLines": 800,
+      "excludePattern": "/PersonnelService(?:\\..+)?\\.cs$"
+    },
+    {
+      "name": "office workspace components",
+      "directory": "apps/export-doc-web/src/features/office",
+      "filePattern": "^.+\\.(?:ts|tsx)$",
+      "maximumLines": 220,
+      "maximumAggregateLines": 900,
+      "excludePattern": "/(?:Personnel.*|personnelModel|usePersonnelData)\\.(?:ts|tsx)$"
     },
     {
       "name": "HS knowledge partials",
@@ -210,7 +226,7 @@
       "directory": "apps/export-doc-web/src",
       "filePattern": "^(?:App|AppWorkspaceRoutes|webSessionStorage)\\.(?:tsx|ts)$",
       "maximumLines": 700,
-      "maximumAggregateLines": 900
+      "maximumAggregateLines": 910
     },
     {
       "name": "settings page orchestration",
@@ -299,11 +315,11 @@
     {
       "name": "report designer v3 modules",
       "directory": "apps/export-doc-web/src/features/report-designer",
-      "filePattern": "^(?:ReportDesignerV3(?:Workspace|Canvas|FlowProperties)|reportDesignerBlockRenderer|reportDesignerV3(?:ElementFactories|History|HtmlExporter|Migration|Mutations|Resize|Schema|TemplateParser|Validation|WorkspaceHelpers))\\.(?:tsx|ts)$",
+      "filePattern": "^(?:ReportDesignerV3(?:Workspace|Canvas|FlowProperties)|ReportDesignerCanvas(?:Element|TextEditor)|reportDesignerBlockRenderer|reportDesignerV3(?:ElementFactories|History|HtmlExporter|Migration|Mutations|Regions|Resize|Schema|TemplateParser|Validation|WorkspaceHelpers))\\.(?:tsx|ts)$",
       "maximumLines": 720,
-      "baselineAggregateLines": 4754,
+      "baselineAggregateLines": 5086,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 4954
+      "maximumAggregateLines": 5286
     },
     {
       "name": "themed stylesheet modules",
@@ -334,6 +350,20 @@
       "directory": "apps/export-doc-web/src",
       "filePattern": "^responsiveOverrides\\.css$",
       "maximumLines": 8
+    },
+    {
+      "name": "personnel services",
+      "directory": "src/ExportDocManager.Infrastructure/Services/Office",
+      "filePattern": "^PersonnelService(?:\\..+)?\\.cs$",
+      "maximumLines": 300,
+      "maximumAggregateLines": 500
+    },
+    {
+      "name": "personnel workspace components",
+      "directory": "apps/export-doc-web/src/features/office",
+      "filePattern": "^(?:Personnel.*|personnelModel|usePersonnelData)\\.(?:ts|tsx)$",
+      "maximumLines": 220,
+      "maximumAggregateLines": 500
     }
   ]
 }

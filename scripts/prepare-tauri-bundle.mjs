@@ -3,6 +3,7 @@ import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promi
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveDotnetCommand } from "./lib/dotnet-command.mjs";
+import { normalizeProductEdition, productEditionCatalog } from "./lib/product-editions.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
@@ -31,15 +32,13 @@ const rid = process.env.EXPORTDOCMANAGER_TAURI_RID || detectRuntimeIdentifier();
 const rustTarget = resolveRustTargetTriple(rid);
 const selfContained = (process.env.EXPORTDOCMANAGER_TAURI_SELF_CONTAINED || "true").toLowerCase() !== "false";
 const productEdition = normalizeProductEdition(process.env.EXPORTDOCMANAGER_PRODUCT_EDITION);
-const dependencyProfile = productEdition === "Sales" ? "sales" : "full";
-const productEditionCatalog = JSON.parse(
-  await readFile(path.join(repoRoot, "scripts", "product-editions.json"), "utf8"),
-);
 const productEditionMetadata = productEditionCatalog.editions?.[productEdition];
 if (!productEditionMetadata) {
   throw new Error(`Product edition metadata is missing for ${productEdition}.`);
 }
 const resourceProfile = validateResourceProfile(productEditionMetadata.resourceProfile, productEdition);
+const dependencyProfile = productEditionMetadata.dependencyProfile;
+if (!["full", "core"].includes(dependencyProfile)) throw new Error(`Unsupported dependency profile: ${dependencyProfile}`);
 const includedStableResourceDirs = new Set([
   "Legal",
   ...(resourceProfile.documentResources ? ["Templates", "Resources"] : []),
@@ -246,14 +245,6 @@ async function createProductEditionManifest() {
     generatedAt: new Date().toISOString(),
     runtimeDataPolicy: "Portable builds use App_Data beside the program; installed builds require an explicit first-run DataRoot selection and support verified migration.",
   };
-}
-
-function normalizeProductEdition(value) {
-  const normalized = String(value || "Full").trim().toLowerCase();
-  if (normalized === "document") return "Document";
-  if (normalized === "sales") return "Sales";
-  if (normalized === "full" || normalized === "") return "Full";
-  throw new Error(`Unsupported product edition: ${value}`);
 }
 
 function validateResourceProfile(value, edition) {

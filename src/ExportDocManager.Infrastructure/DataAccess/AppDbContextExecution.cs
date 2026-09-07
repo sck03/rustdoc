@@ -82,9 +82,11 @@ namespace ExportDocManager.DataAccess
                     await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
                     return result;
                 }
-                catch
+                catch (Exception exception)
                 {
-                    await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                    using var rollbackTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    try { await transaction.RollbackAsync(rollbackTimeout.Token).ConfigureAwait(false); }
+                    catch (Exception rollbackException) { exception.Data["TransactionRollbackFailure"] = rollbackException; }
                     throw;
                 }
             }).ConfigureAwait(false);

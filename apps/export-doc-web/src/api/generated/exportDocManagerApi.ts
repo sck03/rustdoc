@@ -3218,6 +3218,7 @@ export interface ApiUserCapabilitiesDto {
   moduleAccess: ApiModuleAccessDto[];
   permissions: ApiPermissionGrantDto[];
   productEdition: string;
+  usesOfficeRegister: boolean;
 }
 
 export interface ApiUserDto {
@@ -3393,6 +3394,10 @@ export interface EmailConfig {
   smtpPort: number;
   userName: string;
 }
+
+export type EmploymentStatus = "Probation" | "Active" | "Departed";
+
+export type EmploymentType = "FullTime" | "PartTime" | "Intern" | "Contractor";
 
 export interface ExcelImportSettings {
   brandCol: number;
@@ -3611,13 +3616,372 @@ export interface InvoiceCloneOptions {
   resetDates?: boolean;
 }
 
+export interface MeetingBookingCreateRequest {
+  attendeeCount: number;
+  employeeId?: number | null;
+  endsAt: string;
+  meetingRoomId: number;
+  requestKey: string;
+  startsAt: string;
+  title: string;
+}
+
+export interface MeetingBookingRecord {
+  applicantName: string;
+  attendeeCount: number;
+  createdAt: string;
+  departmentId: string;
+  endsAt: string;
+  id: number;
+  issuedAt?: string | null;
+  location: string;
+  meetingRoomId: number;
+  ownerUserId: number;
+  requiresKey: boolean;
+  returnedAt?: string | null;
+  roomName: string;
+  startsAt: string;
+  status: MeetingBookingStatus;
+  title: string;
+  versionNumber: number;
+}
+
+export type MeetingBookingStatus = "Pending" | "Approved" | "InUse" | "Completed" | "Rejected" | "Cancelled";
+
+export interface MeetingBusySlot {
+  endsAt: string;
+  startsAt: string;
+  status: MeetingBookingStatus;
+}
+
+export interface MeetingRoomRecord {
+  advanceBookingDays: number;
+  capacity: number;
+  equipment: string;
+  id: number;
+  inUse: boolean;
+  isActive: boolean;
+  location: string;
+  maximumBookingHours: number;
+  name: string;
+  requiresKey: boolean;
+  versionNumber: number;
+}
+
+export interface MeetingRoomSaveRequest {
+  advanceBookingDays: number;
+  capacity: number;
+  equipment: string;
+  expectedVersion: number;
+  isActive: boolean;
+  location: string;
+  maximumBookingHours: number;
+  name: string;
+  requiresKey: boolean;
+}
+
 export type NotifyPartyMode = "None" | "SameAsConsignee" | "Separate";
+
+export interface OfficeDecisionRequest {
+  expectedVersion: number;
+  note?: string;
+}
+
+export interface OfficeRequestEventRecord {
+  action: string;
+  actorName: string;
+  createdAt: string;
+  id: number;
+  note: string;
+  quantity: number;
+}
+
+export interface OfficeReturnRequest {
+  expectedVersion: number;
+  note?: string;
+  quantity: number;
+}
+
+export interface OfficeStockMovementRecord {
+  actorName: string;
+  createdAt: string;
+  id: number;
+  kind: string;
+  note: string;
+  quantityDelta: number;
+  stockAfter: number;
+}
+
+export interface OfficeStockRequest {
+  expectedVersion: number;
+  note: string;
+  operationId: string;
+  quantity: number;
+}
+
+export interface OfficeSupplyRecord {
+  availableQuantity: number;
+  description: string;
+  id: number;
+  isActive: boolean;
+  isReturnable: boolean;
+  location: string;
+  lowStock: boolean;
+  minimumStock: number;
+  name: string;
+  reservedQuantity: number;
+  stockQuantity: number;
+  unit: string;
+  versionNumber: number;
+}
+
+export interface OfficeSupplyRequestRecord {
+  applicantName: string;
+  createdAt: string;
+  departmentId: string;
+  id: number;
+  isReturnable: boolean;
+  officeSupplyId: number;
+  ownerUserId: number;
+  purpose: string;
+  quantity: number;
+  returnDueDate?: string | null;
+  returnedQuantity: number;
+  status: SupplyRequestStatus;
+  supplyName: string;
+  unit: string;
+  versionNumber: number;
+}
+
+export interface OfficeSupplySaveRequest {
+  description: string;
+  expectedVersion: number;
+  isActive: boolean;
+  isReturnable: boolean;
+  location: string;
+  minimumStock: number;
+  name: string;
+  unit: string;
+}
+
+export interface PagedResultOfMeetingBookingRecord {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: MeetingBookingRecord[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface PagedResultOfMeetingRoomRecord {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: MeetingRoomRecord[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface PagedResultOfOfficeRequestEventRecord {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: OfficeRequestEventRecord[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface PagedResultOfOfficeStockMovementRecord {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: OfficeStockMovementRecord[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface PagedResultOfOfficeSupplyRecord {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: OfficeSupplyRecord[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface PagedResultOfOfficeSupplyRequestRecord {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: OfficeSupplyRequestRecord[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface PagedResultOfPersonnelAccountRecord {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: PersonnelAccountRecord[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface PagedResultOfPersonnelDirectoryRecord {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: PersonnelDirectoryRecord[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface PagedResultOfPersonnelEventRecord {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: PersonnelEventRecord[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
 
 export interface PaymentTemplateItem {
   isEnabled: boolean;
   name: string;
   reportType: string;
   templatePath: string;
+}
+
+export interface PersonnelAccountRecord {
+  departmentId: string;
+  fullName: string;
+  id: number;
+  isActive: boolean;
+  username: string;
+  versionNumber: number;
+}
+
+export interface PersonnelAccountRequest {
+  expectedAccountVersion: number;
+  expectedVersion: number;
+  userId: number;
+}
+
+export interface PersonnelClearance {
+  isClear: boolean;
+  items: PersonnelClearanceItem[];
+  meetingCount: number;
+  supplyCount: number;
+}
+
+export interface PersonnelClearanceItem {
+  kind: string;
+  outstandingQuantity: number;
+  requestId: number;
+  resourceName: string;
+  status: string;
+}
+
+export interface PersonnelCreateRequest {
+  contractEndsOn: string | null;
+  departmentId: string;
+  employeeNumber: string;
+  employmentType: EmploymentType;
+  hireDate: string;
+  jobTitle: string;
+  onProbation: boolean;
+  probationEndsOn: string | null;
+  profile: PersonnelProfile;
+  requestKey: string;
+}
+
+export interface PersonnelDepartmentRecord {
+  code: string;
+  isActive: boolean;
+  name: string;
+}
+
+export interface PersonnelDirectoryRecord {
+  canViewDetails: boolean;
+  departmentId: string;
+  departmentName: string;
+  employeeNumber: string;
+  fullName: string;
+  id: number;
+  jobTitle: string;
+  status: EmploymentStatus;
+  workEmail: string;
+  workLocation: string;
+  workPhone: string;
+}
+
+export interface PersonnelEventRecord {
+  action: string;
+  actorName: string;
+  createdAt: string;
+  effectiveDate: string;
+  id: number;
+  note: string;
+  summary: string;
+}
+
+export interface PersonnelOptions {
+  canCreate: boolean;
+  departments: PersonnelDepartmentRecord[];
+}
+
+export interface PersonnelProfile {
+  emergencyContact: string;
+  emergencyPhone: string;
+  fullName: string;
+  notes: string;
+  personalPhone: string;
+  workEmail: string;
+  workLocation: string;
+  workPhone: string;
+}
+
+export interface PersonnelRecord {
+  account?: null | PersonnelAccountRecord;
+  canEdit: boolean;
+  canLinkAccount: boolean;
+  canTransition: boolean;
+  confirmedOn?: string | null;
+  contractEndsOn?: string | null;
+  departedOn?: string | null;
+  employee: PersonnelDirectoryRecord;
+  employmentType: EmploymentType;
+  hireDate: string;
+  lastEffectiveDate: string;
+  probationEndsOn?: string | null;
+  profile: PersonnelProfile;
+  versionNumber: number;
+}
+
+export interface PersonnelTransitionRequest {
+  departmentId?: string | null;
+  effectiveDate: string;
+  expectedVersion: number;
+  jobTitle?: string | null;
+  note: string;
+  onProbation?: boolean;
+}
+
+export interface PersonnelUpdateRequest {
+  contractEndsOn: string | null;
+  employmentType: EmploymentType;
+  expectedVersion: number;
+  probationEndsOn: string | null;
+  profile: PersonnelProfile;
 }
 
 export interface ReportTemplateDefaults {
@@ -3869,6 +4233,17 @@ export interface SingleWindowSettings {
   customsCooDefaults: CustomsCooDefaultProfile;
 }
 
+export interface SupplyRequestCreateRequest {
+  employeeId?: number | null;
+  officeSupplyId: number;
+  purpose: string;
+  quantity: number;
+  requestKey: string;
+  returnDueDate: string | null;
+}
+
+export type SupplyRequestStatus = "Pending" | "Approved" | "Issued" | "Returned" | "Rejected" | "Cancelled";
+
 export interface SystemSettings {
   appName: string;
   auditLogRetentionDays: number;
@@ -3919,6 +4294,16 @@ export interface AnalyzeInvoiceProfitRequest {
   body: ApiInvoiceProfitAnalysisRequest;
 }
 
+export interface ApproveMeetingBookingRequest {
+  id: number;
+  body: OfficeDecisionRequest;
+}
+
+export interface ApproveOfficeSupplyRequestRequest {
+  id: number;
+  body: OfficeReturnRequest;
+}
+
 export interface ArchiveEmailTemplateRequest {
   id: number;
   expectedVersion: number;
@@ -3956,6 +4341,16 @@ export interface BuildCustomsCooExportReviewRequest {
 
 export interface CancelJobRequest {
   jobId: string;
+}
+
+export interface CancelMeetingBookingRequest {
+  id: number;
+  body: OfficeDecisionRequest;
+}
+
+export interface CancelOfficeSupplyRequestRequest {
+  id: number;
+  body: OfficeReturnRequest;
 }
 
 export interface CaptureRemoteHsCodesRequest {
@@ -3999,6 +4394,11 @@ export interface CommitHsCodesImportRequest {
 export interface CompleteCrmFollowUpRequest {
   id: number;
   body: ApiCrmLifecycleRequest;
+}
+
+export interface ConfirmPersonnelRequest {
+  id: number;
+  body: PersonnelTransitionRequest;
 }
 
 export interface ConfirmSupplierAssessmentRequest {
@@ -4052,6 +4452,22 @@ export interface CreateJobDownloadTicketRequest {
   jobId: string;
 }
 
+export interface CreateMeetingBookingRequest {
+  body: MeetingBookingCreateRequest;
+}
+
+export interface CreateMeetingRoomRequest {
+  body: MeetingRoomSaveRequest;
+}
+
+export interface CreateOfficeSupplyRequest {
+  body: OfficeSupplySaveRequest;
+}
+
+export interface CreateOfficeSupplyRequestRequest {
+  body: SupplyRequestCreateRequest;
+}
+
 export interface CreateOrganizationCompanyRequest {
   body: ApiOrganizationCompanySaveRequest;
 }
@@ -4070,6 +4486,10 @@ export interface CreatePaymentRequest {
 
 export interface CreatePermissionTemplateRequest {
   body: ApiPermissionTemplateSaveRequest;
+}
+
+export interface CreatePersonnelRequest {
+  body: PersonnelCreateRequest;
 }
 
 export interface CreatePortRequest {
@@ -4260,6 +4680,11 @@ export interface DeleteUnitRequest {
   id: number;
 }
 
+export interface DepartPersonnelRequest {
+  id: number;
+  body: PersonnelTransitionRequest;
+}
+
 export interface DisableEmailTemplateRequest {
   id: number;
   body: ApiEmailTemplateLifecycleRequest;
@@ -4412,12 +4837,50 @@ export interface GetJobRequest {
   jobId: string;
 }
 
+export interface GetMeetingBookingHistoryRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetMeetingRoomAvailabilityRequest {
+  id: number;
+  from: string;
+  to: string;
+}
+
+export interface GetOfficeStockHistoryRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetOfficeSupplyRequestHistoryRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 export interface GetPayeeRequest {
   id: number;
 }
 
 export interface GetPaymentRequest {
   id: number;
+}
+
+export interface GetPersonnelRequest {
+  id: number;
+}
+
+export interface GetPersonnelClearanceRequest {
+  id: number;
+}
+
+export interface GetPersonnelHistoryRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface GetPortRequest {
@@ -4499,6 +4962,21 @@ export interface ImportUploadedInvoiceTransferPackageRequest {
   conflictAction?: string;
   newInvoiceNo?: string;
   body: Blob;
+}
+
+export interface IssueMeetingRoomKeyRequest {
+  id: number;
+  body: OfficeDecisionRequest;
+}
+
+export interface IssueOfficeSupplyRequest {
+  id: number;
+  body: OfficeReturnRequest;
+}
+
+export interface LinkPersonnelAccountRequest {
+  id: number;
+  body: PersonnelAccountRequest;
 }
 
 export interface ListAuditLogsRequest {
@@ -4601,6 +5079,47 @@ export interface ListJobsRequest {
   pageSize?: number;
 }
 
+export interface ListMeetingBookingsRequest {
+  status?: string;
+  mineOnly?: boolean;
+  resourceId?: number;
+  from?: string;
+  to?: string;
+  pageNumber?: number;
+  pageSize?: number;
+  requestId?: number;
+  applicantUserId?: number;
+  employeeId?: number;
+}
+
+export interface ListMeetingRoomsRequest {
+  keyword?: string;
+  includeInactive?: boolean;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListOfficeSuppliesRequest {
+  keyword?: string;
+  includeInactive?: boolean;
+  lowStockOnly?: boolean;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListOfficeSupplyRequestsRequest {
+  status?: string;
+  mineOnly?: boolean;
+  resourceId?: number;
+  from?: string;
+  to?: string;
+  pageNumber?: number;
+  pageSize?: number;
+  requestId?: number;
+  applicantUserId?: number;
+  employeeId?: number;
+}
+
 export interface ListPayeesRequest {
   keyword?: string;
 }
@@ -4615,6 +5134,22 @@ export interface ListPaymentsRequest {
   pageNumber?: number;
   pageSize?: number;
   keyword?: string;
+}
+
+export interface ListPersonnelRequest {
+  keyword?: string;
+  departmentId?: string;
+  status?: string;
+  attentionOnly?: boolean;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListPersonnelAccountOptionsRequest {
+  id: number;
+  keyword?: string;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListPortsRequest {
@@ -4870,6 +5405,21 @@ export interface RegisterLicenseRequest {
   body: ApiLicenseRegisterRequest;
 }
 
+export interface RehirePersonnelRequest {
+  id: number;
+  body: PersonnelTransitionRequest;
+}
+
+export interface RejectMeetingBookingRequest {
+  id: number;
+  body: OfficeDecisionRequest;
+}
+
+export interface RejectOfficeSupplyRequestRequest {
+  id: number;
+  body: OfficeReturnRequest;
+}
+
 export interface RenameReportTemplateRequest {
   body: ApiReportTemplateRenameRequest;
 }
@@ -4886,6 +5436,11 @@ export interface ResetHsCodeRemoteCandidatesRequest {
 
 export interface ResolveRemoteHsCodeDetailRequest {
   body: ApiHsCodeDto;
+}
+
+export interface RestockOfficeSupplyRequest {
+  id: number;
+  body: OfficeStockRequest;
 }
 
 export interface RestoreCrmCustomerRequest {
@@ -4945,6 +5500,16 @@ export interface RestoreUserReportTemplateVersionRequest {
 
 export interface RetryJobRequest {
   jobId: string;
+}
+
+export interface ReturnMeetingRoomKeyRequest {
+  id: number;
+  body: OfficeDecisionRequest;
+}
+
+export interface ReturnOfficeSupplyRequest {
+  id: number;
+  body: OfficeReturnRequest;
 }
 
 export interface ReviewHsCodeRemoteCandidateRequest {
@@ -5177,6 +5742,11 @@ export interface StartPdfMergeSaveToPathJobRequest {
   body: ApiPdfMergeRequest;
 }
 
+export interface StocktakeOfficeSupplyRequest {
+  id: number;
+  body: OfficeStockRequest;
+}
+
 export interface SuggestEmailServerConfigRequest {
   body: ApiEmailServerSuggestionRequest;
 }
@@ -5184,6 +5754,11 @@ export interface SuggestEmailServerConfigRequest {
 export interface TransferCrmFollowUpRequest {
   id: number;
   body: ApiCrmFollowUpTransferRequest;
+}
+
+export interface TransferPersonnelRequest {
+  id: number;
+  body: PersonnelTransitionRequest;
 }
 
 export interface TransferSharedDatabaseOwnershipRequest {
@@ -5260,6 +5835,16 @@ export interface UpdateInvoiceRequest {
   body: ApiInvoiceDetailDto;
 }
 
+export interface UpdateMeetingRoomRequest {
+  id: number;
+  body: MeetingRoomSaveRequest;
+}
+
+export interface UpdateOfficeSupplyRequest {
+  id: number;
+  body: OfficeSupplySaveRequest;
+}
+
 export interface UpdateOrganizationCompanyRequest {
   code: string;
   body: ApiOrganizationCompanySaveRequest;
@@ -5283,6 +5868,11 @@ export interface UpdatePaymentRequest {
 export interface UpdatePermissionTemplateRequest {
   id: number;
   body: ApiPermissionTemplateSaveRequest;
+}
+
+export interface UpdatePersonnelRequest {
+  id: number;
+  body: PersonnelUpdateRequest;
 }
 
 export interface UpdatePortRequest {
@@ -5512,6 +6102,22 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public approveMeetingBooking(request: ApproveMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/approve`;
+    return this.request<MeetingBookingRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public approveOfficeSupplyRequest(request: ApproveOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/approve`;
+    return this.request<OfficeSupplyRequestRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public archiveEmailTemplate(request: ArchiveEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
     const path = `/api/email-templates/${encodePath(request.id)}`;
     return this.request<ApiEmailTemplateDto>("DELETE", path, {
@@ -5571,6 +6177,22 @@ export class ExportDocManagerApiClient {
   public cancelJob(request: CancelJobRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/jobs/${encodePath(request.jobId)}/cancel`;
     return this.request<ApiCommandResponse>("POST", path, { init });
+  }
+
+  public cancelMeetingBooking(request: CancelMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/cancel`;
+    return this.request<MeetingBookingRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public cancelOfficeSupplyRequest(request: CancelOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/cancel`;
+    return this.request<OfficeSupplyRequestRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public captureRemoteHsCodes(request: CaptureRemoteHsCodesRequest, init?: ApiRequestInit): Promise<ApiHsCodeSearchResponse> {
@@ -5663,6 +6285,14 @@ export class ExportDocManagerApiClient {
   public completeCrmFollowUp(request: CompleteCrmFollowUpRequest, init?: ApiRequestInit): Promise<ApiCrmFollowUpDto> {
     const path = `/api/crm/follow-ups/${encodePath(request.id)}/complete`;
     return this.request<ApiCrmFollowUpDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public confirmPersonnel(request: ConfirmPersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}/confirm`;
+    return this.request<PersonnelRecord>("POST", path, {
       body: request.body,
       init,
     });
@@ -5768,6 +6398,38 @@ export class ExportDocManagerApiClient {
     return this.request<ApiDownloadTicket>("POST", path, { init });
   }
 
+  public createMeetingBooking(request: CreateMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    const path = "/api/office/bookings";
+    return this.request<MeetingBookingRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public createMeetingRoom(request: CreateMeetingRoomRequest, init?: ApiRequestInit): Promise<MeetingRoomRecord> {
+    const path = "/api/office/rooms";
+    return this.request<MeetingRoomRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public createOfficeSupply(request: CreateOfficeSupplyRequest, init?: ApiRequestInit): Promise<OfficeSupplyRecord> {
+    const path = "/api/office/supplies";
+    return this.request<OfficeSupplyRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public createOfficeSupplyRequest(request: CreateOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    const path = "/api/office/supply-requests";
+    return this.request<OfficeSupplyRequestRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public createOrganizationCompany(request: CreateOrganizationCompanyRequest, init?: ApiRequestInit): Promise<ApiOrganizationCompanyDto> {
     const path = "/api/organization-directory/companies";
     return this.request<ApiOrganizationCompanyDto>("POST", path, {
@@ -5803,6 +6465,14 @@ export class ExportDocManagerApiClient {
   public createPermissionTemplate(request: CreatePermissionTemplateRequest, init?: ApiRequestInit): Promise<ApiPermissionTemplateDto> {
     const path = "/api/permission-templates";
     return this.request<ApiPermissionTemplateDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public createPersonnel(request: CreatePersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = "/api/office/people";
+    return this.request<PersonnelRecord>("POST", path, {
       body: request.body,
       init,
     });
@@ -6128,6 +6798,14 @@ export class ExportDocManagerApiClient {
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
+  public departPersonnel(request: DepartPersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}/depart`;
+    return this.request<PersonnelRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public disableEmailTemplate(request: DisableEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
     const path = `/api/email-templates/${encodePath(request.id)}/disable`;
     return this.request<ApiEmailTemplateDto>("POST", path, {
@@ -6421,6 +7099,50 @@ export class ExportDocManagerApiClient {
     return this.request<ApiLicenseStatusResponse>("GET", path, { init });
   }
 
+  public getMeetingBookingHistory(request: GetMeetingBookingHistoryRequest, init?: ApiRequestInit): Promise<PagedResultOfOfficeRequestEventRecord> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/history`;
+    return this.request<PagedResultOfOfficeRequestEventRecord>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public getMeetingRoomAvailability(request: GetMeetingRoomAvailabilityRequest, init?: ApiRequestInit): Promise<MeetingBusySlot[]> {
+    const path = `/api/office/rooms/${encodePath(request.id)}/availability`;
+    return this.request<MeetingBusySlot[]>("GET", path, {
+      query: {
+        "from": request.from,
+        "to": request.to,
+      },
+      init,
+    });
+  }
+
+  public getOfficeStockHistory(request: GetOfficeStockHistoryRequest, init?: ApiRequestInit): Promise<PagedResultOfOfficeStockMovementRecord> {
+    const path = `/api/office/supplies/${encodePath(request.id)}/movements`;
+    return this.request<PagedResultOfOfficeStockMovementRecord>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public getOfficeSupplyRequestHistory(request: GetOfficeSupplyRequestHistoryRequest, init?: ApiRequestInit): Promise<PagedResultOfOfficeRequestEventRecord> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/history`;
+    return this.request<PagedResultOfOfficeRequestEventRecord>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
   public getOrganizationDirectory(init?: ApiRequestInit): Promise<ApiOrganizationDirectoryResponse> {
     const path = "/api/organization-directory";
     return this.request<ApiOrganizationDirectoryResponse>("GET", path, { init });
@@ -6434,6 +7156,32 @@ export class ExportDocManagerApiClient {
   public getPayment(request: GetPaymentRequest, init?: ApiRequestInit): Promise<ApiPaymentDto> {
     const path = `/api/payments/${encodePath(request.id)}`;
     return this.request<ApiPaymentDto>("GET", path, { init });
+  }
+
+  public getPersonnel(request: GetPersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}`;
+    return this.request<PersonnelRecord>("GET", path, { init });
+  }
+
+  public getPersonnelClearance(request: GetPersonnelClearanceRequest, init?: ApiRequestInit): Promise<PersonnelClearance> {
+    const path = `/api/office/people/${encodePath(request.id)}/clearance`;
+    return this.request<PersonnelClearance>("GET", path, { init });
+  }
+
+  public getPersonnelHistory(request: GetPersonnelHistoryRequest, init?: ApiRequestInit): Promise<PagedResultOfPersonnelEventRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}/history`;
+    return this.request<PagedResultOfPersonnelEventRecord>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public getPersonnelOptions(init?: ApiRequestInit): Promise<PersonnelOptions> {
+    const path = "/api/office/people/options";
+    return this.request<PersonnelOptions>("GET", path, { init });
   }
 
   public getPort(request: GetPortRequest, init?: ApiRequestInit): Promise<ApiPortDto> {
@@ -6613,6 +7361,30 @@ export class ExportDocManagerApiClient {
         "conflictAction": request.conflictAction,
         "newInvoiceNo": request.newInvoiceNo,
       },
+      body: request.body,
+      init,
+    });
+  }
+
+  public issueMeetingRoomKey(request: IssueMeetingRoomKeyRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/issue-key`;
+    return this.request<MeetingBookingRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public issueOfficeSupply(request: IssueOfficeSupplyRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/issue`;
+    return this.request<OfficeSupplyRequestRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public linkPersonnelAccount(request: LinkPersonnelAccountRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}/account`;
+    return this.request<PersonnelRecord>("POST", path, {
       body: request.body,
       init,
     });
@@ -6836,6 +7608,71 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listMeetingBookings(request: ListMeetingBookingsRequest = {}, init?: ApiRequestInit): Promise<PagedResultOfMeetingBookingRecord> {
+    const path = "/api/office/bookings";
+    return this.request<PagedResultOfMeetingBookingRecord>("GET", path, {
+      query: {
+        "status": request.status,
+        "mineOnly": request.mineOnly,
+        "resourceId": request.resourceId,
+        "from": request.from,
+        "to": request.to,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "requestId": request.requestId,
+        "applicantUserId": request.applicantUserId,
+        "employeeId": request.employeeId,
+      },
+      init,
+    });
+  }
+
+  public listMeetingRooms(request: ListMeetingRoomsRequest = {}, init?: ApiRequestInit): Promise<PagedResultOfMeetingRoomRecord> {
+    const path = "/api/office/rooms";
+    return this.request<PagedResultOfMeetingRoomRecord>("GET", path, {
+      query: {
+        "keyword": request.keyword,
+        "includeInactive": request.includeInactive,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listOfficeSupplies(request: ListOfficeSuppliesRequest = {}, init?: ApiRequestInit): Promise<PagedResultOfOfficeSupplyRecord> {
+    const path = "/api/office/supplies";
+    return this.request<PagedResultOfOfficeSupplyRecord>("GET", path, {
+      query: {
+        "keyword": request.keyword,
+        "includeInactive": request.includeInactive,
+        "lowStockOnly": request.lowStockOnly,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listOfficeSupplyRequests(request: ListOfficeSupplyRequestsRequest = {}, init?: ApiRequestInit): Promise<PagedResultOfOfficeSupplyRequestRecord> {
+    const path = "/api/office/supply-requests";
+    return this.request<PagedResultOfOfficeSupplyRequestRecord>("GET", path, {
+      query: {
+        "status": request.status,
+        "mineOnly": request.mineOnly,
+        "resourceId": request.resourceId,
+        "from": request.from,
+        "to": request.to,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "requestId": request.requestId,
+        "applicantUserId": request.applicantUserId,
+        "employeeId": request.employeeId,
+      },
+      init,
+    });
+  }
+
   public listPayees(request: ListPayeesRequest = {}, init?: ApiRequestInit): Promise<ApiPayeeDto[]> {
     const path = "/api/master-data/payees";
     return this.request<ApiPayeeDto[]>("GET", path, {
@@ -6873,6 +7710,33 @@ export class ExportDocManagerApiClient {
   public listPermissionTemplates(init?: ApiRequestInit): Promise<ApiPermissionTemplateCatalogResponse> {
     const path = "/api/permission-templates";
     return this.request<ApiPermissionTemplateCatalogResponse>("GET", path, { init });
+  }
+
+  public listPersonnel(request: ListPersonnelRequest = {}, init?: ApiRequestInit): Promise<PagedResultOfPersonnelDirectoryRecord> {
+    const path = "/api/office/people";
+    return this.request<PagedResultOfPersonnelDirectoryRecord>("GET", path, {
+      query: {
+        "keyword": request.keyword,
+        "departmentId": request.departmentId,
+        "status": request.status,
+        "attentionOnly": request.attentionOnly,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listPersonnelAccountOptions(request: ListPersonnelAccountOptionsRequest, init?: ApiRequestInit): Promise<PagedResultOfPersonnelAccountRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}/accounts`;
+    return this.request<PagedResultOfPersonnelAccountRecord>("GET", path, {
+      query: {
+        "keyword": request.keyword,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
   }
 
   public listPorts(request: ListPortsRequest = {}, init?: ApiRequestInit): Promise<ApiPortDto[]> {
@@ -7356,6 +8220,30 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public rehirePersonnel(request: RehirePersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}/rehire`;
+    return this.request<PersonnelRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public rejectMeetingBooking(request: RejectMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/reject`;
+    return this.request<MeetingBookingRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public rejectOfficeSupplyRequest(request: RejectOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/reject`;
+    return this.request<OfficeSupplyRequestRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public renameReportTemplate(request: RenameReportTemplateRequest, init?: ApiRequestInit): Promise<ApiReportTemplateContentDto> {
     const path = "/api/reports/templates/rename";
     return this.request<ApiReportTemplateContentDto>("POST", path, {
@@ -7393,6 +8281,14 @@ export class ExportDocManagerApiClient {
   public resolveRemoteHsCodeDetail(request: ResolveRemoteHsCodeDetailRequest, init?: ApiRequestInit): Promise<ApiHsCodeRemoteDetailResolutionResponse> {
     const path = "/api/master-data/hs-codes/resolve-remote-detail";
     return this.request<ApiHsCodeRemoteDetailResolutionResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public restockOfficeSupply(request: RestockOfficeSupplyRequest, init?: ApiRequestInit): Promise<OfficeStockMovementRecord> {
+    const path = `/api/office/supplies/${encodePath(request.id)}/restock`;
+    return this.request<OfficeStockMovementRecord>("POST", path, {
       body: request.body,
       init,
     });
@@ -7489,6 +8385,22 @@ export class ExportDocManagerApiClient {
   public retryJob(request: RetryJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/jobs/${encodePath(request.jobId)}/retry`;
     return this.request<BackgroundJobSnapshot>("POST", path, { init });
+  }
+
+  public returnMeetingRoomKey(request: ReturnMeetingRoomKeyRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/return-key`;
+    return this.request<MeetingBookingRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public returnOfficeSupply(request: ReturnOfficeSupplyRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/return`;
+    return this.request<OfficeSupplyRequestRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public reviewHsCodeRemoteCandidate(request: ReviewHsCodeRemoteCandidateRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
@@ -7928,6 +8840,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public stocktakeOfficeSupply(request: StocktakeOfficeSupplyRequest, init?: ApiRequestInit): Promise<OfficeStockMovementRecord> {
+    const path = `/api/office/supplies/${encodePath(request.id)}/stocktake`;
+    return this.request<OfficeStockMovementRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public suggestEmailServerConfig(request: SuggestEmailServerConfigRequest, init?: ApiRequestInit): Promise<ApiEmailServerSuggestionResponse> {
     const path = "/api/tools/email/server-suggestion";
     return this.request<ApiEmailServerSuggestionResponse>("POST", path, {
@@ -7949,6 +8869,14 @@ export class ExportDocManagerApiClient {
   public transferCrmFollowUp(request: TransferCrmFollowUpRequest, init?: ApiRequestInit): Promise<ApiCrmFollowUpDto> {
     const path = `/api/crm/follow-ups/${encodePath(request.id)}/transfer`;
     return this.request<ApiCrmFollowUpDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public transferPersonnel(request: TransferPersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}/transfer`;
+    return this.request<PersonnelRecord>("POST", path, {
       body: request.body,
       init,
     });
@@ -8074,6 +9002,22 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public updateMeetingRoom(request: UpdateMeetingRoomRequest, init?: ApiRequestInit): Promise<MeetingRoomRecord> {
+    const path = `/api/office/rooms/${encodePath(request.id)}`;
+    return this.request<MeetingRoomRecord>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public updateOfficeSupply(request: UpdateOfficeSupplyRequest, init?: ApiRequestInit): Promise<OfficeSupplyRecord> {
+    const path = `/api/office/supplies/${encodePath(request.id)}`;
+    return this.request<OfficeSupplyRecord>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public updateOrganizationCompany(request: UpdateOrganizationCompanyRequest, init?: ApiRequestInit): Promise<ApiOrganizationCompanyDto> {
     const path = `/api/organization-directory/companies/${encodePath(request.code)}`;
     return this.request<ApiOrganizationCompanyDto>("PUT", path, {
@@ -8109,6 +9053,14 @@ export class ExportDocManagerApiClient {
   public updatePermissionTemplate(request: UpdatePermissionTemplateRequest, init?: ApiRequestInit): Promise<ApiPermissionTemplateDto> {
     const path = `/api/permission-templates/${encodePath(request.id)}`;
     return this.request<ApiPermissionTemplateDto>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public updatePersonnel(request: UpdatePersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}`;
+    return this.request<PersonnelRecord>("PUT", path, {
       body: request.body,
       init,
     });

@@ -35,7 +35,7 @@ namespace ExportDocManager.Api.Hosting
                     return TypedResults.Ok(new ApiUserListResponse(
                         users.Select(ApiUserManagementDtoFactory.FromUser).ToArray(),
                         UserRoleCatalog.Roles,
-                        templates.Select(ToPermissionTemplateOptionDto).ToArray(),
+                        ProjectPermissionTemplatesForRuntime(templates, authorizationService).Select(ToPermissionTemplateOptionDto).ToArray(),
                         organizations.Companies.Select(ToOrganizationCompanyDto).ToArray(),
                         organizations.Departments.Select(ToOrganizationDepartmentDto).ToArray()));
                 }

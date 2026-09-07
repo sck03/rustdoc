@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
+using ExportDocManager.Services.Office;
 
 namespace ExportDocManager.Services.Security
 {
@@ -189,6 +190,7 @@ namespace ExportDocManager.Services.Security
                         }
 
                         PreventSelfLockout(normalized);
+                        await OfficeAccountAccess.ValidateAccountEditAsync(context, existing, normalized, token);
                         if (IsActiveAdmin(existing) &&
                             (!normalized.IsActive || !IsAdminRole(normalized.Role)))
                         {
@@ -422,6 +424,10 @@ namespace ExportDocManager.Services.Security
                         .AnyAsync(item => item.OwnerUserId == user.Id, cancellationToken);
             }
 
+            hasBusinessData = hasBusinessData ||
+                await context.PersonnelEmployees.AnyAsync(item => item.OwnerUserId == user.Id, cancellationToken) ||
+                await context.MeetingBookings.AnyAsync(item => item.OwnerUserId == user.Id, cancellationToken) ||
+                await context.OfficeSupplyRequests.AnyAsync(item => item.OwnerUserId == user.Id, cancellationToken);
             if (hasBusinessData)
             {
                 throw new ResourceConflictException("该用户已有业务数据归属，请停用账号而不是删除。");

@@ -23,7 +23,7 @@ param(
     [string]$Architecture,
 
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Document", "Sales", "Full")]
+    [ValidateNotNullOrEmpty()]
     [string]$Edition,
 
     [Parameter(Mandatory = $true)]
@@ -44,6 +44,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 $artifactsRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "artifacts"))
 . (Join-Path $PSScriptRoot "lib\build-script-support.ps1")
+$Edition = Resolve-ExportDocProductEdition -Edition $Edition
 
 function Test-ChildPath {
     param([string]$Path, [string]$Root)

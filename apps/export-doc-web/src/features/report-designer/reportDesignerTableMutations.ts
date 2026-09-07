@@ -39,10 +39,8 @@ export function resizeAdjacentGridColumnWidths(
   leftColumnId: string,
   deltaPercent: number,
 ): ReportGridBlock {
-  return {
-    ...block,
-    columns: resizeAdjacentWidths(block.columns, leftColumnId, deltaPercent, 1, "widthPercent"),
-  };
+  const columns = resizeAdjacentWidths(block.columns, leftColumnId, deltaPercent, 1, "widthPercent");
+  return columns === block.columns ? block : { ...block, columns };
 }
 
 export function resizeAdjacentRowColumnWidths(
@@ -58,10 +56,8 @@ export function resizeAdjacentDetailTableColumnWidths(
   leftColumnId: string,
   deltaMm: number,
 ): ReportDetailTableBlock {
-  return {
-    ...block,
-    columns: resizeAdjacentWidths(block.columns, leftColumnId, deltaMm, 8, "widthMm"),
-  };
+  const columns = resizeAdjacentWidths(block.columns, leftColumnId, deltaMm, 8, "widthMm");
+  return columns === block.columns ? block : { ...block, columns };
 }
 
 export function applyGridDefaultCellStyle(block: ReportGridBlock): ReportGridBlock {
@@ -285,7 +281,7 @@ function createEmptyGroupFooterCell(columnId: string): ReportDetailTableGroupFoo
   };
 }
 
-function resizeAdjacentWidths<T extends { id: string } & Record<TKey, number>, TKey extends keyof T & string>(
+export function resizeAdjacentWidths<T extends { id: string } & Record<TKey, number>, TKey extends keyof T & string>(
   columns: T[],
   leftColumnId: string,
   delta: number,
@@ -313,6 +309,7 @@ function resizeAdjacentWidths<T extends { id: string } & Record<TKey, number>, T
 
   const nextLeftWidth = roundDesignerWidth(clamp(leftWidth + delta, minWidth, pairTotal - minWidth));
   const nextRightWidth = roundDesignerWidth(pairTotal - nextLeftWidth);
+  if (nextLeftWidth === leftColumn[widthKey] && nextRightWidth === rightColumn[widthKey]) return columns;
 
   return columns.map((column, index) => {
     if (index === leftIndex) {

@@ -9,7 +9,7 @@ param(
     [string]$Architecture,
 
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Document", "Sales", "Full")]
+    [ValidateNotNullOrEmpty()]
     [string]$Edition,
 
     [Parameter(Mandatory = $true)]
@@ -24,6 +24,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "lib/product-editions.ps1")
+$Edition = Resolve-ExportDocProductEdition -Edition $Edition
 if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
     throw "GH_TOKEN is required to publish desktop release assets."
 }

@@ -14,12 +14,15 @@ namespace ExportDocManager.Api.Hosting
                 JsonHttpResult<ApiErrorResponse>>> (
                 HttpContext context,
                 IPermissionTemplateService service,
+                ApiAuthorizationService authorizationService,
                 CancellationToken cancellationToken) =>
             {
                 var templates = await service.ListAsync(cancellationToken);
                 return TypedResults.Ok(new ApiPermissionTemplateCatalogResponse(
-                    PermissionResourceCatalog.Resources.Select(ToApiDto).ToArray(),
-                    templates.Select(ToApiDto).ToArray(),
+                    PermissionResourceCatalog.Resources.Where(authorizationService.IsResourceAvailable)
+                        .Select(resource => resource with { Actions = resource.Actions.Where(action => authorizationService.IsPermissionAvailable(resource.Key, action.Key)).ToArray() })
+                        .Select(ToApiDto).ToArray(),
+                    ProjectPermissionTemplatesForRuntime(templates, authorizationService).Select(ToApiDto).ToArray(),
                     PermissionDataScope.Values,
                     PermissionAccessLevel.Levels,
                     "模板修改后现有会话立即失效；服务端按资源、动作、数据范围、技术依赖和产品版本计算最终权限。"));
@@ -160,6 +163,19 @@ namespace ExportDocManager.Api.Hosting
             {
                 return TypedResults.Conflict(new ApiErrorResponse(ex.Message));
             }
+        }
+
+        private static IEnumerable<PermissionTemplateRecord> ProjectPermissionTemplatesForRuntime(
+            IReadOnlyList<PermissionTemplateRecord> templates, ApiAuthorizationService authorization)
+        {
+            bool Available(string key) => PermissionResourceCatalog.ByKey.TryGetValue(key, out var resource) && authorization.IsResourceAvailable(resource);
+            return templates.Where(template => !template.IsSystem || template.Grants.Any(grant => Available(grant.ResourceKey) &&
+                    PermissionResourceCatalog.ByKey[grant.ResourceKey].Workspace != "common"))
+                .Select(template => template with
+                {
+                    Grants = template.Grants.Where(grant => authorization.IsPermissionAvailable(grant.ResourceKey, grant.Action)).ToArray(),
+                    EffectiveGrants = template.EffectiveGrants.Where(grant => authorization.IsPermissionAvailable(grant.ResourceKey, grant.Action)).ToArray()
+                });
         }
 
         private static ApiPermissionResourceDefinitionDto ToApiDto(PermissionResourceDefinition resource) =>

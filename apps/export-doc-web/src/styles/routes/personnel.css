@@ -1,0 +1,40 @@
+@layer route {
+  .personnel-heading, .personnel-card header { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+  .personnel-heading { justify-content: space-between; }
+  .personnel-heading h2 { margin: 0 0 6px; font-size: 1.2rem; }
+  .personnel-directory { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr)); gap: 14px; }
+  .personnel-card { display: grid; align-content: start; gap: 12px; padding: 18px; background: var(--edm-white); border: 1px solid var(--edm-neutral-250); border-radius: 12px; min-width: 0; }
+  .personnel-card header > div { flex: 1; min-width: 0; }
+  .personnel-card h3 { margin: 0 0 4px; font-size: 1.05rem; overflow-wrap: anywhere; }
+  .personnel-initial { display: grid; place-items: center; flex: 0 0 40px; height: 40px; border-radius: 50%; color: var(--edm-primary-700); background: var(--edm-primary-50); font-weight: 600; }
+  .personnel-contact { display: flex; align-items: baseline; gap: 8px; min-width: 0; overflow-wrap: anywhere; font-size: 0.9rem; }
+  .personnel-contact svg { flex: 0 0 15px; }
+  .personnel-contact a { min-width: 0; color: var(--edm-primary-700); text-underline-offset: 3px; }
+  .personnel-card > button { justify-self: start; margin-top: 2px; }
+  .personnel-attention { margin: 0; font-size: 0.9rem; }
+  .personnel-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 0; }
+  .personnel-facts > div { display: grid; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+  .personnel-facts dt { color: var(--edm-neutral-650); font-size: 0.85rem; }
+  .personnel-facts dd { margin: 0; white-space: pre-wrap; }
+  .personnel-facts .personnel-wide { grid-column: 1 / -1; }
+  .personnel-private-fields { margin: 16px 0; border-block: 1px solid var(--edm-neutral-250); padding: 12px 0; }
+  .personnel-private-fields summary { cursor: pointer; font-weight: 600; line-height: 1.5; }
+  .personnel-private-fields[open] summary { margin-bottom: 14px; }
+  .personnel-private-fields fieldset { margin-bottom: 0; }
+  .personnel-form .office-form-grid legend { font-weight: 600; padding-block: 8px; }
+  .personnel-detail-stack, .personnel-clearance { display: grid; gap: 16px; }
+  .personnel-clearance ul { padding-left: 22px; display: grid; gap: 10px; margin: 0; }
+  .personnel-account-list { display: grid; gap: 10px; padding: 0; list-style: none; }
+  .personnel-account-list label { display: flex; align-items: center; gap: 10px; border: 1px solid var(--edm-neutral-250); padding: 12px; border-radius: 8px; overflow-wrap: anywhere; }
+  .personnel-account-list input { flex: 0 0 auto; width: auto; }
+  .office-badge[data-state="Active"] { color: var(--edm-success-700); background: var(--edm-success-50); }
+  .office-badge[data-state="Probation"] { color: var(--edm-primary-700); background: var(--edm-primary-50); }
+  .office-badge[data-state="Departed"] { color: var(--edm-neutral-650); background: var(--edm-neutral-100); }
+  @media (max-width: 600px) {
+    .personnel-card { padding: 14px; }
+    .personnel-heading > button { width: 100%; }
+  }
+  @media (max-width: 360px) {
+    .personnel-facts { grid-template-columns: minmax(0, 1fr); }
+  }
+}

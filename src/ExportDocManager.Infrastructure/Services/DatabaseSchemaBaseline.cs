@@ -13,15 +13,12 @@ namespace ExportDocManager.Services.Infrastructure
     /// </summary>
     internal static partial class DatabaseSchemaBaseline
     {
-        // The v14 empty-database baseline makes resource/action/data-scope
-        // grants the sole persisted permission contract; adds normalized
-        // identity keys, organization master data and optimistic concurrency;
-        // and stores import previews, template lifecycle history and owned
-        // report-image references as server-governed records.
+        // The v15 empty-database baseline adds company-scoped personnel, meeting rooms,
+        // office supplies and transactional employment, handover and stock history.
         // This project is still pre-production,
         // so changing the baseline intentionally rejects older development
         // databases instead of growing a compatibility migration tree.
-        internal const int CurrentVersion = 14;
+        internal const int CurrentVersion = 15;
         internal const string MetadataTableName = "__ExportDocManagerSchema";
         internal const string PostgreSqlTrigramFeatureName = "postgresql.pg_trgm";
         internal const int PostgreSqlTrigramFeatureVersion = 2;

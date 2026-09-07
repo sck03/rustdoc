@@ -13,6 +13,7 @@ import { isDesktopBridgeAvailable, selectEmailAttachmentFiles } from "../../desk
 import { readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { PathTextAreaField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { readEmailDraftNavigationState } from "./emailDraftNavigation.ts";
@@ -152,7 +153,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
     setMessage(null);
     submittedDraftSnapshotRef.current = currentDraftSnapshot;
     if (deliveryAttemptRef.current.snapshot !== currentDraftSnapshot) {
-      deliveryAttemptRef.current = { snapshot: currentDraftSnapshot, id: crypto.randomUUID() };
+      deliveryAttemptRef.current = { snapshot: currentDraftSnapshot, id: createRequestKey() };
     }
     sendMutation.mutate();
   }

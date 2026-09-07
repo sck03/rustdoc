@@ -589,12 +589,17 @@ function Invoke-EditionWorkspacePageProbe {
     )
 
     $productEdition = [string]$CurrentUser.capabilities.productEdition
-    if ([string]::Equals($productEdition, "Sales", [System.StringComparison]::OrdinalIgnoreCase)) {
+    if ($CurrentUser.capabilities.canUseSalesWorkspace -and -not $CurrentUser.capabilities.canUseDocumentWorkspace) {
         $probeName = "SalesCustomers"
         $probePath = "/api/crm/customers/page?pageNumber=1&pageSize=5"
-    } else {
+    } elseif ($CurrentUser.capabilities.canUseDocumentWorkspace) {
         $probeName = "DocumentInvoices"
         $probePath = "/api/invoices?pageNumber=1&pageSize=5"
+    } elseif ($CurrentUser.capabilities.usesOfficeRegister) {
+        $probeName = "OfficePersonnel"
+        $probePath = "/api/office/people?pageNumber=1&pageSize=5"
+    } else {
+        throw "$Purpose did not expose a supported desktop workspace."
     }
 
     $page = Invoke-RestMethod `

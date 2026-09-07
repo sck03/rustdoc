@@ -80,9 +80,10 @@ namespace ExportDocManager.Services.Security
                                 .AnyAsync(item => item.CompanyCode == code && item.IsActive, token);
                             bool hasActiveUsers = await context.Users.AsNoTracking()
                                 .AnyAsync(item => item.CompanyScope == code && item.IsActive, token);
-                            if (hasActiveDepartments || hasActiveUsers)
+                            bool hasEmployees = await context.PersonnelEmployees.AnyAsync(item => item.CompanyScope == code && item.Status != EmploymentStatus.Departed, token);
+                            if (hasActiveDepartments || hasActiveUsers || hasEmployees)
                             {
-                                throw new ResourceConflictException("公司仍有启用部门或启用账号，请先停用或重新分配后再停用公司。");
+                                throw new ResourceConflictException("公司仍有启用部门、账号或在职人员，请先完成相应处理后再停用公司。");
                             }
                         }
                     }
@@ -139,18 +140,20 @@ namespace ExportDocManager.Services.Security
                         {
                             bool hasUsers = await context.Users.AsNoTracking()
                                 .AnyAsync(item => item.DepartmentId == code, token);
-                            if (hasUsers)
+                            bool hasEmployees = await context.PersonnelEmployees.AnyAsync(item => item.DepartmentId == code, token);
+                            if (hasUsers || hasEmployees)
                             {
-                                throw new ResourceConflictException("部门已有账号引用，不能更换所属公司。");
+                                throw new ResourceConflictException("部门已有账号或人员档案引用，不能更换所属公司。");
                             }
                         }
                         if (!request.IsActive)
                         {
                             bool hasActiveUsers = await context.Users.AsNoTracking()
                                 .AnyAsync(item => item.DepartmentId == code && item.IsActive, token);
-                            if (hasActiveUsers)
+                            bool hasEmployees = await context.PersonnelEmployees.AnyAsync(item => item.DepartmentId == code && item.Status != EmploymentStatus.Departed, token);
+                            if (hasActiveUsers || hasEmployees)
                             {
-                                throw new ResourceConflictException("部门仍有启用账号，请先停用或重新分配后再停用部门。");
+                                throw new ResourceConflictException("部门仍有启用账号或在职人员，请先调岗或办理离职后再停用部门。");
                             }
                         }
                     }

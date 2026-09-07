@@ -4,7 +4,7 @@ param(
     [string]$LicenseCargoTargetDir,
     [string]$OutputDir,
     [string]$LicenseOutputDir,
-    [ValidateSet("Document", "Sales", "Full")]
+    [ValidateNotNullOrEmpty()]
     [string]$ProductEdition = "Full",
     [switch]$IncludeLicenseKeygen
 )
@@ -299,6 +299,7 @@ function Copy-BrowserRuntimeResources {
 }
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
+$ProductEdition = Resolve-ExportDocProductEdition -Edition $ProductEdition
 $artifactsRoot = Join-Path $repoRoot "artifacts"
 $cleanupQuarantineRoot = Join-Path $artifactsRoot "runtime-cleanup-quarantine"
 

@@ -273,7 +273,9 @@ public sealed class ApiBackgroundJobPersistenceAtomicityTests
         string storePath = Path.Combine(paths.CacheRoot, "BackgroundJobs", "jobs.json");
         if (File.Exists(storePath))
         {
-            File.Delete(storePath);
+            // Detach the old name before replacing it with a directory. On Windows,
+            // deleting an open read handle can leave that name pending deletion.
+            File.Move(storePath, storePath + ".previous");
         }
 
         Directory.CreateDirectory(storePath);

@@ -5,7 +5,7 @@ param(
     [string]$OutputDir,
     [string]$LicenseOutputDir,
     [string]$CargoBinDir,
-    [ValidateSet("Document", "Sales", "Full")]
+    [ValidateNotNullOrEmpty()]
     [string]$ProductEdition = "Full",
     [string]$MsysUcrtBinDir,
     [switch]$AllowSystemDrive,
@@ -60,6 +60,7 @@ function Resolve-CargoBinDir {
 }
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
+$ProductEdition = Resolve-ExportDocProductEdition -Edition $ProductEdition
 $artifactsRoot = Join-Path $repoRoot "artifacts"
 $mainBuildScript = Join-Path $scriptRoot "run-tauri-local.ps1"
 $prepareScript = Join-Path $scriptRoot "prepare-windows-desktop-run.ps1"
@@ -107,11 +108,7 @@ if ([string]::IsNullOrWhiteSpace($LicenseCargoTargetDir)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
-    $editionFolder = switch ($ProductEdition) {
-        "Document" { "ExportDocManager-Document" }
-        "Sales" { "ExportDocManager-Sales" }
-        default { "ExportDocManager" }
-    }
+    $editionFolder = if ($ProductEdition -eq "Full") { "ExportDocManager" } else { "ExportDocManager-$ProductEdition" }
     $OutputDir = Join-Path $artifactsRoot ("windows-desktop-run\" + $editionFolder)
 }
 

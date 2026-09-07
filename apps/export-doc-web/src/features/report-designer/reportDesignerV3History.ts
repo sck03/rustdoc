@@ -55,9 +55,6 @@ export function useReportDesignerV3History(initialSchema: ReportDesignerV3Schema
         return trimHistory({ past: [...current.past, base], present: next, future: [] });
       });
     },
-    preview(next: ReportDesignerV3DocumentState) {
-      setHistory((current) => ({ ...current, present: next }));
-    },
     reset(schema: ReportDesignerV3Schema) {
       lastCoalescedCommitAt.current = 0;
       setHistory({ past: [], present: createReportDesignerV3DocumentState(schema), future: [] });

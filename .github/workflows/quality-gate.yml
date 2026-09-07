@@ -129,6 +129,7 @@ jobs:
           npm --prefix apps/export-doc-web run test:new-report-designer-exporter
           npm --prefix apps/export-doc-web run test:print-preview-document
           npm --prefix apps/export-doc-web run test:workspace-navigation
+          npm --prefix apps/export-doc-web run test:office-models
           npm --prefix apps/export-doc-web run test:accessibility-contracts
           npm --prefix apps/export-doc-web run test:font-policy
           npm --prefix apps/export-doc-web run test:supplier-assessment-analytics

@@ -16,6 +16,7 @@ on:
           - Full
           - Document
           - Sales
+          - Administration
       publish_release:
         description: '同时上传到对应版本的 GitHub Release'
         required: true
@@ -38,7 +39,6 @@ jobs:
       version: ${{ inputs.version }}
       architecture: x64
       edition: ${{ inputs.edition }}
-      include_browser: ${{ inputs.edition != 'Sales' }}
       publish_release: false
 
   release:
@@ -54,6 +54,8 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD_SALES: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_SALES }}
       TAURI_SIGNING_PRIVATE_KEY_FULL: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_FULL }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD_FULL: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_FULL }}
+      TAURI_SIGNING_PRIVATE_KEY_ADMINISTRATION: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_ADMINISTRATION }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD_ADMINISTRATION: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD_ADMINISTRATION }}
     with:
       platform: windows
       runner: windows-latest
@@ -64,5 +66,4 @@ jobs:
       version: ${{ inputs.version }}
       architecture: x64
       edition: ${{ inputs.edition }}
-      include_browser: ${{ inputs.edition != 'Sales' }}
       publish_release: true

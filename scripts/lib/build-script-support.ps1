@@ -1,4 +1,5 @@
 . (Join-Path $PSScriptRoot "platform-path-safety.ps1")
+. (Join-Path $PSScriptRoot "product-editions.ps1")
 
 function Resolve-ExportDocExternalCommand {
     param([Parameter(Mandatory = $true)][string]$FilePath)

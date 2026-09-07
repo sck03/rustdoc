@@ -1,5 +1,7 @@
 import {
   CircleDollarSign,
+  CalendarDays,
+  Package,
   BookOpen,
   ContactRound,
   ClipboardList,
@@ -41,8 +43,8 @@ export type WorkspaceNavItem = {
   isActive: (pathname: string) => boolean;
   requiresAdmin?: boolean;
   desktopOnly?: boolean;
-  requiresFullEdition?: boolean;
-  workspace?: "document" | "sales";
+  requiresSystemAdministration?: boolean;
+  workspace?: "document" | "sales" | "office";
   moduleKey?: string;
   requiredPermissions?: WorkspacePermissionRequirement[];
   permissionMatch?: "all" | "any";
@@ -50,6 +52,8 @@ export type WorkspaceNavItem = {
 
 export type WorkspaceCapabilities = {
   canManageSettings?: boolean;
+  canManageUsers?: boolean;
+  usesOfficeRegister?: boolean;
   canUseDocumentWorkspace?: boolean;
   canUseSalesWorkspace?: boolean;
   isDesktopRuntime?: boolean;
@@ -94,6 +98,17 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
           { resourceKey: permissionResources.salesOpportunities, action: permissionActions.view },
         ],
       },
+    ],
+  },
+  {
+    key: "office", label: "公司行政", icon: CalendarDays,
+    items: [
+      { label: "会议室预约", to: "/office/meeting-rooms", icon: CalendarDays, isActive: (path) => path.startsWith("/office/meeting-rooms"),
+        workspace: "office", moduleKey: "office.rooms", requiredPermissions: [{ resourceKey: permissionResources.officeRooms, action: permissionActions.view }] },
+      { label: "物品领用", to: "/office/supplies", icon: Package, isActive: (path) => path.startsWith("/office/supplies"),
+        workspace: "office", moduleKey: "office.supplies", requiredPermissions: [{ resourceKey: permissionResources.officeSupplies, action: permissionActions.view }] },
+      { label: "人员信息管理", to: "/office/people", icon: UsersRound, isActive: (path) => path.startsWith("/office/people"),
+        workspace: "office", moduleKey: "office.people", requiredPermissions: [{ resourceKey: permissionResources.officePeople, action: permissionActions.view }] },
     ],
   },
   {
@@ -211,8 +226,8 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     items: [
       { label: "软件更新", to: "/system/update", icon: RefreshCw, isActive: isSystemUpdateRoute, requiresAdmin: true, desktopOnly: true },
       { label: "授权注册", to: "/system/license", icon: KeyRound, isActive: isLicenseRoute, requiresAdmin: true },
-      { label: "审计日志", to: "/audit-logs", icon: ShieldCheck, isActive: isAuditLogRoute, requiresAdmin: true, requiresFullEdition: true },
-      { label: "账号与权限", to: "/system/access-control", icon: UsersRound, isActive: isAccessControlRoute, requiresAdmin: true, requiresFullEdition: true },
+      { label: "审计日志", to: "/audit-logs", icon: ShieldCheck, isActive: isAuditLogRoute, requiresAdmin: true, requiresSystemAdministration: true },
+      { label: "账号与权限", to: "/system/access-control", icon: UsersRound, isActive: isAccessControlRoute, requiresAdmin: true, requiresSystemAdministration: true },
       { label: "系统设置", to: "/settings", icon: Settings, isActive: isSettingsRoute, requiresAdmin: true },
       { label: "关于系统", to: "/system/about", icon: Info, isActive: isAboutRoute, moduleKey: "system.about" },
     ],
@@ -228,7 +243,8 @@ export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
       items: group.items.filter((item) => {
         if (item.requiresAdmin && capabilities.canManageSettings !== true) return false;
         if (item.desktopOnly && capabilities.isDesktopRuntime !== true) return false;
-        if (item.requiresFullEdition && !isFullProductEdition(capabilities.productEdition)) return false;
+        if (item.workspace === "office" && capabilities.isDesktopRuntime === true && capabilities.usesOfficeRegister !== true) return false;
+        if (item.requiresSystemAdministration && capabilities.canManageUsers !== true) return false;
         if (item.workspace === "document" && capabilities.canUseDocumentWorkspace !== true) return false;
         if (item.workspace === "sales" && capabilities.canUseSalesWorkspace !== true) return false;
         if (item.moduleKey && !enabledModules.has(normalizePermissionPart(item.moduleKey))) return false;
@@ -275,6 +291,9 @@ export function createInitialWorkspaceNavGroupState(pathname: string, groups: Wo
 }
 
 export function getWorkspaceContext(pathname: string): WorkspaceContext {
+  if (pathname.startsWith("/office/meeting-rooms")) return createWorkspaceContext("公司行政", "会议室预约", "查看空闲时段、预约审批与钥匙交接", CalendarDays);
+  if (pathname.startsWith("/office/supplies")) return createWorkspaceContext("公司行政", "物品领用", "办公物品申请、发放归还与库存补充", Package);
+  if (pathname.startsWith("/office/people")) return createWorkspaceContext("公司行政", "人员信息管理", "公司通讯录、人员档案与入职调岗离职", UsersRound);
   if (pathname.startsWith("/dashboard") || pathname === "/") {
     return createWorkspaceContext("工作台", "仪表盘", "查看业务概览、近期单据与待办进度", LayoutDashboard);
   }
@@ -385,6 +404,9 @@ export function getRequiredWorkspace(pathname: string): "document" | "sales" | n
 }
 
 export function getRequiredModule(pathname: string): string | null {
+  if (pathname.startsWith("/office/meeting-rooms")) return "office.rooms";
+  if (pathname.startsWith("/office/supplies")) return "office.supplies";
+  if (pathname.startsWith("/office/people")) return "office.people";
   if (pathname.startsWith("/crm/dashboard")) return "sales.dashboard";
   if (pathname.startsWith("/crm/follow-ups")) return "sales.crm";
   if (pathname.startsWith("/crm/opportunities")) return "sales.opportunities";
@@ -426,7 +448,7 @@ export function isAdminOnlyRoute(pathname: string) {
     pathname.startsWith("/audit-logs");
 }
 
-export function isFullEditionOnlyRoute(pathname: string) {
+export function isSystemAdministrationRoute(pathname: string) {
   return pathname.startsWith("/audit-logs") ||
     pathname.startsWith("/system/access-control");
 }
@@ -435,8 +457,8 @@ export function isDesktopOnlyRoute(pathname: string) {
   return pathname.startsWith("/system/update");
 }
 
-function isFullProductEdition(value: unknown) {
-  return typeof value === "string" && value.trim().toLowerCase() === "full";
+export function isOfficeRoute(pathname: string) {
+  return workspaceNavGroups.some((group) => group.items.some((item) => item.workspace === "office" && item.isActive(pathname)));
 }
 
 function normalizePermissionPart(value: unknown) {

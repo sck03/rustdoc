@@ -86,8 +86,8 @@ const salesGroups = model.filterWorkspaceNavGroups({
   permissions: salesPermissions,
 });
 const salesEditionAdminGroups = model.filterWorkspaceNavGroups({ productEdition: "Sales", canManageSettings: true, canUseSalesWorkspace: true, isDesktopRuntime: true, ...fullNavigationGrants });
-const browserAdminGroups = model.filterWorkspaceNavGroups({ productEdition: "Full", canManageSettings: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, isDesktopRuntime: false, ...fullNavigationGrants });
-const adminGroups = model.filterWorkspaceNavGroups({ productEdition: "Full", canManageSettings: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, isDesktopRuntime: true, ...fullNavigationGrants });
+const browserAdminGroups = model.filterWorkspaceNavGroups({ productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, isDesktopRuntime: false, ...fullNavigationGrants });
+const adminGroups = model.filterWorkspaceNavGroups({ productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, isDesktopRuntime: true, ...fullNavigationGrants });
 const financeModules = [
   "document.payments",
   "document.query",
@@ -218,7 +218,7 @@ assert(!permission.hasRouteModulePermission(undefined, ["document.payments"], "d
 assert(model.isAdminOnlyRoute("/settings"), "settings route requires administrator");
 assert(model.isAdminOnlyRoute("/system/access-control"), "access control route requires administrator");
 assert(model.isAdminOnlyRoute("/system/license"), "license registration route requires administrator");
-assert(model.isFullEditionOnlyRoute("/audit-logs"), "audit route requires full edition");
-assert(model.isFullEditionOnlyRoute("/system/access-control"), "access control route requires full edition");
+assert(model.isSystemAdministrationRoute("/audit-logs"), "audit route requires system administration capability");
+assert(model.isSystemAdministrationRoute("/system/access-control"), "access control route requires system administration capability");
 assert(model.isDesktopOnlyRoute("/system/update"), "updater route requires desktop runtime");
 process.stdout.write("workspace-navigation-model tests passed\n");
