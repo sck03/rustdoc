@@ -75,18 +75,14 @@ public sealed class PackagePayloadContractTests
         Assert.Contains("setup-windows.cmd", serverWorkflow, StringComparison.Ordinal);
         Assert.Contains("version.json", serverWorkflow, StringComparison.Ordinal);
         Assert.Contains("ExportDocPackageProfile=Container", dockerfile, StringComparison.Ordinal);
-        Assert.Contains(
-            "COPY src/ExportDocManager.Infrastructure.Excel/ExportDocManager.Infrastructure.Excel.csproj src/ExportDocManager.Infrastructure.Excel/",
-            dockerfile,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "COPY src/ExportDocManager.Infrastructure.Browser/ExportDocManager.Infrastructure.Browser.csproj src/ExportDocManager.Infrastructure.Browser/",
-            dockerfile,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "COPY src/ExportDocManager.Infrastructure.PdfOcr/ExportDocManager.Infrastructure.PdfOcr.csproj src/ExportDocManager.Infrastructure.PdfOcr/",
-            dockerfile,
-            StringComparison.Ordinal);
+        string[] instructions = dockerfile.Split('\n').Select(line => line.Trim()).ToArray();
+        Assert.Single(instructions, line => line == "COPY src/ src/");
+        int sourceCopyIndex = Array.IndexOf(instructions, "COPY src/ src/");
+        int restoreIndex = Array.FindIndex(instructions, line => line.Contains("dotnet restore ", StringComparison.Ordinal));
+        Assert.True(sourceCopyIndex < restoreIndex, "The complete project graph must be copied before locked restore.");
+        string[] dockerIgnore = File.ReadAllLines(Path.Combine(root, ".dockerignore"));
+        Assert.Contains("**/bin", dockerIgnore);
+        Assert.Contains("**/obj", dockerIgnore);
         int containerProfileCount = dockerfile.Split("/p:ExportDocPackageProfile=Container", StringSplitOptions.None).Length - 1;
         Assert.Equal(2, containerProfileCount);
         Assert.Contains("mcr.microsoft.com/dotnet/sdk:10.0-noble AS build", dockerfile, StringComparison.Ordinal);
