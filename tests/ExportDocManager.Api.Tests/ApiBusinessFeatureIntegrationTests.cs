@@ -81,7 +81,9 @@ public sealed class ApiBusinessFeatureIntegrationTests
         Assert.Equal(documents, page.Sources.Any(source => source.Key == "invoice-review"));
         Assert.Equal(sales, page.Sources.Any(source => source.Key == "customer-follow-up"));
         Assert.Equal(documents, login.User.Capabilities.AvailableFeatures.Contains("business-attachments"));
-        Assert.Equal(edition == ProductEditionCatalog.Administration, page.Sources.Any(source => source.Key == "supply-return"));
+        foreach (string source in new[] { "meeting-collection", "meeting-return", "supply-collection", "supply-return", "probation-end", "contract-end" })
+            Assert.Equal(edition is ProductEditionCatalog.Full or ProductEditionCatalog.Administration, page.Sources.Any(item => item.Key == source));
+        Assert.DoesNotContain(page.Sources, source => source.Key is "meeting-approval" or "supply-approval");
     }
 
     [Theory]

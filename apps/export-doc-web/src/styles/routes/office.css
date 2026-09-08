@@ -22,6 +22,9 @@
   .office-card-description { min-height: 2.5em; white-space: pre-wrap; }
   .office-card-actions { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--edm-neutral-200); }
   .office-card-actions button { min-height: 38px; }
+  .office-secondary-actions { flex: 1 0 100%; }
+  .office-secondary-actions summary { width: fit-content; min-height: 38px; padding: 8px 0; cursor: pointer; color: var(--edm-primary-750); font-size: var(--edm-font-size-sm); }
+  .office-secondary-actions > div { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; }
   .office-muted { color: var(--edm-neutral-650); font-size: 0.875rem; line-height: 1.6; }
   .office-badge { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; line-height: 1.4; color: var(--edm-neutral-750); background: var(--edm-neutral-100); }
   .office-badge[data-state="Pending"] { background: var(--edm-warning-100); color: var(--edm-warning-800); }

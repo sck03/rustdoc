@@ -35,7 +35,7 @@ try {
   await assert.rejects(waitForJobCompletion(client, { ...running, status: "failed", errorMessage: "worker failed" }), /worker failed/);
 
   document.hidden = true;
-  await assert.rejects(waitForJobCompletion(client, running, { timeoutMs: 5 }), /后台任务/);
+  await assert.rejects(waitForJobCompletion(client, running, { timeoutMs: 5 }), /文件任务/);
   assert.equal(requests, 0, "hidden tabs must not poll");
   const hiddenCancellation = new AbortController();
   const hiddenWait = waitForJobCompletion(client, running, { signal: hiddenCancellation.signal });

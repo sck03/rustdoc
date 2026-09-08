@@ -131,6 +131,12 @@ try {
     for(const mode of ["rooms","supplies"]){
       await open(mode,width);await audit(page,`${mode}-${width}`);
       await captureScreenshot(page,path.join(output,`${mode}-${width}.png`));
+      if(mode==="supplies") {
+        assert.equal(await read(page,"document.querySelector('.office-secondary-actions').open"),false);
+        await clickText(page,"更多操作","summary");await audit(page,`supply-more-actions-${width}`);
+        await clickText(page,"库存流水");await waitFor(page,"document.querySelector('.office-history')");
+        await read(page,"document.querySelector('.office-dialog [aria-label=关闭窗口]').click()");
+      }
       await clickText(page,mode==="rooms"?"查看日程与预约":"申请借用");
       await waitFor(page,"document.querySelector('[role=dialog]') && !document.querySelector('.office-dialog [aria-busy=true]')");
       await audit(page,`${mode}-dialog-${width}`);

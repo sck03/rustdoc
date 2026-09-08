@@ -45,8 +45,13 @@ function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiCl
       <p className="office-muted office-card-description">{supply.description || (supply.isReturnable ? "借用后需要按期归还" : "按需领用，交接时确认发放")}</p>
       <footer className="office-card-actions">
         {supply.isActive && access.allows("create") && <button className="command-button" type="button" onClick={() => setDialog({ kind: "apply", supply })}>{user.capabilities.usesOfficeRegister ? "登记" : "申请"}{supply.isReturnable ? "借用" : "领用"}</button>}
-        {access.allows("restock") && <><button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "restock", supply })}>补充库存</button><button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "history", supply })}>库存流水</button></>}
-        {access.allows("manage") && <><button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "stocktake", supply })}>盘点</button><button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "edit", supply })}>编辑</button></>}
+        {access.allows("restock") && <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "restock", supply })}>补充库存</button>}
+        {(access.allows("restock") || access.allows("manage")) && <details className="office-secondary-actions">
+          <summary>更多操作</summary><div>
+            {access.allows("restock") && <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "history", supply })}>库存流水</button>}
+            {access.allows("manage") && <><button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "stocktake", supply })}>盘点</button><button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "edit", supply })}>编辑</button></>}
+          </div>
+        </details>}
       </footer>
     </article>)}</div>}
     <OfficePager page={query.data} paging={paging} busy={query.isFetching} />

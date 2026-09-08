@@ -18,7 +18,7 @@ export async function downloadJobResultWhenReady(
 ) {
   const job = await waitForJobCompletion(client, acceptedJob, {
     ...options,
-    timeoutMessage: "文件仍在后台生成，可稍后在任务中心下载。",
+    timeoutMessage: "文件仍在后台生成，可稍后在“文件任务”中下载。",
   });
   await downloadCompletedJobResult(client, job, fileName, options.signal);
   return job;
@@ -42,7 +42,7 @@ export async function waitForJobCompletion(
   const signal = options.signal;
   const deadline = performance.now() + timeoutMs;
   const remainingTime = () => Math.max(0, deadline - performance.now());
-  const timeoutError = () => new Error(options.timeoutMessage || "后台任务仍在运行，可稍后到任务中心查看结果。");
+  const timeoutError = () => new Error(options.timeoutMessage || "任务仍在运行，可稍后到“文件任务”查看结果。");
   let currentPollIntervalMs = initialPollIntervalMs;
   let job = acceptedJob;
 

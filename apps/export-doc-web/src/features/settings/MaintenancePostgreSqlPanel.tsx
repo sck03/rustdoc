@@ -82,7 +82,7 @@ export function PostgreSqlMaintenancePanel({
   const createMutation = useMutation({
     mutationFn: () => runAbortableOperation(async (signal) => {
       const job = await client.createPostgreSqlPhysicalBackup({ signal });
-      return waitForJobCompletion(client, job, { timeoutMs: 60 * 60 * 1000, pollIntervalMs: 2_000, signal, timeoutMessage: "数据库备份仍在后台运行，可稍后到任务中心查看，完成后刷新备份列表。" });
+      return waitForJobCompletion(client, job, { timeoutMs: 60 * 60 * 1000, pollIntervalMs: 2_000, signal, timeoutMessage: "数据库备份仍在后台运行，可稍后到“文件任务”查看，完成后刷新备份列表。" });
     }),
     onSuccess: async () => { setSuccessMessage("PostgreSQL 团队库物理备份已创建并校验完成。"); setMessage(null); await queryClient.invalidateQueries({ queryKey: queryKeys.postgreSqlMaintenanceBackups() }); },
     onError: fail,

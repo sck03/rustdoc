@@ -68,6 +68,11 @@ const registerUser = { ...manager, capabilities: { ...manager.capabilities, prod
   permissions:[...grants("all"), {resourceKey:"office.people",action:"view",dataScope:"all"}] } };
 assert.equal(getDefaultWorkspaceRoute(registerUser.capabilities), "/office/people");
 assert.equal(navigation.filterWorkspaceNavGroups({ ...registerUser.capabilities, isDesktopRuntime:true }).find(group=>group.key==='office').items.length,3);
+const fullRegisterUser = { ...registerUser, capabilities: { ...registerUser.capabilities, productEdition: "Full", canUseDocumentWorkspace: true, canUseSalesWorkspace: true } };
+for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supplies"]) {
+  assert(isRouteAccessAllowed({ pathname, user: fullRegisterUser, canManageSystem: true, isDesktopRuntime: true }), "Full desktop permits direct administration routes");
+  assert(!isRouteAccessAllowed({ pathname, user: { ...fullRegisterUser, capabilities: { ...fullRegisterUser.capabilities, enabledModules: [], permissions: [] } }, canManageSystem: true, isDesktopRuntime: true }), "edition availability never overrides missing grants");
+}
 for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supplies", "/system/access-control"]) {
   assert(isRouteAccessAllowed({ pathname, user:registerUser, canManageSystem:true, isDesktopRuntime:true }));
 }

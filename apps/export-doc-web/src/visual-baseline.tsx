@@ -62,7 +62,7 @@ function BaselineApp() {
     capabilities: {
       canManageSettings: true,
       canManageUsers: true,
-      usesOfficeRegister: false,
+      usesOfficeRegister: page === "state-offline-local",
       availableFeatures: baselineFeatures,
       canViewAllBusinessData: true,
       canUseDocumentWorkspace: true,

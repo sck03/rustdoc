@@ -51,7 +51,8 @@
       "displayName": "全功能版",
       "enabledWorkspaces": [
         "document",
-        "sales"
+        "sales",
+        "office"
       ],
       "resourceProfile": {
         "browserRenderer": true,

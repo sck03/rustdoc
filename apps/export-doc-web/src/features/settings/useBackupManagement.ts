@@ -128,7 +128,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     mutationFn: async () => {
       const acceptedJob = await client.createDatabaseBackup();
       return waitForJobCompletion(client, acceptedJob, {
-        timeoutMessage: "数据库备份仍在后台生成，可稍后到任务中心查看结果。",
+        timeoutMessage: "数据库备份仍在后台生成，可稍后到“文件任务”查看结果。",
       });
     },
     onSuccess: (job) => {
@@ -152,7 +152,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     mutationFn: () => client.uploadLatestDatabaseBackupToCloud(),
     onSuccess: (job) => {
       setMessage(null);
-      setSuccessMessage("WebDAV 上传任务已加入任务中心。");
+      setSuccessMessage("WebDAV 上传任务已加入“文件任务”。");
       setLastCreatedJobId(job.jobId);
     },
     onError: mutationError,
@@ -161,7 +161,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     mutationFn: () => client.downloadCloudDatabaseBackup({ body: { remoteFileName: cloudDownloadFileName } }),
     onSuccess: (job) => {
       setMessage(null);
-      setSuccessMessage("WebDAV 下载与校验任务已加入任务中心；完成后刷新备份列表即可使用。");
+      setSuccessMessage("WebDAV 下载与校验任务已加入“文件任务”；完成后刷新备份列表即可使用。");
       setLastCreatedJobId(job.jobId);
     },
     onError: mutationError,
@@ -172,7 +172,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     }),
     onSuccess: (job) => {
       setMessage(null);
-      setSuccessMessage("数据库还原校验任务已加入任务中心；任务成功后请立即重启程序完成离线还原。");
+      setSuccessMessage("数据库还原校验任务已加入“文件任务”；任务成功后请立即重启程序完成离线还原。");
       setLastCreatedJobId(job.jobId);
       setRestoreConfirmation("");
     },
@@ -182,7 +182,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     mutationFn: () => client.createDisasterRecoveryPackage({ body: { password: recoveryPassword } }),
     onSuccess: (job) => {
       setMessage(null);
-      setSuccessMessage("加密灾难恢复包任务已加入任务中心；完成后可在恢复包目录中查看。");
+      setSuccessMessage("加密灾难恢复包任务已加入“文件任务”；完成后可在恢复包目录中查看。");
       setLastCreatedJobId(job.jobId);
       setRecoveryPassword("");
       setRecoveryPasswordConfirmation("");
@@ -199,7 +199,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     }),
     onSuccess: (job) => {
       setMessage(null);
-      setSuccessMessage("灾难恢复校验任务已加入任务中心；任务成功后请立即重启程序。");
+      setSuccessMessage("灾难恢复校验任务已加入“文件任务”；任务成功后请立即重启程序。");
       setLastCreatedJobId(job.jobId);
       setRecoveryRestorePassword("");
       setRecoveryRestoreConfirmation("");

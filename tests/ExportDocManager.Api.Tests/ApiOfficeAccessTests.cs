@@ -75,7 +75,7 @@ public sealed class ApiOfficeAccessTests
         var user = new User { Id = 1, Role = UserRoleCatalog.Admin, CompanyScope = "DEFAULT" };
         foreach (bool networkMode in new[] { false, true })
         {
-            bool enabled = networkMode || edition == ProductEditionCatalog.Administration;
+            bool enabled = networkMode || edition is ProductEditionCatalog.Full or ProductEditionCatalog.Administration;
             var authorization = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = edition, NetworkMode = networkMode }, new RuntimeCapabilitySet(CapabilityModuleKeys.All));
             foreach (string resource in new[] { PermissionResourceCatalog.OfficeRooms, PermissionResourceCatalog.OfficeSupplies })
             {
@@ -87,21 +87,17 @@ public sealed class ApiOfficeAccessTests
         }
     }
 
-    [Fact]
-    public async Task Desktop_ShouldRejectDirectOfficeEndpoints_EvenForAdministrator()
+    [Theory]
+    [InlineData(ProductEditionCatalog.Document)]
+    [InlineData(ProductEditionCatalog.Sales)]
+    public async Task SpecializedDesktopEditions_ShouldRejectDirectOfficeEndpoints_EvenForAdministrator(string edition)
     {
-        await using var harness = await ApiIntegrationTestHarness.StartAsync("office-desktop", "office.db");
+        await using var harness = await ApiIntegrationTestHarness.StartAsync("office-desktop", "office.db", productEdition: edition);
         using var anonymous = harness.CreateClient();
         var login = await harness.LoginAsync(anonymous, "admin", string.Empty);
         using var client = harness.CreateClient(login.AccessToken);
-        var catalog = await client.GetFromJsonAsync<ApiPermissionTemplateCatalogResponse>("/api/permission-templates");
-        Assert.NotNull(catalog);
-        Assert.DoesNotContain(catalog.Resources, item => item.Workspace == "office");
-        Assert.DoesNotContain(catalog.Templates, item => item.Code is BuiltInPermissionTemplateCatalog.OfficeEmployee or BuiltInPermissionTemplateCatalog.OfficeManager or BuiltInPermissionTemplateCatalog.PersonnelManager);
-        Assert.DoesNotContain(catalog.Templates.SelectMany(item => item.Grants), item => item.ResourceKey is PermissionResourceCatalog.OfficeRooms or PermissionResourceCatalog.OfficeSupplies or PermissionResourceCatalog.OfficePeople);
-        var accounts = await client.GetFromJsonAsync<ApiUserListResponse>("/api/users");
-        Assert.NotNull(accounts);
-        Assert.DoesNotContain(accounts.PermissionTemplates, item => item.Code is BuiltInPermissionTemplateCatalog.OfficeEmployee or BuiltInPermissionTemplateCatalog.OfficeManager or BuiltInPermissionTemplateCatalog.PersonnelManager);
+        Assert.DoesNotContain(login.User.Capabilities.EnabledModules, item => item.StartsWith("office.", StringComparison.Ordinal));
+        Assert.False(login.User.Capabilities.UsesOfficeRegister);
         foreach (string route in new[] { "/api/office/rooms", "/api/office/bookings", "/api/office/supplies", "/api/office/supply-requests", "/api/office/people", "/api/office/people/1", "/api/office/people/options" })
             Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(route)).StatusCode);
     }

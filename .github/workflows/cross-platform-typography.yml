@@ -20,6 +20,7 @@ on:
       - "scripts/test_frontend_scale_contracts.mjs"
       - "scripts/test_report_designer_v3_ui.mjs"
       - "scripts/test_office_workspace_ui.mjs"
+      - "scripts/test_workspace_navigation_ui.mjs"
       - "scripts/check_frontend_style_governance.mjs"
       - "scripts/baselines/frontend-style-governance.json"
       - "scripts/baselines/source-size-governance.json"
@@ -55,6 +56,7 @@ on:
       - "scripts/check_frontend_style_governance.mjs"
       - "scripts/test_report_designer_v3_ui.mjs"
       - "scripts/test_office_workspace_ui.mjs"
+      - "scripts/test_workspace_navigation_ui.mjs"
       - "scripts/baselines/frontend-style-governance.json"
       - "scripts/baselines/source-size-governance.json"
       - "scripts/test_web_runtime_browser_session.mjs"
@@ -199,6 +201,7 @@ jobs:
         run: |
           npm --prefix apps/export-doc-web run test:report-designer-v3-ui
           npm --prefix apps/export-doc-web run test:office-ui
+          npm --prefix apps/export-doc-web run test:workspace-ui
           npm --prefix apps/export-doc-web run test:business-features-ui
 
       - name: Validate archived PDF preview
@@ -216,6 +219,8 @@ jobs:
             artifacts/report-designer-v3-ui/summary.json
             artifacts/office-workspace-ui/*.png
             artifacts/office-workspace-ui/summary.json
+            artifacts/workspace-navigation-ui/*.png
+            artifacts/workspace-navigation-ui/summary.json
             artifacts/business-features-ui/*.png
             artifacts/business-features-ui/summary.json
           if-no-files-found: error

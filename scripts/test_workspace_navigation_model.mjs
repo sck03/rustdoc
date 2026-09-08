@@ -55,11 +55,11 @@ const salesPermissions = [
 ];
 assert(model.getWorkspaceContext("/invoices/12").title === "发票编辑", "invoice editor context");
 assert(model.getWorkspaceContext("/payments/new").title === "新建付款报销", "payment create context");
-assert(model.getWorkspaceContext("/single-window/coo/8").section === "申报与归类", "single-window context");
+assert(model.getWorkspaceContext("/single-window/coo/8").section === "单证与申报", "single-window context");
 assert(model.getWorkspaceContext("/crm/follow-ups").title === "客户跟进", "sales workspace context");
 assert(model.getWorkspaceContext("/crm/dashboard").title === "销售概览", "sales dashboard context");
 assert(model.getWorkspaceContext("/crm/email-templates").title === "邮件模板", "email template context");
-assert(model.getWorkspaceContext("/crm/opportunities").title === "商机与报价跟踪", "sales opportunity context");
+assert(model.getWorkspaceContext("/crm/opportunities").title === "商机与报价", "sales opportunity context");
 assert(model.getWorkspaceContext("/suppliers").title === "供应商管理", "supplier workspace context");
 assert(model.getWorkspaceContext("/system/access-control").title === "账号与权限", "access control context");
 assert(model.getRequiredWorkspace("/crm/follow-ups") === "sales", "sales route access model");
@@ -68,10 +68,11 @@ assert(model.getRequiredWorkspace("/crm/email-templates") === "sales", "email te
 assert(model.getRequiredWorkspace("/crm/opportunities") === "sales", "sales opportunity route access model");
 assert(model.getRequiredWorkspace("/invoices/12") === "document", "document route access model");
 assert(model.findActiveWorkspaceNavGroupKey("/tools/ocr") === "resources", "tools navigation group");
-assert(model.findActiveWorkspaceNavGroupKey("/master-data/hs-knowledge/search") === "declaration", "knowledge route activates only declaration group");
-assert(model.workspaceNavGroups.find((group) => group.key === "declaration")?.label === "申报与归类", "declaration group label");
-assert(model.workspaceNavGroups.find((group) => group.key === "declaration")?.items.some((item) => item.label === "HS 编码知识"), "HS library item label");
-assert(model.workspaceNavGroups.find((group) => group.key === "declaration")?.items[0]?.label === "单一窗口", "single-window operation center label");
+assert(model.findActiveWorkspaceNavGroupKey("/master-data/hs-knowledge/search") === "documents", "classification belongs to document work");
+assert(model.findActiveWorkspaceNavGroupKey("/business-attachments") === "documents", "business files belong to document work");
+assert(model.findActiveWorkspaceNavGroupKey("/jobs") === "workspace", "file progress is distinct from business entry");
+assert(model.workspaceNavGroups.length === 6, "navigation uses six task groups");
+assert(model.createInitialWorkspaceNavGroupState("/settings").size === 1, "only the current group starts expanded");
 assert(model.createInitialWorkspaceNavGroupState("/settings").has("system"), "active group starts expanded");
 const navigationItems = model.workspaceNavGroups.flatMap((group) => group.items);
 const allModules = [...new Set(navigationItems.flatMap((item) => item.moduleKey ? [item.moduleKey] : []))];
@@ -87,7 +88,20 @@ const salesGroups = model.filterWorkspaceNavGroups({
 });
 const salesEditionAdminGroups = model.filterWorkspaceNavGroups({ productEdition: "Sales", canManageSettings: true, canUseSalesWorkspace: true, isDesktopRuntime: true, ...fullNavigationGrants });
 const browserAdminGroups = model.filterWorkspaceNavGroups({ productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, isDesktopRuntime: false, ...fullNavigationGrants });
-const adminGroups = model.filterWorkspaceNavGroups({ productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, isDesktopRuntime: true, ...fullNavigationGrants });
+const fullDesktopCapabilities = { productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, usesOfficeRegister: true, isDesktopRuntime: true, ...fullNavigationGrants };
+const adminGroups = model.filterWorkspaceNavGroups(fullDesktopCapabilities);
+assert(adminGroups.find((group) => group.key === "office")?.items.length === 3, "Full desktop includes every administration entry");
+assert(product.getDefaultWorkspaceRoute(fullDesktopCapabilities) === "/dashboard", "Full desktop retains its business home after enabling administration");
+for (const item of navigationItems) {
+  assert(navigationItems.filter((candidate) => candidate.isActive(item.to)).length === 1, `each route has one navigation owner: ${item.to}`);
+  assert(model.getRequiredModule(item.to) === (item.moduleKey ?? null), `route and menu share their permission module: ${item.to}`);
+  assert(model.getWorkspaceContext(item.to).title === item.label, `page and menu use the same name: ${item.to}`);
+}
+assert(model.findActiveWorkspaceNavGroupKey("/master-data/hs-codes") === "documents", "HS catalogue must not activate basic data navigation");
+assert(model.searchWorkspaceNavGroups("任务中心", adminGroups)[0]?.items[0]?.to === "/jobs", "familiar feature names remain searchable");
+assert(model.searchWorkspaceNavGroups("ＥＸＣＥＬ 模板", adminGroups).some((group) => group.items.some((item) => item.to === "/tools/excel")), "search normalizes case, width and whitespace");
+assert(model.searchWorkspaceNavGroups("系统设置", salesGroups).length === 0, "search cannot expose unavailable system functions");
+assert(model.searchWorkspaceNavGroups("", []).length === 0, "empty permissions never become search results");
 const financeModules = [
   "document.payments",
   "document.query",

@@ -1,283 +1,59 @@
+import { LayoutDashboard } from "lucide-react";
 import {
-  CircleDollarSign,
-  CalendarDays,
-  Package,
-  BookOpen,
-  ContactRound,
-  ClipboardList,
-  CreditCard,
-  Database,
-  FileSpreadsheet,
-  Factory,
-  FileText,
-  Info,
-  KeyRound,
-  LayoutDashboard,
-  Mail,
-  Network,
-  PackageCheck,
-  RefreshCw,
-  ScanText,
-  Search,
-  Settings,
-  ShieldCheck,
-  ScrollText,
-  UsersRound,
-  type LucideIcon,
-} from "lucide-react";
-import { permissionActions, permissionResources } from "./permissionCatalog.ts";
-
-export type WorkspacePermissionRequirement = {
-  resourceKey: string;
-  action: string;
-};
-
-type WorkspacePermissionGrant = WorkspacePermissionRequirement & {
-  dataScope?: string;
-};
-
-export type WorkspaceNavItem = {
-  label: string;
-  to: string;
-  icon: LucideIcon;
-  isActive: (pathname: string) => boolean;
-  requiresAdmin?: boolean;
-  desktopOnly?: boolean;
-  requiresSystemAdministration?: boolean;
-  workspace?: "document" | "sales" | "office";
-  moduleKey?: string;
-  requiredFeature?: string;
-  requiredPermissions?: WorkspacePermissionRequirement[];
-  permissionMatch?: "all" | "any";
-};
-
-export type WorkspaceCapabilities = {
-  canManageSettings?: boolean;
-  canManageUsers?: boolean;
-  usesOfficeRegister?: boolean;
-  canUseDocumentWorkspace?: boolean;
-  canUseSalesWorkspace?: boolean;
-  isDesktopRuntime?: boolean;
-  productEdition?: unknown;
-  enabledModules?: string[];
-  availableFeatures?: string[];
-  permissions?: WorkspacePermissionGrant[];
-};
-
-export type WorkspaceNavGroupConfig = {
-  key: string;
-  label: string;
-  icon: LucideIcon;
-  items: WorkspaceNavItem[];
-};
-
-export type WorkspaceContext = {
-  section: string;
-  title: string;
-  description: string;
-  icon: LucideIcon;
-};
-
-export const defaultExpandedWorkspaceNavGroups = ["workspace", "documents", "declaration"];
-
-export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
-  {
-    key: "workspace",
-    label: "工作台",
-    icon: LayoutDashboard,
-    items: [
-      { label: "我的待办", to: "/worklist", icon: ClipboardList, isActive: (path) => path === "/worklist", requiredFeature: "worklist" },
-      { label: "单证概览", to: "/dashboard", icon: LayoutDashboard, isActive: isDashboardRoute, workspace: "document", moduleKey: "document.dashboard" },
-      { label: "业务资料", to: "/business-attachments", icon: FileText, isActive: isBusinessAttachmentRoute,
-        workspace: "document", moduleKey: "document.invoices", requiredFeature: "business-attachments" },
-      {
-        label: "销售概览",
-        to: "/crm/dashboard",
-        icon: LayoutDashboard,
-        isActive: isCrmDashboardRoute,
-        workspace: "sales",
-        moduleKey: "sales.dashboard",
-        requiredPermissions: [
-          { resourceKey: permissionResources.salesDashboard, action: permissionActions.view },
-          { resourceKey: permissionResources.crmCustomers, action: permissionActions.view },
-          { resourceKey: permissionResources.salesOpportunities, action: permissionActions.view },
-        ],
-      },
-    ],
-  },
-  {
-    key: "office", label: "公司行政", icon: CalendarDays,
-    items: [
-      { label: "会议室预约", to: "/office/meeting-rooms", icon: CalendarDays, isActive: (path) => path.startsWith("/office/meeting-rooms"),
-        workspace: "office", moduleKey: "office.rooms", requiredPermissions: [{ resourceKey: permissionResources.officeRooms, action: permissionActions.view }] },
-      { label: "物品领用", to: "/office/supplies", icon: Package, isActive: (path) => path.startsWith("/office/supplies"),
-        workspace: "office", moduleKey: "office.supplies", requiredPermissions: [{ resourceKey: permissionResources.officeSupplies, action: permissionActions.view }] },
-      { label: "人员信息管理", to: "/office/people", icon: UsersRound, isActive: (path) => path.startsWith("/office/people"),
-        workspace: "office", moduleKey: "office.people", requiredPermissions: [{ resourceKey: permissionResources.officePeople, action: permissionActions.view }] },
-    ],
-  },
-  {
-    key: "customers",
-    label: "客户与供应链",
-    icon: ContactRound,
-    items: [
-      {
-        label: "客户跟进",
-        to: "/crm/follow-ups",
-        icon: ContactRound,
-        isActive: isCustomerFollowUpRoute,
-        workspace: "sales",
-        moduleKey: "sales.crm",
-        requiredPermissions: [
-          { resourceKey: permissionResources.crmCustomers, action: permissionActions.view },
-          { resourceKey: permissionResources.crmFollowUps, action: permissionActions.view },
-        ],
-      },
-      {
-        label: "商机跟踪",
-        to: "/crm/opportunities",
-        icon: CircleDollarSign,
-        isActive: isSalesOpportunityRoute,
-        workspace: "sales",
-        moduleKey: "sales.opportunities",
-        requiredPermissions: [
-          { resourceKey: permissionResources.salesOpportunities, action: permissionActions.view },
-        ],
-      },
-      {
-        label: "邮件模板",
-        to: "/crm/email-templates",
-        icon: Mail,
-        isActive: isEmailTemplateRoute,
-        workspace: "sales",
-        moduleKey: "sales.email-templates",
-        requiredPermissions: [
-          { resourceKey: permissionResources.emailTemplates, action: permissionActions.view },
-        ],
-      },
-      {
-        label: "供应商管理",
-        to: "/suppliers",
-        icon: Factory,
-        isActive: isSupplierRoute,
-        workspace: "sales",
-        moduleKey: "sales.suppliers",
-        requiredPermissions: [
-          { resourceKey: permissionResources.suppliers, action: permissionActions.view },
-        ],
-      },
-    ],
-  },
-  {
-    key: "documents",
-    label: "单证业务",
-    icon: FileText,
-    items: [
-      { label: "发票管理", to: "/invoices", icon: FileText, isActive: isInvoiceRoute, workspace: "document", moduleKey: "document.invoices" },
-      { label: "单据查询", to: "/query/invoices", icon: Search, isActive: isQueryRoute, workspace: "document", moduleKey: "document.query" },
-      { label: "付款报销", to: "/payments", icon: CreditCard, isActive: isPaymentRoute, workspace: "document", moduleKey: "document.payments" },
-      { label: "任务中心", to: "/jobs", icon: ClipboardList, isActive: isJobRoute, workspace: "document", moduleKey: "document.jobs" },
-    ],
-  },
-  {
-    key: "declaration",
-    label: "申报与归类",
-    icon: Network,
-    items: [
-      { label: "单一窗口", to: "/single-window/operation-center", icon: Network, isActive: isSingleWindowOperationRoute, workspace: "document", moduleKey: "document.single-window" },
-      { label: "申报词典", to: "/single-window/reference-catalog", icon: Database, isActive: isSingleWindowReferenceCatalogRoute, workspace: "document", moduleKey: "document.declaration-dictionary" },
-      { label: "HS 编码知识", to: "/master-data/hs-knowledge/search", icon: BookOpen, isActive: isHsKnowledgeRoute, workspace: "document", moduleKey: "document.hs-knowledge" },
-    ],
-  },
-  {
-    key: "resources",
-    label: "资料与工具",
-    icon: Database,
-    items: [
-      { label: "主数据维护", to: "/master-data", icon: Database, isActive: isMasterDataRoute, workspace: "document", moduleKey: "document.master-data" },
-      {
-        label: "报表模板管理",
-        to: "/reports/templates/manage",
-        icon: ScrollText,
-        isActive: isReportRoute,
-        workspace: "document",
-        moduleKey: "document.reports",
-        requiredPermissions: [
-          { resourceKey: permissionResources.reportTemplates, action: permissionActions.view },
-        ],
-      },
-      { label: "Excel 模板", to: "/tools/excel", icon: FileSpreadsheet, isActive: isExcelToolsRoute, workspace: "document", moduleKey: "document.excel" },
-      { label: "智能 OCR", to: "/tools/ocr", icon: ScanText, isActive: isSmartOcrRoute, workspace: "document", moduleKey: "document.ocr" },
-      { label: "装箱模拟", to: "/tools/container-packing", icon: PackageCheck, isActive: isContainerPackingRoute, workspace: "document", moduleKey: "document.container-packing" },
-      { label: "今日汇率", to: "/tools/exchange-rates", icon: CircleDollarSign, isActive: isExchangeRateRoute, moduleKey: "common.exchange-rates" },
-      {
-        label: "邮件发送",
-        to: "/tools/email",
-        icon: Mail,
-        isActive: isEmailRoute,
-        moduleKey: "common.email",
-        permissionMatch: "any",
-        requiredPermissions: [
-          { resourceKey: permissionResources.emailDelivery, action: permissionActions.send },
-          { resourceKey: permissionResources.emailDelivery, action: permissionActions.viewDelivery },
-        ],
-      },
-    ],
-  },
-  {
-    key: "system",
-    label: "系统维护",
-    icon: Settings,
-    items: [
-      { label: "软件更新", to: "/system/update", icon: RefreshCw, isActive: isSystemUpdateRoute, requiresAdmin: true, desktopOnly: true },
-      { label: "授权注册", to: "/system/license", icon: KeyRound, isActive: isLicenseRoute, requiresAdmin: true },
-      { label: "审计日志", to: "/audit-logs", icon: ShieldCheck, isActive: isAuditLogRoute, requiresAdmin: true, requiresSystemAdministration: true },
-      { label: "账号与权限", to: "/system/access-control", icon: UsersRound, isActive: isAccessControlRoute, requiresAdmin: true, requiresSystemAdministration: true },
-      { label: "系统设置", to: "/settings", icon: Settings, isActive: isSettingsRoute, requiresAdmin: true },
-      { label: "关于系统", to: "/system/about", icon: Info, isActive: isAboutRoute, moduleKey: "system.about" },
-    ],
-  },
-];
+  workspaceNavGroups, type WorkspaceCapabilities, type WorkspaceContext,
+  type WorkspaceNavGroupConfig, type WorkspaceNavItem, type WorkspacePermissionGrant,
+} from "./workspaceNavigationCatalog.ts";
+export {
+  workspaceNavGroups, isDashboardRoute, isLicenseRoute, isAuditLogRoute, isAccessControlRoute,
+  type WorkspaceCapabilities, type WorkspaceContext, type WorkspaceNavGroupConfig,
+  type WorkspaceNavItem, type WorkspacePermissionRequirement,
+} from "./workspaceNavigationCatalog.ts";
 
 export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
   if (!Array.isArray(capabilities.enabledModules)) return [];
   const enabledModules = new Set(capabilities.enabledModules.map(normalizePermissionPart));
-  return workspaceNavGroups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => {
-        if (item.requiredFeature && !capabilities.availableFeatures?.includes(item.requiredFeature)) return false;
-        if (item.requiresAdmin && capabilities.canManageSettings !== true) return false;
-        if (item.desktopOnly && capabilities.isDesktopRuntime !== true) return false;
-        if (item.workspace === "office" && capabilities.isDesktopRuntime === true && capabilities.usesOfficeRegister !== true) return false;
-        if (item.requiresSystemAdministration && capabilities.canManageUsers !== true) return false;
-        if (item.workspace === "document" && capabilities.canUseDocumentWorkspace !== true) return false;
-        if (item.workspace === "sales" && capabilities.canUseSalesWorkspace !== true) return false;
-        if (item.moduleKey && !enabledModules.has(normalizePermissionPart(item.moduleKey))) return false;
-        if (!hasWorkspaceNavItemPermission(item, capabilities.permissions)) return false;
-        return true;
-      }),
-    }))
-    .filter((group) => group.items.length > 0);
+  return workspaceNavGroups.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      if (item.requiredFeature && !capabilities.availableFeatures?.includes(item.requiredFeature)) return false;
+      if (item.requiresAdmin && capabilities.canManageSettings !== true) return false;
+      if (item.desktopOnly && capabilities.isDesktopRuntime !== true) return false;
+      if (item.workspace === "office" && capabilities.isDesktopRuntime === true && capabilities.usesOfficeRegister !== true) return false;
+      if (item.requiresSystemAdministration && capabilities.canManageUsers !== true) return false;
+      if (item.workspace === "document" && capabilities.canUseDocumentWorkspace !== true) return false;
+      if (item.workspace === "sales" && capabilities.canUseSalesWorkspace !== true) return false;
+      if (item.moduleKey && !enabledModules.has(normalizePermissionPart(item.moduleKey))) return false;
+      return hasWorkspaceNavItemPermission(item, capabilities.permissions);
+    }),
+  })).filter((group) => group.items.length > 0);
 }
 
-export function hasWorkspacePathPermission(
-  pathname: string,
-  permissions: WorkspacePermissionGrant[] | undefined,
-) {
-  const item = workspaceNavGroups
-    .flatMap((group) => group.items)
-    .find((candidate) => candidate.isActive(pathname));
+// Search only the caller's authorized navigation, including familiar feature names.
+export function searchWorkspaceNavGroups(query: string, groups: WorkspaceNavGroupConfig[]) {
+  const terms = query.normalize("NFKC").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return groups;
+  return groups.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      const text = `${group.label} ${item.label} ${item.description} ${item.keywords ?? ""}`.normalize("NFKC").toLowerCase();
+      return terms.every((term) => text.includes(term));
+    }),
+  })).filter((group) => group.items.length > 0);
+}
+
+function findWorkspaceNavItem(pathname: string) {
+  return workspaceNavGroups.flatMap((group) => group.items).find((item) => item.isActive(pathname));
+}
+
+export function hasWorkspacePathPermission(pathname: string, permissions: WorkspacePermissionGrant[] | undefined) {
+  const item = findWorkspaceNavItem(pathname);
   return !item || hasWorkspaceNavItemPermission(item, permissions);
 }
 
-export function hasWorkspaceNavItemPermission(
-  item: WorkspaceNavItem,
-  permissions: WorkspacePermissionGrant[] | undefined,
-) {
+export function hasWorkspaceNavItemPermission(item: WorkspaceNavItem, permissions: WorkspacePermissionGrant[] | undefined) {
   if (!item.requiredPermissions?.length) return true;
   if (!Array.isArray(permissions)) return false;
-  const matches = (requirement: WorkspacePermissionRequirement) => permissions.some((grant) =>
+  const matches = (requirement: WorkspacePermissionGrant) => permissions.some((grant) =>
     normalizePermissionPart(grant.resourceKey) === normalizePermissionPart(requirement.resourceKey) &&
     normalizePermissionPart(grant.action) === normalizePermissionPart(requirement.action) &&
     isKnownDataScope(grant.dataScope));
@@ -287,248 +63,53 @@ export function hasWorkspaceNavItemPermission(
 }
 
 export function findActiveWorkspaceNavGroupKey(pathname: string, groups: WorkspaceNavGroupConfig[] = workspaceNavGroups) {
-  return groups.find((group) => group.items.some((item) => item.isActive(pathname)))?.key ?? "workspace";
+  return groups.find((group) => group.items.some((item) => item.isActive(pathname)))?.key ?? groups[0]?.key ?? "";
 }
 
 export function createInitialWorkspaceNavGroupState(pathname: string, groups: WorkspaceNavGroupConfig[] = workspaceNavGroups) {
-  const expanded = new Set(defaultExpandedWorkspaceNavGroups);
-  expanded.add(findActiveWorkspaceNavGroupKey(pathname, groups));
-  return expanded;
+  const activeKey = findActiveWorkspaceNavGroupKey(pathname, groups);
+  return new Set(activeKey ? [activeKey] : []);
 }
 
 export function getWorkspaceContext(pathname: string): WorkspaceContext {
-  if (pathname === "/worklist") return createWorkspaceContext("工作台", "我的待办", "汇总个人待办与到期事项，进入原业务处理", ClipboardList);
-  if (isBusinessAttachmentRoute(pathname)) return createWorkspaceContext("单证业务", "业务资料", "保留原始资料、确认文件与实际交付文件的版本", FileText);
-  if (pathname.startsWith("/office/meeting-rooms")) return createWorkspaceContext("公司行政", "会议室预约", "查看空闲时段、预约审批与钥匙交接", CalendarDays);
-  if (pathname.startsWith("/office/supplies")) return createWorkspaceContext("公司行政", "物品领用", "办公物品申请、发放归还与库存补充", Package);
-  if (pathname.startsWith("/office/people")) return createWorkspaceContext("公司行政", "人员信息管理", "公司通讯录、人员档案与入职调岗离职", UsersRound);
-  if (pathname.startsWith("/dashboard") || pathname === "/") {
-    return createWorkspaceContext("工作台", "仪表盘", "查看业务概览、近期单据与待办进度", LayoutDashboard);
-  }
-  if (pathname.startsWith("/crm/follow-ups")) {
-    return createWorkspaceContext("客户与供应链", "客户跟进", "记录客户沟通、下次动作和待办提醒", ContactRound);
-  }
-  if (pathname.startsWith("/crm/dashboard")) {
-    return createWorkspaceContext("工作台", "销售概览", "查看客户、联系人和近期跟进待办", LayoutDashboard);
-  }
-  if (pathname.startsWith("/crm/email-templates")) {
-    return createWorkspaceContext("客户与供应链", "邮件模板", "维护业务邮件模板、变量和单封邮件预览", Mail);
-  }
-  if (pathname.startsWith("/crm/opportunities")) {
-    return createWorkspaceContext("客户与供应链", "商机与报价跟踪", "记录销售阶段、预计金额、概率和下一步动作", CircleDollarSign);
-  }
-  if (pathname.startsWith("/suppliers")) {
-    return createWorkspaceContext("客户与供应链", "供应商管理", "维护供应商、主要产品和联系人", Factory);
-  }
-  if (pathname.startsWith("/settings")) {
-    return createWorkspaceContext("系统维护", "系统设置", "集中管理运行目录、数据库、模板、邮件与维护工具", Settings);
-  }
-  if (pathname.startsWith("/audit-logs")) {
-    return createWorkspaceContext("系统维护", "审计日志", "查询、导出与维护关键业务操作记录", ShieldCheck);
-  }
-  if (pathname.startsWith("/system/access-control")) {
-    return createWorkspaceContext("系统维护", "账号与权限", "维护账号、岗位、操作权限和数据范围", UsersRound);
-  }
-  if (pathname.startsWith("/tools/ocr")) {
-    return createWorkspaceContext("资料与工具", "智能 OCR", "识别扫描件和图片文字，并保留本地离线处理", ScanText);
-  }
-  if (pathname.startsWith("/tools/container-packing")) {
-    return createWorkspaceContext("资料与工具", "装柜模拟器", "维护货物与柜型，分析空间利用和装载重心", PackageCheck);
-  }
-  if (pathname.startsWith("/tools/exchange-rates")) {
-    return createWorkspaceContext("资料与工具", "今日汇率", "查看常用币种汇率并维护业务换算口径", CircleDollarSign);
-  }
-  if (pathname.startsWith("/tools/email")) {
-    return createWorkspaceContext("资料与工具", "邮件发送", "配置收件信息并发送单据、报表与附件", Mail);
-  }
-  if (pathname.startsWith("/system/update")) {
-    return createWorkspaceContext("系统维护", "软件更新", "检查版本、查看更新说明并交由桌面更新器安装", RefreshCw);
-  }
-  if (pathname.startsWith("/system/license")) {
-    return createWorkspaceContext("系统维护", "授权注册", "查看设备机器码、试用状态与离线授权信息", KeyRound);
-  }
-  if (pathname.startsWith("/system/about")) {
-    return createWorkspaceContext("系统维护", "关于系统", "查看产品版本、许可与技术支持信息", Info);
-  }
-  if (pathname.startsWith("/query")) {
-    return createWorkspaceContext("单证业务", "单据查询", "按日期、客户和关键字检索并导出业务数据", Search);
-  }
-  if (pathname.startsWith("/jobs")) {
-    return createWorkspaceContext("单证业务", "任务中心", "跟踪导入、导出、报表和文件处理任务", ClipboardList);
-  }
-  if (pathname.startsWith("/tools/excel")) {
-    return createWorkspaceContext("资料与工具", "Excel 模板与托单", "导入业务数据、导出模板并生成订舱托单副本", FileSpreadsheet);
-  }
-  if (pathname.startsWith("/reports")) {
-    return pathname.startsWith("/reports/templates/manage")
-      ? createWorkspaceContext("资料与工具", "报表模板管理", "维护模板默认值、名称、文件和模板包", ScrollText)
-      : createWorkspaceContext("资料与工具", "报表设计", "编辑当前模板的版式、HTML 和打印预览", ScrollText);
-  }
-  if (pathname.startsWith("/single-window")) {
-    return getSingleWindowWorkspaceContext(pathname);
-  }
-  if (pathname.startsWith("/master-data/hs-knowledge")) {
-    return createWorkspaceContext("申报与归类", "HS 编码知识中心", "查询、维护和迁移本公司的税则与申报经验", BookOpen);
-  }
-  if (pathname.startsWith("/master-data")) {
-    return createWorkspaceContext("资料与工具", "主数据维护", "统一维护客户、出口商、商品、港口、单位与 HS 编码", Database);
-  }
-  if (pathname.includes("/payments/new")) {
-    return createWorkspaceContext("单证业务", "新建付款报销", "录入付款、费用和报销信息并生成凭证", CreditCard);
-  }
-  if (/\/payments\/\d+/.test(pathname)) {
-    return createWorkspaceContext("单证业务", "付款报销编辑", "维护当前付款记录、费用明细与报表输出", CreditCard);
-  }
-  if (pathname.startsWith("/payments")) {
-    return createWorkspaceContext("单证业务", "付款报销", "查询、维护和输出付款及费用报销记录", CreditCard);
-  }
-  if (pathname.includes("/invoices/new")) {
-    return createWorkspaceContext("单证业务", "新建发票", "录入贸易信息、商品明细和单证资料", FileText);
-  }
-  if (/\/invoices\/\d+/.test(pathname)) {
-    return createWorkspaceContext("单证业务", "发票编辑", "维护当前发票、商品明细、利润与单据输出", FileText);
-  }
-  if (pathname.startsWith("/invoices")) {
-    return createWorkspaceContext("单证业务", "发票管理", "管理出口发票、数据导入导出与业务流转", FileText);
-  }
-  return createWorkspaceContext("工作台", "仪表盘", "查看业务概览、近期单据与待办进度", LayoutDashboard);
+  const group = workspaceNavGroups.find((candidate) => candidate.items.some((item) => item.isActive(pathname)));
+  const item = group?.items.find((candidate) => candidate.isActive(pathname));
+  if (!group || !item) return { section: "工作台", title: "工作台", description: "选择需要办理的业务", icon: LayoutDashboard };
+
+  const context = { section: group.label, title: item.label, description: item.description, icon: item.icon };
+  if (pathname === "/invoices/new") return { ...context, title: "新建发票" };
+  if (/^\/invoices\/\d+$/.test(pathname)) return { ...context, title: "发票编辑" };
+  if (pathname === "/payments/new") return { ...context, title: "新建付款报销" };
+  if (/^\/payments\/\d+$/.test(pathname)) return { ...context, title: "付款报销编辑" };
+  if (pathname.startsWith("/single-window/coo")) return { ...context, title: "海关原产地证", description: "编辑原产地证草稿，核对并生成申报资料" };
+  if (pathname.startsWith("/single-window/acd")) return { ...context, title: "报关代理委托", description: "编辑代理委托草稿，核对并处理回执" };
+  if (pathname.startsWith("/reports") && !pathname.startsWith("/reports/templates/manage"))
+    return { ...context, title: "报表设计", description: "编辑模板版式并查看打印效果" };
+  return context;
 }
 
 export function getRequiredWorkspace(pathname: string): "document" | "sales" | null {
-  if (pathname.startsWith("/crm/") || pathname.startsWith("/suppliers")) return "sales";
-  if (
-    pathname.startsWith("/invoices") ||
-    pathname.startsWith("/business-attachments") ||
-    pathname.startsWith("/query") ||
-    pathname.startsWith("/payments") ||
-    pathname.startsWith("/master-data") ||
-    pathname.startsWith("/single-window") ||
-    pathname.startsWith("/reports") ||
-    pathname.startsWith("/jobs") ||
-    pathname.startsWith("/tools/excel") ||
-    pathname.startsWith("/tools/ocr") ||
-    pathname.startsWith("/tools/container-packing")
-  ) return "document";
-  return null;
+  const workspace = findWorkspaceNavItem(pathname)?.workspace;
+  return workspace === "document" || workspace === "sales" ? workspace : null;
 }
 
 export function getRequiredModule(pathname: string): string | null {
-  if (pathname.startsWith("/office/meeting-rooms")) return "office.rooms";
-  if (pathname.startsWith("/office/supplies")) return "office.supplies";
-  if (pathname.startsWith("/office/people")) return "office.people";
-  if (pathname.startsWith("/crm/dashboard")) return "sales.dashboard";
-  if (pathname.startsWith("/crm/follow-ups")) return "sales.crm";
-  if (pathname.startsWith("/crm/opportunities")) return "sales.opportunities";
-  if (pathname.startsWith("/crm/email-templates")) return "sales.email-templates";
-  if (pathname.startsWith("/suppliers")) return "sales.suppliers";
-  if (pathname.startsWith("/dashboard")) return "document.dashboard";
-  if (pathname.startsWith("/invoices")) return "document.invoices";
-  if (pathname.startsWith("/business-attachments")) return "document.invoices";
-  if (pathname.startsWith("/query")) return "document.query";
-  if (pathname.startsWith("/payments")) return "document.payments";
-  if (pathname.startsWith("/master-data/hs-knowledge") || pathname.startsWith("/master-data/hs-codes")) return "document.hs-knowledge";
-  if (pathname.startsWith("/master-data")) return "document.master-data";
-  if (pathname.startsWith("/single-window/reference-catalog")) return "document.declaration-dictionary";
-  if (pathname.startsWith("/single-window")) return "document.single-window";
-  if (pathname.startsWith("/reports")) return "document.reports";
-  if (pathname.startsWith("/jobs")) return "document.jobs";
-  if (pathname.startsWith("/tools/excel")) return "document.excel";
-  if (pathname.startsWith("/tools/ocr")) return "document.ocr";
-  if (pathname.startsWith("/tools/container-packing")) return "document.container-packing";
-  if (pathname.startsWith("/tools/exchange-rates")) return "common.exchange-rates";
-  if (pathname.startsWith("/tools/email")) return "common.email";
-  if (pathname.startsWith("/system/about")) return "system.about";
-  return null;
+  return findWorkspaceNavItem(pathname)?.moduleKey ?? null;
 }
 
 export function getRequiredRouteAccessLevel(pathname: string): "view" | "operate" {
-  return pathname === "/payments/new" ||
-    pathname === "/invoices/new" ||
-    /^\/master-data\/[^/]+\/new$/.test(pathname) ||
-    /^\/single-window\/(coo|acd)\/[^/]+$/.test(pathname)
-    ? "operate"
-    : "view";
+  return pathname === "/payments/new" || pathname === "/invoices/new" ||
+    /^\/master-data\/[^/]+\/new$/.test(pathname) || /^\/single-window\/(coo|acd)\/[^/]+$/.test(pathname)
+    ? "operate" : "view";
 }
 
-export function isAdminOnlyRoute(pathname: string) {
-  return pathname.startsWith("/settings") ||
-    pathname.startsWith("/system/access-control") ||
-    pathname.startsWith("/system/license") ||
-    pathname.startsWith("/system/update") ||
-    pathname.startsWith("/audit-logs");
-}
+export function isAdminOnlyRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.requiresAdmin === true; }
+export function isSystemAdministrationRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.requiresSystemAdministration === true; }
+export function isDesktopOnlyRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.desktopOnly === true; }
+export function isOfficeRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.workspace === "office"; }
+export function getRequiredFeature(pathname: string) { return findWorkspaceNavItem(pathname)?.requiredFeature ?? null; }
 
-export function isSystemAdministrationRoute(pathname: string) {
-  return pathname.startsWith("/audit-logs") ||
-    pathname.startsWith("/system/access-control");
-}
-
-export function isDesktopOnlyRoute(pathname: string) {
-  return pathname.startsWith("/system/update");
-}
-
-export function isOfficeRoute(pathname: string) {
-  return workspaceNavGroups.some((group) => group.items.some((item) => item.workspace === "office" && item.isActive(pathname)));
-}
-
-export function getRequiredFeature(pathname: string) {
-  for (const group of workspaceNavGroups) {
-    const item = group.items.find((item) => item.requiredFeature && item.isActive(pathname));
-    if (item) return item.requiredFeature;
-  }
-  return null;
-}
-
-function normalizePermissionPart(value: unknown) {
-  return typeof value === "string" ? value.trim().toLowerCase() : "";
-}
-
+function normalizePermissionPart(value: unknown) { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
 function isKnownDataScope(value: unknown) {
-  const normalized = normalizePermissionPart(value);
-  return normalized === "own" || normalized === "department" || normalized === "company" || normalized === "all";
+  return ["own", "department", "company", "all"].includes(normalizePermissionPart(value));
 }
-
-function createWorkspaceContext(section: string, title: string, description: string, icon: LucideIcon): WorkspaceContext {
-  return { section, title, description, icon };
-}
-
-function getSingleWindowWorkspaceContext(pathname: string): WorkspaceContext {
-  if (pathname.startsWith("/single-window/reference-catalog")) {
-    return createWorkspaceContext("申报与归类", "参考词典", "维护申报代码、字段选项与 Excel 导入数据", Database);
-  }
-  if (pathname.startsWith("/single-window/coo")) {
-    return createWorkspaceContext("申报与归类", "海关原产地证", "编辑 COO 草稿、审查字段并生成提交交接包", FileText);
-  }
-  if (pathname.startsWith("/single-window/acd")) {
-    return createWorkspaceContext("申报与归类", "报关代理委托", "编辑 ACD 草稿、审查权限项并处理回执", FileText);
-  }
-  return createWorkspaceContext("申报与归类", "单一窗口操作中心", "办公室归档批次与回执；持卡机负责官方客户端交接", Network);
-}
-
-export function isDashboardRoute(pathname: string) { return pathname === "/" || pathname.startsWith("/dashboard"); }
-export function isLicenseRoute(pathname: string) { return pathname.startsWith("/system/license"); }
-export function isAuditLogRoute(pathname: string) { return pathname.startsWith("/audit-logs"); }
-export function isAccessControlRoute(pathname: string) { return pathname.startsWith("/system/access-control"); }
-function isInvoiceRoute(pathname: string) { return pathname.startsWith("/invoices") && !isBusinessAttachmentRoute(pathname); }
-function isBusinessAttachmentRoute(pathname: string) { return pathname.startsWith("/business-attachments") || /^\/invoices\/\d+\/attachments$/.test(pathname); }
-function isCustomerFollowUpRoute(pathname: string) { return pathname.startsWith("/crm/follow-ups"); }
-function isCrmDashboardRoute(pathname: string) { return pathname.startsWith("/crm/dashboard"); }
-function isEmailTemplateRoute(pathname: string) { return pathname.startsWith("/crm/email-templates"); }
-function isSalesOpportunityRoute(pathname: string) { return pathname.startsWith("/crm/opportunities"); }
-function isSupplierRoute(pathname: string) { return pathname.startsWith("/suppliers"); }
-function isQueryRoute(pathname: string) { return pathname.startsWith("/query"); }
-function isPaymentRoute(pathname: string) { return pathname.startsWith("/payments"); }
-function isMasterDataRoute(pathname: string) { return pathname.startsWith("/master-data") && !isHsKnowledgeRoute(pathname); }
-function isHsKnowledgeRoute(pathname: string) { return pathname.startsWith("/master-data/hs-knowledge"); }
-function isSingleWindowOperationRoute(pathname: string) { return pathname === "/single-window" || pathname.startsWith("/single-window/operation-center") || pathname.startsWith("/single-window/coo") || pathname.startsWith("/single-window/acd"); }
-function isSingleWindowReferenceCatalogRoute(pathname: string) { return pathname.startsWith("/single-window/reference-catalog"); }
-function isReportRoute(pathname: string) { return pathname.startsWith("/reports"); }
-function isJobRoute(pathname: string) { return pathname.startsWith("/jobs"); }
-function isExcelToolsRoute(pathname: string) { return pathname.startsWith("/tools/excel"); }
-function isSmartOcrRoute(pathname: string) { return pathname.startsWith("/tools/ocr"); }
-function isContainerPackingRoute(pathname: string) { return pathname.startsWith("/tools/container-packing"); }
-function isExchangeRateRoute(pathname: string) { return pathname.startsWith("/tools/exchange-rates"); }
-function isEmailRoute(pathname: string) { return pathname.startsWith("/tools/email"); }
-function isSystemUpdateRoute(pathname: string) { return pathname.startsWith("/system/update"); }
-function isAboutRoute(pathname: string) { return pathname.startsWith("/system/about"); }
-function isSettingsRoute(pathname: string) { return pathname.startsWith("/settings"); }

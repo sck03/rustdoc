@@ -1434,12 +1434,12 @@ export function createJobCenterSmokeScene(runtime) {
       invoices.push(await createSmokeInvoice(options, accessToken, tokenType));
       invoices.push(await createSmokeInvoice(options, accessToken, tokenType));
 
-      const invoiceIdsText = invoices.map((invoice) => String(invoice.id)).join("\n");
+      const invoiceOptions = invoices.map(({ id, invoiceNo }) => ({ id, invoiceNo }));
       const outputState = await waitFor(async () => {
         const state = await evaluate(
             page,
             `(() => {
-              const invoiceIdsText = ${JSON.stringify(invoiceIdsText)};
+              const invoices = ${JSON.stringify(invoiceOptions)};
               const outputPath = ${JSON.stringify(outputPath)};
               const form = document.querySelector('[aria-label="批量报表 ZIP 任务"]');
               const setNativeValue = (control, value) => {
@@ -1466,36 +1466,44 @@ export function createJobCenterSmokeScene(runtime) {
                 return { ready: false, reason: "batch report ZIP form is not ready" };
               }
 
-              const invoiceIds = fieldByLabel("发票 ID", "textarea");
+              const invoiceSelect = form.querySelector('.job-invoice-selection select');
+              const invoiceSearch = form.querySelector('.job-invoice-selection input');
               const destination = fieldByLabel("输出 ZIP", "input");
-              const template = form.querySelector("select");
+              const template = form.querySelector(".report-zip-options select");
               const button = Array.from(form.querySelectorAll("button"))
                 .find((element) => (element.innerText || "").includes("开始"));
-              if (!invoiceIds || !destination || !template || !button) {
+              if (!invoiceSelect || !invoiceSearch || !destination || !template || !button) {
                 return {
                   ready: false,
                   reason: "batch report ZIP inputs are not ready",
-                  hasInvoiceIds: Boolean(invoiceIds),
+                  hasInvoiceSelect: Boolean(invoiceSelect),
                   hasDestination: Boolean(destination),
                   hasTemplate: Boolean(template),
                   hasButton: Boolean(button),
                 };
               }
 
-              if (invoiceIds.value !== invoiceIdsText) {
-                setNativeValue(invoiceIds, invoiceIdsText);
+              const selectedNos = Array.from(form.querySelectorAll('.job-invoice-selection-list strong')).map(node => node.textContent);
+              const nextInvoice = invoices.find(invoice => !selectedNos.includes(invoice.invoiceNo));
+              if (nextInvoice) {
+                if (invoiceSearch.value !== nextInvoice.invoiceNo) {
+                  setNativeValue(invoiceSearch, nextInvoice.invoiceNo);
+                } else if (Array.from(invoiceSelect.options).some(option => option.value === String(nextInvoice.id))) {
+                  setNativeValue(invoiceSelect, String(nextInvoice.id));
+                }
+                return { ready: false, reason: 'selecting invoice ' + nextInvoice.invoiceNo };
               }
               if (destination.value !== outputPath) {
                 setNativeValue(destination, outputPath);
               }
 
               return {
-                ready: Boolean(!button.disabled && invoiceIds.value === invoiceIdsText && destination.value === outputPath && template.value),
+                ready: Boolean(!button.disabled && selectedNos.length === invoices.length && destination.value === outputPath && template.value),
                 reason: button.disabled ? "batch report ZIP start button is disabled" : "",
-                invoiceIds: invoiceIds.value,
+                invoiceIds: invoices.map(invoice => invoice.id),
                 destinationPath: destination.value,
                 templatePath: template.value,
-                invoiceCountText: ((form.querySelector(".tool-panel-heading span") || {}).innerText || "").trim(),
+                invoiceCountText: ((form.querySelector(".job-tool-submit-row span") || {}).innerText || "").trim(),
                 buttonText: button.innerText || "",
               };
             })()`,

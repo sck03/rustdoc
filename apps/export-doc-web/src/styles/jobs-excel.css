@@ -5,6 +5,13 @@
   text-overflow: ellipsis;
 }
 
+.job-invoice-selection { display: grid; align-content: start; gap: 10px; min-width: 0; }
+.job-invoice-selection-list { display: grid; gap: 6px; max-height: 220px; overflow-y: auto; list-style: none; margin: 0; padding: 0; }
+.job-invoice-selection-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--edm-neutral-250); border-radius: var(--edm-radius-sm); }
+.job-invoice-selection-list li > span { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.job-invoice-selection-list small { color: var(--edm-neutral-650); }
+.job-invoice-selection-list button { flex-shrink: 0; }
+
 .single-window-package-table,
 .single-window-receipt-table {
   min-width: 1240px;

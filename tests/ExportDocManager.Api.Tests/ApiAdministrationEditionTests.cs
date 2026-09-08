@@ -16,22 +16,26 @@ public sealed class ApiAdministrationEditionTests
         Converters = { new JsonStringEnumConverter() }
     };
 
-    [Fact]
-    public async Task LocalAdministration_ShouldWorkFromFirstLoginThroughHandoverAndDeparture()
+    [Theory]
+    [InlineData(ProductEditionCatalog.Administration)]
+    [InlineData(ProductEditionCatalog.Full)]
+    public async Task LocalAdministration_ShouldWorkFromFirstLoginThroughHandoverAndDeparture(string edition)
     {
         await using var harness = await ApiIntegrationTestHarness.StartAsync("administration-http", "office.db",
-            productEdition: ProductEditionCatalog.Administration);
+            productEdition: edition);
         using var anonymous = harness.CreateClient();
         var login = await harness.LoginAsync(anonymous, "admin", string.Empty);
         using var client = harness.CreateClient(login.AccessToken);
         Assert.True(login.User.Capabilities.UsesOfficeRegister);
         Assert.True(login.User.Capabilities.CanManageUsers);
-        Assert.DoesNotContain(login.User.Capabilities.EnabledModules, item => item.StartsWith("document.", StringComparison.Ordinal) ||
-            item.StartsWith("sales.", StringComparison.Ordinal) || item is "common.email" or "common.exchange-rates");
+        Assert.Equal(edition == ProductEditionCatalog.Full, login.User.Capabilities.CanUseDocumentWorkspace);
+        Assert.Equal(edition == ProductEditionCatalog.Full, login.User.Capabilities.CanUseSalesWorkspace);
+        foreach (string module in new[] { "common.email", "common.exchange-rates" })
+            Assert.Equal(edition == ProductEditionCatalog.Full, login.User.Capabilities.EnabledModules.Contains(module));
         var catalog = await client.GetFromJsonAsync<ApiPermissionTemplateCatalogResponse>("/api/permission-templates");
         Assert.NotNull(catalog);
         Assert.Contains(catalog.Resources, item => item.Key == PermissionResourceCatalog.OfficePeople);
-        Assert.DoesNotContain(catalog.Resources, item => item.Workspace is "document" or "sales");
+        Assert.Equal(edition == ProductEditionCatalog.Full, catalog.Resources.Any(item => item.Workspace is "document" or "sales"));
         Assert.DoesNotContain(catalog.Resources.Where(item => item.Workspace == "office").SelectMany(item => item.Actions),
             item => item.Key is PermissionAction.Approve or PermissionAction.Assign);
         var options = await client.GetFromJsonAsync<PersonnelOptions>("/api/office/people/options");
@@ -53,6 +57,18 @@ public sealed class ApiAdministrationEditionTests
                    new PersonnelTransitionRequest(person.VersionNumber, login.User.BusinessDate, "离职交接")))
             Assert.Equal(HttpStatusCode.Conflict, denied.StatusCode);
         await PostAsync<MeetingBookingRecord>(client, $"/api/office/bookings/{booking.Id}/return-key", new OfficeDecisionRequest(booking.VersionNumber));
+        var supply = await PostAsync<OfficeSupplyRecord>(client, "/api/office/supplies", new OfficeSupplySaveRequest("投影仪", "台", "办公室", "", true, true, 0, 0));
+        await PostAsync<OfficeStockMovementRecord>(client, $"/api/office/supplies/{supply.Id}/restock", new OfficeStockRequest(Guid.NewGuid(), 2, supply.VersionNumber, "设备入库"));
+        var request = await PostAsync<OfficeSupplyRequestRecord>(client, "/api/office/supply-requests",
+            new SupplyRequestCreateRequest(Guid.NewGuid(), supply.Id, 1, "会议借用", login.User.BusinessDate.AddDays(1), person.Employee.Id));
+        Assert.Equal(SupplyRequestStatus.Approved, request.Status);
+        Assert.Equal("登记人员", request.ApplicantName);
+        request = await PostAsync<OfficeSupplyRequestRecord>(client, $"/api/office/supply-requests/{request.Id}/issue", new OfficeReturnRequest(request.VersionNumber, 0));
+        using (var denied = await client.PostAsJsonAsync($"/api/office/people/{person.Employee.Id}/depart",
+                   new PersonnelTransitionRequest(person.VersionNumber, login.User.BusinessDate, "尚有借用物品")))
+            Assert.Equal(HttpStatusCode.Conflict, denied.StatusCode);
+        request = await PostAsync<OfficeSupplyRequestRecord>(client, $"/api/office/supply-requests/{request.Id}/return", new OfficeReturnRequest(request.VersionNumber, 1));
+        Assert.Equal(SupplyRequestStatus.Returned, request.Status);
         person = await PostAsync<PersonnelRecord>(client, $"/api/office/people/{person.Employee.Id}/depart",
             new PersonnelTransitionRequest(person.VersionNumber, login.User.BusinessDate, "已完成交接"));
         Assert.Equal(EmploymentStatus.Departed, person.Employee.Status);

@@ -30,7 +30,7 @@ const invoiceReportType = "ExportDocument";
 const jobListViewStateStorageKey = "export-doc-manager.job-list-view-state.v1";
 
 export function JobCenterPage({ client }: { client: ExportDocManagerApiClient }) {
-  const { jobPermission, reportPermission, canExportInvoiceZip, canRetryJob } = useJobPermissions();
+  const { jobPermission, reportPermission, invoicePermission, canExportInvoiceZip, canRetryJob } = useJobPermissions();
   const workspaceDeviceProfile = useWorkspaceDeviceProfile();
   const workspaceDeviceMode = workspaceDeviceProfile.mode;
   const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
@@ -43,11 +43,13 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   const [status, setStatus] = useState("");
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(initialListViewState.pageSize);
+  const [reportToolsOpen, setReportToolsOpen] = useState(false);
   const desktopAvailable = isDesktopBridgeAvailable();
   const canCreateInvoiceReportZip =
     workspaceDeviceCapabilities.canImportExport
     && jobPermission.canOperate
     && reportPermission.canView
+    && invoicePermission.canView
     && canExportInvoiceZip;
 
   const jobsQuery = useQuery({
@@ -67,7 +69,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   const reportTemplatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates(invoiceReportType),
     queryFn: ({ signal }) => client.listReportTemplates({ reportType: invoiceReportType }, { signal }),
-    enabled: canCreateInvoiceReportZip,
+    enabled: canCreateInvoiceReportZip && reportToolsOpen,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -96,7 +98,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
     pdfSources,
     pdfDestination,
     pdfUploadFiles,
-    reportInvoiceIds,
+    reportInvoices,
     reportZipDestination,
     reportTemplatePath,
     reportWithSeal,
@@ -179,7 +181,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   const isActionBusy = operations.isBusy || reportTemplatesQuery.isFetching;
 
   return (
-    <section className="work-surface job-center-surface" aria-label="任务中心">
+    <section className="work-surface job-center-surface" aria-label="文件任务">
       {!jobPermission.canOperate ? (
         <PermissionNotice>当前权限模板仅允许查看任务；新建、取消和重试已禁用，删除与批量清理需要管理权限。</PermissionNotice>
       ) : null}
@@ -193,11 +195,11 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
       {jobPermission.canOperate && workspaceDeviceCapabilities.canImportExport ? (
         <section className="job-create-panel" aria-label="新建任务">
           {canCreateInvoiceReportZip ? (
-            <details>
+            <details onToggle={(event) => setReportToolsOpen(event.currentTarget.open)}>
               <summary><span>批量报表 ZIP</span><small>{reportInvoiceIdList.length} 张发票</small></summary>
-              <InvoiceReportZipJobPanel
-                invoiceIds={reportInvoiceIds}
-                invoiceCount={reportInvoiceIdList.length}
+              {reportToolsOpen && <InvoiceReportZipJobPanel
+                client={client}
+                invoices={reportInvoices}
                 destinationPath={reportZipDestination}
                 templatePath={reportTemplatePath}
                 withSeal={reportWithSeal}
@@ -206,14 +208,14 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
                 isTemplateLoading={reportTemplatesQuery.isFetching}
                 disabled={isActionBusy}
                 canSubmit={canStartReportZip && !reportTemplatesQuery.isFetching}
-                onInvoiceIdsChange={operations.setReportInvoiceIds}
+                onInvoicesChange={operations.setReportInvoices}
                 onDestinationPathChange={operations.setReportZipDestination}
                 onTemplatePathChange={operations.setReportTemplatePath}
                 onWithSealChange={operations.setReportWithSeal}
                 onSubmit={() => operations.reportZipMutation.mutate()}
                 onMessage={operations.handleChildMessage}
                 defaultExportDirectory={defaultExportDirectory}
-              />
+              />}
             </details>
           ) : <PermissionNotice>当前权限可使用普通后台任务，但未同时授予发票单据输出权限，批量报表 ZIP 已隐藏。</PermissionNotice>}
           {reportPermission.canOperate ? <details>
@@ -246,7 +248,12 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
           <Search size={17} aria-hidden="true" />
           <input aria-label="搜索任务" value={keyword} onChange={(event) => handleKeywordChange(event.target.value)} placeholder="任务号、标题、输出文件、错误" />
         </form>
-        <div className="filter-bar"><FilterSelect label="状态" value={status} options={jobStatusOptions} onChange={changeStatus} /></div>
+        <div className="filter-bar"><label className="inline-filter"><span>状态</span>
+          <select value={status} onChange={(event) => changeStatus(event.target.value)}>
+            <option value="">全部</option>
+            {jobStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label></div>
         <div className="toolbar-actions">
           <button className="icon-button" type="button" title="清除搜索" aria-label="清除搜索" disabled={jobsQuery.isFetching || operations.isBusy || (!keyword && !committedKeyword && !focusedJobId)} onClick={() => applyFilters("")}>
             <X size={18} aria-hidden="true" />
@@ -262,7 +269,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
         </div>
       </div>
 
-      {errorMessage ? <InlineNotice tone="error" title="任务中心操作失败">{errorMessage}</InlineNotice> : null}
+      {errorMessage ? <InlineNotice tone="error" title="文件任务操作失败">{errorMessage}</InlineNotice> : null}
       {operations.message ? <InlineNotice tone={operations.messageTone}>{operations.message}</InlineNotice> : null}
 
       <JobTable
@@ -293,27 +300,5 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
         onPageSizeChange={handlePageSizeChange}
       />
     </section>
-  );
-}
-
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: Array<{ value: string; label: string }>;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="inline-filter">
-      <span>{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">全部</option>
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </label>
   );
 }

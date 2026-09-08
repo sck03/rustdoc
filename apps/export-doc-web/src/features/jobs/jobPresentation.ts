@@ -95,21 +95,6 @@ export function readPathLines(value: string) {
     .filter(Boolean);
 }
 
-export function readPositiveIntegerTokens(value: string) {
-  const seen = new Set<number>();
-  const result: number[] = [];
-  for (const token of value.split(/[\s,;，；]+/)) {
-    const trimmed = token.trim();
-    if (!/^\d+$/.test(trimmed)) continue;
-    const parsed = Number.parseInt(trimmed, 10);
-    if (parsed > 0 && !seen.has(parsed)) {
-      seen.add(parsed);
-      result.push(parsed);
-    }
-  }
-  return result;
-}
-
 export function fileNameFromPath(value: string) {
   return value.split(/[\\/]/).filter(Boolean).at(-1) ?? value;
 }

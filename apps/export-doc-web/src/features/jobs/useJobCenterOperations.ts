@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useMutation, type QueryClient } from "@tanstack/react-query";
-import type { BackgroundJobSnapshot, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ApiInvoiceListItemDto, BackgroundJobSnapshot, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { downloadCompletedJobResult, downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
-import { fileNameFromPath, isTerminalJob, readPathLines, readPositiveIntegerTokens } from "./jobPresentation.ts";
+import { fileNameFromPath, isTerminalJob, readPathLines } from "./jobPresentation.ts";
 
 type Options = {
   client: ExportDocManagerApiClient;
@@ -29,7 +29,7 @@ export function useJobCenterOperations({ client, queryClient, canOperate, canMan
   const [pdfSources, setPdfSources] = useState("");
   const [pdfDestination, setPdfDestination] = useState("");
   const [pdfUploadFiles, setPdfUploadFiles] = useState<File[]>([]);
-  const [reportInvoiceIds, setReportInvoiceIds] = useState("");
+  const [reportInvoices, setReportInvoices] = useState<ApiInvoiceListItemDto[]>([]);
   const [reportZipDestination, setReportZipDestination] = useState("");
   const [reportTemplatePath, setReportTemplatePath] = useState("");
   const [reportWithSeal, setReportWithSeal] = useState(true);
@@ -75,7 +75,7 @@ export function useJobCenterOperations({ client, queryClient, canOperate, canMan
   });
   const reportZipMutation = useMutation({
     mutationFn: () => runAbortableOperation(async (signal) => {
-      const body = { invoiceIds: readPositiveIntegerTokens(reportInvoiceIds), reportType: "ExportDocument", templatePath: reportTemplatePath.trim(), withSeal: reportWithSeal, destinationPath: desktopAvailable ? reportZipDestination.trim() : "" };
+      const body = { invoiceIds: reportInvoices.map((invoice) => invoice.id), reportType: "ExportDocument", templatePath: reportTemplatePath.trim(), withSeal: reportWithSeal, destinationPath: desktopAvailable ? reportZipDestination.trim() : "" };
       const job = desktopAvailable ? await client.startInvoiceReportPdfZipSaveToPathJob({ body }, { signal }) : await client.startInvoiceReportPdfZipDownloadJob({ body }, { signal });
       if (!desktopAvailable) await downloadJobResultWhenReady(client, job, "invoice-reports.zip", { signal });
       return job;
@@ -106,7 +106,7 @@ export function useJobCenterOperations({ client, queryClient, canOperate, canMan
 
   const isBusy = cancelMutation.isPending || retryMutation.isPending || deleteMutation.isPending || clearFinishedMutation.isPending || pdfMergeMutation.isPending || reportZipMutation.isPending;
   const canStartPdfMerge = desktopAvailable ? readPathLines(pdfSources).length > 0 && Boolean(pdfDestination.trim()) && !isBusy : pdfUploadFiles.length >= 2 && !isBusy;
-  const reportInvoiceIdList = readPositiveIntegerTokens(reportInvoiceIds);
+  const reportInvoiceIdList = reportInvoices.map((invoice) => invoice.id);
   const canStartReportZip = canCreateInvoiceReportZip && reportInvoiceIdList.length > 0 && (!desktopAvailable || Boolean(reportZipDestination.trim())) && !isBusy;
-  return { message, messageTone, pdfSources, pdfDestination, pdfUploadFiles, reportInvoiceIds, reportZipDestination, reportTemplatePath, reportWithSeal, setPdfSources, setPdfDestination, setPdfUploadFiles, setReportInvoiceIds, setReportZipDestination, setReportTemplatePath, setReportWithSeal, clearFeedback, showSuccess, handleChildMessage, handleCancelJob, handleDeleteJob, handleClearFinishedJobs, cancelMutation, retryMutation, deleteMutation, clearFinishedMutation, pdfMergeMutation, reportZipMutation, downloadMutation, isBusy, canStartPdfMerge, canStartReportZip, reportInvoiceIdList, defaultExportDirectory };
+  return { message, messageTone, pdfSources, pdfDestination, pdfUploadFiles, reportInvoices, reportZipDestination, reportTemplatePath, reportWithSeal, setPdfSources, setPdfDestination, setPdfUploadFiles, setReportInvoices, setReportZipDestination, setReportTemplatePath, setReportWithSeal, clearFeedback, showSuccess, handleChildMessage, handleCancelJob, handleDeleteJob, handleClearFinishedJobs, cancelMutation, retryMutation, deleteMutation, clearFinishedMutation, pdfMergeMutation, reportZipMutation, downloadMutation, isBusy, canStartPdfMerge, canStartReportZip, reportInvoiceIdList, defaultExportDirectory };
 }

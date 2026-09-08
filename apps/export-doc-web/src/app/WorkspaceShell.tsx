@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  ChevronDown,
-  ChevronRight,
   FileText,
   LogOut,
   Menu,
@@ -14,7 +12,6 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type { ApiUserDto } from "../api/index.ts";
 import {
@@ -22,8 +19,8 @@ import {
   filterWorkspaceNavGroups,
   findActiveWorkspaceNavGroupKey,
   getWorkspaceContext,
-  type WorkspaceNavGroupConfig,
 } from "./workspaceNavigation.ts";
+import { WorkspaceNavigation } from "./WorkspaceNavigation.tsx";
 import { getProductEditionPresentation } from "./productEdition.ts";
 import { Button } from "../ui/Button.tsx";
 import { InlineNotice } from "../ui/PageState.tsx";
@@ -130,14 +127,7 @@ export function WorkspaceShell({
   }, [isDesktopRuntime, isOnline, queryClient]);
 
   useEffect(() => {
-    setExpandedGroups((current) => {
-      if (current.has(activeGroupKey)) {
-        return current;
-      }
-      const next = new Set(current);
-      next.add(activeGroupKey);
-      return next;
-    });
+    setExpandedGroups(new Set(activeGroupKey ? [activeGroupKey] : []));
   }, [activeGroupKey]);
 
   useEffect(() => {
@@ -170,12 +160,13 @@ export function WorkspaceShell({
 
     const focusableElements = () => [
       mobileNavToggleRef.current,
-      ...Array.from(mobileNavRef.current?.querySelectorAll<HTMLElement>("a[href], button:not(:disabled)") ?? []),
-    ].filter((element): element is HTMLElement => Boolean(element));
+      ...Array.from(mobileNavRef.current?.querySelectorAll<HTMLElement>("a[href], button:not(:disabled), input:not(:disabled)") ?? []),
+    ].filter((element): element is HTMLElement => Boolean(element?.getClientRects().length));
 
     const focusInitialNavigationItem = window.requestAnimationFrame(() => {
-      const preferredTarget = mobileNavRef.current?.querySelector<HTMLElement>('[aria-current="page"]')
-        ?? mobileNavRef.current?.querySelector<HTMLElement>("button, a[href]");
+      const currentItem = mobileNavRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+      const preferredTarget = currentItem?.getClientRects().length ? currentItem
+        : mobileNavRef.current?.querySelector<HTMLElement>("input, button, a[href]");
       preferredTarget?.focus();
     });
 
@@ -249,15 +240,15 @@ export function WorkspaceShell({
   }, []);
 
   function toggleGroup(groupKey: string) {
-    setExpandedGroups((current) => {
-      const next = new Set(current);
-      if (next.has(groupKey)) {
-        next.delete(groupKey);
-      } else {
-        next.add(groupKey);
-      }
-      return next;
-    });
+    setExpandedGroups((current) => new Set(current.has(groupKey) ? [] : [groupKey]));
+  }
+
+  function expandNavigation(groupKey?: string) {
+    setIsNavCollapsed(false);
+    if (groupKey) setExpandedGroups(new Set([groupKey]));
+    window.requestAnimationFrame(() => mobileNavRef.current?.querySelector<HTMLElement>(
+      groupKey ? `[data-nav-group="${groupKey}"]` : "input[type=search]",
+    )?.focus());
   }
 
   function handleToggleInterfaceDensity() {
@@ -313,22 +304,8 @@ export function WorkspaceShell({
           <span>{isDesktopRuntime ? "本机运行" : "多人协作"}</span>
         </div>
 
-        {isNavCollapsed ? (
-          <WorkspaceNavRail groups={visibleGroups} pathname={pathname} />
-        ) : (
-          <nav ref={mobileNavRef} id="workspace-primary-navigation" className="nav-list" aria-label="主导航">
-            {visibleGroups.map((group) => (
-              <WorkspaceNavGroup
-                key={group.key}
-                group={group}
-                pathname={pathname}
-                isExpanded={expandedGroups.has(group.key)}
-                isActive={activeGroupKey === group.key}
-                onToggle={toggleGroup}
-              />
-            ))}
-          </nav>
-        )}
+        <WorkspaceNavigation groups={visibleGroups} pathname={pathname} collapsed={isNavCollapsed} activeGroupKey={activeGroupKey}
+          expandedGroups={expandedGroups} navigationRef={mobileNavRef} onToggleGroup={toggleGroup} onExpand={expandNavigation} />
 
         <div className="workspace-nav-footer">
           <button
@@ -502,75 +479,4 @@ function renderUserWorkspaceLabel(user: ApiUserDto) {
 function renderProductText(user: ApiUserDto) {
   const product = getProductEditionPresentation(user.capabilities.productEdition);
   return { title: product.productName, subtitle: product.editionName };
-}
-
-function WorkspaceNavRail({ groups, pathname }: { groups: WorkspaceNavGroupConfig[]; pathname: string }) {
-  return (
-    <nav className="nav-rail" aria-label="精简主导航">
-      {groups.flatMap((group) =>
-        group.items.map((item) => {
-          const ItemIcon = item.icon;
-          const isItemActive = item.isActive(pathname);
-          return (
-            <Link
-              key={`${group.key}-${item.to}`}
-              className={isItemActive ? "nav-rail-item nav-rail-item-active" : "nav-rail-item"}
-              aria-current={isItemActive ? "page" : undefined}
-              title={item.label}
-              to={item.to}
-            >
-              <ItemIcon size={18} aria-hidden="true" />
-              <span>{item.label}</span>
-            </Link>
-          );
-        }),
-      )}
-    </nav>
-  );
-}
-
-function WorkspaceNavGroup({
-  group,
-  pathname,
-  isExpanded,
-  isActive,
-  onToggle,
-}: {
-  group: WorkspaceNavGroupConfig;
-  pathname: string;
-  isExpanded: boolean;
-  isActive: boolean;
-  onToggle: (groupKey: string) => void;
-}) {
-  const GroupIcon = group.icon;
-  const ExpandIcon = isExpanded ? ChevronDown : ChevronRight;
-
-  return (
-    <section className={isActive ? "nav-group nav-group-active" : "nav-group"}>
-      <button className="nav-group-button" type="button" aria-expanded={isExpanded} onClick={() => onToggle(group.key)}>
-        <GroupIcon size={17} aria-hidden="true" />
-        <span>{group.label}</span>
-        <ExpandIcon className="nav-group-chevron" size={16} aria-hidden="true" />
-      </button>
-      {isExpanded ? (
-        <div className="nav-sub-list">
-          {group.items.map((item) => {
-            const ItemIcon = item.icon;
-            const isItemActive = item.isActive(pathname);
-            return (
-              <Link
-                key={item.to}
-                className={isItemActive ? "nav-item nav-item-active" : "nav-item"}
-                aria-current={isItemActive ? "page" : undefined}
-                to={item.to}
-              >
-                <ItemIcon size={16} aria-hidden="true" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      ) : null}
-    </section>
-  );
 }

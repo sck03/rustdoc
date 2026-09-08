@@ -98,9 +98,9 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
   ];
   const quickActions = [
     { label: "新建发票", description: "录入贸易与商品明细", icon: FilePlus2, route: "/invoices/new", enabled: invoicePermission.canOperate },
-    { label: "单据查询", description: "检索并导出业务数据", icon: Search, route: "/query/invoices", enabled: queryPermission.canView },
+    { label: "统计查询", description: "检索并导出业务数据", icon: Search, route: "/query/invoices", enabled: queryPermission.canView },
     { label: "HS 查询", description: "查税则与申报经验", icon: BookOpen, route: "/master-data/hs-knowledge/search", enabled: hsKnowledgePermission.canView },
-    { label: "任务中心", description: "跟踪后台处理进度", icon: ListChecks, route: "/jobs", enabled: jobsPermission.canView },
+    { label: "文件任务", description: "跟踪文件处理进度", icon: ListChecks, route: "/jobs", enabled: jobsPermission.canView },
   ].filter((action) => action.enabled);
 
   const isBusy = dashboardQuery.isFetching;

@@ -29,6 +29,7 @@ assert.deepEqual(
 assert.equal(editionCatalog.schemaVersion, 1);
 const editionEntries = Object.entries(editionCatalog.editions || {});
 assert.deepEqual(editionEntries.map(([name]) => name).sort(), ["Administration", "Document", "Full", "Sales"]);
+assert.deepEqual(editionCatalog.editions.Full.enabledWorkspaces, ["document", "sales", "office"], "Full packages include all business workspaces");
 assert.equal(new Set(editionEntries.map(([, value]) => value.identifier)).size, editionEntries.length, "each product edition requires a unique identifier");
 assert.equal(new Set(editionEntries.map(([, value]) => value.releaseTagPrefix)).size, editionEntries.length, "each product edition requires a unique release tag prefix");
 assert.equal(new Set(editionEntries.map(([, value]) => value.stableManifestAsset)).size, editionEntries.length, "each product edition requires a unique stable manifest");

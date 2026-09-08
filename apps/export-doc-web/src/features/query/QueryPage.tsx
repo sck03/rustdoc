@@ -141,7 +141,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
 
       setActionMessage({
         kind: "success",
-        text: "查询结果 Excel 已加入任务中心，完成后将保存到所选路径。",
+        text: "查询结果 Excel 已加入“文件任务”，完成后将保存到所选路径。",
       });
     },
     onError: (error) => setActionMessage({ kind: "error", text: readApiError(error) }),

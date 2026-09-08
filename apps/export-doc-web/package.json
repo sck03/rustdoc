@@ -26,6 +26,7 @@
     "test:invoice-text-normalization": "node ../../scripts/test_invoice_text_normalization_model.mjs",
     "test:settings-models": "node ../../scripts/test_settings_models.mjs",
     "test:workspace-navigation": "node ../../scripts/test_workspace_navigation_model.mjs",
+    "test:workspace-ui": "node ../../scripts/test_workspace_navigation_ui.mjs",
     "test:email-template-model": "node ../../scripts/test_email_template_model.mjs",
     "test:business-status-model": "node ../../scripts/test_business_status_model.mjs",
     "test:concurrency-feedback": "node ../../scripts/test_frontend_concurrency_feedback.mjs",

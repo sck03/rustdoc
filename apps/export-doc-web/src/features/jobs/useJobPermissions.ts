@@ -6,6 +6,7 @@ import { hasJobRetryPermission, type JobRetryPermissionSet } from "./jobPresenta
 export function useJobPermissions() {
   const jobPermission = useModulePermission("document.jobs");
   const reportPermission = useModulePermission("document.reports");
+  const invoicePermission = useModulePermission("document.invoices");
   const retryPermissions: JobRetryPermissionSet = {
     canOperateJobs: jobPermission.canOperate,
     canOperateReports: reportPermission.canOperate,
@@ -20,6 +21,7 @@ export function useJobPermissions() {
   return {
     jobPermission,
     reportPermission,
+    invoicePermission,
     canExportInvoiceZip: retryPermissions.canExportInvoiceZip,
     canRetryJob: (job: BackgroundJobSnapshot) => hasJobRetryPermission(job.retryOperation, retryPermissions),
   };

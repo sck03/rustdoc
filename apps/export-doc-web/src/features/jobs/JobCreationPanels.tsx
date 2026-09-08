@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 import { FileArchive, FileStack, Play, Save } from "lucide-react";
-import type { ApiReportTemplateDto } from "../../api/index.ts";
+import type { ApiInvoiceListItemDto, ApiReportTemplateDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import {
   isDesktopBridgeAvailable,
   selectPdfFiles,
@@ -12,10 +12,11 @@ import { SelectField } from "../../ui/FormFields.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { PathField, PathTextAreaField } from "../../ui/PathField.tsx";
 import { fileNameFromPath, readPathLines } from "./jobPresentation.ts";
+import { InvoiceReportSelection } from "./InvoiceReportSelection.tsx";
 
 export function InvoiceReportZipJobPanel({
-  invoiceIds,
-  invoiceCount,
+  client,
+  invoices,
   destinationPath,
   templatePath,
   withSeal,
@@ -24,7 +25,7 @@ export function InvoiceReportZipJobPanel({
   isTemplateLoading,
   disabled,
   canSubmit,
-  onInvoiceIdsChange,
+  onInvoicesChange,
   onDestinationPathChange,
   onTemplatePathChange,
   onWithSealChange,
@@ -32,8 +33,8 @@ export function InvoiceReportZipJobPanel({
   onMessage,
   defaultExportDirectory,
 }: {
-  invoiceIds: string;
-  invoiceCount: number;
+  client: ExportDocManagerApiClient;
+  invoices: ApiInvoiceListItemDto[];
   destinationPath: string;
   templatePath: string;
   withSeal: boolean;
@@ -42,7 +43,7 @@ export function InvoiceReportZipJobPanel({
   isTemplateLoading: boolean;
   disabled: boolean;
   canSubmit: boolean;
-  onInvoiceIdsChange: (value: string) => void;
+  onInvoicesChange: (value: ApiInvoiceListItemDto[]) => void;
   onDestinationPathChange: (value: string) => void;
   onTemplatePathChange: (value: string) => void;
   onWithSealChange: (value: boolean) => void;
@@ -81,12 +82,8 @@ export function InvoiceReportZipJobPanel({
     <form className="job-tool-panel" aria-label="批量报表 ZIP 任务" onSubmit={handleSubmit}>
       {templateErrorMessage ? <InlineNotice tone="warning" title="报表模板未完整加载">{templateErrorMessage}</InlineNotice> : null}
       <div className="job-tool-grid job-report-zip-grid">
-        <PathTextAreaField
-          label="发票 ID"
-          value={invoiceIds}
-          disabled={disabled}
-          onChange={(value) => { onInvoiceIdsChange(value); onMessage(null); }}
-        />
+        <InvoiceReportSelection client={client} selected={invoices} disabled={disabled}
+          onChange={(value) => { onInvoicesChange(value); onMessage(null); }} />
         <div className="job-tool-stack">
           <div className="report-zip-options">
             <SelectField
@@ -99,7 +96,7 @@ export function InvoiceReportZipJobPanel({
               }))}
               onChange={handleTemplateChange}
             />
-            <label className="toggle-field">
+            <label className="checkbox-field">
               <input
                 type="checkbox"
                 checked={withSeal}
@@ -124,11 +121,11 @@ export function InvoiceReportZipJobPanel({
                 </>
               }
             />
-          ) : <div className="field-help">ZIP 将保存到浏览器默认下载目录。</div>}
+          ) : <div className="field-help">生成后由浏览器下载 ZIP 文件。</div>}
         </div>
       </div>
       <div className="job-tool-submit-row">
-        <span>{invoiceCount} 张发票</span>
+        <span>{invoices.length} 张发票</span>
         <button className="solid action-button" type="submit" disabled={!canSubmit}>
           <Play size={16} aria-hidden="true" />
           <span>{desktopAvailable ? "开始" : "生成并下载"}</span>

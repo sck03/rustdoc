@@ -45,7 +45,7 @@ const presentations: Record<ProductEdition, ProductEditionPresentation> = {
     productName: "外贸业务综合管理系统",
     displayName: "外贸业务综合管理系统（全功能版）",
     editionName: "全功能版",
-    loginTagline: "单证与销售协同工作台",
+    loginTagline: "单证、销售与行政一站式工作台",
     englishName: "Foreign Trade Business Management System",
     defaultRoute: "/dashboard",
   },
@@ -69,7 +69,6 @@ export function getDefaultWorkspaceRoute(capabilities: WorkspaceCapabilities) {
       .map((item) => item.to),
   );
   const preferredRoutes = [
-    ...(capabilities.usesOfficeRegister ? ["/office/people", "/office/meeting-rooms", "/office/supplies"] : []),
     "/dashboard",
     "/crm/dashboard",
     "/payments",
@@ -84,9 +83,9 @@ export function getDefaultWorkspaceRoute(capabilities: WorkspaceCapabilities) {
     "/master-data",
     "/single-window/operation-center",
     "/tools/exchange-rates",
+    "/office/people",
     "/office/meeting-rooms",
     "/office/supplies",
-    "/office/people",
     "/tools/email",
     "/system/about",
     "/settings",

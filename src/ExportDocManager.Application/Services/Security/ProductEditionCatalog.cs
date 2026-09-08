@@ -39,7 +39,7 @@ namespace ExportDocManager.Services.Security
             Normalize(edition) is Full or Administration;
 
         public static Office.OfficeOperatingMode OfficeMode(string edition, bool networkMode) =>
-            networkMode ? Office.OfficeOperatingMode.Team : Normalize(edition) == Administration
+            networkMode ? Office.OfficeOperatingMode.Team : Normalize(edition) is Full or Administration
                 ? Office.OfficeOperatingMode.LocalRegister : Office.OfficeOperatingMode.Disabled;
 
         public static bool IncludesResource(string edition, PermissionResourceDefinition resource, bool networkMode)

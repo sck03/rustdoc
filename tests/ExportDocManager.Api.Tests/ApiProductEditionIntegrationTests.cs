@@ -32,7 +32,10 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(salesAllowed, currentUser.Capabilities.CanUseSalesWorkspace);
             bool administrationAllowed = edition is ProductEditionCatalog.Full or ProductEditionCatalog.Administration;
             Assert.Equal(administrationAllowed, currentUser.Capabilities.CanManageUsers);
-            Assert.Equal(edition == ProductEditionCatalog.Administration, currentUser.Capabilities.UsesOfficeRegister);
+            Assert.Equal(administrationAllowed, currentUser.Capabilities.UsesOfficeRegister);
+
+            foreach (string route in new[] { "/api/office/rooms", "/api/office/supplies", "/api/office/people" })
+                Assert.Equal(administrationAllowed ? HttpStatusCode.OK : HttpStatusCode.Forbidden, (await client.GetAsync(route)).StatusCode);
 
             var documentResponse = await client.GetAsync("/api/invoices?pageNumber=1&pageSize=5");
             Assert.Equal(documentAllowed ? HttpStatusCode.OK : HttpStatusCode.Forbidden, documentResponse.StatusCode);
