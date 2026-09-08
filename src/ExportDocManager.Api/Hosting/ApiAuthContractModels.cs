@@ -31,7 +31,8 @@ namespace ExportDocManager.Api.Hosting
         IReadOnlyList<string> EnabledModules,
         IReadOnlyList<ApiModuleAccessDto> ModuleAccess,
         IReadOnlyList<ApiPermissionGrantDto> Permissions,
-        bool UsesOfficeRegister);
+        bool UsesOfficeRegister,
+        IReadOnlyList<string> AvailableFeatures);
 
     public sealed record ApiModuleAccessDto(
         string ModuleKey,

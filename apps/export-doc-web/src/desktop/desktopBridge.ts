@@ -222,6 +222,11 @@ export async function selectSaveReportTemplateFilePath(defaultFileName?: string,
   });
 }
 
+export async function selectSaveFilePath(defaultFileName: string) {
+  const invoke = getInvoke();
+  return invoke ? invoke<string | null>("select_save_file_path", { defaultFileName }) : null;
+}
+
 export async function selectSavePdfPath(defaultFileName?: string, defaultDirectory?: string) {
   const invoke = getInvoke();
   if (!invoke) {

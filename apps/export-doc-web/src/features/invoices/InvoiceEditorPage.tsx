@@ -47,15 +47,18 @@ import { calculateInvoiceTotals } from "./invoiceItemsEditorModel.ts";
 import { useInvoiceEditorReferenceData } from "./useInvoiceEditorReferenceData.ts";
 import { useInvoiceItemsWorkspace } from "./useInvoiceItemsWorkspace.ts";
 import { useInvoicePersistenceOperations } from "./useInvoicePersistenceOperations.ts";
+import { InvoiceReviewPanel } from "./InvoiceReviewPanel.tsx";
 
 export function InvoiceEditorPage({
   businessDate,
   client,
   mode,
+  attachmentsEnabled = false,
 }: {
   businessDate: string;
   client: ExportDocManagerApiClient;
   mode: "new" | "edit";
+  attachmentsEnabled?: boolean;
 }) {
   const invoicePermission = useModulePermission("document.invoices");
   const masterDataPermission = useModulePermission("document.master-data");
@@ -639,6 +642,8 @@ export function InvoiceEditorPage({
             </span>
           ) : null}
         </div>
+        {!isNew && isInvoiceIdValid && attachmentsEnabled && <button className="command-button secondary" type="button" disabled={isBusy}
+          onClick={() => void confirmDiscardChanges("打开业务资料").then((accepted) => { if (accepted) navigate(`/invoices/${parsedInvoiceId}/attachments`); })}>业务资料</button>}
         {!isNew
           && isInvoiceIdValid
           && invoicePermission.canManage
@@ -677,6 +682,8 @@ export function InvoiceEditorPage({
       />
 
       {!invoice && isBusy ? <PageState tone="loading" title="正在加载发票" description="请稍候，系统正在读取发票和商品明细。" /> : null}
+
+      {invoice && isInvoiceEditable && !isInvoiceItemsWorkbenchMode && <InvoiceReviewPanel client={client} invoice={invoice} disabled={isBusy} hasUnsavedChanges={hasUnsavedInvoiceChanges} />}
 
       {invoice ? (
         <InvoiceEditorFormShell

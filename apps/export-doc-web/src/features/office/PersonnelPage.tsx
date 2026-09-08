@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Mail, MapPin, Phone, Plus, RefreshCw, Search } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient, PersonnelDirectoryRecord } from "../../api/index.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
@@ -14,7 +15,9 @@ import "../../styles/routes/personnel.css";
 export function PersonnelPage({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {
   const model = usePersonnelDirectory(client, user);
   const [creating, setCreating] = useState(false);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [search, setSearch] = useSearchParams();
+  const focusedId = /^[1-9]\d*$/.test(search.get("employeeId") ?? "") ? Number(search.get("employeeId")) : null;
+  const [selectedId, setSelectedId] = useState<number | null>(focusedId);
   const canViewDetails = canViewPersonnelDetails(user);
   return <section className="office-workspace personnel-workspace" aria-label="人员信息管理">
     <div className="personnel-heading"><div><h2>{user.capabilities.usesOfficeRegister ? "人员档案" : "公司通讯录"}</h2>
@@ -43,7 +46,7 @@ export function PersonnelPage({ client, user }: { client: ExportDocManagerApiCli
     <OfficePager page={model.query.data} paging={model.paging} busy={model.query.isFetching} />
     {creating && <PersonnelFormDialog client={client} user={user} departments={model.options.data?.departments ?? []} onClose={() => setCreating(false)}
       onSaved={(record) => { setCreating(false); setSelectedId(record.employee.id); }} />}
-    {selectedId !== null && <PersonnelDetailsDialog client={client} user={user} id={selectedId} departments={model.options.data?.departments ?? []} onClose={() => setSelectedId(null)} />}
+    {selectedId !== null && canViewDetails && <PersonnelDetailsDialog client={client} user={user} id={selectedId} departments={model.options.data?.departments ?? []} onClose={() => { setSelectedId(null); if (focusedId) setSearch({}); }} />}
   </section>;
 }
 

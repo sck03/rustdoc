@@ -14,6 +14,9 @@
     <ExportDocIncludeExcelModule Condition="'$(ExportDocIncludeExcelModule)' == ''">true</ExportDocIncludeExcelModule>
     <ExportDocIncludeBrowserModule Condition="'$(ExportDocIncludeBrowserModule)' == ''">true</ExportDocIncludeBrowserModule>
     <ExportDocIncludePdfOcrModule Condition="'$(ExportDocIncludePdfOcrModule)' == ''">true</ExportDocIncludePdfOcrModule>
+    <ExportDocIncludeAttachmentsModule Condition="'$(ExportDocIncludeAttachmentsModule)' == '' and '$(ExportDocDependencyProfile)' == 'core'">false</ExportDocIncludeAttachmentsModule>
+    <ExportDocIncludeAttachmentsModule Condition="'$(ExportDocIncludeAttachmentsModule)' == ''">true</ExportDocIncludeAttachmentsModule>
+    <ExportDocIncludeWorklistModule Condition="'$(ExportDocIncludeWorklistModule)' == ''">true</ExportDocIncludeWorklistModule>
     <ExportDocIncludeBundledBrowser Condition="'$(ExportDocIncludeBundledBrowser)' == '' and '$(ExportDocPackageProfile)' == 'Container'">false</ExportDocIncludeBundledBrowser>
     <ExportDocIncludeBundledBrowser Condition="'$(ExportDocIncludeBundledBrowser)' == ''">true</ExportDocIncludeBundledBrowser>
     <_ExportDocOnnxRuntimeDirectory Condition="'$(_ExportDocOnnxRuntimeFile)' != ''">$([System.IO.Path]::Combine('$(NuGetPackageRoot)', 'microsoft.ml.onnxruntime', '$(MicrosoftMlOnnxRuntimeVersion)', 'runtimes', '$(RuntimeIdentifier)', 'native'))</_ExportDocOnnxRuntimeDirectory>
@@ -36,6 +39,10 @@
                       Condition="'$(ExportDocIncludeBrowserModule)' == 'true'" />
     <ProjectReference Include="..\ExportDocManager.Infrastructure.PdfOcr\ExportDocManager.Infrastructure.PdfOcr.csproj"
                       Condition="'$(ExportDocIncludePdfOcrModule)' == 'true'" />
+    <ProjectReference Include="../ExportDocManager.Infrastructure.Attachments/ExportDocManager.Infrastructure.Attachments.csproj"
+                      Condition="'$(ExportDocIncludeAttachmentsModule)' == 'true'" />
+    <ProjectReference Include="../ExportDocManager.Infrastructure.Worklist/ExportDocManager.Infrastructure.Worklist.csproj"
+                      Condition="'$(ExportDocIncludeWorklistModule)' == 'true'" />
   </ItemGroup>
 
   <ItemGroup>

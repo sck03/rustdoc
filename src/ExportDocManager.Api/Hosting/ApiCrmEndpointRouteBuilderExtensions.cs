@@ -280,9 +280,9 @@ namespace ExportDocManager.Api.Hosting
 
             endpoints.MapGet("/api/crm/follow-ups/page", async (ICrmService service,
                 int? crmCustomerId, bool? includeCompleted,
-                int? pageNumber, int? pageSize, CancellationToken ct) =>
+                int? pageNumber, int? pageSize, int? followUpId, CancellationToken ct) =>
             {
-                var page = await service.QueryFollowUpsAsync(crmCustomerId, includeCompleted ?? false, pageNumber ?? 1, pageSize ?? 20, ct);
+                var page = await service.QueryFollowUpsAsync(crmCustomerId, includeCompleted ?? false, pageNumber ?? 1, pageSize ?? 20, followUpId, ct);
                 return Results.Ok(new ApiPagedResponse<ApiCrmFollowUpDto>(
                     page.Items.Select(ToApiDto).ToArray(), page.TotalCount, page.PageNumber, page.PageSize,
                     page.TotalPages, page.HasPreviousPage, page.HasNextPage));

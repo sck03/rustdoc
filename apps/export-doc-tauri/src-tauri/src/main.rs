@@ -107,6 +107,7 @@ fn run_tauri_app() -> tauri::Result<()> {
             desktop_file_dialog_commands::select_save_pdf_path,
             desktop_file_dialog_commands::select_save_zip_path,
             desktop_file_dialog_commands::select_save_excel_path,
+            desktop_file_dialog_commands::select_save_file_path,
             desktop_open_commands::open_path,
             desktop_commands::get_runtime_storage_context,
             desktop_commands::schedule_data_root_migration,

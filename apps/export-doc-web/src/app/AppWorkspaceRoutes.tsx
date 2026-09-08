@@ -70,6 +70,8 @@ const SettingsPage = lazyNamed(() => import("../features/settings/SettingsPage.t
 const MeetingRoomsPage = lazyNamed(() => import("../features/office/MeetingRoomsPage.tsx"), "MeetingRoomsPage");
 const OfficeSuppliesPage = lazyNamed(() => import("../features/office/OfficeSuppliesPage.tsx"), "OfficeSuppliesPage");
 const PersonnelPage = lazyNamed(() => import("../features/office/PersonnelPage.tsx"), "PersonnelPage");
+const WorklistPage = lazyNamed(() => import("../features/worklist/WorklistPage.tsx"), "WorklistPage");
+const BusinessAttachmentsPage = lazyNamed(() => import("../features/attachments/BusinessAttachmentsPage.tsx"), "BusinessAttachmentsPage");
 
 export function AppWorkspaceRoutes({
   activeProduct,
@@ -90,6 +92,7 @@ export function AppWorkspaceRoutes({
 
   const defaultRoute = getDefaultWorkspaceRoute(user.capabilities);
   const permissions = user.capabilities.permissions;
+  const features = user.capabilities.availableFeatures ?? [];
   const canViewSalesDashboard = hasPermission(permissions, permissionResources.salesDashboard, permissionActions.view) &&
     hasPermission(permissions, permissionResources.crmCustomers, permissionActions.view) &&
     hasPermission(permissions, permissionResources.salesOpportunities, permissionActions.view);
@@ -118,12 +121,15 @@ export function AppWorkspaceRoutes({
           hasPermission(permissions, permissionResources.crmFollowUps, permissionActions.view)
           ? <CustomerFollowUpPage businessTimeZone={user.businessTimeZone} client={client} />
           : <Navigate to="/dashboard" replace />} />
+        <Route path="/worklist" element={features.includes("worklist") ? <WorklistPage client={client} user={user} /> : <NoModuleAccessPage />} />
+        <Route path="/business-attachments" element={features.includes("business-attachments") ? <BusinessAttachmentsPage client={client} user={user} /> : <NoModuleAccessPage />} />
+        <Route path="/invoices/:invoiceId/attachments" element={features.includes("business-attachments") ? <BusinessAttachmentsPage client={client} user={user} /> : <NoModuleAccessPage />} />
         <Route path="/invoices" element={<InvoiceListPage client={client} />} />
         <Route path="/office/meeting-rooms" element={<MeetingRoomsPage client={client} user={user} />} />
         <Route path="/office/supplies" element={<OfficeSuppliesPage client={client} user={user} />} />
         <Route path="/office/people" element={<PersonnelPage client={client} user={user} />} />
         <Route path="/invoices/new" element={<InvoiceEditorPage businessDate={user.businessDate} client={client} mode="new" />} />
-        <Route path="/invoices/:invoiceId" element={<InvoiceEditorPage businessDate={user.businessDate} client={client} mode="edit" />} />
+        <Route path="/invoices/:invoiceId" element={<InvoiceEditorPage businessDate={user.businessDate} client={client} mode="edit" attachmentsEnabled={features.includes("business-attachments")} />} />
         <Route path="/query/invoices" element={<QueryPage businessDate={user.businessDate} client={client} />} />
         <Route path="/payments" element={<PaymentListPage client={client} />} />
         <Route path="/payments/new" element={<PaymentEditorPage businessDate={user.businessDate} client={client} mode="new" />} />

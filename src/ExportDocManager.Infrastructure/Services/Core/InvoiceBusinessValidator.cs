@@ -35,10 +35,18 @@ namespace ExportDocManager.Services.Core
                 throw new InvoiceValidationException($"单张发票最多允许 {MaximumItemCount} 行商品明细。");
             }
 
-            foreach (var item in normalizedItems)
+            for (int index = 0; index < normalizedItems.Count; index++)
             {
-                NormalizeAndValidateItem(item, invoice.Id);
-                RecalculateItem(item);
+                var item = normalizedItems[index];
+                try
+                {
+                    NormalizeAndValidateItem(item, invoice.Id);
+                    RecalculateItem(item);
+                }
+                catch (InvoiceValidationException ex)
+                {
+                    throw new InvoiceValidationException($"第 {index + 1} 行：{ex.Message}");
+                }
             }
 
             await ValidateHsCodesAsync(context, normalizedItems, cancellationToken).ConfigureAwait(false);
@@ -53,23 +61,10 @@ namespace ExportDocManager.Services.Core
 
             if (string.Equals(target, InvoiceStatusCatalog.Verified, StringComparison.OrdinalIgnoreCase))
             {
-                if (string.IsNullOrWhiteSpace(invoice.CustomerNameEN) ||
-                    string.IsNullOrWhiteSpace(invoice.ExporterNameEN))
-                {
-                    throw new InvoiceValidationException("提交核对前必须填写客户和出口商信息。");
-                }
-
-                if (invoice.Items == null || invoice.Items.Count == 0)
-                {
-                    throw new InvoiceValidationException("提交核对前至少需要一行商品明细。");
-                }
-
-                if (invoice.Items.Any(item =>
-                        string.IsNullOrWhiteSpace(item.StyleName) && string.IsNullOrWhiteSpace(item.StyleNameCN) ||
-                        item.Quantity <= 0))
-                {
-                    throw new InvoiceValidationException("提交核对前，每行商品必须填写品名且数量大于 0。");
-                }
+                var review = InvoiceReviewPolicy.Evaluate(invoice);
+                if (!review.Ready) throw new InvoiceValidationException("提交核对前请补全资料：" +
+                    string.Join(" ", review.Issues.Take(20).Select(issue => issue.RowNumber.HasValue
+                        ? $"第 {issue.RowNumber} 行：{issue.Message}" : issue.Message)));
             }
 
             if (string.Equals(target, InvoiceStatusCatalog.Shipped, StringComparison.OrdinalIgnoreCase) &&
@@ -120,11 +115,6 @@ namespace ExportDocManager.Services.Core
                 throw new InvoiceValidationException("通知人模式无效。");
             }
             NotifyPartyModePolicy.Normalize(invoice);
-            if (invoice.NotifyPartyMode == NotifyPartyMode.Separate &&
-                string.IsNullOrWhiteSpace(invoice.NotifyPartyName))
-            {
-                throw new InvoiceValidationException("独立通知人必须填写名称。");
-            }
             invoice.ExporterNameEN = NormalizeText(invoice.ExporterNameEN, 500, "出口商英文名称");
             invoice.ExporterNameCN = NormalizeText(invoice.ExporterNameCN, 500, "出口商中文名称");
             invoice.ExporterAddressEN = NormalizeText(invoice.ExporterAddressEN, 2000, "出口商英文地址");

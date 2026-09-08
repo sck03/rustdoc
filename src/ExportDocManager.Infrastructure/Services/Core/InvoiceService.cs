@@ -77,10 +77,6 @@ namespace ExportDocManager.Services.Core
                                 customerName,
                                 token);
 
-                            if (invoice.CustomerId == 0)
-                            {
-                                throw new InfrastructureServiceException("保存或获取客户信息失败");
-                            }
                         }
 
                         if (invoice.ExporterId > 0)
@@ -106,10 +102,6 @@ namespace ExportDocManager.Services.Core
                                 invoice.ExporterNameCN,
                                 token);
 
-                            if (invoice.ExporterId == 0)
-                            {
-                                throw new InfrastructureServiceException("保存或获取出口商信息失败");
-                            }
                         }
 
                         invoice.Items = items ?? invoice.Items ?? new List<Item>();

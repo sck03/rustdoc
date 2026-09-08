@@ -1,3 +1,4 @@
+using ExportDocManager.Services.Infrastructure;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -75,7 +76,7 @@ public sealed class ApiOfficeAccessTests
         foreach (bool networkMode in new[] { false, true })
         {
             bool enabled = networkMode || edition == ProductEditionCatalog.Administration;
-            var authorization = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = edition, NetworkMode = networkMode });
+            var authorization = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = edition, NetworkMode = networkMode }, new RuntimeCapabilitySet(CapabilityModuleKeys.All));
             foreach (string resource in new[] { PermissionResourceCatalog.OfficeRooms, PermissionResourceCatalog.OfficeSupplies })
             {
                 Assert.Equal(enabled, authorization.CanUsePermission(user, resource, PermissionAction.Manage));

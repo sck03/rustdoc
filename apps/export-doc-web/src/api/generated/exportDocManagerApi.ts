@@ -67,6 +67,22 @@ export interface ApiAgentConsignmentUnlockFieldsResponse {
   success: boolean;
 }
 
+export interface ApiAttachmentSaveRequest {
+  destinationPath: string;
+}
+
+export interface ApiAttachmentUploadForm {
+  attachmentId?: number | null;
+  category?: BusinessAttachmentCategory;
+  expectedVersion?: number;
+  file?: null | IFormFile;
+  note?: string;
+  poNumber?: string;
+  styleNo?: string;
+  title?: string;
+  uploadKey?: string;
+}
+
 export interface ApiAuditLogCleanupRequest {
   confirmed?: boolean;
   daysToKeep?: number;
@@ -3209,6 +3225,7 @@ export interface ApiUserAccountDto {
 }
 
 export interface ApiUserCapabilitiesDto {
+  availableFeatures: string[];
   canManageSettings: boolean;
   canManageUsers: boolean;
   canUseDocumentWorkspace: boolean;
@@ -3370,6 +3387,67 @@ export interface BatchExportSettings {
   outputFileNamePattern: string;
   outputFolderPattern: string;
   zipAfterExport: boolean;
+}
+
+export type BusinessAttachmentCategory = "Original" | "Confirmation" | "FinalOutput";
+
+export interface BusinessAttachmentDetails {
+  attachment: BusinessAttachmentRecord;
+  eventCount: number;
+  events: BusinessAttachmentEventRecord[];
+  revisions: BusinessAttachmentRevisionRecord[];
+}
+
+export interface BusinessAttachmentEventRecord {
+  action: string;
+  actorName: string;
+  createdAt: string;
+  note: string;
+  revision?: number | null;
+}
+
+export interface BusinessAttachmentPage {
+  canUpload: boolean;
+  fileBytesLimit: number;
+  invoiceBytesLimit: number;
+  page: PagedResultOfBusinessAttachmentRecord;
+  usedBytes?: number | null;
+}
+
+export interface BusinessAttachmentRecord {
+  canEdit: boolean;
+  category: BusinessAttachmentCategory;
+  currentRevision?: number | null;
+  customerName: string;
+  id: number;
+  invoiceId: number;
+  invoiceNo: string;
+  invoiceType: string;
+  isArchived: boolean;
+  latestRevision: number;
+  poNumber: string;
+  styleNo: string;
+  title: string;
+  updatedAt: string;
+  versionNumber: number;
+}
+
+export interface BusinessAttachmentRevisionRecord {
+  contentType: string;
+  createdAt: string;
+  fileName: string;
+  length: number;
+  note: string;
+  revision: number;
+  sha256: string;
+  uploadedBy: string;
+}
+
+export interface BusinessAttachmentUpdate {
+  currentRevision: number | null;
+  expectedVersion: number;
+  isArchived: boolean;
+  note: string;
 }
 
 export interface CustomsCooDefaultProfile {
@@ -3605,7 +3683,7 @@ export interface HsCodeRemoteCandidateReviewInput {
   id: number;
 }
 
-export type IFormFile = string;
+export type IFormFile = string | null;
 
 export type IFormFileCollection = IFormFile[];
 
@@ -3614,6 +3692,17 @@ export interface InvoiceCloneOptions {
   copyHeader?: boolean;
   copyItems?: boolean;
   resetDates?: boolean;
+}
+
+export interface InvoiceReviewIssue {
+  field: string;
+  message: string;
+  rowNumber?: number | null;
+}
+
+export interface InvoiceReviewResult {
+  issues: InvoiceReviewIssue[];
+  ready: boolean;
 }
 
 export interface MeetingBookingCreateRequest {
@@ -3764,6 +3853,16 @@ export interface OfficeSupplySaveRequest {
   unit: string;
 }
 
+export interface PagedResultOfBusinessAttachmentRecord {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: BusinessAttachmentRecord[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface PagedResultOfMeetingBookingRecord {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
@@ -3848,6 +3947,16 @@ export interface PagedResultOfPersonnelEventRecord {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   items: PersonnelEventRecord[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface PagedResultOfWorklistItem {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: WorklistItem[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
@@ -4275,6 +4384,32 @@ export interface WebDavSettings {
   password: string;
   url: string;
   userName: string;
+}
+
+export type WorklistDueFilter = "All" | "Overdue" | "Upcoming" | "Undated";
+
+export interface WorklistItem {
+  description: string;
+  dueAt?: string | null;
+  dueDate?: string | null;
+  isOverdue: boolean;
+  parentId?: number | null;
+  recordId: number;
+  source: string;
+  title: string;
+}
+
+export interface WorklistPage {
+  asOf: string;
+  businessDate: string;
+  page: PagedResultOfWorklistItem;
+  sources: WorklistSourceCount[];
+}
+
+export interface WorklistSourceCount {
+  count: number;
+  key: string;
+  name: string;
 }
 
 export interface ActivateSingleWindowClientProfileRequest {
@@ -4714,6 +4849,11 @@ export interface DownloadAuditLogsRequest {
   body: ApiAuditLogFilterRequest;
 }
 
+export interface DownloadBusinessAttachmentRequest {
+  id: number;
+  revision: number;
+}
+
 export interface DownloadCloudDatabaseBackupRequest {
   body: ApiCloudBackupDownloadRequest;
 }
@@ -4787,6 +4927,10 @@ export interface GetAgentConsignmentDocumentRequest {
 
 export interface GetAgentConsignmentLockedFieldsRequest {
   invoiceId: number;
+}
+
+export interface GetBusinessAttachmentRequest {
+  id: number;
 }
 
 export interface GetContainerPackingProjectRequest {
@@ -4913,6 +5057,13 @@ export interface GetUnitRequest {
   id: number;
 }
 
+export interface GetWorklistRequest {
+  source?: string;
+  due?: WorklistDueFilter;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 export interface ImportCrmCustomersRequest {
   body: ApiCrmCustomerImportRequest;
 }
@@ -4989,6 +5140,14 @@ export interface ListAuditLogsRequest {
   startTime?: string;
   endTime?: string;
   keyword?: string;
+}
+
+export interface ListBusinessAttachmentsRequest {
+  invoiceId?: number;
+  keyword?: string;
+  includeArchived?: boolean;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListContainerPackingProjectsRequest {
@@ -5357,6 +5516,7 @@ export interface QueryCrmFollowUpsRequest {
   includeCompleted?: boolean;
   pageNumber?: number;
   pageSize?: number;
+  followUpId?: number;
 }
 
 export interface QuerySalesOpportunitiesRequest {
@@ -5520,6 +5680,10 @@ export interface ReviewHsCodeRemoteCandidatesBatchRequest {
   body: HsCodeRemoteCandidateBatchReviewInput;
 }
 
+export interface ReviewInvoiceRequest {
+  body: ApiInvoiceDetailDto;
+}
+
 export interface ReviewLetterOfCreditComplianceRequest {
   body: ApiLetterOfCreditReviewRequest;
 }
@@ -5536,6 +5700,12 @@ export interface SaveAgentConsignmentSubmitPackageToPathRequest {
 
 export interface SaveAuditLogsToPathRequest {
   body: ApiAuditLogPathExportRequest;
+}
+
+export interface SaveBusinessAttachmentToPathRequest {
+  id: number;
+  revision: number;
+  body: ApiAttachmentSaveRequest;
 }
 
 export interface SaveContainerPackingContainerTypeRequest {
@@ -5790,6 +5960,11 @@ export interface UnverifyInvoiceRequest {
   body: ApiInvoiceUnverifyRequest;
 }
 
+export interface UpdateBusinessAttachmentRequest {
+  id: number;
+  body: BusinessAttachmentUpdate;
+}
+
 export interface UpdateCrmContactRequest {
   customerId: number;
   id: number;
@@ -5943,6 +6118,11 @@ export interface UploadAndStartBookingSheetConvertDownloadJobRequest {
 }
 
 export interface UploadAndStartPdfMergeDownloadJobRequest {
+  body: FormData;
+}
+
+export interface UploadBusinessAttachmentRequest {
+  invoiceId: number;
   body: FormData;
 }
 
@@ -6858,6 +7038,11 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public downloadBusinessAttachment(request: DownloadBusinessAttachmentRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/business-attachments/${encodePath(request.id)}/revisions/${encodePath(request.revision)}/content`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
   public downloadCloudDatabaseBackup(request: DownloadCloudDatabaseBackupRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/backup/cloud/download";
     return this.request<BackgroundJobSnapshot>("POST", path, {
@@ -6992,6 +7177,11 @@ export class ExportDocManagerApiClient {
   public getAgentConsignmentLockedFields(request: GetAgentConsignmentLockedFieldsRequest, init?: ApiRequestInit): Promise<ApiSingleWindowLockedFieldsResponse> {
     const path = `/api/single-window/acd/${encodePath(request.invoiceId)}/locked-fields`;
     return this.request<ApiSingleWindowLockedFieldsResponse>("GET", path, { init });
+  }
+
+  public getBusinessAttachment(request: GetBusinessAttachmentRequest, init?: ApiRequestInit): Promise<BusinessAttachmentDetails> {
+    const path = `/api/business-attachments/${encodePath(request.id)}`;
+    return this.request<BusinessAttachmentDetails>("GET", path, { init });
   }
 
   public getCloudBackupStatus(init?: ApiRequestInit): Promise<ApiCloudBackupStatusResponse> {
@@ -7265,6 +7455,19 @@ export class ExportDocManagerApiClient {
     return this.request<ApiUnitDto>("GET", path, { init });
   }
 
+  public getWorklist(request: GetWorklistRequest = {}, init?: ApiRequestInit): Promise<WorklistPage> {
+    const path = "/api/worklist";
+    return this.request<WorklistPage>("GET", path, {
+      query: {
+        "source": request.source,
+        "due": request.due,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
   public importCrmCustomers(request: ImportCrmCustomersRequest, init?: ApiRequestInit): Promise<ApiCrmCustomerImportResultDto> {
     const path = "/api/crm/import";
     return this.request<ApiCrmCustomerImportResultDto>("POST", path, {
@@ -7411,6 +7614,20 @@ export class ExportDocManagerApiClient {
   public listAvailableExchangeRateCurrencies(init?: ApiRequestInit): Promise<ApiExchangeRateAvailableCurrenciesResponse> {
     const path = "/api/tools/exchange-rates/available-currencies";
     return this.request<ApiExchangeRateAvailableCurrenciesResponse>("GET", path, { init });
+  }
+
+  public listBusinessAttachments(request: ListBusinessAttachmentsRequest = {}, init?: ApiRequestInit): Promise<BusinessAttachmentPage> {
+    const path = "/api/business-attachments";
+    return this.request<BusinessAttachmentPage>("GET", path, {
+      query: {
+        "invoiceId": request.invoiceId,
+        "keyword": request.keyword,
+        "includeArchived": request.includeArchived,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
   }
 
   public listCloudDatabaseBackups(init?: ApiRequestInit): Promise<ApiCloudBackupListResponse> {
@@ -8130,6 +8347,7 @@ export class ExportDocManagerApiClient {
         "includeCompleted": request.includeCompleted,
         "pageNumber": request.pageNumber,
         "pageSize": request.pageSize,
+        "followUpId": request.followUpId,
       },
       init,
     });
@@ -8419,6 +8637,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public reviewInvoice(request: ReviewInvoiceRequest, init?: ApiRequestInit): Promise<InvoiceReviewResult> {
+    const path = "/api/invoices/review";
+    return this.request<InvoiceReviewResult>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public reviewLetterOfCreditCompliance(request: ReviewLetterOfCreditComplianceRequest, init?: ApiRequestInit): Promise<ApiLetterOfCreditReviewResponse> {
     const path = "/api/tools/letter-of-credit/review";
     return this.request<ApiLetterOfCreditReviewResponse>("POST", path, {
@@ -8451,6 +8677,14 @@ export class ExportDocManagerApiClient {
   public saveAuditLogsToPath(request: SaveAuditLogsToPathRequest, init?: ApiRequestInit): Promise<ApiAuditLogCommandResponse> {
     const path = "/api/audit-logs/save-to-path";
     return this.request<ApiAuditLogCommandResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public saveBusinessAttachmentToPath(request: SaveBusinessAttachmentToPathRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
+    const path = `/api/business-attachments/${encodePath(request.id)}/revisions/${encodePath(request.revision)}/save-to-path`;
+    return this.request<ApiCommandResponse>("POST", path, {
       body: request.body,
       init,
     });
@@ -8930,6 +9164,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public updateBusinessAttachment(request: UpdateBusinessAttachmentRequest, init?: ApiRequestInit): Promise<BusinessAttachmentRecord> {
+    const path = `/api/business-attachments/${encodePath(request.id)}`;
+    return this.request<BusinessAttachmentRecord>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public updateCrmContact(request: UpdateCrmContactRequest, init?: ApiRequestInit): Promise<ApiCrmContactDto> {
     const path = `/api/crm/customers/${encodePath(request.customerId)}/contacts/${encodePath(request.id)}`;
     return this.request<ApiCrmContactDto>("PUT", path, {
@@ -9183,6 +9425,14 @@ export class ExportDocManagerApiClient {
   public uploadAndStartPdfMergeDownloadJob(request: UploadAndStartPdfMergeDownloadJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/tools/pdf/merge/upload";
     return this.request<BackgroundJobSnapshot>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadBusinessAttachment(request: UploadBusinessAttachmentRequest, init?: ApiRequestInit): Promise<BusinessAttachmentRecord> {
+    const path = `/api/invoices/${encodePath(request.invoiceId)}/attachments`;
+    return this.request<BusinessAttachmentRecord>("POST", path, {
       body: request.body,
       init,
     });

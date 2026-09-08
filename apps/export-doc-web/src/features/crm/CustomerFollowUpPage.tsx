@@ -19,7 +19,7 @@ import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { usePermission } from "../../app/PermissionAccessContext.tsx";
 import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
-import { FormGuidance, PageState, PermissionNotice } from "../../ui/PageState.tsx";
+import { FormGuidance, InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
@@ -56,6 +56,7 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
   const queryClient = useQueryClient();
   const runAbortableOperation = useAbortableOperation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const focusedFollowUpId = /^[1-9]\d*$/.test(searchParams.get("followUpId") ?? "") ? Number(searchParams.get("followUpId")) : undefined;
   const [customers, setCustomers] = useState<ApiCrmCustomerDto[]>([]);
   const [contacts, setContacts] = useState<ApiCrmContactDto[]>([]);
   const [customerId, setCustomerId] = useState(0);
@@ -109,8 +110,8 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
   );
 
   const followUpQuery = usePagedDirectoryQuery(
-    ["crm-follow-ups", includeCompleted, followUpPageNumber, followUpPageSize, followUpRevision],
-    (signal) => client.queryCrmFollowUps({ includeCompleted, pageNumber: followUpPageNumber, pageSize: followUpPageSize }, { signal }),
+    ["crm-follow-ups", focusedFollowUpId, includeCompleted, followUpPageNumber, followUpPageSize, followUpRevision],
+    (signal) => client.queryCrmFollowUps({ followUpId: focusedFollowUpId, includeCompleted, pageNumber: followUpPageNumber, pageSize: followUpPageSize }, { signal }),
   );
   const followUpPage = followUpQuery.data ?? null;
   const rows = followUpPage?.items ?? [];
@@ -340,6 +341,7 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
       </div>
 
       <OperationFeedback feedback={feedback} />
+      {focusedFollowUpId && <InlineNotice tone="info">正在查看指定跟进事项。<button type="button" className="command-button secondary" onClick={() => { setSearchParams({}); setFollowUpPageNumber(1); }}>返回全部跟进</button></InlineNotice>}
       {!canCreateCustomer && !canEditCustomer && !canCreateContact && !canEditContact && !canCreateFollowUp && !canEditFollowUp
         ? <PermissionNotice>当前岗位只有查看权限；客户、联系人和跟进的具体动作由管理员逐项授权。</PermissionNotice>
         : null}

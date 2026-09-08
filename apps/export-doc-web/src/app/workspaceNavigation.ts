@@ -46,6 +46,7 @@ export type WorkspaceNavItem = {
   requiresSystemAdministration?: boolean;
   workspace?: "document" | "sales" | "office";
   moduleKey?: string;
+  requiredFeature?: string;
   requiredPermissions?: WorkspacePermissionRequirement[];
   permissionMatch?: "all" | "any";
 };
@@ -59,6 +60,7 @@ export type WorkspaceCapabilities = {
   isDesktopRuntime?: boolean;
   productEdition?: unknown;
   enabledModules?: string[];
+  availableFeatures?: string[];
   permissions?: WorkspacePermissionGrant[];
 };
 
@@ -84,7 +86,10 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     label: "工作台",
     icon: LayoutDashboard,
     items: [
+      { label: "我的待办", to: "/worklist", icon: ClipboardList, isActive: (path) => path === "/worklist", requiredFeature: "worklist" },
       { label: "单证概览", to: "/dashboard", icon: LayoutDashboard, isActive: isDashboardRoute, workspace: "document", moduleKey: "document.dashboard" },
+      { label: "业务资料", to: "/business-attachments", icon: FileText, isActive: isBusinessAttachmentRoute,
+        workspace: "document", moduleKey: "document.invoices", requiredFeature: "business-attachments" },
       {
         label: "销售概览",
         to: "/crm/dashboard",
@@ -241,6 +246,7 @@ export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => {
+        if (item.requiredFeature && !capabilities.availableFeatures?.includes(item.requiredFeature)) return false;
         if (item.requiresAdmin && capabilities.canManageSettings !== true) return false;
         if (item.desktopOnly && capabilities.isDesktopRuntime !== true) return false;
         if (item.workspace === "office" && capabilities.isDesktopRuntime === true && capabilities.usesOfficeRegister !== true) return false;
@@ -291,6 +297,8 @@ export function createInitialWorkspaceNavGroupState(pathname: string, groups: Wo
 }
 
 export function getWorkspaceContext(pathname: string): WorkspaceContext {
+  if (pathname === "/worklist") return createWorkspaceContext("工作台", "我的待办", "汇总个人待办与到期事项，进入原业务处理", ClipboardList);
+  if (isBusinessAttachmentRoute(pathname)) return createWorkspaceContext("单证业务", "业务资料", "保留原始资料、确认文件与实际交付文件的版本", FileText);
   if (pathname.startsWith("/office/meeting-rooms")) return createWorkspaceContext("公司行政", "会议室预约", "查看空闲时段、预约审批与钥匙交接", CalendarDays);
   if (pathname.startsWith("/office/supplies")) return createWorkspaceContext("公司行政", "物品领用", "办公物品申请、发放归还与库存补充", Package);
   if (pathname.startsWith("/office/people")) return createWorkspaceContext("公司行政", "人员信息管理", "公司通讯录、人员档案与入职调岗离职", UsersRound);
@@ -390,6 +398,7 @@ export function getRequiredWorkspace(pathname: string): "document" | "sales" | n
   if (pathname.startsWith("/crm/") || pathname.startsWith("/suppliers")) return "sales";
   if (
     pathname.startsWith("/invoices") ||
+    pathname.startsWith("/business-attachments") ||
     pathname.startsWith("/query") ||
     pathname.startsWith("/payments") ||
     pathname.startsWith("/master-data") ||
@@ -414,6 +423,7 @@ export function getRequiredModule(pathname: string): string | null {
   if (pathname.startsWith("/suppliers")) return "sales.suppliers";
   if (pathname.startsWith("/dashboard")) return "document.dashboard";
   if (pathname.startsWith("/invoices")) return "document.invoices";
+  if (pathname.startsWith("/business-attachments")) return "document.invoices";
   if (pathname.startsWith("/query")) return "document.query";
   if (pathname.startsWith("/payments")) return "document.payments";
   if (pathname.startsWith("/master-data/hs-knowledge") || pathname.startsWith("/master-data/hs-codes")) return "document.hs-knowledge";
@@ -461,6 +471,14 @@ export function isOfficeRoute(pathname: string) {
   return workspaceNavGroups.some((group) => group.items.some((item) => item.workspace === "office" && item.isActive(pathname)));
 }
 
+export function getRequiredFeature(pathname: string) {
+  for (const group of workspaceNavGroups) {
+    const item = group.items.find((item) => item.requiredFeature && item.isActive(pathname));
+    if (item) return item.requiredFeature;
+  }
+  return null;
+}
+
 function normalizePermissionPart(value: unknown) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
@@ -491,7 +509,8 @@ export function isDashboardRoute(pathname: string) { return pathname === "/" || 
 export function isLicenseRoute(pathname: string) { return pathname.startsWith("/system/license"); }
 export function isAuditLogRoute(pathname: string) { return pathname.startsWith("/audit-logs"); }
 export function isAccessControlRoute(pathname: string) { return pathname.startsWith("/system/access-control"); }
-function isInvoiceRoute(pathname: string) { return pathname.startsWith("/invoices"); }
+function isInvoiceRoute(pathname: string) { return pathname.startsWith("/invoices") && !isBusinessAttachmentRoute(pathname); }
+function isBusinessAttachmentRoute(pathname: string) { return pathname.startsWith("/business-attachments") || /^\/invoices\/\d+\/attachments$/.test(pathname); }
 function isCustomerFollowUpRoute(pathname: string) { return pathname.startsWith("/crm/follow-ups"); }
 function isCrmDashboardRoute(pathname: string) { return pathname.startsWith("/crm/dashboard"); }
 function isEmailTemplateRoute(pathname: string) { return pathname.startsWith("/crm/email-templates"); }

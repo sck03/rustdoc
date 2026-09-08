@@ -58,7 +58,8 @@ namespace ExportDocManager.Api.Tests
             string? productEdition = null,
             ILicenseSignatureVerifier? licenseSignatureVerifier = null,
             Action<IServiceCollection>? configureServices = null,
-            string? pathBase = null)
+            string? pathBase = null,
+            IReadOnlyList<string>? disabledCapabilityModules = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
             ArgumentException.ThrowIfNullOrWhiteSpace(databaseFileName);
@@ -74,7 +75,8 @@ namespace ExportDocManager.Api.Tests
                 licenseSignatureVerifier,
                 configureServices,
                 pathBase,
-                cleanupOnFailure: true);
+                cleanupOnFailure: true,
+                disabledCapabilityModules);
         }
 
         public static async Task<ApiIntegrationTestHarness> StartWithExistingRootsAsync(
@@ -100,7 +102,8 @@ namespace ExportDocManager.Api.Tests
                 licenseSignatureVerifier,
                 configureServices,
                 pathBase,
-                cleanupOnFailure: false);
+                cleanupOnFailure: false,
+                disabledCapabilityModules: null);
         }
 
         private static async Task<ApiIntegrationTestHarness> StartCoreAsync(
@@ -112,7 +115,8 @@ namespace ExportDocManager.Api.Tests
             ILicenseSignatureVerifier? licenseSignatureVerifier,
             Action<IServiceCollection>? configureServices,
             string? pathBase,
-            bool cleanupOnFailure)
+            bool cleanupOnFailure,
+            IReadOnlyList<string>? disabledCapabilityModules)
         {
             string databasePath = Path.Combine(dataRoot, "Database", databaseFileName);
             const string listenUrl = "http://127.0.0.1:0";
@@ -133,7 +137,8 @@ namespace ExportDocManager.Api.Tests
                     ListenUrls = listenUrl,
                     DesktopAccessToken = desktopAccessToken ?? string.Empty,
                     ProductEdition = ProductEditionCatalog.Normalize(productEdition ?? string.Empty),
-                    PathBase = pathBase ?? string.Empty
+                    PathBase = pathBase ?? string.Empty,
+                    DisabledCapabilityModules = disabledCapabilityModules ?? []
                 };
 
                 ApiStartupValidator.Validate(pathProvider, databaseSettings, runtimeOptions);

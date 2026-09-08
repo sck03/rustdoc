@@ -1,19 +1,22 @@
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Office;
+using ExportDocManager.Services.Infrastructure;
 
 namespace ExportDocManager.Api.Hosting
 {
-    public sealed class ApiAuthorizationService
+    public sealed class ApiAuthorizationService : IRuntimePermissionAvailability
     {
         private readonly string _productEdition;
         private readonly bool _networkMode;
+        private readonly RuntimeCapabilitySet _capabilities;
 
-        public ApiAuthorizationService(ApiRuntimeOptions runtimeOptions)
+        public ApiAuthorizationService(ApiRuntimeOptions runtimeOptions, RuntimeCapabilitySet capabilities)
         {
             ArgumentNullException.ThrowIfNull(runtimeOptions);
             _productEdition = ProductEditionCatalog.Normalize(runtimeOptions.ProductEdition);
             _networkMode = runtimeOptions.NetworkMode;
+            _capabilities = capabilities;
         }
 
         public bool CanManageSettings(User user)
@@ -200,7 +203,9 @@ namespace ExportDocManager.Api.Hosting
                 moduleAccess.Select(grant => new ApiModuleAccessDto(grant.Key, grant.Value)).ToArray(),
                 permissions.Select(grant => new ApiPermissionGrantDto(
                     grant.ResourceKey, grant.Action, grant.DataScope)).ToArray(),
-                OfficeMode == OfficeOperatingMode.LocalRegister);
+                OfficeMode == OfficeOperatingMode.LocalRegister,
+                _capabilities.Keys.Where(key => key == CapabilityModuleKeys.Worklist ||
+                    key == CapabilityModuleKeys.BusinessAttachments && CanUsePermission(user, PermissionModuleCatalog.DocumentInvoices, PermissionAction.View)).ToArray());
         }
 
         public IReadOnlyList<EffectivePermissionGrant> GetPermissionGrants(User user)
@@ -240,11 +245,20 @@ namespace ExportDocManager.Api.Hosting
         public OfficeOperatingMode OfficeMode => ProductEditionCatalog.OfficeMode(_productEdition, _networkMode);
 
         public bool IsResourceAvailable(PermissionResourceDefinition resource) =>
-            ProductEditionCatalog.IncludesResource(_productEdition, resource, _networkMode);
+            ProductEditionCatalog.IncludesResource(_productEdition, resource, _networkMode) && (resource.ModuleKey switch
+            {
+                PermissionModuleCatalog.DocumentExcel => _capabilities.Contains("excel"),
+                PermissionModuleCatalog.DocumentOcr => _capabilities.Contains("pdf-ocr"),
+                _ => true
+            });
 
         public bool IsPermissionAvailable(string resourceKey, string action) =>
             PermissionResourceCatalog.IsKnownAction(resourceKey, action) &&
             PermissionResourceCatalog.ByKey.TryGetValue(resourceKey, out var resource) && IsResourceAvailable(resource) &&
+            !(action is PermissionAction.Import or PermissionAction.Export &&
+                resourceKey is PermissionResourceCatalog.CrmCustomers or PermissionResourceCatalog.Suppliers && !_capabilities.Contains("excel")) &&
+            !(action is PermissionAction.ExportPdf or PermissionAction.ExportZip &&
+                resourceKey is PermissionResourceCatalog.InvoiceOutput or PermissionResourceCatalog.PaymentOutput && !_capabilities.Contains("browser")) &&
             !(OfficeMode == OfficeOperatingMode.LocalRegister && resource.Workspace == "office" &&
                 action is PermissionAction.Approve or PermissionAction.Assign);
 

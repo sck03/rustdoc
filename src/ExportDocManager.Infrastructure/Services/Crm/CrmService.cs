@@ -423,10 +423,12 @@ namespace ExportDocManager.Services.Crm
                 cancellationToken);
 
         public async Task<PagedResult<CrmFollowUpRecord>> QueryFollowUpsAsync(
-            int? crmCustomerId, bool includeCompleted, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+            int? crmCustomerId, bool includeCompleted, int pageNumber, int pageSize, int? followUpId = null, CancellationToken cancellationToken = default)
         {
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var query = _accessScope.ApplyCrmFollowUpScope(context.CrmFollowUps.AsNoTracking());
+            if (followUpId is <= 0) throw new ServiceValidationException("跟进编号必须大于 0。");
+            if (followUpId.HasValue) query = query.Where(item => item.Id == followUpId);
             if (crmCustomerId is > 0) query = query.Where(item => item.CrmCustomerId == crmCustomerId.Value);
             if (!includeCompleted) query = query.Where(item => !item.IsCompleted);
             pageNumber = Math.Max(1, pageNumber);

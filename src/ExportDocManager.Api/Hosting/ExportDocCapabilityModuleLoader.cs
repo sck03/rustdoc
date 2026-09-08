@@ -6,8 +6,11 @@ namespace ExportDocManager.Api.Hosting;
 
 internal static class ExportDocCapabilityModuleLoader
 {
-    public static IReadOnlyList<IExportDocCapabilityModule> Load(string hostAssemblyPath)
+    public static IReadOnlyList<IExportDocCapabilityModule> Load(string hostAssemblyPath, IReadOnlyList<string>? disabledKeys = null)
     {
+        var disabled = (disabledKeys ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (disabled.Except(CapabilityModuleKeys.All, StringComparer.OrdinalIgnoreCase).Any())
+            throw new InvalidOperationException("禁用能力模块配置包含未知模块。");
         string moduleRoot = Path.GetDirectoryName(Path.GetFullPath(hostAssemblyPath))
             ?? throw new InvalidOperationException("无法解析能力模块目录。");
         var modules = new List<IExportDocCapabilityModule>();
@@ -35,7 +38,7 @@ internal static class ExportDocCapabilityModuleLoader
                     throw new InvalidOperationException($"能力模块键重复：{module.Key}");
                 }
 
-                modules.Add(module);
+                if (!disabled.Contains(module.Key)) modules.Add(module);
             }
         }
 

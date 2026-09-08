@@ -118,7 +118,7 @@ export async function capturePdfViewerPages({
   return results;
 }
 
-async function attachPdfViewerSession(browser, pageTargetId, testCase) {
+export async function attachPdfViewerSession(browser, pageTargetId, testCase) {
   let sessionId;
   try {
     for (let attempt = 0; attempt < 100; attempt += 1) {

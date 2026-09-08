@@ -15,6 +15,9 @@ namespace ExportDocManager.DataAccess
         public DbSet<Customer> Customers { get; set; }
         public DbSet<Exporter> Exporters { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
+        public DbSet<BusinessAttachment> BusinessAttachments { get; set; }
+        public DbSet<BusinessAttachmentRevision> BusinessAttachmentRevisions { get; set; }
+        public DbSet<BusinessAttachmentEvent> BusinessAttachmentEvents { get; set; }
         public DbSet<InvoiceStatusHistory> InvoiceStatusHistories { get; set; }
         public DbSet<Item> Items { get; set; }
         public DbSet<CustomOption> CustomOptions { get; set; }
@@ -158,6 +161,15 @@ namespace ExportDocManager.DataAccess
                 // cross-provider uniqueness semantics.
                 switch (entry.Entity)
                 {
+                    case Invoice invoice:
+                        invoice.SearchKey = CanonicalKey(invoice.InvoiceNo + "\n" + invoice.CustomerNameEN);
+                        break;
+                    case BusinessAttachment attachment:
+                        attachment.SearchKey = CanonicalKey(attachment.Title + "\n" + attachment.PoNumber + "\n" + attachment.StyleNo);
+                        break;
+                    case BusinessAttachmentRevision revision:
+                        revision.FileNameNormalized = CanonicalKey(revision.FileName);
+                        break;
                     case User user:
                         user.UsernameNormalized = CanonicalKey(user.Username);
                         break;
@@ -207,6 +219,7 @@ namespace ExportDocManager.DataAccess
             modelBuilder.Entity<Invoice>()
                 .HasIndex(i => new { i.CompanyScope, i.InvoiceNo, i.Type })
                 .IsUnique();
+            modelBuilder.Entity<Invoice>().Property(item => item.SearchKey).HasDefaultValue(string.Empty).HasMaxLength(620);
 
             modelBuilder.Entity<Invoice>()
                 .Property(i => i.NotifyPartyMode)
@@ -711,6 +724,7 @@ namespace ExportDocManager.DataAccess
             paymentEntity.Property(p => p.CompanyScope).HasMaxLength(50);
 
             OfficeModelConfiguration.Configure(modelBuilder);
+            BusinessAttachmentModelConfiguration.Configure(modelBuilder);
             PersonnelModelConfiguration.Configure(modelBuilder);
             ConfigureTemporalStorage(modelBuilder);
         }

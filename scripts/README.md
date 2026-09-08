@@ -69,6 +69,8 @@ pwsh -NoProfile -File ./scripts/verify-script-suite.ps1
 
 该门禁递归检查全部 `.ps1`、`.cmd` 和 `.mjs`：PowerShell AST、Node 语法、CMD 薄入口/共享宿主、危险系统路径模式，以及原生命令退出码是否统一处理。`run-tests.cmd` 会自动先执行该门禁。
 
+业务资料与待办的前端验证使用 `npm --prefix apps/export-doc-web run test:business-feature-models` 和 `test:business-features-ui`；安装完整 Chrome 后可向后者追加 `-- --pdf-viewer`，检查归档 PDF 实际加载并显示一页。截图与摘要写入 `artifacts/business-features-ui/`。归档/待办、四产品版、模块开关和留存规则见 `docs/单据核对与业务资料待办.md`。
+
 ## 工作区空间清理
 
 先只读查看计划，不删除任何内容：

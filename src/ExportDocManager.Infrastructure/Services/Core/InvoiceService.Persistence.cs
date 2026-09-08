@@ -44,7 +44,7 @@ namespace ExportDocManager.Services.Core
                                 "只有草稿发票可以直接删除。已核对、已出运或已结汇发票只能作废；已作废发票必须保留审计记录，如确需清理请使用管理员数据维护功能。");
                         }
 
-                        await InvoiceDeletionSupport.TrackSingleWindowWorkspaceDeletionAsync(
+                        await InvoiceDeletionSupport.TrackWorkspaceDeletionAsync(
                             context,
                             id,
                             token);

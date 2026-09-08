@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 124504,
+      "baselineAggregateLines": 125493,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 124704,
+      "maximumAggregateLines": 125693,
       "reportFiles": false
     },
     {
@@ -22,9 +22,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 85105,
+      "baselineAggregateLines": 85638,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 85305,
+      "maximumAggregateLines": 85838,
       "reportFiles": false
     },
     {
@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 43937,
+      "baselineAggregateLines": 44692,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 44057,
+      "maximumAggregateLines": 44812,
       "reportFiles": false
     },
     {
@@ -74,6 +74,42 @@
       "maximumAggregateGrowthLines": 20,
       "maximumAggregateLines": 2773,
       "reportFiles": false
+    },
+    {
+      "name": "business attachment services",
+      "directory": "src/ExportDocManager.Infrastructure.Attachments",
+      "filePattern": "^.+\\.cs$",
+      "maximumLines": 220,
+      "baselineAggregateLines": 357,
+      "maximumAggregateGrowthLines": 50,
+      "maximumAggregateLines": 407
+    },
+    {
+      "name": "worklist services",
+      "directory": "src/ExportDocManager.Infrastructure.Worklist",
+      "filePattern": "^.+\\.cs$",
+      "maximumLines": 140,
+      "baselineAggregateLines": 244,
+      "maximumAggregateGrowthLines": 40,
+      "maximumAggregateLines": 284
+    },
+    {
+      "name": "business attachment workspace",
+      "directory": "apps/export-doc-web/src/features/attachments",
+      "filePattern": "^.+\\.(?:ts|tsx)$",
+      "maximumLines": 120,
+      "baselineAggregateLines": 302,
+      "maximumAggregateGrowthLines": 40,
+      "maximumAggregateLines": 342
+    },
+    {
+      "name": "worklist workspace",
+      "directory": "apps/export-doc-web/src/features/worklist",
+      "filePattern": "^.+\\.(?:ts|tsx)$",
+      "maximumLines": 100,
+      "baselineAggregateLines": 94,
+      "maximumAggregateGrowthLines": 30,
+      "maximumAggregateLines": 124
     },
     {
       "name": "office collaboration services",

@@ -16,6 +16,7 @@ namespace ExportDocManager.Api.Hosting
         public const string BootstrapTokenEnvironmentVariable = "EXPORTDOCMANAGER_BOOTSTRAP_TOKEN";
         public const string PathBaseEnvironmentVariable = "EXPORTDOCMANAGER_PATH_BASE";
         public const string BusinessTimeZoneEnvironmentVariable = "EXPORTDOCMANAGER_BUSINESS_TIME_ZONE";
+        public const string DisabledCapabilityModulesEnvironmentVariable = "EXPORTDOCMANAGER_DISABLED_CAPABILITY_MODULES";
         public const string BootstrapTokenHeaderName = "X-ExportDocManager-Bootstrap-Token";
 
         public string AppRoot { get; init; } = AppContext.BaseDirectory;
@@ -45,6 +46,7 @@ namespace ExportDocManager.Api.Hosting
         public string PathBase { get; init; } = string.Empty;
 
         public string BusinessTimeZoneId { get; init; } = BusinessClock.DefaultTimeZoneId;
+        public IReadOnlyList<string> DisabledCapabilityModules { get; init; } = [];
 
         public static ApiRuntimeOptions Parse(string[] args)
         {
@@ -95,7 +97,9 @@ namespace ExportDocManager.Api.Hosting
                 TrustedProxies = NormalizeTrustedProxies(trustedProxiesValue),
                 BootstrapToken = bootstrapToken.Trim(),
                 PathBase = NormalizePathBase(pathBase),
-                BusinessTimeZoneId = NormalizeBusinessTimeZone(businessTimeZoneId)
+                BusinessTimeZoneId = NormalizeBusinessTimeZone(businessTimeZoneId),
+                DisabledCapabilityModules = ParseDisabledCapabilityModules(ReadOption(args, "--disabled-capability-modules") ??
+                    Environment.GetEnvironmentVariable(DisabledCapabilityModulesEnvironmentVariable) ?? string.Empty)
             };
         }
 
@@ -117,6 +121,15 @@ namespace ExportDocManager.Api.Hosting
             }
 
             return null;
+        }
+
+        private static IReadOnlyList<string> ParseDisabledCapabilityModules(string value)
+        {
+            string[] keys = value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .Select(key => key.ToLowerInvariant()).Distinct(StringComparer.Ordinal).ToArray();
+            if (keys.Except(CapabilityModuleKeys.All, StringComparer.Ordinal).Any())
+                throw new ArgumentException("未知能力模块；允许值为 " + string.Join(", ", CapabilityModuleKeys.All));
+            return keys;
         }
 
         private static string NormalizeRoot(string path)

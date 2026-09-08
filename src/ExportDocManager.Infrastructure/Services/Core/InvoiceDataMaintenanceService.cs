@@ -61,7 +61,8 @@ namespace ExportDocManager.Services.Core
             }
 
             string status = InvoiceStatusCatalog.Normalize(invoice.Status);
-            bool canPurge = InvoiceStatusCatalog.IsCancelled(status);
+            bool retained = await InvoiceDeletionSupport.HasRetainedAttachmentsAsync(context, invoiceId, cancellationToken);
+            bool canPurge = InvoiceStatusCatalog.IsCancelled(status) && !retained;
             return new InvoiceDataMaintenancePreview(
                 invoice.Id,
                 invoice.InvoiceNo?.Trim() ?? string.Empty,
@@ -71,7 +72,7 @@ namespace ExportDocManager.Services.Core
                 invoice.InvoiceDate,
                 invoice.CustomerNameEN?.Trim() ?? string.Empty,
                 canPurge,
-                GetGuidance(status),
+                retained ? InvoiceDeletionSupport.AttachmentRetentionGuidance : GetGuidance(status),
                 PurgeStoragePolicy);
         }
 
@@ -134,7 +135,7 @@ namespace ExportDocManager.Services.Core
                         }
 
                         await InvoiceDeletionSupport
-                            .TrackSingleWindowWorkspaceDeletionAsync(context, invoice.Id, token)
+                            .TrackWorkspaceDeletionAsync(context, invoice.Id, token)
                             .ConfigureAwait(false);
 
                         context.AuditLogs.Add(CreateMaintenanceAuditLog(

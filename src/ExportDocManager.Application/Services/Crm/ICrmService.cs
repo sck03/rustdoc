@@ -92,7 +92,7 @@ namespace ExportDocManager.Services.Crm
             int id,
             CancellationToken cancellationToken = default,
             int expectedVersion = 0);
-        Task<PagedResult<CrmFollowUpRecord>> QueryFollowUpsAsync(int? crmCustomerId, bool includeCompleted, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
+        Task<PagedResult<CrmFollowUpRecord>> QueryFollowUpsAsync(int? crmCustomerId, bool includeCompleted, int pageNumber, int pageSize, int? followUpId = null, CancellationToken cancellationToken = default);
         Task<CrmFollowUpRecord> SaveFollowUpAsync(CrmFollowUpSaveRequest request, CancellationToken cancellationToken = default);
         Task<CrmFollowUpRecord> CompleteFollowUpAsync(int id, int expectedVersion, CancellationToken cancellationToken = default);
         Task<CrmFollowUpRecord> RestoreFollowUpAsync(int id, int expectedVersion, CancellationToken cancellationToken = default);

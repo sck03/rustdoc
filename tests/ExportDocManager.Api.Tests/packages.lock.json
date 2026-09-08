@@ -480,9 +480,11 @@
         "dependencies": {
           "ExportDocManager.Application": "[0.1.1, )",
           "ExportDocManager.Infrastructure": "[0.1.1, )",
+          "ExportDocManager.Infrastructure.Attachments": "[0.1.1, )",
           "ExportDocManager.Infrastructure.Browser": "[0.1.1, )",
           "ExportDocManager.Infrastructure.Excel": "[0.1.1, )",
           "ExportDocManager.Infrastructure.PdfOcr": "[0.1.1, )",
+          "ExportDocManager.Infrastructure.Worklist": "[0.1.1, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.11, )",
           "MimeKit": "[4.17.0, )",
           "OpenTelemetry.Exporter.OpenTelemetryProtocol": "[1.17.0, )",
@@ -519,6 +521,12 @@
           "System.Security.Cryptography.Xml": "[10.0.11, )"
         }
       },
+      "exportdocmanager.infrastructure.attachments": {
+        "type": "Project",
+        "dependencies": {
+          "ExportDocManager.Infrastructure": "[0.1.1, )"
+        }
+      },
       "exportdocmanager.infrastructure.browser": {
         "type": "Project",
         "dependencies": {
@@ -548,6 +556,12 @@
           "PDFsharp": "[6.2.4, )",
           "PDFtoImage": "[5.4.0, )",
           "PdfPig": "[0.1.15, )"
+        }
+      },
+      "exportdocmanager.infrastructure.worklist": {
+        "type": "Project",
+        "dependencies": {
+          "ExportDocManager.Infrastructure": "[0.1.1, )"
         }
       },
       "ClosedXML": {

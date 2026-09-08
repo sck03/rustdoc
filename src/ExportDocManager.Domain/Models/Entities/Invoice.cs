@@ -18,6 +18,8 @@ namespace ExportDocManager.Models.Entities
         public string CompanyScope { get; set; } = string.Empty;
         [Required]
         public string InvoiceNo { get; set; } = string.Empty;
+        [MaxLength(620)]
+        public string SearchKey { get; set; } = string.Empty;
         public string? ContractNo { get; set; }
         public DateOnly InvoiceDate { get; set; }
         public string? LetterOfCreditNo { get; set; }

@@ -149,6 +149,8 @@ $moduleAssemblies = [ordered]@{
     "ExportDocManager.Infrastructure.Excel.dll" = $requiresExcelModule
     "ExportDocManager.Infrastructure.Browser.dll" = $requiresBrowserModule
     "ExportDocManager.Infrastructure.PdfOcr.dll" = $requiresPdfOcrModule
+    "ExportDocManager.Infrastructure.Attachments.dll" = $requiresDocumentResources
+    "ExportDocManager.Infrastructure.Worklist.dll" = $true
 }
 foreach ($moduleAssembly in $moduleAssemblies.Keys) {
     $matches = @($allEntries | Where-Object { -not $_.PSIsContainer -and $_.Name -eq $moduleAssembly })

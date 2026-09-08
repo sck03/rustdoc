@@ -45,6 +45,9 @@ namespace ExportDocManager.Api.Hosting
             api.MapPermissionGroup(PermissionModuleCatalog.DocumentDashboard).MapDashboardEndpoints();
             var invoices = api.MapPermissionGroup(PermissionModuleCatalog.DocumentInvoices);
             invoices.MapInvoiceEndpoints();
+            invoices.MapInvoiceReviewEndpoint();
+            api.MapBusinessAttachmentEndpoints();
+            api.MapWorklistEndpoints();
             invoices.MapInvoiceShippingMarkEndpoints();
             invoices.MapInvoiceTransferEndpoints();
             api.MapPermissionGroup(PermissionModuleCatalog.DocumentQuery).MapQueryEndpoints();

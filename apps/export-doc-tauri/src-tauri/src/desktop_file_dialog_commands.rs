@@ -356,6 +356,25 @@ pub(crate) fn select_save_excel_path(
     Ok(dialog.save_file().map(path_to_string))
 }
 
+#[tauri::command]
+pub(crate) fn select_save_file_path(default_file_name: String) -> Result<Option<String>, String> {
+    let file_name = Path::new(&default_file_name)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "文件名无效。".to_owned())?;
+    let mut dialog = rfd::FileDialog::new()
+        .set_title("选择文件保存位置")
+        .set_file_name(file_name);
+    if let Some(extension) = Path::new(file_name)
+        .extension()
+        .and_then(|value| value.to_str())
+    {
+        dialog = dialog.add_filter("原文件类型", &[extension]);
+    }
+    Ok(dialog.save_file().map(path_to_string))
+}
+
 fn pick_file(title: &str, filters: &[(&str, &[&str])]) -> Option<String> {
     let mut dialog = rfd::FileDialog::new().set_title(title);
     for (name, extensions) in filters {

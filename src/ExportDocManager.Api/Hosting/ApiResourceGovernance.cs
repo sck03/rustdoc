@@ -3,6 +3,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http.Timeouts;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace ExportDocManager.Api.Hosting;
@@ -125,6 +127,21 @@ internal static class ApiResourceGovernanceExtensions
         ArgumentNullException.ThrowIfNull(app);
         app.UseRateLimiter();
         app.UseRequestTimeouts();
+        app.Use(async (context, next) =>
+        {
+            if (context.GetEndpoint()?.Metadata.GetMetadata<IRequestSizeLimitMetadata>()?.MaxRequestBodySize is long limit)
+            {
+                if (context.Request.ContentLength > limit)
+                {
+                    context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+                    await context.Response.WriteAsJsonAsync(new ApiErrorResponse("上传内容超过允许大小。", "payload_too_large"), context.RequestAborted);
+                    return;
+                }
+                if (context.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } body)
+                    body.MaxRequestBodySize = body.MaxRequestBodySize.HasValue ? Math.Min(body.MaxRequestBodySize.Value, limit) : limit;
+            }
+            await next(context);
+        });
         return app;
     }
 

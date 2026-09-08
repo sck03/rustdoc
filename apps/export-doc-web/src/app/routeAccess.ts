@@ -2,6 +2,7 @@ import type { ApiUserDto } from "../api/index.ts";
 import { hasRouteModulePermission } from "./PermissionAccessContext.tsx";
 import {
   getRequiredModule,
+  getRequiredFeature,
   getRequiredRouteAccessLevel,
   getRequiredWorkspace,
   hasWorkspacePathPermission,
@@ -27,7 +28,9 @@ export function isRouteAccessAllowed({
   const runtimeAllowed = (!isDesktopOnlyRoute(pathname) || isDesktopRuntime) &&
     (!isOfficeRoute(pathname) || !isDesktopRuntime || user.capabilities.usesOfficeRegister);
   const editionAllowed = !isSystemAdministrationRoute(pathname) || user.capabilities.canManageUsers;
-  return workspaceAndModuleAllowed && adminAllowed && runtimeAllowed && editionAllowed;
+  const requiredFeature = getRequiredFeature(pathname);
+  const featureAllowed = !requiredFeature || user.capabilities.availableFeatures?.includes(requiredFeature) === true;
+  return workspaceAndModuleAllowed && adminAllowed && runtimeAllowed && editionAllowed && featureAllowed;
 }
 
 export function isWorkspaceModuleAccessAllowed(pathname: string, user: ApiUserDto) {

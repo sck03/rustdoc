@@ -3,7 +3,7 @@ using Npgsql;
 
 namespace ExportDocManager.DataAccess
 {
-    internal static class RelationalExceptionClassifier
+    public static class RelationalExceptionClassifier
     {
         public static bool IsUniqueConstraintViolation(Exception exception) =>
             Contains(exception, current =>

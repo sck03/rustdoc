@@ -558,7 +558,7 @@ namespace ExportDocManager.Api.Tests
         [Fact]
         public void ApiAuthorizationService_ShouldExposeAdminCapabilities()
         {
-            var service = new ApiAuthorizationService(new ApiRuntimeOptions());
+            var service = new ApiAuthorizationService(new ApiRuntimeOptions(), new RuntimeCapabilitySet(CapabilityModuleKeys.All));
             var user = new User
             {
                 Role = UserRoleCatalog.Admin
@@ -577,7 +577,7 @@ namespace ExportDocManager.Api.Tests
         [InlineData("")]
         public void ApiAuthorizationService_ShouldRestrictNonAdminManagementCapabilities(string role)
         {
-            var service = new ApiAuthorizationService(new ApiRuntimeOptions());
+            var service = new ApiAuthorizationService(new ApiRuntimeOptions(), new RuntimeCapabilitySet(CapabilityModuleKeys.All));
             var user = new User
             {
                 Role = role
@@ -596,7 +596,7 @@ namespace ExportDocManager.Api.Tests
             var service = new ApiAuthorizationService(new ApiRuntimeOptions
             {
                 ProductEdition = ProductEditionCatalog.Full
-            });
+            }, new RuntimeCapabilitySet(CapabilityModuleKeys.All));
 
             var capabilities = service.GetCapabilities(new User { Role = UserRoleCatalog.User });
             var hsGrant = Assert.Single(capabilities.ModuleAccess, grant =>
@@ -609,7 +609,7 @@ namespace ExportDocManager.Api.Tests
         [Fact]
         public void FinancePermissionTemplate_ShouldExposeOnlyFinanceNavigationModulesAndSupportingCapabilities()
         {
-            var service = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full });
+            var service = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full }, new RuntimeCapabilitySet(CapabilityModuleKeys.All));
             var user = new User { Role = UserRoleCatalog.Finance };
 
             var capabilities = service.GetCapabilities(user);
@@ -639,7 +639,7 @@ namespace ExportDocManager.Api.Tests
         [Fact]
         public void AssignedEmptyTemplate_ShouldNotFallBackToRoleNavigation()
         {
-            var service = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full });
+            var service = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full }, new RuntimeCapabilitySet(CapabilityModuleKeys.All));
             var capabilities = service.GetCapabilities(new User
             {
                 Role = UserRoleCatalog.User,
@@ -655,7 +655,7 @@ namespace ExportDocManager.Api.Tests
         [Fact]
         public void ApiAuthorizationService_ShouldHonorTemplateAccessLevel()
         {
-            var service = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full });
+            var service = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full }, new RuntimeCapabilitySet(CapabilityModuleKeys.All));
             var user = new User
             {
                 Role = UserRoleCatalog.User,
@@ -675,7 +675,7 @@ namespace ExportDocManager.Api.Tests
         [Fact]
         public void ApiUserDtoFactory_ShouldIncludeCapabilities()
         {
-            var service = new ApiAuthorizationService(new ApiRuntimeOptions());
+            var service = new ApiAuthorizationService(new ApiRuntimeOptions(), new RuntimeCapabilitySet(CapabilityModuleKeys.All));
             var user = new User
             {
                 Id = 7,
@@ -725,7 +725,7 @@ namespace ExportDocManager.Api.Tests
             bool expectedDocument,
             bool expectedSales)
         {
-            var service = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = edition });
+            var service = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = edition }, new RuntimeCapabilitySet(CapabilityModuleKeys.All));
             var capabilities = service.GetCapabilities(new User { Role = role });
 
             Assert.Equal(expectedDocument, capabilities.CanUseDocumentWorkspace);
@@ -794,7 +794,7 @@ namespace ExportDocManager.Api.Tests
             bool expectedUserManagement,
             bool expectedAuditManagement)
         {
-            var service = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = edition });
+            var service = new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = edition }, new RuntimeCapabilitySet(CapabilityModuleKeys.All));
             var user = new User { Role = role };
 
             Assert.Equal(expectedUserManagement, service.CanManageUsers(user));
@@ -1716,7 +1716,7 @@ namespace ExportDocManager.Api.Tests
                 var result = await dispatcher.RetryAsync(
                     sourceJob,
                     new User { Id = 1, Username = "admin", Role = UserRoleCatalog.Admin },
-                    new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full }),
+                    new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full }, new RuntimeCapabilitySet(CapabilityModuleKeys.All)),
                     new ThrowingInvoiceService(),
                     CancellationToken.None);
                 var response = ReadResult(result);
@@ -1769,7 +1769,7 @@ namespace ExportDocManager.Api.Tests
             var result = await dispatcher.RetryAsync(
                 sourceJob,
                 new User { Id = 1, Username = "admin", Role = UserRoleCatalog.Admin },
-                new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full }),
+                new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full }, new RuntimeCapabilitySet(CapabilityModuleKeys.All)),
                 new ThrowingInvoiceService(),
                 CancellationToken.None);
             var response = ReadResult(result);
@@ -1813,7 +1813,7 @@ namespace ExportDocManager.Api.Tests
             var result = await dispatcher.RetryAsync(
                 sourceJob,
                 user,
-                new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full }),
+                new ApiAuthorizationService(new ApiRuntimeOptions { ProductEdition = ProductEditionCatalog.Full }, new RuntimeCapabilitySet(CapabilityModuleKeys.All)),
                 new ThrowingInvoiceService(),
                 CancellationToken.None);
             var response = ReadResult(result);

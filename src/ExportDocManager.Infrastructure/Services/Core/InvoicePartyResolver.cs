@@ -10,6 +10,8 @@ namespace ExportDocManager.Services.Core
 {
     public interface IInvoicePartyResolver
     {
+        // Zero means a draft has no party identity yet. Storage failures throw;
+        // they are never represented by an empty identity.
         Task<int> ResolveCustomerIdAsync(
             AppDbContext context,
             Customer? customer,

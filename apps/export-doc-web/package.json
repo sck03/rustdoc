@@ -14,6 +14,8 @@
     "test:report-designer-v3-ui": "node ../../scripts/test_report_designer_v3_ui.mjs",
     "test:office-models": "node ../../scripts/test_office_model.mjs",
     "test:office-ui": "node ../../scripts/test_office_workspace_ui.mjs",
+    "test:business-feature-models": "node ../../scripts/test_business_feature_models.mjs",
+    "test:business-features-ui": "node ../../scripts/test_business_features_ui.mjs",
     "test:report-designer-v3-print": "node ../../scripts/test_report_designer_v3_print_regression.mjs",
     "test:template-visual": "node ../../scripts/test_report_template_visual_regression.mjs",
     "test:template-pdf": "node ../../scripts/test_report_template_pdf_regression.mjs",

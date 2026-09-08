@@ -26,6 +26,10 @@ namespace ExportDocManager.Domain.Tests
                     ModuleReferences(),
                 ["src/ExportDocManager.Infrastructure.PdfOcr/ExportDocManager.Infrastructure.PdfOcr.csproj"] =
                     ModuleReferences(),
+                ["src/ExportDocManager.Infrastructure.Attachments/ExportDocManager.Infrastructure.Attachments.csproj"] =
+                    new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj" },
+                ["src/ExportDocManager.Infrastructure.Worklist/ExportDocManager.Infrastructure.Worklist.csproj"] =
+                    new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj" },
                 ["src/ExportDocManager.Api/ExportDocManager.Api.csproj"] =
                     new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                     {
@@ -33,7 +37,9 @@ namespace ExportDocManager.Domain.Tests
                         "src/ExportDocManager.Infrastructure/ExportDocManager.Infrastructure.csproj",
                         "src/ExportDocManager.Infrastructure.Excel/ExportDocManager.Infrastructure.Excel.csproj",
                         "src/ExportDocManager.Infrastructure.Browser/ExportDocManager.Infrastructure.Browser.csproj",
-                        "src/ExportDocManager.Infrastructure.PdfOcr/ExportDocManager.Infrastructure.PdfOcr.csproj"
+                        "src/ExportDocManager.Infrastructure.PdfOcr/ExportDocManager.Infrastructure.PdfOcr.csproj",
+                        "src/ExportDocManager.Infrastructure.Attachments/ExportDocManager.Infrastructure.Attachments.csproj",
+                        "src/ExportDocManager.Infrastructure.Worklist/ExportDocManager.Infrastructure.Worklist.csproj"
                     },
                 ["tools/ExportDocManager.ApiClientGenerator/ExportDocManager.ApiClientGenerator.csproj"] =
                     new HashSet<string>(StringComparer.OrdinalIgnoreCase)

@@ -3,6 +3,8 @@ using ExportDocManager.DataAccess;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Errors;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using ExportDocManager.Utils;
 
 namespace ExportDocManager.Infrastructure.Tests
 {
@@ -215,6 +217,50 @@ namespace ExportDocManager.Infrastructure.Tests
                 SqliteConnection.ClearAllPools();
                 DeleteDirectoryIfExists(root);
             }
+        }
+
+        [Fact]
+        public async Task BackupRestore_ShouldRestoreAttachmentBytesAndConfirmedRevisionTogether()
+        {
+            string root = CreateTestRoot("attachment-restore");
+            try
+            {
+                var fixture = CreateFixture(root);
+                var factory = new AttachmentBackupFactory(fixture.DatabasePath);
+                await using (var db = factory.CreateDbContext())
+                    await DatabaseSchemaBaseline.EnsureCurrentAsync(db, false);
+                int invoiceId = await BusinessAttachmentServiceTests.SeedAsync(factory);
+                var attachments = BusinessAttachmentServiceTests.Service(factory);
+                var request = BusinessAttachmentServiceTests.Upload();
+                var first = await attachments.UploadAsync(invoiceId, request, BusinessAttachmentServiceTests.Bytes("original bytes"));
+                var confirmed = await attachments.UpdateAsync(first.Id, new(first.VersionNumber, 1, false, "original confirmation"));
+                var backup = await fixture.Service.BackupDatabaseAsync();
+                Assert.True(backup.Success, backup.Message);
+                await attachments.UploadAsync(invoiceId, request with { AttachmentId = first.Id, ExpectedVersion = confirmed.VersionNumber, UploadKey = Guid.NewGuid() },
+                    BusinessAttachmentServiceTests.Bytes("later bytes"));
+                Assert.Equal(2, (await attachments.GetAsync(first.Id)).Revisions.Count);
+                SqliteConnection.ClearAllPools();
+                var restore = await fixture.Service.ScheduleRestoreAsync(backup.FilePath);
+                Assert.True(restore.Success);
+                SqlitePendingRestoreManager.ApplyPendingRestore(fixture.PathProvider, fixture.Settings);
+                var restored = await attachments.GetAsync(first.Id);
+                Assert.Equal(1, restored.Attachment.CurrentRevision);
+                Assert.Single(restored.Revisions);
+                Assert.Equal("original bytes", System.Text.Encoding.UTF8.GetString((await attachments.ReadAsync(first.Id, 1)).Content));
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                Assert.True(PathBoundaryHelper.IsWithinRoot(Path.GetFullPath(root), Path.GetFullPath(Path.GetTempPath())));
+                DeleteDirectoryIfExists(root);
+            }
+        }
+
+        private sealed class AttachmentBackupFactory(string path) : IDbContextFactory<AppDbContext>
+        {
+            public AppDbContext CreateDbContext() => new(new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite(DbHelper.BuildConnectionString(path)).Options);
+            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) => Task.FromResult(CreateDbContext());
         }
 
         private static BackupFixture CreateFixture(

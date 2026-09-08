@@ -199,6 +199,12 @@ jobs:
         run: |
           npm --prefix apps/export-doc-web run test:report-designer-v3-ui
           npm --prefix apps/export-doc-web run test:office-ui
+          npm --prefix apps/export-doc-web run test:business-features-ui
+
+      - name: Validate archived PDF preview
+        if: runner.os == 'Windows'
+        timeout-minutes: 5
+        run: npm --prefix apps/export-doc-web run test:business-features-ui -- --pdf-viewer
 
       - name: Upload frontend scale evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -210,6 +216,8 @@ jobs:
             artifacts/report-designer-v3-ui/summary.json
             artifacts/office-workspace-ui/*.png
             artifacts/office-workspace-ui/summary.json
+            artifacts/business-features-ui/*.png
+            artifacts/business-features-ui/summary.json
           if-no-files-found: error
           retention-days: 14
 

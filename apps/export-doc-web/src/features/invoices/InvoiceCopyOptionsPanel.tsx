@@ -21,7 +21,7 @@ export function InvoiceCopyOptionsPanel({ draft, isBusy, onCancel, onChange, onS
         <label><span>来源发票</span><input value={draft.source.invoiceNo || "-"} disabled /></label>
         <label><span>新发票号</span><input value={draft.newInvoiceNo} required disabled={isBusy} onChange={(event) => onChange({ newInvoiceNo: event.target.value })} /></label>
       </div>
-      <p className="form-field-description">复制后的发票始终从草稿开始，核对后再按状态流程推进。</p>
+      <p className="form-field-description">复制后的发票始终从草稿开始。业务资料保留在原单据，请按本次业务重新归档并核对。</p>
       <div className="inline-options" aria-label="复制选项">{options.map((option) => <label key={option.key}><input type="checkbox" checked={draft[option.key]} disabled={isBusy} onChange={(event) => onChange({ [option.key]: event.target.checked })} /><span>{option.label}</span></label>)}</div>
       <div className="toolbar-actions"><button className="command-button secondary" type="button" disabled={isBusy} onClick={onCancel}>取消</button><button className="command-button" type="submit" disabled={isBusy}><Copy size={17} aria-hidden="true" /><span>{isBusy ? "复制中" : "开始复制"}</span></button></div>
     </form>

@@ -172,6 +172,12 @@
           "System.Security.Cryptography.ProtectedData": "[10.0.11, )"
         }
       },
+      "exportdocmanager.infrastructure.worklist": {
+        "type": "Project",
+        "dependencies": {
+          "ExportDocManager.Infrastructure": "[0.1.1, )"
+        }
+      },
       "HtmlAgilityPack": {
         "type": "CentralTransitive",
         "requested": "[1.12.4, )",

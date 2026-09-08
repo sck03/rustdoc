@@ -37,6 +37,7 @@ const fullOnlyRuntimeDependencies = [
   "exportdocmanager.infrastructure.browser",
   "exportdocmanager.infrastructure.excel",
   "exportdocmanager.infrastructure.pdfocr",
+  "exportdocmanager.infrastructure.attachments",
 ];
 const failures = [];
 let actionCount = 0;
@@ -144,6 +145,9 @@ for (const runtimeIdentifier of runtimeIdentifiers) {
   const coreLock = JSON.parse(readFileSync(path.join(lockRoot, "ExportDocManager.Api.core.packages.lock.json"), "utf8"));
   const fullGraph = fullLock.dependencies?.["net10.0"] ?? {};
   const coreGraph = coreLock.dependencies?.["net10.0"] ?? {};
+  if (!("exportdocmanager.infrastructure.worklist" in fullGraph) || !("exportdocmanager.infrastructure.worklist" in coreGraph)) {
+    failures.push(`${runtimeIdentifier}: Full and Core API runtime graphs must include the worklist module.`);
+  }
   if (Object.keys(coreGraph).length >= Object.keys(fullGraph).length) {
     failures.push(`${runtimeIdentifier}: Core API runtime graph must remain smaller than Full.`);
   }

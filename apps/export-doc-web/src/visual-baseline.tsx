@@ -21,6 +21,7 @@ const page = visualSearch.get("page") ?? "dashboard";
 const fullProduct = getProductEditionPresentation("Full");
 const baselineNavItems = workspaceNavGroups.flatMap((group) => group.items);
 const baselineModules = [...new Set(baselineNavItems.flatMap((item) => item.moduleKey ? [item.moduleKey] : []))];
+const baselineFeatures = [...new Set(baselineNavItems.flatMap((item) => item.requiredFeature ? [item.requiredFeature] : []))];
 const visualQueryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: false },
@@ -62,6 +63,7 @@ function BaselineApp() {
       canManageSettings: true,
       canManageUsers: true,
       usesOfficeRegister: false,
+      availableFeatures: baselineFeatures,
       canViewAllBusinessData: true,
       canUseDocumentWorkspace: true,
       canUseSalesWorkspace: true,

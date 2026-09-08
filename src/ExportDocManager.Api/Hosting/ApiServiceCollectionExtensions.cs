@@ -81,6 +81,7 @@ namespace ExportDocManager.Api.Hosting
             }
             services.AddSingleton<ApiCurrentUserResolver>();
             services.AddSingleton<ApiAuthorizationService>();
+            services.AddSingleton<IRuntimePermissionAvailability>(provider => provider.GetRequiredService<ApiAuthorizationService>());
             services.AddSingleton<ApiLoginAttemptService>();
             services.AddSingleton<ApiSensitiveOperationTicketService>();
             services.AddSingleton<ApiDownloadTicketService>();
@@ -259,7 +260,9 @@ namespace ExportDocManager.Api.Hosting
             services.AddMasterDataReadRepositories();
             services.AddSharedReadRepositories();
             var capabilityRegistry = new ServiceCollectionCapabilityRegistry(services);
-            foreach (var module in ExportDocCapabilityModuleLoader.Load(typeof(ApiServiceCollectionExtensions).Assembly.Location))
+            var modules = ExportDocCapabilityModuleLoader.Load(typeof(ApiServiceCollectionExtensions).Assembly.Location, runtimeOptions.DisabledCapabilityModules);
+            services.AddSingleton(new RuntimeCapabilitySet(modules.Select(module => module.Key)));
+            foreach (var module in modules)
             {
                 module.RegisterServices(capabilityRegistry, pathProvider);
             }
