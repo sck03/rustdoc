@@ -24,11 +24,11 @@ export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCa
     case "Image":
       return <span className="report-designer-v3-preview-image">{element.sourceKind === "Field" ? `图片：${element.fieldPath ?? ""}` : element.resourceId ? `资源：${element.resourceId}` : "图片资源未上传"}</span>;
     case "PageNumber":
-      return <span className="report-designer-v3-preview-page-number">{element.prefix ?? ""}第 1 / 1 页{element.suffix ?? ""}</span>;
+      return <span className="report-designer-v3-preview-page-number">{element.prefix ?? ""}1{element.format === "CurrentOfTotal" ? " / 1" : ""}{element.suffix ?? ""}</span>;
     case "Rectangle":
       return null;
     case "Line":
-      return <span className={`report-designer-v3-preview-line report-designer-v3-preview-line-${element.direction.toLowerCase()}`} style={{ backgroundColor: element.style.borderColor ?? "var(--edm-neutral-700)", ...(element.direction === "Horizontal" ? { height: `${Math.max(1, element.style.borderWidthPx ?? 1)}px` } : { width: `${Math.max(1, element.style.borderWidthPx ?? 1)}px` }) }} aria-hidden="true" />;
+      return <span className={`report-designer-v3-preview-line report-designer-v3-preview-line-${element.direction.toLowerCase()}`} style={lineStyle(element)} aria-hidden="true" />;
     case "Flow":
       return (
         <div className="report-designer-v3-preview-flow" aria-label={`${element.flowKind} 结构预览`}>
@@ -37,6 +37,16 @@ export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCa
       );
   }
 });
+
+function lineStyle(element: Extract<ReportDesignerV3Element, { type: "Line" }>): CSSProperties {
+  const { borderStyle, borderColor = "#334155", borderWidthPx = 1 } = element.style;
+  if (borderStyle === "None") return { display: "none" };
+  const width = Math.max(1, Math.min(8, borderWidthPx));
+  const horizontal = element.direction === "Horizontal";
+  return borderStyle === "Dashed"
+    ? { backgroundColor: "transparent", [horizontal ? "height" : "width"]: 0, [horizontal ? "borderTop" : "borderLeft"]: `${width}px dashed ${borderColor}` }
+    : { backgroundColor: borderColor, [horizontal ? "height" : "width"]: `${width}px` };
+}
 
 function FlowPreview({ block, selectedCellId }: { block: ReportBlock; selectedCellId?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -93,9 +103,9 @@ export function reportDesignerCanvasElementStyle(element: ReportDesignerV3Elemen
     backgroundColor: usesOuterStyle ? element.style.backgroundColor : undefined,
     textAlign: usesOuterStyle ? element.style.align?.toLowerCase() as CSSProperties["textAlign"] : undefined,
     borderColor: usesOuterStyle ? element.style.borderColor : undefined,
-    borderWidth: usesOuterStyle && element.type !== "Line" ? element.style.borderWidthPx : undefined,
+    borderWidth: usesOuterStyle ? element.type === "Line" ? 0 : element.style.borderWidthPx ?? 0 : undefined,
     borderStyle: usesOuterStyle && element.type !== "Line" ? element.style.borderStyle === "Dashed" ? "dashed" : element.style.borderStyle === "None" ? "none" : element.style.borderWidthPx ? "solid" : undefined : undefined,
-    padding: usesOuterStyle && element.style.paddingHundredthMm ? `${hundredthMmToMm(element.style.paddingHundredthMm)}mm` : undefined,
+    padding: usesOuterStyle ? `${hundredthMmToMm(element.style.paddingHundredthMm ?? 0)}mm` : undefined,
   };
   if (element.type === "Line") style.backgroundColor = "transparent";
   return style;

@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { verifyDesignerEditingMutations } from "./lib/report-designer-editing-contracts.mjs";
 
 const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -16,6 +17,8 @@ const workspaceSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerV3W
 const canvasSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerV3Canvas.tsx"), "utf8");
 const canvasElementSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerCanvasElement.tsx"), "utf8");
 const panelsSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerV3Panels.tsx"), "utf8");
+const imagePropertiesSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerV3ImageProperties.tsx"), "utf8");
+const resourcePanelsSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerV3ResourcePanels.tsx"), "utf8");
 const gridPropertiesSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerGridProperties.tsx"), "utf8");
 const layerResizersSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerLayerResizers.tsx"), "utf8");
 const conditionalPropertiesSource = fs.readFileSync(path.join(sourceRoot, "ReportDesignerConditionalProperties.tsx"), "utf8");
@@ -48,6 +51,7 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerV3WorkspaceHelpers
 `);
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 const api = await import(pathToFileURL(bundlePath).href);
+verifyDesignerEditingMutations(api);
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 
 function assertFixedRightMetadataLayout(source, templatePath) {
@@ -136,9 +140,9 @@ assert(conditionalPropertiesSource.match(/selectOnly\s*\n/g)?.length >= 2, "条�
 assert(!conditionalPropertiesSource.includes("datalist") && !conditionalPropertiesSource.includes("表达式"), "条件编辑不得提供表达式输入，普通用户只能使用下拉字段");
 assert(panelsSource.includes("CommitTextField"), "V3 属性面板的文本编辑必须使用完成后提交控件");
 assert(propertyControlsSource.includes("当前值：") && propertyControlsSource.includes("需修正"), "V3 字段下拉必须保留非法当前值的可见修正提示");
-assert(panelsSource.includes('type="file"') && panelsSource.includes("选择图片并上传"), "图片属性栏必须提供直接选择文件并上传的入口");
-assert(panelsSource.includes("uploadReportTemplateV3ImageResource") && panelsSource.includes("已上传图片"), "图片属性栏必须调用受控资源 API 并支持下拉复用已绑定资源");
-assert(panelsSource.includes("无需填写资源 ID") && panelsSource.includes("最大 32 MB"), "图片上传必须说明自动绑定行为和文件大小边界");
+assert(imagePropertiesSource.includes('type="file"') && imagePropertiesSource.includes("选择图片并上传"), "图片属性栏必须提供直接选择文件并上传的入口");
+assert(imagePropertiesSource.includes("uploadReportTemplateV3ImageResource") && imagePropertiesSource.includes("已上传图片"), "图片属性栏必须调用受控资源 API 并支持下拉复用已绑定资源");
+assert(imagePropertiesSource.includes("无需填写资源 ID") && imagePropertiesSource.includes("最大 32 MB"), "图片上传必须说明自动绑定行为和文件大小边界");
 assert(inspectorCss.includes("report-designer-v3-upload-button") && inspectorCss.includes("report-designer-v3-upload-feedback.is-error"), "图片上传控件和错误反馈必须具有独立可见样式");
 assert(workspaceSource.includes("onClick={openFieldPanel}"), "工具栏的选择字段按钮必须打开字段面板而不是静默插入首个字段");
 assert(workspaceSource.includes("report-designer-v3-zoom-select") && workspaceSource.includes("适合窗口"), "V3 工作区必须提供缩放预设和适合窗口操作");
@@ -679,10 +683,9 @@ assert(canvasSource.includes("data-v3-layer-name={layer.name}") && canvasElement
 assert(canvasSource.includes("createV3RegionMoveConstraint") && canvasSource.includes("findReportDesignerElementNodes") && canvasSource.includes("translate3d"), "复杂模板拖动必须预计算边界、缓存元素节点并使用合成层位移");
 assert(canvasSource.includes("--v3-page-ratio") && canvasCss.includes("aspect-ratio: var(--v3-page-ratio"), "V3 画布必须按 A4 物理宽高比渲染横竖版页面");
 assert(canvasCss.includes("report-designer-v3-layer::before") && canvasCss.includes("report-designer-v3-preview-line-horizontal"), "V3 画布样式必须显示图层标识和细线方向");
-assert(panelsSource.includes('label="普通表格"') && panelsSource.includes("明细表（自动重复）") && !panelsSource.includes('label="票据格"'), "组件入口必须清楚区分普通表格和自动重复明细表");
+assert(resourcePanelsSource.includes('label="普通表格"') && resourcePanelsSource.includes("明细表（自动重复）") && !resourcePanelsSource.includes('label="票据格"'), "组件入口必须清楚区分普通表格和自动重复明细表");
 assert(gridPropertiesSource.includes("new-report-grid-cell-picker") && gridPropertiesSource.includes("向右合并") && gridPropertiesSource.includes("向下合并") && gridPropertiesSource.includes("快速版式"), "普通表格属性栏必须提供可视化选格、预设和直接合并操作");
 assert(gridPropertiesSource.includes("修改整表样式会立即应用到全部单元格") && !gridPropertiesSource.includes("套用样式") && !gridPropertiesSource.includes("套用边框"), "整表样式和边框必须即时应用，不能依赖容易漏掉的二次套用按钮");
-assert(panelsSource.includes('element.type !== "Flow" ? <ElementStyleEditor'), "Flow 结构组件不得再显示会被内部单元格样式覆盖的重复通用样式组");
 assert(gridCss.includes("data-report-grid-cell-id") && gridCss.includes("is-designer-selected-cell"), "画布样式必须支持单元格直接命中和选中反馈");
 assert(layerResizersSource.includes('role="separator"') && layerResizersSource.includes("onPointerMove") && bandsCss.includes("report-designer-v3-band-resizer"), "页眉页脚设计带必须支持可访问的画布拖拽调整");
 assert(colorFieldSource.includes("type=\"color\"") && colorFieldSource.includes("常用颜色") && colorFieldSource.includes("高级色值"), "V3 颜色编辑必须提供色板、原生颜色选择器和可选高级色值");

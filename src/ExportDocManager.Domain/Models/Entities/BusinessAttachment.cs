@@ -2,8 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ExportDocManager.Models.Entities;
 
-public enum BusinessAttachmentCategory { Original, Confirmation, FinalOutput }
-
 /// <summary>Documents inherit access and retention from their source invoice.</summary>
 public sealed class BusinessAttachment
 {
@@ -11,7 +9,8 @@ public sealed class BusinessAttachment
     public int InvoiceId { get; set; }
     public Invoice Invoice { get; set; } = null!;
     [Required, MaxLength(200)] public string Title { get; set; } = string.Empty;
-    public BusinessAttachmentCategory Category { get; set; }
+    public int CategoryId { get; set; }
+    public BusinessAttachmentCategory Category { get; set; } = null!;
     [MaxLength(100)] public string PoNumber { get; set; } = string.Empty;
     [MaxLength(200)] public string StyleNo { get; set; } = string.Empty;
     [MaxLength(510)] public string SearchKey { get; set; } = string.Empty;

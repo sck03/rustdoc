@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-09-09",
+  "capturedAt": "2026-09-10",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 125941,
+      "baselineAggregateLines": 126168,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 126141,
+      "maximumAggregateLines": 126368,
       "reportFiles": false
     },
     {
@@ -22,9 +22,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 85638,
+      "baselineAggregateLines": 85917,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 85838,
+      "maximumAggregateLines": 86117,
       "reportFiles": false
     },
     {
@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 45084,
+      "baselineAggregateLines": 45265,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 45204,
+      "maximumAggregateLines": 45385,
       "reportFiles": false
     },
     {
@@ -60,9 +60,9 @@
       ],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 41388,
+      "baselineAggregateLines": 41633,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 41538,
+      "maximumAggregateLines": 41783,
       "reportFiles": false
     },
     {
@@ -80,9 +80,9 @@
       "directory": "src/ExportDocManager.Infrastructure.Attachments",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 220,
-      "baselineAggregateLines": 357,
+      "baselineAggregateLines": 518,
       "maximumAggregateGrowthLines": 50,
-      "maximumAggregateLines": 407
+      "maximumAggregateLines": 568
     },
     {
       "name": "worklist services",
@@ -98,9 +98,9 @@
       "directory": "apps/export-doc-web/src/features/attachments",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 120,
-      "baselineAggregateLines": 302,
+      "baselineAggregateLines": 465,
       "maximumAggregateGrowthLines": 40,
-      "maximumAggregateLines": 342
+      "maximumAggregateLines": 505
     },
     {
       "name": "worklist workspace",

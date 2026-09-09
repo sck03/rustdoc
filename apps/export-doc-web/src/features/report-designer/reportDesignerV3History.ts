@@ -60,6 +60,7 @@ export function useReportDesignerV3History(initialSchema: ReportDesignerV3Schema
       setHistory({ past: [], present: createReportDesignerV3DocumentState(schema), future: [] });
     },
     select(selectedIds: string[], activeLayerId?: string | null) {
+      lastCoalescedCommitAt.current = 0;
       setHistory((current) => ({
         ...current,
         present: {

@@ -44,7 +44,7 @@ public sealed class ApiBusinessFeatureIntegrationTests
         using var content = new MultipartFormDataContent();
         content.Add(new StringContent(Guid.NewGuid().ToString()), "uploadKey");
         content.Add(new StringContent("Source"), "title");
-        content.Add(new StringContent("Original"), "category");
+        content.Add(new StringContent("1"), "categoryId");
         content.Add(new StringContent(new string('样', 500)), "note");
         content.Add(new ByteArrayContent("archived bytes"u8.ToArray()), "file", "source.txt");
         var uploadedResponse = await client.PostAsync(url, content);
@@ -158,12 +158,39 @@ public sealed class ApiBusinessFeatureIntegrationTests
         return await ApiIntegrationTestHarness.ReadJsonAsync<BusinessAttachmentRecord>(response);
     }
 
+    [Fact]
+    public async Task AttachmentManagement_ShouldExposeCategoryMetadataAndVersionedDeleteContracts()
+    {
+        await using var harness = await ApiIntegrationTestHarness.StartAsync("attachment-management", "features.db");
+        using var anonymous = harness.CreateClient();
+        var login = await harness.LoginAsync(anonymous, "admin", "");
+        using var client = harness.CreateClient(login.AccessToken);
+        var attachment = await CreateAttachmentAsync(client);
+        var catalog = await ApiIntegrationTestHarness.ReadJsonAsync<BusinessAttachmentCategoryCatalog>(await client.GetAsync("/api/business-attachment-categories"));
+        Assert.True(catalog.CanManage);
+        Assert.Equal(3, catalog.Items.Count);
+        var category = await ApiIntegrationTestHarness.ReadJsonAsync<BusinessAttachmentCategoryRecord>(await client.PostAsJsonAsync(
+            "/api/business-attachment-categories", new BusinessAttachmentCategoryCreate(catalog.CompanyScope, "质检报告")));
+        var editRequest = new BusinessAttachmentMetadataUpdate(attachment.VersionNumber, "已核对的资料", category.Id, "PO-NEW", "STYLE-NEW", "修正信息");
+        var edited = await ApiIntegrationTestHarness.ReadJsonAsync<BusinessAttachmentRecord>(await client.PutAsJsonAsync(
+            $"/api/business-attachments/{attachment.Id}/metadata", editRequest));
+        Assert.Equal("质检报告", edited.CategoryName);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync($"/api/business-attachments/{attachment.Id}/metadata", editRequest)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync($"/api/business-attachment-categories/{category.Id}?expectedVersion={category.VersionNumber}")).StatusCode);
+        using var deletion = new HttpRequestMessage(HttpMethod.Delete, $"/api/business-attachments/{attachment.Id}")
+        { Content = JsonContent.Create(new BusinessAttachmentDelete(edited.VersionNumber, "误传后清理")) };
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(deletion)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/business-attachments/{attachment.Id}/revisions/1/content")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync($"/api/business-attachment-categories/{category.Id}?expectedVersion={category.VersionNumber}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/business-attachment-categories")).StatusCode);
+    }
+
     private static MultipartFormDataContent UploadForm(byte[] bytes)
     {
         var form = new MultipartFormDataContent();
         form.Add(new StringContent(Guid.NewGuid().ToString()), "uploadKey");
         form.Add(new StringContent("客户资料"), "title");
-        form.Add(new StringContent("Original"), "category");
+        form.Add(new StringContent("1"), "categoryId");
         form.Add(new ByteArrayContent(bytes), "file", "source.txt");
         return form;
     }

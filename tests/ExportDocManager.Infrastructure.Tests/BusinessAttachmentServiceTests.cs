@@ -143,7 +143,7 @@ public sealed class BusinessAttachmentServiceTests
     }
 
     internal static BusinessAttachmentUpload Upload(string name = "source.txt") => new(null, 0, Guid.NewGuid(), "客户资料",
-        BusinessAttachmentCategory.Original, "PO-2026", "STYLE-1", name, "初始资料");
+        1, "PO-2026", "STYLE-1", name, "初始资料");
     internal static MemoryStream Bytes(string text) => new(System.Text.Encoding.UTF8.GetBytes(text), false);
     internal static BusinessAttachmentService Service(IDbContextFactory<AppDbContext> db, User? user = null) =>
         new(db, BusinessFeatureTestRuntime.Scope(user ?? BusinessFeatureTestRuntime.Admin()), BusinessFeatureTestRuntime.Clock, new BusinessFeatureTestRuntime());
@@ -151,6 +151,8 @@ public sealed class BusinessAttachmentServiceTests
     {
         using var context = db.CreateDbContext();
         var invoice = BusinessFeatureTestRuntime.Invoice("ATTACHMENT-1");
+        context.OrganizationCompanies.Add(new OrganizationCompany { Code = "C1", Name = "示例公司" });
+        context.BusinessAttachmentCategories.Add(new BusinessAttachmentCategory { Id = 1, CompanyScope = "C1", Name = "原始资料" });
         context.Invoices.Add(invoice);
         await context.SaveChangesAsync();
         return invoice.Id;

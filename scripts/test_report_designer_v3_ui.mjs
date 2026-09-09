@@ -6,6 +6,7 @@ import { createRequire } from "node:module";
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
+import { verifyDesignerEditingUi } from "./lib/report-designer-editing-ui-scenarios.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -21,7 +22,7 @@ await esbuild.build({
     import { ReportDesignerV3Workspace } from ${source("features/report-designer/ReportDesignerV3Workspace.tsx")};
     import { parseReportDesignerV3FromHtml } from ${source("features/report-designer/reportDesignerV3TemplateParser.ts")};
     import { exportReportDesignerV3SchemaToHtml } from ${source("features/report-designer/reportDesignerV3HtmlExporter.ts")};
-    import { createV3FlowElement, createV3TextElement } from ${source("features/report-designer/reportDesignerV3ElementFactories.ts")};
+    import { createV3FlowElement, createV3TextElement, createV3FieldElement, createV3LineElement, createV3PageNumberElement } from ${source("features/report-designer/reportDesignerV3ElementFactories.ts")};
     import { createGridBlock, createDetailTableBlock } from ${source("features/report-designer/reportDesignerBlockFactories.ts")};
     import ${source("styles/cascade.css")};
     import ${source("styles/foundation.css")};
@@ -36,6 +37,15 @@ await esbuild.build({
     header.elements.push(grid);
     body.elements.push({ ...createV3FlowElement(createDetailTableBlock(), 1000, 14500), id:'review-detail', zIndex:10000 });
     const stress = new URLSearchParams(location.search).has('stress');
+    if (new URLSearchParams(location.search).has('editing')) {
+      const style={fontSizePt:12,bold:true,align:'Right',color:'#334455',backgroundColor:'#fff0dd',borderStyle:'Solid',borderWidthPx:2,paddingHundredthMm:200};
+      schema.layers.find(layer=>layer.role==='Overlay').elements.push(
+        {...createV3TextElement(1500,8500),id:'edit-text',text:'外观样式',widthHundredthMm:6000,style},
+        {...createV3TextElement(8500,8500),id:'edit-other',widthHundredthMm:2500,text:'目标文本'},
+        {...createV3LineElement(1500,11000),id:'edit-line',style:{borderStyle:'Dashed',borderWidthPx:2,borderColor:'#334455'}},
+        {...createV3FieldElement('Invoice.InvoiceNo',1500,13000),id:'edit-field',style},
+        {...createV3PageNumberElement(1500,16000),id:'edit-page',format:'Current',prefix:'第',suffix:'页',style});
+    }
     if (stress) {
       const overlay = schema.layers.find(layer => layer.role === 'Overlay');
       for (let index=0;index<900;index++) overlay.elements.push({ ...createV3TextElement(1000 + index % 40 * 450, 23000 + Math.floor(index / 40) * 220), id:'stress-'+index, text:String(index), widthHundredthMm:400, heightHundredthMm:400 });
@@ -46,6 +56,7 @@ await esbuild.build({
     window.addEventListener('error', event => window.__designerErrors.push(event.message));
     window.addEventListener('unhandledrejection', event => window.__designerErrors.push(String(event.reason)));
     const content = exportReportDesignerV3SchemaToHtml(schema, 'ExportDocument');
+    window.__designerHtml = content;
     createRoot(document.getElementById('root')).render(<div className="work-surface" style={{margin:'12px',padding:'8px'}}>
       <ReportDesignerV3Workspace reportType="ExportDocument" displayName="表格设计交互验证" content={content} editable={true} onDesignerDraftContentChange={html => {
         if(html) { window.__designerUpdates++; window.__designerHtml=html; window.__designerSchema=parseReportDesignerV3FromHtml(html,'ExportDocument').schema; }
@@ -69,7 +80,7 @@ const primaryModifier = process.platform === "darwin" ? 4 : 2;
 const read = async (page, expression) => (await evaluate(page, expression, true)).value;
 async function waitFor(page, expression) {
   const limit = Date.now() + 20000;
-  while (Date.now() < limit) { if (await read(page, expression)) return; await delay(50); }
+  while (Date.now() < limit) { if (await read(page, `Boolean(${expression})`)) return; await delay(50); }
   throw new Error(`Timed out: ${expression}; ${await read(page, "document.body.innerText.slice(0,1600)")}`);
 }
 async function click(page, selector) { await read(page, `document.querySelector(${JSON.stringify(selector)}).click()`); await delay(70); }
@@ -98,9 +109,10 @@ try {
     await waitFor(page, 'Boolean(document.querySelector("[data-v3-element-id=review-grid]"))');
     await read(page, `document.querySelector('[data-v3-element-id="review-grid"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerId:77,clientX:0,clientY:0}));window.dispatchEvent(new PointerEvent('pointercancel',{pointerId:77}));`);
     await waitFor(page, 'document.querySelector(".report-designer-property-tabs [role=tab][aria-selected=true]")?.textContent === "单元格"');
-    const controls = await read(page, `Array.from(document.querySelectorAll('.report-designer-v3-inspector input[type=checkbox]')).map(input=>{const r=input.getBoundingClientRect();return {width:r.width,height:r.height}})`);
+    const controls = await read(page, `Array.from(document.querySelectorAll('.report-designer-v3-inspector input[type=checkbox]')).filter(input=>input.getClientRects().length).map(input=>{const r=input.getBoundingClientRect();return {width:r.width,height:r.height}})`);
     assert(controls.length >= 5 && controls.every(control=>control.width>=14&&control.width<=18&&control.height>=14&&control.height<=18), JSON.stringify(controls));
     await click(page,'.report-designer-property-tabs [role=tab]:nth-child(2)');
+    assert(!await read(page,"[...document.querySelectorAll('.report-designer-v3-inspector [role=tab]')].some(node=>node.textContent==='外观')"), "tables use their own cell and table style editors");
     assert(await read(page, 'document.querySelector(".report-designer-v3-inspector").scrollWidth <= document.querySelector(".report-designer-v3-inspector").clientWidth + 1'), `inspector overflow at ${width}`);
     assert(await read(page, 'document.documentElement.scrollWidth <= innerWidth + 1'), `page overflow at ${width}`);
     await captureScreenshot(page,path.join(output,`grid-${width}.png`),{captureBeyondViewport:false});
@@ -163,7 +175,7 @@ try {
   await key(page,'Escape');
   await waitFor(page,'document.activeElement?.getAttribute("data-v3-element-id") === "review-grid"');
   results.push({test:'F2 edits selected grid cell and restores canvas focus',passed:true});
-  await read(page,'document.activeElement?.blur()');
+  await read(page,'document.querySelector("[data-v3-element-id=review-grid]").focus()');
   await key(page,'c',primaryModifier); await key(page,'v',primaryModifier); await delay(100);
   assert(!await read(page,'document.body.innerText.includes("当前草稿不能保存")'),'copying a table must keep a valid document');
   const gridTexts=await read(page,'window.__designerSchema.layers.flatMap(layer=>layer.elements).filter(element=>element.flowKind==="Grid").map(element=>element.block.rows[0].cells[0].text)');
@@ -216,6 +228,7 @@ try {
   await key(page,'z',primaryModifier);
   await waitFor(page,'window.__designerSchema.layers.flatMap(layer=>layer.elements).find(element=>element.id==="stress-0").text === "0"');
   results.push({test:'902-element text input commits once and undoes as one operation',passed:true});
+  await verifyDesignerEditingUi({page,url,read,waitFor,click,key,modifier:primaryModifier,results});
   fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify({passed:true,results},null,2));
   console.log(`Report designer UI contracts passed (${results.length} cases).`);
 } finally {

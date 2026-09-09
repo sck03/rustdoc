@@ -69,12 +69,16 @@ public sealed partial class BusinessAttachmentService
     {
         bool mayEdit = runtime.IsPermissionAvailable(Resource, PermissionAction.Operate) && access.HasPermission(Resource, PermissionAction.Operate, actor);
         var editable = access.ApplyInvoiceScopeForPermission(db.Invoices, Resource, PermissionAction.Operate, actor);
+        bool mayDelete = runtime.IsPermissionAvailable(Resource, PermissionAction.Manage) && access.HasPermission(Resource, PermissionAction.Manage, actor);
+        var deletable = access.ApplyInvoiceScopeForPermission(db.Invoices, Resource, PermissionAction.Manage, actor);
         return query.Select(item => new BusinessAttachmentRecord(item.Id, item.InvoiceId, item.Invoice.InvoiceNo, item.Invoice.Type ?? "",
-            item.Invoice.CustomerNameEN ?? "", item.Title, item.Category, item.PoNumber, item.StyleNo, item.LatestRevision,
+            item.Invoice.CustomerNameEN ?? "", item.Title, item.CategoryId, item.Category.Name, item.PoNumber, item.StyleNo, item.LatestRevision,
             item.CurrentRevision, item.IsArchived, item.VersionNumber, item.UpdatedAt,
-            mayEdit && editable.Any(invoice => invoice.Id == item.InvoiceId)));
+            mayEdit && editable.Any(invoice => invoice.Id == item.InvoiceId),
+            mayDelete && deletable.Any(invoice => invoice.Id == item.InvoiceId)));
     }
 
-    private Task<BusinessAttachmentRecord> RecordAsync(AppDbContext db, int id, User actor, CancellationToken token) =>
-        Records(db, Accessible(db, actor).Where(item => item.Id == id), actor).SingleAsync(token);
+    private async Task<BusinessAttachmentRecord> RecordAsync(AppDbContext db, int id, User actor, CancellationToken token) =>
+        await Records(db, Accessible(db, actor).Where(item => item.Id == id), actor).SingleOrDefaultAsync(token)
+        ?? throw new ResourceNotFoundException("业务资料不存在。");
 }

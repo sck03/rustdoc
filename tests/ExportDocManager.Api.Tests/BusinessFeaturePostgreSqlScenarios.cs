@@ -62,7 +62,8 @@ internal static class BusinessFeaturePostgreSqlScenarios
             });
             await db.SaveChangesAsync();
         }
-        var request = new BusinessAttachmentUpload(null, 0, Guid.NewGuid(), "原始图纸", BusinessAttachmentCategory.Original, "PO-TEST", "STYLE-TEST", "cafe\u0301.txt", "首次上传");
+        var category = (await service.ListCategoriesAsync(invoiceId)).Items.First();
+        var request = new BusinessAttachmentUpload(null, 0, Guid.NewGuid(), "原始图纸", category.Id, "PO-TEST", "STYLE-TEST", "cafe\u0301.txt", "首次上传");
         var repeated = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => service.UploadAsync(invoiceId, request, new MemoryStream("original"u8.ToArray()))));
         Assert.Equal(repeated[0].Id, repeated[1].Id);
         Assert.Single((await service.GetAsync(repeated[0].Id)).Revisions);
@@ -92,6 +93,52 @@ internal static class BusinessFeaturePostgreSqlScenarios
         var upcoming = await worklist.QueryAsync(new(Due: WorklistDueFilter.Upcoming));
         Assert.Contains(upcoming.Page.Items, item => item.Source == "contract-end" && item.Title == "归档验收员工");
         Assert.DoesNotContain(upcoming.Page.Items, item => item.Source == "customer-follow-up");
+        await VerifyManagementRacesAsync(service, actor.CompanyScope!, invoiceId, repeated[0].Id);
+    }
+
+    private static async Task VerifyManagementRacesAsync(BusinessAttachmentService service, string company, int invoiceId, int id)
+    {
+        var category = await service.CreateCategoryAsync(new(company, "质检资料"));
+        var rename = await Task.WhenAll(Enumerable.Range(0, 2).Select(index => AttemptAsync(() =>
+            service.UpdateCategoryAsync(category.Id, new(category.VersionNumber, $"质检资料-{index}")))));
+        Assert.Single(rename, error => error == null);
+        Assert.Single(rename.OfType<ResourceConflictException>());
+        var record = (await service.GetAsync(id)).Attachment;
+        var edits = await Task.WhenAll(Enumerable.Range(0, 2).Select(index => AttemptAsync(() => service.EditMetadataAsync(id,
+            new(record.VersionNumber, $"修正图纸-{index}", category.Id, "PO-UPDATED", record.StyleNo, "修正资料")))));
+        Assert.Single(edits, error => error == null);
+        Assert.Single(edits.OfType<ResourceConflictException>());
+        Assert.Equal("original", System.Text.Encoding.UTF8.GetString((await service.ReadAsync(id, 1)).Content));
+        var currentCategory = (await service.ListCategoriesAsync(invoiceId)).Items.Single(item => item.Id == category.Id);
+        Assert.Equal(1, currentCategory.AttachmentCount);
+        await Assert.ThrowsAsync<ResourceConflictException>(() => service.DeleteCategoryAsync(category.Id, currentCategory.VersionNumber));
+
+        // Deletion and assignment must serialize around the same category row.
+        // Either deletion wins and upload is rejected, or the reference prevents deletion.
+        var temporary = await service.CreateCategoryAsync(new(company, "并发分类"));
+        var upload = new BusinessAttachmentUpload(null, 0, Guid.NewGuid(), "并发归档", temporary.Id, "", "", "race.txt", "");
+        var assignment = await Task.WhenAll(
+            AttemptAsync(() => service.UploadAsync(invoiceId, upload, new MemoryStream("race"u8.ToArray()))),
+            AttemptAsync(() => service.DeleteCategoryAsync(temporary.Id, temporary.VersionNumber)));
+        Assert.Single(assignment, error => error == null);
+        Assert.Single(assignment, error => error is ServiceValidationException or ResourceConflictException);
+        var catalog = await service.ListCategoriesAsync(invoiceId);
+        var rows = (await service.QueryAsync(new(InvoiceId: invoiceId))).Page.Items;
+        Assert.Equal(rows.Any(item => item.CategoryId == temporary.Id), catalog.Items.Any(item => item.Id == temporary.Id));
+
+        var current = (await service.GetAsync(id)).Attachment;
+        var removal = await Task.WhenAll(
+            AttemptAsync(() => service.DeleteAsync(id, new(current.VersionNumber, "移除误传资料"))),
+            AttemptAsync(() => service.EditMetadataAsync(id, new(current.VersionNumber, "并发修正", category.Id, "", "", "修正资料"))));
+        Assert.Single(removal, error => error == null);
+        Assert.Single(removal, error => error is ResourceConflictException or ResourceNotFoundException);
+    }
+
+    private static async Task<Exception?> AttemptAsync(Func<Task> action)
+    {
+        try { await action(); return null; }
+        catch (Exception exception) when (exception is ResourceConflictException or ResourceNotFoundException or ServiceValidationException)
+        { return exception; }
     }
 
     private sealed class FixedTime : TimeProvider

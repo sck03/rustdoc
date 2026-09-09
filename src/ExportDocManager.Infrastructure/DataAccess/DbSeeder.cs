@@ -48,6 +48,8 @@ namespace ExportDocManager.DataAccess
                     IsActive = true
                 };
                 context.Users.Add(admin);
+                context.BusinessAttachmentCategories.AddRange(new[] { "原始资料", "确认资料", "正式输出" }
+                    .Select(name => new BusinessAttachmentCategory { CompanyScope = OrganizationDirectoryDefaults.CompanyCode, Name = name }));
                 context.SaveChanges();
             }
 

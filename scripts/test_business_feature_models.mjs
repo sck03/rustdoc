@@ -42,10 +42,13 @@ assert.equal(model.attachments.canPreviewAttachment("image/svg+xml"), false);
 assert.equal(model.attachments.canPreviewAttachment("application/pdf"), true);
 assert.match(model.attachments.attachmentVersionLabel({ currentRevision: 1, latestRevision: 2 }), /v1/);
 const file = new File(["客户原始资料"], "café.txt", { type: "text/plain" });
-const request = model.attachments.attachmentUploadRequest({ invoiceId: 9, uploadKey: "key", title: "客户资料", note: "样".repeat(500), file });
+const request = model.attachments.attachmentUploadRequest({ invoiceId: 9, uploadKey: "key", title: "客户资料", categoryId: 3, note: "样".repeat(500), file });
 assert.equal(request.invoiceId, 9);
 assert.equal(request.body.get("file").name, "café.txt");
 assert.equal(request.body.get("note"), "样".repeat(500));
+assert.equal(request.body.get("categoryId"), "3");
+assert.deepEqual(model.attachments.attachmentMetadata({ title: "图纸", categoryId: 7, poNumber: "PO", styleNo: "STYLE", latestRevision: 2 }),
+  { title: "图纸", categoryId: 7, poNumber: "PO", styleNo: "STYLE" });
 assert(!request.body.has("invoiceId"));
 assert(!request.body.has("attachmentId"));
 const draft = model.createEmptyInvoice("2026-09-08");

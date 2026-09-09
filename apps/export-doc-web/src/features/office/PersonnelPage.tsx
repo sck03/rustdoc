@@ -21,7 +21,7 @@ export function PersonnelPage({ client, user }: { client: ExportDocManagerApiCli
   const focusedId = /^[1-9]\d*$/.test(search.get("employeeId") ?? "") ? Number(search.get("employeeId")) : null;
   const [selectedId, setSelectedId] = useState<number | null>(focusedId);
   const canViewDetails = canViewPersonnelDetails(user);
-  return <section className="office-workspace personnel-workspace" aria-label="人员信息管理">
+  return <section className="work-surface office-workspace personnel-workspace" aria-label="人员信息管理">
     <div className="personnel-heading"><div><h2>{user.capabilities.usesOfficeRegister ? "人员档案" : "公司通讯录"}</h2>
       <p className="office-muted">{user.capabilities.usesOfficeRegister ? "维护人员档案，再为人员登记预约和领用；入转离记录统一留存。" : "按部门查找同事，快速联系协作。"}</p></div>
       <div className="office-card-actions">{user.capabilities.canManageUsers && <Link className="command-button secondary" to="/system/organization">组织架构</Link>}

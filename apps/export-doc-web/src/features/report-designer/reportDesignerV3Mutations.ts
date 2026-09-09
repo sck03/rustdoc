@@ -269,10 +269,15 @@ export function resolveV3MoveDelta(
 export function alignSelectedV3Elements(
   state: ReportDesignerV3DocumentState,
   alignment: ReportDesignerV3Alignment,
+  relativeTo: "selection" | "page" = "selection",
 ): ReportDesignerV3DocumentState {
   const movable = getMovableSelectedV3Elements(state);
-  if (movable.length < 2) return state;
-  const bounds = getElementBounds(movable);
+  if (movable.length < (relativeTo === "page" ? 1 : 2)) return state;
+  const page = state.schema.page;
+  const bounds = relativeTo === "page" ? {
+    left: page.marginLeftHundredthMm, right: page.widthHundredthMm - page.marginRightHundredthMm,
+    top: page.marginTopHundredthMm, bottom: page.heightHundredthMm - page.marginBottomHundredthMm,
+  } : getElementBounds(movable);
   return updateV3Elements(state, new Set(movable.map(({ element }) => element.id)), (element, layer) => {
     if (element.locked || layer.locked) return element;
     const currentBounds = reportDesignerV3ElementBounds(element);
@@ -319,9 +324,10 @@ export function distributeSelectedV3Elements(
       : leftBounds.top - rightBounds.top;
     return primary || left.element.id.localeCompare(right.element.id);
   });
-  const bounds = getElementBounds(sorted);
-  const start = direction === "horizontal" ? bounds.left : bounds.top;
-  const end = direction === "horizontal" ? bounds.right : bounds.bottom;
+  const first = reportDesignerV3ElementBounds(sorted[0].element);
+  const last = reportDesignerV3ElementBounds(sorted[sorted.length - 1].element);
+  const start = direction === "horizontal" ? first.left : first.top;
+  const end = direction === "horizontal" ? last.right : last.bottom;
   const occupied = sorted.reduce(
     (total, item) => {
       const itemBounds = reportDesignerV3ElementBounds(item.element);
@@ -331,7 +337,7 @@ export function distributeSelectedV3Elements(
     },
     0,
   );
-  const gap = Math.max(0, (end - start - occupied) / (sorted.length - 1));
+  const gap = (end - start - occupied) / (sorted.length - 1);
   const positions = new Map<string, number>();
   let cursor = start;
   sorted.forEach((item) => {
@@ -343,6 +349,7 @@ export function distributeSelectedV3Elements(
   });
   return updateV3Elements(state, new Set(sorted.map(({ element }) => element.id)), (element, layer) => {
     if (element.locked || layer.locked) return element;
+    if (element.id === sorted[0].element.id || element.id === sorted[sorted.length - 1].element.id) return element;
     const position = positions.get(element.id);
     if (position === undefined) return element;
     const currentBounds = reportDesignerV3ElementBounds(element);
@@ -366,11 +373,11 @@ export function deleteSelectedV3Elements(state: ReportDesignerV3DocumentState): 
     return elements.length === layer.elements.length ? layer : { ...layer, elements };
   });
   if (layers.every((layer, index) => layer === state.schema.layers[index])) return state;
-  const remaining = layers.flatMap((layer) => layer.elements);
+  const remaining = new Set(layers.flatMap((layer) => layer.elements.map((element) => element.id)));
   return {
     ...state,
     schema: { ...state.schema, layers },
-    selectedIds: remaining[0] ? [remaining[0].id] : [],
+    selectedIds: state.selectedIds.filter((id) => remaining.has(id)),
   };
 }
 
@@ -384,7 +391,7 @@ export function pasteV3Elements(
   if (countV3Elements(state.schema) + requestedCount > REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS) return state;
   const fallbackLayer = state.schema.layers.find((l) => l.id === preferredLayerId && l.visible && !l.locked)
     ?? state.schema.layers.find((l) => l.visible && !l.locked);
-  if (!fallbackLayer) return state;
+  if (!fallbackLayer || preferredLayerId && fallbackLayer.id !== preferredLayerId) return state;
   const existingIds = new Set([
     ...state.schema.layers.map((l) => l.id),
     ...state.schema.layers.flatMap((l) => l.elements.map((el) => el.id)),
@@ -397,7 +404,8 @@ export function pasteV3Elements(
   const duplicates: ReportDesignerV3Element[] = [];
   for (const element of elements) {
     const origLayerId = elementToLayerMap.get(element.id);
-    const requestedLayer = (origLayerId ? state.schema.layers.find((l) => l.id === origLayerId && l.visible && !l.locked) : null) ?? fallbackLayer;
+    const requestedLayer = preferredLayerId ? fallbackLayer
+      : (origLayerId ? state.schema.layers.find((l) => l.id === origLayerId && l.visible && !l.locked) : null) ?? fallbackLayer;
     const targetLayer = resolveV3InsertionLayer(state.schema, requestedLayer.id, element);
     if (!targetLayer) return state;
     if (targetLayer.elements.length + (additionsByLayer.get(targetLayer.id)?.length ?? 0) >= REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER) {
@@ -438,6 +446,30 @@ export function duplicateSelectedV3Elements(state: ReportDesignerV3DocumentState
   const selected = new Set(state.selectedIds);
   const elements = state.schema.layers.flatMap((l) => l.locked ? [] : l.elements.filter((el) => selected.has(el.id) && !el.locked));
   return pasteV3Elements(state, elements);
+}
+
+export function matchSelectedV3ElementSize(state: ReportDesignerV3DocumentState, dimension: "width" | "height" | "both") {
+  const movable = new Map(getMovableSelectedV3Elements(state).map((item) => [item.element.id, item]));
+  const reference = state.selectedIds.map((id) => movable.get(id)?.element).find(Boolean);
+  if (!reference || movable.size < 2) return state;
+  return updateV3Elements(state, new Set(movable.keys()), (element) => {
+    if (element.id === reference.id) return element;
+    const resized = clampReportDesignerV3ElementToPage({ ...element,
+      widthHundredthMm: dimension === "height" ? element.widthHundredthMm : reference.widthHundredthMm,
+      heightHundredthMm: dimension === "width" ? element.heightHundredthMm : reference.heightHundredthMm,
+    }, state.schema.page);
+    return requiresV3BodyRegion(resized) ? placeV3ElementInRegion(state.schema, movable.get(element.id)!.layer, resized) : resized;
+  });
+}
+
+export function applySelectedV3ElementStyle(state: ReportDesignerV3DocumentState, style: ReportDesignerV3Element["style"]) {
+  const selected = new Set(getMovableSelectedV3Elements(state).filter(({ element }) => element.type !== "Flow").map(({ element }) => element.id));
+  return updateV3Elements(state, selected, (element) => ({ ...element, style: { ...style } }));
+}
+
+export function updateSelectedV3ElementFlags(state: ReportDesignerV3DocumentState,
+  flags: Partial<Pick<ReportDesignerV3Element, "visible" | "outputEnabled" | "locked">>) {
+  return updateV3Elements(state, new Set(state.selectedIds), (element, layer) => layer.locked ? element : { ...element, ...flags });
 }
 
 export function setV3ElementZIndex(

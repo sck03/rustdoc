@@ -14,8 +14,10 @@ import {
 
 export type SelectOption = { value: string; label: string };
 
-export function DesignerCheckbox({ checked, disabled = false, onChange, children }: { checked: boolean; disabled?: boolean; onChange: (checked: boolean) => void; children: ReactNode }) {
-  return <label className="checkbox-field report-designer-checkbox"><input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /><span>{children}</span></label>;
+export function DesignerCheckbox({ checked, mixed = false, disabled = false, onChange, children }: { checked: boolean; mixed?: boolean; disabled?: boolean; onChange: (checked: boolean) => void; children: ReactNode }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (inputRef.current) inputRef.current.indeterminate = mixed; }, [mixed]);
+  return <label className="checkbox-field report-designer-checkbox"><input ref={inputRef} type="checkbox" checked={checked} aria-checked={mixed ? "mixed" : checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /><span>{children}</span></label>;
 }
 
 export function DesignerPropertyTabs<T extends string>({ value, options, onChange, children }: { value: T; options: readonly { value: T; label: string }[]; onChange: (value: T) => void; children: ReactNode }) {

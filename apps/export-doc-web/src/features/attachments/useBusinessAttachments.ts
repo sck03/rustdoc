@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { BusinessAttachmentRevisionRecord, BusinessAttachmentUpdate, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { BusinessAttachmentDelete, BusinessAttachmentMetadataUpdate, BusinessAttachmentRevisionRecord, BusinessAttachmentUpdate, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { isDesktopBridgeAvailable, selectSaveFilePath } from "../../desktop/desktopBridge.ts";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { attachmentUploadRequest, type AttachmentUploadInput } from "./attachmentModel.ts";
+import { useBusinessAttachmentCategories } from "./useBusinessAttachmentCategories.ts";
 
 export function useBusinessAttachments(client: ExportDocManagerApiClient, invoiceId: number | undefined, userId: number) {
   const [keyword, setKeyword] = useState("");
@@ -34,6 +35,8 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
   const invoice = useQuery({
     queryKey: queryKeys.invoice(invoiceId ?? 0), queryFn: ({ signal }) => client.getInvoice({ id: invoiceId! }, { signal }), enabled: invoiceId !== undefined,
   });
+  const categoryInvoiceId = invoiceId ?? details.data?.attachment.invoiceId;
+  const { categories, saveCategory, removeCategory } = useBusinessAttachmentCategories(client, userId, categoryInvoiceId, run, setMessage);
   useEffect(() => { setPreview(null); }, [selectedId]);
   useEffect(() => {
     if (query.data && pageNumber > Math.max(1, query.data.page.totalPages)) setPageNumber(Math.max(1, query.data.page.totalPages));
@@ -43,16 +46,22 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
     inFlight.current = true; setBusy(true); setError(""); setMessage("");
     try {
       const result = await abortable(operation);
-      if (write) await queries.invalidateQueries({ queryKey: ["business-attachments"] });
+      if (write) await refreshRecords();
       onSuccess(result);
       return true;
     } catch (failure) {
       if (!isAbortError(failure)) {
         setError(readApiError(failure));
-        if (write) void queries.invalidateQueries({ queryKey: ["business-attachments"] });
+        if (write) void refreshRecords();
       }
       return false;
     } finally { inFlight.current = false; setBusy(false); }
+  }
+  async function refreshRecords() {
+    await Promise.all([
+      queries.invalidateQueries({ queryKey: ["business-attachments"] }),
+      queries.invalidateQueries({ queryKey: ["business-attachment-categories"] }),
+    ]);
   }
   function upload(request: AttachmentUploadInput) {
     return run((signal) => client.uploadBusinessAttachment(attachmentUploadRequest(request), { signal }), (item) => {
@@ -66,6 +75,17 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
     const id = details.data.attachment.id;
     return run((signal) => client.updateBusinessAttachment({ id, body: request }, { signal }),
       () => setMessage("资料状态已更新。"), true);
+  }
+  function editMetadata(body: BusinessAttachmentMetadataUpdate) {
+    if (!details.data) return Promise.resolve(false);
+    return run((signal) => client.editBusinessAttachmentMetadata({ id: details.data.attachment.id, body }, { signal }),
+      () => setMessage("资料信息已修正，历史文件完整保留。"), true);
+  }
+  function remove(body: BusinessAttachmentDelete) {
+    if (!details.data) return Promise.resolve(false);
+    return run((signal) => client.deleteBusinessAttachment({ id: details.data.attachment.id, body }, { signal }), () => {
+      setSelectedId(null); setPreview(null); setMessage("业务资料及全部版本已删除，删除操作已记录。" );
+    }, true);
   }
   async function read(version: BusinessAttachmentRevisionRecord, showPreview: boolean) {
     if (!details.data) return;
@@ -85,7 +105,7 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
     }
   }
   const commitSearch = () => { setSearch(keyword.trim()); setPageNumber(1); };
-  return { query, details, invoice, keyword, search, includeArchived, pageNumber, pageSize, selectedId, busy, error, message,
+  return { query, details, invoice, categories, saveCategory, removeCategory, editMetadata, remove, keyword, search, includeArchived, pageNumber, pageSize, selectedId, busy, error, message,
     uploadMode, setUploadMode, preview, setPreview, upload, update, read, setSelectedId, setPageNumber, commitSearch,
     changeKeyword: (value: string) => { setKeyword(value); if (!value) { setSearch(""); setPageNumber(1); } },
     changeArchived: (value: boolean) => { setIncludeArchived(value); setPageNumber(1); },

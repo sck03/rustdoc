@@ -24,7 +24,7 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
   const company = companies.find((item) => item.code === companyCode) ?? companies.find((item) => item.isActive) ?? companies[0];
   const departments = (query.data?.departments ?? []).filter((item) => item.companyCode === company?.code);
   const visible = filterDepartmentTree(departments, search);
-  return <section className="office-workspace organization-workspace" aria-label="组织架构管理">
+  return <section className="work-surface office-workspace organization-workspace" aria-label="组织架构管理">
     <div className="organization-heading"><div><h2>组织架构</h2><p className="office-muted">维护公司、部门层级和负责人，供人员档案及账号归属统一使用。</p></div>
       <div className="office-card-actions"><Link className="command-button secondary" to="/office/people">人员档案</Link>
         <button type="button" className="command-button" onClick={() => setCompanyEditor({})}>新增公司</button></div></div>

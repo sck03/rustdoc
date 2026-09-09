@@ -73,7 +73,7 @@ export interface ApiAttachmentSaveRequest {
 
 export interface ApiAttachmentUploadForm {
   attachmentId?: number | null;
-  category?: BusinessAttachmentCategory;
+  categoryId?: number;
   expectedVersion?: number;
   file?: null | IFormFile;
   note?: string;
@@ -3399,7 +3399,33 @@ export interface BatchExportSettings {
   zipAfterExport: boolean;
 }
 
-export type BusinessAttachmentCategory = "Original" | "Confirmation" | "FinalOutput";
+export interface BusinessAttachmentCategoryCatalog {
+  canManage: boolean;
+  companyScope: string;
+  items: BusinessAttachmentCategoryRecord[];
+}
+
+export interface BusinessAttachmentCategoryCreate {
+  companyScope: string;
+  name: string;
+}
+
+export interface BusinessAttachmentCategoryRecord {
+  attachmentCount: number;
+  id: number;
+  name: string;
+  versionNumber: number;
+}
+
+export interface BusinessAttachmentCategoryUpdate {
+  expectedVersion: number;
+  name: string;
+}
+
+export interface BusinessAttachmentDelete {
+  expectedVersion: number;
+  note: string;
+}
 
 export interface BusinessAttachmentDetails {
   attachment: BusinessAttachmentRecord;
@@ -3416,6 +3442,15 @@ export interface BusinessAttachmentEventRecord {
   revision?: number | null;
 }
 
+export interface BusinessAttachmentMetadataUpdate {
+  categoryId: number;
+  expectedVersion: number;
+  note: string;
+  poNumber: string;
+  styleNo: string;
+  title: string;
+}
+
 export interface BusinessAttachmentPage {
   canUpload: boolean;
   fileBytesLimit: number;
@@ -3425,8 +3460,10 @@ export interface BusinessAttachmentPage {
 }
 
 export interface BusinessAttachmentRecord {
+  canDelete: boolean;
   canEdit: boolean;
-  category: BusinessAttachmentCategory;
+  categoryId: number;
+  categoryName: string;
   currentRevision?: number | null;
   customerName: string;
   id: number;
@@ -4594,6 +4631,10 @@ export interface ConfirmSupplierAssessmentRequest {
   expectedVersion?: number;
 }
 
+export interface CreateBusinessAttachmentCategoryRequest {
+  body: BusinessAttachmentCategoryCreate;
+}
+
 export interface CreateCrmContactRequest {
   customerId: number;
   body: ApiCrmContactSaveRequest;
@@ -4752,6 +4793,16 @@ export interface DeactivateSupplierProductLinkRequest {
 
 export interface DeleteAuditLogsByCriteriaRequest {
   body: ApiAuditLogDeleteRequest;
+}
+
+export interface DeleteBusinessAttachmentRequest {
+  id: number;
+  body: BusinessAttachmentDelete;
+}
+
+export interface DeleteBusinessAttachmentCategoryRequest {
+  id: number;
+  expectedVersion: number;
 }
 
 export interface DeleteContainerPackingContainerTypeRequest {
@@ -4959,6 +5010,11 @@ export interface DownloadSingleWindowReceiptPackageRequest {
 
 export interface DownloadSupportPackageRequest {
   body: ApiSupportPackageRequest;
+}
+
+export interface EditBusinessAttachmentMetadataRequest {
+  id: number;
+  body: BusinessAttachmentMetadataUpdate;
 }
 
 export interface ExportCrmCustomersRequest {
@@ -5207,6 +5263,10 @@ export interface ListAuditLogsRequest {
   startTime?: string;
   endTime?: string;
   keyword?: string;
+}
+
+export interface ListBusinessAttachmentCategoriesRequest {
+  invoiceId?: number;
 }
 
 export interface ListBusinessAttachmentsRequest {
@@ -6039,6 +6099,11 @@ export interface UpdateBusinessAttachmentRequest {
   body: BusinessAttachmentUpdate;
 }
 
+export interface UpdateBusinessAttachmentCategoryRequest {
+  id: number;
+  body: BusinessAttachmentCategoryUpdate;
+}
+
 export interface UpdateCrmContactRequest {
   customerId: number;
   id: number;
@@ -6568,6 +6633,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public createBusinessAttachmentCategory(request: CreateBusinessAttachmentCategoryRequest, init?: ApiRequestInit): Promise<BusinessAttachmentCategoryRecord> {
+    const path = "/api/business-attachment-categories";
+    return this.request<BusinessAttachmentCategoryRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public createCrmContact(request: CreateCrmContactRequest, init?: ApiRequestInit): Promise<ApiCrmContactDto> {
     const path = `/api/crm/customers/${encodePath(request.customerId)}/contacts`;
     return this.request<ApiCrmContactDto>("POST", path, {
@@ -6877,6 +6950,24 @@ export class ExportDocManagerApiClient {
     const path = "/api/audit-logs/delete";
     return this.request<ApiAuditLogCommandResponse>("POST", path, {
       body: request.body,
+      init,
+    });
+  }
+
+  public deleteBusinessAttachment(request: DeleteBusinessAttachmentRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
+    const path = `/api/business-attachments/${encodePath(request.id)}`;
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deleteBusinessAttachmentCategory(request: DeleteBusinessAttachmentCategoryRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
+    const path = `/api/business-attachment-categories/${encodePath(request.id)}`;
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
       init,
     });
   }
@@ -7214,6 +7305,14 @@ export class ExportDocManagerApiClient {
   public downloadSupportPackage(request: DownloadSupportPackageRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/support-package/download";
     return this.request<BackgroundJobSnapshot>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public editBusinessAttachmentMetadata(request: EditBusinessAttachmentMetadataRequest, init?: ApiRequestInit): Promise<BusinessAttachmentRecord> {
+    const path = `/api/business-attachments/${encodePath(request.id)}/metadata`;
+    return this.request<BusinessAttachmentRecord>("PUT", path, {
       body: request.body,
       init,
     });
@@ -7714,6 +7813,16 @@ export class ExportDocManagerApiClient {
   public listAvailableExchangeRateCurrencies(init?: ApiRequestInit): Promise<ApiExchangeRateAvailableCurrenciesResponse> {
     const path = "/api/tools/exchange-rates/available-currencies";
     return this.request<ApiExchangeRateAvailableCurrenciesResponse>("GET", path, { init });
+  }
+
+  public listBusinessAttachmentCategories(request: ListBusinessAttachmentCategoriesRequest = {}, init?: ApiRequestInit): Promise<BusinessAttachmentCategoryCatalog> {
+    const path = "/api/business-attachment-categories";
+    return this.request<BusinessAttachmentCategoryCatalog>("GET", path, {
+      query: {
+        "invoiceId": request.invoiceId,
+      },
+      init,
+    });
   }
 
   public listBusinessAttachments(request: ListBusinessAttachmentsRequest = {}, init?: ApiRequestInit): Promise<BusinessAttachmentPage> {
@@ -9280,6 +9389,14 @@ export class ExportDocManagerApiClient {
   public updateBusinessAttachment(request: UpdateBusinessAttachmentRequest, init?: ApiRequestInit): Promise<BusinessAttachmentRecord> {
     const path = `/api/business-attachments/${encodePath(request.id)}`;
     return this.request<BusinessAttachmentRecord>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public updateBusinessAttachmentCategory(request: UpdateBusinessAttachmentCategoryRequest, init?: ApiRequestInit): Promise<BusinessAttachmentCategoryRecord> {
+    const path = `/api/business-attachment-categories/${encodePath(request.id)}`;
+    return this.request<BusinessAttachmentCategoryRecord>("PUT", path, {
       body: request.body,
       init,
     });

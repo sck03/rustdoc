@@ -1,4 +1,3 @@
-using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Attachments;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Security;
@@ -27,7 +26,7 @@ public static partial class ApiEndpointRouteBuilderExtensions
             var file = form.File ?? throw new ServiceValidationException("请选择需要归档的文件。");
             await using var content = file.OpenReadStream();
             return TypedResults.Ok(await service.UploadAsync(invoiceId, new BusinessAttachmentUpload(form.AttachmentId,
-                form.ExpectedVersion, form.UploadKey, form.Title, form.Category, form.PoNumber, form.StyleNo, file.FileName, form.Note), content, cancellationToken));
+                form.ExpectedVersion, form.UploadKey, form.Title, form.CategoryId, form.PoNumber, form.StyleNo, file.FileName, form.Note), content, cancellationToken));
         })
             .WithName("UploadBusinessAttachment").DisableAntiforgery()
             .WithMetadata(new RequestSizeLimitAttribute(BusinessAttachmentLimits.FileBytes + 64 * 1024))
@@ -40,6 +39,17 @@ public static partial class ApiEndpointRouteBuilderExtensions
             BusinessAttachmentUpdate request, CancellationToken cancellationToken) =>
             TypedResults.Ok(await AttachmentService(services).UpdateAsync(id, request, cancellationToken)))
             .WithName("UpdateBusinessAttachment").WithApiCapability(PermissionModuleCatalog.DocumentInvoices, PermissionAction.Operate);
+        endpoints.MapPut("/api/business-attachments/{id:int:min(1)}/metadata", async (IServiceProvider services, int id,
+            BusinessAttachmentMetadataUpdate request, CancellationToken cancellationToken) =>
+            TypedResults.Ok(await AttachmentService(services).EditMetadataAsync(id, request, cancellationToken)))
+            .WithName("EditBusinessAttachmentMetadata").WithApiCapability(PermissionModuleCatalog.DocumentInvoices, PermissionAction.Operate);
+        endpoints.MapDelete("/api/business-attachments/{id:int:min(1)}", async (IServiceProvider services, int id,
+            [FromBody] BusinessAttachmentDelete request, CancellationToken cancellationToken) =>
+        {
+            await AttachmentService(services).DeleteAsync(id, request, cancellationToken);
+            return TypedResults.Ok(new ApiCommandResponse(true, "业务资料及全部版本已删除。"));
+        }).WithName("DeleteBusinessAttachment").WithApiCapability(PermissionModuleCatalog.DocumentInvoices, PermissionAction.Manage);
+        MapBusinessAttachmentCategoryEndpoints(endpoints);
         endpoints.MapGet("/api/business-attachments/{id:int:min(1)}/revisions/{revision:int:min(1)}/content", async (
             IServiceProvider services, HttpContext context, int id, int revision, CancellationToken cancellationToken) =>
         {
@@ -87,7 +97,7 @@ public sealed class ApiAttachmentUploadForm
     public int ExpectedVersion { get; init; }
     public Guid UploadKey { get; init; }
     public string Title { get; init; } = string.Empty;
-    public BusinessAttachmentCategory Category { get; init; }
+    public int CategoryId { get; init; }
     public string PoNumber { get; init; } = string.Empty;
     public string StyleNo { get; init; } = string.Empty;
     public string Note { get; init; } = string.Empty;

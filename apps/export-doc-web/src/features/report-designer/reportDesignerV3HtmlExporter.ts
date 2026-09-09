@@ -89,7 +89,7 @@ export function exportReportDesignerV3SchemaToHtml(
     .edm-v3-repeat-layer { position: fixed; inset: 0; width: ${page.widthMm}mm; height: ${page.heightMm}mm; overflow: hidden; pointer-events: none; z-index: 1000; }
     .edm-v3-repeat-layer .edm-v3-element { pointer-events: none; }
     .edm-v3-element { position: absolute; overflow: visible; min-width: 0; min-height: 0; }
-    .edm-v3-text, .edm-v3-field { overflow-wrap: anywhere; white-space: pre-wrap; word-break: break-word; }
+    .edm-v3-text, .edm-v3-field, .edm-v3-page-number { display: block; line-height: 1.3; overflow-wrap: anywhere; white-space: pre-wrap; word-break: break-word; }
     .edm-v3-flow { overflow: visible; }
     /* Row/Grid/Conditional Flow elements outside Body are intentionally
        rendered as fixed layer content.  Repetition follows the owning layer;
@@ -271,15 +271,15 @@ function renderElementContent(element: ReportDesignerV3Element) {
   return (() => {
     switch (element.type) {
       case "Text":
-        return `<div class="edm-v3-text" style="${renderTextStyle(element)}">${escapeHtml(element.text)}</div>`;
+        return `<div class="edm-v3-text">${escapeHtml(element.text)}</div>`;
       case "Field":
-        return `<div class="edm-v3-field" style="${renderTextStyle(element)}">${element.label ? `${escapeHtml(element.label)}: ` : ""}${renderField(element.fieldPath, element.fallbackText)}</div>`;
+        return `<div class="edm-v3-field">${element.label ? `${escapeHtml(element.label)}: ` : ""}${renderField(element.fieldPath, element.fallbackText)}</div>`;
       case "Image":
         return renderImage(element);
       case "PageNumber":
         return renderPageNumber(element);
       case "Rectangle":
-        return `<div class="edm-v3-rectangle" style="${renderBoxStyle(element)}"></div>`;
+        return `<div class="edm-v3-rectangle"></div>`;
       case "Line":
         return `<div class="edm-v3-line edm-v3-line-${element.direction.toLowerCase()}" style="${renderLineStyle(element)}"></div>`;
       case "Flow":
@@ -319,10 +319,11 @@ function renderElementPositionStyle(element: ReportDesignerV3Element, yOffset = 
     `height: ${hundredthMmToMm(element.heightHundredthMm)}mm`,
     `z-index: ${element.zIndex}`,
     element.rotationDeg ? `transform: rotate(${element.rotationDeg}deg)` : "",
+    element.type === "Flow" || element.type === "Line" ? "" : renderElementStyle(element),
   ].filter(Boolean).join("; ");
 }
 
-function renderTextStyle(element: Extract<ReportDesignerV3Element, { type: "Text" | "Field" }>) {
+function renderElementStyle(element: ReportDesignerV3Element) {
   const style = element.style;
   return [
     style.fontFamily ? `font-family: ${renderFontFamily(style.fontFamily)}` : "",
@@ -333,13 +334,6 @@ function renderTextStyle(element: Extract<ReportDesignerV3Element, { type: "Text
     style.align ? `text-align: ${style.align.toLowerCase()}` : "",
     style.paddingHundredthMm ? `padding: ${hundredthMmToMm(style.paddingHundredthMm)}mm` : "",
     renderBorder(style),
-  ].filter(Boolean).join("; ");
-}
-
-function renderBoxStyle(element: Extract<ReportDesignerV3Element, { type: "Rectangle" }>) {
-  return [
-    element.style.backgroundColor && colorPattern.test(element.style.backgroundColor) ? `background-color: ${element.style.backgroundColor}` : "",
-    renderBorder(element.style),
   ].filter(Boolean).join("; ");
 }
 

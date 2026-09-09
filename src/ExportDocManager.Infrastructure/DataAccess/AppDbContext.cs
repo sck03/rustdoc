@@ -16,6 +16,7 @@ namespace ExportDocManager.DataAccess
         public DbSet<Exporter> Exporters { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
         public DbSet<BusinessAttachment> BusinessAttachments { get; set; }
+        public DbSet<BusinessAttachmentCategory> BusinessAttachmentCategories { get; set; }
         public DbSet<BusinessAttachmentRevision> BusinessAttachmentRevisions { get; set; }
         public DbSet<BusinessAttachmentEvent> BusinessAttachmentEvents { get; set; }
         public DbSet<InvoiceStatusHistory> InvoiceStatusHistories { get; set; }
@@ -167,6 +168,9 @@ namespace ExportDocManager.DataAccess
                         break;
                     case BusinessAttachment attachment:
                         attachment.SearchKey = CanonicalKey(attachment.Title + "\n" + attachment.PoNumber + "\n" + attachment.StyleNo);
+                        break;
+                    case BusinessAttachmentCategory category:
+                        category.NameNormalized = CanonicalKey(category.Name);
                         break;
                     case BusinessAttachmentRevision revision:
                         revision.FileNameNormalized = CanonicalKey(revision.FileName);

@@ -1,0 +1,66 @@
+import assert from "node:assert/strict";
+
+export async function verifyAttachmentManagementUi({ page, open, read, waitFor, click, input, audit, results }) {
+  await open("attachments");
+  await waitFor(page, "[...document.querySelectorAll('button')].some(node=>node.textContent==='管理分类')");
+  await click(page, "管理分类");
+  const manager = '[aria-label="资料分类管理"]';
+  const nameInput = `${manager} form input`;
+  assert(await read(page, "document.querySelector('[aria-label=删除分类确认资料]').disabled"), "a used category cannot be removed");
+  await input(page, nameInput, "质检报告");
+  await click(page, "新增分类");
+  await waitFor(page, "window.__calls.some(call=>call.name==='createCategory')");
+  assert.deepEqual(await read(page, "window.__calls.find(call=>call.name==='createCategory').input.body"), { companyScope: "C1", name: "质检报告" });
+  await read(page, "document.querySelector('[aria-label=修改分类质检报告]').click()");
+  await waitFor(page, `document.querySelector(${JSON.stringify(nameInput)}).value==='质检报告'`);
+  await input(page, nameInput, "出货检验");
+  await click(page, "保存分类名称");
+  await waitFor(page, "window.__calls.some(call=>call.name==='updateCategory')");
+  assert.equal(await read(page, "window.__calls.find(call=>call.name==='updateCategory').input.body.expectedVersion"), 1);
+  await audit(page, "category-management");
+  await read(page, "document.querySelector('[aria-label=删除分类出货检验]').click()");
+  await waitFor(page, "document.querySelector('[role=dialog]')");
+  await click(page, "删除分类", "[role=dialog] button");
+  await waitFor(page, "window.__calls.some(call=>call.name==='deleteCategory')");
+  assert.equal(await read(page, "window.__calls.find(call=>call.name==='deleteCategory').input.expectedVersion"), 2);
+  await click(page, "关闭分类管理");
+  results.push("create-rename-delete-category-with-version");
+
+  await click(page, "查看版本");
+  await waitFor(page, "document.querySelector('.attachment-detail')");
+  await click(page, "修正资料信息");
+  const form = 'form[aria-label="修正资料信息"]';
+  await input(page, `${form} fieldset label:nth-child(1) input`, "正式产品图纸");
+  await input(page, `${form} select`, "2");
+  await input(page, `${form} fieldset label:nth-child(3) input`, "PO-CORRECTED");
+  await input(page, `${form} > label input`, "按客户确认修正名称和分类");
+  await read(page, "window.__metadataConflict=true");
+  await click(page, "保存资料信息");
+  await waitFor(page, "document.body.innerText.includes('资料已更新，请刷新后重试。')");
+  assert.equal(await read(page, `document.querySelector(${JSON.stringify(`${form} fieldset input`)}).value`), "正式产品图纸", "conflict must preserve the user's draft");
+  assert.equal(await read(page, "document.querySelectorAll('.attachment-detail ol .attachment-version').length"), 2);
+  await read(page, "window.__metadataConflict=false");
+  await click(page, "保存资料信息");
+  await waitFor(page, "!document.querySelector('form[aria-label=\"修正资料信息\"]') && window.__calls.some(call=>call.name==='editMetadata')");
+  assert.equal(await read(page, "window.__calls.find(call=>call.name==='editMetadata').input.body.expectedVersion"), 2);
+  assert.equal(await read(page, "window.__calls.find(call=>call.name==='editMetadata').input.body.categoryId"), 2);
+  assert.equal(await read(page, "document.querySelectorAll('.attachment-detail ol .attachment-version').length"), 2);
+  assert(await read(page, "document.querySelector('.attachment-detail').innerText.includes('有效版本 v1')"));
+  await audit(page, "corrected-metadata-retains-files");
+  results.push("metadata-conflict-preserves-draft-and-file-history");
+
+  await click(page, "删除业务资料");
+  await waitFor(page, "document.body.innerText.includes('请先填写删除原因')");
+  await input(page, ".attachment-detail input", "重复上传的资料");
+  await click(page, "删除业务资料");
+  await waitFor(page, "document.querySelector('[role=dialog]')");
+  await click(page, "取消", "[role=dialog] button");
+  assert(!await read(page, "window.__calls.some(call=>call.name==='deleteAttachment')"));
+  await click(page, "删除业务资料");
+  await waitFor(page, "document.querySelector('[role=dialog]')");
+  await click(page, "永久删除", "[role=dialog] button");
+  await waitFor(page, "!document.querySelector('.attachment-detail') && window.__calls.some(call=>call.name==='deleteAttachment')");
+  assert.deepEqual(await read(page, "window.__calls.find(call=>call.name==='deleteAttachment').input.body"), { expectedVersion: 3, note: "重复上传的资料" });
+  assert.equal(await read(page, "document.querySelectorAll('.business-records-card').length"), 0);
+  results.push("permanent-delete-requires-reason-confirmation-and-current-version");
+}

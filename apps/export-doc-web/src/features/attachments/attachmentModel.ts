@@ -1,4 +1,4 @@
-import type { ApiAttachmentUploadForm, BusinessAttachmentCategory, BusinessAttachmentRecord, UploadBusinessAttachmentRequest } from "../../api/index.ts";
+import type { ApiAttachmentUploadForm, BusinessAttachmentRecord, UploadBusinessAttachmentRequest } from "../../api/index.ts";
 
 export type AttachmentUploadInput = Omit<ApiAttachmentUploadForm, "file"> & { file: File; invoiceId: number };
 
@@ -11,9 +11,11 @@ export function attachmentUploadRequest(input: AttachmentUploadInput): UploadBus
   return { invoiceId, body };
 }
 
-export const attachmentCategories: Record<BusinessAttachmentCategory, string> = {
-  Original: "原始资料", Confirmation: "确认资料", FinalOutput: "正式输出",
-};
+export type AttachmentMetadata = Pick<BusinessAttachmentRecord, "title" | "categoryId" | "poNumber" | "styleNo">;
+
+export function attachmentMetadata(item?: AttachmentMetadata, categoryId = 0): AttachmentMetadata {
+  return { title: item?.title ?? "", categoryId: item?.categoryId ?? categoryId, poNumber: item?.poNumber ?? "", styleNo: item?.styleNo ?? "" };
+}
 
 export function attachmentVersionLabel(item: BusinessAttachmentRecord) {
   if (item.isArchived) return "已停用（保留全部版本）";

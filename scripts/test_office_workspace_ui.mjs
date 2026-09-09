@@ -100,7 +100,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   const queries=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
   const initialPath=mode==='organization'?'/system/organization':mode==='permissions'?'/permissions':mode==='people'?'/office/people':mode==='supplies'?'/office/supplies':'/office/meeting-rooms';
   createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[initialPath]}><QueryClientProvider client={queries}><ConfirmationProvider><UnsavedChangesProvider>
-    <main style={{padding:'16px'}}><h1>公司行政工作台</h1><Routes>
+    <main className='workspace-content'><h1>公司行政工作台</h1><Routes>
       <Route path='/permissions' element={<AccessControlPage client={client} canManageUsers={true}/>}/>
       <Route path='/office/people' element={<PersonnelPage client={client} user={user}/>}/>
       <Route path='/system/organization' element={<OrganizationDirectoryPage client={client} user={user}/>}/>
@@ -129,6 +129,7 @@ async function audit(page,label){
   if(violations.length)await captureScreenshot(page,path.join(output,`${label}-failed.png`));
   assert.deepEqual(violations,[],`${label}: accessibility`);
   assert.equal(await read(page,"document.documentElement.scrollWidth <= innerWidth + 1"),true,`${label}: page overflow`);
+  assert.equal(await read(page,"[...document.querySelectorAll('.office-workspace')].every(node=>node.classList.contains('work-surface') && parseFloat(getComputedStyle(node).paddingLeft)>=12)"),true,`${label}: shared workspace spacing`);
   assert.equal(await read(page,"[...document.querySelectorAll('.office-dialog-body')].every(n=>n.scrollWidth<=n.clientWidth+1)"),true,`${label}: dialog overflow`);
   assert.deepEqual(await read(page,"window.__officeErrors"),[],`${label}: browser errors`);
   results.push(label);

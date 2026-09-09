@@ -1,9 +1,11 @@
+import { useReportDesignerV3Clipboard } from "./useReportDesignerV3Clipboard.ts";
+import { useReportDesignerV3Shortcuts } from "./useReportDesignerV3Shortcuts.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignHorizontalJustifyStart,
   AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart,
   ArrowDown, ArrowUp, ArrowLeftRight, ArrowUpDown,
-  Braces, ClipboardPaste, Columns3, Copy, FilePlus2, Files, Grid2X2, Hash,
+  Braces, Paintbrush, ClipboardPaste, Columns3, Copy, FilePlus2, Files, Grid2X2, Hash,
   Image as ImageIcon, ListFilter, Maximize2, Pilcrow, Redo2, RotateCcw,
   Table2, Trash2, Undo2, ZoomIn, ZoomOut,
 } from "lucide-react";
@@ -23,7 +25,7 @@ import {
   createV3PageNumberElement, createV3RectangleElement, createV3TextElement,
   alignSelectedV3Elements, deleteSelectedV3Elements, duplicateSelectedV3Elements,
   distributeSelectedV3Elements, getV3ElementCapacityIssue, findV3Element, insertV3Element,
-  moveSelectedV3Elements, pasteV3Elements, resizeV3Element, selectAllV3Elements, setV3ElementZIndex,
+  moveSelectedV3Elements, resizeV3Element, setV3ElementZIndex,
   toggleV3Selection, updateV3Element, updateV3Grid, type ReportDesignerV3DocumentState,
 } from "./reportDesignerV3Mutations.ts";
 import { parseReportDesignerV3FromHtml } from "./reportDesignerV3TemplateParser.ts";
@@ -41,21 +43,17 @@ import {
   clampReportDesignerV3Zoom,
   filterFieldGroups,
   fitReportDesignerV3Zoom,
-  isEditableTarget,
   migrationNoticeDescription,
   migrationNoticeTitle,
   REPORT_DESIGNER_V3_ZOOM_PRESETS,
 } from "./reportDesignerV3WorkspaceHelpers.tsx";
 import {
-  ComponentPalette,
   ElementInspector,
-  FieldPanel,
-  focusDesignerNode,
-  LayerPanel,
   MultiElementInspector,
-  type PaletteActions,
   PageInspector,
 } from "./ReportDesignerV3Panels.tsx";
+import { ComponentPalette, FieldPanel, LayerPanel, type PaletteActions } from "./ReportDesignerV3ResourcePanels.tsx";
+import { focusDesignerNode } from "./ReportDesignerV3InspectorControls.tsx";
 
 type V3SidebarTab = "components" | "fields" | "layers";
 
@@ -86,31 +84,10 @@ export function ReportDesignerV3Workspace({
   const [fieldQuery, setFieldQuery] = useState("");
   const [fieldFocusRequest, setFieldFocusRequest] = useState(0);
   const [capacityNotice, setCapacityNotice] = useState<string | null>(null);
-  const [hasClipboard, setHasClipboard] = useState(false);
   const [gridCellSelection, setGridCellSelection] = useState<{ elementId: string; cellId: string } | null>(null);
-  const clipboardRef = useRef<ReportDesignerV3Element[]>([]);
-  function copySelection() {
-    const current = historyRef.current.state;
-    const items = current.selectedIds
-      .map((id) => findV3Element(current.schema, id)?.element)
-      .filter((el): el is ReportDesignerV3Element => Boolean(el));
-    if (items.length > 0) { clipboardRef.current = items; setHasClipboard(true); }
-  }
-  function pasteClipboard() {
-    if (!editingEnabledRef.current) return;
-    if (clipboardRef.current.length > 0) {
-      const current = historyRef.current.state;
-      const next = pasteV3Elements(current, clipboardRef.current, current.activeLayerId ?? undefined);
-      if (next === current) {
-        setCapacityNotice(getV3ElementCapacityIssue(current, undefined, Math.max(1, clipboardRef.current.length)) ?? "当前图层无法容纳更多元素。");
-        return;
-      }
-      setCapacityNotice(null);
-      commitRef.current(next);
-      return;
-    }
-    duplicateSelectionRef.current();
-  }
+  const workspaceRef = useRef<HTMLElement>(null);
+  const documentContentRef = useRef(content);
+  documentContentRef.current = content;
   // Converting advanced HTML (or a damaged/removed V2 structure) is explicit;
   // opening a template must never create a dirty V3 draft.
   const legacyMigrationPending = parsed.migrated;
@@ -118,10 +95,6 @@ export function ReportDesignerV3Workspace({
   const [draftEnabled, setDraftEnabled] = useState(false);
   const emittedContent = useRef("");
   const historyRef = useRef(history);
-  const editingEnabledRef = useRef(false);
-  const commitRef = useRef<(next: ReportDesignerV3DocumentState, options?: { coalesce?: boolean }) => void>(() => undefined);
-  const clearSelectionRef = useRef<() => void>(() => undefined);
-  const duplicateSelectionRef = useRef<() => void>(() => undefined);
   const selected = useMemo(
     () => history.state.selectedIds.length === 1 ? findV3Element(history.state.schema, history.state.selectedIds[0]) : null,
     [history.state],
@@ -163,6 +136,9 @@ export function ReportDesignerV3Workspace({
     onDesignerDraftContentChange?.(exportedHtml);
   }, [draftEnabled, editable, exportValidation.blocked, exportedHtml, migrationAccepted, onDesignerDraftContentChange]);
   const editingEnabled = editable && (!legacyMigrationPending || migrationAccepted);
+  const { hasClipboard, canCopyStyle, canPasteStyle, copySelection, pasteClipboard, copyStyle, pasteStyle } = useReportDesignerV3Clipboard({
+    state: history.state, editable: editingEnabled, content, reportType, onCommit: commit, onNotice: setCapacityNotice,
+  });
   function enableDraftEditing() {
     if (!editable) return;
     setMigrationAccepted(true);
@@ -251,11 +227,12 @@ export function ReportDesignerV3Workspace({
   function patchSelectedFlow(block: Extract<ReportBlock, { type: "Row" | "Grid" | "Conditional" | "DetailTable" | "PageBreak" }>) {
     if (!selected || selected.element.type !== "Flow" || selected.element.flowKind !== block.type || !editingEnabled) return;
     const next = updateV3Element(history.state, selected.element.id, { block } as Partial<ReportDesignerV3Element>);
-    commit(next, { coalesce: true });
+    commit(next);
   }
   function bindImageResource(elementId: string, resource: ApiReportTemplateImageResourceResponse) {
-    if (!editingEnabled) return;
-    const located = findV3Element(history.state.schema, elementId);
+    if (!editingEnabled || documentContentRef.current !== content) return;
+    const current = historyRef.current.state;
+    const located = findV3Element(current.schema, elementId);
     if (!located || located.element.type !== "Image" || located.element.locked || located.layer.locked) return;
     const normalizedResource = {
       id: resource.id,
@@ -265,11 +242,11 @@ export function ReportDesignerV3Workspace({
       altText: resource.altText || undefined,
     };
     const stateWithResource = {
-      ...history.state,
+      ...current,
       schema: {
-        ...history.state.schema,
+        ...current.schema,
         resources: [
-          ...(history.state.schema.resources ?? []).filter((item) => item.id !== normalizedResource.id),
+          ...(current.schema.resources ?? []).filter((item) => item.id !== normalizedResource.id),
           normalizedResource,
         ],
       },
@@ -325,74 +302,10 @@ export function ReportDesignerV3Workspace({
       commit(updateV3Element(current, elementId, { block }));
     }
   }
-  // Keyboard listeners are installed once per workspace.  Refs keep the
-  // handler on the hot path stable while still reading the latest history and
-  // migration-confirmation state on every key press.
   historyRef.current = history;
-  editingEnabledRef.current = editingEnabled;
-  commitRef.current = commit;
-  clearSelectionRef.current = clearSelection;
-  duplicateSelectionRef.current = duplicateSelection;
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented || isEditableTarget(event.target)) return;
-      const currentHistory = historyRef.current;
-      const canEdit = editingEnabledRef.current;
-      const modifier = event.ctrlKey || event.metaKey;
-      if (event.key === "Escape") {
-        clearSelectionRef.current();
-        return;
-      }
-      if (modifier && event.key.toLowerCase() === "a" && canEdit) {
-        event.preventDefault();
-        commitRef.current(selectAllV3Elements(currentHistory.state));
-        return;
-      }
-      if (modifier && event.key.toLowerCase() === "c" && canEdit && currentHistory.state.selectedIds.length > 0) {
-        event.preventDefault();
-        copySelection();
-        return;
-      }
-      if (modifier && event.key.toLowerCase() === "v" && canEdit) {
-        event.preventDefault();
-        pasteClipboard();
-        return;
-      }
-      if ((event.key === "Delete" || event.key === "Backspace") && canEdit && currentHistory.state.selectedIds.length > 0) {
-        event.preventDefault();
-        commitRef.current(deleteSelectedV3Elements(currentHistory.state));
-        return;
-      }
-      if (modifier && event.key.toLowerCase() === "z") {
-        if (!canEdit) return;
-        event.preventDefault();
-        event.shiftKey ? currentHistory.redo() : currentHistory.undo();
-        return;
-      }
-      if (modifier && event.key.toLowerCase() === "y") {
-        if (!canEdit) return;
-        event.preventDefault();
-        currentHistory.redo();
-        return;
-      }
-      if (modifier && event.key.toLowerCase() === "d" && canEdit && currentHistory.state.selectedIds.length > 0) {
-        event.preventDefault();
-        duplicateSelectionRef.current();
-        return;
-      }
-      if (canEdit && currentHistory.state.selectedIds.length > 0 && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
-        event.preventDefault();
-        const step = event.shiftKey ? 500 : 100;
-        const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
-        const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
-        commitRef.current(moveSelectedV3Elements(currentHistory.state, dx, dy, false));
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  useReportDesignerV3Shortcuts({ workspaceRef, history, editable: editingEnabled, commit, copySelection, pasteClipboard, duplicateSelection, clearSelection });
   return (
-    <section className="report-designer-v3-workspace" aria-label="报表模板 V3 自由画布设计器">
+    <section ref={workspaceRef} className="report-designer-v3-workspace" aria-label="报表模板 V3 自由画布设计器">
       <header className="report-designer-v3-header">
         <div>
             <span className="report-designer-v3-eyebrow">可视化排版</span>
@@ -456,9 +369,13 @@ export function ReportDesignerV3Workspace({
           <ToolbarButton label="撤销" title="撤销 (Ctrl+Z)" icon={<Undo2 size={15} />} onClick={history.undo} disabled={!editingEnabled || !history.canUndo} />
           <ToolbarButton label="重做" title="重做 (Ctrl+Y)" icon={<Redo2 size={15} />} onClick={history.redo} disabled={!editingEnabled || !history.canRedo} />
           <ToolbarButton label="复制" title="复制所选到剪贴板 (Ctrl+C)" icon={<Copy size={15} />} onClick={copySelection} disabled={history.state.selectedIds.length === 0 || !editingEnabled} />
-          <ToolbarButton label="粘贴" title="粘贴剪贴板元素 (Ctrl+V)" icon={<ClipboardPaste size={15} />} onClick={pasteClipboard} disabled={!editingEnabled || (!hasClipboard && history.state.selectedIds.length === 0)} />
+          <ToolbarButton label="粘贴" title="粘贴剪贴板元素 (Ctrl+V)" icon={<ClipboardPaste size={15} />} onClick={pasteClipboard} disabled={!editingEnabled || !hasClipboard} />
           <ToolbarButton label="制作副本" title="原位制作副本 (Ctrl+D)" icon={<Files size={15} />} onClick={duplicateSelection} disabled={history.state.selectedIds.length === 0 || !editingEnabled} />
           <ToolbarButton label="删除" title="删除所选 (Delete)" icon={<Trash2 size={15} />} onClick={() => commit(deleteSelectedV3Elements(history.state))} disabled={history.state.selectedIds.length === 0 || !editingEnabled} danger />
+        </div>
+        <div className="report-designer-v3-toolbar-group" role="group" aria-label="样式复用">
+          <ToolbarButton label="复制样式" title="复制单个基础组件的外观" icon={<Paintbrush size={15} />} onClick={copyStyle} disabled={!canCopyStyle} />
+          <ToolbarButton label="应用样式" title="将已复制的外观应用到所选基础组件，保留内容和位置" icon={<ClipboardPaste size={15} />} onClick={pasteStyle} disabled={!canPasteStyle} />
         </div>
         <div className="report-designer-v3-toolbar-group report-designer-v3-arrangement-group" role="group" aria-label="对齐与分布">
           <ToolbarButton label="左对齐" icon={<AlignHorizontalJustifyStart size={15} />} onClick={() => alignSelection("left")} disabled={history.state.selectedIds.length < 2 || !editingEnabled} />
@@ -534,6 +451,7 @@ export function ReportDesignerV3Workspace({
             />
           ) : selected ? (
             <ElementInspector
+              key={selected.element.id}
               located={selected}
               fieldGroups={fieldGroups}
               onPatch={patchSelected}

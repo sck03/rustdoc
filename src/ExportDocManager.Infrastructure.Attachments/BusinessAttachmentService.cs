@@ -22,7 +22,7 @@ public sealed partial class BusinessAttachmentService(IDbContextFactory<AppDbCon
         Demand(PermissionAction.Operate, actor);
         await InvoiceAsync(db, invoiceId, actor, PermissionAction.Operate, false, token);
         if (request.UploadKey == Guid.Empty || request.AttachmentId is <= 0 || request.ExpectedVersion < 0 ||
-            !Enum.IsDefined(request.Category)) throw new ServiceValidationException("附件编号、版本或分类无效。");
+            request.CategoryId <= 0) throw new ServiceValidationException("附件编号、版本或分类无效。");
         string title = BusinessAttachmentFilePolicy.Text(request.Title, "资料名称", 200, true);
         string po = BusinessAttachmentFilePolicy.Text(request.PoNumber, "PO 号", 100);
         string style = BusinessAttachmentFilePolicy.Text(request.StyleNo, "款号", 200);
@@ -38,7 +38,8 @@ public sealed partial class BusinessAttachmentService(IDbContextFactory<AppDbCon
         {
             // A database row lock serializes the per-invoice quota, including uploads
             // to different attachments. SQLite already serializes write transactions.
-            await InvoiceAsync(writeDb, invoiceId, actor, PermissionAction.Operate, true, writeToken);
+            var invoice = await InvoiceAsync(writeDb, invoiceId, actor, PermissionAction.Operate, true, writeToken);
+            await DemandCategoryAsync(writeDb, request.CategoryId, invoice.CompanyScope, writeToken);
             var previous = await writeDb.BusinessAttachmentRevisions.AsNoTracking()
                 .Where(item => item.UploadedByUserId == actor.Id && item.UploadKey == request.UploadKey)
                 .Select(item => new { item.BusinessAttachmentId, item.Sha256, item.FileName, item.Note }).SingleOrDefaultAsync(writeToken);
@@ -46,7 +47,7 @@ public sealed partial class BusinessAttachmentService(IDbContextFactory<AppDbCon
             {
                 var existing = await writeDb.BusinessAttachments.SingleAsync(item => item.Id == previous.BusinessAttachmentId, writeToken);
                 if (existing.InvoiceId != invoiceId || request.AttachmentId.HasValue && request.AttachmentId != existing.Id ||
-                    existing.Title != title || existing.Category != request.Category || existing.PoNumber != po || existing.StyleNo != style ||
+                    existing.Title != title || existing.CategoryId != request.CategoryId || existing.PoNumber != po || existing.StyleNo != style ||
                     previous.Sha256 != hash || previous.FileName != name || previous.Note != note)
                     throw new ResourceConflictException("上传标识已用于其他资料，请重新选择文件后上传。");
                 return await RecordAsync(writeDb, existing.Id, actor, writeToken);
@@ -59,7 +60,7 @@ public sealed partial class BusinessAttachmentService(IDbContextFactory<AppDbCon
                     ?? throw new ResourceNotFoundException("业务资料不存在。");
                 Version(request.ExpectedVersion, attachment.VersionNumber);
                 if (attachment.IsArchived) throw new ResourceConflictException("请先恢复已停用的资料，再上传新版本。");
-                if (attachment.Title != title || attachment.Category != request.Category || attachment.PoNumber != po || attachment.StyleNo != style)
+                if (attachment.Title != title || attachment.CategoryId != request.CategoryId || attachment.PoNumber != po || attachment.StyleNo != style)
                     throw new ServiceValidationException("新版本须沿用原资料的名称、分类、PO 号和款号。");
             }
             else
@@ -67,7 +68,7 @@ public sealed partial class BusinessAttachmentService(IDbContextFactory<AppDbCon
                 if (request.ExpectedVersion != 0) throw new ServiceValidationException("新资料不能携带已有版本号。");
                 if (await writeDb.BusinessAttachments.CountAsync(item => item.InvoiceId == invoiceId, writeToken) >= BusinessAttachmentLimits.AttachmentsPerInvoice)
                     throw new ResourceConflictException("单张发票最多归档 100 份资料。");
-                attachment = new BusinessAttachment { InvoiceId = invoiceId, Title = title, Category = request.Category, PoNumber = po, StyleNo = style };
+                attachment = new BusinessAttachment { InvoiceId = invoiceId, Title = title, CategoryId = request.CategoryId, PoNumber = po, StyleNo = style };
                 writeDb.BusinessAttachments.Add(attachment);
             }
             if (attachment.LatestRevision >= BusinessAttachmentLimits.RevisionsPerAttachment)
@@ -100,39 +101,6 @@ public sealed partial class BusinessAttachmentService(IDbContextFactory<AppDbCon
         }, token);
     }, cancellationToken);
 
-    public Task<BusinessAttachmentRecord> UpdateAsync(int id, BusinessAttachmentUpdate request, CancellationToken cancellationToken = default) =>
-        RunAsync(true, async (db, actor, token) =>
-        {
-            Demand(PermissionAction.Operate, actor);
-            var item = await AttachmentAsync(db, id, actor, PermissionAction.Operate, token);
-            Version(request.ExpectedVersion, item.VersionNumber);
-            string note = BusinessAttachmentFilePolicy.Text(request.Note, "操作说明", 500, true);
-            if (request.CurrentRevision is <= 0 || request.CurrentRevision > item.LatestRevision ||
-                request.CurrentRevision == null && item.CurrentRevision != null)
-                throw new ServiceValidationException("请选择该资料已有的版本。");
-            if (item.CurrentRevision == request.CurrentRevision && item.IsArchived == request.IsArchived)
-                return await RecordAsync(db, id, actor, token);
-            string action = item.IsArchived != request.IsArchived ? request.IsArchived ? "Archive" : "Restore" : "Confirm";
-            if (item.IsArchived && request.CurrentRevision != item.CurrentRevision)
-                throw new ResourceConflictException("请先恢复资料，再确认有效版本。");
-            if (request.CurrentRevision != item.CurrentRevision && request.IsArchived != item.IsArchived)
-                throw new ServiceValidationException("确认版本与停用或恢复须分别操作。");
-            item.CurrentRevision = request.CurrentRevision;
-            item.IsArchived = request.IsArchived;
-            db.BusinessAttachmentEvents.Add(new BusinessAttachmentEvent
-            {
-                BusinessAttachmentId = id,
-                Action = action,
-                Revision = item.CurrentRevision,
-                ActorUserId = actor.Id,
-                ActorName = ActorName(actor),
-                Note = note,
-                CreatedAt = clock.UtcNow
-            });
-            await db.SaveChangesAsync(token);
-            return await RecordAsync(db, id, actor, token);
-        }, cancellationToken);
-
     private async Task<T> RunAsync<T>(bool write, Func<AppDbContext, User, CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
     {
         var actor = access.CurrentUser;
@@ -153,7 +121,7 @@ public sealed partial class BusinessAttachmentService(IDbContextFactory<AppDbCon
         catch (Exception ex) when (RelationalExceptionClassifier.IsWriteContention(ex))
         { throw new ServiceConcurrencyException("资料正在被处理，请刷新后重试。", ex); }
         catch (DbUpdateException ex) when (RelationalExceptionClassifier.IsUniqueConstraintViolation(ex))
-        { throw new ResourceConflictException("该上传已提交，请刷新后核对结果。", ex); }
+        { throw new ResourceConflictException("资料或分类发生冲突，请刷新后核对结果。", ex); }
     }
 
     private void Demand(string action, User actor)
@@ -182,9 +150,11 @@ public sealed partial class BusinessAttachmentService(IDbContextFactory<AppDbCon
 
     private async Task<BusinessAttachment> AttachmentAsync(AppDbContext db, int id, User actor, string action, CancellationToken token)
     {
-        var item = await db.BusinessAttachments.SingleOrDefaultAsync(item => item.Id == id, token)
+        int? invoiceId = await db.BusinessAttachments.Where(item => item.Id == id).Select(item => (int?)item.InvoiceId).SingleOrDefaultAsync(token);
+        if (!invoiceId.HasValue) throw new ResourceNotFoundException("业务资料不存在。");
+        // All writers acquire the invoice first, matching upload/quota lock order.
+        await InvoiceAsync(db, invoiceId.Value, actor, action, action != PermissionAction.View, token);
+        return await db.BusinessAttachments.SingleOrDefaultAsync(item => item.Id == id, token)
             ?? throw new ResourceNotFoundException("业务资料不存在。");
-        await InvoiceAsync(db, item.InvoiceId, actor, action, false, token);
-        return item;
     }
 }
