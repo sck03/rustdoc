@@ -39,6 +39,12 @@ namespace ExportDocManager.Models.Entities
         [Required, MaxLength(120)]
         public string Name { get; set; } = string.Empty;
 
+        [MaxLength(50)]
+        public string? ParentCode { get; set; }
+        public OrganizationDepartment? Parent { get; set; }
+        public int? ManagerEmployeeId { get; set; }
+        public PersonnelEmployee? Manager { get; set; }
+
         public bool IsActive { get; set; } = true;
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }

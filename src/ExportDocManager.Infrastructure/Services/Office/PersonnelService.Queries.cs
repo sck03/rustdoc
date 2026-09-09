@@ -31,18 +31,23 @@ public sealed partial class PersonnelService
             {
                 var soon = office.Clock.Today.AddDays(30);
                 people = people.Where(item => item.Status != EmploymentStatus.Departed &&
-                    (item.Status == EmploymentStatus.Probation && item.ProbationEndsOn <= soon || item.ContractEndsOn <= soon));
+                    (item.Status == EmploymentStatus.Probation && item.ProbationEndsOn <= soon || item.ContractEndsOn <= soon ||
+                        !item.IdentityLongTerm && item.IdentityValidUntil <= soon));
             }
             var page = await PageAsync(people.Include(item => item.Department).OrderBy(item => item.EmployeeNumberNormalized).ThenBy(item => item.Id),
                 query.PageNumber, query.PageSize, token);
-            return new PagedResult<PersonnelDirectoryRecord>(page.Items.Select(item => Directory(item, actor)).ToList(), page.TotalCount, page.PageNumber, page.PageSize);
+            int[] ids = page.Items.Select(item => item.Id).ToArray();
+            var avatars = await db.PersonnelImages.AsNoTracking()
+                .Where(item => ids.Contains(item.EmployeeId) && item.Kind == PersonnelImageKind.Avatar && item.CompanyScope == actor.CompanyScope)
+                .Select(item => new { item.EmployeeId, item.ContentHash }).ToDictionaryAsync(item => item.EmployeeId, item => item.ContentHash, token);
+            return new PagedResult<PersonnelDirectoryRecord>(page.Items.Select(item => Directory(item, actor, avatars.GetValueOrDefault(item.Id))).ToList(), page.TotalCount, page.PageNumber, page.PageSize);
         }, cancellationToken);
 
     public Task<PersonnelOptions> OptionsAsync(CancellationToken cancellationToken = default) =>
         office.RunAsync(Resource, PermissionAction.View, false, async (db, actor, token) => new PersonnelOptions(
             await db.OrganizationDepartments.AsNoTracking().Where(item => item.CompanyCode == actor.CompanyScope)
                 .OrderByDescending(item => item.IsActive).ThenBy(item => item.Name)
-                .Select(item => new PersonnelDepartmentRecord(item.Code, item.Name, item.IsActive)).ToListAsync(token),
+                .Select(item => new PersonnelDepartmentRecord(item.Code, item.Name, item.IsActive, item.ParentCode)).ToListAsync(token),
             office.CanRecord(new PersonnelEmployee { CompanyScope = actor.CompanyScope!, DepartmentId = actor.DepartmentId ?? "" }, actor, Resource, PermissionAction.Create) &&
                 office.CanRecord(new PersonnelEmployee { CompanyScope = actor.CompanyScope!, DepartmentId = actor.DepartmentId ?? "" }, actor, Resource, PermissionAction.ViewDetails)), cancellationToken);
 
@@ -66,24 +71,26 @@ public sealed partial class PersonnelService
             return await ReadClearanceAsync(db, employee, token);
         }, cancellationToken);
 
-    private PersonnelDirectoryRecord Directory(PersonnelEmployee employee, User actor) => new(employee.Id, employee.EmployeeNumber,
+    private PersonnelDirectoryRecord Directory(PersonnelEmployee employee, User actor, string? avatarHash = null) => new(employee.Id, employee.EmployeeNumber,
         employee.FullName, employee.DepartmentId, employee.Department?.Name ?? employee.DepartmentId, employee.JobTitle,
         employee.WorkEmail, employee.WorkPhone, employee.WorkLocation, employee.Status,
-        office.CanRecord(employee, actor, Resource, PermissionAction.ViewDetails));
+        office.CanRecord(employee, actor, Resource, PermissionAction.ViewDetails), avatarHash);
 
     private async Task<PersonnelRecord> RecordAsync(AppDbContext db, PersonnelEmployee employee, User actor, CancellationToken token)
     {
         await db.Entry(employee).Reference(item => item.Department).LoadAsync(token);
         await db.Entry(employee).Reference(item => item.Account).LoadAsync(token);
         var account = employee.Account;
-        return new PersonnelRecord(Directory(employee, actor), Profile(employee), employee.EmploymentType, employee.HireDate,
+        var images = await db.PersonnelImages.AsNoTracking().Where(item => item.EmployeeId == employee.Id && item.CompanyScope == employee.CompanyScope)
+            .OrderBy(item => item.Kind).Select(item => new PersonnelImageRecord(item.Kind, item.ContentType, item.ByteLength, item.ContentHash)).ToListAsync(token);
+        return new PersonnelRecord(Directory(employee, actor, images.Find(item => item.Kind == PersonnelImageKind.Avatar)?.ContentHash), Profile(employee), employee.EmploymentType, employee.HireDate,
             employee.LastEffectiveDate, employee.ProbationEndsOn, employee.ContractEndsOn, employee.ConfirmedOn, employee.DepartedOn,
             account == null ? null : new PersonnelAccountRecord(account.Id, account.Username, account.FullName ?? "", account.DepartmentId ?? "", account.IsActive, account.VersionNumber),
             employee.VersionNumber,
             employee.Status != EmploymentStatus.Departed && office.CanRecord(employee, actor, Resource, PermissionAction.Edit),
             employee.OwnerUserId != actor.Id && office.CanRecord(employee, actor, Resource, PermissionAction.Transition),
             !office.IsLocalRegister && employee.Status != EmploymentStatus.Departed && !employee.OwnerUserId.HasValue &&
-                BusinessDataAccessScope.CanViewAllBusinessData(actor) && office.CanRecord(employee, actor, Resource, PermissionAction.Assign));
+                BusinessDataAccessScope.CanViewAllBusinessData(actor) && office.CanRecord(employee, actor, Resource, PermissionAction.Assign), images);
     }
 
     private static async Task<PersonnelClearance> ReadClearanceAsync(AppDbContext db, PersonnelEmployee employee, CancellationToken token)
@@ -100,7 +107,10 @@ public sealed partial class PersonnelService
                                  orderby request.Id
                                  select new PersonnelClearanceItem("supplies", request.Id, supply.Name, request.Status.ToString(),
                                      request.Status == SupplyRequestStatus.Issued ? request.Quantity - request.ReturnedQuantity : 0)).Take(20).ToListAsync(token);
-        return new(await meetings.CountAsync(token), await supplies.CountAsync(token), [.. meetingItems, .. supplyItems]);
+        var managedDepartments = await db.OrganizationDepartments.AsNoTracking()
+            .Where(item => item.ManagerEmployeeId == employee.Id && item.CompanyCode == employee.CompanyScope)
+            .OrderBy(item => item.Name).Select(item => new PersonnelManagedDepartment(item.Code, item.Name)).ToListAsync(token);
+        return new(await meetings.CountAsync(token), await supplies.CountAsync(token), [.. meetingItems, .. supplyItems], managedDepartments);
     }
 
     internal static IQueryable<MeetingBooking> OpenMeetings(AppDbContext db, int? userId, int? employeeId = null) => db.MeetingBookings.Where(item =>

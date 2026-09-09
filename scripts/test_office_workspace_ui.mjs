@@ -6,6 +6,7 @@ import { createRequire } from "node:module";
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
+import { runPersonnelOrganizationUi } from "./lib/personnel-organization-ui-scenarios.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -24,6 +25,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   import { OfficeSuppliesPage } from ${source("features/office/OfficeSuppliesPage.tsx")};
   import { PersonnelPage } from ${source("features/office/PersonnelPage.tsx")};
   import { AccessControlPage } from ${source("features/access-control/AccessControlPage.tsx")};
+  import { OrganizationDirectoryPage } from ${source("features/organization/OrganizationDirectoryPage.tsx")};
   import ${source("styles/cascade.css")}; import ${source("styles/foundation.css")};
   import ${source("styles/workspaces.css")}; import ${source("styles/responsive.css")};
   const params = new URLSearchParams(location.search), mode=params.get('mode') || 'rooms', admin=params.get('role') !== 'employee';
@@ -33,25 +35,38 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   const permissions=['office.rooms','office.supplies'].flatMap(resourceKey=>(admin?actions:actions.slice(0,3)).map(action=>({resourceKey,action,dataScope:admin?'company':'own'})));
   const personnelActions=['view','view-details','create','edit','transition','assign'];
   permissions.push(...(admin?personnelActions:['view']).map(action=>({resourceKey:'office.people',action,dataScope:'company'})));
-  const user={id:admin?99:1,username:admin?'admin':'employee',fullName:admin?'行政管理员':'示例员工',companyScope:'DEMO',departmentId:'D1',businessDate:date,businessTimeZone:'Asia/Shanghai',capabilities:{permissions:permissions.filter(p=>!register||!['approve','assign'].includes(p.action)),usesOfficeRegister:register}};
+  const user={id:admin?99:1,username:admin?'admin':'employee',fullName:admin?'行政管理员':'示例员工',companyScope:'DEMO',departmentId:'D1',businessDate:date,businessTimeZone:'Asia/Shanghai',capabilities:{permissions:permissions.filter(p=>!register||!['approve','assign'].includes(p.action)),usesOfficeRegister:register,canManageUsers:admin}};
   const room={id:1,name:'三层第一会议室',location:'办公楼三层东侧',equipment:'投影设备、白板、视频会议终端',capacity:12,maximumBookingHours:8,advanceBookingDays:90,requiresKey:true,isActive:true,inUse:false,versionNumber:1};
   const supply={id:1,name:'会议投影设备',unit:'台',location:'行政办公室',description:'会议及培训临时借用，请按期归还。',isReturnable:true,isActive:true,stockQuantity:12,reservedQuantity:2,availableQuantity:10,minimumStock:3,lowStock:false,versionNumber:2};
   const booking={id:1,meetingRoomId:1,roomName:room.name,location:room.location,requiresKey:true,ownerUserId:1,applicantName:'示例员工',departmentId:'D1',title:'项目周会与交付沟通',attendeeCount:5,startsAt:new Date(now+7200000).toISOString(),endsAt:new Date(now+10800000).toISOString(),status:'Pending',createdAt:new Date(now-600000).toISOString(),versionNumber:1};
   const request={id:1,officeSupplyId:1,supplyName:supply.name,unit:'台',isReturnable:true,ownerUserId:1,applicantName:'示例员工',departmentId:'D1',purpose:'客户交流会议',quantity:2,returnedQuantity:0,returnDueDate:date,status:'Pending',createdAt:booking.createdAt,versionNumber:1};
   const page=items=>({items,totalCount:items.length,pageNumber:1,pageSize:24,totalPages:1});
-  const departments=[{code:'D1',name:'业务部',isActive:true},{code:'D2',name:'运营部',isActive:true}];
-  const profile={fullName:'张宁',workEmail:'zhang.ning@example.test',workPhone:'010-5555 1001',workLocation:'总部三楼',personalPhone:'13800000000',emergencyContact:'家属',emergencyPhone:'13900000000',notes:'人事档案示例备注'};
+  const departments=[{code:'D1',name:'业务部',isActive:true},{code:'D2',name:'运营部',isActive:true}].map(item=>({...item,companyCode:'DEMO',versionNumber:1,parentCode:null,managerEmployeeId:null,managerName:''}));
+  const companies=[{code:'DEMO',name:'示例公司',isActive:true,versionNumber:1}];
+  const imageFiles=new Map();
+  const profile={fullName:'张宁',workEmail:'zhang.ning@example.test',workPhone:'010-5555 1001',workLocation:'总部三楼',personalPhone:'13800000000',emergencyContact:'家属',emergencyPhone:'13900000000',notes:'人事档案示例备注',identityNumber:'11010519491231002X',identityAuthority:'示例签发机关',registeredAddress:'测试地址',identityValidFrom:'2020-01-01',identityValidUntil:null,identityLongTerm:true};
   let person={employee:{id:1,employeeNumber:'EMP-001',fullName:profile.fullName,departmentId:'D1',departmentName:'业务部',jobTitle:'业务专员',workEmail:profile.workEmail,workPhone:profile.workPhone,workLocation:profile.workLocation,status:'Probation',canViewDetails:admin},profile,employmentType:'FullTime',hireDate:date,lastEffectiveDate:date,probationEndsOn:date,contractEndsOn:null,confirmedOn:null,departedOn:null,account:{id:1,username:'employee',fullName:profile.fullName,departmentId:'D1',isActive:true,versionNumber:1},versionNumber:1,canEdit:admin,canTransition:admin,canLinkAccount:admin};
   if(register){person.account=null;person.canLinkAccount=false;booking.status='Approved';request.status='Approved';}
   window.__personnelClear=false; window.__personnelConflict=false;
   const resources=['office.rooms','office.supplies'].map((key,index)=>({key,name:index?'物品领用':'会议室预约',group:'公司行政',workspace:'office',moduleKey:key,sortOrder:index,isTechnical:false,supportsDataScope:true,actions:actions.filter(action=>index||action!=='restock').map((key,index)=>({key,name:({view:'查看',create:'申请',cancel:'取消',approve:'审批',issue:'交接',return:'归还登记',restock:'库存补充',manage:'资源管理'})[key],description:'操作公司行政资源',sortOrder:index,presetLevel:index<1?'view':index<3?'operate':'manage'}))}));
   const template={id:7,code:'OfficeEmployee',name:'公司员工',description:'会议室与物品申请',isSystem:true,isActive:true,versionNumber:1,grants:permissions.filter(p=>p.resourceKey==='office.people'?p.action==='view':['view','create','cancel'].includes(p.action)).map(p=>({...p,dataScope:p.resourceKey==='office.people'?'company':'own'})),effectiveGrants:[]};
   resources.push({key:'office.people',name:'人员信息管理',group:'公司行政',workspace:'office',moduleKey:'office.people',sortOrder:350,isTechnical:false,supportsDataScope:true,actions:personnelActions.map((key,index)=>({key,name:({view:'公司通讯录','view-details':'人事档案与记录',create:'入职登记',edit:'维护档案',transition:'转正、调岗与离职',assign:'关联账号'})[key],description:'人员管理动作',sortOrder:index,presetLevel:index===0?'view':index<4?'operate':'manage'}))});
+  person.images=[];
   window.__officeCalls=[]; window.__officeErrors=[];
   window.addEventListener('error',e=>window.__officeErrors.push(e.message));
   window.addEventListener('unhandledrejection',e=>window.__officeErrors.push(String(e.reason)));
   const record=(name,input,value)=>{window.__officeCalls.push({name,input}); return Promise.resolve(value)};
   const client={
+    getOrganizationDirectory:async()=>structuredClone({companies,departments}),
+    createOrganizationCompany:input=>{const item={...input.body,versionNumber:1};companies.push(item);return record('createCompany',input,structuredClone(item))},
+    updateOrganizationCompany:input=>{const item=companies.find(item=>item.code===input.code);Object.assign(item,input.body,{versionNumber:item.versionNumber+1});return record('updateCompany',input,structuredClone(item))},
+    createOrganizationDepartment:input=>{const item={...input.body,versionNumber:1,managerName:input.body.managerEmployeeId?person.employee.fullName:''};departments.push(item);return record('createDepartment',input,structuredClone(item))},
+    updateOrganizationDepartment:input=>{const item=departments.find(item=>item.code===input.code);Object.assign(item,input.body,{versionNumber:item.versionNumber+1,managerName:input.body.managerEmployeeId?person.employee.fullName:''});return record('updateDepartment',input,structuredClone(item))},
+    listOrganizationManagers:async()=>page([{id:person.employee.id,fullName:person.employee.fullName,employeeNumber:person.employee.employeeNumber,departmentName:person.employee.departmentName}]),
+    getPersonnelAvatar:input=>record('readAvatar',input,imageFiles.get('Avatar')),
+    getPersonnelImage:input=>record('readImage',input,imageFiles.get(input.kind)),
+    uploadPersonnelImage:input=>{const file=input.body.get('file');person.versionNumber++;const contentHash='image-'+person.versionNumber;imageFiles.set(input.kind,file);person.images=[...person.images.filter(item=>item.kind!==input.kind),{kind:input.kind,contentType:file.type,byteLength:file.size,contentHash}];if(input.kind==='Avatar')person.employee.avatarHash=contentHash;return record('uploadImage',{id:input.id,kind:input.kind,expectedVersion:Number(input.body.get('expectedVersion'))},structuredClone(person))},
+    deletePersonnelImage:input=>{person.versionNumber++;person.images=person.images.filter(item=>item.kind!==input.kind);imageFiles.delete(input.kind);if(input.kind==='Avatar')person.employee.avatarHash=null;return record('deleteImage',input,structuredClone(person))},
     listMeetingRooms:async()=>page([room]), getMeetingRoomAvailability:async()=>[{startsAt:booking.startsAt,endsAt:booking.endsAt,status:'Approved'}],
     listMeetingBookings:async(input)=>record('listBookings',input,page(!input.status||input.status===booking.status?[booking]:[])),
     createMeetingBooking:input=>record('createBooking',input,{...booking,id:2,...input.body}),
@@ -74,7 +89,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
     createPersonnel:input=>{person={...person,account:null,canLinkAccount:true,profile:input.body.profile,hireDate:input.body.hireDate,employee:{...person.employee,id:2,employeeNumber:input.body.employeeNumber,fullName:input.body.profile.fullName,jobTitle:input.body.jobTitle,departmentId:input.body.departmentId}};return record('createPerson',input,structuredClone(person))},
     updatePersonnel:input=>{if(window.__personnelConflict){window.__personnelConflict=false;return Promise.reject(new Error('记录已被其他人修改，请刷新后重试。'))}person={...person,...input.body,versionNumber:person.versionNumber+1,employee:{...person.employee,fullName:input.body.profile.fullName}};return record('updatePerson',input,structuredClone(person))},
     getPersonnelHistory:async()=>page([{id:1,action:'Hire',effectiveDate:date,actorName:'人事管理员',summary:'入职登记',note:'办理入职手续',createdAt:new Date(now).toISOString()}]),
-    getPersonnelClearance:async()=>window.__personnelClear?{isClear:true,meetingCount:0,supplyCount:0,items:[]}:{isClear:false,meetingCount:1,supplyCount:0,items:[{kind:'rooms',requestId:1,resourceName:room.name,status:'InUse',outstandingQuantity:1}]},
+    getPersonnelClearance:async()=>{const managedDepartments=departments.filter(item=>item.managerEmployeeId===person.employee.id).map(({code,name})=>({code,name}));return window.__personnelClear?{isClear:true,canDepart:managedDepartments.length===0,managedDepartments,meetingCount:0,supplyCount:0,items:[]}:{isClear:false,canDepart:false,managedDepartments,meetingCount:1,supplyCount:0,items:[{kind:'rooms',requestId:1,resourceName:room.name,status:'InUse',outstandingQuantity:1}]}},
     confirmPersonnel:input=>{person={...person,employee:{...person.employee,status:'Active'},versionNumber:person.versionNumber+1};return record('confirmPerson',input,structuredClone(person))},
     transferPersonnel:input=>{person={...person,employee:{...person.employee,departmentId:input.body.departmentId,jobTitle:input.body.jobTitle},versionNumber:person.versionNumber+1};return record('transferPerson',input,structuredClone(person))},
     departPersonnel:input=>{person={...person,employee:{...person.employee,status:'Departed'},account:{...person.account,isActive:false},versionNumber:person.versionNumber+1};return record('departPerson',input,structuredClone(person))},
@@ -83,11 +98,12 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
     linkPersonnelAccount:input=>{person={...person,canLinkAccount:false,account:{id:2,username:'new-account',fullName:person.employee.fullName,departmentId:'D1',isActive:true,versionNumber:4}};return record('linkPerson',input,person)},
   };
   const queries=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
-  const initialPath=mode==='permissions'?'/permissions':mode==='people'?'/office/people':mode==='supplies'?'/office/supplies':'/office/meeting-rooms';
+  const initialPath=mode==='organization'?'/system/organization':mode==='permissions'?'/permissions':mode==='people'?'/office/people':mode==='supplies'?'/office/supplies':'/office/meeting-rooms';
   createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[initialPath]}><QueryClientProvider client={queries}><ConfirmationProvider><UnsavedChangesProvider>
     <main style={{padding:'16px'}}><h1>公司行政工作台</h1><Routes>
       <Route path='/permissions' element={<AccessControlPage client={client} canManageUsers={true}/>}/>
       <Route path='/office/people' element={<PersonnelPage client={client} user={user}/>}/>
+      <Route path='/system/organization' element={<OrganizationDirectoryPage client={client} user={user}/>}/>
       <Route path='/office/supplies' element={<OfficeSuppliesPage client={client} user={user}/>}/>
       <Route path='/office/meeting-rooms' element={<MeetingRoomsPage client={client} user={user}/>}/>
     </Routes></main>
@@ -125,7 +141,7 @@ try {
     await page.send("Emulation.setDeviceMetricsOverride",{width,height:960,deviceScaleFactor:1,mobile:false});
     await page.send("Page.navigate",{url:`http://127.0.0.1:${server.address().port}/?mode=${mode}&role=${role}`});
     if(mode==='permissions'){await waitFor(page,"document.querySelector('.identity-management-tabs')");await clickText(page,'权限方案');}
-    await waitFor(page,"document.querySelector('.office-resource-card, .permission-resource-card, .permission-module-grid, .personnel-card')");
+    await waitFor(page,"document.querySelector('.office-resource-card, .permission-resource-card, .permission-module-grid, .personnel-card, .organization-node')");
   };
   for(const width of [1440,1024,768,390,320]){
     for(const mode of ["rooms","supplies"]){
@@ -211,6 +227,7 @@ try {
   await open("people",1024,"register");await clickText(page,"人员档案");await waitFor(page,"document.querySelector('.personnel-facts')");await clickText(page,"交接事项");
   await waitFor(page,"document.querySelector('.personnel-clearance')");await read(page,"[...document.querySelectorAll('.personnel-clearance a')].find(n=>n.textContent==='全部预约记录').click()");
   await waitFor(page,"window.__officeCalls.some(c=>c.name==='listBookings'&&c.input.employeeId===1)");results.push("local-employee-clearance-navigation");
+  await runPersonnelOrganizationUi({page,open,read,waitFor,clickText,input,audit,results,output,captureScreenshot});
   fs.writeFileSync(path.join(output,"summary.json"),JSON.stringify({passed:results.length,results},null,2));
   process.stdout.write(`Office UI contracts passed (${results.length} cases).\n`);
 } finally {cdp?.close();if(chrome)await closeChrome(chrome.browserWebSocketUrl,chrome.process);await new Promise(resolve=>server.close(resolve));}

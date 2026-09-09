@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-09-08",
+  "capturedAt": "2026-09-09",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 125493,
+      "baselineAggregateLines": 125941,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 125693,
+      "maximumAggregateLines": 126141,
       "reportFiles": false
     },
     {
@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 44692,
+      "baselineAggregateLines": 45084,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 44812,
+      "maximumAggregateLines": 45204,
       "reportFiles": false
     },
     {
@@ -60,9 +60,9 @@
       ],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 41234,
+      "baselineAggregateLines": 41388,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 41384,
+      "maximumAggregateLines": 41538,
       "reportFiles": false
     },
     {
@@ -117,7 +117,7 @@
       "filePattern": "^.+\\.cs$",
       "maximumLines": 300,
       "maximumAggregateLines": 800,
-      "excludePattern": "/PersonnelService(?:\\..+)?\\.cs$"
+      "excludePattern": "/(?:PersonnelService(?:\\..+)?|PersonnelImagePolicy)\\.cs$"
     },
     {
       "name": "office workspace components",
@@ -125,7 +125,7 @@
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 220,
       "maximumAggregateLines": 900,
-      "excludePattern": "/(?:Personnel.*|personnelModel|usePersonnelData)\\.(?:ts|tsx)$"
+      "excludePattern": "/(?:Personnel.*|personnelModel|usePersonnelData|usePersonnelImage)\\.(?:ts|tsx)$"
     },
     {
       "name": "HS knowledge partials",
@@ -391,6 +391,7 @@
       "name": "personnel services",
       "directory": "src/ExportDocManager.Infrastructure/Services/Office",
       "filePattern": "^PersonnelService(?:\\..+)?\\.cs$",
+      "excludePattern": "/PersonnelService\\.(?:Profile|Images)\\.cs$",
       "maximumLines": 300,
       "maximumAggregateLines": 500
     },
@@ -398,8 +399,44 @@
       "name": "personnel workspace components",
       "directory": "apps/export-doc-web/src/features/office",
       "filePattern": "^(?:Personnel.*|personnelModel|usePersonnelData)\\.(?:ts|tsx)$",
+      "excludePattern": "/Personnel(?:Avatar|IdentityFields|ImagesPanel)\\.tsx$",
       "maximumLines": 220,
       "maximumAggregateLines": 500
+    },
+    {
+      "name": "personnel profile and image services",
+      "directory": "src/ExportDocManager.Infrastructure/Services/Office",
+      "filePattern": "^(?:PersonnelService\\.(?:Profile|Images)|PersonnelImagePolicy)\\.cs$",
+      "maximumLines": 160,
+      "maximumAggregateLines": 320
+    },
+    {
+      "name": "personnel image and identity workspace",
+      "directory": "apps/export-doc-web/src/features/office",
+      "filePattern": "^(?:Personnel(?:Avatar|IdentityFields|ImagesPanel)|usePersonnelImage)\\.(?:ts|tsx)$",
+      "maximumLines": 160,
+      "maximumAggregateLines": 240
+    },
+    {
+      "name": "organization directory services",
+      "directory": "src/ExportDocManager.Infrastructure/Security",
+      "filePattern": "^OrganizationDirectoryService(?:\\..+)?\\.cs$",
+      "maximumLines": 220,
+      "maximumAggregateLines": 370
+    },
+    {
+      "name": "organization directory workspace",
+      "directory": "apps/export-doc-web/src/features/organization",
+      "filePattern": "^.+\\.(?:ts|tsx)$",
+      "maximumLines": 200,
+      "maximumAggregateLines": 420
+    },
+    {
+      "name": "personnel identity and organization regression",
+      "directory": "tests",
+      "filePattern": "^(?:PersonnelIdentityAndImageTests|OrganizationHierarchyTests|ApiPersonnelImageAndOrganizationTests|PersonnelPostgreSqlScenarios\\.ImagesAndOrganization)\\.cs$",
+      "maximumLines": 180,
+      "maximumAggregateLines": 460
     }
   ]
 }

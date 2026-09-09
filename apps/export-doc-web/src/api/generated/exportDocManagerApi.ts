@@ -1838,7 +1838,10 @@ export interface ApiOrganizationDepartmentDto {
   code: string;
   companyCode: string;
   isActive: boolean;
+  managerEmployeeId?: number | null;
+  managerName: string;
   name: string;
+  parentCode?: string | null;
   versionNumber: number;
 }
 
@@ -1847,7 +1850,9 @@ export interface ApiOrganizationDepartmentSaveRequest {
   companyCode: string;
   expectedVersion?: number;
   isActive: boolean;
+  managerEmployeeId?: number | null;
   name: string;
+  parentCode?: string | null;
 }
 
 export interface ApiOrganizationDirectoryResponse {
@@ -2220,6 +2225,11 @@ export interface ApiPermissionTemplateSaveRequest {
   id: number;
   isActive: boolean;
   name: string;
+}
+
+export interface ApiPersonnelImageForm {
+  expectedVersion?: number;
+  file?: null | IFormFile;
 }
 
 export interface ApiPortDto {
@@ -3853,6 +3863,13 @@ export interface OfficeSupplySaveRequest {
   unit: string;
 }
 
+export interface OrganizationManagerRecord {
+  departmentName: string;
+  employeeNumber: string;
+  fullName: string;
+  id: number;
+}
+
 export interface PagedResultOfBusinessAttachmentRecord {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
@@ -3923,6 +3940,16 @@ export interface PagedResultOfOfficeSupplyRequestRecord {
   totalPages: number;
 }
 
+export interface PagedResultOfOrganizationManagerRecord {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: OrganizationManagerRecord[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface PagedResultOfPersonnelAccountRecord {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
@@ -3986,8 +4013,10 @@ export interface PersonnelAccountRequest {
 }
 
 export interface PersonnelClearance {
+  canDepart: boolean;
   isClear: boolean;
   items: PersonnelClearanceItem[];
+  managedDepartments: PersonnelManagedDepartment[];
   meetingCount: number;
   supplyCount: number;
 }
@@ -4017,9 +4046,11 @@ export interface PersonnelDepartmentRecord {
   code: string;
   isActive: boolean;
   name: string;
+  parentCode?: string | null;
 }
 
 export interface PersonnelDirectoryRecord {
+  avatarHash?: string | null;
   canViewDetails: boolean;
   departmentId: string;
   departmentName: string;
@@ -4043,6 +4074,20 @@ export interface PersonnelEventRecord {
   summary: string;
 }
 
+export type PersonnelImageKind = "Avatar" | "IdentityFront" | "IdentityBack";
+
+export interface PersonnelImageRecord {
+  byteLength: number;
+  contentHash: string;
+  contentType: string;
+  kind: PersonnelImageKind;
+}
+
+export interface PersonnelManagedDepartment {
+  code: string;
+  name: string;
+}
+
 export interface PersonnelOptions {
   canCreate: boolean;
   departments: PersonnelDepartmentRecord[];
@@ -4052,8 +4097,14 @@ export interface PersonnelProfile {
   emergencyContact: string;
   emergencyPhone: string;
   fullName: string;
+  identityAuthority: string;
+  identityLongTerm: boolean;
+  identityNumber: string;
+  identityValidFrom?: string | null;
+  identityValidUntil?: string | null;
   notes: string;
   personalPhone: string;
+  registeredAddress: string;
   workEmail: string;
   workLocation: string;
   workPhone: string;
@@ -4070,6 +4121,7 @@ export interface PersonnelRecord {
   employee: PersonnelDirectoryRecord;
   employmentType: EmploymentType;
   hireDate: string;
+  images: PersonnelImageRecord[];
   lastEffectiveDate: string;
   probationEndsOn?: string | null;
   profile: PersonnelProfile;
@@ -4775,6 +4827,12 @@ export interface DeletePermissionTemplateRequest {
   expectedVersion?: number;
 }
 
+export interface DeletePersonnelImageRequest {
+  id: number;
+  kind: PersonnelImageKind;
+  expectedVersion: number;
+}
+
 export interface DeletePortRequest {
   id: number;
 }
@@ -5017,6 +5075,10 @@ export interface GetPersonnelRequest {
   id: number;
 }
 
+export interface GetPersonnelAvatarRequest {
+  id: number;
+}
+
 export interface GetPersonnelClearanceRequest {
   id: number;
 }
@@ -5025,6 +5087,11 @@ export interface GetPersonnelHistoryRequest {
   id: number;
   pageNumber?: number;
   pageSize?: number;
+}
+
+export interface GetPersonnelImageRequest {
+  id: number;
+  kind: PersonnelImageKind;
 }
 
 export interface GetPortRequest {
@@ -5277,6 +5344,13 @@ export interface ListOfficeSupplyRequestsRequest {
   requestId?: number;
   applicantUserId?: number;
   employeeId?: number;
+}
+
+export interface ListOrganizationManagersRequest {
+  companyCode: string;
+  keyword?: string;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListPayeesRequest {
@@ -6149,6 +6223,12 @@ export interface UploadOcrImageRequest {
   body: Blob;
 }
 
+export interface UploadPersonnelImageRequest {
+  id: number;
+  kind: PersonnelImageKind;
+  body: FormData;
+}
+
 export interface UploadReportTemplateFileRequest {
   reportType?: string;
   templatePath?: string;
@@ -6912,6 +6992,16 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public deletePersonnelImage(request: DeletePersonnelImageRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}/images/${encodePath(request.kind)}`;
+    return this.request<PersonnelRecord>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
+  }
+
   public deletePort(request: DeletePortRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/ports/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
@@ -7353,6 +7443,11 @@ export class ExportDocManagerApiClient {
     return this.request<PersonnelRecord>("GET", path, { init });
   }
 
+  public getPersonnelAvatar(request: GetPersonnelAvatarRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/people/${encodePath(request.id)}/avatar`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
   public getPersonnelClearance(request: GetPersonnelClearanceRequest, init?: ApiRequestInit): Promise<PersonnelClearance> {
     const path = `/api/office/people/${encodePath(request.id)}/clearance`;
     return this.request<PersonnelClearance>("GET", path, { init });
@@ -7367,6 +7462,11 @@ export class ExportDocManagerApiClient {
       },
       init,
     });
+  }
+
+  public getPersonnelImage(request: GetPersonnelImageRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/people/${encodePath(request.id)}/images/${encodePath(request.kind)}`;
+    return this.request<Blob>("GET", path, { init });
   }
 
   public getPersonnelOptions(init?: ApiRequestInit): Promise<PersonnelOptions> {
@@ -7885,6 +7985,19 @@ export class ExportDocManagerApiClient {
         "requestId": request.requestId,
         "applicantUserId": request.applicantUserId,
         "employeeId": request.employeeId,
+      },
+      init,
+    });
+  }
+
+  public listOrganizationManagers(request: ListOrganizationManagersRequest, init?: ApiRequestInit): Promise<PagedResultOfOrganizationManagerRecord> {
+    const path = "/api/organization-directory/managers";
+    return this.request<PagedResultOfOrganizationManagerRecord>("GET", path, {
+      query: {
+        "companyCode": request.companyCode,
+        "keyword": request.keyword,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
       },
       init,
     });
@@ -9483,6 +9596,14 @@ export class ExportDocManagerApiClient {
         "sourceName": request.sourceName,
         "sourceMimeType": request.sourceMimeType,
       },
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadPersonnelImage(request: UploadPersonnelImageRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}/images/${encodePath(request.kind)}`;
+    return this.request<PersonnelRecord>("POST", path, {
       body: request.body,
       init,
     });

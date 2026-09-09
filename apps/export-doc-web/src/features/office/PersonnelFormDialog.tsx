@@ -4,6 +4,8 @@ import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
 import { useOfficeOperation } from "./useOfficeData.ts";
 import { employmentTypeLabels, readPersonnelCreate, readPersonnelUpdate } from "./personnelModel.ts";
+import { PersonnelIdentityFields } from "./PersonnelIdentityFields.tsx";
+import { departmentOptions } from "../organization/organizationModel.ts";
 
 export function PersonnelFormDialog({ client, user, departments, record, onClose, onSaved }: {
   client: ExportDocManagerApiClient; user: ApiUserDto; departments: PersonnelDepartmentRecord[]; record?: PersonnelRecord;
@@ -27,7 +29,7 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
         <OfficeField label="姓名"><input name="fullName" required maxLength={100} defaultValue={record?.profile.fullName ?? ""} autoFocus={Boolean(record)} /></OfficeField>
         {!record && <>
           <OfficeField label="所属部门"><select name="departmentId" required defaultValue={user.departmentId || ""}>
-            <option value="">请选择部门</option>{departments.filter((item) => item.isActive).map((item) => <option value={item.code} key={item.code}>{item.name}</option>)}
+            <option value="">请选择部门</option>{departmentOptions(departments).filter((item) => item.isActive).map((item) => <option value={item.code} key={item.code}>{item.label}</option>)}
           </select></OfficeField>
           <OfficeField label="岗位"><input name="jobTitle" required maxLength={120} /></OfficeField>
           <OfficeField label="入职日期"><input type="date" name="hireDate" required min="1900-01-01" max={user.businessDate} value={hireDate} onChange={(event) => setHireDate(event.target.value)} /></OfficeField>
@@ -48,7 +50,7 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
       <details className="personnel-private-fields"><summary>个人资料与人事备注（限人事档案权限）</summary>
         <PersonnelPrivateFields profile={record?.profile} busy={operation.busy} />
       </details>
-      {!record && <p className="office-muted">登记后可由系统管理员关联已有账号。未使用系统的员工也可以保留独立档案。</p>}
+      {!record && <p className="office-muted">保存后可在“照片与证件”中上传头像及身份证正反面。{!user.capabilities.usesOfficeRegister && "需要使用系统的员工可由管理员关联已有账号。"}</p>}
       <OfficeSubmit busy={operation.busy} label={record ? "保存档案" : "登记入职"} />
     </form>
   </OfficeDialog>;
@@ -56,6 +58,7 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
 
 function PersonnelPrivateFields({ profile, busy }: { profile?: PersonnelProfile; busy: boolean }) {
   return <fieldset className="office-form-grid" disabled={busy}>
+    <PersonnelIdentityFields profile={profile} />
     <OfficeField label="个人电话"><input type="tel" name="personalPhone" maxLength={50} defaultValue={profile?.personalPhone ?? ""} /></OfficeField>
     <OfficeField label="紧急联系人"><input name="emergencyContact" maxLength={100} defaultValue={profile?.emergencyContact ?? ""} /></OfficeField>
     <OfficeField label="紧急联系电话"><input type="tel" name="emergencyPhone" maxLength={50} defaultValue={profile?.emergencyPhone ?? ""} /></OfficeField>

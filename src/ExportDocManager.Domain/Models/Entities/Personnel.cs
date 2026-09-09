@@ -34,8 +34,29 @@ public sealed class PersonnelEmployee : IBusinessOwnedEntity
     [MaxLength(100)] public string EmergencyContact { get; set; } = string.Empty;
     [MaxLength(50)] public string EmergencyPhone { get; set; } = string.Empty;
     [MaxLength(1000)] public string Notes { get; set; } = string.Empty;
+    [MaxLength(18)] public string IdentityNumber { get; set; } = string.Empty;
+    [MaxLength(120)] public string IdentityAuthority { get; set; } = string.Empty;
+    [MaxLength(300)] public string RegisteredAddress { get; set; } = string.Empty;
+    public DateOnly? IdentityValidFrom { get; set; }
+    public DateOnly? IdentityValidUntil { get; set; }
+    public bool IdentityLongTerm { get; set; }
     [ConcurrencyCheck] public int VersionNumber { get; set; } = 1;
     public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
+public enum PersonnelImageKind { Avatar, IdentityFront, IdentityBack }
+
+/// <summary>Employee images are part of the business database and its backups.</summary>
+public sealed class PersonnelImage
+{
+    public int EmployeeId { get; set; }
+    public PersonnelImageKind Kind { get; set; }
+    [Required, MaxLength(50)] public string CompanyScope { get; set; } = string.Empty;
+    [Required, MaxLength(30)] public string ContentType { get; set; } = string.Empty;
+    [Required, MaxLength(64)] public string ContentHash { get; set; } = string.Empty;
+    public int ByteLength { get; set; }
+    public byte[] Content { get; set; } = [];
     public DateTimeOffset UpdatedAt { get; set; }
 }
 

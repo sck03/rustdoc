@@ -14,12 +14,13 @@ const bundle = path.join(output, "model.mjs");
 await require("esbuild").build({ stdin: { contents: `
   export * as office from ${source("features/office/officeModel.ts")};
   export * as personnel from ${source("features/office/personnelModel.ts")};
+  export * as organization from ${source("features/organization/organizationModel.ts")};
   export * as navigation from ${source("app/workspaceNavigation.ts")};
   export { getDefaultWorkspaceRoute } from ${source("app/productEdition.ts")};
   export { isRouteAccessAllowed } from ${source("app/routeAccess.ts")};
   export { createRequestKey } from ${source("ui/createRequestKey.ts")};
 `, loader: "ts", resolveDir: web }, bundle: true, platform: "node", format: "esm", outfile: bundle, logLevel: "silent" });
-const { office, personnel, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey } = await import(pathToFileURL(bundle).href);
+const { office, personnel, organization, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey } = await import(pathToFileURL(bundle).href);
 const grants = scope => ["office.rooms", "office.supplies"].flatMap(resourceKey =>
   ["view", "create", "cancel", "approve", "issue", "return", "restock", "manage"].map(action => ({ resourceKey, action, dataScope: scope })));
 const user = { id: 1, companyScope: "C1", departmentId: "D1", businessDate: "2026-09-07",
@@ -60,7 +61,19 @@ assert(!personnel.canViewPersonnelDetails(personnelUser));
 assert(personnel.canViewPersonnelDetails({ ...personnelUser, capabilities:{permissions:[{resourceKey:"office.people",action:"view-details",dataScope:"department"}]} }));
 assert.deepEqual(personnel.personnelWorkflows({ canTransition:false,employee:{status:"Active"} }), []);
 assert.deepEqual(personnel.personnelWorkflows({ canTransition:true,employee:{status:"Departed"} }), ["rehire"]);
-assert.deepEqual(personnel.personnelReminders({ employee:{status:"Probation"},probationEndsOn:"2026-09-07",contractEndsOn:"2026-10-08" },"2026-09-07"), ["试用期即将到期：2026-09-07"]);
+assert.deepEqual(personnel.personnelReminders({ employee:{status:"Probation"},profile:{identityLongTerm:false,identityValidUntil:null},probationEndsOn:"2026-09-07",contractEndsOn:"2026-10-08" },"2026-09-07"), ["试用期即将到期：2026-09-07"]);
+assert.deepEqual(personnel.personnelReminders({employee:{status:"Active"},profile:{identityLongTerm:false,identityValidUntil:"2026-09-08"}},"2026-09-07"),["身份证即将到期：2026-09-08"]);
+const identityForm = new FormData();
+identityForm.set("identityNumber","11010519491231002x");identityForm.set("identityLongTerm","on");identityForm.set("identityValidUntil","2030-01-01");
+assert.equal(personnel.readPersonnelProfile(identityForm).identityNumber,"11010519491231002X");
+assert.equal(personnel.readPersonnelProfile(identityForm).identityValidUntil,null);
+const departments=[{code:"ROOT",name:"总部",isActive:true,managerName:""},{code:"SALES",name:"销售部",parentCode:"ROOT",isActive:true,managerName:"张宁"},
+  {code:"TEAM",name:"一组",parentCode:"SALES",isActive:true,managerName:""}];
+assert.equal(organization.departmentOptions(departments).find(item=>item.code==="TEAM").label,"总部 / 销售部 / 一组");
+assert.deepEqual(organization.parentDepartmentOptions(departments,"SALES").map(item=>item.code),["ROOT"]);
+assert.deepEqual(organization.filterDepartmentTree(departments,"一组").map(item=>item.code),["ROOT","SALES","TEAM"]);
+assert.deepEqual(organization.filterDepartmentTree(departments,"张宁").map(item=>item.code),["ROOT","SALES"]);
+assert.throws(()=>organization.departmentOptions([{code:"A",name:"A",parentCode:"B"},{code:"B",name:"B",parentCode:"A"}]),/循环/);
 assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=15&applicantUserId=7&employeeId=5")), {requestId:15,applicantUserId:7,employeeId:5});
 assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=-1&applicantUserId=2147483648&employeeId=0")), {requestId:undefined,applicantUserId:undefined,employeeId:undefined});
 const registerUser = { ...manager, capabilities: { ...manager.capabilities, productEdition:"Administration", usesOfficeRegister:true,
@@ -73,9 +86,11 @@ for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supp
   assert(isRouteAccessAllowed({ pathname, user: fullRegisterUser, canManageSystem: true, isDesktopRuntime: true }), "Full desktop permits direct administration routes");
   assert(!isRouteAccessAllowed({ pathname, user: { ...fullRegisterUser, capabilities: { ...fullRegisterUser.capabilities, enabledModules: [], permissions: [] } }, canManageSystem: true, isDesktopRuntime: true }), "edition availability never overrides missing grants");
 }
-for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supplies", "/system/access-control"]) {
+for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supplies", "/system/access-control", "/system/organization"]) {
   assert(isRouteAccessAllowed({ pathname, user:registerUser, canManageSystem:true, isDesktopRuntime:true }));
 }
+assert(!isRouteAccessAllowed({pathname:"/system/organization",user:personnelUser,canManageSystem:false,isDesktopRuntime:false}));
+assert(navigation.searchWorkspaceNavGroups("部门",navigation.filterWorkspaceNavGroups(registerUser.capabilities)).some(group=>group.items.some(item=>item.to==="/system/organization")));
 assert(!isRouteAccessAllowed({pathname:"/invoices",user:registerUser,canManageSystem:true,isDesktopRuntime:true}));
 assert.equal(office.officeRequestActions({...row,status:"Approved"},registerUser,"rooms").find(item=>item.action==='cancel').label,"取消登记");
 const crypto = globalThis.crypto;

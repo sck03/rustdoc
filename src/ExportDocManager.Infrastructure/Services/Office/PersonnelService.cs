@@ -1,4 +1,3 @@
-using System.Net.Mail;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
@@ -84,43 +83,6 @@ public sealed partial class PersonnelService(OfficeServiceContext office) : IPer
             return new PersonnelChangeResult(await RecordAsync(db, employee, actor, token),
                 before.FullName != employee.FullName ? employee.OwnerUserId : null);
         }, cancellationToken);
-
-    private static PersonnelProfile Profile(PersonnelEmployee employee) => new(employee.FullName, employee.WorkEmail,
-        employee.WorkPhone, employee.WorkLocation, employee.PersonalPhone, employee.EmergencyContact, employee.EmergencyPhone, employee.Notes);
-
-    private static void ApplyProfile(PersonnelEmployee employee, PersonnelProfile profile, EmploymentType type,
-        DateOnly? probationEnd, DateOnly? contractEnd)
-    {
-        if (profile == null) throw new ServiceValidationException("人员信息不能为空。");
-        if (!Enum.IsDefined(type)) throw new ServiceValidationException("用工类型无效。");
-        employee.FullName = Text(profile.FullName, "姓名", 100, true);
-        employee.WorkEmail = Text(profile.WorkEmail, "工作邮箱", 254);
-        if (employee.WorkEmail.Length > 0 && (!MailAddress.TryCreate(employee.WorkEmail, out var address) || address.Address != employee.WorkEmail))
-            throw new ServiceValidationException("请填写有效的工作邮箱地址。");
-        employee.WorkPhone = Text(profile.WorkPhone, "工作电话", 50);
-        employee.WorkLocation = Text(profile.WorkLocation, "工作地点", 120);
-        employee.PersonalPhone = Text(profile.PersonalPhone, "个人电话", 50);
-        employee.EmergencyContact = Text(profile.EmergencyContact, "紧急联系人", 100);
-        employee.EmergencyPhone = Text(profile.EmergencyPhone, "紧急联系电话", 50);
-        if ((employee.EmergencyContact.Length == 0) != (employee.EmergencyPhone.Length == 0))
-            throw new ServiceValidationException("紧急联系人与联系电话须一起填写。");
-        employee.Notes = Text(profile.Notes, "人事备注", 1000);
-        if (probationEnd < employee.HireDate || contractEnd < employee.HireDate || probationEnd.HasValue && contractEnd < probationEnd)
-            throw new ServiceValidationException("试用和合同截止日期不能早于入职，试用期不能超过合同期限。");
-        employee.EmploymentType = type;
-        employee.ProbationEndsOn = probationEnd;
-        employee.ContractEndsOn = contractEnd;
-    }
-
-    private static string ProfileChanges(PersonnelProfile before, PersonnelProfile after)
-    {
-        (string Name, string Before, string After)[] fields = [
-            ("姓名", before.FullName, after.FullName), ("工作邮箱", before.WorkEmail, after.WorkEmail),
-            ("工作电话", before.WorkPhone, after.WorkPhone), ("工作地点", before.WorkLocation, after.WorkLocation),
-            ("个人电话", before.PersonalPhone, after.PersonalPhone), ("紧急联系人", before.EmergencyContact, after.EmergencyContact),
-            ("紧急联系电话", before.EmergencyPhone, after.EmergencyPhone), ("人事备注", before.Notes, after.Notes)];
-        return string.Concat(fields.Where(field => field.Before != field.After).Select(field => field.Name + "；"));
-    }
 
     private void ValidateEffectiveDate(PersonnelEmployee employee, DateOnly date)
     {

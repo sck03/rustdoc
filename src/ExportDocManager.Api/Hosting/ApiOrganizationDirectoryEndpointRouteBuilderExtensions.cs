@@ -7,6 +7,11 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapOrganizationDirectoryEndpoints(this IEndpointRouteBuilder endpoints)
         {
+            endpoints.MapGet("/api/organization-directory/managers", async (IOrganizationDirectoryService service, string companyCode,
+                string? keyword, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await service.ManagerOptionsAsync(companyCode, keyword, pageNumber ?? 1, pageSize ?? 20, cancellationToken)))
+                .WithName("ListOrganizationManagers")
+                .WithApiCapability(PermissionResourceCatalog.SystemUsers, PermissionAction.Manage);
             endpoints.MapGet("/api/organization-directory", async (
                 IOrganizationDirectoryService service,
                 CancellationToken cancellationToken) =>
@@ -104,7 +109,7 @@ namespace ExportDocManager.Api.Hosting
                     var saved = await service.SaveDepartmentAsync(
                         new OrganizationDepartmentSaveRequest(
                             string.Empty, request.Code, request.CompanyCode, request.Name,
-                            request.IsActive, 0),
+                            request.IsActive, 0, request.ParentCode, request.ManagerEmployeeId),
                         cancellationToken);
                     return Results.Created(
                         $"/api/organization-directory/departments/{Uri.EscapeDataString(saved.Code)}",
@@ -135,7 +140,7 @@ namespace ExportDocManager.Api.Hosting
                         new OrganizationDepartmentSaveRequest(
                             code, request?.Code ?? string.Empty, request?.CompanyCode ?? string.Empty,
                             request?.Name ?? string.Empty, request?.IsActive ?? false,
-                            request?.ExpectedVersion ?? 0),
+                            request?.ExpectedVersion ?? 0, request?.ParentCode, request?.ManagerEmployeeId),
                         cancellationToken);
                     return Results.Ok(ToOrganizationDepartmentDto(saved));
                 }

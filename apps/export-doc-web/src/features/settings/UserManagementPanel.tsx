@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { ApiUserAccountDto, ApiUserListResponse, ApiUserSaveRequest, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
@@ -8,7 +9,6 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
-import { OrganizationDirectoryPanel } from "./OrganizationDirectoryPanel.tsx";
 
 type UserDraft = {
   id: number;
@@ -429,7 +429,7 @@ export function UserManagementPanel({
         </div>
       </div>
 
-      <OrganizationDirectoryPanel client={client} />
+      <p className="section-description">公司和部门在 <Link to="/system/organization">组织架构</Link> 中统一维护。</p>
 
       {deleteTarget ? (
         <ConfirmationDialog

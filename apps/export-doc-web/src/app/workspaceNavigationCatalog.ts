@@ -149,6 +149,8 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
         isActive: (path) => path.startsWith("/settings"), requiresAdmin: true },
       { label: "账号与权限", description: "管理登录账号、权限方案和数据范围", to: "/system/access-control", icon: UsersRound,
         isActive: isAccessControlRoute, requiresAdmin: true, requiresSystemAdministration: true },
+      { label: "组织架构", description: "定义公司、部门层级和负责人", keywords: "组织目录 公司部门 综合部", to: "/system/organization", icon: Network,
+        isActive: (path) => path.startsWith("/system/organization"), requiresAdmin: true, requiresSystemAdministration: true },
       { label: "审计日志", description: "查阅和导出关键业务操作记录", to: "/audit-logs", icon: ShieldCheck,
         isActive: isAuditLogRoute, requiresAdmin: true, requiresSystemAdministration: true },
       { label: "软件更新", description: "检查版本、查看更新说明并安装更新", to: "/system/update", icon: RefreshCw,

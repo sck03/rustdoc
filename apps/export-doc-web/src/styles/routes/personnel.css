@@ -7,6 +7,16 @@
   .personnel-card header > div { flex: 1; min-width: 0; }
   .personnel-card h3 { margin: 0 0 4px; font-size: 1.05rem; overflow-wrap: anywhere; }
   .personnel-initial { display: grid; place-items: center; flex: 0 0 40px; height: 40px; border-radius: 50%; color: var(--edm-primary-700); background: var(--edm-primary-50); font-weight: 600; }
+  .personnel-avatar { flex: 0 0 40px; width: 40px; height: 40px; object-fit: cover; border-radius: 50%; }
+  .personnel-avatar-retry { border: 1px solid var(--edm-neutral-250); cursor: pointer; }
+  .personnel-images { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 16px; }
+  .personnel-image-card { display: grid; align-content: start; gap: 12px; min-width: 0; padding: 14px; border: 1px solid var(--edm-neutral-250); border-radius: 10px; }
+  .personnel-image-card h3 { margin: 0; font-size: 1rem; }
+  .personnel-image-card p { overflow-wrap: anywhere; margin: 0; }
+  .personnel-image-preview { width: 100%; height: 180px; padding: 0; overflow: hidden; border: 1px solid var(--edm-neutral-250); background: var(--edm-neutral-50); cursor: zoom-in; }
+  .personnel-image-preview img { width: 100%; height: 100%; object-fit: contain; }
+  .personnel-image-empty { display: grid; place-items: center; height: 180px; color: var(--edm-neutral-650); background: var(--edm-neutral-50); text-align: center; }
+  .personnel-image-zoom { display: block; max-width: 100%; max-height: 75dvh; margin-inline: auto; object-fit: contain; }
   .personnel-contact { display: flex; align-items: baseline; gap: 8px; min-width: 0; overflow-wrap: anywhere; font-size: 0.9rem; }
   .personnel-contact svg { flex: 0 0 15px; }
   .personnel-contact a { min-width: 0; color: var(--edm-primary-700); text-underline-offset: 3px; }

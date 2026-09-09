@@ -247,6 +247,6 @@ namespace ExportDocManager.Api.Hosting
             new(item.Code, item.Name, item.IsActive, item.VersionNumber);
 
         private static ApiOrganizationDepartmentDto ToOrganizationDepartmentDto(OrganizationDepartmentRecord item) =>
-            new(item.Code, item.CompanyCode, item.Name, item.IsActive, item.VersionNumber);
+            new(item.Code, item.CompanyCode, item.Name, item.IsActive, item.VersionNumber, item.ParentCode, item.ManagerEmployeeId, item.ManagerName);
     }
 }

@@ -77,6 +77,8 @@ public sealed partial class PersonnelService
                     break;
                 case PersonnelAction.Depart:
                     if (employee.Status == EmploymentStatus.Departed) throw new ResourceConflictException("该人员已经离职。");
+                    if (await db.OrganizationDepartments.AnyAsync(item => item.ManagerEmployeeId == employee.Id, token))
+                        throw new ResourceConflictException("该人员仍担任部门负责人，请先在组织架构中调整负责人，再办理离职。");
                     if (employee.OwnerUserId.HasValue)
                     {
                         await OfficeAccountAccess.LockAsync(db, employee.OwnerUserId.Value, employee.CompanyScope, token);

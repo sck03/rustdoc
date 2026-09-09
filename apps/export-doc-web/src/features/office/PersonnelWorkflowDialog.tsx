@@ -5,6 +5,7 @@ import { OfficeDialog, OfficeField, OfficePager, OfficeQueryState, OfficeSubmit 
 import { personnelActionLabels, type PersonnelWorkflow } from "./personnelModel.ts";
 import { applyPersonnelWorkflow, usePersonnelAccountOptions, usePersonnelClearance } from "./usePersonnelData.ts";
 import { useOfficeOperation } from "./useOfficeData.ts";
+import { departmentOptions } from "../organization/organizationModel.ts";
 
 export function PersonnelWorkflowDialog({ client, user, record, action, departments, onClose }: {
   client: ExportDocManagerApiClient; user: ApiUserDto; record: PersonnelRecord; action: PersonnelWorkflow;
@@ -15,7 +16,8 @@ export function PersonnelWorkflowDialog({ client, user, record, action, departme
   const [departmentId, setDepartmentId] = useState(record.employee.departmentId);
   const changesJob = action === "transfer" || action === "rehire";
   const needsClearance = action === "depart" || action === "rehire" || action === "transfer" && departmentId !== record.employee.departmentId;
-  const blocked = needsClearance && (clearance.isFetching || clearance.isError || !clearance.data?.isClear);
+  const blocked = needsClearance && (clearance.isFetching || clearance.isError ||
+    !(action === "depart" ? clearance.data?.canDepart : clearance.data?.isClear));
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (blocked) return;
@@ -30,8 +32,10 @@ export function PersonnelWorkflowDialog({ client, user, record, action, departme
     <p className="office-muted">{action === "depart" ? `完成交接后归档人员，保留全部历史记录。${record.account ? "关联账号将停用并撤销会话。" : ""}`
       : action === "rehire" ? `登记新一轮任职，试用与合同日期可在档案中重新设置。${record.account ? "关联账号由系统管理员复核权限后启用。" : ""}`
         : action === "transfer" ? `登记部门或岗位调整，原业务记录保留原归属。${record.account ? "关联账号将同步部门范围并要求重新登录。" : ""}` : "将试用人员转为正式在职，并记录生效日期与办理说明。"}</p>
-    {needsClearance && <InlineNotice tone={clearance.data?.isClear && !clearance.isError ? "success" : "warning"} title="行政交接核对">
-      {clearance.isError ? "无法完成交接核对，请重新核对后提交。" : clearance.isFetching ? "正在核对…" : clearance.data?.isClear ? "未结清事项为 0，可以办理。"
+    {needsClearance && <InlineNotice tone={!blocked ? "success" : "warning"} title="行政交接核对">
+      {clearance.isError ? "无法完成交接核对，请重新核对后提交。" : clearance.isFetching ? "正在核对…"
+        : action === "depart" && (clearance.data?.managedDepartments.length ?? 0) > 0 ? "该人员仍担任部门负责人，请先由管理员在组织架构中调整负责人。"
+        : clearance.data?.isClear ? "未结清事项为 0，可以办理。"
         : `还有预约 ${clearance.data?.meetingCount ?? 0} 笔、物品申请／借用 ${clearance.data?.supplyCount ?? 0} 笔。请返回档案的“交接事项”处理。`}
       <button type="button" disabled={clearance.isFetching} onClick={() => void clearance.refetch()}>重新核对</button>
     </InlineNotice>}
@@ -39,7 +43,7 @@ export function PersonnelWorkflowDialog({ client, user, record, action, departme
       <OfficeField label="生效日期"><input type="date" name="effectiveDate" required min={record.lastEffectiveDate} max={user.businessDate} defaultValue={user.businessDate} /></OfficeField>
       {changesJob && <>
         <OfficeField label="新部门"><select required value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}><option value="">请选择部门</option>
-          {departments.filter((item) => item.isActive).map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></OfficeField>
+          {departmentOptions(departments).filter((item) => item.isActive).map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></OfficeField>
         <OfficeField label="新岗位"><input name="jobTitle" required maxLength={120} defaultValue={record.employee.jobTitle} /></OfficeField>
       </>}
       {action === "rehire" && <label className="checkbox-field"><input type="checkbox" name="onProbation" defaultChecked />返聘后先进入试用期</label>}

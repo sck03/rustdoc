@@ -31,7 +31,10 @@ namespace ExportDocManager.Api.Hosting
         string CompanyCode,
         string Name,
         bool IsActive,
-        int VersionNumber);
+        int VersionNumber,
+        string? ParentCode = null,
+        int? ManagerEmployeeId = null,
+        string ManagerName = "");
 
     public sealed record ApiOrganizationDirectoryResponse(
         IReadOnlyList<ApiOrganizationCompanyDto> Companies,
@@ -48,7 +51,9 @@ namespace ExportDocManager.Api.Hosting
         string CompanyCode,
         string Name,
         bool IsActive,
-        int ExpectedVersion = 0);
+        int ExpectedVersion = 0,
+        string? ParentCode = null,
+        int? ManagerEmployeeId = null);
 
     public sealed record ApiUserSaveRequest(
         string Username,

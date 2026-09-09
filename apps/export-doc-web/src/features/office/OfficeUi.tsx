@@ -8,15 +8,15 @@ import { readApiError } from "../../ui/formUtils.ts";
 import type { OfficePage } from "./officeModel.ts";
 import type { useOfficePaging } from "./useOfficeData.ts";
 
-export function OfficeDialog({ title, children, onClose, busy = false, error = "", protectChanges = false }: {
-  title: string; children: ReactNode; onClose: () => void; busy?: boolean; error?: string; protectChanges?: boolean;
+export function OfficeDialog({ title, children, onClose, busy = false, error = "", protectChanges = false, hasChanges = false }: {
+  title: string; children: ReactNode; onClose: () => void; busy?: boolean; error?: string; protectChanges?: boolean; hasChanges?: boolean;
 }) {
   const titleId = useId();
   const [dirty, setDirty] = useState(false);
   const requestConfirmation = useConfirmation();
   function close() {
     if (busy) return;
-    if (!protectChanges || !dirty) { onClose(); return; }
+    if (!protectChanges || !dirty && !hasChanges) { onClose(); return; }
     void requestConfirmation({ title: "放弃未提交的内容？", description: "当前填写内容尚未提交。", confirmLabel: "放弃并关闭" })
       .then((accepted) => { if (accepted) onClose(); });
   }

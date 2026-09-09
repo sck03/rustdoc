@@ -43,6 +43,7 @@ namespace ExportDocManager.DataAccess
         public DbSet<PersonnelEvent> PersonnelEvents { get; set; }
         public DbSet<OrganizationCompany> OrganizationCompanies { get; set; }
         public DbSet<OrganizationDepartment> OrganizationDepartments { get; set; }
+        public DbSet<PersonnelImage> PersonnelImages { get; set; }
         public DbSet<ApiUserSession> ApiUserSessions { get; set; }
         public DbSet<ApiBackgroundJobRecord> ApiBackgroundJobs { get; set; }
         public DbSet<PermissionTemplate> PermissionTemplates { get; set; }

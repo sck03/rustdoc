@@ -37,6 +37,8 @@ internal static class AuditValuePolicy
     }
 
     private static bool IsSecret(string name) =>
+        name.StartsWith("Identity", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("RegisteredAddress", StringComparison.OrdinalIgnoreCase) ||
         name.Contains("Password", StringComparison.OrdinalIgnoreCase) ||
         name.Contains("Secret", StringComparison.OrdinalIgnoreCase) ||
         name.Contains("ApiKey", StringComparison.OrdinalIgnoreCase) ||

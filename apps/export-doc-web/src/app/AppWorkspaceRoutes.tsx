@@ -10,6 +10,7 @@ type NamedComponent<TModule, TExport extends keyof TModule> =
   TModule[TExport] extends ComponentType<infer TProps> ? ComponentType<TProps> : never;
 
 const DashboardPage = lazyNamed(() => import("../features/dashboard/DashboardPage.tsx"), "DashboardPage");
+const OrganizationDirectoryPage = lazyNamed(() => import("../features/organization/OrganizationDirectoryPage.tsx"), "OrganizationDirectoryPage");
 const CustomerFollowUpPage = lazyNamed(() => import("../features/crm/CustomerFollowUpPage.tsx"), "CustomerFollowUpPage");
 const SalesDashboardPage = lazyNamed(() => import("../features/crm/SalesDashboardPage.tsx"), "SalesDashboardPage");
 const SupplierDirectoryPage = lazyNamed(() => import("../features/suppliers/SupplierDirectoryPage.tsx"), "SupplierDirectoryPage");
@@ -176,6 +177,7 @@ export function AppWorkspaceRoutes({
         <Route path="/system/about" element={<AboutPage client={client} product={activeProduct} />} />
         <Route path="/access-denied" element={<NoModuleAccessPage />} />
         <Route path="/audit-logs" element={<AuditLogPage client={client} canManageAuditLogs={canManageAuditLogs} />} />
+        <Route path="/system/organization" element={<OrganizationDirectoryPage client={client} user={user} />} />
         <Route
           path="/system/access-control"
           element={<AccessControlPage client={client} canManageUsers={user.capabilities.canManageUsers === true} />}

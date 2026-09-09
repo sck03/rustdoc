@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Api.Tests;
 
-internal static class PersonnelPostgreSqlScenarios
+internal static partial class PersonnelPostgreSqlScenarios
 {
     internal static async Task RunAsync(IDbContextFactory<AppDbContext> factory, DatabaseConnectionSettings settings)
     {
@@ -26,6 +26,7 @@ internal static class PersonnelPostgreSqlScenarios
         var clock = new BusinessClock(TimeProvider.System, "Asia/Shanghai");
         OfficeServiceContext Context(User actor) => new(factory, new BusinessDataAccessScope(settings, new PersonnelUser(actor)), clock, OfficeOperatingMode.Team);
         var people = new PersonnelService(Context(admin));
+        await VerifyImagesAndOrganizationAsync(factory, people, admin, clock);
         var create = new PersonnelCreateRequest(Guid.NewGuid(), "EMP-PG-001", firstDepartment, "业务专员", EmploymentType.FullTime,
             clock.Today.AddDays(-1), false, null, null, new("并发测试员工"));
         var registrations = await RaceAsync(8, _ => people.CreateAsync(create));
@@ -75,8 +76,7 @@ internal static class PersonnelPostgreSqlScenarios
         {
             await gate.Task;
             try { return (object)await action(index); }
-            catch (ResourceConflictException exception) { return exception; }
-            catch (PermissionDeniedException exception) { return exception; }
+            catch (ServiceException exception) { return exception; }
         }).ToArray();
         gate.SetResult();
         return await Task.WhenAll(tasks);

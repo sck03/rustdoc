@@ -7,7 +7,9 @@ public sealed record PersonnelQuery(string? Keyword = null, string? DepartmentId
     bool AttentionOnly = false, int PageNumber = 1, int PageSize = 24);
 
 public sealed record PersonnelProfile(string FullName, string WorkEmail = "", string WorkPhone = "",
-    string WorkLocation = "", string PersonalPhone = "", string EmergencyContact = "", string EmergencyPhone = "", string Notes = "");
+    string WorkLocation = "", string PersonalPhone = "", string EmergencyContact = "", string EmergencyPhone = "", string Notes = "",
+    string IdentityNumber = "", string IdentityAuthority = "", string RegisteredAddress = "", DateOnly? IdentityValidFrom = null,
+    DateOnly? IdentityValidUntil = null, bool IdentityLongTerm = false);
 
 public sealed record PersonnelCreateRequest(Guid RequestKey, string EmployeeNumber, string DepartmentId, string JobTitle,
     EmploymentType EmploymentType, DateOnly HireDate, bool OnProbation, DateOnly? ProbationEndsOn,
@@ -24,16 +26,25 @@ public sealed record PersonnelAccountRequest(int ExpectedVersion, int UserId, in
 /// <summary>The company directory contains work information only.</summary>
 public sealed record PersonnelDirectoryRecord(int Id, string EmployeeNumber, string FullName, string DepartmentId,
     string DepartmentName, string JobTitle, string WorkEmail, string WorkPhone, string WorkLocation,
-    EmploymentStatus Status, bool CanViewDetails);
+    EmploymentStatus Status, bool CanViewDetails, string? AvatarHash = null);
 
 public sealed record PersonnelAccountRecord(int Id, string Username, string FullName, string DepartmentId, bool IsActive, int VersionNumber);
-public sealed record PersonnelDepartmentRecord(string Code, string Name, bool IsActive);
+public sealed record PersonnelDepartmentRecord(string Code, string Name, bool IsActive, string? ParentCode = null);
 public sealed record PersonnelOptions(IReadOnlyList<PersonnelDepartmentRecord> Departments, bool CanCreate);
 
 public sealed record PersonnelRecord(PersonnelDirectoryRecord Employee, PersonnelProfile Profile, EmploymentType EmploymentType,
     DateOnly HireDate, DateOnly LastEffectiveDate, DateOnly? ProbationEndsOn, DateOnly? ContractEndsOn,
     DateOnly? ConfirmedOn, DateOnly? DepartedOn, PersonnelAccountRecord? Account, int VersionNumber,
-    bool CanEdit, bool CanTransition, bool CanLinkAccount);
+    bool CanEdit, bool CanTransition, bool CanLinkAccount, IReadOnlyList<PersonnelImageRecord> Images);
+
+public sealed record PersonnelImageRecord(PersonnelImageKind Kind, string ContentType, int ByteLength, string ContentHash);
+public sealed record PersonnelImageFile(byte[] Content, string ContentType);
+public static class PersonnelImageLimits
+{
+    public const int MaxBytes = 5 * 1024 * 1024;
+    public const int MaxDimension = 8192;
+    public const long MaxPixels = 32_000_000;
+}
 
 public sealed record PersonnelEventRecord(int Id, string Action, DateOnly EffectiveDate, string ActorName,
     string Summary, string Note, DateTimeOffset CreatedAt);
@@ -41,9 +52,12 @@ public sealed record PersonnelEventRecord(int Id, string Action, DateOnly Effect
 public sealed record PersonnelChangeResult(PersonnelRecord Record, int? ChangedAccountUserId);
 
 public sealed record PersonnelClearanceItem(string Kind, int RequestId, string ResourceName, string Status, int OutstandingQuantity);
-public sealed record PersonnelClearance(int MeetingCount, int SupplyCount, IReadOnlyList<PersonnelClearanceItem> Items)
+public sealed record PersonnelManagedDepartment(string Code, string Name);
+public sealed record PersonnelClearance(int MeetingCount, int SupplyCount, IReadOnlyList<PersonnelClearanceItem> Items,
+    IReadOnlyList<PersonnelManagedDepartment> ManagedDepartments)
 {
     public bool IsClear => MeetingCount == 0 && SupplyCount == 0;
+    public bool CanDepart => IsClear && ManagedDepartments.Count == 0;
 }
 
 public interface IPersonnelService
@@ -58,4 +72,8 @@ public interface IPersonnelService
     Task<PersonnelChangeResult> LinkAccountAsync(int id, PersonnelAccountRequest request, CancellationToken cancellationToken = default);
     Task<PersonnelClearance> ClearanceAsync(int id, CancellationToken cancellationToken = default);
     Task<PagedResult<PersonnelEventRecord>> HistoryAsync(int id, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
+    Task<PersonnelImageFile> ReadImageAsync(int id, PersonnelImageKind kind, CancellationToken cancellationToken = default);
+    Task<PersonnelRecord> SaveImageAsync(int id, PersonnelImageKind kind, int expectedVersion, Stream source,
+        string contentType, CancellationToken cancellationToken = default);
+    Task<PersonnelRecord> DeleteImageAsync(int id, PersonnelImageKind kind, int expectedVersion, CancellationToken cancellationToken = default);
 }

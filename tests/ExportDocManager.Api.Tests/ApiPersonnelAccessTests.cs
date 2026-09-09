@@ -83,8 +83,12 @@ public sealed class ApiPersonnelAccessTests
         var directory = schemas.GetProperty(nameof(PersonnelDirectoryRecord)).GetProperty("properties");
         Assert.False(directory.TryGetProperty("personalPhone", out _));
         Assert.False(directory.TryGetProperty("notes", out _));
+        Assert.False(directory.TryGetProperty("identityNumber", out _));
+        Assert.False(directory.TryGetProperty("images", out _));
         var profile = schemas.GetProperty(nameof(PersonnelProfile)).GetProperty("properties");
         Assert.True(profile.TryGetProperty("personalPhone", out _));
+        Assert.True(profile.TryGetProperty("identityNumber", out _));
+        Assert.Equal("date", profile.GetProperty("identityValidFrom").GetProperty("format").GetString());
         Assert.Equal("date", schemas.GetProperty(nameof(PersonnelTransitionRequest)).GetProperty("properties").GetProperty("effectiveDate").GetProperty("format").GetString());
     }
 

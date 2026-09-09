@@ -8,6 +8,7 @@ public static partial class ApiEndpointRouteBuilderExtensions
 {
     private static void MapPersonnelEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapPersonnelImageEndpoints();
         const string resource = PermissionResourceCatalog.OfficePeople;
         endpoints.MapGet("/api/office/people", async (IPersonnelService service, string? keyword, string? departmentId,
             string? status, bool? attentionOnly, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
@@ -19,8 +20,11 @@ public static partial class ApiEndpointRouteBuilderExtensions
             TypedResults.Ok(await service.OptionsAsync(cancellationToken)))
             .OfficeEndpoint("GetPersonnelOptions", resource, PermissionAction.View);
 
-        endpoints.MapGet("/api/office/people/{id:int:min(1)}", async (IPersonnelService service, int id, CancellationToken cancellationToken) =>
-            TypedResults.Ok(await service.GetAsync(id, cancellationToken)))
+        endpoints.MapGet("/api/office/people/{id:int:min(1)}", async (IPersonnelService service, HttpContext context, int id, CancellationToken cancellationToken) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            return TypedResults.Ok(await service.GetAsync(id, cancellationToken));
+        })
             .OfficeEndpoint("GetPersonnel", resource, PermissionAction.ViewDetails);
 
         endpoints.MapPost("/api/office/people", async (IPersonnelService service, PersonnelCreateRequest request, CancellationToken cancellationToken) =>

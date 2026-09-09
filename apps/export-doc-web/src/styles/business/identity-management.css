@@ -75,15 +75,6 @@
   align-content: start;
 }
 
-.organization-directory-panel {
-  margin-top: 14px;
-}
-
-.organization-directory-panel > .template-inline-details-content {
-  display: grid;
-  gap: 12px;
-}
-
 .compact-option-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

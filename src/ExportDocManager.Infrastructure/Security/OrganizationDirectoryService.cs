@@ -21,28 +21,27 @@ namespace ExportDocManager.Services.Security
             _currentUserContext = currentUserContext ?? throw new ArgumentNullException(nameof(currentUserContext));
         }
 
-        public async Task<OrganizationDirectoryRecord> ListAsync(
-            CancellationToken cancellationToken = default)
+        public Task<OrganizationDirectoryRecord> ListAsync(CancellationToken cancellationToken = default) =>
+            RunDirectoryAsync(async (context, token) =>
         {
-            DemandAdministrator();
-            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             var companies = await context.OrganizationCompanies.AsNoTracking()
                 .OrderByDescending(item => item.IsActive)
                 .ThenBy(item => item.Name)
                 .ThenBy(item => item.Code)
                 .Select(item => new OrganizationCompanyRecord(
                     item.Code, item.Name, item.IsActive, item.VersionNumber))
-                .ToListAsync(cancellationToken);
+                .ToListAsync(token);
             var departments = await context.OrganizationDepartments.AsNoTracking()
                 .OrderByDescending(item => item.IsActive)
                 .ThenBy(item => item.CompanyCode)
                 .ThenBy(item => item.Name)
                 .ThenBy(item => item.Code)
                 .Select(item => new OrganizationDepartmentRecord(
-                    item.Code, item.CompanyCode, item.Name, item.IsActive, item.VersionNumber))
-                .ToListAsync(cancellationToken);
+                    item.Code, item.CompanyCode, item.Name, item.IsActive, item.VersionNumber,
+                    item.ParentCode, item.ManagerEmployeeId, item.Manager == null ? "" : item.Manager.FullName))
+                .ToListAsync(token);
             return new OrganizationDirectoryRecord(companies, departments);
-        }
+        }, false, cancellationToken);
 
         public Task<OrganizationCompanyRecord> SaveCompanyAsync(
             OrganizationCompanySaveRequest request,
@@ -58,8 +57,7 @@ namespace ExportDocManager.Services.Security
                 throw new ServiceValidationException("公司代码是稳定授权标识，创建后不能修改。");
             }
 
-            return AppDbContextExecution.ExecuteInTransactionAsync(
-                _contextFactory,
+            return RunDirectoryAsync(
                 async (context, token) =>
                 {
                     OrganizationCompany entity;
@@ -94,79 +92,26 @@ namespace ExportDocManager.Services.Security
                     return new OrganizationCompanyRecord(
                         entity.Code, entity.Name, entity.IsActive, entity.VersionNumber);
                 },
-                IsolationLevel.Serializable,
+                true,
                 cancellationToken);
         }
 
-        public Task<OrganizationDepartmentRecord> SaveDepartmentAsync(
-            OrganizationDepartmentSaveRequest request,
-            CancellationToken cancellationToken = default)
+        private async Task<T> RunDirectoryAsync<T>(Func<AppDbContext, CancellationToken, Task<T>> operation, bool write,
+            CancellationToken cancellationToken)
         {
             DemandAdministrator();
-            ArgumentNullException.ThrowIfNull(request);
-            string existingCode = NormalizeOptionalCode(request.ExistingCode);
-            string code = NormalizeRequiredCode(request.Code, "部门代码");
-            string companyCode = NormalizeRequiredCode(request.CompanyCode, "所属公司");
-            string name = NormalizeName(request.Name, "部门名称");
-            if (existingCode.Length > 0 && existingCode != code)
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            try
             {
-                throw new ServiceValidationException("部门代码是稳定授权标识，创建后不能修改。");
+                if (write) return await AppDbContextExecution.ExecuteInTransactionAsync(_contextFactory, operation, IsolationLevel.Serializable, timeout.Token);
+                await using var context = await _contextFactory.CreateDbContextAsync(timeout.Token);
+                return await operation(context, timeout.Token);
             }
-
-            return AppDbContextExecution.ExecuteInTransactionAsync(
-                _contextFactory,
-                async (context, token) =>
-                {
-                    bool companyAvailable = await context.OrganizationCompanies.AsNoTracking()
-                        .AnyAsync(item => item.Code == companyCode && item.IsActive, token);
-                    if (!companyAvailable)
-                    {
-                        throw new ServiceValidationException("所属公司不存在或已停用。");
-                    }
-
-                    OrganizationDepartment entity;
-                    if (existingCode.Length == 0)
-                    {
-                        entity = new OrganizationDepartment { Code = code, VersionNumber = 1 };
-                        await context.OrganizationDepartments.AddAsync(entity, token);
-                    }
-                    else
-                    {
-                        entity = await context.OrganizationDepartments
-                            .SingleOrDefaultAsync(item => item.Code == existingCode, token)
-                            ?? throw new ResourceNotFoundException("部门目录项不存在。");
-                        PrepareExpectedVersion(context, entity, request.ExpectedVersion, "部门");
-                        if (entity.CompanyCode != companyCode)
-                        {
-                            bool hasUsers = await context.Users.AsNoTracking()
-                                .AnyAsync(item => item.DepartmentId == code, token);
-                            bool hasEmployees = await context.PersonnelEmployees.AnyAsync(item => item.DepartmentId == code, token);
-                            if (hasUsers || hasEmployees)
-                            {
-                                throw new ResourceConflictException("部门已有账号或人员档案引用，不能更换所属公司。");
-                            }
-                        }
-                        if (!request.IsActive)
-                        {
-                            bool hasActiveUsers = await context.Users.AsNoTracking()
-                                .AnyAsync(item => item.DepartmentId == code && item.IsActive, token);
-                            bool hasEmployees = await context.PersonnelEmployees.AnyAsync(item => item.DepartmentId == code && item.Status != EmploymentStatus.Departed, token);
-                            if (hasActiveUsers || hasEmployees)
-                            {
-                                throw new ResourceConflictException("部门仍有启用账号或在职人员，请先调岗或办理离职后再停用部门。");
-                            }
-                        }
-                    }
-
-                    entity.CompanyCode = companyCode;
-                    entity.Name = name;
-                    entity.IsActive = request.IsActive;
-                    await SaveChangesAsync(context, "部门", token);
-                    return new OrganizationDepartmentRecord(
-                        entity.Code, entity.CompanyCode, entity.Name, entity.IsActive, entity.VersionNumber);
-                },
-                IsolationLevel.Serializable,
-                cancellationToken);
+            catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
+            { throw new ServiceTimeoutException("组织架构操作超时，请刷新后重试。", exception); }
+            catch (Exception exception) when (RelationalExceptionClassifier.IsWriteContention(exception))
+            { throw new BusinessConcurrencyException("组织架构正在被其他人修改，请刷新后重试。", exception); }
         }
 
         private void DemandAdministrator()

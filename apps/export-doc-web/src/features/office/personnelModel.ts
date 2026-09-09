@@ -5,7 +5,7 @@ export const employmentStatusLabels: Record<EmploymentStatus, string> = { Probat
 export const employmentTypeLabels: Record<EmploymentType, string> = { FullTime: "全职", PartTime: "兼职", Intern: "实习", Contractor: "合同用工" };
 export const personnelActionLabels: Record<PersonnelWorkflow, string> = { confirm: "办理转正", transfer: "部门／岗位调动", depart: "办理离职", rehire: "办理返聘" };
 export const personnelHistoryLabels: Record<string, string> = {
-  Hire: "入职登记", Edit: "档案更新", LinkAccount: "关联账号", Confirm: "转正", Transfer: "调岗", Depart: "离职归档", Rehire: "返聘入职",
+  Hire: "入职登记", Edit: "档案更新", Image: "照片与证件更新", LinkAccount: "关联账号", Confirm: "转正", Transfer: "调岗", Depart: "离职归档", Rehire: "返聘入职",
 };
 
 export function canViewPersonnelDetails(user: ApiUserDto) {
@@ -17,7 +17,10 @@ const value = (form: FormData, key: string) => String(form.get(key) ?? "").trim(
 export function readPersonnelProfile(form: FormData): PersonnelProfile {
   return { fullName: value(form, "fullName"), workEmail: value(form, "workEmail"), workPhone: value(form, "workPhone"),
     workLocation: value(form, "workLocation"), personalPhone: value(form, "personalPhone"), emergencyContact: value(form, "emergencyContact"),
-    emergencyPhone: value(form, "emergencyPhone"), notes: value(form, "notes") };
+    emergencyPhone: value(form, "emergencyPhone"), notes: value(form, "notes"),
+    identityNumber: value(form, "identityNumber").toUpperCase(), identityAuthority: value(form, "identityAuthority"),
+    registeredAddress: value(form, "registeredAddress"), identityValidFrom: value(form, "identityValidFrom") || null,
+    identityValidUntil: form.has("identityLongTerm") ? null : value(form, "identityValidUntil") || null, identityLongTerm: form.has("identityLongTerm") };
 }
 
 export function readPersonnelUpdate(form: FormData, version: number): PersonnelUpdateRequest {
@@ -42,6 +45,7 @@ export function personnelReminders(record: PersonnelRecord, businessDate: string
   return [
     { label: "试用期", day: record.employee.status === "Probation" ? record.probationEndsOn : null },
     { label: "合同", day: record.contractEndsOn },
+    { label: "身份证", day: record.profile.identityLongTerm ? null : record.profile.identityValidUntil },
   ].filter((entry) => entry.day && entry.day <= soon).map((entry) => `${entry.label}${entry.day! < businessDate ? "已到期" : "即将到期"}：${entry.day}`);
 }
 

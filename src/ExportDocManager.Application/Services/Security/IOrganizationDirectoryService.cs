@@ -1,3 +1,5 @@
+using ExportDocManager.Models;
+
 namespace ExportDocManager.Services.Security
 {
     public sealed record OrganizationCompanyRecord(
@@ -11,7 +13,12 @@ namespace ExportDocManager.Services.Security
         string CompanyCode,
         string Name,
         bool IsActive,
-        int VersionNumber);
+        int VersionNumber,
+        string? ParentCode = null,
+        int? ManagerEmployeeId = null,
+        string ManagerName = "");
+
+    public sealed record OrganizationManagerRecord(int Id, string FullName, string EmployeeNumber, string DepartmentName);
 
     public sealed record OrganizationDirectoryRecord(
         IReadOnlyList<OrganizationCompanyRecord> Companies,
@@ -30,11 +37,15 @@ namespace ExportDocManager.Services.Security
         string CompanyCode,
         string Name,
         bool IsActive,
-        int ExpectedVersion = 0);
+        int ExpectedVersion = 0,
+        string? ParentCode = null,
+        int? ManagerEmployeeId = null);
 
     public interface IOrganizationDirectoryService
     {
         Task<OrganizationDirectoryRecord> ListAsync(CancellationToken cancellationToken = default);
+        Task<PagedResult<OrganizationManagerRecord>> ManagerOptionsAsync(string companyCode, string? keyword,
+            int pageNumber, int pageSize, CancellationToken cancellationToken = default);
 
         Task<OrganizationCompanyRecord> SaveCompanyAsync(
             OrganizationCompanySaveRequest request,

@@ -1,0 +1,17 @@
+@layer route {
+  .organization-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  .organization-heading h2 { margin: 0 0 6px; font-size: 1.2rem; }
+  .organization-workspace > .office-field { max-width: 38rem; }
+  .organization-tree, .organization-tree ul, .organization-managers { margin: 0; padding: 0; list-style: none; }
+  .organization-node { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding-block: 14px; border-bottom: 1px solid var(--edm-neutral-250); }
+  .organization-node-name { flex: 1; min-width: 10rem; overflow-wrap: anywhere; }
+  .organization-node-name small { display: block; margin-top: 5px; color: var(--edm-neutral-650); font-size: 0.85rem; }
+  .organization-leaf { flex: 0 0 40px; }
+  .organization-managers { display: grid; gap: 10px; margin-block: 14px; }
+  .organization-managers button { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; width: 100%; text-align: start; }
+  @media (max-width: 600px) {
+    .organization-node > .office-card-actions { flex-basis: 100%; }
+    .organization-node-name { min-width: 0; }
+    .organization-heading > .office-card-actions { width: 100%; }
+  }
+}
