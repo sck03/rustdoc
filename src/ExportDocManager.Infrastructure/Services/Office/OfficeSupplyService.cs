@@ -61,11 +61,7 @@ public sealed partial class OfficeSupplyService(OfficeServiceContext office) : I
                     throw new ResourceConflictException("同一请求标识不能用于不同的领用内容。");
                 return await RequestRecordAsync(db, actor, previous.Id, token);
             }
-            if (!supply.IsActive) throw new ResourceConflictException("物品已停用。");
-            if (supply.IsReturnable && (!request.ReturnDueDate.HasValue || request.ReturnDueDate < office.Clock.Today || request.ReturnDueDate > office.Clock.Today.AddDays(365)))
-                throw new ServiceValidationException("借用物品须填写今天至未来一年内的预计归还日期。");
-            if (!supply.IsReturnable && request.ReturnDueDate.HasValue)
-                throw new ServiceValidationException("消耗品不需要归还日期。");
+            ValidateSupplyRequest(supply, request.Quantity, request.ReturnDueDate);
             if (office.IsLocalRegister) ReserveStock(supply, request.Quantity);
             var entity = new OfficeSupplyRequest
             {

@@ -1,17 +1,38 @@
 @layer route {
   .organization-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-  .organization-heading h2 { margin: 0 0 6px; font-size: 1.2rem; }
-  .organization-workspace > .office-field { max-width: 38rem; }
+  .organization-heading h2 { margin: 0 0 6px; font-size: 1.15rem; }
+  .organization-heading h3 { margin: 0 0 5px; font-size: 1.05rem; }
+  .organization-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .organization-company, .organization-departments { min-width: 0; padding: 22px; border: 1px solid var(--edm-neutral-250); border-radius: 12px; background: var(--edm-white); }
+  .organization-company { border-inline-start: 4px solid var(--edm-primary-600); }
+  .organization-company-title, .organization-company-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+  .organization-company-title > div { min-width: 0; overflow-wrap: anywhere; }
+  .organization-company-title h3 { font-size: 1.2rem; }
+  .organization-company-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; background: var(--edm-primary-50); color: var(--edm-primary-700); }
+  .organization-company-footer { justify-content: space-between; border-top: 1px solid var(--edm-neutral-200); margin-top: 18px; padding-top: 16px; }
+  .organization-metrics { display: flex; gap: 28px; margin: 0; }
+  .organization-metrics dt { font-size: 0.8rem; color: var(--edm-neutral-650); }
+  .organization-metrics dd { margin: 5px 0 0; font-size: 1.35rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .organization-departments { display: grid; gap: 18px; }
+  .organization-search { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--edm-neutral-50); border: 1px solid var(--edm-neutral-250); border-radius: 9px; }
+  .organization-search > svg { flex-shrink: 0; color: var(--edm-neutral-650); }
+  .organization-search input { flex: 1; min-width: 0; border: 0; background: transparent; }
   .organization-tree, .organization-tree ul, .organization-managers { margin: 0; padding: 0; list-style: none; }
-  .organization-node { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding-block: 14px; border-bottom: 1px solid var(--edm-neutral-250); }
+  .organization-tree li + li, .organization-tree ul { margin-top: 8px; }
+  .organization-node { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px; border: 1px solid var(--edm-neutral-250); border-inline-start: 3px solid var(--edm-neutral-300); border-radius: 9px; background: var(--edm-white); }
+  .organization-node[data-root="true"] { background: var(--edm-neutral-50); border-inline-start-color: var(--edm-primary-500); }
+  .organization-node-icon { flex-shrink: 0; color: var(--edm-primary-650); }
   .organization-node-name { flex: 1; min-width: 10rem; overflow-wrap: anywhere; }
   .organization-node-name small { display: block; margin-top: 5px; color: var(--edm-neutral-650); font-size: 0.85rem; }
-  .organization-leaf { flex: 0 0 40px; }
+  .organization-leaf { flex: 0 0 12px; }
+  .organization-manager { display: inline-flex; align-items: center; gap: 6px; color: var(--edm-neutral-650); font-size: 0.85rem; }
   .organization-managers { display: grid; gap: 10px; margin-block: 14px; }
   .organization-managers button { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; width: 100%; text-align: start; }
   @media (max-width: 600px) {
-    .organization-node > .office-card-actions { flex-basis: 100%; }
+    .organization-company, .organization-departments { padding: 14px; }
+    .organization-metrics { gap: 18px; }
+    .organization-node > .organization-actions { flex-basis: 100%; }
     .organization-node-name { min-width: 0; }
-    .organization-heading > .office-card-actions { width: 100%; }
+    .organization-heading > .organization-actions { width: 100%; }
   }
 }

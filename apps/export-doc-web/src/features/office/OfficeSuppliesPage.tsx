@@ -7,10 +7,11 @@ import { OfficeStockDialog, OfficeSupplyApplication, OfficeSupplyEditor } from "
 import { OfficeHistoryDialog } from "./OfficeHistoryDialog.tsx";
 import { OfficeRequestsPanel } from "./OfficeRequestsPanel.tsx";
 import { OfficePager, OfficeQueryState, OfficeTabs } from "./OfficeUi.tsx";
-import { useOfficeDirectory, useOfficeView } from "./useOfficeData.ts";
+import { useOfficeDirectory, useOfficeOperation, useOfficeView } from "./useOfficeData.ts";
+import { RecordDeleteDialog } from "./RecordDeleteDialog.tsx";
 import "../../styles/routes/office.css";
 
-type SupplyDialog = { kind: "edit"; supply?: OfficeSupplyRecord } | { kind: "apply" | "restock" | "stocktake" | "history"; supply: OfficeSupplyRecord };
+type SupplyDialog = { kind: "edit"; supply?: OfficeSupplyRecord } | { kind: "apply" | "restock" | "stocktake" | "history" | "delete"; supply: OfficeSupplyRecord };
 
 export function OfficeSuppliesPage({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {
   const { records, setRecords } = useOfficeView();
@@ -28,6 +29,7 @@ function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiCl
   const { paging, query, keyword, search, lowStockOnly, includeInactive } = model;
   const [dialog, setDialog] = useState<SupplyDialog | null>(null);
   const close = () => setDialog(null);
+  const deletion = useOfficeOperation();
   return <>
     <div className="office-toolbar"><form className="office-search" onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
       <input aria-label="搜索办公物品" placeholder="物品名称或存放位置" maxLength={120} value={keyword} onChange={(event) => model.changeKeyword(event.target.value)} /><button className="command-button secondary" type="submit">搜索</button></form>
@@ -49,7 +51,9 @@ function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiCl
         {(access.allows("restock") || access.allows("manage")) && <details className="office-secondary-actions">
           <summary>更多操作</summary><div>
             {access.allows("restock") && <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "history", supply })}>库存流水</button>}
-            {access.allows("manage") && <><button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "stocktake", supply })}>盘点</button><button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "edit", supply })}>编辑</button></>}
+            {access.allows("manage") && <><button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "stocktake", supply })}>盘点</button>
+              <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "edit", supply })}>编辑</button>
+              <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "delete", supply })}>删除</button></>}
           </div>
         </details>}
       </footer>
@@ -59,5 +63,8 @@ function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiCl
     {dialog?.kind === "apply" && <OfficeSupplyApplication client={client} supply={dialog.supply} user={user} onClose={close} />}
     {(dialog?.kind === "restock" || dialog?.kind === "stocktake") && <OfficeStockDialog client={client} supply={dialog.supply} stocktake={dialog.kind === "stocktake"} onClose={close} />}
     {dialog?.kind === "history" && <OfficeHistoryDialog client={client} user={user} kind="stock" id={dialog.supply.id} title={`${dialog.supply.name} · 库存流水`} onClose={close} />}
+    {dialog?.kind === "delete" && <RecordDeleteDialog name={dialog.supply.name} version={dialog.supply.versionNumber} operation={deletion}
+      description="仅可删除没有库存、领用记录及库存流水的物品。已有历史的物品可在编辑窗口中停用。"
+      onDelete={(body, signal) => client.deleteOfficeSupply({ id: dialog.supply.id, body }, { signal })} onClose={close} onDeleted={close} />}
   </>;
 }

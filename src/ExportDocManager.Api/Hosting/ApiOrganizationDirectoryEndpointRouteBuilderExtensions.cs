@@ -1,162 +1,75 @@
-using ExportDocManager.Services.Errors;
+using ExportDocManager.Models;
 using ExportDocManager.Services.Security;
+using Microsoft.AspNetCore.Mvc;
 
-namespace ExportDocManager.Api.Hosting
+namespace ExportDocManager.Api.Hosting;
+
+public static partial class ApiEndpointRouteBuilderExtensions
 {
-    public static partial class ApiEndpointRouteBuilderExtensions
+    private static void MapOrganizationDirectoryEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        private static void MapOrganizationDirectoryEndpoints(this IEndpointRouteBuilder endpoints)
+        endpoints.MapGet("/api/organization-directory", async (IOrganizationDirectoryService service, CancellationToken token) =>
         {
-            endpoints.MapGet("/api/organization-directory/managers", async (IOrganizationDirectoryService service, string companyCode,
-                string? keyword, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
-                TypedResults.Ok(await service.ManagerOptionsAsync(companyCode, keyword, pageNumber ?? 1, pageSize ?? 20, cancellationToken)))
-                .WithName("ListOrganizationManagers")
-                .WithApiCapability(PermissionResourceCatalog.SystemUsers, PermissionAction.Manage);
-            endpoints.MapGet("/api/organization-directory", async (
-                IOrganizationDirectoryService service,
-                CancellationToken cancellationToken) =>
-            {
-                try
-                {
-                    var directory = await service.ListAsync(cancellationToken);
-                    return Results.Ok(new ApiOrganizationDirectoryResponse(
-                        directory.Companies.Select(ToOrganizationCompanyDto).ToArray(),
-                        directory.Departments.Select(ToOrganizationDepartmentDto).ToArray()));
-                }
-                catch (ServiceException exception)
-                {
-                    return WriteServiceException(exception);
-                }
-            })
-            .WithName("GetOrganizationDirectory")
-            .WithApiCapability(PermissionResourceCatalog.SystemUsers, PermissionAction.Manage)
-            .Produces<ApiOrganizationDirectoryResponse>()
-            .Produces(StatusCodes.Status401Unauthorized)
-            .Produces(StatusCodes.Status403Forbidden);
+            var directory = await service.ListAsync(token);
+            return TypedResults.Ok(new ApiOrganizationDirectoryResponse(
+                directory.Companies.Select(ToOrganizationCompanyDto).ToArray(),
+                directory.Departments.Select(ToOrganizationDepartmentDto).ToArray()));
+        }).OrganizationEndpoint("GetOrganizationDirectory");
 
-            endpoints.MapPost("/api/organization-directory/companies", async (
-                IOrganizationDirectoryService service,
-                ApiOrganizationCompanySaveRequest request,
-                CancellationToken cancellationToken) =>
-            {
-                if (request == null || request.ExpectedVersion != 0)
-                {
-                    return Results.BadRequest(new ApiErrorResponse("新增公司不能包含已有版本号。"));
-                }
-                try
-                {
-                    var saved = await service.SaveCompanyAsync(
-                        new OrganizationCompanySaveRequest(
-                            string.Empty, request.Code, request.Name, request.IsActive, 0),
-                        cancellationToken);
-                    return Results.Created(
-                        $"/api/organization-directory/companies/{Uri.EscapeDataString(saved.Code)}",
-                        ToOrganizationCompanyDto(saved));
-                }
-                catch (ServiceException exception)
-                {
-                    return WriteServiceException(exception);
-                }
-            })
-            .WithName("CreateOrganizationCompany")
-            .WithApiCapability(PermissionResourceCatalog.SystemUsers, PermissionAction.Manage)
-            .Produces<ApiOrganizationCompanyDto>(StatusCodes.Status201Created)
-            .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status401Unauthorized)
-            .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status409Conflict);
+        endpoints.MapGet("/api/organization-directory/managers", async (IOrganizationDirectoryService service, string companyCode,
+            string? keyword, int? pageNumber, int? pageSize, CancellationToken token) =>
+            TypedResults.Ok(await service.ManagerOptionsAsync(companyCode, keyword, pageNumber ?? 1, pageSize ?? 20, token)))
+            .OrganizationEndpoint("ListOrganizationManagers");
 
-            endpoints.MapPut("/api/organization-directory/companies/{code}", async (
-                IOrganizationDirectoryService service,
-                string code,
-                ApiOrganizationCompanySaveRequest request,
-                CancellationToken cancellationToken) =>
-            {
-                try
-                {
-                    var saved = await service.SaveCompanyAsync(
-                        new OrganizationCompanySaveRequest(
-                            code, request?.Code ?? string.Empty, request?.Name ?? string.Empty,
-                            request?.IsActive ?? false, request?.ExpectedVersion ?? 0),
-                        cancellationToken);
-                    return Results.Ok(ToOrganizationCompanyDto(saved));
-                }
-                catch (ServiceException exception)
-                {
-                    return WriteServiceException(exception);
-                }
-            })
-            .WithName("UpdateOrganizationCompany")
-            .WithApiCapability(PermissionResourceCatalog.SystemUsers, PermissionAction.Manage)
-            .Produces<ApiOrganizationCompanyDto>()
-            .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status401Unauthorized)
-            .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status404NotFound)
-            .Produces(StatusCodes.Status409Conflict);
+        endpoints.MapPost("/api/organization-directory/companies", async (IOrganizationDirectoryService service,
+            ApiOrganizationCompanySaveRequest request, CancellationToken token) =>
+        {
+            var saved = await service.SaveCompanyAsync(new("", request.Code, request.Name, request.IsActive, request.ExpectedVersion), token);
+            return TypedResults.Created($"/api/organization-directory/companies/{Uri.EscapeDataString(saved.Code)}", ToOrganizationCompanyDto(saved));
+        }).OrganizationEndpoint("CreateOrganizationCompany");
 
-            endpoints.MapPost("/api/organization-directory/departments", async (
-                IOrganizationDirectoryService service,
-                ApiOrganizationDepartmentSaveRequest request,
-                CancellationToken cancellationToken) =>
-            {
-                if (request == null || request.ExpectedVersion != 0)
-                {
-                    return Results.BadRequest(new ApiErrorResponse("新增部门不能包含已有版本号。"));
-                }
-                try
-                {
-                    var saved = await service.SaveDepartmentAsync(
-                        new OrganizationDepartmentSaveRequest(
-                            string.Empty, request.Code, request.CompanyCode, request.Name,
-                            request.IsActive, 0, request.ParentCode, request.ManagerEmployeeId),
-                        cancellationToken);
-                    return Results.Created(
-                        $"/api/organization-directory/departments/{Uri.EscapeDataString(saved.Code)}",
-                        ToOrganizationDepartmentDto(saved));
-                }
-                catch (ServiceException exception)
-                {
-                    return WriteServiceException(exception);
-                }
-            })
-            .WithName("CreateOrganizationDepartment")
-            .WithApiCapability(PermissionResourceCatalog.SystemUsers, PermissionAction.Manage)
-            .Produces<ApiOrganizationDepartmentDto>(StatusCodes.Status201Created)
-            .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status401Unauthorized)
-            .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status409Conflict);
+        endpoints.MapPut("/api/organization-directory/companies/{code}", async (IOrganizationDirectoryService service,
+            string code, ApiOrganizationCompanySaveRequest request, CancellationToken token) =>
+            TypedResults.Ok(ToOrganizationCompanyDto(await service.SaveCompanyAsync(
+                new(code, request.Code, request.Name, request.IsActive, request.ExpectedVersion), token))))
+            .OrganizationEndpoint("UpdateOrganizationCompany");
 
-            endpoints.MapPut("/api/organization-directory/departments/{code}", async (
-                IOrganizationDirectoryService service,
-                string code,
-                ApiOrganizationDepartmentSaveRequest request,
-                CancellationToken cancellationToken) =>
-            {
-                try
-                {
-                    var saved = await service.SaveDepartmentAsync(
-                        new OrganizationDepartmentSaveRequest(
-                            code, request?.Code ?? string.Empty, request?.CompanyCode ?? string.Empty,
-                            request?.Name ?? string.Empty, request?.IsActive ?? false,
-                            request?.ExpectedVersion ?? 0, request?.ParentCode, request?.ManagerEmployeeId),
-                        cancellationToken);
-                    return Results.Ok(ToOrganizationDepartmentDto(saved));
-                }
-                catch (ServiceException exception)
-                {
-                    return WriteServiceException(exception);
-                }
-            })
-            .WithName("UpdateOrganizationDepartment")
-            .WithApiCapability(PermissionResourceCatalog.SystemUsers, PermissionAction.Manage)
-            .Produces<ApiOrganizationDepartmentDto>()
-            .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status401Unauthorized)
-            .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status404NotFound)
-            .Produces(StatusCodes.Status409Conflict);
-        }
+        endpoints.MapDelete("/api/organization-directory/companies/{code}", async (IOrganizationDirectoryService service,
+            string code, [FromBody] DeleteRecordRequest request, CancellationToken token) =>
+        {
+            await service.DeleteCompanyAsync(code, request, token);
+            return TypedResults.NoContent();
+        }).OrganizationEndpoint("DeleteOrganizationCompany");
+
+        endpoints.MapPost("/api/organization-directory/departments", async (IOrganizationDirectoryService service,
+            ApiOrganizationDepartmentSaveRequest request, CancellationToken token) =>
+        {
+            var saved = await service.SaveDepartmentAsync(new("", request.Code, request.CompanyCode, request.Name,
+                request.IsActive, request.ExpectedVersion, request.ParentCode, request.ManagerEmployeeId), token);
+            return TypedResults.Created($"/api/organization-directory/departments/{Uri.EscapeDataString(saved.Code)}", ToOrganizationDepartmentDto(saved));
+        }).OrganizationEndpoint("CreateOrganizationDepartment");
+
+        endpoints.MapPut("/api/organization-directory/departments/{code}", async (IOrganizationDirectoryService service,
+            string code, ApiOrganizationDepartmentSaveRequest request, CancellationToken token) =>
+            TypedResults.Ok(ToOrganizationDepartmentDto(await service.SaveDepartmentAsync(new(code, request.Code, request.CompanyCode,
+                request.Name, request.IsActive, request.ExpectedVersion, request.ParentCode, request.ManagerEmployeeId), token))))
+            .OrganizationEndpoint("UpdateOrganizationDepartment");
+
+        endpoints.MapDelete("/api/organization-directory/departments/{code}", async (IOrganizationDirectoryService service,
+            string code, [FromBody] DeleteRecordRequest request, CancellationToken token) =>
+        {
+            await service.DeleteDepartmentAsync(code, request, token);
+            return TypedResults.NoContent();
+        }).OrganizationEndpoint("DeleteOrganizationDepartment");
     }
+
+    private static RouteHandlerBuilder OrganizationEndpoint(this RouteHandlerBuilder endpoint, string name) =>
+        endpoint.WithName(name).WithApiCapability(PermissionResourceCatalog.SystemUsers, PermissionAction.Manage)
+            .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces<ApiErrorResponse>(StatusCodes.Status401Unauthorized)
+            .Produces<ApiErrorResponse>(StatusCodes.Status403Forbidden)
+            .Produces<ApiErrorResponse>(StatusCodes.Status404NotFound)
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict)
+            .Produces<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)
+            .Produces<ApiErrorResponse>(StatusCodes.Status504GatewayTimeout);
 }

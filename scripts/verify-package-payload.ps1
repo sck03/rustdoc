@@ -9,7 +9,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-. (Join-Path $scriptRoot "lib\webview2-runtime-support.ps1")
+. (Join-Path $scriptRoot "lib\microsoft-runtime-support.ps1")
+. (Join-Path $scriptRoot "lib\visual-cpp-runtime-support.ps1")
 . (Join-Path $scriptRoot "lib\product-editions.ps1")
 $Edition = Resolve-ExportDocProductEdition -Edition $Edition
 $root = [IO.Path]::GetFullPath($PackageRoot)
@@ -127,6 +128,31 @@ if ($Profile -eq "Desktop") {
     }
 }
 
+if ($Profile -eq "Desktop" -and $RuntimeIdentifier -eq "win-x64") {
+    $crtEntries = @($allEntries | Where-Object {
+        -not $_.PSIsContainer -and $_.Name -match '(?i)^(?:(?:msvcp|msvcr|vcruntime|concrt)[0-9].*\.dll|ucrtbase\.dll|api-ms-win-crt-.*\.dll|vc_redist\..*\.exe)$'
+    })
+    $expectedCrtCount = if ($requiresOcrRuntime) { 4 } else { 0 }
+    if ($crtEntries.Count -ne $expectedCrtCount) {
+        throw "Desktop/$Edition requires exactly $expectedCrtCount app-local CRT DLLs; full VC installers and extra CRT files are forbidden."
+    }
+    $crtRoot = Join-Path $root "sidecar"
+    $crtManifestPath = Join-Path $crtRoot "msvc-runtime.json"
+    $crtNoticePath = Join-Path $crtRoot "MSVC_RUNTIME_NOTICES.md"
+    if ($requiresOcrRuntime) {
+        $sourceManifest = Join-Path $scriptRoot "../VisualCppRuntime/visual-cpp-runtime.json"
+        $release = Read-ExportDocVisualCppRelease -ManifestPath $sourceManifest
+        Assert-ExportDocVisualCppFiles -Directory $crtRoot -Release $release
+        if ((Get-FileHash -LiteralPath $crtManifestPath -Algorithm SHA256).Hash -ne
+            (Get-FileHash -LiteralPath $sourceManifest -Algorithm SHA256).Hash -or
+            -not (Test-Path -LiteralPath $crtNoticePath -PathType Leaf)) {
+            throw "Desktop CRT provenance manifest or redistribution notice is missing or outdated."
+        }
+    } elseif ((Test-Path -LiteralPath $crtManifestPath) -or (Test-Path -LiteralPath $crtNoticePath)) {
+        throw "Desktop/$Edition must not contain unused OCR CRT assets."
+    }
+}
+
 if ($RequireWebView2RuntimeInstaller) {
     if ($Profile -ne "Desktop" -or $RuntimeIdentifier -ne "win-x64") {
         throw "The bundled WebView2 Runtime installer is currently supported only for the Windows x64 desktop portable payload."
@@ -141,8 +167,8 @@ if ($RequireWebView2RuntimeInstaller) {
         }
     }
 
-    $webView2Release = Read-ExportDocWebView2Release -ManifestPath $webView2ManifestPath
-    Assert-ExportDocWebView2Installer -Path $webView2Installer -Release $webView2Release | Out-Null
+    $webView2Release = Read-ExportDocMicrosoftRuntimeRelease -ManifestPath $webView2ManifestPath
+    Assert-ExportDocMicrosoftRuntimeFile -Path $webView2Installer -Release $webView2Release | Out-Null
 }
 
 $moduleAssemblies = [ordered]@{

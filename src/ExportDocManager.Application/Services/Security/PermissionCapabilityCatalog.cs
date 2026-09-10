@@ -176,7 +176,8 @@ namespace ExportDocManager.Services.Security
                 Action(PermissionAction.View, "公司通讯录", "查看在职人员的工作信息和联系方式", 10, PermissionAccessLevel.View),
                 Action(PermissionAction.ViewDetails, "人事档案与记录", "查看入职日期、个人联系方式、紧急联系人和人事记录", 20),
                 Action(PermissionAction.Create, "入职登记", "创建人员档案，工号在公司内唯一", 30),
-                Action(PermissionAction.Edit, "维护档案", "维护联系方式、用工类型和合同日期", 40),
+                Action(PermissionAction.Edit, "编辑档案", "维护资料、合同日期及修正尚未用于业务的入职登记", 40),
+                Action(PermissionAction.Delete, "删除误录档案", "删除没有业务、账号和任职变动引用的误录档案", 45, PermissionAccessLevel.Manage),
                 Action(PermissionAction.Transition, "转正、调岗与离职", "办理任职变动及离职交接，同步关联账号组织范围并撤销会话", 50, PermissionAccessLevel.Manage),
                 Action(PermissionAction.Assign, "关联账号", "仅系统管理员可关联同公司普通账号，不授予登录或权限管理能力", 60, PermissionAccessLevel.Manage)
             ]),
@@ -576,6 +577,7 @@ namespace ExportDocManager.Services.Security
             [
                 ViewAction,
                 Action(PermissionAction.Create, "申请", "提交本人申请", 20),
+                Action(PermissionAction.Edit, "修改申请", "修改尚未交接的申请，团队模式须重新审批", 25),
                 Action(PermissionAction.Cancel, "取消", "取消尚未交接的申请", 30),
                 Action(PermissionAction.Approve, "审批", "审批范围内其他人的申请", 40, PermissionAccessLevel.Manage),
                 Action(PermissionAction.Issue, supplies ? "发放" : "钥匙交接", "确认申请人到场并登记交接", 50, PermissionAccessLevel.Manage),

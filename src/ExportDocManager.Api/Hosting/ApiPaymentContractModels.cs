@@ -10,6 +10,20 @@ namespace ExportDocManager.Api.Hosting
         public string DepartmentId { get; init; } = string.Empty;
         public string CompanyScope { get; init; } = string.Empty;
         public string InvoiceNo { get; init; } = string.Empty;
+        public string VoucherNo { get; init; } = string.Empty;
+        public string QuantityUnit { get; init; } = string.Empty;
+        public string TradeMethod { get; init; } = string.Empty;
+        public string TaxRebateRate { get; init; } = string.Empty;
+        public string Spare1 { get; init; } = string.Empty;
+        public string Spare2 { get; init; } = string.Empty;
+        public string Spare3 { get; init; } = string.Empty;
+        public string Spare4 { get; init; } = string.Empty;
+        public string Spare5 { get; init; } = string.Empty;
+        public string Spare6 { get; init; } = string.Empty;
+        public string Spare7 { get; init; } = string.Empty;
+        public string Spare8 { get; init; } = string.Empty;
+        public string Spare9 { get; init; } = string.Empty;
+        public string Spare10 { get; init; } = string.Empty;
         public DateOnly? ShipmentDate { get; init; }
         public int PayeeId { get; init; }
         public string Department { get; init; } = string.Empty;

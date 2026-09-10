@@ -10,6 +10,20 @@ namespace ExportDocManager.Models.Entities
         public string DepartmentId { get; set; } = string.Empty;
         public string CompanyScope { get; set; } = string.Empty;
         public string? InvoiceNo { get; set; }
+        public string? VoucherNo { get; set; }
+        public string? QuantityUnit { get; set; }
+        public string? TradeMethod { get; set; }
+        public string? TaxRebateRate { get; set; }
+        public string? Spare1 { get; set; }
+        public string? Spare2 { get; set; }
+        public string? Spare3 { get; set; }
+        public string? Spare4 { get; set; }
+        public string? Spare5 { get; set; }
+        public string? Spare6 { get; set; }
+        public string? Spare7 { get; set; }
+        public string? Spare8 { get; set; }
+        public string? Spare9 { get; set; }
+        public string? Spare10 { get; set; }
         public DateOnly? ShipmentDate { get; set; }
         public int PayeeId { get; set; }
         public string? Department { get; set; }

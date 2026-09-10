@@ -15,6 +15,31 @@ public sealed class ApiPersonnelAccessTests
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
 
     [Fact]
+    public async Task PersonnelDeletion_HttpContractChecksAuthorizationAndVersion()
+    {
+        await using var harness = await ApiIntegrationTestHarness.StartAsync("personnel-delete-http", "people-delete.db",
+            configureServices: ApiOfficeAccessTests.ConfigureTeamMode);
+        using var anonymous = harness.CreateClient();
+        var login = await harness.LoginAsync(anonymous, "admin", "");
+        using var admin = harness.CreateClient(login.AccessToken);
+        var person = await PostAsync<PersonnelRecord>(admin, "/api/office/people", new PersonnelCreateRequest(Guid.NewGuid(), "MISTYPED",
+            OrganizationDirectoryDefaults.DepartmentCode, "测试岗位", EmploymentType.FullTime, login.User.BusinessDate,
+            true, null, null, new("误录人员")));
+        async Task<HttpStatusCode> DeleteAsync(HttpClient client, int version)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/office/people/{person.Employee.Id}")
+            { Content = JsonContent.Create(new ExportDocManager.Models.DeleteRecordRequest(version, "误录")) };
+            using var response = await client.SendAsync(request);
+            return response.StatusCode;
+        }
+        Assert.Equal(HttpStatusCode.Unauthorized, await DeleteAsync(anonymous, person.VersionNumber));
+        Assert.Equal(HttpStatusCode.Conflict, await DeleteAsync(admin, 0));
+        Assert.Equal(HttpStatusCode.NoContent, await DeleteAsync(admin, person.VersionNumber));
+        using var missing = await admin.GetAsync($"/api/office/people/{person.Employee.Id}");
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Fact]
     public async Task PersonnelHttpLifecycle_ShouldKeepDirectoryPrivate_AndRevokeCachedSessionsAfterDeparture()
     {
         await using var harness = await ApiIntegrationTestHarness.StartAsync("personnel-http", "people.db", configureServices: services =>

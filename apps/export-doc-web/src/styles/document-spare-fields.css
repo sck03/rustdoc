@@ -1,0 +1,6 @@
+@layer components {
+  .document-spare-fields { margin-block-start: 18px; padding: 14px 16px; border: 1px solid var(--edm-neutral-250); border-radius: 10px; background: var(--edm-neutral-50); }
+  .document-spare-fields summary { cursor: pointer; font-weight: 600; }
+  .document-spare-fields summary small { margin-inline-start: 12px; color: var(--edm-neutral-650); font-weight: 400; }
+  .document-spare-fields > p { margin-block: 12px; }
+}

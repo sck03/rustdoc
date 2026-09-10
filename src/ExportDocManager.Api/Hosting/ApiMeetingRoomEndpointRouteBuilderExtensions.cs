@@ -1,4 +1,6 @@
 using ExportDocManager.Services.Office;
+using ExportDocManager.Models;
+using Microsoft.AspNetCore.Mvc;
 using ExportDocManager.Services.Security;
 
 namespace ExportDocManager.Api.Hosting;
@@ -8,6 +10,16 @@ public static partial class ApiEndpointRouteBuilderExtensions
     private static void MapMeetingRoomEndpoints(this IEndpointRouteBuilder endpoints)
     {
         const string resource = PermissionResourceCatalog.OfficeRooms;
+        endpoints.MapDelete("/api/office/rooms/{id:int:min(1)}", async (IMeetingRoomService service, int id,
+            [FromBody] DeleteRecordRequest request, CancellationToken cancellationToken) =>
+        {
+            await service.DeleteRoomAsync(id, request, cancellationToken);
+            return TypedResults.NoContent();
+        }).OfficeEndpoint("DeleteMeetingRoom", resource, PermissionAction.Manage);
+        endpoints.MapPut("/api/office/bookings/{id:int:min(1)}", async (IMeetingRoomService service, int id,
+            MeetingBookingUpdateRequest request, CancellationToken cancellationToken) =>
+            TypedResults.Ok(await service.UpdateBookingAsync(id, request, cancellationToken)))
+            .OfficeEndpoint("UpdateMeetingBooking", resource, PermissionAction.Edit);
         endpoints.MapGet("/api/office/rooms", async (IMeetingRoomService service, string? keyword,
             bool? includeInactive, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
             TypedResults.Ok(await service.QueryRoomsAsync(new OfficeResourceQuery(keyword, includeInactive ?? false,

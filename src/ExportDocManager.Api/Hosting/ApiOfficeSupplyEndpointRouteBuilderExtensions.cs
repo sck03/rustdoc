@@ -1,4 +1,6 @@
 using ExportDocManager.Services.Office;
+using ExportDocManager.Models;
+using Microsoft.AspNetCore.Mvc;
 using ExportDocManager.Services.Security;
 
 namespace ExportDocManager.Api.Hosting;
@@ -8,6 +10,16 @@ public static partial class ApiEndpointRouteBuilderExtensions
     private static void MapOfficeSupplyEndpoints(this IEndpointRouteBuilder endpoints)
     {
         const string resource = PermissionResourceCatalog.OfficeSupplies;
+        endpoints.MapDelete("/api/office/supplies/{id:int:min(1)}", async (IOfficeSupplyService service, int id,
+            [FromBody] DeleteRecordRequest request, CancellationToken cancellationToken) =>
+        {
+            await service.DeleteSupplyAsync(id, request, cancellationToken);
+            return TypedResults.NoContent();
+        }).OfficeEndpoint("DeleteOfficeSupply", resource, PermissionAction.Manage);
+        endpoints.MapPut("/api/office/supply-requests/{id:int:min(1)}", async (IOfficeSupplyService service, int id,
+            SupplyRequestUpdateRequest request, CancellationToken cancellationToken) =>
+            TypedResults.Ok(await service.UpdateRequestAsync(id, request, cancellationToken)))
+            .OfficeEndpoint("UpdateOfficeSupplyRequest", resource, PermissionAction.Edit);
         endpoints.MapGet("/api/office/supplies", async (IOfficeSupplyService service, string? keyword, bool? includeInactive,
             bool? lowStockOnly, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
             TypedResults.Ok(await service.QuerySuppliesAsync(new OfficeResourceQuery(keyword, includeInactive ?? false,

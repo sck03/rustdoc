@@ -3,6 +3,7 @@ import type { ApiInvoiceDetailDto, ApiInvoiceStatusHistoryDto } from "../../api/
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { DateField, EditableComboField, NumberField, SelectField, TextField } from "../../ui/FormFields.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import { DocumentSpareFieldsPanel } from "../../ui/DocumentSpareFieldsPanel.tsx";
 import { getCustomOptions, type CustomOptionMap } from "../custom-options/customOptionModel.ts";
 import {
   getInvoiceStatusActionLabel,
@@ -174,6 +175,7 @@ export function InvoiceBasicInfoPanel({
           onChange={() => undefined}
         />
       </div>
+      <DocumentSpareFieldsPanel label="发票备用字段" value={invoice} onChange={onChange} disabled={!isEditable} />
       {statusHistory !== undefined || statusHistoryLoading || statusHistoryMessage ? (
         <details className="invoice-status-history">
           <summary>状态记录{statusHistory?.length ? `（${statusHistory.length}）` : ""}</summary>

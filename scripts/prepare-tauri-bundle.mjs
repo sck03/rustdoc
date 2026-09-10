@@ -37,6 +37,7 @@ if (!productEditionMetadata) {
   throw new Error(`Product edition metadata is missing for ${productEdition}.`);
 }
 const resourceProfile = validateResourceProfile(productEditionMetadata.resourceProfile, productEdition);
+const requiresLocalVisualCpp = rid === "win-x64" && resourceProfile.ocr;
 const dependencyProfile = productEditionMetadata.dependencyProfile;
 if (!["full", "core"].includes(dependencyProfile)) throw new Error(`Unsupported dependency profile: ${dependencyProfile}`);
 const includedStableResourceDirs = new Set([
@@ -171,6 +172,10 @@ for (const fileName of rootConfigFiles) {
 }
 
 await copyWindowsWebView2LoaderIfNeeded();
+if (requiresLocalVisualCpp) {
+  run("pwsh", ["-NoProfile", "-File", path.join(repoRoot, "scripts", "provision-visual-cpp-runtime.ps1"),
+    "-DestinationDirectory", sidecarRoot], env);
+}
 if (resourceProfile.excelAnalyzer) {
   await copyExcelAnalyzerIfAvailable();
 }
@@ -373,6 +378,15 @@ async function createRuntimeLayoutManifest() {
     programRootResources.push(
       await inspectProgramRootEntry("WebView2Loader.dll", path.join(resourcesRoot, "WebView2Loader.dll"), "file", true),
     );
+  }
+
+  if (requiresLocalVisualCpp) {
+    const release = JSON.parse(await readFile(path.join(sidecarRoot, "msvc-runtime.json"), "utf8"));
+    for (const fileName of [...release.files.map((file) => file.name), "msvc-runtime.json", "MSVC_RUNTIME_NOTICES.md"]) {
+      programRootResources.push(await inspectProgramRootEntry(
+        fileName, path.join(sidecarRoot, fileName), "file", true,
+      ));
+    }
   }
 
   programRootResources.push(

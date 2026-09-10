@@ -28,8 +28,13 @@ mod sidecar_endpoint;
 mod sidecar_process;
 mod sidecar_shutdown;
 mod tauri_updater_commands;
-mod webview2_runtime;
 mod window;
+#[cfg(windows)]
+mod windows_prerequisites;
+#[cfg(windows)]
+mod windows_runtime_installation;
+#[cfg(windows)]
+mod windows_runtime_probe;
 
 static RUNTIME_DIAGNOSTIC_LOG_ROOT: OnceLock<PathBuf> = OnceLock::new();
 const DESKTOP_SMOKE_ENVIRONMENT_VARIABLE: &str = "EXPORTDOCMANAGER_DESKTOP_SMOKE";
@@ -37,35 +42,17 @@ const DESKTOP_ACCESS_TOKEN_ENVIRONMENT_VARIABLE: &str = "EXPORTDOCMANAGER_DESKTO
 
 fn main() {
     install_panic_log_hook();
-    match webview2_runtime::ensure_available() {
-        Ok(webview2_runtime::StartupDecision::Continue) => {}
-        Ok(webview2_runtime::StartupDecision::Exit) => return,
+    #[cfg(windows)]
+    match windows_prerequisites::ensure_available() {
+        Ok(windows_prerequisites::StartupDecision::Continue) => {}
+        Ok(windows_prerequisites::StartupDecision::Exit) => return,
         Err(error) => {
-            let _ = write_tauri_error(&format!("Windows prerequisite check failed: {error}"));
-            let _ = rfd::MessageDialog::new()
-                .set_level(rfd::MessageLevel::Error)
-                .set_title("程序启动失败")
-                .set_description(format!("程序启动前检查失败：{error}"))
-                .set_buttons(rfd::MessageButtons::Ok)
-                .show();
+            show_startup_failure(&error);
             std::process::exit(1);
         }
     }
     if let Err(error) = run_tauri_app() {
-        let _ = write_tauri_error(&format!("Tauri startup failed: {error}"));
-        let bootstrap_log_path = write_bootstrap_error(&error);
-        let diagnostic_hint = bootstrap_log_path
-            .map(|path| format!("诊断日志已写入：{}", path.display()))
-            .unwrap_or_else(|| {
-                "诊断日志无法写入运行数据目录或程序目录。请复制本弹窗中的错误信息，并检查数据目录和安装目录权限。"
-                    .to_owned()
-            });
-        rfd::MessageDialog::new()
-            .set_level(rfd::MessageLevel::Error)
-            .set_title("程序启动失败")
-            .set_description(format!("程序启动失败：{error}\n\n{diagnostic_hint}"))
-            .set_buttons(rfd::MessageButtons::Ok)
-            .show();
+        show_startup_failure(&error.to_string());
         std::process::exit(1);
     }
 }
@@ -123,6 +110,8 @@ fn run_tauri_app() -> tauri::Result<()> {
             let paths = runtime_paths::prepare_runtime_paths(app)?;
             set_runtime_diagnostic_log_root(&paths.log_root);
             runtime_layout::validate_runtime_layout(&paths)?;
+            #[cfg(windows)]
+            windows_runtime_probe::check_packaged_ocr(&paths.app_root)?;
             let sidecar = sidecar::start_sidecar(&paths)?;
             let api_base_url = sidecar.api_base_url.clone();
             let desktop_access_token = sidecar.desktop_access_token.clone();
@@ -209,12 +198,25 @@ fn set_runtime_diagnostic_log_root(log_root: &Path) {
     let _ = RUNTIME_DIAGNOSTIC_LOG_ROOT.set(log_root.to_path_buf());
 }
 
-fn write_bootstrap_error(error: &tauri::Error) -> Option<PathBuf> {
-    append_diagnostic_log(
+fn show_startup_failure(error: &str) {
+    let _ = write_tauri_error(&format!("Desktop startup failed: {error}"));
+    let log_path = append_diagnostic_log(
         "tauri-bootstrap-error.log",
         "ExportDocManager Tauri bootstrap failed",
-        &error.to_string(),
-    )
+        error,
+    );
+    let diagnostic_hint = log_path
+        .map(|path| format!("诊断日志已写入：{}", path.display()))
+        .unwrap_or_else(|| {
+            "诊断日志无法写入运行数据目录或程序目录。请复制本弹窗中的错误信息，并检查数据目录和安装目录权限。"
+                .to_owned()
+        });
+    rfd::MessageDialog::new()
+        .set_level(rfd::MessageLevel::Error)
+        .set_title("程序启动失败")
+        .set_description(format!("程序启动失败：{error}\n\n{diagnostic_hint}"))
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show();
 }
 
 fn install_panic_log_hook() {

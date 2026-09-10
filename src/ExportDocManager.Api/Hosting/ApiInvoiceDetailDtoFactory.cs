@@ -26,6 +26,13 @@ namespace ExportDocManager.Api.Hosting
                 Spare1 = invoice.Spare1 ?? string.Empty,
                 Spare2 = invoice.Spare2 ?? string.Empty,
                 Spare3 = invoice.Spare3 ?? string.Empty,
+                Spare4 = invoice.Spare4 ?? string.Empty,
+                Spare5 = invoice.Spare5 ?? string.Empty,
+                Spare6 = invoice.Spare6 ?? string.Empty,
+                Spare7 = invoice.Spare7 ?? string.Empty,
+                Spare8 = invoice.Spare8 ?? string.Empty,
+                Spare9 = invoice.Spare9 ?? string.Empty,
+                Spare10 = invoice.Spare10 ?? string.Empty,
                 CustomFieldsJson = invoice.CustomFieldsJson ?? string.Empty,
                 PaymentTerms = invoice.PaymentTerms ?? string.Empty,
                 PortOfLoading = invoice.PortOfLoading ?? string.Empty,
@@ -116,6 +123,13 @@ namespace ExportDocManager.Api.Hosting
                 Spare1 = item.Spare1 ?? string.Empty,
                 Spare2 = item.Spare2 ?? string.Empty,
                 Spare3 = item.Spare3 ?? string.Empty,
+                Spare4 = item.Spare4 ?? string.Empty,
+                Spare5 = item.Spare5 ?? string.Empty,
+                Spare6 = item.Spare6 ?? string.Empty,
+                Spare7 = item.Spare7 ?? string.Empty,
+                Spare8 = item.Spare8 ?? string.Empty,
+                Spare9 = item.Spare9 ?? string.Empty,
+                Spare10 = item.Spare10 ?? string.Empty,
                 CustomFieldsJson = item.CustomFieldsJson ?? string.Empty
             };
         }

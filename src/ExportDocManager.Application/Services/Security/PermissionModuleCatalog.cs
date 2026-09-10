@@ -165,7 +165,7 @@ namespace ExportDocManager.Services.Security
             new(PersonnelManager, "人事管理员", "维护本公司人员档案和任职变动；账号创建、权限分配和关联仍由系统管理员负责。",
                 [.. OfficeEmployeeGrants(),
                     .. Grant(PermissionResourceCatalog.OfficePeople, PermissionDataScope.Company,
-                        PermissionAction.ViewDetails, PermissionAction.Create, PermissionAction.Edit, PermissionAction.Transition),
+                        PermissionAction.ViewDetails, PermissionAction.Create, PermissionAction.Edit, PermissionAction.Delete, PermissionAction.Transition),
                     .. Preset(PermissionModuleCatalog.SystemAbout, PermissionAccessLevel.View)])
         ];
 
@@ -288,7 +288,7 @@ namespace ExportDocManager.Services.Security
             new[] { new PermissionGrantRecord(PermissionResourceCatalog.OfficePeople, PermissionAction.View, PermissionDataScope.Company) }
             .Concat(new[] { PermissionModuleCatalog.OfficeRooms, PermissionModuleCatalog.OfficeSupplies }
                 .SelectMany(resource => Grant(resource, PermissionDataScope.Own,
-                    PermissionAction.View, PermissionAction.Create, PermissionAction.Cancel)));
+                    PermissionAction.View, PermissionAction.Create, PermissionAction.Edit, PermissionAction.Cancel)));
 
         private static IReadOnlyList<PermissionGrantRecord> Preset(
             string resourceKey,

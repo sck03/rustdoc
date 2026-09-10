@@ -52,6 +52,8 @@ namespace ExportDocManager.Services.Security
             string existingCode = NormalizeOptionalCode(request.ExistingCode);
             string code = NormalizeRequiredCode(request.Code, "公司代码");
             string name = NormalizeName(request.Name, "公司名称");
+            if (existingCode.Length == 0 && request.ExpectedVersion != 0)
+                throw new ServiceValidationException("新增公司不能包含已有版本号。");
             if (existingCode.Length > 0 && existingCode != code)
             {
                 throw new ServiceValidationException("公司代码是稳定授权标识，创建后不能修改。");

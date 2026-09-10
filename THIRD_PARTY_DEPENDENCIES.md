@@ -844,3 +844,16 @@ Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `font
 | zvariant | 5.12.0 | MIT | tauri |
 | zvariant_derive | 5.12.0 | MIT | tauri |
 | zvariant_utils | 3.4.0 | MIT | tauri |
+
+## Windows x64 OCR app-local CRT assets
+
+Microsoft Visual C++ 14.51.36247.0; Microsoft redistribution terms apply. Full installer excluded from customer packages.
+
+| File | Bytes | SHA-256 |
+|---|---:|---|
+| vcruntime140.dll | 178616 | d1f4225df2cd877dbf130d5668a021dce3f94118455ff5ec952061c30afc9ce7 |
+| vcruntime140_1.dll | 50112 | a7146c08f89fe5b04541ab507cdb59ff7b44534d4ba3c668a426c6450a03434e |
+| msvcp140.dll | 643512 | 7c26614e1d733892c2deac7e245ce115504b1d80592dd0a01b08e3e5a55f89ca |
+| msvcp140_1.dll | 35768 | 206c931bf90fdad8816de3b5e2ef80b2bcaa9406c89ecc05fe6fddffe251e982 |
+
+Source and redistribution notice: `VisualCppRuntime/visual-cpp-runtime.json` and `VisualCppRuntime/README.md`.

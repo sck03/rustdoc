@@ -128,7 +128,8 @@ export function AppWorkspaceRoutes({
         <Route path="/invoices" element={<InvoiceListPage client={client} />} />
         <Route path="/office/meeting-rooms" element={<MeetingRoomsPage client={client} user={user} />} />
         <Route path="/office/supplies" element={<OfficeSuppliesPage client={client} user={user} />} />
-        <Route path="/office/people" element={<PersonnelPage client={client} user={user} />} />
+        <Route path="/office/people" element={<PersonnelPage key="records" client={client} user={user} />} />
+        <Route path="/office/directory" element={<PersonnelPage key="directory" client={client} user={user} directoryOnly />} />
         <Route path="/invoices/new" element={<InvoiceEditorPage businessDate={user.businessDate} client={client} mode="new" />} />
         <Route path="/invoices/:invoiceId" element={<InvoiceEditorPage businessDate={user.businessDate} client={client} mode="edit" attachmentsEnabled={features.includes("business-attachments")} />} />
         <Route path="/query/invoices" element={<QueryPage businessDate={user.businessDate} client={client} />} />

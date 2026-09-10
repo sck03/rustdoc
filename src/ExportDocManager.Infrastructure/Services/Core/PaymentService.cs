@@ -93,6 +93,20 @@ namespace ExportDocManager.Services.Core
         private static void NormalizePayment(Payment payment)
         {
             payment.InvoiceNo = TextSearchHelper.NormalizeValue(payment.InvoiceNo);
+            payment.VoucherNo = TextSearchHelper.NormalizeValue(payment.VoucherNo);
+            payment.QuantityUnit = TextSearchHelper.NormalizeValue(payment.QuantityUnit);
+            payment.TradeMethod = TextSearchHelper.NormalizeValue(payment.TradeMethod);
+            payment.TaxRebateRate = TextSearchHelper.NormalizeValue(payment.TaxRebateRate);
+            payment.Spare1 = TextSearchHelper.NormalizeValue(payment.Spare1);
+            payment.Spare2 = TextSearchHelper.NormalizeValue(payment.Spare2);
+            payment.Spare3 = TextSearchHelper.NormalizeValue(payment.Spare3);
+            payment.Spare4 = TextSearchHelper.NormalizeValue(payment.Spare4);
+            payment.Spare5 = TextSearchHelper.NormalizeValue(payment.Spare5);
+            payment.Spare6 = TextSearchHelper.NormalizeValue(payment.Spare6);
+            payment.Spare7 = TextSearchHelper.NormalizeValue(payment.Spare7);
+            payment.Spare8 = TextSearchHelper.NormalizeValue(payment.Spare8);
+            payment.Spare9 = TextSearchHelper.NormalizeValue(payment.Spare9);
+            payment.Spare10 = TextSearchHelper.NormalizeValue(payment.Spare10);
             payment.Department = TextSearchHelper.NormalizeValue(payment.Department);
             payment.Project = TextSearchHelper.NormalizeValue(payment.Project);
             payment.PaymentMethod = TextSearchHelper.NormalizeValue(payment.PaymentMethod);
@@ -117,6 +131,20 @@ namespace ExportDocManager.Services.Core
                 throw new ArgumentException("支付对象资料编号不能小于 0。");
             }
             EnsureTextLength(payment.InvoiceNo, 100, "发票号");
+            EnsureTextLength(payment.VoucherNo, 100, "付款单号");
+            EnsureTextLength(payment.QuantityUnit, 20, "数量单位");
+            EnsureTextLength(payment.TradeMethod, 100, "贸易方式");
+            EnsureTextLength(payment.TaxRebateRate, 100, "退税率");
+            EnsureTextLength(payment.Spare1, 500, "备用字段1");
+            EnsureTextLength(payment.Spare2, 500, "备用字段2");
+            EnsureTextLength(payment.Spare3, 500, "备用字段3");
+            EnsureTextLength(payment.Spare4, 500, "备用字段4");
+            EnsureTextLength(payment.Spare5, 500, "备用字段5");
+            EnsureTextLength(payment.Spare6, 500, "备用字段6");
+            EnsureTextLength(payment.Spare7, 500, "备用字段7");
+            EnsureTextLength(payment.Spare8, 500, "备用字段8");
+            EnsureTextLength(payment.Spare9, 500, "备用字段9");
+            EnsureTextLength(payment.Spare10, 500, "备用字段10");
             EnsureTextLength(payment.Department, 100, "部门");
             EnsureTextLength(payment.PaymentMethod, 100, "付款方式");
             EnsureTextLength(payment.Quantity, 100, "数量");

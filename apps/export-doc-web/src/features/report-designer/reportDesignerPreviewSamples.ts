@@ -1,4 +1,9 @@
 import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
+import { documentSpareKeys } from "../../ui/documentSpareFields.ts";
+
+const spareSamples = Object.fromEntries(documentSpareKeys.map((key, index) => [
+  key[0].toUpperCase() + key.slice(1), `备用 ${index + 1} 示例`,
+]));
 
 export type ReportDesignerPreviewSampleProfile =
   | "apiSample"
@@ -60,18 +65,27 @@ function createPreviewSampleData(profile: Exclude<ReportDesignerPreviewSamplePro
         RMBAccount: "6222 0200 0000 0000",
       },
       Payment: {
+        ...spareSamples,
+        VoucherNo: "PAY-2026-0707",
         PayerName: "宁波样例付款有限公司",
         Department: "外贸业务部",
-        InvoiceNo: "PAY-2026-0707",
+        InvoiceNo: "INV-2026-0707",
         PaymentDate: "2026-07-07",
         PayeeName: "宁波样例供应商有限公司",
         PaymentMethod: "电汇",
         BankName: "中国银行宁波分行",
-        BankAccount: "6222 0200 0000 0000",
-        Amount: "12345.67",
-        Currency: "CNY",
-        Purpose: "样品采购及报关杂费",
-        Remark: "用于新版报表设计器付款票据样例预览",
+        AccountNo: "6222 0200 0000 0000",
+        CNYAmount: "12345.67",
+        USDAmount: "0.00",
+        GoodsName: "样例夹克（合并付款）",
+        Quantity: "120",
+        QuantityUnit: "件",
+        TradeMethod: "T/T",
+        TaxRebateRate: "13%",
+        ShipmentCountry: "德国",
+        ShipmentDate: "2026-07-07",
+        ReceiptDate: "2026-07-07",
+        Notes: "样品采购及报关杂费",
       },
     };
   }
@@ -86,13 +100,14 @@ function createPreviewSampleData(profile: Exclude<ReportDesignerPreviewSamplePro
       ShowSeal: true,
     },
     Invoice: {
+      ...spareSamples,
       InvoiceNo: profile === "exportLongItems" ? "INV-LONG-2026-0707" : "INV-STD-2026-0707",
       InvoiceDate: "2026-07-07",
       ContractNo: "BRG-CT-2026-0707",
-      LoadingPort: "NINGBO, CHINA",
-      DestinationPort: "LE HAVRE, FRANCE",
-      TradeTerm: "FOB NINGBO",
-      PaymentTerm: "T/T 30 DAYS",
+      PortOfLoading: "NINGBO, CHINA",
+      PortOfDestination: "LE HAVRE, FRANCE",
+      TradeTerms: "FOB NINGBO",
+      PaymentTerms: "T/T 30 DAYS",
       ShippingMarks: "N/M\nORDER SAMPLE\nMADE IN CHINA",
       SpecialTerms: profile === "exportLongItems" ? "Partial shipment allowed" : "",
       TotalQuantity: String(itemCount * 12),
@@ -109,21 +124,21 @@ function createPreviewSampleData(profile: Exclude<ReportDesignerPreviewSamplePro
       ExporterNameEN: "NINGBO BRIDGE IMP & EXP CO.,LTD",
       AddressEN: "Ningbo, Zhejiang, China",
     },
-    Payment: {},
     items: Array.from({ length: itemCount }, (_, index) => {
       const number = index + 1;
       return {
-        ProductNameEN: `Sample product ${String(number).padStart(2, "0")} with controlled wrapping`,
-        ProductNameCN: `样例商品${number}`,
-        Sku: `SKU-${String(number).padStart(3, "0")}-${profile === "exportLongItems" ? "LONG-CODE-" + "X".repeat(18) : "STD"}`,
-        Specification: `Spec ${number}`,
+        ...spareSamples,
+        StyleName: `Sample product ${String(number).padStart(2, "0")} with controlled wrapping`,
+        StyleNameCN: `样例商品${number}`,
+        StyleNo: `SKU-${String(number).padStart(3, "0")}-${profile === "exportLongItems" ? "LONG-CODE-" + "X".repeat(18) : "STD"}`,
+        Description: `Spec ${number}`,
         Quantity: String(10 + number),
-        Unit: "PCS",
+        UnitEN: "PCS",
         Cartons: String(2 + (number % 5)),
         UnitPrice: (5.8 + number / 10).toFixed(2),
         TotalPrice: (128.5 + number * 3.25).toFixed(2),
-        GrossWeight: (18 + number / 10).toFixed(2),
-        NetWeight: (15 + number / 10).toFixed(2),
+        GWTotal: (18 + number / 10).toFixed(2),
+        NWTotal: (15 + number / 10).toFixed(2),
         Volume: (0.08 + number / 100).toFixed(3),
       };
     }),

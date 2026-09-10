@@ -23,6 +23,13 @@ namespace ExportDocManager.Api.Hosting
                 Spare1 = request.Spare1,
                 Spare2 = request.Spare2,
                 Spare3 = request.Spare3,
+                Spare4 = request.Spare4,
+                Spare5 = request.Spare5,
+                Spare6 = request.Spare6,
+                Spare7 = request.Spare7,
+                Spare8 = request.Spare8,
+                Spare9 = request.Spare9,
+                Spare10 = request.Spare10,
                 CustomFieldsJson = request.CustomFieldsJson,
                 PaymentTerms = request.PaymentTerms,
                 PortOfLoading = request.PortOfLoading,
@@ -114,6 +121,13 @@ namespace ExportDocManager.Api.Hosting
                 Spare1 = item.Spare1,
                 Spare2 = item.Spare2,
                 Spare3 = item.Spare3,
+                Spare4 = item.Spare4,
+                Spare5 = item.Spare5,
+                Spare6 = item.Spare6,
+                Spare7 = item.Spare7,
+                Spare8 = item.Spare8,
+                Spare9 = item.Spare9,
+                Spare10 = item.Spare10,
                 CustomFieldsJson = item.CustomFieldsJson
             };
         }

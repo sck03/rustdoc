@@ -66,13 +66,8 @@ public sealed partial class MeetingRoomService(OfficeServiceContext office) : IM
                     throw new ResourceConflictException("同一请求标识不能用于不同的预约内容。");
                 return await BookingRecordAsync(db, actor, previous.Id, token);
             }
-            if (!room.IsActive) throw new ResourceConflictException("会议室已停用。");
-            Range(request.AttendeeCount, 1, room.Capacity, "参会人数");
+            await ValidateBookingAsync(db, room, request.AttendeeCount, start, end, 0, token);
             var now = office.Clock.UtcNow;
-            if (start < now || start > now.AddDays(room.AdvanceBookingDays) || end - start < TimeSpan.FromMinutes(15) ||
-                end - start > TimeSpan.FromHours(room.MaximumBookingHours))
-                throw new ServiceValidationException($"请预约未来 {room.AdvanceBookingDays} 天内的时段，时长为 15 分钟至 {room.MaximumBookingHours} 小时。");
-            await DemandAvailableAsync(db, room.Id, start, end, 0, token);
             var booking = new MeetingBooking
             {
                 MeetingRoomId = room.Id,

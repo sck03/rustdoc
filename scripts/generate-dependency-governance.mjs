@@ -415,6 +415,7 @@ function buildNotices(items) {
     "- Noto CJK report fonts are redistributed under the SIL Open Font License. The complete text is included below and is also shipped at `Resources/Fonts/OpenSource/OFL-Noto-CJK.txt`.",
     "- PaddleOCR/PP-OCRv6 model provenance and notices are shipped at `OcrModels/PaddleOCR/V6/THIRD_PARTY_NOTICES.md`.",
     "- The Rust Excel analyzer notice is shipped at `Tools/EXCEL_ANALYZER_NOTICES.md`.",
+    "- Windows x64 OCR packages carry only four Microsoft Visual C++ app-local CRT DLLs beside ONNX Runtime, with `sidecar/msvc-runtime.json` and `sidecar/MSVC_RUNTIME_NOTICES.md`. These Microsoft redistribution terms are separate from the open-source package licenses; the full installer is a build-time source and is not shipped.",
     "- Chrome Headless Shell or the reviewed Playwright Chromium ARM64 build is shipped with its upstream license/notice file under `Browsers/`; the clean-package gate rejects browser payloads without a corresponding notice.",
     "- The container-only browser image installs Debian 13 `chromium`, `chromium-sandbox`, `socat`, and `fonts-noto-cjk` from the official Debian repository. `socat` exposes the loopback-only CDP socket solely on the isolated browser network. Their package copyright files remain available under `/usr/share/doc` in that image; the API and Web images do not embed a second Chromium copy.",
     "",
@@ -429,6 +430,10 @@ function buildNotices(items) {
     "### Excel analyzer notice",
     "",
     readRequiredText("tools/excel-analyzer-rs/THIRD_PARTY_NOTICES.md"),
+    "",
+    "### Microsoft app-local CRT notice",
+    "",
+    readRequiredText("VisualCppRuntime/README.md"),
     "",
   );
   return `${lines.join("\n").trimEnd()}\n`;
@@ -464,6 +469,12 @@ function buildInventory(items) {
     }
     lines.push("");
   }
+  const crt = JSON.parse(readRequiredText("VisualCppRuntime/visual-cpp-runtime.json"));
+  lines.push("## Windows x64 OCR app-local CRT assets", "",
+    `Microsoft Visual C++ ${crt.fileVersion}; Microsoft redistribution terms apply. Full installer excluded from customer packages.`, "",
+    "| File | Bytes | SHA-256 |", "|---|---:|---|");
+  for (const file of crt.files) lines.push(`| ${file.name} | ${file.bytes} | ${file.sha256} |`);
+  lines.push("", "Source and redistribution notice: `VisualCppRuntime/visual-cpp-runtime.json` and `VisualCppRuntime/README.md`.", "");
   return `${lines.join("\n").trimEnd()}\n`;
 }
 

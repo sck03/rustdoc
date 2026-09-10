@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-09-10",
+  "capturedAt": "2026-09-11",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 126168,
+      "baselineAggregateLines": 126639,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 126368,
+      "maximumAggregateLines": 126839,
       "reportFiles": false
     },
     {
@@ -22,9 +22,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 85917,
+      "baselineAggregateLines": 85940,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 86117,
+      "maximumAggregateLines": 86140,
       "reportFiles": false
     },
     {
@@ -36,9 +36,9 @@
       ],
       "filePattern": "^.+\\.rs$",
       "maximumLines": 1000,
-      "baselineAggregateLines": 9909,
+      "baselineAggregateLines": 10013,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 9984,
+      "maximumAggregateLines": 10088,
       "reportFiles": false
     },
     {
@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 45265,
+      "baselineAggregateLines": 45576,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 45385,
+      "maximumAggregateLines": 45696,
       "reportFiles": false
     },
     {
@@ -60,9 +60,9 @@
       ],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 41633,
+      "baselineAggregateLines": 42019,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 41783,
+      "maximumAggregateLines": 42169,
       "reportFiles": false
     },
     {
@@ -116,7 +116,7 @@
       "directory": "src/ExportDocManager.Infrastructure/Services/Office",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 300,
-      "maximumAggregateLines": 800,
+      "maximumAggregateLines": 940,
       "excludePattern": "/(?:PersonnelService(?:\\..+)?|PersonnelImagePolicy)\\.cs$"
     },
     {
@@ -226,21 +226,21 @@
       "maximumAggregateLines": 900
     },
     {
-      "name": "Windows desktop prerequisite module",
+      "name": "Windows desktop prerequisite modules",
       "directory": "apps/export-doc-tauri/src-tauri/src",
-      "filePattern": "^webview2_runtime\\.rs$",
+      "filePattern": "^windows_(?:prerequisites|runtime_installation|runtime_probe)\\.rs$",
       "maximumLines": 450
     },
     {
-      "name": "Windows WebView2 provisioning entry",
+      "name": "Windows runtime provisioning entries",
       "directory": "scripts",
-      "filePattern": "^provision-webview2-runtime\\.ps1$",
+      "filePattern": "^provision-(?:webview2|visual-cpp)-runtime\\.ps1$",
       "maximumLines": 150
     },
     {
-      "name": "Windows WebView2 verification helper",
+      "name": "Microsoft runtime verification helpers",
       "directory": "scripts/lib",
-      "filePattern": "^webview2-runtime-support\\.ps1$",
+      "filePattern": "^(?:microsoft|visual-cpp)-runtime-support\\.ps1$",
       "maximumLines": 120
     },
     {
@@ -262,7 +262,7 @@
       "directory": "apps/export-doc-web/src",
       "filePattern": "^(?:App|AppWorkspaceRoutes|webSessionStorage)\\.(?:tsx|ts)$",
       "maximumLines": 700,
-      "maximumAggregateLines": 910
+      "maximumAggregateLines": 920
     },
     {
       "name": "settings page orchestration",

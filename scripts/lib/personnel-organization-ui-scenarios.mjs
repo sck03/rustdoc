@@ -28,11 +28,11 @@ export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickTe
     results.push(`organization-personnel-options-refresh-${width}`);
   }
   await open("organization",1024);
-  await clickText(page,"维护公司");await input(page,'input[name="name"]',"实际公司名称");await clickText(page,"保存公司");
+  await clickText(page,"编辑公司");await input(page,'input[name="name"]',"实际公司名称");await clickText(page,"保存公司");
   await waitFor(page,"!document.querySelector('.office-dialog') && document.body.innerText.includes('实际公司名称')");
   assert.equal((await read(page,"window.__officeCalls.find(item=>item.name==='updateCompany').input")).body.expectedVersion,1);
   results.push("organization-company-edit-version");
-  await read(page,"document.querySelector('[aria-label=维护业务部]').click()");
+  await read(page,"document.querySelector('[aria-label=编辑业务部]').click()");
   await clickText(page,"选择负责人");await waitFor(page,"document.querySelector('.organization-managers button')");
   await read(page,"document.querySelector('.organization-managers button').click()");
   await read(page,"document.querySelector('.office-dialog [aria-label=关闭窗口]').click()");
@@ -44,7 +44,7 @@ export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickTe
   assert.equal(await read(page,"document.querySelector('.personnel-facts').innerText.includes('11010519491231002X')"),false);
   await clickText(page,"查看完整号码");assert(await read(page,"document.querySelector('.personnel-facts').innerText.includes('11010519491231002X')"));
   await clickText(page,"隐藏号码");results.push("identity-number-masked-and-explicit-reveal");
-  await clickText(page,"维护档案");await clickText(page,"个人资料与人事备注（限人事档案权限）","summary");
+  await clickText(page,"编辑档案");await clickText(page,"个人资料与人事备注（限人事档案权限）","summary");
   await waitFor(page,"document.querySelector('input[name=identityNumber]')");
   assert(await read(page,"document.querySelector('input[name=identityValidUntil]').disabled"));
   await input(page,'input[name="identityAuthority"]',"更新后的签发机关");
@@ -85,7 +85,7 @@ export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickTe
   await open("people",390,"employee");
   assert.equal(await read(page,"document.body.innerText.includes('身份证') || Boolean(document.querySelector('a[href*=organization]'))"),false);
   assert.equal(await read(page,"window.__officeCalls.some(item=>item.name==='readImage')"),false);results.push("personnel-private-image-directory-isolation");
-  await open("organization",390);await read(page,"document.querySelector('[aria-label=维护业务部]').click()");
+  await open("organization",390);await read(page,"document.querySelector('[aria-label=编辑业务部]').click()");
   await clickText(page,"选择负责人");await waitFor(page,"document.querySelector('.organization-managers button')");
   await read(page,"document.querySelector('.organization-managers button').click()");await clickText(page,"保存部门");
   await waitFor(page,"!document.querySelector('.office-dialog')");await clickText(page,"人员档案","a");

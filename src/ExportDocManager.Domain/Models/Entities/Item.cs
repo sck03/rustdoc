@@ -49,6 +49,13 @@ namespace ExportDocManager.Models.Entities
         public string? Spare1 { get; set; }
         public string? Spare2 { get; set; }
         public string? Spare3 { get; set; }
+        public string? Spare4 { get; set; }
+        public string? Spare5 { get; set; }
+        public string? Spare6 { get; set; }
+        public string? Spare7 { get; set; }
+        public string? Spare8 { get; set; }
+        public string? Spare9 { get; set; }
+        public string? Spare10 { get; set; }
         public string? CustomFieldsJson { get; set; }
 
         /// <summary>
@@ -202,6 +209,13 @@ namespace ExportDocManager.Models.Entities
                 Spare1 = this.Spare1,
                 Spare2 = this.Spare2,
                 Spare3 = this.Spare3,
+                Spare4 = this.Spare4,
+                Spare5 = this.Spare5,
+                Spare6 = this.Spare6,
+                Spare7 = this.Spare7,
+                Spare8 = this.Spare8,
+                Spare9 = this.Spare9,
+                Spare10 = this.Spare10,
                 CustomFieldsJson = this.CustomFieldsJson
             };
         }

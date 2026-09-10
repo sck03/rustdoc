@@ -1,3 +1,5 @@
+import { documentSpareKeys, type DocumentSpareKey } from "../../ui/documentSpareFields.ts";
+
 export type EditableInvoiceItemField =
   | "poNumber"
   | "styleNo"
@@ -27,9 +29,7 @@ export type EditableInvoiceItemField =
   | "purchasePrice"
   | "purchaseTotal"
   | "taxRebateRate"
-  | "spare1"
-  | "spare2"
-  | "spare3";
+  | DocumentSpareKey;
 
 export type InvoiceItemColumnKind = "text" | "number";
 
@@ -71,9 +71,7 @@ export const invoiceItemEditableColumns: InvoiceItemColumnDefinition[] = [
   { field: "purchasePrice", header: "采购价", ariaName: "采购价", kind: "number", colClassName: "item-number-col", headerClassName: "amount-cell" },
   { field: "purchaseTotal", header: "采购额", ariaName: "采购额", kind: "number", colClassName: "item-number-col", headerClassName: "amount-cell" },
   { field: "taxRebateRate", header: "退税率", ariaName: "退税率", kind: "number", colClassName: "item-number-col", headerClassName: "amount-cell" },
-  { field: "spare1", header: "备注 1", ariaName: "备注 1", kind: "text", colClassName: "item-short-col" },
-  { field: "spare2", header: "备注 2", ariaName: "备注 2", kind: "text", colClassName: "item-short-col" },
-  { field: "spare3", header: "备注 3", ariaName: "备注 3", kind: "text", colClassName: "item-short-col" },
+  ...documentSpareKeys.map((field, index): InvoiceItemColumnDefinition => ({ field, header: `备用 ${index + 1}`, ariaName: `备用 ${index + 1}`, kind: "text", colClassName: "item-short-col" })),
 ];
 
 export const firstEditableInvoiceItemField = invoiceItemEditableColumns[0].field;

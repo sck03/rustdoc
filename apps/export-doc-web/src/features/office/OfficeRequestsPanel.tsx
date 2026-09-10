@@ -7,11 +7,13 @@ import { isMeetingBooking, officeActionLabels, officeRequestActions, officeStatu
 import { applyOfficeAction, useOfficeOperation, useOfficeRequests } from "./useOfficeData.ts";
 import { OfficeDialog, OfficeField, OfficePager, OfficeQueryState, OfficeSubmit } from "./OfficeUi.tsx";
 import { OfficeHistoryDialog } from "./OfficeHistoryDialog.tsx";
+import { OfficeRequestEditor } from "./OfficeRequestEditor.tsx";
 
 export function OfficeRequestsPanel({ client, user, kind }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OfficeKind }) {
   const model = useOfficeRequests(client, user, kind);
   const [selected, setSelected] = useState<{ row: OfficeRequestRow; action: OfficeAction; label: string } | null>(null);
   const [history, setHistory] = useState<OfficeRequestRow | null>(null);
+  const [editing, setEditing] = useState<OfficeRequestRow | null>(null);
   const register = user.capabilities.usesOfficeRegister;
   const statuses = kind === "rooms" ? ["Pending", "Approved", "InUse", "Completed", "Rejected", "Cancelled"] : ["Pending", "Approved", "Issued", "Returned", "Rejected", "Cancelled"];
   return <>
@@ -23,6 +25,7 @@ export function OfficeRequestsPanel({ client, user, kind }: { client: ExportDocM
       {!register && model.access.canSeeOthers && <label className="checkbox-field"><input type="checkbox" checked={model.mineOnly} onChange={(event) => model.changeMineOnly(event.target.checked)} />仅我的申请</label>}
       <button type="button" className="icon-button" aria-label="刷新申请记录" disabled={model.query.isFetching} onClick={() => void model.query.refetch()}><RefreshCw size={17} aria-hidden="true" /></button>
     </div>
+    <p className="office-muted">交接前可修改或取消；取消后释放时段或预留库存，处理记录继续保留。</p>
     <OfficeQueryState query={model.query} emptyTitle={register ? "当前条件下没有登记记录" : "当前条件下没有申请记录"} />
     {!model.query.isError && <div className="office-request-list">{model.query.data?.items.map((row) => <article key={row.id} className="office-request-card">
       <div className="office-card-heading"><h2>{isMeetingBooking(row) ? row.title : row.supplyName}</h2><span className="office-badge" data-state={row.status}>{officeStatus(row, user.businessDate)}</span></div>
@@ -39,11 +42,13 @@ export function OfficeRequestsPanel({ client, user, kind }: { client: ExportDocM
         <button key={entry.action} type="button" className={entry.action === "approve" ? "command-button" : "command-button secondary"}
           onClick={() => setSelected({ row, ...entry })}>{entry.label}</button>)}
         <button className="command-button secondary" type="button" onClick={() => setHistory(row)}>处理记录</button>
+        {["Pending", "Approved"].includes(row.status) && model.access.allows("edit", row) && <button className="command-button secondary" type="button" onClick={() => setEditing(row)}>修改</button>}
       </footer>
     </article>)}</div>}
     <OfficePager page={model.query.data} paging={model.paging} busy={model.query.isFetching} />
     {selected && <OfficeActionDialog client={client} kind={kind} {...selected} onClose={() => setSelected(null)} />}
     {history && <OfficeHistoryDialog client={client} user={user} kind={kind} id={history.id} title="申请处理记录" onClose={() => setHistory(null)} />}
+    {editing && <OfficeRequestEditor client={client} user={user} row={editing} onClose={() => setEditing(null)} />}
   </>;
 }
 

@@ -31,6 +31,13 @@ namespace ExportDocManager.Models.Entities
         public string? Spare1 { get; set; }
         public string? Spare2 { get; set; }
         public string? Spare3 { get; set; }
+        public string? Spare4 { get; set; }
+        public string? Spare5 { get; set; }
+        public string? Spare6 { get; set; }
+        public string? Spare7 { get; set; }
+        public string? Spare8 { get; set; }
+        public string? Spare9 { get; set; }
+        public string? Spare10 { get; set; }
         public string? CustomFieldsJson { get; set; }
         public string? PaymentTerms { get; set; }
         public string? PortOfLoading { get; set; }
@@ -109,6 +116,13 @@ namespace ExportDocManager.Models.Entities
                 Spare1 = Spare1,
                 Spare2 = Spare2,
                 Spare3 = Spare3,
+                Spare4 = Spare4,
+                Spare5 = Spare5,
+                Spare6 = Spare6,
+                Spare7 = Spare7,
+                Spare8 = Spare8,
+                Spare9 = Spare9,
+                Spare10 = Spare10,
                 CustomFieldsJson = CustomFieldsJson,
                 PaymentTerms = PaymentTerms,
                 PortOfLoading = PortOfLoading,

@@ -1,4 +1,6 @@
 using ExportDocManager.Services.Office;
+using ExportDocManager.Models;
+using Microsoft.AspNetCore.Mvc;
 using ExportDocManager.Services.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -10,6 +12,12 @@ public static partial class ApiEndpointRouteBuilderExtensions
     {
         endpoints.MapPersonnelImageEndpoints();
         const string resource = PermissionResourceCatalog.OfficePeople;
+        endpoints.MapDelete("/api/office/people/{id:int:min(1)}", async (IPersonnelService service, int id,
+            [FromBody] DeleteRecordRequest request, CancellationToken cancellationToken) =>
+        {
+            await service.DeleteAsync(id, request, cancellationToken);
+            return TypedResults.NoContent();
+        }).OfficeEndpoint("DeletePersonnel", resource, PermissionAction.Delete);
         endpoints.MapGet("/api/office/people", async (IPersonnelService service, string? keyword, string? departmentId,
             string? status, bool? attentionOnly, int? pageNumber, int? pageSize, CancellationToken cancellationToken) =>
             TypedResults.Ok(await service.QueryAsync(new(keyword, departmentId, status, attentionOnly ?? false,

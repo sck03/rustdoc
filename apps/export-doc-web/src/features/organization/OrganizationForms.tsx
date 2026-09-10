@@ -17,7 +17,7 @@ export function OrganizationCompanyForm({ client, record, onClose, onSaved }: {
     void operation.run((signal) => record ? client.updateOrganizationCompany({ code: record.code, body }, { signal })
       : client.createOrganizationCompany({ body }, { signal }), onSaved);
   }
-  return <OfficeDialog title={record ? "维护公司" : "新增公司"} onClose={onClose} {...operation} protectChanges>
+  return <OfficeDialog title={record ? "编辑公司" : "新增公司"} onClose={onClose} {...operation} protectChanges>
     <form onSubmit={submit}><fieldset className="office-form-grid" disabled={operation.busy}>
       <OfficeField label="公司代码"><input name="code" required maxLength={50} defaultValue={record?.code ?? ""} readOnly={Boolean(record)} autoFocus={!record} /></OfficeField>
       <OfficeField label="公司名称"><input name="name" required maxLength={120} defaultValue={record?.name ?? ""} autoFocus={Boolean(record)} /></OfficeField>
@@ -45,7 +45,7 @@ export function OrganizationDepartmentForm({ client, company, departments, recor
       : client.createOrganizationDepartment({ body }, { signal }), onSaved);
   }
   return <>
-    <OfficeDialog title={record ? "维护部门" : "新增部门"} onClose={onClose} {...operation} protectChanges hasChanges={(manager?.id ?? null) !== (record?.managerEmployeeId ?? null)}>
+    <OfficeDialog title={record ? "编辑部门" : "新增部门"} onClose={onClose} {...operation} protectChanges hasChanges={(manager?.id ?? null) !== (record?.managerEmployeeId ?? null)}>
       <form onSubmit={submit}><fieldset className="office-form-grid" disabled={operation.busy}>
         <p className="office-field-wide office-muted">所属公司：{company.name}。部门代码和所属公司创建后固定。</p>
         <OfficeField label="部门代码"><input name="code" required maxLength={50} defaultValue={record?.code ?? ""} readOnly={Boolean(record)} autoFocus={!record} /></OfficeField>

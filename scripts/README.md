@@ -1,5 +1,9 @@
 # 脚本使用说明
 
+2026-09-11：`provision-visual-cpp-runtime.ps1` 由 Windows x64 OCR 资源准备自动调用，只从已校验的微软安装器提取四个必需 DLL（908008 字节），不执行或分发整套安装器。WebView2 与 CRT 共用 `lib/microsoft-runtime-support.ps1` 的来源／签名／摘要检查；客户仍使用既有构建入口。
+
+单据备用字段验证：`npm --prefix apps/export-doc-web run test:document-spare-fields`，覆盖发票、商品和付款三十项字段的草稿保存、大写转换、设计器选择、HTML 与样例。行政编辑／删除和通讯录验证继续使用 `test:office-models`、`test:office-ui`；设计器交互使用 `test:report-designer-v3-ui`。
+
 > 报表打印像素回归默认只读基准。模板版式有意调整后，先运行 `node scripts/test_report_template_print_pixel_regression.mjs --update` 生成受控基准，再立即运行不带 `--update` 的普通检查。更新只写测试夹具和 `.codex-runtime`，不会写系统临时目录。
 
 ## GitHub 公开发布
@@ -40,7 +44,9 @@ Tauri CLI 由当前 Node 直接启动 `apps/export-doc-tauri/node_modules/@tauri
 
 公开仓库不提交 Chromium 二进制。`run-tests.ps1` 找不到程序根 Chromium 或 `EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE` 时，会明确跳过两个真实 PDF 浏览器测试；正式发布验收使用 `-RequireBrowserPdfTests`，缺少渲染器即失败。测试默认执行 restore，只有确认依赖已还原时才使用 `-NoRestore`。
 
-Windows x64 绿色版构建使用 `WebView2Runtime/` 下的微软官方 Evergreen Standalone Installer。该目录跟踪 `README.md` 和固定版本、大小、SHA-256、下载地址的 `webview2-runtime.json`，约 203 MiB 的安装器本身被 Git 忽略；`provision-webview2-runtime.ps1` 会复用已有安装器或按清单从微软 HTTPS 地址下载，并严格验证 Microsoft Authenticode 签名、文件元数据、体积和 SHA-256。便携程序在创建窗口前由 Rust 预检 Windows 10 1809（内部版本 17763）和 WebView2，缺失时经用户确认打开随包安装程序，安装完成后重新检测。安装器只进入绿色包，不重复进入使用 Evergreen bootstrapper 的 NSIS 安装版；不要把它放入 `App_Data`，也不要在程序目录中自动删除正式发布资产。
+Windows x64 绿色版构建使用 `WebView2Runtime/` 下的微软官方 Evergreen Standalone Installer。该目录跟踪 `README.md` 和固定版本、大小、SHA-256、下载地址的 `webview2-runtime.json`，约 203 MiB 的安装器本身被 Git 忽略；`provision-webview2-runtime.ps1` 会复用已有安装器或按清单从微软 HTTPS 地址下载，并严格验证 Microsoft Authenticode 签名、文件元数据、体积和 SHA-256。内容校验允许下载暂存文件的 `.download` 后缀，仅校验通过后才改为正式文件名；对应回归纳入脚本套件。
+
+便携程序在创建窗口前由 Rust 预检 Windows 10 1809（内部版本 17763）和 WebView2，缺失时只需在原生窗口点击“安装并启动”，随后由随包微软安装器显示进度并在成功后自动继续启动。重复双击不会重复安装；取消正常退出，失败保留诊断，超时清理安装进程树，要求重启时明确提示。安装器只进入绿色包，不重复进入使用联网 Evergreen bootstrapper 的 NSIS 安装版；不要把它放入 `App_Data`，也不要在程序目录中自动删除正式发布资产。.NET 运行时随 API 发布，客户无需另外安装 SDK 或 .NET Runtime。
 
 当前不使用 `.github/dependabot.yml` 自动创建依赖更新 PR。NuGet、npm、Cargo、Docker 和 Actions 版本由维护者集中审查后人工升级，避免一次更新触发大量分支和云端构建。
 

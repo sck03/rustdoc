@@ -10,6 +10,7 @@ use std::{
 
 mod image_processing;
 mod recognition;
+mod runtime;
 
 use image_processing::{
     box_score, component_rects, det_size, expand_ratio, merge_lines, pad_rect, pixel_count,
@@ -153,6 +154,7 @@ impl Response {
 
 impl Engine {
     fn load(root: &Path) -> Result<Self> {
+        runtime::initialize()?;
         let det_path = root.join("det/inference.onnx");
         let rec_path = root.join("rec/inference.onnx");
         if !det_path.is_file() || !rec_path.is_file() {

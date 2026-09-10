@@ -7,6 +7,7 @@ import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
 import { runPersonnelOrganizationUi } from "./lib/personnel-organization-ui-scenarios.mjs";
+import { runAdministrationMaintenanceUi } from "./lib/administration-maintenance-ui-scenarios.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -31,9 +32,9 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   const params = new URLSearchParams(location.search), mode=params.get('mode') || 'rooms', admin=params.get('role') !== 'employee';
   const register=params.get('role')==='register';
   const now=Date.now(), date=new Date(now).toISOString().slice(0,10);
-  const actions=['view','create','cancel','approve','issue','return','restock','manage'];
-  const permissions=['office.rooms','office.supplies'].flatMap(resourceKey=>(admin?actions:actions.slice(0,3)).map(action=>({resourceKey,action,dataScope:admin?'company':'own'})));
-  const personnelActions=['view','view-details','create','edit','transition','assign'];
+  const actions=['view','create','cancel','edit','approve','issue','return','restock','manage'];
+  const permissions=['office.rooms','office.supplies'].flatMap(resourceKey=>(admin?actions:actions.slice(0,4)).map(action=>({resourceKey,action,dataScope:admin?'company':'own'})));
+  const personnelActions=['view','view-details','create','edit','delete','transition','assign'];
   permissions.push(...(admin?personnelActions:['view']).map(action=>({resourceKey:'office.people',action,dataScope:'company'})));
   const user={id:admin?99:1,username:admin?'admin':'employee',fullName:admin?'行政管理员':'示例员工',companyScope:'DEMO',departmentId:'D1',businessDate:date,businessTimeZone:'Asia/Shanghai',capabilities:{permissions:permissions.filter(p=>!register||!['approve','assign'].includes(p.action)),usesOfficeRegister:register,canManageUsers:admin}};
   const room={id:1,name:'三层第一会议室',location:'办公楼三层东侧',equipment:'投影设备、白板、视频会议终端',capacity:12,maximumBookingHours:8,advanceBookingDays:90,requiresKey:true,isActive:true,inUse:false,versionNumber:1};
@@ -50,13 +51,17 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   window.__personnelClear=false; window.__personnelConflict=false;
   const resources=['office.rooms','office.supplies'].map((key,index)=>({key,name:index?'物品领用':'会议室预约',group:'公司行政',workspace:'office',moduleKey:key,sortOrder:index,isTechnical:false,supportsDataScope:true,actions:actions.filter(action=>index||action!=='restock').map((key,index)=>({key,name:({view:'查看',create:'申请',cancel:'取消',approve:'审批',issue:'交接',return:'归还登记',restock:'库存补充',manage:'资源管理'})[key],description:'操作公司行政资源',sortOrder:index,presetLevel:index<1?'view':index<3?'operate':'manage'}))}));
   const template={id:7,code:'OfficeEmployee',name:'公司员工',description:'会议室与物品申请',isSystem:true,isActive:true,versionNumber:1,grants:permissions.filter(p=>p.resourceKey==='office.people'?p.action==='view':['view','create','cancel'].includes(p.action)).map(p=>({...p,dataScope:p.resourceKey==='office.people'?'company':'own'})),effectiveGrants:[]};
-  resources.push({key:'office.people',name:'人员信息管理',group:'公司行政',workspace:'office',moduleKey:'office.people',sortOrder:350,isTechnical:false,supportsDataScope:true,actions:personnelActions.map((key,index)=>({key,name:({view:'公司通讯录','view-details':'人事档案与记录',create:'入职登记',edit:'维护档案',transition:'转正、调岗与离职',assign:'关联账号'})[key],description:'人员管理动作',sortOrder:index,presetLevel:index===0?'view':index<4?'operate':'manage'}))});
+  resources.push({key:'office.people',name:'人员信息管理',group:'公司行政',workspace:'office',moduleKey:'office.people',sortOrder:350,isTechnical:false,supportsDataScope:true,actions:personnelActions.map((key,index)=>({key,name:({view:'公司通讯录','view-details':'人事档案与记录',create:'入职登记',edit:'编辑档案',transition:'转正、调岗与离职',assign:'关联账号'})[key],description:'人员管理动作',sortOrder:index,presetLevel:index===0?'view':index<4?'operate':'manage'}))});
   person.images=[];
+  person.canDelete=admin;person.canCorrectRegistration=register;person.deleteRestriction='';
+  let personDeleted=false;
   window.__officeCalls=[]; window.__officeErrors=[];
   window.addEventListener('error',e=>window.__officeErrors.push(e.message));
   window.addEventListener('unhandledrejection',e=>window.__officeErrors.push(String(e.reason)));
   const record=(name,input,value)=>{window.__officeCalls.push({name,input}); return Promise.resolve(value)};
   const client={
+    deleteOrganizationCompany:input=>{companies.splice(companies.findIndex(item=>item.code===input.code),1);return record('deleteCompany',input,undefined)},
+    deleteOrganizationDepartment:input=>{departments.splice(departments.findIndex(item=>item.code===input.code),1);return record('deleteDepartment',input,undefined)},
     getOrganizationDirectory:async()=>structuredClone({companies,departments}),
     createOrganizationCompany:input=>{const item={...input.body,versionNumber:1};companies.push(item);return record('createCompany',input,structuredClone(item))},
     updateOrganizationCompany:input=>{const item=companies.find(item=>item.code===input.code);Object.assign(item,input.body,{versionNumber:item.versionNumber+1});return record('updateCompany',input,structuredClone(item))},
@@ -70,9 +75,13 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
     listMeetingRooms:async()=>page([room]), getMeetingRoomAvailability:async()=>[{startsAt:booking.startsAt,endsAt:booking.endsAt,status:'Approved'}],
     listMeetingBookings:async(input)=>record('listBookings',input,page(!input.status||input.status===booking.status?[booking]:[])),
     createMeetingBooking:input=>record('createBooking',input,{...booking,id:2,...input.body}),
+    updateMeetingBooking:input=>{Object.assign(booking,input.body,{versionNumber:booking.versionNumber+1});return record('updateBooking',input,structuredClone(booking))},
+    deleteMeetingRoom:input=>record('deleteRoom',input,undefined),
     createMeetingRoom:input=>record('createRoom',input,room), updateMeetingRoom:input=>record('updateRoom',input,room),
     listOfficeSupplies:async()=>page([supply]), listOfficeSupplyRequests:async(input)=>page(!input.status||input.status===request.status?[request]:[]),
     createOfficeSupplyRequest:input=>record('createSupplyRequest',input,request),
+    updateOfficeSupplyRequest:input=>{Object.assign(request,input.body,{versionNumber:request.versionNumber+1});return record('updateRequest',input,structuredClone(request))},
+    deleteOfficeSupply:input=>record('deleteSupply',input,undefined),
     createOfficeSupply:input=>record('createSupply',input,supply), updateOfficeSupply:input=>record('updateSupply',input,supply),
     restockOfficeSupply:input=>record('restock',input,{}), stocktakeOfficeSupply:input=>record('stocktake',input,{}),
     approveMeetingBooking:input=>{booking.status='Approved';return record('approveBooking',input,booking)},
@@ -84,8 +93,9 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
     listUsers:async()=>({users:[],companies:[{code:'DEMO',name:'示例公司',isActive:true,versionNumber:1}],departments:[],roles:['Admin','User'],permissionTemplates:[template]}),
     updatePermissionTemplate:input=>{Object.assign(template,input.body);return record('savePermissions',input,template)},
     getPersonnelOptions:async()=>({departments,canCreate:admin}),
-    listPersonnel:async input=>page((!input.keyword||person.employee.fullName.includes(input.keyword))&&(!input.status||person.employee.status===input.status)?[person.employee]:[]),
-    getPersonnel:async()=>structuredClone(person),
+    listPersonnel:async input=>page(!personDeleted&&(!input.keyword||person.employee.fullName.includes(input.keyword))&&(!input.status||person.employee.status===input.status)?[person.employee]:[]),
+    getPersonnel:input=>record('getPerson',input,structuredClone(person)),
+    deletePersonnel:input=>{personDeleted=true;return record('deletePerson',input,undefined)},
     createPersonnel:input=>{person={...person,account:null,canLinkAccount:true,profile:input.body.profile,hireDate:input.body.hireDate,employee:{...person.employee,id:2,employeeNumber:input.body.employeeNumber,fullName:input.body.profile.fullName,jobTitle:input.body.jobTitle,departmentId:input.body.departmentId}};return record('createPerson',input,structuredClone(person))},
     updatePersonnel:input=>{if(window.__personnelConflict){window.__personnelConflict=false;return Promise.reject(new Error('记录已被其他人修改，请刷新后重试。'))}person={...person,...input.body,versionNumber:person.versionNumber+1,employee:{...person.employee,fullName:input.body.profile.fullName}};return record('updatePerson',input,structuredClone(person))},
     getPersonnelHistory:async()=>page([{id:1,action:'Hire',effectiveDate:date,actorName:'人事管理员',summary:'入职登记',note:'办理入职手续',createdAt:new Date(now).toISOString()}]),
@@ -98,11 +108,12 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
     linkPersonnelAccount:input=>{person={...person,canLinkAccount:false,account:{id:2,username:'new-account',fullName:person.employee.fullName,departmentId:'D1',isActive:true,versionNumber:4}};return record('linkPerson',input,person)},
   };
   const queries=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
-  const initialPath=mode==='organization'?'/system/organization':mode==='permissions'?'/permissions':mode==='people'?'/office/people':mode==='supplies'?'/office/supplies':'/office/meeting-rooms';
+  const initialPath=mode==='organization'?'/system/organization':mode==='permissions'?'/permissions':mode==='directory'||mode==='people'&&!admin?'/office/directory':mode==='people'?'/office/people':mode==='supplies'?'/office/supplies':'/office/meeting-rooms';
   createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[initialPath]}><QueryClientProvider client={queries}><ConfirmationProvider><UnsavedChangesProvider>
     <main className='workspace-content'><h1>公司行政工作台</h1><Routes>
       <Route path='/permissions' element={<AccessControlPage client={client} canManageUsers={true}/>}/>
       <Route path='/office/people' element={<PersonnelPage client={client} user={user}/>}/>
+      <Route path='/office/directory' element={<PersonnelPage key='directory' client={client} user={user} directoryOnly/>}/>
       <Route path='/system/organization' element={<OrganizationDirectoryPage client={client} user={user}/>}/>
       <Route path='/office/supplies' element={<OfficeSuppliesPage client={client} user={user}/>}/>
       <Route path='/office/meeting-rooms' element={<MeetingRoomsPage client={client} user={user}/>}/>
@@ -192,7 +203,7 @@ try {
   assert.equal((await read(page,"window.__officeCalls.filter(c=>c.name==='createPerson')")).length,1);results.push("personnel-hire-single-submit");
   await clickText(page,"关联账号");await waitFor(page,"document.querySelector('.personnel-account-list input')");await read(page,"document.querySelector('.personnel-account-list input').click()");await clickText(page,"确认关联");
   await waitFor(page,"window.__officeCalls.some(c=>c.name==='linkPerson')");assert.equal((await read(page,"window.__officeCalls.find(c=>c.name==='linkPerson').input.body")).expectedAccountVersion,3);results.push("personnel-account-link");
-  await open("people",390);await clickText(page,"人员档案");await waitFor(page,"document.querySelector('.personnel-facts')");await clickText(page,"维护档案");await input(page,'input[name="workPhone"]',"分机 1002");
+  await open("people",390);await clickText(page,"人员档案");await waitFor(page,"document.querySelector('.personnel-facts')");await clickText(page,"编辑档案");await input(page,'input[name="workPhone"]',"分机 1002");
   await read(page,"window.__personnelConflict=true");await clickText(page,"保存档案");await waitFor(page,"document.body.innerText.includes('记录已被其他人修改')");assert.equal(await read(page,"document.querySelector('input[name=workPhone]').value"),"分机 1002");results.push("personnel-conflict-keeps-draft");
   await clickText(page,"保存档案");await waitFor(page,"window.__officeCalls.some(c=>c.name==='updatePerson') && !document.querySelector('input[name=workPhone]')");
   await clickText(page,"办理转正");await input(page,'textarea[name="note"]',"试用期考核通过");await clickText(page,"办理转正",".office-dialog-backdrop:last-of-type button");await waitFor(page,"window.__officeCalls.some(c=>c.name==='confirmPerson')");results.push("personnel-confirm");
@@ -229,6 +240,7 @@ try {
   await waitFor(page,"document.querySelector('.personnel-clearance')");await read(page,"[...document.querySelectorAll('.personnel-clearance a')].find(n=>n.textContent==='全部预约记录').click()");
   await waitFor(page,"window.__officeCalls.some(c=>c.name==='listBookings'&&c.input.employeeId===1)");results.push("local-employee-clearance-navigation");
   await runPersonnelOrganizationUi({page,open,read,waitFor,clickText,input,audit,results,output,captureScreenshot});
+  await runAdministrationMaintenanceUi({page,open,read,waitFor,clickText,input,audit,results,output,captureScreenshot});
   fs.writeFileSync(path.join(output,"summary.json"),JSON.stringify({passed:results.length,results},null,2));
   process.stdout.write(`Office UI contracts passed (${results.length} cases).\n`);
 } finally {cdp?.close();if(chrome)await closeChrome(chrome.browserWebSocketUrl,chrome.process);await new Promise(resolve=>server.close(resolve));}

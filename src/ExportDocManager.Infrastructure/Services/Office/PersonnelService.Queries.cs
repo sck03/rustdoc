@@ -81,6 +81,7 @@ public sealed partial class PersonnelService
         await db.Entry(employee).Reference(item => item.Department).LoadAsync(token);
         await db.Entry(employee).Reference(item => item.Account).LoadAsync(token);
         var account = employee.Account;
+        string restriction = await RegistrationRestrictionAsync(db, employee, token);
         var images = await db.PersonnelImages.AsNoTracking().Where(item => item.EmployeeId == employee.Id && item.CompanyScope == employee.CompanyScope)
             .OrderBy(item => item.Kind).Select(item => new PersonnelImageRecord(item.Kind, item.ContentType, item.ByteLength, item.ContentHash)).ToListAsync(token);
         return new PersonnelRecord(Directory(employee, actor, images.Find(item => item.Kind == PersonnelImageKind.Avatar)?.ContentHash), Profile(employee), employee.EmploymentType, employee.HireDate,
@@ -90,7 +91,9 @@ public sealed partial class PersonnelService
             employee.Status != EmploymentStatus.Departed && office.CanRecord(employee, actor, Resource, PermissionAction.Edit),
             employee.OwnerUserId != actor.Id && office.CanRecord(employee, actor, Resource, PermissionAction.Transition),
             !office.IsLocalRegister && employee.Status != EmploymentStatus.Departed && !employee.OwnerUserId.HasValue &&
-                BusinessDataAccessScope.CanViewAllBusinessData(actor) && office.CanRecord(employee, actor, Resource, PermissionAction.Assign), images);
+                BusinessDataAccessScope.CanViewAllBusinessData(actor) && office.CanRecord(employee, actor, Resource, PermissionAction.Assign), images,
+            office.CanRecord(employee, actor, Resource, PermissionAction.Delete),
+            restriction.Length == 0 && office.CanRecord(employee, actor, Resource, PermissionAction.Edit), restriction);
     }
 
     private static async Task<PersonnelClearance> ReadClearanceAsync(AppDbContext db, PersonnelEmployee employee, CancellationToken token)

@@ -35,6 +35,10 @@ fn configure_product_edition() {
         .expect("missing product name");
     println!("cargo:rustc-env=EXPORTDOCMANAGER_PRODUCT_EDITION={edition}");
     println!("cargo:rustc-env=EXPORTDOCMANAGER_PRODUCT_NAME={product_name}");
+    let has_ocr = metadata["resourceProfile"]["ocr"]
+        .as_bool()
+        .expect("missing OCR resource profile");
+    println!("cargo:rustc-env=EXPORTDOCMANAGER_HAS_OCR={has_ocr}");
 }
 
 fn ensure_debug_resource_root() {

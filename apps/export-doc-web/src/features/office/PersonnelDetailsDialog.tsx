@@ -13,6 +13,7 @@ import { PersonnelAccountDialog, PersonnelWorkflowDialog } from "./PersonnelWork
 import { PersonnelImagesPanel } from "./PersonnelImagesPanel.tsx";
 import { useOfficeOperation } from "./useOfficeData.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { RecordDeleteDialog } from "./RecordDeleteDialog.tsx";
 
 type Props = { client: ExportDocManagerApiClient; user: ApiUserDto; id: number; departments: PersonnelDepartmentRecord[]; onClose: () => void };
 export function PersonnelDetailsDialog({ client, user, id, departments, onClose }: Props) {
@@ -20,6 +21,8 @@ export function PersonnelDetailsDialog({ client, user, id, departments, onClose 
   const [tab, setTab] = useState("profile");
   const [pendingImages, setPendingImages] = useState(new Set<PersonnelImageKind>());
   const imageOperation = useOfficeOperation();
+  const deleteOperation = useOfficeOperation();
+  const [deleting, setDeleting] = useState<PersonnelRecord | null>(null);
   const requestConfirmation = useConfirmation();
   async function changeTab(next: string) {
     if (next === tab || imageOperation.busy) return;
@@ -39,10 +42,13 @@ export function PersonnelDetailsDialog({ client, user, id, departments, onClose 
         <div className="office-card-heading"><span>{record.employee.employeeNumber} · {record.employee.departmentName} · {record.employee.jobTitle}</span>
           <span className="office-badge" data-state={record.employee.status}>{employmentStatusLabels[record.employee.status]}</span></div>
         <div className="office-card-actions">
-          {record.canEdit && <button type="button" className="command-button" disabled={imageOperation.busy} onClick={() => setEditing(record)}>维护档案</button>}
+          {record.canEdit && <button type="button" className="command-button" disabled={imageOperation.busy} onClick={() => setEditing(record)}>编辑档案</button>}
           {personnelWorkflows(record).map((action) => <button type="button" className="command-button secondary" disabled={imageOperation.busy} key={action} onClick={() => setWorkflow({ record, action })}>{personnelActionLabels[action]}</button>)}
           {record.canLinkAccount && <button type="button" className="command-button secondary" disabled={imageOperation.busy} onClick={() => setLinking(record)}>关联账号</button>}
+          {record.canDelete && <button type="button" className="command-button secondary" disabled={imageOperation.busy || Boolean(record.deleteRestriction)}
+            onClick={() => setDeleting(record)}>删除误录档案</button>}
         </div>
+        {record.canDelete && record.deleteRestriction && <p className="office-muted">{record.deleteRestriction}</p>}
         <nav className="office-tabs" aria-label="人员档案内容">{[["profile", "档案信息"], ["images", "照片与证件"], ["history", "任职与操作记录"], ["clearance", "交接事项"]].map(([key, label]) =>
           <button type="button" key={key} disabled={imageOperation.busy} aria-pressed={tab === key} onClick={() => void changeTab(key)}>{label}</button>)}</nav>
         {tab === "profile" && <PersonnelFacts record={record} user={user} />}
@@ -55,6 +61,9 @@ export function PersonnelDetailsDialog({ client, user, id, departments, onClose 
     {editing && <PersonnelFormDialog client={client} user={user} departments={departments} record={editing} onClose={() => setEditing(null)} onSaved={() => setEditing(null)} />}
     {workflow && <PersonnelWorkflowDialog client={client} user={user} departments={departments} {...workflow} onClose={() => setWorkflow(null)} />}
     {linking && <PersonnelAccountDialog client={client} user={user} record={linking} onClose={() => setLinking(null)} />}
+    {deleting && <RecordDeleteDialog name={deleting.employee.fullName} version={deleting.versionNumber} operation={deleteOperation}
+      description="仅可删除没有账号、业务及正式任职变动引用的误录档案。档案和所附照片会一起删除，删除审计保留。"
+      onDelete={(body, signal) => client.deletePersonnel({ id, body }, { signal })} onClose={() => setDeleting(null)} onDeleted={onClose} />}
   </>;
 }
 

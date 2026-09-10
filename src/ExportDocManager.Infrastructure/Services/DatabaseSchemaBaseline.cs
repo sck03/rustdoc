@@ -13,12 +13,12 @@ namespace ExportDocManager.Services.Infrastructure
     /// </summary>
     internal static partial class DatabaseSchemaBaseline
     {
-        // The v18 empty-database baseline replaces fixed attachment categories
-        // with a company-scoped catalog referenced by stable keys.
+        // The v19 baseline adds independent payment voucher fields and ten spare
+        // text fields on payments, invoice headers and invoice items.
         // This project is still pre-production,
         // so changing the baseline intentionally rejects older development
         // databases instead of growing a compatibility migration tree.
-        internal const int CurrentVersion = 18;
+        internal const int CurrentVersion = 19;
         internal const string MetadataTableName = "__ExportDocManagerSchema";
         internal const string PostgreSqlTrigramFeatureName = "postgresql.pg_trgm";
         internal const int PostgreSqlTrigramFeatureVersion = 2;

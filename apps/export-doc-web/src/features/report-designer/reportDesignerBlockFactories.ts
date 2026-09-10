@@ -191,7 +191,7 @@ export function createPageBreakBlock(): ReportBlock {
 
 export function createDetailTableBlock(): ReportBlock {
   const columns = [
-    createDetailTableColumn("Product", "Invoice.Items.ProductNameEN", 72, "Left"),
+    createDetailTableColumn("Product", "Invoice.Items.StyleName", 72, "Left"),
     createDetailTableColumn("Quantity", "Invoice.Items.Quantity", 24, "Right"),
     createDetailTableColumn("Unit Price", "Invoice.Items.UnitPrice", 28, "Right"),
     createDetailTableColumn("Amount", "Invoice.Items.TotalPrice", 30, "Right"),
@@ -270,7 +270,7 @@ export function createDetailTableSideBand() {
 }
 
 export function createDetailTableGrouping(
-  fieldPath = "Invoice.Items.ProductNameEN",
+  fieldPath = "Invoice.Items.StyleName",
   label = "Group",
 ): ReportDetailTableGrouping {
   return {
@@ -336,7 +336,7 @@ export function createRowColumn(
 
 export function createDetailTableColumn(
   title = "Column",
-  fieldPath = "Invoice.Items.ProductNameEN",
+  fieldPath = "Invoice.Items.StyleName",
   widthMm = 30,
   align: "Left" | "Center" | "Right" = "Left",
 ) {
@@ -356,7 +356,7 @@ export function createDetailTableCellContent(kind: "Text" | "Field" | "LineBreak
     id: createReportBlockId("detail-cell-part"),
     kind,
     text: kind === "Text" ? "Text" : "",
-    fieldPath: kind === "Field" ? "Invoice.Items.ProductNameEN" : "",
+    fieldPath: kind === "Field" ? "Invoice.Items.StyleName" : "",
   };
 }
 

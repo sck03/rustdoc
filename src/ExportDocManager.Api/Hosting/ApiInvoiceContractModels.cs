@@ -37,6 +37,13 @@ namespace ExportDocManager.Api.Hosting
         public string Spare1 { get; init; } = string.Empty;
         public string Spare2 { get; init; } = string.Empty;
         public string Spare3 { get; init; } = string.Empty;
+        public string Spare4 { get; init; } = string.Empty;
+        public string Spare5 { get; init; } = string.Empty;
+        public string Spare6 { get; init; } = string.Empty;
+        public string Spare7 { get; init; } = string.Empty;
+        public string Spare8 { get; init; } = string.Empty;
+        public string Spare9 { get; init; } = string.Empty;
+        public string Spare10 { get; init; } = string.Empty;
         public string CustomFieldsJson { get; init; } = string.Empty;
         public string PaymentTerms { get; init; } = string.Empty;
         public string PortOfLoading { get; init; } = string.Empty;
@@ -122,6 +129,13 @@ namespace ExportDocManager.Api.Hosting
         public string Spare1 { get; init; } = string.Empty;
         public string Spare2 { get; init; } = string.Empty;
         public string Spare3 { get; init; } = string.Empty;
+        public string Spare4 { get; init; } = string.Empty;
+        public string Spare5 { get; init; } = string.Empty;
+        public string Spare6 { get; init; } = string.Empty;
+        public string Spare7 { get; init; } = string.Empty;
+        public string Spare8 { get; init; } = string.Empty;
+        public string Spare9 { get; init; } = string.Empty;
+        public string Spare10 { get; init; } = string.Empty;
         public string CustomFieldsJson { get; init; } = string.Empty;
     }
 

@@ -27,7 +27,9 @@ export function readPersonnelUpdate(form: FormData, version: number): PersonnelU
   const type = value(form, "employmentType");
   if (!(type in employmentTypeLabels)) throw new Error("请选择有效的用工类型。");
   return { expectedVersion: version, profile: readPersonnelProfile(form), employmentType: type as EmploymentType,
-    probationEndsOn: value(form, "probationEndsOn") || null, contractEndsOn: value(form, "contractEndsOn") || null };
+    probationEndsOn: value(form, "probationEndsOn") || null, contractEndsOn: value(form, "contractEndsOn") || null,
+    registration: form.has("employeeNumber") ? { employeeNumber: value(form, "employeeNumber"), departmentId: value(form, "departmentId"),
+      jobTitle: value(form, "jobTitle"), hireDate: value(form, "hireDate"), onProbation: form.has("onProbation") } : null };
 }
 
 export function readPersonnelCreate(form: FormData, key: string): PersonnelCreateRequest {

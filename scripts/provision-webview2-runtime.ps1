@@ -10,7 +10,7 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
 $artifactsRoot = Join-Path $repoRoot "artifacts"
 . (Join-Path $scriptRoot "lib\build-script-support.ps1")
-. (Join-Path $scriptRoot "lib\webview2-runtime-support.ps1")
+. (Join-Path $scriptRoot "lib\microsoft-runtime-support.ps1")
 
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
     throw "WebView2 Runtime provisioning is supported only on Windows."
@@ -25,7 +25,7 @@ if (-not (Test-Path -LiteralPath $sourceManifestPath -PathType Leaf)) {
     throw "The pinned WebView2 Runtime release manifest was not found: $sourceManifestPath"
 }
 
-$release = Read-ExportDocWebView2Release -ManifestPath $sourceManifestPath
+$release = Read-ExportDocMicrosoftRuntimeRelease -ManifestPath $sourceManifestPath
 $fileName = [string]$release.fileName
 $officialUrl = [string]$release.sourceUrl
 
@@ -44,7 +44,7 @@ if ([string]::IsNullOrWhiteSpace($SourceInstaller)) {
 
 if (-not [string]::IsNullOrWhiteSpace($SourceInstaller)) {
     $sourcePath = (Resolve-Path -LiteralPath $SourceInstaller).Path
-    Assert-ExportDocWebView2Installer -Path $sourcePath -Release $release | Out-Null
+    Assert-ExportDocMicrosoftRuntimeFile -Path $sourcePath -Release $release | Out-Null
     $resolvedInstallerPath = [IO.Path]::GetFullPath($installerPath)
     if (-not [string]::Equals($sourcePath, $resolvedInstallerPath, [StringComparison]::OrdinalIgnoreCase)) {
         Copy-Item -LiteralPath $sourcePath -Destination $installerPath -Force
@@ -60,11 +60,11 @@ if (-not [string]::IsNullOrWhiteSpace($SourceInstaller)) {
         -DisplayName "Download Microsoft WebView2 Evergreen Standalone Installer x64" `
         -TimeoutSeconds 960 `
         -HeartbeatSeconds 20
-    Assert-ExportDocWebView2Installer -Path $downloadPath -Release $release | Out-Null
+    Assert-ExportDocMicrosoftRuntimeFile -Path $downloadPath -Release $release | Out-Null
     Move-Item -LiteralPath $downloadPath -Destination $installerPath -Force
 }
 
-$verified = Assert-ExportDocWebView2Installer -Path $installerPath -Release $release
+$verified = Assert-ExportDocMicrosoftRuntimeFile -Path $installerPath -Release $release
 
 Write-Host "Verified Microsoft WebView2 Runtime installer:"
 Write-Host "  $installerPath"

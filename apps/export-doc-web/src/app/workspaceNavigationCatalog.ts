@@ -107,8 +107,11 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
   {
     key: "office", label: "公司行政", shortLabel: "行政", icon: CalendarDays,
     items: [
-      { label: "人员档案", description: "查找人员，办理入职、转正、调岗和离职", keywords: "人员信息管理 公司通讯录", to: "/office/people", icon: UsersRound,
+      { label: "人员档案", description: "查找人员，办理入职、转正、调岗和离职", keywords: "人员信息管理 人事 误录修正", to: "/office/people", icon: UsersRound,
         isActive: (path) => path.startsWith("/office/people"), workspace: "office", moduleKey: "office.people",
+        requiredPermissions: [{ resourceKey: permissionResources.officePeople, action: "view-details" }] },
+      { label: "公司通讯录", description: "查找同事的工作电话、邮箱和办公地点", keywords: "联系 同事 部门", to: "/office/directory", icon: ContactRound,
+        isActive: (path) => path.startsWith("/office/directory"), workspace: "office", moduleKey: "office.people",
         requiredPermissions: [{ resourceKey: permissionResources.officePeople, action: permissionActions.view }] },
       { label: "会议室预约", description: "查看日程，办理会议室预约与钥匙交接", to: "/office/meeting-rooms", icon: CalendarDays,
         isActive: (path) => path.startsWith("/office/meeting-rooms"), workspace: "office", moduleKey: "office.rooms",

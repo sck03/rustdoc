@@ -1488,8 +1488,15 @@ export interface ApiInvoiceDetailDto {
   shippingMarksImage: string;
   shippingMarksType: string;
   spare1: string;
+  spare10: string;
   spare2: string;
   spare3: string;
+  spare4: string;
+  spare5: string;
+  spare6: string;
+  spare7: string;
+  spare8: string;
+  spare9: string;
   specialTerms: string;
   status: string;
   supervisionMode: string;
@@ -1579,8 +1586,15 @@ export interface ApiInvoiceItemDto {
   purchaseTotal: number;
   quantity: number;
   spare1: string;
+  spare10: string;
   spare2: string;
   spare3: string;
+  spare4: string;
+  spare5: string;
+  spare6: string;
+  spare7: string;
+  spare8: string;
+  spare9: string;
   styleName: string;
   styleNameCN: string;
   styleNo: string;
@@ -2124,14 +2138,28 @@ export interface ApiPaymentDto {
   paymentMethod: string;
   project: string;
   quantity: string;
+  quantityUnit: string;
   receiptDate?: string | null;
   repairExpense: number;
   rowVersion: string;
   shipmentCountry: string;
   shipmentDate?: string | null;
+  spare1: string;
+  spare10: string;
+  spare2: string;
+  spare3: string;
+  spare4: string;
+  spare5: string;
+  spare6: string;
+  spare7: string;
+  spare8: string;
+  spare9: string;
+  taxRebateRate: string;
   telephoneExpense: number;
+  tradeMethod: string;
   travelExpense: number;
   usdAmount: number;
+  voucherNo: string;
 }
 
 export interface ApiPaymentReportHtmlPreviewRequest {
@@ -3506,6 +3534,11 @@ export interface CustomsCooDefaultProfile {
   orgCode: string;
 }
 
+export interface DeleteRecordRequest {
+  expectedVersion: number;
+  reason: string;
+}
+
 export interface EmailConfig {
   documentEmailBodyTemplate: string;
   documentEmailSubjectTemplate: string;
@@ -3783,6 +3816,14 @@ export interface MeetingBookingRecord {
 }
 
 export type MeetingBookingStatus = "Pending" | "Approved" | "InUse" | "Completed" | "Rejected" | "Cancelled";
+
+export interface MeetingBookingUpdateRequest {
+  attendeeCount: number;
+  endsAt: string;
+  expectedVersion: number;
+  startsAt: string;
+  title: string;
+}
 
 export interface MeetingBusySlot {
   endsAt: string;
@@ -4149,11 +4190,14 @@ export interface PersonnelProfile {
 
 export interface PersonnelRecord {
   account?: null | PersonnelAccountRecord;
+  canCorrectRegistration: boolean;
+  canDelete: boolean;
   canEdit: boolean;
   canLinkAccount: boolean;
   canTransition: boolean;
   confirmedOn?: string | null;
   contractEndsOn?: string | null;
+  deleteRestriction: string;
   departedOn?: string | null;
   employee: PersonnelDirectoryRecord;
   employmentType: EmploymentType;
@@ -4163,6 +4207,14 @@ export interface PersonnelRecord {
   probationEndsOn?: string | null;
   profile: PersonnelProfile;
   versionNumber: number;
+}
+
+export interface PersonnelRegistrationCorrection {
+  departmentId: string;
+  employeeNumber: string;
+  hireDate: string;
+  jobTitle: string;
+  onProbation: boolean;
 }
 
 export interface PersonnelTransitionRequest {
@@ -4180,6 +4232,7 @@ export interface PersonnelUpdateRequest {
   expectedVersion: number;
   probationEndsOn: string | null;
   profile: PersonnelProfile;
+  registration?: null | PersonnelRegistrationCorrection;
 }
 
 export interface ReportTemplateDefaults {
@@ -4441,6 +4494,13 @@ export interface SupplyRequestCreateRequest {
 }
 
 export type SupplyRequestStatus = "Pending" | "Approved" | "Issued" | "Returned" | "Rejected" | "Cancelled";
+
+export interface SupplyRequestUpdateRequest {
+  expectedVersion: number;
+  purpose: string;
+  quantity: number;
+  returnDueDate: string | null;
+}
 
 export interface SystemSettings {
   appName: string;
@@ -4865,6 +4925,26 @@ export interface DeleteJobRequest {
   jobId: string;
 }
 
+export interface DeleteMeetingRoomRequest {
+  id: number;
+  body: DeleteRecordRequest;
+}
+
+export interface DeleteOfficeSupplyRequest {
+  id: number;
+  body: DeleteRecordRequest;
+}
+
+export interface DeleteOrganizationCompanyRequest {
+  code: string;
+  body: DeleteRecordRequest;
+}
+
+export interface DeleteOrganizationDepartmentRequest {
+  code: string;
+  body: DeleteRecordRequest;
+}
+
 export interface DeletePayeeRequest {
   id: number;
 }
@@ -4876,6 +4956,11 @@ export interface DeletePaymentRequest {
 export interface DeletePermissionTemplateRequest {
   id: number;
   expectedVersion?: number;
+}
+
+export interface DeletePersonnelRequest {
+  id: number;
+  body: DeleteRecordRequest;
 }
 
 export interface DeletePersonnelImageRequest {
@@ -6149,6 +6234,11 @@ export interface UpdateInvoiceRequest {
   body: ApiInvoiceDetailDto;
 }
 
+export interface UpdateMeetingBookingRequest {
+  id: number;
+  body: MeetingBookingUpdateRequest;
+}
+
 export interface UpdateMeetingRoomRequest {
   id: number;
   body: MeetingRoomSaveRequest;
@@ -6157,6 +6247,11 @@ export interface UpdateMeetingRoomRequest {
 export interface UpdateOfficeSupplyRequest {
   id: number;
   body: OfficeSupplySaveRequest;
+}
+
+export interface UpdateOfficeSupplyRequestRequest {
+  id: number;
+  body: SupplyRequestUpdateRequest;
 }
 
 export interface UpdateOrganizationCompanyRequest {
@@ -7063,6 +7158,38 @@ export class ExportDocManagerApiClient {
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
+  public deleteMeetingRoom(request: DeleteMeetingRoomRequest, init?: ApiRequestInit): Promise<void> {
+    const path = `/api/office/rooms/${encodePath(request.id)}`;
+    return this.request<void>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deleteOfficeSupply(request: DeleteOfficeSupplyRequest, init?: ApiRequestInit): Promise<void> {
+    const path = `/api/office/supplies/${encodePath(request.id)}`;
+    return this.request<void>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deleteOrganizationCompany(request: DeleteOrganizationCompanyRequest, init?: ApiRequestInit): Promise<void> {
+    const path = `/api/organization-directory/companies/${encodePath(request.code)}`;
+    return this.request<void>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deleteOrganizationDepartment(request: DeleteOrganizationDepartmentRequest, init?: ApiRequestInit): Promise<void> {
+    const path = `/api/organization-directory/departments/${encodePath(request.code)}`;
+    return this.request<void>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public deletePayee(request: DeletePayeeRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/payees/${encodePath(request.id)}`;
     return this.request<ApiCommandResponse>("DELETE", path, { init });
@@ -7079,6 +7206,14 @@ export class ExportDocManagerApiClient {
       query: {
         "expectedVersion": request.expectedVersion,
       },
+      init,
+    });
+  }
+
+  public deletePersonnel(request: DeletePersonnelRequest, init?: ApiRequestInit): Promise<void> {
+    const path = `/api/office/people/${encodePath(request.id)}`;
+    return this.request<void>("DELETE", path, {
+      body: request.body,
       init,
     });
   }
@@ -9474,6 +9609,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public updateMeetingBooking(request: UpdateMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    const path = `/api/office/bookings/${encodePath(request.id)}`;
+    return this.request<MeetingBookingRecord>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public updateMeetingRoom(request: UpdateMeetingRoomRequest, init?: ApiRequestInit): Promise<MeetingRoomRecord> {
     const path = `/api/office/rooms/${encodePath(request.id)}`;
     return this.request<MeetingRoomRecord>("PUT", path, {
@@ -9485,6 +9628,14 @@ export class ExportDocManagerApiClient {
   public updateOfficeSupply(request: UpdateOfficeSupplyRequest, init?: ApiRequestInit): Promise<OfficeSupplyRecord> {
     const path = `/api/office/supplies/${encodePath(request.id)}`;
     return this.request<OfficeSupplyRecord>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public updateOfficeSupplyRequest(request: UpdateOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}`;
+    return this.request<OfficeSupplyRequestRecord>("PUT", path, {
       body: request.body,
       init,
     });

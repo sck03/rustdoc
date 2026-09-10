@@ -1,5 +1,6 @@
 import { ApiInvoiceDetailDto, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import { dateInputToApiDate, readNumber, toDateInputValue } from "../../ui/formUtils.ts";
+import { mapDocumentSpareFields } from "../../ui/documentSpareFields.ts";
 import {
   calculateInvoiceTotals,
   createEmptyInvoiceItem,
@@ -112,9 +113,7 @@ export function createEmptyInvoice(businessDate: string): ApiInvoiceDetailDto {
     swiftCode: "",
     customsBrokerName: "",
     customsBrokerCode: "",
-    spare1: "",
-    spare2: "",
-    spare3: "",
+    ...mapDocumentSpareFields({}),
     customFieldsJson: "",
     currency: "USD",
     customerId: 0,
@@ -213,9 +212,7 @@ export function uppercaseInvoiceEnglishText(invoice: ApiInvoiceDetailDto): ApiIn
     shippingMarks: uppercaseAsciiText(invoice.shippingMarks),
     specialTerms: uppercaseAsciiText(invoice.specialTerms),
     letterOfCreditNo: uppercaseAsciiText(invoice.letterOfCreditNo),
-    spare1: uppercaseAsciiText(invoice.spare1),
-    spare2: uppercaseAsciiText(invoice.spare2),
-    spare3: uppercaseAsciiText(invoice.spare3),
+    ...mapDocumentSpareFields(invoice, uppercaseAsciiText),
     items: (invoice.items ?? []).map((item) => ({
       ...item,
       poNumber: uppercaseAsciiText(item.poNumber),
@@ -230,9 +227,7 @@ export function uppercaseInvoiceEnglishText(invoice: ApiInvoiceDetailDto): ApiIn
       unitCN: uppercaseAsciiText(item.unitCN),
       ctnUnitEN: uppercaseAsciiText(item.ctnUnitEN),
       ctnUnitCN: uppercaseAsciiText(item.ctnUnitCN),
-      spare1: uppercaseAsciiText(item.spare1),
-      spare2: uppercaseAsciiText(item.spare2),
-      spare3: uppercaseAsciiText(item.spare3),
+      ...mapDocumentSpareFields(item, uppercaseAsciiText),
     })),
   };
 }
@@ -269,9 +264,7 @@ export function normalizeInvoiceForSave(
     shipmentDate: dateInputToApiDate(toDateInputValue(invoice.shipmentDate)),
     customsBrokerName: invoice.customsBrokerName?.trim() ?? "",
     customsBrokerCode: invoice.customsBrokerCode?.trim() ?? "",
-    spare1: invoice.spare1?.trim() ?? "",
-    spare2: invoice.spare2?.trim() ?? "",
-    spare3: invoice.spare3?.trim() ?? "",
+    ...mapDocumentSpareFields(invoice),
     customFieldsJson: invoice.customFieldsJson ?? "",
     paymentTerms: invoice.paymentTerms?.trim() ?? "",
     portOfLoading: invoice.portOfLoading?.trim() ?? "",

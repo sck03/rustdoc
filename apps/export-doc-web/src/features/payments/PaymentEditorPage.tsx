@@ -368,14 +368,7 @@ export function PaymentEditorPage({
               void customOptionsQuery.refetch();
             }}
           />
-          {isNew ? (
-            <details className="invoice-new-optional-section payment-new-optional-section">
-              <summary>业务信息</summary>
-              <PaymentBusinessInfoPanel payment={payment} onChange={patchPayment} />
-            </details>
-          ) : (
-            <PaymentBusinessInfoPanel payment={payment} onChange={patchPayment} />
-          )}
+          <PaymentBusinessInfoPanel payment={payment} onChange={patchPayment} />
           <PaymentAmountsPanel
             payment={payment}
             onChange={patchPaymentAmounts}

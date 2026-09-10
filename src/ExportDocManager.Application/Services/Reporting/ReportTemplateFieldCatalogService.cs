@@ -8,7 +8,10 @@ namespace ExportDocManager.Services.Reporting
             "客户信息",
             "出口商信息",
             "商品明细",
+            "单据备用字段",
+            "明细备用列",
             "付款报销",
+            "付款备用字段",
             "金额换算",
             "其它字段"
         ];
@@ -52,9 +55,7 @@ namespace ExportDocManager.Services.Reporting
             Export("单据信息", "【内部】采购总额 (Purchase Amount)", "{{ Invoice.TotalPurchaseAmount }}"),
             Export("单据信息", "【内部】退税总额 (Tax Refund)", "{{ Invoice.TotalTaxRefundAmount }}"),
             Export("单据信息", "【内部】利润总额 (Total Profit)", "{{ Invoice.TotalProfit }}"),
-            Export("单据信息", "单据备用字段1 (Invoice Spare1)", "{{ Invoice.Spare1 }}"),
-            Export("单据信息", "单据备用字段2 (Invoice Spare2)", "{{ Invoice.Spare2 }}"),
-            Export("单据信息", "单据备用字段3 (Invoice Spare3)", "{{ Invoice.Spare3 }}"),
+            .. SpareFields(ReportDocumentType.ExportDocument, "单据备用字段", "Invoice"),
             Export("商品明细", "商品款号 (Item Style No)", "{{ item.StyleNo }}"),
             Export("商品明细", "商品名称 (Item Name)", "{{ item.StyleName }}"),
             Export("商品明细", "商品描述 (Item Description)", "{{ item.Description }}"),
@@ -62,7 +63,7 @@ namespace ExportDocManager.Services.Reporting
             Export("商品明细", "HS编码 (Item HS Code)", "{{ item.HsCode }}"),
             Export("商品明细", "商品数量 (Item Qty)", "{{ item.Quantity }}"),
             Export("商品明细", "数量单位 (Item Qty Unit)", "{{ item.UnitEN }}"),
-            Export("商品明细", "单价 (Item Unit Price)", "{{ format_unit_price item.UnitPrice }}"),
+            Export("商品明细", "单价 (Item Unit Price)", "{{ item.UnitPrice | format_unit_price }}"),
             Export("商品明细", "总价 (Item Total Price)", "{{ item.TotalPrice }}"),
             Export("商品明细", "箱数 (Item Cartons)", "{{ item.Cartons }}"),
             Export("商品明细", "箱数单位 (Item Ctn Unit)", "{{ item.CtnUnitEN }}"),
@@ -71,15 +72,17 @@ namespace ExportDocManager.Services.Reporting
             Export("商品明细", "总毛重 (Item Total GW)", "{{ item.GWTotal }}"),
             Export("商品明细", "总净重 (Item Total NW)", "{{ item.NWTotal }}"),
             Export("商品明细", "商品体积 (Item Volume)", "{{ item.Volume }}"),
-            Export("商品明细", "明细备用字段1 (Item Spare1)", "{{ item.Spare1 }}"),
-            Export("商品明细", "明细备用字段2 (Item Spare2)", "{{ item.Spare2 }}"),
-            Export("商品明细", "明细备用字段3 (Item Spare3)", "{{ item.Spare3 }}")
+            .. SpareFields(ReportDocumentType.ExportDocument, "明细备用列", "item")
         ];
 
         private static readonly IReadOnlyList<ReportTemplateFieldDescriptor> PaymentVoucherFields =
         [
             Payment("付款报销", "付款/报销单号 (Payment ID)", "{{ Payment.Id }}"),
             Payment("付款报销", "发票号/业务参考号 (Text)", "{{ Payment.InvoiceNo }}"),
+            Payment("付款报销", "付款单号", "{{ Payment.VoucherNo }}"),
+            Payment("付款报销", "数量单位", "{{ Payment.QuantityUnit }}"),
+            Payment("付款报销", "贸易方式", "{{ Payment.TradeMethod }}"),
+            Payment("付款报销", "退税率", "{{ Payment.TaxRebateRate }}"),
             Payment("付款报销", "申请日期 (Payment Date)", "{{ Payment.PaymentDate | date.to_string '%Y-%m-%d' }}"),
             Payment("付款报销", "部门 (Department)", "{{ Payment.Department }}"),
             Payment("付款报销", "项目/业务号 (Project)", "{{ Payment.Project }}"),
@@ -104,7 +107,8 @@ namespace ExportDocManager.Services.Reporting
             Payment("付款报销", "出运国 (Shipment Country)", "{{ Payment.ShipmentCountry }}"),
             Payment("付款报销", "出运日期 (Shipment Date)", "{{ Payment.ShipmentDate | date.to_string '%Y-%m-%d' }}"),
             Payment("付款报销", "收单日期 (Receipt Date)", "{{ Payment.ReceiptDate | date.to_string '%Y-%m-%d' }}"),
-            Payment("付款报销", "备注 (Notes)", "{{ Payment.Notes }}")
+            Payment("付款报销", "备注 (Notes)", "{{ Payment.Notes }}"),
+            .. SpareFields(ReportDocumentType.PaymentVoucher, "付款备用字段", "Payment")
         ];
 
         public ReportTemplateFieldCatalog GetFieldCatalog(ReportDocumentType reportType)
@@ -118,6 +122,10 @@ namespace ExportDocManager.Services.Reporting
                     : ExportDocumentFields
             };
         }
+
+        private static IEnumerable<ReportTemplateFieldDescriptor> SpareFields(ReportDocumentType type, string category, string root) =>
+            Enumerable.Range(1, 10).Select(index => Field(type, category, $"备用 {index} ({root}.Spare{index})",
+                "{{ " + root + ".Spare" + index + " }}"));
 
         private static ReportTemplateFieldDescriptor Export(string category, string label, string value)
         {

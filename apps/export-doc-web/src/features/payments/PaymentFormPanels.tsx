@@ -6,6 +6,7 @@ import { formatAmount } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { RemoteSelectField } from "../../ui/RemoteSelectField.tsx";
 import { CustomOptionMap, getCustomOptions } from "../custom-options/customOptionModel.ts";
+import { DocumentSpareFieldsPanel } from "../../ui/DocumentSpareFieldsPanel.tsx";
 
 type PaymentPatch = Partial<ApiPaymentDto>;
 
@@ -115,9 +116,9 @@ export function PaymentBasicInfoPanel({
       </div>
       {referenceDataMessage ? <InlineNotice tone="warning" title="参考资料未完整加载">{referenceDataMessage}</InlineNotice> : null}
       <div className="field-grid">
-        <TextField label="发票号" value={payment.invoiceNo} onChange={(value) => onChange({ invoiceNo: value })} />
+        <TextField label="付款单号" value={payment.voucherNo} onChange={(value) => onChange({ voucherNo: value })} />
+        <TextField label="发票号／业务参考号" value={payment.invoiceNo} onChange={(value) => onChange({ invoiceNo: value })} />
         <DateField label="付款日期" value={payment.paymentDate} onChange={(value) => onChange({ paymentDate: value })} />
-        <DateField label="出运日期" value={payment.shipmentDate} onChange={(value) => onChange({ shipmentDate: value })} />
         <DateField label="收票日期" value={payment.receiptDate} onChange={(value) => onChange({ receiptDate: value })} />
         <RemoteSelectField<ApiPayeeDto>
           label="支付对象资料"
@@ -156,6 +157,7 @@ export function PaymentBasicInfoPanel({
           onCommit={(value) => onCommitCustomOption?.("PaymentPayerName", value)}
         />
         <EditableComboField
+          className="field-grid-span-2"
           label="付款方式"
           value={payment.paymentMethod ?? ""}
           options={getCustomOptions(customOptions, "PaymentMethod")}
@@ -179,21 +181,22 @@ export function PaymentBusinessInfoPanel({
   return (
     <section className="form-section" aria-label="业务信息">
       <div className="section-header">
-        <h2>业务信息</h2>
+        <h2>付款业务信息</h2>
       </div>
+      <p className="form-field-description">按本次付款填写品名与合计数量，可合并同类货物；这里的内容独立保存，不会改动报关单据及其商品明细。</p>
       <div className="field-grid">
         <TextField label="部门" value={payment.department ?? ""} onChange={(value) => onChange({ department: value })} />
         <TextField label="项目" value={payment.project ?? ""} onChange={(value) => onChange({ project: value })} />
-        <TextField label="品名" value={payment.goodsName ?? ""} onChange={(value) => onChange({ goodsName: value })} />
+        <EditableComboField label="贸易方式" value={payment.tradeMethod} options={["L/C", "T/T", "D/P", "远期"]} onChange={(value) => onChange({ tradeMethod: value })} />
+        <EditableComboField label="退税率" value={payment.taxRebateRate} options={["13%", "10%", "9%", "6%", "0%"]} onChange={(value) => onChange({ taxRebateRate: value })} />
+        <TextAreaField className="field-grid-span-2" label="货物品名" value={payment.goodsName ?? ""} onChange={(value) => onChange({ goodsName: value })} />
         <TextField label="数量" value={payment.quantity ?? ""} onChange={(value) => onChange({ quantity: value })} />
+        <TextField label="数量单位" value={payment.quantityUnit} onChange={(value) => onChange({ quantityUnit: value })} />
         <TextField label="出运国家" value={payment.shipmentCountry ?? ""} onChange={(value) => onChange({ shipmentCountry: value })} />
+        <DateField label="出运日期" value={payment.shipmentDate} onChange={(value) => onChange({ shipmentDate: value })} />
+        <TextAreaField className="field-grid-span-2" label="备注" value={payment.notes ?? ""} onChange={(value) => onChange({ notes: value })} />
       </div>
-      <TextAreaField
-        className="field-grid-span-all"
-        label="备注"
-        value={payment.notes ?? ""}
-        onChange={(value) => onChange({ notes: value })}
-      />
+      <DocumentSpareFieldsPanel label="付款备用字段" value={payment} onChange={onChange} />
     </section>
   );
 }

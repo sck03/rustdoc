@@ -87,6 +87,13 @@ namespace ExportDocManager.Services.Core
             invoice.Spare1 = NormalizeText(invoice.Spare1, 500, "备用字段1");
             invoice.Spare2 = NormalizeText(invoice.Spare2, 500, "备用字段2");
             invoice.Spare3 = NormalizeText(invoice.Spare3, 500, "备用字段3");
+            invoice.Spare4 = NormalizeText(invoice.Spare4, 500, "备用字段4");
+            invoice.Spare5 = NormalizeText(invoice.Spare5, 500, "备用字段5");
+            invoice.Spare6 = NormalizeText(invoice.Spare6, 500, "备用字段6");
+            invoice.Spare7 = NormalizeText(invoice.Spare7, 500, "备用字段7");
+            invoice.Spare8 = NormalizeText(invoice.Spare8, 500, "备用字段8");
+            invoice.Spare9 = NormalizeText(invoice.Spare9, 500, "备用字段9");
+            invoice.Spare10 = NormalizeText(invoice.Spare10, 500, "备用字段10");
             invoice.CustomFieldsJson = NormalizeJson(invoice.CustomFieldsJson, 100_000, "发票扩展字段");
             invoice.PaymentTerms = NormalizeText(invoice.PaymentTerms, 300, "付款条款");
             invoice.PortOfLoading = NormalizeText(invoice.PortOfLoading, 200, "装运港");
@@ -216,6 +223,13 @@ namespace ExportDocManager.Services.Core
             item.Spare1 = NormalizeText(item.Spare1, 500, "明细备用字段1");
             item.Spare2 = NormalizeText(item.Spare2, 500, "明细备用字段2");
             item.Spare3 = NormalizeText(item.Spare3, 500, "明细备用字段3");
+            item.Spare4 = NormalizeText(item.Spare4, 500, "明细备用字段4");
+            item.Spare5 = NormalizeText(item.Spare5, 500, "明细备用字段5");
+            item.Spare6 = NormalizeText(item.Spare6, 500, "明细备用字段6");
+            item.Spare7 = NormalizeText(item.Spare7, 500, "明细备用字段7");
+            item.Spare8 = NormalizeText(item.Spare8, 500, "明细备用字段8");
+            item.Spare9 = NormalizeText(item.Spare9, 500, "明细备用字段9");
+            item.Spare10 = NormalizeText(item.Spare10, 500, "明细备用字段10");
             item.CustomFieldsJson = NormalizeJson(item.CustomFieldsJson, 50_000, "明细扩展字段");
 
             // Keep the persisted invoice measurement precision stable before

@@ -1,4 +1,4 @@
-import type { ApiUserDto, MeetingBookingRecord, MeetingRoomSaveRequest, OfficeSupplyRequestRecord, OfficeSupplySaveRequest } from "../../api/index.ts";
+import type { ApiUserDto, MeetingBookingRecord, MeetingBookingUpdateRequest, MeetingRoomSaveRequest, OfficeSupplyRequestRecord, OfficeSupplySaveRequest, SupplyRequestUpdateRequest } from "../../api/index.ts";
 import { businessDateTimeLocalInputToIso, toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
 
 export type OfficeKind = "rooms" | "supplies";
@@ -22,6 +22,7 @@ export const officeActionLabels = { approve: "批准", reject: "驳回", cancel:
 export const officeHistoryLabels: Record<string, string> = {
   Submit: "提交申请", Register: "登记记录", Approve: "审批通过", Reject: "驳回申请", Cancel: "取消申请",
   Issue: "发放／交接", Return: "归还登记", Restock: "补充入库", Stocktake: "盘点调整",
+  Edit: "修改记录",
 };
 
 export function officeAccess(user: ApiUserDto, kind: OfficeKind) {
@@ -41,6 +42,18 @@ export function officeAccess(user: ApiUserDto, kind: OfficeKind) {
 }
 
 export function isMeetingBooking(row: OfficeRequestRow): row is MeetingBookingRecord { return "meetingRoomId" in row; }
+
+export function readMeetingBookingUpdate(form: FormData, version: number, timeZone: string): MeetingBookingUpdateRequest {
+  const startsAt = businessDateTimeLocalInputToIso(String(form.get("startsAt") ?? ""), timeZone);
+  const endsAt = businessDateTimeLocalInputToIso(String(form.get("endsAt") ?? ""), timeZone);
+  if (!startsAt || !endsAt) throw new Error("请选择有效的预约起止时间。");
+  return { expectedVersion: version, title: String(form.get("title") ?? "").trim(), attendeeCount: Number(form.get("attendeeCount")), startsAt, endsAt };
+}
+
+export function readSupplyRequestUpdate(form: FormData, version: number): SupplyRequestUpdateRequest {
+  return { expectedVersion: version, quantity: Number(form.get("quantity")), purpose: String(form.get("purpose") ?? "").trim(),
+    returnDueDate: String(form.get("returnDueDate") ?? "") || null };
+}
 
 export function officeRequestActions(row: OfficeRequestRow, user: ApiUserDto, kind: OfficeKind) {
   const access = officeAccess(user, kind);

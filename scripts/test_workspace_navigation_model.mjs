@@ -90,7 +90,7 @@ const salesEditionAdminGroups = model.filterWorkspaceNavGroups({ productEdition:
 const browserAdminGroups = model.filterWorkspaceNavGroups({ productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, isDesktopRuntime: false, ...fullNavigationGrants });
 const fullDesktopCapabilities = { productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, usesOfficeRegister: true, isDesktopRuntime: true, ...fullNavigationGrants };
 const adminGroups = model.filterWorkspaceNavGroups(fullDesktopCapabilities);
-assert(adminGroups.find((group) => group.key === "office")?.items.length === 3, "Full desktop includes every administration entry");
+assert(adminGroups.find((group) => group.key === "office")?.items.length === 4, "Full desktop includes every administration entry");
 assert(product.getDefaultWorkspaceRoute(fullDesktopCapabilities) === "/dashboard", "Full desktop retains its business home after enabling administration");
 for (const item of navigationItems) {
   assert(navigationItems.filter((candidate) => candidate.isActive(item.to)).length === 1, `each route has one navigation owner: ${item.to}`);

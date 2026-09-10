@@ -43,6 +43,8 @@ namespace ExportDocManager.Services.Security
 
     public interface IOrganizationDirectoryService
     {
+        Task DeleteCompanyAsync(string code, DeleteRecordRequest request, CancellationToken cancellationToken = default);
+        Task DeleteDepartmentAsync(string code, DeleteRecordRequest request, CancellationToken cancellationToken = default);
         Task<OrganizationDirectoryRecord> ListAsync(CancellationToken cancellationToken = default);
         Task<PagedResult<OrganizationManagerRecord>> ManagerOptionsAsync(string companyCode, string? keyword,
             int pageNumber, int pageSize, CancellationToken cancellationToken = default);

@@ -27,6 +27,7 @@ internal static partial class PersonnelPostgreSqlScenarios
         OfficeServiceContext Context(User actor) => new(factory, new BusinessDataAccessScope(settings, new PersonnelUser(actor)), clock, OfficeOperatingMode.Team);
         var people = new PersonnelService(Context(admin));
         await VerifyImagesAndOrganizationAsync(factory, people, admin, clock);
+        await VerifyMaintenanceAsync(factory, people, admin, clock);
         var create = new PersonnelCreateRequest(Guid.NewGuid(), "EMP-PG-001", firstDepartment, "业务专员", EmploymentType.FullTime,
             clock.Today.AddDays(-1), false, null, null, new("并发测试员工"));
         var registrations = await RaceAsync(8, _ => people.CreateAsync(create));

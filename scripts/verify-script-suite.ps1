@@ -72,6 +72,9 @@ $dependencyPolicyTestScript = Join-Path $scriptRoot "test_dependency_policy.mjs"
 Invoke-ExportDocExternal -FilePath "node" -Arguments @($dependencyPolicyTestScript) -WorkingDirectory $repoRoot
 $dotnetSdkCompatibilityTestScript = Join-Path $scriptRoot "test_dotnet_sdk_compatibility.mjs"
 Invoke-ExportDocExternal -FilePath "node" -Arguments @($dotnetSdkCompatibilityTestScript) -WorkingDirectory $repoRoot
+Invoke-ExportDocExternal -FilePath (Resolve-ExportDocPowerShellExecutable) -Arguments @(
+    "-NoProfile", "-File", (Join-Path $scriptRoot "test-webview2-runtime-support.ps1")
+) -WorkingDirectory $repoRoot
 
 $bashPath = Get-Command bash -CommandType Application -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty Source

@@ -15,8 +15,10 @@ public sealed record PersonnelCreateRequest(Guid RequestKey, string EmployeeNumb
     EmploymentType EmploymentType, DateOnly HireDate, bool OnProbation, DateOnly? ProbationEndsOn,
     DateOnly? ContractEndsOn, PersonnelProfile Profile);
 
+public sealed record PersonnelRegistrationCorrection(string EmployeeNumber, string DepartmentId, string JobTitle,
+    DateOnly HireDate, bool OnProbation);
 public sealed record PersonnelUpdateRequest(int ExpectedVersion, PersonnelProfile Profile, EmploymentType EmploymentType,
-    DateOnly? ProbationEndsOn, DateOnly? ContractEndsOn);
+    DateOnly? ProbationEndsOn, DateOnly? ContractEndsOn, PersonnelRegistrationCorrection? Registration = null);
 
 public enum PersonnelAction { Confirm, Transfer, Depart, Rehire }
 public sealed record PersonnelTransitionRequest(int ExpectedVersion, DateOnly EffectiveDate, string Note,
@@ -35,7 +37,8 @@ public sealed record PersonnelOptions(IReadOnlyList<PersonnelDepartmentRecord> D
 public sealed record PersonnelRecord(PersonnelDirectoryRecord Employee, PersonnelProfile Profile, EmploymentType EmploymentType,
     DateOnly HireDate, DateOnly LastEffectiveDate, DateOnly? ProbationEndsOn, DateOnly? ContractEndsOn,
     DateOnly? ConfirmedOn, DateOnly? DepartedOn, PersonnelAccountRecord? Account, int VersionNumber,
-    bool CanEdit, bool CanTransition, bool CanLinkAccount, IReadOnlyList<PersonnelImageRecord> Images);
+    bool CanEdit, bool CanTransition, bool CanLinkAccount, IReadOnlyList<PersonnelImageRecord> Images,
+    bool CanDelete = false, bool CanCorrectRegistration = false, string DeleteRestriction = "");
 
 public sealed record PersonnelImageRecord(PersonnelImageKind Kind, string ContentType, int ByteLength, string ContentHash);
 public sealed record PersonnelImageFile(byte[] Content, string ContentType);
@@ -67,6 +70,7 @@ public interface IPersonnelService
     Task<PersonnelRecord> GetAsync(int id, CancellationToken cancellationToken = default);
     Task<PersonnelRecord> CreateAsync(PersonnelCreateRequest request, CancellationToken cancellationToken = default);
     Task<PersonnelChangeResult> UpdateAsync(int id, PersonnelUpdateRequest request, CancellationToken cancellationToken = default);
+    Task DeleteAsync(int id, DeleteRecordRequest request, CancellationToken cancellationToken = default);
     Task<PersonnelChangeResult> TransitionAsync(int id, PersonnelAction action, PersonnelTransitionRequest request, CancellationToken cancellationToken = default);
     Task<PagedResult<PersonnelAccountRecord>> AccountOptionsAsync(int id, string? keyword, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
     Task<PersonnelChangeResult> LinkAccountAsync(int id, PersonnelAccountRequest request, CancellationToken cancellationToken = default);

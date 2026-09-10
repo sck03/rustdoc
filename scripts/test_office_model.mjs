@@ -54,8 +54,9 @@ for (const pathname of ["/office/meeting-rooms", "/office/supplies"]) {
 }
 const descriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
 const personnelUser = { ...user, capabilities: { ...user.capabilities, enabledModules: ["office.people"], permissions: [{resourceKey:"office.people",action:"view",dataScope:"company"}] } };
-assert.equal(getDefaultWorkspaceRoute(personnelUser.capabilities), "/office/people");
-assert(isRouteAccessAllowed({ pathname:"/office/people",user:personnelUser,canManageSystem:false,isFullEdition:false,isDesktopRuntime:false }));
+assert.equal(getDefaultWorkspaceRoute(personnelUser.capabilities), "/office/directory");
+assert(isRouteAccessAllowed({ pathname:"/office/directory",user:personnelUser,canManageSystem:false,isFullEdition:false,isDesktopRuntime:false }));
+assert(!isRouteAccessAllowed({ pathname:"/office/people",user:personnelUser,canManageSystem:false,isFullEdition:false,isDesktopRuntime:false }));
 assert(!isRouteAccessAllowed({ pathname:"/office/people",user:personnelUser,canManageSystem:true,isFullEdition:true,isDesktopRuntime:true }));
 assert(!personnel.canViewPersonnelDetails(personnelUser));
 assert(personnel.canViewPersonnelDetails({ ...personnelUser, capabilities:{permissions:[{resourceKey:"office.people",action:"view-details",dataScope:"department"}]} }));
@@ -78,9 +79,9 @@ assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=15&app
 assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=-1&applicantUserId=2147483648&employeeId=0")), {requestId:undefined,applicantUserId:undefined,employeeId:undefined});
 const registerUser = { ...manager, capabilities: { ...manager.capabilities, productEdition:"Administration", usesOfficeRegister:true,
   canManageSettings:true, canManageUsers:true, enabledModules:["office.rooms","office.supplies","office.people","system.about"],
-  permissions:[...grants("all"), {resourceKey:"office.people",action:"view",dataScope:"all"}] } };
+  permissions:[...grants("all"), ...["view","view-details"].map(action=>({resourceKey:"office.people",action,dataScope:"all"}))] } };
 assert.equal(getDefaultWorkspaceRoute(registerUser.capabilities), "/office/people");
-assert.equal(navigation.filterWorkspaceNavGroups({ ...registerUser.capabilities, isDesktopRuntime:true }).find(group=>group.key==='office').items.length,3);
+assert.equal(navigation.filterWorkspaceNavGroups({ ...registerUser.capabilities, isDesktopRuntime:true }).find(group=>group.key==='office').items.length,4);
 const fullRegisterUser = { ...registerUser, capabilities: { ...registerUser.capabilities, productEdition: "Full", canUseDocumentWorkspace: true, canUseSalesWorkspace: true } };
 for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supplies"]) {
   assert(isRouteAccessAllowed({ pathname, user: fullRegisterUser, canManageSystem: true, isDesktopRuntime: true }), "Full desktop permits direct administration routes");

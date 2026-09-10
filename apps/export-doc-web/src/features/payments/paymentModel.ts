@@ -1,4 +1,5 @@
 import { ApiPaymentDto } from "../../api/index.ts";
+import { documentSpareKeys, mapDocumentSpareFields } from "../../ui/documentSpareFields.ts";
 import {
   dateInputToApiDate,
   normalizeText,
@@ -16,6 +17,11 @@ export function createEmptyPayment(businessDate: string): ApiPaymentDto {
     departmentId: "",
     companyScope: "",
     invoiceNo: "",
+    voucherNo: "",
+    tradeMethod: "",
+    taxRebateRate: "",
+    quantityUnit: "",
+    ...mapDocumentSpareFields({}),
     shipmentDate: today,
     payeeId: 0,
     department: "",
@@ -60,6 +66,11 @@ export function normalizePaymentForSave(payment: ApiPaymentDto, id: number): Api
     goodsName: normalizeText(payment.goodsName),
     inspectionExpense: numberValue(payment.inspectionExpense),
     invoiceNo: normalizeText(payment.invoiceNo),
+    voucherNo: normalizeText(payment.voucherNo),
+    tradeMethod: normalizeText(payment.tradeMethod),
+    taxRebateRate: normalizeText(payment.taxRebateRate),
+    quantityUnit: normalizeText(payment.quantityUnit),
+    ...mapDocumentSpareFields(payment, normalizeText),
     notes: normalizeText(payment.notes),
     officeExpense: numberValue(payment.officeExpense),
     otherExpense: numberValue(payment.otherExpense),
@@ -89,6 +100,11 @@ export function validatePaymentDraft(payment: ApiPaymentDto) {
 
   const textLimits: Array<[string | undefined, number, string]> = [
     [payment.invoiceNo, 100, "发票号"],
+    [payment.voucherNo, 100, "付款单号"],
+    [payment.tradeMethod, 100, "贸易方式"],
+    [payment.taxRebateRate, 100, "退税率"],
+    [payment.quantityUnit, 20, "数量单位"],
+    ...documentSpareKeys.map((key, index): [string, number, string] => [payment[key], 500, `备用字段${index + 1}`]),
     [payment.department, 100, "部门"],
     [payment.paymentMethod, 100, "付款方式"],
     [payment.quantity, 100, "数量"],

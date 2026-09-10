@@ -69,8 +69,10 @@ public sealed partial class PersonnelService(OfficeServiceContext office) : IPer
             var oldType = employee.EmploymentType;
             var oldProbation = employee.ProbationEndsOn;
             var oldContract = employee.ContractEndsOn;
+            bool corrected = await CorrectRegistrationAsync(db, employee, actor, request.Registration, token);
             ApplyProfile(employee, request.Profile, request.EmploymentType, request.ProbationEndsOn, request.ContractEndsOn);
             string changes = ProfileChanges(before, Profile(employee));
+            if (corrected) changes += "入职登记信息；";
             if (oldType != employee.EmploymentType) changes += "用工类型；";
             if (oldProbation != employee.ProbationEndsOn) changes += "试用截止日期；";
             if (oldContract != employee.ContractEndsOn) changes += "合同截止日期；";

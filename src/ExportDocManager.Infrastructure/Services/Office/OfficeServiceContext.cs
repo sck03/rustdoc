@@ -75,8 +75,10 @@ public sealed class OfficeServiceContext(
         }
 
         if (employeeId is not > 0) throw new ServiceValidationException("请选择需要登记的人员。");
-        var employee = await db.PersonnelEmployees.AsNoTracking()
-            .SingleOrDefaultAsync(item => item.Id == employeeId && item.CompanyScope == actor.CompanyScope, token);
+        var employee = await (db.Database.IsNpgsql()
+            ? db.PersonnelEmployees.FromSqlInterpolated($"SELECT * FROM \"PersonnelEmployees\" WHERE \"Id\" = {employeeId} AND \"CompanyScope\" = {actor.CompanyScope} FOR SHARE")
+            : db.PersonnelEmployees.Where(item => item.Id == employeeId && item.CompanyScope == actor.CompanyScope))
+            .AsNoTracking().SingleOrDefaultAsync(token);
         if (employee == null || employee.Status == EmploymentStatus.Departed)
             throw new ServiceValidationException("请选择本公司在职人员；离职人员不能新增预约或领用记录。");
         return (employee.FullName, employee.DepartmentId);

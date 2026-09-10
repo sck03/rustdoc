@@ -1,5 +1,6 @@
 import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ApiUnitDto } from "../../api/index.ts";
 import { normalizeText, numberValue } from "../../ui/formUtils.ts";
+import { documentSpareKeys, mapDocumentSpareFields } from "../../ui/documentSpareFields.ts";
 import type { EditableInvoiceItemField, InvoiceItemColumnDefinition } from "./invoiceItemTableModel.ts";
 import { invoiceItemEditableColumns } from "./invoiceItemTableModel.ts";
 export type InvoiceItemCellSelection = { rowIndex: number; field: EditableInvoiceItemField };
@@ -342,9 +343,7 @@ export function createEmptyInvoiceItem(invoiceId = 0): ApiInvoiceItemDto {
     purchaseTotal: 0,
     taxRebateRate: 0,
     taxRefundAmount: 0,
-    spare1: "",
-    spare2: "",
-    spare3: "",
+    ...mapDocumentSpareFields({}),
     customFieldsJson: "",
   };
 }
@@ -514,9 +513,7 @@ export function normalizeInvoiceItemForSave(item: ApiInvoiceItemDto): ApiInvoice
     purchasePrice: numberValue(item.purchasePrice),
     purchaseTotal: numberValue(item.purchaseTotal),
     quantity: numberValue(item.quantity),
-    spare1: normalizeText(item.spare1),
-    spare2: normalizeText(item.spare2),
-    spare3: normalizeText(item.spare3),
+    ...mapDocumentSpareFields(item, normalizeText),
     styleName: normalizeText(item.styleName),
     styleNameCN: normalizeText(item.styleNameCN),
     styleNo: normalizeText(item.styleNo),
@@ -552,9 +549,7 @@ export function isMeaningfulInvoiceItem(item: ApiInvoiceItemDto) {
     item.hsCode,
     item.origin,
     item.poNumber,
-    item.spare1,
-    item.spare2,
-    item.spare3,
+    ...documentSpareKeys.map((key) => item[key]),
     item.styleName,
     item.styleNameCN,
     item.styleNo,

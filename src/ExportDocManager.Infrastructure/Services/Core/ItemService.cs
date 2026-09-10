@@ -192,6 +192,13 @@ namespace ExportDocManager.Services.Core
             item.Spare1 = TextSearchHelper.NormalizeValue(item.Spare1);
             item.Spare2 = TextSearchHelper.NormalizeValue(item.Spare2);
             item.Spare3 = TextSearchHelper.NormalizeValue(item.Spare3);
+            item.Spare4 = TextSearchHelper.NormalizeValue(item.Spare4);
+            item.Spare5 = TextSearchHelper.NormalizeValue(item.Spare5);
+            item.Spare6 = TextSearchHelper.NormalizeValue(item.Spare6);
+            item.Spare7 = TextSearchHelper.NormalizeValue(item.Spare7);
+            item.Spare8 = TextSearchHelper.NormalizeValue(item.Spare8);
+            item.Spare9 = TextSearchHelper.NormalizeValue(item.Spare9);
+            item.Spare10 = TextSearchHelper.NormalizeValue(item.Spare10);
             item.CustomFieldsJson = TextSearchHelper.NormalizeValue(item.CustomFieldsJson);
         }
     }

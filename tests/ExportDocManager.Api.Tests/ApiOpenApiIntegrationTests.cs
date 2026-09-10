@@ -21,8 +21,7 @@ public sealed class ApiOpenApiIntegrationTests
         "GET /livez",
         "HEAD /livez",
         "GET /readyz",
-        "HEAD /readyz",
-        "DELETE /api/master-data/hs-knowledge/examples/{id}"
+        "HEAD /readyz"
     };
 
     private static readonly string[] RequiredBusinessPaths =
@@ -176,7 +175,7 @@ public sealed class ApiOpenApiIntegrationTests
                     .Where(item => item.Name.Length == 3 && item.Name[0] == '2')
                     .ToArray();
                 Assert.NotEmpty(successes);
-                if (!BodylessSuccessOperations.Contains(operationKey))
+                if (!BodylessSuccessOperations.Contains(operationKey) && successes.Any(success => success.Name is not ("204" or "205")))
                 {
                     Assert.Contains(successes, success => ResponseHasSchema(success.Value));
                 }

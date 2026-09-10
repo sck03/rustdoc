@@ -84,6 +84,7 @@ export function getDefaultWorkspaceRoute(capabilities: WorkspaceCapabilities) {
     "/single-window/operation-center",
     "/tools/exchange-rates",
     "/office/people",
+    "/office/directory",
     "/office/meeting-rooms",
     "/office/supplies",
     "/tools/email",

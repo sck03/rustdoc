@@ -27,6 +27,8 @@ public sealed record MeetingRoomRecord(int Id, string Name, string Location, str
 
 public sealed record MeetingBookingCreateRequest(Guid RequestKey, int MeetingRoomId, string Title,
     int AttendeeCount, DateTimeOffset StartsAt, DateTimeOffset EndsAt, int? EmployeeId = null);
+public sealed record MeetingBookingUpdateRequest(int ExpectedVersion, string Title,
+    int AttendeeCount, DateTimeOffset StartsAt, DateTimeOffset EndsAt);
 
 public sealed record MeetingBookingRecord(int Id, int MeetingRoomId, string RoomName, string Location,
     bool RequiresKey, int OwnerUserId, string ApplicantName, string DepartmentId, string Title,
@@ -48,6 +50,7 @@ public sealed record OfficeSupplyRecord(int Id, string Name, string Unit, string
 
 public sealed record SupplyRequestCreateRequest(Guid RequestKey, int OfficeSupplyId, int Quantity,
     string Purpose, DateOnly? ReturnDueDate, int? EmployeeId = null);
+public sealed record SupplyRequestUpdateRequest(int ExpectedVersion, int Quantity, string Purpose, DateOnly? ReturnDueDate);
 
 public sealed record OfficeSupplyRequestRecord(int Id, int OfficeSupplyId, string SupplyName, string Unit,
     bool IsReturnable, int OwnerUserId, string ApplicantName, string DepartmentId, string Purpose,
@@ -62,6 +65,8 @@ public interface IMeetingRoomService
 {
     Task<PagedResult<MeetingRoomRecord>> QueryRoomsAsync(OfficeResourceQuery query, CancellationToken cancellationToken = default);
     Task<MeetingRoomRecord> SaveRoomAsync(int id, MeetingRoomSaveRequest request, CancellationToken cancellationToken = default);
+    Task DeleteRoomAsync(int id, DeleteRecordRequest request, CancellationToken cancellationToken = default);
+    Task<MeetingBookingRecord> UpdateBookingAsync(int id, MeetingBookingUpdateRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MeetingBusySlot>> AvailabilityAsync(int roomId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default);
     Task<PagedResult<MeetingBookingRecord>> QueryBookingsAsync(OfficeRequestQuery query, CancellationToken cancellationToken = default);
     Task<MeetingBookingRecord> CreateBookingAsync(MeetingBookingCreateRequest request, CancellationToken cancellationToken = default);
@@ -73,6 +78,8 @@ public interface IOfficeSupplyService
 {
     Task<PagedResult<OfficeSupplyRecord>> QuerySuppliesAsync(OfficeResourceQuery query, CancellationToken cancellationToken = default);
     Task<OfficeSupplyRecord> SaveSupplyAsync(int id, OfficeSupplySaveRequest request, CancellationToken cancellationToken = default);
+    Task DeleteSupplyAsync(int id, DeleteRecordRequest request, CancellationToken cancellationToken = default);
+    Task<OfficeSupplyRequestRecord> UpdateRequestAsync(int id, SupplyRequestUpdateRequest request, CancellationToken cancellationToken = default);
     Task<PagedResult<OfficeSupplyRequestRecord>> QueryRequestsAsync(OfficeRequestQuery query, CancellationToken cancellationToken = default);
     Task<OfficeSupplyRequestRecord> CreateRequestAsync(SupplyRequestCreateRequest request, CancellationToken cancellationToken = default);
     Task<OfficeSupplyRequestRecord> TransitionAsync(int id, OfficeWorkflowAction action, OfficeReturnRequest request, CancellationToken cancellationToken = default);
