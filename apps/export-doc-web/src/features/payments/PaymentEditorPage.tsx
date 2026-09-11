@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Edit3, Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -18,7 +18,9 @@ import {
 } from "../custom-options/customOptionModel.ts";
 import { PaymentAmountsPanel, PaymentBasicInfoPanel, PaymentBusinessInfoPanel } from "./PaymentFormPanels.tsx";
 import { PaymentReportPreviewPanel } from "./PaymentReportPreviewPanel.tsx";
-import { createEmptyPayment, normalizePaymentForSave, validatePaymentDraft } from "./paymentModel.ts";
+import { PaymentEditorSections } from "./PaymentEditorSections.tsx";
+import { DocumentFieldLabelsProvider } from "../../ui/DocumentFieldLabelsContext.tsx";
+import { calculatePaymentExpenseTotal, createEmptyPayment, normalizePaymentForSave, paymentExpenseFields, validatePaymentDraft } from "./paymentModel.ts";
 
 export function PaymentEditorPage({
   businessDate,
@@ -49,6 +51,11 @@ export function PaymentEditorPage({
   const isNew = mode === "new";
   const isPaymentIdValid = Number.isInteger(parsedPaymentId) && parsedPaymentId > 0;
   const queryClient = useQueryClient();
+  const formRef = useRef<HTMLFormElement>(null);
+  const settingsQuery = useQuery({
+    queryKey: queryKeys.settings(),
+    queryFn: ({ signal }) => client.getSettings({ signal }),
+  });
 
   const paymentQuery = useQuery({
     queryKey: queryKeys.payment(parsedPaymentId),
@@ -106,6 +113,7 @@ export function PaymentEditorPage({
       setPayment(response.payment);
       setPersistedPaymentSnapshot(buildPaymentSnapshot(response.payment, response.id));
       setMessage(null);
+      setConcurrencyMessage(null);
       setSuccessMessage(nextMessage);
       queryClient.setQueryData(queryKeys.payment(response.id), response.payment);
       await queryClient.invalidateQueries({ queryKey: queryKeys.paymentsRoot() });
@@ -207,7 +215,7 @@ export function PaymentEditorPage({
   }
 
   function patchPaymentAmounts(next: Partial<ApiPaymentDto>) {
-    const updatesExpense = paymentExpenseFields.some((field) => Object.prototype.hasOwnProperty.call(next, field));
+    const updatesExpense = paymentExpenseFields.some(({ field }) => Object.prototype.hasOwnProperty.call(next, field));
 
     setPayment((current) => {
       if (!current) {
@@ -259,16 +267,16 @@ export function PaymentEditorPage({
     function handleDocumentKeyDown(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        saveCurrentPaymentDraft();
+        formRef.current?.requestSubmit();
       }
     }
 
     window.addEventListener("keydown", handleDocumentKeyDown);
     return () => window.removeEventListener("keydown", handleDocumentKeyDown);
-  }, [isBusy, isNew, isPaymentIdValid, parsedPaymentId, payment]);
+  }, []);
 
   async function handleDeletePayment() {
-    if (isNew || !isPaymentIdValid || !payment || deletePaymentMutation.isPending) {
+    if (!paymentPermission.canManage || isNew || !isPaymentIdValid || !payment || deletePaymentMutation.isPending) {
       return;
     }
 
@@ -302,7 +310,9 @@ export function PaymentEditorPage({
       confirmLabel: "加载最新版本",
     })) return;
     const result = await paymentQuery.refetch();
-    if (result.data) {
+    if (result.data && !result.isError) {
+      setPayment(result.data);
+      setPersistedPaymentSnapshot(buildPaymentSnapshot(result.data, parsedPaymentId));
       setConcurrencyMessage(null);
       setMessage(null);
       setSuccessMessage("已加载服务器上的最新付款记录，请检查后继续编辑。");
@@ -345,61 +355,49 @@ export function PaymentEditorPage({
         <PermissionNotice>当前模板仅允许查看付款报销，表单修改、保存和删除已禁用。</PermissionNotice>
       ) : null}
 
-      {!payment && isBusy ? <PageState tone="loading" title="正在加载付款报销" description="正在读取付款信息、关联发票和报表配置。" /> : null}
+      {settingsQuery.isError && <InlineNotice tone="warning" title="字段名称未能更新">{readApiError(settingsQuery.error)}<button type="button" onClick={() => void settingsQuery.refetch()}>重试</button></InlineNotice>}
+      {!payment && isBusy ? <PageState tone="loading" title="正在加载付款报销" description="正在读取付款信息和报表配置。" /> : null}
 
       {payment ? (
-        <form className="entity-form" onSubmit={handleSubmit} onKeyDownCapture={handleEnterAsTabFormKeyDown}>
-          <fieldset className="permission-fieldset" disabled={!paymentPermission.canOperate}>
-          <PaymentBasicInfoPanel
-            payment={payment}
-            client={client}
-            isBusy={isBusy}
-            isReferenceDataBusy={isReferenceDataBusy}
-            selectedPayee={selectedPayeeQuery.data}
-            payerNameOptions={payerNameOptions}
-            referenceDataMessage={referenceDataMessage}
-            customOptions={paymentCustomOptions}
-            onChange={patchPayment}
-            onCommitCustomOption={commitPaymentCustomOption}
-            onOpenPayeeManagement={handleOpenPayeeManagement}
-            canOpenPayeeManagement={masterDataPermission.canView}
-            onRefreshReferenceData={() => {
-              void queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("payees") });
-              void customOptionsQuery.refetch();
-            }}
-          />
-          <PaymentBusinessInfoPanel payment={payment} onChange={patchPayment} />
-          <PaymentAmountsPanel
-            payment={payment}
-            onChange={patchPaymentAmounts}
-          />
-          </fieldset>
-
-          <PaymentReportPreviewPanel
-            client={client}
-            paymentId={isNew || !isPaymentIdValid ? 0 : parsedPaymentId}
-            paymentDraft={currentPaymentDraft}
-            hasUnsavedDraftChanges={hasUnsavedPaymentChanges}
-          />
-        </form>
+        <DocumentFieldLabelsProvider value={settingsQuery.data?.settings.system.documentFieldLabels}>
+          <form ref={formRef} className="entity-form" onSubmit={handleSubmit} onKeyDownCapture={handleEnterAsTabFormKeyDown}>
+            <PaymentEditorSections key={isNew ? "new" : parsedPaymentId} payment={payment} isNew={isNew} busy={isBusy}
+              saving={savePaymentMutation.isPending} editable={paymentPermission.canOperate} hasUnsavedChanges={hasUnsavedPaymentChanges}
+              basic={
+                <PaymentBasicInfoPanel
+                  payment={payment}
+                  client={client}
+                  isBusy={isBusy}
+                  isReferenceDataBusy={isReferenceDataBusy}
+                  selectedPayee={selectedPayeeQuery.data}
+                  payerNameOptions={payerNameOptions}
+                  referenceDataMessage={referenceDataMessage}
+                  customOptions={paymentCustomOptions}
+                  onChange={patchPayment}
+                  onCommitCustomOption={commitPaymentCustomOption}
+                  onOpenPayeeManagement={handleOpenPayeeManagement}
+                  canOpenPayeeManagement={masterDataPermission.canView}
+                  onRefreshReferenceData={() => {
+                    void queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("payees") });
+                    void customOptionsQuery.refetch();
+                  }}
+                />
+              }
+              business={<PaymentBusinessInfoPanel payment={payment} onChange={patchPayment} />}
+              amounts={<PaymentAmountsPanel payment={payment} onChange={patchPaymentAmounts} />}
+              report={
+                <PaymentReportPreviewPanel
+                  client={client}
+                  paymentId={isNew || !isPaymentIdValid ? 0 : parsedPaymentId}
+                  paymentDraft={currentPaymentDraft}
+                  hasUnsavedDraftChanges={hasUnsavedPaymentChanges}
+                />
+              } />
+          </form>
+        </DocumentFieldLabelsProvider>
       ) : null}
     </section>
   );
-}
-
-const paymentExpenseFields = [
-  "travelExpense",
-  "businessEntertainmentExpense",
-  "telephoneExpense",
-  "officeExpense",
-  "repairExpense",
-  "freightMiscExpense",
-  "inspectionExpense",
-  "otherExpense",
-] as const;
-
-function calculatePaymentExpenseTotal(payment: ApiPaymentDto) {
-  return paymentExpenseFields.reduce((sum, field) => sum + (Number(payment[field]) || 0), 0);
 }
 
 function buildPaymentSnapshot(payment: ApiPaymentDto, id: number) {

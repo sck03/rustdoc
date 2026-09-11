@@ -254,13 +254,13 @@ html[data-interface-density="compact"] :where(th, td) {
   border-color: var(--edm-success-200);
 }
 
-.invoice-editor-sticky-actions,
+.document-editor-sticky-actions,
 .report-template-sticky-header {
   position: sticky;
   z-index: 22;
 }
 
-.invoice-editor-sticky-actions {
+.document-editor-sticky-actions {
   top: 86px;
   display: flex;
   align-items: center;
@@ -274,25 +274,25 @@ html[data-interface-density="compact"] :where(th, td) {
   backdrop-filter: blur(12px);
 }
 
-.invoice-editor-sticky-actions > div {
+.document-editor-sticky-actions > div {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-.invoice-editor-sticky-actions strong {
+.document-editor-sticky-actions strong {
   overflow: hidden;
   color: var(--edm-ink-800);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.invoice-editor-sticky-actions > div > span {
+.document-editor-sticky-actions > div > span {
   color: var(--edm-ink-500);
   font-size: 12px;
 }
 
-.invoice-editor-sticky-actions .command-button:disabled {
+.document-editor-sticky-actions .command-button:disabled {
   color: var(--edm-primary-75);
   background: var(--edm-primary-650);
   border-color: var(--edm-primary-750);
@@ -300,7 +300,7 @@ html[data-interface-density="compact"] :where(th, td) {
   opacity: 1;
 }
 
-.invoice-editor-sticky-actions .command-button:disabled svg {
+.document-editor-sticky-actions .command-button:disabled svg {
   color: var(--edm-primary-150);
 }
 
@@ -639,7 +639,7 @@ dialog::backdrop {
     padding-bottom: 12px;
   }
 
-  .invoice-editor-sticky-actions {
+  .document-editor-sticky-actions {
     top: 68px;
   }
 
@@ -744,12 +744,12 @@ dialog::backdrop {
     content: "";
   }
 
-  .invoice-editor-sticky-actions {
+  .document-editor-sticky-actions {
     top: 58px;
     align-items: stretch;
   }
 
-  .invoice-editor-sticky-actions .command-button {
+  .document-editor-sticky-actions .command-button {
     flex: 0 0 auto;
   }
 

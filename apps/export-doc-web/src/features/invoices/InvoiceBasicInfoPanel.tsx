@@ -158,7 +158,7 @@ export function InvoiceBasicInfoPanel({
           onChange={(value) => onChange({ type: normalizeInvoiceType(value) })}
         />
       </div>
-      <DocumentSpareFieldsPanel label="发票备用字段" value={invoice} onChange={onChange} disabled={!isEditable} />
+      <DocumentSpareFieldsPanel group="invoice" label="发票备用字段" value={invoice} onChange={onChange} disabled={!isEditable} />
       {statusHistory !== undefined || statusHistoryLoading || statusHistoryMessage ? (
         <details className="invoice-status-history">
           <summary>状态记录{statusHistory?.length ? `（${statusHistory.length}）` : ""}</summary>

@@ -374,6 +374,9 @@ public sealed class SettingsServiceTests
                 first.UpdateAsync(settings =>
                 {
                     settings.System.AppName = "Cross-process-safe";
+                    settings.System.DocumentFieldLabels.Invoice["spare1"] = "船名航次";
+                    settings.System.DocumentFieldLabels.Item["spare10"] = "客户货号";
+                    settings.System.DocumentFieldLabels.Payment["spare1"] = "费用归属";
                     return true;
                 }),
                 second.UpdateAsync(settings =>
@@ -386,6 +389,10 @@ public sealed class SettingsServiceTests
             await reader.LoadAsync();
             Assert.Equal("Cross-process-safe", reader.Settings.System.AppName);
             Assert.Equal(96, reader.Settings.System.ItemEntryBlankRowCount);
+            Assert.Equal(2, reader.Settings.Revision);
+            Assert.Equal("船名航次", reader.Settings.System.DocumentFieldLabels.Invoice["spare1"]);
+            Assert.Equal("客户货号", reader.Settings.System.DocumentFieldLabels.Item["spare10"]);
+            Assert.Equal("费用归属", reader.Settings.System.DocumentFieldLabels.Payment["spare1"]);
         }
         finally
         {

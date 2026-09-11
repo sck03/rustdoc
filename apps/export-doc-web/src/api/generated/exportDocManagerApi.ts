@@ -3384,6 +3384,7 @@ export interface AppSettings {
   exchangeRate: ExchangeRateSettings;
   paymentTemplates: PaymentTemplateItem[];
   reportTemplateDefaults: ReportTemplateDefaults;
+  revision: number;
   singleWindow: SingleWindowSettings;
   system: SystemSettings;
   webDav: WebDavSettings;
@@ -3537,6 +3538,12 @@ export interface CustomsCooDefaultProfile {
 export interface DeleteRecordRequest {
   expectedVersion: number;
   reason: string;
+}
+
+export interface DocumentFieldLabelSettings {
+  invoice: Record<string, unknown>;
+  item: Record<string, unknown>;
+  payment: Record<string, unknown>;
 }
 
 export interface EmailConfig {
@@ -4509,6 +4516,7 @@ export interface SystemSettings {
   databaseProvider: string;
   defaultExportDirectory: string;
   defaultTemplateExporterNameCn: string;
+  documentFieldLabels: DocumentFieldLabelSettings;
   itemEntryBlankRowCount: number;
   itemEntrySpareColumnCount: number;
   logFileSizeLimitMB: number;

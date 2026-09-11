@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { DocumentFieldLabelsProvider } from "../../ui/DocumentFieldLabelsContext.tsx";
 import { ArrowLeft, Edit3, Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
@@ -629,6 +630,7 @@ export function InvoiceEditorPage({
   ) : null;
 
   return (
+    <DocumentFieldLabelsProvider value={settingsQuery.data?.settings.system.documentFieldLabels}>
     <section className="editor-surface" aria-label={isNew ? "新建发票" : "编辑发票"}>
       <div className="editor-toolbar">
         <button className="command-button secondary" type="button" onClick={handleBackToInvoiceList}>
@@ -777,5 +779,6 @@ export function InvoiceEditorPage({
         />
       ) : null}
     </section>
+    </DocumentFieldLabelsProvider>
   );
 }

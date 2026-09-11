@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Plus, Save, Trash2 } from "lucide-react";
 import type { ApiReportTemplateDto, AppSettings, BatchExportItem } from "../../api/index.ts";
-import { PageState } from "../../ui/PageState.tsx";
+import { ConcurrencyConflictNotice, PageState } from "../../ui/PageState.tsx";
 import { TextField } from "../../ui/FormFields.tsx";
 import { createBatchExportItem, resolveBatchExportItems } from "./reportExportDefaultsModel.ts";
 
@@ -9,6 +9,8 @@ export function ReportExportDefaultsPanel({
   canManageSettings,
   isBusy,
   isDirty,
+  concurrencyMessage,
+  onReload,
   onChange,
   onSave,
   templates,
@@ -17,6 +19,8 @@ export function ReportExportDefaultsPanel({
   canManageSettings: boolean;
   isBusy: boolean;
   isDirty: boolean;
+  concurrencyMessage: string | null;
+  onReload: () => void;
   onChange: (path: string[], value: unknown) => void;
   onSave: () => void;
   templates: ApiReportTemplateDto[];
@@ -41,6 +45,7 @@ export function ReportExportDefaultsPanel({
         </button>
       </div>
       <div className="template-management-content">
+        {concurrencyMessage && <ConcurrencyConflictNotice message={concurrencyMessage} isBusy={isBusy} onReload={onReload} />}
         {settings ? (
           <fieldset className="settings-fieldset" disabled={!canManageSettings || isBusy}>
             <div className="report-export-defaults-grid">

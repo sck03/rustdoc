@@ -85,7 +85,7 @@
   font-size: 16px;
 }
 
-.invoice-editor-section-nav {
+.document-editor-section-nav {
   position: sticky;
   top: 0;
   z-index: 6;
@@ -100,7 +100,7 @@
   backdrop-filter: blur(8px);
 }
 
-.invoice-section-nav-item {
+.document-section-nav-item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -116,7 +116,7 @@
   white-space: nowrap;
 }
 
-.invoice-section-nav-item:hover:not(:disabled) {
+.document-section-nav-item:hover:not(:disabled) {
   color: var(--edm-primary-650);
   border-color: var(--edm-primary-650);
 }

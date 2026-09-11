@@ -75,6 +75,7 @@ namespace ExportDocManager.Services.Infrastructure
                 }
 
                 candidate = Normalize(candidate);
+                candidate.Revision = checked(Volatile.Read(ref _settings).Revision + 1);
                 await SaveUnsafeAsync(candidate, cancellationToken).ConfigureAwait(false);
                 Volatile.Write(ref _settings, candidate);
                 return true;
@@ -217,6 +218,7 @@ namespace ExportDocManager.Services.Infrastructure
             settings.System.ItemEntryBlankRowCount =
                 Math.Clamp(settings.System.ItemEntryBlankRowCount <= 0 ? 20 : settings.System.ItemEntryBlankRowCount, 1, 500);
             settings.System.ItemEntrySpareColumnCount = Math.Clamp(settings.System.ItemEntrySpareColumnCount, 0, 10);
+            settings.System.DocumentFieldLabels = DocumentFieldLabelSettings.Normalize(settings.System.DocumentFieldLabels);
             settings.System.DatabaseProvider = DatabaseModeHelper.NormalizeProvider(settings.System.DatabaseProvider);
             settings.System.SqliteDatabaseFileName =
                 DbHelper.NormalizeRuntimeSqliteDatabaseFileName(settings.System.SqliteDatabaseFileName);

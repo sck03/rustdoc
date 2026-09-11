@@ -4,6 +4,8 @@ import { SelectField } from "../../ui/FormFields.tsx";
 import { CheckboxSetting, DirectorySetting, NumberSetting, SelectSetting, TextSetting, readSettingString } from "./SettingsFieldControls.tsx";
 import { systemUpdaterEndpointPath } from "./settingsConfigurationPaths.ts";
 import type { SettingsRecord } from "./settingsTypes.ts";
+import { DocumentFieldLabelsSettingsPanel } from "./DocumentFieldLabelsSettingsPanel.tsx";
+import "../../styles/document-spare-fields.css";
 
 export function RuntimeDatabaseSettingsPanel({ settings, secrets, canManageSettings, updateSecrets, isBusy, canSelectDesktopDirectory, onChange, onSelectDefaultExportDirectory }: {
   settings: SettingsRecord;
@@ -17,6 +19,7 @@ export function RuntimeDatabaseSettingsPanel({ settings, secrets, canManageSetti
 }) {
   return (
     <>
+      <DocumentFieldLabelsSettingsPanel settings={settings} disabled={!canManageSettings || isBusy} onChange={onChange} />
       <section className="form-section" aria-label="系统与数据库">
         <div className="section-header"><h2>系统与数据库</h2></div>
         <fieldset className="settings-fieldset" disabled={!canManageSettings}>

@@ -1,4 +1,5 @@
 import { Columns3 } from "lucide-react";
+import { documentFieldLabel, useDocumentFieldLabels } from "../../ui/DocumentFieldLabelsContext.tsx";
 import { invoiceItemEditableColumns, type EditableInvoiceItemField } from "./invoiceItemTableModel.ts";
 
 export function InvoiceItemColumnMenu({ hiddenColumnFields, defaultSpareColumnCount, onShowAll, onReset, onToggle }: {
@@ -8,6 +9,7 @@ export function InvoiceItemColumnMenu({ hiddenColumnFields, defaultSpareColumnCo
   onReset: () => void;
   onToggle: (field: EditableInvoiceItemField) => void;
 }) {
+  const columnLabels = useDocumentFieldLabels("item");
   const visibleCount = invoiceItemEditableColumns.length - hiddenColumnFields.size;
   return <details className="item-column-visibility-menu">
     <summary className="command-button secondary" title="显示/隐藏明细列" aria-label="显示/隐藏明细列">
@@ -25,7 +27,7 @@ export function InvoiceItemColumnMenu({ hiddenColumnFields, defaultSpareColumnCo
           const checked = !hiddenColumnFields.has(column.field);
           return <label className="item-column-option" key={column.field}>
             <input type="checkbox" checked={checked} disabled={checked && visibleCount <= 1} onChange={() => onToggle(column.field)} />
-            <span>{column.header}</span>
+            <span>{documentFieldLabel(columnLabels, column.field, column.header)}</span>
           </label>;
         })}
       </div>

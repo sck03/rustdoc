@@ -7,6 +7,22 @@ import {
   toDateInputValue,
 } from "../../ui/formUtils.ts";
 
+export const paymentExpenseFields = [
+  { field: "travelExpense", label: "差旅费" },
+  { field: "businessEntertainmentExpense", label: "业务招待费" },
+  { field: "telephoneExpense", label: "电话费" },
+  { field: "officeExpense", label: "办公费" },
+  { field: "repairExpense", label: "维修费" },
+  { field: "freightMiscExpense", label: "运杂费" },
+  { field: "inspectionExpense", label: "商检费" },
+  { field: "otherExpense", label: "其他费用" },
+] as const;
+export const paymentAmountFields = [{ field: "usdAmount", label: "USD 金额" }, { field: "cnyAmount", label: "CNY 金额" }, ...paymentExpenseFields] as const;
+
+export function calculatePaymentExpenseTotal(payment: ApiPaymentDto) {
+  return paymentExpenseFields.reduce((sum, { field }) => sum + (Number(payment[field]) || 0), 0);
+}
+
 export function createEmptyPayment(businessDate: string): ApiPaymentDto {
   const today = dateInputToApiDate(businessDate);
   if (!today) throw new Error("服务端业务日期无效。");
@@ -120,19 +136,7 @@ export function validatePaymentDraft(payment: ApiPaymentDto) {
   const overlong = textLimits.find(([value, maximumLength]) => (value?.trim().length ?? 0) > maximumLength);
   if (overlong) return `${overlong[2]}不能超过 ${overlong[1]} 个字符。`;
 
-  const amounts: Array<[number | undefined, string]> = [
-    [payment.usdAmount, "USD 金额"],
-    [payment.cnyAmount, "CNY 金额"],
-    [payment.travelExpense, "差旅费"],
-    [payment.businessEntertainmentExpense, "业务招待费"],
-    [payment.telephoneExpense, "电话费"],
-    [payment.officeExpense, "办公费"],
-    [payment.repairExpense, "维修费"],
-    [payment.freightMiscExpense, "运杂费"],
-    [payment.inspectionExpense, "商检费"],
-    [payment.otherExpense, "其他费用"],
-  ];
-  const negative = amounts.find(([value]) => Number(value ?? 0) < 0);
-  if (negative) return `${negative[1]}不能小于 0。`;
+  const negative = paymentAmountFields.find(({ field }) => Number(payment[field] ?? 0) < 0);
+  if (negative) return `${negative.label}不能小于 0。`;
   return null;
 }

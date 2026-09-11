@@ -1,0 +1,21 @@
+@layer route {
+  .document-editor-sections { display: grid; gap: 14px; min-width: 0; }
+  .document-editor-navigation { position: sticky; top: 0; z-index: 22; min-width: 0; background: var(--edm-surface); border: 1px solid var(--edm-line-strong); border-radius: 12px; }
+  .document-editor-navigation .document-editor-sticky-actions { position: static; gap: 12px; margin: 0; border: 0; border-radius: 12px 12px 0 0; background: transparent; }
+  .document-editor-navigation .document-editor-section-nav { position: static; gap: 8px; padding: 0 12px 8px; border: 0; border-radius: 0; background: transparent; }
+  .document-editor-tabs { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+  .document-editor-tabs [aria-selected="true"] { color: var(--edm-primary-750); background: var(--edm-primary-50); border-color: var(--edm-primary-500); }
+  .document-editor-tabs small { min-width: 20px; padding: 1px 4px; border-radius: 6px; background: var(--edm-surface-muted); font-size: var(--edm-font-size-xs); }
+  .document-editor-section-help { margin: 0; padding: 8px 12px; color: var(--text-secondary); background: var(--edm-surface-muted); border-top: 1px solid var(--edm-line); border-radius: 0 0 12px 12px; font-size: var(--edm-font-size-xs); line-height: 1.5; }
+  .document-editor-tab-panel[hidden] { display: none; }
+  .document-editor-tab-panel { scroll-margin-top: 190px; }
+  @media (max-width: 680px) {
+    .document-editor-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+    .document-editor-navigation .document-editor-sticky-actions > div > span { white-space: normal; }
+    .document-editor-navigation .invoice-uppercase-action { margin-left: 0; }
+    .document-editor-section-help { display: none; }
+  }
+  @media (max-height: 600px) {
+    .document-editor-navigation { position: static; }
+  }
+}

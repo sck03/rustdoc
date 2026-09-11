@@ -1,3 +1,5 @@
+using ExportDocManager.Models;
+
 namespace ExportDocManager.Services.Reporting
 {
     public sealed class ReportTemplateFieldCatalogService : IReportTemplateFieldCatalogService
@@ -55,7 +57,6 @@ namespace ExportDocManager.Services.Reporting
             Export("单据信息", "【内部】采购总额 (Purchase Amount)", "{{ Invoice.TotalPurchaseAmount }}"),
             Export("单据信息", "【内部】退税总额 (Tax Refund)", "{{ Invoice.TotalTaxRefundAmount }}"),
             Export("单据信息", "【内部】利润总额 (Total Profit)", "{{ Invoice.TotalProfit }}"),
-            .. SpareFields(ReportDocumentType.ExportDocument, "单据备用字段", "Invoice"),
             Export("商品明细", "商品款号 (Item Style No)", "{{ item.StyleNo }}"),
             Export("商品明细", "商品名称 (Item Name)", "{{ item.StyleName }}"),
             Export("商品明细", "商品描述 (Item Description)", "{{ item.Description }}"),
@@ -71,8 +72,7 @@ namespace ExportDocManager.Services.Reporting
             Export("商品明细", "单箱净重 (Item NW Per Ctn)", "{{ item.NWPerCtn }}"),
             Export("商品明细", "总毛重 (Item Total GW)", "{{ item.GWTotal }}"),
             Export("商品明细", "总净重 (Item Total NW)", "{{ item.NWTotal }}"),
-            Export("商品明细", "商品体积 (Item Volume)", "{{ item.Volume }}"),
-            .. SpareFields(ReportDocumentType.ExportDocument, "明细备用列", "item")
+            Export("商品明细", "商品体积 (Item Volume)", "{{ item.Volume }}")
         ];
 
         private static readonly IReadOnlyList<ReportTemplateFieldDescriptor> PaymentVoucherFields =
@@ -107,24 +107,25 @@ namespace ExportDocManager.Services.Reporting
             Payment("付款报销", "出运国 (Shipment Country)", "{{ Payment.ShipmentCountry }}"),
             Payment("付款报销", "出运日期 (Shipment Date)", "{{ Payment.ShipmentDate | date.to_string '%Y-%m-%d' }}"),
             Payment("付款报销", "收汇日期 (Remittance Date)", "{{ Payment.ReceiptDate | date.to_string '%Y-%m-%d' }}"),
-            Payment("付款报销", "备注 (Notes)", "{{ Payment.Notes }}"),
-            .. SpareFields(ReportDocumentType.PaymentVoucher, "付款备用字段", "Payment")
+            Payment("付款报销", "备注 (Notes)", "{{ Payment.Notes }}")
         ];
 
-        public ReportTemplateFieldCatalog GetFieldCatalog(ReportDocumentType reportType)
+        public ReportTemplateFieldCatalog GetFieldCatalog(ReportDocumentType reportType, DocumentFieldLabelSettings? labels = null)
         {
+            labels ??= new DocumentFieldLabelSettings();
             return new ReportTemplateFieldCatalog
             {
                 ReportType = reportType,
                 CategoryOrder = CategoryOrder,
                 Fields = reportType == ReportDocumentType.PaymentVoucher
-                    ? PaymentVoucherFields
-                    : ExportDocumentFields
+                    ? [.. PaymentVoucherFields, .. SpareFields(reportType, "付款备用字段", "Payment", labels.Payment)]
+                    : [.. ExportDocumentFields, .. SpareFields(reportType, "单据备用字段", "Invoice", labels.Invoice),
+                       .. SpareFields(reportType, "明细备用列", "item", labels.Item)]
             };
         }
 
-        private static IEnumerable<ReportTemplateFieldDescriptor> SpareFields(ReportDocumentType type, string category, string root) =>
-            Enumerable.Range(1, 10).Select(index => Field(type, category, $"备用 {index} ({root}.Spare{index})",
+        private static IEnumerable<ReportTemplateFieldDescriptor> SpareFields(ReportDocumentType type, string category, string root, IReadOnlyDictionary<string, string> labels) =>
+            Enumerable.Range(1, DocumentFieldLabelSettings.FieldCount).Select(index => Field(type, category, $"{DocumentFieldLabelSettings.GetLabel(labels, index)} ({root}.Spare{index})",
                 "{{ " + root + ".Spare" + index + " }}"));
 
         private static ReportTemplateFieldDescriptor Export(string category, string label, string value)

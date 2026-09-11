@@ -47,7 +47,7 @@ export function useReportTemplateWorkspaceQueries({
     queryKey: queryKeys.reportTemplateFields(reportType),
     queryFn: ({ signal }) => client.getReportTemplateFieldCatalog({ reportType }, { signal }),
     enabled: enabled && includeDesignerData,
-    staleTime: 60 * 60 * 1000,
+    staleTime: 0,
   });
 
   const previewInvoicesQuery = useQuery({

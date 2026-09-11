@@ -57,7 +57,7 @@ await esbuild.build({
     window.addEventListener('unhandledrejection', event => window.__designerErrors.push(String(event.reason)));
     const content = exportReportDesignerV3SchemaToHtml(schema, 'ExportDocument');
     const fieldCatalog={reportType:'ExportDocument',categoryOrder:['单据备用字段','明细备用列'],fields:['Invoice','item'].flatMap(root=>Array.from({length:10},(_,index)=>({
-      category:root==='Invoice'?'单据备用字段':'明细备用列',label:(root==='Invoice'?'发票':'明细')+'备用 '+(index+1),value:'{{ '+root+'.Spare'+(index+1)+' }}',reportType:'ExportDocument'})))};
+      category:root==='Invoice'?'单据备用字段':'明细备用列',label:index===9?(root==='Invoice'?'船名航次':'客户货号'):(root==='Invoice'?'发票':'明细')+'备用 '+(index+1),value:'{{ '+root+'.Spare'+(index+1)+' }}',reportType:'ExportDocument'})))};
     window.__designerHtml = content;
     createRoot(document.getElementById('root')).render(<div className="work-surface" style={{margin:'12px',padding:'8px'}}>
       <ReportDesignerV3Workspace reportType="ExportDocument" displayName="表格设计交互验证" content={content} fieldCatalog={fieldCatalog} editable={true} onDesignerDraftContentChange={html => {
@@ -234,8 +234,8 @@ try {
   await page.send("Page.navigate",{url});
   await waitFor(page,'document.querySelector("[data-v3-element-id=review-grid]")');
   await read(page,"[...document.querySelectorAll('button')].find(node=>node.textContent.trim()==='字段').click()");
-  await waitFor(page,`document.querySelector('[aria-label="插入字段 发票备用 10"]')`);
-  await click(page,'[aria-label="插入字段 发票备用 10"]');
+  await waitFor(page,`document.querySelector('[aria-label="插入字段 船名航次"]')`);
+  await click(page,'[aria-label="插入字段 船名航次"]');
   await waitFor(page,"window.__designerSchema.layers.flatMap(layer=>layer.elements).some(element=>element.fieldPath==='Invoice.Spare10')");
   assert(await read(page,"window.__designerHtml.includes('Invoice.Spare10')"));
   await captureScreenshot(page,path.join(output,'spare-field-picker.png'),{captureBeyondViewport:false});

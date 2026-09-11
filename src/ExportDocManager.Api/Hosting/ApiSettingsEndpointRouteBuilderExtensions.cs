@@ -1,5 +1,6 @@
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Errors;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace ExportDocManager.Api.Hosting
@@ -18,7 +19,7 @@ namespace ExportDocManager.Api.Hosting
             {
                 var user = ApiEndpointAuth.GetRequiredUser(context);
 
-                await settingsService.LoadAsync();
+                await settingsService.LoadAsync(context.RequestAborted);
                 return TypedResults.Ok(ApiSettingsDtoFactory.FromSettingsForUser(
                     settingsService.Settings,
                     authorizationService.CanManageSettings(user),
@@ -55,7 +56,7 @@ namespace ExportDocManager.Api.Hosting
                     return TypedResults.BadRequest(new ApiErrorResponse("设置校验请求体不能为空。"));
                 }
 
-                await settingsService.LoadAsync();
+                await settingsService.LoadAsync(context.RequestAborted);
                 return TypedResults.Ok(ApiSettingsDtoFactory.ValidateDraft(
                     request.Settings,
                     settingsService.Settings,
@@ -91,7 +92,7 @@ namespace ExportDocManager.Api.Hosting
                     return TypedResults.BadRequest(new ApiErrorResponse("设置请求体不能为空。"));
                 }
 
-                await settingsService.LoadAsync();
+                await settingsService.LoadAsync(context.RequestAborted);
                 var validation = ApiSettingsDtoFactory.ValidateDraft(
                     request.Settings,
                     settingsService.Settings,
@@ -110,19 +111,16 @@ namespace ExportDocManager.Api.Hosting
                             : errors));
                 }
 
-                var prepared = ApiSettingsDtoFactory.PrepareForSave(
-                    request.Settings,
-                    settingsService.Settings,
-                    request.UpdateSecrets);
-                bool requiresRestart = ApiSettingsDtoFactory.RequiresRestartForSystemSettingsChange(
-                    settingsService.Settings.System,
-                    prepared.System);
-
+                bool requiresRestart = false;
                 await settingsService.UpdateAsync(current =>
                 {
+                    if (current.Revision != request.Settings.Revision)
+                        throw new ServiceConcurrencyException("系统设置已被其他操作更新，请重新加载最新设置后再保存。");
+                    var prepared = ApiSettingsDtoFactory.PrepareForSave(request.Settings, current, request.UpdateSecrets);
+                    requiresRestart = ApiSettingsDtoFactory.RequiresRestartForSystemSettingsChange(current.System, prepared.System);
                     ApiSettingsDtoFactory.CopyInto(current, prepared);
                     return true;
-                });
+                }, context.RequestAborted);
 
                 return TypedResults.Ok(ApiSettingsDtoFactory.FromSavedSettings(
                     settingsService.Settings,

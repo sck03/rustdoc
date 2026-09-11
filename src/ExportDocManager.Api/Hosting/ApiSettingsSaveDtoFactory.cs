@@ -11,6 +11,7 @@ namespace ExportDocManager.Api.Hosting
         {
             var prepared = CloneSettings(requestSettings ?? new AppSettings());
             EnsureDefaults(prepared);
+            prepared.System.DocumentFieldLabels = DocumentFieldLabelSettings.Normalize(prepared.System.DocumentFieldLabels);
             EnsureDefaults(currentSettings);
 
             if (!updateSecrets)

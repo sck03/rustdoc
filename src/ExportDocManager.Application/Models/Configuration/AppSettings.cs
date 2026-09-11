@@ -8,6 +8,7 @@ namespace ExportDocManager.Models
 {
     public class AppSettings
     {
+        public long Revision { get; set; }
         public SystemSettings System { get; set; } = new SystemSettings();
         public ReportTemplateDefaults ReportTemplateDefaults { get; set; } = new ReportTemplateDefaults();
         public BatchExportSettings BatchExport { get; set; } = new BatchExportSettings();
@@ -192,6 +193,8 @@ namespace ExportDocManager.Models
         [DisplayName("商品明细默认显示备用列数")]
         [Description("默认显示前 0—10 个备用列，0 表示隐藏全部空备用列；已有内容的备用列自动显示")]
         public int ItemEntrySpareColumnCount { get; set; } = 0;
+
+        public DocumentFieldLabelSettings DocumentFieldLabels { get; set; } = new();
 
         [DisplayName("审计日志保留天数")]
         [Description("审计日志（数据库 AuditLogs）保留天数，超过天数自动清理（默认180，0表示不清理）")]

@@ -1,3 +1,4 @@
+using ExportDocManager.Models;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Infrastructure;
 
@@ -272,7 +273,7 @@ namespace ExportDocManager.Services.Reporting
 
     public interface IReportTemplateFieldCatalogService
     {
-        ReportTemplateFieldCatalog GetFieldCatalog(ReportDocumentType reportType);
+        ReportTemplateFieldCatalog GetFieldCatalog(ReportDocumentType reportType, DocumentFieldLabelSettings? labels = null);
     }
 
     public interface IReportTemplateImageResourceService

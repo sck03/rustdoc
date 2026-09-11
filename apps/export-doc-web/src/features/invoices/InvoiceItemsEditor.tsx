@@ -1,3 +1,4 @@
+import { documentFieldLabel, useDocumentFieldLabels } from "../../ui/DocumentFieldLabelsContext.tsx";
 import {
   type ClipboardEvent,
   type KeyboardEvent,
@@ -73,6 +74,7 @@ export function InvoiceItemsEditor({
   unitLookupMessage,
   unitOptions,
 }: InvoiceItemsEditorProps) {
+  const columnLabels = useDocumentFieldLabels("item");
   const [editorMessage, setEditorMessage] = useState<string | null>(null);
   const { unitCandidateDialog, setUnitCandidateDialog, isProductPickerOpen, setIsProductPickerOpen, isHsKnowledgeOpen, setIsHsKnowledgeOpen, productKeyword, setProductKeyword, selectedProductId, setSelectedProductId } = useInvoiceItemsEditorInteraction();
   const { hiddenColumnFields, setColumnVisible, showAllColumns, resetColumns } = useInvoiceItemColumnVisibility(items, defaultSpareColumnCount);
@@ -80,8 +82,10 @@ export function InvoiceItemsEditor({
   const historyItemsRef = useRef(items);
   const pendingHistoryInvalidationRef = useRef<number | null>(null);
   const visibleColumns = useMemo(
-    () => invoiceItemEditableColumns.filter((column) => !hiddenColumnFields.has(column.field)),
-    [hiddenColumnFields],
+    () => invoiceItemEditableColumns.filter((column) => !hiddenColumnFields.has(column.field)).map((column) => ({
+      ...column, header: documentFieldLabel(columnLabels, column.field, column.header), ariaName: documentFieldLabel(columnLabels, column.field, column.ariaName),
+    })),
+    [columnLabels, hiddenColumnFields],
   );
   const unitCandidateLookup = useMemo(() => buildUnitCandidateLookup(unitOptions ?? []), [unitOptions]);
   const itemEditContextRef = useRef({ onChangeItem, readOnly, unitCandidateLookup });
@@ -545,7 +549,7 @@ export function InvoiceItemsEditor({
       removeFieldFromSelection(field);
     }
 
-    setEditorMessage(`${isHidden ? "已显示" : "已隐藏"}${column?.header ?? "明细"}列。`);
+    setEditorMessage(`${isHidden ? "已显示" : "已隐藏"}${documentFieldLabel(columnLabels, field, column?.header ?? "明细")}列。`);
   }
 
   function showAllInvoiceItemColumns() {

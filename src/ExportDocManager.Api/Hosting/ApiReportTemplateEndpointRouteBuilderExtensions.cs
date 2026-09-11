@@ -110,10 +110,11 @@ namespace ExportDocManager.Api.Hosting
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
 
-            endpoints.MapGet("/api/reports/templates/fields", (
+            endpoints.MapGet("/api/reports/templates/fields", async (
                 HttpContext context,
                 ApiAuthorizationService authorizationService,
                 IReportTemplateFieldCatalogService fieldCatalogService,
+                ISettingsService settingsService,
                 string? reportType) =>
             {
 
@@ -126,7 +127,8 @@ namespace ExportDocManager.Api.Hosting
                     return Results.StatusCode(StatusCodes.Status403Forbidden);
                 }
 
-                var catalog = fieldCatalogService.GetFieldCatalog(parsedReportType);
+                await settingsService.LoadAsync(context.RequestAborted);
+                var catalog = fieldCatalogService.GetFieldCatalog(parsedReportType, settingsService.Settings.System.DocumentFieldLabels);
                 return Results.Ok(ToApiReportTemplateFieldCatalogDto(catalog));
             })
             .WithName("GetReportTemplateFieldCatalog")

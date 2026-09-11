@@ -295,7 +295,7 @@ try {
           serviceUnavailableNoticeMatches,
           invoiceDetailColumnCount: ${JSON.stringify(pageName)} === "invoice" ? document.querySelectorAll(".item-editor-table thead th").length : null,
           workspaceNavigation: isShelllessPage ? true : visible(".workspace-nav"),
-          expectedStickyControl: ${JSON.stringify(pageName)} === "invoice" ? visible(".invoice-editor-sticky-actions")
+          expectedStickyControl: ${JSON.stringify(pageName)} === "invoice" ? visible(".document-editor-sticky-actions")
             : ${JSON.stringify(pageName)} === "report" ? visible(".report-template-sticky-header") : true,
           expectedDialog: ${JSON.stringify(pageName)} === "dialog" ? visible('[role="dialog"][aria-modal="true"]') : true,
         };

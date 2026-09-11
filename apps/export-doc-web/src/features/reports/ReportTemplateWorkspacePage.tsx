@@ -697,10 +697,9 @@ export function ReportTemplateWorkspacePage({
        reportType={reportType}
        selectionPanel={selectionPanelProps}
        exportDefaultsPanel={{
-         settings: exportDefaults.settings,
+         ...exportDefaults,
          canManageSettings,
          isBusy: isBusy || exportDefaults.isBusy,
-         isDirty: exportDefaults.isDirty,
          onChange: handleExportSettingsChange,
          onSave: handleSaveExportSettings,
          templates,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CreditCard, RefreshCw, Save, Settings } from "lucide-react";
+import { CreditCard, RefreshCw, Settings } from "lucide-react";
 import { ApiPayeeDto, ApiPaymentDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { DateField, EditableComboField, NumberField, SelectField, TextAreaField, TextField } from "../../ui/FormFields.tsx";
 import { formatAmount } from "../../ui/formUtils.ts";
@@ -8,6 +8,7 @@ import { RemoteSelectField } from "../../ui/RemoteSelectField.tsx";
 import { CustomOptionMap, getCustomOptions } from "../custom-options/customOptionModel.ts";
 import { DocumentSpareFieldsPanel } from "../../ui/DocumentSpareFieldsPanel.tsx";
 import { CustomOptionSelectField } from "../custom-options/CustomOptionSelectField.tsx";
+import { paymentAmountFields } from "./paymentModel.ts";
 
 type PaymentPatch = Partial<ApiPaymentDto>;
 
@@ -109,10 +110,6 @@ export function PaymentBasicInfoPanel({
               <span>收款方资料</span>
             </button>
           ) : null}
-          <button className="command-button" type="submit" disabled={isBusy}>
-            <Save size={17} aria-hidden="true" />
-            <span>保存</span>
-          </button>
         </div>
       </div>
       {referenceDataMessage ? <InlineNotice tone="warning" title="参考资料未完整加载">{referenceDataMessage}</InlineNotice> : null}
@@ -199,7 +196,7 @@ export function PaymentBusinessInfoPanel({
         <DateField label="出运日期" value={payment.shipmentDate} onChange={(value) => onChange({ shipmentDate: value })} />
         <TextAreaField className="field-grid-span-2" label="备注" value={payment.notes ?? ""} onChange={(value) => onChange({ notes: value })} />
       </div>
-      <DocumentSpareFieldsPanel label="付款备用字段" value={payment} onChange={onChange} />
+      <DocumentSpareFieldsPanel group="payment" label="付款备用字段" value={payment} onChange={onChange} />
     </section>
   );
 }
@@ -221,24 +218,7 @@ export function PaymentAmountsPanel({
         </div>
       </div>
       <div className="field-grid">
-        <NumberField label="USD 金额" value={payment.usdAmount} onChange={(value) => onChange({ usdAmount: value })} />
-        <NumberField label="CNY 金额" value={payment.cnyAmount} onChange={(value) => onChange({ cnyAmount: value })} />
-        <NumberField label="差旅费" value={payment.travelExpense} onChange={(value) => onChange({ travelExpense: value })} />
-        <NumberField
-          label="业务招待费"
-          value={payment.businessEntertainmentExpense}
-          onChange={(value) => onChange({ businessEntertainmentExpense: value })}
-        />
-        <NumberField label="电话费" value={payment.telephoneExpense} onChange={(value) => onChange({ telephoneExpense: value })} />
-        <NumberField label="办公费" value={payment.officeExpense} onChange={(value) => onChange({ officeExpense: value })} />
-        <NumberField label="维修费" value={payment.repairExpense} onChange={(value) => onChange({ repairExpense: value })} />
-        <NumberField
-          label="运杂费"
-          value={payment.freightMiscExpense}
-          onChange={(value) => onChange({ freightMiscExpense: value })}
-        />
-        <NumberField label="商检费" value={payment.inspectionExpense} onChange={(value) => onChange({ inspectionExpense: value })} />
-        <NumberField label="其他费用" value={payment.otherExpense} onChange={(value) => onChange({ otherExpense: value })} />
+        {paymentAmountFields.map(({ field, label }) => <NumberField key={field} label={label} value={payment[field]} onChange={(value) => onChange({ [field]: value })} />)}
       </div>
     </section>
   );

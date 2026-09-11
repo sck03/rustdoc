@@ -61,6 +61,12 @@ namespace ExportDocManager.Api.Tests
 
             var requestedSettings = CloneSettings(settingsResponse.Settings);
             requestedSettings.System.AppName = "Settings Endpoint Smoke";
+            requestedSettings.System.DocumentFieldLabels = new()
+            {
+                Invoice = new() { ["spare1"] = "船名航次" },
+                Item = new() { ["spare10"] = "客户货号" },
+                Payment = new() { ["spare1"] = "费用归属" }
+            };
             requestedSettings.System.UpdaterEndpoint = "http://updates.internal:8080/desktop/latest.json";
             requestedSettings.System.DefaultExportDirectory = Path.Combine(harness.DataRoot, "Exports", "Configured");
             requestedSettings.ReportTemplateDefaults = new ReportTemplateDefaults
@@ -115,6 +121,17 @@ namespace ExportDocManager.Api.Tests
             Assert.True(saved.Success);
             Assert.False(saved.RequiresRestart);
             Assert.Equal("Settings Endpoint Smoke", saved.Settings.System.AppName);
+            Assert.Equal(settingsResponse.Settings.Revision + 1, saved.Settings.Revision);
+            var shared = await operatorClient.GetFromJsonAsync<ApiSettingsResponse>("/api/settings");
+            Assert.Equal("船名航次", shared!.Settings.System.DocumentFieldLabels.Invoice["spare1"]);
+            Assert.Equal("客户货号", shared.Settings.System.DocumentFieldLabels.Item["spare10"]);
+            Assert.Equal("费用归属", shared.Settings.System.DocumentFieldLabels.Payment["spare1"]);
+            var staleSave = await adminClient.PutAsJsonAsync("/api/settings", new { settings = requestedSettings, updateSecrets = false });
+            Assert.Equal(HttpStatusCode.Conflict, staleSave.StatusCode);
+            var catalogResponse = await adminClient.GetAsync("/api/reports/templates/fields?reportType=ExportDocument");
+            Assert.Equal(HttpStatusCode.OK, catalogResponse.StatusCode);
+            var catalog = await ApiIntegrationTestHarness.ReadJsonAsync<ApiReportTemplateFieldCatalogResponse>(catalogResponse);
+            Assert.Contains(catalog.Fields, field => field.Label == "船名航次 (Invoice.Spare1)" && field.Value == "{{ Invoice.Spare1 }}");
             Assert.Equal("http://updates.internal:8080/desktop/latest.json", saved.Settings.System.UpdaterEndpoint);
             Assert.Empty(saved.Settings.System.DefaultExportDirectory);
             Assert.True(File.Exists(settingsPath));

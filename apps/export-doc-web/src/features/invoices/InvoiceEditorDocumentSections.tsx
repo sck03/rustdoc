@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { useDocumentEditorValidation } from "../../ui/useDocumentEditorValidation.ts";
 import type {
   ApiCustomerDto,
   ApiExporterDto,
@@ -127,34 +128,9 @@ export function InvoiceEditorDocumentSections({
   onClearPageMessages,
   onLetterOfCreditBusyChange,
 }: InvoiceEditorDocumentSectionsProps) {
-  const [validationMessage, setValidationMessage] = useState<string | null>(null);
-  const invalidField = useRef<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>(null);
-  useLayoutEffect(() => {
-    const field = invalidField.current;
-    if (field && !field.closest<HTMLElement>("[role=tabpanel]")?.hidden) {
-      field.focus();
-      invalidField.current = null;
-    }
-  }, [activeSection, validationMessage]);
-  function revealInvalidField(event: FormEvent<HTMLDivElement>) {
-    const field = event.target;
-    if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) return;
-    event.preventDefault();
-    if (invalidField.current) return;
-    invalidField.current = field;
-    const section = field.closest<HTMLElement>("[data-invoice-section]")?.dataset.invoiceSection;
-    onNavigate(readInvoiceEditorSection(section ?? null));
-    for (let parent = field.parentElement; parent; parent = parent.parentElement) {
-      if (parent instanceof HTMLDetailsElement) parent.open = true;
-    }
-    setValidationMessage(`${field.closest("label")?.querySelector(".form-field-label")?.textContent?.replace("必填", "") || "字段"}：${field.validationMessage}`);
-    if (!field.closest<HTMLElement>("[role=tabpanel]")?.hidden) {
-      field.focus();
-      invalidField.current = null;
-    }
-  }
+  const { validationMessage, revealInvalidField, clearValidationMessage } = useDocumentEditorValidation(activeSection, onNavigate, readInvoiceEditorSection);
   return (
-    <div className="invoice-editor-sections" onInvalidCapture={revealInvalidField} onInputCapture={() => setValidationMessage(null)}>
+    <div className="document-editor-sections" onInvalidCapture={revealInvalidField} onInputCapture={clearValidationMessage}>
       <InvoiceEditorNavigation
         invoiceNo={invoice.invoiceNo || ""}
         isNew={invoiceId <= 0}

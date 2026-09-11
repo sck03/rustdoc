@@ -17,7 +17,7 @@ import {
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
-import { readApiError } from "../../ui/formUtils.ts";
+import { isConcurrencyConflict, readApiError } from "../../ui/formUtils.ts";
 import { SecretToggle, readSettingString } from "./SettingsFieldControls.tsx";
 import { singleWindowCustomsCooAplAddPath, singleWindowCustomsCooFetchPlacePath, singleWindowCustomsCooOrgCodePath } from "./settingsConfigurationPaths.ts";
 import { cloneSettings, normalizeCurrencyList, normalizeSettingText, setNestedValue } from "./settingsValueUtils.ts";
@@ -26,7 +26,7 @@ import { isDesktopBridgeAvailable, selectDirectory } from "../../desktop/desktop
 import { filterSettingsCategories, settingsCategories, type SettingsCategoryKey } from "./settingsCategoryCatalog.ts";
 import { readSettingsCategoryFromSearch, readSettingsPanelLabelFromSearch } from "./settingsNavigationModel.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
-import { InlineNotice, PageState } from "../../ui/PageState.tsx";
+import { ConcurrencyConflictNotice, InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useSettingsMaintenanceActions } from "./useSettingsMaintenanceActions.ts";
 import { useSettingsDraftSync } from "./useSettingsDraftSync.ts";
@@ -99,6 +99,7 @@ export function SettingsPage({
     readSettingsCategoryFromSearch(location.search, availableSettingsCategoryKeys),
   );
   const queryClient = useQueryClient();
+  const [concurrencyMessage, setConcurrencyMessage] = useState<string | null>(null);
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
@@ -154,6 +155,7 @@ export function SettingsPage({
         },
       }),
     onSuccess: async (response) => {
+      setConcurrencyMessage(null);
       setSettings(response.settings as unknown as SettingsRecord);
       setMessage(null);
       setSuccessMessage(response.requiresRestart ? `${response.message} 需要重启后生效。` : response.message || "设置已保存。");
@@ -165,10 +167,14 @@ export function SettingsPage({
         settings: response.settings,
         storagePolicy: settingsQuery.data?.storagePolicy ?? "",
       });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.settings() }),
+        ...["ExportDocument", "PaymentVoucher"].map((type) => queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplateFields(type) })),
+      ]);
     },
     onError: (error) => {
-      setMessage(readApiError(error));
+      setConcurrencyMessage(isConcurrencyConflict(error) ? readApiError(error) : null);
+      setMessage(isConcurrencyConflict(error) ? null : readApiError(error));
       setSuccessMessage(null);
     },
   });
@@ -511,6 +517,17 @@ export function SettingsPage({
     }
   }
 
+  async function handleReloadSettings() {
+    if (!await confirmDiscardChanges("重新加载系统设置")) return;
+    const response = await settingsQuery.refetch();
+    if (!response.data || response.isError) return;
+    setSettings(response.data.settings as unknown as SettingsRecord);
+    setHasUnsavedChanges(false);
+    setConcurrencyMessage(null);
+    setUpdateSecrets(false);
+    setValidationResult(null);
+  }
+
   function handleRefreshExchangeCurrencies() {
     if (!canManageSettings || isBusy) {
       return;
@@ -535,6 +552,7 @@ export function SettingsPage({
   return (
     <section className="editor-surface settings-surface" aria-label="设置">
       {message ? <InlineNotice tone="error" title="设置未保存">{message}</InlineNotice> : null}
+      {concurrencyMessage && <ConcurrencyConflictNotice message={concurrencyMessage} isBusy={settingsQuery.isFetching} onReload={() => void handleReloadSettings()} />}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {!settings && isBusy ? <PageState tone="loading" title="正在加载系统设置" description="请稍候，系统正在读取运行目录、数据库和业务配置。" /> : null}
 
@@ -549,7 +567,7 @@ export function SettingsPage({
             </div>
             <div className="toolbar-actions settings-command-actions">
               <SecretToggle checked={updateSecrets} disabled={!canManageSettings} onChange={setUpdateSecrets} />
-              <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void settingsQuery.refetch()}>
+              <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void handleReloadSettings()}>
                 <RefreshCw size={18} aria-hidden="true" />
               </button>
               <button className="command-button secondary" type="button" disabled={isBusy || !canManageSettings} onClick={handleRestoreSystemDefaults}>
