@@ -104,7 +104,7 @@ export function SecretToggle({ checked, disabled, onChange }: { checked: boolean
   return (
     <label className="inline-check">
       <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
-      <span>更新敏感字段</span>
+      <span>更新密码或密钥（留空保留）</span>
     </label>
   );
 }

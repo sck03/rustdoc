@@ -2260,6 +2260,8 @@ namespace ExportDocManager.Api.Tests
                         ]).Inspect());
                 var publicResponse = ApiHealthResponseFactory.CreatePublic(new DatabaseConnectionSettings());
 
+                Assert.Equal("Sqlite", response.DatabaseProviderKey);
+                Assert.Equal(response.DatabaseProviderKey, publicResponse.DatabaseProviderKey);
                 Assert.Equal("ok", response.Status);
                 Assert.False(string.IsNullOrWhiteSpace(response.ProductVersion));
                 Assert.False(string.IsNullOrWhiteSpace(response.InformationalVersion));

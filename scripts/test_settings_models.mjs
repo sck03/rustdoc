@@ -18,7 +18,7 @@ const runtimeDependencyDiagnosticsPath = path.join(repoRoot, "apps", "export-doc
 const reportTemplateSelectionPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "reportTemplateSelectionModel.ts").replaceAll("\\", "/");
 const updaterEndpointModelPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "system", "updaterEndpointModel.ts").replaceAll("\\", "/");
 const masterDataModelPath = path.join(repoRoot, "apps", "export-doc-web", "src", "features", "master-data", "masterDataModel.ts").replaceAll("\\", "/");
-fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as navigation from ${JSON.stringify(navigationPath)}; import * as categoryCatalog from ${JSON.stringify(categoryCatalogPath)}; import * as runtimeDiagnostics from ${JSON.stringify(runtimeDiagnosticsPath)}; import * as runtimeDependencyDiagnostics from ${JSON.stringify(runtimeDependencyDiagnosticsPath)}; import * as reportTemplateSelection from ${JSON.stringify(reportTemplateSelectionPath)}; import * as updaterEndpointModel from ${JSON.stringify(updaterEndpointModelPath)}; import * as masterDataModel from ${JSON.stringify(masterDataModelPath)}; globalThis.__model = model; globalThis.__navigation = navigation; globalThis.__categoryCatalog = categoryCatalog; globalThis.__runtimeDiagnostics = runtimeDiagnostics; globalThis.__runtimeDependencyDiagnostics = runtimeDependencyDiagnostics; globalThis.__reportTemplateSelection = reportTemplateSelection; globalThis.__updaterEndpointModel = updaterEndpointModel; globalThis.__masterDataModel = masterDataModel;`, "utf8");
+fs.writeFileSync(entry, `import * as draft from ${JSON.stringify(path.join(path.dirname(modelPath), "settingsDraftModel.ts"))}; globalThis.__draft = draft; import * as model from ${JSON.stringify(modelPath)}; import * as navigation from ${JSON.stringify(navigationPath)}; import * as categoryCatalog from ${JSON.stringify(categoryCatalogPath)}; import * as runtimeDiagnostics from ${JSON.stringify(runtimeDiagnosticsPath)}; import * as runtimeDependencyDiagnostics from ${JSON.stringify(runtimeDependencyDiagnosticsPath)}; import * as reportTemplateSelection from ${JSON.stringify(reportTemplateSelectionPath)}; import * as updaterEndpointModel from ${JSON.stringify(updaterEndpointModelPath)}; import * as masterDataModel from ${JSON.stringify(masterDataModelPath)}; globalThis.__model = model; globalThis.__navigation = navigation; globalThis.__categoryCatalog = categoryCatalog; globalThis.__runtimeDiagnostics = runtimeDiagnostics; globalThis.__runtimeDependencyDiagnostics = runtimeDependencyDiagnostics; globalThis.__reportTemplateSelection = reportTemplateSelection; globalThis.__updaterEndpointModel = updaterEndpointModel; globalThis.__masterDataModel = masterDataModel;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -64,7 +64,7 @@ assert(navigation.readSettingsCategoryFromSearch("?section=updater") === "runtim
 assert(navigation.readSettingsPanelLabelFromSearch("?section=updater") === "软件更新", "updater panel deep link");
 assert(navigation.readSettingsPanelLabelFromSearch("?section=unknown") === null, "unknown panel");
 const salesEditionCategories = categoryCatalog.filterSettingsCategories({ canUseDocumentWorkspace: false });
-assert(JSON.stringify(salesEditionCategories.map((item) => item.key)) === JSON.stringify(["runtime", "exchange-rate", "communication", "maintenance"]), "sales edition settings are focused on common runtime tasks");
+assert(JSON.stringify(salesEditionCategories.map((item) => item.key)) === JSON.stringify(["runtime", "exchange-rate", "communication", "backup", "maintenance"]), "sales edition settings are focused on common runtime tasks");
 const documentEditionCategories = categoryCatalog.filterSettingsCategories({ canUseDocumentWorkspace: true });
 assert(!documentEditionCategories.some((item) => item.key === "report-output"), "settings center no longer exposes report and output settings");
 assert(!documentEditionCategories.some((item) => item.key === "users"), "single-role edition hides user management");
@@ -159,4 +159,26 @@ const runtimeDependencySummary = runtimeDependencyDiagnostics.summarizeRuntimeDe
 assert(runtimeDependencySummary.total === 2 && runtimeDependencySummary.ready === 1, "runtime dependency summary");
 assert(runtimeDependencySummary.featureUnavailable === 0 && runtimeDependencySummary.optionalUnavailable === 1, "optional runtime dependency summary");
 assert(runtimeDependencyDiagnostics.runtimeDependencyStatusLabel("incomplete") === "文件不完整", "runtime dependency status label");
+const draft = globalThis.__draft;
+for (const section of ["documents", "documentDefaults", "documentFields"]) {
+  assert(navigation.readSettingsCategoryFromSearch("?section=" + section) === "documents", "document settings category");
+  assert(navigation.readSettingsCategoryFromSearch("?section=" + section, salesEditionCategories.map(item => item.key)) === "runtime", "document deep link is filtered");
+}
+for (const section of ["backup", "backupPolicy", "webDav", "postgresql"]) {
+  assert(navigation.readSettingsCategoryFromSearch("?section=" + section) === "backup", "backup tools are consolidated");
+}
+assert(navigation.readDocumentFieldGroup("?group=payment") === "payment", "payment group deep link");
+assert(navigation.readDocumentFieldGroup("?group=unknown") === "invoice", "invalid group fallback");
+assert(navigation.readSettingsPanelLabelFromSearch("?section=logs") === "日志管理", "log maintenance deep link");
+const before = { revision: 1, system: { appName: "App", logRetentionDays: 30, documentFieldLabels: { invoice: { spare1: "旧名" }, item: {}, payment: {} } }, email: { smtpHost: "old" } };
+const after = structuredClone(before);
+after.system.documentFieldLabels.invoice.spare1 = "新名"; after.email.smtpHost = "new";
+assert(JSON.stringify(draft.changedSettingsCategories(before, after).map(item => item.key)) === JSON.stringify(["documents", "communication"]), "changes across categories");
+after.system.documentFieldLabels.invoice.spare1 = "旧名"; after.email.smtpHost = "old"; after.revision = 2;
+assert(draft.changedSettingsCategories(before, after).length === 0, "undo clears dirty categories and revision is not editable content");
+assert(draft.settingsCategoryForPath(["system", "defaultTemplateExporterNameCn"]) === "excel-import", "exporter default belongs to Excel");
+assert(draft.settingsCategoryForPath(["system", "postgreSqlAutoBackupTime"]) === "backup", "backup schedule ownership");
+assert(draft.settingsCategoryForPath(["system", "auditLogRetentionDays"]) === "maintenance", "audit retention ownership");
+assert(!draft.categoryHasSecrets("documents", "PostgreSQL") && !draft.categoryHasSecrets("runtime", "Sqlite"), "no unrelated secret toggle");
+assert(draft.categoryHasSecrets("runtime", "PostgreSQL") && draft.categoryHasSecrets("backup"), "relevant secret toggles");
 process.stdout.write("settings-model tests passed\n");

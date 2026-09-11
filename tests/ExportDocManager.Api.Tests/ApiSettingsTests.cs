@@ -316,7 +316,7 @@ namespace ExportDocManager.Api.Tests
         }
 
         [Fact]
-        public void PrepareForSave_WhenSecretsAreUpdated_ShouldUseRequestSecrets()
+        public void PrepareForSave_WhenSecretsAreUpdated_ShouldReplaceOnlyNonEmptyRequestSecrets()
         {
             var current = new AppSettings
             {
@@ -341,7 +341,28 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("new-email", prepared.Email.Password);
             Assert.Equal("new-webdav", prepared.WebDav.Password);
             Assert.Equal("new-ai", prepared.AI.ApiKey);
-            Assert.Equal(string.Empty, prepared.System.PostgreSqlPassword);
+            Assert.Equal("current-pg", prepared.System.PostgreSqlPassword);
+        }
+
+        [Fact]
+        public void PrepareForSave_WhenOneCategoryUpdatesPassword_ShouldPreserveOtherCategories()
+        {
+            var current = new AppSettings
+            {
+                Email = new EmailConfig { Password = "current-email" },
+                WebDav = new WebDavSettings { Password = "current-webdav" },
+                AI = new AISettings { ApiKey = "current-ai" },
+                System = new SystemSettings { PostgreSqlPassword = "current-pg" }
+            };
+            var request = ApiSettingsDtoFactory.FromSettings(current).Settings;
+            request.Email.Password = "new-email";
+
+            var prepared = ApiSettingsDtoFactory.PrepareForSave(request, current, updateSecrets: true);
+
+            Assert.Equal("new-email", prepared.Email.Password);
+            Assert.Equal("current-webdav", prepared.WebDav.Password);
+            Assert.Equal("current-ai", prepared.AI.ApiKey);
+            Assert.Equal("current-pg", prepared.System.PostgreSqlPassword);
         }
 
         [Fact]

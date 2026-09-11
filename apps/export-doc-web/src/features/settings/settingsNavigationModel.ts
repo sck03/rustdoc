@@ -10,6 +10,11 @@ export function readSettingsCategoryFromSearch(
 ): SettingsCategoryKey {
   let category: SettingsCategoryKey;
   switch (readSettingsSection(search)) {
+    case "documents":
+    case "documentDefaults":
+    case "documentFields":
+      category = "documents";
+      break;
     case "excelImport":
       category = "excel-import";
       break;
@@ -19,9 +24,13 @@ export function readSettingsCategoryFromSearch(
       category = "exchange-rate";
       break;
     case "email":
+      category = "communication";
+      break;
     case "webDav":
     case "backup":
-      category = "communication";
+    case "backupPolicy":
+    case "postgresql":
+      category = "backup";
       break;
     case "singleWindow":
     case "ai":
@@ -29,7 +38,7 @@ export function readSettingsCategoryFromSearch(
       break;
     case "maintenance":
     case "diagnostics":
-    case "postgresql":
+    case "logs":
     case "ownership":
     case "support":
     case "validation":
@@ -48,6 +57,11 @@ export function readSettingsCategoryFromSearch(
 
 export function readSettingsPanelLabelFromSearch(search: string) {
   switch (readSettingsSection(search)) {
+    case "documents":
+    case "documentDefaults":
+      return "发票录入默认值";
+    case "documentFields":
+      return "单据字段名称";
     case "excelImport":
       return "Excel 导入方案";
     case "exchangeRate":
@@ -55,8 +69,11 @@ export function readSettingsPanelLabelFromSearch(search: string) {
     case "currencies":
       return "汇率与币制";
     case "email":
+      return "邮件设置";
     case "webDav":
-      return "邮件与备份";
+      return "WebDAV 云备份";
+    case "backupPolicy":
+      return "备份计划与保留";
     case "backup":
       return "数据备份与还原";
     case "singleWindow":
@@ -64,7 +81,9 @@ export function readSettingsPanelLabelFromSearch(search: string) {
     case "ai":
       return "AI 设置";
     case "postgresql":
-      return "PostgreSQL";
+      return "PostgreSQL 团队库维护";
+    case "logs":
+      return "日志管理";
     case "diagnostics":
       return "运行诊断";
     case "support":
@@ -72,11 +91,24 @@ export function readSettingsPanelLabelFromSearch(search: string) {
     case "ownership":
       return "数据归属改派";
     case "database":
+      return "数据库连接";
     case "system":
-      return "系统与数据库";
+      return "常规与目录";
     case "updater":
       return "软件更新";
     default:
       return null;
   }
+}
+
+export const documentFieldGroups = [
+  { value: "invoice", label: "发票表头" },
+  { value: "item", label: "商品明细" },
+  { value: "payment", label: "付款报销" },
+] as const;
+export type DocumentFieldGroup = typeof documentFieldGroups[number]["value"];
+
+export function readDocumentFieldGroup(search: string): DocumentFieldGroup {
+  const group = new URLSearchParams(search).get("group");
+  return documentFieldGroups.find((item) => item.value === group)?.value ?? "invoice";
 }

@@ -1,0 +1,33 @@
+.settings-section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.settings-category-panel .document-settings-fields {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  max-width: 60rem;
+}
+
+.settings-category-panel .form-field-description {
+  overflow-wrap: anywhere;
+}
+
+.settings-category-item .settings-dirty-marker {
+  margin-inline-start: auto;
+  font-size: .75rem;
+  color: inherit;
+}
+
+.settings-command-heading {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-command-heading .settings-save-status {
+  color: var(--edm-neutral-650);
+}
+
+.settings-command-heading .settings-save-status[data-dirty="true"] {
+  color: var(--edm-warning-700);
+}

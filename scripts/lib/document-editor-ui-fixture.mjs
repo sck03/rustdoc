@@ -25,7 +25,8 @@ const date='2026-09-11';
 window.__calls=[]; window.__errors=[]; window.__failCustomOption=false;
 addEventListener('error',event=>window.__errors.push(event.message));
 addEventListener('unhandledrejection',event=>window.__errors.push(String(event.reason)));
-let settings={revision:0,batchExport:{items:[],mergePdf:false,zipAfterExport:false,outputFileNamePattern:'发票号',outputFolderPattern:'发票号'},system:{itemEntryBlankRowCount:3,itemEntrySpareColumnCount:Number(params.get('spares')||0),documentFieldLabels:params.has('renamed')
+const provider=params.get('provider')||'Sqlite';
+let settings={revision:0,email:{smtpHost:'mail.example.test',smtpPort:587,password:''},webDav:{url:'',password:'',enabled:false},batchExport:{items:[],mergePdf:false,zipAfterExport:false,outputFileNamePattern:'发票号',outputFolderPattern:'发票号'},system:{appName:'单据工作台',databaseProvider:provider,sqliteDatabaseFileName:'data.db',postgreSqlHost:'database.example.test',postgreSqlAutoBackupSchedule:'Daily',postgreSqlAutoBackupTime:'02:00',backupRetentionDays:0,logRetentionDays:30,itemEntryBlankRowCount:3,itemEntrySpareColumnCount:Number(params.get('spares')||0),documentFieldLabels:params.has('renamed')
   ?{invoice:{spare1:'船名航次'},item:{spare1:'材质规格',spare10:'客户货号'},payment:{spare1:'费用归属'}}:{invoice:{},item:{},payment:{}}}};
 let invoice={...createEmptyInvoice(date),id:7,invoiceNo:'INV-2026-091',customerNameEN:'NORTHSTAR TRADING',exporterNameEN:'BRIDGE EXPORT',exporterNameCN:'示例出口公司',currency:'USD',rowVersion:1,
   items:[{...createEmptyInvoiceItem(7),styleNo:'STYLE-091',styleName:'COTTON SHIRT',quantity:5,unitPrice:10,totalPrice:50,spare10:params.has('populated')?'保留原始备注':''}],totalAmount:50};
@@ -40,6 +41,14 @@ const savePayment=(name,input)=>{
   payment={...input.body,id:9,rowVersion:(payment.rowVersion||0)+1};return record(name,input,{id:9,payment});
 };
 const client={
+  getHealth:()=>window.__failHealth?Promise.reject(new Error('运行状态暂时不可用')):record('getHealth',{}, {databaseProvider:provider==='PostgreSQL'?'当前是数据库共享模式（PostgreSQL）':'当前是单机模式（SQLite）',databaseProviderKey:provider}),
+  listDatabaseBackups:()=>record('listDatabaseBackups',{}, {backupRoot:'App_Data/Backups',backups:[]}),
+  getCloudBackupStatus:()=>record('getCloudBackupStatus',{}, {enabled:false,isConfigured:false}),
+  listPostgreSqlPhysicalBackups:()=>record('listPostgreSqlPhysicalBackups',{}, {status:{postgreSqlConfigured:true,toolsReady:true},backups:[]}),
+  getServerMigrationStatus:()=>record('getServerMigrationStatus',{}, {supported:true,toolsReady:true,pendingRestore:false}),
+  cleanupSystemLogs:()=>record('cleanupSystemLogs',{}, {message:'日志清理已完成。'}),
+  testEmailConnection:()=>record('testEmailConnection',{}, {message:'邮件连接正常。'}),
+  testCloudBackupConnection:()=>record('testCloudBackupConnection',{}, {message:'WebDAV 连接正常。'}),
   getInvoice:input=>record('getInvoice',input,invoice),listInvoiceStatusHistory:()=>Promise.resolve([]),
   createInvoice:input=>saveInvoice('createInvoice',input),updateInvoice:input=>saveInvoice('updateInvoice',input),
   getPayment:input=>{if(window.__failPaymentReload){window.__failPaymentReload=false;return Promise.reject(new Error('付款读取失败'));}return record('getPayment',input,payment);},
@@ -77,7 +86,7 @@ function ExportDefaultsFixture(){
 }
 const grants=['document.invoices','document.payments','document.master-data','document.reports','document.excel'].map(moduleKey=>({moduleKey,accessLevel:readonly?'view':'manage'}));
 const permissions=Object.values(permissionResources).flatMap(resourceKey=>Object.values(permissionActions).map(action=>({resourceKey,action,dataScope:'all'})));
-const entry=mode==='payment'?'/payments/9':mode==='payment-new'?'/payments/new':mode==='settings'?'/settings':mode==='export-defaults'?'/export-defaults':mode==='edit'?'/invoices/7':'/invoices/new';
+const entry=mode==='payment'?'/payments/9':mode==='payment-new'?'/payments/new':mode==='settings'?'/settings?'+new URLSearchParams({section:params.get('section')||'documentDefaults',group:params.get('group')||'invoice'}):mode==='export-defaults'?'/export-defaults':mode==='edit'?'/invoices/7':'/invoices/new';
 createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[entry]}><QueryClientProvider client={queries}>
   <PermissionAccessProvider grants={grants} permissions={permissions} canManageSettings={!readonly}><ConfirmationProvider><UnsavedChangesProvider>
     <main className='workspace-content'><h1>单据工作台</h1><LocationProbe/><Routes>
@@ -85,7 +94,7 @@ createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries=
       <Route path='/invoices/:invoiceId' element={<InvoiceEditorPage client={client} businessDate={date} mode='edit'/>}/>
       <Route path='/payments/:paymentId' element={<PaymentEditorPage client={client} businessDate={date} mode='edit'/>}/>
       <Route path='/payments/new' element={<PaymentEditorPage client={client} businessDate={date} mode='new'/>}/>
-      <Route path='/settings' element={<SettingsPage client={client} canManageSettings={!readonly} canManageUsers={!readonly} canUseDocumentWorkspace={true} productName='单据工作台'/>}/>
+      <Route path='/settings' element={<SettingsPage client={client} canManageSettings={!readonly} canManageUsers={!readonly} canUseDocumentWorkspace={!['Sales','Administration'].includes(params.get('edition'))} isDesktopRuntime={params.has('desktop')} productName='单据工作台'/>}/>
       <Route path='/export-defaults' element={<ExportDefaultsFixture/>}/>
       <Route path='*' element={<p>已返回列表</p>}/>
     </Routes></main>

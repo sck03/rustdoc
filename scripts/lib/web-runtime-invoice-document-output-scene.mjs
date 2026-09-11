@@ -649,7 +649,7 @@ export function createInvoiceDocumentOutputSmokeScene(runtime) {
     await page.send("Page.navigate", { url: checkUrl });
     const expectedText = [
       "设置",
-      "邮件与备份",
+      "邮件设置",
       "SMTP 服务器",
       "单据邮件主题",
       "单据邮件正文",
@@ -658,7 +658,7 @@ export function createInvoiceDocumentOutputSmokeScene(runtime) {
     const panelCheck = await waitForPageExpression(
       page,
       `(() => {
-        const panel = document.querySelector('[aria-label="邮件与备份"]');
+        const panel = document.querySelector('[aria-label="邮件设置"]');
         if (!panel || !window.location.hash.includes('/settings?section=email')) {
           return false;
         }

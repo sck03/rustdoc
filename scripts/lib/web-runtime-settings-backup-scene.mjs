@@ -158,11 +158,38 @@ export function createSettingsBackupSmokeScene(runtime) {
     await page.send("Page.navigate", { url: communicationUrl });
     const communicationExpectedText = [
       "设置",
-      "邮件与备份",
+      "邮件设置",
       "推断 SMTP",
       "测试邮件连接",
       "单据邮件主题",
       "单据邮件正文",
+    ];
+
+    const communicationPageText = await waitForRuntimeDiagnostics(page, communicationExpectedText, timeoutMs);
+    const documentEmailServerSuggestionCheck = await waitForDocumentEmailServerSuggestionCheck(page, timeoutMs);
+
+    const documentEmailSettingsCheck = await waitForPageExpression(
+      page,
+      `(() => {
+        const panel = document.querySelector('[aria-label="邮件设置"]');
+        const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
+        const text = panel ? panel.innerText || '' : '';
+        return Boolean(panel &&
+          panel.querySelector('textarea') &&
+          buttons.some((button) => (button.innerText || '').includes('推断 SMTP')) &&
+          buttons.some((button) => (button.innerText || '').includes('测试邮件连接')) &&
+          text.includes('单据邮件主题') &&
+          text.includes('单据邮件正文') &&
+          text.includes('SMTP 服务器'));
+      })()`,
+      timeoutMs,
+      "Timed out waiting for the document email default settings.",
+    );
+
+    const backupUrl = buildSettingsSectionUrl(options.webUrl, "backup", "smokeBackupSettings");
+    await page.send("Page.navigate", { url: backupUrl });
+    const backupExpectedText = [
+      "备份与恢复",
       "数据备份与还原",
       "备份目录",
       "Backups",
@@ -176,8 +203,7 @@ export function createSettingsBackupSmokeScene(runtime) {
       "大小",
       "路径",
     ];
-
-    const communicationPageText = await waitForRuntimeDiagnostics(page, communicationExpectedText, timeoutMs);
+    const backupPageText = await waitForRuntimeDiagnostics(page, backupExpectedText, timeoutMs);
     const backupPanelCheck = await waitForPageExpression(
       page,
       `(() => {
@@ -196,26 +222,6 @@ export function createSettingsBackupSmokeScene(runtime) {
       "Timed out waiting for the backup management panel.",
     );
 
-    const documentEmailServerSuggestionCheck = await waitForDocumentEmailServerSuggestionCheck(page, timeoutMs);
-
-    const documentEmailSettingsCheck = await waitForPageExpression(
-      page,
-      `(() => {
-        const panel = document.querySelector('[aria-label="邮件与备份"]');
-        const buttons = panel ? Array.from(panel.querySelectorAll('button')) : [];
-        const text = panel ? panel.innerText || '' : '';
-        return Boolean(panel &&
-          panel.querySelector('textarea') &&
-          buttons.some((button) => (button.innerText || '').includes('推断 SMTP')) &&
-          buttons.some((button) => (button.innerText || '').includes('测试邮件连接')) &&
-          text.includes('单据邮件主题') &&
-          text.includes('单据邮件正文') &&
-          text.includes('SMTP 服务器'));
-      })()`,
-      timeoutMs,
-      "Timed out waiting for the document email default settings.",
-    );
-
     return {
       url: redactDesktopAccessToken(runtimeUrl),
       sectionUrls: {
@@ -225,6 +231,7 @@ export function createSettingsBackupSmokeScene(runtime) {
         exchangeRate: redactDesktopAccessToken(exchangeRateUrl),
         singleWindow: redactDesktopAccessToken(singleWindowUrl),
         communication: redactDesktopAccessToken(communicationUrl),
+        backup: redactDesktopAccessToken(backupUrl),
       },
       expectedText: [
         ...runtimeExpectedText.map((value) => ({ section: "runtime", value, found: includesText(runtimePageText, value) })),
@@ -233,6 +240,7 @@ export function createSettingsBackupSmokeScene(runtime) {
         ...exchangeRateExpectedText.map((value) => ({ section: "exchangeRate", value, found: includesText(exchangeRatePageText, value) })),
         ...singleWindowExpectedText.map((value) => ({ section: "singleWindow", value, found: includesText(singleWindowPageText, value) })),
         ...communicationExpectedText.map((value) => ({ section: "communication", value, found: includesText(communicationPageText, value) })),
+        ...backupExpectedText.map((value) => ({ section: "backup", value, found: includesText(backupPageText, value) })),
       ],
       backupPanelCheck,
       exportDefaultsCheck,
@@ -256,7 +264,7 @@ export function createSettingsBackupSmokeScene(runtime) {
     const buttonReady = await waitForPageExpression(
       page,
       `(() => {
-        const section = document.querySelector('[aria-label="系统与数据库"]');
+        const section = document.querySelector('[aria-label="常规与目录"]');
         const label = section
           ? Array.from(section.querySelectorAll('label')).find((item) => (item.innerText || '').includes('默认导出目录'))
           : null;
@@ -270,7 +278,7 @@ export function createSettingsBackupSmokeScene(runtime) {
     const clickResult = await evaluate(
       page,
       `(() => {
-        const section = document.querySelector('[aria-label="系统与数据库"]');
+        const section = document.querySelector('[aria-label="常规与目录"]');
         const label = section
           ? Array.from(section.querySelectorAll('label')).find((item) => (item.innerText || '').includes('默认导出目录'))
           : null;
@@ -290,7 +298,7 @@ export function createSettingsBackupSmokeScene(runtime) {
         page,
         `(() => {
           const expectedPath = ${JSON.stringify(expectedPath)};
-          const section = document.querySelector('[aria-label="系统与数据库"]');
+          const section = document.querySelector('[aria-label="常规与目录"]');
           const label = section
             ? Array.from(section.querySelectorAll('label')).find((item) => (item.innerText || '').includes('默认导出目录'))
             : null;
@@ -326,7 +334,7 @@ export function createSettingsBackupSmokeScene(runtime) {
       const result = await evaluate(
         page,
         `(() => {
-          const panel = document.querySelector('[aria-label="邮件与备份"]');
+          const panel = document.querySelector('[aria-label="邮件设置"]');
           if (!panel) {
             return { found: false, reason: 'missing email panel' };
           }
@@ -405,7 +413,7 @@ export function createSettingsBackupSmokeScene(runtime) {
     const clickResult = await evaluate(
       page,
       `(() => {
-        const panel = document.querySelector('[aria-label="邮件与备份"]');
+        const panel = document.querySelector('[aria-label="邮件设置"]');
         if (!panel) {
           return { found: false, reason: 'missing email panel' };
         }
@@ -429,7 +437,7 @@ export function createSettingsBackupSmokeScene(runtime) {
       const result = await evaluate(
         page,
         `(() => {
-          const panel = document.querySelector('[aria-label="邮件与备份"]');
+          const panel = document.querySelector('[aria-label="邮件设置"]');
           if (!panel) {
             return { found: false, reason: 'missing email panel' };
           }

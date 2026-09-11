@@ -7,6 +7,7 @@ import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
 import { documentEditorUiFixture } from "./lib/document-editor-ui-fixture.mjs";
+import { runSettingsWorkspaceCases } from "./lib/settings-workspace-ui-cases.mjs";
 
 const repo = path.resolve(import.meta.dirname, ".."), web = path.join(repo, "apps/export-doc-web");
 const output = path.join(repo, "artifacts/document-editor-ui");
@@ -75,7 +76,7 @@ try {
     page = await createPageSession(cdp);
     await page.send("Emulation.setDeviceMetricsOverride", { width, height: 960, deviceScaleFactor: 1, mobile: false });
     await page.send("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/?mode=${mode}${extra}` });
-    await waitFor(page, mode === "settings" ? "document.querySelector('[aria-label=发票录入默认值]')" : "(document.querySelector('form') || document.querySelector('[aria-label=发票单据包默认设置]')) && window.__calls.some(call=>call.name==='getSettings')");
+    await waitFor(page, mode === "settings" ? "document.querySelector('.settings-center-form') && !document.querySelector('[aria-busy=true]')" : "(document.querySelector('form') || document.querySelector('[aria-label=发票单据包默认设置]')) && window.__calls.some(call=>call.name==='getSettings')");
     await delay(200);
   };
   for (const width of [1440, 1024, 390, 320]) {
@@ -210,11 +211,11 @@ try {
   assert.equal(renamed.spare1, "PACIFIC V.10"); assert.equal(renamed.items[0].spare1, "混纺"); assert.equal(renamed.items[0].spare10, "保留原始备注");
   results.push("renamed-invoice-and-item-fields-retain-stable-data");
   await open("settings", 1024); await field(page, "默认显示备用列数", "4");
-  await clickText(page, "保存"); await waitFor(page, "window.__calls.some(call=>call.name==='updateSettings')");
+  await clickText(page, "保存全部修改"); await waitFor(page, "window.__calls.some(call=>call.name==='updateSettings')");
   assert.equal(await read(page, "window.__calls.find(call=>call.name==='updateSettings').input.body.settings.system.itemEntrySpareColumnCount"), 4);
   results.push("settings-default-spare-column-control");
   for (const scenario of [
-    { mode: "settings", save: "保存", confirm: "重新加载系统设置", selector: '[aria-label="单据字段名称"] input',
+    { mode: "settings", save: "保存全部修改", confirm: "重新加载系统设置", selector: '[aria-label="单据字段名称"] input',
       remote: "window.__changeSettingOnServer(['system','documentFieldLabels','invoice','spare1'],'服务器版本')", failure: "__failSettingsReload", error: "设置读取失败" },
     { mode: "export-defaults", save: "保存设置", confirm: "加载最新版本", selector: '.report-export-defaults-grid input',
       remote: "window.__changeSettingOnServer(['batchExport','outputFileNamePattern'],'服务器版本')", failure: "__failSettingsReload", error: "设置读取失败" },
@@ -222,7 +223,7 @@ try {
       remote: "window.__changePaymentOnServer({voucherNo:'服务器版本'})", failure: "__failPaymentReload", error: "付款读取失败" },
   ]) {
     await open(scenario.mode);
-    if (scenario.mode === "settings") await click(page, '[aria-label="单据字段名称"] details summary');
+    if (scenario.mode === "settings") await clickText(page, "字段名称");
     await input(page, scenario.selector, "我的草稿");
     const draftValue = () => read(page, `document.querySelector(${JSON.stringify(scenario.selector)}).value`);
     assert.equal(await draftValue(), "我的草稿");
@@ -242,13 +243,14 @@ try {
     await audit(page, `${scenario.mode}-conflict-reload-and-retry`);
   }
   await open("settings", 390, "&role=reader");
-  await click(page, '[aria-label="单据字段名称"] details summary');
+  await clickText(page, "字段名称");
   assert(await read(page, "[...document.querySelectorAll('[aria-label=单据字段名称] input')].every(node=>node.matches(':disabled'))"));
   await open("payment", 390, "&role=reader");
   assert(await read(page, "[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='新增选项').matches(':disabled')"));
   await open("edit", 390, "&role=reader"); await click(page, "#invoice-tab-items");
   assert(await read(page, "[...document.querySelectorAll('.item-editor-table input')].every(n=>n.disabled||n.readOnly)"));
   await audit(page, "invoice-reader-tabs");
+  await runSettingsWorkspaceCases({ open, currentPage: () => page, read, click, clickText, input, field, waitFor, audit, captureScreenshot, output, results });
   fs.writeFileSync(path.join(output, "summary.json"), JSON.stringify({ passed: results.length, results }, null, 2));
   process.stdout.write(`Document editor UI passed (${results.length} cases).\n`);
 } finally {

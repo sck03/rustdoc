@@ -43,6 +43,7 @@ namespace ExportDocManager.Api.Hosting
         string OcrModelRoot,
         string LogRoot,
         string DatabaseProvider,
+        string DatabaseProviderKey,
         string SqliteDatabasePath,
         IReadOnlyList<ApiRuntimePathInfo> RuntimePaths,
         IReadOnlyList<ApiRuntimeDependencyInfo> RuntimeDependencies,
@@ -69,6 +70,7 @@ namespace ExportDocManager.Api.Hosting
                 string.Empty,
                 string.Empty,
                 DatabaseModeHelper.GetCurrentModeText(databaseSettings),
+                DatabaseModeHelper.NormalizeProvider(databaseSettings.Provider),
                 string.Empty,
                 Array.Empty<ApiRuntimePathInfo>(),
                 Array.Empty<ApiRuntimeDependencyInfo>(),
@@ -102,6 +104,7 @@ namespace ExportDocManager.Api.Hosting
                 ApiResponsePathPolicy.Reveal(paths.OcrModelRoot, revealPaths),
                 ApiResponsePathPolicy.Reveal(paths.LogRoot, revealPaths),
                 DatabaseModeHelper.GetCurrentModeText(databaseSettings),
+                DatabaseModeHelper.NormalizeProvider(databaseSettings.Provider),
                 ApiResponsePathPolicy.Reveal(sqliteDatabasePath, revealPaths),
                 runtimePaths,
                 runtimeDependencies

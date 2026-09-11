@@ -7,10 +7,12 @@ import type { SettingsCategoryConfig, SettingsCategoryKey } from "./settingsCate
 export function SettingsCategoryNav({
   categories,
   activeCategory,
+  changedCategories = [],
   onSelect,
 }: {
   categories: SettingsCategoryConfig[];
   activeCategory: SettingsCategoryKey;
+  changedCategories?: SettingsCategoryKey[];
   onSelect: (category: SettingsCategoryKey) => void;
 }) {
   return (
@@ -28,6 +30,7 @@ export function SettingsCategoryNav({
           >
             <Icon size={17} aria-hidden="true" />
             <span>{category.label}</span>
+            {changedCategories.includes(category.key) && <small className="settings-dirty-marker">未保存</small>}
           </button>
         );
       })}

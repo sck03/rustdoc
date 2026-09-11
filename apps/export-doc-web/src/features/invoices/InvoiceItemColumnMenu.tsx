@@ -1,4 +1,5 @@
 import { Columns3 } from "lucide-react";
+import { DocumentSettingsShortcut } from "../../ui/DocumentSettingsShortcut.tsx";
 import { documentFieldLabel, useDocumentFieldLabels } from "../../ui/DocumentFieldLabelsContext.tsx";
 import { invoiceItemEditableColumns, type EditableInvoiceItemField } from "./invoiceItemTableModel.ts";
 
@@ -21,7 +22,7 @@ export function InvoiceItemColumnMenu({ hiddenColumnFields, defaultSpareColumnCo
         <button type="button" className="text-button compact-text-button" onClick={onReset}>恢复默认</button>
         <button type="button" className="text-button compact-text-button" onClick={onShowAll}>全部显示</button>
       </div>
-      <p className="item-column-default-hint">{defaultSpareColumnCount ? `默认显示前 ${defaultSpareColumnCount} 个备用列` : "空备用列默认隐藏"}，已有内容的列自动显示。默认数量可在“系统设置 → 运行与数据库 → 发票录入默认值”调整。</p>
+      <p className="item-column-default-hint">{defaultSpareColumnCount ? `默认显示前 ${defaultSpareColumnCount} 个备用列` : "空备用列默认隐藏"}，已有内容的列自动显示。默认数量在“系统设置 → 单据设置 → 录入默认值”中维护。 <DocumentSettingsShortcut /> <DocumentSettingsShortcut group="item" /></p>
       <div className="item-column-menu-list">
         {invoiceItemEditableColumns.map((column) => {
           const checked = !hiddenColumnFields.has(column.field);

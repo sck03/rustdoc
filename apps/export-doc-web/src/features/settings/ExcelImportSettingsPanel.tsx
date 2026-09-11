@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { TextSetting } from "./SettingsFieldControls.tsx";
 import { RefreshCw, RotateCcw, Save, Trash2 } from "lucide-react";
 import { NumberField, SelectField } from "../../ui/FormFields.tsx";
 import { buildExcelSchemeOptions, createDefaultExcelImportSettings, normalizeExcelImportSettings, readExcelImportRecordNumber, readExcelImportSchemesForSettings, readExcelImportSettingsForSettings } from "./excelImportSettingsModel.ts";
@@ -193,6 +194,11 @@ export function ExcelImportSettingsPanel({
         <div className="batch-export-items-toolbar">
           <span>{schemes.length} 个已保存方案</span>
           <span>{currentSchemeName || "未命名"}</span>
+        </div>
+        <div className="form-section" aria-label="缺省资料">
+          <h3>缺省资料</h3>
+          <p className="form-field-description">Excel 导入缺少出口商中文名时使用，也用于 Excel 模板中的默认出口商资料。</p>
+          <div className="field-grid"><TextSetting settings={settings} path={["system", "defaultTemplateExporterNameCn"]} label="默认出口商中文名" disabled={disabled} onChange={onChange} /></div>
         </div>
         <ExcelImportFieldGroup title="出口商" fields={excelExporterMappingFields} settings={currentSettings} disabled={disabled} onChange={updateCurrentField} />
         <ExcelImportFieldGroup title="客户与通知方" fields={excelCustomerMappingFields} settings={currentSettings} disabled={disabled} onChange={updateCurrentField} />

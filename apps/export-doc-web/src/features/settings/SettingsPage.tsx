@@ -1,12 +1,12 @@
 import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
 import "../../styles/runtime-diagnostics.css";
+import "../../styles/settings-center.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ListChecks,
   RefreshCw,
   RotateCcw,
   Save,
-  Trash2,
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import {
@@ -33,9 +33,13 @@ import { useSettingsDraftSync } from "./useSettingsDraftSync.ts";
 import { systemDefaultPatches } from "./settingsDefaults.ts";
 import { findIssuingAuthority, parseIssuingAuthorityCode } from "./settingsIssuingAuthority.ts";
 import { SettingsCategoryNav, SettingsValidationPanel } from "./SettingsPagePanels.tsx";
+import { categoryHasSecrets, changedSettingsCategories, settingsCategoryForPath } from "./settingsDraftModel.ts";
+import { LogMaintenanceSettingsPanel } from "./LogMaintenanceSettingsPanel.tsx";
 
 const LazyMaintenanceSettingsPanels = lazy(() => import("./MaintenanceSettingsPanels.tsx"));
 const LazyRuntimeDatabaseSettingsPanel = lazy(() => import("./RuntimeDatabaseSettingsPanel.tsx"));
+const LazyDocumentSettingsPanel = lazy(() => import("./DocumentSettingsPanel.tsx"));
+const LazyBackupSettingsPanel = lazy(() => import("./BackupSettingsPanel.tsx"));
 const LazyExcelImportSettingsPanel = lazy(() => import("./ExcelImportSettingsPanel.tsx"));
 const LazyExchangeRateSettingsPanel = lazy(() => import("./ExchangeRateSettingsPanel.tsx"));
 const LazyCommunicationSettingsPanel = lazy(() => import("./CommunicationSettingsPanel.tsx"));
@@ -45,10 +49,19 @@ function SettingsPanelDeepLink({ label }: { label: string | null }) {
   useEffect(() => {
     if (!label) return;
 
-    const panel = Array.from(document.querySelectorAll<HTMLElement>("[aria-label]")).find(
-      (element) => element.getAttribute("aria-label") === label,
-    );
-    panel?.scrollIntoView({ block: "start", behavior: "auto" });
+    const container = document.querySelector(".settings-category-panel");
+    if (!container) return;
+    const scrollToPanel = () => {
+      const panel = Array.from(container.querySelectorAll<HTMLElement>("[aria-label]")).find(
+        (element) => element.getAttribute("aria-label") === label,
+      );
+      panel?.scrollIntoView({ block: "start", behavior: "auto" });
+      return Boolean(panel);
+    };
+    if (scrollToPanel()) return;
+    const observer = new MutationObserver(() => { if (scrollToPanel()) observer.disconnect(); });
+    observer.observe(container, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [label]);
 
   return null;
@@ -71,12 +84,14 @@ export function SettingsPage({
   canManageSettings,
   canManageUsers,
   canUseDocumentWorkspace,
+  isDesktopRuntime,
   productName,
 }: {
   client: ExportDocManagerApiClient;
   canManageSettings: boolean;
   canManageUsers: boolean;
   canUseDocumentWorkspace: boolean;
+  isDesktopRuntime: boolean;
   productName: string;
 }) {
   const requestConfirmation = useConfirmation();
@@ -87,7 +102,9 @@ export function SettingsPage({
   const availableSettingsCategoryKeys = availableSettingsCategories.map((category) => category.key);
   const [settings, setSettings] = useState<SettingsRecord | null>(null);
   const [updateSecrets, setUpdateSecrets] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [baselineSettings, setBaselineSettings] = useState<SettingsRecord | null>(null);
+  const changedCategories = changedSettingsCategories(baselineSettings, settings);
+  const hasUnsavedChanges = changedCategories.length > 0;
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [validationResult, setValidationResult] = useState<ApiSettingsValidationResponse | null>(null);
@@ -109,7 +126,7 @@ export function SettingsPage({
   const healthQuery = useQuery({
     queryKey: queryKeys.health(),
     queryFn: ({ signal }) => client.getHealth({ signal }),
-    enabled: activeCategory === "maintenance",
+    enabled: ["runtime", "backup", "maintenance"].includes(activeCategory),
   });
 
   const issuingAuthoritiesQuery = useQuery({
@@ -125,7 +142,7 @@ export function SettingsPage({
     setSettings,
     setMessage,
     setUpdateSecrets,
-    setHasUnsavedChanges,
+    setBaselineSettings,
     setValidationResult,
     setSingleWindowAuthorityAutoState,
   });
@@ -160,7 +177,7 @@ export function SettingsPage({
       setMessage(null);
       setSuccessMessage(response.requiresRestart ? `${response.message} 需要重启后生效。` : response.message || "设置已保存。");
       setUpdateSecrets(false);
-      setHasUnsavedChanges(false);
+      setBaselineSettings(response.settings as unknown as SettingsRecord);
       setValidationResult(null);
       queryClient.setQueryData<ApiSettingsResponse>(queryKeys.settings(), {
         secrets: response.secrets,
@@ -285,6 +302,7 @@ export function SettingsPage({
     cleanupSystemLogsMutation.isPending ||
     refreshExchangeCurrenciesMutation.isPending;
   const secrets = settingsQuery.data?.secrets ?? null;
+  const databaseProvider = healthQuery.isError ? null : healthQuery.data?.databaseProviderKey ?? null;
   const issuingAuthorityOptions = issuingAuthoritiesQuery.data?.options ?? [];
   const canSelectDesktopDirectory = isDesktopBridgeAvailable();
   const emailAddressCandidate =
@@ -317,7 +335,6 @@ export function SettingsPage({
       }
       return next;
     });
-    setHasUnsavedChanges(true);
     setValidationResult(null);
     setSuccessMessage(null);
   }
@@ -457,8 +474,8 @@ export function SettingsPage({
     }
 
     if (!await requestConfirmation({
-      title: "恢复系统默认设置",
-      description: "确定要把当前系统设置草稿恢复为默认值吗？",
+      title: "恢复本分类默认设置",
+      description: `确定要把“${activeCategoryConfig.label}”的设置草稿恢复为默认值吗？`,
       details: ["此操作只修改当前页面草稿。", "点击保存后才会写入正式配置。", "受保护的密码和密钥不会被直接清空。"],
       confirmLabel: "恢复默认值",
     })) {
@@ -468,10 +485,14 @@ export function SettingsPage({
     patchSettings([
       { path: ["system", "appName"], value: productName },
       ...systemDefaultPatches,
-    ]);
+    ].filter(({ path }) => settingsCategoryForPath(path) === currentCategory
+      && path[1] !== "databaseProvider"
+      && (path[1] !== "updaterEndpoint" || isDesktopRuntime)
+      && (path[1] !== "sqliteDatabaseFileName" || databaseProvider === "Sqlite")
+      && (!path[1]?.startsWith("postgreSql") || databaseProvider === "PostgreSQL")));
     setSingleWindowAuthorityAutoState({ fetchPlace: "", aplAdd: "" });
     setMessage(null);
-    setSuccessMessage("已恢复系统设置默认值，请检查后保存。受保护的密码/密钥字段仍按“更新敏感字段”开关处理。");
+    setSuccessMessage(`已恢复“${activeCategoryConfig.label}”的默认值，请检查后保存。`);
   }
 
   function handleValidateSettings() {
@@ -490,7 +511,6 @@ export function SettingsPage({
     }
 
     setSettings(validationResult.normalizedSettings as unknown as SettingsRecord);
-    setHasUnsavedChanges(true);
     setMessage(null);
     setSuccessMessage("已把自动修复结果应用到当前草稿，请检查后保存。");
     setValidationResult({
@@ -507,10 +527,7 @@ export function SettingsPage({
     setMessage(null);
     setSuccessMessage(null);
     try {
-      if (hasUnsavedChanges) {
-        await saveMutation.mutateAsync(settings);
-      }
-
+      if (hasUnsavedChanges) return;
       await cleanupSystemLogsMutation.mutateAsync();
     } catch {
       // Mutation handlers surface the user-facing error.
@@ -522,7 +539,7 @@ export function SettingsPage({
     const response = await settingsQuery.refetch();
     if (!response.data || response.isError) return;
     setSettings(response.data.settings as unknown as SettingsRecord);
-    setHasUnsavedChanges(false);
+    setBaselineSettings(response.data.settings as unknown as SettingsRecord);
     setConcurrencyMessage(null);
     setUpdateSecrets(false);
     setValidationResult(null);
@@ -540,7 +557,7 @@ export function SettingsPage({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!settings || !canManageSettings) {
+    if (!settings || !canManageSettings || isBusy) {
       return;
     }
 
@@ -563,28 +580,24 @@ export function SettingsPage({
               <div className="settings-command-heading-row">
                 <h2>{activeCategoryConfig.label}</h2>
               </div>
-              {hasUnsavedChanges ? <span>有未保存修改</span> : null}
+              <span className="settings-save-status" data-dirty={hasUnsavedChanges} role="status">{hasUnsavedChanges ? `未保存：${changedCategories.map((category) => category.label).join("、")}` : "所有修改已保存"}</span>
             </div>
             <div className="toolbar-actions settings-command-actions">
-              <SecretToggle checked={updateSecrets} disabled={!canManageSettings} onChange={setUpdateSecrets} />
+              {categoryHasSecrets(currentCategory, databaseProvider) && <SecretToggle checked={updateSecrets} disabled={isBusy || !canManageSettings} onChange={setUpdateSecrets} />}
               <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void handleReloadSettings()}>
                 <RefreshCw size={18} aria-hidden="true" />
               </button>
-              <button className="command-button secondary" type="button" disabled={isBusy || !canManageSettings} onClick={handleRestoreSystemDefaults}>
+              {systemDefaultPatches.some(({ path }) => settingsCategoryForPath(path) === currentCategory) && <button className="command-button secondary" type="button" disabled={isBusy || !canManageSettings} onClick={handleRestoreSystemDefaults}>
                 <RotateCcw size={17} aria-hidden="true" />
-                <span>恢复默认</span>
-              </button>
+                <span>恢复本分类默认</span>
+              </button>}
               <button className="command-button secondary" type="button" disabled={isBusy || !canManageSettings} onClick={handleValidateSettings}>
                 <ListChecks size={17} aria-hidden="true" />
                 <span>校验设置</span>
               </button>
-              <button className="command-button" type="button" disabled={isBusy || !canManageSettings} onClick={handleCleanupSystemLogs}>
-                <Trash2 size={17} aria-hidden="true" />
-                <span>清理旧日志</span>
-              </button>
               <button className="command-button" type="submit" disabled={isBusy || !canManageSettings}>
                 <Save size={17} aria-hidden="true" />
-                <span>保存</span>
+                <span>保存全部修改</span>
               </button>
             </div>
           </div>
@@ -592,9 +605,15 @@ export function SettingsPage({
             <SettingsCategoryNav
               categories={availableSettingsCategories}
               activeCategory={currentCategory}
+              changedCategories={changedCategories.map((category) => category.key)}
               onSelect={setActiveCategory}
             />
             <div className="settings-category-panel">
+              {["runtime", "backup"].includes(currentCategory) && !databaseProvider && <PageState
+                tone={healthQuery.isError ? "error" : "loading"}
+                title={healthQuery.isError ? "无法读取当前数据库类型" : "正在读取运行模式"}
+                description={healthQuery.isError ? readApiError(healthQuery.error) : undefined}
+                action={healthQuery.isError ? <button className="command-button secondary" type="button" onClick={() => void healthQuery.refetch()}>重试运行状态</button> : undefined} />}
               <Suspense fallback={<PageState tone="loading" title="正在加载设置分类" />}>
               {currentCategory === "runtime" ? (
                 <LazyRuntimeDatabaseSettingsPanel
@@ -604,10 +623,17 @@ export function SettingsPage({
                   updateSecrets={updateSecrets}
                   isBusy={isBusy}
                   canSelectDesktopDirectory={canSelectDesktopDirectory}
+                  isDesktopRuntime={isDesktopRuntime}
+                  databaseProvider={databaseProvider}
                   onChange={patchSetting}
                   onSelectDefaultExportDirectory={() => void handleSelectDefaultExportDirectory()}
                 />
               ) : null}
+              {currentCategory === "documents" && <LazyDocumentSettingsPanel settings={settings} disabled={isBusy || !canManageSettings} search={location.search} onChange={patchSetting} />}
+              {currentCategory === "backup" && <LazyBackupSettingsPanel
+                client={client} settings={settings} secrets={secrets} databaseProvider={databaseProvider}
+                disabled={isBusy || !canManageSettings} canManageSettings={canManageSettings} updateSecrets={updateSecrets}
+                search={location.search} onChange={patchSetting} onTestWebDavConnection={handleTestWebDavConnection} onPathError={setMessage} />}
               {currentCategory === "excel-import" ? (
                 <LazyExcelImportSettingsPanel
                   settings={settings}
@@ -633,7 +659,6 @@ export function SettingsPage({
               ) : null}
               {currentCategory === "communication" ? (
                 <LazyCommunicationSettingsPanel
-                  client={client}
                   settings={settings}
                   secrets={secrets}
                   canManageSettings={canManageSettings}
@@ -643,8 +668,6 @@ export function SettingsPage({
                   onChange={patchSetting}
                   onInferEmailServerConfig={handleInferEmailServerConfig}
                   onTestEmailConnection={handleTestEmailConnection}
-                  onTestWebDavConnection={handleTestWebDavConnection}
-                  onPathError={setMessage}
                 />
               ) : null}
               {currentCategory === "single-window" ? (
@@ -652,7 +675,7 @@ export function SettingsPage({
                   settings={settings}
                   secrets={secrets}
                   issuingAuthorityOptions={issuingAuthorityOptions}
-                  canManageSettings={canManageSettings}
+                  canManageSettings={canManageSettings && !isBusy}
                   updateSecrets={updateSecrets}
                   onChange={patchSetting}
                   onOrgCodeChange={handleSingleWindowOrgCodeChange}
@@ -667,6 +690,8 @@ export function SettingsPage({
                       client={client}
                       canManageSettings={canManageSettings}
                       canManageUsers={canManageUsers}
+                      canUseDocumentWorkspace={canUseDocumentWorkspace}
+                      logPanel={<LogMaintenanceSettingsPanel settings={settings} disabled={isBusy || !canManageSettings} hasUnsavedChanges={hasUnsavedChanges} onChange={patchSetting} onCleanup={() => void handleCleanupSystemLogs()} />}
                       health={healthQuery.data ?? null}
                       healthIsBusy={healthQuery.isFetching}
                       healthErrorMessage={healthQuery.isError ? readApiError(healthQuery.error) : null}
@@ -684,7 +709,7 @@ export function SettingsPage({
                   ) : null}
                 </>
               ) : null}
-              <SettingsPanelDeepLink label={readSettingsPanelLabelFromSearch(location.search)} />
+              <SettingsPanelDeepLink label={readSettingsCategoryFromSearch(location.search) === currentCategory ? readSettingsPanelLabelFromSearch(location.search) : null} />
               </Suspense>
             </div>
           </div>

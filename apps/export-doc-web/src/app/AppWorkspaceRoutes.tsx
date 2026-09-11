@@ -5,6 +5,7 @@ import { hasPermission } from "./PermissionAccessContext.tsx";
 import { permissionActions, permissionResources, resolveReportTemplateAccess } from "./permissionCatalog.ts";
 import { getDefaultWorkspaceRoute, type ProductEditionPresentation } from "./productEdition.ts";
 import { PageState } from "../ui/PageState.tsx";
+import { isDesktopBridgeAvailable } from "../desktop/desktopBridge.ts";
 
 type NamedComponent<TModule, TExport extends keyof TModule> =
   TModule[TExport] extends ComponentType<infer TProps> ? ComponentType<TProps> : never;
@@ -191,6 +192,7 @@ export function AppWorkspaceRoutes({
               canManageSettings={user.capabilities.canManageSettings === true}
               canManageUsers={user.capabilities.canManageUsers === true}
               canUseDocumentWorkspace={user.capabilities.canUseDocumentWorkspace === true}
+              isDesktopRuntime={isDesktopBridgeAvailable()}
               productName={activeProduct.productName}
             />
           }

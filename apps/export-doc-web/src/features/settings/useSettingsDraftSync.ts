@@ -13,7 +13,7 @@ type Options = {
   setSettings: Dispatch<SetStateAction<SettingsRecord | null>>;
   setMessage: Dispatch<SetStateAction<string | null>>;
   setUpdateSecrets: Dispatch<SetStateAction<boolean>>;
-  setHasUnsavedChanges: Dispatch<SetStateAction<boolean>>;
+  setBaselineSettings: Dispatch<SetStateAction<SettingsRecord | null>>;
   setValidationResult: Dispatch<SetStateAction<ApiSettingsValidationResponse | null>>;
   setSingleWindowAuthorityAutoState: Dispatch<SetStateAction<SingleWindowAuthorityAutoState>>;
 };
@@ -23,8 +23,8 @@ type Options = {
  *
  * React Query can refresh settings when the window regains focus. A refresh
  * must never replace a draft that the user is currently editing; the save
- * mutation explicitly clears the dirty flag before its own refreshed snapshot
- * is applied.
+ * mutation replaces the draft and its baseline together before applying its
+ * refreshed snapshot.
  */
 export function useSettingsDraftSync({
   response,
@@ -32,7 +32,7 @@ export function useSettingsDraftSync({
   setSettings,
   setMessage,
   setUpdateSecrets,
-  setHasUnsavedChanges,
+  setBaselineSettings,
   setValidationResult,
   setSingleWindowAuthorityAutoState,
 }: Options) {
@@ -44,13 +44,13 @@ export function useSettingsDraftSync({
     setSettings(response.settings as unknown as SettingsRecord);
     setMessage(null);
     setUpdateSecrets(false);
-    setHasUnsavedChanges(false);
+    setBaselineSettings(response.settings as unknown as SettingsRecord);
     setValidationResult(null);
     setSingleWindowAuthorityAutoState({ fetchPlace: "", aplAdd: "" });
   }, [
     hasUnsavedChanges,
     response,
-    setHasUnsavedChanges,
+    setBaselineSettings,
     setMessage,
     setSettings,
     setSingleWindowAuthorityAutoState,

@@ -14,15 +14,17 @@ namespace ExportDocManager.Api.Hosting
             prepared.System.DocumentFieldLabels = DocumentFieldLabelSettings.Normalize(prepared.System.DocumentFieldLabels);
             EnsureDefaults(currentSettings);
 
-            if (!updateSecrets)
-            {
-                prepared.Email.Password = currentSettings.Email.Password;
-                prepared.WebDav.Password = currentSettings.WebDav.Password;
-                prepared.System.PostgreSqlPassword = currentSettings.System.PostgreSqlPassword;
-                prepared.AI.ApiKey = currentSettings.AI.ApiKey;
-            }
+            prepared.Email.Password = ResolveSecret(prepared.Email.Password, currentSettings.Email.Password, updateSecrets);
+            prepared.WebDav.Password = ResolveSecret(prepared.WebDav.Password, currentSettings.WebDav.Password, updateSecrets);
+            prepared.System.PostgreSqlPassword = ResolveSecret(prepared.System.PostgreSqlPassword, currentSettings.System.PostgreSqlPassword, updateSecrets);
+            prepared.AI.ApiKey = ResolveSecret(prepared.AI.ApiKey, currentSettings.AI.ApiKey, updateSecrets);
 
             return prepared;
+        }
+
+        private static string ResolveSecret(string requested, string current, bool updateSecrets)
+        {
+            return updateSecrets && !string.IsNullOrEmpty(requested) ? requested : current;
         }
 
         public static void CopyInto(AppSettings target, AppSettings source)

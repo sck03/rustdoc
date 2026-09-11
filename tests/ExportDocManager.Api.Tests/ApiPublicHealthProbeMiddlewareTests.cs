@@ -9,6 +9,16 @@ namespace ExportDocManager.Api.Tests
 {
     public class ApiPublicHealthProbeMiddlewareTests
     {
+        [Theory]
+        [InlineData("Sqlite", "Sqlite")]
+        [InlineData("postgresql", "PostgreSQL")]
+        public void PublicHealth_ShouldExposeNormalizedRuntimeDatabaseKey(string provider, string expected)
+        {
+            var response = ApiHealthResponseFactory.CreatePublic(new DatabaseConnectionSettings { Provider = provider });
+
+            Assert.Equal(expected, response.DatabaseProviderKey);
+        }
+
         [Fact]
         public async Task ReadinessProbe_ShouldResolveAuthenticationServiceGraph()
         {
@@ -106,6 +116,7 @@ namespace ExportDocManager.Api.Tests
                 "PostgreSQL",
                 document.RootElement.GetProperty("databaseProvider").GetString() ?? string.Empty,
                 StringComparison.Ordinal);
+            Assert.Equal("PostgreSQL", document.RootElement.GetProperty("databaseProviderKey").GetString());
             Assert.Empty(document.RootElement.GetProperty("runtimePaths").EnumerateArray());
         }
 

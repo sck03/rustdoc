@@ -1189,6 +1189,7 @@ export interface ApiHealthResponse {
   checkedAt: string;
   dataRoot: string;
   databaseProvider: string;
+  databaseProviderKey: string;
   databaseRoot: string;
   informationalVersion: string;
   logRoot: string;
