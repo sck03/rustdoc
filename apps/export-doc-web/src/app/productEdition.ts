@@ -1,4 +1,4 @@
-import { filterWorkspaceNavGroups, type WorkspaceCapabilities } from "./workspaceNavigation.ts";
+import { filterWorkspaceNavGroups, getWorkspaceRouteItems, type WorkspaceCapabilities } from "./workspaceNavigation.ts";
 
 export type ProductEdition = "Document" | "Sales" | "Full" | "Administration";
 
@@ -64,9 +64,7 @@ export function getDefaultWorkspaceRoute(capabilities: WorkspaceCapabilities) {
   if (!Array.isArray(capabilities.enabledModules)) return "/access-denied";
 
   const availableRoutes = new Set(
-    filterWorkspaceNavGroups(capabilities)
-      .flatMap((group) => group.items)
-      .map((item) => item.to),
+    getWorkspaceRouteItems(filterWorkspaceNavGroups(capabilities)).map((item) => item.to.split("?")[0]),
   );
   const preferredRoutes = [
     "/dashboard",

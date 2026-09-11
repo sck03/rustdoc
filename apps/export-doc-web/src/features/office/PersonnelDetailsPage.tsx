@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient, PersonnelDepartmentRecord, PersonnelImageKind, PersonnelRecord } from "../../api/index.ts";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { readApiError } from "../../ui/formUtils.ts";
-import { OfficeDialog, OfficePager, OfficeQueryState } from "./OfficeUi.tsx";
+import { OfficePager, OfficeQueryState } from "./OfficeUi.tsx";
+import { useRouteQuery } from "../../ui/useRouteQuery.ts";
+import { readRouteChoice } from "../../ui/routeQueryState.ts";
+import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { officeAccess, officeStatusLabels } from "./officeModel.ts";
 import { employmentStatusLabels, employmentTypeLabels, personnelActionLabels, personnelHistoryLabels, personnelReminders, personnelWorkflows, type PersonnelWorkflow } from "./personnelModel.ts";
 import { usePersonnelClearance, usePersonnelHistory, usePersonnelRecord } from "./usePersonnelData.ts";
@@ -16,27 +19,34 @@ import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { RecordDeleteDialog } from "./RecordDeleteDialog.tsx";
 
 type Props = { client: ExportDocManagerApiClient; user: ApiUserDto; id: number; departments: PersonnelDepartmentRecord[]; onClose: () => void };
-export function PersonnelDetailsDialog({ client, user, id, departments, onClose }: Props) {
+export function PersonnelDetailsPage({ client, user, id, departments, onClose }: Props) {
   const query = usePersonnelRecord(client, user, id);
-  const [tab, setTab] = useState("profile");
+  const { params, update: updateRoute } = useRouteQuery();
+  const tab = readRouteChoice(params.get("tab"), ["profile", "images", "history", "clearance"], "profile");
+  const title = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { title.current?.focus(); }, [id]);
   const [pendingImages, setPendingImages] = useState(new Set<PersonnelImageKind>());
+  useEffect(() => setPendingImages(new Set()), [tab]);
   const imageOperation = useOfficeOperation();
   const deleteOperation = useOfficeOperation();
   const [deleting, setDeleting] = useState<PersonnelRecord | null>(null);
   const requestConfirmation = useConfirmation();
+  const { confirmDiscardChanges } = useUnsavedChangesGuard({ isDirty: pendingImages.size > 0, message: "人员档案有尚未上传的图片。" });
   async function changeTab(next: string) {
     if (next === tab || imageOperation.busy) return;
     if (pendingImages.size && !await requestConfirmation({ title: "放弃未上传的图片？", description: "当前选择的图片尚未上传保存。", confirmLabel: "放弃并切换" })) return;
     setPendingImages(new Set());
-    setTab(next);
+    updateRoute({ tab: next }, false);
   }
   const [editing, setEditing] = useState<PersonnelRecord | null>(null);
   const [linking, setLinking] = useState<PersonnelRecord | null>(null);
   const [workflow, setWorkflow] = useState<{ record: PersonnelRecord; action: PersonnelWorkflow } | null>(null);
   const record = query.data;
   return <>
-    <OfficeDialog title={record ? `${record.employee.fullName} · 人员档案` : "人员档案"} onClose={onClose}
-      busy={imageOperation.busy} protectChanges={pendingImages.size > 0} hasChanges={pendingImages.size > 0}>
+    <section className="work-surface office-workspace personnel-workspace personnel-detail-page" aria-label="人员档案详情">
+      <div className="record-context-heading"><button type="button" className="command-button secondary" disabled={imageOperation.busy}
+        onClick={async () => { if (await confirmDiscardChanges("返回人员目录")) onClose(); }}>返回人员目录</button>
+        <h2 ref={title} tabIndex={-1}>{record ? `${record.employee.fullName} · 人员档案` : "人员档案"}</h2></div>
       {query.isPending ? <PageState tone="loading" title="正在读取人员档案" /> : query.isError ? <PageState tone="error" title="档案加载失败" description={readApiError(query.error)}
         action={<button type="button" onClick={() => void query.refetch()}>重新加载</button>} /> : record && <>
         <div className="office-card-heading"><span>{record.employee.employeeNumber} · {record.employee.departmentName} · {record.employee.jobTitle}</span>
@@ -57,7 +67,7 @@ export function PersonnelDetailsDialog({ client, user, id, departments, onClose 
         {tab === "history" && <PersonnelHistory client={client} user={user} id={id} />}
         {tab === "clearance" && <PersonnelClearancePanel client={client} user={user} record={record} />}
       </>}
-    </OfficeDialog>
+    </section>
     {editing && <PersonnelFormDialog client={client} user={user} departments={departments} record={editing} onClose={() => setEditing(null)} onSaved={() => setEditing(null)} />}
     {workflow && <PersonnelWorkflowDialog client={client} user={user} departments={departments} {...workflow} onClose={() => setWorkflow(null)} />}
     {linking && <PersonnelAccountDialog client={client} user={user} record={linking} onClose={() => setLinking(null)} />}

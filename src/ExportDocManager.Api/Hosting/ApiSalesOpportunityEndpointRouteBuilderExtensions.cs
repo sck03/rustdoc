@@ -10,6 +10,7 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapSalesOpportunityEndpoints(this IEndpointRouteBuilder endpoints)
         {
+            endpoints.MapSalesOpportunityReadEndpoint();
             endpoints.MapGet("/api/crm/opportunities", async Task<Results<Ok<ApiPagedResponse<ApiSalesOpportunityDto>>, UnauthorizedHttpResult, ForbidHttpResult>> (
                 ISalesOpportunityService service,
                 string? keyword, string? stage, int? pageNumber, int? pageSize, CancellationToken ct) =>

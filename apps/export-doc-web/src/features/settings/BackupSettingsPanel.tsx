@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense } from "react";
+import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { Cloud } from "lucide-react";
 import type { ApiSettingsSecretsDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { PageState } from "../../ui/PageState.tsx";
@@ -28,8 +29,9 @@ export default function BackupSettingsPanel({ client, settings, secrets, databas
   onTestWebDavConnection: () => void;
   onPathError: (message: string) => void;
 }) {
-  const [section, setSection] = useState(() => readSection(search));
-  useEffect(() => setSection(readSection(search)), [search]);
+  const { update } = useRouteQuery();
+  const section = readSection(search);
+  const setSection = (next: BackupSection) => update({ section: ({ policy: "backupPolicy", webdav: "webDav", data: "backup", postgresql: "postgresql" })[next] }, false);
   const isPostgreSql = databaseProvider === "PostgreSQL";
   const activeSection = section === "postgresql" && !isPostgreSql ? "policy" : section;
   const sections: { key: BackupSection; label: string }[] = [

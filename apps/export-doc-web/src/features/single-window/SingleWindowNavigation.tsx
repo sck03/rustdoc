@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 
 export function getSingleWindowTitle(pathname: string) {
   if (/\/single-window\/acd\/\d+/.test(pathname)) {
@@ -14,7 +15,7 @@ export function getSingleWindowTitle(pathname: string) {
   }
 
   if (pathname.startsWith("/single-window/reference-catalog")) {
-    return "参考词典";
+    return "申报词典";
   }
 
   return "单一窗口操作中心";
@@ -25,20 +26,24 @@ export function SingleWindowTabs({
 }: {
   activeKey: "operation-center" | "reference-catalog" | "customs-coo" | "agent-consignment";
 }) {
+  const canViewOperations = useModulePermission("document.single-window").canView;
+  const canViewDictionary = useModulePermission("document.declaration-dictionary").canView;
   return (
     <nav className="workspace-tabs" aria-label="单一窗口分类">
-      <Link
+      {canViewOperations && <Link
         className={activeKey === "operation-center" ? "workspace-tab workspace-tab-active" : "workspace-tab"}
         to="/single-window/operation-center"
+        aria-current={activeKey === "operation-center" ? "page" : undefined}
       >
         操作中心
-      </Link>
-      <Link
+      </Link>}
+      {canViewDictionary && <Link
         className={activeKey === "reference-catalog" ? "workspace-tab workspace-tab-active" : "workspace-tab"}
         to="/single-window/reference-catalog"
+        aria-current={activeKey === "reference-catalog" ? "page" : undefined}
       >
-        参考词典
-      </Link>
+        申报词典
+      </Link>}
       {activeKey === "customs-coo" ? <span className="workspace-tab workspace-tab-active">COO 草稿</span> : null}
       {activeKey === "agent-consignment" ? <span className="workspace-tab workspace-tab-active">ACD 草稿</span> : null}
     </nav>

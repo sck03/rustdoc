@@ -33,6 +33,12 @@ namespace ExportDocManager.Api.Tests
                 DateOnly.FromDateTime(DateTime.Today.AddDays(30)), "确认样品", "只做销售跟踪", "首次报价"));
             Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
             var opportunity = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSalesOpportunityDto>(createResponse);
+            var located = await client.GetFromJsonAsync<ApiSalesOpportunityDto>($"/api/crm/opportunities/{opportunity.Id}");
+            Assert.Equal(opportunity.Id, located!.Id);
+            Assert.Equal(opportunity.CustomerName, located.CustomerName);
+            Assert.Equal(opportunity.VersionNumber, located.VersionNumber);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/crm/opportunities/{opportunity.Id}")).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/crm/opportunities/2147483647")).StatusCode);
             Assert.Equal("OPP-001", opportunity.ProductCode);
             Assert.Equal("线索", opportunity.Stage);
             Assert.Equal(["需求确认"], opportunity.AllowedNextStages);

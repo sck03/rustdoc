@@ -10,6 +10,7 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapSupplierEndpoints(this IEndpointRouteBuilder endpoints)
         {
+            endpoints.MapSupplierReadEndpoint();
             endpoints.MapGet("/api/suppliers/page", async (ISupplierDirectoryService s,
                 string? keyword, string? status, int? pageNumber, int? pageSize, CancellationToken ct) =>
             {

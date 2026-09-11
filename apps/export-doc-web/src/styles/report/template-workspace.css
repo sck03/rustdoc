@@ -161,12 +161,12 @@
   min-width: 0;
 }
 
-.report-template-management-header h1,
+.report-template-management-header h2,
 .report-template-management-header p {
   margin: 0;
 }
 
-.report-template-management-header h1 {
+.report-template-management-header h2 {
   color: var(--edm-neutral-850);
   font-size: var(--edm-font-size-xl);
 }

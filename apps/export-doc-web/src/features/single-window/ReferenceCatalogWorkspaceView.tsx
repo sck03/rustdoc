@@ -80,7 +80,7 @@ export function ReferenceCatalogToolbar({
 }: ToolbarProps) {
   return (
     <div className="toolbar single-window-reference-toolbar">
-      <div className="reference-catalog-tabs" aria-label="参考词典分类">
+      <div className="reference-catalog-tabs" aria-label="申报词典分类">
         {catalogPages.map((page) => (
           <button
             key={page.key}

@@ -1,6 +1,9 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Models;
+using ExportDocManager.Services.Errors;
+using ExportDocManager.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Services.Infrastructure;
@@ -94,15 +97,25 @@ public sealed class EmailDeliveryStore : IEmailDeliveryStore
         item.ErrorMessage = message[..Math.Min(message.Length, 4000)];
     }, cancellationToken);
 
-    public async Task<IReadOnlyList<EmailDeliverySnapshot>> ListRecentAsync(int limit = 50, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<EmailDeliverySnapshot>> QueryAsync(string? keyword = null, string? status = null,
+        int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
     {
-        int pageSize = Math.Clamp(limit, 1, 100);
+        keyword = keyword?.Trim() ?? string.Empty;
+        status = status?.Trim() ?? string.Empty;
+        if (pageNumber < 1 || pageSize is < 1 or > 100 || keyword.Length > 100 ||
+            status.Length > 0 && status is not (EmailDeliveryStatus.Sent or EmailDeliveryStatus.Attempting or EmailDeliveryStatus.Uncertain))
+            throw new ServiceValidationException("邮件投递查询条件无效。");
         await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         var query = _accessScope.ApplyEmailDeliveryScope(
             context.EmailDeliveryRecords.AsNoTracking());
-
-        return await query
+        if (keyword.Length > 0) query = query.ApplyKeywordSearch(context, keyword, item => item.Recipient, item => item.Subject);
+        if (status.Length > 0) query = query.Where(item => item.Status == status);
+        int total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await query
             .OrderByDescending(item => item.CreatedAt)
+            .ThenByDescending(item => item.OwnerUserId)
+            .ThenByDescending(item => item.DeliveryId)
+            .Skip(PagingHelper.CalculateOffset(pageNumber, pageSize))
             .Take(pageSize)
             .Select(item => new EmailDeliverySnapshot(
                 item.DeliveryId,
@@ -118,6 +131,7 @@ public sealed class EmailDeliveryStore : IEmailDeliveryStore
                 item.UpdatedAt))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+        return new PagedResult<EmailDeliverySnapshot>(rows, total, pageNumber, pageSize);
     }
 
     private async Task UpdateAsync(string deliveryId, Action<EmailDeliveryRecord> update, CancellationToken cancellationToken)

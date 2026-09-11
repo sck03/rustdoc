@@ -125,6 +125,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
     <main className='workspace-content'><h1>公司行政工作台</h1><Routes>
       <Route path='/permissions' element={<AccessControlPage client={client} canManageUsers={true}/>}/>
       <Route path='/office/people' element={<PersonnelPage client={client} user={user}/>}/>
+      <Route path='/office/people/:employeeId' element={<PersonnelPage client={client} user={user}/>}/>
       <Route path='/office/directory' element={<PersonnelPage key='directory' client={client} user={user} directoryOnly/>}/>
       <Route path='/system/organization' element={<OrganizationDirectoryPage client={client} user={user}/>}/>
       <Route path='/office/supplies' element={<OfficeSuppliesPage client={client} user={user}/>}/>
@@ -164,7 +165,7 @@ try {
   const open=async(mode,width,role="admin")=>{
     await page.send("Emulation.setDeviceMetricsOverride",{width,height:960,deviceScaleFactor:1,mobile:false});
     await page.send("Page.navigate",{url:`http://127.0.0.1:${server.address().port}/?mode=${mode}&role=${role}`});
-    if(mode==='permissions'){await waitFor(page,"document.querySelector('.identity-management-tabs')");await clickText(page,'权限方案');}
+    if(mode==='permissions'){await waitFor(page,"document.querySelector('[role=tablist][aria-label=账号与权限管理]')");await clickText(page,'权限方案');}
     await waitFor(page,"document.querySelector('.office-resource-card, .permission-resource-card, .permission-module-grid, .personnel-card, .organization-node')");
   };
   for(const width of [1440,1024,768,390,320]){

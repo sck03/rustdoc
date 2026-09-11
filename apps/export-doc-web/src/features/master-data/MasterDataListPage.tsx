@@ -29,6 +29,7 @@ formatColumnValue
 } from "./masterDataModel.ts";
 
 import { masterDataConfigs } from "./masterDataConfigs.ts";
+import { HsKnowledgeNavigation } from "./HsKnowledgeNavigation.tsx";
 
 export function MasterDataListPage({
   client,
@@ -243,7 +244,8 @@ export function MasterDataListPage({
 
   return (
     <section className="work-surface master-data-surface" aria-label={config.listLabel}>
-      <MasterDataTabs activeKey={config.key} canViewMasterData={canViewMasterData} canViewHsCodes={canViewHsCodes} />
+      {config.key === "hs-codes" ? <HsKnowledgeNavigation activeSection="catalog" canManage={canManage} />
+        : <MasterDataTabs activeKey={config.key} canViewMasterData={canViewMasterData} canViewHsCodes={canViewHsCodes} />}
       {!canOperate ? (
         <PermissionNotice>
           当前权限模板仅允许查看主数据；新建、导入、联网保存和修改已禁用，删除需要管理权限。
@@ -358,7 +360,7 @@ function MasterDataTabs({
   canViewHsCodes: boolean;
 }) {
   const visibleConfigs = masterDataConfigs.filter((item) =>
-    item.key === "hs-codes" ? canViewHsCodes : canViewMasterData);
+    item.key !== "hs-codes" && canViewMasterData);
   return (
     <nav className="master-data-tabs" aria-label="主数据分类">
       {visibleConfigs.map((item) => (
@@ -370,6 +372,7 @@ function MasterDataTabs({
           {item.label}
         </Link>
       ))}
+      {canViewHsCodes && <Link className="master-data-shortcut" to="/master-data/hs-codes">HS 税则目录 ↗</Link>}
     </nav>
   );
 }

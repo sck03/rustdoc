@@ -13,7 +13,8 @@ export function settingsCategoryForPath([root, field = ""]: readonly string[]): 
   if (root === "exchangeRate") return "exchange-rate";
   if (root === "email") return "communication";
   if (root === "webDav") return "backup";
-  if (root === "singleWindow" || root === "ai") return "single-window";
+  if (root === "singleWindow") return "documents";
+  if (root === "ai") return "ai";
   return "runtime";
 }
 
@@ -42,6 +43,6 @@ export function changedSettingsCategories(baseline: SettingsRecord | null, draft
 }
 
 export function categoryHasSecrets(category: SettingsCategoryKey, databaseProvider?: string | null) {
-  return category === "communication" || category === "backup" || category === "single-window"
+  return category === "communication" || category === "backup" || category === "ai"
     || (category === "runtime" && databaseProvider === "PostgreSQL");
 }

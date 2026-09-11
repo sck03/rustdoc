@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import type { ApiPermissionResourceDefinitionDto } from "../../api/index.ts";
 import { detectPreset, grantKey, presetLabels, scopeLabels } from "./permissionSchemeModel.ts";
+import { filterPermissionResources, permissionResourceLocation } from "./permissionNavigationModel.ts";
 
 export function PermissionModuleGrid({
   resources, grants, dataScopes, disabled, onToggle, onScopeChange, onPresetChange,
@@ -16,13 +17,8 @@ export function PermissionModuleGrid({
 }) {
   const [group, setGroup] = useState("");
   const [search, setSearch] = useState("");
-  const groups = useMemo(() => [...new Set(resources.map((resource) => resource.group))], [resources]);
-  const visible = useMemo(() => {
-    const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    return resources.filter((resource) => (!group || resource.group === group) && words.every((word) =>
-      [resource.name, resource.group, ...resource.actions.flatMap((action) => [action.name, action.description])]
-        .join(" ").toLowerCase().includes(word)));
-  }, [group, resources, search]);
+  const groups = useMemo(() => [...new Set(resources.map((resource) => permissionResourceLocation(resource).group))], [resources]);
+  const visible = useMemo(() => filterPermissionResources(resources, group, search), [group, resources, search]);
 
   return (
     <div className="permission-modules">
@@ -39,9 +35,11 @@ export function PermissionModuleGrid({
           </label>
         </div>
       </div>
+      <p className="permission-navigation-note">按主导航分组查找权限。一个页面可以包含多个独立模块，每项操作的数据范围分别生效；筛选保留全部未保存的授权。</p>
       <div className="permission-module-grid">
         {visible.map((resource) => (
           <section className="permission-resource-card" key={resource.key} aria-label={resource.name}>
+            <p className="permission-resource-location">{permissionResourceLocation(resource).path}</p>
             <div className="permission-resource-header">
               <h4>{resource.name}</h4>
               <select aria-label={`${resource.name}快捷设置`} disabled={disabled} value={detectPreset(grants, resource)} onChange={(event) => onPresetChange(resource, event.target.value)}>

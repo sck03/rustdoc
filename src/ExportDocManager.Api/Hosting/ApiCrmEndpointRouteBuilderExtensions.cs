@@ -11,6 +11,7 @@ namespace ExportDocManager.Api.Hosting
     {
         private static void MapCrmEndpoints(this IEndpointRouteBuilder endpoints)
         {
+            endpoints.MapCrmCustomerReadEndpoint();
             endpoints.MapGet("/api/crm/dashboard", async (ICrmService service,
                 ISalesOpportunityService opportunities, CancellationToken ct) =>
                 Results.Ok(ToApiDto(await service.GetDashboardAsync(ct), await opportunities.GetDashboardAsync(ct))))

@@ -2,6 +2,7 @@ import { ApiReportTemplateDto, ApiUserReportTemplateDto } from "../../api/index.
 import { SelectField } from "../../ui/FormFields.tsx";
 import { fileNameFromPath, matchesTemplatePath, type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
 import { CircleCheckBig } from "lucide-react";
+import { useState } from "react";
 
 export function ReportTemplateSelectionPanel({
   reportType,
@@ -32,8 +33,16 @@ export function ReportTemplateSelectionPanel({
   onUserTemplateChange: (value: string) => void;
   onSetDefault: () => void;
 }) {
-  const selectedTemplateIsDefault = matchesTemplatePath(selectedTemplatePath, defaultTemplatePath);
+  const [search, setSearch] = useState("");
+  const selectedValue = selectedUserTemplateId > 0 ? `user-template:${selectedUserTemplateId}` : selectedTemplatePath;
+  const selectedTemplateIsDefault = matchesTemplatePath(selectedValue, defaultTemplatePath);
   const fileTemplates = templates.filter((template) => !template.templatePath.startsWith("user-template:"));
+  const statusLabels: Record<string, string> = { Draft: "草稿", Published: "已发布", Disabled: "已停用", Archived: "已归档" };
+  const entries = [
+    ...fileTemplates.map((template) => ({ value: template.templatePath, label: `${template.displayName || fileNameFromPath(template.templatePath)} · 文件模板` })),
+    ...userTemplates.map((template) => ({ value: `user-template:${template.id}`, label: `${template.name} · ${template.shareScope === "Private" ? "个人模板" : "共享模板"} · ${statusLabels[template.status] ?? template.status}` })),
+  ].map((item) => ({ ...item, label: `${matchesTemplatePath(item.value, defaultTemplatePath) ? "默认 · " : ""}${item.label}` }));
+  const options = entries.filter((item) => item.value === selectedValue || item.label.normalize("NFKC").toLowerCase().includes(search.normalize("NFKC").trim().toLowerCase()));
 
   return (
     <div className="template-selection-panel">
@@ -45,17 +54,15 @@ export function ReportTemplateSelectionPanel({
         options={reportTypeOptions}
         onChange={onReportTypeChange}
       />
+      <label className="template-directory-search">查找模板<input type="search" aria-label="搜索模板目录" placeholder="名称、来源或状态" value={search} maxLength={100} onChange={(event) => setSearch(event.target.value)} /></label>
       <div className="template-default-selection">
         <SelectField
-          label="文件模板"
+          label="模板目录"
           className="template-select-field"
-          value={selectedUserTemplateId > 0 ? "" : selectedTemplatePath}
-          disabled={isBusy || fileTemplates.length === 0}
-          options={fileTemplates.map((template) => ({
-            value: template.templatePath,
-            label: `${matchesTemplatePath(template.templatePath, defaultTemplatePath) ? "默认 · " : ""}${template.displayName || fileNameFromPath(template.templatePath)}`,
-          }))}
-          onChange={onTemplateChange}
+          value={selectedValue}
+          disabled={isBusy || options.length === 0}
+          options={options}
+          onChange={(value) => value.startsWith("user-template:") ? onUserTemplateChange(value.slice("user-template:".length)) : onTemplateChange(value)}
         />
         <button
           className="command-button secondary compact-button"
@@ -67,20 +74,6 @@ export function ReportTemplateSelectionPanel({
           <span>{selectedTemplateIsDefault ? "当前默认" : "设为默认"}</span>
         </button>
       </div>
-      <SelectField
-        label="我的 / 共享模板"
-        className="template-select-field"
-        value={selectedUserTemplateId > 0 ? String(selectedUserTemplateId) : ""}
-        disabled={isBusy}
-        options={[
-          { value: "", label: "选择用户模板" },
-          ...userTemplates.map((template) => ({
-            value: String(template.id),
-            label: `${matchesTemplatePath(`user-template:${template.id}`, defaultTemplatePath) ? "默认 · " : ""}${template.canEdit ? "我的" : "共享"} · ${template.name}`,
-          })),
-        ]}
-        onChange={onUserTemplateChange}
-      />
     </div>
   );
 }

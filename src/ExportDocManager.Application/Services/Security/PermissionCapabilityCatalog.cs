@@ -171,7 +171,7 @@ namespace ExportDocManager.Services.Security
         [
             OfficeResource(OfficeRooms, "会议室预约", 330, false),
             OfficeResource(OfficeSupplies, "物品领用", 340, true),
-            new(OfficePeople, "人员信息管理", "公司行政", "office", OfficePeople, 350, false, true,
+            new(OfficePeople, "人员档案与通讯录", "公司行政", "office", OfficePeople, 350, false, true,
             [
                 Action(PermissionAction.View, "公司通讯录", "查看在职人员的工作信息和联系方式", 10, PermissionAccessLevel.View),
                 Action(PermissionAction.ViewDetails, "人事档案与记录", "查看入职日期、个人联系方式、紧急联系人和人事记录", 20),
@@ -278,7 +278,7 @@ namespace ExportDocManager.Services.Security
                 Action(PermissionAction.Restore, "恢复", "恢复模板历史版本", 60, PermissionAccessLevel.Manage),
                 Action(PermissionAction.Delete, "删除", "删除模板", 70, PermissionAccessLevel.Manage)
             ]),
-            new(EmailDelivery, "邮件外发", "邮件与外发", "common", PermissionModuleCatalog.CommonEmail, 310,
+            new(EmailDelivery, "邮件发送与投递", "邮件中心", "common", PermissionModuleCatalog.CommonEmail, 310,
                 false, true,
             [
                 Action(PermissionAction.Send, "单封发送", "发送单封业务邮件", 10),

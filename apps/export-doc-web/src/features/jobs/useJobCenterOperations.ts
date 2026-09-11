@@ -7,6 +7,7 @@ import { downloadCompletedJobResult, downloadJobResultWhenReady } from "../../ui
 import { readApiError } from "../../ui/formUtils.ts";
 import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { fileNameFromPath, isTerminalJob, readPathLines } from "./jobPresentation.ts";
+import { createInvoiceReportExport } from "./invoiceReportExport.ts";
 
 type Options = {
   client: ExportDocManagerApiClient;
@@ -76,9 +77,7 @@ export function useJobCenterOperations({ client, queryClient, canOperate, canMan
   const reportZipMutation = useMutation({
     mutationFn: () => runAbortableOperation(async (signal) => {
       const body = { invoiceIds: reportInvoices.map((invoice) => invoice.id), reportType: "ExportDocument", templatePath: reportTemplatePath.trim(), withSeal: reportWithSeal, destinationPath: desktopAvailable ? reportZipDestination.trim() : "" };
-      const job = desktopAvailable ? await client.startInvoiceReportPdfZipSaveToPathJob({ body }, { signal }) : await client.startInvoiceReportPdfZipDownloadJob({ body }, { signal });
-      if (!desktopAvailable) await downloadJobResultWhenReady(client, job, "invoice-reports.zip", { signal });
-      return job;
+      return createInvoiceReportExport(client, body, desktopAvailable, signal);
     }),
     onSuccess: async (job) => { focusJob(job.jobId, `已创建批量报表 ZIP 任务：${job.jobId}`); setReportZipDestination(""); await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() }); },
     onError: (error) => showError(readApiError(error)),

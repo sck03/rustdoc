@@ -551,7 +551,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
 
     await page.send("Page.navigate", { url: checkUrl });
     const expectedText = [
-      "参考词典",
+      "申报词典",
       "国家/地区(COO)",
       "批量粘贴",
       "去重",
@@ -561,7 +561,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
     const tableReady = await waitForPageExpression(
       page,
       `(() => {
-        const surface = document.querySelector('[aria-label="单一窗口参考词典"]');
+        const surface = document.querySelector('[aria-label="单一窗口申报词典"]');
         return Boolean(surface &&
           surface.querySelector('.reference-catalog-table') &&
           surface.querySelector('[data-catalog-row="0"][data-catalog-column="0"]'));
@@ -573,7 +573,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
     await evaluate(
       page,
       `(() => {
-        const surface = document.querySelector('[aria-label="单一窗口参考词典"]');
+        const surface = document.querySelector('[aria-label="单一窗口申报词典"]');
         const input = surface ? surface.querySelector('[data-catalog-row="0"][data-catalog-column="0"]') : null;
         if (!input) {
           throw new Error('Reference catalog first editable cell is not available.');
@@ -600,7 +600,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
       const state = await evaluate(
         page,
         `(() => {
-          const surface = document.querySelector('[aria-label="单一窗口参考词典"]');
+          const surface = document.querySelector('[aria-label="单一窗口申报词典"]');
           const read = (row, column) => {
             const element = surface ? surface.querySelector('[data-catalog-row="' + row + '"][data-catalog-column="' + column + '"]') : null;
             return element ? element.value || '' : '';
@@ -629,7 +629,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
     await evaluate(
       page,
       `(() => {
-        const alias = document.querySelector('[aria-label="单一窗口参考词典"] [data-catalog-row="0"][data-catalog-column="3"]');
+        const alias = document.querySelector('[aria-label="单一窗口申报词典"] [data-catalog-row="0"][data-catalog-column="3"]');
         if (!alias) {
           throw new Error('Reference catalog alias cell is not available.');
         }
@@ -678,7 +678,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
       const state = await evaluate(
         page,
         `(() => {
-          const alias = document.querySelector('[aria-label="单一窗口参考词典"] [data-catalog-row="0"][data-catalog-column="3"]');
+          const alias = document.querySelector('[aria-label="单一窗口申报词典"] [data-catalog-row="0"][data-catalog-column="3"]');
           return { value: alias ? alias.value || '' : '' };
         })()`,
         true,
@@ -690,7 +690,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
     await evaluate(
       page,
       `(() => {
-        const input = document.querySelector('[aria-label="单一窗口参考词典"] [data-catalog-row="0"][data-catalog-column="0"]');
+        const input = document.querySelector('[aria-label="单一窗口申报词典"] [data-catalog-row="0"][data-catalog-column="0"]');
         if (!input) {
           throw new Error('Reference catalog first cell is not available for context menu.');
         }
@@ -731,7 +731,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
     await evaluate(
       page,
       `(() => {
-        const input = document.querySelector('[aria-label="单一窗口参考词典"] [data-catalog-row="0"][data-catalog-column="0"]');
+        const input = document.querySelector('[aria-label="单一窗口申报词典"] [data-catalog-row="0"][data-catalog-column="0"]');
         if (!input) {
           throw new Error('Reference catalog first cell is not available for Ctrl+D.');
         }
@@ -752,7 +752,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
       const state = await evaluate(
         page,
         `(() => {
-          const surface = document.querySelector('[aria-label="单一窗口参考词典"]');
+          const surface = document.querySelector('[aria-label="单一窗口申报词典"]');
           const alias = surface ? surface.querySelector('[data-catalog-row="0"][data-catalog-column="3"]') : null;
           const text = surface ? surface.innerText || '' : '';
           return {

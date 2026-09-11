@@ -13,7 +13,7 @@ export function worklistTarget(item: WorklistItem) {
       return `/office/meeting-rooms?view=requests&requestId=${item.recordId}`;
     case "supply-approval": case "supply-collection": case "supply-return":
       return `/office/supplies?view=requests&requestId=${item.recordId}`;
-    case "probation-end": case "contract-end": return `/office/people?employeeId=${item.recordId}`;
+    case "probation-end": case "contract-end": return `/office/people/${item.recordId}`;
     default: return null;
   }
 }

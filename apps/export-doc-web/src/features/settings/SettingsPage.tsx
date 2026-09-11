@@ -28,6 +28,7 @@ import { readSettingsCategoryFromSearch, readSettingsPanelLabelFromSearch } from
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ConcurrencyConflictNotice, InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { useSettingsMaintenanceActions } from "./useSettingsMaintenanceActions.ts";
 import { useSettingsDraftSync } from "./useSettingsDraftSync.ts";
 import { systemDefaultPatches } from "./settingsDefaults.ts";
@@ -44,6 +45,7 @@ const LazyExcelImportSettingsPanel = lazy(() => import("./ExcelImportSettingsPan
 const LazyExchangeRateSettingsPanel = lazy(() => import("./ExchangeRateSettingsPanel.tsx"));
 const LazyCommunicationSettingsPanel = lazy(() => import("./CommunicationSettingsPanel.tsx"));
 const LazySingleWindowSettingsPanel = lazy(() => import("./SingleWindowSettingsPanel.tsx"));
+const LazyAiSettingsPanel = lazy(() => import("./AiSettingsPanel.tsx"));
 
 function SettingsPanelDeepLink({ label }: { label: string | null }) {
   useEffect(() => {
@@ -112,9 +114,9 @@ export function SettingsPage({
     fetchPlace: "",
     aplAdd: "",
   });
-  const [activeCategory, setActiveCategory] = useState<SettingsCategoryKey>(() =>
-    readSettingsCategoryFromSearch(location.search, availableSettingsCategoryKeys),
-  );
+  const { update: updateRoute } = useRouteQuery();
+  const activeCategory = readSettingsCategoryFromSearch(location.search, availableSettingsCategoryKeys);
+  const setActiveCategory = (key: SettingsCategoryKey) => updateRoute({ section: availableSettingsCategories.find((item) => item.key === key)?.section, group: null }, false);
   const queryClient = useQueryClient();
   const [concurrencyMessage, setConcurrencyMessage] = useState<string | null>(null);
 
@@ -132,7 +134,7 @@ export function SettingsPage({
   const issuingAuthoritiesQuery = useQuery({
     queryKey: queryKeys.singleWindowCustomsCooIssuingAuthorities(),
     queryFn: ({ signal }) => client.getCustomsCooIssuingAuthorities({ signal }),
-    enabled: activeCategory === "single-window",
+    enabled: activeCategory === "documents",
     staleTime: 10 * 60 * 1000,
   });
 
@@ -158,10 +160,6 @@ export function SettingsPage({
       setSuccessMessage(null);
     }
   }, [settingsQuery.error, settingsQuery.isError]);
-
-  useEffect(() => {
-    setActiveCategory(readSettingsCategoryFromSearch(location.search, availableSettingsCategoryKeys));
-  }, [canUseDocumentWorkspace, location.search]);
 
   const saveMutation = useMutation({
     mutationFn: (body: SettingsRecord) =>
@@ -629,7 +627,10 @@ export function SettingsPage({
                   onSelectDefaultExportDirectory={() => void handleSelectDefaultExportDirectory()}
                 />
               ) : null}
-              {currentCategory === "documents" && <LazyDocumentSettingsPanel settings={settings} disabled={isBusy || !canManageSettings} search={location.search} onChange={patchSetting} />}
+              {currentCategory === "documents" && <LazyDocumentSettingsPanel settings={settings} disabled={isBusy || !canManageSettings} search={location.search} onChange={patchSetting}
+                declarationDefaults={<LazySingleWindowSettingsPanel settings={settings} issuingAuthorityOptions={issuingAuthorityOptions}
+                  canManageSettings={canManageSettings && !isBusy} onChange={patchSetting} onOrgCodeChange={handleSingleWindowOrgCodeChange}
+                  onFetchPlaceChange={handleSingleWindowFetchPlaceChange} onAplAddChange={handleSingleWindowAplAddChange} />} />}
               {currentCategory === "backup" && <LazyBackupSettingsPanel
                 client={client} settings={settings} secrets={secrets} databaseProvider={databaseProvider}
                 disabled={isBusy || !canManageSettings} canManageSettings={canManageSettings} updateSecrets={updateSecrets}
@@ -670,19 +671,8 @@ export function SettingsPage({
                   onTestEmailConnection={handleTestEmailConnection}
                 />
               ) : null}
-              {currentCategory === "single-window" ? (
-                <LazySingleWindowSettingsPanel
-                  settings={settings}
-                  secrets={secrets}
-                  issuingAuthorityOptions={issuingAuthorityOptions}
-                  canManageSettings={canManageSettings && !isBusy}
-                  updateSecrets={updateSecrets}
-                  onChange={patchSetting}
-                  onOrgCodeChange={handleSingleWindowOrgCodeChange}
-                  onFetchPlaceChange={handleSingleWindowFetchPlaceChange}
-                  onAplAddChange={handleSingleWindowAplAddChange}
-                />
-              ) : null}
+              {currentCategory === "ai" && <LazyAiSettingsPanel settings={settings} secrets={secrets}
+                disabled={isBusy || !canManageSettings} updateSecrets={updateSecrets} onChange={patchSetting} />}
               {currentCategory === "maintenance" ? (
                 <>
                   <Suspense fallback={<PageState tone="loading" title="正在加载维护工具" />}>
@@ -695,7 +685,6 @@ export function SettingsPage({
                       health={healthQuery.data ?? null}
                       healthIsBusy={healthQuery.isFetching}
                       healthErrorMessage={healthQuery.isError ? readApiError(healthQuery.error) : null}
-                      initialPanelLabel={readSettingsPanelLabelFromSearch(location.search) ?? ""}
                       onRefreshHealth={() => void healthQuery.refetch()}
                       onPathError={setMessage}
                     />

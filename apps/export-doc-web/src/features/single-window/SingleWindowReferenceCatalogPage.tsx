@@ -107,7 +107,7 @@ export function SingleWindowReferenceCatalogPage({
       setDraft(nextCatalog);
       setHasUnsavedChanges(false);
       setMessage(null);
-      setSuccessMessage(response.message || "单一窗口参考词典已保存。");
+      setSuccessMessage(response.message || "单一窗口申报词典已保存。");
       queryClient.setQueryData(queryKeys.singleWindowReferenceCatalog(), {
         catalog: nextCatalog,
         storagePolicy: response.storagePolicy,
@@ -127,7 +127,7 @@ export function SingleWindowReferenceCatalogPage({
       setDraft(nextCatalog);
       setHasUnsavedChanges(false);
       setMessage(null);
-      setSuccessMessage(response.message || "已恢复内置参考词典。");
+      setSuccessMessage(response.message || "已恢复内置申报词典。");
       queryClient.setQueryData(queryKeys.singleWindowReferenceCatalog(), {
         catalog: nextCatalog,
         storagePolicy: response.storagePolicy,
@@ -150,7 +150,7 @@ export function SingleWindowReferenceCatalogPage({
       setDraft(nextCatalog);
       setHasUnsavedChanges(false);
       setMessage(null);
-      setSuccessMessage(response.message || "单一窗口参考词典已导入。");
+      setSuccessMessage(response.message || "单一窗口申报词典已导入。");
       queryClient.setQueryData(queryKeys.singleWindowReferenceCatalog(), {
         catalog: nextCatalog,
         storagePolicy: response.storagePolicy,
@@ -202,7 +202,7 @@ export function SingleWindowReferenceCatalogPage({
   });
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: canManageReferenceCatalog && hasUnsavedChanges,
-    message: "当前单一窗口参考词典有未保存的修改。",
+    message: "当前单一窗口申报词典有未保存的修改。",
   });
 
   useEffect(() => {
@@ -284,7 +284,7 @@ export function SingleWindowReferenceCatalogPage({
       return;
     }
 
-    if (!await requestConfirmation({ title: "删除参考词典行", description: `确定删除“${activePage.label}”第 ${position.rowIndex + 1} 行吗？`, details: ["保存词典后修改才会正式生效。"], confirmLabel: "确认删除", tone: "danger" })) {
+    if (!await requestConfirmation({ title: "删除申报词典行", description: `确定删除“${activePage.label}”第 ${position.rowIndex + 1} 行吗？`, details: ["保存词典后修改才会正式生效。"], confirmLabel: "确认删除", tone: "danger" })) {
       return;
     }
 
@@ -477,11 +477,11 @@ export function SingleWindowReferenceCatalogPage({
       return;
     }
 
-    if (!await confirmDiscardChanges("恢复内置参考词典")) {
+    if (!await confirmDiscardChanges("恢复内置申报词典")) {
       return;
     }
 
-    if (!await requestConfirmation({ title: "恢复内置参考词典", description: "确定恢复系统内置参考词典吗？", details: ["当前外置覆盖词典将被删除。"], confirmLabel: "恢复内置词典", tone: "danger" })) {
+    if (!await requestConfirmation({ title: "恢复内置申报词典", description: "确定恢复系统内置申报词典吗？", details: ["当前外置覆盖词典将被删除。"], confirmLabel: "恢复内置词典", tone: "danger" })) {
       return;
     }
 
@@ -504,7 +504,7 @@ export function SingleWindowReferenceCatalogPage({
 
     downloadJson(normalizeCatalog(draft), "singlewindow_reference_catalogs.json");
     setMessage(null);
-    setSuccessMessage("参考词典已导出。");
+    setSuccessMessage("申报词典已导出。");
   }
 
   function chooseJsonImportFile() {
@@ -520,7 +520,7 @@ export function SingleWindowReferenceCatalogPage({
       return;
     }
 
-    if (!await confirmDiscardChanges("导入参考词典配置")) {
+    if (!await confirmDiscardChanges("导入申报词典配置")) {
       return;
     }
 
@@ -530,7 +530,7 @@ export function SingleWindowReferenceCatalogPage({
   }
 
   async function handleRefreshCatalog() {
-    if (!await confirmDiscardChanges("刷新参考词典")) {
+    if (!await confirmDiscardChanges("刷新申报词典")) {
       return;
     }
 
@@ -540,7 +540,7 @@ export function SingleWindowReferenceCatalogPage({
   }
 
   return (
-    <section className="work-surface single-window-surface single-window-reference-catalog-surface" aria-label="单一窗口参考词典">
+    <section className="work-surface single-window-surface single-window-reference-catalog-surface" aria-label="单一窗口申报词典">
       <SingleWindowTabs activeKey="reference-catalog" />
       <input ref={jsonImportInputRef} hidden type="file" accept=".json,application/json" onChange={handleJsonImportFile} />
       <input
@@ -552,9 +552,9 @@ export function SingleWindowReferenceCatalogPage({
       />
 
       {!canManageReferenceCatalog ? <InlineNotice tone="info">当前账号只能查看申报词典，编辑和导入需要 Operate 权限。</InlineNotice> : null}
-      {message ? <InlineNotice tone="error" title="参考词典操作失败">{message}</InlineNotice> : null}
+      {message ? <InlineNotice tone="error" title="申报词典操作失败">{message}</InlineNotice> : null}
       {serverDraftSync.hasPendingServerVersion ? <ServerDraftUpdateNotice
-        entityLabel="单一窗口参考词典"
+        entityLabel="单一窗口申报词典"
         onKeepLocal={serverDraftSync.keepLocalDraft}
         onLoadServer={serverDraftSync.loadServerVersion}
       /> : null}

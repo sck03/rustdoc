@@ -27,6 +27,23 @@ public sealed class SalesOpportunityService : ISalesOpportunityService
         _clock = clock ?? BusinessClock.CreateSystem();
     }
 
+    public async Task<SalesOpportunityRecord> GetAsync(int id, CancellationToken cancellationToken = default)
+    {
+        _accessScope.DemandPermission(PermissionModuleCatalog.CommonProductReference, PermissionAction.View);
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        var opportunities = _accessScope.ApplySalesOpportunityScope(context.SalesOpportunities.AsNoTracking());
+        var customers = _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking());
+        var query = from opportunity in opportunities
+                    where opportunity.Id == id
+                    join customer in customers on opportunity.CrmCustomerId equals customer.Id
+                    join product in context.Products.AsNoTracking() on opportunity.ProductId equals product.Id into products
+                    from product in products.DefaultIfEmpty()
+                    select new { Opportunity = opportunity, CustomerName = customer.Name, Product = product };
+        var row = await query.SingleOrDefaultAsync(cancellationToken)
+            ?? throw new ResourceNotFoundException("商机不存在、已归档或无权访问。");
+        return ToRecord(row.Opportunity, row.CustomerName, row.Product);
+    }
+
     public async Task<PagedResult<SalesOpportunityRecord>> QueryAsync(
         string? keyword,
         string? stage,

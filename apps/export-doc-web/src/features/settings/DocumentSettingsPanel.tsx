@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { SelectField } from "../../ui/FormFields.tsx";
 import { DocumentFieldLabelsSettingsPanel } from "./DocumentFieldLabelsSettingsPanel.tsx";
 import { NumberSetting, readSettingString } from "./SettingsFieldControls.tsx";
@@ -6,27 +7,24 @@ import { SettingsSectionNav } from "./SettingsSectionNav.tsx";
 import { readDocumentFieldGroup } from "./settingsNavigationModel.ts";
 import type { SettingsRecord } from "./settingsTypes.ts";
 
-const sections = [{ key: "defaults", label: "录入默认值" }, { key: "fields", label: "字段名称" }] as const;
-const readSection = (search: string) => new URLSearchParams(search).get("section") === "documentFields" ? "fields" : "defaults";
+const sections = [{ key: "documentDefaults", label: "录入默认值" }, { key: "documentFields", label: "字段名称" }, { key: "singleWindow", label: "申报默认值" }] as const;
 
-export default function DocumentSettingsPanel({ settings, disabled, search, onChange }: {
+export default function DocumentSettingsPanel({ settings, disabled, search, onChange, declarationDefaults }: {
   settings: SettingsRecord;
   disabled: boolean;
   search: string;
   onChange: (path: string[], value: unknown) => void;
+  declarationDefaults: ReactNode;
 }) {
-  const [section, setSection] = useState<"defaults" | "fields">(() => readSection(search));
-  const [group, setGroup] = useState(() => readDocumentFieldGroup(search));
-  useEffect(() => {
-    setSection(readSection(search));
-    setGroup(readDocumentFieldGroup(search));
-  }, [search]);
+  const { update } = useRouteQuery();
+  const section = sections.find((item) => item.key === new URLSearchParams(search).get("section"))?.key ?? "documentDefaults";
+  const group = readDocumentFieldGroup(search);
 
   return <>
     <p className="form-field-description">连接同一服务的账号共用这些设置。切换分类保留草稿，点击“保存全部修改”后生效。</p>
-    <SettingsSectionNav label="单据设置分类" sections={sections} activeSection={section} onSelect={setSection} />
-    {section === "fields"
-      ? <DocumentFieldLabelsSettingsPanel settings={settings} disabled={disabled} group={group} onGroupChange={setGroup} onChange={onChange} />
+    <SettingsSectionNav label="单据设置分类" sections={sections} activeSection={section} onSelect={(next) => update({ section: next }, false)} />
+    {section === "singleWindow" ? declarationDefaults : section === "documentFields"
+      ? <DocumentFieldLabelsSettingsPanel settings={settings} disabled={disabled} group={group} onGroupChange={(next) => update({ group: next })} onChange={onChange} />
       : <section className="form-section" aria-label="发票录入默认值">
         <div className="section-header"><h2>发票录入默认值</h2></div>
         <fieldset className="settings-fieldset" disabled={disabled}>

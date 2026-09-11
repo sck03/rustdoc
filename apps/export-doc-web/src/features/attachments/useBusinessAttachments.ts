@@ -8,14 +8,17 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { attachmentUploadRequest, type AttachmentUploadInput } from "./attachmentModel.ts";
 import { useBusinessAttachmentCategories } from "./useBusinessAttachmentCategories.ts";
+import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
+import { useRouteQuery } from "../../ui/useRouteQuery.ts";
+import { readRouteId } from "../../ui/routeQueryState.ts";
 
 export function useBusinessAttachments(client: ExportDocManagerApiClient, invoiceId: number | undefined, userId: number) {
-  const [keyword, setKeyword] = useState("");
-  const [search, setSearch] = useState("");
-  const [includeArchived, setIncludeArchived] = useState(false);
-  const [pageNumber, setPageNumber] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const { keywordInput: keyword, setKeywordInput: setKeyword, keyword: search, setKeyword: setSearch, pageNumber, setPageNumber, pageSize, setPageSize } = useDirectoryLocation();
+  const { params, update: updateRoute } = useRouteQuery();
+  const includeArchived = params.get("archived") === "true";
+  const setIncludeArchived = (value: boolean) => updateRoute({ archived: value, page: null });
+  const selectedId = readRouteId(params.get("attachmentId"));
+  const setSelectedId = (id: number | null) => updateRoute({ attachmentId: id }, false);
   const [uploadMode, setUploadMode] = useState<"new" | "revision" | null>(null);
   const [preview, setPreview] = useState<{ blob: Blob; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -108,7 +111,7 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
   return { query, details, invoice, categories, saveCategory, removeCategory, editMetadata, remove, keyword, search, includeArchived, pageNumber, pageSize, selectedId, busy, error, message,
     uploadMode, setUploadMode, preview, setPreview, upload, update, read, setSelectedId, setPageNumber, commitSearch,
     changeKeyword: (value: string) => { setKeyword(value); if (!value) { setSearch(""); setPageNumber(1); } },
-    changeArchived: (value: boolean) => { setIncludeArchived(value); setPageNumber(1); },
+    changeArchived: setIncludeArchived,
     changePageSize: (value: number) => { setPageSize(value); setPageNumber(1); },
     refresh: () => { if (keyword.trim() !== search) commitSearch(); else void queries.invalidateQueries({ queryKey: ["business-attachments"] }); } };
 }

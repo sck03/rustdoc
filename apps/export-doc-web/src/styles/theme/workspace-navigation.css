@@ -1,0 +1,107 @@
+.workspace-section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px;
+  margin-bottom: 12px;
+  border: 1px solid var(--edm-neutral-200);
+  border-radius: 10px;
+  background: var(--edm-neutral-50);
+}
+
+.workspace-section-nav :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--edm-neutral-650);
+  text-decoration: none;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workspace-section-nav [aria-current="page"] {
+  background: var(--edm-primary-100);
+  color: var(--edm-primary-700);
+}
+
+.nav-search-location {
+  display: block;
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: inherit;
+}
+
+.record-context-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-block: 8px 16px;
+  min-width: 0;
+}
+
+.record-context-heading :is(h2, strong) {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 1.125rem;
+}
+
+.record-detail-content,
+.record-detail-content > form,
+.personnel-detail-page {
+  min-width: 0;
+}
+
+.permission-navigation-note,
+.permission-resource-location {
+  margin: 0;
+  color: var(--edm-neutral-550);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+.permission-resource-location {
+  padding: 10px 12px 0;
+}
+
+.knowledge-help {
+  border-bottom: 1px solid var(--edm-neutral-200);
+  padding: 10px 0;
+  color: var(--edm-neutral-650);
+}
+
+.knowledge-help summary,
+.email-service-details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.master-data-shortcut {
+  align-self: center;
+  margin-inline-start: auto;
+  padding: 10px;
+}
+
+.template-directory-search {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.report-template-management-workspace > :is(nav, div) {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .workspace-section-nav :is(a, button) { flex: 1 1 auto; justify-content: center; }
+  .record-context-heading { align-items: flex-start; }
+}

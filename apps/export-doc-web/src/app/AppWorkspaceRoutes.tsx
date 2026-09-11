@@ -119,7 +119,7 @@ export function AppWorkspaceRoutes({
         <Route path="/crm/opportunities" element={hasPermission(permissions, permissionResources.salesOpportunities, permissionActions.view)
           ? <SalesOpportunityPage businessTimeZone={user.businessTimeZone} client={client} />
           : <Navigate to="/dashboard" replace />} />
-        <Route path="/crm/follow-ups" element={hasPermission(permissions, permissionResources.crmCustomers, permissionActions.view) &&
+        <Route path="/crm/follow-ups" element={hasPermission(permissions, permissionResources.crmCustomers, permissionActions.view) ||
           hasPermission(permissions, permissionResources.crmFollowUps, permissionActions.view)
           ? <CustomerFollowUpPage businessTimeZone={user.businessTimeZone} client={client} />
           : <Navigate to="/dashboard" replace />} />
@@ -130,6 +130,7 @@ export function AppWorkspaceRoutes({
         <Route path="/office/meeting-rooms" element={<MeetingRoomsPage client={client} user={user} />} />
         <Route path="/office/supplies" element={<OfficeSuppliesPage client={client} user={user} />} />
         <Route path="/office/people" element={<PersonnelPage key="records" client={client} user={user} />} />
+        <Route path="/office/people/:employeeId" element={<PersonnelPage key="records" client={client} user={user} />} />
         <Route path="/office/directory" element={<PersonnelPage key="directory" client={client} user={user} directoryOnly />} />
         <Route path="/invoices/new" element={<InvoiceEditorPage businessDate={user.businessDate} client={client} mode="new" />} />
         <Route path="/invoices/:invoiceId" element={<InvoiceEditorPage businessDate={user.businessDate} client={client} mode="edit" attachmentsEnabled={features.includes("business-attachments")} />} />
@@ -173,7 +174,7 @@ export function AppWorkspaceRoutes({
         <Route path="/tools/ocr" element={<SmartOcrPage client={client} />} />
         <Route path="/tools/container-packing" element={<ContainerPackingPage client={client} />} />
         <Route path="/tools/exchange-rates" element={<ExchangeRatePage client={client} />} />
-        <Route path="/tools/email" element={<EmailPage client={client} />} />
+        <Route path="/tools/email" element={<EmailPage client={client} businessTimeZone={user.businessTimeZone} />} />
         <Route path="/system/update" element={<UpdateCenterPage client={client} />} />
         <Route path="/system/license" element={<LicensePage client={client} />} />
         <Route path="/system/about" element={<AboutPage client={client} product={activeProduct} />} />

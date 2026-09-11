@@ -7,7 +7,7 @@ import { formatAmount } from "../../ui/formUtils.ts";
 
 const sections = [
   { id: "basic", label: "基本信息", description: "填写付款单号与日期，选择收款方及付款方式。" },
-  { id: "business", label: "业务与备用字段", description: "填写本次付款的货物、数量和业务资料，备用字段按需展开。" },
+  { id: "business", label: "业务信息", description: "填写本次付款的货物、数量和业务资料，备用字段按需展开。" },
   { id: "amounts", label: "金额与费用", description: "填写付款金额和各项费用，费用合计自动汇入人民币金额。" },
   { id: "report", label: "预览与导出", description: "选择付款模板，核对当前草稿并生成凭证。" },
 ] as const;

@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useRouteQuery } from "../../ui/useRouteQuery.ts";
+import { readRouteId } from "../../ui/routeQueryState.ts";
+import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ApiCrmCustomerDto, ApiProductDto, ApiSalesOpportunityDto, ApiSalesOpportunityHistoryDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -11,7 +14,7 @@ import { usePermission } from "../../app/PermissionAccessContext.tsx";
 import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
-import { FormGuidance, PermissionNotice } from "../../ui/PageState.tsx";
+import { FormGuidance, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
@@ -32,13 +35,12 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
   const requestConfirmation = useConfirmation();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [selected, setSelected] = useState<ApiSalesOpportunityDto | null>(null);
-  const [keywordInput, setKeywordInput] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [stage, setStage] = useState("");
-  const [pageNumber, setPageNumber] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const { params: searchParams, update: updateRoute } = useRouteQuery();
+  const selectedId = readRouteId(searchParams.get("opportunityId"));
+  const [selectedRecord, setSelectedRecord] = useState<ApiSalesOpportunityDto | null>(null);
+  const selected = selectedRecord?.id === selectedId ? selectedRecord : null;
+  const setSelected = (item: ApiSalesOpportunityDto | null) => { setSelectedRecord(item); updateRoute({ opportunityId: item?.id }); };
+  const { keywordInput, setKeywordInput, keyword, setKeyword, status: stage, setStatus: setStage, pageNumber, setPageNumber, pageSize, setPageSize } = useDirectoryLocation();
   const [customers, setCustomers] = useState<ApiCrmCustomerDto[]>([]);
   const [products, setProducts] = useState<ApiProductDto[]>([]);
   const [customerKeyword, setCustomerKeyword] = useState("");
@@ -49,7 +51,7 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
   const [revision, setRevision] = useState(0);
   const [history, setHistory] = useState<ApiSalesOpportunityHistoryDto[]>([]);
-  const [view, setView] = useState<"directory" | "editor" | "history">(readOpportunityView(searchParams.get("view")));
+  const view = readOpportunityView(searchParams.get("view"));
   const [draftDirty, setDraftDirty] = useState(false);
   const customerSearchController = useRef<AbortController | null>(null);
   const productSearchController = useRef<AbortController | null>(null);
@@ -57,14 +59,14 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
     isDirty: draftDirty,
     message: "当前商机有未保存的修改。",
   });
+  useEffect(() => setDraftDirty(false), [selectedId, view]);
   const customerOptions = useMemo(() => selected && !customers.some((item) => item.id === selected.crmCustomerId)
     ? [{ id: selected.crmCustomerId, name: selected.customerName } as ApiCrmCustomerDto, ...customers] : customers, [customers, selected]);
   const productOptions = useMemo(() => selected?.productId && !products.some((item) => item.id === selected.productId)
     ? [{ id: selected.productId, productCode: selected.productCode ?? "", nameCN: selected.productName ?? "", nameEN: "" } as ApiProductDto, ...products] : products, [products, selected]);
 
   function applyView(nextView: "directory" | "editor" | "history") {
-    setView(nextView);
-    setSearchParams(nextView === "directory" ? {} : { view: nextView }, { replace: true });
+    updateRoute({ view: nextView }, false);
   }
 
   async function changeView(nextView: "directory" | "editor" | "history") {
@@ -76,17 +78,13 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
   }
 
   useEffect(() => {
-    const requestedView = readOpportunityView(searchParams.get("view"));
-    if (requestedView === view) return;
-    void (async () => {
-      if (!await confirmDiscardChanges("切换商机工作区")) {
-        setSearchParams(view === "directory" ? {} : { view }, { replace: true });
-        return;
-      }
-      setDraftDirty(false);
-      setView(requestedView);
-    })();
-  }, [confirmDiscardChanges, searchParams, setSearchParams, view]);
+    if (!selectedId || selected) return;
+    const controller = new AbortController();
+    void client.getSalesOpportunity({ id: selectedId }, { signal: controller.signal }).then((item) => {
+      if (!controller.signal.aborted) setSelectedRecord(item);
+    }).catch((error) => { if (!controller.signal.aborted) setFeedback(requestErrorFeedback(error)); });
+    return () => controller.abort();
+  }, [client, selectedId, selected]);
 
   const pageQuery = usePagedDirectoryQuery(
     ["sales-opportunities", keyword, stage, pageNumber, pageSize, revision],
@@ -161,9 +159,6 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
       const saved = id ? await client.updateSalesOpportunity({ id, body }) : await client.createSalesOpportunity({ body });
       setSelected(saved);
       setDraftDirty(false);
-      if (keyword || stage || pageNumber !== 1) {
-        setKeywordInput(""); setKeyword(""); setStage(""); setPageNumber(1);
-      }
       setRevision((value) => value + 1);
       await queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() });
       setFeedback(successFeedback(id ? "商机已更新并按规则追加历史版本。" : "商机已建立并生成版本 1。"));
@@ -172,6 +167,7 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
 
   async function transitionTo(nextStage: string) {
     if (!selected || !canTransitionOpportunity || !selected.allowedNextStages.includes(nextStage)) return;
+    if (draftDirty && !await confirmDiscardChanges("流转商机阶段")) return;
     if (!await requestConfirmation({
       title: "流转商机阶段",
       description: `确定将“${selected.title}”从“${selected.stage}”流转到“${nextStage}”吗？`,
@@ -189,6 +185,7 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
         },
       });
       setSelected(saved);
+      setDraftDirty(false);
       setTransitionNote("");
       setRevision((value) => value + 1);
       await queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() });
@@ -211,19 +208,21 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
   }
 
   return <section className="work-surface">
-    <div className="section-heading-row"><div><h2>商机与报价跟踪</h2><p>记录销售阶段和最近报价信息，不替代正式报价文件、发票或单证。</p></div></div>
+    {view === "directory" && <p className="section-description">按客户、阶段和报价编号查找商机，打开后维护资料及报价历史。</p>}
     <OperationFeedback feedback={feedback} />
     {!canCreateOpportunity && !canEditOpportunity && !canTransitionOpportunity
       ? <PermissionNotice>当前岗位只有商机查看权限；新建、编辑、阶段流转和归档分别授权。</PermissionNotice>
       : null}
-    <TaskViewTabs idPrefix={opportunityTabsId} value={view} label="商机工作区" onChange={changeView} items={[
-      { id: "directory", label: "商机目录" }, { id: "editor", label: selected ? canEditOpportunity ? "编辑商机" : "查看商机" : "新建商机", disabled: !selected && !canCreateOpportunity },
-      { id: "history", label: "版本历史", disabled: !selected },
-    ]} />
-    {view === "directory" ? <section className="form-section" {...getTaskViewPanelProps(opportunityTabsId, "directory")}><div className="section-header"><div><h3>商机目录</h3><p className="section-description">按客户、阶段和报价编号查找销售机会。</p></div><div className="section-header-actions"><span>共 {page?.totalCount ?? 0} 项</span>{canCreateOpportunity ? <button className="primary-button" type="button" onClick={() => { setSelected(null); changeView("editor"); }}>新建商机</button> : null}</div></div>
+    {view !== "directory" && <div className="record-context-heading"><button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回商机目录</button>
+      <strong>{selected?.title ?? (selectedId ? "商机详情" : "新建商机")}</strong>{selected && <span>{selected.customerName}</span>}</div>}
+    {view !== "directory" && selected && <TaskViewTabs idPrefix={opportunityTabsId} value={view} label="商机详情" onChange={changeView} items={[
+      { id: "editor", label: "商机资料" }, { id: "history", label: "报价与阶段历史" },
+    ]} />}
+    {view !== "directory" && selectedId && !selected && <PageState tone={feedback ? "error" : "loading"} title="正在定位商机资料" />}
+    {view === "directory" ? <section className="form-section" aria-label="商机目录"><div className="section-header"><div><h3>商机目录</h3><p className="section-description">按客户、阶段和报价编号查找销售机会。</p></div><div className="section-header-actions"><span>共 {page?.totalCount ?? 0} 项</span>{canCreateOpportunity ? <button className="primary-button" type="button" onClick={() => { setSelected(null); changeView("editor"); }}>新建商机</button> : null}</div></div>
       <form className="toolbar" onSubmit={(event) => { event.preventDefault(); setKeyword(keywordInput.trim()); setPageNumber(1); }}>
-        <input value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} placeholder="搜索商机、客户、产品或报价编号" />
-        <select value={stage} onChange={(event) => { setStage(event.target.value); setPageNumber(1); }}><option value="">全部阶段</option>{stages.map((item) => <option key={item}>{item}</option>)}</select>
+        <input aria-label="搜索商机目录" value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} placeholder="搜索商机、客户、产品或报价编号" />
+        <select aria-label="商机阶段" value={stage} onChange={(event) => { setStage(event.target.value); setPageNumber(1); }}><option value="">全部阶段</option>{stages.map((item) => <option key={item}>{item}</option>)}</select>
         <button className="secondary-button" type="submit">搜索</button>
       </form>
       {pageQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(pageQuery.error))} /> : null}
@@ -233,7 +232,7 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
       </tbody></table></ResponsiveTableFrame>
       <ListPaginationControls pageNumber={pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={pageQuery.isFetching} onPageChange={setPageNumber} onPageSizeChange={(value) => { setPageSize(value); setPageNumber(1); }} />
     </section> : null}
-    {view === "editor" ? <form className="form-grid" key={`${selected?.id ?? "new"}-${selected?.versionNumber ?? 0}`} onSubmit={save} {...getTaskViewPanelProps(opportunityTabsId, "editor")}>
+    {view === "editor" && (selected || !selectedId) ? <form className="form-grid" key={`${selected?.id ?? "new"}-${selected?.versionNumber ?? 0}`} onSubmit={save} {...(selected ? getTaskViewPanelProps(opportunityTabsId, "editor") : { "aria-label": "新建商机" })}>
       <div className="section-header"><h3>{selected ? canEditOpportunity ? "编辑商机" : "查看商机" : "新建商机"}</h3><span>轻量销售跟踪</span></div>
       {!customers.length ? <FormGuidance className="form-field-wide" title="先建立一位销售客户" description="商机必须归属 CRM 客户，不会写入原单证客户资料。" action={canCreateCustomer ? <button className="primary-button" type="button" onClick={() => void openCustomerProfile()}>建立客户资料</button> : undefined} /> : null}
       <fieldset className="permission-fieldset form-field-wide" disabled={selected ? !canEditOpportunity || selected.stage === "已成交" || selected.stage === "已失单" : !canCreateOpportunity} onChangeCapture={(event) => {

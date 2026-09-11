@@ -33,7 +33,7 @@ const archiveNavigation = model.filterWorkspaceNavGroups({ ...capabilities, avai
 assert.deepEqual(archiveNavigation.filter(item => item.isActive("/invoices/17/attachments")).map(item => item.to), ["/business-attachments"]);
 assert.equal(model.worklist.worklistTarget({ source: "customer-follow-up", recordId: 79 }), "/crm/follow-ups?followUpId=79");
 assert.equal(model.worklist.worklistTarget({ source: "supply-return", recordId: 23 }), "/office/supplies?view=requests&requestId=23");
-assert.equal(model.worklist.worklistTarget({ source: "contract-end", recordId: 5 }), "/office/people?employeeId=5");
+assert.equal(model.worklist.worklistTarget({ source: "contract-end", recordId: 5 }), "/office/people/5");
 assert.equal(model.worklist.worklistTarget({ source: "unknown", recordId: 1 }), null);
 assert.equal(model.worklist.worklistDueLabel({}, "Asia/Shanghai"), "未设截止日期");
 assert.equal(model.worklist.worklistDueLabel({ dueDate: "2026-09-08" }, "America/New_York"), "2026-09-08", "natural days must not shift with time zone conversion");

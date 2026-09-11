@@ -13,6 +13,7 @@ export function readSettingsCategoryFromSearch(
     case "documents":
     case "documentDefaults":
     case "documentFields":
+    case "singleWindow":
       category = "documents";
       break;
     case "excelImport":
@@ -32,14 +33,14 @@ export function readSettingsCategoryFromSearch(
     case "postgresql":
       category = "backup";
       break;
-    case "singleWindow":
     case "ai":
-      category = "single-window";
+      category = "ai";
       break;
     case "maintenance":
     case "diagnostics":
     case "logs":
     case "ownership":
+    case "invoice-cleanup":
     case "support":
     case "validation":
       category = "maintenance";
@@ -77,9 +78,9 @@ export function readSettingsPanelLabelFromSearch(search: string) {
     case "backup":
       return "数据备份与还原";
     case "singleWindow":
-      return "单一窗口默认值";
+      return "申报默认值";
     case "ai":
-      return "AI 设置";
+      return "AI 服务";
     case "postgresql":
       return "PostgreSQL 团队库维护";
     case "logs":
@@ -90,6 +91,8 @@ export function readSettingsPanelLabelFromSearch(search: string) {
       return "问题诊断包";
     case "ownership":
       return "数据归属改派";
+    case "invoice-cleanup":
+      return "发票清理";
     case "database":
       return "数据库连接";
     case "system":

@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Paperclip, RefreshCw, Send, Settings, Trash2 } from "lucide-react";
 import {
-  type ApiEmailDeliveryDto,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
 import { usePermission, usePermissionCapabilities } from "../../app/PermissionAccessContext.tsx";
@@ -19,18 +18,22 @@ import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { readEmailDraftNavigationState } from "./emailDraftNavigation.ts";
 import { EmailRichTextEditor } from "../../ui/EmailRichTextEditor.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { EmailDeliveryHistory } from "./EmailDeliveryHistory.tsx";
 
 type MessageState = {
   kind: "success" | "error";
   text: string;
 };
 
-export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
+export function EmailPage({ client, businessTimeZone }: { client: ExportDocManagerApiClient; businessTimeZone: string }) {
+  const queries = useQueryClient();
   const sendPermission = usePermission(permissionResources.emailDelivery, permissionActions.send);
   const deliveryViewPermission = usePermission(permissionResources.emailDelivery, permissionActions.viewDelivery);
   const { canManageSettings } = usePermissionCapabilities();
   const location = useLocation();
   const navigate = useNavigate();
+  const requestedView = new URLSearchParams(location.search).get("view");
+  const showDeliveries = requestedView === "deliveries" || (!sendPermission.allowed && requestedView !== "compose");
   const [toAddress, setToAddress] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -47,7 +50,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
     if (draft.toAddress) setToAddress(draft.toAddress);
     setSubject(draft.subject); setBody(draft.body);
     setMessage({ kind: "success", text: "已套用邮件模板，请确认收件人和内容后发送。" });
-    navigate(location.pathname, { replace: true, state: null });
+    navigate(`${location.pathname}?view=compose`, { replace: true, state: null });
   }, [location.pathname, location.state, navigate]);
 
   const statusQuery = useQuery({
@@ -55,11 +58,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
     queryFn: ({ signal }) => client.getEmailToolStatus({ signal }),
     enabled: deliveryViewPermission.allowed,
   });
-  const deliveriesQuery = useQuery({
-    queryKey: queryKeys.emailDeliveries(),
-    queryFn: ({ signal }) => client.listEmailDeliveries({ limit: 50 }, { signal }),
-    enabled: deliveryViewPermission.allowed,
-  });
+
 
   useEffect(() => {
     if (statusQuery.isError) {
@@ -86,11 +85,11 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
         kind: response.success ? "success" : "error",
         text: response.message || "邮件发送完成。",
       });
-      if (deliveryViewPermission.allowed) void deliveriesQuery.refetch();
+      if (deliveryViewPermission.allowed) void queries.invalidateQueries({ queryKey: queryKeys.emailDeliveries() });
     },
     onError: (error) => {
       setMessage({ kind: "error", text: readApiError(error) });
-      if (deliveryViewPermission.allowed) void deliveriesQuery.refetch();
+      if (deliveryViewPermission.allowed) void queries.invalidateQueries({ queryKey: queryKeys.emailDeliveries() });
     },
   });
 
@@ -112,11 +111,11 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
   });
   const isBusy = statusQuery.isFetching || sendMutation.isPending;
   const canSend = sendPermission.allowed && Boolean(status?.isConfigured && toAddress.trim()) && !isBusy;
-  const statusLabel = status ? (status.isConfigured ? "SMTP 已配置" : "SMTP 未配置") : "读取中";
+  const statusLabel = status ? (status.isConfigured ? "邮件服务可用" : "邮件服务未配置") : statusQuery.isError ? "邮件服务读取失败" : "读取中";
   const statusSummary = !status
     ? "正在读取邮件服务状态"
     : status.isConfigured
-      ? `${status.smtpHost}:${status.smtpPort} · ${status.fromAddress}`
+      ? `发件人：${status.fromDisplayName || status.fromAddress}`
       : "请先配置邮件服务器和发件人信息";
 
   async function pickAttachments() {
@@ -164,7 +163,8 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
   }
 
   return (
-    <section className="work-surface email-tool-surface" aria-label="邮件发送">
+    <section className="work-surface email-tool-surface" aria-label="邮件中心">
+      <div hidden={showDeliveries}>
       <div className="toolbar email-tool-toolbar">
         <div className="toolbar-summary">
           <strong>{statusLabel}</strong>
@@ -201,7 +201,8 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
 
       {!sendPermission.allowed ? <PermissionNotice>当前模板仅允许查看邮件服务状态和授权范围内的投递记录，邮件编辑和发送已禁用。</PermissionNotice> : null}
       {message ? <InlineNotice tone={message.kind === "error" ? "error" : "success"}>{message.text}</InlineNotice> : null}
-      <section className="form-section" aria-label="邮件状态">
+      <details className="form-section email-service-details">
+        <summary>邮件服务信息</summary>
         <div className="detail-grid email-status-detail-grid">
           <DetailItem label="SMTP 服务器" value={status?.isConfigured ? status.smtpHost : "-"} wide />
           <DetailItem label="端口" value={status?.isConfigured ? String(status.smtpPort) : "-"} />
@@ -210,7 +211,7 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
           <DetailItem label="发件人名称" value={status?.isConfigured ? (status.fromDisplayName || "-") : "-"} />
           <DetailItem label="附件数量" value={String(attachmentPaths.length)} />
         </div>
-      </section>
+      </details>
 
       <div className="email-tool-layout">
         <section className="form-section email-compose-section" aria-label="邮件内容">
@@ -309,57 +310,12 @@ export function EmailPage({ client }: { client: ExportDocManagerApiClient }) {
         )}
       </div>
 
-      {deliveryViewPermission.allowed ? (
-        <EmailDeliveryHistory
-          rows={deliveriesQuery.data ?? []}
-          isLoading={deliveriesQuery.isFetching}
-          onRefresh={() => void deliveriesQuery.refetch()}
-        />
-      ) : null}
-    </section>
-  );
-}
-
-function EmailDeliveryHistory({ rows, isLoading, onRefresh }: { rows: ApiEmailDeliveryDto[]; isLoading: boolean; onRefresh: () => void }) {
-  return (
-    <section className="form-section" aria-label="邮件投递记录">
-      <div className="section-header">
-        <div><h2>投递记录</h2><span>最近 {rows.length} 条</span></div>
-        <button className="icon-button" type="button" title="刷新投递记录" aria-label="刷新投递记录" disabled={isLoading} onClick={onRefresh}>
-          <RefreshCw size={17} aria-hidden="true" />
-        </button>
       </div>
-      <ResponsiveTableFrame label="邮件投递记录">
-        <table>
-          <thead><tr><th>时间</th><th>来源</th><th>收件人</th><th>主题</th><th>附件</th><th>状态</th></tr></thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.deliveryId}>
-                <td>{formatDeliveryTime(row.createdAt)}</td>
-                <td>{row.kind === "ReportDocumentEmail" ? "发票单据" : "通用邮件"}</td>
-                <td>{row.recipient}</td>
-                <td title={row.errorMessage || row.subject}>{row.subject || "-"}</td>
-                <td>{row.attachmentCount}</td>
-                <td title={row.errorMessage}>{formatDeliveryStatus(row.status)}</td>
-              </tr>
-            ))}
-            {!rows.length ? <tr><td className="empty-cell small-empty" colSpan={6}>{isLoading ? "正在加载" : "暂无投递记录"}</td></tr> : null}
-          </tbody>
-        </table>
-      </ResponsiveTableFrame>
+      {showDeliveries && (deliveryViewPermission.allowed
+        ? <EmailDeliveryHistory client={client} businessTimeZone={businessTimeZone} />
+        : <PermissionNotice>当前账号没有查看投递记录的权限。</PermissionNotice>)}
     </section>
   );
-}
-
-function formatDeliveryStatus(status: string) {
-  if (status === "Sent") return "已发送";
-  if (status === "Uncertain") return "结果不确定";
-  return "投递中";
-}
-
-function formatDeliveryTime(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
 }
 
 function DetailItem({ label, value, wide }: { label: string; value: string; wide?: boolean }) {

@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useConfirmation } from "./ConfirmationProvider.tsx";
 
 const defaultUnsavedChangesMessage = "当前页面有未保存的修改。";
@@ -36,6 +36,7 @@ const UnsavedChangesContext = createContext<UnsavedChangesContextValue | null>(n
 export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
   const requestConfirmation = useConfirmation();
   const location = useLocation();
+  const navigate = useNavigate();
   const entriesRef = useRef<Map<string, UnsavedChangesEntry>>(new Map());
   const activeEntryRef = useRef<UnsavedChangesEntry | null>(null);
   const historyIndexRef = useRef(readHistoryIndex(window.history.state));
@@ -125,13 +126,13 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
       event.stopPropagation();
       event.stopImmediatePropagation();
       if (await confirmDiscardChanges("离开当前编辑页")) {
-        window.location.href = anchor.href;
+        navigate(new URL(anchor.href).hash.slice(1));
       }
     }
 
     document.addEventListener("click", handleDocumentClick, true);
     return () => document.removeEventListener("click", handleDocumentClick, true);
-  }, [confirmDiscardChanges]);
+  }, [confirmDiscardChanges, navigate]);
 
   useEffect(() => {
     // HashRouter records an `idx` value in history.state. Keep the last fully
@@ -142,35 +143,33 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
     }
   }, [location.hash, location.key, location.pathname, location.search]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     function handlePopState(event: PopStateEvent) {
       const targetIndex = readHistoryIndex(event.state);
       const pending = pendingHistoryNavigationRef.current;
 
       if (pending) {
-        if (pending.phase === "restoring" && targetIndex === pending.originIndex) {
-          historyIndexRef.current = pending.originIndex;
-          pending.phase = "confirming";
-          void confirmDiscardChanges("离开当前编辑页").then((confirmed) => {
-            if (pendingHistoryNavigationRef.current !== pending) {
-              return;
-            }
-
-            if (!confirmed) {
-              pendingHistoryNavigationRef.current = null;
-              return;
-            }
-
-            pending.phase = "leaving";
-            window.history.go(pending.delta);
-          });
-          return;
-        }
-
         if (pending.phase === "leaving" && targetIndex === pending.targetIndex) {
           historyIndexRef.current = pending.targetIndex;
           pendingHistoryNavigationRef.current = null;
+          return;
         }
+        event.stopImmediatePropagation();
+        // Repeated Back/Forward while the dialog is open must also restore
+        // the address, so cancelling keeps the URL and mounted form together.
+        if (targetIndex !== pending.originIndex) {
+          if (targetIndex != null) window.history.go(pending.originIndex - targetIndex);
+          return;
+        }
+        historyIndexRef.current = pending.originIndex;
+        if (pending.phase !== "restoring") return;
+        pending.phase = "confirming";
+        void confirmDiscardChanges("离开当前编辑页").then((confirmed) => {
+          if (pendingHistoryNavigationRef.current !== pending) return;
+          if (!confirmed) { pendingHistoryNavigationRef.current = null; return; }
+          pending.phase = "leaving";
+          window.history.go(pending.delta);
+        });
         return;
       }
 
@@ -191,11 +190,14 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
         delta,
         phase: "restoring",
       };
+      // Keep the router on the accepted page until confirmation finishes, so
+      // Back/Forward cannot unmount a dirty form while the history is restored.
+      event.stopImmediatePropagation();
       window.history.go(-delta);
     }
 
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    window.addEventListener("popstate", handlePopState, true);
+    return () => window.removeEventListener("popstate", handlePopState, true);
   }, [confirmDiscardChanges]);
 
   const value = useMemo(

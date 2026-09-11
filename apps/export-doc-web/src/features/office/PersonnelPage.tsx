@@ -1,26 +1,32 @@
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Mail, MapPin, Phone, Plus, RefreshCw, Search } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient, PersonnelDirectoryRecord } from "../../api/index.ts";
-import { InlineNotice } from "../../ui/PageState.tsx";
+import { InlineNotice, PageState } from "../../ui/PageState.tsx";
+import { patchRouteQuery, readRouteId } from "../../ui/routeQueryState.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { OfficePager, OfficeQueryState } from "./OfficeUi.tsx";
 import { canViewPersonnelDetails, employmentStatusLabels } from "./personnelModel.ts";
 import { usePersonnelDirectory } from "./usePersonnelData.ts";
 import { PersonnelFormDialog } from "./PersonnelFormDialog.tsx";
-import { PersonnelDetailsDialog } from "./PersonnelDetailsDialog.tsx";
+import { PersonnelDetailsPage } from "./PersonnelDetailsPage.tsx";
 import { PersonnelAvatar } from "./PersonnelAvatar.tsx";
 import { departmentOptions } from "../organization/organizationModel.ts";
 import "../../styles/routes/office.css";
 import "../../styles/routes/personnel.css";
 
 export function PersonnelPage({ client, user, directoryOnly = false }: { client: ExportDocManagerApiClient; user: ApiUserDto; directoryOnly?: boolean }) {
-  const model = usePersonnelDirectory(client, user);
+  const route = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const model = usePersonnelDirectory(client, user, directoryOnly, !route.employeeId);
   const [creating, setCreating] = useState(false);
-  const [search, setSearch] = useSearchParams();
-  const focusedId = /^[1-9]\d*$/.test(search.get("employeeId") ?? "") ? Number(search.get("employeeId")) : null;
-  const [selectedId, setSelectedId] = useState<number | null>(focusedId);
+  const selectedId = readRouteId(route.employeeId ?? null);
+  const openPerson = (id: number) => navigate({ pathname: `/office/people/${id}`, search: location.search });
   const canViewDetails = !directoryOnly && canViewPersonnelDetails(user);
+  if (route.employeeId) return selectedId && canViewDetails ? <PersonnelDetailsPage key={selectedId} client={client} user={user} id={selectedId}
+    departments={model.options.data?.departments ?? []} onClose={() => navigate({ pathname: "/office/people", search: patchRouteQuery(location.search, { tab: null }) })} />
+    : <PageState tone="permission" title="无法打开人员档案" description="请从有权访问的人员目录选择档案。" />;
   return <section className="work-surface office-workspace personnel-workspace" aria-label="人员信息管理">
     <div className="personnel-heading"><div><h2>{directoryOnly ? "公司通讯录" : "人员档案"}</h2>
       <p className="office-muted">{directoryOnly ? "按部门查找同事，查看工作邮箱、电话和办公地点。" : "维护人员档案，办理入职、转正、调岗和离职，留存任职记录。"}</p></div>
@@ -47,11 +53,10 @@ export function PersonnelPage({ client, user, directoryOnly = false }: { client:
     {model.options.isError && <InlineNotice tone="error" title="部门目录加载失败">{readApiError(model.options.error)} <button type="button" onClick={() => void model.options.refetch()}>重新加载</button></InlineNotice>}
     <OfficeQueryState query={model.query} emptyTitle={model.keyword || model.departmentId || model.status || model.attentionOnly ? "没有符合条件的人员" : "尚未登记人员档案"} />
     {!model.query.isError && <div className="personnel-directory">{model.query.data?.items.map((employee) =>
-      <PersonnelCard key={employee.id} client={client} employee={employee} showDetails={!directoryOnly} onOpen={() => setSelectedId(employee.id)} />)}</div>}
+      <PersonnelCard key={employee.id} client={client} employee={employee} showDetails={!directoryOnly} onOpen={() => openPerson(employee.id)} />)}</div>}
     <OfficePager page={model.query.data} paging={model.paging} busy={model.query.isFetching} />
     {creating && <PersonnelFormDialog client={client} user={user} departments={model.options.data?.departments ?? []} onClose={() => setCreating(false)}
-      onSaved={(record) => { setCreating(false); setSelectedId(record.employee.id); }} />}
-    {selectedId !== null && canViewDetails && <PersonnelDetailsDialog client={client} user={user} id={selectedId} departments={model.options.data?.departments ?? []} onClose={() => { setSelectedId(null); if (focusedId) setSearch({}); }} />}
+      onSaved={(record) => { setCreating(false); openPerson(record.employee.id); }} />}
   </section>;
 }
 

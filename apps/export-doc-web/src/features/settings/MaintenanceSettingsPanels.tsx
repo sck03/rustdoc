@@ -4,6 +4,8 @@ import type { ApiHealthResponse } from "../../api/index.ts";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { RuntimeDiagnosticsSection } from "./RuntimeDiagnosticsSection.tsx";
 import { PageState } from "../../ui/PageState.tsx";
+import { useRouteQuery } from "../../ui/useRouteQuery.ts";
+import { readRouteChoice } from "../../ui/routeQueryState.ts";
 
 const SupportPackagePanel = lazy(() =>
   import("./MaintenanceSupportPackagePanel.tsx")
@@ -29,7 +31,6 @@ export default function MaintenanceSettingsPanels({
   health,
   healthIsBusy,
   healthErrorMessage,
-  initialPanelLabel,
   onRefreshHealth,
   onPathError,
 }: {
@@ -41,12 +42,14 @@ export default function MaintenanceSettingsPanels({
   health: ApiHealthResponse | null;
   healthIsBusy: boolean;
   healthErrorMessage: string | null;
-  initialPanelLabel: string;
   onRefreshHealth: () => void;
   onPathError: (message: string) => void;
 }) {
-  const [activeSection, setActiveSection] = useState<MaintenanceSectionKey>("logs");
-  const [technicalSectionsExpanded, setTechnicalSectionsExpanded] = useState(false);
+  const { params, update } = useRouteQuery();
+  const requestedSection = readRouteChoice<MaintenanceSectionKey>(params.get("section"), ["logs", "ownership", "invoice-cleanup", "diagnostics", "support"], "logs");
+  const activeSection = requestedSection === "invoice-cleanup" && !canUseDocumentWorkspace ? "logs" : requestedSection;
+  const setActiveSection = (section: MaintenanceSectionKey) => update({ section }, false);
+  const [technicalSectionsExpanded, setTechnicalSectionsExpanded] = useState(activeSection === "diagnostics" || activeSection === "support");
   const sections = [
     { key: "logs" as const, label: "日志管理", description: "留存规则与旧日志清理", icon: FileText },
     { key: "ownership" as const, label: "数据归属", description: "人员变更时改派业务数据", icon: Users },
@@ -56,14 +59,8 @@ export default function MaintenanceSettingsPanels({
   ];
 
   useEffect(() => {
-    const normalizedLabel = initialPanelLabel.trim();
-    if (!normalizedLabel) return;
-    if (normalizedLabel.includes("运行诊断")) { setTechnicalSectionsExpanded(true); setActiveSection("diagnostics"); }
-    else if (normalizedLabel.includes("支持") || normalizedLabel.includes("问题诊断")) { setTechnicalSectionsExpanded(true); setActiveSection("support"); }
-    else if (normalizedLabel.includes("发票清理") || normalizedLabel.includes("数据清理")) setActiveSection("invoice-cleanup");
-    else if (normalizedLabel.includes("归属") || normalizedLabel.includes("权限改派")) setActiveSection("ownership");
-    else if (normalizedLabel.includes("日志")) setActiveSection("logs");
-  }, [canManageUsers, initialPanelLabel]);
+    if (activeSection === "diagnostics" || activeSection === "support") setTechnicalSectionsExpanded(true);
+  }, [activeSection]);
 
   return (
     <div className="maintenance-workspace">

@@ -74,6 +74,7 @@ namespace ExportDocManager.Services.Crm
 
     public interface ICrmService
     {
+        Task<CrmCustomerRecord> GetCustomerAsync(int id, CancellationToken cancellationToken = default);
         Task<PagedResult<CrmCustomerRecord>> QueryCustomersAsync(string? keyword, string? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
         Task<CrmCustomerRecord> SaveCustomerAsync(CrmCustomerSaveRequest request, CancellationToken cancellationToken = default);
         Task<CrmCustomerRecord> DeactivateCustomerAsync(int id, int expectedVersion, CancellationToken cancellationToken = default);

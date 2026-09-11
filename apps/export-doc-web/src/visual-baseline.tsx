@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Download, FolderOpen, RefreshCw, Search } from "lucide-react";
 import { HashRouter } from "react-router-dom";
 import { WorkspaceShell } from "./app/WorkspaceShell.tsx";
-import { workspaceNavGroups } from "./app/workspaceNavigation.ts";
+import { getWorkspaceRouteItems } from "./app/workspaceNavigation.ts";
 import type { ApiUserDto, ExportDocManagerApiClient } from "./api/index.ts";
 import { InvoicePartiesPanel } from "./features/invoices/InvoicePartiesPanel.tsx";
 import { InvoiceEditorNavigation } from "./features/invoices/InvoiceEditorNavigation.tsx";
@@ -20,11 +20,13 @@ import { getProductEditionPresentation } from "./app/productEdition.ts";
 import { applyInterfaceDensity, persistInterfaceDensity, readInterfaceDensity } from "./app/interfaceDensity.ts";
 import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "./app/workspaceDevice.ts";
 import { WorkspaceDeviceNotice } from "./ui/WorkspaceDeviceNotice.tsx";
+import { HsKnowledgeWorkflow } from "./features/master-data/HsKnowledgeWorkflow.tsx";
+import { HsKnowledgeNavigation } from "./features/master-data/HsKnowledgeNavigation.tsx";
 
 const visualSearch = new URLSearchParams(location.search);
 const page = visualSearch.get("page") ?? "dashboard";
 const fullProduct = getProductEditionPresentation("Full");
-const baselineNavItems = workspaceNavGroups.flatMap((group) => group.items);
+const baselineNavItems = getWorkspaceRouteItems();
 const baselineModules = [...new Set(baselineNavItems.flatMap((item) => item.moduleKey ? [item.moduleKey] : []))];
 const baselineFeatures = [...new Set(baselineNavItems.flatMap((item) => item.requiredFeature ? [item.requiredFeature] : []))];
 const visualQueryClient = new QueryClient({
@@ -183,7 +185,7 @@ function InvoicePartiesBaseline() {
       onSealUpload={() => undefined} onSealError={() => undefined} />
   </section>;
 }
-function HsBaseline() { return <section className="work-surface hs-knowledge-surface"><div className="knowledge-workflow">{["联网获取","匹配税则","人工审核","实例入库","智能使用"].map((x,i)=><div className={i===2?"active current":i<2?"active":""} key={x}><span>{i+1}</span><strong>{x}</strong><small>流程说明</small>{i===2?<em>当前步骤 3/5</em>:null}</div>)}</div><nav className="hs-knowledge-nav">{["智能查询","申报实例库","历史资料学习","年度税则","换机迁移","联网补充"].map(x=><a className={x==="联网补充"?"active":""} key={x}>{x}</a>)}</nav><div className="knowledge-task-card"><h2>联网候选审核</h2><p className="knowledge-task-lead">网页实例用于提供申报经验；必须匹配当前年度税则并由人工确认后才会入库。</p><div className="knowledge-table">{[1,2,3].map(i=><article className="remote-candidate-card" key={i}><div className="remote-candidate-evidence"><div className="remote-candidate-title"><strong>男式棉制针织T恤衫</strong><span className="status-pill">网页推荐待核验</span></div><div className="remote-code-comparison"><span><small>网页实例编码</small><b>61091000</b></span><i>→</i><span className="current-code"><small>待确认当前编码</small><b>6109100000</b></span></div><p>棉制、针织、男式、短袖</p><div className="remote-candidate-meta"><small>查询词：男T恤</small><small>网页出现 6 次</small><small>来源：i5a6</small></div></div><div className="remote-candidate-actions"><button type="button" className="command-button">确认加入当前编码</button><button type="button" className="text-button">忽略此实例</button></div></article>)}</div></div></section>; }
+function HsBaseline() { return <section className="work-surface hs-knowledge-surface"><HsKnowledgeNavigation activeSection="online" canManage /><HsKnowledgeWorkflow /><div className="knowledge-task-card"><h2>联网候选审核</h2><p className="knowledge-task-lead">网页实例用于提供申报经验；必须匹配当前年度税则并由人工确认后才会入库。</p><div className="knowledge-table">{[1,2,3].map(i=><article className="remote-candidate-card" key={i}><div className="remote-candidate-evidence"><div className="remote-candidate-title"><strong>男式棉制针织T恤衫</strong><span className="status-pill">网页推荐待核验</span></div><div className="remote-code-comparison"><span><small>网页实例编码</small><b>61091000</b></span><i>→</i><span className="current-code"><small>待确认当前编码</small><b>6109100000</b></span></div><p>棉制、针织、男式、短袖</p><div className="remote-candidate-meta"><small>查询词：男T恤</small><small>网页出现 6 次</small><small>来源：i5a6</small></div></div><div className="remote-candidate-actions"><button type="button" className="command-button">确认加入当前编码</button><button type="button" className="text-button">忽略此实例</button></div></article>)}</div></div></section>; }
 function SingleWindowBaseline() { return <section className="editor-surface"><div className="editor-toolbar single-window-document-toolbar"><div className="editor-title">海关原产地证</div><div className="single-window-command-band"><div className="single-window-view-mode"><button type="button" className="active">标准模式</button><button type="button">高级模式</button></div><div className="single-window-tool-group"><span className="single-window-tool-heading">草稿</span><button type="button" className="command-button secondary">回填空白</button></div><div className="single-window-tool-group"><button type="button" className="command-button secondary">预检</button></div><button type="button" className="command-button">保存草稿</button></div></div><section className="form-section"><div className="section-header"><h2>草稿状态</h2></div><div className="coo-completion-overview"><div className="coo-completion-heading"><div><span>录入完成度</span><strong>67%</strong></div><small>4/6 个关键项目已具备</small></div><div className="coo-completion-track"><span style={{width:"67%"}}/></div><div className="coo-completion-steps">{[["证书基础","已具备",true],["申报对象","已具备",true],["运输贸易","待补充",false],["商品明细","2 行",true],["附件","1 条",true],["预警","2 条",false]].map(([label,detail,complete])=><span className={complete?"complete":"pending"} key={String(label)}>{label}<b>{detail}</b></span>)}</div></div></section><section className="form-section"><div className="section-header"><h2>证书基本信息</h2></div><div className="form-grid">{["发票号","申请人","收货人","运输方式","签证机构","目的国"].map(x=><label key={x}>{x}<input readOnly/></label>)}</div></section></section>; }
 function ReportBaseline() {
   const deviceMode = useWorkspaceDeviceMode();

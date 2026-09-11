@@ -9,20 +9,19 @@ import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
+import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
 
-export function CrmCustomerDirectoryPanel({ client, canCreate, canDeactivate, canExport, onCreateCustomer, onSelectCustomer }: {
+export function CrmCustomerDirectoryPanel({ client, canCreate, canDeactivate, canExport, canImport, onImport, onCreateCustomer, onSelectCustomer }: {
   client: ExportDocManagerApiClient;
   canCreate: boolean;
   canDeactivate: boolean;
   canExport: boolean;
+  canImport: boolean;
+  onImport: () => void;
   onCreateCustomer: () => void;
   onSelectCustomer: (customer: ApiCrmCustomerDto) => void;
 }) {
-  const [inputKeyword, setInputKeyword] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [status, setStatus] = useState("");
-  const [pageNumber, setPageNumber] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const { keywordInput: inputKeyword, setKeywordInput: setInputKeyword, keyword, setKeyword, status, setStatus, pageNumber, setPageNumber, pageSize, setPageSize } = useDirectoryLocation("customer");
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [revision, setRevision] = useState(0);
@@ -60,11 +59,12 @@ export function CrmCustomerDirectoryPanel({ client, canCreate, canDeactivate, ca
   return <section className="form-section">
     <div className="section-header"><div><h3>客户目录</h3><p className="section-description">查找销售客户并进入联系人资料。</p></div><div className="section-header-actions"><span>共 {page?.totalCount ?? 0} 家</span>{canCreate ? <button className="primary-button" type="button" onClick={onCreateCustomer}>新建客户</button> : null}</div></div>
     <form className="toolbar" onSubmit={search}>
-      <input value={inputKeyword} onChange={(event) => setInputKeyword(event.target.value)} placeholder="搜索名称、国家、网站、来源或备注" />
-      <select value={status} onChange={(event) => { setStatus(event.target.value); setPageNumber(1); }}>
+      <input aria-label="搜索客户目录" value={inputKeyword} onChange={(event) => setInputKeyword(event.target.value)} placeholder="搜索名称、国家、网站、来源或备注" />
+      <select aria-label="客户状态" value={status} onChange={(event) => { setStatus(event.target.value); setPageNumber(1); }}>
         <option value="">全部状态</option><option>潜在客户</option><option>跟进中</option><option>已成交</option><option>暂停</option><option>已流失</option>
       </select>
       <button className="secondary-button" type="submit">搜索</button>
+      {canImport && <button className="secondary-button" type="button" onClick={onImport}>导入客户</button>}
       {canExport ? <button className="secondary-button" type="button" onClick={() => void exportRows()}>导出当前筛选</button> : null}
       {canDeactivate ? <select aria-label="批量客户状态" defaultValue="" onChange={(event) => { if (event.target.value) void updateBatchStatus(event.target.value); event.target.value = ""; }}>
         <option value="">批量修改状态...</option><option>潜在客户</option><option>跟进中</option><option>已成交</option><option>暂停</option><option>已流失</option>

@@ -114,7 +114,7 @@ export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickTe
   await clickText(page,"移除图片",".personnel-image-card:nth-child(3) button");
   await waitFor(page,"document.body.innerText.includes('移除身份证国徽面')");await clickText(page,"移除图片",".confirmation-dialog button");
   await waitFor(page,"window.__officeCalls.some(item=>item.name==='deleteImage')");results.push("personnel-image-upload-replace-delete-concurrency");
-  await clickText(page,"档案信息");await read(page,"document.querySelector('.office-dialog [aria-label=关闭窗口]').click()");
+  await clickText(page,"档案信息");await clickText(page,"返回人员目录");
   await waitFor(page,"!document.querySelector('.office-dialog') && document.querySelector('.personnel-avatar')?.naturalWidth>0");
   await audit(page,"personnel-avatar-in-directory");
   await open("people",390,"employee");

@@ -30,6 +30,7 @@ import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { formatAmount, formatDate, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
 import { listPageSizeOptions, loadListViewState, normalizeListPageSize, saveListViewState } from "../../ui/listViewState.ts";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
+import { InvoiceBatchReportPanel } from "./InvoiceBatchReportPanel.tsx";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 import { getInvoiceStatusLabel } from "./invoiceModel.ts";
@@ -72,6 +73,9 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
   const invoicePermission = useModulePermission("document.invoices");
   const excelPermission = useModulePermission("document.excel");
   const singleWindowPermission = useModulePermission("document.single-window");
+  const jobPermission = useModulePermission("document.jobs");
+  const reportPermission = useModulePermission("document.reports");
+  const [batchInvoices, setBatchInvoices] = useState<ApiInvoiceListItemDto[]>([]);
   const invoicePackageExportPermission = usePermission(
     permissionResources.invoiceOutput,
     permissionActions.exportZip,
@@ -79,6 +83,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
   const workspaceDeviceProfile = useWorkspaceDeviceProfile();
   const workspaceDeviceMode = workspaceDeviceProfile.mode;
   const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
+  const canBatchExport = invoicePackageExportPermission.allowed && jobPermission.canOperate && reportPermission.canView && workspaceDeviceCapabilities.canImportExport;
   const [initialListViewState] = useState(() => loadListViewState(invoiceListViewStateStorageKey));
   const [keyword, setKeyword] = useState(initialListViewState.keyword);
   const [committedKeyword, setCommittedKeyword] = useState(initialListViewState.keyword);
@@ -553,6 +558,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
           <input
             ref={excelImportInputRef}
             className="visually-hidden"
+            aria-label="导入发票 Excel 文件"
             type="file"
             accept=".xlsx,.xlsm,.xltx,.xltm,.xls"
             onChange={(event) => {
@@ -663,7 +669,9 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
         />
       ) : null}
 
+      {canBatchExport && <InvoiceBatchReportPanel client={client} selected={batchInvoices} onChange={setBatchInvoices} />}
       <InvoiceTable
+        selection={canBatchExport ? { items: batchInvoices, onChange: setBatchInvoices } : undefined}
         data={invoices?.items ?? []}
         isBusy={isBusy}
         hasError={Boolean(invoicesQuery.isError)}

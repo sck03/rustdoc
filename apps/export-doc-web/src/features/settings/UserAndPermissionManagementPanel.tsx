@@ -1,8 +1,10 @@
-import { useState } from "react";
-import { ShieldCheck, Users } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { PermissionTemplateManagementPanel } from "./PermissionTemplateManagementPanel.tsx";
 import { UserManagementPanel } from "./UserManagementPanel.tsx";
+import { useRouteQuery } from "../../ui/useRouteQuery.ts";
+import { useConfirmUnsavedChanges } from "../../ui/unsavedChangesGuard.tsx";
+import { TaskViewTabs, getTaskViewPanelProps } from "../../ui/TaskViewTabs.tsx";
 
 type ManagementTab = "accounts" | "templates";
 
@@ -13,39 +15,24 @@ export function UserAndPermissionManagementPanel({
   client: ExportDocManagerApiClient;
   canManageUsers: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState<ManagementTab>("accounts");
+  const { params, update } = useRouteQuery();
+  const activeTab: ManagementTab = params.get("view") === "templates" ? "templates" : "accounts";
+  const confirmDiscardChanges = useConfirmUnsavedChanges();
+  const setActiveTab = async (view: ManagementTab) => {
+    if (view !== activeTab && await confirmDiscardChanges("切换账号与权限视图")) update({ view }, false);
+  };
 
   if (!canManageUsers) return null;
 
   return (
     <div className="identity-management-shell">
       <div className="identity-management-header">
-        <div className="identity-management-tabs" role="tablist" aria-label="账号与权限管理">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "accounts"}
-            className={activeTab === "accounts" ? "identity-management-tab active" : "identity-management-tab"}
-            onClick={() => setActiveTab("accounts")}
-          >
-            <Users size={18} aria-hidden="true" />
-            <strong>账号管理</strong>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "templates"}
-            className={activeTab === "templates" ? "identity-management-tab active" : "identity-management-tab"}
-            onClick={() => setActiveTab("templates")}
-          >
-            <ShieldCheck size={18} aria-hidden="true" />
-            <strong>权限方案</strong>
-          </button>
-        </div>
+        <TaskViewTabs idPrefix="access-control" label="账号与权限管理" value={activeTab} onChange={setActiveTab}
+          items={[{ id: "accounts", label: "账号管理" }, { id: "templates", label: "权限方案" }]} />
         <span className="identity-management-security-note"><ShieldCheck size={15} aria-hidden="true" />权限变更立即生效，相关账号需重新登录</span>
       </div>
 
-      <div role="tabpanel">
+      <div {...getTaskViewPanelProps("access-control", activeTab)}>
         {activeTab === "accounts" ? (
           <UserManagementPanel client={client} canManageUsers={canManageUsers} />
         ) : (

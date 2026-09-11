@@ -6,6 +6,7 @@ import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 type Props = {
+  section: "profile" | "contacts";
   client: ExportDocManagerApiClient;
   customers: ApiCrmCustomerDto[];
   contacts: ApiCrmContactDto[];
@@ -33,7 +34,7 @@ export function CrmPartyManagementPanel(props: Props) {
     canSetPrimaryContact, canDeleteContact,
   } = props;
   const selectedCustomer = customers.find((item) => item.id === customerId);
-  const [isNewCustomer, setIsNewCustomer] = useState(false);
+  const isNewCustomer = customerId === 0;
   const [contactId, setContactId] = useState(0);
   const [customerDraftDirty, setCustomerDraftDirty] = useState(false);
   const [contactDraftDirty, setContactDraftDirty] = useState(false);
@@ -45,10 +46,9 @@ export function CrmPartyManagementPanel(props: Props) {
   });
 
   useEffect(() => {
-    setIsNewCustomer(false);
     setCustomerDraftDirty(false);
     setContactDraftDirty(false);
-  }, [customerId]);
+  }, [customerId, props.section]);
 
   useEffect(() => {
     setContactId((current) => contacts.some((item) => item.id === current) ? current : contacts[0]?.id ?? 0);
@@ -61,19 +61,6 @@ export function CrmPartyManagementPanel(props: Props) {
     setCustomerDraftDirty(false);
     setContactDraftDirty(false);
     return true;
-  }
-
-  async function beginNewCustomer() {
-    if (!await confirmAndResetDrafts("新建客户")) return;
-    setIsNewCustomer(true);
-    setContactId(0);
-  }
-
-  async function selectCustomer(nextCustomerId: number) {
-    if (nextCustomerId === customerId && !isNewCustomer) return;
-    if (!await confirmAndResetDrafts("切换客户")) return;
-    setIsNewCustomer(false);
-    onSelectCustomer(nextCustomerId);
   }
 
   async function beginNewContact() {
@@ -109,7 +96,6 @@ export function CrmPartyManagementPanel(props: Props) {
       await onReloadCustomers(saved);
       setCustomerDraftDirty(false);
       setContactDraftDirty(false);
-      setIsNewCustomer(false);
       onFeedback(successFeedback(id > 0 ? "CRM 客户已更新。" : "CRM 客户已建立；单证客户资料未被修改。"));
     } catch (error) {
       if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
@@ -218,18 +204,11 @@ export function CrmPartyManagementPanel(props: Props) {
   }
 
   return (
-    <div className="two-column-layout">
-      <form className="form-grid" key={isNewCustomer ? "new" : `${selectedCustomer?.id ?? "empty"}-${selectedCustomer?.versionNumber ?? 0}`} onSubmit={saveCustomer}>
+    <div className="record-detail-content">
+      {props.section === "profile" && <form className="form-grid" key={isNewCustomer ? "new" : `${selectedCustomer?.id ?? "empty"}-${selectedCustomer?.versionNumber ?? 0}`} onSubmit={saveCustomer}>
         <div className="section-heading-row">
           <h3>{isNewCustomer ? "新建销售客户" : "客户资料"}</h3>
-          {canCreateCustomer ? <button className="secondary-button" type="button" onClick={() => void beginNewCustomer()}>新建</button> : null}
         </div>
-        {!isNewCustomer ? (
-          <label>选择客户<select value={customerId} onChange={(event) => void selectCustomer(Number(event.target.value))}>
-            {customers.length === 0 ? <option value={0}>暂无销售客户</option> : null}
-            {customers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select></label>
-        ) : null}
         <fieldset className="permission-fieldset form-field-wide" disabled={isNewCustomer ? !canCreateCustomer : !canEditCustomer} onChangeCapture={() => setCustomerDraftDirty(true)}>
         <label>客户名称<input name="name" required maxLength={200} defaultValue={isNewCustomer ? "" : selectedCustomer?.name} /></label>
         <label>国家/地区<input name="countryRegion" maxLength={100} defaultValue={isNewCustomer ? "" : selectedCustomer?.countryRegion} /></label>
@@ -244,9 +223,9 @@ export function CrmPartyManagementPanel(props: Props) {
           {!isNewCustomer && selectedCustomer && canDeactivateCustomer && (selectedCustomer.status === "暂停" || selectedCustomer.status === "已流失") ? <button className="secondary-button" type="button" onClick={() => void changeCustomerAvailability(true)}>恢复客户</button> : null}
           {!isNewCustomer && selectedCustomer && canDeleteCustomer ? <button className="secondary-button danger-button" type="button" onClick={() => void deleteCustomer()}>删除客户</button> : null}
         </div>
-      </form>
+      </form>}
 
-      <form className="form-grid" key={`${selectedContact?.id ?? "new"}-${selectedContact?.versionNumber ?? 0}-${activeCustomerId}`} onSubmit={saveContact}>
+      {props.section === "contacts" && <form className="form-grid" key={`${selectedContact?.id ?? "new"}-${selectedContact?.versionNumber ?? 0}-${activeCustomerId}`} onSubmit={saveContact}>
         <div className="section-heading-row">
           <h3>{selectedContact ? "联系人资料" : "添加联系人"}</h3>
           {canCreateContact ? <button className="secondary-button" type="button" disabled={!activeCustomerId} onClick={() => void beginNewContact()}>新建</button> : null}
@@ -269,7 +248,7 @@ export function CrmPartyManagementPanel(props: Props) {
           {selectedContact && !selectedContact.isPrimary && canSetPrimaryContact ? <button className="secondary-button" type="button" onClick={() => void setPrimaryContact()}>设为主要联系人</button> : null}
           {selectedContact && canDeleteContact ? <button className="secondary-button danger-button" type="button" onClick={() => void deleteContact()}>删除联系人</button> : null}
         </div>
-      </form>
+      </form>}
     </div>
   );
 }

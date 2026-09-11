@@ -14,23 +14,13 @@ import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { HsCodeToolsPanel } from "./HsCodeToolsPanel.tsx";
 import { HsKnowledgeWorkflow } from "./HsKnowledgeWorkflow.tsx";
+import { HsKnowledgeNavigation, hsKnowledgeSections } from "./HsKnowledgeNavigation.tsx";
 import { HsRemoteCandidateCard } from "./HsRemoteCandidateCard.tsx";
 import {
   formatHsKnowledgeStatus as knowledgeStatusLabel,
   formatHsKnowledgeVerifiedAt as formatVerifiedAt,
 } from "./hsKnowledgeDisplay.ts";
 
-const primarySections = [
-  ["search", "智能查询", Search],
-  ["examples", "申报实例库", BookOpen],
-  ["history", "历史资料学习", GraduationCap],
-  ["online", "联网补充", CloudDownload],
-] as const;
-const maintenanceSections = [
-  ["annual", "年度税则", Database],
-  ["transfer", "换机迁移", Download],
-] as const;
-const sections = [...primarySections, ...maintenanceSections] as const;
 type KnowledgeFeedback = { tone: "success" | "error" | "warning"; message: string };
 
 export function HsCodeKnowledgePage({ businessDate, client }: { businessDate: string; client: ExportDocManagerApiClient }) {
@@ -43,21 +33,12 @@ export function HsCodeKnowledgePage({ businessDate, client }: { businessDate: st
   const normalizedBusinessDate = dateInputToApiDate(businessDate);
   if (!normalizedBusinessDate) throw new Error("服务端业务日期无效。");
   const businessYear = Number(normalizedBusinessDate.slice(0, 4));
-  const [maintenanceOpen, setMaintenanceOpen] = useState(() => maintenanceSections.some(([key]) => key === section));
-  useEffect(() => { setMaintenanceOpen(maintenanceSections.some(([key]) => key === section)); }, [section]);
-  if (!sections.some(([key]) => key === section)) return <Navigate to="/master-data/hs-knowledge/search" replace />;
-  if (!permission.canManage && maintenanceSections.some(([key]) => key === section)) return <Navigate to="/master-data/hs-knowledge/search" replace />;
+  const selectedSection = hsKnowledgeSections.find((item) => item.key === section);
+  if (!selectedSection || section === "catalog") return <Navigate to="/master-data/hs-knowledge/search" replace />;
+  if (!permission.canManage && "manage" in selectedSection) return <Navigate to="/master-data/hs-knowledge/search" replace />;
   return <section className="work-surface hs-knowledge-surface">
-    <HsKnowledgeWorkflow activeSection={section}/>
-    <nav className="hs-knowledge-nav" aria-label="HS知识中心功能">
-      {primarySections.map(([key, label, Icon]) => <Link key={key} className={section === key ? "active" : ""} to={`/master-data/hs-knowledge/${key}`}><Icon size={18}/><span>{label}</span></Link>)}
-      {permission.canManage ? <details className="hs-knowledge-maintenance-nav" open={maintenanceOpen} onToggle={(event) => setMaintenanceOpen(event.currentTarget.open)}>
-        <summary><Database size={18}/><span>高级维护</span></summary>
-        <div>
-          {maintenanceSections.map(([key, label, Icon]) => <Link key={key} className={section === key ? "active" : ""} to={`/master-data/hs-knowledge/${key}`}><Icon size={18}/><span>{label}</span></Link>)}
-        </div>
-      </details> : null}
-    </nav>
+    <HsKnowledgeNavigation activeSection={section} canManage={permission.canManage} />
+    <HsKnowledgeWorkflow />
     {!permission.canManage ? <PermissionNotice>当前权限只允许查询和查看；共享知识库导入、确认和编辑需要 HS 编码管理权限。</PermissionNotice> : null}
     {section === "search" ? <KnowledgeSearch client={client} canOperate={permission.canOperate}/> : null}
     {section === "examples" ? <ExampleLibrary businessYear={businessYear} client={client} canOperate={permission.canManage && workspaceDeviceMode !== "phone"} canManage={permission.canManage && workspaceDeviceMode !== "phone"} canBatchManage={permission.canManage && workspaceDeviceCapabilities.canUseBatchOperations}/> : null}

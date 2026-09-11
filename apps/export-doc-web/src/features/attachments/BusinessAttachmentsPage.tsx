@@ -47,6 +47,7 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
     {uploadMode && data && uploadInvoiceId !== undefined && <BusinessAttachmentUploadForm key={uploadMode}
       invoiceId={uploadInvoiceId} attachment={uploadAttachment} categories={categories} maximumBytes={data.fileBytesLimit} busy={model.busy}
       onUpload={model.upload} onClose={() => model.setUploadMode(null)} />}
+    <div hidden={model.selectedId !== null}>
     <div className="business-records-toolbar"><form onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
       <input aria-label="搜索业务资料" placeholder="客户、单据号、PO、款号、资料名或文件名" value={model.keyword} maxLength={100} onChange={(event) => model.changeKeyword(event.target.value)} />
       <button className="command-button secondary" type="submit">搜索</button></form>
@@ -64,6 +65,7 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
         <ListPaginationControls pageNumber={model.pageNumber} pageSize={model.pageSize} totalCount={data?.page.totalCount ?? 0} totalPages={data?.page.totalPages ?? 0}
           pageSizeOptions={[20, 50, 100]} isBusy={model.query.isFetching} onPageChange={model.setPageNumber} onPageSizeChange={model.changePageSize} />
       </>}
+    </div>
     {model.selectedId !== null && (model.details.isPending ? <PageState tone="loading" title="正在读取版本" /> : model.details.isError ?
       <PageState tone="error" title="版本读取失败" description={readApiError(model.details.error)} /> : selected && <BusinessAttachmentDetails key={selected.attachment.id}
         details={selected} categories={categories} editing={editingMetadata} onEditingChange={setEditingMetadata}

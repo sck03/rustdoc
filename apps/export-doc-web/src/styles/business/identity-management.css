@@ -13,13 +13,6 @@
   flex-wrap: wrap;
   gap: 8px 16px;
 }
-.identity-management-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 3px;
-  background: var(--edm-neutral-100);
-  border-radius: 8px;
-}
 .identity-management-tab {
   display: inline-flex;
   align-items: center;
@@ -31,11 +24,6 @@
   border: 1px solid transparent;
   border-radius: 6px;
   cursor: pointer;
-}
-.identity-management-tab.active {
-  color: var(--edm-primary-775);
-  background: var(--edm-white);
-  border-color: var(--edm-ink-200);
 }
 .identity-management-tab:hover {
   color: var(--edm-primary-775);

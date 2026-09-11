@@ -19,11 +19,11 @@ namespace ExportDocManager.Api.Hosting
         {
             endpoints.MapGet("/api/tools/email/deliveries", async (
                 IEmailDeliveryStore deliveryStore,
-                int? limit,
+                string? keyword, string? status, int? pageNumber, int? pageSize,
                 CancellationToken cancellationToken) =>
             {
-                var rows = await deliveryStore.ListRecentAsync(limit ?? 50, cancellationToken).ConfigureAwait(false);
-                return Results.Ok(rows.Select(item => new ApiEmailDeliveryDto(
+                var page = await deliveryStore.QueryAsync(keyword, status, pageNumber ?? 1, pageSize ?? 20, cancellationToken).ConfigureAwait(false);
+                var rows = page.Items.Select(item => new ApiEmailDeliveryDto(
                     item.DeliveryId,
                     item.JobId,
                     item.Kind,
@@ -34,11 +34,14 @@ namespace ExportDocManager.Api.Hosting
                     item.ErrorMessage,
                     item.CreatedAt,
                     item.SentAt,
-                    item.UpdatedAt)));
+                    item.UpdatedAt)).ToArray();
+                return Results.Ok(new ApiPagedResponse<ApiEmailDeliveryDto>(rows, page.TotalCount, page.PageNumber,
+                    page.PageSize, page.TotalPages, page.HasPreviousPage, page.HasNextPage));
             })
             .WithName("ListEmailDeliveries")
             .WithApiCapability(PermissionResourceCatalog.EmailDelivery, PermissionAction.ViewDelivery)
-            .Produces<IReadOnlyList<ApiEmailDeliveryDto>>(StatusCodes.Status200OK)
+            .Produces<ApiPagedResponse<ApiEmailDeliveryDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
 

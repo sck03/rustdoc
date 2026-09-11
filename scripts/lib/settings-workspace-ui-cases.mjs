@@ -55,6 +55,11 @@ export async function runSettingsWorkspaceCases({ open, currentPage, read, click
   await category("维护工具"); await clickText(page, "清理旧日志");
   await waitFor(page, "window.__calls.some(c=>c.name==='cleanupSystemLogs')");
   results.push("settings-cross-category-save-groups-secrets-and-log-cleanup");
+  await read(page, "[...document.querySelectorAll('.maintenance-section-nav button')].find(n=>n.querySelector('strong')?.textContent==='发票清理').click()");
+  await waitFor(page, "window.__route.includes('section=invoice-cleanup') && document.querySelector('[aria-label=发票数据清理]')");
+  await category("运行与数据库"); await start("&section=invoice-cleanup");
+  await waitFor(page, "document.querySelector('[aria-label=发票数据清理]')");
+  await audit(page, "settings-maintenance-route-and-deep-link");
 
   await start("&section=database&desktop");
   assert(await read(page, "document.querySelector('[aria-label=数据库连接]').textContent.includes('SQLite 文件名')"));

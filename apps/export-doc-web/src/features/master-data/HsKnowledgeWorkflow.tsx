@@ -1,24 +1,11 @@
-export function HsKnowledgeWorkflow({ activeSection }: { activeSection: string }) {
-  const activeStep = activeSection === "online" ? 2
-    : activeSection === "annual" ? 1
-      : activeSection === "examples" || activeSection === "history" || activeSection === "transfer" ? 3
-        : activeSection === "search" ? 4
-          : 0;
-  const steps = [
-    ["联网获取", "申报实例进入候选池"],
-    ["匹配税则", "选择当前年度有效编码"],
-    ["人工审核", "确认或忽略候选"],
-    ["实例入库", "成为本公司的正式经验"],
-    ["智能使用", "查询推荐并回填发票"],
-  ];
-  return <div className="knowledge-workflow" tabIndex={0} aria-label={`HS 编码知识闭环，当前第 ${activeStep + 1} 步：${steps[activeStep][0]}`}>
-    {steps.map(([title, description], index) => <div
-      className={`${index <= activeStep ? "active" : ""}${index === activeStep ? " current" : ""}`.trim()}
-      aria-current={index === activeStep ? "step" : undefined}
-      key={title}
-    >
-      <span>{index + 1}</span><strong>{title}</strong><small>{description}</small>
-      {index === activeStep ? <em>当前步骤 {index + 1}/5</em> : null}
-    </div>)}
-  </div>;
+export function HsKnowledgeWorkflow() {
+  return <details className="knowledge-help">
+    <summary>使用说明：税则、申报实例与智能查询</summary>
+    <ol>
+      <li>导入有来源和年度的税则，在税则目录查询当前有效编码。</li>
+      <li>联网资料和历史单据提供候选经验，人工审核后加入申报实例库。</li>
+      <li>智能查询同时匹配有效税则与已审核实例，可在发票中使用。</li>
+    </ol>
+    <p>可按需要直接进入各项功能，无需依次完成。知识库导入导出仅包含归类资料。</p>
+  </details>;
 }

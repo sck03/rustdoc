@@ -50,7 +50,7 @@ export function OfficeQueryState({ query, emptyTitle }: { query: { isPending: bo
 }
 
 export function OfficePager({ page, paging, busy }: {
-  page?: OfficePage<unknown>; paging: ReturnType<typeof useOfficePaging>; busy: boolean;
+  page?: OfficePage<unknown>; paging: { pageNumber: number; pageSize: number; setPageNumber: (page: number) => void; changePageSize: (size: number) => void }; busy: boolean;
 }) {
   return <ListPaginationControls pageNumber={page?.pageNumber ?? paging.pageNumber} totalPages={page?.totalPages ?? 1}
     totalCount={page?.totalCount ?? 0} pageSize={paging.pageSize} pageSizeOptions={[12, 24, 48, 96]} isBusy={busy}

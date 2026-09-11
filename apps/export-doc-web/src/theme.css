@@ -1,5 +1,6 @@
 @import "./styles/theme/tokens-shell.css";
 @import "./styles/theme/workspace-primitives.css";
+@import "./styles/theme/workspace-navigation.css";
 @import "./styles/theme/controls-accessibility.css";
 @import "./styles/theme/sales-workspace.css";
 @import "./styles/theme/commercial-workspace.css";

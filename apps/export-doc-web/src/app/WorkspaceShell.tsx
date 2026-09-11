@@ -21,6 +21,8 @@ import {
   getWorkspaceContext,
 } from "./workspaceNavigation.ts";
 import { WorkspaceNavigation } from "./WorkspaceNavigation.tsx";
+import { WorkspaceSectionNavigation } from "./WorkspaceSectionNavigation.tsx";
+import { useLocation } from "react-router-dom";
 import { getProductEditionPresentation } from "./productEdition.ts";
 import { Button } from "../ui/Button.tsx";
 import { InlineNotice } from "../ui/PageState.tsx";
@@ -81,6 +83,7 @@ export function WorkspaceShell({
   onDismissNotice,
   sessionAttention,
 }: WorkspaceShellProps) {
+  const location = useLocation();
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [interfaceDensity, setInterfaceDensity] = useState(readInterfaceDensity);
@@ -132,7 +135,7 @@ export function WorkspaceShell({
 
   useEffect(() => {
     setIsMobileNavOpen(false);
-  }, [pathname]);
+  }, [pathname, location.search]);
 
   useEffect(() => {
     const product = getProductEditionPresentation(user.capabilities.productEdition);
@@ -445,7 +448,9 @@ export function WorkspaceShell({
           </div>
         ) : null}
 
-        <div ref={workspaceContentRef} className="workspace-content" inert={sessionExpired}>{children}</div>
+        <div ref={workspaceContentRef} className="workspace-content" inert={sessionExpired}>
+          <WorkspaceSectionNavigation groups={visibleGroups} pathname={pathname} />{children}
+        </div>
       </main>
     </div>
   );

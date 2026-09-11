@@ -39,7 +39,7 @@ export function BusinessAttachmentDetails({ details, categories, busy, editing, 
   return <section className="attachment-detail" aria-label="业务资料版本" ref={region} tabIndex={-1}>
     <header className="business-records-heading"><div><h2>{item.title}</h2><p>{attachmentVersionLabel(item)}</p></div>
       <div className="business-records-actions"><Link to={`/invoices/${item.invoiceId}`} className="command-button secondary">打开单据 {item.invoiceNo}</Link>
-        <button className="command-button secondary" type="button" disabled={busy || editing} onClick={onClose}>关闭版本列表</button></div></header>
+        <button className="command-button secondary" type="button" disabled={busy || editing} onClick={onClose}>返回资料列表</button></div></header>
     <p className="business-records-muted">{item.categoryName}{item.poNumber ? ` · PO ${item.poNumber}` : ""}{item.styleNo ? ` · 款号 ${item.styleNo}` : ""}</p>
     {editing && <BusinessAttachmentMetadataForm item={item} categories={categories} busy={busy} onSave={onEdit} onClose={() => onEditingChange(false)} />}
     {(item.canEdit || item.canDelete) && !editing && <div className="business-records-form">

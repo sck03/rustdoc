@@ -1947,6 +1947,16 @@ export interface ApiPagedResponseOfApiCustomerDto {
   totalPages: number;
 }
 
+export interface ApiPagedResponseOfApiEmailDeliveryDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiEmailDeliveryDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface ApiPagedResponseOfApiExporterDto {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
@@ -5146,6 +5156,10 @@ export interface GetContainerPackingProjectRequest {
   id: number;
 }
 
+export interface GetCrmCustomerRequest {
+  id: number;
+}
+
 export interface GetCrmEmailVariableDraftRequest {
   customerId: number;
 }
@@ -5262,6 +5276,10 @@ export interface GetReportTemplateFieldCatalogRequest {
   reportType?: string;
 }
 
+export interface GetSalesOpportunityRequest {
+  id: number;
+}
+
 export interface GetSingleWindowExportReviewRequest {
   businessType: string;
   invoiceId: number;
@@ -5269,6 +5287,10 @@ export interface GetSingleWindowExportReviewRequest {
 
 export interface GetSingleWindowOperationCenterDetailRequest {
   batchId: number;
+}
+
+export interface GetSupplierRequest {
+  id: number;
 }
 
 export interface GetUnitRequest {
@@ -5395,7 +5417,10 @@ export interface ListCustomsCooProducerProfilesRequest {
 }
 
 export interface ListEmailDeliveriesRequest {
-  limit?: number;
+  keyword?: string;
+  status?: string;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListEmailTemplateVersionsRequest {
@@ -7528,6 +7553,11 @@ export class ExportDocManagerApiClient {
     return this.request<ApiContainerPackingProjectResponse>("GET", path, { init });
   }
 
+  public getCrmCustomer(request: GetCrmCustomerRequest, init?: ApiRequestInit): Promise<ApiCrmCustomerDto> {
+    const path = `/api/crm/customers/${encodePath(request.id)}`;
+    return this.request<ApiCrmCustomerDto>("GET", path, { init });
+  }
+
   public getCrmDashboard(init?: ApiRequestInit): Promise<ApiCrmDashboardDto> {
     const path = "/api/crm/dashboard";
     return this.request<ApiCrmDashboardDto>("GET", path, { init });
@@ -7754,6 +7784,11 @@ export class ExportDocManagerApiClient {
     return this.request<ApiReportTemplateV3ContractResponse>("GET", path, { init });
   }
 
+  public getSalesOpportunity(request: GetSalesOpportunityRequest, init?: ApiRequestInit): Promise<ApiSalesOpportunityDto> {
+    const path = `/api/crm/opportunities/${encodePath(request.id)}`;
+    return this.request<ApiSalesOpportunityDto>("GET", path, { init });
+  }
+
   public getServerMigrationStatus(init?: ApiRequestInit): Promise<ApiServerMigrationStatusResponse> {
     const path = "/api/server-migration/status";
     return this.request<ApiServerMigrationStatusResponse>("GET", path, { init });
@@ -7787,6 +7822,11 @@ export class ExportDocManagerApiClient {
   public getSingleWindowReferenceCatalog(init?: ApiRequestInit): Promise<ApiSingleWindowReferenceCatalogResponse> {
     const path = "/api/single-window/reference-catalog";
     return this.request<ApiSingleWindowReferenceCatalogResponse>("GET", path, { init });
+  }
+
+  public getSupplier(request: GetSupplierRequest, init?: ApiRequestInit): Promise<ApiSupplierDto> {
+    const path = `/api/suppliers/${encodePath(request.id)}`;
+    return this.request<ApiSupplierDto>("GET", path, { init });
   }
 
   public getSupplierAssessmentOverview(init?: ApiRequestInit): Promise<ApiSupplierAssessmentOverviewDto> {
@@ -8046,11 +8086,14 @@ export class ExportDocManagerApiClient {
     return this.request<ApiBackupListResponse>("GET", path, { init });
   }
 
-  public listEmailDeliveries(request: ListEmailDeliveriesRequest = {}, init?: ApiRequestInit): Promise<ApiEmailDeliveryDto[]> {
+  public listEmailDeliveries(request: ListEmailDeliveriesRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiEmailDeliveryDto> {
     const path = "/api/tools/email/deliveries";
-    return this.request<ApiEmailDeliveryDto[]>("GET", path, {
+    return this.request<ApiPagedResponseOfApiEmailDeliveryDto>("GET", path, {
       query: {
-        "limit": request.limit,
+        "keyword": request.keyword,
+        "status": request.status,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
       },
       init,
     });

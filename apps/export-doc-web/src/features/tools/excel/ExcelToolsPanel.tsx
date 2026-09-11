@@ -1,24 +1,21 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FileSpreadsheet, Play, Save } from "lucide-react";
 import {
-  type ApiInvoiceListItemDto,
   type BackgroundJobSnapshot,
   ExportDocManagerApiClient,
 } from "../../../api/index.ts";
 import { queryKeys } from "../../../api/queryKeys.ts";
 import { isDesktopBridgeAvailable, selectExcelFile, selectSaveExcelPath } from "../../../desktop/desktopBridge.ts";
 import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../../ui/DesktopPathActions.tsx";
-import { SelectField } from "../../../ui/FormFields.tsx";
+import { Link } from "react-router-dom";
 import { PathField } from "../../../ui/PathField.tsx";
-import { formatAmount, formatDate, readApiError } from "../../../ui/formUtils.ts";
+import { readApiError } from "../../../ui/formUtils.ts";
 import { downloadJobResultWhenReady } from "../../../ui/downloadJobResult.ts";
 import { ViewJobButton } from "../../jobs/ViewJobButton.tsx";
 import { InlineNotice } from "../../../ui/PageState.tsx";
 import { readDefaultExportDirectory } from "../../settings/settingsPaths.ts";
 import { useAbortableOperation } from "../../../ui/useAbortableOperation.ts";
-
-const invoicePageSize = 50;
 
 export function ExcelToolsPanel({
   client,
@@ -40,8 +37,6 @@ export function ExcelToolsPanel({
   const [convertSourcePath, setConvertSourcePath] = useState("");
   const [convertDestinationPath, setConvertDestinationPath] = useState("");
   const [convertUploadFile, setConvertUploadFile] = useState<File | null>(null);
-  const [invoiceBookingInvoiceId, setInvoiceBookingInvoiceId] = useState("");
-  const [invoiceBookingDestinationPath, setInvoiceBookingDestinationPath] = useState("");
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
@@ -49,27 +44,6 @@ export function ExcelToolsPanel({
     staleTime: 5 * 60 * 1000,
   });
   const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
-
-  const invoicesQuery = useQuery({
-    queryKey: queryKeys.excelToolBookingInvoices(invoicePageSize),
-    queryFn: ({ signal }) =>
-      client.listInvoices({
-        pageNumber: 1,
-        pageSize: invoicePageSize,
-        sortColumn: "InvoiceDate",
-        ascending: false,
-      }, { signal }),
-    enabled: canOperate && canReadInvoices,
-    staleTime: 60 * 1000,
-  });
-  const invoiceOptions = useMemo(
-    () => buildInvoiceOptions(invoicesQuery.data?.items ?? [], invoicesQuery.isFetching),
-    [invoicesQuery.data?.items, invoicesQuery.isFetching],
-  );
-  const selectedInvoice = useMemo(
-    () => (invoicesQuery.data?.items ?? []).find((invoice) => String(invoice.id) === invoiceBookingInvoiceId) ?? null,
-    [invoiceBookingInvoiceId, invoicesQuery.data?.items],
-  );
 
   async function refreshJobs() {
     await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
@@ -148,28 +122,10 @@ export function ExcelToolsPanel({
     onError: handleMutationError,
   });
 
-  const invoiceBookingExportMutation = useMutation({
-    mutationFn: async ({ invoiceId, destinationPath }: { invoiceId: number; destinationPath: string }) => runAbortableOperation(async (signal) => {
-      const job = desktopAvailable
-        ? await client.startInvoiceBookingSheetSaveToPathJob({ body: { invoiceId, destinationPath } }, { signal })
-        : await client.startInvoiceBookingSheetDownloadJob({ invoiceId }, { signal });
-      if (!desktopAvailable) {
-        await downloadJobResultWhenReady(client, job, buildInvoiceBookingSheetFileName(selectedInvoice), { signal });
-      }
-      return job;
-    }),
-    onSuccess: async (job) => {
-      await handleJobAccepted(job, "发票托单导出");
-    },
-    onError: handleMutationError,
-  });
-
   const isBusy =
     templateExportMutation.isPending ||
     blankBookingExportMutation.isPending ||
-    bookingConvertMutation.isPending ||
-    invoiceBookingExportMutation.isPending;
-  const selectedInvoiceId = readSinglePositiveInteger(invoiceBookingInvoiceId);
+    bookingConvertMutation.isPending;
   const canExportTemplate = canOperate && !isBusy;
   const canExportTemplateByPath = canOperate && Boolean(templateDestinationPath.trim()) && !isBusy;
   const canExportBlankBooking = canOperate && !isBusy;
@@ -177,10 +133,6 @@ export function ExcelToolsPanel({
   const canConvertBooking =
     canOperate && (desktopAvailable ? !isBusy : Boolean(convertUploadFile) && !isBusy);
   const canConvertBookingByPath = canOperate && Boolean(convertSourcePath.trim()) && Boolean(convertDestinationPath.trim()) && !isBusy;
-  const canExportInvoiceBooking =
-    canOperate && canReadInvoices && selectedInvoiceId > 0 && !isBusy;
-  const canExportInvoiceBookingByPath = canOperate && canReadInvoices && selectedInvoiceId > 0 && Boolean(invoiceBookingDestinationPath.trim()) && !isBusy;
-
   async function pickConvertSource() {
     try {
       const selected = await selectExcelFile();
@@ -305,36 +257,6 @@ export function ExcelToolsPanel({
     const destinationPath = convertDestinationPath.trim();
     if (sourcePath && destinationPath && canConvertBookingByPath) {
       bookingConvertMutation.mutate({ sourcePath, destinationPath });
-    }
-  }
-
-  async function handleExportInvoiceBooking() {
-    if (!canExportInvoiceBooking) {
-      return;
-    }
-
-    if (desktopAvailable) {
-      try {
-        const destinationPath = await chooseExcelDestination(buildInvoiceBookingSheetFileName(selectedInvoice));
-        if (!destinationPath) {
-          return;
-        }
-
-        setInvoiceBookingDestinationPath(destinationPath);
-        invoiceBookingExportMutation.mutate({ invoiceId: selectedInvoiceId, destinationPath });
-      } catch (error) {
-        showError(readDesktopError(error));
-      }
-      return;
-    }
-
-    invoiceBookingExportMutation.mutate({ invoiceId: selectedInvoiceId, destinationPath: "" });
-  }
-
-  function handleExportInvoiceBookingByPath() {
-    const destinationPath = invoiceBookingDestinationPath.trim();
-    if (selectedInvoiceId > 0 && destinationPath && canExportInvoiceBookingByPath) {
-      invoiceBookingExportMutation.mutate({ invoiceId: selectedInvoiceId, destinationPath });
     }
   }
 
@@ -519,118 +441,20 @@ export function ExcelToolsPanel({
           </details> : <span className="section-description">上传文件只用于本次转换，完成后自动清理。</span>}
         </div>
 
-        <div className="job-tool-stack job-excel-invoice-export">
-          <div className="job-tool-stack-title">
-            <FileSpreadsheet size={16} aria-hidden="true" />
-            <strong>发票导出托单</strong>
-          </div>
-          <SelectField
-            label="发票"
-            value={invoiceBookingInvoiceId}
-            disabled={!canReadInvoices || isBusy || invoicesQuery.isFetching}
-            includeEmptyOption={false}
-            options={invoiceOptions}
-            onChange={(value) => {
-              setInvoiceBookingInvoiceId(value);
-              setMessage(null);
-            }}
-          />
-          {!canReadInvoices ? (
-            <span className="section-description">当前模板未授予发票查看权限，发票托单输出不可用。</span>
-          ) : null}
-          <button
-            className="command-button secondary"
-            type="button"
-            disabled={!canExportInvoiceBooking}
-            onClick={handleExportInvoiceBooking}
-          >
-            <Download size={16} aria-hidden="true" />
-            <span>导出发票托单</span>
-          </button>
-          {desktopAvailable ? <details className="job-tool-advanced">
-            <summary>高级路径</summary>
-            <div className="job-tool-advanced-content">
-              <PathField
-                label="托单输出"
-                value={invoiceBookingDestinationPath}
-                disabled={isBusy}
-                onChange={(value) => {
-                  setInvoiceBookingDestinationPath(value);
-                  setMessage(null);
-                }}
-                actions={
-                  <>
-                    {desktopAvailable ? (
-                      <DesktopIconButton
-                        title="选择发票托单保存位置"
-                        disabled={isBusy}
-                        onClick={() => pickExcelDestination(buildInvoiceBookingSheetFileName(selectedInvoice), setInvoiceBookingDestinationPath)}
-                      >
-                        <Save size={15} aria-hidden="true" />
-                      </DesktopIconButton>
-                    ) : null}
-                    {renderOpenPathAction(invoiceBookingDestinationPath, "打开发票托单输出位置", showError)}
-                  </>
-                }
-              />
-              <button
-                className="command-button secondary"
-                type="button"
-                disabled={!canExportInvoiceBookingByPath}
-                onClick={handleExportInvoiceBookingByPath}
-              >
-                <Download size={16} aria-hidden="true" />
-                <span>按路径导出</span>
-              </button>
-            </div>
-          </details> : <span className="section-description">文件将保存到浏览器默认下载目录。</span>}
-        </div>
+        {canReadInvoices && <div className="job-tool-stack">
+          <div className="job-tool-stack-title"><FileSpreadsheet size={16} aria-hidden="true" /><strong>已保存发票的托单</strong></div>
+          <p className="section-description">从发票列表或单据预览中输出当前发票的托单。</p>
+          <Link className="command-button secondary" to="/invoices">前往发票管理</Link>
+        </div>}
       </div>
       </fieldset>
     </section>
   );
 }
 
-function buildInvoiceOptions(invoices: ApiInvoiceListItemDto[], isLoading: boolean) {
-  const placeholder = isLoading ? "正在加载最近发票" : invoices.length > 0 ? "请选择已保存发票" : "暂无可选发票";
-  return [
-    { value: "", label: placeholder },
-    ...invoices
-      .filter((invoice) => invoice.id > 0)
-      .map((invoice) => ({
-        value: String(invoice.id),
-        label: formatInvoiceOption(invoice),
-      })),
-  ];
-}
-
-function formatInvoiceOption(invoice: ApiInvoiceListItemDto) {
-  const invoiceNo = invoice.invoiceNo || `发票 ${invoice.id}`;
-  const customer = invoice.customerName || "未填写客户";
-  const date = formatDate(invoice.invoiceDate);
-  const amount = formatAmount(invoice.totalAmount, invoice.currency);
-  const type = invoice.type ? ` / ${invoice.type}` : "";
-  return `${invoiceNo}${type} - ${customer} - ${date} - ${amount}`;
-}
-
-function readSinglePositiveInteger(value: string) {
-  const trimmed = value.trim();
-  if (!/^\d+$/.test(trimmed)) {
-    return 0;
-  }
-
-  const parsed = Number.parseInt(trimmed, 10);
-  return parsed > 0 ? parsed : 0;
-}
-
 function buildBookingSheetFileName(sourcePath: string) {
   const baseName = sanitizeExcelFileBaseName(fileNameWithoutExtension(sourcePath));
   return `${baseName || "订舱托单"}_订舱托单.xlsx`;
-}
-
-function buildInvoiceBookingSheetFileName(invoice?: ApiInvoiceListItemDto | null) {
-  const baseName = sanitizeExcelFileBaseName(invoice?.invoiceNo || invoice?.customerName || "");
-  return `${baseName || "发票"}_订舱托单.xlsx`;
 }
 
 function fileNameFromPath(value: string) {

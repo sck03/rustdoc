@@ -10,10 +10,10 @@ export function InvoiceReportSelection({ client, selected, disabled, onChange }:
   onChange: (invoices: ApiInvoiceListItemDto[]) => void;
 }) {
   return <div className="job-invoice-selection">
-    <RemoteSelectField<ApiInvoiceListItemDto> label="选择发票" value="" disabled={disabled}
+    <RemoteSelectField<ApiInvoiceListItemDto> label="选择发票" value="" disabled={disabled || selected.length >= 200}
       queryKey={[...queryKeys.invoicesRoot(), "report-selection"]}
       searchPlaceholder="按发票号或客户搜索" emptyLabel="选择发票后加入清单"
-      description="可连续添加多张发票，已选发票显示在下方。"
+      description="可连续添加多张发票，单次最多 200 张；已选发票显示在下方。"
       loadOptions={async (keyword, signal) => (await client.listInvoices({ pageNumber: 1, pageSize: 20, keyword }, { signal })).items}
       getValue={(invoice) => String(invoice.id)} getLabel={(invoice) => `${invoice.invoiceNo} · ${invoice.customerName}`}
       onChange={(invoice) => { if (invoice && !selected.some((item) => item.id === invoice.id)) onChange([...selected, invoice]); }} />

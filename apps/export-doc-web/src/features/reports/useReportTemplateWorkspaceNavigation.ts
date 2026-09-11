@@ -4,6 +4,7 @@ import type { ConfirmationRequest } from "../../ui/ConfirmationProvider.tsx";
 import type { ReportTypeOption } from "./reportTemplateDesignerModel.ts";
 import type { ReportTemplateReturnTarget } from "./reportTemplateReturnNavigation.ts";
 import { fileNameFromPath } from "./reportTemplateDesignerModel.ts";
+import { useConfirmUnsavedChanges } from "../../ui/unsavedChangesGuard.tsx";
 
 export function useReportTemplateWorkspaceNavigation({
   reportType,
@@ -27,6 +28,7 @@ export function useReportTemplateWorkspaceNavigation({
   refetchTemplates: () => Promise<unknown>;
 }) {
   const navigate = useNavigate();
+  const confirmAllDrafts = useConfirmUnsavedChanges();
   const buildTemplateWorkspaceLocation = useCallback((pathname: string) => {
     const params = new URLSearchParams({ reportType });
     if (selectedUserTemplateId > 0) params.set("userTemplateId", String(selectedUserTemplateId));
@@ -50,8 +52,9 @@ export function useReportTemplateWorkspaceNavigation({
     })) return;
     navigate(returnTarget.path, { replace: true });
   }, [confirmDiscardChanges, exportDefaultsDirty, navigate, requestConfirmation, returnTarget]);
-  const handleOpenDesigner = useCallback(() => {
+  const handleOpenDesigner = useCallback(async () => {
+    if (!await confirmAllDrafts("打开设计器")) return;
     navigate(buildTemplateWorkspaceLocation("/reports/templates"), { state: locationState });
-  }, [buildTemplateWorkspaceLocation, locationState, navigate]);
+  }, [buildTemplateWorkspaceLocation, confirmAllDrafts, locationState, navigate]);
   return { handleRefreshTemplates, handleBackToManagement, handleReturnToBusiness, handleOpenDesigner };
 }

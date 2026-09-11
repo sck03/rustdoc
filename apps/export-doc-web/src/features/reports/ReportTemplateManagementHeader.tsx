@@ -32,14 +32,11 @@ export function ReportTemplateManagementHeader({
               {returnTarget.label}
             </Button>
           ) : null}
-          <h1>报表模板管理</h1>
+          <h2 title={currentTemplateName}>{currentTemplateName}</h2>
         </div>
-        <p>管理模板选择、默认值、生命周期和模板包。</p>
+        <p>当前选中模板</p>
       </div>
       <div className="toolbar-actions">
-        <span className="report-template-management-current" title={currentTemplateName}>
-          当前：{currentTemplateName}
-        </span>
         <IconButton label="刷新模板列表" disabled={isBusy} onClick={onRefresh}>
           <RefreshCw size={18} aria-hidden="true" />
         </IconButton>

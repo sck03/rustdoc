@@ -12,20 +12,25 @@ export {
 export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
   if (!Array.isArray(capabilities.enabledModules)) return [];
   const enabledModules = new Set(capabilities.enabledModules.map(normalizePermissionPart));
-  return workspaceNavGroups.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => {
-      if (item.requiredFeature && !capabilities.availableFeatures?.includes(item.requiredFeature)) return false;
-      if (item.requiresAdmin && capabilities.canManageSettings !== true) return false;
-      if (item.desktopOnly && capabilities.isDesktopRuntime !== true) return false;
-      if (item.workspace === "office" && capabilities.isDesktopRuntime === true && capabilities.usesOfficeRegister !== true) return false;
-      if (item.requiresSystemAdministration && capabilities.canManageUsers !== true) return false;
-      if (item.workspace === "document" && capabilities.canUseDocumentWorkspace !== true) return false;
-      if (item.workspace === "sales" && capabilities.canUseSalesWorkspace !== true) return false;
-      if (item.moduleKey && !enabledModules.has(normalizePermissionPart(item.moduleKey))) return false;
-      return hasWorkspaceNavItemPermission(item, capabilities.permissions);
-    }),
-  })).filter((group) => group.items.length > 0);
+  function filter(items: WorkspaceNavItem[]): WorkspaceNavItem[] {
+    return items.flatMap((item) => {
+      if (item.requiredFeature && !capabilities.availableFeatures?.includes(item.requiredFeature)) return [];
+      if (item.requiresAdmin && capabilities.canManageSettings !== true) return [];
+      if (item.desktopOnly && capabilities.isDesktopRuntime !== true) return [];
+      if (item.workspace === "office" && capabilities.isDesktopRuntime === true && capabilities.usesOfficeRegister !== true) return [];
+      if (item.requiresSystemAdministration && capabilities.canManageUsers !== true) return [];
+      if (item.workspace === "document" && capabilities.canUseDocumentWorkspace !== true) return [];
+      if (item.workspace === "sales" && capabilities.canUseSalesWorkspace !== true) return [];
+      if (item.moduleKey && !enabledModules.has(normalizePermissionPart(item.moduleKey))) return [];
+      if (!hasWorkspaceNavItemPermission(item, capabilities.permissions)) return [];
+      const children = item.children ? filter(item.children) : undefined;
+      if (children && !children.length) return [];
+      const searchItems = item.searchItems ? filter(item.searchItems) : undefined;
+      return [{ ...item, children, searchItems, to: children?.[0]?.to ?? item.to }];
+    });
+  }
+  return workspaceNavGroups.map((group) => ({ ...group, items: filter(group.items) }))
+    .filter((group) => group.items.length > 0);
 }
 
 // Search only the caller's authorized navigation, including familiar feature names.
@@ -34,15 +39,28 @@ export function searchWorkspaceNavGroups(query: string, groups: WorkspaceNavGrou
   if (!terms.length) return groups;
   return groups.map((group) => ({
     ...group,
-    items: group.items.filter((item) => {
-      const text = `${group.label} ${item.label} ${item.description} ${item.keywords ?? ""}`.normalize("NFKC").toLowerCase();
+    items: group.items.flatMap((item) => searchCandidates(item, group.label)).filter((item) => {
+      const text = `${group.label} ${item.locationLabel ?? ""} ${item.label} ${item.description} ${item.keywords ?? ""}`.normalize("NFKC").toLowerCase();
       return terms.every((term) => text.includes(term));
-    }),
+    }).filter((item, index, items) => items.findIndex((candidate) => candidate.to === item.to) === index),
   })).filter((group) => group.items.length > 0);
 }
 
+function searchCandidates(item: WorkspaceNavItem, parent: string): WorkspaceNavItem[] {
+  const locationLabel = `${parent} / ${item.label}`;
+  return [{ ...item, locationLabel },
+    ...(item.children ?? []).flatMap((child) => searchCandidates(child, locationLabel)),
+    ...(item.searchItems ?? []).map((child) => ({ ...child, locationLabel: `${locationLabel} / ${child.label}` })),
+  ];
+}
+
+export function getWorkspaceRouteItems(groups: WorkspaceNavGroupConfig[] = workspaceNavGroups) {
+  return groups.flatMap((group) => group.items.flatMap((item) => item.children ?? [item]));
+}
+
 function findWorkspaceNavItem(pathname: string) {
-  return workspaceNavGroups.flatMap((group) => group.items).find((item) => item.isActive(pathname));
+  // Containers never grant access: direct routes resolve their own leaf requirement.
+  return getWorkspaceRouteItems().find((item) => item.isActive(pathname));
 }
 
 export function hasWorkspacePathPermission(pathname: string, permissions: WorkspacePermissionGrant[] | undefined) {

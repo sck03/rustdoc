@@ -23,6 +23,9 @@ namespace ExportDocManager.Api.Tests
                 0, "Acme Trading", "US", "https://example.com", "展会", "独立 CRM 客户", null));
             Assert.Equal(HttpStatusCode.Created, createCustomerResponse.StatusCode);
             var customer = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCrmCustomerDto>(createCustomerResponse);
+            Assert.Equal(customer, await client.GetFromJsonAsync<ApiCrmCustomerDto>($"/api/crm/customers/{customer.Id}"));
+            Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/crm/customers/{customer.Id}")).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/crm/customers/2147483647")).StatusCode);
 
             var updateCustomerResponse = await client.PutAsJsonAsync($"/api/crm/customers/{customer.Id}",
                 new ApiCrmCustomerSaveRequest(customer.Id, customer.Name, customer.CountryRegion, customer.Website,

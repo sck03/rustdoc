@@ -26,6 +26,14 @@ namespace ExportDocManager.Services.Suppliers
             _clock = clock ?? BusinessClock.CreateSystem();
         }
 
+        public async Task<SupplierRecord> GetAsync(int id, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await _accessScope.ApplySupplierScope(context.SupplierCompanies.AsNoTracking())
+                .Where(item => item.Id == id).Select(ToRecordExpression()).SingleOrDefaultAsync(cancellationToken)
+                ?? throw new ResourceNotFoundException("供应商不存在或无权访问。");
+        }
+
         public async Task<PagedResult<SupplierRecord>> QueryAsync(
             string? keyword, string? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
         {

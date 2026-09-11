@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useRouteQuery } from "../../ui/useRouteQuery.ts";
+import { readRouteId } from "../../ui/routeQueryState.ts";
+import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
 import type {
   ApiCrmContactDto,
   ApiCrmCustomerDto,
@@ -23,7 +25,7 @@ import { FormGuidance, InlineNotice, PageState, PermissionNotice } from "../../u
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
-import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { useConfirmUnsavedChanges, useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { businessDateTimeLocalInputToIso, formatBusinessDateTime, isPastInstant, toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
 
@@ -32,10 +34,13 @@ type CustomerFollowUpPageProps = {
   client: ExportDocManagerApiClient;
 };
 
-type CustomerTaskView = "followups" | "followup-editor" | "directory" | "profile" | "import";
+type CustomerTaskView = "followups" | "followup-editor" | "directory" | "profile" | "contacts" | "customer-followups" | "import";
 const crmTabsId = "crm-customer-workspace";
 
 export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollowUpPageProps) {
+  const canViewCustomers = usePermission(permissionResources.crmCustomers, permissionActions.view).allowed;
+  const canViewFollowUps = usePermission(permissionResources.crmFollowUps, permissionActions.view).allowed;
+  const canViewContacts = usePermission(permissionResources.crmContacts, permissionActions.view).allowed;
   const canCreateCustomer = usePermission(permissionResources.crmCustomers, permissionActions.create).allowed;
   const canEditCustomer = usePermission(permissionResources.crmCustomers, permissionActions.edit).allowed;
   const canDeactivateCustomer = usePermission(permissionResources.crmCustomers, permissionActions.deactivate).allowed;
@@ -55,32 +60,39 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
   const requestConfirmation = useConfirmation();
   const queryClient = useQueryClient();
   const runAbortableOperation = useAbortableOperation();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const focusedFollowUpId = /^[1-9]\d*$/.test(searchParams.get("followUpId") ?? "") ? Number(searchParams.get("followUpId")) : undefined;
+  const { params: searchParams, update: updateRoute } = useRouteQuery();
+  const focusedFollowUpId = readRouteId(searchParams.get("followUpId")) ?? undefined;
   const [customers, setCustomers] = useState<ApiCrmCustomerDto[]>([]);
   const [contacts, setContacts] = useState<ApiCrmContactDto[]>([]);
-  const [customerId, setCustomerId] = useState(0);
+  const customerId = readRouteId(searchParams.get("customerId")) ?? 0;
+  const setCustomerId = (id: number) => updateRoute({ customerId: id || null });
   const [customerKeyword, setCustomerKeyword] = useState("");
-  const [includeCompleted, setIncludeCompleted] = useState(false);
-  const [followUpPageNumber, setFollowUpPageNumber] = useState(1);
-  const [followUpPageSize, setFollowUpPageSize] = useState(20);
+  const includeCompleted = searchParams.get("completed") === "true";
+  const setIncludeCompleted = (value: boolean) => updateRoute({ completed: value, followupPage: null });
+  const { pageNumber: followUpPageNumber, setPageNumber: setFollowUpPageNumber, pageSize: followUpPageSize, setPageSize: setFollowUpPageSize } = useDirectoryLocation("followup");
   const [followUpRevision, setFollowUpRevision] = useState(0);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
-  const [editingFollowUp, setEditingFollowUp] = useState<ApiCrmFollowUpDto | null>(null);
-  const [transferMode, setTransferMode] = useState(false);
+  const editFollowUpId = readRouteId(searchParams.get("editFollowUpId"));
+  const [editingRecord, setEditingRecord] = useState<ApiCrmFollowUpDto | null>(null);
+  const editingFollowUp = editingRecord?.id === editFollowUpId ? editingRecord : null;
+  const setEditingFollowUp = (item: ApiCrmFollowUpDto | null) => { setEditingRecord(item); updateRoute({ editFollowUpId: item?.id }); };
+  const transferMode = searchParams.get("followUpAction") === "transfer";
+  const setTransferMode = (value: boolean) => updateRoute({ followUpAction: value ? "transfer" : null });
   const [followUpContactId, setFollowUpContactId] = useState<number | "">("");
   const [followUpDraftDirty, setFollowUpDraftDirty] = useState(false);
-  const initialView = readCustomerView(searchParams.get("view"));
-  const [view, setView] = useState<CustomerTaskView>(initialView);
-  const { confirmDiscardChanges } = useUnsavedChangesGuard({
+  const view = readCustomerView(searchParams.get("view") ?? (focusedFollowUpId || !canViewCustomers ? "followups" : null));
+  const confirmDiscardChanges = useConfirmUnsavedChanges();
+  useUnsavedChangesGuard({
     isDirty: followUpDraftDirty,
     message: "当前客户跟进有未保存的修改。",
   });
+  useEffect(() => setFollowUpDraftDirty(false), [view, editFollowUpId]);
 
   function applyView(nextView: CustomerTaskView) {
-    setView(nextView);
-    setSearchParams(nextView === "followups" ? {} : { view: nextView }, { replace: true });
+    const returnView = searchParams.get("returnView");
+    const target = nextView === "followups" && view === "followup-editor" && returnView === "customer-followups" ? "customer-followups" : nextView;
+    updateRoute({ view: target, returnView: nextView === "followup-editor" && view === "customer-followups" ? view : null }, false);
   }
 
   async function changeView(nextView: CustomerTaskView) {
@@ -91,18 +103,13 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
     return true;
   }
 
-  useEffect(() => {
-    const requestedView = readCustomerView(searchParams.get("view"));
-    if (requestedView === view) return;
-    void (async () => {
-      if (!await confirmDiscardChanges("切换客户工作区")) {
-        setSearchParams(view === "followups" ? {} : { view }, { replace: true });
-        return;
-      }
-      setFollowUpDraftDirty(false);
-      setView(requestedView);
-    })();
-  }, [confirmDiscardChanges, searchParams, setSearchParams, view]);
+  async function returnToList() {
+    if (view !== "followup-editor") { await changeView(canViewCustomers ? "directory" : "followups"); return; }
+    if (!await changeView("followups")) return;
+    setEditingFollowUp(null);
+    setTransferMode(false);
+    setFollowUpContactId("");
+  }
 
   const selectedCustomer = useMemo(
     () => customers.find((item) => item.id === customerId),
@@ -110,42 +117,67 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
   );
 
   const followUpQuery = usePagedDirectoryQuery(
-    ["crm-follow-ups", focusedFollowUpId, includeCompleted, followUpPageNumber, followUpPageSize, followUpRevision],
-    (signal) => client.queryCrmFollowUps({ followUpId: focusedFollowUpId, includeCompleted, pageNumber: followUpPageNumber, pageSize: followUpPageSize }, { signal }),
+    ["crm-follow-ups", focusedFollowUpId, view === "customer-followups" ? customerId : null, includeCompleted, followUpPageNumber, followUpPageSize, followUpRevision],
+    (signal) => client.queryCrmFollowUps({ crmCustomerId: view === "customer-followups" ? customerId : undefined, followUpId: focusedFollowUpId, includeCompleted, pageNumber: followUpPageNumber, pageSize: followUpPageSize }, { signal }),
+    canViewFollowUps && (view === "followups" || view === "customer-followups" && customerId > 0),
   );
   const followUpPage = followUpQuery.data ?? null;
   const rows = followUpPage?.items ?? [];
   const loading = followUpQuery.isFetching;
 
   useEffect(() => {
+    if (view !== "followup-editor" || !editFollowUpId || editingRecord?.id === editFollowUpId || !canViewFollowUps) return;
+    const controller = new AbortController();
+    void client.queryCrmFollowUps({ followUpId: editFollowUpId, includeCompleted: true, pageNumber: 1, pageSize: 1 }, { signal: controller.signal }).then((page) => {
+      if (controller.signal.aborted) return;
+      const item = page.items.find((record) => record.id === editFollowUpId);
+      if (!item) throw new Error("跟进记录不存在或无权访问。");
+      setEditingRecord(item);
+      updateRoute({ customerId: item.crmCustomerId });
+      setFollowUpContactId(item.crmContactId ?? "");
+    }).catch((error) => { if (!controller.signal.aborted) setFeedback(requestErrorFeedback(error)); });
+    return () => controller.abort();
+  }, [client, view, editFollowUpId, editingRecord?.id, canViewFollowUps, updateRoute]);
+
+  useEffect(() => {
+    if (!canViewCustomers || view !== "followup-editor") return;
     const controller = new AbortController();
     void client.queryCrmCustomers({ keyword: "", status: "", pageNumber: 1, pageSize: 100 }, { signal: controller.signal })
       .then((customerPage) => {
         if (controller.signal.aborted) return;
         const customerRows = customerPage.items;
-        setCustomers(customerRows);
-        setCustomerId((current) => current || customerRows[0]?.id || 0);
+        setCustomers((current) => [...current.filter((item) => !customerRows.some((row) => row.id === item.id)), ...customerRows]);
       })
       .catch((error) => {
         if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error)));
       })
     return () => controller.abort();
-  }, [client]);
+  }, [client, canViewCustomers, view]);
 
   useEffect(() => {
-    if (!customerId) {
+    if (!customerId || !canViewCustomers || selectedCustomer) return;
+    const controller = new AbortController();
+    void client.getCrmCustomer({ id: customerId }, { signal: controller.signal }).then((item) => {
+      if (!controller.signal.aborted) setCustomers((current) => [item, ...current.filter((row) => row.id !== item.id)]);
+    }).catch((error) => { if (!controller.signal.aborted) setFeedback(requestErrorFeedback(error)); });
+    return () => controller.abort();
+  }, [client, customerId, canViewCustomers, selectedCustomer]);
+
+  useEffect(() => {
+    if (!customerId || !canViewContacts) {
       setContacts([]);
       return;
     }
     const controller = new AbortController();
+    setContacts([]);
     void client.queryCrmContacts(
       { customerId, pageNumber: 1, pageSize: 100 },
       { signal: controller.signal },
-    ).then((page) => setContacts(page.items)).catch((error: unknown) => {
+    ).then((page) => { if (!controller.signal.aborted) setContacts(page.items); }).catch((error: unknown) => {
       if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error)));
     });
     return () => controller.abort();
-  }, [client, customerId]);
+  }, [client, customerId, canViewContacts]);
 
   async function refresh() {
     setFollowUpRevision((value) => value + 1);
@@ -163,7 +195,7 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
       setCustomers(nextCustomers);
       const nextId = preferred && nextCustomers.some((item) => item.id === preferred.id)
         ? preferred.id
-        : nextCustomers[0]?.id ?? 0;
+        : 0;
       setCustomerId(nextId);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.crmCustomersRoot() }),
@@ -206,7 +238,7 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
     if (editingFollowUp ? !canEditFollowUp : !canCreateFollowUp) return;
     const formElement = event.currentTarget;
     if (!customerId) {
-      setFeedback(warningFeedback("请先在基础资料中建立并选择客户。"));
+      setFeedback(warningFeedback("请先在客户目录中建立并选择销售客户。"));
       return;
     }
 
@@ -325,34 +357,34 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
 
   return (
     <section className="work-surface">
-      <div className="section-heading-row">
-        <div>
-          <h2>客户跟进</h2>
-          <p>销售客户、联系人和跟进独立维护，不修改单证客户、发票或报表资料。</p>
-        </div>
-        {view === "followups" ? <label className="checkbox-field">
+      {["directory", "followups", "customer-followups"].includes(view) && <div className="section-heading-row">
+        <p className="section-description">从客户目录进入资料与联系人，或集中查看需要办理的跟进事项。</p>
+        {view === "followups" || view === "customer-followups" ? <label className="checkbox-field">
           <input
             type="checkbox"
             checked={includeCompleted}
-            onChange={(event) => { setIncludeCompleted(event.target.checked); setFollowUpPageNumber(1); }}
+            onChange={(event) => setIncludeCompleted(event.target.checked)}
           />
           显示已完成
         </label> : null}
-      </div>
+      </div>}
 
       <OperationFeedback feedback={feedback} />
-      {focusedFollowUpId && <InlineNotice tone="info">正在查看指定跟进事项。<button type="button" className="command-button secondary" onClick={() => { setSearchParams({}); setFollowUpPageNumber(1); }}>返回全部跟进</button></InlineNotice>}
+      {focusedFollowUpId && <InlineNotice tone="info">正在查看指定跟进事项。<button type="button" className="command-button secondary" onClick={() => updateRoute({ view: "followups", followUpId: null, followupPage: null })}>返回全部跟进</button></InlineNotice>}
       {!canCreateCustomer && !canEditCustomer && !canCreateContact && !canEditContact && !canCreateFollowUp && !canEditFollowUp
         ? <PermissionNotice>当前岗位只有查看权限；客户、联系人和跟进的具体动作由管理员逐项授权。</PermissionNotice>
         : null}
 
-      <TaskViewTabs idPrefix={crmTabsId} value={view} label="客户业务工作区" onChange={changeView} items={[
-        { id: "followups", label: "跟进记录" }, { id: "followup-editor", label: transferMode ? "转移跟进" : editingFollowUp ? canEditFollowUp ? "编辑跟进" : "查看跟进" : "新增跟进", disabled: !editingFollowUp && !canCreateFollowUp },
-        { id: "directory", label: "客户目录" },
-        { id: "profile", label: "客户与联系人" }, { id: "import", label: "客户导入", disabled: !canImportCustomer },
-      ]} />
+      {view === "directory" || view === "followups" ? <TaskViewTabs idPrefix={crmTabsId} value={view} label="客户业务工作区" onChange={changeView} items={[
+        ...(canViewCustomers ? [{ id: "directory" as const, label: "客户目录" }] : []), ...(canViewFollowUps ? [{ id: "followups" as const, label: "跟进记录" }] : []),
+      ]} /> : <div className="record-context-heading"><button type="button" className="secondary-button" onClick={() => void returnToList()}>{view === "followup-editor" ? "返回跟进记录" : "返回客户目录"}</button>
+        <strong>{view === "import" ? "导入客户" : selectedCustomer?.name ?? (view === "followup-editor" ? "客户跟进" : customerId ? "客户详情" : "新建销售客户")}</strong></div>}
+      {customerId > 0 && ["profile", "contacts", "customer-followups"].includes(view) && <TaskViewTabs idPrefix={crmTabsId} value={view} label="客户详情" onChange={changeView} items={[
+        { id: "profile", label: "客户资料" }, ...(canViewContacts ? [{ id: "contacts" as const, label: "联系人" }] : []), ...(canViewFollowUps ? [{ id: "customer-followups" as const, label: "该客户跟进" }] : []),
+      ]} />}
 
-      {view === "profile" ? <div {...getTaskViewPanelProps(crmTabsId, "profile")}><CrmPartyManagementPanel
+      {(view === "profile" && canViewCustomers || view === "contacts" && canViewContacts) && (!customerId || selectedCustomer) ? <div {...(customerId ? getTaskViewPanelProps(crmTabsId, view) : { "aria-label": "新建销售客户" })}><CrmPartyManagementPanel
+        section={view === "contacts" ? "contacts" : "profile"}
         client={client}
         customers={customers}
         contacts={contacts}
@@ -371,25 +403,20 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
         canDeleteContact={canDeleteContact}
       /></div> : null}
 
-      {view === "directory" ? <div {...getTaskViewPanelProps(crmTabsId, "directory")}><CrmCustomerDirectoryPanel
+      {view === "directory" && canViewCustomers ? <div {...getTaskViewPanelProps(crmTabsId, "directory")}><CrmCustomerDirectoryPanel
         client={client}
         canCreate={canCreateCustomer}
         canDeactivate={canDeactivateCustomer}
         canExport={canExportCustomer}
-        onCreateCustomer={() => changeView("profile")}
-        onSelectCustomer={(customer) => { setCustomers((current) => current.some((item) => item.id === customer.id) ? current : [customer, ...current]); setCustomerId(customer.id); changeView("profile"); }}
+        canImport={canImportCustomer} onImport={() => void changeView("import")}
+        onCreateCustomer={() => { setCustomerId(0); void changeView("profile"); }}
+        onSelectCustomer={(customer) => { setCustomers((current) => [customer, ...current.filter((item) => item.id !== customer.id)]); setCustomerId(customer.id); changeView("profile"); }}
       /></div> : null}
-      {view === "import" ? <div {...getTaskViewPanelProps(crmTabsId, "import")}><CrmCustomerImportPanel client={client} canImport={canImportCustomer} onImported={() => reloadCustomers()} /></div> : null}
+      {view === "import" && canImportCustomer ? <div aria-label="导入客户"><CrmCustomerImportPanel client={client} canImport={canImportCustomer} onImported={() => reloadCustomers()} /></div> : null}
 
-      {view === "followup-editor" ? <form className="form-grid" key={`${transferMode ? "transfer" : "edit"}-${editingFollowUp?.id ?? "new"}-${editingFollowUp?.versionNumber ?? 0}`} onSubmit={transferMode ? transferFollowUp : handleCreate} {...getTaskViewPanelProps(crmTabsId, "followup-editor")}>
+      {view === "followup-editor" && editFollowUpId && !editingFollowUp && <PageState tone={feedback ? "error" : "loading"} title={feedback ? "无法打开跟进记录" : "正在读取跟进记录"} />}
+      {view === "followup-editor" && (!editFollowUpId || editingFollowUp) ? <form className="form-grid" key={`${transferMode ? "transfer" : "edit"}-${editingFollowUp?.id ?? "new"}-${editingFollowUp?.versionNumber ?? 0}`} onSubmit={transferMode ? transferFollowUp : handleCreate} aria-label="跟进记录编辑">
         <div className="section-heading-row"><h3>{transferMode ? "转移跟进" : editingFollowUp ? canEditFollowUp ? "编辑跟进" : "查看跟进" : "新增跟进"}</h3>
-          <button className="secondary-button" type="button" onClick={async () => {
-            if (await changeView("followups")) {
-              setEditingFollowUp(null);
-              setTransferMode(false);
-              setFollowUpContactId("");
-            }
-          }}>返回跟进记录</button>
         </div>
         {!customers.length ? <FormGuidance className="form-field-wide" title="先建立一位销售客户" description="跟进记录必须归属客户。客户资料与原单证客户相互独立。" action={canCreateCustomer ? <button className="primary-button" type="button" onClick={() => changeView("profile")}>建立客户资料</button> : undefined} /> : null}
         <fieldset className="permission-fieldset form-field-wide" disabled={transferMode ? !canAssignFollowUp : editingFollowUp ? !canEditFollowUp : !canCreateFollowUp} onChangeCapture={(event) => {
@@ -405,7 +432,7 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
             setCustomerId(Number(event.target.value));
             setFollowUpContactId("");
           }}>
-            {customers.length === 0 ? <option value={0}>请先建立销售客户</option> : null}
+            <option value={0}>{customers.length ? "请选择销售客户" : "请先建立销售客户"}</option>
             {customers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
         </label>
@@ -450,7 +477,7 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
         </fieldset>
       </form> : null}
 
-      {view === "followups" ? <section className="form-section" {...getTaskViewPanelProps(crmTabsId, "followups")}>
+      {canViewFollowUps && (view === "followups" || view === "customer-followups" && customerId > 0) ? <section className="form-section" {...getTaskViewPanelProps(crmTabsId, view)}>
       <div className="section-header">
         <div><h3>跟进记录</h3><p className="section-description">集中查看沟通结果、下一步动作和待办提醒。</p></div>
         {canCreateFollowUp ? <button className="primary-button" type="button" onClick={() => {
@@ -513,14 +540,7 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
             ))}
           </tbody>
         </table>
-        {!loading && !followUpQuery.isError && rows.length === 0 ? <PageState tone="empty" title={customers.length ? "还没有跟进记录" : "先建立客户，再开始跟进"} description={customers.length ? "记录一次邮件、电话或拜访结果，系统会帮助保留下次动作。" : "销售客户独立维护，不会修改原单证客户、发票或报表资料。"} action={(customers.length ? canCreateFollowUp : canCreateCustomer) ? <button className="primary-button" type="button" onClick={() => {
-          if (customers.length) {
-            setEditingFollowUp(null);
-            setTransferMode(false);
-            setFollowUpContactId("");
-          }
-          void changeView(customers.length ? "followup-editor" : "profile");
-        }}>{customers.length ? "记录第一次跟进" : "建立客户资料"}</button> : undefined} /> : null}
+        {!loading && !followUpQuery.isError && rows.length === 0 ? <PageState tone="empty" title="没有符合条件的跟进记录" description="可调整筛选，或记录一次邮件、电话或拜访结果。" /> : null}
         {loading ? <PageState tone="loading" title="正在加载客户跟进" description="正在读取沟通结果、下一步动作和提醒状态。" /> : null}
       </ResponsiveTableFrame>
       {followUpQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(followUpQuery.error))} /> : null}
@@ -531,7 +551,7 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
 }
 
 function readCustomerView(value: string | null): CustomerTaskView {
-  return value === "followup-editor" || value === "directory" || value === "profile" || value === "import" ? value : "followups";
+  return value === "followup-editor" || value === "followups" || value === "contacts" || value === "customer-followups" || value === "profile" || value === "import" ? value : "directory";
 }
 
 function optionalNumber(value: FormDataEntryValue | null) {

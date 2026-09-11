@@ -6,9 +6,10 @@ import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { isDirectTableRowKeyboardEvent } from "../../ui/tableRowInteractions.ts";
 import { getInvoiceStatusLabel } from "./invoiceModel.ts";
 
-export function InvoiceTable({ data, isBusy, hasError = false, canOperate, canExportPackage, canExportBookingSheet, canUseSingleWindow, onOpen, onCopy, onExportPackage, onExportBookingSheet, onSingleWindow }: {
+export function InvoiceTable({ data, isBusy, hasError = false, canOperate, canExportPackage, canExportBookingSheet, canUseSingleWindow, onOpen, onCopy, onExportPackage, onExportBookingSheet, onSingleWindow, selection }: {
   data: ApiInvoiceListItemDto[]; isBusy: boolean; onOpen: (invoiceId: number) => void;
   hasError?: boolean;
+  selection?: { items: ApiInvoiceListItemDto[]; onChange: (items: ApiInvoiceListItemDto[]) => void };
   canOperate: boolean; canExportPackage: boolean; canExportBookingSheet: boolean; canUseSingleWindow: boolean;
   onCopy: (invoice: ApiInvoiceListItemDto) => void; onExportPackage: (invoice: ApiInvoiceListItemDto) => void;
   onExportBookingSheet: (invoice: ApiInvoiceListItemDto) => void; onSingleWindow: (invoice: ApiInvoiceListItemDto) => void;
@@ -23,8 +24,12 @@ export function InvoiceTable({ data, isBusy, hasError = false, canOperate, canEx
     { title: "单一窗口办理", icon: FileCheck2, run: onSingleWindow, visible: canUseSingleWindow },
     { title: "复制发票", icon: Copy, run: onCopy, visible: canOperate },
   ].filter((action) => action.visible);
-  return <ResponsiveTableFrame label="发票列表" busy={isBusy} mobileLayout="scroll"><table><thead><tr>{["发票号","日期","客户","出口商","目的国","装港","目的港","金额","类型","状态","操作"].map((label) => <th key={label} className={label === "金额" ? "amount-cell" : undefined}>{label}</th>)}</tr></thead><tbody>
-    {data.length === 0 && !hasError ? <tr><td colSpan={11} className="empty-cell">{isBusy ? "加载中" : "暂无数据"}</td></tr> : data.map((invoice) => <tr className="clickable-row" key={invoice.id} tabIndex={0} onClick={() => onOpen(invoice.id)} onKeyDown={(event) => openFromKeyboard(event, invoice.id)}>
+  return <ResponsiveTableFrame label="发票列表" busy={isBusy} mobileLayout="scroll"><table><thead><tr>{selection && <th><input type="checkbox" aria-label="选择本页发票" disabled={isBusy} checked={data.length > 0 && data.every((item) => selection.items.some((selected) => selected.id === item.id))}
+    onChange={(event) => selection.onChange(event.target.checked ? [...selection.items, ...data.filter((item) => !selection.items.some((selected) => selected.id === item.id))].slice(0, 200) : selection.items.filter((item) => !data.some((row) => row.id === item.id)))} /></th>}{["发票号","日期","客户","出口商","目的国","装港","目的港","金额","类型","状态","操作"].map((label) => <th key={label} className={label === "金额" ? "amount-cell" : undefined}>{label}</th>)}</tr></thead><tbody>
+    {data.length === 0 && !hasError ? <tr><td colSpan={selection ? 12 : 11} className="empty-cell">{isBusy ? "加载中" : "暂无数据"}</td></tr> : data.map((invoice) => <tr className="clickable-row" key={invoice.id} tabIndex={0} onClick={() => onOpen(invoice.id)} onKeyDown={(event) => openFromKeyboard(event, invoice.id)}>
+      {selection && <td onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={`选择发票 ${invoice.invoiceNo || invoice.id}`}
+        checked={selection.items.some((item) => item.id === invoice.id)} disabled={isBusy || selection.items.length >= 200 && !selection.items.some((item) => item.id === invoice.id)}
+        onChange={(event) => selection.onChange(event.target.checked ? [...selection.items, invoice] : selection.items.filter((item) => item.id !== invoice.id))} /></td>}
       <td className="strong-cell">{invoice.invoiceNo || "-"}</td><td>{formatDate(invoice.invoiceDate)}</td><td>{invoice.customerName || "-"}</td><td>{invoice.exporterName || "-"}</td><td>{invoice.destinationCountry || "-"}</td><td>{invoice.portOfLoading || "-"}</td><td>{invoice.portOfDestination || "-"}</td><td className="amount-cell">{formatAmount(invoice.totalAmount, invoice.currency)}</td><td><span className="status-pill">{invoice.type || "-"}</span></td><td><span className="status-pill">{getInvoiceStatusLabel(invoice.status)}</span></td>
       <td className="row-actions-cell">{actions.map(({ title, icon: Icon, run }) => <button key={title} className="icon-button compact-icon-button" type="button" title={title} aria-label={`${title} ${invoice.invoiceNo || invoice.id}`} disabled={isBusy} onClick={(event) => { event.stopPropagation(); run(invoice); }}><Icon size={15} aria-hidden="true" /></button>)}</td>
     </tr>)}

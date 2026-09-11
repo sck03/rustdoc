@@ -19,7 +19,7 @@ await require("esbuild").build({ stdin: { resolveDir: web, loader: "tsx", conten
   import {MemoryRouter,useLocation} from 'react-router-dom';
   import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
   import {WorkspaceShell} from './src/app/WorkspaceShell.tsx';
-  import {workspaceNavGroups} from './src/app/workspaceNavigation.ts';
+  import {getWorkspaceRouteItems} from './src/app/workspaceNavigation.ts';
   import {getDefaultWorkspaceRoute} from './src/app/productEdition.ts';
   import {isRouteAccessAllowed} from './src/app/routeAccess.ts';
   import {PermissionAccessProvider} from './src/app/PermissionAccessContext.tsx';
@@ -29,7 +29,7 @@ await require("esbuild").build({ stdin: { resolveDir: web, loader: "tsx", conten
   const params=new URLSearchParams(location.search), edition=params.get('edition')||'Full', desktop=params.get('runtime')!=='browser';
   const workspaces=edition==='Full'?['document','sales','office']:edition==='Administration'?['office']:edition==='Sales'?['sales']:['document'];
   if(!desktop&&!workspaces.includes('office'))workspaces.push('office');
-  const items=workspaceNavGroups.flatMap(group=>group.items).filter(item=>(!item.workspace||workspaces.includes(item.workspace))&&!(edition==='Administration'&&item.moduleKey?.startsWith('common.')));
+  const items=getWorkspaceRouteItems().filter(item=>(!item.workspace||workspaces.includes(item.workspace))&&!(edition==='Administration'&&item.moduleKey?.startsWith('common.')));
   const modules=[...new Set(items.flatMap(item=>item.moduleKey?[item.moduleKey]:[]))];
   const permissions=items.flatMap(item=>item.requiredPermissions||[]).map(item=>({...item,dataScope:'all'}));
   permissions.push({resourceKey:'document.invoice-output',action:'export-zip',dataScope:'all'});
@@ -100,7 +100,7 @@ try {
   chrome = await startChrome({ browserExecutable: locateChromeForTesting(repo, "headless-shell"), userDataDir: path.join(repo, ".codex-runtime/workspace-navigation-ui-chrome"), timeoutMs: 30000 });
   cdp = await CdpClient.connect(chrome.browserWebSocketUrl); page = await createPageSession(cdp);
   await open(1366);
-  assert.equal(await read("document.querySelector('.workspace-header h1').textContent"), "单证概览");
+  assert.equal(await read("document.querySelector('.workspace-header h1').textContent"), "工作概览");
   assert.equal(await read("document.querySelectorAll('.nav-group-button[aria-expanded=true]').length"), 1);
   assert.equal(await read("document.querySelectorAll('.nav-group-button').length"), 6); await audit("full-desktop");
   await click('[data-nav-group="office"]'); await click('.nav-item[href="/office/people"]');

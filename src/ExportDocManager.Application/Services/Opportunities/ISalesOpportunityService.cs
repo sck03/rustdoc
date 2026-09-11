@@ -34,6 +34,7 @@ namespace ExportDocManager.Services.Opportunities
 
     public interface ISalesOpportunityService
     {
+        Task<SalesOpportunityRecord> GetAsync(int id, CancellationToken cancellationToken = default);
         Task<PagedResult<SalesOpportunityRecord>> QueryAsync(
             string? keyword, string? stage, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
         Task<SalesOpportunityRecord> SaveAsync(SalesOpportunitySaveRequest request, CancellationToken cancellationToken = default);

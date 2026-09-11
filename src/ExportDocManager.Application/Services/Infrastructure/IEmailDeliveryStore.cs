@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using ExportDocManager.Models;
 
 namespace ExportDocManager.Services.Infrastructure;
 
@@ -22,7 +23,7 @@ public interface IEmailDeliveryStore
     Task<EmailDeliveryBeginResult> BeginAsync(string deliveryId, string requestFingerprint, string jobId, string kind, string recipient, string subject, int attachmentCount, CancellationToken cancellationToken = default);
     Task MarkSentAsync(string deliveryId, CancellationToken cancellationToken = default);
     Task MarkUncertainAsync(string deliveryId, string errorMessage, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<EmailDeliverySnapshot>> ListRecentAsync(int limit = 50, CancellationToken cancellationToken = default);
+    Task<PagedResult<EmailDeliverySnapshot>> QueryAsync(string? keyword = null, string? status = null, int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default);
 }
 
 public static class EmailDeliveryFingerprint

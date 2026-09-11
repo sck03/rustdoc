@@ -56,7 +56,7 @@ namespace ExportDocManager.Api.Tests
 
             var emailDeliveriesResponse = await adminClient.GetAsync("/api/tools/email/deliveries");
             Assert.Equal(HttpStatusCode.OK, emailDeliveriesResponse.StatusCode);
-            Assert.Empty(await ApiIntegrationTestHarness.ReadJsonAsync<ApiEmailDeliveryDto[]>(emailDeliveriesResponse));
+            Assert.Empty((await ApiIntegrationTestHarness.ReadJsonAsync<ApiPagedResponse<ApiEmailDeliveryDto>>(emailDeliveriesResponse)).Items);
 
             var invalidEmailSuggestionResponse = await adminClient.PostAsJsonAsync(
                 "/api/tools/email/server-suggestion",

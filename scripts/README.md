@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+导航与界面整理验证：`npm --prefix apps/export-doc-web run test:navigation-reorganization-ui` 使用实际工作区、路由和受控接口夹具，覆盖对象直达、保留筛选／页码、客户与邮件草稿、连续返回、独立权限、模板目录及发票跨页批量报表。截图与摘要写入 `artifacts/navigation-reorganization-ui`；按编号读取和数据范围另由 .NET API／Infrastructure 集成测试验证。
+
 单据编辑界面验证：`npm --prefix apps/export-doc-web run test:document-editor-ui`，使用真实 React 页面与受控接口夹具验证发票五个／付款四个页签、跨区保存及必填定位、自定义字段名称／备用列保留数据、付款自定义方式、只读权限和窄屏布局，并覆盖系统设置、报表导出默认设置及付款的冲突取消、加载失败保留草稿和重新加载后保存；截图与摘要写入 `artifacts/document-editor-ui`。`test:office-ui` 同时覆盖 175 部门、深层搜索、折叠恢复、公司切换及保存后定位。数据库持久化另由 .NET 集成测试验证。
 
 2026-09-11：`provision-visual-cpp-runtime.ps1` 由 Windows x64 OCR 资源准备自动调用，只从已校验的微软安装器提取四个必需 DLL（908008 字节），不执行或分发整套安装器。WebView2 与 CRT 共用 `lib/microsoft-runtime-support.ps1` 的来源／签名／摘要检查；客户仍使用既有构建入口。

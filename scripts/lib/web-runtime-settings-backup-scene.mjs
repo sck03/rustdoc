@@ -144,7 +144,7 @@ export function createSettingsBackupSmokeScene(runtime) {
     await page.send("Page.navigate", { url: singleWindowUrl });
     const singleWindowExpectedText = [
       "设置",
-      "AI 与单一窗口",
+      "AI 服务",
       "AI 设置",
       "AI API 地址",
       "AI 模型",

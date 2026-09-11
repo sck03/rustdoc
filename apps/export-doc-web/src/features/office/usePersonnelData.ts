@@ -3,14 +3,17 @@ import { useQuery } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient, PersonnelTransitionRequest } from "../../api/index.ts";
 import { useOfficePaging } from "./useOfficeData.ts";
 import type { PersonnelWorkflow } from "./personnelModel.ts";
+import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
+import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 
-export function usePersonnelDirectory(client: ExportDocManagerApiClient, user: ApiUserDto) {
-  const paging = useOfficePaging();
-  const [keyword, setKeyword] = useState("");
-  const [search, setSearch] = useState("");
-  const [departmentId, setDepartmentId] = useState("");
-  const [status, setStatus] = useState("");
-  const [attentionOnly, setAttentionOnly] = useState(false);
+export function usePersonnelDirectory(client: ExportDocManagerApiClient, user: ApiUserDto, directoryOnly = false, enabled = true) {
+  const list = useDirectoryLocation("people", 24);
+  const { params, update } = useRouteQuery();
+  const paging = { pageNumber: list.pageNumber, pageSize: list.pageSize, setPageNumber: list.setPageNumber, resetPage: () => list.setPageNumber(1), changePageSize: list.setPageSize };
+  const keyword = list.keywordInput, search = list.keyword;
+  const departmentId = params.get("departmentId") ?? "";
+  const status = directoryOnly ? "" : list.status;
+  const attentionOnly = !directoryOnly && params.get("attention") === "true";
   const options = useQuery({ queryKey: ["office", "people", "options", user.id, user.companyScope],
     queryFn: ({ signal }) => client.getPersonnelOptions({ signal }) });
   const query = useQuery({
@@ -18,13 +21,14 @@ export function usePersonnelDirectory(client: ExportDocManagerApiClient, user: A
     queryFn: ({ signal }) => client.listPersonnel({ keyword: search || undefined, departmentId: departmentId || undefined,
       status: status || undefined, attentionOnly, pageNumber: paging.pageNumber, pageSize: paging.pageSize }, { signal }),
     refetchInterval: 60000, refetchIntervalInBackground: false,
+    enabled,
   });
   return { paging, query, options, keyword, departmentId, status, attentionOnly,
-    changeKeyword: (text: string) => { setKeyword(text); if (!text) { setSearch(""); paging.resetPage(); } },
-    search: () => { setSearch(keyword.trim()); paging.resetPage(); },
-    changeDepartment: (id: string) => { setDepartmentId(id); paging.resetPage(); },
-    changeStatus: (next: string) => { setStatus(next); setAttentionOnly(false); paging.resetPage(); },
-    changeAttention: (next: boolean) => { setAttentionOnly(next); setStatus(""); paging.resetPage(); },
+    changeKeyword: (text: string) => { list.setKeywordInput(text); if (!text) list.setKeyword(""); },
+    search: () => list.setKeyword(keyword),
+    changeDepartment: (id: string) => update({ departmentId: id, peoplePage: null }),
+    changeStatus: (next: string) => update({ peopleStatus: next, attention: null, peoplePage: null }),
+    changeAttention: (next: boolean) => update({ attention: next, peopleStatus: null, peoplePage: null }),
   };
 }
 

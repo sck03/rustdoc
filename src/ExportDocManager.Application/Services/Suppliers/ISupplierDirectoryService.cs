@@ -42,6 +42,7 @@ namespace ExportDocManager.Services.Suppliers
 
     public interface ISupplierDirectoryService
     {
+        Task<SupplierRecord> GetAsync(int id, CancellationToken cancellationToken = default);
         Task<PagedResult<SupplierRecord>> QueryAsync(string? keyword, string? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
         Task<SupplierRecord> SaveAsync(SupplierSaveRequest request, CancellationToken cancellationToken = default);
         Task<SupplierRecord> AdmitAsync(int id, int expectedVersion, CancellationToken cancellationToken = default);

@@ -26,6 +26,17 @@ namespace ExportDocManager.Services.Crm
             _clock = clock ?? BusinessClock.CreateSystem();
         }
 
+        public async Task<CrmCustomerRecord> GetCustomerAsync(int id, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking())
+                .Where(item => item.Id == id)
+                .Select(item => new CrmCustomerRecord(item.Id, item.Name, item.CountryRegion, item.Website,
+                    item.Status, item.Source, item.Notes, item.LinkedDocumentCustomerId, item.VersionNumber))
+                .SingleOrDefaultAsync(cancellationToken)
+                ?? throw new ResourceNotFoundException("CRM 客户不存在或无权访问。");
+        }
+
         public async Task<PagedResult<CrmCustomerRecord>> QueryCustomersAsync(
             string? keyword, string? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
         {

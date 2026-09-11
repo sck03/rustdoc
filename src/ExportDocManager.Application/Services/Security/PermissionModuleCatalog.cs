@@ -89,26 +89,26 @@ namespace ExportDocManager.Services.Security
 
         public static readonly IReadOnlyList<PermissionModuleDefinition> Modules =
         [
-            new(DocumentDashboard, "单证仪表盘", "单证业务", "document", 10),
+            new(DocumentDashboard, "单证概览", "单证业务", "document", 10),
             new(DocumentInvoices, "发票管理", "单证业务", "document", 20),
-            new(DocumentQuery, "单据查询", "单证业务", "document", 30),
+            new(DocumentQuery, "统计查询", "单证业务", "document", 30),
             new(DocumentPayments, "付款报销", "单证业务", "document", 40),
-            new(DocumentJobs, "任务中心", "单证业务", "document", 50),
+            new(DocumentJobs, "文件任务", "单证业务", "document", 50),
             new(DocumentSingleWindow, "单一窗口", "单证业务", "document", 60),
             new(DocumentDeclarationDictionary, "申报词典", "申报与归类", "document", 62),
             new(DocumentHsKnowledge, "HS 编码知识", "申报与归类", "document", 65),
-            new(DocumentMasterData, "主数据维护", "单证业务", "document", 70),
-            new(DocumentReports, "报表设计", "单证工具", "document", 80),
+            new(DocumentMasterData, "基础资料", "单证业务", "document", 70),
+            new(DocumentReports, "报表模板管理", "单证工具", "document", 80),
             new(DocumentInvoiceReports, "发票单据输出", "单证基础能力", "document", 84, true),
             new(DocumentPaymentReports, "付款报销单据输出", "单证基础能力", "document", 85, true),
-            new(DocumentExcel, "Excel 工具", "单证工具", "document", 90),
-            new(DocumentOcr, "智能 OCR", "通用工具", "document", 100),
-            new(DocumentContainerPacking, "装箱模拟", "单证工具", "document", 110),
+            new(DocumentExcel, "Excel 模板与托单", "单证工具", "document", 90),
+            new(DocumentOcr, "文字识别", "通用工具", "document", 100),
+            new(DocumentContainerPacking, "装柜模拟", "单证工具", "document", 110),
             new(DocumentCustomOptions, "单证候选项", "单证基础能力", "document", 120, true),
             new(DocumentReferenceData, "业务基础资料读取", "单证基础能力", "document", 130, true),
             new(SalesDashboard, "销售概览", "销售业务", "sales", 200),
             new(SalesCrm, "客户与跟进", "销售业务", "sales", 210),
-            new(SalesOpportunities, "商机跟踪", "销售业务", "sales", 220),
+            new(SalesOpportunities, "商机与报价", "销售业务", "sales", 220),
             new(SalesEmailTemplates, "邮件模板", "销售业务", "sales", 230),
             new(SalesSuppliers, "供应商管理", "销售业务", "sales", 240),
             new(CommonProductReference, "商品资料读取", "通用基础能力", "common", 290, true),
@@ -118,7 +118,7 @@ namespace ExportDocManager.Services.Security
             new(SystemAbout, "关于系统", "系统", "common", 320),
             new(OfficeRooms, "会议室预约", "公司行政", "office", 330),
             new(OfficeSupplies, "物品领用", "公司行政", "office", 340),
-            new(OfficePeople, "人员信息管理", "公司行政", "office", 350)
+            new(OfficePeople, "人员档案与通讯录", "公司行政", "office", 350)
         ];
 
         public static readonly IReadOnlyDictionary<string, PermissionModuleDefinition> ByKey =

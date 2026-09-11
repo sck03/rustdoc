@@ -24,6 +24,9 @@ namespace ExportDocManager.Api.Tests
                     "服装、面料", "独立供应商资料"));
             Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
             var supplier = await ApiIntegrationTestHarness.ReadJsonAsync<ApiSupplierDto>(createResponse);
+            Assert.Equal(supplier, await client.GetFromJsonAsync<ApiSupplierDto>($"/api/suppliers/{supplier.Id}"));
+            Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/suppliers/{supplier.Id}")).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/suppliers/2147483647")).StatusCode);
             Assert.Equal("考察中", supplier.Status);
 
             int productId;

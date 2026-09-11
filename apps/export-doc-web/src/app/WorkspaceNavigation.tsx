@@ -68,8 +68,8 @@ export function WorkspaceNavigation({ groups, pathname, collapsed, activeGroupKe
               const ItemIcon = item.icon;
               const active = item.isActive(pathname);
               return <Link key={item.to} className={active ? "nav-item nav-item-active" : "nav-item"} to={item.to}
-                aria-current={active ? "page" : undefined} title={item.description}>
-                <ItemIcon size={16} aria-hidden="true" /><span>{item.label}</span>
+                aria-current={active ? "page" : undefined} title={item.description} onClick={() => setQuery("")}>
+                <ItemIcon size={16} aria-hidden="true" /><span>{item.label}{searching && <small className="nav-search-location">{item.locationLabel}</small>}</span>
               </Link>;
             })}
           </div>

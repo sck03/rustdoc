@@ -9,6 +9,30 @@ namespace ExportDocManager.Infrastructure.Tests;
 public sealed class EmailDeliveryStoreTests
 {
     [Fact]
+    public async Task HistoryQuery_ShouldPageBeyondRecentRecordsAndFilterBeforeCounting()
+    {
+        using var factory = new InMemoryTestDatabase();
+        var store = new EmailDeliveryStore(factory, new BusinessDataAccessScope(new DatabaseConnectionSettings()));
+        for (int index = 0; index < 65; index++)
+        {
+            string id = $"history-{index:D3}";
+            await store.BeginAsync(id, EmailDeliveryFingerprint.Create([id]), string.Empty, "EmailTool", "buyer@example.com", $"Invoice {index}", 0);
+            if (index % 2 == 0) await store.MarkSentAsync(id);
+        }
+        var first = await store.QueryAsync(pageNumber: 1, pageSize: 50);
+        var second = await store.QueryAsync(pageNumber: 2, pageSize: 50);
+        Assert.Equal(65, first.TotalCount);
+        Assert.Equal(15, second.Items.Count);
+        Assert.Equal(65, first.Items.Concat(second.Items).Select(item => item.DeliveryId).Distinct().Count());
+        var sent = await store.QueryAsync("buyer@example.com", "Sent", pageSize: 100);
+        Assert.Equal(33, sent.TotalCount);
+        Assert.All(sent.Items, item => Assert.Equal("Sent", item.Status));
+        Assert.Empty((await store.QueryAsync("no-match", pageSize: 20)).Items);
+        await Assert.ThrowsAsync<ExportDocManager.Services.Errors.ServiceValidationException>(() => store.QueryAsync(status: "unknown"));
+        await Assert.ThrowsAsync<ExportDocManager.Services.Errors.ServiceValidationException>(() => store.QueryAsync(pageNumber: 0));
+    }
+
+    [Fact]
     public async Task DeliveryKey_ShouldPreventDuplicateSendAndPreserveHistory()
     {
         using var factory = new InMemoryTestDatabase();
@@ -26,7 +50,7 @@ public sealed class EmailDeliveryStoreTests
         Assert.False(duplicate.ShouldSend);
         Assert.True(duplicate.AlreadySent);
 
-        var row = Assert.Single(await store.ListRecentAsync());
+        var row = Assert.Single((await store.QueryAsync()).Items);
         Assert.Equal("Sent", row.Status);
         await using var context = factory.CreateDbContext();
         Assert.Equal("sender", (await context.EmailDeliveryRecords.SingleAsync()).RequestedBy);
@@ -63,11 +87,11 @@ public sealed class EmailDeliveryStoreTests
         var departmentStore = new EmailDeliveryStore(
             factory,
             new BusinessDataAccessScope(databaseSettings, new FixedCurrentUserContext(viewer)));
-        var departmentRows = await departmentStore.ListRecentAsync();
+        var departmentRows = (await departmentStore.QueryAsync()).Items;
         Assert.Equal(new[] { "peer", "viewer" }, departmentRows.Select(row => row.Subject).Order().ToArray());
 
         viewer.EffectivePermissionGrants = CreateDeliveryHistoryGrant(PermissionDataScope.Company);
-        var companyRows = await departmentStore.ListRecentAsync();
+        var companyRows = (await departmentStore.QueryAsync()).Items;
         Assert.Equal(new[] { "finance", "peer", "viewer" }, companyRows.Select(row => row.Subject).Order().ToArray());
     }
 

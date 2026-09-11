@@ -1,11 +1,13 @@
 import { Dispatch, SetStateAction } from "react";
 import {
   buildNewTemplateFileName,
+  fileNameFromPath,
   readPreferredPreviewSampleProfile,
   type ReportTypeOption,
 } from "./reportTemplateDesignerModel.ts";
 import { readNumber } from "../../ui/formUtils.ts";
 import { type ReportDesignerPreviewSampleProfile } from "../report-designer/reportDesignerPreviewSamples.ts";
+import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 
 export function useReportTemplateSelectionActions({
   reportType,
@@ -44,6 +46,7 @@ export function useReportTemplateSelectionActions({
   clearFeedback: () => void;
   confirmDiscardChanges: (actionLabel?: string) => Promise<boolean>;
 }) {
+  const { update } = useRouteQuery();
   function clearLoadedTemplateContent() {
     setContent("");
     setContentTemplatePath("");
@@ -58,6 +61,7 @@ export function useReportTemplateSelectionActions({
       return;
     }
     setReportType(nextReportType);
+    update({ reportType: nextReportType, template: null, userTemplateId: null });
     setSelectedUserTemplateId(0);
     setSelectedTemplatePath("");
     clearLoadedTemplateContent();
@@ -74,6 +78,7 @@ export function useReportTemplateSelectionActions({
     }
     setSelectedUserTemplateId(0);
     setSelectedTemplatePath(value);
+    update({ reportType, template: fileNameFromPath(value), userTemplateId: null });
     clearLoadedTemplateContent();
   }
 
@@ -83,6 +88,7 @@ export function useReportTemplateSelectionActions({
       return;
     }
     setSelectedUserTemplateId(id);
+    update({ reportType, userTemplateId: id || null, template: null });
     if (id <= 0) {
       setSelectedTemplatePath("");
       clearLoadedTemplateContent();

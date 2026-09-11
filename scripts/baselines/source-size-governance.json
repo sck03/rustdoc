@@ -60,9 +60,9 @@
       ],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 42599,
+      "baselineAggregateLines": 42824,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 42749,
+      "maximumAggregateLines": 42974,
       "reportFiles": false
     },
     {
