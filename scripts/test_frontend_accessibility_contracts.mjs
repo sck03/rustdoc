@@ -355,8 +355,8 @@ const responsiveCss = readCssImportGraph(path.join(root, "responsiveOverrides.cs
 if (!/@media\s*\(min-width:\s*861px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.field-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/u.test(responsiveCss)) {
   failures.push("responsiveOverrides.css: 公共业务表单必须在 861—1180px 中等桌面宽度切换为双列");
 }
-if (!/@media\s*\(min-width:\s*861px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.invoice-party-group-exporter\s+\.field-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/u.test(responsiveCss)) {
-  failures.push("responsiveOverrides.css: 出口商资料在 861—1180px 仍应使用可容纳的专用四列布局，避免通用双列规则拉长页面");
+if (!/@media\s*\(min-width:\s*861px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.invoice-party-group-exporter\s+\.field-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/u.test(responsiveCss)) {
+  failures.push("responsiveOverrides.css: 并排的客户与出口商面板在中等宽度应保持双列字段，避免压缩长名称与地址");
 }
 
 for (const scriptName of ["test_frontend_visual_baselines.mjs", "test_frontend_scale_contracts.mjs"]) {
@@ -500,8 +500,8 @@ for (const globalBusinessStyle of [
   }
 }
 const invoicePartiesCss = readCssImportGraph(path.join(root, "styles", "business", "invoice-parties.css"));
-if (!/@media\s*\(max-width:\s*860px\)[\s\S]*?\.invoice-party-group:not\(\.invoice-party-group-exporter\)\s+\.field-grid\s*,[\s\S]*?grid-template-columns:\s*1fr/u.test(invoicePartiesCss)) {
-  failures.push("invoice-parties.css: 发票客户与通知人专用双列布局必须在窄窗口退化为单列");
+if (!/@media\s*\(max-width:\s*860px\)[\s\S]*?\.invoice-party-group\s+\.field-grid\s*\{[\s\S]*?grid-template-columns:\s*1fr/u.test(invoicePartiesCss)) {
+  failures.push("invoice-parties.css: 客户与出口商的字段布局必须在窄窗口退化为单列");
 }
 for (const [routeCssPath, forbiddenSharedDefinitions] of [
   ["styles/single-window-core.css", [".visually-hidden {", ".danger-icon {", ".filter-bar {", ".inline-filter {", ".inline-check {"]],

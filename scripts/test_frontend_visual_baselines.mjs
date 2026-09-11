@@ -120,6 +120,7 @@ try {
         const partyControlOverflow = ${JSON.stringify(pageName)} === "invoiceParties"
           ? [...document.querySelectorAll(".invoice-party-group input, .invoice-party-group select, .invoice-party-group textarea")]
             .filter((control) => {
+              if (control.getClientRects().length === 0) return false;
               const group = control.closest(".invoice-party-group");
               if (!group) return true;
               const controlRect = control.getBoundingClientRect();

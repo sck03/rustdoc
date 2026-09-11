@@ -1,8 +1,9 @@
-import type { FormEventHandler, KeyboardEventHandler, ReactNode } from "react";
+import type { FormEventHandler, KeyboardEventHandler, ReactNode, RefObject } from "react";
 import { Minimize2, PackageSearch, Save } from "lucide-react";
 import type { ApiInvoiceDetailDto } from "../../api/index.ts";
 
 type InvoiceEditorFormShellProps = {
+  formRef: RefObject<HTMLFormElement | null>;
   invoice: ApiInvoiceDetailDto;
   isWorkbench: boolean;
   isBusy: boolean;
@@ -21,6 +22,7 @@ type InvoiceEditorFormShellProps = {
  * modes (normal editor and dense item workbench).
  */
 export function InvoiceEditorFormShell({
+  formRef,
   invoice,
   isWorkbench,
   isBusy,
@@ -33,7 +35,7 @@ export function InvoiceEditorFormShell({
   documentSections,
 }: InvoiceEditorFormShellProps) {
   return (
-    <form className={formClassName} onSubmit={onSubmit} onKeyDownCapture={onKeyDownCapture}>
+    <form ref={formRef} className={formClassName} onSubmit={onSubmit} onKeyDownCapture={onKeyDownCapture}>
       {isWorkbench ? (
         <div className="invoice-items-focus-shell" aria-label="商品明细工作台">
           <div className="invoice-items-focus-header workspace-surface-card">

@@ -143,6 +143,7 @@ namespace ExportDocManager.Api.Hosting
             AddRangeFixMessage(messages, "system.postgreSqlAutoBackupDayOfWeek", raw.PostgreSqlAutoBackupDayOfWeek, normalized.PostgreSqlAutoBackupDayOfWeek, "PostgreSQL 每周备份星期");
             AddRangeFixMessage(messages, "system.postgreSqlAutoBackupRetentionCount", raw.PostgreSqlAutoBackupRetentionCount, normalized.PostgreSqlAutoBackupRetentionCount, "PostgreSQL 备份保留份数");
             AddRangeFixMessage(messages, "system.itemEntryBlankRowCount", raw.ItemEntryBlankRowCount, normalized.ItemEntryBlankRowCount, "商品明细预留空白行数");
+            AddRangeFixMessage(messages, "system.itemEntrySpareColumnCount", raw.ItemEntrySpareColumnCount, normalized.ItemEntrySpareColumnCount, "商品明细默认显示备用列数");
             AddRangeFixMessage(messages, "system.auditLogRetentionDays", raw.AuditLogRetentionDays, normalized.AuditLogRetentionDays, "审计日志保留天数");
             AddRangeFixMessage(messages, "system.logRetentionDays", raw.LogRetentionDays, normalized.LogRetentionDays, "文本日志保留天数");
             AddRangeFixMessage(messages, "system.logRetainedFileCount", raw.LogRetainedFileCount, normalized.LogRetainedFileCount, "文本日志保留文件数");

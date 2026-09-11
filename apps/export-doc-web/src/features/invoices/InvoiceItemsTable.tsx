@@ -20,6 +20,9 @@ export function InvoiceItemsTable(props:Props){
  return <>
       <div
         className="table-frame item-editor-frame"
+        role="region"
+        aria-label="商品明细表，可横向滚动查看各列"
+        tabIndex={0}
         ref={tableFrameRef}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}

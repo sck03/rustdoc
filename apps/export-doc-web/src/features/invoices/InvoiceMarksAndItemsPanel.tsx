@@ -24,6 +24,7 @@ export function InvoiceMarksAndItemsPanel({
   canUseHsKnowledge,
   canUndoItemEdit,
   invoiceItemBlankRowCount,
+  defaultSpareColumnCount = 0,
   isEditable,
   isFocusedWorkbench = false,
   isProductLibraryBusy,
@@ -64,6 +65,7 @@ export function InvoiceMarksAndItemsPanel({
   canUseHsKnowledge: boolean;
   canUndoItemEdit: boolean;
   invoiceItemBlankRowCount: number;
+  defaultSpareColumnCount?: number;
   isEditable: boolean;
   isFocusedWorkbench?: boolean;
   isProductLibraryBusy: boolean;
@@ -271,9 +273,9 @@ export function InvoiceMarksAndItemsPanel({
               <span>明细工作台</span>
             </button>
           ) : null}
-          <button className="icon-button" type="button" title="新增商品明细" aria-label="新增商品明细" disabled={!isEditable} onClick={onAddItem}>
+          {isEditable && <button className="icon-button" type="button" title="新增商品明细" aria-label="新增商品明细" onClick={onAddItem}>
             <Plus size={17} aria-hidden="true" />
-          </button>
+          </button>}
         </div>
       </div>
       <details className="invoice-items-support-details">
@@ -288,6 +290,7 @@ export function InvoiceMarksAndItemsPanel({
         canUseHsKnowledge={canUseHsKnowledge}
         canUndoItemEdit={canUndoItemEdit}
         blankRowCount={invoiceItemBlankRowCount}
+        defaultSpareColumnCount={defaultSpareColumnCount}
         currency={invoice.currency}
         exchangeRate={invoice.exchangeRate}
         isProductLibraryBusy={isProductLibraryBusy}

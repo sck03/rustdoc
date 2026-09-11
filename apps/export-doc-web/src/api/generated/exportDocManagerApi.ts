@@ -4510,6 +4510,7 @@ export interface SystemSettings {
   defaultExportDirectory: string;
   defaultTemplateExporterNameCn: string;
   itemEntryBlankRowCount: number;
+  itemEntrySpareColumnCount: number;
   logFileSizeLimitMB: number;
   logRetainedFileCount: number;
   logRetentionDays: number;

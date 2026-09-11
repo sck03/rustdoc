@@ -393,6 +393,35 @@ public sealed class SettingsServiceTests
         }
     }
 
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(0, 0)]
+    [InlineData(3, 3)]
+    [InlineData(10, 10)]
+    [InlineData(11, 10)]
+    public async Task InvoiceSpareColumnDefault_ShouldPersistWithinSupportedRange(int requested, int expected)
+    {
+        string root = CreateTempRoot();
+        try
+        {
+            var paths = new RuntimeAppPathProvider(root, Path.Combine(root, "App_Data"));
+            var service = new SettingsService(paths);
+            Assert.Equal(0, service.Settings.System.ItemEntrySpareColumnCount);
+            await service.UpdateAsync(settings =>
+            {
+                settings.System.ItemEntrySpareColumnCount = requested;
+                return true;
+            });
+            var reader = new SettingsService(paths);
+            await reader.LoadAsync();
+            Assert.Equal(expected, reader.Settings.System.ItemEntrySpareColumnCount);
+        }
+        finally
+        {
+            TryDeleteDirectory(root);
+        }
+    }
+
     private static AppSettings CreateSettings(
         string emailPassword,
         string webDavPassword,

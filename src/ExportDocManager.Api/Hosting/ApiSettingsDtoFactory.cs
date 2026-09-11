@@ -71,6 +71,7 @@ namespace ExportDocManager.Api.Hosting
             settings.System.PostgreSqlAutoBackupRetentionCount =
                 Math.Max(1, settings.System.PostgreSqlAutoBackupRetentionCount);
             settings.System.ItemEntryBlankRowCount = Math.Clamp(settings.System.ItemEntryBlankRowCount, 1, 500);
+            settings.System.ItemEntrySpareColumnCount = Math.Clamp(settings.System.ItemEntrySpareColumnCount, 0, 10);
             settings.System.AuditLogRetentionDays = Math.Max(0, settings.System.AuditLogRetentionDays);
             settings.System.LogRetentionDays = Math.Max(0, settings.System.LogRetentionDays);
             settings.System.LogRetainedFileCount = Math.Max(1, settings.System.LogRetainedFileCount);

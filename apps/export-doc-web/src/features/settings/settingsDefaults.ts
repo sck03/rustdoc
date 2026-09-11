@@ -11,6 +11,7 @@ export const systemDefaultPatches: SettingPatch[] = [
   { path: ["system", "defaultTemplateExporterNameCn"], value: "" },
   { path: ["system", "backupRetentionDays"], value: 0 },
   { path: ["system", "itemEntryBlankRowCount"], value: 20 },
+  { path: ["system", "itemEntrySpareColumnCount"], value: 0 },
   { path: ["system", "auditLogRetentionDays"], value: 180 },
   { path: ["system", "logRetentionDays"], value: 30 },
   { path: ["system", "logRetainedFileCount"], value: 14 },

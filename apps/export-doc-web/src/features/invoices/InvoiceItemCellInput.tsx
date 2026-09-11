@@ -224,7 +224,7 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
               : undefined}
           aria-label={ariaLabel}
           aria-controls={canShowInlineOptions ? historyPanelId : undefined}
-          aria-expanded={canShowInlineOptions}
+          aria-haspopup={canShowInlineOptions ? "listbox" : undefined}
           aria-activedescendant={activeOptionId}
           data-invoice-item-row={index}
           data-invoice-item-field={column.field}
@@ -251,6 +251,8 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
         ref={inputRef}
         className={`item-cell-input${selected ? " item-cell-selected" : ""}`}
         aria-label={ariaLabel}
+        role="combobox"
+        aria-autocomplete="both"
         aria-controls={canShowInlineOptions ? historyPanelId : undefined}
         aria-expanded={canShowInlineOptions}
         aria-activedescendant={activeOptionId}

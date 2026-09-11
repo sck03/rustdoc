@@ -2,6 +2,41 @@ import assert from "node:assert/strict";
 import path from "node:path";
 
 export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickText,input,audit,results,output,captureScreenshot}) {
+  for (const width of [1440,390,320]) {
+    await open("organization",width,"complex");
+    const initialCount=await read(page,"document.querySelectorAll('.organization-tree-table tbody tr').length");
+    assert(initialCount>20&&initialCount<50,"complex organizations start with two levels, not every descendant");
+    if(width===1440)assert(await read(page,"[...document.querySelectorAll('.organization-tree-table tbody tr')].every(row=>row.getBoundingClientRect().height<=48)"),"desktop department rows must stay compact");
+    await audit(page,`organization-complex-${width}`);
+    await captureScreenshot(page,path.join(output,`organization-complex-${width}.png`));
+    await clickText(page,"全部展开");
+    assert.equal(await read(page,"document.querySelectorAll('.organization-tree-table tbody tr').length"),175);
+    await clickText(page,"仅看一级");
+    assert.equal(await read(page,"document.querySelectorAll('.organization-tree-table tbody tr').length"),5);
+    await input(page,'input[aria-label="查找部门或负责人"]',"重点客户协作组");
+    assert.equal(await read(page,"document.querySelectorAll('.organization-tree-table tbody tr').length"),3);
+    await clickText(page,"重点客户协作组AREA-2-TEAM-3-GROUP-2",".organization-node-name");
+    assert(await read(page,"document.querySelector('.organization-selection-path').textContent.includes('示例公司 / 业务事业部2 / 区域团队3 / 重点客户协作组')"));
+    await input(page,'input[aria-label="查找部门或负责人"]',"DEEP-19");
+    assert.equal(await read(page,"document.querySelectorAll('.organization-tree-table tbody tr').length"),21);
+    await read(page,"document.querySelector('.organization-tree-table tbody tr:last-child .organization-node-name').click()");
+    assert(await read(page,"document.querySelector('.organization-selection-path').textContent.includes('专项组19')"));
+    await audit(page,`organization-deep-search-${width}`);
+    await input(page,'input[aria-label="查找部门或负责人"]',"");
+    assert.equal(await read(page,"document.querySelectorAll('.organization-tree-table tbody tr').length"),5,"clearing search restores the user's collapse choice");
+    if(width===1440) {
+      await clickText(page,"展开两级");
+      await read(page,"document.querySelector('[data-department-code=AREA-1-TEAM-1] [aria-label=为区域团队1新增下级部门]').click()");
+      await input(page,'input[name="code"]',"FRESH-TEAM");await input(page,'input[name="name"]',"新增三级部门");await clickText(page,"保存部门");
+      await waitFor(page,"!document.querySelector('.office-dialog') && document.querySelector('[data-department-code=FRESH-TEAM]')?.dataset.selected==='true'");
+      assert(await read(page,"document.querySelector('.organization-selection-path').textContent.includes('区域团队1 / 新增三级部门')"));
+      results.push("organization-save-reveals-descendant");
+    }
+    if(width===1440)await read(page,"[...document.querySelectorAll('.organization-company-list button')].find(button=>button.textContent.includes('华东分公司')).click()");
+    else await input(page,'.organization-company-switch select',"BRANCH");
+    await waitFor(page,"document.body.innerText.includes('该公司尚未设置部门')");
+    results.push(`organization-complex-search-collapse-switch-${width}`);
+  }
   for (const width of [1024,390,320]) {
     await open("organization",width);
     await audit(page,`organization-${width}`);

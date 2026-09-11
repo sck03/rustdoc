@@ -6,7 +6,7 @@ import {
   createEmptyInvoiceItem,
   isMeaningfulInvoiceItem,
   normalizeInvoiceItemForSave,
-} from "./InvoiceItemsEditor.tsx";
+} from "./invoiceItemsEditorModel.ts";
 
 export const invoiceTypeOptions = [
   { value: "实际数据", label: "实际数据" },

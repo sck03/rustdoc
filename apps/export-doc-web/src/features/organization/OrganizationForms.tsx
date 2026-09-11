@@ -29,7 +29,7 @@ export function OrganizationCompanyForm({ client, record, onClose, onSaved }: {
 
 export function OrganizationDepartmentForm({ client, company, departments, record, parentCode, onClose, onSaved }: {
   client: ExportDocManagerApiClient; company: ApiOrganizationCompanyDto; departments: ApiOrganizationDepartmentDto[];
-  record?: ApiOrganizationDepartmentDto; parentCode?: string; onClose: () => void; onSaved: () => void;
+  record?: ApiOrganizationDepartmentDto; parentCode?: string; onClose: () => void; onSaved: (department: ApiOrganizationDepartmentDto) => void;
 }) {
   const operation = useOrganizationOperation();
   const [manager, setManager] = useState<{ id: number; name: string } | null>(record?.managerEmployeeId ? { id: record.managerEmployeeId, name: record.managerName } : null);

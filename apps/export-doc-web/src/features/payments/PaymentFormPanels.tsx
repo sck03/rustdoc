@@ -7,6 +7,7 @@ import { InlineNotice } from "../../ui/PageState.tsx";
 import { RemoteSelectField } from "../../ui/RemoteSelectField.tsx";
 import { CustomOptionMap, getCustomOptions } from "../custom-options/customOptionModel.ts";
 import { DocumentSpareFieldsPanel } from "../../ui/DocumentSpareFieldsPanel.tsx";
+import { CustomOptionSelectField } from "../custom-options/CustomOptionSelectField.tsx";
 
 type PaymentPatch = Partial<ApiPaymentDto>;
 
@@ -119,7 +120,7 @@ export function PaymentBasicInfoPanel({
         <TextField label="付款单号" value={payment.voucherNo} onChange={(value) => onChange({ voucherNo: value })} />
         <TextField label="发票号／业务参考号" value={payment.invoiceNo} onChange={(value) => onChange({ invoiceNo: value })} />
         <DateField label="付款日期" value={payment.paymentDate} onChange={(value) => onChange({ paymentDate: value })} />
-        <DateField label="收票日期" value={payment.receiptDate} onChange={(value) => onChange({ receiptDate: value })} />
+        <DateField label="收汇日期" value={payment.receiptDate} onChange={(value) => onChange({ receiptDate: value })} />
         <RemoteSelectField<ApiPayeeDto>
           label="支付对象资料"
           value={payment.payeeId && payment.payeeId > 0 ? String(payment.payeeId) : ""}
@@ -156,13 +157,15 @@ export function PaymentBasicInfoPanel({
           onChange={(value) => onChange({ payerName: value })}
           onCommit={(value) => onCommitCustomOption?.("PaymentPayerName", value)}
         />
-        <EditableComboField
+        <CustomOptionSelectField
           className="field-grid-span-2"
+          client={client}
+          optionType="PaymentMethod"
           label="付款方式"
           value={payment.paymentMethod ?? ""}
           options={getCustomOptions(customOptions, "PaymentMethod")}
+          disabled={isBusy}
           onChange={(value) => onChange({ paymentMethod: value })}
-          onCommit={(value) => onCommitCustomOption?.("PaymentMethod", value)}
         />
         <TextField className="field-grid-span-2" label="银行" value={payment.bankName ?? ""} onChange={(value) => onChange({ bankName: value })} />
         <TextField className="field-grid-span-2" label="账号" value={payment.accountNo ?? ""} onChange={(value) => onChange({ accountNo: value })} />

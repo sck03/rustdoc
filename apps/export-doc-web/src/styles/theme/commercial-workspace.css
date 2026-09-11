@@ -271,7 +271,6 @@ html[data-interface-density="compact"] :where(th, td) {
   background: color-mix(in srgb, var(--edm-white) 95%, transparent);
   border: 1px solid var(--edm-line-strong);
   border-radius: 11px;
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--edm-ink-900) 11%, transparent);
   backdrop-filter: blur(12px);
 }
 

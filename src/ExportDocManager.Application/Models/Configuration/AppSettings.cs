@@ -189,6 +189,10 @@ namespace ExportDocManager.Models
         [Description("商品明细页在新建/清空后默认保留的空白录入行数")]
         public int ItemEntryBlankRowCount { get; set; } = 20;
 
+        [DisplayName("商品明细默认显示备用列数")]
+        [Description("默认显示前 0—10 个备用列，0 表示隐藏全部空备用列；已有内容的备用列自动显示")]
+        public int ItemEntrySpareColumnCount { get; set; } = 0;
+
         [DisplayName("审计日志保留天数")]
         [Description("审计日志（数据库 AuditLogs）保留天数，超过天数自动清理（默认180，0表示不清理）")]
         public int AuditLogRetentionDays { get; set; } = 180;

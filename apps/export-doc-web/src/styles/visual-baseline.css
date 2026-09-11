@@ -1,29 +1,26 @@
-/*
- * Visual acceptance renders every representative workspace in one entry.
- * Keep the historical production cascade here while real application routes
- * load the heavy report, Single Window and container styles on demand.
- */
-@import "./theme/color-tokens.css";
-@import "./base.css";
-@import "./dashboard.css";
-@import "./master-data.css";
-@import "./single-window-core.css";
-@import "./audit-query.css";
-@import "./tools-ocr-exchange.css";
-@import "./update-center.css";
-@import "./email.css";
-@import "./runtime-diagnostics.css";
-@import "./jobs-excel.css";
-@import "./container-packing.css";
-@import "./single-window-runtime.css";
-@import "./single-window-documents.css";
-@import "./coo-review.css";
-@import "./auth-forms.css";
-@import "./remote-select.css";
-@import "../workspaceFeatures.css";
-@import "../reportWorkspace.css";
-@import "../businessFeatures.css";
-@import "../theme.css";
-@import "../ui/commercialComponents.css";
-@import "../features/master-data/hsKnowledge.css";
-@import "../responsiveOverrides.css";
+/* Visual acceptance uses the same named cascade order as the application. */
+@import "./cascade.css";
+@import "./theme/color-tokens.css" layer(workspace);
+@import "./base.css" layer(workspace);
+@import "./dashboard.css" layer(workspace);
+@import "./master-data.css" layer(workspace);
+@import "./single-window-core.css" layer(workspace);
+@import "./audit-query.css" layer(workspace);
+@import "./tools-ocr-exchange.css" layer(workspace);
+@import "./update-center.css" layer(workspace);
+@import "./email.css" layer(workspace);
+@import "./runtime-diagnostics.css" layer(workspace);
+@import "./jobs-excel.css" layer(workspace);
+@import "./container-packing.css" layer(workspace);
+@import "./single-window-runtime.css" layer(workspace);
+@import "./single-window-documents.css" layer(workspace);
+@import "./coo-review.css" layer(workspace);
+@import "./auth-forms.css" layer(workspace);
+@import "./remote-select.css" layer(workspace);
+@import "../workspaceFeatures.css" layer(workspace);
+@import "../reportWorkspace.css" layer(workspace);
+@import "../businessFeatures.css" layer(workspace);
+@import "../theme.css" layer(workspace);
+@import "../ui/commercialComponents.css" layer(workspace);
+@import "../features/master-data/hsKnowledge.css" layer(workspace);
+@import "../responsiveOverrides.css" layer(responsive);

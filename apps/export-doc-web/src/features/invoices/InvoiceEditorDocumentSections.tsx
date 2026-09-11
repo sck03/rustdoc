@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type {
   ApiCustomerDto,
   ApiExporterDto,
@@ -16,11 +16,17 @@ import { InvoiceEditorNavigation } from "./InvoiceEditorNavigation.tsx";
 import { InvoiceLetterOfCreditPanel } from "./InvoiceLetterOfCreditPanel.tsx";
 import { InvoiceProfitAnalysisPanel } from "./InvoiceProfitAnalysisPanel.tsx";
 import { InvoiceReportPreviewPanel } from "./InvoiceReportPreviewPanel.tsx";
+import { InvoiceEditorSection } from "./InvoiceEditorSection.tsx";
+import { readInvoiceEditorSection, type InvoiceEditorSectionId } from "./invoiceEditorSections.ts";
+import { isMeaningfulInvoiceItem } from "./invoiceItemsEditorModel.ts";
+import { formatAmount } from "../../ui/formUtils.ts";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 type InvoiceEditorDocumentSectionsProps = {
   client: ExportDocManagerApiClient;
   invoice: ApiInvoiceDetailDto;
   invoiceId: number;
+  activeSection: InvoiceEditorSectionId;
   reportInvoiceId: number;
   invoiceDraft?: ApiInvoiceDetailDto;
   selectedCustomer?: ApiCustomerDto;
@@ -52,7 +58,7 @@ type InvoiceEditorDocumentSectionsProps = {
   profitAnalysisDisabled: boolean;
   letterOfCreditDisabled: boolean;
   letterOfCreditReviewDisabled: boolean;
-  onNavigate: (sectionId: string) => void;
+  onNavigate: (sectionId: InvoiceEditorSectionId) => void;
   onUppercase: () => void;
   onChange: (next: Partial<ApiInvoiceDetailDto>) => void;
   onTransitionStatus: () => void;
@@ -73,6 +79,7 @@ export function InvoiceEditorDocumentSections({
   client,
   invoice,
   invoiceId,
+  activeSection,
   reportInvoiceId,
   invoiceDraft,
   selectedCustomer,
@@ -120,10 +127,40 @@ export function InvoiceEditorDocumentSections({
   onClearPageMessages,
   onLetterOfCreditBusyChange,
 }: InvoiceEditorDocumentSectionsProps) {
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const invalidField = useRef<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>(null);
+  useLayoutEffect(() => {
+    const field = invalidField.current;
+    if (field && !field.closest<HTMLElement>("[role=tabpanel]")?.hidden) {
+      field.focus();
+      invalidField.current = null;
+    }
+  }, [activeSection, validationMessage]);
+  function revealInvalidField(event: FormEvent<HTMLDivElement>) {
+    const field = event.target;
+    if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) return;
+    event.preventDefault();
+    if (invalidField.current) return;
+    invalidField.current = field;
+    const section = field.closest<HTMLElement>("[data-invoice-section]")?.dataset.invoiceSection;
+    onNavigate(readInvoiceEditorSection(section ?? null));
+    for (let parent = field.parentElement; parent; parent = parent.parentElement) {
+      if (parent instanceof HTMLDetailsElement) parent.open = true;
+    }
+    setValidationMessage(`${field.closest("label")?.querySelector(".form-field-label")?.textContent?.replace("必填", "") || "字段"}：${field.validationMessage}`);
+    if (!field.closest<HTMLElement>("[role=tabpanel]")?.hidden) {
+      field.focus();
+      invalidField.current = null;
+    }
+  }
   return (
-    <>
+    <div className="invoice-editor-sections" onInvalidCapture={revealInvalidField} onInputCapture={() => setValidationMessage(null)}>
       <InvoiceEditorNavigation
         invoiceNo={invoice.invoiceNo || ""}
+        isNew={invoiceId <= 0}
+        itemCount={invoice.items.filter(isMeaningfulInvoiceItem).length}
+        totalLabel={formatAmount(invoice.totalAmount, invoice.currency)}
+        activeSection={activeSection}
         editable={isEditable}
         busy={isBusy}
         saving={isSaving}
@@ -131,8 +168,9 @@ export function InvoiceEditorDocumentSections({
         onNavigate={onNavigate}
         onUppercase={onUppercase}
       />
+      {validationMessage && <InlineNotice tone="error" title="请完善后保存">{validationMessage}</InlineNotice>}
 
-      <div id="invoice-header-section" className="invoice-editor-section-anchor">
+      <InvoiceEditorSection id="header" activeSection={activeSection}>
         <InvoiceBasicInfoPanel
           invoice={invoice}
           canOpenSingleWindowDocuments={canOpenSingleWindowDocuments}
@@ -175,10 +213,11 @@ export function InvoiceEditorDocumentSections({
           onSealUpload={onSealUpload}
           onSealError={onSealError}
         />
-
+      </InvoiceEditorSection>
+      <InvoiceEditorSection id="items" activeSection={activeSection}>{itemsPanel}</InvoiceEditorSection>
+      <InvoiceEditorSection id="shipping" activeSection={activeSection}>
         <InvoiceShippingTermsPanel
           invoice={invoice}
-          isNewInvoice={invoiceId <= 0}
           isEditable={isEditable}
           customOptions={customOptions}
           onChange={onChange}
@@ -196,13 +235,9 @@ export function InvoiceEditorDocumentSections({
             onChange={onChange}
           />
         </details>
-      </div>
+      </InvoiceEditorSection>
 
-      <div id="invoice-items-section" className="invoice-editor-section-anchor">
-        {itemsPanel}
-      </div>
-
-      <div id="invoice-analysis-section" className="invoice-editor-section-anchor">
+      <InvoiceEditorSection id="analysis" activeSection={activeSection}>
         <InvoiceProfitAnalysisPanel
           client={client}
           invoice={invoice}
@@ -219,9 +254,9 @@ export function InvoiceEditorDocumentSections({
           onClearPageMessages={onClearPageMessages}
           onBusyChange={onLetterOfCreditBusyChange}
         />
-      </div>
+      </InvoiceEditorSection>
 
-      <div id="invoice-report-section" className="invoice-editor-section-anchor">
+      <InvoiceEditorSection id="report" activeSection={activeSection}>
         <InvoiceReportPreviewPanel
           client={client}
           invoiceId={reportInvoiceId}
@@ -231,7 +266,7 @@ export function InvoiceEditorDocumentSections({
           defaultToAddress={selectedCustomerEmail}
           hasUnsavedDraftChanges={hasUnsavedChanges}
         />
-      </div>
-    </>
+      </InvoiceEditorSection>
+    </div>
   );
 }

@@ -10,14 +10,12 @@ type InvoicePatch = Partial<ApiInvoiceDetailDto>;
 
 export function InvoiceShippingTermsPanel({
   invoice,
-  isNewInvoice = false,
   isEditable,
   onChange,
   customOptions,
   onCommitCustomOption,
 }: {
   invoice: ApiInvoiceDetailDto;
-  isNewInvoice?: boolean;
   isEditable: boolean;
   onChange: (next: InvoicePatch) => void;
   customOptions?: CustomOptionMap;
@@ -76,14 +74,11 @@ export function InvoiceShippingTermsPanel({
           onChange={(value) => onChange({ paymentTerms: value })}
           onCommit={(value) => onCommitCustomOption?.("PaymentTerms", value)}
         />
-        {isNewInvoice ? null : totalsFields}
       </div>
-      {isNewInvoice ? (
-        <details className="invoice-inline-details">
-          <summary>汇总与派生金额</summary>
-          <div className="field-grid invoice-inline-details-grid">{totalsFields}</div>
-        </details>
-      ) : null}
+      <details className="invoice-inline-details">
+        <summary>汇总与派生金额</summary>
+        <div className="field-grid invoice-inline-details-grid">{totalsFields}</div>
+      </details>
     </section>
   );
 }

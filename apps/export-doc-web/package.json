@@ -14,6 +14,7 @@
     "test:report-designer-v3-ui": "node ../../scripts/test_report_designer_v3_ui.mjs",
     "test:office-models": "node ../../scripts/test_office_model.mjs",
     "test:document-spare-fields": "node ../../scripts/test_document_spare_fields.mjs",
+    "test:document-editor-ui": "node ../../scripts/test_document_editor_ui.mjs",
     "test:office-ui": "node ../../scripts/test_office_workspace_ui.mjs",
     "test:business-feature-models": "node ../../scripts/test_business_feature_models.mjs",
     "test:business-features-ui": "node ../../scripts/test_business_features_ui.mjs",

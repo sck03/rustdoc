@@ -1,26 +1,27 @@
 import type { KeyboardEvent } from "react";
-import { ArrowDownToLine, ClipboardCopy, ClipboardPaste, Columns3, Eraser, PackageCheck, PackagePlus, PackageSearch, Redo2, RefreshCw, Search, Sparkles, Undo2 } from "lucide-react";
+import { ArrowDownToLine, ClipboardCopy, ClipboardPaste, Eraser, PackageCheck, PackagePlus, PackageSearch, Redo2, RefreshCw, Search, Sparkles, Undo2 } from "lucide-react";
 import type { ApiProductDto } from "../../api/index.ts";
 import type { EditableInvoiceItemField } from "./invoiceItemTableModel.ts";
-import { invoiceItemEditableColumns } from "./invoiceItemTableModel.ts";
+import { InvoiceItemColumnMenu } from "./InvoiceItemColumnMenu.tsx";
 import { formatProductOptionLabel } from "./InvoiceProductLibraryPickerDialog.tsx";
 
 type Props = {
  canApplySelectedProduct:boolean; canRedoItemEdit:boolean; canSaveFocusedItem:boolean; canUndoItemEdit:boolean; hiddenColumnFields:Set<EditableInvoiceItemField>;
  canUseHsKnowledge:boolean; isFillDownAvailable:boolean; isProductLibraryBusy:boolean; productKeyword:string; productLibraryProducts:ApiProductDto[]; readOnly:boolean;
- selectedCellCount:number; selectedProductId:string; visibleColumnCount:number; visibleMessage:string|null;
+ selectedCellCount:number; selectedProductId:string; visibleMessage:string|null;
  onApplySelectedProduct():void; onClearSelectedCells():void; onCopySelectedCells():void; onFillDown():void; onOpenProductPicker():void; onPaste():void;
  onProductKeywordChange(value:string):void; onProductKeywordKeyDown(event:KeyboardEvent<HTMLInputElement>):void; onRedo():void; onRefreshProductLibrary():void;
  onOpenHsKnowledge():void; onSaveFocusedProduct():void; onSearchProductLibrary():void; onSelectedProductChange(value:string):void; onShowAllColumns():void;
  onToggleColumn(field:EditableInvoiceItemField):void; onUndo():void;
+ defaultSpareColumnCount:number; onResetColumns():void;
 };
 
 export function InvoiceItemsEditorToolbar(props:Props){
- const {canApplySelectedProduct,canRedoItemEdit,canSaveFocusedItem,canUndoItemEdit,canUseHsKnowledge,hiddenColumnFields,isFillDownAvailable,isProductLibraryBusy,productKeyword,productLibraryProducts,readOnly,selectedCellCount,selectedProductId,visibleColumnCount,visibleMessage}=props;
+ const {canApplySelectedProduct,canRedoItemEdit,canSaveFocusedItem,canUndoItemEdit,canUseHsKnowledge,hiddenColumnFields,isFillDownAvailable,isProductLibraryBusy,productKeyword,productLibraryProducts,readOnly,selectedCellCount,selectedProductId,visibleMessage}=props;
  const {onApplySelectedProduct:applySelectedProduct,onClearSelectedCells:clearSelectedCells,onCopySelectedCells,onFillDown:fillDownFocusedCell,onOpenHsKnowledge,onOpenProductPicker,onPaste,onProductKeywordChange:setProductKeyword,onProductKeywordKeyDown:handleProductKeywordKeyDown,onRedo:redoItemEdit,onRefreshProductLibrary,onSaveFocusedProduct:saveFocusedItemToProductLibrary,onSearchProductLibrary:searchProductLibrary,onSelectedProductChange:setSelectedProductId,onShowAllColumns:showAllInvoiceItemColumns,onToggleColumn:toggleInvoiceItemColumn,onUndo:undoItemEdit}=props;
  return (
       <div className="item-editor-toolbar" aria-label="明细编辑工具">
-        <div className="item-product-library-toolbar" aria-label="商品库工具">
+        {!readOnly && <div className="item-product-library-toolbar" aria-label="商品库工具">
           <PackageSearch size={16} aria-hidden="true" />
           <input
             className="item-product-library-search"
@@ -95,36 +96,9 @@ export function InvoiceItemsEditorToolbar(props:Props){
             <RefreshCw size={16} aria-hidden="true" />
           </button>
           {canUseHsKnowledge ? <button className="secondary-button invoice-hs-open-button" type="button" disabled={isProductLibraryBusy} onClick={onOpenHsKnowledge}><Sparkles size={15}/><span>智能 HS</span></button> : null}
-        </div>
-        <details className="item-column-visibility-menu">
-          <summary className="icon-button compact-icon-button" title="显示/隐藏明细列" aria-label="显示/隐藏明细列">
-            <Columns3 size={16} aria-hidden="true" />
-          </summary>
-          <div className="item-column-menu" role="menu" aria-label="明细显示列">
-            <div className="item-column-menu-header">
-              <span>显示列</span>
-              <button type="button" className="text-button compact-text-button" onClick={showAllInvoiceItemColumns}>
-                全部显示
-              </button>
-            </div>
-            <div className="item-column-menu-list">
-              {invoiceItemEditableColumns.map((column) => {
-                const checked = !hiddenColumnFields.has(column.field);
-                return (
-                  <label className="item-column-option" key={column.field}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={checked && visibleColumnCount <= 1}
-                      onChange={() => toggleInvoiceItemColumn(column.field)}
-                    />
-                    <span>{column.header}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        </details>
+        </div>}
+        <InvoiceItemColumnMenu hiddenColumnFields={hiddenColumnFields} defaultSpareColumnCount={props.defaultSpareColumnCount}
+          onReset={props.onResetColumns} onShowAll={showAllInvoiceItemColumns} onToggle={toggleInvoiceItemColumn} />
         <button
           className="icon-button compact-icon-button"
           type="button"
@@ -135,6 +109,7 @@ export function InvoiceItemsEditorToolbar(props:Props){
         >
           <ClipboardCopy size={16} aria-hidden="true" />
         </button>
+        {!readOnly && <>
         <button
           className="icon-button compact-icon-button"
           type="button"
@@ -185,6 +160,7 @@ export function InvoiceItemsEditorToolbar(props:Props){
         >
           <Redo2 size={16} aria-hidden="true" />
         </button>
+        </>}
         {visibleMessage ? <span className="item-editor-message">{visibleMessage}</span> : null}
       </div>
 

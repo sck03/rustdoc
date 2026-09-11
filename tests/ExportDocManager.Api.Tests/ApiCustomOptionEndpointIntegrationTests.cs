@@ -9,7 +9,7 @@ namespace ExportDocManager.Api.Tests
     public sealed class ApiCustomOptionEndpointIntegrationTests
     {
         [Fact]
-        public async Task CustomOptionEndpoints_ShouldSupportLegacyEditableComboBoxOptions()
+        public async Task CustomOptionEndpoints_ShouldPreserveDefaultsAndPersistCustomChoices()
         {
             await using var harness = await ApiIntegrationTestHarness.StartAsync(
                 "edm-api-custom-options",
@@ -26,6 +26,19 @@ namespace ExportDocManager.Api.Tests
 
             var adminLogin = await harness.LoginAsync(anonymousClient, "admin", string.Empty);
             using var adminClient = harness.CreateClient(adminLogin.AccessToken);
+
+            var paymentMethods = await adminClient.GetFromJsonAsync<ApiCustomOptionListResponse>("/api/custom-options/PaymentMethod");
+            Assert.NotNull(paymentMethods);
+            Assert.Equal(["支票", "电汇", "预付"], paymentMethods.PredefinedOptions);
+            Assert.True(paymentMethods.AllowCustomValues);
+            using var methodSave = await adminClient.PostAsJsonAsync("/api/custom-options/PaymentMethod", new { value = "  银行承兑汇票  " });
+            Assert.Equal(HttpStatusCode.OK, methodSave.StatusCode);
+            using var duplicateMethodSave = await adminClient.PostAsJsonAsync("/api/custom-options/PaymentMethod", new { value = "银行承兑汇票" });
+            Assert.Equal(HttpStatusCode.OK, duplicateMethodSave.StatusCode);
+            var reloadedMethods = await adminClient.GetFromJsonAsync<ApiCustomOptionListResponse>("/api/custom-options/PaymentMethod");
+            Assert.NotNull(reloadedMethods);
+            Assert.Equal(["支票", "电汇", "预付", "银行承兑汇票"], reloadedMethods.Options);
+            Assert.Equal("银行承兑汇票", Assert.Single(reloadedMethods.CustomOptions));
 
             var invalidTypeResponse = await adminClient.GetAsync("/api/custom-options/UnknownOption");
             Assert.Equal(HttpStatusCode.BadRequest, invalidTypeResponse.StatusCode);

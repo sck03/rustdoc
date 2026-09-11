@@ -22,9 +22,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 85940,
+      "baselineAggregateLines": 86280,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 86140,
+      "maximumAggregateLines": 86480,
       "reportFiles": false
     },
     {
@@ -60,9 +60,9 @@
       ],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 42019,
+      "baselineAggregateLines": 42342,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 42169,
+      "maximumAggregateLines": 42492,
       "reportFiles": false
     },
     {

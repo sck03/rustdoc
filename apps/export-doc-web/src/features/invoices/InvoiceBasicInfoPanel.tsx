@@ -1,4 +1,4 @@
-import { ClipboardList, Copy, FileText, RotateCcw, Save } from "lucide-react";
+import { ClipboardList, Copy, FileText, RotateCcw } from "lucide-react";
 import type { ApiInvoiceDetailDto, ApiInvoiceStatusHistoryDto } from "../../api/index.ts";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { DateField, EditableComboField, NumberField, SelectField, TextField } from "../../ui/FormFields.tsx";
@@ -68,7 +68,7 @@ export function InvoiceBasicInfoPanel({
   return (
     <section className="form-section information-tier-required" aria-label="基础信息">
       <div className="section-header">
-        <h2>基础信息</h2>
+        <div className="editor-title"><h2>基础信息</h2><BusinessStatusBadge value={getInvoiceStatusLabel(invoice.status)} /></div>
         <div className="toolbar-actions">
           {canOpenSingleWindowDocuments ? (
             <>
@@ -124,10 +124,6 @@ export function InvoiceBasicInfoPanel({
               <span>作废</span>
             </button>
           ) : null}
-          <button className="command-button" type="submit" disabled={isBusy || !isEditable}>
-            <Save size={17} aria-hidden="true" />
-            <span>保存</span>
-          </button>
         </div>
       </div>
       <div className="field-grid">
@@ -144,6 +140,7 @@ export function InvoiceBasicInfoPanel({
           onChange={(value) => onChange({ currency: value })}
           onCommit={(value) => onCommitCustomOption?.("Currency", value)}
         />
+        <NumberField label="汇率" value={invoice.exchangeRate ?? 0} step="0.0001" disabled={!isEditable} onChange={(value) => onChange({ exchangeRate: value })} />
         <EditableComboField
           label="监管方式"
           value={invoice.supervisionMode ?? ""}
@@ -152,13 +149,6 @@ export function InvoiceBasicInfoPanel({
           onChange={(value) => onChange({ supervisionMode: value })}
           onCommit={(value) => onCommitCustomOption?.("SupervisionMode", value)}
         />
-        <div className="form-field form-field-disabled invoice-status-field" aria-label="状态">
-          <span className="form-field-label"><span>状态</span></span>
-          <div className="invoice-status-field-value">
-            <BusinessStatusBadge value={getInvoiceStatusLabel(invoice.status)} />
-            <small>通过状态操作推进，不能直接编辑</small>
-          </div>
-        </div>
         <SelectField
           label="业务类型"
           value={normalizeInvoiceType(invoice.type)}
@@ -166,13 +156,6 @@ export function InvoiceBasicInfoPanel({
           includeEmptyOption={false}
           options={invoiceTypeOptions}
           onChange={(value) => onChange({ type: normalizeInvoiceType(value) })}
-        />
-        <NumberField
-          label="总金额"
-          value={invoice.totalAmount}
-          disabled
-          description="由商品明细行金额合计；修改单价或行金额会自动联动"
-          onChange={() => undefined}
         />
       </div>
       <DocumentSpareFieldsPanel label="发票备用字段" value={invoice} onChange={onChange} disabled={!isEditable} />

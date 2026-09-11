@@ -201,6 +201,7 @@ jobs:
         run: |
           npm --prefix apps/export-doc-web run test:report-designer-v3-ui
           npm --prefix apps/export-doc-web run test:office-ui
+          npm --prefix apps/export-doc-web run test:document-editor-ui
           npm --prefix apps/export-doc-web run test:workspace-ui
           npm --prefix apps/export-doc-web run test:business-features-ui
 
@@ -219,6 +220,8 @@ jobs:
             artifacts/report-designer-v3-ui/summary.json
             artifacts/office-workspace-ui/*.png
             artifacts/office-workspace-ui/summary.json
+            artifacts/document-editor-ui/*.png
+            artifacts/document-editor-ui/summary.json
             artifacts/workspace-navigation-ui/*.png
             artifacts/workspace-navigation-ui/summary.json
             artifacts/business-features-ui/*.png

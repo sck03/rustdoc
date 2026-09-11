@@ -216,6 +216,7 @@ namespace ExportDocManager.Services.Infrastructure
                 Math.Max(1, settings.System.PostgreSqlAutoBackupRetentionCount);
             settings.System.ItemEntryBlankRowCount =
                 Math.Clamp(settings.System.ItemEntryBlankRowCount <= 0 ? 20 : settings.System.ItemEntryBlankRowCount, 1, 500);
+            settings.System.ItemEntrySpareColumnCount = Math.Clamp(settings.System.ItemEntrySpareColumnCount, 0, 10);
             settings.System.DatabaseProvider = DatabaseModeHelper.NormalizeProvider(settings.System.DatabaseProvider);
             settings.System.SqliteDatabaseFileName =
                 DbHelper.NormalizeRuntimeSqliteDatabaseFileName(settings.System.SqliteDatabaseFileName);

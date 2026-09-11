@@ -14,6 +14,7 @@ const bundle = path.join(output, "model.mjs");
 await require("esbuild").build({ stdin: { loader: "ts", resolveDir: web, contents: `
   export * as invoice from ${source("features/invoices/invoiceModel.ts")};
   export * as items from ${source("features/invoices/invoiceItemsEditorModel.ts")};
+  export * from ${source("features/invoices/invoiceItemColumnVisibility.ts")};
   export * as payment from ${source("features/payments/paymentModel.ts")};
   export * from ${source("ui/documentSpareFields.ts")};
   export * from ${source("features/report-designer/reportDesignerFields.ts")};
@@ -39,6 +40,16 @@ for (const key of keys) {
   assert.equal(api.invoice.uppercaseInvoiceEnglishText(invoice).items[0][key], `ITEM-${key.toUpperCase()}`);
 }
 assert.equal(api.items.isMeaningfulInvoiceItem({ ...api.items.createEmptyInvoiceItem(), spare10: "only spare" }), true);
+assert.deepEqual([...api.resolveInvoiceItemHiddenColumns(0, [])], keys);
+assert.deepEqual([...api.resolveInvoiceItemHiddenColumns(3, [])], keys.slice(3));
+assert.equal(api.resolveInvoiceItemHiddenColumns(10, []).size, 0);
+const populated = api.findPopulatedInvoiceSpareColumns([{ ...api.items.createEmptyInvoiceItem(), spare10: "original data", spare1: "  " }]);
+assert.deepEqual(populated, ["spare10"]);
+assert(!api.resolveInvoiceItemHiddenColumns(0, populated).has("spare10"), "existing content must be discoverable by default");
+assert(api.resolveInvoiceItemHiddenColumns(0, populated, { spare10: false }).has("spare10"), "explicit temporary column choices take precedence");
+assert.equal(api.normalizeInvoiceItemSpareColumnCount(-1), 0);
+assert.equal(api.normalizeInvoiceItemSpareColumnCount(11), 10);
+assert.equal(api.normalizeInvoiceItemSpareColumnCount(undefined), 0);
 assert.match(api.payment.validatePaymentDraft({ ...payment, spare10: "a".repeat(501) }), /备用字段10/);
 
 const paths = (root) => keys.map((key) => `${root}.${key[0].toUpperCase()}${key.slice(1)}`);

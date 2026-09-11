@@ -106,7 +106,7 @@ namespace ExportDocManager.Services.Reporting
             Payment("付款报销", "数量 (Quantity)", "{{ Payment.Quantity }}"),
             Payment("付款报销", "出运国 (Shipment Country)", "{{ Payment.ShipmentCountry }}"),
             Payment("付款报销", "出运日期 (Shipment Date)", "{{ Payment.ShipmentDate | date.to_string '%Y-%m-%d' }}"),
-            Payment("付款报销", "收单日期 (Receipt Date)", "{{ Payment.ReceiptDate | date.to_string '%Y-%m-%d' }}"),
+            Payment("付款报销", "收汇日期 (Remittance Date)", "{{ Payment.ReceiptDate | date.to_string '%Y-%m-%d' }}"),
             Payment("付款报销", "备注 (Notes)", "{{ Payment.Notes }}"),
             .. SpareFields(ReportDocumentType.PaymentVoucher, "付款备用字段", "Payment")
         ];

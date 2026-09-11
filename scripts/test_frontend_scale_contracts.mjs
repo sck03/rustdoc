@@ -179,8 +179,7 @@ function buildAuditExpression(isMobile) {
       : 0;
     const invoicePartyGridLayouts = fieldGridLayouts.filter((layout) => layout.parentClassName.includes("invoice-party-group"));
     const invoicePartyGridContractPassed = invoicePartyGridLayouts.length === 0 || invoicePartyGridLayouts.every((layout) => {
-      const exporter = layout.parentClassName.includes("invoice-party-group-exporter");
-      const expectedColumns = innerWidth <= 860 ? 1 : exporter ? 4 : 2;
+      const expectedColumns = innerWidth <= 860 ? 1 : 2;
       return layout.display === "grid" && layout.columnCount === expectedColumns;
     });
     const queryFilterContractDetails = (() => {

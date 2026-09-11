@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Edit3, Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -42,12 +42,14 @@ import {
   buildInvoiceSnapshot,
   mergeRouteInvoiceImportDraft,
   readInvoiceItemBlankRowCount,
+  readInvoiceItemSpareColumnCount,
 } from "./invoiceEditorHelpers.ts";
 import { calculateInvoiceTotals } from "./invoiceItemsEditorModel.ts";
 import { useInvoiceEditorReferenceData } from "./useInvoiceEditorReferenceData.ts";
 import { useInvoiceItemsWorkspace } from "./useInvoiceItemsWorkspace.ts";
 import { useInvoicePersistenceOperations } from "./useInvoicePersistenceOperations.ts";
 import { InvoiceReviewPanel } from "./InvoiceReviewPanel.tsx";
+import { readInvoiceEditorSection, type InvoiceEditorSectionId } from "./invoiceEditorSections.ts";
 
 export function InvoiceEditorPage({
   businessDate,
@@ -69,6 +71,8 @@ export function InvoiceEditorPage({
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const formRef = useRef<HTMLFormElement>(null);
+  const activeSection = readInvoiceEditorSection(searchParams.get("section"));
   const workspaceDeviceProfile = useWorkspaceDeviceProfile();
   const workspaceDeviceMode = workspaceDeviceProfile.mode;
   const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
@@ -369,12 +373,12 @@ export function InvoiceEditorPage({
       }
 
       event.preventDefault();
-      saveCurrentInvoiceDraft();
+      formRef.current?.requestSubmit();
     }
 
     window.addEventListener("keydown", handleDocumentKeyDown);
     return () => window.removeEventListener("keydown", handleDocumentKeyDown);
-  }, [invoice, isBusy, isInvoiceEditable, isNew, parsedInvoiceId, pendingHsFeedback]);
+  }, []);
 
   async function handleCloneInvoiceType() {
     if (!invoicePermission.canOperate || !invoice || isNew || !isInvoiceIdValid) {
@@ -557,15 +561,16 @@ export function InvoiceEditorPage({
     }
   }
 
-  function scrollToInvoiceSection(sectionId: string) {
-    document.getElementById(sectionId)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+  function navigateInvoiceSection(sectionId: InvoiceEditorSectionId) {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.set("section", sectionId);
+    setSearchParams(nextSearchParams, { replace: true });
+    window.requestAnimationFrame(() => document.getElementById("invoice-editor-navigation")?.scrollIntoView({ block: "start" }));
   }
 
   function openInvoiceItemsWorkbench() {
     const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.set("section", "items");
     nextSearchParams.set("workbench", "items");
     setSearchParams(nextSearchParams);
   }
@@ -573,8 +578,9 @@ export function InvoiceEditorPage({
   function closeInvoiceItemsWorkbench() {
     const nextSearchParams = new URLSearchParams(searchParams);
     nextSearchParams.delete("workbench");
+    nextSearchParams.set("section", "items");
     setSearchParams(nextSearchParams);
-    window.requestAnimationFrame(() => scrollToInvoiceSection("invoice-items-section"));
+    window.requestAnimationFrame(() => document.getElementById("invoice-tab-items")?.focus());
   }
 
   const invoiceItemsPanel = invoice ? (
@@ -586,6 +592,7 @@ export function InvoiceEditorPage({
       canRedoItemEdit={itemsWorkspace.canRedoItemEdit}
       canUndoItemEdit={itemsWorkspace.canUndoItemEdit}
       invoiceItemBlankRowCount={invoiceItemBlankRowCount}
+      defaultSpareColumnCount={readInvoiceItemSpareColumnCount(settingsQuery.data?.settings)}
       isEditable={isInvoiceEditable && workspaceDeviceCapabilities.canUseDenseWorkbench}
       isFocusedWorkbench={isInvoiceItemsWorkbenchMode}
       isProductLibraryBusy={isProductLibraryBusy}
@@ -634,11 +641,11 @@ export function InvoiceEditorPage({
           {invoice ? (
             <span
               className="editor-save-state"
-              data-state={saveInvoiceMutation.isPending ? "saving" : hasUnsavedInvoiceChanges ? "dirty" : "saved"}
+              data-state={saveInvoiceMutation.isPending ? "saving" : hasUnsavedInvoiceChanges || isNew ? "dirty" : "saved"}
               role="status"
               aria-live="polite"
             >
-              {saveInvoiceMutation.isPending ? "保存中" : hasUnsavedInvoiceChanges ? "有未保存修改" : "已保存"}
+              {saveInvoiceMutation.isPending ? "保存中" : hasUnsavedInvoiceChanges ? "有未保存修改" : isNew ? "尚未保存" : "已保存"}
             </span>
           ) : null}
         </div>
@@ -667,6 +674,7 @@ export function InvoiceEditorPage({
         onLoadServer={serverDraftSync.loadServerVersion}
       /> : null}
       {message ? <InlineNotice tone="error" title="操作未完成">{message}</InlineNotice> : null}
+      {settingsQuery.isError && <InlineNotice tone="warning" title="发票默认设置读取失败">{readApiError(settingsQuery.error)}；当前使用内置显示列，可稍后刷新。</InlineNotice>}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {!invoicePermission.canOperate ? (
         <PermissionNotice>
@@ -687,6 +695,7 @@ export function InvoiceEditorPage({
 
       {invoice ? (
         <InvoiceEditorFormShell
+          formRef={formRef}
           invoice={invoice}
           isWorkbench={isInvoiceItemsWorkbenchMode}
           isBusy={isBusy}
@@ -698,9 +707,11 @@ export function InvoiceEditorPage({
           itemsPanel={invoiceItemsPanel}
           documentSections={
             <InvoiceEditorDocumentSections
+              key={isNew ? "new" : parsedInvoiceId}
               client={client}
               invoice={invoice}
               invoiceId={isNew ? 0 : parsedInvoiceId}
+              activeSection={activeSection}
               reportInvoiceId={isNew || !isInvoiceIdValid ? 0 : parsedInvoiceId}
               invoiceDraft={currentInvoiceDraft ?? undefined}
               selectedCustomer={selectedCustomerQuery.data}
@@ -732,7 +743,7 @@ export function InvoiceEditorPage({
               profitAnalysisDisabled={!invoicePermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
               letterOfCreditDisabled={!isInvoiceEditable || !workspaceDeviceCapabilities.canUseAdvancedTools || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
               letterOfCreditReviewDisabled={!invoicePermission.canOperate || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
-              onNavigate={scrollToInvoiceSection}
+              onNavigate={navigateInvoiceSection}
               onUppercase={uppercaseInvoiceText}
               onChange={patchInvoice}
               onTransitionStatus={() => void handleTransitionInvoiceStatus()}

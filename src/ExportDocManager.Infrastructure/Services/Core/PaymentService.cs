@@ -124,7 +124,7 @@ namespace ExportDocManager.Services.Core
         {
             EnsureOptionalDate(payment.PaymentDate, "付款日期");
             EnsureOptionalDate(payment.ShipmentDate, "出运日期");
-            EnsureOptionalDate(payment.ReceiptDate, "收票日期");
+            EnsureOptionalDate(payment.ReceiptDate, "收汇日期");
 
             if (payment.PayeeId < 0)
             {

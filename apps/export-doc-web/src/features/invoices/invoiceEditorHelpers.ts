@@ -1,7 +1,8 @@
 import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import { readNumber } from "../../ui/formUtils.ts";
-import { calculateInvoiceTotals, createEmptyInvoiceItem } from "./InvoiceItemsEditor.tsx";
+import { calculateInvoiceTotals, createEmptyInvoiceItem } from "./invoiceItemsEditorModel.ts";
 import { normalizeInvoiceForSave, type RouteInvoiceImportAction } from "./invoiceModel.ts";
+import { normalizeInvoiceItemSpareColumnCount } from "./invoiceItemColumnVisibility.ts";
 
 export function mergeRouteInvoiceImportDraft(
   existing: ApiInvoiceDetailDto,
@@ -46,13 +47,21 @@ export function buildInvoiceSnapshot(invoice: ApiInvoiceDetailDto, id: number, p
   return JSON.stringify(normalizeInvoiceForSave(invoice, id, pendingHsFeedback));
 }
 
-export function readInvoiceItemBlankRowCount(settings?: object) {
+function readInvoiceSystemSetting(settings: object | undefined, key: string) {
   const system = settings && typeof settings === "object"
     ? (settings as { system?: unknown }).system
     : null;
   const systemSettings = system && typeof system === "object" ? (system as Record<string, unknown>) : null;
-  const value = Number(systemSettings?.itemEntryBlankRowCount);
+  return systemSettings?.[key];
+}
+
+export function readInvoiceItemBlankRowCount(settings?: object) {
+  const value = Number(readInvoiceSystemSetting(settings, "itemEntryBlankRowCount"));
   return Number.isFinite(value) ? Math.max(1, Math.min(500, Math.trunc(value))) : 20;
+}
+
+export function readInvoiceItemSpareColumnCount(settings?: object) {
+  return normalizeInvoiceItemSpareColumnCount(readInvoiceSystemSetting(settings, "itemEntrySpareColumnCount"));
 }
 
 export function areInvoiceItemValuesEqual(left: unknown, right: unknown) {

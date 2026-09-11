@@ -28,6 +28,7 @@ export { type EditableInvoiceItemField, type InvoiceItemColumnDefinition, invoic
 export { calculateInvoiceTotals, createEmptyInvoiceItem, isMeaningfulInvoiceItem, normalizeInvoiceItemForSave, recalculateInvoiceItem } from "./invoiceItemsEditorModel.ts";
 import type { InvoiceItemsEditorProps } from "./invoiceItemsEditorTypes.ts";
 import { useInvoiceItemsGridInteraction } from "./useInvoiceItemsGridInteraction.ts";
+import { useInvoiceItemColumnVisibility } from "./useInvoiceItemColumnVisibility.ts";
 export type { InvoiceItemCellSelection } from "./invoiceItemsEditorTypes.ts";
 
 export function InvoiceItemsEditor({
@@ -38,6 +39,7 @@ export function InvoiceItemsEditor({
   canUseHsKnowledge,
   canUndoItemEdit,
   blankRowCount = 0,
+  defaultSpareColumnCount = 0,
   currency,
   exchangeRate,
   focusedWorkbench = false,
@@ -72,7 +74,8 @@ export function InvoiceItemsEditor({
   unitOptions,
 }: InvoiceItemsEditorProps) {
   const [editorMessage, setEditorMessage] = useState<string | null>(null);
-  const { unitCandidateDialog, setUnitCandidateDialog, isProductPickerOpen, setIsProductPickerOpen, isHsKnowledgeOpen, setIsHsKnowledgeOpen, productKeyword, setProductKeyword, selectedProductId, setSelectedProductId, hiddenColumnFields, setHiddenColumnFields } = useInvoiceItemsEditorInteraction();
+  const { unitCandidateDialog, setUnitCandidateDialog, isProductPickerOpen, setIsProductPickerOpen, isHsKnowledgeOpen, setIsHsKnowledgeOpen, productKeyword, setProductKeyword, selectedProductId, setSelectedProductId } = useInvoiceItemsEditorInteraction();
+  const { hiddenColumnFields, setColumnVisible, showAllColumns, resetColumns } = useInvoiceItemColumnVisibility(items, defaultSpareColumnCount);
   const historyOptionCacheRef = useRef(new InvoiceItemHistoryOptionCache());
   const historyItemsRef = useRef(items);
   const pendingHistoryInvalidationRef = useRef<number | null>(null);
@@ -536,16 +539,7 @@ export function InvoiceItemsEditor({
       return;
     }
 
-    setHiddenColumnFields((current) => {
-      const next = new Set(current);
-      if (next.has(field)) {
-        next.delete(field);
-      } else {
-        next.add(field);
-      }
-
-      return next;
-    });
+    setColumnVisible(field, isHidden);
 
     if (!isHidden) {
       removeFieldFromSelection(field);
@@ -555,7 +549,7 @@ export function InvoiceItemsEditor({
   }
 
   function showAllInvoiceItemColumns() {
-    setHiddenColumnFields(new Set<EditableInvoiceItemField>());
+    showAllColumns();
     setEditorMessage("已显示全部明细列。");
   }
 
@@ -587,7 +581,8 @@ export function InvoiceItemsEditor({
         hiddenColumnFields={hiddenColumnFields} isFillDownAvailable={isFillDownAvailable}
         isProductLibraryBusy={isProductLibraryBusy} productKeyword={productKeyword} productLibraryProducts={productLibraryProducts}
         readOnly={readOnly} selectedCellCount={selectedCellCount} selectedProductId={selectedProductId}
-        visibleColumnCount={visibleColumnCount} visibleMessage={visibleMessage}
+        visibleMessage={visibleMessage}
+        defaultSpareColumnCount={defaultSpareColumnCount} onResetColumns={() => { resetColumns(); setEditorMessage("已恢复默认显示列。"); }}
         onApplySelectedProduct={applySelectedProduct} onClearSelectedCells={clearSelectedCells} onCopySelectedCells={() => void copySelectedCells()}
         onFillDown={fillDownFocusedCell} onOpenProductPicker={() => { setEditorMessage(null); onOpenProductLibrary(); setIsProductPickerOpen(true); }}
         onOpenHsKnowledge={() => { setEditorMessage(null); setIsHsKnowledgeOpen(true); }}
@@ -596,7 +591,7 @@ export function InvoiceItemsEditor({
         onSearchProductLibrary={searchProductLibrary} onSelectedProductChange={setSelectedProductId} onShowAllColumns={showAllInvoiceItemColumns}
         onToggleColumn={toggleInvoiceItemColumn} onUndo={undoItemEdit}
       />
-      <InvoiceItemShortcutGuide />
+      {!readOnly && <InvoiceItemShortcutGuide />}
       <InvoiceItemsEditorDialogs client={client} focusedRowIndex={focusedRowIndex} isBusy={isProductLibraryBusy}
         isProductPickerOpen={isProductPickerOpen} isHsKnowledgeOpen={isHsKnowledgeOpen} items={items} productKeyword={productKeyword}
         products={productLibraryProducts} productLibraryPageNumber={productLibraryPageNumber} productLibraryPageSize={productLibraryPageSize} productLibraryTotalCount={productLibraryTotalCount} productLibraryTotalPages={productLibraryTotalPages} readOnly={readOnly} unitCandidateDialog={unitCandidateDialog} onApplyProduct={applyPickedProduct}

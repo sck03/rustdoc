@@ -16,6 +16,8 @@ const require = createRequire(path.join(web, "package.json"));
 fs.mkdirSync(output, { recursive: true });
 const source = name => JSON.stringify(path.join(web, "src", name).replaceAll("\\", "/"));
 await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, contents: `
+  import ${source("styles/cascade.css")}; import ${source("styles/foundation.css")};
+  import ${source("styles/workspaces.css")}; import ${source("styles/responsive.css")};
   import React from 'react';
   import { createRoot } from 'react-dom/client';
   import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -27,8 +29,6 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   import { PersonnelPage } from ${source("features/office/PersonnelPage.tsx")};
   import { AccessControlPage } from ${source("features/access-control/AccessControlPage.tsx")};
   import { OrganizationDirectoryPage } from ${source("features/organization/OrganizationDirectoryPage.tsx")};
-  import ${source("styles/cascade.css")}; import ${source("styles/foundation.css")};
-  import ${source("styles/workspaces.css")}; import ${source("styles/responsive.css")};
   const params = new URLSearchParams(location.search), mode=params.get('mode') || 'rooms', admin=params.get('role') !== 'employee';
   const register=params.get('role')==='register';
   const now=Date.now(), date=new Date(now).toISOString().slice(0,10);
@@ -44,6 +44,18 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   const page=items=>({items,totalCount:items.length,pageNumber:1,pageSize:24,totalPages:1});
   const departments=[{code:'D1',name:'业务部',isActive:true},{code:'D2',name:'运营部',isActive:true}].map(item=>({...item,companyCode:'DEMO',versionNumber:1,parentCode:null,managerEmployeeId:null,managerName:''}));
   const companies=[{code:'DEMO',name:'示例公司',isActive:true,versionNumber:1}];
+  if(params.get('role')==='complex') {
+    companies.push({code:'BRANCH',name:'华东分公司',isActive:true,versionNumber:1},{code:'OLD',name:'已停用公司',isActive:false,versionNumber:1});
+    const addDepartment=(code,name,parentCode,managerName='')=>departments.push({code,name,parentCode,managerName,companyCode:'DEMO',isActive:true,versionNumber:1,managerEmployeeId:managerName?1:null});
+    for(let area=1;area<=3;area++) {
+      addDepartment('AREA-'+area,'业务事业部'+area,null,'张宁');
+      for(let team=1;team<=10;team++) {
+        const parent='AREA-'+area+'-TEAM-'+team;addDepartment(parent,'区域团队'+team,'AREA-'+area,'李明');
+        for(let group=1;group<=4;group++)addDepartment(parent+'-GROUP-'+group,area===2&&team===3&&group===2?'重点客户协作组':'业务小组'+group,parent);
+      }
+    }
+    for(let depth=0;depth<20;depth++)addDepartment('DEEP-'+depth,'专项组'+depth,depth?'DEEP-'+(depth-1):'AREA-1');
+  }
   const imageFiles=new Map();
   const profile={fullName:'张宁',workEmail:'zhang.ning@example.test',workPhone:'010-5555 1001',workLocation:'总部三楼',personalPhone:'13800000000',emergencyContact:'家属',emergencyPhone:'13900000000',notes:'人事档案示例备注',identityNumber:'11010519491231002X',identityAuthority:'示例签发机关',registeredAddress:'测试地址',identityValidFrom:'2020-01-01',identityValidUntil:null,identityLongTerm:true};
   let person={employee:{id:1,employeeNumber:'EMP-001',fullName:profile.fullName,departmentId:'D1',departmentName:'业务部',jobTitle:'业务专员',workEmail:profile.workEmail,workPhone:profile.workPhone,workLocation:profile.workLocation,status:'Probation',canViewDetails:admin},profile,employmentType:'FullTime',hireDate:date,lastEffectiveDate:date,probationEndsOn:date,contractEndsOn:null,confirmedOn:null,departedOn:null,account:{id:1,username:'employee',fullName:profile.fullName,departmentId:'D1',isActive:true,versionNumber:1},versionNumber:1,canEdit:admin,canTransition:admin,canLinkAccount:admin};

@@ -90,6 +90,7 @@ export function ExporterSealField({
         ref={uploadInputRef}
         hidden
         type="file"
+        aria-label={`${sealLabel}图片文件`}
         accept="image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp"
         disabled={actionDisabled}
         onChange={(event) => {

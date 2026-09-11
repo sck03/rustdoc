@@ -1,6 +1,7 @@
 import type { ApiSettingsSecretsDto } from "../../api/index.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { CheckboxSetting, DirectorySetting, NumberSetting, SelectSetting, TextSetting } from "./SettingsFieldControls.tsx";
+import { SelectField } from "../../ui/FormFields.tsx";
+import { CheckboxSetting, DirectorySetting, NumberSetting, SelectSetting, TextSetting, readSettingString } from "./SettingsFieldControls.tsx";
 import { systemUpdaterEndpointPath } from "./settingsConfigurationPaths.ts";
 import type { SettingsRecord } from "./settingsTypes.ts";
 
@@ -24,13 +25,28 @@ export function RuntimeDatabaseSettingsPanel({ settings, secrets, canManageSetti
             <SelectSetting settings={settings} path={["system", "databaseProvider"]} label="数据库类型" options={[{ value: "Sqlite", label: "SQLite" }, { value: "PostgreSQL", label: "PostgreSQL" }]} onChange={onChange} />
             <TextSetting settings={settings} path={["system", "sqliteDatabaseFileName"]} label="SQLite 文件名" onChange={onChange} />
             <DirectorySetting settings={settings} path={["system", "defaultExportDirectory"]} label="默认导出目录" disabled={isBusy || !canManageSettings} canSelectDirectory={canSelectDesktopDirectory} onChange={onChange} onSelectDirectory={onSelectDefaultExportDirectory} />
-            <NumberSetting settings={settings} path={["system", "itemEntryBlankRowCount"]} label="明细空白行数" onChange={onChange} />
             <NumberSetting settings={settings} path={["system", "backupRetentionDays"]} label="备份保留天数" onChange={onChange} />
             <NumberSetting settings={settings} path={["system", "auditLogRetentionDays"]} label="审计保留天数" onChange={onChange} />
             <NumberSetting settings={settings} path={["system", "logRetentionDays"]} label="日志保留天数" onChange={onChange} />
             <NumberSetting settings={settings} path={["system", "logRetainedFileCount"]} label="日志保留文件数" onChange={onChange} />
             <NumberSetting settings={settings} path={["system", "logFileSizeLimitMB"]} label="单日志大小 MB" onChange={onChange} />
             <TextSetting settings={settings} path={["system", "defaultTemplateExporterNameCn"]} label="默认出口商中文名" placeholder="Excel 未提供中文名时使用" onChange={onChange} />
+          </div>
+        </fieldset>
+      </section>
+      <section className="form-section" aria-label="发票录入默认值">
+        <div className="section-header"><h2>发票录入默认值</h2></div>
+        <fieldset className="settings-fieldset" disabled={!canManageSettings}>
+          <div className="field-grid">
+            <SelectField
+              label="默认显示备用列数"
+              value={readSettingString(settings, ["system", "itemEntrySpareColumnCount"]) || "0"}
+              includeEmptyOption={false}
+              options={Array.from({ length: 11 }, (_, count) => ({ value: String(count), label: count ? `显示前 ${count} 个备用列` : "隐藏全部空备用列（默认）" }))}
+              description="新建和编辑发票均适用；已有内容的备用列自动显示。每张发票还可在明细表的“显示列”中临时调整。"
+              onChange={(value) => onChange(["system", "itemEntrySpareColumnCount"], Number(value))}
+            />
+            <NumberSetting settings={settings} path={["system", "itemEntryBlankRowCount"]} label="明细空白行数" onChange={onChange} />
           </div>
         </fieldset>
       </section>

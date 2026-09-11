@@ -513,6 +513,7 @@ namespace ExportDocManager.Api.Tests
                     PostgreSqlAutoBackupDayOfWeek = 9,
                     PostgreSqlAutoBackupRetentionCount = -2,
                     ItemEntryBlankRowCount = 999,
+                    ItemEntrySpareColumnCount = 99,
                     LogRetainedFileCount = 0,
                     LogFileSizeLimitMB = 0
                 },
@@ -537,6 +538,8 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(6, response.NormalizedSettings.System.PostgreSqlAutoBackupDayOfWeek);
             Assert.Equal(1, response.NormalizedSettings.System.PostgreSqlAutoBackupRetentionCount);
             Assert.Equal(500, response.NormalizedSettings.System.ItemEntryBlankRowCount);
+            Assert.Equal(10, response.NormalizedSettings.System.ItemEntrySpareColumnCount);
+            Assert.Contains(response.Messages, message => message.PropertyName == "system.itemEntrySpareColumnCount" && message.IsAutoFixable);
             Assert.Equal(1, response.NormalizedSettings.System.LogRetainedFileCount);
             Assert.Equal(1, response.NormalizedSettings.System.LogFileSizeLimitMB);
             Assert.Equal(string.Empty, response.NormalizedSettings.Email.Password);

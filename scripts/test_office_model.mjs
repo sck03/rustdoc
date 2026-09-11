@@ -74,6 +74,14 @@ assert.equal(organization.departmentOptions(departments).find(item=>item.code===
 assert.deepEqual(organization.parentDepartmentOptions(departments,"SALES").map(item=>item.code),["ROOT"]);
 assert.deepEqual(organization.filterDepartmentTree(departments,"一组").map(item=>item.code),["ROOT","SALES","TEAM"]);
 assert.deepEqual(organization.filterDepartmentTree(departments,"张宁").map(item=>item.code),["ROOT","SALES"]);
+assert.deepEqual(organization.buildDepartmentTreeRows(departments,"",1,{}).map(item=>item.code),["ROOT","SALES"]);
+assert.deepEqual(organization.buildDepartmentTreeRows(departments,"",0,{}).map(item=>item.code),["ROOT"]);
+assert.deepEqual(organization.buildDepartmentTreeRows(departments,"",Infinity,{}).map(item=>item.code),["ROOT","SALES","TEAM"]);
+assert.deepEqual(organization.buildDepartmentTreeRows(departments,"",Infinity,{ROOT:false}).map(item=>item.code),["ROOT"]);
+assert.deepEqual(organization.buildDepartmentTreeRows(departments,"一组",0,{ROOT:false}).map(item=>item.code),["ROOT","SALES","TEAM"]);
+const deepDepartments=Array.from({length:32},(_,index)=>({code:`D${index}`,name:`部门${index}`,parentCode:index?`D${index-1}`:null,isActive:true,managerName:""}));
+const deepMatch=organization.buildDepartmentTreeRows(deepDepartments,"部门31",1,{});
+assert.equal(deepMatch.length,32);assert.equal(deepMatch.at(-1).depth,31);assert.equal(deepMatch.at(-1).ancestors.length,31);
 assert.throws(()=>organization.departmentOptions([{code:"A",name:"A",parentCode:"B"},{code:"B",name:"B",parentCode:"A"}]),/循环/);
 assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=15&applicantUserId=7&employeeId=5")), {requestId:15,applicantUserId:7,employeeId:5});
 assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=-1&applicantUserId=2147483648&employeeId=0")), {requestId:undefined,applicantUserId:undefined,employeeId:undefined});
