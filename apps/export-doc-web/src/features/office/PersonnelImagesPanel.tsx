@@ -63,7 +63,7 @@ function PersonnelImageEditor({ client, id, kind, image, editable, busy, upload,
     {url && failedUrl !== url ? <button type="button" className="personnel-image-preview" aria-label={`放大查看${label}`} onClick={() => setZoom(true)}>
       <img src={url} alt={file ? `待上传的${label}` : label} onError={() => setFailedUrl(url)} /></button>
       : <div className="personnel-image-empty">{failedUrl && failedUrl === url ? "图片无法显示，请选择有效的原始图片。" : stored.pending ? "图片加载中…" : image ? "图片未能加载" : "尚未上传"}</div>}
-    {stored.error && <InlineNotice tone="error" title="图片加载失败">{stored.error} <button type="button" onClick={stored.retry}>重试</button></InlineNotice>}
+    {stored.error && <InlineNotice tone="error" title="图片加载失败" action={<button className="command-button secondary" type="button" onClick={stored.retry}>重试</button>}>{stored.error}</InlineNotice>}
     {selectionError && <InlineNotice tone="error" title="图片未选择">{selectionError}</InlineNotice>}
     {editable && <>
       <label className="office-field"><span>选择{label}</span><input key={inputKey} type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" disabled={busy}

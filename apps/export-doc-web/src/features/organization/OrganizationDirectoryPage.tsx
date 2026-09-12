@@ -33,7 +33,7 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
       <div className="organization-actions"><Link className="command-button secondary" to="/office/people">人员档案</Link>
         <button type="button" className="command-button secondary" onClick={() => setCompanyEditor({})}><Plus size={16} aria-hidden="true" />新增公司</button></div></div>
     {query.isPending ? <PageState tone="loading" title="正在加载组织架构" /> : query.isError ? <PageState tone="error" title="组织架构加载失败" description={readApiError(query.error)}
-      action={<button type="button" onClick={() => void query.refetch()}>重新加载</button>} /> : !company ? <PageState title="尚未设置公司" description="先新增公司，再在公司下建立部门。" /> : <>
+      action={<button className="command-button secondary" type="button" onClick={() => void query.refetch()}>重新加载</button>} /> : !company ? <PageState title="尚未设置公司" description="先新增公司，再在公司下建立部门。" /> : <>
       <div className="organization-directory-layout">
       <OrganizationCompanyList companies={companies} departments={query.data?.departments ?? []} selectedCode={company.code}
         onSelect={(code) => { setCompanyCode(code); setSearch(""); }} />

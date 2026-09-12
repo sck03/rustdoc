@@ -50,7 +50,7 @@ export function PersonnelPage({ client, user, directoryOnly = false }: { client:
       <button type="button" className="icon-button" aria-label="刷新通讯录" disabled={model.query.isFetching} onClick={() => void model.query.refetch()}><RefreshCw size={17} aria-hidden="true" /></button>
     </div>
     {canViewDetails && <label className="checkbox-field personnel-attention"><input type="checkbox" checked={model.attentionOnly} onChange={(event) => model.changeAttention(event.target.checked)} />仅看试用／合同／身份证已到期或 30 天内到期的人员</label>}
-    {model.options.isError && <InlineNotice tone="error" title="部门目录加载失败">{readApiError(model.options.error)} <button type="button" onClick={() => void model.options.refetch()}>重新加载</button></InlineNotice>}
+    {model.options.isError && <InlineNotice tone="error" title="部门目录加载失败" action={<button className="command-button secondary" type="button" onClick={() => void model.options.refetch()}>重新加载</button>}>{readApiError(model.options.error)}</InlineNotice>}
     <OfficeQueryState query={model.query} emptyTitle={model.keyword || model.departmentId || model.status || model.attentionOnly ? "没有符合条件的人员" : "尚未登记人员档案"} />
     {!model.query.isError && <div className="personnel-directory">{model.query.data?.items.map((employee) =>
       <PersonnelCard key={employee.id} client={client} employee={employee} showDetails={!directoryOnly} onOpen={() => openPerson(employee.id)} />)}</div>}

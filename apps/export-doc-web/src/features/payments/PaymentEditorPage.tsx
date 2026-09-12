@@ -355,7 +355,7 @@ export function PaymentEditorPage({
         <PermissionNotice>当前模板仅允许查看付款报销，表单修改、保存和删除已禁用。</PermissionNotice>
       ) : null}
 
-      {settingsQuery.isError && <InlineNotice tone="warning" title="字段名称未能更新">{readApiError(settingsQuery.error)}<button type="button" onClick={() => void settingsQuery.refetch()}>重试</button></InlineNotice>}
+      {settingsQuery.isError && <InlineNotice tone="warning" title="字段名称未能更新" action={<button className="command-button secondary" type="button" onClick={() => void settingsQuery.refetch()}>重试</button>}>{readApiError(settingsQuery.error)}</InlineNotice>}
       {!payment && isBusy ? <PageState tone="loading" title="正在加载付款报销" description="正在读取付款信息和报表配置。" /> : null}
 
       {payment ? (

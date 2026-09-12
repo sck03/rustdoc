@@ -48,7 +48,7 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
         onClick={async () => { if (await confirmDiscardChanges("返回人员目录")) onClose(); }}>返回人员目录</button>
         <h2 ref={title} tabIndex={-1}>{record ? `${record.employee.fullName} · 人员档案` : "人员档案"}</h2></div>
       {query.isPending ? <PageState tone="loading" title="正在读取人员档案" /> : query.isError ? <PageState tone="error" title="档案加载失败" description={readApiError(query.error)}
-        action={<button type="button" onClick={() => void query.refetch()}>重新加载</button>} /> : record && <>
+        action={<button className="command-button secondary" type="button" onClick={() => void query.refetch()}>重新加载</button>} /> : record && <>
         <div className="office-card-heading"><span>{record.employee.employeeNumber} · {record.employee.departmentName} · {record.employee.jobTitle}</span>
           <span className="office-badge" data-state={record.employee.status}>{employmentStatusLabels[record.employee.status]}</span></div>
         <div className="office-card-actions">
@@ -116,7 +116,7 @@ function PersonnelHistory({ client, user, id }: { client: ExportDocManagerApiCli
 export function PersonnelClearancePanel({ client, user, record }: { client: ExportDocManagerApiClient; user: ApiUserDto; record: PersonnelRecord }) {
   const query = usePersonnelClearance(client, user, record.employee.id);
   if (query.isPending) return <PageState tone="loading" title="正在核对交接事项" />;
-  if (query.isError) return <PageState tone="error" title="交接核对失败" description={readApiError(query.error)} action={<button type="button" onClick={() => void query.refetch()}>重新核对</button>} />;
+  if (query.isError) return <PageState tone="error" title="交接核对失败" description={readApiError(query.error)} action={<button className="command-button secondary" type="button" onClick={() => void query.refetch()}>重新核对</button>} />;
   const data = query.data;
   return <div className="personnel-clearance">
     {data.managedDepartments.length > 0 && <InlineNotice tone="warning" title="离职前需调整部门负责人">

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw, Search } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
@@ -41,27 +41,31 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
     {data?.usedBytes != null && <p className="business-records-muted">本单已使用 {fileSizeLabel(data.usedBytes)} / {fileSizeLabel(data.invoiceBytesLimit)}，包含所有历史版本与停用资料。资料随数据库备份保存。</p>}
     {model.error && <InlineNotice tone="error" title="操作未完成">{model.error}</InlineNotice>}
     {model.message && <InlineNotice tone="success">{model.message}</InlineNotice>}
-    {model.categories.isError && <InlineNotice tone="error" title="分类加载失败">{readApiError(model.categories.error)} <button type="button" onClick={() => void model.categories.refetch()}>重新加载分类</button></InlineNotice>}
+    {model.categories.isError && <InlineNotice tone="error" title="分类加载失败" action={<button className="command-button secondary" type="button" onClick={() => void model.categories.refetch()}>重新加载分类</button>}>{readApiError(model.categories.error)}</InlineNotice>}
     {managingCategories && catalog?.canManage && <BusinessAttachmentCategoryManager items={categories} busy={model.busy}
       onSave={model.saveCategory} onDelete={model.removeCategory} onClose={() => setManagingCategories(false)} />}
     {uploadMode && data && uploadInvoiceId !== undefined && <BusinessAttachmentUploadForm key={uploadMode}
       invoiceId={uploadInvoiceId} attachment={uploadAttachment} categories={categories} maximumBytes={data.fileBytesLimit} busy={model.busy}
       onUpload={model.upload} onClose={() => model.setUploadMode(null)} />}
-    <div hidden={model.selectedId !== null}>
-    <div className="business-records-toolbar"><form onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
-      <input aria-label="搜索业务资料" placeholder="客户、单据号、PO、款号、资料名或文件名" value={model.keyword} maxLength={100} onChange={(event) => model.changeKeyword(event.target.value)} />
-      <button className="command-button secondary" type="submit">搜索</button></form>
-      <label className="checkbox-field"><input type="checkbox" checked={model.includeArchived} onChange={(event) => model.changeArchived(event.target.checked)} />含停用资料</label>
-      <button className="icon-button" type="button" aria-label="刷新业务资料" disabled={model.query.isFetching} onClick={model.refresh}><RefreshCw size={16} aria-hidden="true" /></button></div>
+    <div className="business-records-content" hidden={model.selectedId !== null}>
+    <form className="toolbar business-records-toolbar" role="search" onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
+      <div className="search-form"><Search size={17} aria-hidden="true" />
+        <input aria-label="搜索业务资料" placeholder="客户、单据号、PO、款号、资料名或文件名" value={model.keyword} maxLength={100} onChange={(event) => model.changeKeyword(event.target.value)} /></div>
+      <div className="toolbar-actions">
+        <button className="command-button secondary" type="submit">搜索</button>
+        <label className="inline-check"><input type="checkbox" checked={model.includeArchived} onChange={(event) => model.changeArchived(event.target.checked)} />含停用资料</label>
+        <button className="icon-button" type="button" aria-label="刷新业务资料" title="刷新业务资料" disabled={model.query.isFetching} onClick={model.refresh}><RefreshCw size={16} aria-hidden="true" /></button>
+      </div>
+    </form>
     {model.query.isPending ? <PageState tone="loading" title="正在读取业务资料" /> : model.query.isError ?
       <PageState tone="error" title="资料加载失败" description={readApiError(model.query.error)} /> : <>
-        {!data?.page.items.length && <PageState title="没有符合条件的业务资料" description={invoiceId ? "可从本单上传客户资料或实际交付文件。" : "请打开对应发票，从“业务资料”入口上传。"} />}
-        <ul className="business-records-list">{data?.page.items.map((item) => <li key={item.id} className="business-records-card">
+        {!data?.page.items.length ? <PageState title="没有符合条件的业务资料" description={invoiceId ? "可从本单上传客户资料或实际交付文件。" : "请打开对应发票，从“业务资料”入口上传。"} /> :
+        <ul className="business-records-list">{data.page.items.map((item) => <li key={item.id} className="business-records-card">
           <div><span className="business-records-muted">{item.invoiceNo} · {item.invoiceType} · {item.categoryName}</span>
             <h3>{item.title}</h3><p>{item.customerName}{item.poNumber ? ` · PO ${item.poNumber}` : ""}{item.styleNo ? ` · 款号 ${item.styleNo}` : ""}</p>
             <p className="business-records-muted">{attachmentVersionLabel(item)}</p></div>
           <button type="button" className="command-button secondary" disabled={model.busy || editorOpen} onClick={() => model.setSelectedId(item.id)}>查看版本</button>
-        </li>)}</ul>
+        </li>)}</ul>}
         <ListPaginationControls pageNumber={model.pageNumber} pageSize={model.pageSize} totalCount={data?.page.totalCount ?? 0} totalPages={data?.page.totalPages ?? 0}
           pageSizeOptions={[20, 50, 100]} isBusy={model.query.isFetching} onPageChange={model.setPageNumber} onPageSizeChange={model.changePageSize} />
       </>}

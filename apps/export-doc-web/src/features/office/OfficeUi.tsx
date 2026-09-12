@@ -45,7 +45,7 @@ export function OfficeSubmit({ busy, disabled = false, label = "保存" }: { bus
 export function OfficeQueryState({ query, emptyTitle }: { query: { isPending: boolean; isError: boolean; error: unknown; data?: { items: unknown[] }; refetch: () => unknown }; emptyTitle: string }) {
   if (query.isPending) return <PageState tone="loading" title="正在加载" />;
   if (query.isError) return <PageState tone="error" title="加载失败" description={readApiError(query.error)}
-    action={<button type="button" onClick={() => void query.refetch()}>重新加载</button>} />;
+    action={<button className="command-button secondary" type="button" onClick={() => void query.refetch()}>重新加载</button>} />;
   return query.data?.items.length ? null : <PageState title={emptyTitle} />;
 }
 
