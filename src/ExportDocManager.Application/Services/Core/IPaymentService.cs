@@ -7,6 +7,6 @@ namespace ExportDocManager.Services.Core
     public interface IPaymentService
     {
         Task<int> SavePaymentAsync(Payment payment, CancellationToken cancellationToken = default);
-        Task<bool> DeletePaymentAsync(int id, CancellationToken cancellationToken = default);
+        Task<bool> DeletePaymentAsync(int id, byte[] expectedRowVersion, CancellationToken cancellationToken = default);
     }
 }

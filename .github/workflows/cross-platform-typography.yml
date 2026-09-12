@@ -19,6 +19,8 @@ on:
       - "scripts/report-layout-requirements.txt"
       - "scripts/test_frontend_scale_contracts.mjs"
       - "scripts/test_report_designer_v3_ui.mjs"
+      - "scripts/test_report_template_draft_ui.mjs"
+      - "scripts/lib/navigation-reorganization-ui-fixture.mjs"
       - "scripts/test_office_workspace_ui.mjs"
       - "scripts/test_workspace_navigation_ui.mjs"
       - "scripts/check_frontend_style_governance.mjs"
@@ -55,6 +57,8 @@ on:
       - "scripts/test_frontend_scale_contracts.mjs"
       - "scripts/check_frontend_style_governance.mjs"
       - "scripts/test_report_designer_v3_ui.mjs"
+      - "scripts/test_report_template_draft_ui.mjs"
+      - "scripts/lib/navigation-reorganization-ui-fixture.mjs"
       - "scripts/test_office_workspace_ui.mjs"
       - "scripts/test_workspace_navigation_ui.mjs"
       - "scripts/baselines/frontend-style-governance.json"
@@ -200,6 +204,7 @@ jobs:
         timeout-minutes: 5
         run: |
           npm --prefix apps/export-doc-web run test:report-designer-v3-ui
+          npm --prefix apps/export-doc-web run test:report-template-draft-ui
           npm --prefix apps/export-doc-web run test:office-ui
           npm --prefix apps/export-doc-web run test:document-editor-ui
           npm --prefix apps/export-doc-web run test:workspace-ui

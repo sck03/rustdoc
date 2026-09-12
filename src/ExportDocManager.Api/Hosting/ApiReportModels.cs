@@ -244,7 +244,8 @@ namespace ExportDocManager.Api.Hosting
             string templatePath,
             bool? withSealDefault,
             string content,
-            string storagePolicy)
+            string storagePolicy,
+            string revision)
         {
             ReportType = reportType ?? string.Empty;
             DisplayName = displayName ?? string.Empty;
@@ -252,6 +253,7 @@ namespace ExportDocManager.Api.Hosting
             WithSealDefault = withSealDefault;
             Content = content ?? string.Empty;
             StoragePolicy = storagePolicy ?? string.Empty;
+            Revision = revision;
         }
 
         public string ReportType { get; }
@@ -265,11 +267,15 @@ namespace ExportDocManager.Api.Hosting
 
         public string Content { get; }
 
+        public string Revision { get; }
+
         public string StoragePolicy { get; }
     }
 
     public sealed class ApiReportTemplateSaveRequest
     {
+        public string ExpectedRevision { get; set; } = string.Empty;
+
         public string ReportType { get; set; } = "ExportDocument";
 
         public string TemplatePath { get; set; } = string.Empty;
@@ -288,6 +294,8 @@ namespace ExportDocManager.Api.Hosting
 
     public sealed class ApiReportTemplateRenameRequest
     {
+        public string ExpectedRevision { get; set; } = string.Empty;
+
         public string ReportType { get; set; } = "ExportDocument";
 
         public string TemplatePath { get; set; } = string.Empty;
@@ -297,6 +305,8 @@ namespace ExportDocManager.Api.Hosting
 
     public sealed class ApiReportTemplateMetadataRequest
     {
+        public string ExpectedRevision { get; set; } = string.Empty;
+
         public string ReportType { get; set; } = "ExportDocument";
 
         public string TemplatePath { get; set; } = string.Empty;
@@ -443,6 +453,8 @@ namespace ExportDocManager.Api.Hosting
     [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
     public sealed class ApiReportTemplateFileImportRequest
     {
+        public string ExpectedRevision { get; set; } = string.Empty;
+
         public string ReportType { get; set; } = "ExportDocument";
 
         public string TemplatePath { get; set; } = string.Empty;

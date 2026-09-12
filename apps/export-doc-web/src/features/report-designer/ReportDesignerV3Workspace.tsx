@@ -1,3 +1,4 @@
+import { EMPTY_REPORT_DESIGNER_DRAFT, type ReportDesignerDraft } from "./reportDesignerDraft.ts";
 import { useReportDesignerV3Clipboard } from "./useReportDesignerV3Clipboard.ts";
 import { useReportDesignerV3Shortcuts } from "./useReportDesignerV3Shortcuts.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -64,7 +65,7 @@ export function ReportDesignerV3Workspace({
   fieldCatalog,
   client,
   editable,
-  onDesignerDraftContentChange,
+  onDesignerDraftChange,
 }: {
   reportType: ReportDesignerReportType;
   displayName: string;
@@ -72,7 +73,7 @@ export function ReportDesignerV3Workspace({
   fieldCatalog?: ApiReportTemplateFieldCatalogResponse | null;
   client?: ExportDocManagerApiClient;
   editable: boolean;
-  onDesignerDraftContentChange?: (nextContent: string) => void;
+  onDesignerDraftChange?: (draft: ReportDesignerDraft) => void;
 }) {
   const parsed = useMemo(() => parseReportDesignerV3FromHtml(content, reportType), [content, reportType]);
   const history = useReportDesignerV3History(parsed.schema);
@@ -93,7 +94,6 @@ export function ReportDesignerV3Workspace({
   const legacyMigrationPending = parsed.migrated;
   const [migrationAccepted, setMigrationAccepted] = useState(!legacyMigrationPending);
   const [draftEnabled, setDraftEnabled] = useState(false);
-  const emittedContent = useRef("");
   const historyRef = useRef(history);
   const selected = useMemo(
     () => history.state.selectedIds.length === 1 ? findV3Element(history.state.schema, history.state.selectedIds[0]) : null,
@@ -116,25 +116,16 @@ export function ReportDesignerV3Workspace({
     setMigrationAccepted(!legacyMigrationPending);
     setDraftEnabled(false);
     setGridCellSelection(null);
-    emittedContent.current = "";
-    onDesignerDraftContentChange?.("");
-  }, [legacyMigrationPending, content, reportType, onDesignerDraftContentChange]);
+  }, [legacyMigrationPending, content, reportType]);
+  const schemaChanged = JSON.stringify(history.state.schema) !== JSON.stringify(parsed.schema);
+  const draftDirty = migrationAccepted && draftEnabled && (parsed.migrated || schemaChanged);
   useEffect(() => {
-    if (!editable || !migrationAccepted || !draftEnabled) return;
-    if (exportValidation.blocked || !exportedHtml.trim()) {
-      // Never publish an empty string as a usable draft.  Clearing the last
-      // emitted value keeps the original `content` intact and disables the
-      // parent save action until the user repairs the schema.
-      if (emittedContent.current) {
-        emittedContent.current = "";
-        onDesignerDraftContentChange?.("");
-      }
-      return;
-    }
-    if (emittedContent.current === exportedHtml) return;
-    emittedContent.current = exportedHtml;
-    onDesignerDraftContentChange?.(exportedHtml);
-  }, [draftEnabled, editable, exportValidation.blocked, exportedHtml, migrationAccepted, onDesignerDraftContentChange]);
+    onDesignerDraftChange?.({
+      content: draftDirty && !exportValidation.blocked ? exportedHtml : "",
+      isDirty: draftDirty,
+      isValid: !exportValidation.blocked,
+    });
+  }, [draftDirty, exportValidation.blocked, exportedHtml, onDesignerDraftChange]);
   const editingEnabled = editable && (!legacyMigrationPending || migrationAccepted);
   const { hasClipboard, canCopyStyle, canPasteStyle, copySelection, pasteClipboard, copyStyle, pasteStyle } = useReportDesignerV3Clipboard({
     state: history.state, editable: editingEnabled, content, reportType, onCommit: commit, onNotice: setCapacityNotice,
@@ -314,7 +305,7 @@ export function ReportDesignerV3Workspace({
           {!editable ? <small>只读预览：当前权限或设备不支持设计操作。</small> : null}
         </div>
         <div className="report-designer-v3-header-actions">
-           <button className="command-button secondary" type="button" onClick={() => { history.reset(parsed.schema); setDraftEnabled(false); setMigrationAccepted(!parsed.migrated); onDesignerDraftContentChange?.(""); }}>
+           <button className="command-button secondary" type="button" disabled={!editable} onClick={() => { history.reset(parsed.schema); setDraftEnabled(false); setMigrationAccepted(!parsed.migrated); onDesignerDraftChange?.(EMPTY_REPORT_DESIGNER_DRAFT); }}>
             <RotateCcw size={16} aria-hidden="true" />
             <span>重新载入</span>
           </button>

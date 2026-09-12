@@ -7,6 +7,7 @@ export function useDefaultReportTemplateLifecycleMutations({
   client,
   reportType,
   selectedTemplatePath,
+  expectedRevision,
   newTemplateFileName,
   newTemplateDisplayName,
   currentTemplateDisplayName,
@@ -21,6 +22,7 @@ export function useDefaultReportTemplateLifecycleMutations({
   client: ExportDocManagerApiClient;
   reportType: ReportTypeOption;
   selectedTemplatePath: string;
+  expectedRevision: string;
   newTemplateFileName: string;
   newTemplateDisplayName: string;
   currentTemplateDisplayName: string;
@@ -58,6 +60,7 @@ export function useDefaultReportTemplateLifecycleMutations({
           reportType,
           templatePath: selectedTemplatePath,
           newTemplatePath: renameTemplateFileName.trim(),
+          expectedRevision,
         },
       }),
     onSuccess: async (renamed) => {
@@ -76,6 +79,7 @@ export function useDefaultReportTemplateLifecycleMutations({
           reportType,
           templatePath: selectedTemplatePath,
           displayName: currentTemplateDisplayName.trim(),
+          expectedRevision,
         },
       }),
     onSuccess: async (updated) => {
@@ -102,7 +106,7 @@ export function useDefaultReportTemplateLifecycleMutations({
   });
 
   const deleteTemplateMutation = useMutation({
-    mutationFn: () => client.deleteReportTemplate({ reportType, templatePath: selectedTemplatePath }),
+    mutationFn: () => client.deleteReportTemplate({ reportType, templatePath: selectedTemplatePath, expectedRevision }),
     onSuccess: async () => {
       queryClient.removeQueries({ queryKey: queryKeys.reportTemplateContent(reportType, selectedTemplatePath) });
       onDeleted();

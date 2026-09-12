@@ -54,20 +54,12 @@ public static partial class ApiEndpointRouteBuilderExtensions
 
         endpoints.MapGet("/api/reports/templates/v3/resources/{resourceId}", async (
             IReportTemplateImageResourceAccessService resourceAccessService,
-            IReportTemplateImageResourceService resourceService,
             string resourceId,
             CancellationToken cancellationToken) =>
         {
             try
             {
-                if (!await resourceAccessService.CanReadAsync(resourceId, cancellationToken))
-                {
-                    // Do not disclose whether an unreferenced ID exists in the
-                    // shared content-addressed directory.
-                    return Results.NotFound();
-                }
-
-                var resource = await resourceService.ReadAsync(resourceId, cancellationToken);
+                var resource = await resourceAccessService.ReadAsync(resourceId, cancellationToken);
                 return Results.File(
                     resource.Content,
                     resource.Resource.MediaType,
@@ -92,36 +84,12 @@ public static partial class ApiEndpointRouteBuilderExtensions
 
         endpoints.MapDelete("/api/reports/templates/v3/resources/{resourceId}", async (
             IReportTemplateImageResourceAccessService resourceAccessService,
-            IReportTemplateImageResourceService resourceService,
             string resourceId,
             CancellationToken cancellationToken) =>
         {
             try
             {
                 bool deletePhysicalFile = await resourceAccessService.RecycleAsync(resourceId, cancellationToken);
-                if (deletePhysicalFile)
-                {
-                    try
-                    {
-                        await resourceService.DeleteAsync(resourceId, cancellationToken);
-                    }
-                    catch (Exception deleteException) when (
-                        deleteException is ServiceException or IOException or UnauthorizedAccessException)
-                    {
-                        try
-                        {
-                            await resourceAccessService.RollbackRecycleAsync(resourceId, CancellationToken.None);
-                        }
-                        catch (Exception rollbackException)
-                        {
-                            throw new UserVisibleInfrastructureException(
-                                "图片物理文件删除失败，且资源归属回滚失败；请保留数据目录并联系管理员处理。",
-                                new AggregateException(deleteException, rollbackException));
-                        }
-                        throw;
-                    }
-                }
-
                 return Results.Ok(new ApiCommandResponse(
                     true,
                     deletePhysicalFile

@@ -1,4 +1,4 @@
-export function navigationReorganizationUiFixture(source) {
+export function navigationReorganizationUiFixture(source, setup = "") {
   return `
 import React from 'react';
 import {createRoot} from 'react-dom/client';
@@ -47,7 +47,7 @@ const client={
  getCustomsCooIssuingAuthorities:()=>call('authorities',{},[]),
  listReportTemplates:input=>call('templates',input,templates),listUserReportTemplates:input=>call('userTemplates',input,userTemplates),
  listUserReportTemplateVersions:input=>call('templateVersions',input,[]),
- getReportTemplateContent:input=>call('templateContent',input,{...templates.find(row=>row.templatePath===input.templatePath),content:'<html><body>Invoice</body></html>',storagePolicy:''}),
+ getReportTemplateContent:input=>call('templateContent',input,{...templates.find(row=>row.templatePath===input.templatePath),content:'<html><body>Invoice</body></html>',revision:'fixture-revision',storagePolicy:''}),
  getEmailToolStatus:()=>call('emailStatus',{}, {isConfigured:true,smtpHost:'smtp.example.test',smtpPort:587,enableSsl:true,fromAddress:'sender@example.test',fromDisplayName:'业务部'}),
  listEmailDeliveries:input=>call('deliveries',input,page(matches(deliveries,input).filter(row=>!input.status||row.status===input.status),input)),
  sendEmail:input=>call('sendEmail',input,{success:true,message:'邮件已发送'}),
@@ -65,6 +65,7 @@ function Workspace(){const current=useLocation();window.__route=current.pathname
   <AppWorkspaceRoutes client={client} activeProduct={getProductEditionPresentation('Full')} user={user} canManageAuditLogs={true}
     routeAccessAllowed={isRouteAccessAllowed({pathname:current.pathname,user,canManageSystem:capabilities.canManageSettings,isDesktopRuntime:false})}/>
 </WorkspaceShell>;}
+${setup}
 createRoot(document.getElementById('root')).render(<HashRouter><QueryClientProvider client={queries}><PermissionAccessProvider grants={capabilities.moduleAccess} permissions={permissions} canManageSettings={capabilities.canManageSettings}><ConfirmationProvider><UnsavedChangesProvider><Workspace/></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider></QueryClientProvider></HashRouter>);
 `;
 }

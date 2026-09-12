@@ -343,7 +343,8 @@ namespace ExportDocManager.Api.Tests
                 {
                     reportType = "ExportDocument",
                     templatePath = createdTemplate.TemplatePath,
-                    newTemplatePath = renamedTemplatePath
+                    newTemplatePath = renamedTemplatePath,
+                    expectedRevision = createdTemplate.Revision
                 });
             Assert.True(renameTemplateResponse.StatusCode == HttpStatusCode.OK, await renameTemplateResponse.Content.ReadAsStringAsync());
             var renamedTemplate = await ApiIntegrationTestHarness.ReadJsonAsync<ApiReportTemplateContentDto>(renameTemplateResponse);
@@ -352,7 +353,7 @@ namespace ExportDocManager.Api.Tests
             Assert.True(File.Exists(renamedTemplatePath));
 
             var deleteTemplateResponse = await adminClient.DeleteAsync(
-                $"/api/reports/templates/content?reportType=ExportDocument&templatePath={Uri.EscapeDataString(renamedTemplate.TemplatePath)}");
+                $"/api/reports/templates/content?reportType=ExportDocument&templatePath={Uri.EscapeDataString(renamedTemplate.TemplatePath)}&expectedRevision={renamedTemplate.Revision}");
             Assert.Equal(HttpStatusCode.OK, deleteTemplateResponse.StatusCode);
             var deleteTemplateResult = await ApiIntegrationTestHarness.ReadJsonAsync<ApiCommandResponse>(deleteTemplateResponse);
             Assert.True(deleteTemplateResult.Success);

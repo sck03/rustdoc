@@ -1,3 +1,4 @@
+import type { ReportDesignerDraft } from "../report-designer/reportDesignerDraft.ts";
 import { Code2 } from "lucide-react";
 import { ApiReportTemplateFieldCatalogResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { ReportDesignerPage } from "../report-designer/ReportDesignerPage.tsx";
@@ -13,7 +14,7 @@ export function ReportTemplateDesignWorkspace({
   editable,
   canFormatSource,
   sourceDisabled,
-  onDesignerDraftContentChange,
+  onDesignerDraftChange,
   onFormatSource,
   onSourceContentChange,
 }: {
@@ -26,7 +27,7 @@ export function ReportTemplateDesignWorkspace({
   editable: boolean;
   canFormatSource: boolean;
   sourceDisabled: boolean;
-  onDesignerDraftContentChange: (content: string) => void;
+  onDesignerDraftChange: (draft: ReportDesignerDraft) => void;
   onFormatSource: () => void;
   onSourceContentChange: (content: string) => void;
 }) {
@@ -60,7 +61,7 @@ export function ReportTemplateDesignWorkspace({
         fieldCatalog={fieldCatalog}
         client={client}
         editable={editable}
-        onDesignerDraftContentChange={onDesignerDraftContentChange}
+        onDesignerDraftChange={onDesignerDraftChange}
       />
     </div>
   );

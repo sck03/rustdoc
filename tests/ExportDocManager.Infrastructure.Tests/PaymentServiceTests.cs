@@ -61,7 +61,7 @@ namespace ExportDocManager.Infrastructure.Tests
                 .Select(payment => payment.Id)
                 .SingleAsync();
 
-            var deleted = await service.DeletePaymentAsync(foreignPaymentId);
+            var deleted = await service.DeletePaymentAsync(foreignPaymentId, [1]);
             var updateException = await Assert.ThrowsAsync<PermissionDeniedException>(() =>
                 service.SavePaymentAsync(CreateValidPayment("FOREIGN-EDIT", foreignPaymentId, 8)));
 

@@ -33,12 +33,10 @@ const importSpecifier = (name) => {
   return relative.startsWith(".") ? relative : `./${relative}`;
 };
 fs.writeFileSync(entryPath, `
-export * from ${JSON.stringify(importSpecifier("reportDesignerV3Migration.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3Validation.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3Schema.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3Mutations.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3TemplateParser.ts"))};
-export * from ${JSON.stringify(importSpecifier("reportDesignerV3TemplateAnalysis.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3HtmlExporter.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerBlockRenderer.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerPreviewSamples.ts"))};
@@ -74,53 +72,21 @@ function assertFixedRightMetadataLayout(source, templatePath) {
   );
 }
 
-const legacyA5 = {
-  version: 2,
-  reportType: "ExportDocument",
-  page: { size: "A5", orientation: "Landscape", marginTopMm: 8, marginRightMm: 8, marginBottomMm: 8, marginLeftMm: 8, fontFamily: "Arial", fontSizePt: 9 },
-  sections: [{ id: "body", type: "Body", print: { repeatOnEveryPage: false, keepTogether: false }, blocks: [{ id: "title", type: "Text", text: "标题", style: { fontSizePt: 12 } }] }],
-};
-const migrated = api.migrateReportDesignerSchemaV2ToV3(legacyA5);
-assert(migrated.schema.page.size === "A4", "迁移后页面必须固定为 A4");
-assert(migrated.schema.page.widthHundredthMm === 29700 && migrated.schema.page.heightHundredthMm === 21000, "横版 A4 尺寸错误");
-assert(migrated.issues.some((issue) => issue.path === "$.page.size"), "非 A4 迁移必须给出明确提示");
+const landscapeSchema = api.parseReportDesignerV3FromHtml("<style>@page { size: A4 landscape; }</style>", "ExportDocument").schema;
+landscapeSchema.layers = landscapeSchema.layers.filter(layer => layer.role === "Body").map(layer => ({ ...layer, elements: [] }));
+landscapeSchema.layers[0].elements.push({ ...api.createV3TextElement(1000, 1000), id: "title", text: "标题" });
+assert(landscapeSchema.page.widthHundredthMm === 29700 && landscapeSchema.page.heightHundredthMm === 21000, "横版 A4 尺寸错误");
 
-const crossDomainLegacy = api.migrateReportDesignerSchemaV2ToV3(
-  { ...legacyA5, reportType: "PaymentVoucher" },
-  "ExportDocument",
-);
-assert(crossDomainLegacy.schema.reportType === "ExportDocument", "V2 迁移必须以当前路由数据域为权威");
-assert(crossDomainLegacy.issues.some((issue) => issue.severity === "error" && issue.path === "$.reportType"), "跨域 V2 迁移必须阻断并要求人工修正");
-
-const legacyStyled = api.migrateReportDesignerSchemaV2ToV3({
-  ...legacyA5,
-  page: { ...legacyA5.page, size: "A4", orientation: "Portrait" },
-  sections: [{
-    id: "body-styled",
-    type: "Body",
-    print: { repeatOnEveryPage: false, keepTogether: false },
-    blocks: [{
-      id: "styled-text",
-      type: "Text",
-      text: "带边框",
-      style: { fontSizePt: 11, bold: true, align: "Center" },
-      border: { color: "#112233", widthPx: 2, style: "Dashed", top: true, right: true, bottom: false, left: true },
-    }],
-  }],
-});
-const styledElement = legacyStyled.schema.layers.find((layer) => layer.role === "Body").elements[0];
-assert(styledElement.style.borderColor === "#112233" && styledElement.style.borderStyle === "Dashed", "V2 边框样式迁移必须保留");
-
-const normalized = api.normalizeReportDesignerV3Schema({ ...migrated.schema, page: { ...migrated.schema.page, size: "Custom", widthHundredthMm: 99999, heightHundredthMm: 99999 } });
+const normalized = api.normalizeReportDesignerV3Schema({ ...landscapeSchema, page: { ...landscapeSchema.page, size: "Custom", widthHundredthMm: 99999, heightHundredthMm: 99999 } });
 assert(normalized.schema?.page.size === "A4", "v3 校验不得保留非 A4 页面");
 assert(normalized.schema?.page.widthHundredthMm === 29700 && normalized.schema?.page.heightHundredthMm === 21000, "v3 校验必须恢复标准横版 A4 尺寸");
 
 const maliciousFlow = api.normalizeReportDesignerV3Schema({
-  ...migrated.schema,
+  ...landscapeSchema,
   layers: [{
-    ...migrated.schema.layers[0],
+    ...landscapeSchema.layers[0],
     elements: [{
-      ...migrated.schema.layers[0].elements[0],
+      ...landscapeSchema.layers[0].elements[0],
       type: "Flow",
       flowKind: "Conditional",
       block: {
@@ -131,7 +97,7 @@ const maliciousFlow = api.normalizeReportDesignerV3Schema({
         style: {},
       },
     }],
-  }, ...migrated.schema.layers.slice(1)],
+  }, ...landscapeSchema.layers.slice(1)],
 });
 assert(maliciousFlow.issues.some((issue) => issue.severity === "error" && issue.path.includes("block")), "Flow 内嵌表达式必须经过统一白名单校验");
 
@@ -166,7 +132,7 @@ const conditionalBlock = {
   content: { kind: "Text", text: conditionalText, fieldPath: "", label: "", fallbackText: "" },
   style: { fontSizePt: 9 },
 };
-const bodyLayer = migrated.schema.layers.find((layer) => layer.role === "Body");
+const bodyLayer = landscapeSchema.layers.find((layer) => layer.role === "Body");
 assert(bodyLayer, "条件显示回归需要主体图层");
 const conditionalFlow = {
   id: "conditional-export-flow",
@@ -185,9 +151,9 @@ const conditionalFlow = {
   block: conditionalBlock,
 };
 const conditionalSchema = {
-  ...migrated.schema,
+  ...landscapeSchema,
   reportType: "ExportDocument",
-  layers: migrated.schema.layers.map((layer) => layer.id === bodyLayer.id
+  layers: landscapeSchema.layers.map((layer) => layer.id === bodyLayer.id
     ? { ...layer, elements: [...layer.elements, conditionalFlow] }
     : layer),
 };
@@ -224,56 +190,26 @@ assert(paymentConditionalValidation.issues.some((issue) => issue.severity === "e
 assert(api.validateReportDesignerV3Export(paymentConditionalSchema, "PaymentVoucher").blocked, "付款模板条件域错误必须阻断导出");
 
 const manyElementsLayer = {
-  ...migrated.schema.layers[0],
+  ...landscapeSchema.layers[0],
   elements: Array.from({ length: api.REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER + 20 }, (_, index) => ({
-    ...migrated.schema.layers[0].elements[0],
+    ...landscapeSchema.layers[0].elements[0],
     id: `many-${index}`,
     type: "Text",
     text: String(index),
   })),
 };
-const capped = api.normalizeReportDesignerV3Schema({ ...migrated.schema, layers: [manyElementsLayer, ...migrated.schema.layers.slice(1)] });
+const capped = api.normalizeReportDesignerV3Schema({ ...landscapeSchema, layers: [manyElementsLayer, ...landscapeSchema.layers.slice(1)] });
 assert(capped.schema === null && api.hasBlockingReportDesignerV3SchemaIssues(capped.issues), "V3 超出单图层容量必须拒绝，不能截断为可保存模板");
 
-const legacyOverflow = api.migrateReportDesignerSchemaV2ToV3({
-  ...legacyA5,
-  sections: [{
-    ...legacyA5.sections[0],
-    blocks: Array.from({ length: api.REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER + 25 }, (_, index) => ({
-      id: `legacy-overflow-${index}`,
-      type: "Text",
-      text: String(index),
-    })),
-  }],
-});
-assert(legacyOverflow.schema.layers[0].elements.length === api.REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER, "V2 迁移必须在构造元素前遵守单图层预算");
-assert(legacyOverflow.issues.some((issue) => issue.message.includes("单图层最多迁移")), "V2 超量迁移必须给出明确预算提示");
-
-const legacyTotalOverflow = api.migrateReportDesignerSchemaV2ToV3({
-  ...legacyA5,
-  sections: Array.from({ length: 5 }, (_, sectionIndex) => ({
-    ...legacyA5.sections[0],
-    id: `legacy-total-${sectionIndex}`,
-    blocks: Array.from({ length: api.REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER }, (_, index) => ({
-      id: `legacy-total-${sectionIndex}-${index}`,
-      type: "Text",
-      text: String(index),
-    })),
-  })),
-});
-const legacyTotalCount = legacyTotalOverflow.schema.layers.reduce((sum, layer) => sum + layer.elements.length, 0);
-assert(legacyTotalCount <= api.REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS, "V2 迁移必须遵守总元素预算");
-assert(legacyTotalOverflow.issues.some((issue) => issue.message.includes("元素总数已达到")), "V2 总预算耗尽必须给出明确提示");
-
 const manyLayers = Array.from({ length: api.REPORT_DESIGNER_V3_MAX_LAYER_COUNT + 4 }, (_, index) => ({
-  ...migrated.schema.layers[0],
+  ...landscapeSchema.layers[0],
   id: `layer-cap-${index}`,
   elements: [],
 }));
-const cappedLayers = api.normalizeReportDesignerV3Schema({ ...migrated.schema, layers: manyLayers });
+const cappedLayers = api.normalizeReportDesignerV3Schema({ ...landscapeSchema, layers: manyLayers });
 assert(cappedLayers.schema === null && api.hasBlockingReportDesignerV3SchemaIssues(cappedLayers.issues), "超出图层容量必须明确拒绝，不能丢弃图层");
 const totalOverflow = api.normalizeReportDesignerV3Schema({
-  ...migrated.schema,
+  ...landscapeSchema,
   layers: Array.from({ length: Math.floor(api.REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS / api.REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER) + 1 }, (_, index) => ({
     ...manyElementsLayer,
     id: `total-cap-${index}`,
@@ -282,13 +218,13 @@ const totalOverflow = api.normalizeReportDesignerV3Schema({
 });
 assert(totalOverflow.schema === null && api.hasBlockingReportDesignerV3SchemaIssues(totalOverflow.issues), "跨图层总容量超限必须拒绝");
 const resourceOverflow = api.normalizeReportDesignerV3Schema({
-  ...migrated.schema, resources: Array.from({ length: api.REPORT_DESIGNER_V3_MAX_RESOURCES + 1 }, () => ({})),
+  ...landscapeSchema, resources: Array.from({ length: api.REPORT_DESIGNER_V3_MAX_RESOURCES + 1 }, () => ({})),
 });
 assert(resourceOverflow.schema === null && api.hasBlockingReportDesignerV3SchemaIssues(resourceOverflow.issues), "图片清单超限必须拒绝，不能截断资源引用");
 
-let state = api.createReportDesignerV3DocumentState(migrated.schema);
+let state = api.createReportDesignerV3DocumentState(landscapeSchema);
 const layerId = state.activeLayerId;
-assert(layerId, "迁移结果应有活动图层");
+assert(layerId, "模板应有活动图层");
 const first = state.schema.layers[0].elements[0];
 const selectedAgain = api.toggleV3Selection({ ...state, selectedIds: [first.id] }, first.id, false);
 assert(selectedAgain.selectedIds.length === 1 && selectedAgain.selectedIds[0] === first.id, "普通点击当前选中元素不得意外清空选择");
@@ -298,8 +234,8 @@ state = api.insertV3Element(state, layerId, api.createV3TextElement(29000, 20500
 const insertedId = state.selectedIds[0];
 const inserted = api.findV3Element(state.schema, insertedId);
 assert(inserted?.element.xHundredthMm + inserted.element.widthHundredthMm <= 29700, "新增元素不得越出横版页面");
-const layerIdCollision = api.insertV3Element(state, layerId, { ...api.createV3TextElement(), id: state.schema.layers[1].id });
-assert(layerIdCollision.selectedIds[0] !== state.schema.layers[1].id, "新增元素 ID 不得与图层 ID 冲突");
+const layerIdCollision = api.insertV3Element(state, layerId, { ...api.createV3TextElement(), id: layerId });
+assert(layerIdCollision.selectedIds[0] !== layerId, "新增元素 ID 不得与图层 ID 冲突");
 state = { ...state, selectedIds: [first.id, insertedId] };
 const moved = api.moveSelectedV3Elements(state, 20000, 20000, false);
 for (const id of moved.selectedIds) {
@@ -320,8 +256,8 @@ const rotatedResizeElement = {
   rotationDeg: 45,
 };
 const rotatedResizeSchema = {
-  ...migrated.schema,
-  layers: migrated.schema.layers.map((layer, index) => index === 0
+  ...landscapeSchema,
+  layers: landscapeSchema.layers.map((layer, index) => index === 0
     ? { ...layer, elements: [rotatedResizeElement] }
     : { ...layer, elements: [] }),
 };
@@ -331,7 +267,7 @@ const rotatedResizedElement = api.findV3Element(rotatedResized.schema, rotatedRe
 assert(rotatedResizedElement.widthHundredthMm >= rotatedResizeElement.widthHundredthMm + 990, "旋转元素沿自身东侧手柄缩放必须沿局部轴增加宽度");
 assert(rotatedResizedElement.heightHundredthMm === rotatedResizeElement.heightHundredthMm, "旋转元素单边水平缩放不得意外改变高度");
 const rotatedResizeBounds = api.reportDesignerV3ElementBounds(rotatedResizedElement);
-assert(rotatedResizeBounds.left >= -1 && rotatedResizeBounds.top >= -1 && rotatedResizeBounds.right <= migrated.schema.page.widthHundredthMm + 1 && rotatedResizeBounds.bottom <= migrated.schema.page.heightHundredthMm + 1, "旋转元素缩放后视觉边界必须保持在 A4 内");
+assert(rotatedResizeBounds.left >= -1 && rotatedResizeBounds.top >= -1 && rotatedResizeBounds.right <= landscapeSchema.page.widthHundredthMm + 1 && rotatedResizeBounds.bottom <= landscapeSchema.page.heightHundredthMm + 1, "旋转元素缩放后视觉边界必须保持在 A4 内");
 const extremeRatio = {
   ...rotatedResizeElement,
   id: "rotated-extreme-ratio",
@@ -349,36 +285,36 @@ const extremeRatioResized = api.resizeV3Element(extremeRatioState, extremeRatio.
 const extremeRatioElement = api.findV3Element(extremeRatioResized.schema, extremeRatio.id).element;
 const extremeRatioBounds = api.reportDesignerV3ElementBounds(extremeRatioElement);
 assert(extremeRatioElement.widthHundredthMm >= 400 && extremeRatioElement.heightHundredthMm >= 400, "极端宽高比旋转缩放必须保留最小尺寸");
-assert(extremeRatioBounds.left >= -1 && extremeRatioBounds.top >= -1 && extremeRatioBounds.right <= migrated.schema.page.widthHundredthMm + 1 && extremeRatioBounds.bottom <= migrated.schema.page.heightHundredthMm + 1, "极端宽高比旋转缩放必须保持视觉边界");
-const rotated = api.clampReportDesignerV3ElementToPage({ ...inserted, rotationDeg: 45 }, migrated.schema.page);
+assert(extremeRatioBounds.left >= -1 && extremeRatioBounds.top >= -1 && extremeRatioBounds.right <= landscapeSchema.page.widthHundredthMm + 1 && extremeRatioBounds.bottom <= landscapeSchema.page.heightHundredthMm + 1, "极端宽高比旋转缩放必须保持视觉边界");
+const rotated = api.clampReportDesignerV3ElementToPage({ ...inserted, rotationDeg: 45 }, landscapeSchema.page);
 const rotatedBounds = api.reportDesignerV3ElementBounds(rotated);
-assert(rotatedBounds.left >= -1 && rotatedBounds.top >= -1 && rotatedBounds.right <= migrated.schema.page.widthHundredthMm + 1 && rotatedBounds.bottom <= migrated.schema.page.heightHundredthMm + 1, "旋转元素的视觉边界必须限制在 A4 页面内");
+assert(rotatedBounds.left >= -1 && rotatedBounds.top >= -1 && rotatedBounds.right <= landscapeSchema.page.widthHundredthMm + 1 && rotatedBounds.bottom <= landscapeSchema.page.heightHundredthMm + 1, "旋转元素的视觉边界必须限制在 A4 页面内");
 const oversizedRotated = api.clampReportDesignerV3ElementToPage({
   ...inserted,
   xHundredthMm: -5000,
   yHundredthMm: -5000,
-  widthHundredthMm: migrated.schema.page.widthHundredthMm,
-  heightHundredthMm: migrated.schema.page.heightHundredthMm,
+  widthHundredthMm: landscapeSchema.page.widthHundredthMm,
+  heightHundredthMm: landscapeSchema.page.heightHundredthMm,
   rotationDeg: 45,
-}, migrated.schema.page);
+}, landscapeSchema.page);
 const oversizedRotatedBounds = api.reportDesignerV3ElementBounds(oversizedRotated);
-assert(oversizedRotated.widthHundredthMm < migrated.schema.page.widthHundredthMm && oversizedRotated.heightHundredthMm < migrated.schema.page.heightHundredthMm, "超大旋转元素必须先按视觉包围盒缩放");
-assert(oversizedRotatedBounds.left >= -1 && oversizedRotatedBounds.top >= -1 && oversizedRotatedBounds.right <= migrated.schema.page.widthHundredthMm + 1 && oversizedRotatedBounds.bottom <= migrated.schema.page.heightHundredthMm + 1, "超大旋转元素缩放后必须完全位于 A4 页面内");
+assert(oversizedRotated.widthHundredthMm < landscapeSchema.page.widthHundredthMm && oversizedRotated.heightHundredthMm < landscapeSchema.page.heightHundredthMm, "超大旋转元素必须先按视觉包围盒缩放");
+assert(oversizedRotatedBounds.left >= -1 && oversizedRotatedBounds.top >= -1 && oversizedRotatedBounds.right <= landscapeSchema.page.widthHundredthMm + 1 && oversizedRotatedBounds.bottom <= landscapeSchema.page.heightHundredthMm + 1, "超大旋转元素缩放后必须完全位于 A4 页面内");
 const rotatedLayoutElements = [
   { ...api.createV3TextElement(1000, 2000), id: "rotated-left", rotationDeg: 45, widthHundredthMm: 3000, heightHundredthMm: 1200 },
   { ...api.createV3TextElement(9000, 7000), id: "rotated-right", rotationDeg: -30, widthHundredthMm: 2600, heightHundredthMm: 1800 },
   { ...api.createV3TextElement(15000, 12000), id: "rotated-third", rotationDeg: 180, widthHundredthMm: 2200, heightHundredthMm: 1400 },
 ];
 const rotatedLayoutSchema = {
-  ...migrated.schema,
-  layers: migrated.schema.layers.map((layer, index) => index === 0 ? { ...layer, elements: rotatedLayoutElements } : { ...layer, elements: [] }),
+  ...landscapeSchema,
+  layers: landscapeSchema.layers.map((layer, index) => index === 0 ? { ...layer, elements: rotatedLayoutElements } : { ...layer, elements: [] }),
 };
 const rotatedLayoutState = { ...api.createReportDesignerV3DocumentState(rotatedLayoutSchema), selectedIds: rotatedLayoutElements.map((element) => element.id) };
 const rotatedMoved = api.moveSelectedV3Elements(rotatedLayoutState, 50000, 50000, false);
 for (const id of rotatedMoved.selectedIds) {
   const movedElement = api.findV3Element(rotatedMoved.schema, id).element;
   const movedBounds = api.reportDesignerV3ElementBounds(movedElement);
-  assert(movedBounds.left >= -1 && movedBounds.top >= -1 && movedBounds.right <= migrated.schema.page.widthHundredthMm + 1 && movedBounds.bottom <= migrated.schema.page.heightHundredthMm + 1, "旋转元素多选移动必须限制视觉边界");
+  assert(movedBounds.left >= -1 && movedBounds.top >= -1 && movedBounds.right <= landscapeSchema.page.widthHundredthMm + 1 && movedBounds.bottom <= landscapeSchema.page.heightHundredthMm + 1, "旋转元素多选移动必须限制视觉边界");
 }
 const rotatedAligned = api.alignSelectedV3Elements(rotatedLayoutState, "center-horizontal");
 const rotatedCenters = rotatedLayoutElements.map((element) => {
@@ -464,8 +400,8 @@ const barrierElements = [
   { ...api.createV3TextElement(7000, 1000), id: "barrier-c", zIndex: 40 },
 ];
 const barrierSchema = {
-  ...migrated.schema,
-  layers: migrated.schema.layers.map((layer, index) => index === 0 ? { ...layer, elements: barrierElements } : { ...layer, elements: [] }),
+  ...landscapeSchema,
+  layers: landscapeSchema.layers.map((layer, index) => index === 0 ? { ...layer, elements: barrierElements } : { ...layer, elements: [] }),
 };
 const barrierState = { ...api.createReportDesignerV3DocumentState(barrierSchema), selectedIds: ["barrier-c"] };
 const barrierMoved = api.setV3ElementZIndex(barrierState, "barrier-c", "back");
@@ -487,8 +423,8 @@ const layoutElements = [
   heightHundredthMm: 800 + index * 200,
 }));
 const layoutSchema = {
-  ...migrated.schema,
-  layers: migrated.schema.layers.map((layer, index) => index === 0
+  ...landscapeSchema,
+  layers: landscapeSchema.layers.map((layer, index) => index === 0
     ? { ...layer, elements: layoutElements }
     : { ...layer, elements: [] }),
 };
@@ -510,7 +446,7 @@ const verticalDistributed = api.distributeSelectedV3Elements(layoutState, "verti
 const verticalElements = layoutElements.map((element) => api.findV3Element(verticalDistributed.schema, element.id).element);
 assert(verticalElements[0].yHundredthMm === 1800 && verticalElements[2].yHundredthMm + verticalElements[2].heightHundredthMm <= 29700, "垂直分布必须保留外边界并限制在页面内");
 
-const exported = api.exportReportDesignerV3SchemaToHtml(migrated.schema);
+const exported = api.exportReportDesignerV3SchemaToHtml(landscapeSchema);
 assert(exported.includes("@page { size: 297mm 210mm"), "V3 导出必须输出横版 A4");
 assert(!exported.includes("http://") && !exported.includes("https://"), "V3 导出不得产生外部图片 URL");
 const parsedRoundtrip = api.parseReportDesignerV3FromHtml(exported, "ExportDocument");
@@ -519,16 +455,6 @@ const inferred = api.parseReportDesignerV3FromHtml("<style>@page { size: A4 land
 assert(inferred.schema.page.orientation === "Landscape", "无 schema 的旧模板应识别 @page 方向并创建 V3 替换草稿");
 assert(inferred.sourceVersion === null && inferred.migrated, "无 V3 schema 的旧模板必须只创建一次性 V3 替换草稿");
 assert(inferred.issues.some((issue) => issue.message.includes("高级 HTML") && issue.message.includes("确认")), "经典 HTML 必须明确保持高级 HTML，转换需人工确认");
-
-const complexClassic = api.analyzeClassicReportTemplateHtml(`
-  <style>.seal { position: absolute; writing-mode: vertical-rl; }</style>
-  <table><tr><td colspan="3"><table><tr><td>字段</td></tr></table></td></tr></table>
-  {{ for item in items }}{{ if item.Name }}<tr><td>{{ item.Name }}</td></tr>{{ end }}{{ end }}
-  <svg><line x1="0" y1="0" x2="1" y2="1" /></svg><img src="{{ seal }}" />
-`);
-assert(complexClassic.complexity === "complex" && complexClassic.conversion === "classic-only", "嵌套表格、循环和 SVG 经典模板必须标记为 classic-only");
-assert(complexClassic.nestedTableCount === 1 && complexClassic.svgCount === 1, "经典模板结构统计必须识别嵌套表格和 SVG");
-assert(complexClassic.summary.includes("不能保证原版式等价"), "复杂经典模板必须提示无法保证原版式等价");
 
 for (const classicPath of [
   "Templates/Export/customs_declaration_template.html",
@@ -555,9 +481,9 @@ assert(brokenV3.sourceVersion === 3 && brokenV3.migrated, "损坏的 V3 schema �
 assert(brokenV3.issues.some((issue) => issue.severity === "error"), "损坏的 V3 schema 必须产生阻断错误");
 
 const paymentCrossDomain = {
-  ...migrated.schema,
+  ...landscapeSchema,
   reportType: "PaymentVoucher",
-  layers: migrated.schema.layers.map((layer, index) => index === 0
+  layers: landscapeSchema.layers.map((layer, index) => index === 0
     ? {
         ...layer,
         elements: [{
@@ -576,9 +502,9 @@ assert(api.exportReportDesignerV3SchemaToHtml(paymentCrossDomain, "PaymentVouche
 assert(api.validateReportDesignerV3Export(paymentCrossDomain, "PaymentVoucher").blocked, "导出状态必须暴露字段域阻断错误");
 
 const exportCrossDomain = {
-  ...migrated.schema,
+  ...landscapeSchema,
   reportType: "ExportDocument",
-  layers: migrated.schema.layers.map((layer, index) => index === 0
+  layers: landscapeSchema.layers.map((layer, index) => index === 0
     ? {
         ...layer,
         elements: [{
@@ -595,7 +521,7 @@ const exportValidation = api.normalizeReportDesignerV3Schema(exportCrossDomain, 
 assert(exportValidation.issues.some((issue) => issue.severity === "error" && issue.path.includes("fieldPath")), "出口模板混用 Payment.* 字段必须阻断");
 assert(api.validateReportDesignerV3Export(exportCrossDomain, "ExportDocument").blocked, "出口模板导出状态必须暴露字段域阻断错误");
 assert(workspaceSource.includes("当前草稿不能保存"), "V3 工作区必须明确提示阻断草稿不能保存");
-assert(workspaceSource.includes("exportValidation.blocked") && workspaceSource.includes("onDesignerDraftContentChange?.(\"\")"), "阻断导出时必须清理陈旧草稿而保留原始内容");
+assert(workspaceSource.includes("exportValidation.blocked") && workspaceSource.includes("isDirty: draftDirty") && workspaceSource.includes("isValid: !exportValidation.blocked"), "阻断导出时必须独立报告修改状态与校验状态");
 
 const v3NeedsReview = api.parseReportDesignerV3FromHtml(
   exported.replace('"size": "A4"', '"size": "Letter"'),
@@ -787,17 +713,6 @@ const safeFieldSchema = {
 };
 const safeFieldHtml = api.exportReportDesignerV3SchemaToHtml(safeFieldSchema, "ExportDocument");
 assert(safeFieldHtml.includes('src="{{ doc_seal_path }}"'), "受控 data URI 图片字段必须输出字段绑定");
-
-const unsafeLegacyImage = api.migrateReportDesignerSchemaV2ToV3({
-  ...legacyA5,
-  sections: [{
-    ...legacyA5.sections[0],
-    blocks: [{ ...legacyA5.sections[0].blocks[0], id: "legacy-image", type: "Image", sourceKind: "Field", fieldPath: "Invoice.LogoUrl", url: "" }],
-  }],
-});
-const migratedImage = unsafeLegacyImage.schema.layers[0].elements[0];
-assert(migratedImage.type === "Image" && migratedImage.sourceKind === "Resource" && !migratedImage.resourceId, "不受控旧图片字段必须迁移为安全资源占位");
-assert(unsafeLegacyImage.issues.some((issue) => issue.message.includes("受控 data URI")), "不受控旧图片字段迁移必须给出明确提示");
 
 const unsafeImageSchema = {
   ...controlledImageSchema,

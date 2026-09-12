@@ -164,6 +164,7 @@ namespace ExportDocManager.Api.Hosting
                 IApiSessionTokenService tokenService,
                 IPaymentService paymentService,
                 int id,
+                string rowVersion,
                 CancellationToken cancellationToken) =>
             {
 
@@ -172,13 +173,14 @@ namespace ExportDocManager.Api.Hosting
                     return TypedResults.BadRequest(new ApiErrorResponse("付款ID必须大于0。"));
                 }
 
-                bool deleted = await paymentService.DeletePaymentAsync(id, cancellationToken);
+                bool deleted = await paymentService.DeletePaymentAsync(id, ApiRowVersion.ParseRequired(rowVersion), cancellationToken);
 
                 return deleted
                     ? TypedResults.Ok(new ApiCommandResponse(true, "付款已删除。"))
                     : TypedResults.NotFound();
             })
-            .WithName("DeletePayment");
+            .WithName("DeletePayment")
+            .Produces<ApiErrorResponse>(StatusCodes.Status409Conflict);
         }
 
     }

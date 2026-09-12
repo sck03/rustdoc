@@ -1,6 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 using ExportDocManager.Services.Errors;
+using ExportDocManager.DataAccess;
+using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Utils;
@@ -229,8 +232,11 @@ public sealed class ReportTemplateImageResourceServiceTests
         try
         {
             var service = CreateService(root);
+            using var database = new InMemoryTestDatabase();
+            var access = CreateResourceAccess(root, database, service);
             await using var input = new MemoryStream(Png, writable: false);
             ReportTemplateImageResource resource = await service.StoreAsync(input, "seal.png", "image/png");
+            await access.RegisterUploadAsync(resource);
             string html = $$"""
                 <!doctype html><html><body>
                 <!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA { "version": 3, "resources": [{ "id": "{{resource.Id}}", "mediaType": "{{resource.MediaType}}", "byteLength": {{resource.ByteLength}}, "sha256": "{{resource.Sha256}}" }] } -->
@@ -238,7 +244,7 @@ public sealed class ReportTemplateImageResourceServiceTests
                 </body></html>
                 """;
 
-            string hydrated = await new ReportTemplateV3ImageResourceHydrator(service).HydrateAsync(html);
+            string hydrated = await new ReportTemplateV3ImageResourceHydrator(access).HydrateAsync(html);
 
             Assert.Contains("src=\"data:image/png;base64,", hydrated, StringComparison.Ordinal);
             Assert.DoesNotContain(ReportTemplateV3ImageResourceHydrator.ResourceIdAttribute, hydrated, StringComparison.Ordinal);
@@ -256,6 +262,8 @@ public sealed class ReportTemplateImageResourceServiceTests
         string root = CreateTestRoot("image-resource-hydrate-missing");
         try
         {
+            using var database = new InMemoryTestDatabase();
+            var access = CreateResourceAccess(root, database, CreateService(root));
             string resourceId = $"img-{new string('b', 64)}.png";
             string html = $$"""
                 <!doctype html><html><body>
@@ -265,7 +273,7 @@ public sealed class ReportTemplateImageResourceServiceTests
                 """;
 
             var error = await Assert.ThrowsAsync<UserVisibleInfrastructureException>(() =>
-                new ReportTemplateV3ImageResourceHydrator(CreateService(root)).HydrateAsync(html));
+                new ReportTemplateV3ImageResourceHydrator(access).HydrateAsync(html));
 
             Assert.Contains("不可用", error.Message, StringComparison.Ordinal);
         }
@@ -282,11 +290,14 @@ public sealed class ReportTemplateImageResourceServiceTests
         try
         {
             var service = CreateService(root);
+            using var database = new InMemoryTestDatabase();
+            var access = CreateResourceAccess(root, database, service);
             await using var input = new MemoryStream(Png, writable: false);
             ReportTemplateImageResource resource = await service.StoreAsync(input, "seal.png", "image/png");
+            await access.RegisterUploadAsync(resource);
             string schemaComment =
                 $"<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA {{ \"resources\": [{{ \"id\": \"{resource.Id}\", \"mediaType\": \"image/png\" }}] }} -->";
-            var hydrator = new ReportTemplateV3ImageResourceHydrator(service);
+            var hydrator = new ReportTemplateV3ImageResourceHydrator(access);
 
             await Assert.ThrowsAsync<ServiceValidationException>(() =>
                 hydrator.HydrateAsync($"<html><body>{schemaComment}<div data-edm-v3-resource-id=\"{resource.Id}\"></div></body></html>"));
@@ -319,6 +330,8 @@ public sealed class ReportTemplateImageResourceServiceTests
             }
 
             var service = CreateService(root);
+            using var database = new InMemoryTestDatabase();
+            var access = CreateResourceAccess(root, database, service);
             await using var input = new MemoryStream(Png, writable: false);
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
@@ -351,6 +364,10 @@ public sealed class ReportTemplateImageResourceServiceTests
             return ex;
         }
     }
+
+    private static ReportTemplateImageResourceAccessService CreateResourceAccess(string root, InMemoryTestDatabase database, IReportTemplateImageResourceService service) => new(
+        database, new BusinessDataAccessScope(new DatabaseConnectionSettings(), new FixedCurrentUserContext(new User { Id = 1, Role = "Admin" })),
+        new RuntimeAppPathProvider(Path.Combine(root, "app"), Path.Combine(root, "data")), service);
 
     private static IReportTemplateImageResourceService CreateService(string root) =>
         new ReportTemplateImageResourceService(

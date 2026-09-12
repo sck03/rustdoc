@@ -148,6 +148,15 @@ namespace ExportDocManager.Api.Tests
             }
 
             var deleteResponse = await adminClient.DeleteAsync($"/api/invoices/{created.Id}");
+            Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
+            var malformedDelete = await adminClient.DeleteAsync($"/api/invoices/{created.Id}?rowVersion=invalid");
+            Assert.Equal(HttpStatusCode.BadRequest, malformedDelete.StatusCode);
+            var staleDelete = await adminClient.DeleteAsync($"/api/invoices/{created.Id}?rowVersion={Uri.EscapeDataString(created.Invoice.RowVersion!)}");
+            Assert.Equal(HttpStatusCode.Conflict, staleDelete.StatusCode);
+            var retained = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceDetailDto>(await adminClient.GetAsync($"/api/invoices/{created.Id}"));
+            Assert.Equal("API Buyer Updated", retained!.CustomerNameEN);
+
+            deleteResponse = await adminClient.DeleteAsync($"/api/invoices/{created.Id}?rowVersion={Uri.EscapeDataString(updated.Invoice.RowVersion!)}");
             Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
 
             var getAfterDeleteResponse = await adminClient.GetAsync($"/api/invoices/{created.Id}");
@@ -743,7 +752,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.Created, draftCreateResponse.StatusCode);
             var draft = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(draftCreateResponse);
 
-            var draftDeleteResponse = await adminClient.DeleteAsync($"/api/invoices/{draft.Id}");
+            var draftDeleteResponse = await adminClient.DeleteAsync($"/api/invoices/{draft.Id}?rowVersion={Uri.EscapeDataString(draft.Invoice.RowVersion!)}");
             Assert.Equal(HttpStatusCode.OK, draftDeleteResponse.StatusCode);
             Assert.Equal(
                 HttpStatusCode.NotFound,
@@ -766,7 +775,7 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.OK, verifyResponse.StatusCode);
             formal = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(verifyResponse);
 
-            var verifiedDeleteResponse = await adminClient.DeleteAsync($"/api/invoices/{formal.Id}");
+            var verifiedDeleteResponse = await adminClient.DeleteAsync($"/api/invoices/{formal.Id}?rowVersion={Uri.EscapeDataString(formal.Invoice.RowVersion!)}");
             Assert.Equal(HttpStatusCode.Conflict, verifiedDeleteResponse.StatusCode);
             var verifiedDeleteError = await ApiIntegrationTestHarness.ReadJsonAsync<ApiErrorResponse>(verifiedDeleteResponse);
             Assert.Contains("只能作废", verifiedDeleteError.Message, StringComparison.Ordinal);
@@ -810,7 +819,7 @@ namespace ExportDocManager.Api.Tests
             var cancelledUnverifyError = await ApiIntegrationTestHarness.ReadJsonAsync<ApiErrorResponse>(cancelledUnverifyResponse);
             Assert.Contains("不能反审核", cancelledUnverifyError.Message, StringComparison.Ordinal);
 
-            var cancelledDeleteResponse = await adminClient.DeleteAsync($"/api/invoices/{formal.Id}");
+            var cancelledDeleteResponse = await adminClient.DeleteAsync($"/api/invoices/{formal.Id}?rowVersion={Uri.EscapeDataString(formal.Invoice.RowVersion!)}");
             Assert.Equal(HttpStatusCode.Conflict, cancelledDeleteResponse.StatusCode);
             var cancelledDeleteError = await ApiIntegrationTestHarness.ReadJsonAsync<ApiErrorResponse>(cancelledDeleteResponse);
             Assert.Contains("数据维护", cancelledDeleteError.Message, StringComparison.Ordinal);

@@ -39,7 +39,7 @@ public sealed class DocumentWriteScopeTests
         var saved = await service.SaveInvoiceWithAutoCreationAsync(invoice, [], null, null);
         Assert.False(saved.Success);
         Assert.Equal(SaveFailureKind.Forbidden, saved.FailureKind);
-        await Assert.ThrowsAsync<PermissionDeniedException>(() => service.DeleteInvoiceAsync(invoice.Id));
+        await Assert.ThrowsAsync<PermissionDeniedException>(() => service.DeleteInvoiceAsync(invoice.Id, rowVersion));
         await Assert.ThrowsAsync<PermissionDeniedException>(() => service.CopyInvoiceAsync(invoice.Id, "COPY"));
         await Assert.ThrowsAsync<PermissionDeniedException>(() => service.CopyInvoiceAsTypeAsync(invoice.Id, InvoiceTypeCatalog.Customs));
         foreach (string target in new[] { InvoiceStatusCatalog.Verified, InvoiceStatusCatalog.Cancelled })
@@ -68,7 +68,7 @@ public sealed class DocumentWriteScopeTests
         await context.SaveChangesAsync();
         var service = new PaymentService(database, CreateScope());
         await Assert.ThrowsAsync<PermissionDeniedException>(() => service.SavePaymentAsync(payment));
-        await Assert.ThrowsAsync<PermissionDeniedException>(() => service.DeletePaymentAsync(payment.Id));
+        await Assert.ThrowsAsync<PermissionDeniedException>(() => service.DeletePaymentAsync(payment.Id, payment.RowVersion!));
 
         service = new PaymentService(database, CreateScope(PermissionDataScope.Company));
         payment.OwnerUserId = 7;

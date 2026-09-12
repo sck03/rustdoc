@@ -15,6 +15,7 @@ type Options = {
   client: ExportDocManagerApiClient;
   reportType: ReportTypeOption;
   selectedTemplatePath: string;
+  expectedRevision: string;
   defaultExportDirectory: string;
   requestConfirmation(request: ConfirmationRequest): Promise<boolean>;
   onImported(response: ApiReportTemplateContentDto): void;
@@ -25,6 +26,7 @@ export function useReportTemplateFileWorkspace({
   client,
   reportType,
   selectedTemplatePath,
+  expectedRevision,
   defaultExportDirectory,
   requestConfirmation,
   onImported,
@@ -38,6 +40,7 @@ export function useReportTemplateFileWorkspace({
     client,
     reportType,
     selectedTemplatePath,
+    expectedRevision,
     fileExportPath: exportPath,
     onExported: (response) => {
       setExportPath(response.filePath);

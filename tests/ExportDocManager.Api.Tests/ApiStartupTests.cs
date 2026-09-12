@@ -2409,7 +2409,7 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<bool> DeleteInvoiceAsync(int id, CancellationToken cancellationToken = default)
+            public Task<bool> DeleteInvoiceAsync(int id, byte[] expectedRowVersion, CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }
@@ -2615,7 +2615,7 @@ namespace ExportDocManager.Api.Tests
                 throw new NotSupportedException();
             }
 
-            public Task<bool> DeleteInvoiceAsync(int id, CancellationToken cancellationToken = default)
+            public Task<bool> DeleteInvoiceAsync(int id, byte[] expectedRowVersion, CancellationToken cancellationToken = default)
             {
                 throw new NotSupportedException();
             }

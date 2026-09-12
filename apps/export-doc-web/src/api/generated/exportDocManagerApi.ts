@@ -2425,6 +2425,7 @@ export interface ApiReportTemplateContentDto {
   content: string;
   displayName: string;
   reportType: string;
+  revision: string;
   storagePolicy: string;
   templatePath: string;
   withSealDefault?: boolean | null;
@@ -2474,6 +2475,7 @@ export interface ApiReportTemplateFileExportResponse {
 }
 
 export interface ApiReportTemplateFileImportRequest {
+  expectedRevision?: string;
   filePath?: string;
   reportType?: string;
   templatePath?: string;
@@ -2490,6 +2492,7 @@ export interface ApiReportTemplateImageResourceResponse {
 
 export interface ApiReportTemplateMetadataRequest {
   displayName?: string;
+  expectedRevision?: string;
   reportType?: string;
   templatePath?: string;
 }
@@ -2528,6 +2531,7 @@ export interface ApiReportTemplatePreviewResponse {
 }
 
 export interface ApiReportTemplateRenameRequest {
+  expectedRevision?: string;
   newTemplatePath?: string;
   reportType?: string;
   templatePath?: string;
@@ -2535,6 +2539,7 @@ export interface ApiReportTemplateRenameRequest {
 
 export interface ApiReportTemplateSaveRequest {
   content?: string;
+  expectedRevision?: string;
   reportType?: string;
   templatePath?: string;
 }
@@ -4939,6 +4944,7 @@ export interface DeleteHsCodesBatchRequest {
 
 export interface DeleteInvoiceRequest {
   id: number;
+  rowVersion: string;
 }
 
 export interface DeleteJobRequest {
@@ -4971,6 +4977,7 @@ export interface DeletePayeeRequest {
 
 export interface DeletePaymentRequest {
   id: number;
+  rowVersion: string;
 }
 
 export interface DeletePermissionTemplateRequest {
@@ -5000,6 +5007,7 @@ export interface DeleteProductRequest {
 export interface DeleteReportTemplateRequest {
   reportType?: string;
   templatePath?: string;
+  expectedRevision: string;
 }
 
 export interface DeleteSupplierRequest {
@@ -6428,6 +6436,7 @@ export interface UploadReportTemplateFileRequest {
   reportType?: string;
   templatePath?: string;
   fileName?: string;
+  expectedRevision: string;
   body: Blob;
 }
 
@@ -7185,7 +7194,12 @@ export class ExportDocManagerApiClient {
 
   public deleteInvoice(request: DeleteInvoiceRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/invoices/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "rowVersion": request.rowVersion,
+      },
+      init,
+    });
   }
 
   public deleteJob(request: DeleteJobRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
@@ -7232,7 +7246,12 @@ export class ExportDocManagerApiClient {
 
   public deletePayment(request: DeletePaymentRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/payments/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "rowVersion": request.rowVersion,
+      },
+      init,
+    });
   }
 
   public deletePermissionTemplate(request: DeletePermissionTemplateRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
@@ -7273,12 +7292,13 @@ export class ExportDocManagerApiClient {
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public deleteReportTemplate(request: DeleteReportTemplateRequest = {}, init?: ApiRequestInit): Promise<ApiCommandResponse> {
+  public deleteReportTemplate(request: DeleteReportTemplateRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/reports/templates/content";
     return this.request<ApiCommandResponse>("DELETE", path, {
       query: {
         "reportType": request.reportType,
         "templatePath": request.templatePath,
+        "expectedRevision": request.expectedRevision,
       },
       init,
     });
@@ -9937,6 +9957,7 @@ export class ExportDocManagerApiClient {
         "reportType": request.reportType,
         "templatePath": request.templatePath,
         "fileName": request.fileName,
+        "expectedRevision": request.expectedRevision,
       },
       body: request.body,
       init,

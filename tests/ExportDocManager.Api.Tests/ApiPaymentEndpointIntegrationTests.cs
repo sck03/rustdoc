@@ -186,6 +186,15 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal(HttpStatusCode.Conflict, staleUpdateResponse.StatusCode);
 
             var deleteResponse = await adminClient.DeleteAsync($"/api/payments/{created.Id}");
+            Assert.Equal(HttpStatusCode.BadRequest, deleteResponse.StatusCode);
+            var malformedDelete = await adminClient.DeleteAsync($"/api/payments/{created.Id}?rowVersion=invalid");
+            Assert.Equal(HttpStatusCode.BadRequest, malformedDelete.StatusCode);
+            var staleDelete = await adminClient.DeleteAsync($"/api/payments/{created.Id}?rowVersion={Uri.EscapeDataString(payment.RowVersion!)}");
+            Assert.Equal(HttpStatusCode.Conflict, staleDelete.StatusCode);
+            var retained = await adminClient.GetFromJsonAsync<ApiPaymentDto>($"/api/payments/{created.Id}");
+            Assert.Equal("Factory Updated", retained!.PayeeName);
+
+            deleteResponse = await adminClient.DeleteAsync($"/api/payments/{created.Id}?rowVersion={Uri.EscapeDataString(updated.Payment.RowVersion!)}");
             Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
 
             var getAfterDeleteResponse = await adminClient.GetAsync($"/api/payments/{created.Id}");
@@ -206,6 +215,7 @@ namespace ExportDocManager.Api.Tests
 
             public Task<bool> DeletePaymentAsync(
                 int id,
+                byte[] expectedRowVersion,
                 CancellationToken cancellationToken = default) =>
                 Task.FromException<bool>(failure);
         }

@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
+using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
 using Microsoft.EntityFrameworkCore;
@@ -8,8 +9,12 @@ using System.Text.Json;
 
 namespace ExportDocManager.Infrastructure.Tests;
 
-public sealed class ReportTemplateImageResourceAccessServiceTests
+public sealed class ReportTemplateImageResourceAccessServiceTests : IDisposable
 {
+    private readonly string _root = Path.Combine(AppContext.BaseDirectory, "resource-access-tests", Guid.NewGuid().ToString("N"));
+    private RuntimeAppPathProvider Paths => new(_root, Path.Combine(_root, "data"));
+    public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true); }
+
     [Fact]
     public void CanonicalTemplate_ShouldRemainAValidV3ResourceReference()
     {
@@ -50,13 +55,13 @@ public sealed class ReportTemplateImageResourceAccessServiceTests
 
         var resourceOnlyService = new ReportTemplateImageResourceAccessService(
             factory,
-            CreateScope(CreateResourceUser(7, canViewTemplates: false)));
+            CreateScope(CreateResourceUser(7, canViewTemplates: false)), Paths, new ReportTemplateImageResourceService(Paths));
         Assert.False(await resourceOnlyService.CanReadAsync(ownResourceId));
         Assert.False(await resourceOnlyService.CanReadAsync(sharedResourceId));
 
         var service = new ReportTemplateImageResourceAccessService(
             factory,
-            CreateScope(CreateResourceUser(7)));
+            CreateScope(CreateResourceUser(7)), Paths, new ReportTemplateImageResourceService(Paths));
 
         Assert.True(await service.CanReadAsync(ownResourceId));
         Assert.False(await service.CanReadAsync(privateResourceId));
@@ -72,7 +77,7 @@ public sealed class ReportTemplateImageResourceAccessServiceTests
         const string resourceId = "img-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png";
         var service = new ReportTemplateImageResourceAccessService(
             factory,
-            CreateScope(CreateResourceUser(7)));
+            CreateScope(CreateResourceUser(7)), Paths, new ReportTemplateImageResourceService(Paths));
         var resource = new ReportTemplateImageResource
         {
             Id = resourceId,
@@ -110,13 +115,13 @@ public sealed class ReportTemplateImageResourceAccessServiceTests
     }
 
     [Fact]
-    public async Task RollbackRecycleAsync_ShouldRestoreClaimForPhysicalDeleteRetry()
+    public async Task RecycleAsync_ShouldRestoreClaimWhenPhysicalDeleteFails()
     {
         using var factory = new InMemoryTestDatabase();
         const string resourceId = "img-ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.png";
         var service = new ReportTemplateImageResourceAccessService(
             factory,
-            CreateScope(CreateResourceUser(7)));
+            CreateScope(CreateResourceUser(7)), Paths, new FailingDeleteResourceService());
         await service.RegisterUploadAsync(new ReportTemplateImageResource
         {
             Id = resourceId,
@@ -125,10 +130,59 @@ public sealed class ReportTemplateImageResourceAccessServiceTests
             ByteLength = 68
         });
 
-        Assert.True(await service.RecycleAsync(resourceId));
-        await service.RollbackRecycleAsync(resourceId);
+        await Assert.ThrowsAsync<IOException>(() => service.RecycleAsync(resourceId));
         Assert.True(await service.CanReadAsync(resourceId));
-        Assert.True(await service.RecycleAsync(resourceId));
+        var retry = new ReportTemplateImageResourceAccessService(factory, CreateScope(CreateResourceUser(7)), Paths, new ReportTemplateImageResourceService(Paths));
+        Assert.True(await retry.RecycleAsync(resourceId));
+    }
+
+    private sealed class FailingDeleteResourceService : IReportTemplateImageResourceService
+    {
+        public Task<ReportTemplateImageResource> StoreAsync(Stream source, string? fileName = null, string? declaredMediaType = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<ReportTemplateImageResource> StoreAndCommitAsync(Stream source, string? fileName, string? declaredMediaType, Func<ReportTemplateImageResource, CancellationToken, Task> commit, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<ReportTemplateImageResourceContent> ReadAsync(string resourceId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<bool> DeleteAsync(string resourceId, CancellationToken cancellationToken = default) => Task.FromException<bool>(new IOException("injected delete failure"));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TemplateCommitAndRecycle_ShouldHaveOnlyOneSuccessfulOutcome(bool saveFirst)
+    {
+        using var factory = new InMemoryTestDatabase(ignoreTransactions: true);
+        var scope = new BusinessDataAccessScope(new DatabaseConnectionSettings(), new FixedCurrentUserContext(new User { Id = 7, Role = "Admin" }));
+        var access = new ReportTemplateImageResourceAccessService(factory, scope, Paths, new ReportTemplateImageResourceService(Paths));
+        const string resourceId = "img-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png";
+        await access.RegisterUploadAsync(new ReportTemplateImageResource { Id = resourceId, Sha256 = new string('a', 64), MediaType = "image/png", ByteLength = 68 });
+        var templates = new UserReportTemplateService(factory, scope, Paths);
+        async Task<bool> Save()
+        {
+            try
+            {
+                await templates.SaveDraftAsync(new UserReportTemplateDraftRequest(0, "ExportDocument", "并发草稿", CanonicalTemplate(resourceId)));
+                return true;
+            }
+            catch (ResourceNotFoundException) { return false; }
+        }
+        async Task<bool> Recycle()
+        {
+            try { return await access.RecycleAsync(resourceId); }
+            catch (ResourceConflictException) { return false; }
+        }
+        Task<bool> saving;
+        Task<bool> recycling;
+        await using (var held = await new ReportTemplateStorageLock(Paths).AcquireAsync(CancellationToken.None))
+        {
+            if (saveFirst) { saving = Save(); recycling = Recycle(); }
+            else { recycling = Recycle(); saving = Save(); }
+            Assert.False(saving.IsCompleted);
+            Assert.False(recycling.IsCompleted);
+        }
+        await Task.WhenAll(saving, recycling);
+        Assert.NotEqual(await saving, await recycling);
+        using var verify = factory.CreateDbContext();
+        Assert.Equal(await saving, await verify.UserReportTemplateResourceReferences.AnyAsync());
+        Assert.Equal(await recycling, (await verify.ReportTemplateImageResources.SingleAsync()).RecycledAt.HasValue);
     }
 
     private static UserReportTemplate Template(int ownerId, string name, string status, string shareScope) =>

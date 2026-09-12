@@ -203,7 +203,8 @@ public sealed class ReportTemplateDomainIsolationTests
                 var saved = await service.SaveTemplateContentAsync(
                     ReportDocumentType.PaymentVoucher,
                     templatePath,
-                    content);
+                    content,
+                    (await service.GetTemplateContentAsync(ReportDocumentType.PaymentVoucher, templatePath)).Revision);
 
                 Assert.True(File.Exists(saved.TemplatePath));
                 Assert.True(PathBoundaryHelper.IsWithinRoot(
@@ -246,10 +247,11 @@ public sealed class ReportTemplateDomainIsolationTests
             var saved = await service.SaveTemplateContentAsync(
                 ReportDocumentType.PaymentVoucher,
                 created.TemplatePath,
-                created.Content);
+                created.Content,
+                created.Revision);
             Assert.Equal(created.Content, saved.Content);
             Assert.Null(saved.WithSealDefault);
-            await service.UpdateTemplateDisplayNameAsync(ReportDocumentType.PaymentVoucher, saved.TemplatePath, $"{displayName}（自定义）");
+            await service.UpdateTemplateDisplayNameAsync(ReportDocumentType.PaymentVoucher, saved.TemplatePath, $"{displayName}（自定义）", saved.Revision);
             Assert.Equal($"{displayName}（自定义）", (await service.GetTemplateContentAsync(ReportDocumentType.PaymentVoucher, saved.TemplatePath)).DisplayName);
             await service.SetDefaultTemplateAsync(ReportDocumentType.PaymentVoucher, saved.TemplatePath);
             Assert.Equal($"user:Internal/{fileName}", settingsService.Settings.ReportTemplateDefaults.PaymentVoucherTemplatePath);
@@ -341,11 +343,12 @@ public sealed class ReportTemplateDomainIsolationTests
 
         try
         {
+            var revision = (await service.GetTemplateContentAsync(ReportDocumentType.PaymentVoucher, sourcePath)).Revision;
             var error = await Assert.ThrowsAsync<ResourceConflictException>(() =>
                 service.RenameTemplateAsync(
                     ReportDocumentType.PaymentVoucher,
                     "user:Internal/source.html",
-                    "Internal/target.html"));
+                    "Internal/target.html", revision));
 
             Assert.Equal("目标模板已存在。", error.Message);
             Assert.True(File.Exists(sourcePath));
@@ -474,7 +477,8 @@ public sealed class ReportTemplateDomainIsolationTests
             var result = await service.SaveTemplateContentAsync(
                 reportType,
                 builtInPath,
-                CreateV3Template(reportType, "updated"));
+                CreateV3Template(reportType, "updated"),
+                (await service.GetTemplateContentAsync(reportType, builtInPath)).Revision);
 
             string expectedStoredPath = $"user:{category}/{fileName}";
             Assert.Equal(Path.Combine(dataRoot, "Templates", category, fileName), result.TemplatePath);
@@ -812,6 +816,35 @@ public sealed class ReportTemplateDomainIsolationTests
         {
             DeleteDirectory(root);
         }
+    }
+
+    [Fact]
+    public async Task TemplateTransaction_ShouldSnapshotOnlyTouchedFilesAndRestoreAfterFailure()
+    {
+        string root = CreateTestRoot("template-file-journal");
+        var paths = new RuntimeAppPathProvider(Path.Combine(root, "app"), Path.Combine(root, "data"));
+        string target = Path.Combine(paths.UserTemplateRoot, "Export", "edited.html");
+        string unrelated = Path.Combine(paths.UserTemplateRoot, "Resources", "V3", "unrelated.png");
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(unrelated)!);
+        await File.WriteAllTextAsync(target, "original");
+        await File.WriteAllBytesAsync(unrelated, new byte[1024 * 1024]);
+        var coordinator = new ReportTemplateStorageCoordinator(paths, new StubSettingsService(new AppSettings()));
+        try
+        {
+            await Assert.ThrowsAsync<IOException>(() => coordinator.ExecuteMutationAsync<bool>(async transaction =>
+            {
+                await transaction.CaptureFilesAsync([target], CancellationToken.None);
+                var snapshots = Directory.GetFiles(Path.Combine(paths.DataRoot, "Cache", "TemplateTransactions"), "*.bak", SearchOption.AllDirectories);
+                Assert.Equal("original", await File.ReadAllTextAsync(Assert.Single(snapshots)));
+                await File.WriteAllTextAsync(target, "changed");
+                throw new IOException("injected failure after write");
+            }));
+            Assert.Equal("original", await File.ReadAllTextAsync(target));
+            Assert.Equal(1024 * 1024, new FileInfo(unrelated).Length);
+            Assert.Empty(Directory.GetFiles(Path.Combine(paths.DataRoot, "Cache", "TemplateTransactions"), "*.bak", SearchOption.AllDirectories));
+        }
+        finally { DeleteDirectory(root); }
     }
 
     private static string CreateTestRoot(string suffix)

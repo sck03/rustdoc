@@ -8,11 +8,11 @@ namespace ExportDocManager.Services.Reporting;
 internal sealed partial class ReportTemplateV3ImageResourceHydrator
 {
     internal const string ResourceIdAttribute = "data-edm-v3-resource-id";
-    private readonly IReportTemplateImageResourceService _resourceService;
+    private readonly IReportTemplateImageResourceAccessService? _resourceAccessService;
 
-    public ReportTemplateV3ImageResourceHydrator(IReportTemplateImageResourceService resourceService)
+    public ReportTemplateV3ImageResourceHydrator(IReportTemplateImageResourceAccessService? resourceAccessService)
     {
-        _resourceService = resourceService ?? throw new ArgumentNullException(nameof(resourceService));
+        _resourceAccessService = resourceAccessService;
     }
 
     public async Task<string> HydrateAsync(string renderedHtml, CancellationToken cancellationToken = default)
@@ -58,7 +58,8 @@ internal sealed partial class ReportTemplateV3ImageResourceHydrator
                 ReportTemplateImageResourceContent loaded;
                 try
                 {
-                    loaded = await _resourceService.ReadAsync(resourceId, cancellationToken).ConfigureAwait(false);
+                    if (_resourceAccessService == null) throw new PermissionDeniedException("未配置报表图片授权服务，不能读取图片资源。");
+                    loaded = await _resourceAccessService.ReadAsync(resourceId, cancellationToken).ConfigureAwait(false);
                 }
                 catch (ResourceNotFoundException ex)
                 {

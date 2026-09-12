@@ -14,10 +14,6 @@ export function useReportTemplateSelectionActions({
   setReportType,
   setSelectedUserTemplateId,
   setSelectedTemplatePath,
-  setContent,
-  setContentTemplatePath,
-  setLoadedContent,
-  setDesignerDraftContent,
   setNewTemplateFileName,
   setNewTemplateDisplayName,
   setNewUserTemplateName,
@@ -26,16 +22,13 @@ export function useReportTemplateSelectionActions({
   setPreviewInvoiceId,
   setPreviewPaymentId,
   clearFeedback,
+  clearLoadedTemplateContent,
   confirmDiscardChanges,
 }: {
   reportType: ReportTypeOption;
   setReportType: Dispatch<SetStateAction<ReportTypeOption>>;
   setSelectedUserTemplateId: Dispatch<SetStateAction<number>>;
   setSelectedTemplatePath: Dispatch<SetStateAction<string>>;
-  setContent: Dispatch<SetStateAction<string>>;
-  setContentTemplatePath: Dispatch<SetStateAction<string>>;
-  setLoadedContent: Dispatch<SetStateAction<string>>;
-  setDesignerDraftContent: Dispatch<SetStateAction<string>>;
   setNewTemplateFileName: Dispatch<SetStateAction<string>>;
   setNewTemplateDisplayName: Dispatch<SetStateAction<string>>;
   setNewUserTemplateName: Dispatch<SetStateAction<string>>;
@@ -44,17 +37,10 @@ export function useReportTemplateSelectionActions({
   setPreviewInvoiceId: Dispatch<SetStateAction<number>>;
   setPreviewPaymentId: Dispatch<SetStateAction<number>>;
   clearFeedback: () => void;
+  clearLoadedTemplateContent: () => void;
   confirmDiscardChanges: (actionLabel?: string) => Promise<boolean>;
 }) {
   const { update } = useRouteQuery();
-  function clearLoadedTemplateContent() {
-    setContent("");
-    setContentTemplatePath("");
-    setLoadedContent("");
-    setDesignerDraftContent("");
-    clearFeedback();
-  }
-
   async function handleReportTypeChange(value: string) {
     const nextReportType = value === "PaymentVoucher" ? "PaymentVoucher" : "ExportDocument";
     if (nextReportType === reportType || !await confirmDiscardChanges("切换报表类型")) {
@@ -89,10 +75,8 @@ export function useReportTemplateSelectionActions({
     }
     setSelectedUserTemplateId(id);
     update({ reportType, userTemplateId: id || null, template: null });
-    if (id <= 0) {
-      setSelectedTemplatePath("");
-      clearLoadedTemplateContent();
-    }
+    setSelectedTemplatePath("");
+    clearLoadedTemplateContent();
   }
 
   function handlePreviewSourceChange(value: string) {

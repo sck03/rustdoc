@@ -59,7 +59,7 @@ public sealed class ApiBusinessFeatureIntegrationTests
         Assert.True(downloaded.Headers.CacheControl?.NoStore);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync($"/api/business-attachments/{uploaded.Id}/revisions/1/save-to-path",
             new ApiAttachmentSaveRequest("unused.txt"))).StatusCode);
-        var deleted = await client.DeleteAsync($"/api/invoices/{saved.Id}");
+        var deleted = await client.DeleteAsync($"/api/invoices/{saved.Id}?rowVersion={Uri.EscapeDataString(saved.Invoice.RowVersion!)}");
         Assert.Equal(HttpStatusCode.Conflict, deleted.StatusCode);
         Assert.Contains("归档资料", await deleted.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }

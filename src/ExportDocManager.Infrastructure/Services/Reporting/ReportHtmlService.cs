@@ -35,7 +35,7 @@ namespace ExportDocManager.Services.Reporting
             IAppPathProvider pathProvider,
             BusinessDataAccessScope accessScope,
             ILogger<ReportHtmlService>? logger = null,
-            IReportTemplateImageResourceService? imageResourceService = null)
+            IReportTemplateImageResourceAccessService? imageResourceAccessService = null)
         {
             ArgumentNullException.ThrowIfNull(contextFactory);
             ArgumentNullException.ThrowIfNull(settingsService);
@@ -45,8 +45,7 @@ namespace ExportDocManager.Services.Reporting
             _logger = logger ?? NullLogger<ReportHtmlService>.Instance;
             _entityLoader = new ReportEntityLoader(contextFactory, _accessScope);
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
-            _imageResourceHydrator = new ReportTemplateV3ImageResourceHydrator(
-                imageResourceService ?? new ReportTemplateImageResourceService(pathProvider));
+            _imageResourceHydrator = new ReportTemplateV3ImageResourceHydrator(imageResourceAccessService);
             _pathResolver = new ReportTemplatePathResolver(pathProvider);
             _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver, _logger);
             _storageCoordinator = new ReportTemplateStorageCoordinator(pathProvider, settingsService, _logger);

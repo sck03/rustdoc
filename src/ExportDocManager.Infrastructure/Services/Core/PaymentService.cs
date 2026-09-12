@@ -70,8 +70,14 @@ namespace ExportDocManager.Services.Core
 
         public async Task<bool> DeletePaymentAsync(
             int id,
+            byte[] expectedRowVersion,
             CancellationToken cancellationToken = default)
         {
+            if (expectedRowVersion == null || expectedRowVersion.Length == 0)
+            {
+                throw new ServiceValidationException("删除必须提交付款版本号，请刷新后重试。");
+            }
+
             await using var context = await _contextFactory
                 .CreateDbContextAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -85,8 +91,19 @@ namespace ExportDocManager.Services.Core
             }
 
             _businessDataAccessScope.DemandRecordAccess(entity, PermissionModuleCatalog.DocumentPayments, PermissionAction.Manage);
-            context.Payments.Remove(entity);
-            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (!entity.RowVersion.AsSpan().SequenceEqual(expectedRowVersion))
+                {
+                    throw new DbUpdateConcurrencyException();
+                }
+                context.Payments.Remove(entity);
+                await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (DbUpdateConcurrencyException exception)
+            {
+                throw new BusinessConcurrencyException("该付款记录已被其他用户修改或删除，请刷新后重试。", exception);
+            }
             return true;
         }
 

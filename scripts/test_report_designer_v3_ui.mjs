@@ -60,8 +60,8 @@ await esbuild.build({
       category:root==='Invoice'?'单据备用字段':'明细备用列',label:index===9?(root==='Invoice'?'船名航次':'客户货号'):(root==='Invoice'?'发票':'明细')+'备用 '+(index+1),value:'{{ '+root+'.Spare'+(index+1)+' }}',reportType:'ExportDocument'})))};
     window.__designerHtml = content;
     createRoot(document.getElementById('root')).render(<div className="work-surface" style={{margin:'12px',padding:'8px'}}>
-      <ReportDesignerV3Workspace reportType="ExportDocument" displayName="表格设计交互验证" content={content} fieldCatalog={fieldCatalog} editable={true} onDesignerDraftContentChange={html => {
-        if(html) { window.__designerUpdates++; window.__designerHtml=html; window.__designerSchema=parseReportDesignerV3FromHtml(html,'ExportDocument').schema; }
+      <ReportDesignerV3Workspace reportType="ExportDocument" displayName="表格设计交互验证" content={content} fieldCatalog={fieldCatalog} editable={true} onDesignerDraftChange={({content: html, isDirty, isValid}) => {
+        if(isValid) { window.__designerUpdates++; window.__designerHtml=isDirty?html:content; window.__designerSchema=parseReportDesignerV3FromHtml(window.__designerHtml,'ExportDocument').schema; }
       }} />
     </div>);
   ` },

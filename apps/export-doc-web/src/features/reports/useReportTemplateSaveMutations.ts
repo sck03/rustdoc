@@ -11,7 +11,9 @@ export function useReportTemplateSaveMutations({
   client,
   reportType,
   selectedTemplatePath,
+  expectedRevision,
   selectedUserTemplateId,
+  expectedUserVersion,
   userTemplates,
   content,
   userTemplateName,
@@ -22,7 +24,9 @@ export function useReportTemplateSaveMutations({
   client: ExportDocManagerApiClient;
   reportType: ReportTypeOption;
   selectedTemplatePath: string;
+  expectedRevision: string;
   selectedUserTemplateId: number;
+  expectedUserVersion: number;
   userTemplates: ApiUserReportTemplateDto[];
   content: string;
   userTemplateName: string;
@@ -39,9 +43,11 @@ export function useReportTemplateSaveMutations({
           reportType,
           templatePath: selectedTemplatePath,
           content: nextContent ?? content,
+          expectedRevision,
         },
       }),
     onSuccess: async (saved) => {
+      queryClient.setQueryData(queryKeys.reportTemplateContent(reportType, saved.templatePath), saved);
       onDefaultTemplateSaved(saved);
       await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
       await queryClient.invalidateQueries({
@@ -64,11 +70,12 @@ export function useReportTemplateSaveMutations({
           reportType,
           name: userTemplateName.trim() || current.name,
           contentHtml: nextContent ?? content,
-          expectedVersion: current.versionNumber,
+          expectedVersion: expectedUserVersion,
         },
       });
     },
     onSuccess: async (saved) => {
+      queryClient.setQueryData<ApiUserReportTemplateDto[]>(queryKeys.userReportTemplates(reportType), current => current?.map(row => row.id === saved.id ? saved : row));
       onUserTemplateSaved(saved);
       await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplateVersions(saved.id) });

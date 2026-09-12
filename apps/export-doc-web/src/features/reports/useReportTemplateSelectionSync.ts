@@ -5,7 +5,6 @@ import {
   ApiUserReportTemplateDto,
 } from "../../api/index.ts";
 import {
-  fileNameFromPath,
   matchesTemplatePath,
   readPreferredPreviewSampleProfile,
   readUserTemplateIdFromKey,
@@ -40,10 +39,9 @@ export function useReportTemplateSelectionSync({
   userTemplates,
   userTemplatesLoaded,
   templateContent,
-  onSelectionChanged,
+  preserveSelection,
   onUserTemplateLoaded,
   onDefaultTemplateLoaded,
-  onDefaultMetadataLoaded,
 }: {
   requestedReportType: ReportTypeOption | null;
   availableReportTypeOptions: Array<{ value: ReportTypeOption; label: string }>;
@@ -69,10 +67,9 @@ export function useReportTemplateSelectionSync({
   userTemplates: ApiUserReportTemplateDto[];
   userTemplatesLoaded: boolean;
   templateContent: ApiReportTemplateContentDto | null;
-  onSelectionChanged: () => void;
+  preserveSelection: boolean;
   onUserTemplateLoaded: (template: ApiUserReportTemplateDto) => void;
   onDefaultTemplateLoaded: (template: ApiReportTemplateContentDto) => void;
-  onDefaultMetadataLoaded: (fileName: string, displayName: string) => void;
 }) {
   useEffect(() => {
     if (requestedReportType && availableReportTypeOptions.some((option) => option.value === requestedReportType)) {
@@ -107,11 +104,7 @@ export function useReportTemplateSelectionSync({
   }, [previewInvoiceIds, previewPaymentIds, reportType, setPreviewInvoiceId, setPreviewPaymentId]);
 
   useEffect(() => {
-    onSelectionChanged();
-  }, [onSelectionChanged, reportType, selectedTemplatePath]);
-
-  useEffect(() => {
-    if (!templatesLoaded) {
+    if (!templatesLoaded || preserveSelection) {
       return;
     }
 
@@ -125,7 +118,7 @@ export function useReportTemplateSelectionSync({
         userTemplateSelected: selectedUserTemplateId > 0,
       }),
     );
-  }, [configuredTemplatePath, reportType, requestedTemplateFileName, selectedUserTemplateId, setSelectedTemplatePath, templates, templatesLoaded]);
+  }, [configuredTemplatePath, preserveSelection, reportType, requestedTemplateFileName, selectedUserTemplateId, setSelectedTemplatePath, templates, templatesLoaded]);
 
   useEffect(() => {
     if (!templatesLoaded || !userTemplatesLoaded || selectedUserTemplateId > 0) {
@@ -141,14 +134,14 @@ export function useReportTemplateSelectionSync({
   }, [configuredTemplatePath, selectedTemplatePath, selectedUserTemplateId, setSelectedUserTemplateId, templatesLoaded, userTemplates, userTemplatesLoaded]);
 
   useEffect(() => {
-    if (requestedUserTemplateId <= 0 || !userTemplatesLoaded) {
+    if (requestedUserTemplateId <= 0 || !userTemplatesLoaded || preserveSelection) {
       return;
     }
 
     setSelectedUserTemplateId(
       userTemplates.some((template) => template.id === requestedUserTemplateId) ? requestedUserTemplateId : 0,
     );
-  }, [requestedUserTemplateId, setSelectedUserTemplateId, userTemplates, userTemplatesLoaded]);
+  }, [preserveSelection, requestedUserTemplateId, setSelectedUserTemplateId, userTemplates, userTemplatesLoaded]);
 
   useEffect(() => {
     if (selectedUserTemplateId <= 0 || !userTemplatesLoaded) {
@@ -157,7 +150,6 @@ export function useReportTemplateSelectionSync({
 
     const selected = userTemplates.find((template) => template.id === selectedUserTemplateId);
     if (!selected) {
-      setSelectedUserTemplateId(0);
       return;
     }
 
@@ -174,11 +166,4 @@ export function useReportTemplateSelectionSync({
     }
   }, [onDefaultTemplateLoaded, selectedTemplatePath, selectedUserTemplateId, templateContent]);
 
-  useEffect(() => {
-    if (selectedUserTemplateId <= 0) {
-      const fileName = fileNameFromPath(selectedTemplatePath);
-      const selected = templates.find((template) => matchesTemplatePath(template.templatePath, selectedTemplatePath));
-      onDefaultMetadataLoaded(fileName, selected?.displayName || fileName);
-    }
-  }, [onDefaultMetadataLoaded, selectedTemplatePath, selectedUserTemplateId, templates]);
 }

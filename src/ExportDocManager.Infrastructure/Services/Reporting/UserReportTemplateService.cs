@@ -2,6 +2,7 @@ using System.Data;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
+using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
@@ -18,15 +19,18 @@ namespace ExportDocManager.Services.Reporting
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
         private readonly IBusinessClock _clock;
+        private readonly ReportTemplateStorageLock _storageLock;
 
         public UserReportTemplateService(
             IDbContextFactory<AppDbContext> contextFactory,
             BusinessDataAccessScope accessScope,
+            IAppPathProvider pathProvider,
             IBusinessClock? clock = null)
         {
             _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
             _clock = clock ?? BusinessClock.CreateSystem();
+            _storageLock = new ReportTemplateStorageLock(pathProvider);
         }
 
         public async Task<IReadOnlyList<UserReportTemplateRecord>> ListAsync(
@@ -85,8 +89,7 @@ namespace ExportDocManager.Services.Reporting
 
             if (isNew)
             {
-                return AppDbContextExecution.ExecuteInTransactionAsync(
-                    _contextFactory,
+                return ExecuteMutationAsync(
                     (context, token) => CreateDraftAsync(
                         context,
                         reportType,
@@ -96,12 +99,10 @@ namespace ExportDocManager.Services.Reporting
                         PermissionAction.Design,
                         "创建草稿",
                         token),
-                    IsolationLevel.Serializable,
                     cancellationToken);
             }
 
-            return AppDbContextExecution.ExecuteInTransactionAsync(
-                _contextFactory,
+            return ExecuteMutationAsync(
                 async (context, token) =>
                 {
                     var entity = await context.UserReportTemplates
@@ -160,7 +161,6 @@ namespace ExportDocManager.Services.Reporting
                     await SaveChangesAsync(context, token);
                     return ToRecord(entity);
                 },
-                IsolationLevel.Serializable,
                 cancellationToken);
         }
 
@@ -188,8 +188,7 @@ namespace ExportDocManager.Services.Reporting
                 throw new ServiceValidationException("复制报表模板时必须且只能指定一个有效来源。");
             }
 
-            return AppDbContextExecution.ExecuteInTransactionAsync(
-                _contextFactory,
+            return ExecuteMutationAsync(
                 async (context, token) =>
                 {
                     _accessScope.DemandPermission(
@@ -232,7 +231,6 @@ namespace ExportDocManager.Services.Reporting
                         "复制草稿",
                         token);
                 },
-                IsolationLevel.Serializable,
                 cancellationToken);
         }
 
@@ -393,8 +391,7 @@ namespace ExportDocManager.Services.Reporting
                 throw new ServiceValidationException("报表模板历史版本无效。");
             }
 
-            return AppDbContextExecution.ExecuteInTransactionAsync(
-                _contextFactory,
+            return ExecuteMutationAsync(
                 async (context, token) =>
                 {
                     var entity = await LoadForActionAsync(context, id, PermissionAction.Restore, token);
@@ -443,8 +440,13 @@ namespace ExportDocManager.Services.Reporting
                     await SaveChangesAsync(context, token);
                     return ToRecord(entity);
                 },
-                IsolationLevel.Serializable,
                 cancellationToken);
+        }
+
+        private async Task<T> ExecuteMutationAsync<T>(Func<AppDbContext, CancellationToken, Task<T>> mutation, CancellationToken cancellationToken)
+        {
+            await using var fileLock = await _storageLock.AcquireAsync(cancellationToken).ConfigureAwait(false);
+            return await AppDbContextExecution.ExecuteInTransactionAsync(_contextFactory, mutation, IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
         }
 
         private async Task<UserReportTemplateRecord> CreateDraftAsync(
@@ -504,8 +506,7 @@ namespace ExportDocManager.Services.Reporting
             string changeType,
             Action<UserReportTemplate> mutate,
             CancellationToken cancellationToken) =>
-            AppDbContextExecution.ExecuteInTransactionAsync(
-                _contextFactory,
+            ExecuteMutationAsync(
                 async (context, token) =>
                 {
                     var entity = await LoadForActionAsync(context, id, action, token);
@@ -531,7 +532,6 @@ namespace ExportDocManager.Services.Reporting
                     await SaveChangesAsync(context, token);
                     return ToRecord(entity);
                 },
-                IsolationLevel.Serializable,
                 cancellationToken);
 
         private async Task<UserReportTemplate> LoadForActionAsync(

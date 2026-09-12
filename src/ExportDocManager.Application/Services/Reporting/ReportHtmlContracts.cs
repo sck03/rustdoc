@@ -46,6 +46,8 @@ namespace ExportDocManager.Services.Reporting
 
         public string Content { get; init; } = string.Empty;
 
+        public string Revision { get; init; } = string.Empty;
+
         public string StoragePolicy { get; init; } = string.Empty;
     }
 
@@ -206,18 +208,21 @@ namespace ExportDocManager.Services.Reporting
             ReportDocumentType reportType,
             string templatePath,
             string content,
+            string expectedRevision,
             CancellationToken cancellationToken = default);
 
         Task<ReportTemplateContentResult> RenameTemplateAsync(
             ReportDocumentType reportType,
             string templatePath,
             string newTemplatePath,
+            string expectedRevision,
             CancellationToken cancellationToken = default);
 
         Task<ReportTemplateContentResult> UpdateTemplateDisplayNameAsync(
             ReportDocumentType reportType,
             string templatePath,
             string displayName,
+            string expectedRevision,
             CancellationToken cancellationToken = default);
 
         Task<ReportTemplateCommandResult> SetDefaultTemplateAsync(
@@ -228,6 +233,7 @@ namespace ExportDocManager.Services.Reporting
         Task<ReportTemplateCommandResult> DeleteTemplateAsync(
             ReportDocumentType reportType,
             string templatePath,
+            string expectedRevision,
             CancellationToken cancellationToken = default);
 
         Task<ReportTemplatePreviewResult> PreviewTemplateContentAsync(
@@ -249,6 +255,7 @@ namespace ExportDocManager.Services.Reporting
             ReportDocumentType reportType,
             string templatePath,
             string filePath,
+            string expectedRevision,
             CancellationToken cancellationToken = default);
     }
 
@@ -307,6 +314,10 @@ namespace ExportDocManager.Services.Reporting
     /// </summary>
     public interface IReportTemplateImageResourceAccessService
     {
+        Task<ReportTemplateImageResourceContent> ReadAsync(
+            string resourceId,
+            CancellationToken cancellationToken = default);
+
         Task RegisterUploadAsync(
             ReportTemplateImageResource resource,
             CancellationToken cancellationToken = default);
@@ -319,8 +330,5 @@ namespace ExportDocManager.Services.Reporting
             string resourceId,
             CancellationToken cancellationToken = default);
 
-        Task RollbackRecycleAsync(
-            string resourceId,
-            CancellationToken cancellationToken = default);
     }
 }

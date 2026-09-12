@@ -185,6 +185,8 @@ assertEqual(JSON.stringify(configuredItems), configuredSnapshot, "解析默认�
 const baseWorkspaceStateInput = {
   reportType: "ExportDocument",
   designerDraftContent: "",
+  designerDraftDirty: false,
+  designerDraftValid: true,
   content: "<html>{{ Invoice.InvoiceNo }}</html>",
   loadedContent: "<html>{{ Invoice.InvoiceNo }}</html>",
   contentTemplatePath: "builtin:Export/invoice_template.html",
@@ -258,13 +260,17 @@ const localSamplePreviewState = deriveReportTemplateWorkspaceState({
   templatePreviewSampleProfile: "exportStandard",
 });
 assertEqual(localSamplePreviewState.canRenderTemplatePreview, true, "只读用户仍可使用不读取业务数据的本地 V3 样例");
-assertMatch(workspaceStateSource, /hasUnappliedDesignerChanges\s*=\s*[\s\S]*?designerDraftContent\s*!==\s*content/, "新版画布草稿必须独立识别为未应用修改");
+
 assertMatch(workspaceStateSource, /hasUnsavedChanges\s*=\s*hasChanges\s*\|\|\s*hasUnappliedDesignerChanges/, "保存和离开保护必须同时覆盖源码与画布草稿");
-const dirtyDesignerInput = { ...baseWorkspaceStateInput, designerDraftContent: "<html>Changed</html>", canManageTemplates: true };
+const dirtyDesignerInput = { ...baseWorkspaceStateInput, designerDraftContent: "<html>Changed</html>", designerDraftDirty: true, canManageTemplates: true };
 const dirtyDesignerState = deriveReportTemplateWorkspaceState(dirtyDesignerInput);
 assertEqual(dirtyDesignerState.canSave, true, "获准编辑且存在画布草稿时顶部保存必须可用");
 assertEqual(deriveReportTemplateWorkspaceState({ ...dirtyDesignerInput, busyFlags: [true] }).canSave, false, "请求进行中不得重复保存");
 assertEqual(deriveReportTemplateWorkspaceState({ ...dirtyDesignerInput, canManageTemplates: false }).canSave, false, "撤销编辑权限后不得保存草稿");
+const invalidDesigner = deriveReportTemplateWorkspaceState({ ...dirtyDesignerInput, designerDraftContent: "", designerDraftValid: false });
+assertEqual(invalidDesigner.hasUnsavedChanges, true, "无效画布草稿仍须保留未保存状态");
+assertEqual(invalidDesigner.canSave, false, "无效草稿不得保存或回退保存旧正文");
+assertEqual(invalidDesigner.canRenderTemplatePreview, false, "无效草稿不得用旧正文伪装预览");
 if (/<details[^>]*template-user-panel[^>]*\bopen\b/u.test(userPanelSource)) {
   throw new Error("我的 / 共享模板默认应保持折叠");
 }

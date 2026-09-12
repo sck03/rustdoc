@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
+using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Services.Time;
 using Microsoft.EntityFrameworkCore;
@@ -19,15 +20,33 @@ public sealed partial class ReportTemplateImageResourceAccessService
     private readonly IDbContextFactory<AppDbContext> _contextFactory;
     private readonly BusinessDataAccessScope _accessScope;
     private readonly IBusinessClock _clock;
+    private readonly IReportTemplateImageResourceService _resourceService;
+    private readonly ReportTemplateStorageLock _storageLock;
+    private readonly ReportTemplateFileResourceReferences _fileReferences;
 
     public ReportTemplateImageResourceAccessService(
         IDbContextFactory<AppDbContext> contextFactory,
         BusinessDataAccessScope accessScope,
+        IAppPathProvider pathProvider,
+        IReportTemplateImageResourceService resourceService,
         IBusinessClock? clock = null)
     {
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
         _clock = clock ?? BusinessClock.CreateSystem();
+        _resourceService = resourceService ?? throw new ArgumentNullException(nameof(resourceService));
+        _storageLock = new ReportTemplateStorageLock(pathProvider);
+        _fileReferences = new ReportTemplateFileResourceReferences(pathProvider);
+    }
+
+    public async Task<ReportTemplateImageResourceContent> ReadAsync(string resourceId, CancellationToken cancellationToken = default)
+    {
+        await using var fileLock = await _storageLock.AcquireAsync(cancellationToken).ConfigureAwait(false);
+        if (!await CanReadAsync(resourceId, cancellationToken).ConfigureAwait(false))
+        {
+            throw new ResourceNotFoundException("受控图片资源不存在或无权访问。");
+        }
+        return await _resourceService.ReadAsync(resourceId, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task RegisterUploadAsync(
@@ -122,6 +141,13 @@ public sealed partial class ReportTemplateImageResourceAccessService
             return false;
         }
 
+        if (await _fileReferences.ContainsAsync(normalizedId, type =>
+                _accessScope.HasPermission(PermissionResourceCatalog.ReportTemplates, PermissionAction.View) &&
+                _accessScope.HasPermission(ReportDocumentAccessCatalog.GetSourceResource(type), PermissionAction.View), cancellationToken))
+        {
+            return true;
+        }
+
         await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
         bool exists = await context.ReportTemplateImageResources.AsNoTracking()
             .AnyAsync(item => item.Id == normalizedId && item.RecycledAt == null, cancellationToken);
@@ -151,6 +177,33 @@ public sealed partial class ReportTemplateImageResourceAccessService
         string resourceId,
         CancellationToken cancellationToken = default)
     {
+        await using var fileLock = await _storageLock.AcquireAsync(cancellationToken).ConfigureAwait(false);
+        bool deletePhysicalFile = await RecycleClaimAsync(resourceId, cancellationToken).ConfigureAwait(false);
+        if (deletePhysicalFile)
+        {
+            try
+            {
+                await _resourceService.DeleteAsync(resourceId, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception deleteException)
+            {
+                try
+                {
+                    await RollbackRecycleAsync(resourceId, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception rollbackException)
+                {
+                    throw new UserVisibleInfrastructureException("图片删除失败且归属回滚失败，请保留数据目录并联系管理员。",
+                        new AggregateException(deleteException, rollbackException));
+                }
+                throw;
+            }
+        }
+        return deletePhysicalFile;
+    }
+
+    private async Task<bool> RecycleClaimAsync(string resourceId, CancellationToken cancellationToken)
+    {
         _accessScope.DemandPermission(PermissionResourceCatalog.ReportResources, PermissionAction.Recycle);
         int userId = RequireCurrentUserId();
         string normalizedId = NormalizeResourceId(resourceId);
@@ -175,7 +228,8 @@ public sealed partial class ReportTemplateImageResourceAccessService
         bool isReferenced = await context.UserReportTemplateResourceReferences.AsNoTracking()
             .AnyAsync(item => item.ResourceId == normalizedId, cancellationToken) ||
             await context.UserReportTemplateVersionResourceReferences.AsNoTracking()
-                .AnyAsync(item => item.ResourceId == normalizedId, cancellationToken);
+                .AnyAsync(item => item.ResourceId == normalizedId, cancellationToken) ||
+            await _fileReferences.ContainsAsync(normalizedId, canRead: null, cancellationToken);
         if (isReferenced)
         {
             throw new ResourceConflictException("该图片仍被报表模板或历史版本引用，不能回收。");
@@ -204,7 +258,7 @@ public sealed partial class ReportTemplateImageResourceAccessService
         return !hasOtherClaim;
     }
 
-    public async Task RollbackRecycleAsync(
+    private async Task RollbackRecycleAsync(
         string resourceId,
         CancellationToken cancellationToken = default)
     {

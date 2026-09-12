@@ -14,6 +14,7 @@ namespace ExportDocManager.Services.Core
     {
         public async Task<bool> DeleteInvoiceAsync(
             int id,
+            byte[] expectedRowVersion,
             CancellationToken cancellationToken = default)
         {
             if (id <= 0)
@@ -21,6 +22,7 @@ namespace ExportDocManager.Services.Core
                 return false;
             }
 
+            ValidateExpectedRowVersion(expectedRowVersion);
             try
             {
                 return await AppDbContextExecution.ExecuteInTransactionAsync(
@@ -37,6 +39,11 @@ namespace ExportDocManager.Services.Core
                         }
 
                         _businessDataAccessScope.DemandRecordAccess(invoice, PermissionModuleCatalog.DocumentInvoices, PermissionAction.Manage);
+
+                        if (!invoice.RowVersion.AsSpan().SequenceEqual(expectedRowVersion))
+                        {
+                            throw new DbUpdateConcurrencyException();
+                        }
 
                         if (!InvoiceStatusCatalog.IsEditable(invoice.Status))
                         {
@@ -359,7 +366,7 @@ namespace ExportDocManager.Services.Core
         {
             if (expectedRowVersion == null || expectedRowVersion.Length == 0)
             {
-                throw new InvoiceValidationException("状态操作必须提交发票版本号，请刷新后重试。");
+                throw new InvoiceValidationException("操作必须提交发票版本号，请刷新后重试。");
             }
         }
 

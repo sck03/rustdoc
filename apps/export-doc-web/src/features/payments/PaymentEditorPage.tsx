@@ -133,7 +133,7 @@ export function PaymentEditorPage({
   });
 
   const deletePaymentMutation = useMutation({
-    mutationFn: () => client.deletePayment({ id: parsedPaymentId }),
+    mutationFn: () => client.deletePayment({ id: parsedPaymentId, rowVersion: payment?.rowVersion ?? "" }),
     onSuccess: async (response) => {
       setMessage(null);
       setSuccessMessage(null);

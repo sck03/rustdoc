@@ -53,6 +53,7 @@ namespace ExportDocManager.Services.Reporting
             ReportDocumentType reportType,
             string templatePath,
             string filePath,
+            string expectedRevision,
             CancellationToken cancellationToken = default)
         {
             string sourcePath = NormalizeImportPath(filePath);
@@ -65,6 +66,7 @@ namespace ExportDocManager.Services.Reporting
                     reportType,
                     templatePath,
                     content,
+                    expectedRevision,
                     cancellationToken)
                 .ConfigureAwait(false);
         }

@@ -14,11 +14,13 @@ public sealed partial class ReportTemplateImageResourceService : IReportTemplate
     private const string ResourcePrefix = "img-";
     private readonly string _resourceRoot;
     private readonly SemaphoreSlim _writeSemaphore = new(1, 1);
+    private readonly ReportTemplateStorageLock _storageLock;
 
     public ReportTemplateImageResourceService(IAppPathProvider pathProvider)
     {
         ArgumentNullException.ThrowIfNull(pathProvider);
         _resourceRoot = Path.GetFullPath(Path.Combine(pathProvider.UserTemplateRoot, "Resources", "V3"));
+        _storageLock = new ReportTemplateStorageLock(pathProvider);
     }
 
     public async Task<ReportTemplateImageResource> StoreAsync(
@@ -76,6 +78,7 @@ public sealed partial class ReportTemplateImageResourceService : IReportTemplate
         string resourceId = $"{ResourcePrefix}{sha256}.{format.Extension}";
         var resource = CreateResource(resourceId, format.MediaType, byteLength, sha256, fileName);
 
+        await using var fileLock = await _storageLock.AcquireAsync(cancellationToken).ConfigureAwait(false);
         await _writeSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         bool created = false;
         string targetPath = string.Empty;

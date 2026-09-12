@@ -214,6 +214,7 @@ namespace ExportDocManager.Api.Hosting
                         parsedReportType,
                         request.TemplatePath,
                         request.Content ?? string.Empty,
+                        request.ExpectedRevision,
                         cancellationToken);
                     return Results.Ok(ToApiReportTemplateContentDto(context, result));
                 }
@@ -257,6 +258,7 @@ namespace ExportDocManager.Api.Hosting
                             parsedReportType,
                             request!.TemplatePath,
                             request!.NewTemplatePath,
+                            request!.ExpectedRevision,
                             cancellationToken))))
             .WithName("RenameReportTemplate")
             .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Publish)
@@ -280,6 +282,7 @@ namespace ExportDocManager.Api.Hosting
                             parsedReportType,
                             request!.TemplatePath,
                             request!.DisplayName,
+                            request!.ExpectedRevision,
                             cancellationToken);
                         return ToApiReportTemplateContentDto(context, result);
                     }))
@@ -319,6 +322,7 @@ namespace ExportDocManager.Api.Hosting
                 IReportTemplateService reportTemplateService,
                 string? reportType,
                 string? templatePath,
+                string expectedRevision,
                 CancellationToken cancellationToken) =>
             {
                 if (!TryParseReportDocumentType(reportType, out var parsedReportType))
@@ -331,6 +335,7 @@ namespace ExportDocManager.Api.Hosting
                     var result = await reportTemplateService.DeleteTemplateAsync(
                         parsedReportType,
                         templatePath ?? string.Empty,
+                        expectedRevision,
                         cancellationToken);
                     return Results.Ok(new ApiCommandResponse(true, result.Message));
                 }
@@ -709,7 +714,8 @@ namespace ExportDocManager.Api.Hosting
                 ToApiReportTemplatePath(context, result.TemplatePath),
                 result.WithSealDefault,
                 result.Content,
-                result.StoragePolicy);
+                result.StoragePolicy,
+                result.Revision);
         }
 
         private static ApiReportTemplateFieldCatalogResponse ToApiReportTemplateFieldCatalogDto(

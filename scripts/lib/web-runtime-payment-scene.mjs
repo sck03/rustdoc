@@ -1031,7 +1031,13 @@ export function createPaymentSmokeScene(runtime) {
   }
 
   async function deleteSmokePayment(options, accessToken, tokenType, paymentId) {
-    const response = await fetch(new URL(`/api/payments/${paymentId}`, ensureTrailingSlash(options.apiBaseUrl)), {
+    const url = new URL(`/api/payments/${paymentId}`, ensureTrailingSlash(options.apiBaseUrl));
+    const detail = await fetch(url, { headers: authorizedHeaders(options, accessToken, tokenType) });
+    if (detail.status === 404) return true;
+    if (!detail.ok) return false;
+    const payment = await detail.json();
+    url.searchParams.set("rowVersion", payment.rowVersion);
+    const response = await fetch(url, {
       method: "DELETE",
       headers: authorizedHeaders(options, accessToken, tokenType),
     });

@@ -15,6 +15,7 @@ import {
   buildUserTemplateKey,
   fileNameFromPath,
   matchesTemplatePath,
+  readUserTemplateIdFromKey,
   type ReportTypeOption,
   type TemplatePreviewMode,
 } from "./reportTemplateDesignerModel.ts";
@@ -53,6 +54,8 @@ export function deriveReportTemplateFeedback({
 export function deriveReportTemplateWorkspaceState({
   reportType,
   designerDraftContent,
+  designerDraftDirty,
+  designerDraftValid,
   content,
   loadedContent,
   contentTemplatePath,
@@ -89,6 +92,8 @@ export function deriveReportTemplateWorkspaceState({
 }: {
   reportType: ReportTypeOption;
   designerDraftContent: string;
+  designerDraftDirty: boolean;
+  designerDraftValid: boolean;
   content: string;
   loadedContent: string;
   contentTemplatePath: string;
@@ -123,7 +128,8 @@ export function deriveReportTemplateWorkspaceState({
   fileExportPath: string;
   fileImportPath: string;
 }) {
-  const isUserTemplate = currentUserTemplate !== null;
+  const userTemplateId = currentUserTemplate?.id ?? readUserTemplateIdFromKey(selectedTemplatePath);
+  const isUserTemplate = userTemplateId > 0;
   const previewDocumentOptions =
     reportType === "PaymentVoucher"
       ? buildPaymentPreviewOptions(previewPayments, previewPaymentId)
@@ -142,24 +148,25 @@ export function deriveReportTemplateWorkspaceState({
   const renderedPreviewHtml = localSamplePreviewHtml || previewHtml || buildRawPreviewHtml(previewContent);
   const selectedTemplateContentLoaded =
     isUserTemplate ||
-    (Boolean(selectedTemplatePath) && matchesTemplatePath(selectedContentTemplatePath, selectedTemplatePath));
+    (Boolean(selectedTemplatePath) && (matchesTemplatePath(selectedContentTemplatePath, selectedTemplatePath) ||
+      matchesTemplatePath(contentTemplatePath, selectedTemplatePath)));
   const selectedTemplateContentActive =
     selectedTemplateContentLoaded &&
     (isUserTemplate
-      ? contentTemplatePath === buildUserTemplateKey(currentUserTemplate.id)
+      ? contentTemplatePath === buildUserTemplateKey(userTemplateId)
       : matchesTemplatePath(contentTemplatePath, selectedTemplatePath));
   const isBusy = busyFlags.some(Boolean);
   const hasChanges = content !== loadedContent;
-  const hasUnappliedDesignerChanges = Boolean(designerDraftContent.trim()) && designerDraftContent !== content;
-  const hasUnsavedChanges = hasChanges || hasUnappliedDesignerChanges;
+  const hasUnappliedDesignerChanges = designerDraftDirty;
+  const hasUnsavedChanges = hasChanges || hasUnappliedDesignerChanges || currentTemplateDisplayName !== persistedDisplayName;
   const canPreviewRendered =
     Boolean(selectedTemplatePath) && (reportType === "PaymentVoucher" ? previewPaymentId > 0 : previewInvoiceId > 0);
-  const canRenderTemplatePreview =
+  const canRenderTemplatePreview = designerDraftValid && (
     templatePreviewMode === "savedSource"
       ? canPreviewSavedSource && canPreviewRendered && !isBusy
       : isLocalSamplePreview
         ? Boolean(previewContent.trim()) && !isBusy
-        : canDesignTemplates && Boolean(previewContent.trim()) && Boolean(selectedTemplatePath) && !isBusy;
+        : canDesignTemplates && Boolean(previewContent.trim()) && Boolean(selectedTemplatePath) && !isBusy);
   const canCreateTemplate = canManageTemplates && Boolean(newTemplateFileName.trim()) && !isBusy;
   const canCreateBlankUserTemplate =
     canDesignTemplates && Boolean(newUserTemplateName.trim()) && !isBusy;
@@ -172,12 +179,12 @@ export function deriveReportTemplateWorkspaceState({
     renameTemplateFileName.trim() !== fileNameFromPath(selectedTemplatePath) &&
     !isBusy;
   const canDeleteTemplate = isUserTemplate
-    ? currentUserTemplate.canArchive && !isBusy
+    ? currentUserTemplate?.canArchive === true && !isBusy
     : canArchiveTemplates && Boolean(selectedTemplatePath) && !isBusy;
   const canEditCurrentTemplate =
     Boolean(selectedTemplatePath) &&
     !isBusy &&
-    (isUserTemplate ? currentUserTemplate.canEdit && canDesignTemplates : canManageTemplates);
+    (isUserTemplate ? currentUserTemplate?.canEdit === true && canDesignTemplates : canManageTemplates);
 
   return {
     isUserTemplate,
@@ -214,8 +221,8 @@ export function deriveReportTemplateWorkspaceState({
     canImportTemplateFileByPath: !isUserTemplate && canImportTemplates && Boolean(selectedTemplatePath) &&
       Boolean(fileImportPath.trim()) && !isBusy,
     canUploadTemplateFile: !isUserTemplate && canImportTemplates && Boolean(selectedTemplatePath) && !desktopAvailable && !isBusy,
-    canSave: canEditCurrentTemplate && hasUnsavedChanges,
-    canUpdateDisplayName: canEditCurrentTemplate && Boolean(currentTemplateDisplayName.trim()) &&
+    canSave: selectedTemplateContentActive && canEditCurrentTemplate && hasUnsavedChanges && designerDraftValid,
+    canUpdateDisplayName: selectedTemplateContentActive && designerDraftValid && canEditCurrentTemplate && Boolean(currentTemplateDisplayName.trim()) &&
       currentTemplateDisplayName.trim() !== persistedDisplayName,
     canSetDefault: Boolean(selectedTemplatePath) && canManageTemplates && !isBusy &&
       !matchesTemplatePath(selectedTemplatePath, defaultTemplatePath),

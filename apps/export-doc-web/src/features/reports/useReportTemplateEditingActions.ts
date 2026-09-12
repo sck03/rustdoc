@@ -22,6 +22,7 @@ export function useReportTemplateEditingActions({
   content,
   currentUserTemplateCanEdit,
   designerDraftContent,
+  designerDraftValid,
   designerMode,
   isLimitedReportView,
   isLocalSamplePreview,
@@ -37,7 +38,6 @@ export function useReportTemplateEditingActions({
   saveDefaultTemplateContent,
   saveUserTemplateContent,
   setContent,
-  setContentTemplatePath,
   setDesignerMode,
   setMessage,
   setMessageType,
@@ -53,6 +53,7 @@ export function useReportTemplateEditingActions({
   content: string;
   currentUserTemplateCanEdit: boolean;
   designerDraftContent: string;
+  designerDraftValid: boolean;
   designerMode: DesignerMode;
   isLimitedReportView: boolean;
   isLocalSamplePreview: boolean;
@@ -67,9 +68,8 @@ export function useReportTemplateEditingActions({
   renderSamplePreview: () => void;
   saveDefaultTemplateContent: (content: string) => void;
   saveUserTemplateContent: (content: string) => void;
-  setContent: Dispatch<SetStateAction<string>>;
-  setContentTemplatePath: Dispatch<SetStateAction<string>>;
-  setDesignerMode: Dispatch<SetStateAction<DesignerMode>>;
+  setContent: (content: string) => void;
+  setDesignerMode: (mode: DesignerMode) => void;
   setMessage: Dispatch<SetStateAction<string | null>>;
   setMessageType: Dispatch<SetStateAction<MessageType>>;
   setPreview: Dispatch<SetStateAction<ApiReportTemplatePreviewResponse | null>>;
@@ -103,9 +103,13 @@ export function useReportTemplateEditingActions({
       setWorkspaceMode("design");
       return;
     }
+    if (designerMode === "v3" && !designerDraftValid) {
+      setMessage("请先修正画布中的校验问题，再切换为高级 HTML。");
+      setMessageType("error");
+      return;
+    }
     if (designerMode === "v3" && workspaceHasUnappliedDesignerChanges) {
       setContent(designerDraftContent);
-      setContentTemplatePath(selectedTemplatePath);
       setPreview(null);
     }
     setWorkspaceMode("design");
@@ -125,8 +129,6 @@ export function useReportTemplateEditingActions({
       return;
     }
 
-    setContent(nextContent);
-    setContentTemplatePath(selectedTemplatePath);
     setPreview(null);
     setMessage(null);
     setMessageType(null);
@@ -143,7 +145,6 @@ export function useReportTemplateEditingActions({
     }
 
     setContent(formatReportTemplateSource(content));
-    setContentTemplatePath(selectedTemplatePath);
     setPreview(null);
     setMessage("高级 HTML 已格式化，保存后写入模板文件。");
     setMessageType("success");

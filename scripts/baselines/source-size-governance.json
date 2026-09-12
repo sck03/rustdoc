@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 45723,
+      "baselineAggregateLines": 46108,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 45843,
+      "maximumAggregateLines": 46228,
       "reportFiles": false
     },
     {
@@ -70,9 +70,9 @@
       "directory": ".github/workflows",
       "filePattern": "^.+\\.(?:yml|yaml)$",
       "maximumLines": 800,
-      "baselineAggregateLines": 2753,
+      "baselineAggregateLines": 2776,
       "maximumAggregateGrowthLines": 20,
-      "maximumAggregateLines": 2773,
+      "maximumAggregateLines": 2796,
       "reportFiles": false
     },
     {

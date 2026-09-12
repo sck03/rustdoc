@@ -87,6 +87,7 @@ namespace ExportDocManager.Api.Hosting
                         parsedReportType,
                         request.TemplatePath,
                         request.FilePath,
+                        request.ExpectedRevision,
                         cancellationToken);
                     return Results.Ok(ToApiReportTemplateContentDto(context, result));
                 }
@@ -159,6 +160,7 @@ namespace ExportDocManager.Api.Hosting
                 string? reportType,
                 string? templatePath,
                 string? fileName,
+                string expectedRevision,
                 CancellationToken cancellationToken) =>
             {
                 if (!TryParseReportDocumentType(reportType, out var parsedReportType))
@@ -184,6 +186,7 @@ namespace ExportDocManager.Api.Hosting
                         parsedReportType,
                         templatePath ?? string.Empty,
                         content,
+                        expectedRevision,
                         cancellationToken);
                     return Results.Ok(ToApiReportTemplateContentDto(context, result));
                 }
@@ -195,7 +198,7 @@ namespace ExportDocManager.Api.Hosting
                 catch (IOException ex) { return WriteServiceException(ex); }
                 catch (InvalidOperationException ex) { return WriteServiceException(ex); }
             })
-            .Accepts<IFormFile>("application/octet-stream")
+            .Accepts<IFormFile>("text/html", "application/octet-stream")
             .WithName("UploadReportTemplateFile")
             .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.Import)
             .Produces<ApiReportTemplateContentDto>(StatusCodes.Status200OK)

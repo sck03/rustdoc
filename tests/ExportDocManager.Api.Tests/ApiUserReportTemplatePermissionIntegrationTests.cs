@@ -119,13 +119,14 @@ public sealed class ApiUserReportTemplatePermissionIntegrationTests
         Assert.Equal("application/octet-stream", exportResponse.Content.Headers.ContentType?.MediaType);
     }
 
-    private static async Task<HttpClient> CreateUserWithPermissionsAsync(
+    internal static async Task<HttpClient> CreateUserWithPermissionsAsync(
         ApiIntegrationTestHarness harness,
         HttpClient anonymous,
         HttpClient admin,
         string username,
         string password,
-        string[] actions)
+        string[] actions,
+        bool canViewResources = false)
     {
         var templateResponse = await admin.PostAsJsonAsync(
             "/api/permission-templates",
@@ -149,6 +150,12 @@ public sealed class ApiUserReportTemplatePermissionIntegrationTests
                         action = PermissionAction.View,
                         dataScope = PermissionDataScope.Own
                     })
+                    .Concat(canViewResources ? [new
+                    {
+                        resourceKey = PermissionResourceCatalog.ReportResources,
+                        action = PermissionAction.View,
+                        dataScope = PermissionDataScope.Own
+                    }] : [])
             });
         Assert.Equal(HttpStatusCode.OK, templateResponse.StatusCode);
         var template = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPermissionTemplateDto>(templateResponse);

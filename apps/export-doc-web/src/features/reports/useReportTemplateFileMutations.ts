@@ -12,6 +12,7 @@ export function useReportTemplateFileMutations({
   client,
   reportType,
   selectedTemplatePath,
+  expectedRevision,
   fileExportPath,
   onExported,
   onDownloaded,
@@ -21,6 +22,7 @@ export function useReportTemplateFileMutations({
   client: ExportDocManagerApiClient;
   reportType: ReportTypeOption;
   selectedTemplatePath: string;
+  expectedRevision: string;
   fileExportPath: string;
   onExported: (response: ApiReportTemplateFileExportResponse) => void;
   onDownloaded: () => void;
@@ -61,7 +63,7 @@ export function useReportTemplateFileMutations({
 
   const importFileMutation = useMutation({
     mutationFn: (filePath: string) => client.importReportTemplateFile({
-      body: { reportType, templatePath: selectedTemplatePath, filePath },
+      body: { reportType, templatePath: selectedTemplatePath, filePath, expectedRevision },
     }),
     onSuccess: async (response) => {
       onImported(response, "path");
@@ -74,6 +76,7 @@ export function useReportTemplateFileMutations({
     mutationFn: async (file: File) => client.uploadReportTemplateFile({
       reportType,
       templatePath: selectedTemplatePath,
+      expectedRevision,
       fileName: file.name,
       // The raw HTML endpoint must not be JSON encoded by the generated client.
       body: new Blob([await file.arrayBuffer()], { type: "text/html" }),

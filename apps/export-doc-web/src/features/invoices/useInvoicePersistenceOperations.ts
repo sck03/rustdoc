@@ -197,7 +197,7 @@ export function useInvoicePersistenceOperations({
   });
 
   const deleteInvoiceMutation = useMutation({
-    mutationFn: () => client.deleteInvoice({ id: invoiceId }),
+    mutationFn: () => client.deleteInvoice({ id: invoiceId, rowVersion: invoice?.rowVersion ?? "" }),
     onSuccess: async (response) => {
       setMessage(null);
       setSuccessMessage(null);

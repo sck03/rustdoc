@@ -218,7 +218,10 @@ namespace ExportDocManager.Services.Reporting
                     ReportTemplateFilePolicy.ValidateExistingTemplatePath(sourceFile);
                     ReportTemplateFilePolicy.EnsureNoPortableCollision(targetFile);
                 }
-                transaction.MarkTemplatesChanged();
+                await transaction.CaptureFilesAsync(sourceFiles
+                    .Select(path => Path.Combine(templatesRoot, Path.GetRelativePath(sourceTemplates, path)))
+                    .Where(path => strategy != ReportTemplateImportStrategy.AddOnly || !File.Exists(path))
+                    .Append(_pathResolver.GetUserConfigPath()), cancellationToken).ConfigureAwait(false);
                 await CopyFilesAsync(
                     sourceFiles,
                     sourceTemplates,

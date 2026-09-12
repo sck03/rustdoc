@@ -1,6 +1,7 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
 using ExportDocManager.Services.Errors;
+using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
 using Microsoft.Data.Sqlite;
@@ -8,8 +9,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ExportDocManager.Infrastructure.Tests
 {
-    public sealed class UserReportTemplateServiceTests
+    public sealed class UserReportTemplateServiceTests : IDisposable
     {
+        private readonly string _root = Path.Combine(AppContext.BaseDirectory, "user-template-tests", Guid.NewGuid().ToString("N"));
+
+        public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true); }
+
         [Fact]
         public async Task Lifecycle_ShouldProtectSharedContentAndRequireExpectedVersion()
         {
@@ -238,12 +243,13 @@ namespace ExportDocManager.Infrastructure.Tests
                 CompanyScope = companyScope
             };
 
-        private static UserReportTemplateService CreateService(SqliteTestDatabase factory, User user) =>
+        private UserReportTemplateService CreateService(SqliteTestDatabase factory, User user) =>
             new(
                 factory,
                 new BusinessDataAccessScope(
                     CreatePostgreSqlSettings(),
-                    new FixedCurrentUserContext(user)));
+                    new FixedCurrentUserContext(user)),
+                new RuntimeAppPathProvider(_root, Path.Combine(_root, "data")));
 
         private static User CreateTemplateUser(
             int id,

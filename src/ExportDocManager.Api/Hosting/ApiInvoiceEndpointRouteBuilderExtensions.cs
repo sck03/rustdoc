@@ -235,6 +235,7 @@ namespace ExportDocManager.Api.Hosting
                 HttpContext context,
                 IInvoiceService invoiceService,
                 int id,
+                string rowVersion,
                 CancellationToken cancellationToken) =>
             {
 
@@ -243,7 +244,7 @@ namespace ExportDocManager.Api.Hosting
                     return Results.BadRequest(new ApiErrorResponse("发票ID必须大于0。"));
                 }
 
-                bool deleted = await invoiceService.DeleteInvoiceAsync(id, cancellationToken);
+                bool deleted = await invoiceService.DeleteInvoiceAsync(id, ApiRowVersion.ParseRequired(rowVersion), cancellationToken);
 
                 return deleted
                     ? Results.Ok(new ApiCommandResponse(true, "发票已删除。"))
