@@ -1,9 +1,9 @@
 import { ArrowDown, ArrowUp, Copy, Trash2 } from "lucide-react";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
-import { createRowColumn, normalizeDesignerFieldPath, normalizeRowColumnWidths, resizeAdjacentRowColumnWidths } from "./reportDesignerMutations.ts";
+import { createRowColumn, normalizeRowColumnWidths, resizeAdjacentRowColumnWidths } from "./reportDesignerMutations.ts";
 import type { ReportBlock, ReportRowColumn } from "./reportDesignerSchema.ts";
 import { BorderEditor, ColumnWidthStrip, FieldPathInput, TextStyleEditor } from "./ReportDesignerPropertyControls.tsx";
-import { normalizeBorderForEditor, normalizeNumber, readDefaultRowFieldPath } from "./reportDesignerPropertiesModel.ts";
+import { normalizeNumber, readDefaultRowFieldPath } from "./reportDesignerPropertiesModel.ts";
 
 export function RowBlockProperties({
   block,

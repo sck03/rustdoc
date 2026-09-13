@@ -1,4 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { useVersionedRecordDraft } from "../../ui/useVersionedRecordDraft.ts";
+import { ServerDraftUpdateNotice } from "../../ui/serverDraftSync.tsx";
 import type { ApiSupplierContactDto, ApiSupplierDto, ApiSupplierImportPreviewDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { currentLocalDateInputValue, readApiError } from "../../ui/formUtils.ts";
 import { SupplierProductLinksPanel } from "./SupplierProductLinksPanel.tsx";
@@ -69,8 +71,10 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
   const [contactView, setContactView] = useState<"directory" | "editor">("directory");
   const [supplierDraftDirty, setSupplierDraftDirty] = useState(false);
   const [contactDraftDirty, setContactDraftDirty] = useState(false);
-  const selectedSupplier = suppliers.find((item) => item.id === supplierId);
-  const selectedContact = contacts.find((item) => item.id === contactId);
+  const supplierDraft = useVersionedRecordDraft(`supplier:${supplierId}`, suppliers.find((item) => item.id === supplierId), supplierDraftDirty);
+  const contactDraft = useVersionedRecordDraft(`supplier:${supplierId}:contact:${contactId}`, contacts.find((item) => item.id === contactId), contactDraftDirty);
+  const selectedSupplier = supplierDraft.record;
+  const selectedContact = contactDraft.record;
   const confirmDiscardChanges = useConfirmUnsavedChanges();
   useUnsavedChangesGuard({
     isDirty: supplierDraftDirty || contactDraftDirty,
@@ -206,7 +210,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
       description,
       confirmLabel: title,
       tone: action === "deactivate" ? "danger" : undefined,
-    })) return;
+    }) || !await confirmDiscardChanges(title)) return;
     try {
       const request = { id: selectedSupplier.id, body: { expectedVersion: selectedSupplier.versionNumber } };
       const saved = action === "admit"
@@ -215,6 +219,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
           ? await client.restoreSupplier(request)
           : await client.deactivateSupplier(request);
       await loadSupplierOptions(saved);
+      setSupplierDraftDirty(false);
       setRevision((value) => value + 1);
       setFeedback(successFeedback(successMessage));
     } catch (error) {
@@ -242,6 +247,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
 
   async function setPrimaryContact() {
     if (!canSetPrimaryContact || !selectedContact) return;
+    if (!await confirmDiscardChanges("设为主要联系人")) return;
     try {
       const saved = await client.setPrimarySupplierContact({
         supplierId,
@@ -249,6 +255,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
         body: { expectedVersion: selectedContact.versionNumber },
       });
       await reloadContacts(saved.id);
+      setContactDraftDirty(false);
       setFeedback(successFeedback("主要联系人已切换。"));
     } catch (error) {
       setFeedback(requestErrorFeedback(error));
@@ -292,6 +299,16 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
   return <section className="work-surface">
     {view === "directory" && <p className="section-description">查找供应商，打开资料后维护联系人、供应产品和评价。</p>}
     <OperationFeedback feedback={feedback} />
+    {(view === "profile" ? supplierDraft : contactDraft).hasPendingServerVersion ? <ServerDraftUpdateNotice
+      entityLabel={view === "profile" ? "供应商" : "联系人"}
+      onKeepLocal={(view === "profile" ? supplierDraft : contactDraft).keepLocalDraft}
+      onLoadServer={() => { void (async () => {
+        if (!await confirmDiscardChanges("载入服务器版本")) return;
+        (view === "profile" ? supplierDraft : contactDraft).loadServerVersion();
+        setSupplierDraftDirty(false);
+        setContactDraftDirty(false);
+      })(); }}
+    /> : null}
     {!canCreateSupplier && !canEditSupplier && !canCreateContact && !canEditContact && !canEditProductLink && !canCreateAssessment && !canEditAssessment
       ? <PermissionNotice>当前岗位只有供应商业务查看权限；档案、联系人、供货关系、评价、导入和导出分别授权。</PermissionNotice>
       : null}

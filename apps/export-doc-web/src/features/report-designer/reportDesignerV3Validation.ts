@@ -14,6 +14,7 @@ import {
 } from "./reportDesignerSchemaDomains.ts";
 import {
   REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER,
+  REPORT_DESIGNER_V3_MAX_PAGE_MARGIN,
   REPORT_DESIGNER_V3_MAX_ALT_TEXT_LENGTH,
   REPORT_DESIGNER_V3_MAX_FALLBACK_LENGTH,
   REPORT_DESIGNER_V3_MAX_FIELD_PATH_LENGTH,
@@ -127,10 +128,17 @@ function normalizePage(value: unknown, issues: ReportDesignerSchemaIssue[]): Rep
   }
   const width = expectedDimensions.width;
   const height = expectedDimensions.height;
-  const marginTop = readInteger(value.marginTopHundredthMm, 800, 0, Math.max(0, height - 200), "$.page.marginTopHundredthMm", issues);
-  const marginRight = readInteger(value.marginRightHundredthMm, 800, 0, Math.max(0, width - 200), "$.page.marginRightHundredthMm", issues);
-  const marginBottom = readInteger(value.marginBottomHundredthMm, 800, 0, Math.max(0, height - marginTop - 100), "$.page.marginBottomHundredthMm", issues);
-  const marginLeft = readInteger(value.marginLeftHundredthMm, 800, 0, Math.max(0, width - marginRight - 100), "$.page.marginLeftHundredthMm", issues);
+  const margin = (name: string) => {
+    const supplied = value[name];
+    if (supplied !== undefined && (typeof supplied !== "number" || !Number.isInteger(supplied) || supplied < 0 || supplied > REPORT_DESIGNER_V3_MAX_PAGE_MARGIN)) {
+      issues.push({ severity: "error", path: `$.page.${name}`, message: `页边距必须在 0–${REPORT_DESIGNER_V3_MAX_PAGE_MARGIN / 100} mm 之间，精确到 0.01 mm。` });
+    }
+    return readInteger(supplied, 800, 0, REPORT_DESIGNER_V3_MAX_PAGE_MARGIN, `$.page.${name}`, issues);
+  };
+  const marginTop = margin("marginTopHundredthMm");
+  const marginRight = margin("marginRightHundredthMm");
+  const marginBottom = margin("marginBottomHundredthMm");
+  const marginLeft = margin("marginLeftHundredthMm");
   if (value.size !== "A4") {
     issues.push({ severity: "warning", path: "$.page.size", message: "v3 仅支持 A4，已统一为 A4。" });
   }
@@ -547,12 +555,10 @@ function validateBodyFlowOverlaps(
   const bodyLayers = layers
     .map((layer, layerIndex) => ({ layer, layerIndex }))
     .filter(({ layer }) => layer.role === "Body");
-  const flowElements = bodyLayers.flatMap(({ layer, layerIndex }) => layer.elements
-    .filter((element) => element.type === "Flow" && element.visible && element.outputEnabled)
+  const elements = bodyLayers.flatMap(({ layer, layerIndex }) => layer.elements
     .map((element, elementIndex) => ({ element, layerIndex, elementIndex })));
-  const staticElements = bodyLayers.flatMap(({ layer, layerIndex }) => layer.elements
-    .filter((element) => element.type !== "Flow" && element.visible && element.outputEnabled)
-    .map((element, elementIndex) => ({ element, layerIndex, elementIndex })));
+  const flowElements = elements.filter(({ element }) => element.type === "Flow" && element.visible && element.outputEnabled);
+  const staticElements = elements.filter(({ element }) => element.type !== "Flow" && element.visible && element.outputEnabled);
   let emitted = 0;
   for (const flow of flowElements) {
     const flowBounds = reportDesignerV3ElementBounds(flow.element);

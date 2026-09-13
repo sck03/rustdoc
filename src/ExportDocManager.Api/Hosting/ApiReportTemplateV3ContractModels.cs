@@ -1,4 +1,5 @@
 using ExportDocManager.Services.Reporting;
+using System.ComponentModel;
 
 namespace ExportDocManager.Api.Hosting;
 
@@ -42,7 +43,22 @@ public sealed class ApiReportTemplateV3ReleaseContract
 }
 public sealed class ApiReportTemplateV3LimitsContract
 {
-    public int MaxLayers { get; init; } = ReportTemplateV3ContractCatalog.MaxLayers; public int MaxElementsPerLayer { get; init; } = ReportTemplateV3ContractCatalog.MaxElementsPerLayer;
-    public int MaxTotalElements { get; init; } = ReportTemplateV3ContractCatalog.MaxTotalElements; public int MaxResources { get; init; } = ReportTemplateV3ContractCatalog.MaxResources;
-    public int MaxResourceBytes { get; init; } = ReportTemplateV3ContractCatalog.MaxResourceBytes; public int MinElementSizeHundredthMm { get; init; } = ReportTemplateV3ContractCatalog.MinElementSize;
+    [DefaultValue(ReportTemplateV3ContractCatalog.MaxLayers)]
+    public int MaxLayers { get; init; } = ReportTemplateV3ContractCatalog.MaxLayers;
+    [DefaultValue(ReportTemplateV3ContractCatalog.MaxElementsPerLayer)]
+    public int MaxElementsPerLayer { get; init; } = ReportTemplateV3ContractCatalog.MaxElementsPerLayer;
+    [DefaultValue(ReportTemplateV3ContractCatalog.MaxTotalElements)]
+    public int MaxTotalElements { get; init; } = ReportTemplateV3ContractCatalog.MaxTotalElements;
+    [DefaultValue(ReportTemplateV3ContractCatalog.MaxResources)]
+    public int MaxResources { get; init; } = ReportTemplateV3ContractCatalog.MaxResources;
+    [DefaultValue(ReportTemplateV3ContractCatalog.MaxResourceBytes)]
+    public int MaxResourceBytes { get; init; } = ReportTemplateV3ContractCatalog.MaxResourceBytes;
+    [DefaultValue(ReportTemplateV3ContractCatalog.MinElementSize)]
+    public int MinElementSizeHundredthMm { get; init; } = ReportTemplateV3ContractCatalog.MinElementSize;
+    [DefaultValue(ReportTemplateV3ContractCatalog.MaxPageMarginHundredthMm)]
+    public int MaxPageMarginHundredthMm { get; init; } = ReportTemplateV3ContractCatalog.MaxPageMarginHundredthMm;
+    [DefaultValue(ReportTemplateV3ContractCatalog.MaxImageDimension)]
+    public int MaxImageDimension { get; init; } = ReportTemplateV3ContractCatalog.MaxImageDimension;
+    [DefaultValue(ReportTemplateV3ContractCatalog.MaxImagePixels)]
+    public int MaxImagePixels { get; init; } = ReportTemplateV3ContractCatalog.MaxImagePixels;
 }

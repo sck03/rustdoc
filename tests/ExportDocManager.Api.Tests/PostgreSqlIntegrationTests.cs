@@ -114,6 +114,8 @@ namespace ExportDocManager.Api.Tests
                         created.Source, created.Notes, created.LinkedDocumentCustomerId,
                         created.VersionNumber)));
 
+                await ReportDesignerPostgreSqlScenarios.VerifyAsync(factory, settings, admin, created.Id);
+
                 var now = DateTime.UtcNow;
                 var startOfMonth = new DateOnly(now.Year, now.Month, 1);
                 await using (var context = factory.CreateDbContext())

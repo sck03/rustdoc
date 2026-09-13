@@ -36,7 +36,7 @@ namespace ExportDocManager.Services.Reporting
                 templatesRoot,
                 templatesRoot,
                 "模板目录不能包含符号链接、目录联接或其他重解析点。");
-            await _settingsService.LoadAsync().ConfigureAwait(false);
+            await _settingsService.LoadAsync(cancellationToken).ConfigureAwait(false);
 
             try
             {
@@ -124,14 +124,18 @@ namespace ExportDocManager.Services.Reporting
             }
         }
 
-        public Task<ReportTemplatePackageImportResult> ImportAsync(
+        public async Task<ReportTemplatePackageImportResult> ImportAsync(
             string packagePath,
             ReportTemplateImportStrategy strategy = ReportTemplateImportStrategy.Overwrite,
             IProgress<OperationProgressUpdate>? progress = null,
-            CancellationToken cancellationToken = default) =>
-            _storageCoordinator.ExecuteMutationAsync(
+            CancellationToken cancellationToken = default)
+        {
+            var result = await _storageCoordinator.ExecuteMutationAsync(
                 transaction => ImportCoreAsync(packagePath, strategy, progress, transaction, cancellationToken),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
+            OperationProgressReporter.Report(progress, "模板包导入完成", $"共加载 {result.TemplateCount} 个模板配置项。", 100);
+            return result;
+        }
 
         private async Task<ReportTemplatePackageImportResult> ImportCoreAsync(
             string packagePath,
@@ -267,8 +271,7 @@ namespace ExportDocManager.Services.Reporting
 
                 cancellationToken.ThrowIfCancellationRequested();
                 OperationProgressReporter.Report(progress, "正在保存模板配置", "正在写入默认模板、单据包和付款报表设置。", 90);
-                transaction.MarkSettingsChanged();
-                await _settingsService.UpdateAsync(settings =>
+                transaction.UpdateSettings(settings =>
                 {
                     settings.ReportTemplateDefaults.ExportDocumentTemplatePath = ReportTemplatePackageReferencePolicy.MergeDefault(
                         settings.ReportTemplateDefaults.ExportDocumentTemplatePath,
@@ -287,10 +290,9 @@ namespace ExportDocManager.Services.Reporting
                         internalTemplates,
                         strategy);
                     return true;
-                }, cancellationToken).ConfigureAwait(false);
+                });
 
                 int importedTemplateCount = manifest.Templates?.Count ?? 0;
-                OperationProgressReporter.Report(progress, "模板包导入完成", $"共加载 {importedTemplateCount} 个模板配置项。", 100);
                 return new ReportTemplatePackageImportResult
                 {
                     TemplateCount = importedTemplateCount,

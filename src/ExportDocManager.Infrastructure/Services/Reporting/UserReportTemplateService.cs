@@ -14,7 +14,7 @@ namespace ExportDocManager.Services.Reporting
     /// commands, immutable versions and image references are committed in one
     /// database transaction; built-in file templates remain outside this store.
     /// </summary>
-    public sealed class UserReportTemplateService : IUserReportTemplateService
+    public sealed partial class UserReportTemplateService : IUserReportTemplateService
     {
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly BusinessDataAccessScope _accessScope;
@@ -31,29 +31,6 @@ namespace ExportDocManager.Services.Reporting
             _accessScope = accessScope ?? throw new ArgumentNullException(nameof(accessScope));
             _clock = clock ?? BusinessClock.CreateSystem();
             _storageLock = new ReportTemplateStorageLock(pathProvider);
-        }
-
-        public async Task<IReadOnlyList<UserReportTemplateRecord>> ListAsync(
-            ReportDocumentType reportType,
-            bool includeArchived = false,
-            CancellationToken cancellationToken = default)
-        {
-            DemandReportTypeAccess(reportType);
-            string type = reportType.ToString();
-            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            var query = _accessScope
-                .ApplyUserReportTemplateScope(context.UserReportTemplates.AsNoTracking())
-                .Where(item => item.ReportType == type);
-            if (!includeArchived)
-            {
-                query = query.Where(item => item.Status != TemplateLifecycleStatusCatalog.Archived);
-            }
-
-            var rows = await query
-                .OrderByDescending(item => item.Status == TemplateLifecycleStatusCatalog.Published)
-                .ThenBy(item => item.Name)
-                .ToListAsync(cancellationToken);
-            return rows.Select(ToRecord).ToArray();
         }
 
         public Task<UserReportTemplateRecord> SaveDraftAsync(
@@ -347,39 +324,6 @@ namespace ExportDocManager.Services.Reporting
                 },
                 cancellationToken);
 
-        public async Task<IReadOnlyList<UserReportTemplateVersionRecord>> ListVersionsAsync(
-            int id,
-            CancellationToken cancellationToken = default)
-        {
-            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            var template = await _accessScope
-                .ApplyUserReportTemplateScope(context.UserReportTemplates.AsNoTracking())
-                .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
-            if (template == null)
-            {
-                return [];
-            }
-            DemandReportTypeAccess(Enum.Parse<ReportDocumentType>(template.ReportType, true));
-
-            bool canRestore = CanAct(template, PermissionAction.Restore);
-            return await context.UserReportTemplateVersions.AsNoTracking()
-                .Where(item => item.UserReportTemplateId == id)
-                .OrderByDescending(item => item.VersionNumber)
-                .Select(item => new UserReportTemplateVersionRecord(
-                    item.Id,
-                    item.UserReportTemplateId,
-                    item.VersionNumber,
-                    item.ChangeType,
-                    item.Name,
-                    item.ContentHtml,
-                    item.Status,
-                    item.ShareScope,
-                    item.ChangedBy,
-                    item.CreatedAt,
-                    canRestore))
-                .ToListAsync(cancellationToken);
-        }
-
         public Task<UserReportTemplateRecord> RestoreVersionAsync(
             int id,
             int versionNumber,
@@ -569,16 +513,17 @@ namespace ExportDocManager.Services.Reporting
                 PermissionResourceCatalog.ReportTemplates,
                 action);
 
-        private UserReportTemplateRecord ToRecord(UserReportTemplate item)
+        private UserReportTemplateRecord ToRecord(UserReportTemplate item) => new(ToSummary(item), item.ContentHtml);
+
+        private UserReportTemplateSummaryRecord ToSummary(UserReportTemplate item)
         {
             bool canEdit = item.Status != TemplateLifecycleStatusCatalog.Archived &&
                            _accessScope.IsOwnedByCurrentUser(item.OwnerUserId) &&
                            CanAct(item, PermissionAction.Design);
-            return new UserReportTemplateRecord(
+            return new UserReportTemplateSummaryRecord(
                 item.Id,
                 item.ReportType,
                 item.Name,
-                item.ContentHtml,
                 item.Status,
                 item.ShareScope,
                 item.VersionNumber,

@@ -22,7 +22,7 @@ internal static partial class PersonnelPostgreSqlScenarios
         Assert.Single(hierarchyRace.OfType<ServiceException>());
         var person = await people.CreateAsync(new(Guid.NewGuid(), "EMP-PG-MANAGER", admin.DepartmentId!, "部门负责人", EmploymentType.FullTime,
             clock.Today, false, null, null, new PersonnelProfile("组织负责人", IdentityNumber: "11010519491231002X")));
-        var bytes = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4i8AAAAASUVORK5CYII=");
+        var bytes = RasterImageFixtures.Read("png");
         var imageRace = await RaceAsync(2, async index =>
         {
             using var source = new MemoryStream(bytes);

@@ -1,10 +1,9 @@
-import { lazy, Suspense, useId } from "react";
-import type { ApiContainerPackingAnalysisDto, ApiPackedCargoItemDto } from "../../../api/index.ts";
+import { useId } from "react";
+import type { ApiContainerPackingAnalysisDto } from "../../../api/index.ts";
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
 import type { ContainerPackingRenderModeValue } from "./containerPackingModel.ts";
-import { signedArgbToColorHex, shadeHexColor } from "./containerPackingModel.ts";
+import { signedArgbToColorHex } from "./containerPackingModel.ts";
 import type {
-  ContainerPackingRenderBlockSource,
   ContainerPackingVisualizationDimensions,
 } from "./containerPackingVisualizationModel.ts";
 import {
@@ -12,7 +11,6 @@ import {
 } from "./containerPackingPseudo3dModel.ts";
 import { buildContainerPackingLegend, buildContainerPackingProjection, buildPackedCargoTitle, projectPackedCargoItem, renderContainerPackingCenterOfGravity, renderContainerPackingGuides, renderContainerPackingItemGrid } from "./ContainerPackingProjectionModel.tsx";
 
-const ContainerPackingScene3d = lazy(() => import("./ContainerPackingScene3d.tsx"));
 
 export function ContainerPackingVisualization({
   analysis,
@@ -126,13 +124,6 @@ type ContainerPackingPseudo3dLine = [
   ContainerPackingPseudo3dPoint,
 ];
 
-type ContainerPackingPseudo3dFaceGridLines = {
-  front: ContainerPackingPseudo3dLine[];
-
-  side: ContainerPackingPseudo3dLine[];
-
-  top: ContainerPackingPseudo3dLine[];
-};
 
 function ContainerPackingPseudo3dView({
   dimensions,

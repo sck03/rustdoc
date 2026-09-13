@@ -1,5 +1,4 @@
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
-import { normalizeRowColumnWidths } from "./reportDesignerMutations.ts";
 import type {
   ReportBlock,
   ReportBorderStyle,
@@ -10,7 +9,6 @@ import type {
   ReportDetailTableGroupFooterCell,
   ReportDetailTableSummaryCell,
   ReportGridCell,
-  ReportSection,
   ReportTextStyle,
 } from "./reportDesignerSchema.ts";
 

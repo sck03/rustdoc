@@ -41,12 +41,9 @@ public sealed partial class ReportTemplateImageResourceAccessService
 
     public async Task<ReportTemplateImageResourceContent> ReadAsync(string resourceId, CancellationToken cancellationToken = default)
     {
-        await using var fileLock = await _storageLock.AcquireAsync(cancellationToken).ConfigureAwait(false);
-        if (!await CanReadAsync(resourceId, cancellationToken).ConfigureAwait(false))
-        {
-            throw new ResourceNotFoundException("受控图片资源不存在或无权访问。");
-        }
-        return await _resourceService.ReadAsync(resourceId, cancellationToken).ConfigureAwait(false);
+        ReportTemplateImageResourceContent? result = null;
+        await ReadManyAsync([resourceId], content => result = content, cancellationToken).ConfigureAwait(false);
+        return result!;
     }
 
     public async Task RegisterUploadAsync(
@@ -126,52 +123,8 @@ public sealed partial class ReportTemplateImageResourceAccessService
 
     public async Task<bool> CanReadAsync(
         string resourceId,
-        CancellationToken cancellationToken = default)
-    {
-        string normalizedId = (resourceId ?? string.Empty).Trim();
-        if (!ResourceIdRegex().IsMatch(normalizedId) ||
-            !_accessScope.HasPermission(PermissionResourceCatalog.ReportResources, PermissionAction.View))
-        {
-            return false;
-        }
-
-        int userId = _accessScope.CurrentUser?.Id ?? 0;
-        if (userId <= 0)
-        {
-            return false;
-        }
-
-        if (await _fileReferences.ContainsAsync(normalizedId, type =>
-                _accessScope.HasPermission(PermissionResourceCatalog.ReportTemplates, PermissionAction.View) &&
-                _accessScope.HasPermission(ReportDocumentAccessCatalog.GetSourceResource(type), PermissionAction.View), cancellationToken))
-        {
-            return true;
-        }
-
-        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-        bool exists = await context.ReportTemplateImageResources.AsNoTracking()
-            .AnyAsync(item => item.Id == normalizedId && item.RecycledAt == null, cancellationToken);
-        if (!exists)
-        {
-            return false;
-        }
-
-        bool ownsUpload = await context.ReportTemplateImageResourceUploadClaims.AsNoTracking()
-            .AnyAsync(item => item.ResourceId == normalizedId && item.UserId == userId, cancellationToken);
-        if (ownsUpload)
-        {
-            return true;
-        }
-
-        IQueryable<int> visibleTemplates = _accessScope
-            .ApplyUserReportTemplateScope(context.UserReportTemplates.AsNoTracking())
-            .Select(item => item.Id);
-        return await context.UserReportTemplateResourceReferences.AsNoTracking()
-            .AnyAsync(reference =>
-                reference.ResourceId == normalizedId &&
-                visibleTemplates.Contains(reference.UserReportTemplateId),
-                cancellationToken);
-    }
+        CancellationToken cancellationToken = default) =>
+        (await GetReadableIdsAsync([resourceId], cancellationToken).ConfigureAwait(false)).Contains((resourceId ?? string.Empty).Trim());
 
     public async Task<bool> RecycleAsync(
         string resourceId,

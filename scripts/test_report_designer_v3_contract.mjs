@@ -81,6 +81,16 @@ const normalized = api.normalizeReportDesignerV3Schema({ ...landscapeSchema, pag
 assert(normalized.schema?.page.size === "A4", "v3 校验不得保留非 A4 页面");
 assert(normalized.schema?.page.widthHundredthMm === 29700 && normalized.schema?.page.heightHundredthMm === 21000, "v3 校验必须恢复标准横版 A4 尺寸");
 
+const marginCases = JSON.parse(fs.readFileSync(path.join(repoRoot, "tests/ReportTemplateFixtures/designer-margin-cases.json"), "utf8"));
+for (const sample of marginCases) for (const side of ["Top", "Right", "Bottom", "Left"]) for (const orientation of ["Portrait", "Landscape"]) {
+  const value = structuredClone(landscapeSchema);
+  const dimensions = api.reportDesignerV3PageDimensions(orientation);
+  Object.assign(value.page, { orientation, widthHundredthMm: dimensions.width, heightHundredthMm: dimensions.height, [`margin${side}HundredthMm`]: sample.value });
+  const result = api.normalizeReportDesignerV3Schema(value);
+  const accepted = !result.issues.some(issue => issue.severity === "error" && issue.path === `$.page.margin${side}HundredthMm`);
+  assert(accepted === sample.valid, `前后端页边距样本不一致：${orientation}/${side}/${JSON.stringify(sample.value)}`);
+}
+
 const maliciousFlow = api.normalizeReportDesignerV3Schema({
   ...landscapeSchema,
   layers: [{

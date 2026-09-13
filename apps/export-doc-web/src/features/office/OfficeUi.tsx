@@ -6,7 +6,6 @@ import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import type { OfficePage } from "./officeModel.ts";
-import type { useOfficePaging } from "./useOfficeData.ts";
 
 export function OfficeDialog({ title, children, onClose, busy = false, error = "", protectChanges = false, hasChanges = false }: {
   title: string; children: ReactNode; onClose: () => void; busy?: boolean; error?: string; protectChanges?: boolean; hasChanges?: boolean;

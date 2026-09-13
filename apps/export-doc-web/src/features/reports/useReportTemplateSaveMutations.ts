@@ -12,9 +12,8 @@ export function useReportTemplateSaveMutations({
   reportType,
   selectedTemplatePath,
   expectedRevision,
-  selectedUserTemplateId,
   expectedUserVersion,
-  userTemplates,
+  currentUserTemplate,
   content,
   userTemplateName,
   onDefaultTemplateSaved,
@@ -25,9 +24,8 @@ export function useReportTemplateSaveMutations({
   reportType: ReportTypeOption;
   selectedTemplatePath: string;
   expectedRevision: string;
-  selectedUserTemplateId: number;
   expectedUserVersion: number;
-  userTemplates: ApiUserReportTemplateDto[];
+  currentUserTemplate: ApiUserReportTemplateDto | null;
   content: string;
   userTemplateName: string;
   onDefaultTemplateSaved: (saved: ApiReportTemplateContentDto) => void;
@@ -59,7 +57,7 @@ export function useReportTemplateSaveMutations({
 
   const saveUserTemplateMutation = useMutation({
     mutationFn: (nextContent?: string) => {
-      const current = userTemplates.find((template) => template.id === selectedUserTemplateId);
+      const current = currentUserTemplate;
       if (!current || !current.canEdit) {
         throw new Error("当前共享模板只读，请先复制为自己的模板。");
       }
@@ -75,7 +73,7 @@ export function useReportTemplateSaveMutations({
       });
     },
     onSuccess: async (saved) => {
-      queryClient.setQueryData<ApiUserReportTemplateDto[]>(queryKeys.userReportTemplates(reportType), current => current?.map(row => row.id === saved.id ? saved : row));
+      queryClient.setQueryData(queryKeys.userReportTemplateContent(reportType, saved.id), saved);
       onUserTemplateSaved(saved);
       await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplateVersions(saved.id) });

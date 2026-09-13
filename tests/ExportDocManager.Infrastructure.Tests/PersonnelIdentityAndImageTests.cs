@@ -13,7 +13,7 @@ public sealed class PersonnelIdentityAndImageTests
 {
     // Publicly documented checksum example, never a customer record.
     private const string ExampleIdentity = "11010519491231002X";
-    private static byte[] Png => Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4i8AAAAASUVORK5CYII=");
+    private static byte[] Png => RasterImageFixtures.Read("png");
 
     [Fact]
     public async Task Identity_ShouldRoundTripPrivately_AndOnlyLogChangedFieldNames()

@@ -32,7 +32,7 @@ namespace ExportDocManager.Services.Infrastructure
         public int PageSize { get; set; } = 20;
     }
 
-    public sealed class BackgroundJobSnapshot
+    public sealed record BackgroundJobSnapshot
     {
         public string JobId { get; init; } = string.Empty;
 

@@ -22,7 +22,6 @@ namespace ExportDocManager.Services.Reporting
 
         private readonly ReportTemplatePathResolver _pathResolver;
         private readonly ReportTemplateCatalogLoader _catalogLoader;
-        private readonly ISettingsService _settingsService;
         private readonly IBusinessClock _clock;
         private readonly ILogger<ReportTemplateService> _logger;
         private readonly ReportTemplateV3ImageResourceHydrator _imageResourceHydrator;
@@ -45,7 +44,6 @@ namespace ExportDocManager.Services.Reporting
             _pathResolver = new ReportTemplatePathResolver(pathProvider);
             _logger = logger ?? NullLogger<ReportTemplateService>.Instance;
             _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver, _logger);
-            _settingsService = settingsService;
             _clock = clock ?? BusinessClock.CreateSystem();
             _contextFactory = contextFactory;
             _accessScope = accessScope;
@@ -89,8 +87,7 @@ namespace ExportDocManager.Services.Reporting
                         cancellationToken)
                     .ConfigureAwait(false);
 
-                transaction.MarkSettingsChanged();
-                await SyncTemplateStateAsync(reportType, string.Empty, resolvedPath, title, cancellationToken).ConfigureAwait(false);
+                await SyncTemplateStateAsync(transaction, reportType, string.Empty, resolvedPath, title, cancellationToken).ConfigureAwait(false);
                 return ToContentResult(CreateResolvedTemplate(reportType, resolvedPath, title), content);
             }, cancellationToken).ConfigureAwait(false);
         }
@@ -126,9 +123,11 @@ namespace ExportDocManager.Services.Reporting
                 var resolved = await ResolveEditableTemplateAsync(reportType, templatePath, mustExist: false, cancellationToken)
                     .ConfigureAwait(false);
                 await ValidateRevisionAsync(resolved, expectedRevision, cancellationToken).ConfigureAwait(false);
-                foreach (var resource in ReportTemplateV3ResourceReferenceParser.Parse(reportType, content))
+                var resourceIds = ReportTemplateV3ResourceReferenceParser.Parse(reportType, content).Select(resource => resource.Id).ToArray();
+                if (resourceIds.Length > 0)
                 {
-                    if (_imageResourceAccessService == null || !await _imageResourceAccessService.CanReadAsync(resource.Id, cancellationToken).ConfigureAwait(false))
+                    if (_imageResourceAccessService == null ||
+                        (await _imageResourceAccessService.GetReadableIdsAsync(resourceIds, cancellationToken).ConfigureAwait(false)).Count != resourceIds.Length)
                     {
                         throw new PermissionDeniedException("报表模板引用的图片不存在或无权使用。");
                     }
@@ -150,8 +149,8 @@ namespace ExportDocManager.Services.Reporting
                         cancellationToken)
                     .ConfigureAwait(false);
 
-                transaction.MarkSettingsChanged();
                 await SyncTemplateStateAsync(
+                        transaction,
                         reportType,
                         previousPath,
                         resolved.TemplatePath,
@@ -199,8 +198,8 @@ namespace ExportDocManager.Services.Reporting
                 Directory.CreateDirectory(Path.GetDirectoryName(resolvedNewPath)!);
                 await transaction.CaptureFilesAsync([current.TemplatePath, resolvedNewPath, _pathResolver.GetUserConfigPath()], cancellationToken).ConfigureAwait(false);
                 File.Move(current.TemplatePath, resolvedNewPath, overwrite: false);
-                transaction.MarkSettingsChanged();
                 await SyncTemplateStateAsync(
+                        transaction,
                         reportType,
                         current.TemplatePath,
                         resolvedNewPath,
@@ -267,10 +266,8 @@ namespace ExportDocManager.Services.Reporting
                         throw new ResourceNotFoundException("用户报表模板不存在、已停用或无权访问。");
                     }
 
-                    await _settingsService.LoadAsync(cancellationToken).ConfigureAwait(false);
                     string userStoredPath = $"user-template:{userTemplate.Id}";
-                    transaction.MarkSettingsChanged();
-                    await _settingsService.UpdateAsync(settings =>
+                    transaction.UpdateSettings(settings =>
                     {
                         if (reportType == ReportDocumentType.PaymentVoucher)
                         {
@@ -283,7 +280,7 @@ namespace ExportDocManager.Services.Reporting
                             settings.ReportTemplateDefaults.ExportDocumentTemplatePath = userStoredPath;
                         }
                         return true;
-                    }, cancellationToken).ConfigureAwait(false);
+                    });
 
                     return new ReportTemplateCommandResult
                     {
@@ -298,9 +295,7 @@ namespace ExportDocManager.Services.Reporting
                     .ConfigureAwait(false);
                 string storedPath = _pathResolver.ToStoredPath(current.TemplatePath);
 
-                await _settingsService.LoadAsync(cancellationToken).ConfigureAwait(false);
-                transaction.MarkSettingsChanged();
-                await _settingsService.UpdateAsync(settings =>
+                transaction.UpdateSettings(settings =>
                 {
                     string configuredPath = reportType == ReportDocumentType.PaymentVoucher
                         ? settings.ReportTemplateDefaults.PaymentVoucherTemplatePath
@@ -320,7 +315,7 @@ namespace ExportDocManager.Services.Reporting
                     }
 
                     return true;
-                }, cancellationToken).ConfigureAwait(false);
+                });
 
                 return new ReportTemplateCommandResult
                 {
@@ -349,8 +344,8 @@ namespace ExportDocManager.Services.Reporting
 
                 await transaction.CaptureFilesAsync([current.TemplatePath, _pathResolver.GetUserConfigPath()], cancellationToken).ConfigureAwait(false);
                 File.Delete(current.TemplatePath);
-                transaction.MarkSettingsChanged();
                 await SyncTemplateStateAsync(
+                        transaction,
                         reportType,
                         current.TemplatePath,
                         string.Empty,
@@ -496,6 +491,7 @@ namespace ExportDocManager.Services.Reporting
         }
 
         private async Task SyncTemplateStateAsync(
+            ReportTemplateStorageCoordinator.ReportTemplateStorageMutation transaction,
             ReportDocumentType reportType,
             string previousTemplatePath,
             string currentTemplatePath,
@@ -504,12 +500,10 @@ namespace ExportDocManager.Services.Reporting
             IReadOnlyList<ReportTemplateConfig>? catalogSnapshot = null,
             string? removedTemplatePath = null)
         {
-            await _settingsService.LoadAsync(cancellationToken).ConfigureAwait(false);
-
             string normalizedPreviousPath = _catalogLoader.NormalizeStoredTemplatePath(previousTemplatePath);
             string normalizedPreviousAbsolutePath = _catalogLoader.NormalizeAbsoluteTemplatePath(previousTemplatePath);
             string normalizedCurrentPath = _catalogLoader.NormalizeStoredTemplatePath(currentTemplatePath);
-            await _settingsService.UpdateAsync(settings =>
+            transaction.UpdateSettings(settings =>
             {
                 bool changed = UpdateDefaultTemplateReference(
                     settings.ReportTemplateDefaults,
@@ -531,7 +525,7 @@ namespace ExportDocManager.Services.Reporting
                     normalizedPreviousPath,
                     normalizedPreviousAbsolutePath,
                     normalizedCurrentPath) || changed;
-            }, cancellationToken).ConfigureAwait(false);
+            });
 
             cancellationToken.ThrowIfCancellationRequested();
             await RefreshTemplateCatalogAsync(

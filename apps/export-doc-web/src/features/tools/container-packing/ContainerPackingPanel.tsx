@@ -1,21 +1,11 @@
 import {
   FormEvent,
-  lazy,
-  Suspense,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  FolderOpen,
-  PackageCheck,
-  Plus,
-  RefreshCw,
-  Save,
-  Trash2,
-} from "lucide-react";
 import type {
   ApiContainerPackingAnalyzeRequest,
   ApiContainerPackingAnalyzeResponse,
@@ -32,17 +22,13 @@ import {
   type ContainerPackingFormState,
   type ContainerPackingRenderModeValue,
   type ContainerPackingRulesFormState,
-  type ContainerPackingZoneValue,
   buildContainerPackingAnalyzeRequest,
   buildContainerPackingProjectSaveRequest,
   buildContainerPackingStatusText,
   containerPackingAutoRefreshDebounceMs,
-  containerPackingRenderModeOptions,
-  containerPackingZoneOptions,
   createContainerPackingCargoRow,
   findContainerType,
   formatFormNumber,
-  formatPackingPercent,
   isValidContainerPackingCargoRow,
   normalizeContainerPackingZone,
   readNonNegativeNumberInput,

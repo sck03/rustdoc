@@ -55,7 +55,7 @@ internal static class ReportTemplateV3SchemaValidator
     {
         var orientation = RequiredString(page, "orientation", "$.page.orientation"); if (!ReportTemplateV3ContractCatalog.Orientations.Contains(orientation, StringComparer.Ordinal)) throw Error("V3 页面方向无效。");
         var expected = ReportTemplateV3ContractCatalog.A4Dimensions(orientation); if (RequiredInt(page, "widthHundredthMm", "$.page.widthHundredthMm") != expected.WidthHundredthMm || RequiredInt(page, "heightHundredthMm", "$.page.heightHundredthMm") != expected.HeightHundredthMm) throw Error("V3 页面尺寸必须与 A4 方向一致，单位为 1/100 mm。");
-        foreach (var name in PageMargins) if (page.TryGetProperty(name, out var value) && (!Integer(value) || value.GetInt32() is < 0 or > 6000)) throw Error($"$.page.{name}无效。");
+        foreach (var name in PageMargins) if (page.TryGetProperty(name, out var value) && (!Integer(value) || value.GetInt32() is < 0 or > ReportTemplateV3ContractCatalog.MaxPageMarginHundredthMm)) throw Error($"$.page.{name}无效。");
     }
     private static HashSet<string> ValidateResources(JsonElement root)
     {

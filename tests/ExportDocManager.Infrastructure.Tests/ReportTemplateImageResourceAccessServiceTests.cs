@@ -218,7 +218,7 @@ public sealed class ReportTemplateImageResourceAccessServiceTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-    private static User CreateResourceUser(int id, bool canViewTemplates = true)
+    private static User CreateResourceUser(int id, bool canViewTemplates = true, bool canViewExports = true)
     {
         var actions = PermissionResourceCatalog.ByKey[PermissionResourceCatalog.ReportResources].Actions;
         var grants = actions.ToDictionary(
@@ -230,6 +230,8 @@ public sealed class ReportTemplateImageResourceAccessServiceTests : IDisposable
             grants[PermissionResourceCatalog.CreateGrantKey(
                 PermissionResourceCatalog.ReportTemplates, PermissionAction.View)] = PermissionDataScope.All;
         }
+        if (canViewExports) grants[PermissionResourceCatalog.CreateGrantKey(
+            PermissionModuleCatalog.DocumentInvoices, PermissionAction.View)] = PermissionDataScope.All;
         return new User
         {
             Id = id,
@@ -237,6 +239,30 @@ public sealed class ReportTemplateImageResourceAccessServiceTests : IDisposable
             Role = UserRoleCatalog.User,
             EffectivePermissionGrants = grants
         };
+    }
+
+    [Theory]
+    [InlineData(DatabaseConnectionSettings.SqliteProvider)]
+    [InlineData(DatabaseConnectionSettings.PostgreSqlProvider)]
+    public async Task ReferencedImages_ShouldRequireTemplateAndSourceDomainPermissions(string provider)
+    {
+        using var factory = new InMemoryTestDatabase();
+        const string id = "img-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png";
+        await using (var context = factory.CreateDbContext())
+        {
+            var template = Template(8, "出口共享模板", TemplateLifecycleStatusCatalog.Published, TemplateShareScopeCatalog.All);
+            context.UserReportTemplates.Add(template);
+            context.ReportTemplateImageResources.Add(Resource(id));
+            context.UserReportTemplateResourceReferences.Add(Reference(template, id, ReportTemplateResourceReferenceKind.Published));
+            await context.SaveChangesAsync();
+        }
+        foreach (var user in new[] { CreateResourceUser(7, canViewTemplates: false), CreateResourceUser(7, canViewExports: false) })
+        {
+            var scope = new BusinessDataAccessScope(new DatabaseConnectionSettings { Provider = provider }, new FixedCurrentUserContext(user));
+            var service = new ReportTemplateImageResourceAccessService(factory, scope, Paths, new ReportTemplateImageResourceService(Paths));
+            Assert.False(await service.CanReadAsync(id));
+            Assert.Empty((await service.QueryAsync(1, 20)).Items);
+        }
     }
 
     private static BusinessDataAccessScope CreateScope(User user) =>

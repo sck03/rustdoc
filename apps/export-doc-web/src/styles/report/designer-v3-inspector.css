@@ -219,26 +219,10 @@
   width: 100%;
 }
 
-.report-designer-v3-resource-help,
-.report-designer-v3-resource-id {
+.report-designer-v3-resource-help {
   color: var(--edm-neutral-550);
   font-size: 0.6875rem;
   line-height: 1.45;
-}
-
-.report-designer-v3-resource-id {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-  padding-top: 5px;
-  border-top: 1px solid var(--edm-neutral-200);
-}
-
-.report-designer-v3-resource-id code {
-  overflow-wrap: anywhere;
-  color: var(--edm-neutral-750);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.625rem;
 }
 
 .report-designer-v3-upload-feedback {

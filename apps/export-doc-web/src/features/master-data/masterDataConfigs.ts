@@ -9,7 +9,6 @@ ApiUnitDto,
 } from "../../api/index.ts";
 import { formatAmount,formatDate,numberValue } from "../../ui/formUtils.ts";
 import {
-customerTextFields,
 encodeRouteId,
 exporterTextFields,
 applyCustomerFieldChange,

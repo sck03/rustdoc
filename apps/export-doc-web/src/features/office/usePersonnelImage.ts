@@ -1,17 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ExportDocManagerApiClient, PersonnelImageKind } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
-
-export function usePersonnelBlobUrl(blob: Blob | null) {
-  const [value, setValue] = useState<{ blob: Blob; url: string } | null>(null);
-  useEffect(() => {
-    if (!blob) { setValue(null); return; }
-    const url = URL.createObjectURL(blob);
-    setValue({ blob, url });
-    return () => URL.revokeObjectURL(url);
-  }, [blob]);
-  return value?.blob === blob ? value.url : "";
-}
+import { useBlobUrl } from "../../ui/useBlobUrl.ts";
 
 export function usePersonnelImage(client: ExportDocManagerApiClient, id: number, kind: PersonnelImageKind, hash?: string | null) {
   const key = `${id}/${kind}/${hash ?? ""}`;
@@ -31,6 +21,6 @@ export function usePersonnelImage(client: ExportDocManagerApiClient, id: number,
     return () => controller.abort();
   }, [client, id, kind, hash, key, attempt]);
   const current = hash && result?.key === key ? result : null;
-  const url = usePersonnelBlobUrl(current?.blob ?? null);
+  const url = useBlobUrl(current?.blob ?? null);
   return { url, pending: current?.pending ?? Boolean(hash), error: current?.error ?? "", retry: () => setAttempt((value) => value + 1) };
 }

@@ -9,7 +9,7 @@ import {
   invoiceItemWeightDisplayValue,
   type InvoiceItemCellSelection,
 } from "./invoiceItemsEditorModel.ts";
-import { firstEditableInvoiceItemField, type EditableInvoiceItemField, type InvoiceItemColumnDefinition } from "./invoiceItemTableModel.ts";
+import { firstEditableInvoiceItemField, type InvoiceItemColumnDefinition } from "./invoiceItemTableModel.ts";
 
 type VirtualRange={startIndex:number;endIndex:number;topSpacerHeight:number;bottomSpacerHeight:number};
 type Props={activeFocusedCell:InvoiceItemCellSelection|null;activeFocusedCellOptions?:string[];currency?:string;displayItems:ApiInvoiceItemDto[];invoiceItemTableMinWidth:number;itemsCount:number;meaningfulItemCount:number;readOnly:boolean;selectedCellKeys:Set<string>;tableFrameRef:Ref<HTMLDivElement>;totals:Partial<ApiInvoiceDetailDto>;virtualRowRange:VirtualRange;visibleColumns:InvoiceItemColumnDefinition[];visibleDisplayItems:ApiInvoiceItemDto[];onCellMouseDown(event:MouseEvent<HTMLInputElement>,cell:InvoiceItemCellSelection):void;onDuplicateItem(index:number):void;onFocusCell(cell:InvoiceItemCellSelection):void;onKeyDown(event:KeyboardEvent<HTMLDivElement>):void;onMarkMutation(index:number):void;onMoveItem(index:number,direction:-1|1):void;onPaste(event:ClipboardEvent<HTMLDivElement>):void;onRemoveItem(index:number):void;onScroll(event:UIEvent<HTMLDivElement>):void;onUpdateItemField(index:number,column:InvoiceItemColumnDefinition,value:string|number|undefined):void;};

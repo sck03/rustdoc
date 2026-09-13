@@ -1,5 +1,5 @@
 import type { ApiCustomsCooDocumentDto } from "../../api/index.ts";
-import { formatDateTime, readDisplayText, readDisplayValue, shouldShowCooModificationFields, shouldShowCooNonpartyCorps } from "./customsCooModel.ts";
+import { formatDateTime, readDisplayValue, shouldShowCooModificationFields, shouldShowCooNonpartyCorps } from "./customsCooModel.ts";
 
 export function CooSummary({ document }: { document: ApiCustomsCooDocumentDto }) {
   const completion = buildCooCompletion(document);

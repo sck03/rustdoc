@@ -64,8 +64,8 @@ public sealed partial class ReportTemplateImageResourceService : IReportTemplate
         }
 
         byte[] content = buffer.ToArray();
-        var format = DetectFormat(content)
-                     ?? throw new ServiceValidationException("图片内容无效；只支持 PNG、JPEG、GIF 或 WebP。");
+        var format = DetectFormat(content, cancellationToken)
+                     ?? throw new ServiceValidationException("图片结构或尺寸无效；仅支持完整的 PNG、JPEG、GIF 或 WebP，单边不超过 8192 像素，总像素不超过 3200 万。");
         string normalizedDeclaredType = (declaredMediaType ?? string.Empty).Trim().ToLowerInvariant();
         if (!string.IsNullOrEmpty(normalizedDeclaredType) &&
             !string.Equals(normalizedDeclaredType, "application/octet-stream", StringComparison.Ordinal) &&
@@ -157,7 +157,7 @@ public sealed partial class ReportTemplateImageResourceService : IReportTemplate
         string expectedHash = match.Groups["hash"].Value;
         string expectedMediaType = ExtensionToMediaType(match.Groups["extension"].Value);
         byte[] content = await ReadBoundedAsync(path, cancellationToken).ConfigureAwait(false);
-        var actualFormat = DetectFormat(content);
+        var actualFormat = DetectFormat(content, cancellationToken);
         string actualHash = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
         if (actualFormat == null ||
             !string.Equals(actualFormat.MediaType, expectedMediaType, StringComparison.Ordinal) ||
@@ -276,7 +276,7 @@ public sealed partial class ReportTemplateImageResourceService : IReportTemplate
         CancellationToken cancellationToken)
     {
         byte[] content = await ReadBoundedAsync(path, cancellationToken).ConfigureAwait(false);
-        var format = DetectFormat(content);
+        var format = DetectFormat(content, cancellationToken);
         string hash = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
         if (format == null ||
             !string.Equals(format.MediaType, expectedMediaType, StringComparison.Ordinal) ||
@@ -309,18 +309,9 @@ public sealed partial class ReportTemplateImageResourceService : IReportTemplate
         return value.Length <= 200 ? value : value[..200];
     }
 
-    private static ImageFormat? DetectFormat(ReadOnlySpan<byte> content)
-    {
-        if (content.Length >= 8 && content[..8].SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }))
-            return new("image/png", "png");
-        if (content.Length >= 4 && content[0] == 0xFF && content[1] == 0xD8 && content[2] == 0xFF && content[^2] == 0xFF && content[^1] == 0xD9)
-            return new("image/jpeg", "jpg");
-        if (content.Length >= 6 && (content[..6].SequenceEqual("GIF87a"u8) || content[..6].SequenceEqual("GIF89a"u8)))
-            return new("image/gif", "gif");
-        if (content.Length >= 12 && content[..4].SequenceEqual("RIFF"u8) && content.Slice(8, 4).SequenceEqual("WEBP"u8))
-            return new("image/webp", "webp");
-        return null;
-    }
+    private static RasterImageInspector.ImageInfo? DetectFormat(ReadOnlySpan<byte> content, CancellationToken cancellationToken) =>
+        RasterImageInspector.Inspect(content, ReportTemplateV3ContractCatalog.MaxImageDimension,
+            ReportTemplateV3ContractCatalog.MaxImagePixels, cancellationToken);
 
     private static string ExtensionToMediaType(string extension) => extension switch
     {
@@ -334,5 +325,4 @@ public sealed partial class ReportTemplateImageResourceService : IReportTemplate
     [GeneratedRegex("^img-(?<hash>[0-9a-f]{64})\\.(?<extension>png|jpg|gif|webp)$", RegexOptions.CultureInvariant)]
     private static partial Regex ResourceIdRegex();
 
-    private sealed record ImageFormat(string MediaType, string Extension);
 }

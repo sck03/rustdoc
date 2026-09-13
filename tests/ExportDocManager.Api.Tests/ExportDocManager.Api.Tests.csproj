@@ -16,6 +16,9 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="ExportDocManager.Testing" />
+    <Compile Include="../Shared/RasterImageFixtures.cs" Link="RasterImageFixtures.cs" />
+    <None Include="../ReportTemplateFixtures/raster-images.json" Link="Fixtures/raster-images.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

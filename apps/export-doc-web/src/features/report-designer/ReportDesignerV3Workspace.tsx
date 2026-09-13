@@ -1,11 +1,12 @@
 import { EMPTY_REPORT_DESIGNER_DRAFT, type ReportDesignerDraft } from "./reportDesignerDraft.ts";
 import { useReportDesignerV3Clipboard } from "./useReportDesignerV3Clipboard.ts";
+import { ReportDesignerUploadState } from "./reportDesignerUploadState.ts";
 import { useReportDesignerV3Shortcuts } from "./useReportDesignerV3Shortcuts.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignHorizontalJustifyStart,
   AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart,
-  ArrowDown, ArrowUp, ArrowLeftRight, ArrowUpDown,
+  ArrowLeftRight, ArrowUpDown,
   Braces, Paintbrush, ClipboardPaste, Columns3, Copy, FilePlus2, Files, Grid2X2, Hash,
   Image as ImageIcon, ListFilter, Maximize2, Pilcrow, Redo2, RotateCcw,
   Table2, Trash2, Undo2, ZoomIn, ZoomOut,
@@ -43,7 +44,6 @@ import {
   countElements,
   clampReportDesignerV3Zoom,
   filterFieldGroups,
-  fitReportDesignerV3Zoom,
   migrationNoticeDescription,
   migrationNoticeTitle,
   REPORT_DESIGNER_V3_ZOOM_PRESETS,
@@ -85,6 +85,7 @@ export function ReportDesignerV3Workspace({
   const [fieldQuery, setFieldQuery] = useState("");
   const [fieldFocusRequest, setFieldFocusRequest] = useState(0);
   const [capacityNotice, setCapacityNotice] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
   const [gridCellSelection, setGridCellSelection] = useState<{ elementId: string; cellId: string } | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const documentContentRef = useRef(content);
@@ -122,10 +123,10 @@ export function ReportDesignerV3Workspace({
   useEffect(() => {
     onDesignerDraftChange?.({
       content: draftDirty && !exportValidation.blocked ? exportedHtml : "",
-      isDirty: draftDirty,
-      isValid: !exportValidation.blocked,
+      isDirty: draftDirty || imageUploading,
+      isValid: !exportValidation.blocked && !imageUploading,
     });
-  }, [draftDirty, exportValidation.blocked, exportedHtml, onDesignerDraftChange]);
+  }, [draftDirty, exportValidation.blocked, exportedHtml, imageUploading, onDesignerDraftChange]);
   const editingEnabled = editable && (!legacyMigrationPending || migrationAccepted);
   const { hasClipboard, canCopyStyle, canPasteStyle, copySelection, pasteClipboard, copyStyle, pasteStyle } = useReportDesignerV3Clipboard({
     state: history.state, editable: editingEnabled, content, reportType, onCommit: commit, onNotice: setCapacityNotice,
@@ -197,7 +198,7 @@ export function ReportDesignerV3Workspace({
     rectangle: () => placeElement(createV3RectangleElement()),
     line: () => placeElement(createV3LineElement()),
     pageNumber: () => placeElement(createV3PageNumberElement()),
-    image: reportType === "ExportDocument" ? () => placeElement(createV3ImageElement()) : undefined,
+    image: () => placeElement(createV3ImageElement()),
     row: () => insertFlow(createRowBlock(reportType)),
     grid: () => insertFlow(createGridBlock(reportType)),
     conditional: () => insertFlow(createConditionalBlock(reportType)),
@@ -296,6 +297,7 @@ export function ReportDesignerV3Workspace({
   historyRef.current = history;
   useReportDesignerV3Shortcuts({ workspaceRef, history, editable: editingEnabled, commit, copySelection, pasteClipboard, duplicateSelection, clearSelection });
   return (
+    <ReportDesignerUploadState.Provider value={setImageUploading}>
     <section ref={workspaceRef} className="report-designer-v3-workspace" aria-label="报表模板 V3 自由画布设计器">
       <header className="report-designer-v3-header">
         <div>
@@ -338,6 +340,7 @@ export function ReportDesignerV3Workspace({
         </div>
       ) : null}
       {capacityNotice ? <div className="report-designer-v3-notice warning" role="status"><strong>已达到设计器限制</strong><span>{capacityNotice}</span></div> : null}
+      {imageUploading ? <div className="report-designer-v3-notice" role="status">图片正在上传，完成后可保存。</div> : null}
       <div className="report-designer-v3-editing-surface">
       <div className="report-designer-v3-toolbar" role="toolbar" aria-label="设计器工具栏">
         {editingEnabled ? <>
@@ -412,6 +415,7 @@ export function ReportDesignerV3Workspace({
             </> : null}
           </div>
           <ReportDesignerV3Canvas
+            client={client}
             state={history.state}
             zoom={zoom}
             fitRequest={fitRequest}
@@ -464,6 +468,7 @@ export function ReportDesignerV3Workspace({
       </div>
       </div>
     </section>
+    </ReportDesignerUploadState.Provider>
   );
 }
 

@@ -22,6 +22,7 @@ import {
 } from "./reportDesignerV3Mutations.ts";
 import {
   hundredthMmToMm,
+  REPORT_DESIGNER_V3_MAX_PAGE_MARGIN,
   reportDesignerV3ElementText,
   reportDesignerV3ElementKindLabel,
   type ReportDesignerV3Element,
@@ -54,7 +55,7 @@ export function PageInspector({ state, onCommit, canEdit = true }: { state: Repo
       </div>
       <div className="report-designer-v3-page-size-readout"><strong>A4</strong><span>{page.orientation === "Landscape" ? "297 × 210 mm" : "210 × 297 mm"}</span></div>
       <div className="report-designer-v3-inspector-grid">
-        {margins.map(([label, key]) => <NumberField key={key} label={label} value={hundredthMmToMm(page[key])} disabled={!canEdit} onCommit={(value) => onCommit(updateV3Page(state, { [key]: Math.round(value * 100) } as never))} />)}
+        {margins.map(([label, key]) => <NumberField key={key} label={label} value={hundredthMmToMm(page[key])} min={0} max={hundredthMmToMm(REPORT_DESIGNER_V3_MAX_PAGE_MARGIN)} disabled={!canEdit} onCommit={(value) => onCommit(updateV3Page(state, { [key]: Math.round(value * 100) }))} />)}
         <NumberField label="网格间距" value={hundredthMmToMm(state.schema.grid.sizeHundredthMm)} min={1} max={50} disabled={!canEdit} onCommit={(value) => onCommit(updateV3Grid(state, { sizeHundredthMm: Math.max(100, Math.round(value * 100)) }))} />
       </div>
       <CheckRow checked={state.schema.grid.enabled} disabled={!canEdit} onChange={(checked) => onCommit(updateV3Grid(state, { enabled: checked }))}>显示网格</CheckRow>

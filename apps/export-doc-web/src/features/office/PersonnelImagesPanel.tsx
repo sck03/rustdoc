@@ -4,7 +4,8 @@ import { InlineNotice } from "../../ui/PageState.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { OfficeDialog } from "./OfficeUi.tsx";
 import type { useOfficeOperation } from "./useOfficeData.ts";
-import { usePersonnelBlobUrl, usePersonnelImage } from "./usePersonnelImage.ts";
+import { usePersonnelImage } from "./usePersonnelImage.ts";
+import { useBlobUrl } from "../../ui/useBlobUrl.ts";
 
 const imageLabels: Record<PersonnelImageKind, string> = { Avatar: "人员头像", IdentityFront: "身份证人像面（正面）", IdentityBack: "身份证国徽面（反面）" };
 
@@ -46,7 +47,7 @@ function PersonnelImageEditor({ client, id, kind, image, editable, busy, upload,
   const [failedUrl, setFailedUrl] = useState("");
   const [selectionError, setSelectionError] = useState("");
   const stored = usePersonnelImage(client, id, kind, image?.contentHash);
-  const preview = usePersonnelBlobUrl(file);
+  const preview = useBlobUrl(file);
   const url = preview || stored.url;
   const label = imageLabels[kind];
   function clearFile() { setFile(null); setInputKey((value) => value + 1); onPendingChange(kind, false); }

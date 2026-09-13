@@ -2,9 +2,8 @@ import { useReportTemplateDocument } from "./useReportTemplateDocument.ts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "../../styles/routes/reports.css";
 import { useLocation } from "react-router-dom";
-import { ApiReportTemplatePreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
+import { ApiReportTemplatePreviewResponse, ApiUserReportTemplateDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
-import { queryKeys } from "../../api/queryKeys.ts";
 import {
   isDesktopBridgeAvailable,
 } from "../../desktop/desktopBridge.ts";
@@ -18,7 +17,6 @@ import {
   getReportDesignerPreviewSampleProfiles,
   type ReportDesignerPreviewSampleProfile,
 } from "../report-designer/reportDesignerPreviewSamples.ts";
-import { hasValidReportDesignerV3Schema } from "../report-designer/reportDesignerV3TemplateParser.ts";
 import { ReportTemplatePreviewWorkspace } from "./ReportTemplatePreviewWorkspace.tsx";
 import { ReportTemplateWorkspaceHeader } from "./ReportTemplateWorkspaceHeader.tsx";
 import { useReportTemplateSelectionSync } from "./useReportTemplateSelectionSync.ts";
@@ -48,7 +46,6 @@ import {
   readSearchFromHash,
   readTemplateFileNameFromSearch,
   readUserTemplateIdFromSearch,
-  type DesignerMode,
   type ReportTypeOption,
   type ReportTemplatePermissionAccess,
   type TemplatePreviewMode,
@@ -128,7 +125,8 @@ export function ReportTemplateWorkspacePage({
   const {
     templatesQuery,
     userTemplatesQuery,
-    userTemplateVersionsQuery,
+    userTemplateContentQuery,
+    userTemplateDirectory,
     fieldCatalogQuery,
     previewInvoicesQuery,
     previewPaymentsQuery,
@@ -139,18 +137,22 @@ export function ReportTemplateWorkspacePage({
     reportType,
     enabled: canUseCurrentReportType,
     includeDesignerData: view === "designer",
+    includeArchived: templateAccess.restore,
     canPreviewInvoiceSource: invoicePreviewPermission.allowed,
     canPreviewPaymentSource: paymentPreviewPermission.allowed,
     selectedUserTemplateId,
     selectedTemplatePath,
   });
   const currentUserTemplate = useMemo(() => {
-    const current = userTemplatesQuery.data?.find(template => template.id === selectedUserTemplateId) ?? null;
+    const current = userTemplateContentQuery.isError ? null : userTemplateContentQuery.data ?? null;
     return current && contentTemplatePath === buildUserTemplateKey(current.id) && expectedUserVersion > 0
       ? { ...current, versionNumber: expectedUserVersion } : current;
-  }, [contentTemplatePath, expectedUserVersion, selectedUserTemplateId, userTemplatesQuery.data]);
+  }, [contentTemplatePath, expectedUserVersion, userTemplateContentQuery.data, userTemplateContentQuery.isError]);
   const templates = templatesQuery.data ?? [];
-  const userTemplates = userTemplatesQuery.data ?? [];
+  const userTemplates = useMemo(() => {
+    const rows = userTemplatesQuery.data?.items ?? [];
+    return currentUserTemplate && !rows.some(item => item.id === currentUserTemplate.id) ? [currentUserTemplate, ...rows] : rows;
+  }, [userTemplatesQuery.data, currentUserTemplate]);
   const currentTemplate = useMemo(
     () => templates.find((template) => template.templatePath === selectedTemplatePath) ?? null,
     [selectedTemplatePath, templates],
@@ -180,7 +182,7 @@ export function ReportTemplateWorkspacePage({
     onFeedback: showFeedback,
   });
 
-  const handleUserTemplateLoaded = useCallback((selected: (typeof userTemplates)[number]) => {
+  const handleUserTemplateLoaded = useCallback((selected: ApiUserReportTemplateDto) => {
     setSelectedTemplatePath(buildUserTemplateKey(selected.id));
     loadUser(selected);
   }, [loadUser]);
@@ -229,8 +231,7 @@ export function ReportTemplateWorkspacePage({
     setSelectedTemplatePath,
     selectedUserTemplateId,
     setSelectedUserTemplateId,
-    userTemplates,
-    userTemplatesLoaded: userTemplatesQuery.isSuccess,
+    userTemplateContent: userTemplateContentQuery.data ?? null,
     templateContent: templateContentQuery.data ?? null,
     preserveSelection: hasUnsavedTemplateChanges,
     onUserTemplateLoaded: handleUserTemplateLoaded,
@@ -279,9 +280,8 @@ export function ReportTemplateWorkspacePage({
     reportType,
     selectedTemplatePath,
     expectedRevision,
-    selectedUserTemplateId,
     expectedUserVersion,
-    userTemplates: userTemplatesQuery.data ?? [],
+    currentUserTemplate,
     content,
     userTemplateName: currentTemplateDisplayName,
     onDefaultTemplateSaved: (saved) => {
@@ -472,6 +472,7 @@ export function ReportTemplateWorkspacePage({
     busyFlags: [
       templatesQuery.isFetching,
       userTemplatesQuery.isFetching,
+      userTemplateContentQuery.isFetching,
       settingsQuery.isFetching,
       templateContentQuery.isFetching,
       createTemplateMutation.isPending,
@@ -519,7 +520,7 @@ export function ReportTemplateWorkspacePage({
     reportType,
     templateListError: templatesQuery.error,
     userTemplateListError: userTemplatesQuery.error,
-    templateContentError: templateContentQuery.error,
+    templateContentError: templateContentQuery.error ?? userTemplateContentQuery.error,
     previewInvoiceError: previewInvoicesQuery.error,
     previewPaymentError: previewPaymentsQuery.error,
     message,
@@ -624,9 +625,10 @@ export function ReportTemplateWorkspacePage({
       requestConfirmation,
       exportDefaultsDirty: exportDefaults.isDirty,
       refetchTemplates: async () => {
-        const [, users] = await Promise.all([templatesQuery.refetch(), userTemplatesQuery.refetch()]);
+        await Promise.all([templatesQuery.refetch(), userTemplatesQuery.refetch()]);
         if (selectedUserTemplateId > 0) {
-          const selected = users.data?.find(template => template.id === selectedUserTemplateId);
+          const users = await userTemplateContentQuery.refetch();
+          const selected = users.data;
           if (users.isError || !selected) { showFeedback(users.isError ? readApiError(users.error) : "模板不存在或已无权访问，本地草稿已保留。", "error"); return; }
           loadUser(selected, true);
         } else {
@@ -641,6 +643,7 @@ export function ReportTemplateWorkspacePage({
     });
 
   const selectionPanelProps = {
+    directory: userTemplateDirectory,
     reportType,
     reportTypeOptions: availableReportTypeOptions,
     templates,
@@ -671,8 +674,7 @@ export function ReportTemplateWorkspacePage({
        }}
       userPanel={Object.values(templateAccess).some(Boolean) ? {
         currentTemplate: currentUserTemplate,
-        versions: userTemplateVersionsQuery.data ?? [],
-        versionsLoading: userTemplateVersionsQuery.isFetching,
+        client,
         newTemplateName: newUserTemplateName,
         isBusy,
         allowCreateBlank: canDesignTemplates,

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
+import { createHash } from "node:crypto";
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
@@ -15,21 +16,33 @@ const require = createRequire(path.join(web, "package.json"));
 fs.mkdirSync(output, { recursive: true });
 const esbuild = require("esbuild");
 const source = name => JSON.stringify(path.join(web, "src", name).replaceAll("\\", "/"));
+const rasterImages = JSON.parse(fs.readFileSync(path.join(repo, "tests/ReportTemplateFixtures/raster-images.json"), "utf8"));
+const imageFixtures = ["png", "pngAlternate", "jpeg"].map((format, index) => {
+  const bytes = Buffer.from(rasterImages[format], "base64"), sha256 = createHash("sha256").update(bytes).digest("hex");
+  return { id: `img-${sha256}.${format === "jpeg" ? "jpg" : "png"}`, sha256, mediaType: format === "jpeg" ? "image/jpeg" : "image/png", byteLength: bytes.length,
+    altText: `示例图片 ${index + 1}`, storagePolicy: "", ownsUpload: true, isReferenced: index === 0, canRecycle: index > 0, bytes: [...bytes] };
+});
 await esbuild.build({
   stdin: { loader: "tsx", resolveDir: web, contents: `
     import React from 'react';
     import { createRoot } from 'react-dom/client';
+    import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+    import { PermissionAccessProvider } from ${source("app/PermissionAccessContext.tsx")};
+    import { permissionResources } from ${source("app/permissionCatalog.ts")};
+    import { ConfirmationProvider } from ${source("ui/ConfirmationProvider.tsx")};
     import { ReportDesignerV3Workspace } from ${source("features/report-designer/ReportDesignerV3Workspace.tsx")};
     import { parseReportDesignerV3FromHtml } from ${source("features/report-designer/reportDesignerV3TemplateParser.ts")};
     import { exportReportDesignerV3SchemaToHtml } from ${source("features/report-designer/reportDesignerV3HtmlExporter.ts")};
-    import { createV3FlowElement, createV3TextElement, createV3FieldElement, createV3LineElement, createV3PageNumberElement } from ${source("features/report-designer/reportDesignerV3ElementFactories.ts")};
+    import { createV3FlowElement, createV3TextElement, createV3FieldElement, createV3LineElement, createV3PageNumberElement, createV3ImageElement } from ${source("features/report-designer/reportDesignerV3ElementFactories.ts")};
     import { createGridBlock, createDetailTableBlock } from ${source("features/report-designer/reportDesignerBlockFactories.ts")};
     import ${source("styles/cascade.css")};
     import ${source("styles/foundation.css")};
     import ${source("styles/workspaces.css")};
     import ${source("styles/responsive.css")};
     import ${source("styles/routes/reports.css")};
-    const schema = parseReportDesignerV3FromHtml('', 'ExportDocument').schema;
+    const imageScenario = new URLSearchParams(location.search).has('images');
+    const reportType = imageScenario ? 'PaymentVoucher' : 'ExportDocument';
+    const schema = parseReportDesignerV3FromHtml('', reportType).schema;
     schema.layers.forEach(layer => { layer.elements = []; if (layer.role === 'Header') layer.designHeightHundredthMm = 6000; });
     const header = schema.layers.find(layer => layer.role === 'Header');
     const body = schema.layers.find(layer => layer.role === 'Body');
@@ -50,20 +63,36 @@ await esbuild.build({
       const overlay = schema.layers.find(layer => layer.role === 'Overlay');
       for (let index=0;index<900;index++) overlay.elements.push({ ...createV3TextElement(1000 + index % 40 * 450, 23000 + Math.floor(index / 40) * 220), id:'stress-'+index, text:String(index), widthHundredthMm:400, heightHundredthMm:400 });
     }
+    let images=${JSON.stringify(imageFixtures)};
+    window.__imageCalls=[];
+    const client={
+      downloadReportTemplateV3ImageResource:async({resourceId})=>{window.__imageCalls.push({kind:'download',resourceId});const image=images.find(i=>i.id===resourceId);return new Blob([new Uint8Array(image.bytes)],{type:image.mediaType});},
+      queryReportTemplateV3ImageResources:async()=>{window.__imageCalls.push({kind:'list'});return {items:images.map(({bytes,...item})=>item),pageNumber:1,pageSize:12,totalCount:images.length,totalPages:1,hasPreviousPage:false,hasNextPage:false};},
+      uploadReportTemplateV3ImageResource:async()=>{window.__imageCalls.push({kind:'upload'});return new Promise(resolve=>window.__finishImageUpload=()=>resolve((({bytes,...image})=>image)(images[1])));},
+      recycleReportTemplateV3ImageResource:async({resourceId})=>{window.__imageCalls.push({kind:'recycle',resourceId});images=images.filter(i=>i.id!==resourceId);return {success:true,message:'图片资源已安全回收。'};}
+    };
+    window.__imageFixtures=images;
+    if(imageScenario){
+      schema.layers.forEach(layer=>layer.elements=[]);
+      schema.resources=[(({bytes,ownsUpload,isReferenced,canRecycle,storagePolicy,...item})=>item)(images[0])];
+      const overlay=schema.layers.find(layer=>layer.role==='Overlay');
+      overlay.elements.push(...[0,1].map(index=>({...createV3ImageElement(1500+index*7000,6000),id:'image-'+index,resourceId:images[0].id,altText:'真实付款图片'})));
+    }
     window.__designerSchema = schema;
     window.__designerUpdates = 0;
     window.__designerErrors = [];
     window.addEventListener('error', event => window.__designerErrors.push(event.message));
     window.addEventListener('unhandledrejection', event => window.__designerErrors.push(String(event.reason)));
-    const content = exportReportDesignerV3SchemaToHtml(schema, 'ExportDocument');
+    const content = exportReportDesignerV3SchemaToHtml(schema, reportType);
     const fieldCatalog={reportType:'ExportDocument',categoryOrder:['单据备用字段','明细备用列'],fields:['Invoice','item'].flatMap(root=>Array.from({length:10},(_,index)=>({
       category:root==='Invoice'?'单据备用字段':'明细备用列',label:index===9?(root==='Invoice'?'船名航次':'客户货号'):(root==='Invoice'?'发票':'明细')+'备用 '+(index+1),value:'{{ '+root+'.Spare'+(index+1)+' }}',reportType:'ExportDocument'})))};
     window.__designerHtml = content;
-    createRoot(document.getElementById('root')).render(<div className="work-surface" style={{margin:'12px',padding:'8px'}}>
-      <ReportDesignerV3Workspace reportType="ExportDocument" displayName="表格设计交互验证" content={content} fieldCatalog={fieldCatalog} editable={true} onDesignerDraftChange={({content: html, isDirty, isValid}) => {
-        if(isValid) { window.__designerUpdates++; window.__designerHtml=isDirty?html:content; window.__designerSchema=parseReportDesignerV3FromHtml(window.__designerHtml,'ExportDocument').schema; }
+    createRoot(document.getElementById('root')).render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><PermissionAccessProvider grants={[]} permissions={['view','upload','recycle'].map(action=>({resourceKey:permissionResources.reportResources,action,dataScope:'all'}))} canManageSettings={false}><ConfirmationProvider><div className="work-surface" style={{margin:'12px',padding:'8px'}}>
+      <ReportDesignerV3Workspace client={imageScenario?client:undefined} reportType={reportType} displayName="表格设计交互验证" content={content} fieldCatalog={imageScenario?{reportType,fields:[],categoryOrder:[]}:fieldCatalog} editable={!new URLSearchParams(location.search).has('readonly')} onDesignerDraftChange={({content: html, isDirty, isValid}) => {
+        window.__designerDraftState={isDirty,isValid};
+        if(isValid) { window.__designerUpdates++; window.__designerHtml=isDirty?html:content; window.__designerSchema=parseReportDesignerV3FromHtml(window.__designerHtml,reportType).schema; }
       }} />
-    </div>);
+    </div></ConfirmationProvider></PermissionAccessProvider></QueryClientProvider>);
   ` },
   outfile: path.join(output, "app.js"), bundle: true, format: "esm", platform: "browser", jsx: "automatic", nodePaths: [path.join(web, "node_modules")], logLevel: "silent",
 });
@@ -240,6 +269,38 @@ try {
   assert(await read(page,"window.__designerHtml.includes('Invoice.Spare10')"));
   await captureScreenshot(page,path.join(output,'spare-field-picker.png'),{captureBeyondViewport:false});
   results.push({test:'API spare field groups insert a real selectable binding',passed:true});
+  await page.send("Page.navigate",{url:`${url}?images=1`});
+  await waitFor(page,'[...document.querySelectorAll("[data-v3-element-id] img")].length===2 && [...document.querySelectorAll("[data-v3-element-id] img")].every(img=>img.naturalWidth===16)');
+  assert.equal(await read(page,'window.__imageCalls.filter(call=>call.kind==="download").length'),1,'duplicate image elements share one authorized request');
+  assert.equal(await read(page,'window.__imageCalls.some(call=>call.kind==="list")'),false,'the resource library loads on demand');
+  await read(page,'document.querySelector("[data-v3-element-id=image-0]").focus()'); await key(page,'Enter');
+  await waitFor(page,'document.querySelector(".report-designer-v3-resource-gallery summary")');
+  await click(page,'.report-designer-v3-resource-gallery summary');
+  await waitFor(page,'document.querySelectorAll(".report-designer-v3-resource-card").length===3');
+  await read(page,'document.querySelectorAll(".report-designer-v3-resource-card")[1].querySelector("button").click()');
+  await waitFor(page,`window.__designerSchema.layers.flatMap(layer=>layer.elements).find(element=>element.id==='image-0').resourceId===${JSON.stringify(imageFixtures[1].id)}`);
+  assert.equal(await read(page,'document.querySelectorAll(".report-designer-v3-resource-card")[1].querySelectorAll("button").length'),1,'a reused draft image cannot be recycled');
+  await read(page,'document.querySelectorAll(".report-designer-v3-resource-card")[2].querySelector(".danger-button").click()');
+  await waitFor(page,'document.querySelector(".confirmation-dialog")');
+  await read(page,'[...document.querySelectorAll(".confirmation-dialog button")].find(button=>button.textContent.trim()==="确认回收").click()');
+  await waitFor(page,'document.querySelectorAll(".report-designer-v3-resource-card").length===2');
+  assert.equal(await read(page,'window.__imageCalls.filter(call=>call.kind==="recycle").length'),1);
+  assert.equal(await read(page,'window.__designerErrors.length'),0);
+  await captureScreenshot(page,path.join(output,'payment-image-resource-library.png'),{captureBeyondViewport:false});
+  results.push({test:'payment images render, deduplicate, reuse and recycle safely',passed:true});
+  await read(page,`(()=>{const input=document.querySelector('.report-designer-v3-image-editor input[type=file]');const transfer=new DataTransfer();transfer.items.add(new File([new Uint8Array(window.__imageFixtures[1].bytes)],'upload.png',{type:'image/png'}));input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await waitFor(page,'window.__finishImageUpload');
+  await waitFor(page,'window.__designerDraftState.isDirty && !window.__designerDraftState.isValid');
+  await read(page,`[...document.querySelectorAll('.report-designer-v3-image-editor label')].find(label=>label.textContent.includes('来源为空时隐藏')).querySelector('input').click()`);
+  await waitFor(page,`[...document.querySelectorAll('.report-designer-v3-image-editor label')].find(label=>label.textContent.includes('来源为空时隐藏')).querySelector('input').checked===false`);
+  await read(page,'window.__finishImageUpload()');
+  await waitFor(page,`document.body.innerText.includes('图片已上传并自动绑定')`);
+  assert.equal(await read(page,`window.__designerSchema.layers.flatMap(layer=>layer.elements).find(element=>element.id==='image-0').hideWhenSourceEmpty`),false,'upload completion must retain newer image property edits');
+  results.push({test:'upload completion uses the latest canvas draft',passed:true});
+  await page.send("Page.navigate",{url:`${url}?images=1&readonly=1`});
+  await waitFor(page,'document.querySelector("[data-v3-element-id=image-0] img")?.naturalWidth===16');
+  assert.equal(await read(page,'Boolean(document.querySelector(".report-designer-v3-inspector"))'),false);
+  results.push({test:'read-only payment canvas displays authorized images',passed:true});
   fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify({passed:true,results},null,2));
   console.log(`Report designer UI contracts passed (${results.length} cases).`);
 } finally {

@@ -38,7 +38,6 @@ import {
   parseAliases,
   parsePastedTableRows,
   readAliases,
-  readRowString,
   setRows,
   validateCatalog,
 } from "./referenceCatalogModel.ts";

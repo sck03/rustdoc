@@ -1,9 +1,11 @@
 import { Plus } from "lucide-react";
+import { useState } from "react";
 import {
   ApiUserReportTemplateDto,
-  ApiUserReportTemplateVersionDto,
+  ExportDocManagerApiClient,
 } from "../../api/index.ts";
 import { SelectField, TextField } from "../../ui/FormFields.tsx";
+import { ReportTemplateVersionHistory } from "./ReportTemplateVersionHistory.tsx";
 
 const reportTemplateShareScopeOptions = [
   { value: "Private", label: "仅自己可见" },
@@ -18,8 +20,7 @@ export function reportTemplateShareScopeLabel(value?: string) {
 
 export function ReportTemplateUserPanel({
   currentTemplate,
-  versions,
-  versionsLoading,
+  client,
   newTemplateName,
   isBusy,
   allowCreateBlank,
@@ -37,8 +38,7 @@ export function ReportTemplateUserPanel({
   onRestoreVersion,
 }: {
   currentTemplate: ApiUserReportTemplateDto | null;
-  versions: ApiUserReportTemplateVersionDto[];
-  versionsLoading: boolean;
+  client: ExportDocManagerApiClient;
   newTemplateName: string;
   isBusy: boolean;
   allowCreateBlank: boolean;
@@ -55,8 +55,9 @@ export function ReportTemplateUserPanel({
   onArchive: () => void;
   onRestoreVersion: (versionNumber: number) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   return (
-    <details className="template-management-panel template-actions-panel template-user-panel" aria-label="我的和共享模板">
+    <details className="template-management-panel template-actions-panel template-user-panel" aria-label="我的和共享模板" open={expanded} onToggle={event => setExpanded(event.currentTarget.open)}>
       <summary>
         <span>我的 / 共享模板</span>
         <small>默认私有，可明确共享</small>
@@ -139,33 +140,7 @@ export function ReportTemplateUserPanel({
                 ) : null}
               </div>
             ) : null}
-            <details className="template-inline-details">
-              <summary>版本历史 ({versions.length})</summary>
-              <div className="template-version-list">
-                {versionsLoading ? <small>正在读取历史版本…</small> : null}
-                {!versionsLoading && versions.length === 0 ? <small>保存后会在这里保留可恢复快照。</small> : null}
-                {versions.map((version) => (
-                  <div className="template-version-row" key={version.id}>
-                    <div>
-                      <strong>V{version.versionNumber} · {version.changeType}</strong>
-                      <small>
-                        {version.changedBy || "当前用户"} · {new Date(version.createdAt).toLocaleString()}
-                      </small>
-                    </div>
-                    {currentTemplate.canEdit && version.canRestore && version.versionNumber !== currentTemplate.versionNumber ? (
-                      <button
-                        className="command-button secondary compact-button"
-                        type="button"
-                        disabled={isBusy}
-                        onClick={() => onRestoreVersion(version.versionNumber)}
-                      >
-                        恢复
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </details>
+            <ReportTemplateVersionHistory key={currentTemplate.id} client={client} template={currentTemplate} enabled={expanded} isBusy={isBusy} onRestore={onRestoreVersion} />
           </section>
         ) : null}
       </div>

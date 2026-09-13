@@ -1,5 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
+import { ReportDesignerUploadState } from "./reportDesignerUploadState.ts";
 import { Upload } from "lucide-react";
+import { usePermission } from "../../app/PermissionAccessContext.tsx";
+import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
+import { ReportImageResourceGallery } from "./ReportImageResourceGallery.tsx";
+import { REPORT_DESIGNER_V3_MAX_RESOURCE_BYTES } from "./reportDesignerV3Schema.ts";
 import type { ApiReportTemplateImageResourceResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { isAbortError } from "../../ui/useAbortableOperation.ts";
@@ -11,10 +16,17 @@ import { getControlledReportImageFieldPaths, isControlledReportImageFieldPath } 
 
 export function ImageSourceEditor({ element, reportType, resources, editable, client, onPatch, onUploaded }: { element: Extract<ReportDesignerV3Element, { type: "Image" }>; reportType: ReportDesignerReportType; resources: ReportDesignerV3ImageResource[]; editable: boolean; client?: ExportDocManagerApiClient; onPatch: (update: Partial<ReportDesignerV3Element>) => void; onUploaded: (elementId: string, resource: ApiReportTemplateImageResourceResponse) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const canUpload = usePermission(permissionResources.reportResources, permissionActions.upload).allowed;
+  const canView = usePermission(permissionResources.reportResources, permissionActions.view).allowed;
   const uploadRef = useRef<AbortController | null>(null);
+  const onUploading = useContext(ReportDesignerUploadState);
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-  useEffect(() => () => uploadRef.current?.abort(), [element.id, client]);
+  useEffect(() => {
+    setUploading(false);
+    setFeedback(null);
+    return () => { uploadRef.current?.abort(); uploadRef.current = null; onUploading(false); };
+  }, [element.id, client, editable, onUploading]);
   const imageFields = getControlledReportImageFieldPaths(reportType);
   const currentImageField = isControlledReportImageFieldPath(element.fieldPath) ? element.fieldPath : "";
   const imageFieldOptions = [
@@ -25,17 +37,18 @@ export function ImageSourceEditor({ element, reportType, resources, editable, cl
     { value: "", label: resources.length ? "请选择已上传图片" : "暂无已上传图片" },
     ...resources.map((resource) => ({
       value: resource.id,
-      label: `${resource.altText || "图片"} · ${formatResourceSize(resource.byteLength)} · ${resource.id.slice(0, 16)}…`,
+      label: `${resource.altText || "图片"} · ${formatResourceSize(resource.byteLength)}`,
     })),
   ];
 
   async function upload(file: File) {
-    if (!client || !editable || uploadRef.current) return;
-    if (file.size > 32 * 1024 * 1024) {
+    if (!client || !editable || !canUpload || uploadRef.current) return;
+    if (file.size > REPORT_DESIGNER_V3_MAX_RESOURCE_BYTES) {
       setFeedback({ tone: "error", text: "图片不能超过 32 MB。" });
       return;
     }
     setUploading(true);
+    onUploading(true);
     setFeedback(null);
     const controller = new AbortController();
     uploadRef.current = controller;
@@ -51,14 +64,17 @@ export function ImageSourceEditor({ element, reportType, resources, editable, cl
     } catch (error) {
       if (!controller.signal.aborted && !isAbortError(error)) setFeedback({ tone: "error", text: readApiError(error) });
     } finally {
-      uploadRef.current = null;
-      if (!controller.signal.aborted) setUploading(false);
+      if (uploadRef.current === controller) {
+        uploadRef.current = null;
+        setUploading(false);
+        onUploading(false);
+      }
     }
   }
 
   return (
     <div className="report-designer-v3-image-editor">
-      <SelectField label="来源" value={element.sourceKind} options={[{ value: "Field", label: "字段图片" }, { value: "Resource", label: "上传图片" }]} disabled={!editable || uploading} onChange={(value) => {
+      <SelectField label="来源" value={element.sourceKind} options={[...(imageFields.length ? [{ value: "Field", label: "字段图片" }] : []), { value: "Resource", label: "上传图片" }]} disabled={!editable || uploading} onChange={(value) => {
         const sourceKind = value === "Resource" ? "Resource" : "Field";
         onPatch(sourceKind === "Field"
           ? { sourceKind, fieldPath: currentImageField || imageFields[0], resourceId: undefined }
@@ -77,13 +93,13 @@ export function ImageSourceEditor({ element, reportType, resources, editable, cl
             event.currentTarget.value = "";
             if (file) void upload(file);
           }} />
-          <button className="command-button secondary report-designer-v3-upload-button" type="button" disabled={!editable || uploading || !client} onClick={() => inputRef.current?.click()}>
+          <button className="command-button secondary report-designer-v3-upload-button" type="button" disabled={!editable || uploading || !client || !canUpload} onClick={() => inputRef.current?.click()}>
             <Upload size={15} aria-hidden="true" />
             <span>{uploading ? "正在上传…" : "选择图片并上传"}</span>
           </button>
-          <small className="report-designer-v3-resource-help">支持 PNG、JPEG、GIF、WebP，最大 32 MB；上传后自动生成并绑定受控资源。</small>
-          {element.resourceId ? <div className="report-designer-v3-resource-id"><span>资源 ID</span><code>{element.resourceId}</code></div> : null}
+          <small className="report-designer-v3-resource-help">支持静态 PNG/JPEG/WebP 和 GIF，最大 32 MB、单边 8192 像素、总像素 3200 万；上传后自动绑定。</small>
           {feedback ? <div className={`report-designer-v3-upload-feedback is-${feedback.tone}`} role={feedback.tone === "error" ? "alert" : "status"}>{feedback.text}</div> : null}
+          {client && canView ? <ReportImageResourceGallery client={client} editable={editable && !uploading} resources={resources} onChoose={resource => onUploaded(element.id, resource)} /> : null}
         </div>
       )}
       <label><span>替代文本</span><CommitTextField value={element.altText ?? ""} disabled={!editable} placeholder="例如：公司标志" onCommit={(altText) => onPatch({ altText: altText || undefined })} /></label>

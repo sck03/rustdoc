@@ -20,7 +20,7 @@ import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { isConcurrencyConflict, readApiError } from "../../ui/formUtils.ts";
 import { SecretToggle, readSettingString } from "./SettingsFieldControls.tsx";
 import { singleWindowCustomsCooAplAddPath, singleWindowCustomsCooFetchPlacePath, singleWindowCustomsCooOrgCodePath } from "./settingsConfigurationPaths.ts";
-import { cloneSettings, normalizeCurrencyList, normalizeSettingText, setNestedValue } from "./settingsValueUtils.ts";
+import { cloneSettings, normalizeSettingText, setNestedValue } from "./settingsValueUtils.ts";
 import type { SettingPatch, SettingsRecord } from "./settingsTypes.ts";
 import { isDesktopBridgeAvailable, selectDirectory } from "../../desktop/desktopBridge.ts";
 import { filterSettingsCategories, settingsCategories, type SettingsCategoryKey } from "./settingsCategoryCatalog.ts";

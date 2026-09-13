@@ -22,6 +22,9 @@ const invoices=rows.map(row=>({id:row.id,invoiceNo:'INV-'+row.id,customerName:ro
 const deliveries=Array.from({length:65},(_,i)=>({deliveryId:'delivery-'+i,jobId:'',kind:'EmailTool',recipient:'buyer'+i+'@example.test',subject:'业务邮件 '+i,attachmentCount:0,status:i%2?'Uncertain':'Sent',errorMessage:'',createdAt:'2026-09-12T01:00:00Z',updatedAt:'2026-09-12T01:00:00Z'}));
 const templates=[{templatePath:'invoice_template.html',displayName:'标准发票',reportType:'ExportDocument',withSealDefault:true},{templatePath:'packing.html',displayName:'装箱单',reportType:'ExportDocument',withSealDefault:false}];
 const userTemplates=[{id:23,name:'公司共享发票',reportType:'ExportDocument',shareScope:'Company',status:'Published',contentHtml:'<html><body>Shared template</body></html>',versionNumber:1,canEdit:true,canShare:true,canPublish:false,canArchive:true}];
+if(location.hash.includes('manyTemplates=true'))userTemplates.push(...Array.from({length:120},(_,index)=>({...userTemplates[0],id:100+index,name:'分页模板 '+String(index+1).padStart(3,'0'),contentHtml:'<p>Body '+index+'</p>'})));
+let customerContact={id:1,name:'示例联系人',title:'采购',email:'buyer@example.test',phone:'',instantMessaging:'',isPrimary:false,versionNumber:1};
+let supplierContact={id:1,name:'供应商联系人',title:'业务员',email:'sales@example.test',phone:'',instantMessaging:'',isPrimary:false,versionNumber:1};
 const settings={revision:0,system:{appName:'业务系统',itemEntryBlankRowCount:20,itemEntrySpareColumnCount:0,documentFieldLabels:{invoice:{},item:{},payment:{}}},reportTemplateDefaults:{exportDocumentTemplatePath:'invoice_template.html'},batchExport:{items:[],mergePdf:true,zipAfterExport:true,outputFileNamePattern:'发票号',outputFolderPattern:'发票号'},email:{smtpHost:'smtp.example.test'},webDav:{},singleWindow:{customsCooDefaults:{}},ai:{}};
 window.__calls=[];window.__errors=[];
 addEventListener('error',event=>window.__errors.push(event.message));
@@ -32,11 +35,13 @@ const matches=(items,input={})=>items.filter(row=>!input.keyword||JSON.stringify
 const exact=(items,id)=>{const item=items.find(row=>row.id===id);if(!item)throw new Error('记录不存在或无权访问');return item;};
 const client={
  queryCrmCustomers:input=>call('customers',input,page(matches(rows,input),input)),getCrmCustomer:input=>call('customer',input,exact(rows,input.id)),
- queryCrmContacts:input=>call('customerContacts',input,page([{id:1,crmCustomerId:input.customerId,name:'示例联系人',title:'采购',email:'buyer@example.test',phone:'',instantMessaging:'',isPrimary:true,versionNumber:1}],input)),
+ queryCrmContacts:input=>call('customerContacts',input,page([{...customerContact,crmCustomerId:input.customerId}],input)),
+ setPrimaryCrmContact:input=>{window.__calls.push({name:'primaryCustomerContact',input});if(window.__failContactAction)return Promise.reject(new Error('contact action failed'));customerContact={...customerContact,isPrimary:true,versionNumber:customerContact.versionNumber+1};return Promise.resolve({...customerContact,crmCustomerId:input.customerId});},
  queryCrmFollowUps:input=>call('followups',input,page(input.followUpId?[{id:input.followUpId,crmCustomerId:135,customerName:'示例单位 135',crmContactId:1,contactName:'示例联系人',type:'邮件',summary:'确认样品',nextAction:'发送报价',followedUpAt:'2026-09-12T01:00:00Z',isCompleted:false,versionNumber:1}]:[],input)),
  updateCrmCustomer:input=>call('saveCustomer',input,{...exact(rows,input.id),...input.body,versionNumber:2}),
  querySuppliers:input=>call('suppliers',input,page(matches(rows,input),input)),getSupplier:input=>call('supplier',input,exact(rows,input.id)),
- querySupplierContacts:input=>call('supplierContacts',input,page([{id:1,supplierCompanyId:input.supplierId,name:'供应商联系人',title:'业务员',email:'sales@example.test',phone:'',instantMessaging:'',isPrimary:true,versionNumber:1}],input)),
+ querySupplierContacts:input=>call('supplierContacts',input,page([{...supplierContact,supplierCompanyId:input.supplierId}],input)),
+ setPrimarySupplierContact:input=>{window.__calls.push({name:'primarySupplierContact',input});if(window.__failContactAction)return Promise.reject(new Error('contact action failed'));supplierContact={...supplierContact,isPrimary:true,versionNumber:supplierContact.versionNumber+1};return Promise.resolve({...supplierContact,supplierCompanyId:input.supplierId});},
  querySalesOpportunities:input=>call('opportunities',input,page(matches(opportunities,input),input)),getSalesOpportunity:input=>call('opportunity',input,exact(opportunities,input.id)),
  listSalesOpportunityHistory:input=>call('opportunityHistory',input,[{id:1,versionNumber:1,changeType:'新建',stage:'线索',quotationNo:'QT-'+input.id,estimatedAmount:100,currency:'USD',probabilityPercent:20,changedBy:'示例人员',createdAt:'2026-09-12T01:00:00Z'}]),
  listProducts:input=>call('products',input,page([],input)),
@@ -45,8 +50,9 @@ const client={
  updateSettings:input=>{Object.assign(settings,input.body.settings);settings.revision++;return call('saveSettings',input,{settings,secrets:{},message:'已保存',requiresRestart:false});},
  getHealth:()=>call('health',{}, {status:'ok',databaseProviderKey:'Sqlite'}),
  getCustomsCooIssuingAuthorities:()=>call('authorities',{},[]),
- listReportTemplates:input=>call('templates',input,templates),listUserReportTemplates:input=>call('userTemplates',input,userTemplates),
- listUserReportTemplateVersions:input=>call('templateVersions',input,[]),
+ listReportTemplates:input=>call('templates',input,templates),listUserReportTemplates:input=>call('userTemplates',input,page(matches(userTemplates,input).map(({contentHtml,...item})=>item),input)),
+ getUserReportTemplate:input=>call('userTemplateContent',input,exact(userTemplates,input.id)),
+ listUserReportTemplateVersions:input=>call('templateVersions',input,page([],input)),
  getReportTemplateContent:input=>call('templateContent',input,{...templates.find(row=>row.templatePath===input.templatePath),content:'<html><body>Invoice</body></html>',revision:'fixture-revision',storagePolicy:''}),
  getEmailToolStatus:()=>call('emailStatus',{}, {isConfigured:true,smtpHost:'smtp.example.test',smtpPort:587,enableSsl:true,fromAddress:'sender@example.test',fromDisplayName:'业务部'}),
  listEmailDeliveries:input=>call('deliveries',input,page(matches(deliveries,input).filter(row=>!input.status||row.status===input.status),input)),

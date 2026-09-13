@@ -803,10 +803,12 @@ public sealed class ReportTemplateDomainIsolationTests
         var importer = new ReportTemplatePackageService(
             new RuntimeAppPathProvider(Path.Combine(targetRoot, "app"), targetData),
             new FailOnceSettingsService(targetSettings));
+        var progress = new ProgressRecorder();
 
         try
         {
-            await Assert.ThrowsAsync<IOException>(() => importer.ImportAsync(packagePath));
+            await Assert.ThrowsAsync<IOException>(() => importer.ImportAsync(packagePath, progress: progress));
+            Assert.DoesNotContain(100, progress.Values);
 
             Assert.Equal(originalTemplate, await File.ReadAllBytesAsync(targetTemplate));
             Assert.False(File.Exists(Path.Combine(targetData, "Templates", "Export", "incoming.html")));
@@ -845,6 +847,70 @@ public sealed class ReportTemplateDomainIsolationTests
             Assert.Empty(Directory.GetFiles(Path.Combine(paths.DataRoot, "Cache", "TemplateTransactions"), "*.bak", SearchOption.AllDirectories));
         }
         finally { DeleteDirectory(root); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TemplateTransaction_ShouldPreserveConcurrentSettingsWrites(bool fail)
+    {
+        string root = CreateTestRoot("template-settings-interleaving");
+        var paths = new RuntimeAppPathProvider(Path.Combine(root, "app"), Path.Combine(root, "data"));
+        var settings = new SettingsService(paths);
+        var otherWriter = new SettingsService(paths);
+        var coordinator = new ReportTemplateStorageCoordinator(paths, settings);
+        string target = Path.Combine(paths.UserTemplateRoot, "Export", "transaction.html");
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+        await File.WriteAllTextAsync(target, "before");
+        try
+        {
+            Task<bool> Mutate() => coordinator.ExecuteMutationAsync<bool>(async transaction =>
+            {
+                await transaction.CaptureFilesAsync([target], CancellationToken.None);
+                await File.WriteAllTextAsync(target, "after");
+                transaction.UpdateSettings(current => { current.ReportTemplateDefaults.ExportDocumentTemplatePath = "staged"; return true; });
+                await otherWriter.UpdateAsync(current =>
+                {
+                    current.ReportTemplateDefaults.ExportDocumentTemplatePath = "other export";
+                    current.ReportTemplateDefaults.PaymentVoucherTemplatePath = "other payment";
+                    return true;
+                });
+                if (fail) throw new IOException("injected failure after concurrent save");
+                return true;
+            });
+            if (fail) await Assert.ThrowsAsync<IOException>(Mutate);
+            else Assert.True(await Mutate());
+            await otherWriter.LoadAsync();
+            Assert.Equal(fail ? "other export" : "staged", otherWriter.Settings.ReportTemplateDefaults.ExportDocumentTemplatePath);
+            Assert.Equal("other payment", otherWriter.Settings.ReportTemplateDefaults.PaymentVoucherTemplatePath);
+            Assert.Equal(fail ? "before" : "after", await File.ReadAllTextAsync(target));
+            Assert.Equal(fail ? 1 : 2, otherWriter.Settings.Revision);
+        }
+        finally { DeleteDirectory(root); }
+    }
+
+    [Fact]
+    public void V3Margins_ShouldMatchTheSharedBrowserBoundarySamples()
+    {
+        using var cases = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "designer-margin-cases.json")));
+        foreach (var sample in cases.RootElement.EnumerateArray())
+            foreach (string side in new[] { "Top", "Right", "Bottom", "Left" })
+                foreach (string orientation in new[] { "Portrait", "Landscape" })
+                {
+                    string html = CreateV3Template(ReportDocumentType.ExportDocument, "<p>example</p>");
+                    if (orientation == "Landscape") html = html.Replace("\"orientation\": \"Portrait\"", "\"orientation\": \"Landscape\"", StringComparison.Ordinal)
+                        .Replace("\"widthHundredthMm\": 21000", "\"widthHundredthMm\": 29700", StringComparison.Ordinal)
+                        .Replace("\"heightHundredthMm\": 29700", "\"heightHundredthMm\": 21000", StringComparison.Ordinal);
+                    html = html.Replace($"\"margin{side}HundredthMm\": 800", $"\"margin{side}HundredthMm\": {sample.GetProperty("value").GetRawText()}", StringComparison.Ordinal);
+                    if (sample.GetProperty("valid").GetBoolean()) ReportTemplateContentPolicy.Validate(ReportDocumentType.ExportDocument, html);
+                    else Assert.Throws<ArgumentException>(() => ReportTemplateContentPolicy.Validate(ReportDocumentType.ExportDocument, html));
+                }
+    }
+
+    private sealed class ProgressRecorder : IProgress<OperationProgressUpdate>
+    {
+        public List<int?> Values { get; } = [];
+        public void Report(OperationProgressUpdate value) => Values.Add(value.ProgressPercent);
     }
 
     private static string CreateTestRoot(string suffix)

@@ -29,6 +29,7 @@ internal static partial class TypeScriptClientGenerator
         EmitHeader(builder);
         var schemaTypeNames = GetSchemaTypeNames(schemas);
         EmitSchemaTypes(builder, schemas);
+        EmitSchemaDefaults(builder, schemas);
         EmitMissingReferencedSchemaAliases(builder, document, schemaTypeNames);
         EmitOperationRequestTypes(builder, operations);
         EmitClient(builder, operations);

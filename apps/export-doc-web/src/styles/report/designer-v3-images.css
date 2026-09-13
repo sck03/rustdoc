@@ -1,0 +1,32 @@
+.report-designer-v3-resource-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.report-designer-v3-resource-gallery {
+  min-width: 0;
+  margin-block: 0.5rem;
+}
+
+.report-designer-v3-resource-card {
+  display: grid;
+  gap: 0.5rem;
+  padding-block: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.report-designer-v3-resource-thumbnail {
+  height: 6rem;
+  overflow: hidden;
+}
+
+.report-designer-v3-resource-card-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

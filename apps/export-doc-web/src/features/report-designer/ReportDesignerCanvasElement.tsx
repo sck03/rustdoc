@@ -1,5 +1,7 @@
 import { memo, useLayoutEffect, useMemo, useRef, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { ReportBlock } from "./reportDesignerSchema.ts";
+import type { ExportDocManagerApiClient } from "../../api/index.ts";
+import { ReportResourceImage } from "./ReportResourceImage.tsx";
 import { renderReportDesignerBlockPreviewToHtml } from "./reportDesignerBlockRenderer.ts";
 import type { ReportDesignerV3ResizeDirection } from "./reportDesignerV3Mutations.ts";
 import {
@@ -7,8 +9,9 @@ import {
   type ReportDesignerV3Element,
 } from "./reportDesignerV3Schema.ts";
 
-export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCanvasElementPreview({ element, selectedGridCellId }: {
+export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCanvasElementPreview({ element, selectedGridCellId, client }: {
   element: ReportDesignerV3Element;
+  client?: ExportDocManagerApiClient;
   selectedGridCellId?: string;
 }) {
   switch (element.type) {
@@ -22,7 +25,9 @@ export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCa
         </span>
       );
     case "Image":
-      return <span className="report-designer-v3-preview-image">{element.sourceKind === "Field" ? `图片：${element.fieldPath ?? ""}` : element.resourceId ? `资源：${element.resourceId}` : "图片资源未上传"}</span>;
+      return element.sourceKind === "Field"
+        ? <span className="report-designer-v3-preview-image">{`业务图片：${element.fieldPath ?? ""}`}</span>
+        : <ReportResourceImage client={client} resourceId={element.resourceId} alt={element.altText ?? ""} />;
     case "PageNumber":
       return <span className="report-designer-v3-preview-page-number">{element.prefix ?? ""}1{element.format === "CurrentOfTotal" ? " / 1" : ""}{element.suffix ?? ""}</span>;
     case "Rectangle":

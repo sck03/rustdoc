@@ -433,56 +433,29 @@ namespace ExportDocManager.Api.Hosting
             {
                 bool canRetry = normalized.CanRetry && HasRetryDescriptor(normalized);
                 changed = normalized.CanCancel || canRetry != normalized.CanRetry;
-                return new BackgroundJobSnapshot
+                return normalized with
                 {
-                    JobId = normalized.JobId,
-                    Kind = normalized.Kind,
-                    Title = normalized.Title,
-                    Status = normalized.Status,
-                    ProgressPercent = normalized.ProgressPercent,
-                    StatusText = normalized.StatusText,
-                    DetailText = normalized.DetailText,
-                    RequestedBy = normalized.RequestedBy,
-                    RequestedByUserId = normalized.RequestedByUserId,
-                    CreatedAt = normalized.CreatedAt,
-                    StartedAt = normalized.StartedAt,
-                    CompletedAt = normalized.CompletedAt,
                     UpdatedAt = changed
                         ? NextUpdatedAt(normalized.UpdatedAt, restartTime)
                         : normalized.UpdatedAt,
-                    OutputPath = normalized.OutputPath,
-                    ErrorMessage = normalized.ErrorMessage,
                     CanCancel = false,
                     CanRetry = canRetry,
-                    RetryOperation = normalized.RetryOperation,
-                    RetryRequestJson = normalized.RetryRequestJson
                 };
             }
 
             changed = true;
-            return new BackgroundJobSnapshot
+            return normalized with
             {
-                JobId = normalized.JobId,
-                Kind = normalized.Kind,
-                Title = normalized.Title,
                 Status = BackgroundJobStatusCatalog.Failed,
-                ProgressPercent = normalized.ProgressPercent,
                 StatusText = "未完成",
                 DetailText = string.IsNullOrWhiteSpace(normalized.DetailText)
                     ? "API sidecar 重启前任务未正常结束。"
                     : normalized.DetailText,
-                RequestedBy = normalized.RequestedBy,
-                RequestedByUserId = normalized.RequestedByUserId,
-                CreatedAt = normalized.CreatedAt,
-                StartedAt = normalized.StartedAt,
                 CompletedAt = restartTime,
                 UpdatedAt = NextUpdatedAt(normalized.UpdatedAt, restartTime),
-                OutputPath = normalized.OutputPath,
                 ErrorMessage = "API sidecar 重启前任务未正常结束，请重新提交任务。",
                 CanCancel = false,
                 CanRetry = HasRetryDescriptor(normalized),
-                RetryOperation = normalized.RetryOperation,
-                RetryRequestJson = normalized.RetryRequestJson
             };
         }
 
@@ -503,27 +476,10 @@ namespace ExportDocManager.Api.Hosting
 
             TryDeleteControlledBrowserOutput(job.OutputPath);
             changed = true;
-            return new BackgroundJobSnapshot
+            return job with
             {
-                JobId = job.JobId,
-                Kind = job.Kind,
-                Title = job.Title,
-                Status = job.Status,
-                ProgressPercent = job.ProgressPercent,
-                StatusText = job.StatusText,
-                DetailText = job.DetailText,
-                RequestedBy = job.RequestedBy,
-                RequestedByUserId = job.RequestedByUserId,
-                CreatedAt = job.CreatedAt,
-                StartedAt = job.StartedAt,
-                CompletedAt = job.CompletedAt,
                 UpdatedAt = NextUpdatedAt(job.UpdatedAt, _timeProvider.GetUtcNow()),
                 OutputPath = string.Empty,
-                ErrorMessage = job.ErrorMessage,
-                CanCancel = job.CanCancel,
-                CanRetry = job.CanRetry,
-                RetryOperation = job.RetryOperation,
-                RetryRequestJson = job.RetryRequestJson
             };
         }
 

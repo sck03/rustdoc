@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { PackageCheck, PackagePlus, PackageSearch, RefreshCw, Search, X } from "lucide-react";
+import { PackagePlus, PackageSearch, RefreshCw, Search, X } from "lucide-react";
 import type { ApiProductDto } from "../../api/index.ts";
 import { formatPlainNumber, normalizeText, numberValue } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";

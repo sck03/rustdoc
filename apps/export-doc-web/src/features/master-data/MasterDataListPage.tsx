@@ -237,10 +237,6 @@ export function MasterDataListPage({
       : null;
   const isBusy = masterDataQuery.isFetching || deleteMutation.isPending || batchDeleteHsCodesMutation.isPending;
 
-  async function handleLocalHsCodesChanged() {
-    await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("hs-codes") });
-    await masterDataQuery.refetch();
-  }
 
   return (
     <section className="work-surface master-data-surface" aria-label={config.listLabel}>

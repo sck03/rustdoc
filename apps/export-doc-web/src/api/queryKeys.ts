@@ -66,6 +66,7 @@ export const queryKeys = {
   paymentsRoot: () => ["payments"] as const,
   reportTemplates: (reportType: string) => ["reports", "templates", reportType] as const,
   userReportTemplates: (reportType: string) => ["reports", "user-templates", reportType] as const,
+  userReportTemplateContent: (reportType: string, id: number) => ["reports", "user-templates", reportType, "content", id] as const,
   userReportTemplateVersions: (id: number) => ["reports", "user-templates", id, "versions"] as const,
   reportTemplateContent: (reportType: string, templatePath: string) =>
     ["reports", "templates", reportType, "content", templatePath] as const,

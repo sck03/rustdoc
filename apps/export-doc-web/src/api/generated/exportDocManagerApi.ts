@@ -2097,10 +2097,40 @@ export interface ApiPagedResponseOfApiUnitDto {
   totalPages: number;
 }
 
+export interface ApiPagedResponseOfApiUserReportTemplateVersionDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiUserReportTemplateVersionDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface ApiPagedResponseOfBackgroundJobSnapshot {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   items: BackgroundJobSnapshot[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface ApiPagedResponseOfReportTemplateImageResourceListItem {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ReportTemplateImageResourceListItem[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface ApiPagedResponseOfUserReportTemplateSummaryRecord {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: UserReportTemplateSummaryRecord[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
@@ -2584,7 +2614,10 @@ export interface ApiReportTemplateV3ImageResourceContract {
 
 export interface ApiReportTemplateV3LimitsContract {
   maxElementsPerLayer: number;
+  maxImageDimension: number;
+  maxImagePixels: number;
   maxLayers: number;
+  maxPageMarginHundredthMm: number;
   maxResourceBytes: number;
   maxResources: number;
   maxTotalElements: number;
@@ -3363,7 +3396,6 @@ export interface ApiUserReportTemplateVersionDto {
   canRestore: boolean;
   changeType: string;
   changedBy: string;
-  contentHtml: string;
   createdAt: string;
   id: number;
   name: string;
@@ -4263,6 +4295,16 @@ export interface ReportTemplateDefaults {
   paymentVoucherTemplatePath: string;
 }
 
+export interface ReportTemplateImageResourceListItem {
+  byteLength: number;
+  canRecycle: boolean;
+  id: string;
+  isReferenced: boolean;
+  mediaType: string;
+  ownsUpload: boolean;
+  sha256: string;
+}
+
 export type SingleWindowBusinessType = "CustomsCoo" | "AgentConsignment";
 
 export interface SingleWindowClientDispatchResult {
@@ -4553,6 +4595,22 @@ export interface SystemSettings {
   updaterEndpoint: string;
 }
 
+export interface UserReportTemplateSummaryRecord {
+  canArchive: boolean;
+  canDisable: boolean;
+  canEdit: boolean;
+  canPublish: boolean;
+  canRestore: boolean;
+  canShare: boolean;
+  id: number;
+  name: string;
+  ownerUserId?: number | null;
+  reportType: string;
+  shareScope: string;
+  status: string;
+  versionNumber: number;
+}
+
 export interface WebDavSettings {
   enabled: boolean;
   password: string;
@@ -4585,6 +4643,216 @@ export interface WorklistSourceCount {
   key: string;
   name: string;
 }
+
+export const ApiCrmContactSaveRequestDefaults = {
+  expectedVersion: 0,
+} as const satisfies Partial<ApiCrmContactSaveRequest>;
+
+export const ApiCrmCustomerSaveRequestDefaults = {
+  expectedVersion: 0,
+} as const satisfies Partial<ApiCrmCustomerSaveRequest>;
+
+export const ApiCrmFollowUpSaveRequestDefaults = {
+  expectedVersion: 0,
+  nextAction: "",
+  summary: "",
+  type: "",
+} as const satisfies Partial<ApiCrmFollowUpSaveRequest>;
+
+export const ApiEmailTemplateDraftRequestDefaults = {
+  bodyHtml: "",
+  category: "",
+  expectedVersion: 0,
+  name: "",
+  subject: "",
+} as const satisfies Partial<ApiEmailTemplateDraftRequest>;
+
+export const ApiHsCodeDtoDefaults = {
+  consumptionTaxRate: "",
+  declarationExampleCount: 0,
+  evidenceUrl: "",
+  exportTariffRate: "",
+  normalTariffRate: "",
+  notes: "",
+  personalPostalTaxCode: "",
+  preferentialTariffRate: "",
+  remoteRecordKind: "StandardCode",
+  replacedByCodes: "",
+  rowVersion: "",
+  sourceName: "",
+  status: "ReferenceOnly",
+  summaryUrl: "",
+  valueAddedTaxRate: "",
+} as const satisfies Partial<ApiHsCodeDto>;
+
+export const ApiHsCodeSearchResponseDefaults = {
+  declarationExampleCount: 0,
+  standardCodeCount: 0,
+} as const satisfies Partial<ApiHsCodeSearchResponse>;
+
+export const ApiOrganizationCompanySaveRequestDefaults = {
+  expectedVersion: 0,
+} as const satisfies Partial<ApiOrganizationCompanySaveRequest>;
+
+export const ApiOrganizationDepartmentDtoDefaults = {
+  managerName: "",
+} as const satisfies Partial<ApiOrganizationDepartmentDto>;
+
+export const ApiOrganizationDepartmentSaveRequestDefaults = {
+  expectedVersion: 0,
+} as const satisfies Partial<ApiOrganizationDepartmentSaveRequest>;
+
+export const ApiPayeeDtoDefaults = {
+  rowVersion: "",
+} as const satisfies Partial<ApiPayeeDto>;
+
+export const ApiPaymentReportHtmlPreviewResponseDefaults = {
+  storagePolicy: "",
+} as const satisfies Partial<ApiPaymentReportHtmlPreviewResponse>;
+
+export const ApiPermissionTemplateDtoDefaults = {
+  versionNumber: 1,
+} as const satisfies Partial<ApiPermissionTemplateDto>;
+
+export const ApiPermissionTemplateSaveRequestDefaults = {
+  expectedVersion: 0,
+} as const satisfies Partial<ApiPermissionTemplateSaveRequest>;
+
+export const ApiPortDtoDefaults = {
+  rowVersion: "",
+} as const satisfies Partial<ApiPortDto>;
+
+export const ApiProductDtoDefaults = {
+  rowVersion: "",
+} as const satisfies Partial<ApiProductDto>;
+
+export const ApiReportHtmlPreviewResponseDefaults = {
+  storagePolicy: "",
+} as const satisfies Partial<ApiReportHtmlPreviewResponse>;
+
+export const ApiReportTemplateV3LimitsContractDefaults = {
+  maxElementsPerLayer: 1000,
+  maxImageDimension: 8192,
+  maxImagePixels: 32000000,
+  maxLayers: 16,
+  maxPageMarginHundredthMm: 6000,
+  maxResourceBytes: 33554432,
+  maxResources: 1000,
+  maxTotalElements: 4000,
+  minElementSizeHundredthMm: 400,
+} as const satisfies Partial<ApiReportTemplateV3LimitsContract>;
+
+export const ApiSalesOpportunitySaveRequestDefaults = {
+  changeNote: "",
+  currency: "USD",
+  estimatedAmount: 0,
+  expectedVersion: 0,
+  nextAction: "",
+  notes: "",
+  probabilityPercent: 0,
+  quotationNo: "",
+  title: "",
+} as const satisfies Partial<ApiSalesOpportunitySaveRequest>;
+
+export const ApiSingleWindowImportPackageRequestDefaults = {
+  keepWorkingDirectory: false,
+  workingDirectory: "",
+} as const satisfies Partial<ApiSingleWindowImportPackageRequest>;
+
+export const ApiSingleWindowSubmitPackageRequestDefaults = {
+  packagePath: "",
+  stationAssignmentCode: "",
+} as const satisfies Partial<ApiSingleWindowSubmitPackageRequest>;
+
+export const ApiSupplierAssessmentSaveRequestDefaults = {
+  expectedVersion: 0,
+} as const satisfies Partial<ApiSupplierAssessmentSaveRequest>;
+
+export const ApiSupplierContactSaveRequestDefaults = {
+  expectedVersion: 0,
+} as const satisfies Partial<ApiSupplierContactSaveRequest>;
+
+export const ApiSupplierProductLinkSaveRequestDefaults = {
+  expectedVersion: 0,
+} as const satisfies Partial<ApiSupplierProductLinkSaveRequest>;
+
+export const ApiSupplierSaveRequestDefaults = {
+  expectedVersion: 0,
+} as const satisfies Partial<ApiSupplierSaveRequest>;
+
+export const ApiUnitDtoDefaults = {
+  rowVersion: "",
+} as const satisfies Partial<ApiUnitDto>;
+
+export const ApiUserAccountDtoDefaults = {
+  versionNumber: 1,
+} as const satisfies Partial<ApiUserAccountDto>;
+
+export const ApiUserReportTemplateCloneRequestDefaults = {
+  name: "",
+  reportType: "",
+  sourceTemplatePath: "",
+} as const satisfies Partial<ApiUserReportTemplateCloneRequest>;
+
+export const ApiUserReportTemplateCreateRequestDefaults = {
+  contentHtml: "",
+  name: "",
+  reportType: "",
+} as const satisfies Partial<ApiUserReportTemplateCreateRequest>;
+
+export const ApiUserReportTemplateDraftRequestDefaults = {
+  contentHtml: "",
+  expectedVersion: 0,
+  name: "",
+  reportType: "",
+} as const satisfies Partial<ApiUserReportTemplateDraftRequest>;
+
+export const ApiUserSaveRequestDefaults = {
+  expectedVersion: 0,
+} as const satisfies Partial<ApiUserSaveRequest>;
+
+export const HsCodeExampleInputDefaults = {
+  isManuallyVerified: true,
+  resolutionStatus: "Unresolved",
+} as const satisfies Partial<HsCodeExampleInput>;
+
+export const HsCodeHistoryCandidatePageDefaults = {
+  isTruncated: false,
+  notice: "",
+  scannedSourceCount: 0,
+} as const satisfies Partial<HsCodeHistoryCandidatePage>;
+
+export const OfficeDecisionRequestDefaults = {
+  note: "",
+} as const satisfies Partial<OfficeDecisionRequest>;
+
+export const OfficeReturnRequestDefaults = {
+  note: "",
+} as const satisfies Partial<OfficeReturnRequest>;
+
+export const PersonnelProfileDefaults = {
+  emergencyContact: "",
+  emergencyPhone: "",
+  identityAuthority: "",
+  identityLongTerm: false,
+  identityNumber: "",
+  notes: "",
+  personalPhone: "",
+  registeredAddress: "",
+  workEmail: "",
+  workLocation: "",
+  workPhone: "",
+} as const satisfies Partial<PersonnelProfile>;
+
+export const PersonnelRecordDefaults = {
+  canCorrectRegistration: false,
+  canDelete: false,
+  deleteRestriction: "",
+} as const satisfies Partial<PersonnelRecord>;
+
+export const PersonnelTransitionRequestDefaults = {
+  onProbation: true,
+} as const satisfies Partial<PersonnelTransitionRequest>;
 
 export interface ActivateSingleWindowClientProfileRequest {
   profileKey: string;
@@ -5305,6 +5573,10 @@ export interface GetUnitRequest {
   id: number;
 }
 
+export interface GetUserReportTemplateRequest {
+  id: number;
+}
+
 export interface GetWorklistRequest {
   source?: string;
   due?: WorklistDueFilter;
@@ -5636,11 +5908,16 @@ export interface ListUnitsPageRequest {
 
 export interface ListUserReportTemplateVersionsRequest {
   id: number;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListUserReportTemplatesRequest {
   reportType?: string;
   includeArchived?: boolean;
+  pageNumber?: number;
+  pageSize?: number;
+  keyword?: string;
 }
 
 export interface LoginRequest {
@@ -5779,6 +6056,11 @@ export interface QueryCrmFollowUpsRequest {
   pageNumber?: number;
   pageSize?: number;
   followUpId?: number;
+}
+
+export interface QueryReportTemplateV3ImageResourcesRequest {
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface QuerySalesOpportunitiesRequest {
@@ -7859,6 +8141,11 @@ export class ExportDocManagerApiClient {
     return this.request<ApiUnitDto>("GET", path, { init });
   }
 
+  public getUserReportTemplate(request: GetUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
+    const path = `/api/reports/user-templates/${encodePath(request.id)}`;
+    return this.request<ApiUserReportTemplateDto>("GET", path, { init });
+  }
+
   public getWorklist(request: GetWorklistRequest = {}, init?: ApiRequestInit): Promise<WorklistPage> {
     const path = "/api/worklist";
     return this.request<WorklistPage>("GET", path, {
@@ -8502,17 +8789,26 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public listUserReportTemplateVersions(request: ListUserReportTemplateVersionsRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateVersionDto[]> {
+  public listUserReportTemplateVersions(request: ListUserReportTemplateVersionsRequest, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiUserReportTemplateVersionDto> {
     const path = `/api/reports/user-templates/${encodePath(request.id)}/versions`;
-    return this.request<ApiUserReportTemplateVersionDto[]>("GET", path, { init });
+    return this.request<ApiPagedResponseOfApiUserReportTemplateVersionDto>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
   }
 
-  public listUserReportTemplates(request: ListUserReportTemplatesRequest = {}, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto[]> {
+  public listUserReportTemplates(request: ListUserReportTemplatesRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfUserReportTemplateSummaryRecord> {
     const path = "/api/reports/user-templates";
-    return this.request<ApiUserReportTemplateDto[]>("GET", path, {
+    return this.request<ApiPagedResponseOfUserReportTemplateSummaryRecord>("GET", path, {
       query: {
         "reportType": request.reportType,
         "includeArchived": request.includeArchived,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "keyword": request.keyword,
       },
       init,
     });
@@ -8778,6 +9074,17 @@ export class ExportDocManagerApiClient {
         "pageNumber": request.pageNumber,
         "pageSize": request.pageSize,
         "followUpId": request.followUpId,
+      },
+      init,
+    });
+  }
+
+  public queryReportTemplateV3ImageResources(request: QueryReportTemplateV3ImageResourcesRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfReportTemplateImageResourceListItem> {
+    const path = "/api/reports/templates/v3/resources";
+    return this.request<ApiPagedResponseOfReportTemplateImageResourceListItem>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
       },
       init,
     });

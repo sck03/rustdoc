@@ -112,7 +112,6 @@ export const containerPackingRenderModeOptions: Array<{
 
 export const containerPackingAutoRefreshDebounceMs = 900;
 
-const maxContainerPackingGridSegments = 18;
 
 export const containerPackingColorPalette = [
   "#4287f5",
@@ -427,17 +426,6 @@ export function formatFormNumber(value?: number) {
     : String(Number(value.toFixed(3)));
 }
 
-function formatContainerPackingZone(value?: string) {
-  const normalized = value?.trim().toLowerCase();
-
-  return (
-    containerPackingZoneOptions.find(
-      (option) => option.value.toLowerCase() === normalized,
-    )?.label ??
-    value ??
-    "-"
-  );
-}
 
 export function formatPackingPercent(value?: number) {
   const formatted = formatPlainNumber(value);

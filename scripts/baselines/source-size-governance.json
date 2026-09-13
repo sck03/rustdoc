@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-09-12",
+  "capturedAt": "2026-09-13",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -11,9 +11,9 @@
       ],
       "filePattern": "^.+\\.cs$",
       "maximumLines": 850,
-      "baselineAggregateLines": 126639,
+      "baselineAggregateLines": 127054,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 126839,
+      "maximumAggregateLines": 127254,
       "reportFiles": false
     },
     {
@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 46108,
+      "baselineAggregateLines": 46446,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 46228,
+      "maximumAggregateLines": 46566,
       "reportFiles": false
     },
     {
@@ -60,9 +60,9 @@
       ],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "maximumLines": 2300,
-      "baselineAggregateLines": 42824,
+      "baselineAggregateLines": 43013,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 42974,
+      "maximumAggregateLines": 43163,
       "reportFiles": false
     },
     {

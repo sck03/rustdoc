@@ -1,7 +1,6 @@
 import { type ReactNode, useId } from "react";
 import type { ApiAgentConsignmentDocumentDto } from "../../api/index.ts";
 import { FieldShell, SelectField, TextAreaField, TextField } from "../../ui/FormFields.tsx";
-import { formatPlainNumber } from "../../ui/formUtils.ts";
 import {
   buildAgentConsignmentEditorOptions,
   formatAgentDateTime,

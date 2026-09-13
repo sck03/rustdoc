@@ -108,27 +108,12 @@ namespace ExportDocManager.Api.Hosting
                     // worker may complete immediately after observing cancellation;
                     // changing the state first prevents a stale Running snapshot
                     // from making an otherwise accepted request look unsuccessful.
-                    var next = new BackgroundJobSnapshot
+                    var next = job with
                     {
-                        JobId = job.JobId,
-                        Kind = job.Kind,
-                        Title = job.Title,
                         Status = BackgroundJobStatusCatalog.Canceling,
-                        ProgressPercent = job.ProgressPercent,
                         StatusText = "正在取消",
-                        DetailText = job.DetailText,
-                        RequestedBy = job.RequestedBy,
-                        RequestedByUserId = job.RequestedByUserId,
-                        CreatedAt = job.CreatedAt,
-                        StartedAt = job.StartedAt,
-                        CompletedAt = job.CompletedAt,
                         UpdatedAt = NextUpdatedAt(job.UpdatedAt, default),
-                        OutputPath = job.OutputPath,
-                        ErrorMessage = job.ErrorMessage,
                         CanCancel = false,
-                        CanRetry = job.CanRetry,
-                        RetryOperation = job.RetryOperation,
-                        RetryRequestJson = job.RetryRequestJson
                     };
 
                     if (!_jobs.TryUpdate(key, next, job))
@@ -535,13 +520,12 @@ namespace ExportDocManager.Api.Hosting
             ArgumentNullException.ThrowIfNull(job);
             ArgumentNullException.ThrowIfNull(fallback);
 
-            return new BackgroundJobSnapshot
+            return job with
             {
                 JobId = string.IsNullOrWhiteSpace(job.JobId) ? fallback.JobId : job.JobId.Trim(),
                 Kind = job.Kind ?? fallback.Kind ?? string.Empty,
                 Title = job.Title ?? fallback.Title ?? string.Empty,
                 Status = string.IsNullOrWhiteSpace(job.Status) ? fallback.Status : job.Status,
-                ProgressPercent = job.ProgressPercent,
                 StatusText = job.StatusText ?? string.Empty,
                 DetailText = job.DetailText ?? string.Empty,
                 RequestedBy = job.RequestedBy ?? fallback.RequestedBy ?? string.Empty,
@@ -549,13 +533,9 @@ namespace ExportDocManager.Api.Hosting
                     ? job.RequestedByUserId
                     : fallback.RequestedByUserId,
                 CreatedAt = job.CreatedAt == default ? fallback.CreatedAt : job.CreatedAt,
-                StartedAt = job.StartedAt,
-                CompletedAt = job.CompletedAt,
                 UpdatedAt = NextUpdatedAt(fallback.UpdatedAt, job.UpdatedAt),
                 OutputPath = job.OutputPath ?? string.Empty,
                 ErrorMessage = job.ErrorMessage ?? string.Empty,
-                CanCancel = job.CanCancel,
-                CanRetry = job.CanRetry,
                 RetryOperation = CoalesceRetryValue(job.RetryOperation, fallback.RetryOperation),
                 RetryRequestJson = CoalesceRetryValue(job.RetryRequestJson, fallback.RetryRequestJson)
             };
@@ -563,25 +543,19 @@ namespace ExportDocManager.Api.Hosting
 
         private BackgroundJobSnapshot NormalizeNewJob(BackgroundJobSnapshot job, string jobId)
         {
-            return new BackgroundJobSnapshot
+            return job with
             {
                 JobId = jobId,
                 Kind = job.Kind ?? string.Empty,
                 Title = job.Title ?? string.Empty,
                 Status = string.IsNullOrWhiteSpace(job.Status) ? BackgroundJobStatusCatalog.Queued : job.Status,
-                ProgressPercent = job.ProgressPercent,
                 StatusText = job.StatusText ?? string.Empty,
                 DetailText = job.DetailText ?? string.Empty,
                 RequestedBy = job.RequestedBy ?? string.Empty,
-                RequestedByUserId = job.RequestedByUserId,
                 CreatedAt = job.CreatedAt == default ? _timeProvider.GetUtcNow() : job.CreatedAt,
-                StartedAt = job.StartedAt,
-                CompletedAt = job.CompletedAt,
                 UpdatedAt = NextUpdatedAt(default, job.UpdatedAt),
                 OutputPath = job.OutputPath ?? string.Empty,
                 ErrorMessage = job.ErrorMessage ?? string.Empty,
-                CanCancel = job.CanCancel,
-                CanRetry = job.CanRetry,
                 RetryOperation = job.RetryOperation ?? string.Empty,
                 RetryRequestJson = job.RetryRequestJson ?? string.Empty
             };

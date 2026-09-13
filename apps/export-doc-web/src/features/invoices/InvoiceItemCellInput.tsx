@@ -1,6 +1,6 @@
 import { memo, type KeyboardEvent, type MouseEvent, useEffect, useId, useRef, useState } from "react";
 import type { ApiInvoiceItemDto } from "../../api/index.ts";
-import type { EditableInvoiceItemField, InvoiceItemColumnDefinition } from "./invoiceItemTableModel.ts";
+import type { InvoiceItemColumnDefinition } from "./invoiceItemTableModel.ts";
 import {
   invoiceItemNumberDisplayValue,
   invoiceItemNumberInputValue,

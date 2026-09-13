@@ -3,7 +3,6 @@ import type {
   ApiPaymentDto,
   ApiUserReportTemplateCloneRequest,
   ApiUserReportTemplateCreateRequest,
-  ApiUserReportTemplateDto,
 } from "../../api/index.ts";
 import { formatAmount, formatDate, readNumber } from "../../ui/formUtils.ts";
 import {

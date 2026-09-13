@@ -1,4 +1,4 @@
-import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ApiUnitDto } from "../../api/index.ts";
+import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiUnitDto } from "../../api/index.ts";
 import { normalizeText, numberValue } from "../../ui/formUtils.ts";
 import { documentSpareKeys, mapDocumentSpareFields } from "../../ui/documentSpareFields.ts";
 import type { EditableInvoiceItemField, InvoiceItemColumnDefinition } from "./invoiceItemTableModel.ts";
@@ -6,7 +6,6 @@ import { invoiceItemEditableColumns } from "./invoiceItemTableModel.ts";
 export type InvoiceItemCellSelection = { rowIndex: number; field: EditableInvoiceItemField };
 type UnitLookupSourceField = "unitEN" | "ctnUnitEN";
 const invoiceItemHeaderHeightPx = 42;
-const invoiceItemVirtualizationThreshold = 90;
 const invoiceItemVirtualOverscanRows = 8;
 const invoiceItemRowHeightPx = 42;
 const blankWhenZeroInvoiceItemNumberFields = new Set<EditableInvoiceItemField>(["pcsPerCtn","cartons","length","width","height","volume","gwPerCtn","gwTotal","nwPerCtn","nwTotal","purchasePrice","purchaseTotal","taxRebateRate"]);
@@ -603,15 +602,7 @@ export function roundMeasure(value: number) {
   return roundVolume(value);
 }
 
-function roundOptionalWeight(value?: number) {
-  const normalized = normalizeOptionalInvoiceItemNumber(value);
-  return normalized === undefined ? undefined : roundWeight(normalized);
-}
 
-function roundOptionalVolume(value?: number) {
-  const normalized = normalizeOptionalInvoiceItemNumber(value);
-  return normalized === undefined ? undefined : roundVolume(normalized);
-}
 
 export function roundTo(value: number, digits: number) {
   return Number.isFinite(value) ? Number(value.toFixed(digits)) : 0;

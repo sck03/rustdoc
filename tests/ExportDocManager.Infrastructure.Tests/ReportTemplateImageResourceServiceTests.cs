@@ -12,11 +12,7 @@ namespace ExportDocManager.Infrastructure.Tests;
 
 public sealed class ReportTemplateImageResourceServiceTests
 {
-    private static readonly byte[] Png =
-    [
-        137, 80, 78, 71, 13, 10, 26, 10,
-        0, 0, 0, 0
-    ];
+    private static byte[] Png => RasterImageFixtures.Read("png");
 
     [Fact]
     public async Task StoreAsync_ShouldCreateStableSha256ResourceAndTrimReadId()
@@ -116,10 +112,42 @@ public sealed class ReportTemplateImageResourceServiceTests
     public static IEnumerable<object[]> SupportedImageFormats() =>
     [
         [Png, "image/png", "png"],
-        [new byte[] { 0xFF, 0xD8, 0xFF, 0x00, 0xFF, 0xD9 }, "image/jpeg", "jpg"],
-        [Encoding.ASCII.GetBytes("GIF89a"), "image/gif", "gif"],
-        [Encoding.ASCII.GetBytes("RIFF0000WEBP"), "image/webp", "webp"]
+        [RasterImageFixtures.Read("jpeg"), "image/jpeg", "jpg"],
+        [RasterImageFixtures.Read("gif"), "image/gif", "gif"],
+        [RasterImageFixtures.Read("webp"), "image/webp", "webp"]
     ];
+
+    [Theory]
+    [MemberData(nameof(SupportedImageFormats))]
+    public async Task StoreAsync_ShouldRejectTruncatedImagesWithoutPublishingAFile(byte[] content, string mediaType, string extension)
+    {
+        string root = CreateTestRoot("truncated-raster");
+        try
+        {
+            var service = CreateService(root);
+            foreach (int length in new[] { Math.Min(8, content.Length), content.Length / 2, content.Length - 1 })
+            {
+                await using var input = new MemoryStream(content[..length]);
+                await Assert.ThrowsAsync<ServiceValidationException>(() => service.StoreAsync(input, $"image.{extension}", mediaType));
+            }
+            Assert.False(Directory.Exists(Path.Combine(root, "data", "Templates", "Resources", "V3")));
+        }
+        finally { DeleteDirectory(root); }
+    }
+
+    [Fact]
+    public async Task StoreAsync_ShouldRejectCorruptedPngData()
+    {
+        string root = CreateTestRoot("corrupt-raster");
+        try
+        {
+            var bytes = Png;
+            bytes[45] ^= 1;
+            await using var input = new MemoryStream(bytes);
+            await Assert.ThrowsAsync<ServiceValidationException>(() => CreateService(root).StoreAsync(input, "image.png", "image/png"));
+        }
+        finally { DeleteDirectory(root); }
+    }
 
     [Fact]
     public async Task StoreAsync_ShouldRejectMismatchedMediaType()
@@ -209,7 +237,7 @@ public sealed class ReportTemplateImageResourceServiceTests
             Task<Exception?>[] uploads =
             [
                 CaptureExceptionAsync(service, Png, "first.png"),
-                CaptureExceptionAsync(service, [.. Png, 1], "second.png")
+                CaptureExceptionAsync(service, RasterImageFixtures.Read("pngAlternate"), "second.png")
             ];
             Exception?[] errors = await Task.WhenAll(uploads);
 

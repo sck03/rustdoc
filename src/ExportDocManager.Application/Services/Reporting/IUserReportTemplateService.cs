@@ -1,12 +1,12 @@
 using ExportDocManager.Services.Errors;
+using ExportDocManager.Models;
 
 namespace ExportDocManager.Services.Reporting
 {
-    public sealed record UserReportTemplateRecord(
+    public record UserReportTemplateSummaryRecord(
         int Id,
         string ReportType,
         string Name,
-        string ContentHtml,
         string Status,
         string ShareScope,
         int VersionNumber,
@@ -17,6 +17,12 @@ namespace ExportDocManager.Services.Reporting
         bool CanRestore,
         bool CanArchive,
         int? OwnerUserId);
+
+    public sealed record UserReportTemplateRecord : UserReportTemplateSummaryRecord
+    {
+        public string ContentHtml { get; init; }
+        public UserReportTemplateRecord(UserReportTemplateSummaryRecord summary, string contentHtml) : base(summary) => ContentHtml = contentHtml;
+    }
 
     public sealed record UserReportTemplateDraftRequest(
         int Id,
@@ -45,7 +51,6 @@ namespace ExportDocManager.Services.Reporting
         int VersionNumber,
         string ChangeType,
         string Name,
-        string ContentHtml,
         string Status,
         string ShareScope,
         string ChangedBy,
@@ -61,10 +66,15 @@ namespace ExportDocManager.Services.Reporting
 
     public interface IUserReportTemplateService
     {
-        Task<IReadOnlyList<UserReportTemplateRecord>> ListAsync(
+        Task<PagedResult<UserReportTemplateSummaryRecord>> ListAsync(
             ReportDocumentType reportType,
             bool includeArchived = false,
+            int pageNumber = 1,
+            int pageSize = 50,
+            string? keyword = null,
             CancellationToken cancellationToken = default);
+
+        Task<UserReportTemplateRecord> GetAsync(int id, CancellationToken cancellationToken = default);
 
         Task<UserReportTemplateRecord> SaveDraftAsync(
             UserReportTemplateDraftRequest request,
@@ -89,8 +99,10 @@ namespace ExportDocManager.Services.Reporting
         Task<UserReportTemplateRecord> ArchiveAsync(
             int id, int expectedVersion, CancellationToken cancellationToken = default);
 
-        Task<IReadOnlyList<UserReportTemplateVersionRecord>> ListVersionsAsync(
+        Task<PagedResult<UserReportTemplateVersionRecord>> ListVersionsAsync(
             int id,
+            int pageNumber = 1,
+            int pageSize = 20,
             CancellationToken cancellationToken = default);
 
         Task<UserReportTemplateRecord> RestoreVersionAsync(

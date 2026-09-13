@@ -5,117 +5,47 @@ namespace ExportDocManager.Services.Reporting
     public sealed partial class ReportTemplatePackageService
     {
         private static List<ReportTemplateConfig> MergeTemplateRows(
-            List<ReportTemplateConfig> existing,
-            List<ReportTemplateConfig> incoming,
-            ReportTemplateImportStrategy strategy)
-        {
-            if (strategy == ReportTemplateImportStrategy.Overwrite)
+            List<ReportTemplateConfig> existing, List<ReportTemplateConfig> incoming, ReportTemplateImportStrategy strategy) =>
+            MergeRows(existing, incoming, strategy, BuildTemplateRowKey, CloneRow, (current, next) =>
             {
-                return incoming.Select(CloneRow).ToList();
-            }
-
-            var result = existing?.Select(CloneRow).ToList() ?? new List<ReportTemplateConfig>();
-            var map = result.ToDictionary(BuildTemplateRowKey, item => item, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var row in incoming)
-            {
-                string key = BuildTemplateRowKey(row);
-                if (!map.ContainsKey(key))
-                {
-                    var added = CloneRow(row);
-                    result.Add(added);
-                    map[key] = added;
-                    continue;
-                }
-
-                if (strategy == ReportTemplateImportStrategy.Merge)
-                {
-                    map[key].Name = row.Name;
-                    map[key].WithSeal = row.WithSeal;
-                }
-            }
-
-            return result;
-        }
+                current.Name = next.Name;
+                current.WithSeal = next.WithSeal;
+                return current;
+            });
 
         private static List<BatchExportItem> MergeBatchExportItems(
-            List<BatchExportItem> existing,
-            List<BatchExportItem> incoming,
-            ReportTemplateImportStrategy strategy)
-        {
-            if (strategy == ReportTemplateImportStrategy.Overwrite)
-            {
-                return incoming.Select(CloneItem).ToList();
-            }
-
-            var result = existing?.Select(CloneItem).ToList() ?? new List<BatchExportItem>();
-            var map = result.ToDictionary(BuildBatchItemKey, item => item, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var item in incoming)
-            {
-                string key = BuildBatchItemKey(item);
-                if (!map.ContainsKey(key))
-                {
-                    var added = CloneItem(item);
-                    result.Add(added);
-                    map[key] = added;
-                    continue;
-                }
-
-                if (strategy == ReportTemplateImportStrategy.Merge)
-                {
-                    map[key].Name = item.Name;
-                    map[key].TemplatePath = item.TemplatePath;
-                    map[key].ReportType = item.ReportType;
-                    map[key].IsEnabled = item.IsEnabled;
-                    map[key].ShowSeal = item.ShowSeal;
-                }
-            }
-
-            return result;
-        }
+            List<BatchExportItem> existing, List<BatchExportItem> incoming, ReportTemplateImportStrategy strategy) =>
+            MergeRows(existing, incoming, strategy, BuildTemplateItemKey, CloneItem);
 
         private static List<PaymentTemplateItem> MergePaymentTemplateItems(
-            List<PaymentTemplateItem> existing,
-            List<PaymentTemplateItem> incoming,
-            ReportTemplateImportStrategy strategy)
+            List<PaymentTemplateItem> existing, List<PaymentTemplateItem> incoming, ReportTemplateImportStrategy strategy) =>
+            MergeRows(existing, incoming, strategy, BuildTemplateItemKey, ClonePaymentItem);
+
+        private static List<T> MergeRows<T>(IEnumerable<T>? existing, IEnumerable<T> incoming,
+            ReportTemplateImportStrategy strategy, Func<T, string> key, Func<T, T> clone, Func<T, T, T>? merge = null)
         {
-            if (strategy == ReportTemplateImportStrategy.Overwrite)
-            {
-                return incoming.Select(ClonePaymentItem).ToList();
-            }
-
-            var result = existing?.Select(ClonePaymentItem).ToList() ?? new List<PaymentTemplateItem>();
-            var map = result.ToDictionary(BuildTemplateItemKey, item => item, StringComparer.OrdinalIgnoreCase);
-
+            if (strategy == ReportTemplateImportStrategy.Overwrite) return incoming.Select(clone).ToList();
+            var result = existing?.Select(clone).ToList() ?? [];
+            var positions = result.Select((item, index) => (Key: key(item), Index: index))
+                .ToDictionary(item => item.Key, item => item.Index, StringComparer.OrdinalIgnoreCase);
             foreach (var item in incoming)
             {
-                string key = BuildTemplateItemKey(item);
-                if (!map.ContainsKey(key))
+                string itemKey = key(item);
+                if (!positions.TryGetValue(itemKey, out int index))
                 {
-                    var added = ClonePaymentItem(item);
-                    result.Add(added);
-                    map[key] = added;
-                    continue;
+                    positions.Add(itemKey, result.Count);
+                    result.Add(clone(item));
                 }
-
-                if (strategy == ReportTemplateImportStrategy.Merge)
+                else if (strategy == ReportTemplateImportStrategy.Merge)
                 {
-                    map[key].Name = item.Name;
-                    map[key].TemplatePath = item.TemplatePath;
-                    map[key].ReportType = ReportDocumentType.PaymentVoucher.ToString();
-                    map[key].IsEnabled = item.IsEnabled;
+                    result[index] = merge == null ? clone(item) : merge(result[index], item);
                 }
             }
-
             return result;
         }
 
         private static string BuildTemplateRowKey(ReportTemplateConfig row) =>
             $"{row?.Type}|{row?.FileName}";
-
-        private static string BuildBatchItemKey(BatchExportItem item) =>
-            BuildTemplateItemKey(item);
 
         private static string BuildTemplateItemKey(TemplateItemBase item) =>
             $"{item?.ReportType}|{item?.TemplatePath}|{item?.Name}";

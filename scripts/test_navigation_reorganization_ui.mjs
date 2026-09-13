@@ -66,6 +66,23 @@ try {
     await clickText("返回供应商目录"); await waitFor("document.querySelector('.pagination-bar')?.textContent.includes('第 2 /')"); results.push("supplier-return-" + width);
   }
   await open("/suppliers?view=profile&supplierId=135"); await waitFor("document.querySelector('input[name=name]')?.value==='示例单位 135'"); results.push("supplier-deep-link-beyond-first-100");
+  for (const party of ["customer", "supplier"]) {
+    await open(party === "customer" ? "/crm/follow-ups?view=contacts&customerId=135" : "/suppliers?view=contacts&supplierId=135");
+    if (party === "supplier") { await waitFor("document.querySelector('.supplier-contact-workspace tbody button')"); await clickText("编辑", ".supplier-contact-workspace tbody button"); }
+    await waitFor("document.querySelector('input[name=email]')");
+    const originalEmail = await read("document.querySelector('input[name=email]').value");
+    await input('input[name=email]', 'local-draft@example.test');
+    await clickText("设为主要联系人"); await waitFor("document.querySelector('.confirmation-dialog')"); await clickText("取消", ".confirmation-dialog button");
+    assert.equal(await read("document.querySelector('input[name=email]').value"), 'local-draft@example.test');
+    assert.equal(await read("window.__calls.some(c=>c.name.startsWith('primary'))"), false);
+    await read("window.__failContactAction=true"); await clickText("设为主要联系人"); await clickText("设为主要联系人", ".confirmation-dialog button");
+    await waitFor("document.body.innerText.includes('contact action failed')");
+    assert.equal(await read("document.querySelector('input[name=email]').value"), 'local-draft@example.test');
+    await read("window.__failContactAction=false"); await clickText("设为主要联系人"); await waitFor("document.querySelector('.confirmation-dialog')");
+    await clickText("设为主要联系人", ".confirmation-dialog button"); await waitFor("document.querySelector('input[name=email]').value!== 'local-draft@example.test'");
+    assert.equal(await read("document.querySelector('input[name=email]').value"), originalEmail);
+    await audit(party + "-status-action-draft-protection");
+  }
   await open("/crm/follow-ups?customerPage=2"); await waitFor("document.querySelector('tbody tr button')"); await clickText("打开", "tbody button");
   await waitFor("document.querySelector('input[name=name]')?.value==='示例单位 021'");
   await input('input[name=name]', "未保存的客户名称"); await clickText("联系人", "[role=tab]"); await waitFor("document.querySelector('.confirmation-dialog')");
@@ -112,8 +129,27 @@ try {
   await open("/reports/templates/manage"); await waitFor("document.querySelector('.template-default-selection select')?.options.length>=3");
   assert.equal(await read("document.querySelectorAll('.template-selection-panel select').length"), 2);
   await input('.template-default-selection select', "user-template:23"); await waitFor("window.__route.includes('userTemplateId=23')");
+  await waitFor("document.querySelector('.template-user-panel')");
+  assert.equal(await read("document.querySelector('.template-user-panel').open"),false);
+  assert.equal(await read("window.__calls.some(call=>call.name==='templateVersions')"),false);
+  await read("document.querySelector('.template-user-panel > summary').click()");
+  await read("document.querySelector('.template-inline-details > summary').click()");
+  await waitFor("window.__calls.some(call=>call.name==='templateVersions')");
+  await read("document.querySelector('.template-user-panel > summary').click()");
+  results.push("template-history-loads-only-when-expanded");
   await clickText("输出默认值", "[role=tab]"); await waitFor("document.querySelector('.report-export-defaults-panel')?.getClientRects().length"); await audit("report-defaults-unified-directory");
   await clickText("导入导出", "[role=tab]"); await audit("report-transfer-view");
+  await open("/reports/templates/manage?manyTemplates=true&userTemplateId=180");
+  await waitFor("document.querySelector('.template-default-selection select')?.value==='user-template:180'");
+  await clickText("下一页", '[aria-label="用户模板分页"] button');
+  await waitFor("window.__calls.some(call=>call.name==='userTemplates'&&call.input.pageNumber===2)");
+  await input('[aria-label="搜索模板目录"]', "分页模板 120");
+  await waitFor("window.__calls.some(call=>call.name==='userTemplates'&&call.input.pageNumber===1&&call.input.keyword==='分页模板 120')");
+  await waitFor("[...document.querySelector('.template-default-selection select').options].some(option=>option.value==='user-template:219')");
+  await input('.template-default-selection select', "user-template:219");
+  await waitFor("window.__route.includes('userTemplateId=219')&&document.querySelector('.template-default-selection select').value==='user-template:219'");
+  assert.equal(await read("[...document.querySelectorAll('.template-default-selection select option')].filter(option=>option.value).length"),1);
+  results.push("template-directory-page-search-and-selected-detail");
   await open("/tools/excel"); await waitFor("document.querySelector('.job-excel-grid')");
   assert.equal(await read("window.__calls.some(c=>c.name==='invoices')"), false); assert(await read("Boolean(document.querySelector('.job-excel-grid a[href=\"#/invoices\"]'))")); await audit("excel-context-shortcut");
   await open("/invoices"); await waitFor("document.querySelector('[aria-label=\"选择发票 INV-1\"]')");

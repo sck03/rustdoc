@@ -26,7 +26,6 @@ import { SingleWindowStationProfilePanel } from "./SingleWindowStationProfilePan
 
 export function SingleWindowOperationCenterPage({ client }: { client: ExportDocManagerApiClient }) {
   const permission = useModulePermission("document.single-window");
-  const queryClient = useQueryClient();
   const [initialListViewState] = useState(() => loadSingleWindowOperationCenterViewState());
   const [keyword, setKeyword] = useState(initialListViewState.keyword);
   const [committedKeyword, setCommittedKeyword] = useState(initialListViewState.keyword);

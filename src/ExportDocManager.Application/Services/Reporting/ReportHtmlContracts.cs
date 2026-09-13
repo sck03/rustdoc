@@ -314,6 +314,16 @@ namespace ExportDocManager.Services.Reporting
     /// </summary>
     public interface IReportTemplateImageResourceAccessService
     {
+        Task ReadManyAsync(IReadOnlyCollection<string> resourceIds,
+            Action<ReportTemplateImageResourceContent> consume,
+            CancellationToken cancellationToken = default);
+
+        Task<IReadOnlySet<string>> GetReadableIdsAsync(IReadOnlyCollection<string> resourceIds,
+            CancellationToken cancellationToken = default);
+
+        Task<PagedResult<ReportTemplateImageResourceListItem>> QueryAsync(int pageNumber, int pageSize,
+            CancellationToken cancellationToken = default);
+
         Task<ReportTemplateImageResourceContent> ReadAsync(
             string resourceId,
             CancellationToken cancellationToken = default);
@@ -331,4 +341,7 @@ namespace ExportDocManager.Services.Reporting
             CancellationToken cancellationToken = default);
 
     }
+
+    public sealed record ReportTemplateImageResourceListItem(string Id, string MediaType, long ByteLength,
+        string Sha256, bool OwnsUpload, bool IsReferenced, bool CanRecycle);
 }

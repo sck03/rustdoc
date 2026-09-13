@@ -2,7 +2,6 @@ import type { ApiContainerPackingAnalysisDto, ApiPackedCargoItemDto } from "../.
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
 import { signedArgbToColorHex } from "./containerPackingModel.ts";
 import type {
-  ContainerPackingRenderBlockSource,
   ContainerPackingVisualizationDimensions,
 } from "./containerPackingVisualizationModel.ts";
 
@@ -406,17 +405,6 @@ export function buildPackedCargoTitle(item: ApiPackedCargoItemDto) {
   return `${item.name || "货物"} / ${footprintText} / 高度 ${heightText} / ${countText}`;
 }
 
-function buildPackedCargoRenderBlockTitle(
-  item: ContainerPackingRenderBlockSource,
-) {
-  const footprintText = `${formatPlainNumber(item.length)} x ${formatPlainNumber(item.width)} cm`;
-
-  const heightText = `${formatPlainNumber(item.baseHeight)} - ${formatPlainNumber(item.baseHeight + item.occupiedHeight)} cm`;
-
-  const countText = `${formatPlainNumber(item.unitsRepresented || item.loadCount)} 件`;
-
-  return `${item.name || "货物"} / ${footprintText} / 高度 ${heightText} / ${countText}`;
-}
 
 function readPackedCargoFootprint(item: ApiPackedCargoItemDto) {
   return {

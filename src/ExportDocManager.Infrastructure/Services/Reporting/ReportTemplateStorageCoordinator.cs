@@ -1,4 +1,3 @@
-using System.Text.Json;
 using ExportDocManager.Models;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
@@ -26,11 +25,15 @@ internal sealed class ReportTemplateStorageCoordinator
     {
         ArgumentNullException.ThrowIfNull(mutation);
         await using var fileLock = await _storageLock.AcquireAsync(cancellationToken).ConfigureAwait(false);
-        await _settingsService.LoadAsync(cancellationToken).ConfigureAwait(false);
-        await using var transaction = new ReportTemplateStorageMutation(_pathProvider, _settingsService, _logger);
+        await using var transaction = new ReportTemplateStorageMutation(_pathProvider, _logger);
         try
         {
-            return await mutation(transaction).ConfigureAwait(false);
+            T result = await mutation(transaction).ConfigureAwait(false);
+            // Publish settings only after every fallible file/catalog operation has succeeded.
+            // UpdateAsync reloads the latest settings under its own lock and commits atomically;
+            // a failed template transaction never needs to restore another writer's settings.
+            await transaction.CommitSettingsAsync(_settingsService, cancellationToken).ConfigureAwait(false);
+            return result;
         }
         catch (Exception originalException)
         {
@@ -59,22 +62,18 @@ internal sealed class ReportTemplateStorageCoordinator
     internal sealed class ReportTemplateStorageMutation : IAsyncDisposable
     {
         private readonly IAppPathProvider _pathProvider;
-        private readonly ISettingsService _settingsService;
         private readonly ILogger? _logger;
         private readonly string _templatesRoot;
-        private readonly ReportSettingsSnapshot _settingsSnapshot;
+        private readonly List<Func<AppSettings, bool>> _settingsUpdates = [];
         private readonly List<(string Target, string? Backup)> _files = [];
         private string? _snapshotRoot;
-        private bool _settingsChanged;
         private bool _retainRecoveryFiles;
 
-        internal ReportTemplateStorageMutation(IAppPathProvider pathProvider, ISettingsService settingsService, ILogger? logger)
+        internal ReportTemplateStorageMutation(IAppPathProvider pathProvider, ILogger? logger)
         {
             _pathProvider = pathProvider;
-            _settingsService = settingsService;
             _logger = logger;
             _templatesRoot = new ReportTemplatePathResolver(pathProvider).GetUserTemplatesBaseDirectory();
-            _settingsSnapshot = ReportSettingsSnapshot.Capture(settingsService.Settings);
         }
 
         /// <summary>Call before the first write, move or delete of each affected file.</summary>
@@ -100,7 +99,15 @@ internal sealed class ReportTemplateStorageCoordinator
             }
         }
 
-        public void MarkSettingsChanged() => _settingsChanged = true;
+        public void UpdateSettings(Func<AppSettings, bool> update) => _settingsUpdates.Add(update);
+
+        internal Task CommitSettingsAsync(ISettingsService settingsService, CancellationToken cancellationToken) =>
+            _settingsUpdates.Count == 0 ? Task.CompletedTask : settingsService.UpdateAsync(settings =>
+            {
+                bool changed = false;
+                foreach (var update in _settingsUpdates) changed |= update(settings);
+                return changed;
+            }, cancellationToken);
 
         public void RetainRecoveryFiles() => _retainRecoveryFiles = true;
 
@@ -122,18 +129,6 @@ internal sealed class ReportTemplateStorageCoordinator
                     }, CancellationToken.None).ConfigureAwait(false);
                 }
             }
-            if (_settingsChanged)
-            {
-                await _settingsService.LoadAsync(CancellationToken.None).ConfigureAwait(false);
-                if (!ReportSettingsSnapshot.AreEquivalent(ReportSettingsSnapshot.Capture(_settingsService.Settings), _settingsSnapshot))
-                {
-                    await _settingsService.UpdateAsync(settings =>
-                    {
-                        _settingsSnapshot.Apply(settings);
-                        return true;
-                    }, CancellationToken.None).ConfigureAwait(false);
-                }
-            }
         }
 
         public ValueTask DisposeAsync()
@@ -146,26 +141,5 @@ internal sealed class ReportTemplateStorageCoordinator
             return ValueTask.CompletedTask;
         }
 
-        private sealed record ReportSettingsSnapshot(ReportTemplateDefaults ReportTemplateDefaults, BatchExportSettings BatchExport, List<PaymentTemplateItem> PaymentTemplates)
-        {
-            private static readonly JsonSerializerOptions Options = new();
-            public static ReportSettingsSnapshot Capture(AppSettings settings) => new(
-                DeepCopy(settings.ReportTemplateDefaults ?? new ReportTemplateDefaults()),
-                DeepCopy(settings.BatchExport ?? new BatchExportSettings()),
-                DeepCopy(settings.PaymentTemplates ?? []));
-
-            public void Apply(AppSettings settings)
-            {
-                settings.ReportTemplateDefaults = DeepCopy(ReportTemplateDefaults);
-                settings.BatchExport = DeepCopy(BatchExport);
-                settings.PaymentTemplates = DeepCopy(PaymentTemplates);
-            }
-
-            public static bool AreEquivalent(ReportSettingsSnapshot left, ReportSettingsSnapshot right) =>
-                JsonSerializer.SerializeToUtf8Bytes(left, Options).AsSpan().SequenceEqual(JsonSerializer.SerializeToUtf8Bytes(right, Options));
-
-            private static T DeepCopy<T>(T value) => JsonSerializer.Deserialize<T>(JsonSerializer.SerializeToUtf8Bytes(value, Options), Options)
-                ?? throw new InvalidOperationException("无法创建报表模板设置快照。");
-        }
     }
 }

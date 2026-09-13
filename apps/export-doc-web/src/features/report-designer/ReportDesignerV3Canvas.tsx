@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { getGridCellLocations } from "./reportDesignerGridMutations.ts";
+import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { ReportDesignerCanvasTextEditor, type ReportDesignerTextEdit } from "./ReportDesignerCanvasTextEditor.tsx";
 import {
   findV3Element,
@@ -57,6 +58,7 @@ type Gesture = {
 
 export function ReportDesignerV3Canvas({
   state,
+  client,
   zoom,
   fitRequest = 0,
   showGuides = true,
@@ -72,6 +74,7 @@ export function ReportDesignerV3Canvas({
   onCommitText,
   }: {
   state: ReportDesignerV3DocumentState;
+  client?: ExportDocManagerApiClient;
   zoom: number;
   fitRequest?: number;
   showGuides?: boolean;
@@ -472,7 +475,7 @@ export function ReportDesignerV3Canvas({
                       aria-disabled={!disabled && (element.locked || layer.locked) || undefined}
                       aria-label={`${reportDesignerV3ElementText(element)}${element.locked ? "，已锁定" : ""}`}
                     >
-                      <ReportDesignerCanvasElementPreview element={element} selectedGridCellId={selectedGridCell?.elementId === element.id ? selectedGridCell.cellId : undefined} />
+                      <ReportDesignerCanvasElementPreview element={element} client={client} selectedGridCellId={selectedGridCell?.elementId === element.id ? selectedGridCell.cellId : undefined} />
                       {!disabled && selected && state.selectedIds.length === 1 && !element.locked && !layer.locked ? (
                         <ReportDesignerCanvasResizeHandles elementId={element.id} onPointerDown={beginResize} onKeyDown={resizeByKeyboard} />
                       ) : null}

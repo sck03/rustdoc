@@ -41,6 +41,7 @@ export function useUserReportTemplateLifecycleMutations({
   const queryClient = useQueryClient();
 
   async function invalidateTemplateQueries(saved?: ApiUserReportTemplateDto) {
+    if (saved) queryClient.setQueryData(queryKeys.userReportTemplateContent(reportType, saved.id), saved);
     await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
     if (saved) {
       await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplateVersions(saved.id) });
@@ -48,10 +49,7 @@ export function useUserReportTemplateLifecycleMutations({
   }
 
   async function handleCreated(created: ApiUserReportTemplateDto) {
-    queryClient.setQueryData<ApiUserReportTemplateDto[]>(
-      queryKeys.userReportTemplates(reportType),
-      (current) => [...(current ?? []).filter((item) => item.id !== created.id), created],
-    );
+    queryClient.setQueryData(queryKeys.userReportTemplateContent(reportType, created.id), created);
     onCreated(created);
     await invalidateTemplateQueries(created);
   }

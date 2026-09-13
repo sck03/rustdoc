@@ -271,7 +271,7 @@ const invalidDesigner = deriveReportTemplateWorkspaceState({ ...dirtyDesignerInp
 assertEqual(invalidDesigner.hasUnsavedChanges, true, "无效画布草稿仍须保留未保存状态");
 assertEqual(invalidDesigner.canSave, false, "无效草稿不得保存或回退保存旧正文");
 assertEqual(invalidDesigner.canRenderTemplatePreview, false, "无效草稿不得用旧正文伪装预览");
-if (/<details[^>]*template-user-panel[^>]*\bopen\b/u.test(userPanelSource)) {
+if (/<details[^>]*template-user-panel[^>]*\bopen(?:\s|>|=\{true\})/u.test(userPanelSource)) {
   throw new Error("我的 / 共享模板默认应保持折叠");
 }
 assertMatch(exportDefaultsPanelSource, /resolveBatchExportItems\(settings\.batchExport\.items,\s*templates\)/, "管理页应显示与高级导出一致的有效单据项");

@@ -27,7 +27,8 @@ if(scenario==='v3'){
 }
 let file={...templates[0],content:'<html><body>File baseline</body></html>',revision:'file-1',storagePolicy:''};
 client.getReportTemplateFieldCatalog=()=>call('fields',{}, {reportType:'ExportDocument',categoryOrder:[],fields:[]});
-client.listUserReportTemplates=input=>window.__failReload?Promise.reject(new Error('reload unavailable')):call('userTemplates',input,userTemplates);
+client.listUserReportTemplates=input=>window.__failReload?Promise.reject(new Error('reload unavailable')):call('userTemplates',input,page(userTemplates.map(({contentHtml,...item})=>item),input));
+client.getUserReportTemplate=input=>window.__failReload?Promise.reject(new Error('reload unavailable')):window.__missingTemplate?Promise.reject(new ApiError(404,'Not Found','模板已删除')):call('userTemplateContent',input,exact(userTemplates,input.id));
 client.getReportTemplateContent=input=>window.__failReload?Promise.reject(new Error('reload unavailable')):window.__missingTemplate?Promise.reject(new ApiError(404,'Not Found','模板已删除')):call('templateContent',input,file);
 client.saveUserReportTemplateDraft=async input=>{
  window.__calls.push({name:'saveUser',input});

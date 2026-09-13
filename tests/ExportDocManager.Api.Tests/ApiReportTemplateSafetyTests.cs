@@ -4,11 +4,50 @@ using System.Text;
 using System.Text.Json;
 using ExportDocManager.Api.Hosting;
 using ExportDocManager.Services.Security;
+using ExportDocManager.Services.Reporting;
+using ExportDocManager.DataAccess;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ExportDocManager.Api.Tests;
 
 public sealed class ApiReportTemplateSafetyTests
 {
+    [Fact]
+    public async Task CatalogAndHistory_ShouldReturnMetadataPagesAndAuthorizeBodyReads()
+    {
+        await using var harness = await ApiIntegrationTestHarness.StartAsync("template-metadata-pages", "templates.db",
+            configureServices: services => services.AddScoped(provider => new BusinessDataAccessScope(
+                new DatabaseConnectionSettings { Provider = DatabaseConnectionSettings.PostgreSqlProvider },
+                provider.GetRequiredService<ICurrentUserContext>())));
+        using var anonymous = harness.CreateClient();
+        var login = await harness.LoginAsync(anonymous, "admin", "");
+        using var client = harness.CreateClient(login.AccessToken);
+        using var reader = await ApiUserReportTemplatePermissionIntegrationTests.CreateUserWithPermissionsAsync(
+            harness, anonymous, client, "metadata-reader", "reader-pass", [PermissionAction.View], canViewResources: false);
+        const string html = "<html><body>Private body</body></html>";
+        ApiUserReportTemplateDto? selected = null;
+        for (int i = 0; i < 3; i++)
+        {
+            var response = await client.PostAsJsonAsync("/api/reports/user-templates", new ApiUserReportTemplateCreateRequest("ExportDocument", $"Paged {i}", html));
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            selected = await ApiIntegrationTestHarness.ReadJsonAsync<ApiUserReportTemplateDto>(response);
+        }
+        var pageResponse = await client.GetAsync("/api/reports/user-templates?reportType=ExportDocument&pageNumber=2&pageSize=1");
+        var page = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPagedResponse<UserReportTemplateSummaryRecord>>(pageResponse);
+        Assert.Equal(3, page.TotalCount);
+        Assert.Equal("Paged 1", Assert.Single(page.Items).Name);
+        Assert.DoesNotContain("contentHtml", await pageResponse.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        var detail = await client.GetFromJsonAsync<ApiUserReportTemplateDto>($"/api/reports/user-templates/{selected!.Id}");
+        Assert.Equal(html, detail!.ContentHtml);
+        Assert.Equal(HttpStatusCode.NotFound, (await reader.GetAsync($"/api/reports/user-templates/{selected.Id}")).StatusCode);
+        var versionsResponse = await client.GetAsync($"/api/reports/user-templates/{selected.Id}/versions?pageSize=1");
+        var versions = await ApiIntegrationTestHarness.ReadJsonAsync<ApiPagedResponse<ApiUserReportTemplateVersionDto>>(versionsResponse);
+        Assert.Single(versions.Items);
+        Assert.DoesNotContain("contentHtml", await versionsResponse.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        using var broken = new ByteArrayContent([137, 80, 78, 71, 13, 10, 26, 10]);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/reports/templates/v3/resources/upload?mediaType=image/png", broken)).StatusCode);
+    }
+
     [Fact]
     public async Task Images_ShouldShareReadAuthorizationAndRetainFileTemplateReferences()
     {
@@ -18,12 +57,16 @@ public sealed class ApiReportTemplateSafetyTests
         using var admin = harness.CreateClient(login.AccessToken);
         using var designer = await ApiUserReportTemplatePermissionIntegrationTests.CreateUserWithPermissionsAsync(
             harness, anonymous, admin, "image-designer", "designer-pass", [PermissionAction.View, PermissionAction.Design], canViewResources: true);
-        using var bytes = new ByteArrayContent([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]);
+        using var bytes = new ByteArrayContent(RasterImageFixtures.Read("png"));
         var upload = await admin.PostAsync("/api/reports/templates/v3/resources/upload?fileName=private.png&mediaType=image/png", bytes);
         Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
         var image = await ApiIntegrationTestHarness.ReadJsonAsync<ApiReportTemplateImageResourceResponse>(upload);
         string imageUrl = $"/api/reports/templates/v3/resources/{image.Id}";
         string html = ImageTemplate(image);
+        var resources = await admin.GetFromJsonAsync<ApiPagedResponse<ReportTemplateImageResourceListItem>>("/api/reports/templates/v3/resources?pageSize=1");
+        Assert.True(Assert.Single(resources!.Items).CanRecycle);
+        Assert.False(resources.Items[0].IsReferenced);
+        Assert.Empty((await designer.GetFromJsonAsync<ApiPagedResponse<ReportTemplateImageResourceListItem>>("/api/reports/templates/v3/resources"))!.Items);
 
         Assert.Equal(HttpStatusCode.NotFound, (await designer.GetAsync(imageUrl)).StatusCode);
         var denied = await designer.PostAsJsonAsync("/api/reports/templates/preview", new { reportType = "ExportDocument", content = html });
@@ -44,7 +87,12 @@ public sealed class ApiReportTemplateSafetyTests
         Assert.Equal(HttpStatusCode.OK, savedResponse.StatusCode);
         var saved = await ApiIntegrationTestHarness.ReadJsonAsync<ApiReportTemplateContentDto>(savedResponse);
         Assert.Equal(HttpStatusCode.Conflict, (await admin.DeleteAsync(imageUrl)).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await designer.GetAsync(imageUrl)).StatusCode);
+        var downloaded = await designer.GetAsync(imageUrl);
+        Assert.Equal(HttpStatusCode.OK, downloaded.StatusCode);
+        Assert.True(downloaded.Headers.CacheControl?.NoStore);
+        var referenced = Assert.Single((await designer.GetFromJsonAsync<ApiPagedResponse<ReportTemplateImageResourceListItem>>("/api/reports/templates/v3/resources"))!.Items);
+        Assert.True(referenced.IsReferenced);
+        Assert.False(referenced.CanRecycle);
         var retained = await admin.PostAsJsonAsync("/api/reports/templates/preview", new { reportType = "ExportDocument", content = html });
         Assert.Equal(HttpStatusCode.OK, retained.StatusCode);
 

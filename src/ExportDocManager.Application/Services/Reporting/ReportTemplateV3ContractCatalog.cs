@@ -29,6 +29,9 @@ public static class ReportTemplateV3ContractCatalog
     public const int MaxTotalElements = 4000;
     public const int MaxResources = 1000;
     public const int MaxResourceBytes = 32 * 1024 * 1024;
+    public const int MaxImageDimension = 8192;
+    public const int MaxImagePixels = 32_000_000;
+    public const int MaxPageMarginHundredthMm = 6000;
     public const int MinElementSize = 400;
     public const int MaxTextLength = 32768;
     public static (int WidthHundredthMm, int HeightHundredthMm) A4Dimensions(string orientation) =>

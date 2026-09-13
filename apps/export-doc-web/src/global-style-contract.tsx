@@ -1,4 +1,3 @@
-import React from "react";
 import ReactDOM from "react-dom/client";
 import { applyInterfaceDensity } from "./app/interfaceDensity.ts";
 import "./styles/cascade.css";

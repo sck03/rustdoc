@@ -14,7 +14,7 @@ namespace ExportDocManager.Api.Tests;
 public sealed class ApiPersonnelImageAndOrganizationTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
-    private static byte[] Png => Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4i8AAAAASUVORK5CYII=");
+    private static byte[] Png => RasterImageFixtures.Read("png");
 
     [Fact]
     public async Task ImagesAndHierarchy_ShouldUseRealHttpPermissions_AndPreserveConcurrencyAndBinaryContracts()

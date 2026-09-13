@@ -28,7 +28,6 @@ import {
   readEnum,
   readFontFamily,
   readNumber,
-  readOptionalEnum,
   readOptionalFieldPath,
   readOptionalImageSource,
   readOptionalNumber,

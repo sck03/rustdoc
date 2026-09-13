@@ -22,7 +22,6 @@ namespace ExportDocManager.Api.Hosting
         int VersionNumber,
         string ChangeType,
         string Name,
-        string ContentHtml,
         string Status,
         string ShareScope,
         string ChangedBy,

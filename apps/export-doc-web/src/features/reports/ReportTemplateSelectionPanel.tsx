@@ -1,14 +1,14 @@
-import { ApiReportTemplateDto, ApiUserReportTemplateDto } from "../../api/index.ts";
+import { ApiReportTemplateDto, UserReportTemplateSummaryRecord } from "../../api/index.ts";
 import { SelectField } from "../../ui/FormFields.tsx";
 import { fileNameFromPath, matchesTemplatePath, type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
 import { CircleCheckBig } from "lucide-react";
-import { useState } from "react";
 
 export function ReportTemplateSelectionPanel({
   reportType,
   reportTypeOptions,
   templates,
   userTemplates,
+  directory,
   selectedTemplatePath,
   selectedUserTemplateId,
   defaultTemplatePath,
@@ -22,7 +22,11 @@ export function ReportTemplateSelectionPanel({
   reportType: ReportTypeOption;
   reportTypeOptions: Array<{ value: ReportTypeOption; label: string }>;
   templates: ApiReportTemplateDto[];
-  userTemplates: ApiUserReportTemplateDto[];
+  userTemplates: UserReportTemplateSummaryRecord[];
+  directory: {
+    search: string; pageNumber: number; totalPages: number; totalCount: number; loading: boolean;
+    onSearchChange: (search: string) => void; onPageChange: (pageNumber: number) => void;
+  };
   selectedTemplatePath: string;
   selectedUserTemplateId: number;
   defaultTemplatePath: string;
@@ -33,7 +37,7 @@ export function ReportTemplateSelectionPanel({
   onUserTemplateChange: (value: string) => void;
   onSetDefault: () => void;
 }) {
-  const [search, setSearch] = useState("");
+  const search = directory.search;
   const selectedValue = selectedUserTemplateId > 0 ? `user-template:${selectedUserTemplateId}` : selectedTemplatePath;
   const selectedTemplateIsDefault = matchesTemplatePath(selectedValue, defaultTemplatePath);
   const fileTemplates = templates.filter((template) => !template.templatePath.startsWith("user-template:"));
@@ -54,7 +58,7 @@ export function ReportTemplateSelectionPanel({
         options={reportTypeOptions}
         onChange={onReportTypeChange}
       />
-      <label className="template-directory-search">查找模板<input type="search" aria-label="搜索模板目录" placeholder="名称、来源或状态" value={search} maxLength={100} onChange={(event) => setSearch(event.target.value)} /></label>
+      <label className="template-directory-search">查找模板<input type="search" aria-label="搜索模板目录" placeholder="按模板名称查找" value={search} maxLength={100} onChange={(event) => directory.onSearchChange(event.target.value)} /></label>
       <div className="template-default-selection">
         <SelectField
           label="模板目录"
@@ -74,6 +78,11 @@ export function ReportTemplateSelectionPanel({
           <span>{selectedTemplateIsDefault ? "当前默认" : "设为默认"}</span>
         </button>
       </div>
+      {directory.totalPages > 1 ? <div className="template-management-actions" aria-label="用户模板分页">
+        <button className="command-button secondary compact-button" type="button" disabled={directory.pageNumber <= 1 || directory.loading} onClick={() => directory.onPageChange(directory.pageNumber - 1)}>上一页</button>
+        <small>用户模板 {directory.pageNumber} / {directory.totalPages} 页 · 共 {directory.totalCount} 个</small>
+        <button className="command-button secondary compact-button" type="button" disabled={directory.pageNumber >= directory.totalPages || directory.loading} onClick={() => directory.onPageChange(directory.pageNumber + 1)}>下一页</button>
+      </div> : null}
     </div>
   );
 }

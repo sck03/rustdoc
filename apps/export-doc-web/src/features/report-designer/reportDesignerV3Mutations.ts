@@ -12,8 +12,8 @@ import {
 } from "./reportDesignerGeometry.ts";
 import { createV3RegionMoveConstraint, placeV3ElementInRegion, reassignV3MovedElements, requiresV3BodyRegion, resolveV3InsertionLayer } from "./reportDesignerV3Regions.ts";
 import {
-  createV3ElementId, createV3FieldElement, createV3FlowElement, createV3ImageElement,
-  createV3LineElement, createV3PageNumberElement, createV3RectangleElement, createV3TextElement,
+  createV3ElementId
+  ,
 } from "./reportDesignerV3ElementFactories.ts";
 import { resizeV3Element as resizeV3ElementLocal } from "./reportDesignerV3Resize.ts";
 export {

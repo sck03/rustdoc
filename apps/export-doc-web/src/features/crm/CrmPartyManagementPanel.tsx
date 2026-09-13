@@ -4,6 +4,8 @@ import { requestErrorFeedback, successFeedback, type OperationFeedbackState } fr
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { useVersionedRecordDraft } from "../../ui/useVersionedRecordDraft.ts";
+import { ServerDraftUpdateNotice } from "../../ui/serverDraftSync.tsx";
 
 type Props = {
   section: "profile" | "contacts";
@@ -29,17 +31,19 @@ export function CrmPartyManagementPanel(props: Props) {
   const requestConfirmation = useConfirmation();
   const runAbortableOperation = useAbortableOperation();
   const {
-    client, customers, contacts, customerId, onSelectCustomer, onReloadCustomers, onReloadContacts, onFeedback,
+    client, customers, contacts, customerId, onReloadCustomers, onReloadContacts, onFeedback,
     canCreateCustomer, canEditCustomer, canDeactivateCustomer, canDeleteCustomer, canCreateContact, canEditContact,
     canSetPrimaryContact, canDeleteContact,
   } = props;
-  const selectedCustomer = customers.find((item) => item.id === customerId);
   const isNewCustomer = customerId === 0;
   const [contactId, setContactId] = useState(0);
   const [customerDraftDirty, setCustomerDraftDirty] = useState(false);
   const [contactDraftDirty, setContactDraftDirty] = useState(false);
+  const customerDraft = useVersionedRecordDraft(`customer:${customerId}`, customers.find((item) => item.id === customerId), customerDraftDirty);
+  const selectedCustomer = customerDraft.record;
   const activeCustomerId = isNewCustomer ? 0 : customerId;
-  const selectedContact = activeCustomerId ? contacts.find((item) => item.id === contactId) : undefined;
+  const contactDraft = useVersionedRecordDraft(`customer:${customerId}:contact:${contactId}`, activeCustomerId ? contacts.find((item) => item.id === contactId) : undefined, contactDraftDirty);
+  const selectedContact = contactDraft.record;
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: customerDraftDirty || contactDraftDirty,
     message: "当前客户或联系人资料有未保存的修改。",
@@ -51,8 +55,8 @@ export function CrmPartyManagementPanel(props: Props) {
   }, [customerId, props.section]);
 
   useEffect(() => {
+    if (contactDraftDirty) return;
     setContactId((current) => contacts.some((item) => item.id === current) ? current : contacts[0]?.id ?? 0);
-    setContactDraftDirty(false);
   }, [customerId, contacts]);
 
   async function confirmAndResetDrafts(actionLabel: string) {
@@ -111,7 +115,7 @@ export function CrmPartyManagementPanel(props: Props) {
       details: restore ? ["恢复后客户状态将变为跟进中。"] : ["停用不会删除跟进或商机历史。"],
       confirmLabel: `确认${action}`,
       tone: restore ? undefined : "danger",
-    })) return;
+    }) || !await confirmDiscardChanges(`${action}客户`)) return;
     try {
       const saved = await runAbortableOperation((signal) => restore
         ? client.restoreCrmCustomer(
@@ -123,6 +127,7 @@ export function CrmPartyManagementPanel(props: Props) {
           { signal },
         ));
       await onReloadCustomers(saved);
+      setCustomerDraftDirty(false);
       onFeedback(successFeedback(restore ? "CRM 客户已恢复为跟进中。" : "CRM 客户已停用，历史记录保持不变。"));
     } catch (error) {
       if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
@@ -130,13 +135,15 @@ export function CrmPartyManagementPanel(props: Props) {
   }
 
   async function deleteCustomer() {
-    if (!canDeleteCustomer || !selectedCustomer || !await requestConfirmation({ title: "删除 CRM 客户", description: `确定删除 CRM 客户“${selectedCustomer.name}”吗？`, details: ["存在业务引用时服务端会拒绝删除。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmAndResetDrafts("删除客户")) return;
+    if (!canDeleteCustomer || !selectedCustomer || !await requestConfirmation({ title: "删除 CRM 客户", description: `确定删除 CRM 客户“${selectedCustomer.name}”吗？`, details: ["存在业务引用时服务端会拒绝删除。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除客户")) return;
     try {
       await runAbortableOperation((signal) => client.deleteCrmCustomer(
         { id: selectedCustomer.id, expectedVersion: selectedCustomer.versionNumber },
         { signal },
       ));
       await onReloadCustomers();
+      setCustomerDraftDirty(false);
+      setContactDraftDirty(false);
       onFeedback(successFeedback("CRM 客户已删除。"));
     } catch (error) {
       if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
@@ -174,6 +181,7 @@ export function CrmPartyManagementPanel(props: Props) {
 
   async function setPrimaryContact() {
     if (!canSetPrimaryContact || !selectedContact || selectedContact.isPrimary) return;
+    if (!await confirmDiscardChanges("设为主要联系人")) return;
     try {
       const saved = await runAbortableOperation((signal) => client.setPrimaryCrmContact({
         customerId: activeCustomerId,
@@ -181,6 +189,7 @@ export function CrmPartyManagementPanel(props: Props) {
         body: { expectedVersion: selectedContact.versionNumber },
       }, { signal }));
       await onReloadContacts();
+      setContactDraftDirty(false);
       setContactId(saved.id);
       onFeedback(successFeedback("主要联系人已切换。"));
     } catch (error) {
@@ -189,7 +198,7 @@ export function CrmPartyManagementPanel(props: Props) {
   }
 
   async function deleteContact() {
-    if (!canDeleteContact || !selectedContact || !await requestConfirmation({ title: "删除客户联系人", description: `确定删除联系人“${selectedContact.name}”吗？`, details: ["历史跟进记录仍会保留。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmAndResetDrafts("删除联系人")) return;
+    if (!canDeleteContact || !selectedContact || !await requestConfirmation({ title: "删除客户联系人", description: `确定删除联系人“${selectedContact.name}”吗？`, details: ["历史跟进记录仍会保留。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除联系人")) return;
     try {
       await runAbortableOperation((signal) => client.deleteCrmContact(
         { customerId: activeCustomerId, id: selectedContact.id, expectedVersion: selectedContact.versionNumber },
@@ -197,6 +206,7 @@ export function CrmPartyManagementPanel(props: Props) {
       ));
       setContactId(0);
       await onReloadContacts();
+      setContactDraftDirty(false);
       onFeedback(successFeedback("联系人已删除，历史跟进仍保留。"));
     } catch (error) {
       if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
@@ -205,6 +215,16 @@ export function CrmPartyManagementPanel(props: Props) {
 
   return (
     <div className="record-detail-content">
+      {(props.section === "profile" ? customerDraft : contactDraft).hasPendingServerVersion ? <ServerDraftUpdateNotice
+        entityLabel={props.section === "profile" ? "客户" : "联系人"}
+        onKeepLocal={(props.section === "profile" ? customerDraft : contactDraft).keepLocalDraft}
+        onLoadServer={() => { void (async () => {
+          if (!await confirmDiscardChanges("载入服务器版本")) return;
+          (props.section === "profile" ? customerDraft : contactDraft).loadServerVersion();
+          setCustomerDraftDirty(false);
+          setContactDraftDirty(false);
+        })(); }}
+      /> : null}
       {props.section === "profile" && <form className="form-grid" key={isNewCustomer ? "new" : `${selectedCustomer?.id ?? "empty"}-${selectedCustomer?.versionNumber ?? 0}`} onSubmit={saveCustomer}>
         <div className="section-heading-row">
           <h3>{isNewCustomer ? "新建销售客户" : "客户资料"}</h3>

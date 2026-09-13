@@ -264,7 +264,7 @@ namespace ExportDocManager.Services.Crm
             var customer = await _accessScope.ApplyCrmCustomerScope(context.CrmCustomers.AsNoTracking())
                 .FirstOrDefaultAsync(item => item.Id == crmCustomerId, cancellationToken)
                 ?? throw new ResourceNotFoundException("CRM 客户不存在或无权访问。");
-            var contact = await context.CrmContacts.AsNoTracking().Where(item => item.CrmCustomerId == crmCustomerId)
+            var contact = await QueryAccessibleContacts(context, crmCustomerId)
                 .OrderByDescending(item => item.IsPrimary).ThenBy(item => item.Id).FirstOrDefaultAsync(cancellationToken);
             var user = _accessScope.CurrentUser;
             string companyName = string.IsNullOrWhiteSpace(user?.CompanyScope)
@@ -295,12 +295,7 @@ namespace ExportDocManager.Services.Crm
             pageNumber = Math.Max(1, pageNumber);
             pageSize = Math.Clamp(pageSize, 1, 100);
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
-            var customers = _accessScope.ApplyCrmCustomerScopeForPermission(
-                context.CrmCustomers.AsNoTracking(),
-                PermissionResourceCatalog.CrmContacts,
-                PermissionAction.View);
-            var query = context.CrmContacts.AsNoTracking()
-                .Where(item => item.CrmCustomerId == crmCustomerId && customers.Any(customer => customer.Id == item.CrmCustomerId))
+            var query = QueryAccessibleContacts(context, crmCustomerId)
                 .OrderByDescending(item => item.IsPrimary)
                 .ThenBy(item => item.Name);
             int totalCount = await query.CountAsync(cancellationToken);
@@ -311,6 +306,16 @@ namespace ExportDocManager.Services.Crm
                     item.Email, item.Phone, item.InstantMessaging, item.IsPrimary, item.VersionNumber))
                 .ToListAsync(cancellationToken);
             return new PagedResult<CrmContactRecord>(rows, totalCount, pageNumber, pageSize);
+        }
+
+        private IQueryable<CrmContact> QueryAccessibleContacts(AppDbContext context, int crmCustomerId)
+        {
+            if (!_accessScope.HasPermission(PermissionResourceCatalog.CrmContacts, PermissionAction.View))
+                return context.CrmContacts.Where(_ => false);
+            var customers = _accessScope.ApplyCrmCustomerScopeForPermission(
+                context.CrmCustomers.AsNoTracking(), PermissionResourceCatalog.CrmContacts, PermissionAction.View);
+            return context.CrmContacts.AsNoTracking().Where(item => item.CrmCustomerId == crmCustomerId &&
+                customers.Any(customer => customer.Id == item.CrmCustomerId));
         }
 
         public async Task<CrmContactRecord> SaveContactAsync(CrmContactSaveRequest request, CancellationToken cancellationToken = default)

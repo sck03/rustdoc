@@ -14,6 +14,9 @@ namespace ExportDocManager.Api.Hosting
                 IUserReportTemplateService service,
                 string? reportType,
                 bool? includeArchived,
+                int? pageNumber,
+                int? pageSize,
+                string? keyword,
                 CancellationToken cancellationToken) =>
             {
                 if (!Enum.TryParse(reportType, true, out ReportDocumentType parsedReportType))
@@ -29,15 +32,25 @@ namespace ExportDocManager.Api.Hosting
                     return Results.StatusCode(StatusCodes.Status403Forbidden);
                 }
 
-                var rows = await service.ListAsync(parsedReportType, includeArchived ?? false, cancellationToken);
-                return Results.Ok(rows.Select(ToApiDto));
+                var page = await service.ListAsync(parsedReportType, includeArchived ?? false, pageNumber ?? 1,
+                    pageSize ?? 50, keyword, cancellationToken);
+                return Results.Ok(ApiMasterDataDtoFactory.FromPage(page, items => items.ToArray()));
             })
             .WithName("ListUserReportTemplates")
             .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.View)
-            .Produces<IReadOnlyList<ApiUserReportTemplateDto>>()
+            .Produces<ApiPagedResponse<UserReportTemplateSummaryRecord>>()
             .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);
+
+            endpoints.MapGet("/api/reports/user-templates/{id:int}", async (
+                IUserReportTemplateService service, int id, CancellationToken cancellationToken) =>
+                await ExecuteUserReportTemplateCommandAsync(() => service.GetAsync(id, cancellationToken)))
+            .WithName("GetUserReportTemplate")
+            .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.View)
+            .Produces<ApiUserReportTemplateDto>()
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
             endpoints.MapPost("/api/reports/user-templates", async (
                 IUserReportTemplateService service,
@@ -270,18 +283,20 @@ namespace ExportDocManager.Api.Hosting
             endpoints.MapGet("/api/reports/user-templates/{id:int}/versions", async (
                 IUserReportTemplateService service,
                 int id,
+                int? pageNumber,
+                int? pageSize,
                 CancellationToken cancellationToken) =>
             {
                 if (id <= 0)
                 {
                     return Results.BadRequest(new ApiErrorResponse("报表模板 ID 无效。"));
                 }
-                var rows = await service.ListVersionsAsync(id, cancellationToken);
-                return rows.Count == 0 ? Results.NotFound() : Results.Ok(rows.Select(ToApiVersionDto));
+                var page = await service.ListVersionsAsync(id, pageNumber ?? 1, pageSize ?? 20, cancellationToken);
+                return Results.Ok(ApiMasterDataDtoFactory.FromPage(page, items => items.Select(ToApiVersionDto).ToArray()));
             })
             .WithName("ListUserReportTemplateVersions")
             .WithApiCapability(PermissionResourceCatalog.ReportTemplates, PermissionAction.View)
-            .Produces<IReadOnlyList<ApiUserReportTemplateVersionDto>>()
+            .Produces<ApiPagedResponse<ApiUserReportTemplateVersionDto>>()
             .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
@@ -367,7 +382,6 @@ namespace ExportDocManager.Api.Hosting
                 item.VersionNumber,
                 item.ChangeType,
                 item.Name,
-                item.ContentHtml,
                 item.Status,
                 item.ShareScope,
                 item.ChangedBy,

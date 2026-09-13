@@ -39,6 +39,7 @@ internal sealed partial class ReportTemplateV3ImageResourceHydrator
         }
 
         var dataUris = new Dictionary<string, string>(StringComparer.Ordinal);
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (HtmlNode node in resourceNodes)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -48,24 +49,21 @@ internal sealed partial class ReportTemplateV3ImageResourceHydrator
             }
 
             string resourceId = node.GetAttributeValue(ResourceIdAttribute, string.Empty).Trim();
-            if (!resources.TryGetValue(resourceId, out var expected))
+            if (!resources.ContainsKey(resourceId))
             {
                 throw new ServiceValidationException("模板图片没有引用 resources 清单中的受控资源。");
             }
 
-            if (!dataUris.TryGetValue(resourceId, out string? dataUri))
+            counts[resourceId] = counts.GetValueOrDefault(resourceId) + 1;
+        }
+        if (_resourceAccessService == null) throw new PermissionDeniedException("未配置报表图片授权服务，不能读取图片资源。");
+        long hydratedLength = source.Length;
+        try
+        {
+            await _resourceAccessService.ReadManyAsync(counts.Keys.ToArray(), loaded =>
             {
-                ReportTemplateImageResourceContent loaded;
-                try
-                {
-                    if (_resourceAccessService == null) throw new PermissionDeniedException("未配置报表图片授权服务，不能读取图片资源。");
-                    loaded = await _resourceAccessService.ReadAsync(resourceId, cancellationToken).ConfigureAwait(false);
-                }
-                catch (ResourceNotFoundException ex)
-                {
-                    throw new UserVisibleInfrastructureException("模板引用的受控图片资源不可用，请重新上传并保存模板。", ex);
-                }
-
+                string resourceId = loaded.Resource.Id;
+                var expected = resources[resourceId];
                 if (!string.Equals(loaded.Resource.MediaType, expected.MediaType, StringComparison.Ordinal) ||
                     expected.ByteLength.HasValue && loaded.Resource.ByteLength != expected.ByteLength.Value ||
                     !string.IsNullOrWhiteSpace(expected.Sha256) &&
@@ -74,11 +72,19 @@ internal sealed partial class ReportTemplateV3ImageResourceHydrator
                     throw new UserVisibleInfrastructureException("模板图片元数据与受控资源不一致，请重新上传并保存模板。");
                 }
 
-                dataUri = $"data:{loaded.Resource.MediaType};base64,{Convert.ToBase64String(loaded.Content)}";
-                dataUris.Add(resourceId, dataUri);
-            }
-
-            node.SetAttributeValue("src", dataUri);
+                hydratedLength += ((loaded.Content.LongLength + 2) / 3 * 4 + loaded.Resource.MediaType.Length + 16) * counts[resourceId];
+                if (hydratedLength > ReportTemplateContentPolicy.MaximumRenderedHtmlCharacters)
+                    throw new ServiceValidationException("模板图片输出超过报表大小上限，请减少图片尺寸或重复次数。");
+                dataUris.Add(resourceId, $"data:{loaded.Resource.MediaType};base64,{Convert.ToBase64String(loaded.Content)}");
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (ResourceNotFoundException ex)
+        {
+            throw new UserVisibleInfrastructureException("模板引用的受控图片资源不可用，请重新上传并保存模板。", ex);
+        }
+        foreach (HtmlNode node in resourceNodes)
+        {
+            node.SetAttributeValue("src", dataUris[node.GetAttributeValue(ResourceIdAttribute, string.Empty).Trim()]);
             node.Attributes.Remove(ResourceIdAttribute);
         }
 

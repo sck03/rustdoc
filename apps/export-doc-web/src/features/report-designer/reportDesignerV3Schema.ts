@@ -4,6 +4,7 @@ import type {
   ReportTextStyle,
 } from "./reportDesignerSchema.ts";
 import { reportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
+import { ApiReportTemplateV3LimitsContractDefaults as limits } from "../../api/generated/exportDocManagerApi.ts";
 
 export { reportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
 export type { ReportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
@@ -15,18 +16,19 @@ export const REPORT_DESIGNER_V3_COORDINATE_UNIT = "hundredth-mm" as const;
 export const REPORT_DESIGNER_V3_FLOW_TYPES = ["Row", "Grid", "Conditional", "DetailTable", "PageBreak"] as const;
 export const REPORT_DESIGNER_V3_RELEASE_STATES = ["Draft", "Published", "Archived"] as const;
 export const HUNDREDTH_MM_PER_MM = 100;
-export const REPORT_DESIGNER_V3_MAX_LAYER_COUNT = 16;
-export const REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER = 1000;
-export const REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS = 4000;
-export const REPORT_DESIGNER_V3_MIN_ELEMENT_SIZE_HUNDREDTH_MM = 400;
+export const REPORT_DESIGNER_V3_MAX_LAYER_COUNT = limits.maxLayers;
+export const REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER = limits.maxElementsPerLayer;
+export const REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS = limits.maxTotalElements;
+export const REPORT_DESIGNER_V3_MIN_ELEMENT_SIZE_HUNDREDTH_MM = limits.minElementSizeHundredthMm;
+export const REPORT_DESIGNER_V3_MAX_PAGE_MARGIN = limits.maxPageMarginHundredthMm;
 export const REPORT_DESIGNER_V3_MAX_TEXT_LENGTH = 32768;
 export const REPORT_DESIGNER_V3_MAX_FALLBACK_LENGTH = 2048;
 export const REPORT_DESIGNER_V3_MAX_LABEL_LENGTH = 200;
 export const REPORT_DESIGNER_V3_MAX_ALT_TEXT_LENGTH = 200;
 export const REPORT_DESIGNER_V3_MAX_FIELD_PATH_LENGTH = 256;
 export const REPORT_DESIGNER_V3_MAX_FONT_FAMILY_LENGTH = 256;
-export const REPORT_DESIGNER_V3_MAX_RESOURCES = 1000;
-export const REPORT_DESIGNER_V3_MAX_RESOURCE_BYTES = 32 * 1024 * 1024;
+export const REPORT_DESIGNER_V3_MAX_RESOURCES = limits.maxResources;
+export const REPORT_DESIGNER_V3_MAX_RESOURCE_BYTES = limits.maxResourceBytes;
 export const A4_PORTRAIT_SIZE_HUNDREDTH_MM = Object.freeze({ width: 21000, height: 29700 });
 export const A4_LANDSCAPE_SIZE_HUNDREDTH_MM = Object.freeze({ width: 29700, height: 21000 });
 export type ReportDesignerV3Schema = {

@@ -49,7 +49,8 @@ namespace ExportDocManager.Infrastructure.Tests
             }
 
             var service = CreateService(factory, CreateTemplateUser(7));
-            var shared = Assert.Single(await service.ListAsync(ReportDocumentType.ExportDocument, true));
+            var sharedSummary = Assert.Single((await service.ListAsync(ReportDocumentType.ExportDocument, true)).Items);
+            var shared = await service.GetAsync(sharedSummary.Id);
             Assert.Equal(sharedId, shared.Id);
             Assert.Equal(TemplateLifecycleStatusCatalog.Published, shared.Status);
             Assert.Equal(TemplateShareScopeCatalog.All, shared.ShareScope);
@@ -101,7 +102,54 @@ namespace ExportDocManager.Infrastructure.Tests
             Assert.Equal(shared.ContentHtml, restoredVersion.ContentHtml);
             var archived = await service.ArchiveAsync(restoredVersion.Id, restoredVersion.VersionNumber);
             Assert.Equal(TemplateLifecycleStatusCatalog.Archived, archived.Status);
-            Assert.Single(await service.ListAsync(ReportDocumentType.ExportDocument, includeArchived: false));
+            Assert.Single((await service.ListAsync(ReportDocumentType.ExportDocument, includeArchived: false)).Items);
+        }
+
+        [Fact]
+        public async Task CatalogAndHistory_ShouldPageMetadataAndLoadOnlyTheSelectedBody()
+        {
+            using var factory = new SqliteTestDatabase();
+            string content = $"<p>{new string('x', 100_000)}</p>";
+            var rows = Enumerable.Range(0, 7).Select(index => new UserReportTemplate
+            {
+                Name = $"Paged {index}",
+                OwnerUserId = 7,
+                ContentHtml = content,
+                ReportType = "ExportDocument",
+                Status = "Draft",
+                ShareScope = "Private"
+            }).ToArray();
+            var hidden = new UserReportTemplate { Name = "Hidden", OwnerUserId = 8, ContentHtml = content };
+            await using (var context = factory.CreateDbContext())
+            {
+                context.UserReportTemplates.AddRange(rows);
+                context.UserReportTemplates.Add(hidden);
+                context.UserReportTemplateVersions.AddRange(Enumerable.Range(1, 7).Select(version => new UserReportTemplateVersion
+                {
+                    Template = rows[0],
+                    VersionNumber = version,
+                    Name = rows[0].Name,
+                    ContentHtml = content,
+                    ChangeType = "保存",
+                    Status = "Draft",
+                    ShareScope = "Private",
+                    ChangedBy = "owner"
+                }));
+                await context.SaveChangesAsync();
+            }
+            var service = CreateService(factory, CreateTemplateUser(7));
+            var page = await service.ListAsync(ReportDocumentType.ExportDocument, pageNumber: 2, pageSize: 3);
+            Assert.Equal(7, page.TotalCount);
+            Assert.Equal(new[] { "Paged 3", "Paged 4", "Paged 5" }, page.Items.Select(item => item.Name));
+            Assert.DoesNotContain("ContentHtml", System.Text.Json.JsonSerializer.Serialize(page), StringComparison.Ordinal);
+            Assert.Equal(content, (await service.GetAsync(rows[0].Id)).ContentHtml);
+            await Assert.ThrowsAsync<ResourceNotFoundException>(() => service.GetAsync(hidden.Id));
+            var versions = await service.ListVersionsAsync(rows[0].Id, pageNumber: 2, pageSize: 2);
+            Assert.Equal(7, versions.TotalCount);
+            Assert.Equal(new[] { 5, 4 }, versions.Items.Select(item => item.VersionNumber));
+            Assert.DoesNotContain("ContentHtml", System.Text.Json.JsonSerializer.Serialize(versions), StringComparison.Ordinal);
+            Assert.Empty((await service.ListVersionsAsync(rows[0].Id, pageNumber: 99)).Items);
+            await Assert.ThrowsAsync<ResourceNotFoundException>(() => service.ListVersionsAsync(hidden.Id));
         }
 
         [Theory]
@@ -165,12 +213,12 @@ namespace ExportDocManager.Infrastructure.Tests
             var visible = await service.ListAsync(ReportDocumentType.ExportDocument);
             Assert.Equal(
                 new[] { "全员模板", "公司模板", "部门模板" },
-                visible.Select(item => item.Name).OrderBy(item => item, StringComparer.Ordinal));
+                visible.Items.Select(item => item.Name).OrderBy(item => item, StringComparer.Ordinal));
 
             var otherUser = CreateTemplateUser(6, "finance", "other");
             var otherVisible = await CreateService(factory, otherUser)
                 .ListAsync(ReportDocumentType.ExportDocument);
-            Assert.Equal(new[] { "全员模板" }, otherVisible.Select(item => item.Name));
+            Assert.Equal(new[] { "全员模板" }, otherVisible.Items.Select(item => item.Name));
         }
 
         [Fact]

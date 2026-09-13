@@ -36,8 +36,7 @@ export function useReportTemplateSelectionSync({
   setSelectedTemplatePath,
   selectedUserTemplateId,
   setSelectedUserTemplateId,
-  userTemplates,
-  userTemplatesLoaded,
+  userTemplateContent,
   templateContent,
   preserveSelection,
   onUserTemplateLoaded,
@@ -64,8 +63,7 @@ export function useReportTemplateSelectionSync({
   setSelectedTemplatePath: Dispatch<SetStateAction<string>>;
   selectedUserTemplateId: number;
   setSelectedUserTemplateId: Dispatch<SetStateAction<number>>;
-  userTemplates: ApiUserReportTemplateDto[];
-  userTemplatesLoaded: boolean;
+  userTemplateContent: ApiUserReportTemplateDto | null;
   templateContent: ApiReportTemplateContentDto | null;
   preserveSelection: boolean;
   onUserTemplateLoaded: (template: ApiUserReportTemplateDto) => void;
@@ -121,40 +119,33 @@ export function useReportTemplateSelectionSync({
   }, [configuredTemplatePath, preserveSelection, reportType, requestedTemplateFileName, selectedUserTemplateId, setSelectedTemplatePath, templates, templatesLoaded]);
 
   useEffect(() => {
-    if (!templatesLoaded || !userTemplatesLoaded || selectedUserTemplateId > 0) {
+    if (!templatesLoaded || selectedUserTemplateId > 0) {
       return;
     }
 
     const configuredUserTemplateId = readUserTemplateIdFromKey(configuredTemplatePath);
     const selectedUserTemplateKey = readUserTemplateIdFromKey(selectedTemplatePath);
     const targetId = selectedUserTemplateKey || (!selectedTemplatePath ? configuredUserTemplateId : 0);
-    if (userTemplates.some((template) => template.id === targetId && template.status === "Published")) {
+    if (targetId > 0) {
       setSelectedUserTemplateId(targetId);
     }
-  }, [configuredTemplatePath, selectedTemplatePath, selectedUserTemplateId, setSelectedUserTemplateId, templatesLoaded, userTemplates, userTemplatesLoaded]);
+  }, [configuredTemplatePath, selectedTemplatePath, selectedUserTemplateId, setSelectedUserTemplateId, templatesLoaded]);
 
   useEffect(() => {
-    if (requestedUserTemplateId <= 0 || !userTemplatesLoaded || preserveSelection) {
+    if (requestedUserTemplateId <= 0 || preserveSelection) {
       return;
     }
 
-    setSelectedUserTemplateId(
-      userTemplates.some((template) => template.id === requestedUserTemplateId) ? requestedUserTemplateId : 0,
-    );
-  }, [preserveSelection, requestedUserTemplateId, setSelectedUserTemplateId, userTemplates, userTemplatesLoaded]);
+    setSelectedUserTemplateId(requestedUserTemplateId);
+  }, [preserveSelection, requestedUserTemplateId, setSelectedUserTemplateId]);
 
   useEffect(() => {
-    if (selectedUserTemplateId <= 0 || !userTemplatesLoaded) {
+    if (selectedUserTemplateId <= 0 || userTemplateContent?.id !== selectedUserTemplateId) {
       return;
     }
 
-    const selected = userTemplates.find((template) => template.id === selectedUserTemplateId);
-    if (!selected) {
-      return;
-    }
-
-    onUserTemplateLoaded(selected);
-  }, [onUserTemplateLoaded, selectedUserTemplateId, setSelectedUserTemplateId, userTemplates, userTemplatesLoaded]);
+    onUserTemplateLoaded(userTemplateContent);
+  }, [onUserTemplateLoaded, selectedUserTemplateId, userTemplateContent]);
 
   useEffect(() => {
     if (

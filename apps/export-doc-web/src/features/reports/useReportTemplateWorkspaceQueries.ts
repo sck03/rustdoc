@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { previewSourcePageSize, type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
@@ -8,6 +9,7 @@ export function useReportTemplateWorkspaceQueries({
   reportType,
   enabled,
   includeDesignerData,
+  includeArchived,
   canPreviewInvoiceSource,
   canPreviewPaymentSource,
   selectedUserTemplateId,
@@ -17,11 +19,14 @@ export function useReportTemplateWorkspaceQueries({
   reportType: ReportTypeOption;
   enabled: boolean;
   includeDesignerData: boolean;
+  includeArchived: boolean;
   canPreviewInvoiceSource: boolean;
   canPreviewPaymentSource: boolean;
   selectedUserTemplateId: number;
   selectedTemplatePath: string;
 }) {
+  const [directoryState, setDirectory] = useState({ reportType, search: "", pageNumber: 1 });
+  const directory = directoryState.reportType === reportType ? directoryState : { reportType, search: "", pageNumber: 1 };
   const templatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates(reportType),
     queryFn: ({ signal }) => client.listReportTemplates({ reportType }, { signal }),
@@ -30,18 +35,23 @@ export function useReportTemplateWorkspaceQueries({
   });
 
   const userTemplatesQuery = useQuery({
-    queryKey: queryKeys.userReportTemplates(reportType),
-    queryFn: ({ signal }) => client.listUserReportTemplates({ reportType, includeArchived: true }, { signal }),
+    queryKey: [...queryKeys.userReportTemplates(reportType), "directory", directory.search, directory.pageNumber, includeArchived],
+    queryFn: ({ signal }) => client.listUserReportTemplates({ reportType, includeArchived, keyword: directory.search, pageNumber: directory.pageNumber, pageSize: 50 }, { signal }),
     enabled,
     staleTime: 60 * 1000,
   });
 
-  const userTemplateVersionsQuery = useQuery({
-    queryKey: queryKeys.userReportTemplateVersions(selectedUserTemplateId),
-    queryFn: ({ signal }) => client.listUserReportTemplateVersions({ id: selectedUserTemplateId }, { signal }),
+  const userTemplateContentQuery = useQuery({
+    queryKey: queryKeys.userReportTemplateContent(reportType, selectedUserTemplateId),
+    queryFn: ({ signal }) => client.getUserReportTemplate({ id: selectedUserTemplateId }, { signal }),
     enabled: enabled && selectedUserTemplateId > 0,
     staleTime: 30 * 1000,
   });
+  useEffect(() => {
+    if (userTemplatesQuery.data && directory.pageNumber > Math.max(1, userTemplatesQuery.data.totalPages)) {
+      setDirectory({ ...directory, pageNumber: Math.max(1, userTemplatesQuery.data.totalPages) });
+    }
+  }, [directory, userTemplatesQuery.data]);
 
   const fieldCatalogQuery = useQuery({
     queryKey: queryKeys.reportTemplateFields(reportType),
@@ -85,7 +95,16 @@ export function useReportTemplateWorkspaceQueries({
   return {
     templatesQuery,
     userTemplatesQuery,
-    userTemplateVersionsQuery,
+    userTemplateContentQuery,
+    userTemplateDirectory: {
+      search: directory.search,
+      pageNumber: directory.pageNumber,
+      totalPages: userTemplatesQuery.data?.totalPages ?? 1,
+      totalCount: userTemplatesQuery.data?.totalCount ?? 0,
+      loading: userTemplatesQuery.isFetching,
+      onSearchChange: (search: string) => setDirectory({ reportType, search, pageNumber: 1 }),
+      onPageChange: (pageNumber: number) => setDirectory({ ...directory, pageNumber }),
+    },
     fieldCatalogQuery,
     previewInvoicesQuery,
     previewPaymentsQuery,

@@ -9,6 +9,18 @@ public static partial class ApiEndpointRouteBuilderExtensions
 {
     private static void MapReportTemplateImageResourceEndpoints(IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/api/reports/templates/v3/resources", async (
+            IReportTemplateImageResourceAccessService resourceAccessService, int? pageNumber, int? pageSize,
+            CancellationToken cancellationToken) =>
+        {
+            var page = await resourceAccessService.QueryAsync(pageNumber ?? 1, pageSize ?? 20, cancellationToken);
+            return Results.Ok(ApiMasterDataDtoFactory.FromPage(page, items => items.ToArray()));
+        })
+        .WithName("QueryReportTemplateV3ImageResources")
+        .WithApiCapability(PermissionResourceCatalog.ReportResources, PermissionAction.View)
+        .Produces<ApiPagedResponse<ReportTemplateImageResourceListItem>>()
+        .Produces(StatusCodes.Status403Forbidden);
+
         endpoints.MapPost("/api/reports/templates/v3/resources/upload", async (
             HttpContext context,
             IReportTemplateImageResourceAccessService resourceAccessService,
@@ -53,6 +65,7 @@ public static partial class ApiEndpointRouteBuilderExtensions
         .Produces(StatusCodes.Status503ServiceUnavailable);
 
         endpoints.MapGet("/api/reports/templates/v3/resources/{resourceId}", async (
+            HttpContext context,
             IReportTemplateImageResourceAccessService resourceAccessService,
             string resourceId,
             CancellationToken cancellationToken) =>
@@ -60,6 +73,7 @@ public static partial class ApiEndpointRouteBuilderExtensions
             try
             {
                 var resource = await resourceAccessService.ReadAsync(resourceId, cancellationToken);
+                context.Response.Headers.CacheControl = "no-store";
                 return Results.File(
                     resource.Content,
                     resource.Resource.MediaType,

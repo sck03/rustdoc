@@ -8,8 +8,13 @@ internal sealed class ReportTemplateFileResourceReferences(IAppPathProvider path
 {
     private readonly ReportTemplatePathResolver _paths = new(pathProvider);
 
-    public async Task<bool> ContainsAsync(string resourceId, Func<ReportDocumentType, bool>? canRead, CancellationToken cancellationToken)
+    public async Task<bool> ContainsAsync(string resourceId, Func<ReportDocumentType, bool>? canRead, CancellationToken cancellationToken) =>
+        (await FindAsync(new HashSet<string>([resourceId], StringComparer.Ordinal), canRead, cancellationToken).ConfigureAwait(false)).Contains(resourceId);
+
+    public async Task<HashSet<string>> FindAsync(IReadOnlySet<string> resourceIds, Func<ReportDocumentType, bool>? canRead, CancellationToken cancellationToken)
     {
+        var found = new HashSet<string>(StringComparer.Ordinal);
+        if (resourceIds.Count == 0) return found;
         foreach (ReportDocumentType type in Enum.GetValues<ReportDocumentType>())
         {
             if (canRead != null && !canRead(type)) continue;
@@ -20,10 +25,12 @@ internal sealed class ReportTemplateFileResourceReferences(IAppPathProvider path
                              .Where(path => string.Equals(Path.GetExtension(path), ReportTemplateFilePolicy.Extension, StringComparison.Ordinal)))
                 {
                     string content = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
-                    if (ReportTemplateV3ResourceReferenceParser.Parse(type, content).Any(resource => resource.Id == resourceId)) return true;
+                    foreach (var resource in ReportTemplateV3ResourceReferenceParser.Parse(type, content))
+                        if (resourceIds.Contains(resource.Id)) found.Add(resource.Id);
+                    if (found.Count == resourceIds.Count) return found;
                 }
             }
         }
-        return false;
+        return found;
     }
 }

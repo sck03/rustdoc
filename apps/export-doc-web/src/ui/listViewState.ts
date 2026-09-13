@@ -29,10 +29,3 @@ export function normalizeListPageSize(value: unknown) {
     ? numericValue
     : defaultListPageSize;
 }
-
-function createDefaultListViewState(): StoredListViewState {
-  return {
-    keyword: "",
-    pageSize: defaultListPageSize,
-  };
-}
