@@ -77,8 +77,8 @@
       }
     },
     "built-in-invoice-template#2": {
-      "fingerprintHex": "e0000060ff00003c0060183e7c003e48001e7c0f8e7ffffe7ffffc7ffffe7ffffe7e003262003e7e003e7e003e7a00207a00207ffc207e00207e00207ffffe7ffffe7ffffe7ffffc7ffe040002040002040003fc007e007e0000000000fffffb",
-      "occupiedCells": 370,
+      "fingerprintHex": "f0000060ff00003c0060183e7c003e48001e7c0f8e7ffffe7ffffc7ffffe7ffffe7a003e7e003e7a00207a00207ffc207ffc207e00207ffffe7ffffe7ffffe7ffffe7ffe0073fffc0002040002040002040003fc007e007e0000000000ffffe3",
+      "occupiedCells": 379,
       "paperBounds": {
         "left": 305,
         "top": 429,
@@ -109,8 +109,8 @@
       }
     },
     "built-in-packing-list-template#2": {
-      "fingerprintHex": "e0000060ff00003c00603c327c003e48003e00001e7fff827ffffe7feffe7ffffe680f827800027800027800026800027ffffe400ffe430ffe400fd67ffffe0000000000000003fc0002040002040002040003fc007e007e0000000000fffffb",
-      "occupiedCells": 294,
+      "fingerprintHex": "f0000060ff00003c00603c327c003e48003e00001e7fff827ffffe7feffe7ffffe780f827800026800027ffffe430ffe430ffe7ffffe7ff8000000000000000000000000000003fc0002040002040002040003fc007e007e0000000000ffffe3",
+      "occupiedCells": 288,
       "paperBounds": {
         "left": 305,
         "top": 429,

@@ -10,7 +10,9 @@
 
 单据备用字段验证：`npm --prefix apps/export-doc-web run test:document-spare-fields`，覆盖发票、商品和付款三十项字段的草稿保存、大写转换、设计器选择、HTML 与样例。行政编辑／删除和通讯录验证继续使用 `test:office-models`、`test:office-ui`；设计器交互使用 `test:report-designer-v3-ui`。
 
-> 报表打印像素回归默认只读基准。模板版式有意调整后，先运行 `node scripts/test_report_template_print_pixel_regression.mjs --update` 生成受控基准，再立即运行不带 `--update` 的普通检查。更新只写测试夹具和 `.codex-runtime`，不会写系统临时目录。
+> 报表模板变更后，必须分别运行 `npm --prefix apps/export-doc-web run test:template-print-pixels` 和 `npm --prefix apps/export-doc-web run test:template-pdf-pixels`。前者检查打印媒体下的模板源码，后者使用完整 Chrome 的 PDF Viewer 逐页检查实际生成的 PDF；两者维护独立基准，源码中的 Scriban 分支变化也会影响这两套静态排版夹具。业务数据绑定另由 .NET 报表集成测试验证。
+>
+> 两套像素回归默认只读基准。确认版式变化符合预期后，可向对应命令追加 `-- --update` 生成候选基准；逐页复核 `.codex-runtime/report-template-print-pixel-regression` 或 `.codex-runtime/report-template-pdf-pixel-regression` 中的截图和指标，只保留受影响条目的变更，再运行不带更新参数的两套检查。保持指纹、纸张和墨迹边界阈值，不以批量刷新基准掩盖未审查变化。更新只写测试夹具和仓库运行目录。
 
 ## GitHub 公开发布
 
