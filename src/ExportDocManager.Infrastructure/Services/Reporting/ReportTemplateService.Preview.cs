@@ -5,7 +5,7 @@ namespace ExportDocManager.Services.Reporting
 {
     public sealed partial class ReportTemplateService
     {
-        private string RenderInvoicePreview(string templateContent, bool withSeal)
+        private async Task<string> RenderInvoicePreviewAsync(string templateContent, bool withSeal, CancellationToken cancellationToken)
         {
             var invoice = BuildSampleInvoice();
             var customer = new Customer
@@ -17,12 +17,13 @@ namespace ExportDocManager.Services.Reporting
                 Phone = "+49 40 0000 0000"
             };
             var exporter = BuildSampleExporter();
-            var globals = ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(
+            var globals = await ReportTemplateGlobalsBuilder.BuildInvoiceGlobalsAsync(
                 invoice,
                 customer,
                 exporter,
                 withSeal,
-                logger: _logger);
+                logger: _logger,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
             return ScribanReportTemplateRenderer.Render(templateContent, globals);
         }
 
@@ -101,6 +102,7 @@ namespace ExportDocManager.Services.Reporting
                 DestinationCountry = "GERMANY",
                 Currency = "USD",
                 PaymentTerms = "T/T",
+                ShippingMarks = "N/M\nMADE IN CHINA",
                 TradeTerms = "FOB"
             };
             invoice.Items =

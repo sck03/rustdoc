@@ -12,7 +12,6 @@ const exportTemplateSystemFields: ReportDesignerField[] = [
   { category: "模板系统字段", label: "是否带章 (ShowSeal)", value: "ShowSeal" },
   { category: "模板系统字段", label: "单证章图片 (doc_seal_path)", value: "doc_seal_path" },
   { category: "模板系统字段", label: "报关章图片 (customs_seal_path)", value: "customs_seal_path" },
-  { category: "模板系统字段", label: "唛头图片 (shipping_marks_image_data)", value: "shipping_marks_image_data" },
 ];
 
 export function buildReportDesignerFieldGroups(

@@ -1,5 +1,8 @@
 import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { documentSpareKeys } from "../../ui/documentSpareFields.ts";
+import { isShippingMarksField } from "./reportDesignerFieldRendering.ts";
+
+const shippingMarksSampleDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAABkCAAAAAAk3WRTAAADcUlEQVR4Ac3BCZIiwQEEwYgy/v/lFOTuzHI1fZUk3A3fbfDlBl9u8OUGX27w5QZf7sJcQpjJMJFUmMcwjfwKswymkX9kFsMcUgGpMIVhBqlQUmGCwQxS4Y9QMoHhNKlwRyqcZThJKjyRCucMTpIKz0LJOYYzpMJbUuEEw3FSYZFUOGxwnFRYFkoOMxwkFVZIhWMMh0iFDaTCEYNDpMIWoeQIw35SYTOpsJthL6mwi1TYabCXVNgnlOxk2EUqHCAV9jDsIBUOkgrbDXaQCkeFku0MW0mFU6TCRoZtpMJpUmGTwTZS4bxQsolhA6kwiVRYZ1glFSaSCmsGq6TCTKFkjeEzqTCdVPjI8IlUKCH8I4RnQighPBDCHanwweATqfBL9pB78iSUfHBhmVTYQR4YPglyJWHJhSVS4ZHhIHkjyJWE9wYLpMIuAuGO/JD3Qsl7g7eUm4QXsov8IUsSbpR3LrwhFY4IjwxrglxJeDF4JRXek0XyKPwQCItCyYvBM+UmYYIAArIi4UZ5Mnik3CS8F0AWCIQXIlfho4Qb5cHggVT4SDYLV3IV1oSSe4M7yk3CsvBReBL+COsSbpR/Br+Um4SPAsg78k7YIeFG+TH4IRX+K8JGoeSvwYOEVQHklUB4FSBslnDvwgMJ04U95MHgRyhZFUCeCYTTpMJfF34FuZLwfyMVfg3uJNwonwWQV+Ec5Sbhn8GDULJOHshpUuHehUdBriR8EJlOKjy68CzIlYRlEeSOQDhOKjwbvAol/ztS4cWFN4JcSVgSeRaOkgpvXHgryJWETeQ4qfDWYEEoWRAmkQrvXVgS5ErCKoFwhFRYcmFZkCsJb0ROkwrLBp+EknVhP6nwwYWPglxJeBE5RSp8ZFgjFaaSCisGq0LJTFJhjWEDqTCJVFhn2EQqTCAVthhsE0rOkwqbGLaSCqdIhY0M20mFw6TCZoMdQslRUmE7wy5S4QCpsIdhJ6mwk1TYZ7BXKNlHKuxk2E8qbCYVdjMcIRU2kQoHDA4JJVtIhSMMB0mFFVLhGMNhUuEDqXDU4LhQskwqHGY4Qyq8JRVOMJwjFV5IhVMGJ4WSZ1LhHMNpUuGOVDjLMIFU+EsqnDeYIZT8IRUmMMwhFZAKUxhmkTthksE04Z8wi2EiqTCPYSohzGT4boMvN/hygy83+HKDL/cfVmETodyaiYAAAAAASUVORK5CYII=";
 
 const spareSamples = Object.fromEntries(documentSpareKeys.map((key, index) => [
   key[0].toUpperCase() + key.slice(1), `备用 ${index + 1} 示例`,
@@ -8,6 +11,7 @@ const spareSamples = Object.fromEntries(documentSpareKeys.map((key, index) => [
 export type ReportDesignerPreviewSampleProfile =
   | "apiSample"
   | "exportStandard"
+  | "exportImageMarks"
   | "exportLongItems"
   | "paymentVoucher";
 
@@ -19,6 +23,7 @@ type PreviewSampleData = {
   Payee?: Record<string, string>;
   Payment?: Record<string, string>;
   items?: Array<Record<string, string>>;
+  shippingMarksImage?: string;
 };
 
 export function getReportDesignerPreviewSampleProfiles(reportType: ReportDesignerReportType) {
@@ -32,6 +37,7 @@ export function getReportDesignerPreviewSampleProfiles(reportType: ReportDesigne
   return [
     { value: "apiSample" as const, label: "后端样例" },
     { value: "exportStandard" as const, label: "常规发票样例" },
+    { value: "exportImageMarks" as const, label: "图片唛头样例" },
     { value: "exportLongItems" as const, label: "长明细分页样例" },
   ];
 }
@@ -96,9 +102,9 @@ function createPreviewSampleData(profile: Exclude<ReportDesignerPreviewSamplePro
       cny_amount_upper: "美元壹万贰仟叁佰肆拾伍元陆角柒分",
       doc_seal_path: "",
       customs_seal_path: "",
-      shipping_marks_image_data: "",
       ShowSeal: true,
     },
+    shippingMarksImage: profile === "exportImageMarks" ? shippingMarksSampleDataUrl : undefined,
     Invoice: {
       ...spareSamples,
       InvoiceNo: profile === "exportLongItems" ? "INV-LONG-2026-0707" : "INV-STD-2026-0707",
@@ -232,6 +238,8 @@ function evaluateScribanCondition(expression: string, data: PreviewSampleData, i
 
 function replaceScribanValues(sourceHtml: string, data: PreviewSampleData, item: Record<string, string>) {
   return sourceHtml.replace(/{{\s*([A-Za-z_][A-Za-z0-9_.]*)\s*}}/g, (_match, path: string) => {
+    if (isShippingMarksField(path) && data.shippingMarksImage)
+      return `<img class="edm-shipping-marks-image" src="${data.shippingMarksImage}" alt="唛头样例" style="display:inline-block;max-width:100%;max-height:var(--edm-field-image-height,60mm);width:auto;height:auto;object-fit:contain;vertical-align:top">`;
     const value = readSampleValue(path, data, item);
     return escapeHtml(value === undefined ? "" : String(value));
   });

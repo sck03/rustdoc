@@ -13,6 +13,7 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { type InvoiceItemCellSelection, InvoiceItemsEditor } from "./InvoiceItemsEditor.tsx";
 import type { EditableInvoiceItemField } from "./invoiceItemTableModel.ts";
 import { ShippingMarkEditorDialog } from "./ShippingMarkEditorDialog.tsx";
+import { normalizeInvoiceShippingMarks } from "./invoiceModel.ts";
 
 type InvoicePatch = Partial<ApiInvoiceDetailDto>;
 
@@ -110,7 +111,7 @@ export function InvoiceMarksAndItemsPanel({
   const [shippingMarkPreviewDataUrl, setShippingMarkPreviewDataUrl] = useState<string | null>(null);
   const [shippingMarkMessage, setShippingMarkMessage] = useState<string | null>(null);
 
-  const shippingMarksMode = invoice.shippingMarksType?.trim() === "Image" ? "Image" : "Text";
+  const shippingMarksMode = normalizeInvoiceShippingMarks(invoice).shippingMarksType;
   const shippingMarksImagePath = invoice.shippingMarksImage?.trim() ?? "";
 
   useEffect(() => {

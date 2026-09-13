@@ -299,7 +299,7 @@ export function normalizeInvoiceForSave(
     totalTaxRefundAmount: readNumber(String(invoice.totalTaxRefundAmount)),
     totalProfit: readNumber(String(invoice.totalProfit)),
     exchangeRate: readNumber(String(invoice.exchangeRate)),
-    shippingMarksType: invoice.shippingMarksType?.trim() || "Text",
+    ...normalizeInvoiceShippingMarks(invoice),
     specialTerms: invoice.specialTerms ?? "",
     letterOfCreditNo: invoice.letterOfCreditNo?.trim() ?? "",
     letterOfCreditSourcePath: invoice.letterOfCreditSourcePath?.trim() ?? "",
@@ -307,5 +307,15 @@ export function normalizeInvoiceForSave(
     pendingHsFeedback,
     items,
     ...calculatedTotals,
+  };
+}
+
+export function normalizeInvoiceShippingMarks(invoice: Pick<ApiInvoiceDetailDto, "shippingMarksType" | "shippingMarks" | "shippingMarksImage">) {
+  const type = invoice.shippingMarksType?.trim() || "Text";
+  const shippingMarksType = type.toLowerCase() === "image" ? "Image" : type.toLowerCase() === "text" ? "Text" : type;
+  return {
+    shippingMarksType,
+    shippingMarks: shippingMarksType === "Image" ? "" : invoice.shippingMarks ?? "",
+    shippingMarksImage: shippingMarksType === "Text" ? "" : invoice.shippingMarksImage?.trim() ?? "",
   };
 }

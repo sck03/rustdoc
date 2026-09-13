@@ -1,5 +1,6 @@
 import type { ReportBlock } from "./reportDesignerSchema.ts";
 import { renderReportDesignerBlockToHtml } from "./reportDesignerBlockRenderer.ts";
+import { renderReportField } from "./reportDesignerFieldRendering.ts";
 import {
   hundredthMmToMm,
   reportDesignerV3ElementBounds,
@@ -14,7 +15,6 @@ import {
 import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { isControlledReportImageFieldPath } from "./reportDesignerSchemaDomains.ts";
 
-const fieldPathPattern = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/;
 const colorPattern = /^#[0-9a-fA-F]{3,8}$/;
 const fontFamilyPattern = /^[A-Za-z0-9 \t"',._-]+$/;
 const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
@@ -90,6 +90,8 @@ export function exportReportDesignerV3SchemaToHtml(
     .edm-v3-repeat-layer .edm-v3-element { pointer-events: none; }
     .edm-v3-element { position: absolute; overflow: visible; min-width: 0; min-height: 0; }
     .edm-v3-text, .edm-v3-field, .edm-v3-page-number { display: block; line-height: 1.3; overflow-wrap: anywhere; white-space: pre-wrap; word-break: break-word; }
+    .edm-v3-field { display: flex; flex-direction: column; height: 100%; }
+    .edm-v3-field > .edm-report-field-content { flex: 1; min-height: 0; --edm-field-image-height: 100%; }
     .edm-v3-flow { overflow: visible; }
     /* Row/Grid/Conditional Flow elements outside Body are intentionally
        rendered as fixed layer content.  Repetition follows the owning layer;
@@ -273,7 +275,7 @@ function renderElementContent(element: ReportDesignerV3Element) {
       case "Text":
         return `<div class="edm-v3-text">${escapeHtml(element.text)}</div>`;
       case "Field":
-        return `<div class="edm-v3-field">${element.label ? `${escapeHtml(element.label)}: ` : ""}${renderField(element.fieldPath, element.fallbackText)}</div>`;
+        return `<div class="edm-v3-field">${element.label ? `${escapeHtml(element.label)}: ` : ""}${renderReportField(element.fieldPath, element.fallbackText)}</div>`;
       case "Image":
         return renderImage(element);
       case "PageNumber":
@@ -283,7 +285,7 @@ function renderElementContent(element: ReportDesignerV3Element) {
       case "Line":
         return `<div class="edm-v3-line edm-v3-line-${element.direction.toLowerCase()}" style="${renderLineStyle(element)}"></div>`;
       case "Flow":
-        return `<div class="edm-v3-flow">${renderReportDesignerBlockToHtml(element.block as ReportBlock)}</div>`;
+        return `<div class="edm-v3-flow" style="--edm-field-image-height:${hundredthMmToMm(element.heightHundredthMm)}mm">${renderReportDesignerBlockToHtml(element.block as ReportBlock)}</div>`;
     }
   })();
 }
@@ -357,16 +359,6 @@ function renderBorder(style: ReportDesignerV3Element["style"]) {
   const color = style.borderColor && colorPattern.test(style.borderColor) ? style.borderColor : "#334155";
   const borderStyle = style.borderStyle === "Dashed" ? "dashed" : "solid";
   return `border: ${style.borderWidthPx}px ${borderStyle} ${color}`;
-}
-
-function renderField(fieldPath: string, fallback?: string) {
-  if (!isFieldPath(fieldPath)) return escapeHtml(fallback ?? "");
-  const expression = `{{ ${fieldPath.trim()} }}`;
-  return fallback ? `{{ if ${fieldPath.trim()} }}${expression}{{ else }}${escapeHtml(fallback)}{{ end }}` : expression;
-}
-
-function isFieldPath(value: string) {
-  return fieldPathPattern.test(value.trim());
 }
 
 function renderFontFamily(value: string) {

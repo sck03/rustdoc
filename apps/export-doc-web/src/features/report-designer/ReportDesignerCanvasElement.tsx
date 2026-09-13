@@ -3,6 +3,7 @@ import type { ReportBlock } from "./reportDesignerSchema.ts";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { ReportResourceImage } from "./ReportResourceImage.tsx";
 import { renderReportDesignerBlockPreviewToHtml } from "./reportDesignerBlockRenderer.ts";
+import { isShippingMarksField, shippingMarksPreviewText } from "./reportDesignerFieldRendering.ts";
 import type { ReportDesignerV3ResizeDirection } from "./reportDesignerV3Mutations.ts";
 import {
   hundredthMmToMm,
@@ -21,7 +22,7 @@ export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCa
       return (
         <span className="report-designer-v3-preview-field">
           {element.label ? `${element.label}: ` : ""}
-          {`{{ ${element.fieldPath || "字段"} }}`}
+          {isShippingMarksField(element.fieldPath) ? shippingMarksPreviewText : `{{ ${element.fieldPath || "字段"} }}`}
         </span>
       );
     case "Image":

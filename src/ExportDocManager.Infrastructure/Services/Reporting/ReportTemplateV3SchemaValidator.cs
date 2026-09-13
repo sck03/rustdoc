@@ -182,7 +182,7 @@ internal static class ReportTemplateV3SchemaValidator
     private static void ValidateField(ReportDocumentType type, string field, string path)
     {
         if (!Field.IsMatch(field)) throw Error("V3 字段路径只能使用点分隔标识符。");
-        bool allowed = type == ReportDocumentType.PaymentVoucher ? field == "cny_amount_upper" || field.StartsWith("Payment.", StringComparison.Ordinal) : field.StartsWith("Invoice.", StringComparison.Ordinal) || field.StartsWith("Customer.", StringComparison.Ordinal) || field.StartsWith("Exporter.", StringComparison.Ordinal) || field.StartsWith("item.", StringComparison.Ordinal) || field is "ShowSeal" or "doc_seal_path" or "customs_seal_path" or "shipping_marks_image_data";
+        bool allowed = type == ReportDocumentType.PaymentVoucher ? field == "cny_amount_upper" || field.StartsWith("Payment.", StringComparison.Ordinal) : field.StartsWith("Invoice.", StringComparison.Ordinal) || field.StartsWith("Customer.", StringComparison.Ordinal) || field.StartsWith("Exporter.", StringComparison.Ordinal) || field.StartsWith("item.", StringComparison.Ordinal) || field is "ShowSeal" or "doc_seal_path" or "customs_seal_path";
         if (!allowed) throw Error($"V3 字段 {field} 不属于当前报表数据域。");
     }
     private static void ValidateControlledImage(ReportDocumentType type, string field, string path)

@@ -34,7 +34,7 @@ namespace ExportDocManager.Services.Reporting
             Export("单据信息", "目的国 (Destination Country)", "{{ Invoice.DestinationCountry }}"),
             Export("单据信息", "运输方式 (Transport Mode)", "{{ Invoice.TransportMode }}"),
             Export("单据信息", "船期/航期 (Shipment Date)", "{{ Invoice.ShipmentDate | date.to_string '%Y-%m-%d' }}"),
-            Export("单据信息", "唛头 (Shipping Marks)", "{{ Invoice.ShippingMarks }}"),
+            Export("单据信息", "唛头 · 自动显示文字或图片 (Shipping Marks)", "{{ Invoice.ShippingMarks }}"),
             Export("客户信息", "客户英文名 (Customer Name EN)", "{{ Customer.CustomerNameEN }}"),
             Export("客户信息", "客户英文地址 (Customer Address EN)", "{{ Customer.AddressEN }}"),
             Export("客户信息", "通知人名称 (Notify Party Name)", "{{ Customer.NotifyPartyName }}"),

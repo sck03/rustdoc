@@ -16,7 +16,7 @@ using Scriban.Runtime;
 namespace ExportDocManager.Infrastructure.Tests
 {
     [Collection(BrowserIntegrationCollection.Name)]
-    public class ReportHtmlServiceInfrastructureTests
+    public partial class ReportHtmlServiceInfrastructureTests
     {
         [Fact]
         public async Task RenderInvoiceReportAsync_ShouldReadTemplateFromProgramTemplateRoot()

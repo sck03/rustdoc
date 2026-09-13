@@ -74,6 +74,10 @@ assert(draft.items[0].styleName === "MEN'S COTTON T-SHIRT", "item description up
 assert(draft.items[0].fabricComposition === "100% COTTON", "item composition uppercased");
 assert(draft.items[0].styleNameCN === "棉制男式T恤衫" && draft.items[0].unitCN === "件", "Chinese item fields preserved");
 const persistedDraft = model.normalizeInvoiceForSave(draft, 7);
+const imageMarks = model.normalizeInvoiceForSave({ ...draft, shippingMarksType: " image ", shippingMarks: "stale text", shippingMarksImage: " Marks/mark.png " }, 7);
+assert(imageMarks.shippingMarksType === "Image" && imageMarks.shippingMarks === "" && imageMarks.shippingMarksImage === "Marks/mark.png", "saving an image mark keeps only its canonical type and managed reference");
+const textMarks = model.normalizeInvoiceForSave({ ...imageMarks, shippingMarksType: "text", shippingMarks: "N/M\nMADE IN CHINA" }, 7);
+assert(textMarks.shippingMarksType === "Text" && textMarks.shippingMarksImage === "" && textMarks.shippingMarks === "N/M\nMADE IN CHINA", "switching back to text clears the persisted image reference");
 const changedDraft = { ...persistedDraft, customerNameEN: "TEMPORARY CUSTOMER" };
 assert(!draftEquality.areInvoiceDraftsEqual(changedDraft, persistedDraft), "invoice dirty comparison detects a changed field");
 const restoredDraft = { ...changedDraft, customerNameEN: persistedDraft.customerNameEN };

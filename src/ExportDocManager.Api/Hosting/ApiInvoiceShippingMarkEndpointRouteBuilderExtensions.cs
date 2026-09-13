@@ -1,5 +1,4 @@
 using ExportDocManager.Services.Core;
-using ExportDocManager.Services.Security;
 
 namespace ExportDocManager.Api.Hosting
 {
@@ -8,8 +7,6 @@ namespace ExportDocManager.Api.Hosting
         private static void MapInvoiceShippingMarkEndpoints(this IEndpointRouteBuilder endpoints)
         {
             endpoints.MapPost("/api/invoices/shipping-marks/image", async (
-                HttpContext context,
-                IApiSessionTokenService tokenService,
                 IShippingMarkImageService imageService,
                 ApiShippingMarkImageSaveRequest request,
                 CancellationToken cancellationToken) =>
@@ -42,11 +39,10 @@ namespace ExportDocManager.Api.Hosting
             .WithName("SaveShippingMarkImage")
             .Produces<ApiShippingMarkImageSaveResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status401Unauthorized);
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status503ServiceUnavailable);
 
             endpoints.MapPost("/api/invoices/shipping-marks/image/preview", async (
-                HttpContext context,
-                IApiSessionTokenService tokenService,
                 IShippingMarkImageService imageService,
                 ApiShippingMarkImagePreviewRequest request,
                 CancellationToken cancellationToken) =>
@@ -72,16 +68,12 @@ namespace ExportDocManager.Api.Hosting
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
-                catch (FormatException ex)
-                {
-                    return Results.BadRequest(new ApiErrorResponse(ex.Message));
-                }
                 catch (InvalidDataException ex)
                 {
                     return Results.BadRequest(new ApiErrorResponse(ex.Message));
                 }
                 catch (UnauthorizedAccessException ex) { return WriteServiceException(ex); }
-                catch (FileNotFoundException)
+                catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
                 {
                     return Results.NotFound();
                 }
@@ -95,7 +87,7 @@ namespace ExportDocManager.Api.Hosting
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status404NotFound)
-            .Produces(StatusCodes.Status409Conflict);
+            .Produces(StatusCodes.Status503ServiceUnavailable);
         }
     }
 }

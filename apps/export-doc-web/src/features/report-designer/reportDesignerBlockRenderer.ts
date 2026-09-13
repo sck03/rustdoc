@@ -1,4 +1,5 @@
 import type { ReportBlock, ReportBorderStyle, ReportTextStyle } from "./reportDesignerSchema.ts";
+import { renderReportField as renderFieldExpression, shippingMarksFieldPath, shippingMarksPreviewText } from "./reportDesignerFieldRendering.ts";
 import {
   isReportDesignerCssColor,
   isReportDesignerFieldPath,
@@ -18,17 +19,13 @@ export function renderReportDesignerBlockToHtml(block: ReportBlock) {
  * representative set of rows for visual editing and never gets persisted.
  */
 export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock) {
-  // The editor preview shows one representative content value.  Do not carry
-  // a conditional field's export fallback into this data-free rendering: the
-  // control tags are intentionally removed below, so doing so would display
-  // both the field token and the fallback at once.
-  const previewBlock = block.type === "Conditional" && block.content.kind === "Field"
-    ? { ...block, content: { ...block.content, fallbackText: undefined } }
-    : block;
-  let html = renderBlock(previewBlock, true);
+  // Keep one representative field value, without also showing its fallback.
+  let html = renderBlock(block, true).replace(
+    /\{\{ if ([A-Za-z_][A-Za-z0-9_.]*) \}\}(\{\{ \1 \}\})\{\{ else \}\}[\s\S]*?\{\{ end \}\}/g, "$2");
   html = expandPreviewLoops(html);
   html = html.replace(/\{\{\s*(?:if|else|end|capture|assign|while|case|when)[\s\S]*?\}\}/gi, "");
   html = html.replace(/\{\{\s*\$?[A-Za-z_][A-Za-z0-9_]*\s*=\s*[\s\S]*?\}\}/g, "");
+  html = html.split(`{{ ${shippingMarksFieldPath} }}`).join(shippingMarksPreviewText);
   return html;
 }
 
@@ -51,7 +48,7 @@ function renderBlock(block: ReportBlock, preview = false) {
     case "Text":
       return `<div style="${renderBoxStyle(block.style, block.border)}">${escapeHtml(block.text)}</div>`;
     case "Field":
-      return `<div style="${renderBoxStyle(block.style, block.border)}">${block.label ? `${escapeHtml(block.label)}: ` : ""}<span>${renderFieldExpression(block.fieldPath)}</span></div>`;
+      return `<div style="${renderBoxStyle(block.style, block.border)}">${block.label ? `${escapeHtml(block.label)}: ` : ""}<span>${renderFieldExpression(block.fieldPath, block.fallbackText)}</span></div>`;
     case "Row":
       return renderRowBlock(block);
     case "Grid":
@@ -73,14 +70,19 @@ function renderGridBlock(block: Extract<ReportBlock, { type: "Grid" }>, preview:
     const width = Math.round((Math.max(1, column.widthPercent) / columnWidthTotal) * 10000) / 100;
     return `<col style="width: ${width}%;">`;
   }).join("")}</colgroup>`;
-  const rows = block.rows.map((row) => `<tr${row.heightMm ? ` style="height: ${row.heightMm}mm;"` : ""}>${row.cells.map((cell) => {
+  const rows = block.rows.map((row, rowIndex) => `<tr${row.heightMm ? ` style="height: ${row.heightMm}mm;"` : ""}>${row.cells.map((cell) => {
     const colSpan = Math.max(1, Math.floor(cell.colSpan ?? 1));
     const rowSpan = Math.max(1, Math.floor(cell.rowSpan ?? 1));
     const spanAttributes = `${colSpan > 1 ? ` colspan="${colSpan}"` : ""}${rowSpan > 1 ? ` rowspan="${rowSpan}"` : ""}`;
     const previewAttributes = preview
       ? ` data-report-grid-cell-id="${escapeHtml(cell.id)}"`
       : "";
-    return `<td${spanAttributes}${previewAttributes} style="${renderGridCellStyle(block, cell)}">${renderGridCellContent(cell)}</td>`;
+    const spannedRows = block.rows.slice(rowIndex, rowIndex + rowSpan);
+    const style = { ...block.defaultCellStyle, ...cell.style };
+    const imageHeightMm = spannedRows.every((item) => item.heightMm)
+      ? spannedRows.reduce((height, item) => height + item.heightMm!, 0) - (style.marginTopMm ?? 1.2) - (style.marginBottomMm ?? 1.2)
+      : undefined;
+    return `<td${spanAttributes}${previewAttributes} style="${renderGridCellStyle(block, cell)}">${renderGridCellContent(cell, imageHeightMm)}</td>`;
   }).join("")}</tr>`).join("");
 
   const caption = block.title ? `<caption class="edm-report-grid-title">${escapeHtml(block.title)}</caption>` : "";
@@ -109,10 +111,10 @@ function renderGridCellStyle(
   ].filter(Boolean).join("; ");
 }
 
-function renderGridCellContent(cell: Extract<ReportBlock, { type: "Grid" }>["rows"][number]["cells"][number]) {
+function renderGridCellContent(cell: Extract<ReportBlock, { type: "Grid" }>["rows"][number]["cells"][number], imageHeightMm?: number) {
   switch (cell.contentKind) {
     case "Field":
-      return `${cell.label ? `${escapeHtml(cell.label)}: ` : ""}${renderFieldExpression(cell.fieldPath)}`;
+      return `${cell.label ? `${escapeHtml(cell.label)}: ` : ""}${renderFieldExpression(cell.fieldPath, cell.fallbackText, imageHeightMm)}`;
     case "CheckboxGroup":
       return renderGridCheckboxGroup(cell);
     case "Text":
@@ -136,7 +138,7 @@ function renderGridCheckboxGroup(cell: Extract<ReportBlock, { type: "Grid" }>["r
 function renderRowBlock(block: Extract<ReportBlock, { type: "Row" }>) {
   return `<table class="edm-report-row" style="${renderRowStyle(block)}"><tbody><tr>${block.columns.map((column) => {
     const content = column.contentKind === "Field"
-      ? `${column.label ? `${escapeHtml(column.label)}: ` : ""}<span>${renderFieldExpression(column.fieldPath)}</span>`
+      ? `${column.label ? `${escapeHtml(column.label)}: ` : ""}<span>${renderFieldExpression(column.fieldPath, column.fallbackText)}</span>`
       : escapeHtml(column.text);
     return `<td style="${renderRowCellStyle(column)}">${content}</td>`;
   }).join("")}</tr></tbody></table>`;
@@ -229,7 +231,7 @@ function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>)
   const detailRow = `<tr>${block.columns
     .map((column) => `<td style="${renderDetailCellStyle(block.bodyStyle, column.border ?? block.border, column.align)}">${renderDetailCellContent(column)}</td>`)
     .join("")}</tr>`;
-  const table = `<table class="edm-detail-table ${detailPrintClasses}"><thead>${renderDetailTableHeaderRows(block)}</thead><tbody>${renderDetailTableRows(block, detailRow)}${summaryRow}</tbody></table>`;
+  const table = `<table class="edm-detail-table ${detailPrintClasses}">${renderProportionalColumns(block.columns.map(column => column.widthMm))}<thead>${renderDetailTableHeaderRows(block)}</thead><tbody>${renderDetailTableRows(block, detailRow)}${summaryRow}</tbody></table>`;
 
   if (!block.sideBand) {
     return table;
@@ -240,16 +242,17 @@ function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>)
     : escapeHtml(block.sideBand.text);
 
   return `<table class="edm-detail-layout ${renderDetailHeaderRepeatClassName(block)}">
+  ${renderProportionalColumns([block.sideBand.widthMm, block.detailWidthMm ?? block.columns.reduce((sum, column) => sum + column.widthMm, 0)])}
   <thead>
     <tr>
-      <th style="${renderDetailLayoutCellStyle(block.headerStyle, block.border, block.sideBand.widthMm)}">${escapeHtml(block.sideBand.title)}</th>
-      <th style="${renderDetailLayoutCellStyle(block.headerStyle, block.border, block.detailWidthMm)}">${escapeHtml(block.title || "Detail")}</th>
+      <th style="${renderDetailLayoutCellStyle(block.headerStyle, block.border)}">${escapeHtml(block.sideBand.title)}</th>
+      <th style="${renderDetailLayoutCellStyle(block.headerStyle, block.border)}">${escapeHtml(block.title || "Detail")}</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td style="${renderDetailLayoutCellStyle(block.sideBand.style, block.border, block.sideBand.widthMm, "top")}">${sideContent}</td>
-      <td style="${renderDetailLayoutCellStyle({}, block.border, block.detailWidthMm, "top")}; padding: 0;">${table}</td>
+      <td style="${renderDetailLayoutCellStyle(block.sideBand.style, block.border, "top")}">${sideContent}</td>
+      <td style="${renderDetailLayoutCellStyle({}, block.border, "top")}; padding: 0;">${table}</td>
     </tr>
   </tbody>
 </table>`;
@@ -308,7 +311,7 @@ function renderDetailTableRowsWithGroupPageBreaks(
 function renderDetailTableHeaderRows(block: Extract<ReportBlock, { type: "DetailTable" }>) {
   const groupRow = renderDetailTableHeaderGroupRow(block);
   const columnRow = `<tr>${block.columns
-    .map((column) => `<th style="${renderDetailCellStyle(block.headerStyle, column.border ?? block.border, column.align, column.widthMm)}">${escapeHtml(column.title)}</th>`)
+    .map((column) => `<th style="${renderDetailCellStyle(block.headerStyle, column.border ?? block.border, column.align)}">${escapeHtml(column.title)}</th>`)
     .join("")}</tr>`;
 
   return `${groupRow}${columnRow}`;
@@ -542,14 +545,17 @@ function renderDetailCellContent(column: Extract<ReportBlock, { type: "DetailTab
   }).join("");
 }
 
+function renderProportionalColumns(widths: number[]) {
+  const total = widths.reduce((sum, width) => sum + Math.max(1, width), 0);
+  return `<colgroup>${widths.map(width => `<col style="width:${Math.max(1, width) / total * 100}%">`).join("")}</colgroup>`;
+}
+
 function renderDetailLayoutCellStyle(
   style: ReportTextStyle,
   border: ReportBorderStyle,
-  widthMm?: number,
   verticalAlign?: "top" | "middle" | "bottom",
 ) {
   return [
-    widthMm ? `width: ${widthMm}mm` : "",
     renderTextStyle(style),
     verticalAlign ? `vertical-align: ${verticalAlign}` : "",
     "white-space: pre-wrap",
@@ -563,10 +569,8 @@ function renderDetailCellStyle(
   style: ReportTextStyle,
   border: ReportBorderStyle,
   align: "Left" | "Center" | "Right",
-  widthMm?: number,
 ) {
   return [
-    widthMm ? `width: ${widthMm}mm` : "",
     `text-align: ${alignToCss(align)}`,
     style.fontSizePt ? `font-size: ${style.fontSizePt}pt` : "",
     style.bold ? "font-weight: 700" : "",
@@ -601,13 +605,6 @@ function renderDetailItemExpression(fieldPath: string) {
 function renderDetailItemValueReference(fieldPath: string) {
   const itemField = readDetailItemField(fieldPath);
   return isReportDesignerFieldPath(itemField) ? `item.${itemField}` : "";
-}
-
-function renderFieldExpression(fieldPath: string, fallbackText?: string) {
-  const normalized = fieldPath.trim();
-  if (!isReportDesignerFieldPath(normalized)) return escapeHtml(fallbackText ?? "");
-  const expression = `{{ ${normalized} }}`;
-  return fallbackText ? `{{ if ${normalized} }}${expression}{{ else }}${escapeHtml(fallbackText)}{{ end }}` : expression;
 }
 
 function renderTextStyle(style: ReportTextStyle) {

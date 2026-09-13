@@ -96,6 +96,7 @@
         th { border: 1px solid black; padding: 8px; text-align: left; background-color: #f2f2f2; font-weight: bold; }
         td { padding: 8px; text-align: left; }
         td.marks { 
+            --edm-field-image-height: 52.9mm;
             white-space: pre-line; 
             font-size: 8px;
             border-left: 1px solid black;
@@ -219,11 +220,7 @@
             {{ if $page == 0 }}
             <tr>
                 <td rowspan="{{ $current_page_items.size + 1 }}" class="marks">
-                    {{ if Invoice.ShippingMarksType == 'Image' }}
-                        <img src="{{ shipping_marks_image_data }}" style="max-width: 95%; max-height: 200px; display: block; margin: 0 auto;">
-                    {{ else }}
-                        {{ Invoice.ShippingMarks }}
-                    {{ end }}
+                    {{ Invoice.ShippingMarks }}
                 </td>
                 <td></td>
                 <td class="trade-terms">{{ Invoice.TradeTerms }}</td>

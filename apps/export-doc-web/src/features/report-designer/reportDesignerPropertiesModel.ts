@@ -31,7 +31,6 @@ export function readDefaultRowFieldPath(fieldGroups: ReportDesignerFieldGroup[])
       candidate.value !== "ShowSeal" &&
       candidate.value !== "doc_seal_path" &&
       candidate.value !== "customs_seal_path" &&
-      candidate.value !== "shipping_marks_image_data" &&
       !candidate.value.startsWith("item."),
     );
 

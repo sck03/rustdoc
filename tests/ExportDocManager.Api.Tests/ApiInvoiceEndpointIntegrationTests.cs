@@ -275,7 +275,7 @@ namespace ExportDocManager.Api.Tests
                 "api-shipping-mark-image.db");
             using var anonymousClient = harness.CreateClient();
 
-            const string pngDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
+            string pngDataUrl = "data:image/png;base64," + Convert.ToBase64String(RasterImageFixtures.Read("png"));
 
             var anonymousSaveResponse = await anonymousClient.PostAsJsonAsync(
                 "/api/invoices/shipping-marks/image",
@@ -289,6 +289,10 @@ namespace ExportDocManager.Api.Tests
                 "/api/invoices/shipping-marks/image",
                 new ApiShippingMarkImageSaveRequest { ImageDataUrl = " " });
             Assert.Equal(HttpStatusCode.BadRequest, blankSaveResponse.StatusCode);
+
+            var missing = await adminClient.PostAsJsonAsync("/api/invoices/shipping-marks/image/preview",
+                new ApiShippingMarkImagePreviewRequest { ImagePath = "Marks/missing.png" });
+            Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
 
             var saveResponse = await adminClient.PostAsJsonAsync(
                 "/api/invoices/shipping-marks/image",
@@ -328,8 +332,8 @@ namespace ExportDocManager.Api.Tests
 
             var invoiceRequest = CreateInvoiceRequest(
                 "INV-MARK-IMAGE-001",
-                shippingMarks: string.Empty,
-                shippingMarksType: "Image",
+                shippingMarks: "旧文字不能随图片保存",
+                shippingMarksType: " image ",
                 shippingMarksImage: saved.ImagePath);
             var createResponse = await adminClient.PostAsJsonAsync("/api/invoices", invoiceRequest);
             Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
@@ -337,6 +341,34 @@ namespace ExportDocManager.Api.Tests
             Assert.Equal("Image", created.Invoice.ShippingMarksType);
             Assert.Equal(saved.ImagePath, created.Invoice.ShippingMarksImage);
             Assert.Equal(string.Empty, created.Invoice.ShippingMarks);
+
+            var readBack = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceDetailDto>(
+                await adminClient.GetAsync($"/api/invoices/{created.Id}"));
+            Assert.Equal("Image", readBack.ShippingMarksType);
+            Assert.Equal(string.Empty, readBack.ShippingMarks);
+            var textRequest = CreateInvoiceRequest("INV-MARK-IMAGE-001", id: created.Id,
+                rowVersion: readBack.RowVersion, shippingMarks: "N/M\nMADE IN CHINA",
+                shippingMarksType: " text ", shippingMarksImage: saved.ImagePath);
+            var textResponse = await adminClient.PutAsJsonAsync($"/api/invoices/{created.Id}", textRequest);
+            Assert.Equal(HttpStatusCode.OK, textResponse.StatusCode);
+            var text = await ApiIntegrationTestHarness.ReadJsonAsync<ApiInvoiceSaveResponse>(textResponse);
+            Assert.Equal("Text", text.Invoice.ShippingMarksType);
+            Assert.Equal(string.Empty, text.Invoice.ShippingMarksImage);
+
+            await using var connection = new SqliteConnection(DbHelper.BuildConnectionString(harness.DatabasePath));
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT ShippingMarksType, ShippingMarks, ShippingMarksImage FROM Invoices WHERE Id = $id";
+            command.Parameters.AddWithValue("$id", created.Id);
+            await using var reader = await command.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("Text", reader.GetString(0));
+            Assert.Equal("N/M\nMADE IN CHINA", reader.GetString(1));
+            Assert.Equal(string.Empty, reader.GetString(2));
+            await File.WriteAllBytesAsync(savedImagePath, RasterImageFixtures.Read("png")[..20]);
+            var corrupt = await adminClient.PostAsJsonAsync("/api/invoices/shipping-marks/image/preview",
+                new ApiShippingMarkImagePreviewRequest { ImagePath = saved.ImagePath });
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, corrupt.StatusCode);
         }
 
         [Fact]

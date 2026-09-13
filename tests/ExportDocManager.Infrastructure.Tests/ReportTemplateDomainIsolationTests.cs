@@ -12,7 +12,7 @@ namespace ExportDocManager.Infrastructure.Tests;
 public sealed class ReportTemplateDomainIsolationTests
 {
     [Fact]
-    public void ExportGlobals_ShouldKeepSealDataInsideExportDocumentDomain()
+    public async Task ExportGlobals_ShouldKeepSealDataInsideExportDocumentDomain()
     {
         string root = CreateTestRoot("export-seal-globals");
         string appRoot = Path.Combine(root, "app");
@@ -27,7 +27,7 @@ public sealed class ReportTemplateDomainIsolationTests
 
         try
         {
-            var globals = ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(
+            var globals = await ReportTemplateGlobalsBuilder.BuildInvoiceGlobalsAsync(
                 new Invoice(),
                 new Customer(),
                 new Exporter
@@ -36,7 +36,7 @@ public sealed class ReportTemplateDomainIsolationTests
                     CustomsSealPath = "Files/Seals/Exporters/42/customs.png"
                 },
                 withSeal: true,
-                new RuntimeAppPathProvider(appRoot, dataRoot));
+                pathProvider: new RuntimeAppPathProvider(appRoot, dataRoot));
 
             Assert.True(globals.ContainsKey("ShowSeal"));
             Assert.True(globals.ContainsKey("doc_seal_path"));
@@ -53,7 +53,7 @@ public sealed class ReportTemplateDomainIsolationTests
     }
 
     [Fact]
-    public void ExportGlobals_ShouldRejectSealImagesOutsideManagedRoots()
+    public async Task ExportGlobals_ShouldRejectSealImagesOutsideManagedRoots()
     {
         string root = CreateTestRoot("external-export-seal-globals");
         string appRoot = Path.Combine(root, "app");
@@ -65,7 +65,7 @@ public sealed class ReportTemplateDomainIsolationTests
 
         try
         {
-            var globals = ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(
+            var globals = await ReportTemplateGlobalsBuilder.BuildInvoiceGlobalsAsync(
                 new Invoice(),
                 new Customer(),
                 new Exporter
@@ -74,7 +74,7 @@ public sealed class ReportTemplateDomainIsolationTests
                     CustomsSealPath = externalSealPath
                 },
                 withSeal: true,
-                new RuntimeAppPathProvider(appRoot, dataRoot));
+                pathProvider: new RuntimeAppPathProvider(appRoot, dataRoot));
 
             Assert.Equal(string.Empty, Assert.IsType<string>(globals["doc_seal_path"]));
             Assert.Equal(string.Empty, Assert.IsType<string>(globals["customs_seal_path"]));

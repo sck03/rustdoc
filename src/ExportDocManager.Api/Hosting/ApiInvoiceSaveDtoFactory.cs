@@ -36,9 +36,7 @@ namespace ExportDocManager.Api.Hosting
                 PortOfDestination = request.PortOfDestination,
                 DestinationCountry = request.DestinationCountry,
                 ShippingMarks = request.ShippingMarks,
-                ShippingMarksType = string.IsNullOrWhiteSpace(request.ShippingMarksType)
-                    ? "Text"
-                    : request.ShippingMarksType,
+                ShippingMarksType = ShippingMarksTypeCatalog.Normalize(request.ShippingMarksType),
                 ShippingMarksImage = request.ShippingMarksImage,
                 TradeTerms = request.TradeTerms,
                 TransportMode = request.TransportMode,

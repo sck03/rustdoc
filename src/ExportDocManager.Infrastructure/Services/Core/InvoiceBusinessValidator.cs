@@ -99,13 +99,11 @@ namespace ExportDocManager.Services.Core
             invoice.PortOfLoading = NormalizeText(invoice.PortOfLoading, 200, "装运港");
             invoice.PortOfDestination = NormalizeText(invoice.PortOfDestination, 200, "目的港");
             invoice.DestinationCountry = NormalizeText(invoice.DestinationCountry, 200, "目的国");
-            invoice.ShippingMarks = NormalizeText(invoice.ShippingMarks, 20_000, "唛头");
-            invoice.ShippingMarksType = NormalizeText(invoice.ShippingMarksType, 20, "唛头类型");
-            if (string.IsNullOrWhiteSpace(invoice.ShippingMarksType))
-            {
-                invoice.ShippingMarksType = "Text";
-            }
-            invoice.ShippingMarksImage = NormalizeText(invoice.ShippingMarksImage, 1000, "唛头图片路径");
+            invoice.ShippingMarksType = ShippingMarksTypeCatalog.Normalize(invoice.ShippingMarksType);
+            invoice.ShippingMarks = invoice.ShippingMarksType == ShippingMarksTypeCatalog.Image
+                ? string.Empty : NormalizeText(invoice.ShippingMarks, 20_000, "唛头");
+            invoice.ShippingMarksImage = invoice.ShippingMarksType == ShippingMarksTypeCatalog.Text
+                ? string.Empty : NormalizeText(invoice.ShippingMarksImage, 1000, "唛头图片路径");
             invoice.TradeTerms = NormalizeText(invoice.TradeTerms, 100, "贸易条款");
             invoice.TransportMode = NormalizeText(invoice.TransportMode, 100, "运输方式");
             invoice.Currency = NormalizeText(invoice.Currency, 10, "币种").ToUpperInvariant();
@@ -177,12 +175,11 @@ namespace ExportDocManager.Services.Core
                 throw new InvoiceValidationException("发票日期和出运日期必须在 1900—2100 年之间。");
             }
 
-            if (!string.Equals(invoice.ShippingMarksType, "Text", StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(invoice.ShippingMarksType, "Image", StringComparison.OrdinalIgnoreCase))
+            if (!ShippingMarksTypeCatalog.IsKnown(invoice.ShippingMarksType))
             {
                 throw new InvoiceValidationException("唛头类型只能是文本或图片。");
             }
-            if (string.Equals(invoice.ShippingMarksType, "Image", StringComparison.OrdinalIgnoreCase))
+            if (invoice.ShippingMarksType == ShippingMarksTypeCatalog.Image)
             {
                 try
                 {
@@ -194,10 +191,6 @@ namespace ExportDocManager.Services.Core
                 {
                     throw new InvoiceValidationException(ex.Message);
                 }
-            }
-            else
-            {
-                invoice.ShippingMarksImage = string.Empty;
             }
         }
 

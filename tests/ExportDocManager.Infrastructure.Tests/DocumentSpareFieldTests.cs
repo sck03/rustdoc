@@ -54,7 +54,7 @@ public sealed class DocumentSpareFieldTests
     }
 
     [Fact]
-    public void AllTenSpareFields_SurviveInvoiceCloning_AndAreAvailableInBothReportDomains()
+    public async Task AllTenSpareFields_SurviveInvoiceCloning_AndAreAvailableInBothReportDomains()
     {
         var invoice = new Invoice();
         var item = new Item();
@@ -75,6 +75,6 @@ public sealed class DocumentSpareFieldTests
         var price = Assert.Single(fields.GetFieldCatalog(ReportDocumentType.ExportDocument).Fields,
             field => field.Value.Contains("item.UnitPrice", StringComparison.Ordinal));
         Assert.Equal("2.50", ScribanReportTemplateRenderer.Render("{{ for item in Invoice.Items }}" + price.Value + "{{ end }}",
-            ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(invoice, null, null, false)));
+            await ReportTemplateGlobalsBuilder.BuildInvoiceGlobalsAsync(invoice, null, null, false)));
     }
 }

@@ -33,7 +33,7 @@ export function ReportDesignerDetailTableLayoutProperties({
       </label>
       {block.sideBand ? (
         <label>
-          <span>明细区宽度(mm)</span>
+          <span>明细区参考宽度(mm)</span>
           <input
             type="number"
             min={40}
@@ -73,7 +73,7 @@ export function ReportDesignerDetailTableLayoutProperties({
           unit="mm"
           onResizeBoundary={(leftColumnId, delta) => onCommit(resizeAdjacentDetailTableColumnWidths(block, leftColumnId, delta))}
         />
-        <div className="new-report-designer-muted">拖动列之间的分隔线调整宽度，松开后应用；方向键可微调。</div>
+        <div className="new-report-designer-muted">列宽按比例适配表格区域；拖动分隔线调整，方向键可微调。添加唛头栏时自动保持在表格内。</div>
       </div>
       <div className="new-report-detail-style-group">
         <div className="new-report-detail-column-title">
@@ -184,7 +184,7 @@ export function ReportDesignerDetailTableLayoutProperties({
             </div>
           </div>
         ) : (
-          <div className="new-report-designer-muted">用于截图这类左侧唛头/备注区域，内容不随商品明细循环。</div>
+          <div className="new-report-designer-muted">唛头自动显示文字或图片，内容不随商品明细循环。</div>
         )}
       </div>
     </>

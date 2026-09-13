@@ -1,4 +1,5 @@
 import type { ReportBlock } from "./reportDesignerSchema.ts";
+import { isShippingMarksField } from "./reportDesignerFieldRendering.ts";
 import {
   type ReportDesignerV3Element,
   type ReportDesignerV3ElementBase,
@@ -14,6 +15,8 @@ export function createV3TextElement(x = 1500, y = 1500): ReportDesignerV3Element
 }
 
 export function createV3FieldElement(fieldPath: string, x = 1500, y = 1500): ReportDesignerV3Element {
+  if (isShippingMarksField(fieldPath))
+    return createBase("Field", x, y, 5000, 3500, { fontSizePt: 10, align: "Left" }, { fieldPath });
   return createBase("Field", x, y, 9000, 1200, { fontSizePt: 10, align: "Left" }, { fieldPath, fallbackText: fieldPath });
 }
 

@@ -46,9 +46,9 @@
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
       "maximumLines": 3700,
-      "baselineAggregateLines": 46446,
+      "baselineAggregateLines": 46744,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 46566,
+      "maximumAggregateLines": 46864,
       "reportFiles": false
     },
     {

@@ -1,8 +1,10 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Crm;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
+using ExportDocManager.Services.MasterData;
 using ExportDocManager.Services.Reporting;
 using ExportDocManager.Services.Security;
 using ExportDocManager.Utils;
@@ -38,6 +40,38 @@ internal static class ReportDesignerPostgreSqlScenarios
         Assert.Null((await limitedCrm.GetEmailVariableDraftAsync(customerId)).CrmContactId);
         try
         {
+            var marks = await new ShippingMarkImageService(paths).SavePngDataUrlAsync(
+                "data:image/png;base64," + Convert.ToBase64String(RasterImageFixtures.Read("png")));
+            var invoices = new InvoiceService(factory, new ItemService(factory), new InvoicePartyResolver(adminScope), adminScope);
+            var markedInvoice = new Invoice
+            {
+                InvoiceNo = "PG-SHIPPING-MARKS",
+                // This fixture factory has no AuditInterceptor; seed its initial concurrency token.
+                RowVersion = Guid.NewGuid().ToByteArray(),
+                InvoiceDate = new DateOnly(2026, 9, 13),
+                ShipmentDate = new DateOnly(2026, 9, 13),
+                ShippingMarksType = " image ",
+                ShippingMarks = "STALE TEXT",
+                ShippingMarksImage = marks.ImagePath
+            };
+            var imageSave = await invoices.SaveInvoiceWithAutoCreationAsync(markedInvoice, [], null, null);
+            Assert.True(imageSave.Success, imageSave.ErrorMessage);
+            var persistedImage = Assert.IsType<Invoice>(await invoices.GetInvoiceByIdAsync(imageSave.SavedInvoice!.Id));
+            Assert.Equal("Image", persistedImage.ShippingMarksType);
+            Assert.Equal(string.Empty, persistedImage.ShippingMarks);
+            Assert.Equal(marks.ImagePath, persistedImage.ShippingMarksImage);
+            persistedImage.ShippingMarksType = "text";
+            persistedImage.ShippingMarks = "N/M\nMADE IN CHINA";
+            var textSave = await invoices.SaveInvoiceWithAutoCreationAsync(persistedImage, [], null, null);
+            Assert.True(textSave.Success, textSave.ErrorMessage);
+            await using (var read = factory.CreateDbContext())
+            {
+                var persisted = await read.Invoices.AsNoTracking().SingleAsync(invoice => invoice.Id == persistedImage.Id);
+                Assert.Equal("Text", persisted.ShippingMarksType);
+                Assert.Equal("N/M\nMADE IN CHINA", persisted.ShippingMarks);
+                Assert.Equal(string.Empty, persisted.ShippingMarksImage);
+                Assert.True(await invoices.DeleteInvoiceAsync(persisted.Id, Assert.IsType<byte[]>(persisted.RowVersion)));
+            }
             var templates = new UserReportTemplateService(factory, adminScope, paths);
             var readerTemplates = new UserReportTemplateService(factory, readerScope, paths);
             var draft = await templates.SaveDraftAsync(new UserReportTemplateDraftRequest(0, "ExportDocument", "PostgreSQL metadata", "<p>Private report body</p>"));

@@ -201,8 +201,7 @@ function collectReportDesignerDataSources(
 function isTemplateSystemModelField(fieldPath: string) {
   return fieldPath === "ShowSeal" ||
     fieldPath === "doc_seal_path" ||
-    fieldPath === "customs_seal_path" ||
-    fieldPath === "shipping_marks_image_data";
+    fieldPath === "customs_seal_path";
 }
 
 function renderPageModelLabel(schema: ReportDesignerSchema) {

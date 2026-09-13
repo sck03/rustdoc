@@ -1,5 +1,6 @@
 using ExportDocManager.DataAccess;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Core;
 using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Services.Security;
@@ -19,6 +20,7 @@ namespace ExportDocManager.Services.Reporting
         private readonly BusinessDataAccessScope _accessScope;
         private readonly ISettingsService _settingsService;
         private readonly IAppPathProvider _pathProvider;
+        private readonly IShippingMarkImageService _shippingMarkImages;
         private readonly ReportTemplateV3ImageResourceHydrator _imageResourceHydrator;
         private readonly ILogger<ReportHtmlService> _logger;
         private readonly ReportTemplateStorageCoordinator _storageCoordinator;
@@ -35,7 +37,8 @@ namespace ExportDocManager.Services.Reporting
             IAppPathProvider pathProvider,
             BusinessDataAccessScope accessScope,
             ILogger<ReportHtmlService>? logger = null,
-            IReportTemplateImageResourceAccessService? imageResourceAccessService = null)
+            IReportTemplateImageResourceAccessService? imageResourceAccessService = null,
+            IShippingMarkImageService? shippingMarkImages = null)
         {
             ArgumentNullException.ThrowIfNull(contextFactory);
             ArgumentNullException.ThrowIfNull(settingsService);
@@ -45,6 +48,7 @@ namespace ExportDocManager.Services.Reporting
             _logger = logger ?? NullLogger<ReportHtmlService>.Instance;
             _entityLoader = new ReportEntityLoader(contextFactory, _accessScope);
             _pathProvider = pathProvider ?? throw new ArgumentNullException(nameof(pathProvider));
+            _shippingMarkImages = shippingMarkImages ?? new ShippingMarkImageService(pathProvider);
             _imageResourceHydrator = new ReportTemplateV3ImageResourceHydrator(imageResourceAccessService);
             _pathResolver = new ReportTemplatePathResolver(pathProvider);
             _catalogLoader = new ReportTemplateCatalogLoader(_pathResolver, _logger);
@@ -309,13 +313,15 @@ namespace ExportDocManager.Services.Reporting
                     .LoadInvoiceEntitiesAsync(invoice, isPreview, cancellationToken)
                     .ConfigureAwait(false);
 
-                var globals = ReportTemplateGlobalsBuilder.BuildInvoiceGlobals(
+                var globals = await ReportTemplateGlobalsBuilder.BuildInvoiceGlobalsAsync(
                     invoice,
                     customer,
                     exporter,
                     withSeal,
+                    _shippingMarkImages,
                     _pathProvider,
-                    _logger);
+                    _logger,
+                    cancellationToken).ConfigureAwait(false);
                 string rendered = ScribanReportTemplateRenderer.Render(templateContent, globals);
                 return await _imageResourceHydrator.HydrateAsync(rendered, cancellationToken).ConfigureAwait(false);
             }

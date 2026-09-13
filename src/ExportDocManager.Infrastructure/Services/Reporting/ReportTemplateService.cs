@@ -380,7 +380,7 @@ namespace ExportDocManager.Services.Reporting
             bool effectiveWithSeal = reportType != ReportDocumentType.PaymentVoucher && withSeal;
             string html = reportType == ReportDocumentType.PaymentVoucher
                 ? RenderPaymentVoucherPreview(templateContent)
-                : RenderInvoicePreview(templateContent, effectiveWithSeal);
+                : await RenderInvoicePreviewAsync(templateContent, effectiveWithSeal, cancellationToken).ConfigureAwait(false);
             html = await _imageResourceHydrator.HydrateAsync(html, cancellationToken).ConfigureAwait(false);
 
             return new ReportTemplatePreviewResult

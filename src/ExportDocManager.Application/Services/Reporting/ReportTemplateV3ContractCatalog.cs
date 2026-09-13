@@ -22,7 +22,7 @@ public static class ReportTemplateV3ContractCatalog
     public static IReadOnlyList<string> ReleaseStates { get; } = ["Draft", "Published", "Archived"];
     public static IReadOnlyList<string> ReportTypes { get; } = ["ExportDocument", "PaymentVoucher"];
     public static IReadOnlyList<string> ImageMediaTypes { get; } = ["image/png", "image/jpeg", "image/gif", "image/webp"];
-    public static IReadOnlyList<string> ControlledImageFieldPaths { get; } = ["doc_seal_path", "customs_seal_path", "shipping_marks_image_data"];
+    public static IReadOnlyList<string> ControlledImageFieldPaths { get; } = ["doc_seal_path", "customs_seal_path"];
     public static IReadOnlyList<string> StampFieldPaths { get; } = ["doc_seal_path", "customs_seal_path"];
     public const int MaxLayers = 16;
     public const int MaxElementsPerLayer = 1000;

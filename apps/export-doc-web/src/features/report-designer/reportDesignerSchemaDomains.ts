@@ -17,7 +17,6 @@ import {
 export const CONTROLLED_REPORT_IMAGE_FIELD_PATHS = [
   "doc_seal_path",
   "customs_seal_path",
-  "shipping_marks_image_data",
 ] as const;
 
 export function isControlledReportImageFieldPath(fieldPath: string | undefined): fieldPath is typeof CONTROLLED_REPORT_IMAGE_FIELD_PATHS[number] {
@@ -122,7 +121,7 @@ export function validateControlledReportImageFieldPath(
   issues.push(createIssue(
     "error",
     path,
-    "图片字段必须来自受控 data URI 字段（doc_seal_path、customs_seal_path 或 shipping_marks_image_data），不能绑定普通文本或外部 URL。",
+    "图片字段只能使用受控印章；唛头请使用“唛头”字段，自动显示文字或图片。",
   ));
 }
 
@@ -188,7 +187,6 @@ function isTemplateSystemFieldForReportType(reportType: ReportDesignerReportType
   return reportType === "ExportDocument" && (
     fieldPath === "ShowSeal" ||
     fieldPath === "doc_seal_path" ||
-    fieldPath === "customs_seal_path" ||
-    fieldPath === "shipping_marks_image_data"
+    fieldPath === "customs_seal_path"
   );
 }

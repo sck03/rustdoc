@@ -1,5 +1,8 @@
 using System.Globalization;
+using System.Net;
 using ExportDocManager.Models.Entities;
+using ExportDocManager.Services.Core;
+using ExportDocManager.Services.Errors;
 using ExportDocManager.Services.Infrastructure;
 using ExportDocManager.Utils;
 using Microsoft.Extensions.Logging;
@@ -9,18 +12,25 @@ namespace ExportDocManager.Services.Reporting
 {
     internal static class ReportTemplateGlobalsBuilder
     {
-        public static ScriptObject BuildInvoiceGlobals(
+        public static async Task<ScriptObject> BuildInvoiceGlobalsAsync(
             Invoice invoice,
             Customer? customer,
             Exporter? exporter,
             bool withSeal,
+            IShippingMarkImageService? shippingMarkImages = null,
             IAppPathProvider? pathProvider = null,
-            ILogger? logger = null)
+            ILogger? logger = null,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             invoice.Items ??= new List<Item>();
 
             var scriptObject = new ScriptObject();
-            scriptObject.Add("Invoice", invoice);
+            var reportInvoice = new ScriptObject();
+            reportInvoice.Import(invoice, renamer: member => member.Name);
+            reportInvoice.SetValue(nameof(Invoice.ShippingMarks),
+                await RenderShippingMarksAsync(invoice, shippingMarkImages, cancellationToken).ConfigureAwait(false), true);
+            scriptObject.Add("Invoice", reportInvoice);
             scriptObject.Add("Customer", customer);
             scriptObject.Add("Exporter", exporter);
 
@@ -46,12 +56,30 @@ namespace ExportDocManager.Services.Reporting
                 scriptObject.Add("customs_seal_path", ReportImageDataUriHelper.GetSealDataUri(exporter?.CustomsSealPath, pathProvider, logger));
             }
 
-            if (invoice.ShippingMarksType == "Image" && !string.IsNullOrWhiteSpace(invoice.ShippingMarksImage))
-            {
-                scriptObject.Add("shipping_marks_image_data", ReportImageDataUriHelper.GetShippingMarkDataUri(invoice.ShippingMarksImage, pathProvider, logger));
-            }
-
             return scriptObject;
+        }
+
+        private static async Task<string?> RenderShippingMarksAsync(
+            Invoice invoice, IShippingMarkImageService? images, CancellationToken cancellationToken)
+        {
+            string type = ShippingMarksTypeCatalog.Normalize(invoice.ShippingMarksType);
+            if (type == ShippingMarksTypeCatalog.Text)
+                return string.IsNullOrWhiteSpace(invoice.ShippingMarks) ? null : WebUtility.HtmlEncode(invoice.ShippingMarks);
+            if (type != ShippingMarksTypeCatalog.Image)
+                throw new ServiceValidationException("唛头类型只能是文本或图片。");
+            if (images == null)
+                throw new UserVisibleInfrastructureException("唛头图片读取服务不可用。");
+
+            try
+            {
+                var image = await images.ReadImageAsDataUrlAsync(invoice.ShippingMarksImage ?? string.Empty, cancellationToken)
+                    .ConfigureAwait(false);
+                return $"<img class=\"edm-shipping-marks-image\" src=\"{image.DataUrl}\" alt=\"唛头\" style=\"display:inline-block;max-width:100%;max-height:var(--edm-field-image-height,60mm);width:auto;height:auto;object-fit:contain;vertical-align:top\">";
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
+            {
+                throw new UserVisibleInfrastructureException("唛头图片无法读取，请重新编辑并保存该发票的唛头图片。", ex);
+            }
         }
 
         public static ScriptObject BuildPaymentVoucherGlobals(
@@ -105,32 +133,6 @@ namespace ExportDocManager.Services.Reporting
     internal static class ReportImageDataUriHelper
     {
         private const long MaximumImageBytes = 5L * 1024L * 1024L;
-
-        public static string GetShippingMarkDataUri(
-            string? path,
-            IAppPathProvider? pathProvider,
-            ILogger? logger = null)
-        {
-            if (pathProvider == null || string.IsNullOrWhiteSpace(path))
-            {
-                return string.Empty;
-            }
-            string marksRoot = Path.Combine(pathProvider.DataRoot, "Marks");
-            try
-            {
-                string resolved = ManagedDataPathResolver.ResolveStoredPath(
-                    pathProvider,
-                    path,
-                    marksRoot,
-                    "Marks");
-                return GetDataUri(resolved, [marksRoot], logger);
-            }
-            catch (Exception ex)
-            {
-                logger?.LogWarning(ex, "Blocked invalid shipping mark image path: {Path}", path);
-                return string.Empty;
-            }
-        }
 
         public static string GetSealDataUri(
             string? path,

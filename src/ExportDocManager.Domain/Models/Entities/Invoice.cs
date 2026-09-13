@@ -44,8 +44,8 @@ namespace ExportDocManager.Models.Entities
         public string? PortOfDestination { get; set; }
         public string? DestinationCountry { get; set; }
         public string? ShippingMarks { get; set; }
-        public string ShippingMarksType { get; set; } = "Text"; // Text or Image
-        public string? ShippingMarksImage { get; set; } // Path to image file relative to App_Data
+        public string ShippingMarksType { get; set; } = ShippingMarksTypeCatalog.Text;
+        public string? ShippingMarksImage { get; set; } // Marks/ path relative to DataRoot; mutually exclusive with ShippingMarks.
         public string? TradeTerms { get; set; }
         public string? TransportMode { get; set; }
         public DateOnly ShipmentDate { get; set; } // 船期/航期字段

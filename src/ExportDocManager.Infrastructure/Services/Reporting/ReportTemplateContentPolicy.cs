@@ -120,6 +120,9 @@ internal static class ReportTemplateContentPolicy
             throw new ArgumentException("报表模板不允许使用 object.eval 或 object.eval_template 动态执行内容。", nameof(content));
         }
 
+        if (visitor.Roots.Contains("shipping_marks_image_data"))
+            throw new ArgumentException("唛头统一使用 Invoice.ShippingMarks，自动显示文字或图片，请替换单独的唛头图片字段。", nameof(content));
+
         if (reportType == ReportDocumentType.PaymentVoucher)
         {
             var sealReferences = visitor.ReferencedNames

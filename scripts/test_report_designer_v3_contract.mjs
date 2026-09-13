@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { verifyDesignerEditingMutations } from "./lib/report-designer-editing-contracts.mjs";
+import { createShippingMarksScenario } from "./lib/report-shipping-marks-fixture.mjs";
 
 const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -46,6 +47,7 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerV3Regions.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerTableMutations.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerLayerBands.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3WorkspaceHelpers.tsx"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerFields.ts"))};
 `);
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 const api = await import(pathToFileURL(bundlePath).href);
@@ -776,4 +778,22 @@ assert(!unsafeImageHtml.includes("evil.example") && !unsafeImageHtml.includes("h
   assert(api.findV3Element(shifted.schema, shifted.selectedIds[0]).layer.id === overlay.id, "覆盖层元素不得因拖动自动改变打印语义");
 }
 
+const markSchema = createShippingMarksScenario(api);
+const markHtml = api.exportReportDesignerV3SchemaToHtml(markSchema, "ExportDocument");
+assert(markHtml.length > 0, "唛头必须可用于自由画布、普通行、表格、条件内容和明细旁栏");
+assert(!markHtml.includes("shipping_marks_image_data"), "模板只保存统一唛头绑定");
+const markImagePreview = api.renderReportDesignerLocalPreviewSample(markHtml, "exportImageMarks");
+assert((markImagePreview.match(/<img class="edm-shipping-marks-image"/g) ?? []).length === 5, "图片样例在全部五个位置显示图片");
+assert(!markImagePreview.includes("ORDER SAMPLE"), "图片样例不能输出残留文字");
+const markTextPreview = api.renderReportDesignerLocalPreviewSample(markHtml, "exportStandard");
+assert(!markTextPreview.includes("<img") && (markTextPreview.match(/ORDER SAMPLE/g) ?? []).length === 5, "文字样例保留换行且不输出图片");
+const markGroups = api.buildReportDesignerFieldGroups({ reportType: "ExportDocument", fields: [{ category: "单据信息", label: "唛头", value: "{{ Invoice.ShippingMarks }}" }] });
+assert(markGroups.flatMap(group => group.fields).filter(field => field.label.includes("唛头")).length === 1, "字段目录只能提供一个唛头");
+for (const flow of markSchema.layers.find(layer => layer.role === "Body").elements) {
+  const preview = api.renderReportDesignerBlockPreviewToHtml(flow.block);
+  assert(preview.includes("唛头（文字 / 图片自动）") && !preview.includes("N/M"), "画布显示统一唛头提示，不能把占位文本重复输出");
+}
+fs.writeFileSync(path.join(workspaceRoot, "shipping-marks-template.html"), markHtml);
+fs.writeFileSync(path.join(workspaceRoot, "shipping-marks-image.html"), markImagePreview);
+fs.writeFileSync(path.join(workspaceRoot, "shipping-marks-text.html"), markTextPreview);
 console.log("report-designer-v3-contract test passed");

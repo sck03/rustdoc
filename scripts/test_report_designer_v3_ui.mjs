@@ -8,6 +8,7 @@ import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
 import { verifyDesignerEditingUi } from "./lib/report-designer-editing-ui-scenarios.mjs";
+import { verifyShippingMarksUi } from "./lib/report-shipping-marks-ui-scenarios.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -34,7 +35,9 @@ await esbuild.build({
     import { parseReportDesignerV3FromHtml } from ${source("features/report-designer/reportDesignerV3TemplateParser.ts")};
     import { exportReportDesignerV3SchemaToHtml } from ${source("features/report-designer/reportDesignerV3HtmlExporter.ts")};
     import { createV3FlowElement, createV3TextElement, createV3FieldElement, createV3LineElement, createV3PageNumberElement, createV3ImageElement } from ${source("features/report-designer/reportDesignerV3ElementFactories.ts")};
-    import { createGridBlock, createDetailTableBlock } from ${source("features/report-designer/reportDesignerBlockFactories.ts")};
+    import { createGridBlock, createDetailTableBlock, createRowBlock, createConditionalBlock, createDetailTableSideBand } from ${source("features/report-designer/reportDesignerBlockFactories.ts")};
+    import { createShippingMarksScenario } from ${JSON.stringify(path.join(repo, "scripts/lib/report-shipping-marks-fixture.mjs").replaceAll("\\", "/"))};
+    import { renderReportDesignerLocalPreviewSample } from ${source("features/report-designer/reportDesignerPreviewSamples.ts")};
     import ${source("styles/cascade.css")};
     import ${source("styles/foundation.css")};
     import ${source("styles/workspaces.css")};
@@ -78,6 +81,7 @@ await esbuild.build({
       const overlay=schema.layers.find(layer=>layer.role==='Overlay');
       overlay.elements.push(...[0,1].map(index=>({...createV3ImageElement(1500+index*7000,6000),id:'image-'+index,resourceId:images[0].id,altText:'真实付款图片'})));
     }
+    if(new URLSearchParams(location.search).has('marks')) Object.assign(schema,createShippingMarksScenario({parseReportDesignerV3FromHtml,createRowBlock,createGridBlock,createConditionalBlock,createDetailTableBlock,createDetailTableSideBand,createV3FlowElement,createV3FieldElement}));
     window.__designerSchema = schema;
     window.__designerUpdates = 0;
     window.__designerErrors = [];
@@ -86,7 +90,9 @@ await esbuild.build({
     const content = exportReportDesignerV3SchemaToHtml(schema, reportType);
     const fieldCatalog={reportType:'ExportDocument',categoryOrder:['单据备用字段','明细备用列'],fields:['Invoice','item'].flatMap(root=>Array.from({length:10},(_,index)=>({
       category:root==='Invoice'?'单据备用字段':'明细备用列',label:index===9?(root==='Invoice'?'船名航次':'客户货号'):(root==='Invoice'?'发票':'明细')+'备用 '+(index+1),value:'{{ '+root+'.Spare'+(index+1)+' }}',reportType:'ExportDocument'})))};
+    fieldCatalog.fields.push({category:'单据信息',label:'唛头（文字 / 图片自动）',value:'{{ Invoice.ShippingMarks }}',reportType:'ExportDocument'});
     window.__designerHtml = content;
+    window.__renderMarksPreview=profile=>renderReportDesignerLocalPreviewSample(window.__designerHtml,profile);
     createRoot(document.getElementById('root')).render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><PermissionAccessProvider grants={[]} permissions={['view','upload','recycle'].map(action=>({resourceKey:permissionResources.reportResources,action,dataScope:'all'}))} canManageSettings={false}><ConfirmationProvider><div className="work-surface" style={{margin:'12px',padding:'8px'}}>
       <ReportDesignerV3Workspace client={imageScenario?client:undefined} reportType={reportType} displayName="表格设计交互验证" content={content} fieldCatalog={imageScenario?{reportType,fields:[],categoryOrder:[]}:fieldCatalog} editable={!new URLSearchParams(location.search).has('readonly')} onDesignerDraftChange={({content: html, isDirty, isValid}) => {
         window.__designerDraftState={isDirty,isValid};
@@ -99,8 +105,8 @@ await esbuild.build({
 const server = http.createServer((request, response) => {
   const name = new URL(request.url, "http://localhost").pathname.slice(1);
   if (!name) { response.setHeader("Content-Type", "text/html; charset=utf-8"); response.end('<!doctype html><html lang="zh-CN"><meta name="viewport" content="width=device-width, initial-scale=1"><title>报表设计交互验证</title><link rel="stylesheet" href="/app.css"><div id="root"></div><script type="module" src="/app.js"></script></html>'); return; }
-  if (!["app.js", "app.css"].includes(name)) { response.writeHead(404).end(); return; }
-  response.setHeader("Content-Type", name.endsWith("js") ? "text/javascript" : "text/css");
+  if (!["app.js", "app.css", "marks-text.html", "marks-image.html"].includes(name)) { response.writeHead(404).end(); return; }
+  response.setHeader("Content-Type", name.endsWith("js") ? "text/javascript" : name.endsWith("html") ? "text/html; charset=utf-8" : "text/css");
   response.end(fs.readFileSync(path.join(output, name)));
 });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -301,6 +307,7 @@ try {
   await waitFor(page,'document.querySelector("[data-v3-element-id=image-0] img")?.naturalWidth===16');
   assert.equal(await read(page,'Boolean(document.querySelector(".report-designer-v3-inspector"))'),false);
   results.push({test:'read-only payment canvas displays authorized images',passed:true});
+  await verifyShippingMarksUi({page,url,read,waitFor,click,key,results,output});
   fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify({passed:true,results},null,2));
   console.log(`Report designer UI contracts passed (${results.length} cases).`);
 } finally {
