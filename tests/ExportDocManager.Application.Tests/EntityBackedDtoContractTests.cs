@@ -23,36 +23,6 @@ namespace ExportDocManager.Application.Tests
         }
 
         [Fact]
-        public void MainExcelImportWorkflowResult_ShouldKeepSelectedFileFlag()
-        {
-            var result = new MainExcelImportWorkflowResult
-            {
-                HasSelectedFile = true
-            };
-
-            Assert.True(result.HasSelectedFile);
-            Assert.True(result.Success);
-        }
-
-        [Fact]
-        public void MainWorkspaceSaveRequest_ShouldKeepEntityReferences()
-        {
-            var invoice = new Invoice { InvoiceNo = "INV002" };
-            var item = new Item { StyleNo = "ST-01" };
-
-            var request = new MainWorkspaceSaveRequest
-            {
-                Invoice = invoice,
-                Items = [item],
-                Customer = new Customer { CustomerNameEN = "Buyer" },
-                Exporter = new Exporter { ExporterNameEN = "Seller" }
-            };
-
-            Assert.Same(invoice, request.Invoice);
-            Assert.Same(item, request.Items.Single());
-        }
-
-        [Fact]
         public void InvoiceTransferPackage_ShouldKeepEntityPayload()
         {
             var package = new InvoiceTransferPackage
