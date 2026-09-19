@@ -5,8 +5,6 @@ use export_doc_engine::generated_api::{ApiLicenseStatusResponse, ApiSupportPacka
 pub struct LicenseModel {
     pub status: Option<ApiLicenseStatusResponse>,
     pub license_key: String,
-    pub include_database_backup: bool,
-    pub include_sample_files: bool,
     pub package: Option<ApiSupportPackageResponse>,
 }
 
@@ -21,7 +19,9 @@ impl LicenseModel {
         .into()
     }
     pub fn registered(&self) -> bool {
-        self.status.as_ref().is_some_and(|status| status.is_registered)
+        self.status
+            .as_ref()
+            .is_some_and(|status| status.is_registered)
     }
     fn raw(&self, key: &str) -> String {
         self.status

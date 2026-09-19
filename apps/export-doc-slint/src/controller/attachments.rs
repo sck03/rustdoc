@@ -626,6 +626,7 @@ impl Desktop {
                     parameters,
                     query: vec![],
                     destination,
+                    body: None,
                     limit: 16 * 1024 * 1024,
                 });
             }

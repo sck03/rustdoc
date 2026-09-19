@@ -55,13 +55,6 @@ if ($parseFailures.Count -gt 0) {
     throw "PowerShell syntax validation failed:`n$($parseFailures -join "`n")"
 }
 
-$permissionVerifier = Join-Path $scriptRoot "assert-tauri-command-permissions.ps1"
-[void](Invoke-ExportDocExternal -FilePath (Resolve-ExportDocPowerShellExecutable) -Arguments @(
-    "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
-    "-File", $permissionVerifier,
-    "-RepositoryRoot", $repoRoot
-) -CaptureOutput)
-
 foreach ($file in $moduleScripts) {
     Invoke-ExportDocExternal -FilePath "node" -Arguments @("--check", $file.FullName) -WorkingDirectory $repoRoot
 }
@@ -70,12 +63,6 @@ $dependencyPolicyScript = Join-Path $scriptRoot "verify-dependency-policy.mjs"
 Invoke-ExportDocExternal -FilePath "node" -Arguments @($dependencyPolicyScript) -WorkingDirectory $repoRoot
 $dependencyPolicyTestScript = Join-Path $scriptRoot "test_dependency_policy.mjs"
 Invoke-ExportDocExternal -FilePath "node" -Arguments @($dependencyPolicyTestScript) -WorkingDirectory $repoRoot
-$dotnetSdkCompatibilityTestScript = Join-Path $scriptRoot "test_dotnet_sdk_compatibility.mjs"
-Invoke-ExportDocExternal -FilePath "node" -Arguments @($dotnetSdkCompatibilityTestScript) -WorkingDirectory $repoRoot
-Invoke-ExportDocExternal -FilePath (Resolve-ExportDocPowerShellExecutable) -Arguments @(
-    "-NoProfile", "-File", (Join-Path $scriptRoot "test-webview2-runtime-support.ps1")
-) -WorkingDirectory $repoRoot
-
 $bashPath = Get-Command bash -CommandType Application -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty Source
 if ([string]::IsNullOrWhiteSpace($bashPath)) {

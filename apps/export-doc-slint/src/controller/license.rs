@@ -67,7 +67,10 @@ impl Desktop {
                     return;
                 }
                 let body = self.support_package_body(&view);
-                if body["confirmationText"].as_str().is_some_and(|text| !text.is_empty()) {
+                if body["confirmationText"]
+                    .as_str()
+                    .is_some_and(|text| !text.is_empty())
+                {
                     self.confirm(
                         Pending::SupportPackage(body),
                         "支持包将包含所选的数据库备份或样张文件。请确认其中不含不应交给技术支持的敏感业务资料。",
@@ -88,7 +91,10 @@ impl Desktop {
                     return;
                 }
                 let body = self.support_package_body(&view);
-                if body["confirmationText"].as_str().is_some_and(|text| !text.is_empty()) {
+                if body["confirmationText"]
+                    .as_str()
+                    .is_some_and(|text| !text.is_empty())
+                {
                     self.confirm(
                         Pending::SupportPackageDownload(body),
                         "支持包将包含所选的数据库备份或样张文件。请确认其中不含不应交给技术支持的敏感业务资料。",
@@ -110,17 +116,26 @@ impl Desktop {
             _ => {}
         }
     }
-    fn start_support_package_download(&mut self, body: Value, ui: &AppWindow) {
+    pub(crate) fn start_support_package_download(&mut self, body: Value, ui: &AppWindow) {
         let name = format!(
             "support-package-{}.zip",
             chrono::Local::now().format("%Y%m%d%H%M%S")
         );
-        let Some(destination) = self.platform.choose_destination(ui.window(), &name, &["zip"])
+        let Some(destination) = self
+            .platform
+            .choose_destination(ui.window(), &name, &["zip"])
         else {
             self.status("已取消下载");
             return;
         };
-        self.start(Work::SupportPackageDownload { body, destination });
+        self.start(Work::BinarySave {
+            operation: DOWNLOAD_SUPPORT_PACKAGE,
+            parameters: vec![],
+            query: vec![],
+            destination,
+            body: Some(body),
+            limit: 1024 * 1024 * 1024,
+        });
     }
     pub fn license_loaded(&mut self, reply: &str, value: Value) {
         match reply {
@@ -128,6 +143,9 @@ impl Desktop {
                 Ok(status) => {
                     self.license.status = Some(status);
                     self.sync_license();
+                    if self.form.is_none() {
+                        self.request(GET_SETTINGS, 0, vec![], None, "settings");
+                    }
                 }
                 Err(cause) => self.error(cause.to_string()),
             },

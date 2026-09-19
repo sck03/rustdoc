@@ -10,6 +10,7 @@ mod form_model;
 mod form_sections;
 mod hs_model;
 mod labels;
+mod license_model;
 mod mail_model;
 mod ocr_model;
 mod office_model;
@@ -24,6 +25,7 @@ mod settings_model;
 mod single_window_model;
 mod single_window_sections;
 mod smoke;
+mod template_file_model;
 mod worker;
 slint::include_modules!();
 pub fn model<T: Clone + 'static>(rows: Vec<T>) -> ModelRc<T> {

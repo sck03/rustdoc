@@ -49,6 +49,18 @@ Windows、Linux、macOS 共同开发与维护，按平台分别验收。Slint �
 
 ## 桌面选型建议
 
+> 2026-09-20 交付入口更正:上一节“尚未完成全量迁移”中的“OCR、邮件实际投递、单一窗口完整流程、团队备份灾备、四产品版与跨平台发布”不再按旧实现整体描述。当前 Rust 主支已经接入 OCR 资源检查与识别链、真实 SMTP 投递、单一窗口提交包/回执包和持卡机流程、SQLite 备份与灾备包确认,继续保留的缺口改为真实客户端交换箱/官方回执样本、全套旧报表资源、真实 Docker/PostgreSQL 现场、系统 IME/原生文件对话框和各目标平台真机验收。正式交付入口如下。
+
+Rust 主支的交付入口已经从旧 Tauri/ASP.NET 链拆开:
+
+- 本地绿色桌面版由 `scripts/build-native.ps1` 直接生成 Slint + SQLite 包,不经过 WebView、Tauri、Node 或 .NET sidecar。
+- 远端桌面端由 `.github/workflows/rust-native-desktop-release.yml` 手工构建 Windows x64/ARM64、Linux x64/ARM64、macOS ARM64 绿色包。
+- 远端网页端由 `.github/workflows/rust-native-web-server-release.yml` 手工构建 React 静态资源与 Rust HTTP 服务包,目标数据源为 PostgreSQL 18;本地可先运行 `scripts/package-native-web-server.ps1` 整理同名目录验收。
+- 远端 Docker 容器版由 `.github/workflows/rust-native-container-release.yml` 手工验证 Compose 生命周期;选择 publish 时才推送 Rust 容器镜像。
+- `.github/workflows/rust-native-validation.yml`、`dependency-governance.yml` 和 `browser-compatibility.yml` 只承担门禁与验收,不伪装成正式发布入口。
+
+旧 `apps/export-doc-tauri` 和 WebView2/旧桌面发布脚本已从 Rust 主支删除;保留的旧 Web 文档和历史测试只用于行为对照,不进入 Rust 原生交付依赖图。
+
 Slint 更贴近本项目长期业务软件的侧栏、表单、页签、弹窗及统一样式维护需求，视图声明和 Rust 业务模型的边界更直观。egui/eframe 的优势是 Rust 编写工具界面和自定义画布直接，已有表格基础也便于验证。
 
 两个框架都不提供本项目完整的 Excel 式发票编辑器。列可见性、行重排、多格选择、复制粘贴、精确计价、撤销重做和中文输入必须使用共享编辑模型实现并验收，不能用一个基础 TableView 就宣称等效替换。

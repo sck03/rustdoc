@@ -385,6 +385,7 @@ function Get-GeneratedArtifactCleanupPlan {
 
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "TestResults") -Reason "test result output"
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "tmp") -Reason "repository-local temporary output"
+    Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "target") -Reason "root Rust workspace build output"
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".vs") -Reason "local Visual Studio workspace cache"
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".dotnet-cli") -Reason "repo-local dotnet CLI home cache"
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "apps/.codex-runtime/cargo-target-tauri") -Reason "legacy Tauri Cargo build output"

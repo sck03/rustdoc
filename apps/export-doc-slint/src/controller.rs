@@ -14,6 +14,7 @@ mod hs_files;
 mod invoice;
 mod invoice_files;
 mod letter_of_credit;
+mod license;
 mod mail;
 mod mail_templates;
 mod maintenance;
@@ -38,6 +39,7 @@ mod single_window_actions;
 mod single_window_responses;
 mod single_window_tools;
 mod supplier_overview;
+mod template_files;
 mod workspace;
 
 use crate::{
@@ -117,6 +119,8 @@ pub struct Desktop {
     pub pdf_sources: Vec<std::path::PathBuf>,
     pub document_package: crate::document_package_model::DocumentPackageModel,
     pub recovery: crate::recovery_model::RecoveryModel,
+    pub license: crate::license_model::LicenseModel,
+    pub template_files: crate::template_file_model::TemplateFileState,
 }
 #[derive(Clone)]
 pub enum Pending {
@@ -140,6 +144,10 @@ pub enum Pending {
     InvoicePackageImport,
     RecoveryAction(Operation, serde_json::Value, String),
     RecoveryRestore(serde_json::Value),
+    SupportPackage(serde_json::Value),
+    SupportPackageDownload(serde_json::Value),
+    LogCleanup,
+    TemplateDelete(serde_json::Value),
 }
 impl Desktop {
     pub fn new(ui: &AppWindow, client: ApiClient, paths: RuntimePaths) -> Rc<RefCell<Self>> {
@@ -212,6 +220,8 @@ impl Desktop {
             pdf_sources: vec![],
             document_package: Default::default(),
             recovery: Default::default(),
+            license: Default::default(),
+            template_files: Default::default(),
         }));
         state.borrow().sync_navigation();
         bindings::bind(ui, state.clone());
@@ -566,6 +576,30 @@ impl Desktop {
                 Some(body),
                 "recovery:restored",
             ),
+            Some(Pending::SupportPackage(body)) => self.request(
+                SAVE_SUPPORT_PACKAGE_TO_RUNTIME,
+                0,
+                vec![],
+                Some(body),
+                "license:support",
+            ),
+            Some(Pending::SupportPackageDownload(body)) => {
+                if let Some(ui) = self.ui.upgrade() {
+                    self.start_support_package_download(body, &ui);
+                }
+            }
+            Some(Pending::LogCleanup) => {
+                self.request(CLEANUP_SYSTEM_LOGS, 0, vec![], None, "license:logs");
+            }
+            Some(Pending::TemplateDelete(body)) => {
+                self.request(
+                    DELETE_REPORT_TEMPLATE,
+                    0,
+                    vec![],
+                    Some(body),
+                    "template-files:mutated",
+                );
+            }
             None => {}
         }
     }

@@ -52,6 +52,7 @@ import { Query, InvoiceFiles } from "document-files-models.slint";
 export { Query, InvoiceFiles }
 import { License } from "license-models.slint";
 export { License }
+import { LicensePanel } from "license.slint";
 import { Recovery } from "recovery-models.slint";
 export { Recovery }
 import { TemplateFiles, TemplateFileRow } from "template-files-models.slint";
@@ -136,11 +137,19 @@ export component AppWindow inherits Window {
                     if App.page=="payment-report":Card{PdfView{}}
                     if App.page=="document-package":DocumentPackagePanel{}
                     if App.page=="about":Card {
-                        VerticalLayout {padding:32px;spacing:18px;alignment:start;
-                            Text{text:"外贸业务综合管理系统";font-size:26px;font-weight:700;color:Theme.ink;}
-                            Text{text:"全功能版 · Rust + Slint 原生桌面";font-size:16px;color:Theme.primary;}
-                            Text{text:"网页端和 Docker 版继续使用 React。\n桌面数据保存在程序运行目录内的 SQLite 数据库中。\n软件第三方许可随安装包提供。";wrap:word-wrap;color:Theme.muted;font-size:14px;min-height:80px;}
-                            AboutSlint {preferred-height:220px;}
+                        VerticalLayout {padding:24px;spacing:14px;
+                            HorizontalLayout {height:36px;spacing:8px;
+                                ActionButton {text:"关于系统";active:App.about-tab==0;clicked=>{App.about-tab=0;}}
+                                ActionButton {text:"授权注册";active:App.about-tab==1;clicked=>{App.about-tab=1;}}
+                                Rectangle{horizontal-stretch:1;}
+                            }
+                            if App.about-tab==0:ScrollView{content-width:self.visible-width;VerticalLayout {padding:8px;spacing:18px;alignment:start;
+                                Text{text:"外贸业务综合管理系统";font-size:26px;font-weight:700;color:Theme.ink;}
+                                Text{text:"全功能版 · Rust + Slint 原生桌面";font-size:16px;color:Theme.primary;}
+                                Text{text:"网页端和 Docker 版继续使用 React。\n桌面数据保存在程序运行目录内的 SQLite 数据库中。\n软件第三方许可随安装包提供。";wrap:word-wrap;color:Theme.muted;font-size:14px;min-height:80px;}
+                                AboutSlint {preferred-height:220px;}
+                            }}
+                            if App.about-tab==1:LicensePanel{}
                         }
                     }
                 }

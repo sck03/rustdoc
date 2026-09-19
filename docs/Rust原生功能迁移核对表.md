@@ -83,7 +83,15 @@
 - 删除 Slint 灾备控制器对远端能力位的重复拦截。`CREATE_DISASTER_RECOVERY_PACKAGE` 与 `RESTORE_DISASTER_RECOVERY_PACKAGE` 已由正式 Rust 组合根支持,窗口现在直接调用受认证服务并进入确认流程。
 - 设置保存不再阻止凭证写入。按正式设置凭证字段清空后交给现有 AES-256-GCM protector 加密保存,数据库只留密文;新增设置接口回归验证明文 canary 不进入 SQLite。
 - 模板克隆不再只接受 `user-template:{id}`。克隆可以从 `builtin:` 或受管模板文件读取内容,内容为当前 V3 结构时创建个人草稿,非 V3 内容明确拒绝且不产生草稿。
+- “关于与支持”页签现接入原生“授权注册”分页:进入页面串行加载授权状态和设置,显示机器码、试用/注册状态、到期信息、受管存储说明、支持包生成/下载与系统日志清理;支持包下载通过既有受控 `BinarySave` 通道携带选项请求体,不在 UI 线程写文件。软件更新仍因正式签名与公钥信任链未完成而保持未开放。
+- 报表设计器的“模板文件”面板恢复真实接线:`report_template_files::handle` 与上传入口进入 engine 主分派,Slint 状态、响应和动作绑定复用独立 `controller/template_files.rs`;模板目录、列表、重命名、默认模板、HTML 上传/导入/下载及 `.edtpl` 导入导出不再落入 501。
 - PDF 栈替换为最新稳定、免费商用组合 `krilla 0.8.2` + `krilla-svg 0.8.1` + `usvg 0.47.0` + `pdf-writer 0.15.0`,移除旧 `svg2pdf 0.13` + `pdf-writer 0.12` 约束。桌面与 HTTP 组合根共用同一栈。
 - Slint 升级为 `1.18.0`;将 `ScrollView` 已弃用的 `viewport-*` 使用替换为 `content-*`。Slint 运行库与 `slint-build` 仍精确同版本。
 
 验证(本轮实跑):正式 Slint feature 集下 435 个契约 operation 的支持矩阵为 `UNSUPPORTED(0)`;`cargo check --locked -p export-doc-report`、`export-doc-slint`、`export-doc-server` 通过;`cargo test --locked -p export-doc-report` 8 项通过;模板克隆与设置凭证定向回归通过;依赖治理为 1266 组件、`unresolved=0`、`disallowed=0`;`verify-native-desktop` 通过,桌面 391 个运行包,无 WebView、无服务端数据库。系统 IME、原生文件对话框、真实 Docker/PostgreSQL、跨平台真机和发布签名仍需目标环境验收。
+
+2026-09-19 后续窗口验收:完整 `--validation --ui-smoke` 在原生包内通过 35 项检查,其中新增 `navigation-about-attribution-license-status` 和 `report-template-file-storage`,验证授权注册页真实显示机器码、试用状态和日志保留摘要,报表设计器可加载模板目录与模板文件列表;既有发票、付款、客户、商机、供应商、组织/人员、行政、权限/审计、任务、装柜、HS、邮件、单一窗口、SQLite 备份和灾备确认链继续通过。结果时间 `154.7` 秒,渲染器为 Slint winit software,系统 IME 与原生文件对话框仍据实标记 `not-validated`。
+
+2026-09-20 本批联调:桌面原生包重新执行 `--validation --ui-smoke`,35 项检查全部通过,结果时间 `157.9` 秒,5000 行虚拟化仍只渲染 8 行;Web 在移除 `@tauri-apps/api` 后按锁文件安装并以 `2391 modules` 完成生产构建;Rust HTTP 组合根 `cargo check --locked -p export-doc-server --all-features` 通过;真实环回 SMTP 回归 5 项全部通过,覆盖多部分邮件投递、幂等、不确定结果持久化和模板发布/版本流程;模板文件引擎回归 9 项、原生服务回归 13 项全部通过。原生依赖边界仍为 391 个运行包且不含 WebView 或服务端数据库。系统 IME、原生文件对话框、真实 Docker/PostgreSQL 与跨平台真机仍未在本轮取得目标环境证据。
+
+2026-09-20 交付入口整理:本地绿色桌面版统一由 `scripts/build-native.ps1` 生成,新增 `-RustTarget` 支持远端交叉矩阵;新增 `scripts/package-native-web-server.ps1` 生成 React + Rust HTTP 服务端包。远端拆分出 `rust-native-desktop-release.yml`、`rust-native-web-server-release.yml`、`rust-native-container-release.yml`,分别负责桌面绿色包、网页服务端包、Docker 生命周期与可选 GHCR 发布;保留 `rust-native-validation.yml`、`dependency-governance.yml`、`browser-compatibility.yml` 作为门禁。旧 Tauri/WebView2 updater 契约脚本和 ASP.NET 浏览器兼容构建已从 Rust 主支移除。`verify-script-suite.ps1` 与 `verify-github-workflow-actions.mjs` 已通过,Action 引用为 32 个。

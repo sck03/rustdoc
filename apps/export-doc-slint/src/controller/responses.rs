@@ -37,6 +37,14 @@ impl Desktop {
             self.recovery_loaded(reply, value);
             return;
         }
+        if reply.starts_with("license:") {
+            self.license_loaded(reply, value);
+            return;
+        }
+        if reply.starts_with("template-files:") {
+            self.template_files_loaded(reply, value);
+            return;
+        }
         if reply == "followup-record" {
             if let Some(row) = value["items"]
                 .as_array()
@@ -336,6 +344,7 @@ impl Desktop {
                     self.form_id = 0;
                     self.form_reply = "settings-saved".into();
                     self.sync_form();
+                    self.sync_license();
                 }
                 "settings-saved" => {
                     self.settings_secrets(&value);
@@ -345,6 +354,7 @@ impl Desktop {
                         form.buffers.clear();
                     }
                     self.sync_form();
+                    self.sync_license();
                     self.status("设置已保存");
                 }
                 "logout" => {

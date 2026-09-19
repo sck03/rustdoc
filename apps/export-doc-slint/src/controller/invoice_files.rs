@@ -54,6 +54,7 @@ impl Desktop {
                         parameters: vec![("id", id.to_string())],
                         query: vec![],
                         destination,
+                        body: None,
                         limit: 25 * 1024 * 1024,
                     });
                 }

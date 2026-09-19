@@ -7,14 +7,10 @@ on:
   push:
     branches: [main]
     paths:
-      - "global.json"
-      - "Directory.Packages.props"
-      - "**/*.csproj"
       - "**/package.json"
       - "**/package-lock.json"
       - "**/Cargo.toml"
       - "**/Cargo.lock"
-      - "scripts/audit-dotnet-packages.mjs"
       - "scripts/generate-dependency-governance.mjs"
       - "scripts/verify-dependency-policy.mjs"
       - "scripts/test_dependency_policy.mjs"
@@ -22,14 +18,10 @@ on:
       - ".github/workflows/dependency-governance.yml"
   pull_request:
     paths:
-      - "global.json"
-      - "Directory.Packages.props"
-      - "**/*.csproj"
       - "**/package.json"
       - "**/package-lock.json"
       - "**/Cargo.toml"
       - "**/Cargo.lock"
-      - "scripts/audit-dotnet-packages.mjs"
       - "scripts/generate-dependency-governance.mjs"
       - "scripts/verify-dependency-policy.mjs"
       - "scripts/test_dependency_policy.mjs"
@@ -48,18 +40,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      NUGET_PACKAGES: ${{ github.workspace }}/artifacts/nuget-packages
-      NUGET_HTTP_CACHE_PATH: ${{ github.workspace }}/.codex-runtime/nuget-http-cache
       CARGO_HOME: ${{ github.workspace }}/artifacts/cargo-home
 
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
-        with:
-          dotnet-version: "10.0.x"
 
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -68,7 +53,6 @@ jobs:
           cache: npm
           cache-dependency-path: |
             apps/export-doc-web/package-lock.json
-            apps/export-doc-tauri/package-lock.json
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable action
@@ -77,10 +61,8 @@ jobs:
 
       - name: Restore locked dependency graphs
         run: |
-          dotnet restore ExportDocManager.sln --locked-mode --configfile NuGet.Config
           npm ci --prefix apps/export-doc-web
-          npm ci --prefix apps/export-doc-tauri
-          cargo fetch --locked --manifest-path apps/export-doc-tauri/src-tauri/Cargo.toml
+          cargo fetch --locked
           cargo fetch --locked --manifest-path apps/exportdoc-ocr-rs/Cargo.toml
           cargo fetch --locked --manifest-path tools/excel-analyzer-rs/Cargo.toml
 
@@ -94,22 +76,14 @@ jobs:
         run: node scripts/test_dependency_policy.mjs
 
       - name: Audit npm production dependencies
-        run: |
-          npm --prefix apps/export-doc-web run audit:production
-          npm --prefix apps/export-doc-tauri run audit:production
-
-      - name: Audit NuGet direct and transitive dependencies
-        run: node scripts/audit-dotnet-packages.mjs
+        run: npm --prefix apps/export-doc-web run audit:production
 
       - name: Install RustSec cargo-audit
         run: cargo install cargo-audit --locked --root "$CARGO_HOME"
 
       - name: Audit Rust lock files
         run: |
-          # Tauri's current Linux WebKit/GTK3 stack still pulls glib 0.18.5.
-          # Keep that one reviewed transitive exception explicit while failing
-          # every new vulnerability, unsound advisory or yanked crate.
-          "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --ignore RUSTSEC-2024-0429 --file apps/export-doc-tauri/src-tauri/Cargo.lock
+          "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file Cargo.lock
           "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file apps/exportdoc-ocr-rs/Cargo.lock
           "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file tools/excel-analyzer-rs/Cargo.lock
 

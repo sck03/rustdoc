@@ -260,7 +260,11 @@ impl Desktop {
         if key == "audit" {
             self.setup_audit();
         }
-        if !["about", "excel", "exchange-rates"].contains(&key) {
+        if key == "about" {
+            self.request(GET_LICENSE_STATUS, 0, vec![], None, "license:status");
+            return;
+        }
+        if !["excel", "exchange-rates"].contains(&key) {
             self.refresh();
         }
     }

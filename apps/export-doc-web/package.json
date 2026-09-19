@@ -67,7 +67,6 @@
   },
   "dependencies": {
     "@tanstack/react-query": "5.103.0",
-    "@tauri-apps/api": "^2.11.1",
     "lucide-react": "1.46.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

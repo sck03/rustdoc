@@ -4,6 +4,7 @@ param(
     [string]$OutputRoot,
     [string]$PdfiumPath,
     [string]$OnnxRuntimePath,
+    [string]$RustTarget,
     [switch]$WithoutOcr,
     [switch]$SkipBuild,
     [switch]$NoPause
@@ -60,15 +61,21 @@ Invoke-ExportDocExternal -FilePath 'node' -Arguments @((Join-Path $PSScriptRoot 
 if (-not $SkipBuild) {
     $cargoArguments = @('build', '--locked', '-p', 'export-doc-slint')
     if ($Configuration -eq 'Release') { $cargoArguments += '--release' }
+    if (-not [string]::IsNullOrWhiteSpace($RustTarget)) { $cargoArguments += @('--target', $RustTarget) }
     Invoke-ExportDocExternal -FilePath 'cargo' -Arguments $cargoArguments -WorkingDirectory $repositoryRoot -DisplayName 'Build Rust + Slint desktop'
 }
 $executableSuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
 $profile = $Configuration.ToLowerInvariant()
+$artifactDirectory = if ([string]::IsNullOrWhiteSpace($RustTarget)) {
+    Join-Path $env:CARGO_TARGET_DIR $profile
+} else {
+    Join-Path (Join-Path $env:CARGO_TARGET_DIR $RustTarget) $profile
+}
 $copies = [ordered]@{}
 if (-not $WithoutOcr) {
     Add-ExportDocNativeOcrResources -RepositoryRoot $repositoryRoot -Configuration $Configuration -Copies $copies -OnnxRuntimePath $OnnxRuntimePath -SkipBuild:$SkipBuild
 }
-$copies[(Join-Path $env:CARGO_TARGET_DIR "$profile/export-doc-slint$executableSuffix")] = "ExportDocManager$executableSuffix"
+$copies[(Join-Path $artifactDirectory "export-doc-slint$executableSuffix")] = "ExportDocManager$executableSuffix"
 foreach ($name in @('NotoSansCJKsc-Regular.otf', 'NotoSansCJKsc-Bold.otf', 'NotoSerifCJKsc-Regular.otf', 'OFL-Noto-CJK.txt', 'font-manifest.json')) {
     $copies[(Join-Path $repositoryRoot "Resources/Fonts/OpenSource/$name")] = "Resources/Fonts/OpenSource/$name"
 }

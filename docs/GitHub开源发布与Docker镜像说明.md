@@ -1,5 +1,24 @@
 # GitHub 开源发布与 Docker 镜像说明
 
+> 2026-09-20 Rust 主支覆盖说明:下方旧 Tauri、ASP.NET API/Browser/Web 三镜像和 WebView2 发布内容只用于历史对照。当前公开发布入口以本节为准。
+
+## Rust 主支发布入口
+
+公开源码仓库只包含构建代码和校验清单,不提交客户数据、数据库、私钥、注册机或大型浏览器资源。Rust 主支已经移除旧 Tauri/WebView2 桌面发布链和 ASP.NET 三镜像拓扑。
+
+| 入口 | 用途 | 产物 |
+| --- | --- | --- |
+| [`rust-native-desktop-release.yml`](../.github/workflows/rust-native-desktop-release.yml) | 远端手工构建 Rust + Slint + SQLite 绿色桌面版 | Windows x64/ARM64、Linux x64/ARM64、macOS ARM64 桌面包 Artifact |
+| [`rust-native-web-server-release.yml`](../.github/workflows/rust-native-web-server-release.yml) | 远端手工构建 React + Rust HTTP 网页服务端 | Windows x64、Linux x64/ARM64、macOS ARM64 服务端包 Artifact |
+| [`rust-native-container-release.yml`](../.github/workflows/rust-native-container-release.yml) | Docker Compose 生命周期验收和可选 GHCR 发布 | `exportdoc-rust-native` 容器镜像 |
+| [`rust-native-validation.yml`](../.github/workflows/rust-native-validation.yml) | Rust 主支持续门禁 | 测试、编译和依赖边界结果 |
+| [`dependency-governance.yml`](../.github/workflows/dependency-governance.yml) | npm/Cargo 依赖治理 | 审计和 SBOM 证据 |
+| [`browser-compatibility.yml`](../.github/workflows/browser-compatibility.yml) | Firefox/WebKit 手工验收 | 浏览器兼容结果 |
+
+本地绿色桌面版不使用 GitHub Actions 发布流程,直接运行 `scripts/build-native.ps1`;默认输出到 `artifacts/native-desktop/ExportDocManager.Slint`。本地网页服务端包由 `scripts/package-native-web-server.ps1` 生成;本地 Docker 由 `scripts/run-native-docker.ps1` 管理。
+
+> 本节以下旧清单与 `container-images.yml`、`windows-desktop-package.yml`、`linux-desktop-package.yml`、`macos-desktop-package.yml`、`browser-server-package-reusable.yml` 等描述只保留为历史对照;这些工作流已从 Rust 主支删除,不得继续作为发布入口或重命名目标。
+
 > 更新日期：2026-08-08
 
 ## 1. 公开仓库边界

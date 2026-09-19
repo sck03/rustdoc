@@ -614,6 +614,17 @@ impl NativeService {
                     )?)
                     .map_err(Into::into);
                 }
+                if report_template_files::OPERATIONS.contains(&operation) {
+                    return serde_json::to_vec(&report_template_files::handle(
+                        self,
+                        &actor,
+                        operation,
+                        parameters,
+                        query,
+                        &body_value,
+                    )?)
+                    .map_err(Into::into);
+                }
                 #[cfg(feature = "excel")]
                 if excel::OPERATIONS.contains(&operation) {
                     return serde_json::to_vec(&excel::handle(

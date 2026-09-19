@@ -89,7 +89,7 @@ impl Smoke {
         if self.stage > 0 && self.stage < 3 && !app.get_logged_in() {
             return Ok(false);
         }
-        if self.stage >= 36 {
+        if self.stage >= 38 {
             let complete = match self.batch {
                 0 => self.pages.tick(ui, state, &self.output)?,
                 1 => self.office.tick(ui, state, &self.output)?,
@@ -210,29 +210,49 @@ impl Smoke {
             }
             9 => {
                 snapshot(ui, &self.output.join("05-designer.png"))?;
+                ui.global::<crate::TemplateFiles>()
+                    .invoke_action("toggle".into());
+            }
+            10 => {
+                let template_files = ui.global::<crate::TemplateFiles>();
+                if !template_files.get_open()
+                    || !template_files.get_loaded()
+                    || template_files.get_template_root().is_empty()
+                    || template_files.get_rows().row_count() == 0
+                {
+                    return Err(format!(
+                        "报表模板文件面板未加载:open={},loaded={},root={:?},rows={}",
+                        template_files.get_open(),
+                        template_files.get_loaded(),
+                        template_files.get_template_root(),
+                        template_files.get_rows().row_count()
+                    ));
+                }
+                snapshot(ui, &self.output.join("05-template-files.png"))?;
+                self.checks.push("report-template-file-storage".into());
                 state.borrow_mut().designer_move("title", 500., 100.);
                 app.invoke_designer_action("save".into());
             }
-            10 => {
+            11 => {
                 if !app.get_template_saved() {
                     return Err("模板未持久化。".into());
                 }
                 app.invoke_designer_action("publish".into());
             }
-            11 => {
+            12 => {
                 self.checks.push("designer-save-publish".into());
                 state.borrow_mut().navigate_now("crm-customers");
             }
-            12 => {
+            13 => {
                 snapshot(ui, &self.output.join("06-crm.png"))?;
                 app.invoke_new_record();
             }
-            13 => {
+            14 => {
                 app.invoke_field_edited("name".into(), "Slint 验收客户".into());
                 app.invoke_field_edited("countryRegion".into(), "中国".into());
                 app.invoke_save_form();
             }
-            14 => {
+            15 => {
                 if state.borrow().load_lookups {
                     return Ok(false);
                 }
@@ -242,21 +262,38 @@ impl Smoke {
                 self.checks.push("crm-create-readback".into());
                 state.borrow_mut().navigate_now("people");
             }
-            15 => {
+            16 => {
                 snapshot(ui, &self.output.join("07-personnel.png"))?;
                 state.borrow_mut().navigate_now("companies");
             }
-            16 => {
+            17 => {
                 snapshot(ui, &self.output.join("08-organization.png"))?;
                 state.borrow_mut().navigate_now("settings");
             }
-            17 => {
+            18 => {
                 snapshot(ui, &self.output.join("09-settings.png"))?;
                 state.borrow_mut().navigate_now("about");
             }
-            18 => {
+            19 => {
                 snapshot(ui, &self.output.join("10-about.png"))?;
-                self.checks.push("navigation-and-about-attribution".into());
+                app.set_about_tab(1);
+            }
+            20 => {
+                let license = ui.global::<crate::License>();
+                if license.get_machine_id().is_empty()
+                    || license.get_status_text() == "读取中"
+                    || license.get_log_retention().contains("尚未读取设置")
+                {
+                    return Err(format!(
+                        "授权注册页没有加载机器码、授权状态和日志保留设置:machineId={:?},status={:?},retention={:?}",
+                        license.get_machine_id(),
+                        license.get_status_text(),
+                        license.get_log_retention()
+                    ));
+                }
+                snapshot(ui, &self.output.join("10-license.png"))?;
+                self.checks
+                    .push("navigation-about-attribution-license-status".into());
                 let mut desktop = state.borrow_mut();
                 let mut draft = InvoiceDraft::demo("2026-09-16", "SCALE");
                 draft.rows = vec![draft.rows[0].clone(); 5000];
@@ -264,7 +301,7 @@ impl Smoke {
                 drop(desktop);
                 app.invoke_invoice_tab_changed(1);
             }
-            19 => {
+            21 => {
                 let rendered = app.get_grid_rows().row_count();
                 if app.get_grid_count() != 5000 || rendered > 100 {
                     return Err(format!("虚拟表格行数异常：{rendered}"));
@@ -272,7 +309,7 @@ impl Smoke {
                 app.invoke_grid_scroll(4970, 30);
                 app.invoke_grid_select(4999, 23, false);
             }
-            20 => {
+            22 => {
                 snapshot(ui, &self.output.join("11-5000-rows.png"))?;
                 if app.get_grid_rows().row_count() > 100 {
                     return Err("滚动后创建了全部行控件。".into());
@@ -281,7 +318,7 @@ impl Smoke {
                 self.scale_visible_rows = app.get_grid_rows().row_count();
                 state.borrow_mut().navigate_now("excel");
             }
-            21 => {
+            23 => {
                 snapshot(ui, &self.output.join("12-excel-tools.png"))?;
                 let destination = self.output.join("native-booking.xlsx");
                 state.borrow_mut().start(crate::worker::Work::FileJob{
@@ -290,7 +327,7 @@ impl Smoke {
                     body:serde_json::json!({"destinationPath":destination}),destination,
                 });
             }
-            22 => {
+            24 => {
                 let source = self.output.join("native-booking.xlsx");
                 if !std::fs::read(&source)
                     .map_err(|e| e.to_string())?
@@ -307,7 +344,7 @@ impl Smoke {
                     "excel-preview",
                 );
             }
-            23 => {
+            25 => {
                 if !app.get_import_open()
                     || !app.get_import_success()
                     || app.get_import_rows().row_count() != 3
@@ -317,7 +354,7 @@ impl Smoke {
                 snapshot(ui, &self.output.join("13-excel-import-preview.png"))?;
                 app.invoke_import_confirmed(true);
             }
-            24 => {
+            26 => {
                 if !state.borrow().grid.dirty() || state.borrow().grid.draft.header.id != 0 {
                     return Err("导入结果没有保留为待保存的新草稿。".into());
                 }
@@ -326,7 +363,7 @@ impl Smoke {
                     .invoice_field_edit("invoiceNo", "SLINT-IMPORTED-001");
                 app.invoke_invoice_action("save".into());
             }
-            25 => {
+            27 => {
                 if state.borrow().grid.draft.header.id <= 0
                     || state.borrow().grid.draft.header.invoice_no != "SLINT-IMPORTED-001"
                 {
@@ -335,7 +372,7 @@ impl Smoke {
                 self.checks.push("native-excel-preview-confirm-save".into());
                 state.borrow_mut().navigate_now("jobs");
             }
-            26 => {
+            28 => {
                 if app.get_records().row_count() == 0 {
                     return Err("文件任务没有显示已完成的托单。".into());
                 }
@@ -347,10 +384,10 @@ impl Smoke {
                 self.checks.push("native-file-task-selection".into());
                 state.borrow_mut().navigate_now("payments");
             }
-            27 => {
+            29 => {
                 app.invoke_new_record();
             }
-            28 => {
+            30 => {
                 if app.get_page() != "payment-edit" {
                     return Err("付款没有使用专用编辑页面。".into());
                 }
@@ -362,7 +399,7 @@ impl Smoke {
                 snapshot(ui, &self.output.join("15-payment-business.png"))?;
                 app.invoke_payment_tab_changed(2);
             }
-            29 => {
+            31 => {
                 app.invoke_payment_field_edited("travelExpense".into(), "0.1".into());
                 app.invoke_payment_field_edited("otherExpense".into(), "0.2".into());
                 let total: rust_decimal::Decimal = serde_json::from_value(
@@ -378,7 +415,7 @@ impl Smoke {
                 app.invoke_payment_tab_changed(2);
                 app.invoke_payment_action("save".into());
             }
-            30 => {
+            32 => {
                 if app.get_payment_tab() != 0
                     || app.get_payment_invalid_field() != "receiptDate"
                     || app.get_payment_error().is_empty()
@@ -388,10 +425,10 @@ impl Smoke {
                 app.invoke_payment_field_edited("receiptDate".into(), "".into());
                 app.invoke_payment_tab_changed(3);
             }
-            31 => {
+            33 => {
                 app.invoke_pdf_action("preview".into());
             }
-            32 => {
+            34 => {
                 if app.get_pdf_pages() == 0
                     || app.get_payment_saved()
                     || app.get_report_export_ready()
@@ -403,7 +440,7 @@ impl Smoke {
                     .push("payment-tabs-exact-expenses-validation-draft-preview".into());
                 app.invoke_payment_action("save".into());
             }
-            33 => {
+            35 => {
                 if !app.get_payment_saved() || app.get_payment_dirty() {
                     return Err("付款保存没有更新草稿基线。".into());
                 }
@@ -416,7 +453,7 @@ impl Smoke {
                 app.set_payment_new_method("国内汇款".into());
                 app.invoke_payment_action("add-method".into());
             }
-            34 => {
+            36 => {
                 if state.borrow().payment_form.as_ref().unwrap().value["paymentMethod"]
                     != "国内汇款"
                 {
@@ -434,7 +471,7 @@ impl Smoke {
                 }
                 app.invoke_payment_action("save".into());
             }
-            35 => {
+            37 => {
                 self.checks
                     .push("payment-custom-method-save-reload-cancel".into());
                 snapshot(ui, &self.output.join("18-payment-saved.png"))?;

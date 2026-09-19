@@ -1,6 +1,16 @@
 # 脚本使用说明
 
-## Rust 原生分支
+## Rust 主支:本地与远端交付入口
+
+- 本地绿色桌面版由 `build-native.cmd`/`build-native.ps1` 生成,默认输出 `artifacts/native-desktop/ExportDocManager.Slint`;`-RustTarget` 用于交叉编译或远端矩阵,`-WithoutOcr` 生成不携带 OCR 资源的轻量包。`run-native.cmd`/`run-native.ps1` 启动该包。
+- 本地网页服务端包由 `package-native-web-server.ps1` 生成,输出 React 静态资源与 Rust HTTP 服务到 `artifacts/native-web-server`;目标机仍使用 PostgreSQL 18。
+
+远端 workflow 分类:
+
+- `rust-native-desktop-release.yml`:手工构建 Windows x64/ARM64、Linux x64/ARM64、macOS ARM64 绿色桌面包。
+- `rust-native-web-server-release.yml`:手工构建 Windows x64、Linux x64/ARM64、macOS ARM64 网页服务端包。
+- `rust-native-container-release.yml`:手工验证 Docker Compose 生命周期;选择发布时才推送 Rust 容器镜像到 GHCR。
+- `rust-native-validation.yml`、`dependency-governance.yml`、`browser-compatibility.yml`:Rust 主支门禁、依赖治理和手工跨浏览器验收。
 
 - `build-native.cmd`／`build-native.ps1` 构建 Rust + Slint + SQLite 桌面包；`run-native.cmd`／`run-native.ps1` 启动该包。Excel 原模板、受控字体、PDFium 与 notices 随包进入 `Resources`，不携带 WebView 或 .NET sidecar。
 - `run-native-docker.cmd`／`run-native-docker.ps1` 使用 `deploy/rust-native/compose.yml` 构建 React + Rust HTTP 服务和 PostgreSQL 18。`-PrepareOnly -NoPause` 只准备私有配置；不传该开关时构建并启动；`-Stop -NoPause` 停止容器并保留数据卷。默认仅绑定 `127.0.0.1:5188`，局域网地址通过 `-BindAddress` 显式指定。

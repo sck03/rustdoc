@@ -61,6 +61,7 @@ pub enum Work {
         parameters: Vec<(&'static str, String)>,
         query: Vec<(&'static str, String)>,
         destination: std::path::PathBuf,
+        body: Option<Value>,
         limit: u64,
     },
     OrganizationManagers {
@@ -342,10 +343,11 @@ fn execute(
             parameters,
             query,
             destination,
+            body,
             limit,
         } => {
             let bytes = client
-                .bytes(operation, &parameters, &query, None, limit)
+                .bytes(operation, &parameters, &query, body, limit)
                 .map_err(|cause| cause.to_string())?;
             export_doc_engine::operation::check().map_err(|cause| cause.to_string())?;
             export_doc_engine::paths::atomic_write(&destination, &bytes)?;

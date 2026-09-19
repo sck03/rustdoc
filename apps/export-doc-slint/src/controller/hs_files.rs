@@ -43,6 +43,7 @@ impl Desktop {
                         vec![("since", since)]
                     },
                     destination,
+                    body: None,
                     limit: 100 * 1024 * 1024,
                 });
             }

@@ -1,29 +1,13 @@
 use super::*;
-use crate::{TemplateFileRow, TemplateFiles};
+use crate::{TemplateFileRow, TemplateFiles, template_file_model::PendingTemplate};
 use export_doc_engine::generated_api::{
     ApiReportTemplateContentDto, ApiReportTemplateFileExportResponse,
     ApiReportTemplatePackageImportResponse, ApiReportTemplateStorageStatusResponse,
 };
 use serde_json::{Value, json};
-use std::path::PathBuf;
 
 const FILE_LIMIT: u64 = 16 * 1024 * 1024;
 const PACKAGE_LIMIT: u64 = 64 * 1024 * 1024;
-
-/// File mutations validate a content revision. The revision is only published
-/// by content responses, so a mutation may have to load content first.
-#[derive(Clone)]
-pub enum PendingTemplate {
-    Request {
-        operation: Operation,
-        body: Value,
-        reply: String,
-    },
-    Upload {
-        metadata: Value,
-        source: PathBuf,
-    },
-}
 
 impl Desktop {
     fn report_type(&self) -> String {
@@ -349,10 +333,10 @@ impl Desktop {
                 );
             }
             "import-file" => {
-                let Some(template) = self.selected_template() else {
+                if self.selected_template().is_none() {
                     self.error("请先选择一个模板文件。");
                     return;
-                };
+                }
                 let Some(source) =
                     self.platform
                         .choose_source(ui.window(), "HTML 模板文件", &["html"])
@@ -436,7 +420,7 @@ impl Desktop {
                 match serde_json::from_value::<ApiReportTemplateContentDto>(value) {
                     Ok(content) => {
                         self.template_files.revision =
-                            Some((content.template_path, content.revision));
+                            Some((content.template_path, content.revision.clone()));
                         self.finish_pending_template(content.revision);
                     }
                     Err(cause) => {

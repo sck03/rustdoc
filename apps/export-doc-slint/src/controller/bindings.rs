@@ -85,6 +85,10 @@ pub fn bind(ui: &AppWindow, state: Rc<RefCell<Desktop>>) {
     bind!(on_logout, |s| s.logout());
     bind!(crate::Exchange, on_action, |s, action| s
         .exchange_action(&action));
+    bind!(crate::License, on_action, |s, action| s
+        .license_action(&action));
+    bind!(crate::TemplateFiles, on_action, |s, action| s
+        .template_file_action(&action));
     bind!(on_navigate, |s, key| s.navigate(&key));
     bind!(on_open_tab, |s, key| s.open_tab(&key));
     bind!(on_toggle_form_section, |s, key| s.toggle_form_section(&key));
