@@ -1,0 +1,118 @@
+import { LineEdit, TextEdit, ScrollView, ComboBox, CheckBox } from "std-widgets.slint";
+import { App } from "models.slint";
+import { Mail } from "mail-models.slint";
+import { Theme, ActionButton, Card } from "theme.slint";
+import { RecordTable } from "data-table.slint";
+export component MailPage inherits VerticalLayout {
+    spacing:10px;
+    HorizontalLayout{spacing:8px;height:38px;
+        ActionButton{text:"写邮件";primary:Mail.tab==0;enabled:Mail.can-send;clicked=>{Mail.action("tab",0);}}
+        ActionButton{text:"投递记录";primary:Mail.tab==1;enabled:Mail.can-view-deliveries;clicked=>{Mail.action("tab",1);}}
+        ActionButton{text:"邮件模板";primary:Mail.tab==2;enabled:Mail.can-view-templates;clicked=>{Mail.action("tab",2);}}
+        Text{text:Mail.status;color:Mail.configured?Theme.primary:Theme.muted;vertical-alignment:center;horizontal-stretch:1;overflow:elide;}
+        if Mail.can-configure:ActionButton{text:"邮件设置";enabled:!App.busy;clicked=>{Mail.action("settings",0);}}
+        ActionButton{text:"刷新";enabled:!App.busy;clicked=>{Mail.action("refresh",0);}}
+    }
+    if Mail.tab==0:Card{vertical-stretch:1;VerticalLayout{padding:16px;spacing:10px;
+        HorizontalLayout{spacing:12px;height:38px;Text{text:"收件人";width:80px;vertical-alignment:center;color:Theme.ink;}
+            LineEdit{text:Mail.to;placeholder-text:"收件人邮箱";horizontal-stretch:1;enabled:!App.busy;edited=>{Mail.edited("to",self.text);}}}
+        HorizontalLayout{spacing:12px;height:38px;Text{text:"主题";width:80px;vertical-alignment:center;color:Theme.ink;}
+            LineEdit{text:Mail.subject;placeholder-text:"邮件主题";horizontal-stretch:1;enabled:!App.busy;edited=>{Mail.edited("subject",self.text);}}}
+        HorizontalLayout{spacing:8px;height:36px;alignment:start;
+            Text{text:"正文";width:80px;vertical-alignment:center;color:Theme.ink;}
+            if Mail.rich-body:Text{text:"保留模板富文本格式";vertical-alignment:center;color:Theme.primary;}
+            if Mail.rich-body:ActionButton{text:Mail.source-mode?"返回预览":"编辑 HTML 源码";enabled:!App.busy;clicked=>{Mail.action("source",0);}}
+            if Mail.rich-body:ActionButton{text:"转为纯文本编辑";enabled:!App.busy;clicked=>{Mail.action("plain",0);}}
+            ActionButton{text:"从模板填写";enabled:Mail.can-view-templates&&!App.busy;clicked=>{Mail.action("tab",2);}}
+        }
+        TextEdit{text:Mail.body;read-only:App.busy||(Mail.rich-body&&!Mail.source-mode);wrap:word-wrap;vertical-stretch:1;edited=>{Mail.edited("body",self.text);}}
+        HorizontalLayout{spacing:10px;height:36px;alignment:start;
+            ActionButton{text:"添加附件";enabled:!App.busy;clicked=>{Mail.action("attachment",0);}}
+            Text{text:"最多 10 个附件，单个 10 MiB，总计 18 MiB";vertical-alignment:center;color:Theme.muted;horizontal-stretch:1;}
+            ActionButton{text:"清空";enabled:!App.busy;clicked=>{Mail.action("clear",0);}}
+            ActionButton{text:"发送邮件";primary:true;enabled:Mail.can-send&&Mail.configured&&Mail.to!=""&&!App.busy;clicked=>{Mail.action("send",0);}}
+        }
+        for attachment[i] in Mail.attachments:HorizontalLayout{height:32px;spacing:8px;
+            Text{text:attachment;overflow:elide;vertical-alignment:center;color:Theme.muted;horizontal-stretch:1;}
+            ActionButton{text:"移除";enabled:!App.busy;clicked=>{Mail.action("remove-attachment",i);}}
+        }
+    }}
+    if Mail.tab==1:VerticalLayout{spacing:10px;
+        HorizontalLayout{height:38px;spacing:10px;LineEdit{text<=>Mail.keyword;placeholder-text:"收件人或主题";horizontal-stretch:1;accepted=>{Mail.action("search",0);}}
+            ComboBox{model:["全部状态","已发送","尝试投递","结果不确定"];current-index<=>Mail.status-index;selected=>{Mail.action("search",0);}}
+            ActionButton{text:"查询";enabled:!App.busy;clicked=>{Mail.action("search",0);}}}
+        Card{vertical-stretch:2;RecordTable{columns:["收件人","主题","投递状态","附件数","申请时间"];rows:Mail.rows;selected-id:Mail.selected;busy:App.busy;selected(id)=>{Mail.action("delivery",id);}}}
+        HorizontalLayout{height:36px;spacing:10px;Text{text:"结果不确定的邮件须核实后重新撰写；原请求不会自动重复投递。";color:Theme.muted;vertical-alignment:center;horizontal-stretch:1;}
+            ActionButton{text:"上一页";enabled:Mail.page>1&&!App.busy;clicked=>{Mail.action("page",-1);}}
+            Text{text:Mail.page+" / "+Mail.total-pages;color:Theme.muted;vertical-alignment:center;}
+            ActionButton{text:"下一页";enabled:Mail.page<Mail.total-pages&&!App.busy;clicked=>{Mail.action("page",1);}}}
+        Card{height:160px;ScrollView{content-width:self.visible-width;Text{text:Mail.details;color:Theme.ink;wrap:word-wrap;}}}
+    }
+    if Mail.tab==2:VerticalLayout{spacing:10px;
+        HorizontalLayout{height:36px;spacing:6px;alignment:start;
+            for title[i] in ["模板目录","模板编辑","变量填写","效果预览","版本历史"]:ActionButton{text:title;active:Mail.template-tab==i;enabled:!App.busy;clicked=>{Mail.action("template-tab",i);}}
+            Rectangle{horizontal-stretch:1;}
+            Text{text:Mail.template-status;color:Theme.muted;vertical-alignment:center;}
+        }
+        if Mail.template-tab==0:VerticalLayout{spacing:10px;
+            HorizontalLayout{height:38px;spacing:8px;
+                LineEdit{text<=>Mail.keyword;placeholder-text:"模板名称、主题或正文";horizontal-stretch:1;accepted=>{Mail.action("search",0);}}
+                ComboBox{model:["全部可见","我可编辑","已共享"];current-index<=>Mail.template-scope;selected=>{Mail.action("filter",0);}}
+                CheckBox{text:"含归档";checked<=>Mail.include-archived;toggled=>{Mail.action("search",0);}}
+                ActionButton{text:"查询";enabled:!App.busy;clicked=>{Mail.action("search",0);}}
+                ActionButton{text:"新增模板";enabled:Mail.can-create&&!App.busy;clicked=>{Mail.action("new-template",0);}}
+            }
+            Card{RecordTable{columns:["模板名称","分类","邮件主题","状态","共享范围"];rows:Mail.template-rows;selected-id:Mail.template-selected;busy:App.busy;selected(id)=>{Mail.action("template",id);}opened(id)=>{Mail.action("open-template",id);}}}
+        }
+        if Mail.template-tab==1:Card{VerticalLayout{padding:14px;spacing:10px;
+            HorizontalLayout{height:38px;spacing:10px;LineEdit{text:Mail.name;placeholder-text:"模板名称";horizontal-stretch:2;enabled:Mail.can-edit&&!App.busy;edited=>{Mail.edited("template-name",self.text);}}
+                LineEdit{text:Mail.category;placeholder-text:"分类";horizontal-stretch:1;enabled:Mail.can-edit&&!App.busy;edited=>{Mail.edited("template-category",self.text);}}}
+            LineEdit{text:Mail.template-subject;placeholder-text:"邮件主题，可使用 {{CustomerName}} 等变量";height:38px;enabled:Mail.can-edit&&!App.busy;edited=>{Mail.edited("template-subject",self.text);}}
+            Text{text:"正文格式源稿";color:Theme.muted;height:24px;}
+            TextEdit{text:Mail.template-body;read-only:!Mail.can-edit||App.busy;wrap:word-wrap;vertical-stretch:1;edited=>{Mail.edited("template-body",self.text);}}
+            HorizontalLayout{spacing:8px;height:36px;alignment:start;
+                ActionButton{text:"保存草稿";primary:true;enabled:Mail.can-edit&&!App.busy;clicked=>{Mail.action("save-template",0);}}
+                ActionButton{text:"复制";enabled:Mail.can-create&&!App.busy;clicked=>{Mail.action("copy-template",0);}}
+                ActionButton{text:"撤销";enabled:Mail.can-undo&&!App.busy;clicked=>{Mail.action("undo",0);}}
+                ActionButton{text:"重做";enabled:Mail.can-redo&&!App.busy;clicked=>{Mail.action("redo",0);}}
+                Rectangle{horizontal-stretch:1;}
+                ActionButton{text:"发布";enabled:Mail.can-publish&&!App.busy;clicked=>{Mail.action("publish",0);}}
+                ActionButton{text:"停用";enabled:Mail.can-disable&&!App.busy;clicked=>{Mail.action("disable",0);}}
+                ActionButton{text:"恢复";enabled:Mail.can-restore&&!App.busy;clicked=>{Mail.action("restore",0);}}
+                ActionButton{text:"归档";enabled:Mail.can-archive&&!App.busy;clicked=>{Mail.action("archive",0);}}
+            }
+            HorizontalLayout{height:36px;spacing:8px;alignment:start;
+                Text{text:"共享范围";color:Theme.muted;vertical-alignment:center;}
+                ComboBox{model:["私有","部门","公司","全部"];current-index<=>Mail.share-scope;enabled:Mail.can-share&&!App.busy;}
+                ActionButton{text:"保存共享范围";enabled:Mail.can-share&&!App.busy;clicked=>{Mail.action("share",0);}}
+            }
+        }}
+        if Mail.template-tab==2:Card{VerticalLayout{padding:14px;spacing:12px;
+            HorizontalLayout{height:38px;spacing:8px;LineEdit{text<=>Mail.customer-keyword;placeholder-text:"按客户名称查找";horizontal-stretch:1;accepted=>{Mail.action("customers",0);}}
+                ActionButton{text:"查找客户";enabled:!App.busy;clicked=>{Mail.action("customers",0);}}
+                ComboBox{model:Mail.customers;current-index<=>Mail.customer-index;horizontal-stretch:1;selected=>{Mail.action("customer",self.current-index);}}}
+            ScrollView{content-width:self.visible-width;VerticalLayout{spacing:10px;alignment:start;
+                for variable in Mail.variables:HorizontalLayout{height:38px;spacing:12px;
+                    Text{text:variable.label;vertical-alignment:center;color:Theme.ink;width:150px;}
+                    LineEdit{text:variable.value;placeholder-text:variable.token;horizontal-stretch:1;edited=>{Mail.edited("variable:"+variable.key,self.text);}}
+                    ActionButton{text:"插入正文";enabled:Mail.can-edit&&!App.busy;clicked=>{Mail.edited("insert-token",variable.token);}}
+                }
+            }}
+            ActionButton{text:"生成预览";primary:true;enabled:!App.busy;clicked=>{Mail.action("preview",0);}}
+        }}
+        if Mail.template-tab==3:Card{VerticalLayout{padding:14px;spacing:12px;
+            Text{text:Mail.preview-subject;font-size:18px;font-weight:700;color:Theme.ink;wrap:word-wrap;min-height:30px;}
+            if Mail.unresolved!="":Text{text:Mail.unresolved;color:Theme.error;wrap:word-wrap;min-height:24px;}
+            ScrollView{content-width:self.visible-width;Text{text:Mail.preview-body;color:Theme.ink;wrap:word-wrap;}}
+            HorizontalLayout{height:36px;spacing:10px;alignment:start;
+                ActionButton{text:"刷新预览";enabled:!App.busy;clicked=>{Mail.action("preview",0);}}
+                ActionButton{text:"填写到邮件";primary:true;enabled:Mail.can-send&&Mail.unresolved==""&&!App.busy;clicked=>{Mail.action("compose-preview",0);}}
+            }
+        }}
+        if Mail.template-tab==4:VerticalLayout{spacing:10px;
+            Card{vertical-stretch:1;RecordTable{columns:["版本","变更","名称","操作人","时间"];rows:Mail.versions;selected-id:Mail.version-selected;busy:App.busy;selected(id)=>{Mail.action("version",id);}}}
+            Card{vertical-stretch:1;ScrollView{content-width:self.visible-width;Text{text:Mail.version-detail;color:Theme.ink;wrap:word-wrap;}}}
+            ActionButton{text:"恢复所选版本内容为私有草稿";enabled:Mail.version-selected>0&&!App.busy;clicked=>{Mail.action("restore-version",Mail.version-selected);}}
+        }
+    }
+}

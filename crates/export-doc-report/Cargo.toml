@@ -1,0 +1,22 @@
+[package]
+name = "export-doc-report"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Native report layout and vector PDF output shared by desktop and HTTP hosts"
+
+[dependencies]
+export-doc-domain = { path = "../export-doc-domain" }
+export-doc-contracts = { path = "../export-doc-contracts" }
+serde.workspace = true
+serde_json.workspace = true
+rust_decimal.workspace = true
+base64.workspace = true
+zip = { version = "=8.6.0", default-features = false, features = ["deflate"] }
+krilla = "=0.8.2"
+krilla-svg = "=0.8.1"
+usvg = "=0.47.0"
+
+[lints]
+workspace = true

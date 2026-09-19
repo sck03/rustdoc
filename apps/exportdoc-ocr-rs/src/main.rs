@@ -4,7 +4,7 @@ use ort::{session::Session, value::Tensor};
 use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
-    io::{self, BufRead, Write},
+    io::{self, BufRead, Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -78,6 +78,12 @@ fn main() -> Result<()> {
             "{}",
             serde_json::json!({"ready":true,"engine":"rust-ort-ppocrv6","modelRoot":model_root})
         );
+        return Ok(());
+    }
+    if args.iter().any(|arg|arg=="--recognize-stdin") {
+        let mut encoded=Vec::new();io::stdin().take(MAX_IMAGE_BYTES+1).read_to_end(&mut encoded)?;
+        let response=match engine.recognize_bytes(&encoded) {Ok(lines)=>Response::ok("stdin",lines),Err(cause)=>Response::error("stdin",format!("{cause:#}"))};
+        write_response(&mut io::BufWriter::new(io::stdout()),response)?;
         return Ok(());
     }
     let stdin = io::stdin();
@@ -187,14 +193,15 @@ impl Engine {
         if metadata.len() == 0 || metadata.len() > MAX_IMAGE_BYTES {
             bail!("image must be non-empty and no larger than 25 MB")
         }
-        let (width, height) = image::image_dimensions(path)
-            .with_context(|| format!("cannot inspect image dimensions for {}", path.display()))?;
-        validate_image_dimensions(width, height)?;
-        let encoded =
-            std::fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
-        let image = image::load_from_memory(&encoded)
-            .with_context(|| format!("cannot decode {}", path.display()))?
-            .to_rgb8();
+        let mut encoded=Vec::new();std::fs::File::open(path)?.take(MAX_IMAGE_BYTES+1).read_to_end(&mut encoded)?;
+        self.recognize_bytes(&encoded)
+    }
+
+    fn recognize_bytes(&mut self,encoded:&[u8])->Result<Vec<OcrLine>> {
+        if encoded.is_empty()||encoded.len() as u64>MAX_IMAGE_BYTES {bail!("image must be non-empty and no larger than 25 MB")}
+        let (width,height)=image::ImageReader::new(io::Cursor::new(encoded)).with_guessed_format()?.into_dimensions()?;
+        validate_image_dimensions(width,height)?;
+        let image=image::load_from_memory(encoded).context("cannot decode OCR image")?.to_rgb8();
         let mut rects = self.detect(&image)?;
         if rects.is_empty() {
             if pixel_count(image.width(), image.height()) > MAX_FALLBACK_RECOGNITION_PIXELS {

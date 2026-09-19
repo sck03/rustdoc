@@ -1,0 +1,28 @@
+import { App } from "models.slint";
+import { Theme, Card, ActionButton } from "theme.slint";
+import { FormSections } from "forms.slint";
+import { RecordsPage } from "records.slint";
+
+export component BusinessPage inherits Rectangle {
+    background:transparent;
+    VerticalLayout{padding:0px;spacing:12px;
+        HorizontalLayout{height:38px;spacing:10px;
+            ActionButton{text:App.business-resource=="suppliers"?"返回供应商目录":"返回客户目录";enabled:!App.busy;clicked=>{App.business-action("back","");}}
+            Text{text:App.business-title;color:Theme.ink;font-size:22px;font-weight:700;horizontal-stretch:1;vertical-alignment:center;}
+        }
+        Text{text:App.business-summary;color:Theme.muted;height:24px;}
+        HorizontalLayout{height:36px;spacing:8px;alignment:start;
+            for tab in App.business-tabs:ActionButton{text:tab.label;active:App.resource==tab.key;enabled:!App.busy;clicked=>{App.business-action("tab",tab.key);}}
+        }
+        if App.resource==App.business-resource:Card{VerticalLayout{padding:16px;spacing:12px;
+            HorizontalLayout{height:36px;spacing:8px;alignment:start;
+                ActionButton{text:"编辑资料";primary:true;visible:App.business-can-edit;enabled:!App.busy;clicked=>{App.business-action("edit","");}}
+                for action in App.business-actions:ActionButton{text:action.label;enabled:!App.busy;clicked=>{App.business-action(action.key,"");}}
+                ActionButton{text:"删除";visible:App.business-can-delete;enabled:!App.busy;clicked=>{App.business-action("delete","");}}
+                ActionButton{text:"刷新";enabled:!App.busy;clicked=>{App.refresh();}}
+            }
+            FormSections{sections:App.business-sections;editable:false;toggled(key)=>{App.toggle-form-section(key);}}
+        }}
+        if App.resource!=App.business-resource:RecordsPage{}
+    }
+}

@@ -1,0 +1,59 @@
+import { ScrollView, LineEdit, ComboBox } from "std-widgets.slint";
+import { App } from "models.slint";
+import { Theme, Card, ActionButton } from "theme.slint";
+import { DisasterRecoveryPanel } from "disaster-recovery.slint";
+
+export component BackupPage inherits Rectangle {
+    background:transparent;
+    ScrollView{content-width:self.visible-width;VerticalLayout{padding:0px;spacing:16px;
+        HorizontalLayout{height:38px;spacing:10px;
+            Text{text:"数据备份与还原";font-size:21px;font-weight:700;color:Theme.ink;vertical-alignment:center;horizontal-stretch:1;}
+            ActionButton{text:"返回系统设置";enabled:!App.busy;clicked=>{App.open-tab("settings");}}
+            ActionButton{text:"刷新";enabled:!App.busy;clicked=>{App.refresh();}}
+            ActionButton{text:"创建备份";primary:true;enabled:!App.busy;clicked=>{App.maintenance-action("create");}}
+        }
+        Card{VerticalLayout{padding:16px;spacing:8px;
+            Text{text:"备份目录";color:Theme.muted;height:22px;}
+            Text{text:App.backup-root;color:Theme.ink;overflow:elide;height:24px;}
+            Text{text:App.backup-policy;color:Theme.muted;height:22px;}
+        }}
+        Card{VerticalLayout{padding:16px;spacing:12px;
+            HorizontalLayout{height:36px;spacing:10px;alignment:start;
+                Text{text:"保留天数";color:Theme.muted;vertical-alignment:center;}
+                LineEdit{text<=>App.backup-days;width:90px;accessible-label:"备份保留天数";enabled:!App.busy;}
+                ActionButton{text:"清理旧备份";enabled:!App.busy;clicked=>{App.maintenance-action("cleanup");}}
+            }
+            Rectangle{height:36px;background:Theme.soft;HorizontalLayout{padding:10px;spacing:16px;
+                Text{text:"备份文件";color:Theme.muted;horizontal-stretch:3;}
+                Text{text:"大小";color:Theme.muted;width:105px;}
+                Text{text:"创建时间";color:Theme.muted;horizontal-stretch:2;}
+            }}
+            ScrollView{content-width:self.visible-width;VerticalLayout{padding:0px;spacing:0px;alignment:start;
+                for backup in App.backup-rows:Rectangle{height:52px;background:App.backup-index==backup.index?Theme.soft:white;
+                    Rectangle{y:51px;height:1px;background:Theme.line;}
+                    HorizontalLayout{padding:10px;spacing:16px;
+                        Text{text:backup.name;color:Theme.ink;horizontal-stretch:3;overflow:elide;vertical-alignment:center;}
+                        Text{text:backup.size;color:Theme.muted;width:105px;vertical-alignment:center;}
+                        Text{text:backup.created;color:Theme.muted;horizontal-stretch:2;overflow:elide;vertical-alignment:center;}
+                    }
+                    TouchArea{mouse-cursor:pointer;clicked=>{App.backup-index=backup.index;App.backup-confirmation="";}}
+                }
+                if App.backup-rows.length==0:Text{text:App.busy?"正在读取备份…":"尚无备份，可先创建一份备份。";color:Theme.muted;height:140px;horizontal-alignment:center;}
+            }}
+        }}
+        Card{VerticalLayout{padding:16px;spacing:12px;
+            Text{text:"还原前会校验备份并保留当前数据库；完成后所有账号须重新登录。";color:Theme.muted;height:24px;}
+            HorizontalLayout{height:36px;spacing:10px;
+                Text{text:"还原备份";color:Theme.ink;vertical-alignment:center;}
+                ComboBox{model:App.backup-names;current-index<=>App.backup-index;accessible-label:"选择数据库备份";horizontal-stretch:1;enabled:!App.busy;selected(value)=>{App.backup-confirmation="";} }
+                ActionButton{text:"保存副本";enabled:!App.busy&&App.backup-rows.length>0;clicked=>{App.maintenance-action("copy");}}
+            }
+            HorizontalLayout{height:36px;spacing:10px;alignment:end;
+                Text{text:"确认文本";color:Theme.muted;vertical-alignment:center;}
+                LineEdit{text<=>App.backup-confirmation;placeholder-text:"RESTORE";accessible-label:"还原确认文本";width:180px;enabled:!App.busy;}
+                ActionButton{text:"还原数据库";enabled:!App.busy&&App.backup-rows.length>0&&App.backup-confirmation=="RESTORE";clicked=>{App.maintenance-action("restore");}}
+            }
+        }}
+        DisasterRecoveryPanel{}
+    }}
+}

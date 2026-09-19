@@ -1,0 +1,90 @@
+import { ScrollView,LineEdit,ComboBox } from "std-widgets.slint";
+import { App } from "models.slint";
+import { SingleWindow as Sw } from "single-window-models.slint";
+import { Theme,ActionButton,Card } from "theme.slint";
+import { FormView,FormSections } from "forms.slint";
+import { RecordTable } from "data-table.slint";
+
+export component SingleWindowEditor inherits VerticalLayout {
+    spacing:10px;
+    HorizontalLayout {height:38px;spacing:8px;
+        LineEdit {text<=>Sw.invoice-keyword;placeholder-text:"发票号、合同号";horizontal-stretch:1;accepted=>{Sw.action("find-invoices",0);}}
+        ActionButton {text:"查找发票";enabled:!App.busy;clicked=>{Sw.action("find-invoices",0);}}
+        ComboBox {model:Sw.invoices;current-index<=>Sw.invoice-index;horizontal-stretch:2;enabled:!App.busy;selected=>{Sw.action("invoice",self.current-index);}}
+        ActionButton {text:"打开原发票";enabled:Sw.has-document&&!App.busy;clicked=>{Sw.action("source",0);}}
+    }
+    if !Sw.has-document:Card {Text {text:"选择来源发票，按原业务资料生成并核对申报草稿。";color:Theme.muted;horizontal-alignment:center;vertical-alignment:center;}}
+    if Sw.has-document:VerticalLayout {spacing:10px;
+        Text {text:Sw.summary;color:Theme.muted;wrap:word-wrap;min-height:28px;}
+        HorizontalLayout {height:36px;spacing:8px;alignment:start;
+            ActionButton {text:"单证资料";primary:Sw.document-tab==0;clicked=>{Sw.action("document-tab",0);}}
+            if Sw.tab==1:ActionButton {text:"商品明细";primary:Sw.document-tab==1;clicked=>{Sw.action("document-tab",1);}}
+            if Sw.tab==1:ActionButton {text:"附件与第三方企业";primary:Sw.document-tab==2;clicked=>{Sw.action("document-tab",2);}}
+            ActionButton {text:"校验与锁定";primary:Sw.document-tab==3;clicked=>{Sw.action("document-tab",3);}}
+            ActionButton {text:"申报交接包";primary:Sw.document-tab==4;clicked=>{Sw.action("document-tab",4);}}
+        }
+        if Sw.document-tab==0:Card {FormSections {sections:Sw.document-sections;editable:Sw.can-edit;enabled:!App.busy;
+            toggled(key)=>{Sw.toggled(key);}edited(key,value)=>{Sw.edited(key,value);}selected(key,index)=>{Sw.chosen(key,index);}
+        }}
+        if Sw.document-tab==1:HorizontalLayout {spacing:12px;
+            VerticalLayout {horizontal-stretch:1;spacing:8px;
+                Card {RecordTable {columns:["行号","款号","HS 编码","中文品名","数量","原产地标准"];rows:Sw.goods;selected-id:Sw.selected-good;busy:App.busy;selected(id)=>{Sw.action("good",id);}}}
+                HorizontalLayout {height:36px;spacing:6px;alignment:start;
+                    ActionButton {text:"新增商品";enabled:Sw.can-edit&&!App.busy;clicked=>{Sw.action("add-good",0);}}
+                    ActionButton {text:"删除所选";enabled:Sw.can-edit&&!App.busy&&Sw.goods.length>0;clicked=>{Sw.action("remove-good",Sw.selected-good);}}
+                    ActionButton {text:"生成英文描述";enabled:Sw.can-edit&&!App.busy&&Sw.goods.length>0;clicked=>{Sw.action("goods-description",Sw.selected-good);}}
+                }
+                HorizontalLayout {height:36px;spacing:6px;alignment:start;
+                    ActionButton {text:"复制原产地与企业到下方";enabled:Sw.can-edit&&!App.busy&&Sw.goods.length>0;clicked=>{Sw.action("copy-origin",Sw.selected-good);}}
+                    ActionButton {text:"选生产企业";enabled:Sw.can-edit&&!App.busy&&Sw.goods.length>0;clicked=>{Sw.action("producers",0);}}
+                    ActionButton {text:"记住生产企业";enabled:Sw.can-edit&&!App.busy&&Sw.goods.length>0;clicked=>{Sw.action("remember-producer",0);}}
+                }
+            }
+            Card {horizontal-stretch:1;FormSections {sections:Sw.goods-sections;editable:Sw.can-edit;enabled:!App.busy;
+                toggled(key)=>{Sw.toggled(key);}edited(key,value)=>{Sw.edited(key,value);}selected(key,index)=>{Sw.chosen(key,index);}
+            }}
+        }
+        if Sw.document-tab==2:VerticalLayout {spacing:10px;
+            HorizontalLayout {height:36px;spacing:8px;alignment:start;
+                ActionButton {text:"选择附件";enabled:Sw.can-edit&&!App.busy;clicked=>{Sw.action("add-attachment",0);}}
+                ActionButton {text:"移除附件";enabled:Sw.can-edit&&!App.busy&&Sw.attachments.length>0;clicked=>{Sw.action("remove-attachment",Sw.selected-attachment);}}
+                ActionButton {text:"新增第三方企业";enabled:Sw.can-edit&&!App.busy;clicked=>{Sw.action("add-corp",0);}}
+                ActionButton {text:"移除企业";enabled:Sw.can-edit&&!App.busy&&Sw.corps.length>0;clicked=>{Sw.action("remove-corp",Sw.selected-corp);}}
+            }
+            HorizontalLayout {spacing:10px;
+                Card {RecordTable {columns:["附件","类型","说明"];rows:Sw.attachments;selected-id:Sw.selected-attachment;busy:App.busy;selected(id)=>{Sw.action("attachment",id);}}}
+                Card {FormView {fields:Sw.attachment-fields;editable:Sw.can-edit;enabled:!App.busy;edited(key,value)=>{Sw.edited(key,value);}selected(key,index)=>{Sw.chosen(key,index);}}}
+            }
+            HorizontalLayout {spacing:10px;
+                Card {RecordTable {columns:["企业名称","地址","国家"];rows:Sw.corps;selected-id:Sw.selected-corp;busy:App.busy;selected(id)=>{Sw.action("corp",id);}}}
+                Card {FormView {fields:Sw.corp-fields;editable:Sw.can-edit;enabled:!App.busy;edited(key,value)=>{Sw.edited(key,value);}selected(key,index)=>{Sw.chosen(key,index);}}}
+            }
+        }
+        if Sw.document-tab==3:VerticalLayout {spacing:10px;
+            HorizontalLayout {height:36px;spacing:8px;alignment:start;
+                ActionButton {text:"核对当前草稿";enabled:!App.busy;clicked=>{Sw.action("review",0);}}
+                ActionButton {text:"定位问题";enabled:Sw.selected-issue>0;clicked=>{Sw.action("locate-issue",Sw.selected-issue);}}
+                ActionButton {text:"修复所选分组";enabled:Sw.can-edit&&!App.busy&&Sw.selected-issue>0;clicked=>{Sw.action("repair-group",Sw.selected-issue);}}
+                ActionButton {text:"读取锁定字段";enabled:!App.busy;clicked=>{Sw.action("locks",0);}}
+                ActionButton {text:"解锁所选字段";enabled:Sw.can-edit&&!App.busy&&Sw.selected-lock>0;clicked=>{Sw.action("unlock",Sw.selected-lock);}}
+            }
+            Card {RecordTable {columns:["分组","字段","校验说明"];rows:Sw.issues;selected-id:Sw.selected-issue;busy:App.busy;selected(id)=>{Sw.selected-issue=id;}}}
+            Card {RecordTable {columns:["锁定字段","当前值","来源建议值"];rows:Sw.locks;selected-id:Sw.selected-lock;busy:App.busy;selected(id)=>{Sw.selected-lock=id;}}}
+        }
+        if Sw.document-tab==4:Card {VerticalLayout {padding:20px;spacing:14px;alignment:start;
+            Text {text:"生成提交包 → 持卡机导入 → 送入官方客户端 → 收集回执 → 回写申报状态";color:Theme.ink;wrap:word-wrap;min-height:42px;}
+            Text {text:"持卡机授权码（本机提交可留空，使用当前档案）";color:Theme.muted;height:24px;}
+            LineEdit {text<=>Sw.assignment-code;input-type:password;enabled:!App.busy;height:38px;}
+            ActionButton {text:"保存提交包";primary:true;enabled:Sw.can-export&&!App.busy;clicked=>{Sw.action("export-submit",0);}}
+            Text {text:"请先保存并通过申报校验。授权码须对应来源发票的公司及申报业务。";color:Theme.muted;wrap:word-wrap;min-height:38px;}
+            ActionButton {text:"打开持卡机档案";enabled:!App.busy;clicked=>{Sw.action("tab",3);}}
+        }}
+        HorizontalLayout {height:36px;spacing:8px;alignment:start;
+            ActionButton {text:"保存草稿";primary:true;enabled:Sw.can-edit&&!App.busy;clicked=>{Sw.action("save-document",0);}}
+            ActionButton {text:"补齐空白字段";enabled:Sw.can-edit&&!App.busy;clicked=>{Sw.action("fill-defaults",0);}}
+            ActionButton {text:"按来源重建";enabled:Sw.can-edit&&!App.busy;clicked=>{Sw.action("reload-document",0);}}
+            ActionButton {text:"撤销";enabled:Sw.can-undo&&!App.busy;clicked=>{Sw.action("undo",0);}}
+            ActionButton {text:"重做";enabled:Sw.can-redo&&!App.busy;clicked=>{Sw.action("redo",0);}}
+        }
+    }
+}

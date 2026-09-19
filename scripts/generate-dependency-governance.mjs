@@ -34,11 +34,13 @@ const approvedLicenseIdentifiers = new Set([
   "LGPL-2.1-or-later",
   "LGPL-3.0-only",
   "LicenseRef-SQLite-Public-Domain",
+  "LicenseRef-Slint-Royalty-free-2.0",
   "LLVM-exception",
   "MIT",
   "MIT-0",
   "MPL-2.0",
   "MS-PL",
+  "NCSA",
   "OpenSSL",
   "PostgreSQL",
   "Unicode-3.0",
@@ -57,12 +59,18 @@ const extractedLicensingInfo = new Map([
   ],
 ]);
 const components = new Map();
+extractedLicensingInfo.set("LicenseRef-Slint-Royalty-free-2.0", {
+  name: "Slint Royalty-free Desktop, Mobile, and Web Applications License 2.0",
+  extractedText: readFileSync(path.join(repositoryRoot, "eng/licenses/LicenseRef-Slint-Royalty-free-2.0.md"), "utf8"),
+  seeAlsos: ["https://github.com/slint-ui/slint/blob/v1.18.0/LICENSES/LicenseRef-Slint-Royalty-free-2.0.md"],
+});
 
 collectNpmLock("web", "apps/export-doc-web/package-lock.json");
 collectNpmLock("tauri-build", "apps/export-doc-tauri/package-lock.json");
 collectCargoMetadata("tauri", "apps/export-doc-tauri/src-tauri/Cargo.toml");
 collectCargoMetadata("ocr", "apps/exportdoc-ocr-rs/Cargo.toml");
 collectCargoMetadata("excel-analyzer", "tools/excel-analyzer-rs/Cargo.toml");
+collectCargoMetadata("native-desktop", "Cargo.toml");
 collectNuGet();
 
 const ordered = [...components.values()].sort((left, right) =>
@@ -160,11 +168,20 @@ function collectCargoMetadata(scope, relativeManifestPath) {
       scope,
       name: item.name,
       version: String(item.version),
-      license: normalizeLicense(item.license),
+      license: selectedCargoLicense(item),
       downloadLocation: item.repository || item.homepage || item.source,
       purl: `pkg:cargo/${encodeURIComponent(item.name)}@${encodeURIComponent(item.version)}`,
     });
   }
+}
+
+function selectedCargoLicense(item) {
+  const declared = normalizeLicense(item.license);
+  if (!declared.includes("LicenseRef-Slint-Royalty-free-2.0")) return declared;
+  if (item.version !== "1.18.0" || item.repository?.replace(/\/$/u, "") !== "https://github.com/slint-ui/slint") {
+    throw new Error(`Slint licensing must be reviewed before changing ${item.name}@${item.version}.`);
+  }
+  return "LicenseRef-Slint-Royalty-free-2.0";
 }
 
 function collectNuGet() {
@@ -412,6 +429,7 @@ function buildNotices(items) {
     "",
     "## Bundled runtime assets",
     "",
+    "- The Slint desktop uses the Royalty-free 2.0 license option for Slint 1.18.0. The top-level About screen displays the official AboutSlint widget. This selected royalty-free license has attribution and product-type conditions; it is not described as an unconditional MIT/Apache grant. The complete selected license is included above and at eng/licenses/LicenseRef-Slint-Royalty-free-2.0.md.",
     "- Noto CJK report fonts are redistributed under the SIL Open Font License. The complete text is included below and is also shipped at `Resources/Fonts/OpenSource/OFL-Noto-CJK.txt`.",
     "- PaddleOCR/PP-OCRv6 model provenance and notices are shipped at `OcrModels/PaddleOCR/V6/THIRD_PARTY_NOTICES.md`.",
     "- The Rust Excel analyzer notice is shipped at `Tools/EXCEL_ANALYZER_NOTICES.md`.",

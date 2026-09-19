@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
+  "updatedAt": "2026-09-17",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -42,6 +43,38 @@
       "reportFiles": false
     },
     {
+      "name": "Rust native production",
+      "directories": ["crates", "apps/export-doc-slint", "apps/export-doc-server"],
+      "filePattern": "^.+\\.rs$",
+      "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
+      "maximumLines": 900,
+      "baselineAggregateLines": 66781,
+      "maximumAggregateGrowthLines": 75,
+      "maximumAggregateLines": 66856,
+      "reportFiles": false
+    },
+    {
+      "name": "Rust native tests and examples",
+      "directories": ["crates", "apps/export-doc-slint", "apps/export-doc-server"],
+      "filePattern": "^.+\\.rs$",
+      "relativePathPattern": "/(?:tests|examples)/",
+      "maximumLines": 1200,
+      "baselineAggregateLines": 5680,
+      "maximumAggregateGrowthLines": 120,
+      "maximumAggregateLines": 5800,
+      "reportFiles": false
+    },
+    {
+      "name": "Slint native views",
+      "directory": "apps/export-doc-slint/ui",
+      "filePattern": "^.+\\.slint$",
+      "maximumLines": 300,
+      "baselineAggregateLines": 3491,
+      "maximumAggregateGrowthLines": 75,
+      "maximumAggregateLines": 3566,
+      "reportFiles": false
+    },
+    {
       "name": "repository test source default",
       "directory": "tests",
       "filePattern": "^.+\\.cs$",
@@ -59,6 +92,7 @@
         ".github/workflows"
       ],
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
+      "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
       "baselineAggregateLines": 43013,
       "maximumAggregateGrowthLines": 150,
@@ -66,9 +100,21 @@
       "reportFiles": false
     },
     {
+      "name": "Rust native delivery automation",
+      "directories": ["scripts", "deploy/rust-native", ".github/workflows"],
+      "filePattern": "^(?:.+\\.(?:mjs|ps1|cmd|yml|yaml|sh)|Dockerfile)$",
+      "relativePathPattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)|deploy/rust-native/[^/]+|\\.github/workflows/rust-native-validation\\.yml)$",
+      "maximumLines": 350,
+      "baselineAggregateLines": 997,
+      "maximumAggregateGrowthLines": 75,
+      "maximumAggregateLines": 1072,
+      "reportFiles": false
+    },
+    {
       "name": "GitHub workflow default",
       "directory": ".github/workflows",
       "filePattern": "^.+\\.(?:yml|yaml)$",
+      "excludePattern": "^\\.github/workflows/rust-native-validation\\.yml$",
       "maximumLines": 800,
       "baselineAggregateLines": 2776,
       "maximumAggregateGrowthLines": 20,

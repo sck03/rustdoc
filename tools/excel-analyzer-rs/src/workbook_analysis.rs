@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn analyze_workbook(path: PathBuf) -> Result<AnalysisReport, String> {
+pub fn analyze_workbook(path: PathBuf) -> Result<AnalysisReport, String> {
     let metadata = fs::metadata(&path)
         .map_err(|error| format!("无法读取 Excel 文件 '{}': {error}", path.display()))?;
     if !metadata.is_file() || metadata.len() == 0 || metadata.len() > MAX_WORKBOOK_BYTES {

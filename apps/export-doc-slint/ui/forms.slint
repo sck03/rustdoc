@@ -1,0 +1,127 @@
+import { ScrollView, LineEdit, TextEdit, ComboBox, CheckBox } from "std-widgets.slint";
+import { FormField, FormSection } from "models.slint";
+import { Theme, ActionButton } from "theme.slint";
+export component FieldControl inherits Rectangle {
+    in property <FormField> field;
+    in property <bool> editable:true;
+    in property <bool> enabled:true;
+    in property <bool> invalid:false;
+    callback edited(string,string);
+    callback selected(string,int);
+    callback array-action(string,string);
+    background:transparent;
+    border-width:root.invalid?1px:0px;
+    border-color:Theme.error;
+    height: root.field.kind=="multiline" ? 106px : root.field.kind=="heading" ? 32px : 72px;
+    VerticalLayout {
+        spacing:6px;padding:0px;alignment:start;
+        Text {text:root.field.label;color:root.field.kind=="heading"? Theme.primary:Theme.muted;font-weight:root.field.kind=="heading"?700:500;font-size:13px;height:22px;}
+        if !root.editable:Text {
+            text:root.field.kind=="choice"&&root.field.selected>=0?root.field.options[root.field.selected]:root.field.kind=="bool"?(root.field.value=="true"?"是":"否"):root.field.value==""?"未填写":root.field.value;
+            color:root.field.value==""?Theme.muted:Theme.ink;font-size:14px;wrap:word-wrap;overflow:elide;
+            accessible-label:root.field.label;
+        }
+        if root.editable&&(root.field.kind=="text" || root.field.kind=="number" || root.field.kind=="password"): input:=LineEdit {
+            text:root.field.value;
+            enabled:root.editable&&root.enabled;
+            input-type:root.field.kind=="password"?InputType.password:InputType.text;
+            accessible-label:root.field.label;
+            height:36px;
+            edited=>{root.edited(root.field.key,self.text);}
+        }
+        if root.editable&&root.field.kind=="multiline": TextEdit {
+            enabled:root.editable&&root.enabled;
+            text:root.field.value;wrap:word-wrap;accessible-label:root.field.label;
+            edited=>{root.edited(root.field.key,self.text);}
+        }
+        if root.editable&&root.field.kind=="choice": ComboBox {
+            enabled:root.editable&&root.enabled;
+            model:root.field.options;current-index:root.field.selected;
+            accessible-label:root.field.label;
+            selected(value)=>{root.selected(root.field.key,self.current-index);}
+        }
+        if root.editable&&root.field.kind=="bool": CheckBox {
+            enabled:root.editable&&root.enabled;
+            text:"是";checked:root.field.value=="true";
+            toggled=>{root.edited(root.field.key,self.checked?"true":"false");}
+        }
+        if root.editable&&root.field.kind=="array": HorizontalLayout {
+            ActionButton {text:"添加一项";enabled:root.editable&&root.enabled;clicked=>{root.array-action(root.field.key,"add");}}
+            ActionButton {text:"移除最后一项";enabled:root.editable&&root.enabled&&root.field.value!="0";clicked=>{root.array-action(root.field.key,"remove");}}
+            Text{text:root.field.value+" 项";color:Theme.muted;}
+        }
+    }
+}
+component FormGrid inherits VerticalLayout {
+    in property <[FormField]> fields;
+    in property <bool> editable:true;
+    in property <bool> enabled:true;
+    in property <string> invalid-key;
+    callback edited(string,string);
+    callback selected(string,int);
+    callback array-action(string,string);
+    in property <int> column-count:2;
+    padding:14px;spacing:14px;alignment:start;
+    for row in ceil(root.fields.length/root.column-count): HorizontalLayout {
+        spacing:16px;
+        for col in root.column-count: Rectangle {
+            horizontal-stretch:1;background:transparent;
+            height:root.fields[row*root.column-count+col].kind=="multiline"?106px:72px;
+            if row*root.column-count+col<root.fields.length:FieldControl {
+                field:root.fields[row*root.column-count+col];
+                editable:root.editable;enabled:root.enabled;
+                invalid:root.invalid-key!=""&&self.field.key==root.invalid-key;
+                edited(key,value)=>{root.edited(key,value);}
+                selected(key,index)=>{root.selected(key,index);}
+                array-action(key,action)=>{root.array-action(key,action);}
+            }
+        }
+    }
+}
+export component FormView inherits Rectangle {
+    in property <[FormField]> fields;
+    in property <bool> editable:true;
+    in property <bool> enabled:true;
+    in property <string> invalid-key;
+    callback edited(string,string);
+    callback selected(string,int);
+    callback array-action(string,string);
+    in property <int> column-count: root.width>1080px?3:root.width>620px?2:1;
+    background:transparent;
+    ScrollView {
+        content-width:self.visible-width;
+        FormGrid {fields:root.fields;editable:root.editable;enabled:root.enabled;invalid-key:root.invalid-key;column-count:root.column-count;
+            edited(key,value)=>{root.edited(key,value);}
+            selected(key,index)=>{root.selected(key,index);}
+            array-action(key,action)=>{root.array-action(key,action);}
+        }
+    }
+}
+export component FormSections inherits Rectangle {
+    in property <[FormSection]> sections;
+    in property <bool> editable:true;
+    in property <bool> enabled:true;
+    in property <string> invalid-key;
+    in property <int> column-count: root.width>1080px?3:root.width>620px?2:1;
+    callback toggled(string);
+    callback edited(string,string);
+    callback selected(string,int);
+    callback array-action(string,string);
+    background:transparent;
+    ScrollView {
+        content-width:self.visible-width;
+        VerticalLayout {
+            padding:12px;spacing:10px;alignment:start;
+            for section in root.sections:VerticalLayout {
+                spacing:0px;padding:0px;
+                ActionButton{text:(section.expanded?"▾  ":"▸  ")+section.title+(section.filled>0?"  ·  已填写 "+section.filled+" 项":"");left-aligned:true;active:section.expanded;enabled:root.enabled;clicked=>{root.toggled(section.key);}}
+                if section.expanded:FormGrid {
+                    fields:section.fields;editable:root.editable;enabled:root.enabled;invalid-key:root.invalid-key;column-count:root.column-count;
+                    edited(key,value)=>{root.edited(key,value);}
+                    selected(key,index)=>{root.selected(key,index);}
+                    array-action(key,action)=>{root.array-action(key,action);}
+                }
+            }
+        }
+    }
+}

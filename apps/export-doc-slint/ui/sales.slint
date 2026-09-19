@@ -1,0 +1,66 @@
+import { ScrollView, ComboBox, LineEdit } from "std-widgets.slint";
+import { App } from "models.slint";
+import { Sales } from "sales-models.slint";
+import { Theme, ActionButton, Card, Badge } from "theme.slint";
+import { FormSections } from "forms.slint";
+import { RecordsPage } from "records.slint";
+export component SalesPage inherits Rectangle {
+    background:transparent;
+    VerticalLayout {padding:0px;spacing:12px;
+        HorizontalLayout {height:36px;spacing:8px;alignment:start;
+            ActionButton {text:"商机清单";active:Sales.view=="directory";enabled:!App.busy;clicked=>{Sales.action("directory","");}}
+            ActionButton {text:"商机资料";active:Sales.view=="editor";enabled:!App.busy;clicked=>{Sales.action("editor","");}}
+            ActionButton {text:"报价与阶段历史";active:Sales.view=="history";enabled:Sales.saved&&!App.busy;clicked=>{Sales.action("history","");}}
+            if Sales.saved:Badge {text:Sales.stage+" · "+Sales.version;}
+            if Sales.dirty:Text {text:"有未保存修改";color:Theme.muted;vertical-alignment:center;}
+        }
+        if Sales.view=="directory":VerticalLayout {padding:0px;spacing:10px;
+            HorizontalLayout {height:36px;spacing:8px;alignment:start;
+                Text {text:"销售阶段";color:Theme.muted;vertical-alignment:center;}
+                ComboBox {model:Sales.stages;current-index<=>Sales.stage-filter;accessible-label:"销售阶段筛选";selected=>{App.refresh();}}
+            }
+            RecordsPage {}
+        }
+        if Sales.view=="editor":VerticalLayout {padding:0px;spacing:10px;
+            HorizontalLayout {height:36px;spacing:8px;alignment:start;
+                Text {text:Sales.title;color:Theme.ink;font-size:19px;font-weight:700;horizontal-stretch:1;vertical-alignment:center;}
+                ActionButton {text:"保存商机";primary:true;visible:Sales.can-edit;enabled:!App.busy;clicked=>{Sales.action("save","");}}
+                ActionButton {text:"重新读取";visible:Sales.saved;enabled:!App.busy;clicked=>{Sales.action("reload","");}}
+                ActionButton {text:"打开客户资料";visible:Sales.saved;enabled:!App.busy;clicked=>{Sales.action("customer","");}}
+                ActionButton {text:"归档";visible:Sales.saved&&Sales.can-archive;enabled:!App.busy;clicked=>{Sales.action("archive","");}}
+            }
+            if Sales.form-error!="":Text {text:Sales.form-error;color:Theme.error;wrap:word-wrap;min-height:28px;accessible-live-region:assertive;}
+            if Sales.saved&&!Sales.can-edit:Text {text:"当前商机只读；已成交或已失单商机须先流转到谈判中再编辑。";color:Theme.muted;wrap:word-wrap;min-height:26px;}
+            HorizontalLayout {spacing:12px;
+                Card {horizontal-stretch:3;
+                    FormSections {sections:Sales.details;editable:Sales.can-edit;enabled:!App.busy;invalid-key:Sales.invalid-field;column-count:2;
+                        edited(key,value)=>{Sales.edited(key,value);} selected(key,index)=>{Sales.selected(key,index);} toggled(key)=>{Sales.action("toggle",key);}
+                    }
+                }
+                Card {horizontal-stretch:2;
+                    FormSections {sections:Sales.quote;editable:Sales.can-edit&&Sales.can-quote;enabled:!App.busy;invalid-key:Sales.invalid-field;column-count:1;
+                        edited(key,value)=>{Sales.edited(key,value);} selected(key,index)=>{Sales.selected(key,index);} toggled(key)=>{Sales.action("toggle",key);}
+                    }
+                }
+            }
+        }
+        if Sales.view=="history":Card {VerticalLayout {padding:16px;spacing:12px;
+            Text {text:Sales.title+" · 报价与阶段历史";font-size:20px;font-weight:700;color:Theme.ink;height:32px;}
+            if Sales.can-transition:HorizontalLayout {height:36px;spacing:8px;
+                LineEdit {text<=>Sales.transition-note;placeholder-text:"阶段流转说明（选填）";accessible-label:"阶段流转说明";horizontal-stretch:1;}
+                for stage in Sales.next-stages:ActionButton {text:"流转到"+stage;enabled:!App.busy;clicked=>{Sales.action("transition",stage);}}
+            }
+            ScrollView {content-width:self.visible-width;VerticalLayout {spacing:10px;alignment:start;
+                for row in Sales.history:Rectangle {min-height:135px;background:Theme.soft;border-radius:6px;
+                    VerticalLayout {padding:14px;spacing:7px;
+                        HorizontalLayout {height:24px;spacing:12px;Text{text:"版本 "+row.version+" · "+row.kind;color:Theme.primary;font-weight:700;} Badge{text:row.stage;} Text{text:row.changed;color:Theme.muted;horizontal-stretch:1;horizontal-alignment:right;}}
+                        Text {text:"报价编号："+row.quote+"    "+row.amount;color:Theme.ink;wrap:word-wrap;}
+                        Text {text:row.expected;color:Theme.muted;}
+                        Text {text:row.note;color:Theme.ink;wrap:word-wrap;}
+                    }
+                }
+                if Sales.history.length==0:Text {text:App.busy?"正在读取版本历史…":"尚无版本记录";color:Theme.muted;height:80px;horizontal-alignment:center;}
+            }}
+        }}
+    }
+}

@@ -1,0 +1,263 @@
+{
+  "reportType": "PaymentVoucher",
+  "categoryOrder": [
+    "单据信息",
+    "客户信息",
+    "出口商信息",
+    "商品明细",
+    "单据备用字段",
+    "明细备用列",
+    "付款报销",
+    "付款备用字段",
+    "金额换算",
+    "其它字段"
+  ],
+  "fields": [
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "付款/报销单号 (Payment ID)",
+      "value": "{{ Payment.Id }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "发票号/业务参考号 (Text)",
+      "value": "{{ Payment.InvoiceNo }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "付款单号",
+      "value": "{{ Payment.VoucherNo }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "数量单位",
+      "value": "{{ Payment.QuantityUnit }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "贸易方式",
+      "value": "{{ Payment.TradeMethod }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "退税率",
+      "value": "{{ Payment.TaxRebateRate }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "申请日期 (Payment Date)",
+      "value": "{{ Payment.PaymentDate | date.to_string '%Y-%m-%d' }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "部门 (Department)",
+      "value": "{{ Payment.Department }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "项目/业务号 (Project)",
+      "value": "{{ Payment.Project }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "付款方式 (Payment Method)",
+      "value": "{{ Payment.PaymentMethod }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "收款人名称 (Payee Name)",
+      "value": "{{ Payment.PayeeName }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "收款人开户行 (Bank Name)",
+      "value": "{{ Payment.BankName }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "收款人账号 (Account No)",
+      "value": "{{ Payment.AccountNo }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "申请人/付款人 (Payer Name)",
+      "value": "{{ Payment.PayerName }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "外币金额 (USD Amount)",
+      "value": "{{ Payment.USDAmount }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "人民币金额 (CNY Amount)",
+      "value": "{{ Payment.CNYAmount }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "金额换算",
+      "label": "人民币大写 (CNY Upper)",
+      "value": "{{ cny_amount_upper }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "差旅费 (Travel Expense)",
+      "value": "{{ Payment.TravelExpense }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "业务招待费 (Entertainment Expense)",
+      "value": "{{ Payment.BusinessEntertainmentExpense }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "通讯费 (Telephone Expense)",
+      "value": "{{ Payment.TelephoneExpense }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "办公费 (Office Expense)",
+      "value": "{{ Payment.OfficeExpense }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "维修费 (Repair Expense)",
+      "value": "{{ Payment.RepairExpense }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "运杂费 (Freight Misc Expense)",
+      "value": "{{ Payment.FreightMiscExpense }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "商检/检验费 (Inspection Expense)",
+      "value": "{{ Payment.InspectionExpense }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "其他费用 (Other Expense)",
+      "value": "{{ Payment.OtherExpense }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "货品名称 (Goods Name)",
+      "value": "{{ Payment.GoodsName }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "数量 (Quantity)",
+      "value": "{{ Payment.Quantity }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "出运国 (Shipment Country)",
+      "value": "{{ Payment.ShipmentCountry }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "出运日期 (Shipment Date)",
+      "value": "{{ Payment.ShipmentDate | date.to_string '%Y-%m-%d' }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "收汇日期 (Remittance Date)",
+      "value": "{{ Payment.ReceiptDate | date.to_string '%Y-%m-%d' }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款报销",
+      "label": "备注 (Notes)",
+      "value": "{{ Payment.Notes }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款备用字段",
+      "label": "备用 1 (Payment.Spare1)",
+      "value": "{{ Payment.Spare1 }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款备用字段",
+      "label": "备用 2 (Payment.Spare2)",
+      "value": "{{ Payment.Spare2 }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款备用字段",
+      "label": "备用 3 (Payment.Spare3)",
+      "value": "{{ Payment.Spare3 }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款备用字段",
+      "label": "备用 4 (Payment.Spare4)",
+      "value": "{{ Payment.Spare4 }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款备用字段",
+      "label": "备用 5 (Payment.Spare5)",
+      "value": "{{ Payment.Spare5 }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款备用字段",
+      "label": "备用 6 (Payment.Spare6)",
+      "value": "{{ Payment.Spare6 }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款备用字段",
+      "label": "备用 7 (Payment.Spare7)",
+      "value": "{{ Payment.Spare7 }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款备用字段",
+      "label": "备用 8 (Payment.Spare8)",
+      "value": "{{ Payment.Spare8 }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款备用字段",
+      "label": "备用 9 (Payment.Spare9)",
+      "value": "{{ Payment.Spare9 }}"
+    },
+    {
+      "reportType": "PaymentVoucher",
+      "category": "付款备用字段",
+      "label": "备用 10 (Payment.Spare10)",
+      "value": "{{ Payment.Spare10 }}"
+    }
+  ]
+}

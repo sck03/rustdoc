@@ -18,6 +18,7 @@ Resources/Fonts/OpenSource/*.otf
 deploy/container/.env
 deploy/container/runtime
 deploy/container/config
+deploy/rust-native/runtime
 **/KEY
 **/ExportDocLicenseKeyGen*
 **/*.pem

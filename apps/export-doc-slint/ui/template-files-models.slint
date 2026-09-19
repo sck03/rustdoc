@@ -1,0 +1,18 @@
+export struct TemplateFileRow { index:int, name:string, path:string, report-type:string, builtin:bool, default:bool }
+export global TemplateFiles {
+    in-out property <bool> open:false;
+    in-out property <bool> loaded:false;
+    in-out property <string> template-root;
+    in-out property <bool> storage-exists:false;
+    in-out property <bool> storage-writable:false;
+    in-out property <string> storage-message;
+    in-out property <string> storage-policy;
+    in-out property <[TemplateFileRow]> rows;
+    in-out property <int> selected:0;
+    in-out property <string> new-name;
+    in-out property <bool> can-edit:false;
+    in-out property <bool> can-import:false;
+    in-out property <bool> can-export:false;
+    in-out property <bool> can-delete:false;
+    callback action(string);
+}

@@ -1,0 +1,38 @@
+import { ScrollView, LineEdit } from "std-widgets.slint";
+import { App } from "models.slint";
+import { Theme } from "theme.slint";
+export component Navigation inherits Rectangle {
+    accessible-role:navigation;
+    accessible-label:"主导航";
+    width:244px;background:#12332e;
+    VerticalLayout {
+        padding:14px;spacing:14px;
+        Rectangle {
+            height:65px;border-radius:10px;background:#22413b;border-color:#3a5650;border-width:1px;
+            VerticalLayout {padding:12px;spacing:5px;
+                Text{text:"▣  外贸业务综合管理系统";color:white;font-size:14px;font-weight:700;}
+                Text{text:"      全功能版";color:#a7d1c4;font-size:12px;}
+            }
+        }
+        Text{text:"●  本地运行";color:#7ecfbb;font-size:12px;height:23px;}
+        LineEdit {input-type:InputType.search;accessible-label:"查找功能";placeholder-text:"查找功能";edited=>{App.navigate("search:"+self.text);}}
+        ScrollView {
+            content-width:self.visible-width;
+            VerticalLayout {
+                padding:0px;spacing:5px;
+                for item in App.navigation: Rectangle {
+                    accessible-role:button;
+                    accessible-label:item.label;
+                    accessible-action-default=>{App.navigate(item.key);}
+                    height:item.group?42px:36px;
+                    border-radius:7px;
+                    background:item.active?#087f74:touch.has-hover?#254e44:transparent;
+                    Text {x:item.group?12px:34px;width:parent.width - self.x - 6px;text:item.label;color:item.group?#d8ebe5:item.active?white:#acc7bf;font-weight:item.group||item.active?600:400;font-size:13px;vertical-alignment:center;}
+                    touch:=TouchArea {mouse-cursor:pointer;clicked=>{App.navigate(item.key);}}
+                }
+            }
+        }
+        Rectangle {height:1px;background:#315249;}
+        Text{text:"Rust 原生桌面  ·  SQLite";color:#91b6aa;font-size:11px;height:25px;}
+    }
+}

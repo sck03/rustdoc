@@ -1,0 +1,25 @@
+[package]
+name = "export-doc-native"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Retained egui comparison client; the desktop product uses export-doc-slint"
+
+[features]
+default = []
+reference-backend = ["export-doc-engine/reference-backend"]
+
+[dependencies]
+export-doc-engine = { path = "../../crates/export-doc-engine" }
+eframe = { version = "=0.36.2", default-features = false, features = ["default_fonts", "glow", "accesskit", "x11", "wayland"] }
+egui_extras = { version = "=0.36.2", default-features = false }
+serde.workspace = true
+serde_json.workspace = true
+rust_decimal.workspace = true
+image.workspace = true
+chrono.workspace = true
+rfd.workspace = true
+
+[lints]
+workspace = true

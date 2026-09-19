@@ -1,0 +1,15 @@
+[package]
+name = "export-doc-contracts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Generated wire contracts shared by the Rust application adapters"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+rust_decimal.workspace = true
+
+[lints]
+workspace = true

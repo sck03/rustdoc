@@ -1,0 +1,53 @@
+import { ScrollView, LineEdit } from "std-widgets.slint";
+import { App } from "models.slint";
+import { TemplateFiles } from "template-files-models.slint";
+import { Theme, Card, ActionButton, Badge } from "theme.slint";
+
+export component TemplateFilesPanel inherits Rectangle {
+    background:transparent;
+    VerticalLayout {padding:0px;spacing:12px;
+        Card {VerticalLayout {padding:16px;spacing:10px;
+            HorizontalLayout {height:26px;spacing:10px;
+                Text{text:"模板文件存储";font-size:15px;font-weight:700;color:Theme.ink;vertical-alignment:center;horizontal-stretch:1;}
+                Badge{text:TemplateFiles.storage-exists?(TemplateFiles.storage-writable?"可写":"只读"):"缺失";}
+            }
+            Text{text:"目录：" + TemplateFiles.template-root;color:Theme.ink;overflow:elide;height:22px;font-size:12px;}
+            Text{text:TemplateFiles.storage-message;color:Theme.muted;wrap:word-wrap;font-size:12px;min-height:28px;}
+            Text{text:TemplateFiles.storage-policy;color:Theme.muted;wrap:word-wrap;font-size:12px;min-height:40px;}
+        }}
+        Card {VerticalLayout {padding:16px;spacing:10px;
+            HorizontalLayout {height:30px;spacing:8px;
+                Text{text:"模板文件（" + TemplateFiles.rows.length + "）";font-size:15px;font-weight:700;color:Theme.ink;vertical-alignment:center;horizontal-stretch:1;}
+                ActionButton{text:"刷新";enabled:!App.busy;clicked=>{TemplateFiles.action("refresh");}}
+            }
+            ScrollView{content-width:self.visible-width;VerticalLayout{padding:0px;spacing:0px;alignment:start;
+                for row in TemplateFiles.rows:Rectangle{height:50px;background:TemplateFiles.selected==row.index?Theme.soft:white;
+                    Rectangle{y:49px;height:1px;background:Theme.line;}
+                    HorizontalLayout{padding:8px;spacing:10px;
+                        Text{text:row.name;color:Theme.ink;vertical-alignment:center;horizontal-stretch:1;overflow:elide;}
+                        Text{text:row.builtin?"内置":"用户";color:Theme.muted;width:44px;vertical-alignment:center;font-size:12px;}
+                        if row.default:Badge{text:"默认";}
+                    }
+                    TouchArea{mouse-cursor:pointer;clicked=>{TemplateFiles.selected=row.index;TemplateFiles.action("select");}}
+                }
+                if TemplateFiles.rows.length==0:Text{text:App.busy?"正在读取模板…":"尚无模板文件。";color:Theme.muted;height:70px;horizontal-alignment:center;}
+            }}
+            HorizontalLayout {height:38px;spacing:8px;alignment:start;
+                LineEdit {text <=> TemplateFiles.new-name;placeholder-text:"新文件名（不含扩展名）";accessible-label:"模板新名称";width:210px;enabled:!App.busy&&TemplateFiles.selected>0&&!TemplateFiles.rows[TemplateFiles.selected - 1].builtin;}
+                ActionButton{text:"重命名";enabled:!App.busy&&TemplateFiles.can-edit&&TemplateFiles.selected>0&&!TemplateFiles.rows[TemplateFiles.selected - 1].builtin;clicked=>{TemplateFiles.action("rename");}}
+                ActionButton{text:"设为默认";enabled:!App.busy&&TemplateFiles.can-edit&&TemplateFiles.selected>0;clicked=>{TemplateFiles.action("set-default");}}
+                ActionButton{text:"删除";enabled:!App.busy&&TemplateFiles.can-delete&&TemplateFiles.selected>0&&!TemplateFiles.rows[TemplateFiles.selected - 1].builtin;clicked=>{TemplateFiles.action("delete");}}
+            }
+            HorizontalLayout {height:38px;spacing:8px;alignment:start;
+                ActionButton{text:"另存为 HTML 文件";enabled:!App.busy&&TemplateFiles.can-export&&TemplateFiles.selected>0;clicked=>{TemplateFiles.action("save-file");}}
+                ActionButton{text:"下载 HTML 文件";enabled:!App.busy&&TemplateFiles.can-export&&TemplateFiles.selected>0;clicked=>{TemplateFiles.action("download-file");}}
+                ActionButton{text:"上传 HTML 文件";enabled:!App.busy&&TemplateFiles.can-import&&TemplateFiles.selected>0;clicked=>{TemplateFiles.action("upload-file");}}
+                ActionButton{text:"按路径导入 HTML";enabled:!App.busy&&TemplateFiles.can-import;clicked=>{TemplateFiles.action("import-file");}}
+            }
+            HorizontalLayout {height:38px;spacing:8px;alignment:start;
+                ActionButton{text:"导出模板包";enabled:!App.busy&&TemplateFiles.can-export;clicked=>{TemplateFiles.action("download-package");}}
+                ActionButton{text:"导入模板包";enabled:!App.busy&&TemplateFiles.can-import;clicked=>{TemplateFiles.action("import-package");}}
+            }
+        }}
+    }
+}

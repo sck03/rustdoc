@@ -1,0 +1,72 @@
+import { ScrollView } from "std-widgets.slint";
+import { App } from "models.slint";
+import { Theme, ActionButton, Card } from "theme.slint";
+
+export component ExcelPage inherits Rectangle {
+    background:transparent;
+    ScrollView {
+        content-width:self.visible-width;
+        VerticalLayout {padding:0px;spacing:16px;alignment:start;
+            Card {height:160px;VerticalLayout {padding:22px;spacing:14px;
+                Text{text:"导入 Excel 发票";font-size:20px;font-weight:700;color:Theme.ink;}
+                Text{text:"选择工作簿，核对识别的发票抬头与商品明细，确认后进入发票编辑。";color:Theme.muted;wrap:word-wrap;}
+                HorizontalLayout {height:36px;alignment:start;
+                    ActionButton{text:"选择 Excel 并预览";primary:true;enabled:App.can-import&&!App.busy;clicked=>{App.excel-action("import");}}
+                }
+            }}
+            Card {height:170px;VerticalLayout {padding:22px;spacing:14px;
+                Text{text:"模板导出";font-size:20px;font-weight:700;color:Theme.ink;}
+                Text{text:"导出填写用的数据模板或空白订舱托单，保留原有表头、列顺序和打印版式。";color:Theme.muted;wrap:word-wrap;}
+                HorizontalLayout {height:36px;alignment:start;spacing:10px;
+                    ActionButton{text:"导出数据模板";enabled:App.can-excel&&!App.busy;clicked=>{App.excel-action("template");}}
+                    ActionButton{text:"导出空白托单";enabled:App.can-excel&&!App.busy;clicked=>{App.excel-action("blank-booking");}}
+                }
+            }}
+            Card {height:180px;VerticalLayout {padding:22px;spacing:14px;
+                Text{text:"Excel 转换为订舱托单";font-size:20px;font-weight:700;color:Theme.ink;}
+                Text{text:"选择现有 .xlsx 工作簿并另存为托单。已保存的发票也可在“预览与导出”中直接输出托单。";color:Theme.muted;wrap:word-wrap;}
+                HorizontalLayout {height:36px;alignment:start;spacing:10px;
+                    ActionButton{text:"选择文件并转换";enabled:App.can-excel&&!App.busy;clicked=>{App.excel-action("convert");}}
+                    ActionButton{text:"查看文件任务";clicked=>{App.navigate("jobs");}}
+                }
+            }}
+        }
+    }
+}
+
+export component ImportPreview inherits Rectangle {
+    background:#092d2870;TouchArea{}
+    Card {x:(parent.width - self.width)/2;y:(parent.height - self.height)/2;width:min(1050px,parent.width - 60px);height:min(760px,parent.height - 60px);
+        VerticalLayout {padding:24px;spacing:16px;
+            Text{text:"Excel 导入预览";font-size:22px;font-weight:700;color:Theme.ink;height:32px;}
+            Text{text:App.import-source;color:Theme.muted;height:22px;overflow:elide;}
+            HorizontalLayout {height:80px;spacing:12px;
+                for metric in App.import-metrics:VerticalLayout{padding:10px;spacing:8px;
+                    Text{text:metric.label;color:Theme.muted;font-size:12px;}
+                    Text{text:metric.value;color:Theme.ink;font-size:15px;font-weight:700;overflow:elide;}
+                }
+            }
+            Rectangle {height:38px;background:Theme.soft;
+                HorizontalLayout {padding:10px;spacing:12px;
+                    for label in ["款号","品名","数量","单价","金额"]:Text{text:label;color:Theme.muted;horizontal-stretch:1;}
+                }
+            }
+            ScrollView {content-width:self.visible-width;
+                VerticalLayout {padding:0px;spacing:0px;
+                    for row in App.import-rows:Rectangle {height:42px;
+                        Rectangle {y:parent.height - 1px;height:1px;background:Theme.line;}
+                        HorizontalLayout {padding:10px;spacing:12px;
+                            for cell in row.cells:Text{text:cell;color:Theme.ink;horizontal-stretch:1;overflow:elide;vertical-alignment:center;}
+                        }
+                    }
+                }
+            }
+            Text{text:App.import-notice;wrap:word-wrap;color:App.import-success?Theme.muted:Theme.error;min-height:42px;}
+            Text{text:"预览最多显示 200 行，确认后将载入全部已识别明细。";font-size:11px;color:Theme.muted;height:20px;}
+            HorizontalLayout {height:38px;alignment:end;spacing:10px;
+                ActionButton{text:"取消";clicked=>{App.import-confirmed(false);}}
+                ActionButton{text:"确认并继续编辑";primary:true;enabled:App.import-success&&!App.busy;clicked=>{App.import-confirmed(true);}}
+            }
+        }
+    }
+}

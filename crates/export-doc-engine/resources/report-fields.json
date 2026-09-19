@@ -1,0 +1,455 @@
+{
+  "reportType": "ExportDocument",
+  "categoryOrder": [
+    "单据信息",
+    "客户信息",
+    "出口商信息",
+    "商品明细",
+    "单据备用字段",
+    "明细备用列",
+    "付款报销",
+    "付款备用字段",
+    "金额换算",
+    "其它字段"
+  ],
+  "fields": [
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "发票号码 (Invoice No)",
+      "value": "{{ Invoice.InvoiceNo }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "合同号码 (Contract No)",
+      "value": "{{ Invoice.ContractNo }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "发票日期 (Date)",
+      "value": "{{ Invoice.InvoiceDate | date.to_string '%Y-%m-%d' }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "信用证号 (L/C No)",
+      "value": "{{ Invoice.LetterOfCreditNo }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "开证行 (Issuing Bank)",
+      "value": "{{ Invoice.IssuingBank }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "付款方式 (Payment Terms)",
+      "value": "{{ Invoice.PaymentTerms }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "贸易条款 (Trade Terms)",
+      "value": "{{ Invoice.TradeTerms }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "特殊条款 (Special Terms)",
+      "value": "{{ Invoice.SpecialTerms }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "监管方式 (Supervision Mode)",
+      "value": "{{ Invoice.SupervisionMode }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "起运港 (Port of Loading)",
+      "value": "{{ Invoice.PortOfLoading }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "目的港 (Port of Destination)",
+      "value": "{{ Invoice.PortOfDestination }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "目的国 (Destination Country)",
+      "value": "{{ Invoice.DestinationCountry }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "运输方式 (Transport Mode)",
+      "value": "{{ Invoice.TransportMode }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "船期/航期 (Shipment Date)",
+      "value": "{{ Invoice.ShipmentDate | date.to_string '%Y-%m-%d' }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "唛头 · 自动显示文字或图片 (Shipping Marks)",
+      "value": "{{ Invoice.ShippingMarks }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "客户信息",
+      "label": "客户英文名 (Customer Name EN)",
+      "value": "{{ Customer.CustomerNameEN }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "客户信息",
+      "label": "客户英文地址 (Customer Address EN)",
+      "value": "{{ Customer.AddressEN }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "客户信息",
+      "label": "通知人名称 (Notify Party Name)",
+      "value": "{{ Customer.NotifyPartyName }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "客户信息",
+      "label": "通知人地址 (Notify Party Address)",
+      "value": "{{ Customer.NotifyPartyAddress }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "出口商信息",
+      "label": "我方英文名 (Exporter Name EN)",
+      "value": "{{ Exporter.ExporterNameEN }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "出口商信息",
+      "label": "我方英文地址 (Exporter Address EN)",
+      "value": "{{ Exporter.AddressEN }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "出口商信息",
+      "label": "我方中文名 (Exporter Name CN)",
+      "value": "{{ Exporter.ExporterNameCN }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "出口商信息",
+      "label": "我方中文地址 (Exporter Address CN)",
+      "value": "{{ Exporter.AddressCN }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "出口商信息",
+      "label": "统一社会信用代码 (Credit Code)",
+      "value": "{{ Exporter.CreditCode }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "出口商信息",
+      "label": "开户行名称 (Bank Name)",
+      "value": "{{ Exporter.BankName }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "出口商信息",
+      "label": "银行账号 (Bank Account)",
+      "value": "{{ Exporter.BankAccount }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "出口商信息",
+      "label": "Swift Code",
+      "value": "{{ Exporter.SwiftCode }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "币种 (Currency)",
+      "value": "{{ Invoice.Currency }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "总金额 (Total Amount)",
+      "value": "{{ Invoice.TotalAmount }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "总数量 (Total Quantity)",
+      "value": "{{ Invoice.TotalQuantity }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "总箱数 (Total Cartons)",
+      "value": "{{ Invoice.TotalCartons }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "总毛重 (Total Gross Weight)",
+      "value": "{{ Invoice.TotalGrossWeight }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "总净重 (Total Net Weight)",
+      "value": "{{ Invoice.TotalNetWeight }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "总体积 (Total Volume)",
+      "value": "{{ Invoice.TotalVolume }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "【内部】采购总额 (Purchase Amount)",
+      "value": "{{ Invoice.TotalPurchaseAmount }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "【内部】退税总额 (Tax Refund)",
+      "value": "{{ Invoice.TotalTaxRefundAmount }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "【内部】利润总额 (Total Profit)",
+      "value": "{{ Invoice.TotalProfit }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "商品款号 (Item Style No)",
+      "value": "{{ item.StyleNo }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "商品名称 (Item Name)",
+      "value": "{{ item.StyleName }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "商品描述 (Item Description)",
+      "value": "{{ item.Description }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "客户PO (Item PO)",
+      "value": "{{ item.PoNumber }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "HS编码 (Item HS Code)",
+      "value": "{{ item.HsCode }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "商品数量 (Item Qty)",
+      "value": "{{ item.Quantity }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "数量单位 (Item Qty Unit)",
+      "value": "{{ item.UnitEN }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "单价 (Item Unit Price)",
+      "value": "{{ item.UnitPrice | format_unit_price }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "总价 (Item Total Price)",
+      "value": "{{ item.TotalPrice }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "箱数 (Item Cartons)",
+      "value": "{{ item.Cartons }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "箱数单位 (Item Ctn Unit)",
+      "value": "{{ item.CtnUnitEN }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "单箱毛重 (Item GW Per Ctn)",
+      "value": "{{ item.GWPerCtn }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "单箱净重 (Item NW Per Ctn)",
+      "value": "{{ item.NWPerCtn }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "总毛重 (Item Total GW)",
+      "value": "{{ item.GWTotal }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "总净重 (Item Total NW)",
+      "value": "{{ item.NWTotal }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "商品明细",
+      "label": "商品体积 (Item Volume)",
+      "value": "{{ item.Volume }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据备用字段",
+      "label": "备用 1 (Invoice.Spare1)",
+      "value": "{{ Invoice.Spare1 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据备用字段",
+      "label": "备用 2 (Invoice.Spare2)",
+      "value": "{{ Invoice.Spare2 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据备用字段",
+      "label": "备用 3 (Invoice.Spare3)",
+      "value": "{{ Invoice.Spare3 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据备用字段",
+      "label": "备用 4 (Invoice.Spare4)",
+      "value": "{{ Invoice.Spare4 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据备用字段",
+      "label": "备用 5 (Invoice.Spare5)",
+      "value": "{{ Invoice.Spare5 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据备用字段",
+      "label": "备用 6 (Invoice.Spare6)",
+      "value": "{{ Invoice.Spare6 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据备用字段",
+      "label": "备用 7 (Invoice.Spare7)",
+      "value": "{{ Invoice.Spare7 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据备用字段",
+      "label": "备用 8 (Invoice.Spare8)",
+      "value": "{{ Invoice.Spare8 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据备用字段",
+      "label": "备用 9 (Invoice.Spare9)",
+      "value": "{{ Invoice.Spare9 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据备用字段",
+      "label": "备用 10 (Invoice.Spare10)",
+      "value": "{{ Invoice.Spare10 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "明细备用列",
+      "label": "备用 1 (item.Spare1)",
+      "value": "{{ item.Spare1 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "明细备用列",
+      "label": "备用 2 (item.Spare2)",
+      "value": "{{ item.Spare2 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "明细备用列",
+      "label": "备用 3 (item.Spare3)",
+      "value": "{{ item.Spare3 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "明细备用列",
+      "label": "备用 4 (item.Spare4)",
+      "value": "{{ item.Spare4 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "明细备用列",
+      "label": "备用 5 (item.Spare5)",
+      "value": "{{ item.Spare5 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "明细备用列",
+      "label": "备用 6 (item.Spare6)",
+      "value": "{{ item.Spare6 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "明细备用列",
+      "label": "备用 7 (item.Spare7)",
+      "value": "{{ item.Spare7 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "明细备用列",
+      "label": "备用 8 (item.Spare8)",
+      "value": "{{ item.Spare8 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "明细备用列",
+      "label": "备用 9 (item.Spare9)",
+      "value": "{{ item.Spare9 }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "明细备用列",
+      "label": "备用 10 (item.Spare10)",
+      "value": "{{ item.Spare10 }}"
+    }
+  ]
+}

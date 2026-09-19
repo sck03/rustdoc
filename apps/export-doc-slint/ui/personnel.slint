@@ -1,0 +1,125 @@
+import { ScrollView, LineEdit, ComboBox, CheckBox } from "std-widgets.slint";
+import { App, PersonRow } from "models.slint";
+import { Theme, Card, Badge, ActionButton } from "theme.slint";
+import { FormSections } from "forms.slint";
+
+component PersonnelPager inherits HorizontalLayout {
+    in property <bool> history:false;
+    height:36px;spacing:8px;
+    Text{text:"共 "+App.total-records+" 条";color:Theme.muted;vertical-alignment:center;horizontal-stretch:1;}
+    ActionButton{text:"上一页";enabled:!App.busy&&App.list-page>1;clicked=>{if root.history{App.personnel-action("history-previous","");}else{App.change-page(-1);}}}
+    Text{text:App.list-page+" / "+max(1,App.total-pages);color:Theme.muted;vertical-alignment:center;}
+    ActionButton{text:"下一页";enabled:!App.busy&&App.list-page<App.total-pages;clicked=>{if root.history{App.personnel-action("history-next","");}else{App.change-page(1);}}}
+}
+
+component PersonCard inherits Card {
+    in property <PersonRow> person;
+    height:224px;
+    VerticalLayout{padding:16px;spacing:10px;
+        HorizontalLayout{height:42px;spacing:10px;
+            Rectangle{width:42px;height:42px;border-radius:21px;background:Theme.soft;Text{text:"人";color:Theme.primary;horizontal-alignment:center;vertical-alignment:center;font-size:18px;}}
+            VerticalLayout{spacing:5px;horizontal-stretch:1;Text{text:root.person.name;color:Theme.ink;font-size:17px;font-weight:700;overflow:elide;}Text{text:root.person.number;color:Theme.muted;font-size:11px;}}
+            if App.root-key!="directory":Badge{text:root.person.state;}
+        }
+        Text{text:root.person.department+" · "+root.person.job-title;color:Theme.ink;overflow:elide;height:22px;}
+        Text{text:root.person.email==""?"未登记工作邮箱":root.person.email;color:Theme.muted;overflow:elide;height:20px;}
+        Text{text:root.person.phone==""?"未登记工作电话":root.person.phone;color:Theme.muted;overflow:elide;height:20px;}
+        Text{text:root.person.location;color:Theme.muted;overflow:elide;height:20px;}
+        ActionButton{text:"人员档案";visible:root.person.can-open;enabled:!App.busy;clicked=>{App.personnel-action("open",root.person.id+"");}}
+    }
+}
+
+export component PeoplePage inherits Rectangle {
+    background:transparent;
+    in property <int> card-columns:self.width>1150px?3:self.width>720px?2:1;
+    VerticalLayout{padding:0px;spacing:14px;
+        HorizontalLayout{height:38px;spacing:8px;
+            Text{text:App.root-key=="directory"?"公司通讯录":"人员档案";font-size:20px;font-weight:700;color:Theme.ink;vertical-alignment:center;horizontal-stretch:1;}
+            ActionButton{text:App.root-key=="directory"?"人员档案":"公司通讯录";visible:App.root-key!="directory"||App.people-can-view-details;clicked=>{App.navigate(App.root-key=="directory"?"people":"directory");}}
+            ActionButton{text:"入职登记";primary:true;visible:App.can-create;enabled:!App.busy;clicked=>{App.new-record();}}
+        }
+        Card{VerticalLayout{padding:14px;spacing:12px;
+            HorizontalLayout{height:36px;spacing:8px;
+                LineEdit{text<=>App.search;input-type:InputType.search;placeholder-text:"姓名、工号、岗位或工作邮箱";accessible-label:"搜索人员";horizontal-stretch:1;accepted=>{App.personnel-action("filter","");}}
+                ActionButton{text:"搜索";enabled:!App.busy;clicked=>{App.personnel-action("filter","");}}
+                ComboBox{model:App.people-departments;current-index<=>App.people-department-index;width:180px;accessible-label:"所属部门";enabled:!App.busy;selected(value)=>{App.personnel-action("filter","");}}
+                if App.root-key!="directory":ComboBox{model:App.people-can-view-details?["全部在职","试用期","正式在职","已离职"]:["全部在职","试用期","正式在职"];current-index<=>App.people-status-index;width:135px;accessible-label:"任职状态";enabled:!App.busy;selected(value)=>{App.personnel-action("filter","");}}
+                ActionButton{text:"刷新";enabled:!App.busy;clicked=>{App.refresh();}}
+            }
+            if App.root-key!="directory"&&App.people-can-view-details:CheckBox{text:"仅看试用 / 合同 / 身份证已到期或 30 天内到期的人员";checked<=>App.people-attention;enabled:!App.busy;toggled=>{App.personnel-action("filter","");}}
+            ScrollView{content-width:self.visible-width;VerticalLayout{spacing:14px;padding:0px;alignment:start;
+                for row in ceil(App.people.length/root.card-columns):HorizontalLayout{spacing:14px;
+                    for column in root.card-columns:PersonCard{
+                        person:App.people[row*root.card-columns+column];
+                        visible:row*root.card-columns+column<App.people.length;horizontal-stretch:1;
+                    }
+                }
+                if App.people.length==0:Text{text:App.busy?"正在加载人员目录…":"没有符合条件的人员";color:Theme.muted;horizontal-alignment:center;height:140px;}
+            }}
+            PersonnelPager{}
+        }}
+    }
+}
+
+component PersonnelTable inherits Rectangle {
+    in property <bool> clearance:false;
+    background:transparent;
+    VerticalLayout{padding:0px;spacing:0px;
+        Rectangle{height:38px;background:Theme.soft;HorizontalLayout{padding:10px;spacing:10px;for column in App.columns:Text{text:column;color:Theme.muted;horizontal-stretch:1;vertical-alignment:center;}}}
+        ScrollView{content-width:self.visible-width;VerticalLayout{padding:0px;spacing:0px;
+            for row in App.records:Rectangle{height:62px;background:white;
+                Rectangle{y:61px;height:1px;background:Theme.line;}
+                HorizontalLayout{padding:10px;spacing:10px;for cell in row.cells:Text{text:cell;color:Theme.ink;horizontal-stretch:1;overflow:elide;vertical-alignment:center;}}
+                TouchArea{enabled:root.clearance;mouse-cursor:root.clearance?pointer:default;double-clicked=>{App.personnel-action("clearance-open",row.id+"");}}
+            }
+            if App.records.length==0:Text{text:App.busy?"正在读取…":root.clearance?"没有待交接事项":"尚无任职记录";color:Theme.muted;horizontal-alignment:center;height:140px;}
+        }}
+    }
+}
+
+export component PersonnelPage inherits Rectangle {
+    background:transparent;
+    VerticalLayout{padding:0px;spacing:12px;
+        HorizontalLayout{height:38px;spacing:10px;
+            ActionButton{text:"返回人员目录";enabled:!App.busy;clicked=>{App.personnel-action("back","");}}
+            Text{text:App.person-title;color:Theme.ink;font-size:21px;font-weight:700;vertical-alignment:center;horizontal-stretch:1;}
+            Badge{text:App.person-state;}
+        }
+        Text{text:App.person-subtitle;color:Theme.muted;height:24px;}
+        HorizontalLayout{height:36px;spacing:8px;alignment:start;
+            ActionButton{text:"编辑档案";primary:true;visible:App.person-can-edit;enabled:!App.busy;clicked=>{App.personnel-action("edit","");}}
+            for action in App.person-actions:ActionButton{text:action.label;enabled:!App.busy;clicked=>{App.personnel-action(action.key,"");}}
+            ActionButton{text:"删除误录档案";visible:App.person-can-delete;enabled:!App.busy&&App.person-restriction=="";clicked=>{App.personnel-action("delete","");}}
+            ActionButton{text:"刷新";enabled:!App.busy;clicked=>{App.refresh();}}
+        }
+        if App.person-restriction!="":Text{text:App.person-restriction;color:Theme.muted;wrap:word-wrap;min-height:24px;}
+        HorizontalLayout{height:36px;spacing:8px;alignment:start;
+            for label[index] in ["档案信息","照片与证件","任职与操作记录","交接事项"]:ActionButton{text:label;active:App.person-tab==index;enabled:!App.busy;clicked=>{App.personnel-action("tab",index+"");}}
+        }
+        Card{VerticalLayout{padding:16px;spacing:12px;
+            if App.person-tab==0:VerticalLayout{padding:0px;spacing:8px;
+                if App.person-reminder!="":Text{text:App.person-reminder;color:Theme.error;wrap:word-wrap;min-height:30px;}
+                HorizontalLayout{height:34px;alignment:end;ActionButton{text:App.person-identity-visible?"隐藏身份证号码":"查看完整身份证号码";clicked=>{App.personnel-action("identity","");}}}
+                FormSections{sections:App.person-sections;editable:false;toggled(key)=>{App.toggle-form-section(key);}}
+            }
+            if App.person-tab==1:VerticalLayout{padding:0px;spacing:12px;
+                HorizontalLayout{height:36px;spacing:8px;alignment:start;
+                    for label[index] in ["头像","身份证正面","身份证背面"]:ActionButton{text:label;active:App.person-image-kind==index;enabled:!App.busy;clicked=>{App.personnel-action("image-kind",index+"");}}
+                    ActionButton{text:App.person-has-image?"替换图片":"上传图片";primary:true;visible:App.person-can-edit;enabled:!App.busy;clicked=>{App.personnel-action("upload-image","");}}
+                    ActionButton{text:"删除图片";visible:App.person-can-edit&&App.person-has-image;enabled:!App.busy;clicked=>{App.personnel-action("delete-image","");}}
+                }
+                Rectangle{background:Theme.soft;vertical-stretch:1;
+                    if App.person-has-image:Image{source:App.person-image;image-fit:contain;}
+                    if !App.person-has-image:Text{text:"尚未上传这类图片";color:Theme.muted;horizontal-alignment:center;vertical-alignment:center;}
+                }
+                Text{text:"支持 PNG、JPG，每张不超过 5 MiB。身份证图片仅在人员档案权限范围内查看。";color:Theme.muted;wrap:word-wrap;min-height:24px;}
+            }
+            if App.person-tab==2:VerticalLayout{padding:0px;spacing:12px;PersonnelTable{}PersonnelPager{history:true;}}
+            if App.person-tab==3:VerticalLayout{padding:0px;spacing:12px;
+                Text{text:App.person-clearance-summary;color:Theme.ink;wrap:word-wrap;min-height:30px;}
+                PersonnelTable{clearance:true;}
+                Text{text:"双击事项进入对应预约或领用记录；完成交接后再办理调岗或离职。";color:Theme.muted;wrap:word-wrap;min-height:24px;}
+            }
+        }}
+    }
+}

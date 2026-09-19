@@ -1,0 +1,22 @@
+export global License {
+    in-out property <bool> loaded:false;
+    in-out property <string> status-text:"正在读取授权状态";
+    in-out property <bool> registered:false;
+    in-out property <string> machine-id;
+    in-out property <string> trial-days;
+    in-out property <string> trial-start;
+    in-out property <string> days-remaining;
+    in-out property <string> expire-date;
+    in-out property <string> message;
+    in-out property <string> license-key;
+    in-out property <string> storage-path;
+    in-out property <string> storage-policy;
+    in-out property <bool> include-database-backup:false;
+    in-out property <bool> include-sample-files:false;
+    in-out property <string> package-summary;
+    in-out property <string> package-root;
+    in-out property <string> package-path;
+    in-out property <string> log-retention;
+    callback action(string);
+    callback edited(string,string);
+}

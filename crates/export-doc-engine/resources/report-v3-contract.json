@@ -1,0 +1,101 @@
+{
+  "contractVersion": "3.0",
+  "schemaVersion": 3,
+  "astKind": "ReportDocument",
+  "coordinateUnit": "hundredth-mm",
+  "page": {
+    "size": "A4",
+    "orientations": [
+      "Portrait",
+      "Landscape"
+    ],
+    "coordinateUnit": "hundredth-mm",
+    "pageAndLayerRoles": [
+      "Header",
+      "Body",
+      "Footer",
+      "Overlay"
+    ]
+  },
+  "layerRoles": [
+    "Header",
+    "Body",
+    "Footer",
+    "Overlay"
+  ],
+  "repeatBand": {
+    "source": "layers[].print + DetailTable.print",
+    "layerRoles": [
+      "Header",
+      "Footer"
+    ],
+    "detailTableSemantics": "repeatHeaderOnPageBreak",
+    "persistedAsSeparateList": false
+  },
+  "elementTypes": [
+    "Text",
+    "Field",
+    "Line",
+    "Rectangle",
+    "Image",
+    "PageNumber",
+    "Flow"
+  ],
+  "flowTypes": [
+    "Row",
+    "Grid",
+    "Conditional",
+    "DetailTable",
+    "PageBreak"
+  ],
+  "expressions": {
+    "conditionOperators": [
+      "HasValue",
+      "Equals",
+      "NotEquals"
+    ],
+    "aggregateOperators": [
+      "Sum",
+      "Count"
+    ],
+    "allowsDynamicEvaluation": false
+  },
+  "images": {
+    "policy": "managed-resource-or-controlled-field",
+    "mediaTypes": [
+      "image/png",
+      "image/jpeg",
+      "image/gif",
+      "image/webp"
+    ],
+    "controlledFieldPaths": [
+      "doc_seal_path",
+      "customs_seal_path"
+    ],
+    "allowsExternalUrl": false
+  },
+  "release": {
+    "states": [
+      "Draft",
+      "Published",
+      "Archived"
+    ],
+    "revisionType": "non-negative integer",
+    "publishedAtType": "ISO-8601 DateTimeOffset"
+  },
+  "limits": {
+    "maxLayers": 16,
+    "maxElementsPerLayer": 1000,
+    "maxTotalElements": 4000,
+    "maxResources": 1000,
+    "maxResourceBytes": 33554432,
+    "minElementSizeHundredthMm": 400,
+    "maxPageMarginHundredthMm": 6000,
+    "maxImageDimension": 8192,
+    "maxImagePixels": 32000000
+  },
+  "reportTypes": [
+    "ExportDocument",
+    "PaymentVoucher"
+  ]
+}

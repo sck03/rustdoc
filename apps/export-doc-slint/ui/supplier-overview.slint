@@ -1,0 +1,26 @@
+import { App, Metric, DataRow } from "models.slint";
+import { Theme, Card, ActionButton } from "theme.slint";
+import { RecordTable } from "data-table.slint";
+export global SupplierOverview {
+    in-out property <[Metric]> metrics;
+    in-out property <[DataRow]> rows;
+    in-out property <string> summary;
+}
+export component SupplierOverviewPage inherits Rectangle {
+    background:transparent;
+    VerticalLayout {padding:0px;spacing:12px;
+        HorizontalLayout {height:36px;spacing:8px;alignment:start;
+            for tab in App.tabs:ActionButton {text:tab.label;active:App.resource==tab.key;enabled:!App.busy;clicked=>{App.open-tab(tab.key);}}
+            ActionButton {text:"刷新";enabled:!App.busy;clicked=>{App.refresh();}}
+        }
+        HorizontalLayout {height:86px;spacing:10px;
+            for metric in SupplierOverview.metrics:Card {VerticalLayout {padding:14px;spacing:7px;Text{text:metric.label;color:Theme.muted;}Text{text:metric.value;color:Theme.primary;font-size:24px;font-weight:700;}}}
+        }
+        Text {text:SupplierOverview.summary;wrap:word-wrap;min-height:42px;color:Theme.muted;}
+        Card {VerticalLayout {padding:14px;spacing:12px;
+            Text {text:"供应商最新已确认评价";color:Theme.ink;font-size:18px;font-weight:700;}
+            RecordTable {columns:["供应商","状态","分类","评价次数","最近评价","平均评分","结论"];rows:SupplierOverview.rows;busy:App.busy;opened(id)=>{App.open-record(id);}}
+            Text {text:"双击供应商打开资料，联系人、供应产品及评价记录在对应页签中。";color:Theme.muted;height:24px;}
+        }}
+    }
+}

@@ -78,3 +78,5 @@ apps/license-keygen-tauri/
 **/HsKnowledgeImports/
 **/HsCodeImports/
 **/hs-import-probe/
+# Native Docker credentials and local configuration are never source artifacts.
+deploy/rust-native/runtime/

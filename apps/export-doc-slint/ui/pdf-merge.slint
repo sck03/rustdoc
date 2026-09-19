@@ -1,0 +1,35 @@
+import { ScrollView } from "std-widgets.slint";
+import { App, PageTab } from "models.slint";
+import { Theme,Card,ActionButton } from "theme.slint";
+export global PdfMerge {
+    in-out property <[PageTab]> files;
+    in-out property <int> selected:0;
+    callback action(string,int);
+}
+export component PdfMergePage inherits VerticalLayout {
+    padding:0px;spacing:14px;
+    Card{height:94px;VerticalLayout{padding:16px;spacing:8px;
+        Text{text:"按列表顺序合并 PDF";font-size:18px;font-weight:700;color:Theme.ink;}
+        Text{text:"每个文件最多 200 页，合计最多 400 页、128 MiB。输出另存为新文件，源文件保留。";wrap:word-wrap;color:Theme.muted;}
+    }}
+    Card{vertical-stretch:1;VerticalLayout{padding:16px;spacing:12px;
+        HorizontalLayout{height:36px;spacing:8px;alignment:start;
+            ActionButton{text:"＋ 添加 PDF";enabled:!App.busy;clicked=>{PdfMerge.action("add",0);}}
+            ActionButton{text:"上移";enabled:PdfMerge.selected>1&&!App.busy;clicked=>{PdfMerge.action("up",PdfMerge.selected);}}
+            ActionButton{text:"下移";enabled:PdfMerge.selected>0&&PdfMerge.selected<PdfMerge.files.length&&!App.busy;clicked=>{PdfMerge.action("down",PdfMerge.selected);}}
+            ActionButton{text:"移除";enabled:PdfMerge.selected>0&&!App.busy;clicked=>{PdfMerge.action("remove",PdfMerge.selected);}}
+            ActionButton{text:"清空";enabled:PdfMerge.files.length>0&&!App.busy;clicked=>{PdfMerge.action("clear",0);}}
+        }
+        ScrollView{content-width:self.visible-width;VerticalLayout{spacing:8px;
+            for file[index] in PdfMerge.files:Rectangle{height:54px;border-radius:6px;background:PdfMerge.selected==index+1?Theme.soft:white;border-color:Theme.line;border-width:1px;
+                HorizontalLayout{padding:12px;spacing:12px;Text{text:(index+1)+".";width:32px;color:Theme.muted;}Text{text:file.label;color:Theme.ink;horizontal-stretch:1;overflow:elide;}Text{text:file.key;color:Theme.muted;horizontal-stretch:1;overflow:elide;}}
+                TouchArea{clicked=>{PdfMerge.selected=index+1;}}
+            }
+            if PdfMerge.files.length==0:Text{text:"添加 PDF 文件后，可调整合并顺序。";color:Theme.muted;horizontal-alignment:center;min-height:150px;}
+        }}
+        HorizontalLayout{height:36px;spacing:8px;alignment:end;
+            Text{text:"已选择 "+PdfMerge.files.length+" 个文件";color:Theme.muted;vertical-alignment:center;}
+            ActionButton{text:"合并并另存";primary:true;enabled:PdfMerge.files.length>0&&!App.busy;clicked=>{PdfMerge.action("merge",0);}}
+        }
+    }}
+}

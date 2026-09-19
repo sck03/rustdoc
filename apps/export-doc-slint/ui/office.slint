@@ -1,0 +1,118 @@
+import { ScrollView, LineEdit, ComboBox, CheckBox } from "std-widgets.slint";
+import { App, OfficeCard } from "models.slint";
+import { Theme, Card, Badge, ActionButton } from "theme.slint";
+
+component OfficePager inherits HorizontalLayout {
+    height:36px;spacing:8px;
+    Text{text:"共 "+App.total-records+" 条";color:Theme.muted;vertical-alignment:center;horizontal-stretch:1;}
+    ActionButton{text:"上一页";enabled:!App.busy&&App.list-page>1;clicked=>{App.office-action("previous",0);}}
+    Text{text:App.list-page+" / "+max(1,App.total-pages);color:Theme.muted;vertical-alignment:center;}
+    ActionButton{text:"下一页";enabled:!App.busy&&App.list-page<App.total-pages;clicked=>{App.office-action("next",0);}}
+}
+
+component ResourceCard inherits Card {
+    in property <OfficeCard> item;
+    height:root.item.directory?290px:236px;
+    VerticalLayout{padding:16px;spacing:12px;alignment:start;
+        HorizontalLayout{height:30px;spacing:10px;
+            Text{text:root.item.title;color:Theme.ink;font-size:18px;font-weight:700;overflow:elide;vertical-alignment:center;horizontal-stretch:1;}
+            Badge{text:root.item.state;}
+        }
+        Text{text:root.item.details;color:Theme.ink;wrap:word-wrap;height:root.item.directory?50px:48px;}
+        Text{text:root.item.description;color:Theme.muted;wrap:word-wrap;height:root.item.directory?52px:26px;}
+        for row in ceil(root.item.actions.length/(root.item.directory?3:6)):HorizontalLayout{height:36px;spacing:7px;alignment:start;
+            for column in (root.item.directory?3:6):ActionButton{
+                in property <int> index:row*(root.item.directory?3:6)+column;
+                visible:self.index<root.item.actions.length;
+                text:root.item.actions[self.index].label;enabled:!App.busy;
+                primary:self.index==0&&root.item.actions[self.index].key!="edit";
+                clicked=>{App.office-action(root.item.actions[self.index].key,root.item.id);}
+            }
+        }
+    }
+}
+
+component OfficeSchedule inherits Card {
+    VerticalLayout{padding:18px;spacing:16px;
+        HorizontalLayout{height:36px;spacing:12px;
+            Text{text:App.office-room-title;color:Theme.ink;font-size:20px;font-weight:700;vertical-alignment:center;horizontal-stretch:1;}
+            ActionButton{text:"返回会议室目录";enabled:!App.busy;clicked=>{App.office-action("resources",0);}}
+        }
+        Text{text:App.office-room-description;color:Theme.muted;height:24px;}
+        HorizontalLayout{height:36px;spacing:10px;alignment:start;
+            ActionButton{text:"前一天";enabled:!App.busy;clicked=>{App.office-action("day-previous",0);}}
+            LineEdit{text<=>App.office-day;accessible-label:"日程日期";placeholder-text:"YYYY-MM-DD";width:160px;accepted=>{App.office-action("day",0);}}
+            ActionButton{text:"查看日程";enabled:!App.busy;clicked=>{App.office-action("day",0);}}
+            ActionButton{text:"后一天";enabled:!App.busy;clicked=>{App.office-action("day-next",0);}}
+            ActionButton{text:App.office-register?"登记预约":"提交预约";primary:true;visible:App.office-can-book;enabled:!App.busy;clicked=>{App.office-action("book",0);}}
+        }
+        Text{text:"所选日期的已占用时段";color:Theme.ink;font-size:16px;font-weight:700;height:28px;}
+        ScrollView{content-width:self.visible-width;VerticalLayout{padding:0px;spacing:12px;alignment:start;
+            for slot in App.office-slots:Rectangle{height:62px;background:Theme.soft;border-radius:7px;
+                HorizontalLayout{padding:16px;spacing:12px;
+                    Text{text:slot.label;color:Theme.ink;vertical-alignment:center;horizontal-stretch:1;}
+                    Badge{text:slot.key;}
+                }
+            }
+            if App.office-slots.length==0:Text{text:App.busy?"正在读取日程…":"当天暂无预约";color:Theme.muted;height:160px;horizontal-alignment:center;}
+        }}
+        Text{text:"登记后占用所选时段。到场后办理使用或钥匙交接，结束后登记归还。";color:Theme.muted;wrap:word-wrap;min-height:24px;}
+    }
+}
+
+export component OfficePage inherits Rectangle {
+    background:transparent;
+    in property <bool> meeting:App.root-key=="bookings";
+    in property <int> card-columns:root.width>1450px?3:root.width>800px?2:1;
+    VerticalLayout{padding:0px;spacing:14px;
+        HorizontalLayout{height:36px;spacing:10px;alignment:start;
+            ActionButton{text:root.meeting?"会议室与登记":"物品与登记";active:!App.office-requests;enabled:!App.busy;clicked=>{App.office-action("resources",0);}}
+            ActionButton{text:root.meeting?"预约与钥匙交接记录":"领用与归还记录";active:App.office-requests;enabled:!App.busy;clicked=>{App.office-action("requests",0);}}
+        }
+        if App.office-schedule:OfficeSchedule{}
+        if App.office-history-open:Card{VerticalLayout{padding:18px;spacing:14px;
+            HorizontalLayout{height:36px;spacing:12px;
+                Text{text:App.office-history-title;color:Theme.ink;font-size:19px;font-weight:700;vertical-alignment:center;horizontal-stretch:1;}
+                ActionButton{text:"返回";enabled:!App.busy;clicked=>{App.office-action(App.office-requests?"requests":"resources",0);}}
+            }
+            Rectangle{height:38px;background:Theme.soft;HorizontalLayout{padding:10px;spacing:12px;for column in App.columns:Text{text:column;color:Theme.muted;horizontal-stretch:1;vertical-alignment:center;}}}
+            ScrollView{content-width:self.visible-width;VerticalLayout{padding:0px;spacing:0px;alignment:start;
+                for row in App.records:Rectangle{height:66px;background:white;
+                    Rectangle{y:65px;height:1px;background:Theme.line;}
+                    HorizontalLayout{padding:10px;spacing:12px;for cell in row.cells:Text{text:cell;color:Theme.ink;wrap:word-wrap;overflow:elide;horizontal-stretch:1;vertical-alignment:center;}}
+                }
+                if App.records.length==0:Text{text:"尚无处理记录";color:Theme.muted;horizontal-alignment:center;height:140px;}
+            }}
+            OfficePager{}
+        }}
+        if !App.office-schedule&&!App.office-history-open:Card{VerticalLayout{padding:16px;spacing:14px;
+            HorizontalLayout{height:36px;spacing:10px;
+                if !App.office-requests:LineEdit{text<=>App.search;input-type:InputType.search;placeholder-text:root.meeting?"会议室名称或位置":"物品名称或存放位置";accessible-label:root.meeting?"搜索会议室":"搜索办公物品";horizontal-stretch:1;accepted=>{App.office-action("filter",0);}}
+                if !App.office-requests:ActionButton{text:"搜索";enabled:!App.busy;clicked=>{App.office-action("filter",0);}}
+                if !App.office-requests&&!root.meeting:CheckBox{text:"仅低库存";checked<=>App.office-low-stock;enabled:!App.busy;toggled=>{App.office-action("filter",0);}}
+                if !App.office-requests&&App.office-can-manage:CheckBox{text:"含停用";checked<=>App.office-inactive;enabled:!App.busy;toggled=>{App.office-action("filter",0);}}
+                if App.office-requests:Text{text:"记录状态";color:Theme.muted;vertical-alignment:center;}
+                if App.office-requests:ComboBox{model:App.office-statuses;current-index<=>App.office-status-index;accessible-label:"行政记录状态";width:190px;enabled:!App.busy;selected(value)=>{App.office-action("filter",0);}}
+                if App.office-requests&&!App.office-register:CheckBox{text:"仅我的申请";checked<=>App.office-mine;enabled:!App.busy;toggled=>{App.office-action("filter",0);}}
+                if App.office-requests:Rectangle{horizontal-stretch:1;}
+                ActionButton{text:"刷新";enabled:!App.busy;clicked=>{App.refresh();}}
+                if !App.office-requests&&App.office-can-manage:ActionButton{text:root.meeting?"添加会议室":"添加物品";primary:true;enabled:!App.busy;clicked=>{App.office-action("new",0);}}
+            }
+            if App.office-focused:HorizontalLayout{height:36px;spacing:10px;
+                Text{text:"正在查看所选登记记录";color:Theme.primary;vertical-alignment:center;horizontal-stretch:1;}
+                ActionButton{text:"显示全部记录";enabled:!App.busy;clicked=>{App.office-action("all",0);}}
+            }
+            if App.office-requests:Text{text:"交接前可修改或取消；取消后释放时段或预留库存，处理记录继续保留。";color:Theme.muted;height:24px;}
+            ScrollView{content-width:self.visible-width;VerticalLayout{padding:0px;spacing:14px;alignment:start;
+                for row in ceil(App.office-cards.length/(App.office-requests?1:root.card-columns)):HorizontalLayout{spacing:14px;
+                    for column in (App.office-requests?1:root.card-columns):Rectangle{
+                        horizontal-stretch:1;height:App.office-requests?236px:290px;background:transparent;
+                        if row*(App.office-requests?1:root.card-columns)+column<App.office-cards.length:ResourceCard{item:App.office-cards[row*(App.office-requests?1:root.card-columns)+column];}
+                    }
+                }
+                if App.office-cards.length==0:Text{text:App.busy?"正在读取…":"当前条件下没有记录";color:Theme.muted;height:150px;horizontal-alignment:center;}
+            }}
+            OfficePager{}
+        }}
+    }
+}

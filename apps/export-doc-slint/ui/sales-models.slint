@@ -1,0 +1,26 @@
+import { FormSection } from "models.slint";
+export struct SalesHistoryRow { version:int, kind:string, stage:string, quote:string, amount:string, expected:string, changed:string, note:string }
+export global Sales {
+    in-out property <string> view:"directory";
+    in-out property <string> title;
+    in-out property <string> stage;
+    in-out property <string> version;
+    in-out property <string> form-error;
+    in-out property <string> invalid-field;
+    in-out property <string> transition-note;
+    in-out property <[string]> stages;
+    in-out property <[string]> next-stages;
+    in-out property <int> stage-filter:0;
+    in-out property <bool> saved:false;
+    in-out property <bool> can-edit:false;
+    in-out property <bool> can-quote:false;
+    in-out property <bool> can-transition:false;
+    in-out property <bool> can-archive:false;
+    in-out property <bool> dirty:false;
+    in-out property <[FormSection]> details;
+    in-out property <[FormSection]> quote;
+    in-out property <[SalesHistoryRow]> history;
+    callback action(string,string);
+    callback edited(string,string);
+    callback selected(string,int);
+}

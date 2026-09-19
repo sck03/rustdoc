@@ -1,0 +1,35 @@
+import { App, DataRow } from "models.slint";
+import { Theme, Card, ActionButton } from "theme.slint";
+import { RecordTable } from "data-table.slint";
+export global PartyFiles {
+    in-out property <bool> can-import;
+    in-out property <bool> can-export;
+    in-out property <bool> can-confirm;
+    in-out property <string> title;
+    in-out property <string> summary;
+    in-out property <string> detail;
+    in-out property <int> selected-id;
+    in-out property <[DataRow]> rows;
+    callback action(string,int);
+}
+export component PartyFileActions inherits HorizontalLayout {
+    spacing:8px;
+    ActionButton {text:"导入客户 / 供应商";visible:PartyFiles.can-import;enabled:!App.busy;clicked=>{PartyFiles.action("choose",0);}}
+    ActionButton {text:"导出当前筛选";visible:PartyFiles.can-export;enabled:!App.busy;clicked=>{PartyFiles.action("export",0);}}
+}
+export component PartyImportPage inherits Rectangle {
+    background:transparent;
+    VerticalLayout {spacing:12px;padding:0px;
+        HorizontalLayout {height:36px;spacing:8px;
+            ActionButton {text:"返回目录";enabled:!App.busy;clicked=>{PartyFiles.action("back",0);}}
+            Text {text:PartyFiles.title;color:Theme.ink;font-size:20px;font-weight:700;horizontal-stretch:1;vertical-alignment:center;}
+            ActionButton {text:"重新选择文件";enabled:!App.busy;clicked=>{PartyFiles.action("choose",0);}}
+            ActionButton {text:"确认导入有效记录";primary:true;enabled:PartyFiles.can-confirm&&!App.busy;clicked=>{PartyFiles.action("confirm",0);}}
+        }
+        Text {text:PartyFiles.summary;color:Theme.muted;wrap:word-wrap;min-height:28px;}
+        Card {VerticalLayout {padding:14px;spacing:12px;
+            RecordTable {columns:["行号","名称","国家 / 地区","状态","联系人","邮箱","预检结果"];rows:PartyFiles.rows;selected-id:PartyFiles.selected-id;busy:App.busy;selected(id)=>{PartyFiles.action("select",id);}}
+            if PartyFiles.detail!="":Text {text:PartyFiles.detail;color:Theme.ink;wrap:word-wrap;min-height:100px;max-height:190px;overflow:elide;}
+        }}
+    }
+}

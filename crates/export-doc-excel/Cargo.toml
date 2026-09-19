@@ -1,0 +1,22 @@
+[package]
+name = "export-doc-excel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Native Excel import and template-preserving workbook output"
+
+[dependencies]
+export-doc-contracts = { path = "../export-doc-contracts" }
+export-doc-domain = { path = "../export-doc-domain" }
+exportdoc-excel-analyzer = { path = "../../tools/excel-analyzer-rs" }
+calamine = { version = "=0.36.1", features = ["dates"] }
+quick-xml = "=0.42.0"
+zip = { version = "=8.6.0", default-features = false, features = ["deflate"] }
+serde_json.workspace = true
+rust_decimal.workspace = true
+chrono.workspace = true
+unicode-normalization.workspace = true
+
+[lints]
+workspace = true

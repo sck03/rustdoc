@@ -1,0 +1,17 @@
+export global Audit {
+    in-out property <[string]> entities;
+    in-out property <int> entity-index:0;
+    in-out property <int> action-index:0;
+    in-out property <string> invoice;
+    in-out property <string> user;
+    in-out property <bool> date-range:false;
+    in-out property <string> start;
+    in-out property <string> end;
+    in-out property <string> zone;
+    in-out property <string> detail;
+    in-out property <bool> maintenance:false;
+    in-out property <string> days:"180";
+    in-out property <bool> can-manage:false;
+    in-out property <bool> can-export:false;
+    callback action(string);
+}

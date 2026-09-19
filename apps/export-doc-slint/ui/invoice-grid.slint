@@ -1,0 +1,95 @@
+import { ScrollView } from "std-widgets.slint";
+import { App } from "models.slint";
+import { Theme, ActionButton } from "theme.slint";
+export component InvoiceGridView inherits Rectangle {
+    init => { input.focus(); }
+    border-color:Theme.line;border-width:1px;border-radius:7px;clip:true;
+    in-out property <int> first-visible: max(0,floor(-scroll.content-y/42px)-2);
+    property <int> visible-count:ceil(scroll.visible-height/42px)+5;
+    property <int> focus-serial:App.cell-focus;
+    changed first-visible=>{App.grid-scroll(root.first-visible,root.visible-count);}
+    changed visible-count=>{App.grid-scroll(root.first-visible,root.visible-count);}
+    changed focus-serial=>{
+        if(App.active-row*42px < -scroll.content-y){scroll.content-y=-App.active-row*42px;}
+        if((App.active-row+1)*42px > -scroll.content-y+scroll.visible-height){scroll.content-y=scroll.visible-height - (App.active-row+1)*42px;}
+        if((App.grid-columns[App.active-column].offset+App.grid-columns[App.active-column].width)*1px > -scroll.content-x+scroll.visible-width) {
+            scroll.content-x=scroll.visible-width - (App.grid-columns[App.active-column].offset+App.grid-columns[App.active-column].width)*1px;
+        }
+        if(App.grid-columns[App.active-column].offset*1px < -scroll.content-x+140px){scroll.content-x=140px-App.grid-columns[App.active-column].offset*1px;}
+        input.focus();
+    }
+    Rectangle {
+        x:0px;y:0px;width:parent.width;height:42px;background:Theme.soft;clip:true;
+        Text {x:8px;width:125px;text:"操作";color:Theme.muted;font-size:12px;vertical-alignment:center;}
+        for column in App.grid-columns: Text {
+            x:column.offset*1px+scroll.content-x;width:column.width*1px;
+            text:column.label;color:Theme.muted;font-size:12px;vertical-alignment:center;horizontal-alignment:center;
+        }
+    }
+    scroll:=ScrollView {
+        y:42px;height:parent.height - 42px;
+        content-width:App.grid-width*1px;
+        content-height:App.grid-count*42px;
+        for row in App.grid-rows: Rectangle {
+            y:row.index*42px;height:42px;width:App.grid-width*1px;
+            background:mod(row.index,2)==0?#ffffff:#fbfdfc;
+            Rectangle{y:41px;height:1px;background:#e9efed;}
+            HorizontalLayout {
+                x:5px;y:5px;width:130px;height:31px;spacing:3px;padding:0px;
+                for action[i] in ["复","↑","↓","×"]: ActionButton {
+                    text:action;min-width:27px;height:30px;enabled:App.invoice-editable;
+                    clicked=>{App.grid-row-action(i==0?"duplicate":i==1?"up":i==2?"down":"delete",row.index);}
+                }
+            }
+            for column[ci] in App.grid-columns: Rectangle {
+                x:column.offset*1px+4px;y:5px;width:column.width*1px-8px;height:32px;
+                property <bool> selected: row.index>=min(App.active-row,App.anchor-row)&&row.index<=max(App.active-row,App.anchor-row)&&ci>=min(App.active-column,App.anchor-column)&&ci<=max(App.active-column,App.anchor-column);
+                border-width:1px;border-color:self.selected?#269e88:#cfdbdc;border-radius:4px;background:self.selected?#e3f4ee:white;
+                Text {x:6px;width:parent.width - 12px;text:row.cells[ci];font-size:13px;color:Theme.ink;vertical-alignment:center;overflow:elide;}
+                TouchArea {
+                    mouse-cursor:text;
+                    pointer-event(e)=>{if(e.kind==PointerEventKind.down && e.button==PointerEventButton.left){App.grid-select(row.index,ci,e.modifiers.shift);}}
+                }
+            }
+        }
+        Rectangle {
+            x:App.grid-columns[App.active-column].offset*1px+4px;y:App.active-row*42px+5px;
+            width:App.grid-columns[App.active-column].width*1px-8px;height:32px;
+            visible:App.active-row>=root.first-visible&&App.active-row<root.first-visible+root.visible-count;
+            border-width:2px;border-color:Theme.primary;border-radius:4px;background:white;clip:true;
+            input:=TextInput {
+                x:6px;width:parent.width - 12px;text<=>App.cell-value;single-line:true;
+                color:Theme.ink;font-size:13px;vertical-alignment:center;read-only:!App.invoice-editable;
+                accessible-label:"第 "+(App.active-row+1)+" 行 "+App.grid-columns[App.active-column].label;
+                accepted=>{App.grid-command("next",false);}
+                key-pressed(e)=>{
+                    if(e.modifiers.control || e.modifiers.meta) {
+                        if(e.text=="c"){App.grid-command("copy",false);return accept;}
+                        if(e.text=="v"){App.grid-command("paste",false);return accept;}
+                        if(e.text=="z"){App.grid-command(e.modifiers.shift?"redo":"undo",false);return accept;}
+                        if(e.text=="y"){App.grid-command("redo",false);return accept;}
+                        if(e.text=="d"){App.grid-command(e.modifiers.shift?"duplicate":"fill",false);return accept;}
+                        if(e.text==Key.DownArrow){App.grid-command("extend-down",true);return accept;}
+                        if(e.text=="s"){App.invoice-action("save");return accept;}
+                    }
+                    if(e.modifiers.alt&&(e.text==Key.UpArrow||e.text==Key.DownArrow)){
+                        App.grid-command(e.text==Key.UpArrow?"row-up":"row-down",false);return accept;
+                    }
+                    if(e.text==Key.Tab){App.grid-command("next",e.modifiers.shift);return accept;}
+                    if(e.text==Key.Return&&e.modifiers.shift){App.grid-command("next",true);return accept;}
+                    if(e.text==Key.UpArrow||e.text==Key.DownArrow){
+                        App.grid-command(e.text==Key.UpArrow?"up":"down",e.modifiers.shift);return accept;
+                    }
+                    if(e.modifiers.shift&&(e.text==Key.LeftArrow||e.text==Key.RightArrow)){
+                        App.grid-command(e.text==Key.LeftArrow?"left":"right",true);return accept;
+                    }
+                    if(e.text==Key.Insert){App.grid-command("insert",false);return accept;}
+                    if(e.text==Key.Delete&&(App.anchor-row!=App.active-row||App.anchor-column!=App.active-column)){
+                        App.grid-command("clear",false);return accept;
+                    }
+                    return reject;
+                }
+            }
+        }
+    }
+}

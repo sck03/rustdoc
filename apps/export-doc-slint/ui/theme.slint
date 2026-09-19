@@ -1,0 +1,49 @@
+export global Theme {
+    out property <color> primary:#087f74;
+    out property <color> ink:#183c38;
+    out property <color> muted:#607a76;
+    out property <color> line:#cfdfdb;
+    out property <color> surface:#ffffff;
+    out property <color> background:#f1f6f4;
+    out property <color> soft:#eef7f4;
+    out property <color> error:#ad3535;
+}
+export component ActionButton inherits Rectangle {
+    in property <string> text;
+    in property <string> hint;
+    in property <bool> primary:false;
+    in property <bool> active:false;
+    in property <bool> enabled:true;
+    in property <bool> left-aligned:false;
+    callback clicked();
+    min-width: label.preferred-width + 24px;
+    preferred-width: label.preferred-width + 24px;
+    horizontal-stretch:0;
+    height:36px;
+    border-radius:7px;
+    background: !root.enabled ? #f5f8f7 : root.primary ? Theme.primary : root.active ? #e2f3ee : touch.has-hover ? #edf7f3 : white;
+    border-width:1px;
+    border-color: root.primary || root.active ? Theme.primary : Theme.line;
+    accessible-role:button;
+    accessible-label:root.text;
+    accessible-enabled:root.enabled;
+    accessible-action-default => {if(root.enabled){root.clicked();}}
+    label:=Text {x:12px;width:parent.width - 24px;text:root.text;color:!root.enabled ? #97a8a4 : root.primary ? white : Theme.ink;font-size:13px;font-weight:600;horizontal-alignment:root.left-aligned?left:center;vertical-alignment:center;}
+    touch:=TouchArea {enabled:root.enabled;mouse-cursor:pointer;clicked=>{root.clicked();}}
+    if root.hint!="":Tooltip{text:@markdown("\{root.hint}");}
+    FocusScope {
+        enabled:root.enabled;
+        key-pressed(e)=>{if(e.text=="\n" || e.text==" "){root.clicked();return accept;}return reject;}
+    }
+}
+export component Badge inherits Rectangle {
+    in property <string> text;
+    background:Theme.soft;border-radius:12px;height:26px;
+    min-width:label.preferred-width+20px;
+    preferred-width:label.preferred-width+20px;
+    horizontal-stretch:0;
+    label:=Text{text:root.text;font-size:12px;color:Theme.primary;horizontal-alignment:center;vertical-alignment:center;}
+}
+export component Card inherits Rectangle {
+    background:Theme.surface;border-radius:10px;border-width:1px;border-color:Theme.line;
+}

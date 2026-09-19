@@ -1,0 +1,101 @@
+import { ScrollView, LineEdit, ComboBox, CheckBox, Slider } from "std-widgets.slint";
+import { App } from "models.slint";
+import { Packing } from "packing-models.slint";
+import { Theme, Card, ActionButton, Badge } from "theme.slint";
+import { FormSections } from "forms.slint";
+import { RecordTable } from "data-table.slint";
+
+export component PackingPage inherits VerticalLayout {
+    spacing:10px;padding:0px;
+    HorizontalLayout { spacing:8px;alignment:start;
+        ActionButton{text:"货物与规则";primary:Packing.tab==0;clicked=>{Packing.tab=0;}}
+        ActionButton{text:"装载预览";primary:Packing.tab==1;clicked=>{Packing.tab=1;}}
+        ActionButton{text:"新增货物";enabled:Packing.can-edit&&!App.busy;clicked=>{Packing.action("add",0);}}
+        ActionButton{text:"开始分析";primary:true;enabled:Packing.can-edit&&!App.busy;clicked=>{Packing.action("analyze",0);}}
+        CheckBox{text:"自动刷新";checked <=> Packing.auto-refresh;enabled:Packing.can-edit;}
+        Rectangle{horizontal-stretch:1;}
+        ActionButton{text:"导出 PDF";enabled:Packing.can-export&&Packing.ready&&!App.busy;clicked=>{Packing.action("pdf",0);}}
+    }
+    Card {height:98px;
+        VerticalLayout {padding:12px;spacing:8px;
+            HorizontalLayout {spacing:8px;
+                Text{text:"方案";color:Theme.muted;vertical-alignment:center;width:34px;}
+                LineEdit{text:Packing.name;placeholder-text:"方案名称";enabled:Packing.can-edit&&!App.busy;edited=>{Packing.edited("name",self.text);}}
+                Badge{text:Packing.dirty?"未保存":Packing.saved?"已保存":"新方案";}
+                ActionButton{text:"保存方案";enabled:Packing.can-edit&&!App.busy;clicked=>{Packing.action("save",0);}}
+                ActionButton{text:"新建";enabled:Packing.can-edit&&!App.busy;clicked=>{Packing.action("new",0);}}
+            }
+            HorizontalLayout {spacing:8px;
+                ComboBox{model:Packing.projects;current-index <=> Packing.project-index;horizontal-stretch:1;accessible-label:"已保存方案";enabled:!App.busy;}
+                ActionButton{text:"读取";enabled:Packing.project-index>=0&&!App.busy;clicked=>{Packing.action("load",Packing.project-index);}}
+                ActionButton{text:"删除";enabled:Packing.can-delete&&Packing.project-index>=0&&!App.busy;clicked=>{Packing.action("delete",Packing.project-index);}}
+                ActionButton{text:"刷新方案";enabled:!App.busy;clicked=>{Packing.action("refresh",0);}}
+            }
+        }
+    }
+    if Packing.form-error!="":Text{text:Packing.form-error;color:Theme.error;wrap:word-wrap;min-height:28px;}
+    if Packing.tab==0:VerticalLayout {spacing:10px;
+        HorizontalLayout {spacing:8px;height:36px;
+            Text{text:"柜型";color:Theme.muted;vertical-alignment:center;width:34px;}
+            ComboBox{model:Packing.types;current-index:Packing.type-index;enabled:Packing.can-edit&&!App.busy;selected=>{Packing.action("type",self.current-index);}}
+            LineEdit{text:Packing.type-name;placeholder-text:"自定义柜型名称";enabled:Packing.can-manage&&!App.busy;edited=>{Packing.edited("containerType",self.text);}}
+            ActionButton{text:"保存柜型";enabled:Packing.can-manage&&!App.busy;clicked=>{Packing.action("save-type",0);}}
+            ActionButton{text:"删除柜型";enabled:Packing.can-manage&&!App.busy;clicked=>{Packing.action("delete-type",Packing.type-index);}}
+        }
+        Card {height:205px;
+            FormSections{sections:Packing.sections;editable:Packing.can-edit;enabled:!App.busy;invalid-key:Packing.invalid-field;
+                edited(key,value)=>{Packing.edited(key,value);} selected(key,index)=>{Packing.selected(key,index);}
+                toggled(key)=>{Packing.action(key,0);}
+            }
+        }
+        HorizontalLayout {spacing:8px;alignment:start;height:32px;
+            Text{text:"货物明细 · 尺寸为厘米，重量为千克";font-weight:700;color:Theme.ink;vertical-alignment:center;horizontal-stretch:1;}
+            ActionButton{text:"撤销";enabled:Packing.can-undo&&!App.busy;clicked=>{Packing.action("undo",0);}}
+            ActionButton{text:"重做";enabled:Packing.can-redo&&!App.busy;clicked=>{Packing.action("redo",0);}}
+            ActionButton{text:"清空货物";enabled:Packing.can-edit&&!App.busy;clicked=>{Packing.action("clear",0);}}
+        }
+        Card {vertical-stretch:1;
+            ScrollView {content-width:1680px;
+                VerticalLayout {padding:6px;spacing:2px;alignment:start;
+                    HorizontalLayout {height:32px;spacing:6px;
+                        Text{text:"颜色";width:36px;color:Theme.muted;}
+                        for label[i] in ["货物名称","长 cm","宽 cm","高 cm","单重 kg","件数","使用托盘","每托件数","顶部承重 kg","优先区域","装载顺序","优先组"]:Text{text:label;width:i==0?190px:i==11?145px:94px;color:Theme.muted;font-size:12px;}
+                        Text{text:"操作";color:Theme.muted;}
+                    }
+                    for row in Packing.cargo:HorizontalLayout {height:38px;spacing:6px;
+                        Rectangle{width:36px;background:row.tint;border-radius:4px;TouchArea{enabled:Packing.can-edit&&!App.busy;clicked=>{Packing.action("color",row.index);}}}
+                        for field[i] in row.fields:Rectangle {width:i==0?190px:i==11?145px:94px;
+                            if field.kind=="bool":CheckBox{checked:field.value=="true";enabled:Packing.can-edit&&!App.busy;toggled=>{Packing.edited(field.key,self.checked?"true":"false");}}
+                            if field.kind=="choice":ComboBox{model:field.options;current-index:field.selected;enabled:Packing.can-edit&&!App.busy;selected=>{Packing.selected(field.key,self.current-index);}}
+                            if field.kind!="bool"&&field.kind!="choice":LineEdit{text:field.value;accessible-label:field.label;enabled:Packing.can-edit&&!App.busy;edited=>{Packing.edited(field.key,self.text);}}
+                        }
+                        ActionButton{text:"复制";enabled:Packing.can-edit&&!App.busy;clicked=>{Packing.action("duplicate",row.index);}}
+                        ActionButton{text:"删除";enabled:Packing.can-edit&&!App.busy;clicked=>{Packing.action("remove",row.index);}}
+                    }
+                    if Packing.cargo.length==0:Text{text:"点击“新增货物”录入装载明细。";color:Theme.muted;height:72px;vertical-alignment:center;}
+                }
+            }
+        }
+    }
+    if Packing.tab==1:VerticalLayout {spacing:8px;
+        Text{text:Packing.summary;color:Theme.ink;wrap:word-wrap;min-height:44px;}
+        HorizontalLayout {height:34px;spacing:8px;alignment:start;
+            ComboBox{model:["三维预览","俯视图","侧视图","柜门视图"];current-index <=> Packing.projection;selected=>{Packing.action("view",0);}}
+            CheckBox{text:"填充颜色";checked <=> Packing.filled;toggled=>{Packing.action("view",0);}}
+            Text{text:"旋转";color:Theme.muted;vertical-alignment:center;}
+            Slider{minimum:0;maximum:360;value <=> Packing.angle;enabled:Packing.projection==0;changed=>{Packing.action("view",0);}width:170px;}
+            Text{text:"缩放";color:Theme.muted;vertical-alignment:center;}
+            Slider{minimum:0.5;maximum:2.5;value <=> Packing.zoom;width:140px;}
+        }
+        Card {vertical-stretch:2;min-height:180px;
+            ScrollView{content-width:max(self.visible-width,self.visible-width*Packing.zoom);content-height:max(self.visible-height,self.visible-height*Packing.zoom);
+                Image{source:Packing.preview;width:parent.content-width;height:parent.content-height;image-fit:contain;}
+            }
+            if !Packing.ready:Text{text:"完成分析后显示装载预览。修改货物或规则后请重新分析。";color:Theme.muted;horizontal-alignment:center;vertical-alignment:center;}
+        }
+        Card {vertical-stretch:1;min-height:150px;
+            RecordTable{columns:["货物","装载数量","位置 cm","尺寸 cm","重量 kg","分组"];rows:Packing.blocks;selected-id:Packing.selected-block;selected(index)=>{Packing.selected-block=index;Packing.action("view",0);}}
+        }
+    }
+    Text{text:Packing.status;color:Theme.muted;height:22px;}
+}

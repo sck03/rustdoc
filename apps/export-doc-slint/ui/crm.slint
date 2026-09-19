@@ -1,0 +1,52 @@
+import { CheckBox, ComboBox, ScrollView } from "std-widgets.slint";
+import { App, Metric, DataRow } from "models.slint";
+import { Theme, Card, ActionButton } from "theme.slint";
+import { RecordTable } from "data-table.slint";
+export global Crm {
+    in-out property <[string]> statuses;
+    in-out property <int> status-index:0;
+    in-out property <[string]> customers;
+    in-out property <int> customer-index:0;
+    in-out property <bool> include-completed:false;
+    in-out property <[Metric]> metrics;
+    in-out property <[DataRow]> follow-ups;
+    in-out property <[DataRow]> stages;
+    in-out property <[DataRow]> currencies;
+    in-out property <[DataRow]> closings;
+    callback action(string,int);
+}
+export component BusinessFilters inherits HorizontalLayout {
+    height:36px;spacing:10px;alignment:start;
+    if App.resource=="crm-customers"||App.resource=="suppliers":ComboBox {model:Crm.statuses;current-index<=>Crm.status-index;accessible-label:"业务状态";enabled:!App.busy;selected=>{Crm.action("filter",0);}}
+    if App.resource=="crm-follow-ups":ComboBox {model:Crm.customers;current-index<=>Crm.customer-index;accessible-label:"跟进客户";enabled:!App.busy;selected=>{Crm.action("filter",0);}}
+    if App.resource=="crm-follow-ups":CheckBox {text:"包含已完成跟进";checked<=>Crm.include-completed;enabled:!App.busy;toggled=>{Crm.action("filter",0);}}
+}
+export component SalesDashboardPage inherits Rectangle {
+    background:transparent;
+    VerticalLayout {padding:0px;spacing:12px;
+        HorizontalLayout {height:36px;spacing:8px;alignment:start;
+            ActionButton{text:"客户与跟进";clicked=>{App.navigate("crm-customers");}}
+            ActionButton{text:"商机与报价";clicked=>{App.navigate("opportunities");}}
+            ActionButton{text:"刷新";enabled:!App.busy;clicked=>{App.refresh();}}
+        }
+        HorizontalLayout {height:88px;spacing:12px;
+            for metric in Crm.metrics:Card {VerticalLayout {padding:14px;spacing:7px;Text{text:metric.label;color:Theme.muted;} Text{text:metric.value;color:Theme.primary;font-size:25px;font-weight:700;}}}
+        }
+        ScrollView {content-width:self.visible-width;VerticalLayout {padding:0px;spacing:12px;
+            Card {height:270px;VerticalLayout {padding:14px;spacing:10px;Text{text:"近期跟进待办";font-size:17px;font-weight:700;color:Theme.ink;}
+                RecordTable {columns:["客户","联系人","下次动作","提醒时间"];rows:Crm.follow-ups;busy:App.busy;opened(id)=>{Crm.action("follow-up",id);}}
+            }}
+            HorizontalLayout {height:270px;spacing:12px;
+                Card {VerticalLayout {padding:14px;spacing:10px;Text{text:"商机阶段";font-size:17px;font-weight:700;color:Theme.ink;}
+                    RecordTable {columns:["阶段","数量"];rows:Crm.stages;busy:App.busy;opened=>{App.navigate("opportunities");}}
+                }}
+                Card {VerticalLayout {padding:14px;spacing:10px;Text{text:"进行中商机金额（按币种）";font-size:17px;font-weight:700;color:Theme.ink;}
+                    RecordTable {columns:["币种","商机数","预计金额","加权金额"];rows:Crm.currencies;busy:App.busy;}
+                }}
+            }
+            Card {height:260px;VerticalLayout {padding:14px;spacing:10px;Text{text:"近期预计成交";font-size:17px;font-weight:700;color:Theme.ink;}
+                RecordTable {columns:["商机","客户","预计成交","币种","金额"];rows:Crm.closings;busy:App.busy;opened(id)=>{Crm.action("opportunity",id);}}
+            }}
+        }}
+    }
+}

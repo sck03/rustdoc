@@ -28,7 +28,7 @@ if (!requiredDotNetSdkChannel) {
 if (dotnetSdkPolicy.rollForward !== "latestFeature" || dotnetSdkPolicy.allowPrerelease !== false) {
   throw new Error("global.json must allow the latest stable feature band within its .NET major.minor line.");
 }
-const requiredRustToolchain = "1.96.0";
+const requiredRustToolchain = "1.98.1";
 const runtimeIdentifiers = ["win-x64", "win-arm64", "linux-x64", "linux-arm64", "osx-arm64"];
 const fullOnlyRuntimeDependencies = [
   "ClosedXML",

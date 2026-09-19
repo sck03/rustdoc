@@ -1,0 +1,83 @@
+name: exportdoc-rust-native
+services:
+  postgres:
+    image: postgres:18.4-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: exportdoc_native
+      POSTGRES_USER: exportdoc_bootstrap
+      POSTGRES_PASSWORD_FILE: /run/secrets/bootstrap_password
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale-provider=builtin --builtin-locale=PG_UNICODE_FAST
+    secrets: [bootstrap_password, maintenance_password, app_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/10-native-roles.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U exportdoc_bootstrap -d exportdoc_native']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    stop_grace_period: 45s
+    networks: [database]
+  initialize:
+    image: exportdoc-rust-native:local
+    build:
+      context: ../..
+      dockerfile: deploy/rust-native/Dockerfile
+    command: [--app-root, /opt/exportdoc, --data-root, /var/lib/exportdoc, --initialize-only]
+    environment:
+      EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION_FILE: /run/secrets/maintenance_connection
+      EXPORTDOCMANAGER_POSTGRES_OWNER: exportdoc_owner
+    secrets: [maintenance_connection]
+    read_only: true
+    tmpfs:
+      - /var/lib/exportdoc:uid=10001,gid=10001,mode=0700,size=16m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [database]
+  application:
+    image: exportdoc-rust-native:local
+    restart: unless-stopped
+    environment:
+      EXPORTDOCMANAGER_POSTGRES_CONNECTION_FILE: /run/secrets/app_connection
+      EXPORTDOCMANAGER_BOOTSTRAP_TOKEN_FILE: /run/secrets/bootstrap_token
+      EXPORTDOCMANAGER_BUSINESS_TIME_ZONE: Asia/Shanghai
+    secrets: [app_connection, bootstrap_token]
+    volumes:
+      - app_data:/var/lib/exportdoc
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - '${NATIVE_BIND_ADDRESS:-127.0.0.1}:${NATIVE_PORT:-5188}:5188'
+    healthcheck:
+      test: [CMD, /opt/exportdoc/ExportDocManager.Server, --health-check, '127.0.0.1:5188']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    stop_grace_period: 210s
+    depends_on:
+      initialize: {condition: service_completed_successfully}
+    networks: [database, web]
+secrets:
+  bootstrap_password:
+    file: '${NATIVE_RUNTIME_ROOT:?Use scripts/run-native-docker.ps1}/postgres-bootstrap-password.txt'
+  maintenance_password:
+    file: '${NATIVE_RUNTIME_ROOT:?Use scripts/run-native-docker.ps1}/maintenance-password.txt'
+  app_password:
+    file: '${NATIVE_RUNTIME_ROOT:?Use scripts/run-native-docker.ps1}/app-password.txt'
+  maintenance_connection:
+    file: '${NATIVE_RUNTIME_ROOT:?Use scripts/run-native-docker.ps1}/maintenance-connection.txt'
+  app_connection:
+    file: '${NATIVE_RUNTIME_ROOT:?Use scripts/run-native-docker.ps1}/app-connection.txt'
+  bootstrap_token:
+    file: '${NATIVE_RUNTIME_ROOT:?Use scripts/run-native-docker.ps1}/bootstrap-token.txt'
+volumes:
+  postgres_data:
+  app_data:
+networks:
+  database: {internal: true}
+  web:

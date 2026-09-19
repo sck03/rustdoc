@@ -1,0 +1,17 @@
+[package]
+name = "export-doc-hs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Optional static HS reference lookup without a browser runtime"
+
+[dependencies]
+export-doc-contracts = { path = "../export-doc-contracts" }
+export-doc-domain = { path = "../export-doc-domain" }
+ureq = { version = "=3.4.2", default-features = false, features = ["native-tls"] }
+scraper = { version = "=0.27.0", default-features = false }
+url = "=2.5.8"
+
+[lints]
+workspace = true

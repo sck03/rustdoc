@@ -10,33 +10,15 @@ export default defineConfig({
   plugins: [react()],
   build: {
     chunkSizeWarningLimit: 600,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        onlyExplicitManualChunks: true,
-        manualChunks(id) {
-          if (!id.includes("node_modules")) {
-            return undefined;
-          }
-
-          if (id.includes("three")) {
-            return "vendor-three";
-          }
-
-          if (id.includes("lucide-react")) {
-            return "vendor-icons";
-          }
-
-          if (
-            id.includes("react") ||
-            id.includes("react-dom") ||
-            id.includes("react-router-dom") ||
-            id.includes("@remix-run") ||
-            id.includes("@tanstack")
-          ) {
-            return "vendor-react";
-          }
-
-          return "vendor";
+        codeSplitting: {
+          groups: [
+            { name: "vendor-three", test: /node_modules[\\/]three[\\/]/, priority: 30 },
+            { name: "vendor-react", test: /node_modules[\\/](?:react|react-dom|react-router|react-router-dom|scheduler|@tanstack|@remix-run)[\\/]/, priority: 20 },
+            { name: "vendor-icons", test: /node_modules[\\/]lucide-react[\\/]/, priority: 10 },
+            { name: "vendor", test: /node_modules[\\/]/ },
+          ],
         },
       },
     },

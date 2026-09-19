@@ -1,0 +1,3241 @@
+{
+  "sources": {
+    "src/ExportDocManager.Application/Services/SingleWindow/CustomsCooGoodsItemFlagCatalog.cs": "41994d01fb70dbc9db5023fec9db95c8e8bd82397c11405baa71eb879f13a2c4",
+    "src/ExportDocManager.Application/Services/SingleWindow/CustomsCooPackTypeCatalog.cs": "3627b3cf56541a3fae7563b874e47d9a96f92d431b737e05e39b7d9893122e6e",
+    "src/ExportDocManager.Application/Services/SingleWindow/CustomsCooEditorCatalog.cs": "6f4035aa0848830cbb0324e283ba10005129d1fd72ca9406dd259b31371726c4",
+    "src/ExportDocManager.Application/Services/SingleWindow/CustomsCooPackUnitCatalog.cs": "9883350b24fc81d3b9a840c0e43987b96c58c9787a02ca860087dafa5e62b1c0",
+    "src/ExportDocManager.Application/Services/SingleWindow/CustomsCooOriginCriteriaCatalog.cs": "dcf3d0aea8f21727c41ca4354a8dba0e064c57695ee51e3a348aeddbb47a38d8",
+    "src/ExportDocManager.Application/Services/SingleWindow/SingleWindowXmlValidator.cs": "10fc39ed61506939bdacf01fdc10b1eca1360cd3bf21990f444b9a6aa85f22cf",
+    "src/ExportDocManager.Infrastructure/Services/SingleWindow/SingleWindowPayloadGenerators.cs": "4607be352e1b0debb5c95974f198c7f6c5aa221bd23a173c53ee926be0d7e2b9",
+    "src/ExportDocManager.Application/Services/SingleWindow/SingleWindowDraftStateHelper.Catalog.cs": "536617c1c86dc1d6af9efadf77520326e1618829a5e50a8eb66d4d717a1b9ce3",
+    "src/ExportDocManager.Application/Services/SingleWindow/SingleWindowUnitNormalizer.cs": "9dac88290711bce703d99a74e3229891f106a96884fe5da0238ed2ba5722b1b3",
+    "src/ExportDocManager.Application/Services/SingleWindow/CustomsCooTradeModeCatalog.cs": "0665a9e3698a80e38cb000c0a1822ba9627e3fce5fbc349851bc8a25913c4871"
+  },
+  "options": {
+    "applyTypeOptions": [
+      {
+        "value": "0",
+        "label": "0：暂存"
+      },
+      {
+        "value": "1",
+        "label": "1：申报"
+      }
+    ],
+    "certStatusOptions": [
+      {
+        "value": "0",
+        "label": "0：新证"
+      },
+      {
+        "value": "1",
+        "label": "1：更改证"
+      },
+      {
+        "value": "2",
+        "label": "2：重发证"
+      },
+      {
+        "value": "3",
+        "label": "3：更改重发证"
+      }
+    ],
+    "certTypeOptions": [
+      {
+        "value": "C",
+        "label": "C：一般原产地证"
+      },
+      {
+        "value": "G",
+        "label": "G：普惠制原产地证"
+      },
+      {
+        "value": "B",
+        "label": "B：亚太证书"
+      },
+      {
+        "value": "E",
+        "label": "E：东盟证书"
+      },
+      {
+        "value": "F",
+        "label": "F：中国-智利证书"
+      },
+      {
+        "value": "M",
+        "label": "M：欧盟蘑菇证书"
+      },
+      {
+        "value": "P",
+        "label": "P：中巴证书"
+      },
+      {
+        "value": "T",
+        "label": "T：烟草证书"
+      },
+      {
+        "value": "N",
+        "label": "N：新西兰证书"
+      },
+      {
+        "value": "X",
+        "label": "X：新加坡证书"
+      },
+      {
+        "value": "R",
+        "label": "R：中国-秘鲁证书"
+      },
+      {
+        "value": "H",
+        "label": "H：海峡两岸证书"
+      },
+      {
+        "value": "L",
+        "label": "L：中国-哥斯达黎加证书"
+      },
+      {
+        "value": "I",
+        "label": "I：中国-冰岛证书"
+      },
+      {
+        "value": "S",
+        "label": "S：中国-瑞士证书"
+      },
+      {
+        "value": "PR",
+        "label": "PR：加工装配证书"
+      },
+      {
+        "value": "TR",
+        "label": "TR：转口证书"
+      },
+      {
+        "value": "A",
+        "label": "A：中国-澳大利亚证书"
+      },
+      {
+        "value": "K",
+        "label": "K：中国-韩国证书"
+      },
+      {
+        "value": "AD",
+        "label": "AD：输往墨西哥瓷砖价格承诺证书"
+      },
+      {
+        "value": "AP",
+        "label": "AP：输往巴基斯坦瓷砖价格承诺证书"
+      },
+      {
+        "value": "GE",
+        "label": "GE：中国-格鲁吉亚证书"
+      },
+      {
+        "value": "MU",
+        "label": "MU：中国-毛里求斯证书"
+      },
+      {
+        "value": "CA",
+        "label": "CA：中国-柬埔寨证书"
+      },
+      {
+        "value": "RC",
+        "label": "RC：RCEP证书"
+      },
+      {
+        "value": "NI",
+        "label": "NI：中国-尼加拉瓜证书"
+      },
+      {
+        "value": "EC",
+        "label": "EC：中国-厄瓜多尔证书"
+      },
+      {
+        "value": "SE",
+        "label": "SE：中国-塞尔维亚证书"
+      },
+      {
+        "value": "HD",
+        "label": "HD：中国-洪都拉斯证书"
+      },
+      {
+        "value": "MV",
+        "label": "MV：中国-马尔代夫证书"
+      },
+      {
+        "value": "CG",
+        "label": "CG：中国-刚果证书"
+      }
+    ],
+    "producerSecretOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "N",
+        "label": "N：否"
+      },
+      {
+        "value": "Y",
+        "label": "Y：是"
+      }
+    ],
+    "exhibitFlagOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "0",
+        "label": "0：非展览"
+      },
+      {
+        "value": "1",
+        "label": "1：展览"
+      }
+    ],
+    "thirdPartyInvoiceOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "0",
+        "label": "0：非第三方发票"
+      },
+      {
+        "value": "1",
+        "label": "1：第三方发票"
+      }
+    ],
+    "predictFlagOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "0",
+        "label": "0：非预计离港"
+      },
+      {
+        "value": "1",
+        "label": "1：预计离港"
+      }
+    ],
+    "promiseOptions": [
+      {
+        "value": "1",
+        "label": "1：申请企业承诺"
+      }
+    ],
+    "currencyOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "CNY",
+        "label": "CNY：人民币"
+      },
+      {
+        "value": "USD",
+        "label": "USD：美元"
+      },
+      {
+        "value": "EUR",
+        "label": "EUR：欧元"
+      },
+      {
+        "value": "HKD",
+        "label": "HKD：港币"
+      },
+      {
+        "value": "GBP",
+        "label": "GBP：英镑"
+      },
+      {
+        "value": "JPY",
+        "label": "JPY：日元"
+      },
+      {
+        "value": "KRW",
+        "label": "KRW：韩元"
+      },
+      {
+        "value": "CAD",
+        "label": "CAD：加元"
+      },
+      {
+        "value": "AUD",
+        "label": "AUD：澳元"
+      },
+      {
+        "value": "CHF",
+        "label": "CHF：瑞郎"
+      },
+      {
+        "value": "SGD",
+        "label": "SGD：新加坡元"
+      }
+    ],
+    "cooTradeModeOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "0",
+        "label": "0：其他贸易方式"
+      },
+      {
+        "value": "1",
+        "label": "1：一般贸易"
+      },
+      {
+        "value": "2",
+        "label": "2：来料加工"
+      },
+      {
+        "value": "3",
+        "label": "3：进料加工"
+      },
+      {
+        "value": "4",
+        "label": "4：外商投资"
+      },
+      {
+        "value": "5",
+        "label": "5：易货贸易"
+      },
+      {
+        "value": "6",
+        "label": "6：补偿贸易"
+      },
+      {
+        "value": "7",
+        "label": "7：边境贸易"
+      },
+      {
+        "value": "8",
+        "label": "8：展卖贸易"
+      },
+      {
+        "value": "9",
+        "label": "9：零售贸易"
+      },
+      {
+        "value": "10",
+        "label": "10：无偿援助"
+      },
+      {
+        "value": "33",
+        "label": "33：边民互市"
+      },
+      {
+        "value": "34",
+        "label": "34：小额贸易"
+      }
+    ],
+    "goodsItemFlagOptions": [
+      {
+        "value": "N",
+        "label": "N：货物项"
+      },
+      {
+        "value": "Y",
+        "label": "Y：非货物项"
+      }
+    ],
+    "packTypeOptions": [
+      {
+        "value": "1",
+        "label": "1：常规包装"
+      },
+      {
+        "value": "2",
+        "label": "2：非常规包装"
+      }
+    ],
+    "goodsTaxRateOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "0",
+        "label": "0：非最高税率"
+      },
+      {
+        "value": "1",
+        "label": "1：相关缔约方最高税率"
+      },
+      {
+        "value": "2",
+        "label": "2：全部缔约方最高税率"
+      }
+    ],
+    "packUnitOptions": [
+      {
+        "value": "CTN",
+        "label": "CTN"
+      },
+      {
+        "value": "BOX",
+        "label": "BOX"
+      },
+      {
+        "value": "BAG",
+        "label": "BAG"
+      },
+      {
+        "value": "BALE",
+        "label": "BALE"
+      },
+      {
+        "value": "PALLET",
+        "label": "PALLET"
+      },
+      {
+        "value": "PACKAGES",
+        "label": "PACKAGES"
+      },
+      {
+        "value": "HANGING GARMENT",
+        "label": "HANGING GARMENT"
+      },
+      {
+        "value": "IN BULK",
+        "label": "IN BULK"
+      },
+      {
+        "value": "PCS IN NUDE",
+        "label": "PCS IN NUDE"
+      },
+      {
+        "value": "SETS IN NUDE",
+        "label": "SETS IN NUDE"
+      },
+      {
+        "value": "UNITS IN NUDE",
+        "label": "UNITS IN NUDE"
+      }
+    ]
+  },
+  "origin": {
+    "EmptyOptions": [
+      {
+        "value": "",
+        "label": ""
+      }
+    ],
+    "AustraliaAgreementOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "WO",
+        "label": "WO：完全获得"
+      },
+      {
+        "value": "WP",
+        "label": "WP：完全使用原产材料生产"
+      },
+      {
+        "value": "PSR",
+        "label": "PSR：产品特定原产地标准"
+      }
+    ],
+    "ChileAgreementOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "WO",
+        "label": "WO：完全获得"
+      },
+      {
+        "value": "WP",
+        "label": "WP：完全使用原产材料生产"
+      },
+      {
+        "value": "PSR",
+        "label": "PSR：产品特定原产地标准"
+      }
+    ],
+    "KoreaAgreementOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "WO",
+        "label": "WO：完全获得或生产"
+      },
+      {
+        "value": "WP",
+        "label": "WP：完全使用双方原产材料生产"
+      },
+      {
+        "value": "PSR",
+        "label": "PSR：产品特定原产地标准"
+      },
+      {
+        "value": "OP",
+        "label": "OP：特定货物处理规定"
+      }
+    ],
+    "TaiwanAgreementOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "WO",
+        "label": "WO：完全获得"
+      },
+      {
+        "value": "WP",
+        "label": "WP：完全使用双方原产材料生产"
+      },
+      {
+        "value": "PSR",
+        "label": "PSR：产品特定原产地标准"
+      },
+      {
+        "value": "PSR ACU",
+        "label": "PSR ACU：产品特定原产地标准 + 累积规则"
+      },
+      {
+        "value": "PSR DMI",
+        "label": "PSR DMI：产品特定原产地标准 + 微小含量"
+      },
+      {
+        "value": "PSR FG",
+        "label": "PSR FG：产品特定原产地标准 + 可互换材料"
+      }
+    ],
+    "FormEOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "WO",
+        "label": "WO：完全获得或生产"
+      },
+      {
+        "value": "PE",
+        "label": "PE：完全使用东盟/中国原产材料生产"
+      },
+      {
+        "value": "PSR",
+        "label": "PSR：产品特定原产地规则"
+      },
+      {
+        "value": "CTH",
+        "label": "CTH：税号前4位改变"
+      }
+    ],
+    "GspReferenceOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "F",
+        "label": "F：进口成分价值不超过规定比例"
+      },
+      {
+        "value": "P",
+        "label": "P：完全原产"
+      },
+      {
+        "value": "PK",
+        "label": "PK：完全原产并含巴基斯坦配额/特殊要求"
+      },
+      {
+        "value": "W",
+        "label": "W：按 HS 前4位税目标准判定"
+      },
+      {
+        "value": "Y",
+        "label": "Y：填写进口成分占 FOB 百分比"
+      }
+    ],
+    "GeorgiaAgreementOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "WO",
+        "label": "WO：完全获得或生产"
+      },
+      {
+        "value": "WP",
+        "label": "WP：完全使用原产材料生产"
+      },
+      {
+        "value": "40%",
+        "label": "40%：区域价值成分不低于40%"
+      },
+      {
+        "value": "PSR",
+        "label": "PSR：产品特定原产地规则"
+      }
+    ],
+    "RcepOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "CR",
+        "label": "CR：完全获得或生产"
+      },
+      {
+        "value": "CTC",
+        "label": "CTC：税则归类改变"
+      },
+      {
+        "value": "PE",
+        "label": "PE：完全使用原产材料生产"
+      },
+      {
+        "value": "RVC",
+        "label": "RVC：区域价值成分"
+      },
+      {
+        "value": "WO",
+        "label": "WO：完全获得或生产"
+      }
+    ],
+    "FormESubOptions": [
+      {
+        "value": "",
+        "label": ""
+      },
+      {
+        "value": "1",
+        "label": "1：适用区域价值成分（RVC）标准"
+      },
+      {
+        "value": "2",
+        "label": "2：适用归类改变标准（CTC）"
+      },
+      {
+        "value": "3",
+        "label": "3：适用加工工序标准"
+      }
+    ]
+  },
+  "rules": [
+    {
+      "scope": "coo",
+      "key": "applyType",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "申请类型"
+    },
+    {
+      "scope": "coo",
+      "key": "certStatus",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "证书类别"
+    },
+    {
+      "scope": "coo",
+      "key": "certType",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "证书类型"
+    },
+    {
+      "scope": "coo",
+      "key": "certNo",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "原产地证编号"
+    },
+    {
+      "scope": "coo",
+      "key": "ciqRegNo",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "出口商代码"
+    },
+    {
+      "scope": "coo",
+      "key": "aplRegNo",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "录入企业代码"
+    },
+    {
+      "scope": "coo",
+      "key": "etpsName",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "企业名称"
+    },
+    {
+      "scope": "coo",
+      "key": "applName",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "申报员姓名"
+    },
+    {
+      "scope": "coo",
+      "key": "applicant",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "申报员身份证号"
+    },
+    {
+      "scope": "coo",
+      "key": "applTel",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "申报员电话"
+    },
+    {
+      "scope": "coo",
+      "key": "orgCode",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "签证机构代码"
+    },
+    {
+      "scope": "coo",
+      "key": "fetchPlace",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "领证机构代码"
+    },
+    {
+      "scope": "coo",
+      "key": "aplAdd",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "申请地址"
+    },
+    {
+      "scope": "coo",
+      "key": "aplDate",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "申请日期"
+    },
+    {
+      "scope": "coo",
+      "key": "exporter",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "出口商"
+    },
+    {
+      "scope": "coo",
+      "key": "consignee",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "收货人"
+    },
+    {
+      "scope": "coo",
+      "key": "destCountry",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "进口国/地区"
+    },
+    {
+      "scope": "coo",
+      "key": "destCountryCode",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "进口国/地区编码"
+    },
+    {
+      "scope": "coo",
+      "key": "destCountryName",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "进口国/地区中文名"
+    },
+    {
+      "scope": "coo",
+      "key": "mark",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "唛头"
+    },
+    {
+      "scope": "coo",
+      "key": "aplPromiseCode",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "申请企业承诺代码"
+    },
+    {
+      "scope": "coo",
+      "key": "applyType",
+      "method": "ValidateAllowedValues",
+      "numbers": [],
+      "allowed": [
+        "0",
+        "1"
+      ],
+      "format": "",
+      "label": "申请类型"
+    },
+    {
+      "scope": "coo",
+      "key": "certStatus",
+      "method": "ValidateAllowedValues",
+      "numbers": [],
+      "allowed": [
+        "0",
+        "1",
+        "2",
+        "3"
+      ],
+      "format": "",
+      "label": "证书类别"
+    },
+    {
+      "scope": "coo",
+      "key": "producerSertFlag",
+      "method": "ValidateAllowedValues",
+      "numbers": [],
+      "allowed": [
+        "Y",
+        "N"
+      ],
+      "format": "",
+      "label": "是否生产商保密"
+    },
+    {
+      "scope": "coo",
+      "key": "exhibitFlag",
+      "method": "ValidateAllowedValues",
+      "numbers": [],
+      "allowed": [
+        "0",
+        "1"
+      ],
+      "format": "",
+      "label": "是否展览证书"
+    },
+    {
+      "scope": "coo",
+      "key": "thirdPartyInvFlag",
+      "method": "ValidateAllowedValues",
+      "numbers": [],
+      "allowed": [
+        "0",
+        "1"
+      ],
+      "format": "",
+      "label": "第三方发票标志"
+    },
+    {
+      "scope": "coo",
+      "key": "predictFlag",
+      "method": "ValidateAllowedValues",
+      "numbers": [],
+      "allowed": [
+        "0",
+        "1"
+      ],
+      "format": "",
+      "label": "预计离港日期标志"
+    },
+    {
+      "scope": "coo",
+      "key": "aplPromiseCode",
+      "method": "ValidateAllowedValues",
+      "numbers": [],
+      "allowed": [
+        "1"
+      ],
+      "format": "",
+      "label": "申请企业承诺代码"
+    },
+    {
+      "scope": "coo",
+      "key": "tradeModeCode",
+      "method": "ValidateAllowedValues",
+      "numbers": [],
+      "allowed": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "33",
+        "34"
+      ],
+      "format": "",
+      "label": "贸易方式代码"
+    },
+    {
+      "scope": "coo",
+      "key": "certNo",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        20
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "原产地证编号"
+    },
+    {
+      "scope": "coo",
+      "key": "certType",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        2
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "证书类型"
+    },
+    {
+      "scope": "coo",
+      "key": "entMgrNo",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        19
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "企业编号"
+    },
+    {
+      "scope": "coo",
+      "key": "ciqRegNo",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        18
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "出口商代码"
+    },
+    {
+      "scope": "coo",
+      "key": "aplRegNo",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        18
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "录入企业代码"
+    },
+    {
+      "scope": "coo",
+      "key": "etpsName",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        400
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "企业名称"
+    },
+    {
+      "scope": "coo",
+      "key": "applName",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        20
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "申报员姓名"
+    },
+    {
+      "scope": "coo",
+      "key": "applicant",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        18
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "申报员身份证号"
+    },
+    {
+      "scope": "coo",
+      "key": "applTel",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        30
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "申报员电话"
+    },
+    {
+      "scope": "coo",
+      "key": "orgCode",
+      "method": "ValidateDigits",
+      "numbers": [
+        4
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "签证机构代码"
+    },
+    {
+      "scope": "coo",
+      "key": "fetchPlace",
+      "method": "ValidateDigits",
+      "numbers": [
+        4
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "领证机构代码"
+    },
+    {
+      "scope": "coo",
+      "key": "aplAdd",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        30
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "申请地址"
+    },
+    {
+      "scope": "coo",
+      "key": "destCountry",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        80
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "进口国/地区"
+    },
+    {
+      "scope": "coo",
+      "key": "destCountryCode",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        4
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "进口国/地区编码"
+    },
+    {
+      "scope": "coo",
+      "key": "destCountryName",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "进口国/地区中文名"
+    },
+    {
+      "scope": "coo",
+      "key": "exporter",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        400
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "出口商"
+    },
+    {
+      "scope": "coo",
+      "key": "consignee",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        400
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "收货人"
+    },
+    {
+      "scope": "coo",
+      "key": "goodsSpecClause",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        2000
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "货物特殊条款"
+    },
+    {
+      "scope": "coo",
+      "key": "mark",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        2000
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "唛头"
+    },
+    {
+      "scope": "coo",
+      "key": "loadPort",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "启运港"
+    },
+    {
+      "scope": "coo",
+      "key": "unloadPort",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "卸货港"
+    },
+    {
+      "scope": "coo",
+      "key": "transMeans",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        100
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "运输方式"
+    },
+    {
+      "scope": "coo",
+      "key": "transName",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        100
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "运输工具名称"
+    },
+    {
+      "scope": "coo",
+      "key": "transCountryCode",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        4
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "转运国/地区代码"
+    },
+    {
+      "scope": "coo",
+      "key": "transCountryName",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        150
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "转运国/地区名称"
+    },
+    {
+      "scope": "coo",
+      "key": "transPort",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "转运港"
+    },
+    {
+      "scope": "coo",
+      "key": "destPort",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "目的港"
+    },
+    {
+      "scope": "coo",
+      "key": "invNo",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "发票号"
+    },
+    {
+      "scope": "coo",
+      "key": "transDetails",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        630
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "运输细节"
+    },
+    {
+      "scope": "coo",
+      "key": "fobValue",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        25
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "FOB值"
+    },
+    {
+      "scope": "coo",
+      "key": "totalAmt",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        25
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "总金额"
+    },
+    {
+      "scope": "coo",
+      "key": "note",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        1000
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "备注"
+    },
+    {
+      "scope": "coo",
+      "key": "contractNo",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        200
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "合同号"
+    },
+    {
+      "scope": "coo",
+      "key": "lcNo",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "信用证号"
+    },
+    {
+      "scope": "coo",
+      "key": "tradeModeCode",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        4
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "贸易方式代码"
+    },
+    {
+      "scope": "coo",
+      "key": "specInvTerms",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        1000
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "发票特殊条款"
+    },
+    {
+      "scope": "coo",
+      "key": "priceTerms",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        20
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "价格条款"
+    },
+    {
+      "scope": "coo",
+      "key": "curr",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        10
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "货币单位"
+    },
+    {
+      "scope": "coo",
+      "key": "remark",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        300
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "备注说明"
+    },
+    {
+      "scope": "coo",
+      "key": "producer",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        1000
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "证书货物生产商描述"
+    },
+    {
+      "scope": "coo",
+      "key": "exporterTel",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "出口商电话"
+    },
+    {
+      "scope": "coo",
+      "key": "exporterFax",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "出口商传真"
+    },
+    {
+      "scope": "coo",
+      "key": "exporterEmail",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "出口商邮箱"
+    },
+    {
+      "scope": "coo",
+      "key": "consigneeTel",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "进口商电话"
+    },
+    {
+      "scope": "coo",
+      "key": "consigneeFax",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "进口商传真"
+    },
+    {
+      "scope": "coo",
+      "key": "consigneeEmail",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "进口商邮箱"
+    },
+    {
+      "scope": "coo",
+      "key": "oriCountryCode",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        4
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "原产国/地区代码"
+    },
+    {
+      "scope": "coo",
+      "key": "oriCountry",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        30
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "原产国/地区"
+    },
+    {
+      "scope": "coo",
+      "key": "etpsConcEr",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        30
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "企业联系人"
+    },
+    {
+      "scope": "coo",
+      "key": "etpsTel",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        20
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "企业联系电话"
+    },
+    {
+      "scope": "coo",
+      "key": "prcsAssembly",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        30
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "加工装配工序"
+    },
+    {
+      "scope": "coo",
+      "key": "entryId",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        600
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "报关单号"
+    },
+    {
+      "scope": "coo",
+      "key": "invDate",
+      "method": "ValidateExactDate",
+      "numbers": [],
+      "allowed": [
+        "yyyy-MM-dd"
+      ],
+      "format": "yyyy-MM-dd",
+      "label": "发票日期"
+    },
+    {
+      "scope": "coo",
+      "key": "aplDate",
+      "method": "ValidateExactDate",
+      "numbers": [],
+      "allowed": [
+        "yyyy-MM-dd"
+      ],
+      "format": "yyyy-MM-dd",
+      "label": "申请日期"
+    },
+    {
+      "scope": "coo",
+      "key": "intendExpDate",
+      "method": "ValidateExactDate",
+      "numbers": [],
+      "allowed": [
+        "yyyy-MM-dd"
+      ],
+      "format": "yyyy-MM-dd",
+      "label": "出运日期"
+    },
+    {
+      "scope": "coo",
+      "key": "expDeclDate",
+      "method": "ValidateExactDate",
+      "numbers": [],
+      "allowed": [
+        "yyyy-MM-dd"
+      ],
+      "format": "yyyy-MM-dd",
+      "label": "出口报关日期"
+    },
+    {
+      "scope": "coo",
+      "key": "chkValidDate",
+      "method": "ValidateExactDate",
+      "numbers": [],
+      "allowed": [
+        "yyyy-MM-dd"
+      ],
+      "format": "yyyy-MM-dd",
+      "label": "签发有效日期"
+    },
+    {
+      "scope": "coo",
+      "key": "oldDeclDate",
+      "method": "ValidateExactDate",
+      "numbers": [],
+      "allowed": [
+        "yyyy-MM-dd"
+      ],
+      "format": "yyyy-MM-dd",
+      "label": "原证申请日期"
+    },
+    {
+      "scope": "coo",
+      "key": "oldIssueDate",
+      "method": "ValidateExactDate",
+      "numbers": [],
+      "allowed": [
+        "yyyy-MM-dd"
+      ],
+      "format": "yyyy-MM-dd",
+      "label": "原证签发日期"
+    },
+    {
+      "scope": "coo",
+      "key": "fobValue",
+      "method": "ValidateDecimal",
+      "numbers": [
+        19,
+        5
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "FOB值"
+    },
+    {
+      "scope": "coo",
+      "key": "totalAmt",
+      "method": "ValidateDecimal",
+      "numbers": [
+        19,
+        5
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "总金额"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsItemFlag",
+      "method": "ValidateAllowedValues",
+      "numbers": [],
+      "allowed": [
+        "N",
+        "Y"
+      ],
+      "format": "",
+      "label": "非货物项标志"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsItemFlag",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        1
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "非货物项标志"
+    },
+    {
+      "scope": "goods",
+      "key": "hsCode",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        10
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "商品HS编码"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsName",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        200
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "货物名称中文"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsNameE",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        400
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "货物名称英文"
+    },
+    {
+      "scope": "goods",
+      "key": "packUnit",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        20
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "包装单位"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsUnitE",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        20
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "标准货物单位英文"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsUnit",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        20
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "标准货物单位中文"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsUnitRef",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        20
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "辅助单位"
+    },
+    {
+      "scope": "goods",
+      "key": "secdGoodsUnitRef",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        20
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "第二辅助单位"
+    },
+    {
+      "scope": "goods",
+      "key": "wtUnit",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        10
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "重量单位"
+    },
+    {
+      "scope": "goods",
+      "key": "iCompPrpr",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        10
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "进口成份比例"
+    },
+    {
+      "scope": "goods",
+      "key": "oriCriteria",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        10
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "原产标准"
+    },
+    {
+      "scope": "goods",
+      "key": "oriCriteriaRef",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        10
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "原产标准辅助项"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsOriginCountry",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        3
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "协定原产国代码"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsOriginCountryEn",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        80
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "协定原产国英文"
+    },
+    {
+      "scope": "goods",
+      "key": "producer",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        1000
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "生产商描述"
+    },
+    {
+      "scope": "goods",
+      "key": "producerTel",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "生产商电话"
+    },
+    {
+      "scope": "goods",
+      "key": "producerFax",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "生产商传真"
+    },
+    {
+      "scope": "goods",
+      "key": "producerEmail",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "生产商邮箱"
+    },
+    {
+      "scope": "goods",
+      "key": "ciqRegNo",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        10
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "生产企业组织机构代码"
+    },
+    {
+      "scope": "goods",
+      "key": "prdcEtpsName",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        400
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "生产企业名称"
+    },
+    {
+      "scope": "goods",
+      "key": "prdcEtpsConcEr",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        20
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "生产企业联系人"
+    },
+    {
+      "scope": "goods",
+      "key": "prdcEtpsTel",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        20
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "生产企业联系电话"
+    },
+    {
+      "scope": "goods",
+      "key": "producerSertFlag",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        1
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "是否生产商保密"
+    },
+    {
+      "scope": "goods",
+      "key": "oriCriteriaSub",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        1
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "原产标准子项"
+    },
+    {
+      "scope": "goods",
+      "key": "invNo",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        50
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "发票号"
+    },
+    {
+      "scope": "goods",
+      "key": "packType",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        1
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "包装类型"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsTaxRate",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        1
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "最高税率标志"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsDesc",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        1000
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "货物描述"
+    },
+    {
+      "scope": "goods",
+      "key": "packQty",
+      "method": "ValidateDecimal",
+      "numbers": [
+        19,
+        5
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "包装件数"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsQty",
+      "method": "ValidateDecimal",
+      "numbers": [
+        19,
+        5
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "标准货物数量"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsQtyRef",
+      "method": "ValidateDecimal",
+      "numbers": [
+        19,
+        5
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "辅助数量"
+    },
+    {
+      "scope": "goods",
+      "key": "secdGoodsQtyRef",
+      "method": "ValidateDecimal",
+      "numbers": [
+        19,
+        5
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "第二辅助数量"
+    },
+    {
+      "scope": "goods",
+      "key": "grossWt",
+      "method": "ValidateDecimal",
+      "numbers": [
+        19,
+        5
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "毛重"
+    },
+    {
+      "scope": "goods",
+      "key": "netWt",
+      "method": "ValidateDecimal",
+      "numbers": [
+        19,
+        5
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "净重"
+    },
+    {
+      "scope": "goods",
+      "key": "invPrice",
+      "method": "ValidateDecimal",
+      "numbers": [
+        19,
+        5
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "发票单价"
+    },
+    {
+      "scope": "goods",
+      "key": "invValue",
+      "method": "ValidateDecimal",
+      "numbers": [
+        19,
+        5
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "发票金额"
+    },
+    {
+      "scope": "goods",
+      "key": "fobValue",
+      "method": "ValidateDecimal",
+      "numbers": [
+        19,
+        5
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "FOB值"
+    },
+    {
+      "scope": "goods",
+      "key": "producerSertFlag",
+      "method": "ValidateAllowedValues",
+      "numbers": [],
+      "allowed": [
+        "Y",
+        "N"
+      ],
+      "format": "",
+      "label": "是否生产商保密"
+    },
+    {
+      "scope": "goods",
+      "key": "goodsTaxRate",
+      "method": "ValidateAllowedValues",
+      "numbers": [],
+      "allowed": [
+        "0",
+        "1",
+        "2"
+      ],
+      "format": "",
+      "label": "最高税率标志"
+    },
+    {
+      "scope": "goods",
+      "key": "packType",
+      "method": "ValidateAllowedValues",
+      "numbers": [],
+      "allowed": [
+        "1",
+        "2"
+      ],
+      "format": "",
+      "label": "包装类型"
+    },
+    {
+      "scope": "acd",
+      "key": "copCusCode",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "企业内部编号"
+    },
+    {
+      "scope": "acd",
+      "key": "gName",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "主要货物名称"
+    },
+    {
+      "scope": "acd",
+      "key": "codeTS",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "HS编码"
+    },
+    {
+      "scope": "acd",
+      "key": "declTotal",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "货物总价"
+    },
+    {
+      "scope": "acd",
+      "key": "ieDate",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "进出口日期"
+    },
+    {
+      "scope": "acd",
+      "key": "tradeMode",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "贸易方式"
+    },
+    {
+      "scope": "acd",
+      "key": "oriCountry",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "原产地/货源地"
+    },
+    {
+      "scope": "acd",
+      "key": "tradeCode",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "经营单位"
+    },
+    {
+      "scope": "acd",
+      "key": "agentCode",
+      "method": "RequireValue",
+      "numbers": [],
+      "allowed": [],
+      "format": "",
+      "label": "申报单位"
+    },
+    {
+      "scope": "acd",
+      "key": "codeTS",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        10
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "HS编码"
+    },
+    {
+      "scope": "acd",
+      "key": "listNo",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        32
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "提单号"
+    },
+    {
+      "scope": "acd",
+      "key": "tradeMode",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        4
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "贸易方式"
+    },
+    {
+      "scope": "acd",
+      "key": "ieDate",
+      "method": "ValidateExactDate",
+      "numbers": [],
+      "allowed": [
+        "yyyyMMdd"
+      ],
+      "format": "yyyyMMdd",
+      "label": "进出口日期"
+    },
+    {
+      "scope": "acd",
+      "key": "receiveDate",
+      "method": "ValidateExactDate",
+      "numbers": [],
+      "allowed": [
+        "yyyyMMdd"
+      ],
+      "format": "yyyyMMdd",
+      "label": "收到证件日期"
+    },
+    {
+      "scope": "acd",
+      "key": "declTotal",
+      "method": "ValidateDecimal",
+      "numbers": [
+        19,
+        4
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "货物总价"
+    },
+    {
+      "scope": "acd",
+      "key": "declarePrice",
+      "method": "ValidateDecimal",
+      "numbers": [
+        19,
+        2
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "报关收费"
+    },
+    {
+      "scope": "acd",
+      "key": "copCusCode",
+      "method": "ValidateDigits",
+      "numbers": [
+        10
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "企业内部编号"
+    },
+    {
+      "scope": "acd",
+      "key": "curr",
+      "method": "ValidateDigits",
+      "numbers": [
+        3
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "币制代码"
+    },
+    {
+      "scope": "acd",
+      "key": "oriCountry",
+      "method": "ValidateDigits",
+      "numbers": [
+        3
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "原产地/货源地"
+    },
+    {
+      "scope": "acd",
+      "key": "agentCode",
+      "method": "ValidateDigits",
+      "numbers": [
+        10
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "申报单位"
+    },
+    {
+      "scope": "acd",
+      "key": "tradeCode",
+      "method": "ValidateDigits",
+      "numbers": [
+        10
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "经营单位"
+    }
+  ],
+  "labels": {
+    "coo.applyType": "申请类型",
+    "coo.certStatus": "证书类别",
+    "coo.certType": "证书类型",
+    "coo.certNo": "原产地证编号",
+    "coo.ciqRegNo": "出口商代码",
+    "coo.aplRegNo": "录入企业代码",
+    "coo.etpsName": "企业名称",
+    "coo.applName": "申报员姓名",
+    "coo.applicant": "申报员身份证号",
+    "coo.applTel": "申报员电话",
+    "coo.orgCode": "签证机构代码",
+    "coo.fetchPlace": "领证机构代码",
+    "coo.aplAdd": "申请地址",
+    "coo.aplDate": "申请日期",
+    "coo.exporter": "出口商",
+    "coo.consignee": "收货人",
+    "coo.destCountry": "进口国/地区",
+    "coo.destCountryCode": "进口国/地区编码",
+    "coo.destCountryName": "进口国/地区中文名",
+    "coo.mark": "唛头",
+    "coo.aplPromiseCode": "申请企业承诺代码",
+    "coo.producerSertFlag": "是否生产商保密",
+    "coo.exhibitFlag": "是否展览证书",
+    "coo.thirdPartyInvFlag": "第三方发票标志",
+    "coo.predictFlag": "预计离港日期标志",
+    "coo.tradeModeCode": "贸易方式代码",
+    "coo.entMgrNo": "企业编号",
+    "coo.goodsSpecClause": "货物特殊条款",
+    "coo.loadPort": "启运港",
+    "coo.unloadPort": "卸货港",
+    "coo.transMeans": "运输方式",
+    "coo.transName": "运输工具名称",
+    "coo.transCountryCode": "转运国/地区代码",
+    "coo.transCountryName": "转运国/地区名称",
+    "coo.transPort": "转运港",
+    "coo.destPort": "目的港",
+    "coo.invNo": "发票号",
+    "coo.transDetails": "运输细节",
+    "coo.fobValue": "FOB值",
+    "coo.totalAmt": "总金额",
+    "coo.note": "备注",
+    "coo.contractNo": "合同号",
+    "coo.lcNo": "信用证号",
+    "coo.specInvTerms": "发票特殊条款",
+    "coo.priceTerms": "价格条款",
+    "coo.curr": "货币单位",
+    "coo.remark": "备注说明",
+    "coo.producer": "证书货物生产商描述",
+    "coo.exporterTel": "出口商电话",
+    "coo.exporterFax": "出口商传真",
+    "coo.exporterEmail": "出口商邮箱",
+    "coo.consigneeTel": "进口商电话",
+    "coo.consigneeFax": "进口商传真",
+    "coo.consigneeEmail": "进口商邮箱",
+    "coo.oriCountryCode": "原产国/地区代码",
+    "coo.oriCountry": "原产国/地区",
+    "coo.etpsConcEr": "企业联系人",
+    "coo.etpsTel": "企业联系电话",
+    "coo.prcsAssembly": "加工装配工序",
+    "coo.entryId": "报关单号",
+    "coo.invDate": "发票日期",
+    "coo.intendExpDate": "出运日期",
+    "coo.expDeclDate": "出口报关日期",
+    "coo.chkValidDate": "签发有效日期",
+    "coo.oldDeclDate": "原证申请日期",
+    "coo.oldIssueDate": "原证签发日期",
+    "goods.goodsItemFlag": "非货物项标志",
+    "goods.goodsNameE": "货物名称英文",
+    "goods.packQty": "包装件数",
+    "goods.packUnit": "包装单位英文",
+    "goods.hsCode": "商品HS编码",
+    "goods.goodsName": "货物名称中文",
+    "goods.goodsQty": "标准货物数量",
+    "goods.goodsUnitE": "标准货物单位英文",
+    "goods.goodsUnit": "标准货物单位中文",
+    "goods.invValue": "发票金额",
+    "goods.fobValue": "FOB值",
+    "goods.packType": "包装类型",
+    "goods.goodsUnitRef": "辅助单位",
+    "goods.secdGoodsUnitRef": "第二辅助单位",
+    "goods.wtUnit": "重量单位",
+    "goods.iCompPrpr": "进口成份比例",
+    "goods.oriCriteria": "原产标准",
+    "goods.oriCriteriaRef": "原产标准辅助项",
+    "goods.goodsOriginCountry": "协定原产国代码",
+    "goods.goodsOriginCountryEn": "协定原产国英文",
+    "goods.producer": "生产商描述",
+    "goods.producerTel": "生产商电话",
+    "goods.producerFax": "生产商传真",
+    "goods.producerEmail": "生产商邮箱",
+    "goods.ciqRegNo": "生产企业组织机构代码",
+    "goods.prdcEtpsName": "生产企业名称",
+    "goods.prdcEtpsConcEr": "生产企业联系人",
+    "goods.prdcEtpsTel": "生产企业联系电话",
+    "goods.producerSertFlag": "是否生产商保密",
+    "goods.oriCriteriaSub": "原产标准子项",
+    "goods.invNo": "发票号",
+    "goods.goodsTaxRate": "最高税率标志",
+    "goods.goodsDesc": "货物描述",
+    "goods.goodsQtyRef": "辅助数量",
+    "goods.secdGoodsQtyRef": "第二辅助数量",
+    "goods.grossWt": "毛重",
+    "goods.netWt": "净重",
+    "goods.invPrice": "发票单价",
+    "acd.copCusCode": "企业内部编号",
+    "acd.gName": "主要货物名称",
+    "acd.codeTS": "HS编码",
+    "acd.declTotal": "货物总价",
+    "acd.ieDate": "进出口日期",
+    "acd.tradeMode": "贸易方式",
+    "acd.oriCountry": "原产地/货源地",
+    "acd.tradeCode": "经营单位",
+    "acd.agentCode": "申报单位",
+    "acd.listNo": "提单号",
+    "acd.receiveDate": "收到证件日期",
+    "acd.declarePrice": "报关收费",
+    "acd.curr": "币制代码"
+  },
+  "xml": {
+    "coo": [
+      {
+        "tag": "CertNo",
+        "key": "certNo",
+        "multiline": false
+      },
+      {
+        "tag": "ApplyType",
+        "key": "applyType",
+        "multiline": false
+      },
+      {
+        "tag": "CertStatus",
+        "key": "certStatus",
+        "multiline": false
+      },
+      {
+        "tag": "CertType",
+        "key": "certType",
+        "multiline": false
+      },
+      {
+        "tag": "EntMgrNo",
+        "key": "entMgrNo",
+        "multiline": false
+      },
+      {
+        "tag": "CiqRegNo",
+        "key": "ciqRegNo",
+        "multiline": false
+      },
+      {
+        "tag": "AplRegNo",
+        "key": "aplRegNo",
+        "multiline": false
+      },
+      {
+        "tag": "EtpsName",
+        "key": "etpsName",
+        "multiline": false
+      },
+      {
+        "tag": "ApplName",
+        "key": "applName",
+        "multiline": false
+      },
+      {
+        "tag": "Applicant",
+        "key": "applicant",
+        "multiline": false
+      },
+      {
+        "tag": "ApplTel",
+        "key": "applTel",
+        "multiline": false
+      },
+      {
+        "tag": "OrgCode",
+        "key": "orgCode",
+        "multiline": false
+      },
+      {
+        "tag": "FetchPlace",
+        "key": "fetchPlace",
+        "multiline": false
+      },
+      {
+        "tag": "AplAdd",
+        "key": "aplAdd",
+        "multiline": false
+      },
+      {
+        "tag": "InvDate",
+        "key": "invDate",
+        "multiline": false
+      },
+      {
+        "tag": "InvNo",
+        "key": "invNo",
+        "multiline": false
+      },
+      {
+        "tag": "AplDate",
+        "key": "aplDate",
+        "multiline": false
+      },
+      {
+        "tag": "DestCountry",
+        "key": "destCountry",
+        "multiline": false
+      },
+      {
+        "tag": "DestCountryCode",
+        "key": "destCountryCode",
+        "multiline": false
+      },
+      {
+        "tag": "DestCountryName",
+        "key": "destCountryName",
+        "multiline": false
+      },
+      {
+        "tag": "Exporter",
+        "key": "exporter",
+        "multiline": true
+      },
+      {
+        "tag": "Consignee",
+        "key": "consignee",
+        "multiline": true
+      },
+      {
+        "tag": "GoodsSpecClause",
+        "key": "goodsSpecClause",
+        "multiline": true
+      },
+      {
+        "tag": "Mark",
+        "key": "mark",
+        "multiline": true
+      },
+      {
+        "tag": "LoadPort",
+        "key": "loadPort",
+        "multiline": false
+      },
+      {
+        "tag": "UnloadPort",
+        "key": "unloadPort",
+        "multiline": false
+      },
+      {
+        "tag": "TransMeans",
+        "key": "transMeans",
+        "multiline": false
+      },
+      {
+        "tag": "TransName",
+        "key": "transName",
+        "multiline": false
+      },
+      {
+        "tag": "TransCountryCode",
+        "key": "transCountryCode",
+        "multiline": false
+      },
+      {
+        "tag": "TransCountryName",
+        "key": "transCountryName",
+        "multiline": false
+      },
+      {
+        "tag": "TransPort",
+        "key": "transPort",
+        "multiline": false
+      },
+      {
+        "tag": "DestPort",
+        "key": "destPort",
+        "multiline": false
+      },
+      {
+        "tag": "TransDetails",
+        "key": "transDetails",
+        "multiline": true
+      },
+      {
+        "tag": "IntendExpDate",
+        "key": "intendExpDate",
+        "multiline": false
+      },
+      {
+        "tag": "TradeModeCode",
+        "key": "tradeModeCode",
+        "multiline": false
+      },
+      {
+        "tag": "FOBValue",
+        "key": "fobValue",
+        "multiline": false
+      },
+      {
+        "tag": "TotalAmt",
+        "key": "totalAmt",
+        "multiline": false
+      },
+      {
+        "tag": "Note",
+        "key": "note",
+        "multiline": true
+      },
+      {
+        "tag": "ContractNo",
+        "key": "contractNo",
+        "multiline": false
+      },
+      {
+        "tag": "LcNo",
+        "key": "lcNo",
+        "multiline": false
+      },
+      {
+        "tag": "SpecInvTerms",
+        "key": "specInvTerms",
+        "multiline": true
+      },
+      {
+        "tag": "PriceTerms",
+        "key": "priceTerms",
+        "multiline": false
+      },
+      {
+        "tag": "Curr",
+        "key": "curr",
+        "multiline": false
+      },
+      {
+        "tag": "Remark",
+        "key": "remark",
+        "multiline": true
+      },
+      {
+        "tag": "ProducerSertFlag",
+        "key": "producerSertFlag",
+        "multiline": false
+      },
+      {
+        "tag": "ExhibitFlag",
+        "key": "exhibitFlag",
+        "multiline": false
+      },
+      {
+        "tag": "ThirdPartyInvFlag",
+        "key": "thirdPartyInvFlag",
+        "multiline": false
+      },
+      {
+        "tag": "ExporterTel",
+        "key": "exporterTel",
+        "multiline": false
+      },
+      {
+        "tag": "ExporterFax",
+        "key": "exporterFax",
+        "multiline": false
+      },
+      {
+        "tag": "ExporterEmail",
+        "key": "exporterEmail",
+        "multiline": false
+      },
+      {
+        "tag": "ConsigneeTel",
+        "key": "consigneeTel",
+        "multiline": false
+      },
+      {
+        "tag": "ConsigneeFax",
+        "key": "consigneeFax",
+        "multiline": false
+      },
+      {
+        "tag": "ConsigneeEmail",
+        "key": "consigneeEmail",
+        "multiline": false
+      },
+      {
+        "tag": "PredictFlag",
+        "key": "predictFlag",
+        "multiline": false
+      },
+      {
+        "tag": "ExpDeclDate",
+        "key": "expDeclDate",
+        "multiline": false
+      },
+      {
+        "tag": "OriCountryCode",
+        "key": "oriCountryCode",
+        "multiline": false
+      },
+      {
+        "tag": "OriCountry",
+        "key": "oriCountry",
+        "multiline": false
+      },
+      {
+        "tag": "ChkValidDate",
+        "key": "chkValidDate",
+        "multiline": false
+      },
+      {
+        "tag": "EtpsConcEr",
+        "key": "etpsConcEr",
+        "multiline": false
+      },
+      {
+        "tag": "EtpsTel",
+        "key": "etpsTel",
+        "multiline": false
+      },
+      {
+        "tag": "Producer",
+        "key": "producer",
+        "multiline": true
+      },
+      {
+        "tag": "PrcsAssembly",
+        "key": "prcsAssembly",
+        "multiline": true
+      },
+      {
+        "tag": "EntryId",
+        "key": "entryId",
+        "multiline": false
+      }
+    ],
+    "goods": [
+      {
+        "tag": "GoodsItemFlag",
+        "key": "goodsItemFlag",
+        "multiline": false
+      },
+      {
+        "tag": "GNo",
+        "key": "gNo",
+        "multiline": false
+      },
+      {
+        "tag": "HSCode",
+        "key": "hsCode",
+        "multiline": false
+      },
+      {
+        "tag": "GoodsName",
+        "key": "goodsName",
+        "multiline": false
+      },
+      {
+        "tag": "GoodsNameE",
+        "key": "goodsNameE",
+        "multiline": false
+      },
+      {
+        "tag": "PackQty",
+        "key": "packQty",
+        "multiline": false
+      },
+      {
+        "tag": "PackUnit",
+        "key": "packUnit",
+        "multiline": false
+      },
+      {
+        "tag": "GoodsQty",
+        "key": "goodsQty",
+        "multiline": false
+      },
+      {
+        "tag": "GoodsUnitE",
+        "key": "goodsUnitE",
+        "multiline": false
+      },
+      {
+        "tag": "GoodsUnit",
+        "key": "goodsUnit",
+        "multiline": false
+      },
+      {
+        "tag": "GoodsQtyRef",
+        "key": "goodsQtyRef",
+        "multiline": false
+      },
+      {
+        "tag": "GoodsUnitRef",
+        "key": "goodsUnitRef",
+        "multiline": false
+      },
+      {
+        "tag": "SecdGoodsQtyRef",
+        "key": "secdGoodsQtyRef",
+        "multiline": false
+      },
+      {
+        "tag": "SecdGoodsUnitRef",
+        "key": "secdGoodsUnitRef",
+        "multiline": false
+      },
+      {
+        "tag": "GrossWt",
+        "key": "grossWt",
+        "multiline": false
+      },
+      {
+        "tag": "NetWt",
+        "key": "netWt",
+        "multiline": false
+      },
+      {
+        "tag": "WtUnit",
+        "key": "wtUnit",
+        "multiline": false
+      },
+      {
+        "tag": "InvPrice",
+        "key": "invPrice",
+        "multiline": false
+      },
+      {
+        "tag": "InvValue",
+        "key": "invValue",
+        "multiline": false
+      },
+      {
+        "tag": "FOBValue",
+        "key": "fobValue",
+        "multiline": false
+      },
+      {
+        "tag": "ICompPrpr",
+        "key": "iCompPrpr",
+        "multiline": false
+      },
+      {
+        "tag": "OriCriteria",
+        "key": "oriCriteria",
+        "multiline": false
+      },
+      {
+        "tag": "OriCriteriaRef",
+        "key": "oriCriteriaRef",
+        "multiline": false
+      },
+      {
+        "tag": "Producer",
+        "key": "producer",
+        "multiline": true
+      },
+      {
+        "tag": "ProducerTel",
+        "key": "producerTel",
+        "multiline": false
+      },
+      {
+        "tag": "ProducerFax",
+        "key": "producerFax",
+        "multiline": false
+      },
+      {
+        "tag": "ProducerEmail",
+        "key": "producerEmail",
+        "multiline": false
+      },
+      {
+        "tag": "CiqRegNo",
+        "key": "ciqRegNo",
+        "multiline": false
+      },
+      {
+        "tag": "PrdcEtpsName",
+        "key": "prdcEtpsName",
+        "multiline": false
+      },
+      {
+        "tag": "PrdcEtpsConcEr",
+        "key": "prdcEtpsConcEr",
+        "multiline": false
+      },
+      {
+        "tag": "PrdcEtpsTel",
+        "key": "prdcEtpsTel",
+        "multiline": false
+      },
+      {
+        "tag": "ProducerSertFlag",
+        "key": "producerSertFlag",
+        "multiline": false
+      },
+      {
+        "tag": "GoodsDesc",
+        "key": "goodsDesc",
+        "multiline": true
+      },
+      {
+        "tag": "OriCriteriaSub",
+        "key": "oriCriteriaSub",
+        "multiline": false
+      },
+      {
+        "tag": "GoodsOriginCountry",
+        "key": "goodsOriginCountry",
+        "multiline": false
+      },
+      {
+        "tag": "GoodsOriginCountryEn",
+        "key": "goodsOriginCountryEn",
+        "multiline": false
+      },
+      {
+        "tag": "GoodsTaxRate",
+        "key": "goodsTaxRate",
+        "multiline": false
+      },
+      {
+        "tag": "InvNo",
+        "key": "invNo",
+        "multiline": false
+      },
+      {
+        "tag": "PackType",
+        "key": "packType",
+        "multiline": false
+      }
+    ],
+    "acd": [
+      {
+        "tag": "CopCusCode",
+        "key": "copCusCode",
+        "multiline": false
+      },
+      {
+        "tag": "Sign",
+        "key": "sign",
+        "multiline": false
+      },
+      {
+        "tag": "OperType",
+        "key": "operType",
+        "multiline": false
+      },
+      {
+        "tag": "GName",
+        "key": "gName",
+        "multiline": false
+      },
+      {
+        "tag": "CodeTS",
+        "key": "codeTS",
+        "multiline": false
+      },
+      {
+        "tag": "DeclTotal",
+        "key": "declTotal",
+        "multiline": false
+      },
+      {
+        "tag": "IEDate",
+        "key": "ieDate",
+        "multiline": false
+      },
+      {
+        "tag": "ListNo",
+        "key": "listNo",
+        "multiline": false
+      },
+      {
+        "tag": "TradeMode",
+        "key": "tradeMode",
+        "multiline": false
+      },
+      {
+        "tag": "OriCountry",
+        "key": "oriCountry",
+        "multiline": false
+      },
+      {
+        "tag": "TradeCode",
+        "key": "tradeCode",
+        "multiline": false
+      },
+      {
+        "tag": "AgentCode",
+        "key": "agentCode",
+        "multiline": false
+      },
+      {
+        "tag": "Curr",
+        "key": "curr",
+        "multiline": false
+      },
+      {
+        "tag": "QtyOrWeight",
+        "key": "qtyOrWeight",
+        "multiline": false
+      },
+      {
+        "tag": "PackingCondition",
+        "key": "packingCondition",
+        "multiline": false
+      },
+      {
+        "tag": "OtherNote",
+        "key": "otherNote",
+        "multiline": false
+      },
+      {
+        "tag": "ConsignTele",
+        "key": "consignTele",
+        "multiline": false
+      },
+      {
+        "tag": "EntryID",
+        "key": "entryId",
+        "multiline": false
+      },
+      {
+        "tag": "ReceiveDate",
+        "key": "receiveDate",
+        "multiline": false
+      },
+      {
+        "tag": "PaperInfo",
+        "key": "paperInfo",
+        "multiline": false
+      },
+      {
+        "tag": "OtherRecInfo",
+        "key": "otherRecInfo",
+        "multiline": false
+      },
+      {
+        "tag": "DeclarePrice",
+        "key": "declarePrice",
+        "multiline": false
+      },
+      {
+        "tag": "PromiseNote",
+        "key": "promiseNote",
+        "multiline": false
+      },
+      {
+        "tag": "DeclTele",
+        "key": "declTele",
+        "multiline": false
+      }
+    ]
+  },
+  "sets": {
+    "CustomsCooDocumentEditableExclusions": [
+      "Id",
+      "SourceInvoiceId",
+      "InvoiceNo",
+      "ContractNo",
+      "Status",
+      "CertNo",
+      "WarningCount",
+      "WarningSummary",
+      "DraftRevision",
+      "ManualLockedFieldsJson",
+      "SourceBaselineJson",
+      "SourceBaselineHash",
+      "LastGeneratedAt",
+      "Items",
+      "NonpartyCorps",
+      "Attachments",
+      "SourceDiffCount",
+      "SourceDiffSummary",
+      "ManualLockedFieldCount"
+    ],
+    "CustomsCooItemEditableExclusions": [
+      "Id",
+      "DocumentId",
+      "SourceItemId",
+      "SourceStyleNo",
+      "GNo",
+      "Document"
+    ],
+    "AgentConsignmentEditableExclusions": [
+      "Id",
+      "SourceInvoiceId",
+      "InvoiceNo",
+      "ContractNo",
+      "Status",
+      "CounterpartyStatus",
+      "ConsignNo",
+      "WarningCount",
+      "WarningSummary",
+      "DraftRevision",
+      "ManualLockedFieldsJson",
+      "SourceBaselineJson",
+      "SourceBaselineHash",
+      "LastGeneratedAt",
+      "SourceDiffCount",
+      "SourceDiffSummary",
+      "ManualLockedFieldCount"
+    ],
+    "SourceDiffPriorityFields": [
+      "InvNo",
+      "InvDate",
+      "DestCountry",
+      "DestCountryCode",
+      "DestCountryName",
+      "Exporter",
+      "Consignee",
+      "Mark",
+      "LoadPort",
+      "UnloadPort",
+      "TransMeans",
+      "TransName",
+      "Curr",
+      "PriceTerms",
+      "TotalAmt",
+      "FobValue"
+    ],
+    "SourceDiffPriorityGoodsFields": [
+      "HSCode",
+      "GoodsName",
+      "GoodsNameE",
+      "PackQty",
+      "GoodsQty",
+      "GoodsQtyRef",
+      "GoodsUnitE",
+      "GoodsUnit",
+      "GrossWt",
+      "NetWt"
+    ],
+    "CustomsCooSourceDiffFields": [
+      "InvNo",
+      "InvDate",
+      "DestCountry",
+      "Exporter",
+      "Consignee",
+      "GoodsSpecClause",
+      "Mark",
+      "LoadPort",
+      "UnloadPort",
+      "TransMeans",
+      "TransName",
+      "Curr",
+      "PriceTerms",
+      "TotalAmt",
+      "FobValue"
+    ],
+    "CustomsCooSourceDiffGoodsFields": [
+      "HSCode",
+      "GoodsName",
+      "GoodsNameE",
+      "PackQty",
+      "PackUnit",
+      "GoodsQty",
+      "GoodsQtyRef",
+      "GoodsUnitE",
+      "GoodsUnit",
+      "GrossWt",
+      "NetWt",
+      "InvPrice",
+      "InvValue",
+      "FobValue",
+      "GoodsDesc",
+      "InvNo"
+    ]
+  },
+  "units": {
+    "UnitEnglishLookup": {
+      "PCS": "PCS",
+      "PIECE": "PCS",
+      "PIECES": "PCS",
+      "件": "PCS",
+      "个": "PCS",
+      "EA": "PCS",
+      "SET": "SET",
+      "SETS": "SET",
+      "套": "SET",
+      "CTN": "CTN",
+      "CTNS": "CTN",
+      "CARTON": "CTN",
+      "CARTONS": "CTN",
+      "箱": "CTN",
+      "BOX": "BOX",
+      "BOXES": "BOX",
+      "盒": "BOX",
+      "KGS": "KGS",
+      "KG": "KGS",
+      "KILOGRAM": "KGS",
+      "KILOGRAMS": "KGS",
+      "千克": "KGS",
+      "公斤": "KGS"
+    },
+    "UnitChineseLookup": {
+      "PCS": "件",
+      "PIECE": "件",
+      "PIECES": "件",
+      "件": "件",
+      "个": "件",
+      "EA": "件",
+      "SET": "套",
+      "SETS": "套",
+      "套": "套",
+      "CTN": "箱",
+      "CTNS": "箱",
+      "CARTON": "箱",
+      "CARTONS": "箱",
+      "箱": "箱",
+      "BOX": "盒",
+      "BOXES": "盒",
+      "盒": "盒",
+      "KGS": "千克",
+      "KG": "千克",
+      "KILOGRAM": "千克",
+      "KILOGRAMS": "千克",
+      "千克": "千克",
+      "公斤": "千克"
+    }
+  },
+  "cooTradeModes": {
+    "其他贸易方式": "0",
+    "其他贸易": "0",
+    "其他": "0",
+    "普通贸易": "1",
+    "一般贸易": "1",
+    "来料加工": "2",
+    "进料加工": "3",
+    "外商投资": "4",
+    "外商投资企业": "4",
+    "易货贸易": "5",
+    "补偿贸易": "6",
+    "边境贸易": "7",
+    "展卖贸易": "8",
+    "零售贸易": "9",
+    "无偿援助": "10",
+    "边民互市": "33",
+    "小额贸易": "34",
+    "边境小额贸易": "34"
+  }
+}

@@ -1,0 +1,77 @@
+import { LineEdit, CheckBox } from "std-widgets.slint";
+import { App } from "models.slint";
+import { License } from "license-models.slint";
+import { Theme, Card, ActionButton } from "theme.slint";
+
+component DetailRow inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <bool> wide:false;
+    height:26px;
+    HorizontalLayout {spacing:10px;
+        Text{text:label;color:Theme.muted;width:104px;vertical-alignment:center;}
+        Text{text:value;color:Theme.ink;horizontal-stretch:1;vertical-alignment:center;overflow: wide ? TextOverflow.elide : TextOverflow.clip; wrap: wide ? TextWrap.no-wrap : TextWrap.word-wrap;}
+    }
+}
+
+export component LicensePanel inherits Rectangle {
+    background:transparent;
+    VerticalLayout {padding:0px;spacing:14px;
+        Card {VerticalLayout {padding:16px;spacing:10px;
+            Text{text:"授权状态";font-size:15px;font-weight:700;color:Theme.ink;height:26px;}
+            DetailRow {label:"当前状态";value:License.status-text;}
+            HorizontalLayout {height:26px;spacing:10px;
+                Text{text:"机器码";color:Theme.muted;width:104px;vertical-alignment:center;}
+                Text{text:License.machine-id;color:Theme.ink;horizontal-stretch:1;vertical-alignment:center;overflow:elide;}
+                ActionButton{text:"复制";enabled:!App.busy&&License.machine-id!="";clicked=>{License.action("copy");}}
+            }
+            DetailRow {label:"试用天数";value:License.trial-days;}
+            DetailRow {label:"试用开始日期";value:License.trial-start;}
+            DetailRow {label:"剩余天数";value:License.days-remaining;}
+            DetailRow {label:"到期日期";value:License.expire-date;}
+            DetailRow {label:"状态说明";value:License.message;wide:true;}
+            Text{text:"许可证存储位置";color:Theme.muted;height:20px;}
+            Text{text:License.storage-path;color:Theme.ink;wrap:word-wrap;font-size:12px;min-height:34px;}
+            Text{text:License.storage-policy;color:Theme.muted;wrap:word-wrap;font-size:12px;min-height:48px;}
+            HorizontalLayout {height:32px;spacing:10px;
+                Rectangle{horizontal-stretch:1;}
+                ActionButton{text:"刷新授权状态";enabled:!App.busy;clicked=>{License.action("status");}}
+            }
+        }}
+        Card {VerticalLayout {padding:16px;spacing:10px;
+            Text{text:License.registered?"当前设备已注册":"注册授权";font-size:15px;font-weight:700;color:Theme.ink;height:26px;}
+            Text{text:License.registered?"如需更换设备，请先联系发行方解除绑定。":"输入当前机器码对应的注册码（EDM2- 开头），注册后授权保存在本机受管目录。";color:Theme.muted;wrap:word-wrap;min-height:32px;font-size:12px;}
+            LineEdit {text <=> License.license-key;placeholder-text:"EDM2- 注册码";accessible-label:"注册码";height:38px;enabled:!App.busy&&!License.registered;
+                accepted=>{if(!License.registered){License.action("register");}}}
+            HorizontalLayout {height:32px;spacing:10px;
+                Rectangle{horizontal-stretch:1;}
+                ActionButton{text:License.registered?"已注册":"提交注册码";primary:true;enabled:!App.busy&&!License.registered&&License.license-key!="";clicked=>{License.action("register");}}
+            }
+        }}
+        Card {VerticalLayout {padding:16px;spacing:10px;
+            Text{text:"问题诊断包（支持包）";font-size:15px;font-weight:700;color:Theme.ink;height:26px;}
+            Text{text:"支持包只包含诊断摘要（版本、数据库类型、受管目录、脱敏配置摘要与审计统计）；不收集密码、令牌、业务数据或数据库内容。";color:Theme.muted;wrap:word-wrap;font-size:12px;min-height:48px;}
+            HorizontalLayout {height:26px;spacing:16px;
+                CheckBox {text:"包含最新数据库备份";checked <=> License.include-database-backup;enabled:!App.busy;}
+                CheckBox {text:"包含样张文件";checked <=> License.include-sample-files;enabled:!App.busy;}
+            }
+            HorizontalLayout {height:32px;spacing:10px;
+                ActionButton{text:"生成到运行目录";primary:true;enabled:!App.busy;clicked=>{License.action("support");}}
+                ActionButton{text:"下载支持包";enabled:!App.busy;clicked=>{License.action("download-support");}}
+                Rectangle{horizontal-stretch:1;}
+            }
+            if License.package-summary!="":DetailRow {label:"最近支持包";value:License.package-summary;wide:true;}
+            if License.package-root!="":DetailRow {label:"支持包目录";value:License.package-root;wide:true;}
+            if License.package-path!="":DetailRow {label:"完整路径";value:License.package-path;wide:true;}
+        }}
+        Card {VerticalLayout {padding:16px;spacing:10px;
+            Text{text:"系统日志清理";font-size:15px;font-weight:700;color:Theme.ink;height:26px;}
+            Text{text:"按已保存的日志保留设置清理审计日志与文本日志（在“维护工具”分类中调整保留天数）。";color:Theme.muted;wrap:word-wrap;font-size:12px;min-height:32px;}
+            DetailRow {label:"当前保留设置";value:License.log-retention;wide:true;}
+            HorizontalLayout {height:32px;spacing:10px;
+                Rectangle{horizontal-stretch:1;}
+                ActionButton{text:"清理系统日志";enabled:!App.busy;clicked=>{License.action("cleanup-logs");}}
+            }
+        }}
+    }
+}

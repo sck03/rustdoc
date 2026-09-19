@@ -1,0 +1,36 @@
+import { ScrollView, ComboBox, CheckBox } from "std-widgets.slint";
+import { App } from "models.slint";
+import { Theme, ActionButton, Card } from "theme.slint";
+export component PdfView inherits Rectangle {
+    in property <bool> report-controls:true;
+    background:transparent;
+    VerticalLayout {padding:12px;spacing:12px;
+        if root.report-controls:HorizontalLayout {height:36px;spacing:8px;cross-axis-alignment:center;
+            if App.page=="payment-report":ActionButton{text:"← 返回";enabled:!App.busy;clicked=>{App.pdf-action("back");}}
+            ComboBox {model:App.report-templates;current-index<=>App.report-template-index;horizontal-stretch:1;enabled:!App.busy;selected=>{App.pdf-action("invalidate");}}
+            if App.report-type=="ExportDocument":CheckBox{text:"加盖印章";checked<=>App.report-with-seal;enabled:!App.busy;toggled=>{App.pdf-action("invalidate");}}
+            ActionButton {text:"预览 PDF";primary:true;enabled:App.report-ready&&!App.busy;clicked=>{App.pdf-action("preview");}}
+            ActionButton {text:"导出 PDF";hint:"保存单据后，选择位置导出 PDF";enabled:App.report-export-ready&&App.pdf-pages>0&&!App.busy;clicked=>{App.pdf-action("save");}}
+            ActionButton {text:"取消";visible:App.busy;clicked=>{App.pdf-action("cancel");}}
+            ActionButton {text:"报表模板管理";clicked=>{App.navigate("report-templates");}}
+        }
+        Rectangle {
+            background:#dce7e3;border-radius:7px;
+            ScrollView {
+                content-width:max(self.visible-width,min(780px,root.width - 80px)*App.pdf-scale + 40px);
+                VerticalLayout {padding:20px;alignment:start;
+                    Image {source:App.pdf-image;image-fit:contain;width:min(780px,root.width - 80px)*App.pdf-scale;height:App.pdf-pages>0?self.width/App.pdf-aspect-ratio:220px;}
+                    if App.pdf-pages==0:Text{text:!root.report-controls?"正在读取 PDF…":App.report-ready?"选择模板后预览或导出 PDF":"保存单据后预览或导出 PDF";color:Theme.muted;horizontal-alignment:center;}
+                }
+            }
+        }
+        HorizontalLayout {height:36px;spacing:8px;alignment:center;
+            ActionButton {text:"上一页";enabled:App.pdf-page>0&&!App.busy;clicked=>{App.pdf-action("previous");}}
+            Text {text:App.pdf-pages>0?(App.pdf-page+1)+" / "+App.pdf-pages+" 页":"未生成预览";color:Theme.muted;vertical-alignment:center;}
+            ActionButton {text:"下一页";enabled:App.pdf-page+1<App.pdf-pages&&!App.busy;clicked=>{App.pdf-action("next");}}
+            ActionButton {text:"−";hint:"缩小预览";enabled:App.pdf-scale>0.5;clicked=>{App.pdf-scale=max(0.5,App.pdf-scale - 0.25);}}
+            Text{text:round(App.pdf-scale*100)+"%";vertical-alignment:center;color:Theme.muted;}
+            ActionButton {text:"＋";hint:"放大预览";enabled:App.pdf-scale<2.5;clicked=>{App.pdf-scale=min(2.5,App.pdf-scale + 0.25);}}
+        }
+    }
+}

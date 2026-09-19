@@ -1,6 +1,6 @@
-# ExportDocManager 项目协作与工程规则
+# ExportDocManager Rust 原生重构协作与工程规则
 
-本文件是本仓库中自动化代理、维护者和贡献者的通用工作规范。它描述的是“如何安全地修改、验证和交付”本项目，不替代产品需求或安全政策。用户/维护者的明确指令优先于本文件；本文件与源码不一致时，先以源码和 `docs/当前架构事实.md` 为准，并在提交中修正文档事实。
+本文件适用于 Rust 重构分支及其 worktree。用户已批准桌面改为 Rust + Slint + SQLite，网页／Docker 保留 React 界面和 PostgreSQL 18，业务及 HTTP 服务逐步由共用 Rust 模块实现。本文描述修改、验证和交付规则，不表示全部迁移已完成。用户明确指令优先；当前进度以源码、`docs/当前架构事实.md` 和 `docs/Rust原生架构与选型.md` 为准。
 
 ## 1. 开始工作前
 
@@ -15,6 +15,8 @@
 2. 先读以下事实源，再决定修改位置：
 
    - `docs/当前架构事实.md`：当前部署、目录、数据库、API 和模块边界的唯一事实源。
+   - `docs/Rust原生架构与选型.md`：本分支的 Rust 实现、未完成项目、许可与原生验收边界；区分重构事实和保留的 C# 对照基线。
+   - `docs/Rust桌面平台适配与验收.md`：Slint 稳定版本证据、跨平台适配边界，以及各 OS／架构分别完成的检查。
    - `docs/产品架构与文档总览.md`：产品形态、运行方式和门禁总览。
    - `docs/程序改进重构进度文档.md`：按日期保存的实施证据；旧条目只用于追溯，不能当作当前契约。
    - `docs/运行目录与路径存储审查清单.md`：路径、缓存、临时文件和系统目录审查规则。
@@ -25,17 +27,23 @@
 
 ## 2. 项目形态与目录边界
 
-- 产品共用 Domain、Application、API 契约和 React Web 界面，包含 Tauri 桌面端、浏览器服务器版和容器版。
-- 后端统一为 `net10.0`；能力按程序集拆分为核心 Infrastructure、Excel、Browser、PDF/OCR 模块。核心层不得重新直接引用这些可裁剪模块的重量级实现。
-- API 是组合根：基础设施适配、DI 注册、端点映射和模块发现留在 API/Infrastructure；Domain 不引用 ASP.NET Core、文件系统宿主细节或具体数据库 provider。
-- Web 源码在 `apps/export-doc-web`；Tauri 壳和 Rust 命令在 `apps/export-doc-tauri`；OCR 与 Excel analyzer 是独立 Rust 工程；C# 测试在 `tests`。
-- `src`、`apps`、`tests`、`tools` 中的 `bin/`、`obj/`、`dist/`、`target/`、`node_modules/` 以及根 `artifacts/`、`TestResults/`、`.codex-runtime/` 都是生成或本地工作区，不得提交到 Git。
+- 正式桌面方向为 `apps/export-doc-slint`，直接调用 Rust 应用服务并使用 SQLite；不依赖 Tauri、WebView、React、Node 或 .NET sidecar 运行桌面业务。
+- 网页前端继续位于 `apps/export-doc-web`，保留 React 19、原布局和操作；`apps/export-doc-server` 是 Rust HTTP 组合根，团队及 Docker 使用 PostgreSQL 18，不能改用 SQLite 或把数据库账号交给前端。
+- `crates/export-doc-contracts` 管理生成的 API 契约；`export-doc-domain` 放纯业务规则；`export-doc-engine` 编排用例；`export-doc-storage` 提供存储边界与 SQLite／PostgreSQL 适配。数据库 SQL 不进入 UI 或用例协调器，Domain 不引用 GUI、HTTP、数据库、进程或宿主文件系统。
+- UI 状态／事件、应用用例、业务校验、存储、文件、报表／PDF、Excel、OCR、邮件和系统集成须按职责分模块。能力依赖按 Cargo feature 或独立 crate 裁剪，核心不得为了单一可选功能拉入整套浏览器实现。
+- Excel 能力位于 `crates/export-doc-excel`，由组合根显式启用 `excel` feature；现有 `tools/excel-analyzer-rs` 同时提供库和对照 CLI，禁止复制第二套表头／字段识别器。文件任务位于 `engine::tasks`，状态和结果事务化发布，文件预览不得隐式写入正式业务数据。
+- Windows、Linux、macOS 桌面共同维护一套 Rust + Slint + SQLite 源码；Windows 在当前宿主优先运行验证，其它目标在对应 runner／设备验收。原生窗口句柄、对话框、剪贴板、打印、进程树和安装包进入平台适配边界，禁止把 Windows 路径、COM／Win32 或 Linux／macOS 命令散入业务层。每个平台分别记录编译、运行和功能证据，预留接口不等于已支持。
+- 原 C# `src/`、Tauri、Web 界面及测试保留作行为对照；原 .NET 10、xUnit v3 门禁只适用于相关源码修改。`apps/export-doc-native` 是早期 egui 比较工程，不进入 Slint 交付包，不再复制业务实现。
+- 不以通用 JSON 表单或同名路由代替原有完整业务。逐项对照主导航、页签、表单顺序、表格编辑、键盘／中文 IME、权限、并发、导入导出、报表和维护流程；未完成或未验收的能力须明确记录。
+- 按用户 2026-09-16 的要求，优先逐页完成原版界面、后端用例和操作衔接，积累一批后集中联调，最后统一执行完整门禁。开发中只做必要的快速编译和针对实际失败的回归，不在每个模块后重复全量构建／测试；已经通过且未受后续修改影响的检查不重复运行。
+- 原生界面统一提供可折叠分区：常用内容默认展开，地址／银行明细、备用字段、信用证、高级设置等低频内容默认收起。展开状态保存在当前界面会话内；收起不丢失草稿、已保存数据或校验，出错时自动展开对应分区。
+- `src`、`crates`、`apps`、`tests`、`tools` 中的 `bin/`、`obj/`、`dist/`、`target/`、`node_modules/`，以及根 `target/`、`artifacts/`、`TestResults/`、`.codex-runtime/` 都是生成或本地工作区，不得提交到 Git。
 
 ## 3. 架构不变量
 
 ### 3.1 运行目录和数据
 
-- 所有持久化路径由启动组合根显式注入 `AppRoot`/`DataRoot` 和 `IAppPathProvider` 解析；服务不得自行 `new` 全局路径提供器，也不得在静态字段中缓存宿主路径。
+- 所有持久化路径由启动组合根显式注入 `AppRoot`/`DataRoot`，Rust 使用 `RuntimePaths`／受管路径接口，C# 对照实现使用 `IAppPathProvider`；服务不得自行构造全局路径提供器，也不得在静态字段中缓存宿主路径。
 - 数据库、配置、日志、备份、模板、缓存、浏览器 profile、PostgreSQL 客户端、OCR/浏览器资源和随包工具必须落在运行目录或明确职责的容器层；不要默认写入 `C:\Users\...\AppData`、系统 TEMP、ProgramData 或系统级工具缓存。
 - 配置中保存相对路径；写入、读取、迁移前后都必须验证仍在受管根目录内，并拒绝符号链接、联接点、路径穿越、磁盘根和不可写目录。
 - SQLite 仅用于桌面单机；团队/服务器/容器模式使用 PostgreSQL 18。项目尚未投产，不添加旧 v1—v7 数据兼容分支、猜测式迁移或双读逻辑；需要改变空库基线时直接更新正式 schema 和测试。
@@ -46,11 +54,11 @@
 - 文件名先做 NFC 规范化，并遵守 Windows/Linux/macOS 共同非法字符、尾部点/空格、保留设备名和长度规则。
 - Windows 路径比较按不区分大小写；Linux 和 macOS 目标文件系统的大小写语义必须被尊重，不能为了“看起来一致”在大小写敏感卷上折叠不同文件。
 - 只使用 `Path`/`PathBuf`、`Path.Combine`、URI API 和平台无关分隔符；不得拼接硬编码 `\`、`/`、盘符或假定当前工作目录。
-- 业务自然日使用 `DateOnly`；具有时区意义的时间点使用 `DateTimeOffset`。公开 Domain/Application/API/OpenAPI 不新增 `DateTime` 属性；第三方 Excel/文件系统互操作边界除外。
+- 业务自然日使用严格日期类型，API 为 `YYYY-MM-DD`；时间点保留明确偏移并使用 RFC 3339。Rust 使用日期／带时区类型，C# 对照实现继续使用 `DateOnly`／`DateTimeOffset`；禁止用本地无时区时间或字符串截断推断业务日期。金额和数量使用精确十进制，不用浮点数代替业务金额。
 
 ### 3.3 API、错误和契约
 
-- `/openapi/v1.json` 是唯一 API 契约事实源，由 .NET 官方 OpenAPI 元数据生成；TypeScript 客户端必须从生成结果更新，不手写第二套 endpoint/schema 目录。
+- `/openapi/v1.json` 是唯一 API 契约事实源。迁移期间从原 .NET 官方 OpenAPI 导出契约，Rust DTO、路由和权限元数据通过 `scripts/generate-native-api-client.mjs` 生成，React 客户端仍从相同契约生成；禁止手工修改生成文件或建立第二套 endpoint/schema。切换到 Rust 契约生成器须独立验证全部 schema、错误、认证及权限元数据，不能静默变更契约。
 - 端点认证、桌面令牌和许可证要求使用 endpoint metadata；不要按 `/api` 前缀、路径白名单或前端路由猜测授权。
 - 业务错误按现有分类映射：校验 400、权限 403、明确资源不存在 404、冲突 409、繁忙 429、依赖不可用 503、超时 504；不要把数据库、文件或外部工具故障包装成 404/409。
 - 所有异步公共操作都要有明确取消边界、超时和资源清理；后台任务完成、失败、取消和输出清理必须可观察且幂等。
@@ -67,9 +75,14 @@
 
 所有 .NET NuGet 包版本集中在 `Directory.Packages.props`，SDK 最低基线和滚动策略集中在 `global.json`，Web 版本集中在 `apps/export-doc-web/package.json`/`package-lock.json`，Rust 版本由各工程 `Cargo.toml`/`Cargo.lock` 管理。升级后必须同步锁文件、第三方 notices、依赖清单和治理证据。
 
-普通依赖的精确版本以中央清单和锁文件为准，不在本规范复制容易过期的版本表。当前批准的技术代际是 .NET 10、React 19 和 xUnit v3；改变技术代际时必须作为独立专项评审和验证。
+普通依赖的精确版本以中央清单和锁文件为准，不在本规范复制容易过期的版本表。本分支已批准 Rust + Slint 原生迁移，根 Cargo workspace 集中管理 Rust 基线及共享依赖；React 19、原 .NET 10 和 xUnit v3 保持现有代际，不把无关升级混入迁移。
 
-### NPOI 强制规则
+- Slint 使用已审查的 Royalty-free 2.0 桌面应用许可路径；顶层可访问的“关于”页面保留官方 `AboutSlint`，随包包含许可原文和 notices。升级时重新审查，不能删掉署名或泛化许可适用范围。
+- Slint 交付依赖树须确认没有 WebView／Tauri／egui、Node 或 .NET 运行依赖；可选受控工具单独声明用途、来源、许可和真实功能边界。
+
+### NPOI 强制规则（仅适用于保留对照的原 .NET 实现）
+
+Rust 原生程序的后端与桌面最终全部使用 Rust：版本由根 `Cargo.toml`/`Cargo.lock` 精确锁定，crate 选型取查询时最新稳定版，Excel 与 PDF 由 `export-doc-excel`/`export-doc-report` 纯 Rust 实现，交付依赖树不含 NPOI、NuGet 或 .NET 运行依赖。下列 .NET/NuGet 规则只约束本工作树中保留对照的原 C#/Tauri 源码及其治理结果，只改 Rust 源码不触发这些约束，也不得把 NPOI/NuGet 版本表套用到 Cargo 依赖；Rust 桌面依赖图以 `native-desktop` 作用域进入同一治理脚本分开验收。
 
 **NPOI 必须保持 `2.7.6`。严禁升级到 `2.8.0`。** `2.8.0` 的额外维护费用条款不符合本项目“免费、开源、可商用”的依赖策略。任何依赖升级、自动化代理或批量更新都必须检查并保持：
 
@@ -92,14 +105,18 @@
 
 - React 19 使用公开 API；不得读取 `__reactProps$` 等私有字段，不得用兼容层掩盖类型或生命周期问题。
 - 页面组件负责展示和组合；查询、变更、轮询、表单模型、导出和平台桥接应放在可测试的 hook/model/service 中。
-- Tauri 只负责原生窗口、文件对话框、桌面令牌和 sidecar 生命周期；业务规则仍由 API/Application 提供。桌面保存路径必须来自用户显式选择。
-- 浏览器/桌面报表 PDF 统一使用后端受控渲染能力；不恢复前端 DOM 截图、Base64 写盘、`html2canvas`/`jsPDF` 等重复链路。
+- Slint 视图只负责展示、布局和输入，Rust controller/model 管理草稿、选择、焦点和事件，应用服务负责业务；阻塞数据库、报表及外部进程操作不在 UI 线程执行。优先原生文件对话框、剪贴板、打印和窗口接口；保存路径来自用户显式选择。
+- 桌面与服务器复用 Rust 报表模型和受控 PDF 输出；优先原生排版／PDF 能力。旧模板逐类对照实际输出，不能默默退成简化表格，也不恢复 DOM 截图、Base64 写盘、`html2canvas`/`jsPDF` 等重复链路。
 - Firefox/WebKit 桌面/移动重型验收只在 `.github/workflows/browser-compatibility.yml` 通过 `workflow_dispatch` 手动触发，不加入每次提交的普通 Quality Gate。
-- 不做 Windows Authenticode、macOS Developer ID 或 Apple 公证；Tauri updater 的包签名/公钥信任合同仍必须保持。
+- 不做 Windows Authenticode、macOS Developer ID 或 Apple 公证；原 Tauri updater 信任合同保留用于对照版，新原生更新机制完成签名／公钥验收前不得宣称可替换正式更新渠道。
 
 ## 6. 测试与质量门禁
 
 改动范围决定验证深度；涉及依赖、路径、打包、API 或基础设施时不得只跑单元测试。
+
+Rust 主工作区至少执行 `cargo fmt --all --check`、`cargo test --locked --workspace` 和 `cargo check --locked --workspace --all-features`。数据库变更须用隔离的真实 PostgreSQL 18 与 SQLite 验证同一业务契约；忽略的实库测试不算通过。HTTP 变更须验证真实 React 请求、认证、授权、错误、上传下载和会话；原生界面须启动 Slint，检查截图、表格滚动／编辑、中文输入及实际 PDF。发布时执行对应平台 locked build 和包内依赖审查。
+
+下列 .NET 和原 Web 门禁按被修改的对照源码适用；只改 Rust 不要求把完整 C# 构建当作 Rust 验收，更不能借旧测试结果宣称新实现等价：
 
 ```powershell
 # 依赖还原（锁定模式）
@@ -141,7 +158,7 @@ Rust 修改必须至少执行对应工程的 `cargo fmt --check` 和 `cargo test
 
 - 默认从 `codex/` 前缀分支工作；不要未经明确要求直接改写远端历史或强制推送。
 - 提交前检查 `git status`、`git diff --stat`、`git diff --check`、暂存区内容和生成物；只提交与任务相关的文件。
-- 依赖升级提交应说明版本、许可证/商业策略和已执行的治理门禁；NPOI `2.7.6` 必须在提交说明或验证结果中明确保留。
+- 依赖升级提交应说明版本、许可证/商业策略和已执行的治理门禁；涉及原 .NET 实现的提交必须在说明或验证结果中明确保留 NPOI `2.7.6`，纯 Rust 依赖升级只说明 Cargo crate 版本、许可证和治理结果。
 - 推送前确认 `origin/main` 没有未审查漂移；用户明确要求发布时才推送 `main`。
 
 ## 9. 工作区空间清理规则

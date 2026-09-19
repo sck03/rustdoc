@@ -1,5 +1,18 @@
 # 脚本使用说明
 
+## Rust 原生分支
+
+- `build-native.cmd`／`build-native.ps1` 构建 Rust + Slint + SQLite 桌面包；`run-native.cmd`／`run-native.ps1` 启动该包。Excel 原模板、受控字体、PDFium 与 notices 随包进入 `Resources`，不携带 WebView 或 .NET sidecar。
+- `run-native-docker.cmd`／`run-native-docker.ps1` 使用 `deploy/rust-native/compose.yml` 构建 React + Rust HTTP 服务和 PostgreSQL 18。`-PrepareOnly -NoPause` 只准备私有配置；不传该开关时构建并启动；`-Stop -NoPause` 停止容器并保留数据卷。默认仅绑定 `127.0.0.1:5188`，局域网地址通过 `-BindAddress` 显式指定。
+- Docker 凭证和首次管理员初始化令牌保存在 `deploy/rust-native/runtime`，该目录不进入 Git 或 Docker 构建上下文。首次在网页使用 `admin`、自定的 8–128 字密码及该目录的 `bootstrap-token.txt` 初始化账号。普通服务只读取业务连接，维护连接仅交给一次性建表容器。
+- `test-native-postgres.ps1 -PostgresBin <PostgreSQL-18-bin>` 创建隔离测试集群并在结束后停止；不访问正式数据库。`verify-native-desktop.mjs` 和 `generate-native-api-client.mjs` 是内部依赖／契约门禁。
+
+本批开发库基线为 4。旧 Rust 试验库保留，不能直接由新版本打开；请使用新的程序／数据目录。原生窗口验收新增客户跟进、商机报价与历史、供应商导入确认及评价分析。
+
+迁移功能和平台支持以 `docs/Rust原生架构与选型.md` 为准；有构建入口不代表全功能或容器实跑已验收。
+
+原生窗口验收继续使用包内程序的 `--validation --ui-smoke <工作区内绝对输出目录>`，自动建立隔离验证数据目录。发票／付款、组织／人事／附件之外，现包含会议室日程与钥匙交接、物品入库／部分归还以及 SQLite 备份还原闭环。验收只操作生成的夹具；结果中的系统 IME、原生对话框和其他平台边界必须按真实记录解释。
+
 唛头绑定验证：`npm --prefix apps/export-doc-web run test:report-designer-v3` 检查单一字段及五种放置位置；`test:report-designer-v3-ui` 使用真实画布插入、调整尺寸、撤销，并对同一模板的文字／图片样例检查比例、边界、明细旁栏和 Chromium PDF。HTML、截图、PDF 与摘要位于 `artifacts/report-designer-v3-ui/marks-*`；.NET 集成回归验证 SQLite／PostgreSQL 保存互斥、图片校验、实际单据 HTML／PDF 及缺图失败，使用隔离测试数据库。
 
 导航与界面整理验证：`npm --prefix apps/export-doc-web run test:navigation-reorganization-ui` 使用实际工作区、路由和受控接口夹具，覆盖对象直达、保留筛选／页码、客户与邮件草稿、连续返回、独立权限、模板目录及发票跨页批量报表。截图与摘要写入 `artifacts/navigation-reorganization-ui`；按编号读取和数据范围另由 .NET API／Infrastructure 集成测试验证。

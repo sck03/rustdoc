@@ -1,0 +1,26 @@
+[package]
+name = "export-doc-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Rust HTTP composition root for the React and PostgreSQL editions"
+
+[dependencies]
+export-doc-contracts = { path = "../../crates/export-doc-contracts" }
+export-doc-engine = { path = "../../crates/export-doc-engine", features = ["postgres", "excel", "invoice-transfer", "exchange-rates", "hs-remote", "mail", "ocr", "ai", "single-window"] }
+export-doc-storage = { path = "../../crates/export-doc-storage", features = ["postgres"] }
+axum = { version = "=0.8.9", default-features = false, features = ["http1", "json", "multipart", "tokio"] }
+tokio = { version = "=1.53.1", features = ["rt-multi-thread", "net", "signal", "time", "sync", "macros"] }
+tower-http = { version = "=0.7.1", features = ["fs", "limit"] }
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+subtle = "=2.6.1"
+url = "=2.5.8"
+
+[dev-dependencies]
+tower = { version = "=0.5.3", features = ["util"] }
+
+[lints]
+workspace = true

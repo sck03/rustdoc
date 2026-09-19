@@ -1,0 +1,54 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/export-doc-ai",
+    "crates/export-doc-network",
+    "crates/export-doc-single-window",
+    "crates/export-doc-contracts",
+    "crates/export-doc-domain",
+    "crates/export-doc-engine",
+    "crates/export-doc-excel",
+    "crates/export-doc-exchange",
+    "crates/export-doc-hs",
+    "crates/export-doc-mail",
+    "crates/export-doc-report",
+    "crates/export-doc-storage",
+    "apps/export-doc-slint",
+    "apps/export-doc-server",
+]
+default-members = ["apps/export-doc-slint", "crates/export-doc-engine", "crates/export-doc-domain"]
+exclude = ["apps/export-doc-native", "apps/export-doc-tauri/src-tauri", "apps/exportdoc-ocr-rs", "tools/excel-analyzer-rs"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98.1"
+publish = false
+
+[workspace.dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = { version = "=1.0.151", features = ["arbitrary_precision", "preserve_order"] }
+rust_decimal = { version = "=1.43.0", default-features = false, features = ["std", "serde-arbitrary-precision"] }
+unicode-normalization = "=0.1.25"
+sha2 = "=0.11.0"
+getrandom = "=0.4.3"
+image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
+chrono = { version = "=0.4.45", default-features = false, features = ["clock", "serde"] }
+base64 = "=0.23.1"
+rfd = { version = "=0.17.2", default-features = false, features = ["xdg-portal"] }
+
+[profile.release]
+opt-level = "s"
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[profile.dev.package.sha2]
+opt-level = 3
+[profile.dev.package.pbkdf2]
+opt-level = 3
+[profile.dev.package.hmac]
+opt-level = 3
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"

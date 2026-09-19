@@ -1,0 +1,34 @@
+import { CheckBox } from "std-widgets.slint";
+import { App } from "models.slint";
+import { Theme, ActionButton, Card, Badge } from "theme.slint";
+import { DocumentPackage } from "document-package-models.slint";
+
+export component DocumentPackagePanel inherits Rectangle {
+    background: transparent;
+    Card {
+        VerticalLayout { padding:12px; spacing:8px;
+            HorizontalLayout { height:28px; spacing:8px;
+                Text{text:"组合单据";font-size:15px;font-weight:700;color:Theme.ink;vertical-alignment:center;horizontal-stretch:1;}
+                Badge{text:DocumentPackage.selected-count+" 份";}
+            }
+            Text{text:"选择要随发票输出的单据模板,可按需生成合并 PDF。";color:Theme.muted;font-size:12px;height:22px;}
+            for row in DocumentPackage.rows: CheckBox {
+                text: row.name;
+                checked: row.selected;
+                enabled: !App.busy;
+                toggled => { DocumentPackage.template-toggled(row.template-path, self.checked); }
+            }
+            CheckBox {
+                text:"生成合并 PDF";
+                checked: DocumentPackage.include-merged-pdf;
+                enabled: !App.busy;
+                toggled => { DocumentPackage.include-merged-pdf = self.checked; }
+            }
+            HorizontalLayout { height:36px; spacing:8px;
+                ActionButton{text:"预览组合";primary:true;enabled:DocumentPackage.can-preview&&!App.busy;clicked=>{DocumentPackage.action("preview");}}
+                ActionButton{text:"导出 ZIP";enabled:DocumentPackage.can-export&&!App.busy;clicked=>{DocumentPackage.action("download");}}
+                ActionButton{text:"导出文件夹";enabled:DocumentPackage.can-export&&!App.busy;clicked=>{DocumentPackage.action("folder");}}
+            }
+        }
+    }
+}

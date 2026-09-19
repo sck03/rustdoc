@@ -27,6 +27,9 @@ internal sealed class ApiOpenApiDocumentTransformer : IOpenApiDocumentTransforme
         document.Info.Title = "ExportDocManager API";
         document.Info.Version = ProductVersionProvider.ProductVersion;
         document.Info.Description = "Local sidecar API for ExportDocManager desktop and browser clients.";
+        document.Extensions ??= new Dictionary<string, IOpenApiExtension>();
+        document.Extensions["x-exportdoc-permissions"] = ApiNativeContractMetadata.PermissionCatalog();
+        document.Extensions["x-exportdoc-configuration"] = ApiNativeContractMetadata.Configuration();
         document.Servers = [new OpenApiServer
         {
             Url = string.IsNullOrEmpty(_runtimeOptions.PathBase) ? "/" : _runtimeOptions.PathBase
@@ -60,6 +63,10 @@ internal sealed class ApiOpenApiDocumentTransformer : IOpenApiDocumentTransforme
         cancellationToken.ThrowIfCancellationRequested();
         var metadata = ApiEndpointMetadataExtensions.Resolve(
             context.Description.ActionDescriptor.EndpointMetadata.OfType<ApiEndpointAccessMetadata>());
+        var endpoint = new Endpoint(null,
+            new EndpointMetadataCollection(context.Description.ActionDescriptor.EndpointMetadata), null);
+        operation.Extensions ??= new Dictionary<string, IOpenApiExtension>();
+        operation.Extensions["x-exportdoc-policy"] = ApiNativeContractMetadata.EndpointPolicy(endpoint);
         bool requiresBearer = metadata?.RequiresAuthentication ?? false;
         bool requiresDesktop = _desktopAccessOptions.IsEnabled &&
             (metadata?.RequiresDesktopAccess ?? false);

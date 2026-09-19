@@ -1,0 +1,57 @@
+import { LineEdit, ComboBox, CheckBox, ScrollView } from "std-widgets.slint";
+import { App } from "models.slint";
+import { Audit } from "audit-models.slint";
+import { DataTable } from "data-table.slint";
+import { Theme, ActionButton, Card } from "theme.slint";
+export component AuditPage inherits VerticalLayout {
+    padding:0px;spacing:12px;
+    Card{height:Audit.date-range?150px:104px;
+        VerticalLayout{padding:14px;spacing:10px;
+            HorizontalLayout{height:34px;spacing:10px;
+                LineEdit{text<=>App.search;input-type:InputType.search;placeholder-text:"搜索审计记录";accessible-label:"审计关键词";horizontal-stretch:1;accepted=>{Audit.action("search");}}
+                ComboBox{model:Audit.entities;current-index<=>Audit.entity-index;width:170px;accessible-label:"业务实体";}
+                ComboBox{model:["全部操作","新增","修改","删除"];current-index<=>Audit.action-index;width:115px;accessible-label:"操作类型";}
+                ActionButton{text:"查询";primary:true;enabled:!App.busy;clicked=>{Audit.action("search");}}
+                ActionButton{text:"重置";enabled:!App.busy;clicked=>{Audit.action("reset");}}
+            }
+            HorizontalLayout{height:34px;spacing:10px;
+                LineEdit{text<=>Audit.invoice;placeholder-text:"单据编号或审计内容";accessible-label:"单据审计筛选";}
+                LineEdit{text<=>Audit.user;placeholder-text:"操作人编号";accessible-label:"操作人筛选";}
+                CheckBox{text:"按时间筛选";checked<=>Audit.date-range;}
+                Text{text:Audit.zone;color:Theme.muted;vertical-alignment:center;}
+            }
+            if Audit.date-range:HorizontalLayout{height:34px;spacing:10px;
+                Text{text:"开始";color:Theme.muted;vertical-alignment:center;}
+                LineEdit{text<=>Audit.start;placeholder-text:"YYYY-MM-DD HH:MM";accessible-label:"审计开始时间";}
+                Text{text:"结束";color:Theme.muted;vertical-alignment:center;}
+                LineEdit{text<=>Audit.end;placeholder-text:"YYYY-MM-DD HH:MM";accessible-label:"审计结束时间";}
+            }
+        }
+    }
+    if Audit.can-manage:Card{height:Audit.maintenance?105px:48px;
+        VerticalLayout{padding:8px;spacing:8px;
+            ActionButton{text:Audit.maintenance?"▾ 导出与维护":"▸ 导出与维护";left-aligned:true;clicked=>{Audit.maintenance=!Audit.maintenance;}}
+            if Audit.maintenance:HorizontalLayout{height:36px;spacing:10px;
+                ActionButton{text:"导出 Excel";enabled:!App.busy&&Audit.can-export;clicked=>{Audit.action("export");}}
+                ActionButton{text:"删除当前筛选结果";enabled:!App.busy;clicked=>{Audit.action("delete");}}
+                Rectangle{horizontal-stretch:1;}
+                Text{text:"保留最近";color:Theme.muted;vertical-alignment:center;}
+                LineEdit{text<=>Audit.days;width:75px;accessible-label:"审计保留天数";}
+                Text{text:"天";color:Theme.muted;vertical-alignment:center;}
+                ActionButton{text:"清理历史日志";enabled:!App.busy;clicked=>{Audit.action("cleanup");}}
+            }
+        }
+    }
+    Card{VerticalLayout{padding:12px;spacing:10px;
+        DataTable{}
+        if Audit.detail!="":ScrollView{height:110px;content-width:self.visible-width;
+            Text{text:Audit.detail;color:Theme.ink;wrap:word-wrap;font-size:12px;accessible-label:"审计变更详情";}
+        }
+        HorizontalLayout{height:36px;spacing:10px;
+            Text{text:"共 "+App.total-records+" 条  ·  "+App.list-page+" / "+App.total-pages+" 页";color:Theme.muted;vertical-alignment:center;}
+            Rectangle{horizontal-stretch:1;}
+            ActionButton{text:"上一页";enabled:App.list-page>1&&!App.busy;clicked=>{App.change-page(-1);}}
+            ActionButton{text:"下一页";enabled:App.list-page<App.total-pages&&!App.busy;clicked=>{App.change-page(1);}}
+        }
+    }}
+}

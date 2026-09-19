@@ -1,0 +1,37 @@
+import { FormField, FormSection, DataRow } from "models.slint";
+export struct PackingCargo { index:int, fields:[FormField], tint:color }
+export global Packing {
+    in-out property <[PackingCargo]> cargo;
+    in-out property <[FormSection]> sections;
+    in-out property <[string]> projects;
+    in-out property <[string]> types;
+    in-out property <int> project-index:-1;
+    in-out property <int> type-index:0;
+    in-out property <string> name;
+    in-out property <string> type-name;
+    in-out property <string> status;
+    in-out property <string> summary;
+    in-out property <string> form-error;
+    in-out property <string> invalid-field;
+    in-out property <bool> dirty;
+    in-out property <bool> saved;
+    in-out property <bool> can-edit;
+    in-out property <bool> can-manage;
+    in-out property <bool> can-delete;
+    in-out property <bool> can-export;
+    in-out property <bool> can-undo;
+    in-out property <bool> can-redo;
+    in-out property <bool> auto-refresh:false;
+    in-out property <bool> filled:true;
+    in-out property <bool> ready:false;
+    in-out property <int> tab:0;
+    in-out property <int> projection:0;
+    in-out property <float> angle:30;
+    in-out property <float> zoom:1;
+    in-out property <image> preview;
+    in-out property <[DataRow]> blocks;
+    in-out property <int> selected-block:0;
+    callback action(string,int);
+    callback edited(string,string);
+    callback selected(string,int);
+}
