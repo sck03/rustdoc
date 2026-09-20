@@ -4,10 +4,12 @@ param(
     [string]$OutputRoot,
     [string]$RuntimeIdentifier,
     [switch]$SkipBuild,
+    [switch]$WithoutOcr,
     [switch]$NoPause
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
+. (Join-Path $PSScriptRoot 'lib/native-package-resources.ps1')
 $interactiveLaunch = Test-ExportDocPauseEnabled -NoPauseRequested $NoPause
 trap {
     Write-ExportDocScriptFailure -ErrorRecord $_
@@ -22,6 +24,24 @@ $outputFullPath = [System.IO.Path]::GetFullPath($OutputRoot)
 if ($outputFullPath -eq [System.IO.Path]::GetPathRoot($outputFullPath) -or (Test-ExportDocPathEqual -Left $outputFullPath -Right $repositoryRoot)) {
     throw 'Use a dedicated web server package directory.'
 }
+Assert-NativePackagePath -Path $outputFullPath
+$packageMarkerPath = Join-Path $outputFullPath 'exportdoc-native-web-server.json'
+if (Test-Path -LiteralPath $outputFullPath) {
+    if (Test-Path -LiteralPath $packageMarkerPath -PathType Leaf) {
+        $existing = Get-Content -LiteralPath $packageMarkerPath -Raw | ConvertFrom-Json
+        if ($existing.schemaVersion -ne 1 -or $existing.purpose -ne 'rust-native-web-server-package') {
+            throw 'Output does not belong to the Rust web server package.'
+        }
+    } elseif (@(Get-ChildItem -LiteralPath $outputFullPath -Force).Count -gt 0) {
+        throw 'Refusing to overwrite an unmarked existing directory.'
+    }
+}
+$runtimeRoot = Join-Path $repositoryRoot '.codex-runtime'
+if (-not $env:CARGO_HOME) { $env:CARGO_HOME = Join-Path $runtimeRoot 'cargo-home' }
+if (-not $env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR = Join-Path $runtimeRoot 'cargo-target-native' }
+$env:TEMP = Join-Path $runtimeRoot 'temp'
+$env:TMP = $env:TEMP
+New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
 $profile = $Configuration.ToLowerInvariant()
 $targetRoot = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $repositoryRoot 'target' }
 if ([string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
@@ -31,6 +51,8 @@ if ([string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
 }
 New-Item -ItemType Directory -Force -Path $outputFullPath | Out-Null
 if (-not $SkipBuild) {
+    $env:npm_config_cache = Join-Path $runtimeRoot 'npm-cache'
+    Invoke-ExportDocExternal -FilePath 'npm' -Arguments @('--prefix', 'apps/export-doc-web', 'ci') -WorkingDirectory $repositoryRoot -DisplayName 'Restore shared React dependencies'
     $npmArguments = @('--prefix', 'apps/export-doc-web', 'run', 'build')
     Invoke-ExportDocExternal -FilePath 'npm' -Arguments $npmArguments -WorkingDirectory $repositoryRoot -DisplayName 'Build React web assets'
     $cargoArguments = @('build', '--locked', '-p', 'export-doc-server')
@@ -47,21 +69,26 @@ if (-not (Test-Path -LiteralPath $serverSource -PathType Leaf)) {
 }
 $copyMap = [ordered]@{
     $serverSource = "ExportDocManager.Server$suffix"
-    (Join-Path $repositoryRoot 'apps/export-doc-web/dist') = 'Web'
-    (Join-Path $repositoryRoot 'Resources/ExcelTemplates') = 'Resources/ExcelTemplates'
-    (Join-Path $repositoryRoot 'THIRD_PARTY_NOTICES.md') = 'THIRD_PARTY_NOTICES.md'
-    (Join-Path $repositoryRoot 'THIRD_PARTY_DEPENDENCIES.md') = 'THIRD_PARTY_DEPENDENCIES.md'
 }
+$webRoot = Join-Path $repositoryRoot 'apps/export-doc-web/dist'
+if (-not (Test-Path -LiteralPath (Join-Path $webRoot 'index.html') -PathType Leaf)) { throw 'Build the React frontend first.' }
+foreach ($file in Get-ChildItem -LiteralPath $webRoot -Recurse -File) {
+    Assert-NativePackagePath -Path $file.FullName
+    $copyMap[$file.FullName] = Join-Path 'Web' ([IO.Path]::GetRelativePath($webRoot, $file.FullName))
+}
+Add-ExportDocRustPackageResources -RepositoryRoot $repositoryRoot -Configuration $Configuration -RustTarget $RuntimeIdentifier -Copies $copyMap -WithoutOcr:$WithoutOcr -SkipBuild:$SkipBuild
 foreach ($entry in $copyMap.GetEnumerator()) {
     if (-not (Test-Path -LiteralPath $entry.Key)) {
         throw "Required web server package input is missing: $($entry.Key)"
     }
+    Assert-NativePackagePath -Path $entry.Key
     $destination = Join-Path $outputFullPath $entry.Value
+    Assert-NativePackagePath -Path $destination
     if (-not (Test-ExportDocPathUnderRoot -Path $destination -Root $outputFullPath)) {
         throw 'Package destination escaped output root.'
     }
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
-    Copy-Item -LiteralPath $entry.Key -Destination $destination -Recurse -Force
+    Copy-Item -LiteralPath $entry.Key -Destination $destination -Force
 }
 $marker = [ordered]@{
     schemaVersion = 1

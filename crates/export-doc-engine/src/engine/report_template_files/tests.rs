@@ -100,7 +100,7 @@ fn created_template_roundtrips_and_blocks_stale_revisions() {
             "reportType":"ExportDocument",
             "templatePath":stored,
             "expectedRevision":revision,
-            "content":starter("ExportDocument","测试发票模板-修订").unwrap()
+            "content":report_templates::starter::create("ExportDocument","测试发票模板-修订").unwrap()
         }),
     )
     .unwrap();
@@ -117,7 +117,7 @@ fn created_template_roundtrips_and_blocks_stale_revisions() {
             "reportType":"ExportDocument",
             "templatePath":stored,
             "expectedRevision":revision,
-            "content":starter("ExportDocument","测试发票模板").unwrap()
+            "content":report_templates::starter::create("ExportDocument","测试发票模板").unwrap()
         }),
     );
     assert!(stale.is_err());
@@ -138,7 +138,7 @@ fn uploaded_file_is_listed_and_downloaded_unchanged() {
     )
     .unwrap();
     let target = created["templatePath"].as_str().unwrap();
-    let content = starter("ExportDocument", "上传模板").unwrap();
+    let content = report_templates::starter::create("ExportDocument", "上传模板").unwrap();
     let uploaded = upload(
         &service,
         &admin(),
@@ -271,7 +271,8 @@ fn managed_file_template_can_be_cloned_into_an_editable_user_draft() {
     )
     .unwrap();
     let source_path = created["templatePath"].as_str().unwrap().to_string();
-    let source_content = starter("ExportDocument", "可复制源模板").unwrap();
+    let source_content =
+        report_templates::starter::create("ExportDocument", "可复制源模板").unwrap();
     let _uploaded = upload(
         &service,
         &admin(),
@@ -336,7 +337,7 @@ fn non_v3_managed_template_clone_is_rejected_without_creating_a_draft() {
             "displayName":"旧格式源模板"
         }),
         "legacy-source.html",
-        starter("ExportDocument", "旧格式源模板")
+        report_templates::starter::create("ExportDocument", "旧格式源模板")
             .unwrap()
             .as_bytes(),
     )

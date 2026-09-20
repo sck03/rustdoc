@@ -9,11 +9,11 @@ trap {
     exit 1
 }
 if ([string]::IsNullOrWhiteSpace($AppRoot)) {
-    $AppRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/native-desktop/ExportDocManager.Slint'
+    $AppRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/native-desktop/ExportDocManager.Tauri'
 }
 $executableName = if ($env:OS -eq 'Windows_NT') { 'ExportDocManager.exe' } else { 'ExportDocManager' }
 $executable = Join-Path $AppRoot $executableName
 if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
     throw 'Build the native program first with scripts/build-native.ps1 (or build-native.cmd on Windows).'
 }
-Invoke-ExportDocExternal -FilePath $executable -Arguments @('--app-root', $AppRoot) -WorkingDirectory $AppRoot -DisplayName 'ExportDocManager Rust + Slint' -TimeoutSeconds 86400
+Invoke-ExportDocExternal -FilePath $executable -Arguments @('--app-root', $AppRoot) -WorkingDirectory $AppRoot -DisplayName 'ExportDocManager Tauri + React + Rust' -TimeoutSeconds 86400

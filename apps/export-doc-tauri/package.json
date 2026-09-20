@@ -1,0 +1,16 @@
+{
+  "name": "export-doc-tauri",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "pwsh -NoProfile -File ../../scripts/build-native.ps1 -NoPause",
+    "tauri": "tauri",
+    "build:web": "npm --prefix ../export-doc-web run build",
+    "test:native": "cargo test --locked -p export-doc-tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.5"
+  }
+}

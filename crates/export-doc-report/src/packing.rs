@@ -1,4 +1,4 @@
-//! Shared vector views for the Slint workbench and native container PDF.
+//! Shared vector views for container previews and Rust PDF output.
 use crate::{Document, Result, canvas::Canvas, error::invalid, layout::escape};
 use export_doc_domain::{generated_api::*, packing::Dimensions};
 use rust_decimal::{Decimal, prelude::ToPrimitive};

@@ -4,15 +4,24 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
-description = "Rust HTTP composition root for the React and PostgreSQL editions"
+description = "Shared Rust HTTP adapter for Tauri, React and PostgreSQL editions"
+
+[features]
+default = ["postgres"]
+postgres = ["export-doc-engine/postgres", "export-doc-storage/postgres"]
+
+[[bin]]
+name = "export-doc-server"
+path = "src/main.rs"
+required-features = ["postgres"]
 
 [dependencies]
 export-doc-contracts = { path = "../../crates/export-doc-contracts" }
-export-doc-engine = { path = "../../crates/export-doc-engine", features = ["postgres", "excel", "invoice-transfer", "exchange-rates", "hs-remote", "mail", "ocr", "ai", "single-window"] }
-export-doc-storage = { path = "../../crates/export-doc-storage", features = ["postgres"] }
+export-doc-engine = { path = "../../crates/export-doc-engine", features = ["excel", "invoice-transfer", "exchange-rates", "hs-remote", "mail", "ocr", "ai", "single-window"] }
+export-doc-storage = { path = "../../crates/export-doc-storage" }
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "json", "multipart", "tokio"] }
 tokio = { version = "=1.53.1", features = ["rt-multi-thread", "net", "signal", "time", "sync", "macros"] }
-tower-http = { version = "=0.7.1", features = ["fs", "limit"] }
+tower-http = { version = "=0.7.1", features = ["fs", "limit", "cors"] }
 serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true

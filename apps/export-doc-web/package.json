@@ -71,7 +71,8 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router-dom": "7.18.4",
-    "three": "0.186.0"
+    "three": "0.186.0",
+    "@tauri-apps/api": "2.11.1"
   },
   "devDependencies": {
     "@types/node": "24.13.5",
@@ -81,12 +82,13 @@
     "@types/three": "0.186.0",
     "@vitejs/plugin-react": "6.1.1",
     "axe-core": "^4.13.0",
+    "esbuild": "0.28.2",
     "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0",
     "typescript": "6.0.3",
     "vite": "8.3.0"
   },
   "allowScripts": {
-    "esbuild@0.28.1": true
+    "esbuild@0.28.2": true
   }
 }

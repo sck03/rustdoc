@@ -13,11 +13,11 @@ members = [
     "crates/export-doc-mail",
     "crates/export-doc-report",
     "crates/export-doc-storage",
-    "apps/export-doc-slint",
+    "apps/export-doc-tauri/src-tauri",
     "apps/export-doc-server",
 ]
-default-members = ["apps/export-doc-slint", "crates/export-doc-engine", "crates/export-doc-domain"]
-exclude = ["apps/export-doc-native", "apps/export-doc-tauri/src-tauri", "apps/exportdoc-ocr-rs", "tools/excel-analyzer-rs"]
+default-members = ["apps/export-doc-tauri/src-tauri", "crates/export-doc-engine", "crates/export-doc-domain"]
+exclude = ["apps/exportdoc-ocr-rs", "tools/excel-analyzer-rs"]
 
 [workspace.package]
 version = "0.1.0"
@@ -28,7 +28,7 @@ publish = false
 [workspace.dependencies]
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.151", features = ["arbitrary_precision", "preserve_order"] }
-rust_decimal = { version = "=1.43.0", default-features = false, features = ["std", "serde-arbitrary-precision"] }
+rust_decimal = { version = "=1.43.0", default-features = false, features = ["std", "serde-float", "serde-arbitrary-precision"] }
 unicode-normalization = "=0.1.25"
 sha2 = "=0.11.0"
 getrandom = "=0.4.3"

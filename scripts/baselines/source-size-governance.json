@@ -44,7 +44,10 @@
     },
     {
       "name": "Rust native production",
-      "directories": ["crates", "apps/export-doc-slint", "apps/export-doc-server"],
+      "directories": [
+        "crates",
+        "apps/export-doc-server"
+      ],
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
@@ -55,23 +58,16 @@
     },
     {
       "name": "Rust native tests and examples",
-      "directories": ["crates", "apps/export-doc-slint", "apps/export-doc-server"],
+      "directories": [
+        "crates",
+        "apps/export-doc-server"
+      ],
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
       "baselineAggregateLines": 5680,
       "maximumAggregateGrowthLines": 120,
       "maximumAggregateLines": 5800,
-      "reportFiles": false
-    },
-    {
-      "name": "Slint native views",
-      "directory": "apps/export-doc-slint/ui",
-      "filePattern": "^.+\\.slint$",
-      "maximumLines": 300,
-      "baselineAggregateLines": 3491,
-      "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 3566,
       "reportFiles": false
     },
     {
@@ -101,13 +97,17 @@
     },
     {
       "name": "Rust native delivery automation",
-      "directories": ["scripts", "deploy/rust-native", ".github/workflows"],
+      "directories": [
+        "scripts",
+        "deploy/rust-native",
+        ".github/workflows"
+      ],
       "filePattern": "^(?:.+\\.(?:mjs|ps1|cmd|yml|yaml|sh)|Dockerfile)$",
       "relativePathPattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)|deploy/rust-native/[^/]+|\\.github/workflows/rust-native-validation\\.yml)$",
       "maximumLines": 350,
-      "baselineAggregateLines": 997,
+      "baselineAggregateLines": 1181,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 1072,
+      "maximumAggregateLines": 1256,
       "reportFiles": false
     },
     {

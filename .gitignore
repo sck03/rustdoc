@@ -80,3 +80,6 @@ apps/license-keygen-tauri/
 **/hs-import-probe/
 # Native Docker credentials and local configuration are never source artifacts.
 deploy/rust-native/runtime/
+
+# Tauri generated capability schemas.
+apps/export-doc-tauri/src-tauri/gen/

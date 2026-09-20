@@ -12,8 +12,6 @@ use crate::{
 use serde_json::{Value, json};
 use std::{path::PathBuf, process::Command, sync::TryLockError, time::Duration};
 pub const OPERATIONS: &[Operation] = &[RECOGNIZE_OCR_IMAGE, UPLOAD_OCR_IMAGE, PREVIEW_OCR_IMAGE];
-#[allow(dead_code)]
-pub const LOCAL: &[Operation] = &[PREVIEW_OCR_IMAGE];
 const MAX_INPUT: usize = 25 * 1024 * 1024;
 pub struct Resources {
     pub worker: PathBuf,
@@ -85,8 +83,19 @@ pub fn diagnostic(paths: &RuntimePaths) -> Value {
     let availability = resources.validate();
     json!({"key":"ocr-runtime","label":"智能 OCR","requirement":"optional","status":if availability.is_ok(){"ready"}else{"missing"},"ready":availability.is_ok(),"resolvedPath":resources.worker,"message":availability.err().map(|e|e.message).unwrap_or_else(||"Rust 识别资源齐全；识别时检查模型加载和执行结果。".into())})
 }
-#[allow(dead_code)]
-pub fn preview(_service: &NativeService, query: &[(&str, String)]) -> Result<tasks::FileOutput> {
+impl NativeService {
+    pub fn preview_ocr_image(
+        &self,
+        query: &[(&str, String)],
+        token: &str,
+    ) -> Result<tasks::FileOutput> {
+        let actor = self.sessions.actor(&self.store, token)?;
+        super::auth::authorize_operation(&actor, PREVIEW_OCR_IMAGE, query)?;
+        preview(query)
+    }
+}
+
+fn preview(query: &[(&str, String)]) -> Result<tasks::FileOutput> {
     let selected = query
         .iter()
         .find(|(key, _)| *key == "filePath")
@@ -109,7 +118,7 @@ pub fn preview(_service: &NativeService, query: &[(&str, String)]) -> Result<tas
         "bmp" => "image/bmp",
         "gif" => "image/gif",
         "webp" => "image/webp",
-        _ => "application/octet-stream",
+        _ => return Err(invalid("OCR 预览只支持图片文件。")),
     };
     Ok(tasks::FileOutput {
         file_name: path

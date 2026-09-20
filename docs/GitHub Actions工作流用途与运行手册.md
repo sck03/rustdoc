@@ -1,21 +1,21 @@
 # GitHub Actions 工作流用途与运行手册
 
-> 2026-09-20 Rust 主支覆盖说明:本文下方保留的工作流清单、Tauri/ASP.NET/WebView2 拓扑和旧产物名称只用于追溯对照,不再是 Rust 主支正式交付事实源。当前正式入口只有 Rust 原生桌面端、Rust 原生网页服务端和 Rust 原生 Docker 容器版;本地绿色桌面版使用 `scripts/build-native.ps1`。
+> 2026-09-20 Rust 主支覆盖说明：桌面恢复 Tauri 2 + 原版 React，后端统一 Rust；下方旧 ASP.NET 工作流只用于追溯。当前入口包括 Tauri 桌面、React + Rust 网页服务和 Rust Docker 容器，本地入口与原版名称映射见 `scripts/README.md`。
 
 ## Rust 主支工作流
 
 | 类别 | 工作流 | 默认触发 | 主要结果 |
 | --- | --- | --- | --- |
-| Rust 主支门禁 | [`rust-native-validation.yml`](../.github/workflows/rust-native-validation.yml) | 相关源码、Cargo、Web、Docker 或脚本路径的 PR,以及手工 | 格式、生成契约、Rust 测试、Slint/HTTP 编译、原生依赖边界和容器生命周期 |
+| Rust 主支门禁 | [`rust-native-validation.yml`](../.github/workflows/rust-native-validation.yml) | 相关源码、Cargo、Web、Docker 或脚本路径的 PR,以及手工 | 格式、生成契约、Rust 测试、Tauri/HTTP 编译、依赖边界和容器生命周期 |
 | 依赖治理 | [`dependency-governance.yml`](../.github/workflows/dependency-governance.yml) | 依赖文件变更、定时和手工 | npm/Cargo 审计、许可证和 SBOM 证据 |
 | 跨浏览器验收 | [`browser-compatibility.yml`](../.github/workflows/browser-compatibility.yml) | 仅手工 `workflow_dispatch` | Firefox/WebKit 桌面与手机视口、axe 严重问题和横向溢出 |
-| 远端桌面端 | [`rust-native-desktop-release.yml`](../.github/workflows/rust-native-desktop-release.yml) | 仅手工 `workflow_dispatch` | Windows x64/ARM64、Linux x64/ARM64、macOS ARM64 Rust + Slint 绿色包 Artifact |
+| 远端桌面端 | [`rust-native-desktop-release.yml`](../.github/workflows/rust-native-desktop-release.yml) | 仅手工 `workflow_dispatch` | Windows x64/ARM64、Linux x64/ARM64、macOS ARM64 Tauri 2 + React + Rust 绿色包 Artifact |
 | 远端网页端 | [`rust-native-web-server-release.yml`](../.github/workflows/rust-native-web-server-release.yml) | 仅手工 `workflow_dispatch` | React 静态资源与 Rust HTTP 服务端包,目标数据库 PostgreSQL 18 |
 | 远端 Docker 容器版 | [`rust-native-container-release.yml`](../.github/workflows/rust-native-container-release.yml) | 仅手工 `workflow_dispatch` | Docker Compose 生命周期验收;勾选 publish 后推送 Rust 容器镜像到 GHCR |
 
 正式交付顺序:先在 `main` 或目标提交运行 Rust 主支门禁和依赖治理;需要浏览器验收时手工运行跨浏览器;随后分别从桌面端、网页端和 Docker 容器版入口生成目标产物。CI 结果不代表目标公司服务器上的备份、权限、并发和真机验收已经完成。
 
-本地绿色桌面版不依赖 Actions:运行 `scripts/build-native.cmd`,默认输出 `artifacts/native-desktop/ExportDocManager.Slint`。需要交叉编译或远端矩阵时使用 `build-native.ps1 -RustTarget <target>`;不需要 OCR 资源时使用 `-WithoutOcr`。
+本地绿色桌面版不依赖 Actions：运行 `scripts/build-native.cmd`，默认输出 `artifacts/native-desktop/ExportDocManager.Tauri`。使用 `-RustTarget <target>` 指定目标，`-Bundles nsis` 等参数生成对应安装器，`-WithoutOcr` 明确省略 OCR 资源。远端同时保存便携目录与平台安装／应用包，跨平台真机与四产品版验收不由编译结果代替。
 
 网页服务端本地验收:运行 `scripts/package-native-web-server.ps1`,默认输出 `artifacts/native-web-server`。目标机需要 PostgreSQL 18,生产部署不应把数据库账号交给浏览器。
 

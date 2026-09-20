@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-09-20",
+  "packages": {
+    "bblanchon.pdfium.win32": {
+      "version": "152.0.7961",
+      "sha512": "pWyGOMwMdyYGtBGqXa77gdXLKZJ0mJL9jLP09tFEpmJd6QVqZoVYPufmVdaKN/3t3RC16O6dZPuttpV97JBAOw==",
+      "source": "https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.win32/152.0.7961/bblanchon.pdfium.win32.152.0.7961.nupkg",
+      "license": "Apache-2.0"
+    },
+    "bblanchon.pdfium.linux": {
+      "version": "152.0.7961",
+      "sha512": "mHqxElmixmwmLHJNCghdxOFlrvwn4rc79DblFfD8fQswbw4Ahk6vFVOCb9zuDyNcM+Fj/QCiVMGyuwlPekJk+w==",
+      "source": "https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.linux/152.0.7961/bblanchon.pdfium.linux.152.0.7961.nupkg",
+      "license": "Apache-2.0"
+    },
+    "bblanchon.pdfium.macos": {
+      "version": "152.0.7961",
+      "sha512": "o84By5TiSCLoPb6Mr/veMqkJDWCS0keu3Rrp+OpWBKLNOVy/alHUIdNKZhyd9H4PbbFACtBGagRryWNnYUdD7Q==",
+      "source": "https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.macos/152.0.7961/bblanchon.pdfium.macos.152.0.7961.nupkg",
+      "license": "Apache-2.0"
+    },
+    "microsoft.ml.onnxruntime": {
+      "version": "1.29.0",
+      "sha512": "AJ6YRZdKeGtpI2A7Ix+C6hxfGoTHTxWo9fZZx+j5PNSGPBIPLA8x/Tp6WHnBo9WHtr+z23MhALTmRk8Yti6/YA==",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/1.29.0/microsoft.ml.onnxruntime.1.29.0.nupkg",
+      "license": "MIT"
+    }
+  }
+}

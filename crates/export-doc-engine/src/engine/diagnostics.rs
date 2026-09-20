@@ -52,7 +52,8 @@ pub fn health(paths: &RuntimePaths, provider: &str) -> Result<Value> {
     if let Some(items) = value["runtimeDependencies"].as_array_mut() {
         items.push(super::ocr::diagnostic(paths));
     }
-    value["storagePolicy"] =
-        json!("数据库、配置、缓存和输出均使用受管运行目录；桌面运行不需要 WebView 或 .NET。");
+    value["storagePolicy"] = json!(
+        "数据库、配置、缓存和输出均使用受管运行目录；桌面采用 Tauri 与系统 WebView，业务由 Rust 实现，无需 .NET。"
+    );
     Ok(value)
 }

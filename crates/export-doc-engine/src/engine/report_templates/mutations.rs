@@ -64,7 +64,7 @@ pub(super) fn save(
         "design"
     };
     auth::authorize(actor, PERMISSION, permission)?;
-    required(body, "name", "模板名称", 160)?;
+    required(body, "name", "模板名称", 150)?;
     let id = if operation == SAVE_USER_REPORT_TEMPLATE_DRAFT {
         super::super::records::id(parameters)?
     } else {
@@ -99,7 +99,12 @@ pub(super) fn save(
             } else {
                 cloned_file_content.clone().ok_or_else(|| invalid("文件模板复制内容缺失。"))?
             }
-        } else { text(body, "contentHtml") };
+        } else {
+            let supplied = text(body, "contentHtml");
+            if operation == CREATE_USER_REPORT_TEMPLATE && supplied.trim().is_empty() {
+                starter::create(kind, &text(body, "name"))?
+            } else { supplied }
+        };
         validate_content(kind, &content)?;
         let mut value = if id > 0 {
             let value = store::get(tx, KIND, id)?;

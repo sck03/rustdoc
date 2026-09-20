@@ -15,7 +15,7 @@ ARG TARGETARCH
 RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/*
 COPY scripts/prepare-native-ocr-runtime.mjs scripts/
 COPY scripts/lib/child-process-tree.mjs scripts/lib/
-COPY src/ExportDocManager.Infrastructure.PdfOcr/packages.lock.json src/ExportDocManager.Infrastructure.PdfOcr/
+COPY eng/native-runtime-packages.json eng/
 RUN case "$TARGETARCH" in amd64) rid=linux-x64;; arm64) rid=linux-arm64;; *) exit 1;; esac \
     && node scripts/prepare-native-ocr-runtime.mjs "$rid" /workspace/artifacts/ocr-runtime
 
@@ -28,9 +28,10 @@ COPY .cargo/ .cargo/
 COPY crates/ crates/
 COPY apps/export-doc-server/ apps/export-doc-server/
 COPY apps/exportdoc-ocr-rs/ apps/exportdoc-ocr-rs/
-COPY apps/export-doc-slint/ apps/export-doc-slint/
+COPY apps/export-doc-tauri/src-tauri/ apps/export-doc-tauri/src-tauri/
 COPY tools/excel-analyzer-rs/ tools/excel-analyzer-rs/
 COPY Resources/ExcelTemplates/ Resources/ExcelTemplates/
+COPY Templates/ Templates/
 RUN --mount=type=cache,target=/workspace/.cache/cargo/registry,sharing=locked cargo build --locked --release -p export-doc-server \
     && cargo build --locked --release --manifest-path apps/exportdoc-ocr-rs/Cargo.toml
 
@@ -41,12 +42,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 WORKDIR /opt/exportdoc
 COPY --from=rust /workspace/target/release/export-doc-server ./ExportDocManager.Server
 COPY --from=rust /workspace/target/release/exportdoc-ocr ./sidecar/ocr/exportdoc-ocr
-COPY --from=ocr-assets /workspace/artifacts/ocr-runtime/ ./sidecar/ocr/
+COPY --from=ocr-assets /workspace/artifacts/ocr-runtime/ocr/ ./sidecar/ocr/
+COPY --from=ocr-assets /workspace/artifacts/ocr-runtime/pdf/ ./Resources/Pdf/
 COPY OcrModels/PaddleOCR/V6/ ./OcrModels/PaddleOCR/V6/
 COPY apps/exportdoc-ocr-rs/README.md ./sidecar/ocr/README.md
 COPY --from=web /workspace/apps/export-doc-web/dist/ ./Web/
 COPY --from=web /workspace/Resources/Fonts/OpenSource/ ./Resources/Fonts/OpenSource/
 COPY Resources/ExcelTemplates/ ./Resources/ExcelTemplates/
+COPY Templates/ ./Templates/
 COPY THIRD_PARTY_NOTICES.md THIRD_PARTY_DEPENDENCIES.md ./
 USER 10001:10001
 EXPOSE 5188

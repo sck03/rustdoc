@@ -19,20 +19,19 @@ function dependencies(pkg) {
   const output=execute(cargo,["tree","--locked","-p",pkg,"--target",target,"--edges","normal","--prefix","none","--format","{p}"]);
   return [...new Set(output.split(/\r?\n/).map(line=>line.match(/^([^ ]+) v([^ ]+)/)?.slice(1)).filter(Boolean).map(([name,version])=>`${name}@${version}`))].sort();
 }
-const desktop=dependencies("export-doc-slint");
+const desktop=dependencies("export-doc-tauri");
 const domain=dependencies("export-doc-domain");
 function reject(graph,names,label) {
   const found=graph.filter(pkg=>names.includes(pkg.split("@")[0]));
   if(found.length)throw new Error(`${label} unexpectedly depends on ${found.join(", ")}`);
 }
-reject(desktop,["tauri","wry","webview2-com","egui","eframe","axum","postgres","tokio-postgres"],"SQLite desktop");
-reject(domain,["slint","rfd","rusqlite","postgres","axum","reqwest","ureq","windows","winapi"],"Pure domain");
+reject(desktop,["slint","i-slint-core","egui","eframe","postgres","tokio-postgres"],"SQLite desktop");
+reject(domain,["tauri","slint","rfd","rusqlite","postgres","axum","reqwest","ureq","windows","winapi"],"Pure domain");
 if(!desktop.some(pkg=>pkg.startsWith("rusqlite@")))throw new Error("The desktop must use the SQLite adapter.");
-const manifest=readFileSync(path.join(root,"apps/export-doc-slint/Cargo.toml"),"utf8");
-const slintVersion=manifest.match(/^slint\s*=\s*\{[^\n]*version\s*=\s*"=([^"]+)"/m)?.[1];
-const compilerVersion=manifest.match(/^slint-build\s*=\s*"=([^"]+)"/m)?.[1];
-if(!slintVersion||slintVersion!==compilerVersion||!desktop.includes(`slint@${slintVersion}`))throw new Error("Slint runtime and compiler must share an exact locked stable version.");
+const manifest=readFileSync(path.join(root,"apps/export-doc-tauri/src-tauri/Cargo.toml"),"utf8");
+const tauriVersion=manifest.match(/^tauri\s*=\s*\{[^\n]*version\s*=\s*"=([^"]+)"/m)?.[1];
+if(!tauriVersion?.startsWith("2.")||!desktop.includes(`tauri@${tauriVersion}`))throw new Error("Tauri must use an exact locked stable 2.x version.");
 const output=path.resolve(option("--output")??path.join(root,"artifacts/native-validation/dependencies"));
 mkdirSync(output,{recursive:true});
-writeFileSync(path.join(output,`${target}.json`),JSON.stringify({target,slintVersion,webView:false,desktop,domain},null,2)+"\n");
-console.log(`Native dependency boundaries passed: ${target}; Slint ${slintVersion}; ${desktop.length} runtime packages; no WebView or server database in desktop.`);
+writeFileSync(path.join(output,`${target}.json`),JSON.stringify({target,tauriVersion,webView:true,desktop,domain},null,2)+"\n");
+console.log(`Native dependency boundaries passed: ${target}; Tauri ${tauriVersion}; ${desktop.length} runtime packages; no retired UI or server database in desktop.`);

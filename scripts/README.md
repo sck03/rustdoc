@@ -1,133 +1,70 @@
 # 脚本使用说明
 
-## Rust 主支:本地与远端交付入口
+> 2026-09-20：当前主线为 Tauri 2 + React + Rust。相邻 ExportDocManager_CS 是只读行为和脚本对照；这里的正式构建不发布 ASP.NET sidecar，不要求 .NET SDK／Runtime，不使用 NPOI。
 
-- 本地绿色桌面版由 `build-native.cmd`/`build-native.ps1` 生成,默认输出 `artifacts/native-desktop/ExportDocManager.Slint`;`-RustTarget` 用于交叉编译或远端矩阵,`-WithoutOcr` 生成不携带 OCR 资源的轻量包。`run-native.cmd`/`run-native.ps1` 启动该包。
-- 本地网页服务端包由 `package-native-web-server.ps1` 生成,输出 React 静态资源与 Rust HTTP 服务到 `artifacts/native-web-server`;目标机仍使用 PostgreSQL 18。
-
-远端 workflow 分类:
-
-- `rust-native-desktop-release.yml`:手工构建 Windows x64/ARM64、Linux x64/ARM64、macOS ARM64 绿色桌面包。
-- `rust-native-web-server-release.yml`:手工构建 Windows x64、Linux x64/ARM64、macOS ARM64 网页服务端包。
-- `rust-native-container-release.yml`:手工验证 Docker Compose 生命周期;选择发布时才推送 Rust 容器镜像到 GHCR。
-- `rust-native-validation.yml`、`dependency-governance.yml`、`browser-compatibility.yml`:Rust 主支门禁、依赖治理和手工跨浏览器验收。
-
-- `build-native.cmd`／`build-native.ps1` 构建 Rust + Slint + SQLite 桌面包；`run-native.cmd`／`run-native.ps1` 启动该包。Excel 原模板、受控字体、PDFium 与 notices 随包进入 `Resources`，不携带 WebView 或 .NET sidecar。
-- `run-native-docker.cmd`／`run-native-docker.ps1` 使用 `deploy/rust-native/compose.yml` 构建 React + Rust HTTP 服务和 PostgreSQL 18。`-PrepareOnly -NoPause` 只准备私有配置；不传该开关时构建并启动；`-Stop -NoPause` 停止容器并保留数据卷。默认仅绑定 `127.0.0.1:5188`，局域网地址通过 `-BindAddress` 显式指定。
-- Docker 凭证和首次管理员初始化令牌保存在 `deploy/rust-native/runtime`，该目录不进入 Git 或 Docker 构建上下文。首次在网页使用 `admin`、自定的 8–128 字密码及该目录的 `bootstrap-token.txt` 初始化账号。普通服务只读取业务连接，维护连接仅交给一次性建表容器。
-- `test-native-postgres.ps1 -PostgresBin <PostgreSQL-18-bin>` 创建隔离测试集群并在结束后停止；不访问正式数据库。`verify-native-desktop.mjs` 和 `generate-native-api-client.mjs` 是内部依赖／契约门禁。
-
-本批开发库基线为 4。旧 Rust 试验库保留，不能直接由新版本打开；请使用新的程序／数据目录。原生窗口验收新增客户跟进、商机报价与历史、供应商导入确认及评价分析。
-
-迁移功能和平台支持以 `docs/Rust原生架构与选型.md` 为准；有构建入口不代表全功能或容器实跑已验收。
-
-原生窗口验收继续使用包内程序的 `--validation --ui-smoke <工作区内绝对输出目录>`，自动建立隔离验证数据目录。发票／付款、组织／人事／附件之外，现包含会议室日程与钥匙交接、物品入库／部分归还以及 SQLite 备份还原闭环。验收只操作生成的夹具；结果中的系统 IME、原生对话框和其他平台边界必须按真实记录解释。
-
-唛头绑定验证：`npm --prefix apps/export-doc-web run test:report-designer-v3` 检查单一字段及五种放置位置；`test:report-designer-v3-ui` 使用真实画布插入、调整尺寸、撤销，并对同一模板的文字／图片样例检查比例、边界、明细旁栏和 Chromium PDF。HTML、截图、PDF 与摘要位于 `artifacts/report-designer-v3-ui/marks-*`；.NET 集成回归验证 SQLite／PostgreSQL 保存互斥、图片校验、实际单据 HTML／PDF 及缺图失败，使用隔离测试数据库。
-
-导航与界面整理验证：`npm --prefix apps/export-doc-web run test:navigation-reorganization-ui` 使用实际工作区、路由和受控接口夹具，覆盖对象直达、保留筛选／页码、客户与邮件草稿、连续返回、独立权限、模板目录及发票跨页批量报表。截图与摘要写入 `artifacts/navigation-reorganization-ui`；按编号读取和数据范围另由 .NET API／Infrastructure 集成测试验证。
-
-单据编辑界面验证：`npm --prefix apps/export-doc-web run test:document-editor-ui`，使用真实 React 页面与受控接口夹具验证发票五个／付款四个页签、跨区保存及必填定位、自定义字段名称／备用列保留数据、付款自定义方式、只读权限和窄屏布局，并覆盖系统设置、报表导出默认设置及付款的冲突取消、加载失败保留草稿和重新加载后保存；截图与摘要写入 `artifacts/document-editor-ui`。`test:office-ui` 同时覆盖 175 部门、深层搜索、折叠恢复、公司切换及保存后定位。数据库持久化另由 .NET 集成测试验证。
-
-2026-09-11：`provision-visual-cpp-runtime.ps1` 由 Windows x64 OCR 资源准备自动调用，只从已校验的微软安装器提取四个必需 DLL（908008 字节），不执行或分发整套安装器。WebView2 与 CRT 共用 `lib/microsoft-runtime-support.ps1` 的来源／签名／摘要检查；客户仍使用既有构建入口。
-
-单据备用字段验证：`npm --prefix apps/export-doc-web run test:document-spare-fields`，覆盖发票、商品和付款三十项字段的草稿保存、大写转换、设计器选择、HTML 与样例。行政编辑／删除和通讯录验证继续使用 `test:office-models`、`test:office-ui`；设计器交互使用 `test:report-designer-v3-ui`。
-
-> 报表模板变更后，必须分别运行 `npm --prefix apps/export-doc-web run test:template-print-pixels` 和 `npm --prefix apps/export-doc-web run test:template-pdf-pixels`。前者检查打印媒体下的模板源码，后者使用完整 Chrome 的 PDF Viewer 逐页检查实际生成的 PDF；两者维护独立基准，源码中的 Scriban 分支变化也会影响这两套静态排版夹具。业务数据绑定另由 .NET 报表集成测试验证。
->
-> 两套像素回归默认只读基准。确认版式变化符合预期后，可向对应命令追加 `-- --update` 生成候选基准；逐页复核 `.codex-runtime/report-template-print-pixel-regression` 或 `.codex-runtime/report-template-pdf-pixel-regression` 中的截图和指标，只保留受影响条目的变更，再运行不带更新参数的两套检查。保持指纹、纸张和墨迹边界阈值，不以批量刷新基准掩盖未审查变化。更新只写测试夹具和仓库运行目录。
-
-## GitHub 公开发布
-
-- `github/verify-public-source.ps1`：上传前检查注册机、私钥、内部 `KEY/` 产物和 GitHub 大文件边界。
-- `github/validate-container-installer.sh`：在 Linux CI 中验证容器一键安装器的幂等、回滚、符号链接拒绝、目录权限和 PostgreSQL 数据卷合同。
-- `github/initialize-github-repository.ps1`：初始化 `main` 分支、暂存公开文件，可选配置 origin、创建提交和推送；默认不会提交或联网推送。
-- `verify-github-workflow-actions.mjs`：检查官方 Action 主版本、Node 24、`upload-artifact@v7` 和 `download-artifact@v8`，防止工作流运行时回退。
-- `audit-npm-production.mjs`、`audit-dotnet-packages.mjs`：执行结构化 npm/NuGet 漏洞审计；NuGet 优先读取官方源的 `dotnet --vulnerable` 结果，若宿主 TLS 无法访问漏洞元数据，则从已还原依赖图提取精确版本并使用 OSV NuGet 生态复核，依赖图本身不可读取时仍立即失败。
-- `verify-dependency-policy.mjs`：校验中央 NuGet 清单、所有锁文件和生成的依赖证据；NPOI 强制保持 `2.7.6`，发现 `2.8.0` 或锁图缺失时立即失败。普通生产依赖继续使用精确 lockfile，不用“大于某版本即可”替代可复现构建。依赖治理工作流生成 SBOM 后使用 `--generated-only` 只复核证据，避免重复扫描源码锁图。
-- `global.json` 以精确稳定版本声明最低 SDK 基线，并用 `rollForward: latestFeature`、`allowPrerelease: false` 允许同一 .NET `major.minor` 内使用更新的稳定 feature band，例如 `10.0.302 -> 10.0.303/10.0.400/10.0.401`；低于基线、preview、`10.1.x` 和 `11.x` 均拒绝。GitHub Actions 与容器分别使用稳定通道 `10.0.x`、`10.0-noble`，门禁从 `global.json` 推导通道，避免重复硬编码精确 SDK。NuGet servicing 与发布依赖仍使用中央精确版本和 lockfile，当前为 `10.0.11`，不得改成 `10.0.*` 或“大于某版本”。
-- `generate-dependency-governance.mjs`：从 npm/Cargo 锁文件和还原后的 NuGet 图生成 SPDX、CycloneDX 和第三方依赖清单到显式 `artifacts/` 目录。
-- `check_frontend_style_governance.mjs`：阻止硬编码颜色、阴影、渐变、px 字号和 `!important` 债务继续增长。
-- `check_source_size_governance.mjs`：对 .NET、Web、Rust、测试、自动化和 GitHub 工作流实行全仓库单文件上限、聚合上限与相对基线增量门禁；统一忽略 `bin/obj/dist/target/node_modules/artifacts/TestResults/.codex-runtime/.git` 等生成目录，避免构建产物污染统计。
-
-RustSec 工作流直接调用安装后的 `cargo-audit` 时必须保留 `audit` 子命令，并拒绝漏洞、新增 unsound 公告和 yanked crate。Tauri 当前 Linux WebKit/GTK3 传递栈只精确豁免 `RUSTSEC-2024-0429`；该例外不能扩展为通配忽略，也不代表其它停止维护告警已经消失。
-
-Tauri 正式 updater 密钥不由仓库脚本或 CI 自动生成，也不需要先确认 endpoint。项目所有者可先按 `docs/Tauri正式更新签名与发布配置.md` 在仓库外手工执行一次 signer 命令并妥善备份私钥；公钥固定进入正式安装包，更新地址由管理员配置，可在 GitHub、自建服务器和可信企业内网之间切换。
-
-普通用户只需要使用 `scripts/` 根目录下的以下批处理入口，不要直接运行 `lib/`、`prepare-*`、`verify-*` 或 `assert-*`：
+## 本地入口
 
 | 入口 | 用途 |
 | --- | --- |
-| `build-windows-desktop-run.cmd` | 构建一个 Windows 便携运行目录，默认全功能版 |
-| `build-windows-editions.cmd` | 构建单证员版、业务员版、全功能版、行政版四个便携目录 |
-| `build-windows-installers.cmd` | 构建四个 Windows NSIS 安装包 |
-| `run-tests.cmd` | 先核查全部脚本，再运行完整 .NET 测试 |
+| `build-windows-desktop-run.cmd`／`.ps1` | 沿用原版名称，调用统一 Rust 打包器，生成 Windows Full 便携目录 |
+| `build-windows-installers.cmd`／`.ps1` | 生成 Tauri NSIS 安装器，使用同一 Rust 业务与资源 |
+| `build-native.cmd`／`.ps1` | 当前平台 Rust + Tauri + React 便携包；默认目录 `artifacts/native-desktop/ExportDocManager.Tauri` |
+| `run-native.cmd`／`.ps1` | 启动已构建便携包；`-AppRoot` 可指定包目录 |
+| `package-native-web-server.ps1` | 原版 React 构建、Rust HTTP 服务、报表与可选 OCR 资源；目标数据库 PostgreSQL 18 |
+| `run-native-docker.cmd`／`.ps1` | React + Rust HTTP + PostgreSQL 18 容器构建、启动和停止 |
 
-公开/客户构建默认不生成内部注册机。只有本机保留私有 `apps/license-keygen-tauri/` 源码并显式向 PowerShell 构建脚本传入 `-IncludeLicenseKeygen` 时，才会把内部工具整理到客户目录之外的 `KEY/`。
+普通用户只运行 `scripts/` 根入口；`lib/`、`prepare-*`、`verify-*`、`assert-*` 为内部组合部件。
 
-构建输出按“一次生成、完整替换”处理：单版和多版便携包会在复制前清理旧稳定资源及整个浏览器目标目录；未传 `-IncludeLicenseKeygen` 的多版构建会删除旧 `KEY/`；安装器只清理本次请求版本的旧安装包与版本 manifest，未请求版本继续保留。Windows 便携目录和 GitHub 便携 ZIP 在进入交付阶段前都会执行最终 `ExportDocManager.exe` 的零参数启动、动态 API 健康、空密码 `admin` 登录及基础分页冒烟检查，随后清理测试生成的 `App_Data`；载荷门禁继续禁止未知字体、Playwright 开发 UI、重复 ONNX Runtime 或内部注册机。本机 GNU 构建默认单并发，以控制普通 16 GiB 电脑上的 LLVM 峰值内存；GitHub Windows 发布仍使用 MSVC，并由工作流显式设置自己的并发度。
+`build-native.ps1 -PreflightOnly -NoPause` 只检查 Rust、Node、curl 等构建工具。`-Configuration Debug` 用于联调，默认 Release。`-RustTarget` 明确目标架构；`-Bundles nsis`、`-Bundles deb,appimage` 或 `-Bundles app,dmg` 生成对应平台安装／应用包。安装器需要对应平台工具链。
 
-桌面资源准备会在 release 依赖治理扫描前自动还原完整 `ExportDocManager.sln`。本地 Tauri 构建入口也会在锁定依赖缺失时分别对 Web 与桌面项目执行一次 `npm ci`。因此运行空间清理删除项目 `bin/obj` 或显式删除 `node_modules` 后，可以直接执行上述构建入口，不需要先手工运行测试、`dotnet restore` 或 `npm ci`；.NET CLI、NuGet 和 npm 缓存仍由构建环境定向到仓库 `.codex-runtime/`，不会新增系统 C 盘默认缓存。
+`-SkipBuild` 只整理已经构建好的相同 profile／target 二进制与资源。正式包默认包含 OCR；`-WithoutOcr` 仅生成明确不提供文字识别的轻量验收包，不能用它代替 Full 功能验收。
 
-同一工作区一次只允许一个本地 Tauri 构建占用共享 Cargo 与资源暂存目录。重复双击或同时从终端启动第二次构建时，后启动的入口会立即给出明确提示并停止，避免两个构建互相覆盖 `artifacts/tauri-bundle` 后出现 `EBUSY`、文件锁或不完整便携包。
+当前开放 Full 打包。原版 Document／Sales／Administration 的 Rust 资源裁剪、权限隔离和更新通道仍需分别验收；不通过更换标题冒充四版已完成。
 
-Tauri CLI 由当前 Node 直接启动 `apps/export-doc-tauri/node_modules/@tauri-apps/cli/tauri.js`，不再通过 npm 命令垫片间接启动。依赖还原和普通 npm script 继续经过统一外部进程入口；该入口会把裸命令解析为当前平台的实际可执行文件（Windows 包括 `.cmd`），同时保留超时、心跳和退出码检查。
+## 桌面启动检查与资源
 
-公开仓库不提交 Chromium 二进制。`run-tests.ps1` 找不到程序根 Chromium 或 `EXPORTDOCMANAGER_CHROMIUM_EXECUTABLE` 时，会明确跳过两个真实 PDF 浏览器测试；正式发布验收使用 `-RequireBrowserPdfTests`，缺少渲染器即失败。测试默认执行 restore，只有确认依赖已还原时才使用 `-NoRestore`。
+Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便携包携带原版固定清单验证的微软离线安装器；缺少 WebView2 时显示安装／退出选择，保留取消、繁忙、超时和需重启处理。构建时核对微软签名、版本、大小和 SHA-256。Windows GNU 构建同时携带 `WebView2Loader.dll`。
 
-Windows x64 绿色版构建使用 `WebView2Runtime/` 下的微软官方 Evergreen Standalone Installer。该目录跟踪 `README.md` 和固定版本、大小、SHA-256、下载地址的 `webview2-runtime.json`，约 203 MiB 的安装器本身被 Git 忽略；`provision-webview2-runtime.ps1` 会复用已有安装器或按清单从微软 HTTPS 地址下载，并严格验证 Microsoft Authenticode 签名、文件元数据、体积和 SHA-256。内容校验允许下载暂存文件的 `.download` 后缀，仅校验通过后才改为正式文件名；对应回归纳入脚本套件。
+程序随后读取本包资源清单，核对中文字体、PDFium 及已声明的 OCR 工具、ONNX 和模型。Windows OCR 只携带四个 app-local CRT DLL，不安装全局 .NET 或整个 VC 运行库。Linux 使用 WebKitGTK 4.1，macOS 使用系统 WKWebView；其它平台必须在对应 runner／设备验收。
 
-便携程序在创建窗口前由 Rust 预检 Windows 10 1809（内部版本 17763）和 WebView2，缺失时只需在原生窗口点击“安装并启动”，随后由随包微软安装器显示进度并在成功后自动继续启动。重复双击不会重复安装；取消正常退出，失败保留诊断，超时清理安装进程树，要求重启时明确提示。安装器只进入绿色包，不重复进入使用联网 Evergreen bootstrapper 的 NSIS 安装版；不要把它放入 `App_Data`，也不要在程序目录中自动删除正式发布资产。.NET 运行时随 API 发布，客户无需另外安装 SDK 或 .NET Runtime。
+`eng/native-runtime-packages.json` 固定已校验来源及签名的原生资源归档版本和 SHA-512。NuGet 在此只是原生 DLL／so／dylib 的下载载体；不复制托管程序集，也不执行 dotnet restore。不要把 NuGet lock 的“内容哈希”直接当成签名后整个归档的哈希。PowerShell 打包器和容器资源准备都读取这份清单。
 
-当前不使用 `.github/dependabot.yml` 自动创建依赖更新 PR。NuGet、npm、Cargo、Docker 和 Actions 版本由维护者集中审查后人工升级，避免一次更新触发大量分支和云端构建。
+共享字体、Excel 模板、原版报表模板、PDFium、notices 和 OCR 资源通过 `lib/native-package-resources.ps1` 组装，桌面与网页服务不维护重复清单。临时文件和下载缓存写仓库 `.codex-runtime/`。AppRoot 与 DataRoot 显式传入；桌面 WebView profile 写 DataRoot/WebView。
 
-双击 `.cmd` 后窗口会一直保留，最后明确显示成功或失败及退出码，按任意键关闭。构建环境有问题时，错误信息不会一闪而过。
+## 网页与 Docker
 
-正式构建前可先在终端运行只读预检：
+`run-native-docker.ps1 -PrepareOnly -NoPause` 只生成私有配置；普通运行构建并启动，`-Stop -NoPause` 停止并保留数据库。默认绑定 `127.0.0.1:5188`；局域网地址须显式设置。凭据保存在忽略的 `deploy/rust-native/runtime/`，不进入 Git 或镜像。
 
-```powershell
-./scripts/build-windows-desktop-run.cmd -PreflightOnly
-./scripts/build-windows-editions.cmd -PreflightOnly
-./scripts/build-windows-installers.cmd -PreflightOnly
-```
+首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接只供初始化／维护使用。桌面 SQLite 空库仍为 admin 空密码，数据库使用独立 Rust 基线 4，不能打开 C# v19 或旧 Rust 试验库。
 
-自动化或已有终端不希望暂停时：
+## 远端入口
 
-```powershell
-$env:EXPORTDOCMANAGER_NO_PAUSE = "1"
-./scripts/build-windows-editions.cmd -PreflightOnly
-```
+| 工作流 | 用途 |
+| --- | --- |
+| `rust-native-desktop-release.yml` | 手工构建 Windows x64／ARM64、Linux x64／ARM64、macOS ARM64 桌面及平台安装包，默认含 OCR |
+| `rust-native-web-server-release.yml` | 手工构建 React + Rust PostgreSQL 服务包 |
+| `rust-native-container-release.yml` | 手工 Docker 生命周期验收；显式选择 publish 才发布 GHCR |
+| `rust-native-validation.yml` | Rust 测试、生成契约、依赖边界与跨平台构建／容器验收 |
+| `dependency-governance.yml` | npm／Cargo／原生资源的许可与 SBOM；不调用 .NET |
+| `browser-compatibility.yml` | 仅手工 Firefox／WebKit 验收 |
 
-开发或审查时可单独执行完整脚本门禁：
+Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公钥和私钥，私钥不写仓库。便携包不执行安装器更新。不执行 Windows Authenticode、Developer ID 或 Apple 公证。未实跑的 CI／系统／架构不写成已通过。
 
-```powershell
-pwsh -NoProfile -File ./scripts/verify-script-suite.ps1
-```
+## 验证和证据
 
-该门禁递归检查全部 `.ps1`、`.cmd` 和 `.mjs`：PowerShell AST、Node 语法、CMD 薄入口/共享宿主、危险系统路径模式，以及原生命令退出码是否统一处理。`run-tests.cmd` 会自动先执行该门禁。
+按用户要求先集中完成一批页面、后端和操作，再统一联调与最终门禁。开发中只做必要编译和针对失败的回归。
 
-业务资料与待办的前端验证使用 `npm --prefix apps/export-doc-web run test:business-feature-models` 和 `test:business-features-ui`；安装完整 Chrome 后可向后者追加 `-- --pdf-viewer`，检查归档 PDF 实际加载并显示一页。截图与摘要写入 `artifacts/business-features-ui/`。归档/待办、四产品版、模块开关和留存规则见 `docs/单据核对与业务资料待办.md`。
+- Rust：`cargo fmt --all --check`、`cargo test --locked --workspace`、`cargo check --locked --workspace --all-features`。
+- 实库：`test-native-postgres.ps1 -PostgresBin <PostgreSQL-18-bin>` 创建并停止隔离集群；忽略的实库测试不计通过。
+- React：项目 `build`、API／登录／权限／草稿／无障碍及相应页面回归；真正的 Tauri 窗口和输出仍需实跑。
+- 依赖：`generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository`，要求 `unresolved=0 / disallowed=0`。
+- 平台：`verify-native-desktop.mjs` 验证 Tauri／SQLite，排除 Slint／egui／PostgreSQL 桌面依赖；`assert-tauri-command-permissions.ps1` 校验 command 与能力白名单。
+- 脚本：`verify-script-suite.ps1`、`verify-github-workflow-actions.mjs`、`test_tauri_updater_release_contract.mjs`、`github/verify-public-source.ps1`、`git diff --check`。
 
-## 工作区空间清理
+Rust notices 不列保留 C# 的运行图。`verify-dependency-policy.mjs` 仍单独约束未删除的 C# 对照锁文件，NPOI 2.7.6 只属于该对照规则，与 Rust 业务运行无关。
 
-先只读查看计划，不删除任何内容：
+报表原版 React 设计器可复用，但 Rust 渲染仍有明确未完成项；当前事实见 `docs/Rust原生功能迁移核对表.md`。旧 Slint 的 `--validation --ui-smoke` 入口已退役。
 
-```powershell
-./scripts/clean-generated-artifacts.ps1 -ListOnly
-```
+## 工作区清理
 
-日常整理建议同时清除 `.codex-runtime` 中的一次性测试、截图、诊断和回归工作区，但保留仓库内 .NET SDK、NuGet/npm 缓存和工具：
-
-```powershell
-./scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntimeWorkspaces
-```
-
-依赖升级后可按仓库全部 `packages.lock.json` 精确删除不再引用的 NuGet 旧版本，同时保留当前锁定图和 NPOI `2.7.6`：
-
-```powershell
-./scripts/clean-generated-artifacts.ps1 -PruneUnusedNuGetVersions
-```
-
-默认清理会保留 `artifacts/windows-desktop-run/`、`artifacts/windows-installers/`、`artifacts/license-keygen/`、浏览器/工具下载缓存、`node_modules` 和完整 `.codex-runtime` 依赖缓存。`-PruneUnusedNuGetVersions` 只修剪锁文件未引用的普通 NuGet 精确版本，不清空当前依赖，并保留由当前 .NET SDK 管理的 Runtime/Host packs；Cargo 与 npm 内容寻址缓存不做猜测式版本删除。只有确认可重新下载或重新构建时才组合使用 `-IncludePackageCaches`、`-IncludeNodeModules`、`-IncludeCodexRuntime` 或 `-IncludeLegacyRuntimeAssets`；只有明确不再需要便携包、安装器和内部注册机输出时才使用 `-IncludeReleaseOutputs`。所有目标都必须解析到当前工作区内部，脚本不会扫描或删除 `App_Data`、数据库、Git、模板、OCR 模型、字体资源或仓库外目录。
-
-注意：`artifacts/windows-desktop-run/` 是一次性构建输出。正式便携构建不检测、不询问，也不保留旧运行数据，会直接删除目标版本目录中的 `App_Data/` 和 `logs/` 后覆盖。需要保留的开发数据请在运行构建脚本前自行备份；不要把真实业务数据库放在该构建目录中长期使用。
+先 `clean-generated-artifacts.ps1 -ListOnly` 盘点，再按根 AGENTS 中已授权的范围清理。保留业务数据、模板、模型、已需资源、交付输出和可复用依赖缓存；依赖缓存、node_modules、整个运行缓存及发布输出只有用户明确同意后才能删除。

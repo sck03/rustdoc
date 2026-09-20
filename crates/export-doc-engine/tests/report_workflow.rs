@@ -13,6 +13,55 @@ use export_doc_report::Builtin;
 use serde_json::{Value, json};
 use std::{fs, io::Cursor, path::PathBuf, sync::atomic::AtomicBool};
 
+#[test]
+fn original_react_empty_template_requests_create_server_drafts_and_keep_empty_updates_invalid() {
+    let fixture = Fixture::new();
+    for kind in ["ExportDocument", "PaymentVoucher"] {
+        let created = fixture.create(
+            CREATE_USER_REPORT_TEMPLATE,
+            json!({"reportType":kind,"name":format!("空白模板-{kind}"),"contentHtml":""}),
+        );
+        let content = created["contentHtml"].as_str().unwrap();
+        let mut design = Design::from_html(content).unwrap();
+        assert_eq!(design.report_type, kind);
+        assert_eq!(created["status"], "Draft");
+        assert_eq!(created["shareScope"], "Private");
+        let id = created["id"].as_i64().unwrap();
+        let parameters = [("id", id.to_string())];
+        let invalid = fixture.client().json::<Value>(SAVE_USER_REPORT_TEMPLATE_DRAFT, &parameters, &[],
+            Some(json!({"reportType":kind,"name":"不能清空","contentHtml":"  ","expectedVersion":created["versionNumber"]})));
+        assert_eq!(invalid.unwrap_err().status, Some(400));
+        let unchanged = fixture.request(GET_USER_REPORT_TEMPLATE, &parameters, &[], None);
+        assert_eq!(unchanged["contentHtml"], created["contentHtml"]);
+        let fields: ApiReportTemplateFieldCatalogResponse =
+            serde_json::from_value(fixture.request(
+                GET_REPORT_TEMPLATE_FIELD_CATALOG,
+                &[],
+                &[("reportType", kind.into())],
+                None,
+            ))
+            .unwrap();
+        design.layers[0].elements[0].kind = export_doc_engine::designer::Kind::Text {
+            text: "可视化编辑回读".into(),
+        };
+        let edited = template::export(&design, &field_catalog(&fields)).unwrap();
+        let saved = fixture.request(SAVE_USER_REPORT_TEMPLATE_DRAFT, &parameters, &[],
+            Some(json!({"reportType":kind,"name":created["name"],"contentHtml":edited,"expectedVersion":created["versionNumber"]})));
+        assert!(
+            saved["versionNumber"].as_i64().unwrap() > created["versionNumber"].as_i64().unwrap()
+        );
+        let cloned = fixture.create(CLONE_USER_REPORT_TEMPLATE,
+            json!({"reportType":kind,"name":format!("模板副本-{kind}"),"sourceTemplatePath":format!("user-template:{id}")}));
+        assert_eq!(cloned["contentHtml"], saved["contentHtml"]);
+        fixture.request(
+            PUBLISH_USER_REPORT_TEMPLATE,
+            &parameters,
+            &[],
+            Some(json!({"expectedVersion":saved["versionNumber"]})),
+        );
+    }
+}
+
 struct Fixture {
     root: PathBuf,
     client: Option<ApiClient>,

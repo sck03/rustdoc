@@ -4,33 +4,35 @@ function Add-ExportDocNativeOcrResources {
         [Parameter(Mandatory = $true)][string]$Configuration,
         [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Copies,
         [string]$OnnxRuntimePath,
+        [string]$RustTarget,
         [switch]$SkipBuild
     )
     $ocrManifest = Join-Path $RepositoryRoot 'apps/exportdoc-ocr-rs/Cargo.toml'
     if (-not $SkipBuild) {
         $ocrArguments = @('build', '--locked', '--manifest-path', $ocrManifest)
         if ($Configuration -eq 'Release') { $ocrArguments += '--release' }
+        if ($RustTarget) { $ocrArguments += @('--target', $RustTarget) }
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments $ocrArguments -WorkingDirectory $RepositoryRoot -DisplayName 'Build native Rust OCR worker'
     }
     $suffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
     $profile = $Configuration.ToLowerInvariant()
-    $Copies[(Join-Path $env:CARGO_TARGET_DIR "$profile/exportdoc-ocr$suffix")] = "sidecar/ocr/exportdoc-ocr$suffix"
+    $ocrTarget = if ($RustTarget) { Join-Path $env:CARGO_TARGET_DIR $RustTarget } else { $env:CARGO_TARGET_DIR }
+    $Copies[(Join-Path $ocrTarget "$profile/exportdoc-ocr$suffix")] = "sidecar/ocr/exportdoc-ocr$suffix"
     $Copies[(Join-Path $RepositoryRoot 'apps/exportdoc-ocr-rs/README.md')] = 'sidecar/ocr/README.md'
     $platform = if ($env:OS -eq 'Windows_NT') { 'win' } elseif ($IsMacOS) { 'osx' } else { 'linux' }
-    $architecture = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
+    $architecture = if ($RustTarget -like 'aarch64-*') { 'arm64' } elseif ($RustTarget -like 'x86_64-*') { 'x64' } else { [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant() }
     $runtimeName = if ($platform -eq 'win') { 'onnxruntime.dll' } elseif ($platform -eq 'osx') { 'libonnxruntime.dylib' } else { 'libonnxruntime.so' }
     if ([string]::IsNullOrWhiteSpace($OnnxRuntimePath)) {
-        $nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $RepositoryRoot '.codex-runtime/nuget-packages' }
-        $lockedPackages = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'src/ExportDocManager.Infrastructure.PdfOcr/packages.lock.json') -Raw | ConvertFrom-Json
-        $versions = @($lockedPackages.dependencies.PSObject.Properties | ForEach-Object {
-            $_.Value.PSObject.Properties | Where-Object { $_.Name -ieq 'Microsoft.ML.OnnxRuntime' } | ForEach-Object { $_.Value.resolved }
-        } | Select-Object -Unique)
-        if ($versions.Count -ne 1) { throw 'ONNX Runtime must have one governed exact version.' }
-        $OnnxRuntimePath = Join-Path $nugetRoot "microsoft.ml.onnxruntime/$($versions[0])/runtimes/$platform-$architecture/native/$runtimeName"
+        $OnnxRuntimePath = Get-ExportDocNativeRuntimeLibrary -RepositoryRoot $RepositoryRoot -PackageId 'microsoft.ml.onnxruntime' -RuntimeIdentifier "$platform-$architecture" -LibraryName $runtimeName
     }
     Assert-NativePackagePath -Path $OnnxRuntimePath
     if (-not (Test-Path -LiteralPath $OnnxRuntimePath -PathType Leaf)) { throw 'Pass -OnnxRuntimePath with the governed native library from the locked ONNX Runtime package.' }
     $Copies[$OnnxRuntimePath] = "sidecar/ocr/$runtimeName"
+    foreach ($name in @('LICENSE', 'ThirdPartyNotices.txt')) {
+        $notice = Join-Path (Split-Path -Parent $OnnxRuntimePath) $name
+        if (-not (Test-Path -LiteralPath $notice -PathType Leaf)) { throw "OCR native library is missing $name; use the governed package resource extractor." }
+        $Copies[$notice] = "sidecar/ocr/$name"
+    }
     $providerName = if ($platform -eq 'win') { 'onnxruntime_providers_shared.dll' } elseif ($platform -eq 'osx') { 'libonnxruntime_providers_shared.dylib' } else { 'libonnxruntime_providers_shared.so' }
     $provider = Join-Path (Split-Path -Parent $OnnxRuntimePath) $providerName
     if (Test-Path -LiteralPath $provider -PathType Leaf) { $Copies[$provider] = "sidecar/ocr/$providerName" }

@@ -33,6 +33,7 @@ impl NativeService {
                     | SAVE_BUSINESS_ATTACHMENT_TO_PATH
                     | IMPORT_LETTER_OF_CREDIT_DOCUMENT
                     | RECOGNIZE_OCR_IMAGE
+                    | PREVIEW_OCR_IMAGE
                     | SAVE_AUDIT_LOGS_TO_PATH
             )
     }

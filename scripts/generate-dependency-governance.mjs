@@ -8,7 +8,6 @@ import {
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveDotnetCommand } from "./lib/dotnet-command.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argumentsList = process.argv.slice(2);
@@ -34,7 +33,6 @@ const approvedLicenseIdentifiers = new Set([
   "LGPL-2.1-or-later",
   "LGPL-3.0-only",
   "LicenseRef-SQLite-Public-Domain",
-  "LicenseRef-Slint-Royalty-free-2.0",
   "LLVM-exception",
   "MIT",
   "MIT-0",
@@ -59,19 +57,12 @@ const extractedLicensingInfo = new Map([
   ],
 ]);
 const components = new Map();
-extractedLicensingInfo.set("LicenseRef-Slint-Royalty-free-2.0", {
-  name: "Slint Royalty-free Desktop, Mobile, and Web Applications License 2.0",
-  extractedText: readFileSync(path.join(repositoryRoot, "eng/licenses/LicenseRef-Slint-Royalty-free-2.0.md"), "utf8"),
-  seeAlsos: ["https://github.com/slint-ui/slint/blob/v1.18.0/LICENSES/LicenseRef-Slint-Royalty-free-2.0.md"],
-});
-
 collectNpmLock("web", "apps/export-doc-web/package-lock.json");
 collectNpmLock("tauri-build", "apps/export-doc-tauri/package-lock.json");
-collectCargoMetadata("tauri", "apps/export-doc-tauri/src-tauri/Cargo.toml");
 collectCargoMetadata("ocr", "apps/exportdoc-ocr-rs/Cargo.toml");
 collectCargoMetadata("excel-analyzer", "tools/excel-analyzer-rs/Cargo.toml");
 collectCargoMetadata("native-desktop", "Cargo.toml");
-collectNuGet();
+collectNativeResources();
 
 const ordered = [...components.values()].sort((left, right) =>
   left.ecosystem.localeCompare(right.ecosystem)
@@ -175,151 +166,17 @@ function collectCargoMetadata(scope, relativeManifestPath) {
   }
 }
 
-function selectedCargoLicense(item) {
-  const declared = normalizeLicense(item.license);
-  if (!declared.includes("LicenseRef-Slint-Royalty-free-2.0")) return declared;
-  if (item.version !== "1.18.0" || item.repository?.replace(/\/$/u, "") !== "https://github.com/slint-ui/slint") {
-    throw new Error(`Slint licensing must be reviewed before changing ${item.name}@${item.version}.`);
+function selectedCargoLicense(item) { return normalizeLicense(item.license); }
+
+function collectNativeResources() {
+  const manifest = JSON.parse(readRequiredText("eng/native-runtime-packages.json"));
+  if (manifest.schemaVersion !== 1) throw new Error("Invalid native resource manifest.");
+  for (const [name, item] of Object.entries(manifest.packages)) {
+    if (!/^[a-z0-9.]+$/u.test(name) || !/^\d+(?:\.\d+){2,3}$/u.test(item.version) || Buffer.from(item.sha512,"base64").length !== 64) throw new Error(`Invalid native package ${name}`);
+    const source = `https://api.nuget.org/v3-flatcontainer/${name}/${item.version}/${name}.${item.version}.nupkg`;
+    if (item.source !== source) throw new Error(`Unexpected native package source: ${name}`);
+    addComponent({ecosystem:"native-resource",scope:"Rust native library only; managed assemblies excluded",name,version:item.version,license:normalizeLicense(item.license),downloadLocation:source,purl:`pkg:nuget/${name}@${item.version}`});
   }
-  return "LicenseRef-Slint-Royalty-free-2.0";
-}
-
-function collectNuGet() {
-  const result = spawnSync(
-    resolveDotnetCommand(),
-    [
-      "package",
-      "list",
-      "--project",
-      "ExportDocManager.sln",
-      "--include-transitive",
-      "--format",
-      "json",
-      "--no-restore",
-    ],
-    { cwd: repositoryRoot, encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024 },
-  );
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    throw new Error(`dotnet package inventory failed:\n${result.stdout || ""}\n${result.stderr || ""}`);
-  }
-  const raw = String(result.stdout || "");
-  const report = JSON.parse(raw.slice(raw.indexOf("{")));
-  const packagesRoot = resolveNuGetPackagesRoot();
-  const projectsWithMissingGraphs = [];
-  for (const project of report.projects || []) {
-    const projectName = path.basename(project.path || "dotnet-project");
-    let projectPackageCount = 0;
-    for (const framework of project.frameworks || []) {
-      for (const groupName of ["topLevelPackages", "transitivePackages"]) {
-        for (const item of framework[groupName] || []) {
-          projectPackageCount += 1;
-          const version = item.resolvedVersion || item.requestedVersion || "unknown";
-          addComponent({
-            ecosystem: "nuget",
-            scope: projectName,
-            name: item.id,
-            version,
-            license: readNuGetLicense(packagesRoot, item.id, version),
-            downloadLocation: `https://www.nuget.org/packages/${item.id}/${version}`,
-            purl: `pkg:nuget/${encodeURIComponent(item.id)}@${encodeURIComponent(version)}`,
-          });
-        }
-      }
-    }
-
-    const projectPath = path.resolve(project.path || "");
-    if (
-      projectPackageCount === 0
-      && existsSync(projectPath)
-      && /<PackageReference\b/iu.test(readFileSync(projectPath, "utf8"))
-    ) {
-      projectsWithMissingGraphs.push(path.relative(repositoryRoot, projectPath));
-    }
-  }
-
-  if (projectsWithMissingGraphs.length > 0) {
-    throw new Error(
-      "NuGet package inventory is incomplete for restored projects:\n"
-      + projectsWithMissingGraphs.join("\n")
-      + "\nRun dotnet restore before dependency governance generation.",
-    );
-  }
-}
-
-function resolveNuGetPackagesRoot() {
-  const candidates = [
-    process.env.NUGET_PACKAGES,
-    path.join(repositoryRoot, ".codex-runtime", "nuget-packages"),
-  ].filter(Boolean);
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return path.resolve(candidate);
-  }
-
-  const result = spawnSync(
-    resolveDotnetCommand(),
-    ["nuget", "locals", "global-packages", "--list", "--force-english-output"],
-    { cwd: repositoryRoot, encoding: "utf8", windowsHide: true },
-  );
-  if (result.status === 0) {
-    const resolved = String(result.stdout || "").match(/global-packages:\s*(.+)/iu)?.[1]?.trim();
-    if (resolved && existsSync(resolved)) return path.resolve(resolved);
-  }
-  return "";
-}
-
-function readNuGetLicense(packagesRoot, packageId, version) {
-  if (!packagesRoot) return "NOASSERTION";
-  const packageRoot = path.join(packagesRoot, packageId.toLowerCase(), String(version).toLowerCase());
-  const nuspecCandidates = [
-    path.join(packageRoot, `${packageId.toLowerCase()}.nuspec`),
-    path.join(packageRoot, `${packageId}.nuspec`),
-  ];
-  const nuspecPath = nuspecCandidates.find(existsSync);
-  if (!nuspecPath) return "NOASSERTION";
-  const nuspec = readFileSync(nuspecPath, "utf8");
-  const expression = nuspec.match(/<license\b[^>]*type=["']expression["'][^>]*>([\s\S]*?)<\/license>/iu)?.[1];
-  if (expression) return normalizeLicense(decodeXml(expression));
-
-  const licenseFileName = decodeXml(
-    nuspec.match(/<license\b[^>]*type=["']file["'][^>]*>([\s\S]*?)<\/license>/iu)?.[1] || "",
-  ).trim();
-  if (licenseFileName) {
-    const licensePath = path.resolve(
-      packageRoot,
-      licenseFileName.replaceAll("\\", path.sep).replaceAll("/", path.sep),
-    );
-    if (licensePath.startsWith(path.resolve(packageRoot) + path.sep) && existsSync(licensePath)) {
-      const detected = detectLicenseText(readFileSync(licensePath, "utf8"));
-      if (detected) return detected;
-    }
-  }
-
-  const licenseUrl = decodeXml(nuspec.match(/<licenseUrl>([\s\S]*?)<\/licenseUrl>/iu)?.[1] || "").trim();
-  return normalizeLicense(mapKnownLicenseUrl(licenseUrl));
-}
-
-function mapKnownLicenseUrl(value) {
-  const normalized = String(value || "").toLowerCase();
-  if (normalized.includes("apache.org/licenses/license-2.0")) return "Apache-2.0";
-  if (normalized.includes("opensource.org/licenses/mit") || normalized.endsWith("/license/mit")) return "MIT";
-  if (normalized.includes("licenses.nuget.org/mit")) return "MIT";
-  if (normalized.includes("licenses.nuget.org/apache-2.0")) return "Apache-2.0";
-  if (normalized.includes("github.com/dotnet/corefx") && normalized.includes("license")) return "MIT";
-  if (normalized.includes("xunit/xunit") && normalized.includes("license")) return "Apache-2.0";
-  if (normalized.includes("microsoft.com/web/webpi/eula/net_library_eula_enu.htm")) return "MS-PL";
-  return "";
-}
-
-function detectLicenseText(value) {
-  const normalized = String(value || "");
-  if (/SQLite\s+is\s+Public\s+Domain/iu.test(normalized)) return "LicenseRef-SQLite-Public-Domain";
-  if (/Permission is hereby granted, free of charge/iu.test(normalized)) return "MIT";
-  if (/Apache License\s+Version 2\.0/iu.test(normalized)) return "Apache-2.0";
-  if (/Redistribution and use in source and binary forms/iu.test(normalized)) {
-    return /Neither the name of/iu.test(normalized) ? "BSD-3-Clause" : "BSD-2-Clause";
-  }
-  return "";
 }
 
 function addComponent(component) {
@@ -429,13 +286,11 @@ function buildNotices(items) {
     "",
     "## Bundled runtime assets",
     "",
-    "- The Slint desktop uses the Royalty-free 2.0 license option for Slint 1.18.0. The top-level About screen displays the official AboutSlint widget. This selected royalty-free license has attribution and product-type conditions; it is not described as an unconditional MIT/Apache grant. The complete selected license is included above and at eng/licenses/LicenseRef-Slint-Royalty-free-2.0.md.",
     "- Noto CJK report fonts are redistributed under the SIL Open Font License. The complete text is included below and is also shipped at `Resources/Fonts/OpenSource/OFL-Noto-CJK.txt`.",
     "- PaddleOCR/PP-OCRv6 model provenance and notices are shipped at `OcrModels/PaddleOCR/V6/THIRD_PARTY_NOTICES.md`.",
     "- The Rust Excel analyzer notice is shipped at `Tools/EXCEL_ANALYZER_NOTICES.md`.",
-    "- Windows x64 OCR packages carry only four Microsoft Visual C++ app-local CRT DLLs beside ONNX Runtime, with `sidecar/msvc-runtime.json` and `sidecar/MSVC_RUNTIME_NOTICES.md`. These Microsoft redistribution terms are separate from the open-source package licenses; the full installer is a build-time source and is not shipped.",
-    "- Chrome Headless Shell or the reviewed Playwright Chromium ARM64 build is shipped with its upstream license/notice file under `Browsers/`; the clean-package gate rejects browser payloads without a corresponding notice.",
-    "- The container-only browser image installs Debian 13 `chromium`, `chromium-sandbox`, `socat`, and `fonts-noto-cjk` from the official Debian repository. `socat` exposes the loopback-only CDP socket solely on the isolated browser network. Their package copyright files remain available under `/usr/share/doc` in that image; the API and Web images do not embed a second Chromium copy.",
+    "- Windows x64 OCR packages carry only four Microsoft Visual C++ app-local CRT DLLs beside ONNX Runtime, with `sidecar/ocr/msvc-runtime.json` and `sidecar/ocr/MSVC_RUNTIME_NOTICES.md`. These Microsoft redistribution terms are separate from the open-source package licenses; the full installer is a build-time source and is not shipped.",
+    "- The Rust desktop uses the system WebView (WebView2 on Windows, WebKitGTK on Linux, WKWebView on macOS). Windows x64 portable packages carry the pinned Microsoft WebView2 installer and its notice under `WebView2Runtime/`. Rust PDF generation does not ship Chromium. Retained C# browser/NuGet dependencies are excluded from this Rust delivery inventory.",
     "",
     "### Noto CJK font license",
     "",
@@ -448,6 +303,10 @@ function buildNotices(items) {
     "### Excel analyzer notice",
     "",
     readRequiredText("tools/excel-analyzer-rs/THIRD_PARTY_NOTICES.md"),
+    "",
+    "### WebView2 redistribution notice",
+    "",
+    readRequiredText("WebView2Runtime/README.md"),
     "",
     "### Microsoft app-local CRT notice",
     "",
@@ -473,13 +332,13 @@ function buildInventory(items) {
   const lines = [
     "# ExportDocManager third-party dependency inventory",
     "",
-    "Generated from committed npm/Cargo lock files, Cargo package metadata, restored NuGet package metadata, and the solution package graph. " +
+    "Generated from committed npm/Cargo lock files, Cargo metadata and signed native-resource archive manifests. The retained C# comparison graph is excluded from Rust delivery; NPOI 2.7.6 remains enforced separately by verify-dependency-policy.mjs. " +
       "The exact application build version is recorded in the accompanying machine-readable SBOM files.",
     "",
-    "Runtime image boundary: Debian 13 `chromium`, `chromium-sandbox`, `socat`, `fonts-noto-cjk`, `ca-certificates`, `curl`, `tini`, and PostgreSQL client packages are OS-level image inputs rather than npm/NuGet/Cargo components. The Browser image retains their Debian copyright files under `/usr/share/doc`; API/Web images do not embed Chromium or duplicate its notices.",
+    "Runtime image boundary: Debian libraries and PostgreSQL 18 are OS/container inputs; their copyright files remain under /usr/share/doc. Rust containers do not include .NET or a browser rendering service.",
     "",
   ];
-  for (const ecosystem of ["npm", "nuget", "cargo"]) {
+  for (const ecosystem of ["npm", "cargo", "native-resource"]) {
     const group = items.filter((item) => item.ecosystem === ecosystem);
     lines.push(`## ${ecosystem} (${group.length})`, "", "| Package | Version | Declared license | Used by |", "|---|---:|---|---|");
     for (const item of group) {
@@ -508,7 +367,7 @@ function npmPackageName(packagePath) {
 function normalizeLicense(value) {
   if (Array.isArray(value) && value.length) return value.map(normalizeLicense).join(" AND ");
   if (typeof value !== "string" || !value.trim()) return "NOASSERTION";
-  let normalized = decodeXml(value).replaceAll(/\s+/gu, " ").trim();
+  let normalized = value.replaceAll(/\s+/gu, " ").trim();
   if (/^MIT\s+OR\s+SEE LICENSE/iu.test(normalized)) return "MIT";
   if (/SEE LICENSE/iu.test(normalized)) return "NOASSERTION";
   normalized = normalized
@@ -575,15 +434,6 @@ function describeFirstDifference(actual, expected) {
       `generated=${JSON.stringify(expectedLines[index] ?? "<missing>")}`;
   }
   return "";
-}
-
-function decodeXml(value) {
-  return String(value || "")
-    .replaceAll("&amp;", "&")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&apos;", "'");
 }
 
 function escapeMarkdown(value) {

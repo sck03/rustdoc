@@ -5,13 +5,15 @@ param(
     [string]$PdfiumPath,
     [string]$OnnxRuntimePath,
     [string]$RustTarget,
+    [string]$Bundles,
+    [switch]$PreflightOnly,
     [switch]$WithoutOcr,
     [switch]$SkipBuild,
     [switch]$NoPause
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
-. (Join-Path $PSScriptRoot 'lib/native-ocr-resources.ps1')
+. (Join-Path $PSScriptRoot 'lib/native-package-resources.ps1')
 $interactiveLaunch = Test-ExportDocPauseEnabled -NoPauseRequested $NoPause
 trap {
     Write-ExportDocScriptFailure -ErrorRecord $_
@@ -20,33 +22,29 @@ trap {
 }
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $runtimeRoot = Join-Path $repositoryRoot '.codex-runtime'
+if ($PreflightOnly) {
+    foreach ($commandName in @('cargo', 'rustc', 'node', 'npm', 'curl')) {
+        $command = Resolve-ExportDocExternalCommand -FilePath $commandName
+        Write-Host "$commandName : $command"
+    }
+    Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('--version') -WorkingDirectory $repositoryRoot -DisplayName 'Rust toolchain'
+    Invoke-ExportDocExternal -FilePath 'node' -Arguments @('--version') -WorkingDirectory $repositoryRoot -DisplayName 'Frontend build runtime'
+    Write-Host 'Desktop/backend build uses Rust; .NET SDK and .NET runtime are not required.'
+    Wait-ExportDocInteractiveExit -Enabled $interactiveLaunch -ExitCode 0
+    return
+}
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    $OutputRoot = Join-Path $repositoryRoot 'artifacts/native-desktop/ExportDocManager.Slint'
+    $OutputRoot = Join-Path $repositoryRoot 'artifacts/native-desktop/ExportDocManager.Tauri'
 }
 $outputFullPath = [System.IO.Path]::GetFullPath($OutputRoot)
-function Assert-NativePackagePath {
-    param([Parameter(Mandatory = $true)][string]$Path)
-    $nativePath = [System.IO.Path]::GetFullPath($Path)
-    if ($nativePath -eq [System.IO.Path]::GetPathRoot($nativePath)) { throw 'A native package path must not be a disk root.' }
-    $currentPath = $nativePath
-    while ($currentPath) {
-        if (Test-Path -LiteralPath $currentPath) {
-            $entry = Get-Item -LiteralPath $currentPath -Force
-            if ($entry.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { throw "Linked paths are not allowed: $currentPath" }
-        }
-        $parentPath = [System.IO.Path]::GetDirectoryName($currentPath)
-        if ($parentPath -eq $currentPath) { break }
-        $currentPath = $parentPath
-    }
-}
 Assert-NativePackagePath -Path $outputFullPath
 if (Test-ExportDocPathEqual -Left $outputFullPath -Right $repositoryRoot) { throw 'Output must be a dedicated package directory.' }
 $marker = Join-Path $outputFullPath 'exportdoc-native-package.json'
 if (Test-Path -LiteralPath $outputFullPath) {
     if (Test-Path -LiteralPath $marker -PathType Leaf) {
         $existingMarker = Get-Content -LiteralPath $marker -Raw | ConvertFrom-Json
-        if ($existingMarker.schemaVersion -ne 1 -or $existingMarker.purpose -ne 'rust-native-application' -or $existingMarker.frontend -ne 'Slint') {
-            throw 'Existing output does not belong to the Slint package.'
+        if ($existingMarker.schemaVersion -ne 1 -or $existingMarker.purpose -ne 'rust-native-application' -or $existingMarker.frontend -ne 'Tauri') {
+            throw 'Existing output does not belong to the Tauri package.'
         }
     } elseif (@(Get-ChildItem -LiteralPath $outputFullPath -Force).Count -gt 0) {
         throw 'Refusing to overwrite an unmarked existing directory.'
@@ -57,12 +55,14 @@ if ([string]::IsNullOrWhiteSpace($env:CARGO_TARGET_DIR)) { $env:CARGO_TARGET_DIR
 $env:TEMP = Join-Path $runtimeRoot 'temp'
 $env:TMP = $env:TEMP
 New-Item -ItemType Directory -Force -Path $env:TEMP, $outputFullPath | Out-Null
-Invoke-ExportDocExternal -FilePath 'node' -Arguments @((Join-Path $PSScriptRoot 'provision-report-fonts.mjs')) -WorkingDirectory $repositoryRoot -DisplayName 'Provision verified report fonts'
 if (-not $SkipBuild) {
-    $cargoArguments = @('build', '--locked', '-p', 'export-doc-slint')
+    $env:npm_config_cache = Join-Path $runtimeRoot 'npm-cache'
+    Invoke-ExportDocExternal -FilePath 'npm' -Arguments @('--prefix', 'apps/export-doc-web', 'ci') -WorkingDirectory $repositoryRoot -DisplayName 'Restore shared React dependencies'
+    Invoke-ExportDocExternal -FilePath 'npm' -Arguments @('--prefix', 'apps/export-doc-web', 'run', 'build') -WorkingDirectory $repositoryRoot -DisplayName 'Build original React UI'
+    $cargoArguments = @('build', '--locked', '-p', 'export-doc-tauri', '--features', 'custom-protocol')
     if ($Configuration -eq 'Release') { $cargoArguments += '--release' }
     if (-not [string]::IsNullOrWhiteSpace($RustTarget)) { $cargoArguments += @('--target', $RustTarget) }
-    Invoke-ExportDocExternal -FilePath 'cargo' -Arguments $cargoArguments -WorkingDirectory $repositoryRoot -DisplayName 'Build Rust + Slint desktop'
+    Invoke-ExportDocExternal -FilePath 'cargo' -Arguments $cargoArguments -WorkingDirectory $repositoryRoot -DisplayName 'Build Tauri + React + Rust desktop'
 }
 $executableSuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
 $profile = $Configuration.ToLowerInvariant()
@@ -72,34 +72,19 @@ $artifactDirectory = if ([string]::IsNullOrWhiteSpace($RustTarget)) {
     Join-Path (Join-Path $env:CARGO_TARGET_DIR $RustTarget) $profile
 }
 $copies = [ordered]@{}
-if (-not $WithoutOcr) {
-    Add-ExportDocNativeOcrResources -RepositoryRoot $repositoryRoot -Configuration $Configuration -Copies $copies -OnnxRuntimePath $OnnxRuntimePath -SkipBuild:$SkipBuild
+$copies[(Join-Path $artifactDirectory "export-doc-tauri$executableSuffix")] = "ExportDocManager$executableSuffix"
+$webviewLoader = Join-Path $artifactDirectory 'WebView2Loader.dll'
+if ($env:OS -eq 'Windows_NT' -and (Test-Path -LiteralPath $webviewLoader -PathType Leaf)) {
+    $copies[$webviewLoader] = 'WebView2Loader.dll'
 }
-$copies[(Join-Path $artifactDirectory "export-doc-slint$executableSuffix")] = "ExportDocManager$executableSuffix"
-foreach ($name in @('NotoSansCJKsc-Regular.otf', 'NotoSansCJKsc-Bold.otf', 'NotoSerifCJKsc-Regular.otf', 'OFL-Noto-CJK.txt', 'font-manifest.json')) {
-    $copies[(Join-Path $repositoryRoot "Resources/Fonts/OpenSource/$name")] = "Resources/Fonts/OpenSource/$name"
-}
-$copies[(Join-Path $repositoryRoot 'Resources/ExcelTemplates/invoice-import-template.xlsx')] = 'Resources/ExcelTemplates/invoice-import-template.xlsx'
-if ([string]::IsNullOrWhiteSpace($PdfiumPath)) {
-    $nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $runtimeRoot 'nuget-packages' }
-    $platform = if ($env:OS -eq 'Windows_NT') { 'win32' } elseif ($IsMacOS) { 'macos' } else { 'linux' }
-    $nativeName = if ($env:OS -eq 'Windows_NT') { 'pdfium.dll' } elseif ($IsMacOS) { 'libpdfium.dylib' } else { 'libpdfium.so' }
-    $packageId = "bblanchon.pdfium.$platform"
-    $lockedPackages = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src/ExportDocManager.Infrastructure.PdfOcr/packages.lock.json') -Raw | ConvertFrom-Json
-    $versions = @($lockedPackages.dependencies.PSObject.Properties | ForEach-Object {
-        $_.Value.PSObject.Properties | Where-Object { $_.Name -ieq $packageId } | ForEach-Object { $_.Value.resolved }
-    } | Select-Object -Unique)
-    if ($versions.Count -ne 1 -or [string]::IsNullOrWhiteSpace($versions[0])) { throw 'The PDFium package must have one exact version in the governed lockfile.' }
-    $packageRoot = Join-Path (Join-Path $nugetRoot $packageId) $versions[0]
-    $architecture = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
-    $candidates = if (Test-Path -LiteralPath $packageRoot) { @(Get-ChildItem -LiteralPath $packageRoot -Recurse -File -Filter $nativeName | Where-Object { $_.FullName -match "[-/]$architecture[/\\]" }) } else { @() }
-    if ($candidates.Count -ne 1) { throw 'Pass -PdfiumPath with the governed PDFium library from the current locked package.' }
-    $PdfiumPath = $candidates[0].FullName
-}
-Assert-NativePackagePath -Path $PdfiumPath
-$copies[$PdfiumPath] = 'Resources/Pdf/' + [System.IO.Path]::GetFileName($PdfiumPath)
-foreach ($name in @('THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_DEPENDENCIES.md', 'eng/licenses/LicenseRef-Slint-Royalty-free-2.0.md')) {
-    $copies[(Join-Path $repositoryRoot $name)] = $name
+Add-ExportDocRustPackageResources -RepositoryRoot $repositoryRoot -Configuration $Configuration -RustTarget $RustTarget -Copies $copies -PdfiumPath $PdfiumPath -OnnxRuntimePath $OnnxRuntimePath -WithoutOcr:$WithoutOcr -SkipBuild:$SkipBuild
+$targetIsWindowsX64 = $env:OS -eq 'Windows_NT' -and ($RustTarget -eq 'x86_64-pc-windows-msvc' -or $RustTarget -eq 'x86_64-pc-windows-gnu' -or ([string]::IsNullOrWhiteSpace($RustTarget) -and [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq 'X64'))
+if ($targetIsWindowsX64) {
+    Invoke-ExportDocExternal -FilePath 'pwsh' -Arguments @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'provision-webview2-runtime.ps1')) -WorkingDirectory $repositoryRoot -DisplayName 'Verify Windows WebView2 bootstrap assets'
+    $release = Get-Content -LiteralPath (Join-Path $repositoryRoot 'WebView2Runtime/webview2-runtime.json') -Raw | ConvertFrom-Json
+    foreach ($name in @('webview2-runtime.json', 'README.md', $release.fileName)) {
+        $copies[(Join-Path $repositoryRoot "WebView2Runtime/$name")] = "WebView2Runtime/$name"
+    }
 }
 foreach ($copy in $copies.GetEnumerator()) {
     $destination = Join-Path $outputFullPath $copy.Value
@@ -109,11 +94,32 @@ foreach ($copy in $copies.GetEnumerator()) {
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
     Copy-Item -LiteralPath $copy.Key -Destination $destination -Force
 }
+@{ schemaVersion = 1; mode = 'portable' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputFullPath 'portable-runtime.json') -Encoding utf8
+@{ schemaVersion = 1; target = 'tauri-desktop'; backend = 'Rust' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputFullPath 'runtime-layout.json') -Encoding utf8
 $packageMarker = [ordered]@{
     schemaVersion = 1; purpose = 'rust-native-application'; product = 'ExportDocManager'
-    configuration = $Configuration; backend = 'Rust'; frontend = 'Slint'; webView = $false; ocr = (-not $WithoutOcr)
+    configuration = $Configuration; backend = 'Rust'; frontend = 'Tauri'; webView = $true; ocr = (-not $WithoutOcr)
     builtAt = [DateTimeOffset]::UtcNow.ToString('o')
 }
 $packageMarker | ConvertTo-Json | Set-Content -LiteralPath $marker -Encoding utf8
-Write-Host "Rust + Slint package: $outputFullPath"
+if (-not [string]::IsNullOrWhiteSpace($Bundles)) {
+    $bundleResources = [ordered]@{}
+    foreach ($relative in $copies.Values) {
+        if ($relative -ne "ExportDocManager$executableSuffix") {
+            $bundleResources[(Join-Path $outputFullPath $relative)] = ($relative -replace '\\', '/')
+        }
+    }
+    foreach ($name in @('exportdoc-native-package.json', 'runtime-layout.json')) {
+        $bundleResources[(Join-Path $outputFullPath $name)] = $name
+    }
+    $bundleConfig = Join-Path $runtimeRoot 'tauri-rust-bundle.conf.json'
+    @{ build = @{ beforeBuildCommand = '' }; bundle = @{ resources = $bundleResources } } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $bundleConfig -Encoding utf8
+    $env:npm_config_cache = Join-Path $runtimeRoot 'npm-cache'
+    Invoke-ExportDocExternal -FilePath 'npm' -Arguments @('--prefix', 'apps/export-doc-tauri', 'ci') -WorkingDirectory $repositoryRoot -DisplayName 'Restore pinned Tauri CLI'
+    $bundleArguments = @((Join-Path $PSScriptRoot 'run-tauri-build.mjs'), '--bundles', $Bundles, '--config', $bundleConfig)
+    if ($Configuration -eq 'Debug') { $bundleArguments += '--debug' }
+    if ($RustTarget) { $bundleArguments += @('--target', $RustTarget) }
+    Invoke-ExportDocExternal -FilePath 'node' -Arguments $bundleArguments -WorkingDirectory $repositoryRoot -DisplayName 'Build platform Tauri installer and application bundle'
+}
+Write-Host "Rust + Tauri package: $outputFullPath"
 Wait-ExportDocInteractiveExit -Enabled $interactiveLaunch -ExitCode 0

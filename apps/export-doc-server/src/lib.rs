@@ -1,4 +1,6 @@
+#[cfg(feature = "postgres")]
 pub mod configuration;
+pub mod desktop;
 mod downloads;
 mod request;
 mod response;
@@ -20,14 +22,24 @@ pub struct ServerState {
     requests: Arc<Semaphore>,
     bulk_uploads: Arc<Semaphore>,
     tickets: Arc<downloads::Tickets>,
+    desktop_token: Option<Arc<str>>,
 }
 
 pub fn router(service: Arc<NativeService>, web_root: Option<&Path>) -> Router {
+    compose_router(service, web_root, None)
+}
+
+fn compose_router(
+    service: Arc<NativeService>,
+    web_root: Option<&Path>,
+    desktop_token: Option<Arc<str>>,
+) -> Router {
     let state = ServerState {
         service,
         requests: Arc::new(Semaphore::new(16)),
         bulk_uploads: Arc::new(Semaphore::new(2)),
         tickets: Arc::default(),
+        desktop_token,
     };
     let mut router = Router::new().route(
         "/openapi/v1.json",

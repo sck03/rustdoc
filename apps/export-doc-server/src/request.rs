@@ -41,10 +41,25 @@ async fn execute(
     operation: Operation,
     request: Request,
 ) -> Result<response::Reply, ApiError> {
-    // These operations access a desktop user's filesystem/process. A network
-    // host never installs that transport capability, even for an administrator.
-    if export_doc_engine::engine::NativeService::requires_local_transport(operation) {
+    let local_operation =
+        export_doc_engine::engine::NativeService::requires_local_transport(operation);
+    if local_operation && state.desktop_token.is_none() {
         return Err(error(403, "此操作只支持本机桌面调用。"));
+    }
+    if let Some(expected) = &state.desktop_token {
+        // Read the official endpoint policy, never infer it from a URL prefix.
+        let policy = &contracts::contract()["operations"][operation.id]["policy"];
+        if local_operation || policy["requiresDesktopAccess"].as_bool().unwrap_or(true) {
+            use subtle::ConstantTimeEq;
+            let actual = request
+                .headers()
+                .get("x-exportdocmanager-desktop-token")
+                .map(|value| value.as_bytes())
+                .unwrap_or_default();
+            if !bool::from(actual.ct_eq(expected.as_bytes())) {
+                return Err(error(403, "桌面访问令牌无效，请从桌面程序打开。"));
+            }
+        }
     }
     let permit = state
         .requests
@@ -285,6 +300,12 @@ async fn execute(
                 .map(|(k, v)| (k.as_str(), v.clone()))
                 .collect();
             let query: Vec<_> = query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
+            if operation == PREVIEW_OCR_IMAGE {
+                return state
+                    .service
+                    .preview_ocr_image(&query, &token)
+                    .map(response::Reply::file);
+            }
             if operation == DOWNLOAD_JOB_RESULT_WITH_TICKET {
                 let ticket = parameters
                     .iter()

@@ -1,5 +1,6 @@
 //! Template ownership, publication, sharing and version queries.
 mod mutations;
+pub(super) mod starter;
 use super::{
     auth,
     error::{Result, error, invalid, unavailable},
@@ -65,7 +66,7 @@ pub fn fields(kind: &str) -> Result<ApiReportTemplateFieldCatalogResponse> {
     .map_err(Into::into)
 }
 pub fn validate_content(kind: &str, content: &str) -> Result<Design> {
-    if content.is_empty() || content.len() > 4 * 1024 * 1024 {
+    if content.trim().is_empty() || content.len() > 4 * 1024 * 1024 {
         return Err(invalid("报表模板内容不能为空或超过 4 MiB。"));
     }
     let design = Design::from_html(content).map_err(invalid)?;

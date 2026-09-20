@@ -1,13 +1,5 @@
-type DesktopInvoke = <T>(
-  command: string,
-  args?: Record<string, unknown>,
-) => Promise<T>;
-const invoke: DesktopInvoke | undefined = undefined;
-const isTauri = () => false;
-const listen = async <T>(
-  _event: string,
-  _handler: (event: { payload: T }) => void,
-) => () => {};
+import { invoke, isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { ProductEdition } from "../app/productEdition.ts";
 
 export type DesktopRuntimeContext = {
