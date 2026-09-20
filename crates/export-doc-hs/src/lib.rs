@@ -63,7 +63,7 @@ pub fn search(
     query: &str,
     observed: &str,
     check: &dyn Fn() -> Result<(), String>,
-) -> Result<Vec<ApiHsCodeDto>, String> {
+) -> Result<parser::SearchBundle, String> {
     let query = query.trim();
     if query.is_empty() || query.chars().count() > 500 {
         return Err("请输入 1 至 500 字的检索条件。".into());
@@ -73,17 +73,17 @@ pub fn search(
         .map_err(|_| "参考地址无效")?
         .extend(["hscode", "key", query]);
     let html = read(url, check)?;
-    let rows = parser::search(&html, observed)?;
-    if rows.is_empty() && !parser::empty_result(&html) {
+    let bundle = parser::search(&html, observed)?;
+    if bundle.records.is_empty() && !parser::empty_result(&html) {
         return Err("参考页面没有可读取的静态结果，数据源可能需要交互验证或已改变格式。".into());
     }
-    Ok(rows)
+    Ok(bundle)
 }
 pub fn detail(
     seed: &ApiHsCodeDto,
     observed: &str,
     check: &dyn Fn() -> Result<(), String>,
-) -> Result<ApiHsCodeDto, String> {
+) -> Result<parser::DetailBundle, String> {
     let url = trusted_url(&seed.detail_url)?;
     if !url.path().starts_with("/hscode/detail/") {
         return Err("请选择有效的 HS 详情页面。".into());

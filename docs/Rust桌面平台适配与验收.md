@@ -20,4 +20,10 @@
 
 `scripts/verify-native-desktop.mjs` 检查真实 Cargo 运行依赖图：包含 Tauri 和 SQLite，排除 Slint／egui、PostgreSQL 服务端适配器；Domain 保持纯业务。桌面与服务端分别构建，避免 workspace feature 合并被误认为桌面交付图。
 
+## PDFium 动态库与 ABI 边界
+
+报表维持 krilla 生成 PDF、PDFium worker 处理已有 PDF。当前手写绑定未替换；长期优先建议使用 `pdfium-render`，迁移前必须验证 crate/API feature/原生库组合。Windows x64/ARM64、Linux x64/ARM64、macOS ARM64 分别使用目标 C ABI；Windows x86_32 的 stdcall 名称修饰不能推广到这些 64 位目标。macOS `dlsym` 查询 `FPDF_*` 不加下划线；保存回调 `WriteBlock` 使用头文件规定的 C ABI。
+
+2026-09-20 本地 Windows x64 DLL 与 Linux x64 ELF 静态导出检查均包含当前 19/19 个所需符号；本轮没有执行 Linux/macOS/ARM64 加载或功能调用，不据此宣称跨平台运行通过。详细平台矩阵、符号/加载/回调/资源限制检查见[《PDFium 跨平台绑定与验收方案》](./PDFium跨平台绑定与验收方案.md)。
+
 本批实际验证统一记入进度文档。平台完整验收包括原版导航和页签、表格滚动／编辑、中文 IME、撤销与粘贴、缩放、保存取消、路径与链接拒绝、登录授权、后台任务、真实 PDF／打印、备份恢复和退出清理。未经实跑不声明通过，不执行 Windows Authenticode、Developer ID 或 Apple 公证。

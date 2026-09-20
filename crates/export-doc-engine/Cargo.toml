@@ -8,7 +8,7 @@ description = "Rust application services, runtime paths and persistence adapters
 
 [features]
 default = []
-reference-backend = ["dep:ureq"]
+reference-backend = []
 postgres = ["export-doc-storage/postgres"]
 excel = ["dep:export-doc-excel"]
 invoice-transfer = []
@@ -30,6 +30,7 @@ export-doc-excel = { path = "../export-doc-excel", optional = true }
 export-doc-exchange = { path = "../export-doc-exchange", optional = true }
 export-doc-hs = { path = "../export-doc-hs", optional = true }
 export-doc-mail = { path = "../export-doc-mail", optional = true }
+export-doc-network = { path = "../export-doc-network" }
 serde.workspace = true
 serde_json.workspace = true
 rust_decimal.workspace = true
@@ -42,7 +43,9 @@ base64.workspace = true
 aes-gcm = { version = "=0.11.1", default-features = false, features = ["aes", "alloc", "zeroize"] }
 zeroize = "=1.9.0"
 chrono-tz = { version = "=0.10.4", default-features = false, features = ["std"] }
-ureq = { version = "=3.4.2", optional = true, default-features = false, features = ["json"] }
+ureq = { version = "=3.4.2", default-features = false, features = ["json", "native-tls"] }
+url = "=2.5.8"
+quick-xml = "=0.42.0"
 libloading = "=0.9.0"
 fs2 = "=0.4.3"
 pbkdf2 = { version = "=0.13.0", features = ["sha2"] }

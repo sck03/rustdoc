@@ -25,6 +25,10 @@ Tauri 是桌面宿主；浏览器与 Docker 不运行 Tauri 窗口。Node 只用
 - `export-doc-storage`：SQLite／PostgreSQL 18、事务、版本、单实例锁与持久化。
 - Excel、报表、邮件、汇率、HS、AI、单一窗口分别使用现有独立 crate；同一功能不复制另一套实现。
 
+2026-09-20 用户确认报表继续使用 **krilla + PDFium** 联动：`export-doc-report` 负责模型、排版和 krilla PDF 编码，隔离的 PDFium worker 负责已有 PDF 的预览、文字提取、OCR 页图及合并。完整 V3 和高级 HTML 的模板语义/原生布局在上游补齐，不通过更换 PDF 库代替。当前原生包版本及逐项差距见[《Rust 与 C# 后端功能差距及修正方案》](./Rust与CSharp后端功能差距及修正方案.md)；封装/原生包升级单独验证和治理。
+
+绑定维护建议优先采用经验证的 `pdfium-render`，当前仍是手写 C ABI。调用约定与符号名分别核对；公共 API 的 `system` 在现有 Linux/macOS 目标上等价于 C ABI，`WriteBlock` 等回调按各自头文件声明，不能统一改为 stdcall。完整三平台规则、集中类型宏和迁移验收见[《PDFium 跨平台绑定与验收方案》](./PDFium跨平台绑定与验收方案.md)。
+
 Slint 和 egui 客户端、专用构建与许可引用已退役。原 C# 源码和历史测试仍作行为对照，不进入 Rust 包。
 
 ## 通信与运行目录

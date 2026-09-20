@@ -7,7 +7,7 @@ publish.workspace = true
 description = "Shared address policy and DNS-pinned HTTP resolver"
 
 [dependencies]
-ureq = { version = "=3.4.2", default-features = false }
+ureq = { version = "=3.4.2", default-features = false, features = ["native-tls"] }
 
 [lints]
 workspace = true

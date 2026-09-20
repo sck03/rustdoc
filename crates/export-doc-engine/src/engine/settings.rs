@@ -236,13 +236,45 @@ pub fn credential(
     protector: &crate::secrets::Protector,
     path: &str,
 ) -> Result<zeroize::Zeroizing<String>> {
-    let protected = store
-        .settings("protected-credentials")?
-        .unwrap_or_else(|| json!({}));
-    let value = protected
-        .get(path)
-        .map(|v| v.as_str().ok_or_else(|| unavailable("加密凭证记录损坏。")))
-        .transpose()?
-        .unwrap_or("");
+    let protected = store.settings("protected-credentials")?;
+    let Some(value) = protected.as_ref().and_then(|value| value.get(path)) else {
+        return Ok(zeroize::Zeroizing::new(String::new()));
+    };
+    let value = value
+        .as_str()
+        .ok_or_else(|| unavailable("加密凭证记录损坏。"))?;
     protector.unprotect(path, value).map_err(unavailable)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn corrupted_credentials_are_not_reported_as_unconfigured() {
+        let root = std::env::temp_dir().join(format!(
+            "exportdoc-credential-test-{}",
+            crate::paths::nonce().unwrap()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let paths = RuntimePaths {
+            app_root: root.clone(),
+            data_root: root.clone(),
+            cache_root: root.join("Cache"),
+            log_root: root.join("Logs"),
+            font_path: root.join("font.otf"),
+        };
+        let store = Store::open(&paths).unwrap();
+        store
+            .connection()
+            .unwrap()
+            .set_settings(
+                "protected-credentials",
+                1,
+                &json!({"/webDav/password": "edm-rust-aes256gcm-v1:not-valid-base64!"}),
+            )
+            .unwrap();
+        assert!(credential(&store, &crate::secrets::Protector::new(&root), "/webDav/password").is_err());
+        let _ = std::fs::remove_dir_all(root);
+    }
 }
