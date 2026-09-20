@@ -274,7 +274,14 @@ mod tests {
                 &json!({"/webDav/password": "edm-rust-aes256gcm-v1:not-valid-base64!"}),
             )
             .unwrap();
-        assert!(credential(&store, &crate::secrets::Protector::new(&root), "/webDav/password").is_err());
+        assert!(
+            credential(
+                &store,
+                &crate::secrets::Protector::new(&root),
+                "/webDav/password"
+            )
+            .is_err()
+        );
         let _ = std::fs::remove_dir_all(root);
     }
 }

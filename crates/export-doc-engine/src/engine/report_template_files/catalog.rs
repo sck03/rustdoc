@@ -224,10 +224,13 @@ pub(super) fn revision(content: &str, display: &str) -> String {
         .collect()
 }
 pub(super) fn validate_revision(path: &Path, display: &str, expected: &str) -> Result<()> {
-    let revision = fs::read_to_string(path)
-        .ok()
-        .map(|content| revision(&content, display))
-        .unwrap_or_default();
+    let revision = match fs::read_to_string(path) {
+        Ok(content) => revision(&content, display),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(error) => {
+            return Err(unavailable(format!("无法读取报表模板以核对修订号:{error}")));
+        }
+    };
     if revision != expected {
         return Err(conflict("模板已被其他用户修改或删除，请重新加载后重试。"));
     }
@@ -389,6 +392,91 @@ pub(super) fn resolve_editable(
         display,
         with_seal,
     })
+}
+
+/// Resolves a managed template reference without requiring the caller to know
+/// whether it is a `builtin:`, `user:`, absolute or catalog-relative value.
+/// File maintenance and report rendering share this identity function.
+pub(super) fn resolve_template(paths: &RuntimePaths, kind: &str, stored: &str) -> Result<Resolved> {
+    let absolute = to_absolute(paths, stored)?;
+    validate_existing(&absolute)?;
+    let category =
+        category_of_path(&absolute).ok_or_else(|| invalid("模板路径不在受管模板分类目录下。"))?;
+    if kind_of_category(category) != kind {
+        return Err(invalid("模板类型与请求的报表类型不匹配。"));
+    }
+    if !absolute.is_file() {
+        return Err(error(404, "报表模板不存在。"));
+    }
+    let stored = to_stored(paths, &absolute)?;
+    let metadata = catalog_rows(paths)?
+        .into_iter()
+        .find(|row| text(row, "fileName") == stored)
+        .unwrap_or_default();
+    Ok(Resolved {
+        path: absolute.clone(),
+        display: display_name(&text(&metadata, "name"), &absolute),
+        with_seal: if kind == "PaymentVoucher" {
+            None
+        } else {
+            metadata["withSeal"].as_bool().or(Some(true))
+        },
+    })
+}
+
+/// Enumerates managed file templates for a report domain. Files without a
+/// catalog row remain visible with metadata derived from their stable path.
+pub(super) fn catalog_entries(paths: &RuntimePaths, kind: &str) -> Result<Vec<Value>> {
+    let root = user_root(paths);
+    if !root.is_dir() {
+        return Ok(Vec::new());
+    }
+    let metadata = catalog_rows(paths)?;
+    let mut rows = Vec::new();
+    let mut stack = vec![root.clone()];
+    while let Some(directory) = stack.pop() {
+        ensure_managed(&directory, &root)?;
+        for entry in fs::read_dir(&directory)? {
+            let path = entry?.path();
+            ensure_managed(&path, &root)?;
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if file_name(&path) == CATALOG_FILE
+                || path.extension().and_then(|value| value.to_str()) != Some(EXTENSION_NAME)
+            {
+                continue;
+            }
+            let category = category_of_path(&path)
+                .ok_or_else(|| invalid("模板路径不在受管模板分类目录下。"))?;
+            if kind_of_category(category) != kind {
+                continue;
+            }
+            let stored = to_stored(paths, &path)?;
+            let row = metadata
+                .iter()
+                .find(|row| text(row, "fileName") == stored)
+                .unwrap_or(&Value::Null);
+            rows.push(json!({
+                "reportType":kind,
+                "displayName":display_name(&text(row, "name"), &path),
+                "templatePath":stored,
+                "withSealDefault":if kind == "PaymentVoucher" {
+                    Value::Null
+                } else {
+                    json!(row["withSeal"].as_bool().unwrap_or(true))
+                }
+            }));
+        }
+    }
+    rows.sort_by(|left, right| {
+        text(left, "displayName")
+            .to_lowercase()
+            .cmp(&text(right, "displayName").to_lowercase())
+            .then_with(|| text(left, "templatePath").cmp(&text(right, "templatePath")))
+    });
+    Ok(rows)
 }
 
 /// Reads one managed report-template file for callers that need to create a

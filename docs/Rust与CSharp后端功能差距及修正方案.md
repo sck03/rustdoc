@@ -38,7 +38,7 @@
 | 报表 PDF 编码 | `krilla = 0.8.2`、`krilla-svg = 0.8.1`、`usvg = 0.47.0` | 当前报表生成不是 PDFium |
 | 已有 PDF 预览、提取文字、OCR 页图、合并 | `export-doc-engine/src/pdf.rs`、`pdf/native.rs`、`pdf/merge.rs`；通过 `libloading` 手写绑定 PDFium C ABI | 已经在 Rust 后端调用 PDFium；PDFium 本体为 C++ 原生库 |
 | 故障与取消隔离 | 当前可执行文件的受控 PDF worker 子进程 | 改换封装时应保留此边界 |
-| Rust PDFium 封装 | 当前 Cargo 清单/锁文件没有 `pdfium-render` | 不能声称已采用该 crate |
+| Rust PDFium 封装 | 已引入 `pdfium-render = 0.9.4`,显式启用 `pdfium_7881 + image_025` | 不能声称已采用该 crate |
 | 原生载荷 | `eng/native-runtime-packages.json` 中 Windows/Linux/macOS 包均为 `152.0.7961` | NuGet 仅是原生归档载体，不引入 .NET Runtime |
 
 ### 2.2 本次在线查询结果

@@ -2,6 +2,7 @@
 //! builtin:/user: storage paths, single HTML file transfer and .edtpl packages.
 mod catalog;
 mod package;
+mod transaction;
 mod transfer;
 use super::report_templates;
 use super::{
@@ -29,6 +30,7 @@ use std::{
     io::{Cursor, Read, Write},
     path::{Path, PathBuf},
 };
+pub(super) use transaction::FileTransaction;
 pub use transfer::{download, upload};
 use unicode_normalization::UnicodeNormalization;
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
@@ -92,6 +94,28 @@ pub(super) fn load_template_content(
         return Err(invalid("报表模板内容超过允许的大小。"));
     }
     Ok((resolved.display, content))
+}
+
+pub(super) fn load_resolved_template(
+    paths: &RuntimePaths,
+    kind: &str,
+    stored: &str,
+) -> Result<(String, String, String, Option<bool>)> {
+    let resolved = catalog::resolve_template(paths, kind, stored)?;
+    let content = fs::read_to_string(&resolved.path)?;
+    if content.len() > MAX_TEMPLATE_BYTES {
+        return Err(invalid("报表模板内容超过允许的大小。"));
+    }
+    Ok((
+        resolved.display,
+        catalog::to_stored(paths, &resolved.path)?,
+        content,
+        resolved.with_seal,
+    ))
+}
+
+pub(super) fn catalog_entries(paths: &RuntimePaths, kind: &str) -> Result<Vec<Value>> {
+    catalog::catalog_entries(paths, kind)
 }
 pub fn handle(
     service: &NativeService,
@@ -213,7 +237,8 @@ fn create_template(
     kind: &str,
     body: &Value,
 ) -> Result<Value> {
-    service.store.transaction(|tx| {
+    let mut files = FileTransaction::new(&service.paths)?;
+    files.execute(|files| {
         let path = lifecycle_target(
             service,
             kind,
@@ -227,17 +252,20 @@ fn create_template(
         let display = display_name(&text(body, "displayName"), &path);
         let content = report_templates::starter::create(kind, &display)?;
         report_templates::validate_content(kind, &content)?;
-        report_assets::validate_template(tx, actor, &content)?;
-        fs::create_dir_all(path.parent().unwrap_or(&path))?;
-        paths::atomic_write(&path, content.as_bytes()).map_err(unavailable)?;
-        let stored = to_stored(&service.paths, &path)?;
-        let with_seal = if kind == "PaymentVoucher" {
-            None
-        } else {
-            Some(true)
-        };
-        upsert_catalog_row(&service.paths, kind, &stored, &display, with_seal)?;
-        Ok(content_dto(kind, &stored, &display, with_seal, &content))
+        files.capture(&path)?;
+        service.store.transaction(|tx| {
+            report_assets::validate_template(tx, actor, &content)?;
+            fs::create_dir_all(path.parent().unwrap_or(&path))?;
+            paths::atomic_write(&path, content.as_bytes()).map_err(unavailable)?;
+            let stored = to_stored(&service.paths, &path)?;
+            let with_seal = if kind == "PaymentVoucher" {
+                None
+            } else {
+                Some(true)
+            };
+            upsert_catalog_row(&service.paths, kind, &stored, &display, with_seal)?;
+            Ok(content_dto(kind, &stored, &display, with_seal, &content))
+        })
     })
 }
 
@@ -250,35 +278,39 @@ fn save_template_content(
     content: &str,
 ) -> Result<Value> {
     report_templates::validate_content(kind, content)?;
-    service.store.transaction(|tx| {
-        let mut resolved = resolve_editable(service, kind, stored, false)?;
-        validate_revision(&resolved.path, &resolved.display, expected_revision)?;
-        report_assets::validate_template(tx, actor, content)?;
-        if within(&resolved.path, &builtin_root(&service.paths)) {
-            let copy = user_copy_path(&service.paths, &resolved.path)?;
-            if copy.exists() {
-                return Err(conflict("已有内置模板的用户副本，请打开该副本后继续编辑。"));
+    let mut files = FileTransaction::new(&service.paths)?;
+    files.execute(|files| {
+        service.store.transaction(|tx| {
+            let mut resolved = resolve_editable(service, kind, stored, false)?;
+            validate_revision(&resolved.path, &resolved.display, expected_revision)?;
+            report_assets::validate_template(tx, actor, content)?;
+            if within(&resolved.path, &builtin_root(&service.paths)) {
+                let copy = user_copy_path(&service.paths, &resolved.path)?;
+                if copy.exists() {
+                    return Err(conflict("已有内置模板的用户副本，请打开该副本后继续编辑。"));
+                }
+                resolved.display = display_name("", &copy);
+                resolved.path = copy;
             }
-            resolved.display = display_name("", &copy);
-            resolved.path = copy;
-        }
-        fs::create_dir_all(resolved.path.parent().unwrap_or(&resolved.path))?;
-        paths::atomic_write(&resolved.path, content.as_bytes()).map_err(unavailable)?;
-        let stored = to_stored(&service.paths, &resolved.path)?;
-        upsert_catalog_row(
-            &service.paths,
-            kind,
-            &stored,
-            &resolved.display,
-            resolved.with_seal,
-        )?;
-        Ok(content_dto(
-            kind,
-            &stored,
-            &resolved.display,
-            resolved.with_seal,
-            content,
-        ))
+            files.capture(&resolved.path)?;
+            fs::create_dir_all(resolved.path.parent().unwrap_or(&resolved.path))?;
+            paths::atomic_write(&resolved.path, content.as_bytes()).map_err(unavailable)?;
+            let stored = to_stored(&service.paths, &resolved.path)?;
+            upsert_catalog_row(
+                &service.paths,
+                kind,
+                &stored,
+                &resolved.display,
+                resolved.with_seal,
+            )?;
+            Ok(content_dto(
+                kind,
+                &stored,
+                &resolved.display,
+                resolved.with_seal,
+                content,
+            ))
+        })
     })
 }
 
@@ -288,53 +320,59 @@ fn rename_template(
     kind: &str,
     body: &Value,
 ) -> Result<Value> {
-    service.store.transaction(|tx| {
-        let current = resolve_editable(service, kind, &text(body, "templatePath"), true)?;
-        validate_revision(
-            &current.path,
-            &current.display,
-            &text(body, "expectedRevision"),
-        )?;
-        ensure_user_path(&service.paths, &current.path)?;
-        let old_stored = to_stored(&service.paths, &current.path)?;
-        let target = lifecycle_target(
-            service,
-            kind,
-            &text(body, "newTemplatePath"),
-            file_name(&current.path),
-        )?;
-        if target != current.path {
-            ensure_no_collision(&target, Some(&current.path))?;
-            if target.exists() {
-                return Err(conflict("目标模板已存在。"));
-            }
-            fs::create_dir_all(target.parent().unwrap_or(&target))?;
-            fs::rename(&current.path, &target)?;
-        }
-        let stored = to_stored(&service.paths, &target)?;
-        move_catalog_row(
-            &service.paths,
-            &old_stored,
-            &stored,
-            &current.display,
-            current.with_seal,
-        )?;
-        update_settings(tx, |settings| {
-            let defaults = &mut settings["reportTemplateDefaults"];
-            for key in ["exportDocumentTemplatePath", "paymentVoucherTemplatePath"] {
-                if defaults[key].as_str() == Some(&old_stored) {
-                    defaults[key] = json!(stored);
+    let mut files = FileTransaction::new(&service.paths)?;
+    files.execute(|files| {
+        service.store.transaction(|tx| {
+            let current = resolve_editable(service, kind, &text(body, "templatePath"), true)?;
+            validate_revision(
+                &current.path,
+                &current.display,
+                &text(body, "expectedRevision"),
+            )?;
+            ensure_user_path(&service.paths, &current.path)?;
+            let old_stored = to_stored(&service.paths, &current.path)?;
+            let target = lifecycle_target(
+                service,
+                kind,
+                &text(body, "newTemplatePath"),
+                file_name(&current.path),
+            )?;
+            if target != current.path {
+                ensure_no_collision(&target, Some(&current.path))?;
+                if target.exists() {
+                    return Err(conflict("目标模板已存在。"));
                 }
+                files.capture(&current.path)?;
+                files.capture(&target)?;
+                fs::create_dir_all(target.parent().unwrap_or(&target))?;
+                fs::rename(&current.path, &target)?;
             }
-        })?;
-        let content = fs::read_to_string(&target)?;
-        Ok(content_dto(
-            kind,
-            &stored,
-            &current.display,
-            current.with_seal,
-            &content,
-        ))
+            let stored = to_stored(&service.paths, &target)?;
+            files.capture(&user_root(&service.paths).join(CATALOG_FILE))?;
+            move_catalog_row(
+                &service.paths,
+                &old_stored,
+                &stored,
+                &current.display,
+                current.with_seal,
+            )?;
+            update_settings(tx, |settings| {
+                let defaults = &mut settings["reportTemplateDefaults"];
+                for key in ["exportDocumentTemplatePath", "paymentVoucherTemplatePath"] {
+                    if defaults[key].as_str() == Some(&old_stored) {
+                        defaults[key] = json!(stored);
+                    }
+                }
+            })?;
+            let content = fs::read_to_string(&target)?;
+            Ok(content_dto(
+                kind,
+                &stored,
+                &current.display,
+                current.with_seal,
+                &content,
+            ))
+        })
     })
 }
 
@@ -370,33 +408,38 @@ fn delete_template(
     parameters: &[(&str, String)],
     query: &[(&str, String)],
 ) -> Result<Value> {
-    let resolved = resolve_editable(
-        service,
-        kind,
-        &value_of(parameters, query, "templatePath"),
-        true,
-    )?;
-    validate_revision(
-        &resolved.path,
-        &resolved.display,
-        &value_of(parameters, query, "expectedRevision"),
-    )?;
-    ensure_user_path(&service.paths, &resolved.path)?;
-    let stored = to_stored(&service.paths, &resolved.path)?;
-    fs::remove_file(&resolved.path)?;
-    let mut rows = catalog_rows(&service.paths)?;
-    rows.retain(|row| text(row, "fileName") != stored);
-    save_catalog(&service.paths, &rows)?;
-    service.store.transaction(|tx| {
-        update_settings(tx, |settings| {
-            let defaults = &mut settings["reportTemplateDefaults"];
-            let key = default_key(kind);
-            if defaults[key].as_str() == Some(&stored) {
-                defaults[key] = json!("");
-            }
-        })
-    })?;
-    Ok(json!({"success":true,"message":"模板已删除。"}))
+    let mut files = FileTransaction::new(&service.paths)?;
+    files.execute(|files| {
+        let resolved = resolve_editable(
+            service,
+            kind,
+            &value_of(parameters, query, "templatePath"),
+            true,
+        )?;
+        validate_revision(
+            &resolved.path,
+            &resolved.display,
+            &value_of(parameters, query, "expectedRevision"),
+        )?;
+        ensure_user_path(&service.paths, &resolved.path)?;
+        let stored = to_stored(&service.paths, &resolved.path)?;
+        files.capture(&resolved.path)?;
+        files.capture(&user_root(&service.paths).join(CATALOG_FILE))?;
+        service.store.transaction(|tx| {
+            fs::remove_file(&resolved.path)?;
+            let mut rows = catalog_rows(&service.paths)?;
+            rows.retain(|row| text(row, "fileName") != stored);
+            save_catalog(&service.paths, &rows)?;
+            update_settings(tx, |settings| {
+                let defaults = &mut settings["reportTemplateDefaults"];
+                let key = default_key(kind);
+                if defaults[key].as_str() == Some(&stored) {
+                    defaults[key] = json!("");
+                }
+            })
+        })?;
+        Ok(json!({"success":true,"message":"模板已删除。"}))
+    })
 }
 
 fn set_default_template(

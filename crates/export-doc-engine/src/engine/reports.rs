@@ -88,6 +88,7 @@ fn default_path(kind: &str) -> &'static str {
 
 fn template(
     store: &Store,
+    paths: &crate::paths::RuntimePaths,
     actor: &Actor,
     reference: &str,
     kind: &str,
@@ -134,13 +135,34 @@ fn template(
             path: reference.into(),
         });
     }
+    if reference.starts_with("builtin:")
+        || reference.starts_with("user:")
+        || reference.starts_with("Templates/")
+        || PathBuf::from(reference).is_absolute()
+    {
+        let (display, stored, content, _) =
+            super::report_template_files::load_resolved_template(paths, kind, reference)?;
+        let design = validate_content(kind, &content)?;
+        return Ok(Template::Custom {
+            design,
+            content,
+            name: display,
+            path: stored,
+        });
+    }
     Err(unsupported(
-        "此模板尚未提供原生排版。请使用内置模板或已发布的 V3 模板。",
+        "此模板尚未提供原生排版。请使用内置模板、受管文件模板或已发布的 V3 模板。",
     ))
 }
-fn catalog(store: &Store, actor: &Actor, kind: &str) -> Result<Value> {
+fn catalog(
+    store: &Store,
+    paths: &crate::paths::RuntimePaths,
+    actor: &Actor,
+    kind: &str,
+) -> Result<Value> {
     auth::authorize(actor, "document.report-templates", "view")?;
     let mut rows:Vec<_>=render::BUILTINS.iter().filter(|v|v.report_type()==kind).map(|v|json!({"reportType":kind,"displayName":v.label(),"templatePath":v.path(),"withSealDefault":false})).collect();
+    rows.extend(super::report_template_files::catalog_entries(paths, kind)?);
     for saved in store.all("report-templates")? {
         if text(&saved, "reportType") == kind
             && saved["status"] == "Published"
@@ -261,6 +283,7 @@ pub fn preview_document(
         };
         let template = template(
             &service.store,
+            &service.paths,
             actor,
             &text(body, "templatePath"),
             kind,
@@ -268,7 +291,15 @@ pub fn preview_document(
         )?;
         (data, template)
     } else {
-        prepare(&service.store, actor, id, body, payment, "preview")?
+        prepare(
+            &service.store,
+            &service.paths,
+            actor,
+            id,
+            body,
+            payment,
+            "preview",
+        )?
     };
     report_assets::hydrate(
         &service.store,
@@ -290,6 +321,7 @@ pub fn preview_document(
 }
 fn prepare(
     store: &Store,
+    paths: &crate::paths::RuntimePaths,
     actor: &Actor,
     id: i64,
     body: &Value,
@@ -316,7 +348,7 @@ fn prepare(
     } else {
         invoice_data(store, actor, source, body["withSeal"] == true)?
     };
-    let template = template(store, actor, &text(body, "templatePath"), kind, true)?;
+    let template = template(store, paths, actor, &text(body, "templatePath"), kind, true)?;
     report_assets::hydrate(
         store,
         actor,
@@ -366,13 +398,14 @@ fn output_name(data: &ReportData, template: &Template, id: i64) -> String {
 }
 pub(super) fn invoice_document(
     store: &Store,
+    paths: &crate::paths::RuntimePaths,
     actor: &Actor,
     id: i64,
     item: &Value,
     action: &str,
     cancelled: &AtomicBool,
 ) -> Result<(Document, String)> {
-    let (data, template) = prepare(store, actor, id, item, false, action)?;
+    let (data, template) = prepare(store, paths, actor, id, item, false, action)?;
     Ok((
         template.render(&data, cancelled)?,
         output_name(&data, &template, id),
@@ -414,7 +447,15 @@ fn start(
         return Err(error(403, "服务器不能保存到客户端本机路径。"));
     }
     for id in &ids {
-        prepare(&service.store, actor, *id, body, payment, "export-pdf")?;
+        prepare(
+            &service.store,
+            &service.paths,
+            actor,
+            *id,
+            body,
+            payment,
+            "export-pdf",
+        )?;
     }
     let store = service.store.clone();
     let paths = service.paths.clone();
@@ -444,7 +485,8 @@ fn start(
                 crate::operation::check()?;
                 let actor = auth::current_actor(&store, actor_id)?;
                 auth::authorize_operation(&actor, operation, &[])?;
-                let (data, template) = prepare(&store, &actor, *id, &body, payment, "export-pdf")?;
+                let (data, template) =
+                    prepare(&store, &paths, &actor, *id, &body, payment, "export-pdf")?;
                 let document = template.render(&data, cancelled)?;
                 let pdf = render::pdf_document(&document, &paths.font_path, cancelled)?;
                 files.push((output_name(&data, &template, *id), pdf));
@@ -491,10 +533,11 @@ pub fn handle(
         query_value(query, "reportType")
     })?;
     match operation {
-        LIST_REPORT_TEMPLATES => catalog(&service.store, actor, kind),
+        LIST_REPORT_TEMPLATES => catalog(&service.store, &service.paths, actor, kind),
         GET_REPORT_TEMPLATE_CONTENT => {
             let template = template(
                 &service.store,
+                &service.paths,
                 actor,
                 query_value(query, "templatePath"),
                 kind,

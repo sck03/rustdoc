@@ -33,12 +33,12 @@ pub(crate) fn items(body: &Value) -> Result<Vec<Value>> {
 }
 pub(super) fn files(
     store: &Store,
+    paths: &crate::paths::RuntimePaths,
     actor: &Actor,
     invoice: i64,
     items: &[Value],
     merged: bool,
     action: &str,
-    font: &std::path::Path,
     cancelled: &AtomicBool,
 ) -> Result<Vec<(String, Vec<u8>)>> {
     let mut files = vec![];
@@ -47,7 +47,7 @@ pub(super) fn files(
     for (index, item) in items.iter().enumerate() {
         crate::operation::check()?;
         let (document, fallback) =
-            reports::invoice_document(store, actor, invoice, item, action, cancelled)?;
+            reports::invoice_document(store, paths, actor, invoice, item, action, cancelled)?;
         let name = text(item, "name");
         let name = if name.is_empty() {
             fallback
@@ -55,7 +55,7 @@ pub(super) fn files(
             paths::suggested_pdf_name(&name)
         };
         let name = format!("{:02}-{name}", index + 1);
-        let bytes = export_doc_report::pdf_document(&document, font, cancelled)?;
+        let bytes = export_doc_report::pdf_document(&document, &paths.font_path, cancelled)?;
         total = total
             .checked_add(bytes.len())
             .filter(|n| *n <= 64 * 1024 * 1024)
@@ -68,7 +68,7 @@ pub(super) fn files(
     if merged {
         files.push((
             "合并单据.pdf".into(),
-            export_doc_report::pdf_document(&combined, font, cancelled)?,
+            export_doc_report::pdf_document(&combined, &paths.font_path, cancelled)?,
         ));
     }
     Ok(files)
@@ -90,12 +90,12 @@ pub fn preview_pdf(
     }
     let merged = files(
         &service.store,
+        &service.paths,
         actor,
         invoice,
         &items,
         true,
         "export-zip",
-        &service.paths.font_path,
         &crate::operation::cancellation_flag(),
     )?;
     merged
@@ -133,6 +133,7 @@ pub fn handle(
         for item in items {
             let (document, _) = reports::invoice_document(
                 &service.store,
+                &service.paths,
                 actor,
                 invoice,
                 &item,
@@ -184,7 +185,7 @@ pub fn handle(
         None
     };
     let store = service.store.clone();
-    let font = service.paths.font_path.clone();
+    let paths = service.paths.clone();
     let actor_id = actor.id;
     let merged = body["includeMergedPdf"] == true;
     service.jobs.start_replayable(
@@ -201,12 +202,12 @@ pub fn handle(
             auth::authorize_operation(&actor, operation, &[])?;
             let files = files(
                 &store,
+                &paths,
                 &actor,
                 invoice,
                 &items,
                 merged,
                 "export-zip",
-                &font,
                 cancelled,
             )?;
             let actor = auth::current_actor(&store, actor_id)?;

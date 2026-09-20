@@ -312,6 +312,85 @@ fn managed_file_template_can_be_cloned_into_an_editable_user_draft() {
 }
 
 #[test]
+fn managed_file_template_is_published_to_the_report_catalog_and_preview() {
+    let workspace = Workspace::new();
+    let service = open(&workspace);
+    let created = handle(
+        &service,
+        &admin(),
+        CREATE_REPORT_TEMPLATE,
+        &[],
+        &[],
+        &json!({"reportType":"ExportDocument","displayName":"目录贯通模板"}),
+    )
+    .unwrap();
+    let stored = created["templatePath"].as_str().unwrap().to_string();
+    let catalog = crate::engine::reports::handle(
+        &service,
+        &admin(),
+        LIST_REPORT_TEMPLATES,
+        &[],
+        &[("reportType", "ExportDocument".into())],
+        &json!({}),
+    )
+    .unwrap();
+    assert!(catalog.as_array().unwrap().iter().any(|row| {
+        row["templatePath"] == stored && row["displayName"] == "目录贯通模板"
+    }));
+    let content = crate::engine::reports::handle(
+        &service,
+        &admin(),
+        PREVIEW_REPORT_TEMPLATE_CONTENT,
+        &[],
+        &[("reportType", "ExportDocument".into())],
+        &json!({
+            "content": report_templates::starter::create("ExportDocument", "目录贯通预览").unwrap(),
+            "withSeal": false
+        }),
+    )
+    .unwrap();
+    assert!(
+        content["html"]
+            .as_str()
+            .unwrap()
+            .contains("<!doctype html>")
+    );
+}
+
+#[test]
+fn revision_read_failure_is_reported_as_unavailable_not_a_conflict() {
+    let workspace = Workspace::new();
+    let directory = workspace.paths().data_root.join("not-a-template-file");
+    fs::create_dir_all(&directory).unwrap();
+    let result = validate_revision(&directory, "模板", "expected");
+    assert_ne!(result.unwrap_err().status, Some(409));
+}
+
+#[test]
+fn file_transaction_restores_modified_and_created_templates_on_failure() {
+    let workspace = Workspace::new();
+    let paths = workspace.paths();
+    let root = user_root(&paths);
+    fs::create_dir_all(root.join(EXPORT_CATEGORY)).unwrap();
+    let modified = root.join(EXPORT_CATEGORY).join("modified.html");
+    let created = root.join(EXPORT_CATEGORY).join("created.html");
+    fs::write(&modified, b"before").unwrap();
+
+    let mut transaction = FileTransaction::new(&paths).unwrap();
+    let result = transaction.execute(|transaction| {
+        transaction.capture(&modified)?;
+        fs::write(&modified, b"after")?;
+        transaction.capture(&created)?;
+        fs::write(&created, b"created")?;
+        Err::<(), _>(unavailable("forced failure"))
+    });
+
+    assert!(result.is_err());
+    assert_eq!(fs::read(&modified).unwrap(), b"before");
+    assert!(!created.exists());
+}
+
+#[test]
 fn non_v3_managed_template_clone_is_rejected_without_creating_a_draft() {
     let workspace = Workspace::new();
     let service = open(&workspace);

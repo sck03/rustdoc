@@ -414,7 +414,9 @@ pub(super) fn import_template_package(
         templates.push((relative.to_owned(), bytes));
     }
     validate_file_manifest(&manifest, &templates)?;
-    service.store.transaction(|tx| {
+    let mut files = FileTransaction::new(&service.paths)?;
+    files.execute(|files| {
+        service.store.transaction(|tx| {
         for (relative, bytes) in &templates {
             crate::operation::check()?;
             let kind = kind_of_category(relative.split('/').next().unwrap_or(EXPORT_CATEGORY));
@@ -422,6 +424,7 @@ pub(super) fn import_template_package(
             ensure_managed(&target, &root)?;
             validate_existing(&target)?;
             ensure_no_collision(&target, None)?;
+            files.capture(&target)?;
             let content =
                 std::str::from_utf8(bytes).map_err(|_| invalid("模板文件必须是 UTF-8 文本。"))?;
             report_templates::validate_content(kind, content)?;
@@ -433,6 +436,7 @@ pub(super) fn import_template_package(
             paths::atomic_write(&target, bytes).map_err(unavailable)?;
         }
         let mut rows = catalog_rows(&service.paths)?;
+        files.capture(&root.join(CATALOG_FILE))?;
         let mut incoming = vec![];
         for row in manifest["Templates"].as_array().into_iter().flatten() {
             let file_name = text(row, "FileName");
@@ -488,5 +492,6 @@ pub(super) fn import_template_package(
             "packageVersion":text(&manifest,"PackageVersion"),
             "storagePolicy":PACKAGE_POLICY
         }))
+        })
     })
 }

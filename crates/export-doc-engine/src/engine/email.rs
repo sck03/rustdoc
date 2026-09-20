@@ -335,7 +335,7 @@ fn document_email(
         invoice_id, &to, &subject, &html, merged, items
     ]))?);
     let store = service.store.clone();
-    let font = service.paths.font_path.clone();
+    let paths = service.paths.clone();
     let clock = service.clock.clone();
     let protector = service.protector.clone();
     let (email_check, _) = config(&service.store, &service.protector)?;
@@ -365,12 +365,12 @@ fn document_email(
             }
             let files = super::document_packages::files(
                 &store,
+                &paths,
                 &actor,
                 invoice_id,
                 &items,
                 merged,
                 "send-email",
-                &font,
                 cancelled,
             )?;
             let attachments: Vec<attachment::Attachment> = files
