@@ -16,6 +16,7 @@ base64.workspace = true
 zip = { version = "=8.6.0", default-features = false, features = ["deflate"] }
 krilla = "=0.8.2"
 krilla-svg = "=0.8.1"
+rustybuzz = "=0.20.1"
 usvg = "=0.47.0"
 
 [lints]

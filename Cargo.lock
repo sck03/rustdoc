@@ -1606,6 +1606,7 @@ dependencies = [
  "krilla",
  "krilla-svg",
  "rust_decimal",
+ "rustybuzz",
  "serde",
  "serde_json",
  "usvg",

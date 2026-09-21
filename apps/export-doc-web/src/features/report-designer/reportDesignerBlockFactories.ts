@@ -226,6 +226,8 @@ export function createDetailTablePrintSettings() {
   return {
     repeatHeaderOnPageBreak: true,
     keepRowsTogether: true,
+    firstPageRows: undefined,
+    continuationPageRows: undefined,
   };
 }
 

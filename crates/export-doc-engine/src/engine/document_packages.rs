@@ -55,6 +55,7 @@ pub(super) fn files(
             paths::suggested_pdf_name(&name)
         };
         let name = format!("{:02}-{name}", index + 1);
+        export_doc_report::configure(&paths.font_path);
         let bytes = export_doc_report::pdf_document(&document, &paths.font_path, cancelled)?;
         total = total
             .checked_add(bytes.len())

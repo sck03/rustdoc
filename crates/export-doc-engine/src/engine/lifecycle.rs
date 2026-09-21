@@ -9,6 +9,7 @@ impl NativeService {
         paths: RuntimePaths,
         retention: tasks::retention::Retention,
     ) -> Result<Arc<Self>> {
+        export_doc_report::configure(&paths.font_path);
         let store = Arc::new(Store::open(&paths)?);
         auth::seed(&store)?;
         packing::seed(&store)?;
@@ -54,6 +55,7 @@ impl NativeService {
         clock: crate::clock::BusinessClock,
         retention: tasks::retention::Retention,
     ) -> Result<Arc<Self>> {
+        export_doc_report::configure(&paths.font_path);
         let store = Arc::new(Store::open_postgres(connection_string)?);
         packing::seed(&store)?;
         #[cfg(feature = "mail")]

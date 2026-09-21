@@ -100,6 +100,47 @@ export function ReportDesignerDetailTableLayoutProperties({
                   },
                 })
               }>明细行避免截断</DesignerCheckbox>
+          <label>
+            <span>首页明细行数</span>
+            <input
+              type="number"
+              min={1}
+              max={80}
+              step={1}
+              value={block.print.firstPageRows ?? ""}
+              placeholder="自动"
+              onChange={(event) =>
+                onCommit({
+                  ...block,
+                  print: {
+                    ...block.print,
+                    firstPageRows: optionalRowLimit(event.target.value),
+                  },
+                })
+              }
+            />
+          </label>
+          <label>
+            <span>续页明细行数</span>
+            <input
+              type="number"
+              min={1}
+              max={80}
+              step={1}
+              value={block.print.continuationPageRows ?? ""}
+              placeholder="自动"
+              onChange={(event) =>
+                onCommit({
+                  ...block,
+                  print: {
+                    ...block.print,
+                    continuationPageRows: optionalRowLimit(event.target.value),
+                  },
+                })
+              }
+            />
+          </label>
+          <div className="new-report-designer-muted">留空时按页面高度自动分页;填写后每页最多显示该行数。</div>
         </div>
       </div>
       <div className="new-report-detail-style-group">
@@ -189,4 +230,12 @@ export function ReportDesignerDetailTableLayoutProperties({
       </div>
     </>
   );
+}
+
+function optionalRowLimit(value: string) {
+  if (value.trim() === "") {
+    return undefined;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 80 ? parsed : undefined;
 }

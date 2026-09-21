@@ -487,6 +487,7 @@ fn start(
                 auth::authorize_operation(&actor, operation, &[])?;
                 let (data, template) =
                     prepare(&store, &paths, &actor, *id, &body, payment, "export-pdf")?;
+                export_doc_report::configure(&paths.font_path);
                 let document = template.render(&data, cancelled)?;
                 let pdf = render::pdf_document(&document, &paths.font_path, cancelled)?;
                 files.push((output_name(&data, &template, *id), pdf));

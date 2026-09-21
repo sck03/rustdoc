@@ -1,6 +1,6 @@
 //! Structured fixed blocks. Geometry and styling are interpreted once for
 //! both SVG preview and krilla PDF output.
-use super::{PT_MM, text_svg, wrap};
+use super::{PT_MM, measured_wrap, text_svg};
 use crate::{ReportData, Result, error::invalid};
 use export_doc_domain::{
     designer::{Element, Kind, ReportBlock, ReportBorderStyle, ReportTextStyle, grid},
@@ -66,7 +66,8 @@ pub(super) fn render(svg: &mut String, element: &Element, data: &ReportData) -> 
             let mut top = y;
             if !block.title.is_empty() {
                 let size = element.style.font_size_pt * PT_MM;
-                let lines = wrap(&block.title, width, size);
+                let lines =
+                    measured_wrap(&block.title, width, &element.style.font_family, true, size);
                 text_svg(
                     &mut content,
                     &lines,
@@ -205,6 +206,10 @@ fn inherit(style: &ReportTextStyle, base: &ReportTextStyle) -> ReportTextStyle {
         font_size_pt: style.font_size_pt.or(base.font_size_pt),
         bold: style.bold.or(base.bold),
         align: style.align.clone().or_else(|| base.align.clone()),
+        vertical_align: style
+            .vertical_align
+            .clone()
+            .or_else(|| base.vertical_align.clone()),
         margin_top_mm: style.margin_top_mm.or(base.margin_top_mm),
         margin_right_mm: style.margin_right_mm.or(base.margin_right_mm),
         margin_bottom_mm: style.margin_bottom_mm.or(base.margin_bottom_mm),
@@ -251,7 +256,19 @@ fn box_content(
             .map(|c| c.to_string())
             .collect()
     } else {
-        wrap(value, w, size)
+        measured_wrap(
+            value,
+            w,
+            &element.style.font_family,
+            style.bold.unwrap_or(element.style.bold),
+            size,
+        )
+    };
+    let lines_height = lines.len() as f32 * size * 1.35;
+    let top = match style.vertical_align.as_deref().unwrap_or("Top") {
+        "Middle" => top + (h - lines_height).max(0.) / 2.,
+        "Bottom" => top + (h - lines_height).max(0.),
+        _ => top,
     };
     text_svg(
         svg,

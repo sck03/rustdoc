@@ -27,6 +27,8 @@ pub struct ReportTextStyle {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub align: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vertical_align: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub margin_top_mm: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub margin_right_mm: Option<f32>,
@@ -41,6 +43,7 @@ impl Default for ReportTextStyle {
             font_size_pt: None,
             bold: None,
             align: None,
+            vertical_align: None,
             margin_top_mm: None,
             margin_right_mm: None,
             margin_bottom_mm: None,

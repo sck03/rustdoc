@@ -379,6 +379,17 @@ fn validate_detail_table(
         validate_detail_column(column, fields)?;
     }
     if table
+        .print
+        .first_page_rows
+        .is_some_and(|rows| !(1..=80).contains(&rows))
+        || table
+            .print
+            .continuation_page_rows
+            .is_some_and(|rows| !(1..=80).contains(&rows))
+    {
+        return Err("V3 明细分页行数必须在 1–80 行之间。".into());
+    }
+    if table
         .detail_width_mm
         .is_some_and(|width| !width.is_finite() || !(40. ..=240.).contains(&width))
     {
@@ -503,6 +514,10 @@ fn validate_text_style(style: &ReportTextStyle) -> Result<(), String> {
             .align
             .as_ref()
             .is_some_and(|align| !matches!(align.as_str(), "Left" | "Center" | "Right"))
+        || style
+            .vertical_align
+            .as_ref()
+            .is_some_and(|align| !matches!(align.as_str(), "Top" | "Middle" | "Bottom"))
     {
         return Err("V3 文本样式无效。".into());
     }

@@ -106,7 +106,7 @@ function renderGridCellStyle(
     renderTextPresentation(style),
     cell.verticalText ? "writing-mode: vertical-rl" : "",
     cell.verticalText ? "text-orientation: upright" : "",
-    "vertical-align: middle",
+    `vertical-align: ${(style.verticalAlign ?? "Middle").toLowerCase()}`,
     renderBorderStyle(cell.border ?? block.border),
     renderCellPadding(style, 1.2),
   ].filter(Boolean).join("; ");
@@ -494,6 +494,8 @@ function renderDetailPrintClassNames(block: Extract<ReportBlock, { type: "Detail
   return [
     renderDetailHeaderRepeatClassName(block),
     block.print.keepRowsTogether ? "edm-detail-keep-rows" : "edm-detail-split-rows",
+    block.print.firstPageRows ? `edm-detail-first-rows-${block.print.firstPageRows}` : "",
+    block.print.continuationPageRows ? `edm-detail-continuation-rows-${block.print.continuationPageRows}` : "",
   ].join(" ");
 }
 
@@ -623,6 +625,7 @@ function renderTextPresentation(style: ReportTextStyle) {
     style.fontSizePt ? `font-size: ${style.fontSizePt}pt` : "",
     style.bold ? `font-weight: 700; font-family: ${portableReportSansFontFamily}` : "",
     style.align ? `text-align: ${alignToCss(style.align)}` : "",
+    style.verticalAlign ? `vertical-align: ${style.verticalAlign.toLowerCase()}` : "",
   ].filter(Boolean).join("; ");
 }
 

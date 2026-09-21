@@ -23,6 +23,7 @@ import {
   readNumber,
   readOptionalEnum,
   readOptionalFieldPath,
+  readOptionalInteger,
   readOptionalNumber,
   readOptionalString,
   readRequiredFieldPath,
@@ -108,6 +109,8 @@ function normalizeDetailTablePrintSettings(
   return {
     repeatHeaderOnPageBreak: readBoolean(value.repeatHeaderOnPageBreak, true, `${path}.repeatHeaderOnPageBreak`, issues),
     keepRowsTogether: readBoolean(value.keepRowsTogether, true, `${path}.keepRowsTogether`, issues),
+    firstPageRows: readOptionalInteger(value.firstPageRows, 1, 80, `${path}.firstPageRows`, issues),
+    continuationPageRows: readOptionalInteger(value.continuationPageRows, 1, 80, `${path}.continuationPageRows`, issues),
   };
 }
 

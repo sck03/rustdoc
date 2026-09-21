@@ -75,6 +75,14 @@ export function normalizeAlign(value: string): NonNullable<ReportTextStyle["alig
   return "Left";
 }
 
+export function normalizeVerticalAlign(value: string): NonNullable<ReportTextStyle["verticalAlign"]> {
+  if (value === "Middle" || value === "Bottom") {
+    return value;
+  }
+
+  return "Top";
+}
+
 export function normalizeSummaryContentKind(value: string): ReportDetailTableSummaryCell["contentKind"] {
   if (value === "Field" || value === "Text") {
     return value;

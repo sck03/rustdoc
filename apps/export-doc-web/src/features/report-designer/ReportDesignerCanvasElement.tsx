@@ -113,6 +113,10 @@ export function reportDesignerCanvasElementStyle(element: ReportDesignerV3Elemen
     borderWidth: usesOuterStyle ? element.type === "Line" ? 0 : element.style.borderWidthPx ?? 0 : undefined,
     borderStyle: usesOuterStyle && element.type !== "Line" ? element.style.borderStyle === "Dashed" ? "dashed" : element.style.borderStyle === "None" ? "none" : element.style.borderWidthPx ? "solid" : undefined : undefined,
     padding: usesOuterStyle ? `${hundredthMmToMm(element.style.paddingHundredthMm ?? 0)}mm` : undefined,
+    alignItems: usesOuterStyle && (element.type === "Text" || element.type === "Field" || element.type === "PageNumber")
+      ? element.style.verticalAlign === "Middle" ? "center" : element.style.verticalAlign === "Bottom" ? "flex-end" : "flex-start"
+      : undefined,
+    display: usesOuterStyle && (element.type === "Text" || element.type === "Field" || element.type === "PageNumber") ? "flex" : undefined,
   };
   if (element.type === "Line") style.backgroundColor = "transparent";
   return style;

@@ -183,6 +183,7 @@ pub struct Style {
     pub color: String,
     pub background_color: String,
     pub align: String,
+    pub vertical_align: String,
     pub border_color: String,
     #[serde(deserialize_with = "json_float")]
     pub border_width_px: f32,
@@ -198,6 +199,7 @@ impl Default for Style {
             color: "#173f3b".into(),
             background_color: "#ffffff".into(),
             align: "Left".into(),
+            vertical_align: "Top".into(),
             border_color: "#c5d3cf".into(),
             border_width_px: 0.,
             border_style: "Solid".into(),
@@ -240,6 +242,10 @@ pub struct DetailTable {
 pub struct DetailPrint {
     pub repeat_header_on_page_break: bool,
     pub keep_rows_together: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_page_rows: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continuation_page_rows: Option<usize>,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -564,6 +570,8 @@ impl Design {
                     print: DetailPrint {
                         repeat_header_on_page_break: true,
                         keep_rows_together: true,
+                        first_page_rows: None,
+                        continuation_page_rows: None,
                     },
                     summary_row: None,
                     header_style: ReportTextStyle::default(),

@@ -113,7 +113,10 @@ export function exportReportDesignerV3SchemaToHtml(
     .edm-report-grid, .edm-detail-table, .edm-detail-layout { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .edm-detail-table td, .edm-detail-table th, .edm-detail-layout td, .edm-detail-layout th { border: 1px solid #333; padding: 1mm; vertical-align: top; }
     .edm-detail-table thead { display: table-header-group; }
+    .edm-detail-no-repeat-header thead { display: table-row-group; }
     .edm-detail-table tr { page-break-inside: avoid; break-inside: avoid; }
+    .edm-detail-split-rows tr { page-break-inside: auto; break-inside: auto; }
+    .edm-detail-repeat-header, .edm-detail-no-repeat-header { break-inside: auto; page-break-inside: auto; }
     .report-page-break-row { page-break-before: always; break-before: page; height: 0; }
     @media screen { .edm-v3-repeat-layer { display: none; } }
     @media print {

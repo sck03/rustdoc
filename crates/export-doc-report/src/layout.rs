@@ -47,9 +47,8 @@ pub(crate) fn escape(text: &str) -> String {
         .replace('"', "&quot;")
 }
 pub(crate) fn wrap(text: &str, width: f32, size: f32) -> Vec<String> {
-    let capacity = (width / size).max(1.);
     let mut lines = Vec::new();
-    let advance = |character: char| if character.is_ascii() { 0.56 } else { 1. };
+    let capacity = width.max(size);
     for paragraph in text.split('\n') {
         let mut tokens = Vec::new();
         let mut word = String::new();
@@ -67,30 +66,71 @@ pub(crate) fn wrap(text: &str, width: f32, size: f32) -> Vec<String> {
             tokens.push(word);
         }
         let mut line = String::new();
-        let mut units = 0.;
+        let mut measured = 0.;
         for token in tokens {
-            let token_width: f32 = token.chars().map(advance).sum();
-            if units + token_width > capacity && !line.is_empty() {
+            let token_width = measure("Noto Sans CJK SC", false, &token, size);
+            if measured + token_width > capacity && !line.is_empty() {
                 lines.push(line.trim_end().to_owned());
                 line.clear();
-                units = 0.;
+                measured = 0.;
             }
             if token.trim().is_empty() && line.is_empty() {
                 continue;
             }
             for character in token.chars() {
-                let next = advance(character);
-                if units + next > capacity && !line.is_empty() {
+                let next = measure("Noto Sans CJK SC", false, &character.to_string(), size);
+                if measured + next > capacity && !line.is_empty() {
                     lines.push(std::mem::take(&mut line));
-                    units = 0.;
+                    measured = 0.;
                 }
                 line.push(character);
-                units += next;
+                measured += next;
             }
         }
         lines.push(line.trim_end().to_owned());
     }
     lines
+}
+
+pub(crate) fn measured_wrap(
+    text: &str,
+    width: f32,
+    family: &str,
+    bold: bool,
+    size: f32,
+) -> Vec<String> {
+    if family.eq_ignore_ascii_case("Noto Sans CJK SC") && !bold {
+        return wrap(text, width, size);
+    }
+    wrap_measured(text, width, family, bold, size)
+}
+
+fn wrap_measured(text: &str, width: f32, family: &str, bold: bool, size: f32) -> Vec<String> {
+    let capacity = width.max(size);
+    let mut lines = Vec::new();
+    for paragraph in text.split('\n') {
+        let mut line = String::new();
+        let mut measured = 0.;
+        for character in paragraph.chars() {
+            let next = measure(family, bold, &character.to_string(), size);
+            let hard_break = measured + next > capacity && !line.is_empty();
+            if hard_break {
+                lines.push(std::mem::take(&mut line));
+                measured = 0.;
+            }
+            line.push(character);
+            measured += next;
+        }
+        lines.push(line.trim_end().to_owned());
+    }
+    lines
+}
+
+fn measure(family: &str, bold: bool, text: &str, size: f32) -> f32 {
+    crate::fonts::text_width_mm(text, family, bold, size).unwrap_or_else(|_| {
+        let fallback = |character: char| if character.is_ascii() { 0.56 } else { 1. };
+        text.chars().map(fallback).sum::<f32>() * size
+    })
 }
 pub(crate) fn text_svg(
     svg: &mut String,
@@ -220,7 +260,13 @@ fn element(
         };
         let size = style.font_size_pt * PT_MM;
         let padding = style.padding_hundredth_mm as f32 / 100.;
-        let lines = wrap(&text, (width - padding * 2.).max(size), size);
+        let lines = measured_wrap(
+            &text,
+            (width - padding * 2.).max(size),
+            &style.font_family,
+            style.bold,
+            size,
+        );
         if lines.len() as f32 * size * 1.35 > height + size * 0.6 {
             return Err(invalid(format!(
                 "报表组件“{}”高度不足，请扩大高度以显示完整内容。",
@@ -267,6 +313,16 @@ fn fixed_elements(
         {
             continue;
         }
+        let pinned_footer_offset = if layer.role == "Footer" && layer.print.pin_to_page_bottom {
+            design.page.height_hundredth_mm as f32 / 100. - footer_content_bottom(layer)
+        } else {
+            0.
+        };
+        if pinned_footer_offset.abs() > f32::EPSILON {
+            svg.push_str(&format!(
+                "<g transform=\"translate(0 {pinned_footer_offset})\">"
+            ));
+        }
         let mut elements: Vec<_> = layer.elements.iter().collect();
         elements.sort_by_key(|e| e.z_index);
         for item in elements {
@@ -285,8 +341,80 @@ fn fixed_elements(
                 element(svg, item, data, index, count)?;
             }
         }
+        if pinned_footer_offset.abs() > f32::EPSILON {
+            svg.push_str("</g>");
+        }
     }
     Ok(())
+}
+
+fn layer_header_bottom(design: &Design, height: f32) -> f32 {
+    design
+        .layers
+        .iter()
+        .filter(|layer| layer.role == "Header" && layer.visible)
+        .fold(0., |bottom, layer| {
+            let content = layer
+                .elements
+                .iter()
+                .filter(|element| element.visible && element.output_enabled)
+                .map(|element| (element.y_hundredth_mm + element.height_hundredth_mm) as f32 / 100.)
+                .fold(0., f32::max);
+            bottom
+                .max(content)
+                .max(layer.print.min_height_hundredth_mm as f32 / 100.)
+                .min(height)
+        })
+}
+
+fn layer_footer_top(design: &Design, height: f32) -> f32 {
+    design
+        .layers
+        .iter()
+        .filter(|layer| layer.role == "Footer" && layer.visible)
+        .fold(height, |top, layer| {
+            let reserved = if layer.print.pin_to_page_bottom {
+                footer_content_height(layer)
+            } else {
+                layer
+                    .elements
+                    .iter()
+                    .filter(|element| element.visible && element.output_enabled)
+                    .map(|element| element.y_hundredth_mm as f32 / 100.)
+                    .fold(height, f32::min)
+                    .min(height)
+            };
+            top.min((height - layer.print.min_height_hundredth_mm as f32 / 100.).max(0.))
+                .min((height - reserved).max(0.))
+        })
+}
+
+fn footer_content_bottom(layer: &export_doc_domain::designer::Layer) -> f32 {
+    let bottom = layer
+        .elements
+        .iter()
+        .filter(|element| element.visible && element.output_enabled)
+        .map(|element| (element.y_hundredth_mm + element.height_hundredth_mm) as f32 / 100.)
+        .fold(0., f32::max);
+    if bottom > 0. {
+        bottom
+    } else {
+        layer.print.min_height_hundredth_mm as f32 / 100.
+    }
+}
+
+fn footer_content_height(layer: &export_doc_domain::designer::Layer) -> f32 {
+    let top = layer
+        .elements
+        .iter()
+        .filter(|element| element.visible && element.output_enabled)
+        .map(|element| element.y_hundredth_mm as f32 / 100.)
+        .fold(f32::INFINITY, f32::min);
+    if top.is_finite() {
+        footer_content_bottom(layer) - top
+    } else {
+        layer.print.min_height_hundredth_mm as f32 / 100.
+    }
 }
 pub fn render_design(
     data: &crate::ReportData,
@@ -383,13 +511,7 @@ fn pages_data(
     if block.columns.is_empty() {
         return Err(invalid("商品明细表必须包含至少一列。"));
     }
-    let footer = design
-        .layers
-        .iter()
-        .filter(|layer| layer.role == "Footer" && layer.visible)
-        .flat_map(|layer| &layer.elements)
-        .map(|element| element.y_hundredth_mm as f32 / 100.)
-        .fold(height - 10., f32::min);
+    let footer = layer_footer_top(design, height);
     let top = table.y_hundredth_mm as f32 / 100.;
     let left = table.x_hundredth_mm as f32 / 100.;
     let table_width = table.width_hundredth_mm as f32 / 100.;
@@ -422,36 +544,8 @@ fn render_body_flow(
     height: f32,
     cancelled: &AtomicBool,
 ) -> Result<Vec<String>> {
-    let header_bottom = design
-        .layers
-        .iter()
-        .filter(|layer| layer.role == "Header" && layer.visible)
-        .flat_map(|layer| {
-            layer
-                .elements
-                .iter()
-                .filter(|element| element.visible && element.output_enabled)
-                .map(|element| (element.y_hundredth_mm + element.height_hundredth_mm) as f32 / 100.)
-                .chain(std::iter::once(
-                    layer.print.min_height_hundredth_mm as f32 / 100.,
-                ))
-        })
-        .fold(0., f32::max);
-    let footer_top = design
-        .layers
-        .iter()
-        .filter(|layer| layer.role == "Footer" && layer.visible)
-        .flat_map(|layer| {
-            layer
-                .elements
-                .iter()
-                .filter(|element| element.visible && element.output_enabled)
-                .map(|element| element.y_hundredth_mm as f32 / 100.)
-                .chain(std::iter::once(
-                    height - layer.print.min_height_hundredth_mm as f32 / 100.,
-                ))
-        })
-        .fold(height, f32::min);
+    let header_bottom = layer_header_bottom(design, height);
+    let footer_top = layer_footer_top(design, height);
     let capacity = footer_top - header_bottom;
     if capacity <= 0. {
         return Err(invalid("页眉与页脚之间没有足够的 Flow 空间。"));

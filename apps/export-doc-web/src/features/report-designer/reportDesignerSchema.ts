@@ -189,6 +189,8 @@ export type ReportDetailTableBlock = ReportBlockBase & {
 export type ReportDetailTablePrintSettings = {
   repeatHeaderOnPageBreak: boolean;
   keepRowsTogether: boolean;
+  firstPageRows?: number;
+  continuationPageRows?: number;
 };
 
 export type ReportDetailTableSideBand = {
@@ -267,6 +269,7 @@ export type ReportTextStyle = {
   fontSizePt?: number;
   bold?: boolean;
   align?: "Left" | "Center" | "Right";
+  verticalAlign?: "Top" | "Middle" | "Bottom";
   marginTopMm?: number;
   marginRightMm?: number;
   marginBottomMm?: number;

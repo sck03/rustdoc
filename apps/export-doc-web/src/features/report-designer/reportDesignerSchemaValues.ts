@@ -54,6 +54,7 @@ export function normalizeTextStyle(value: unknown, path: string, issues: ReportD
     fontSizePt: readOptionalNumber(value.fontSizePt, 10, 6, 48, `${path}.fontSizePt`, issues),
     bold: typeof value.bold === "boolean" ? value.bold : undefined,
     align: readOptionalEnum(value.align, ["Left", "Center", "Right"] as const, `${path}.align`, issues),
+    verticalAlign: readOptionalEnum(value.verticalAlign, ["Top", "Middle", "Bottom"] as const, `${path}.verticalAlign`, issues),
     marginTopMm: readOptionalNumber(value.marginTopMm, 0, 0, 80, `${path}.marginTopMm`, issues),
     marginRightMm: readOptionalNumber(value.marginRightMm, 0, 0, 80, `${path}.marginRightMm`, issues),
     marginBottomMm: readOptionalNumber(value.marginBottomMm, 0, 0, 80, `${path}.marginBottomMm`, issues),
@@ -240,6 +241,26 @@ export function readOptionalNumber(
   }
 
   return readNumber(value, fallback, min, max, path, issues);
+}
+
+export function readOptionalInteger(
+  value: unknown,
+  min: number,
+  max: number,
+  path: string,
+  issues: ReportDesignerSchemaIssue[],
+) {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  const parsed = typeof value === "number" ? value : Number.parseFloat(String(value));
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    issues.push(createIssue("warning", path, `整数必须为 ${min}-${max},已忽略。`));
+    return undefined;
+  }
+
+  return parsed;
 }
 
 export function readEnum<T extends string>(

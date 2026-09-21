@@ -452,6 +452,7 @@ function normalizeStyle(value: unknown, path: string, issues: ReportDesignerSche
   if (typeof value.color === "string" && isReportDesignerCssColor(value.color)) style.color = value.color.trim();
   if (typeof value.backgroundColor === "string" && isReportDesignerCssColor(value.backgroundColor)) style.backgroundColor = value.backgroundColor.trim();
   if (value.align === "Left" || value.align === "Center" || value.align === "Right") style.align = value.align;
+  if (value.verticalAlign === "Top" || value.verticalAlign === "Middle" || value.verticalAlign === "Bottom") style.verticalAlign = value.verticalAlign;
   if (typeof value.borderColor === "string" && isReportDesignerCssColor(value.borderColor)) style.borderColor = value.borderColor.trim();
   if (value.borderWidthPx !== undefined) style.borderWidthPx = readNumber(value.borderWidthPx, 0, 0, 8, `${path}.borderWidthPx`, issues);
   if (value.borderStyle === "Solid" || value.borderStyle === "Dashed" || value.borderStyle === "None") style.borderStyle = value.borderStyle;

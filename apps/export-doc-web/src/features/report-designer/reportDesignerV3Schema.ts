@@ -94,6 +94,7 @@ export type ReportDesignerV3ElementStyle = {
   color?: string;
   backgroundColor?: string;
   align?: "Left" | "Center" | "Right";
+  verticalAlign?: "Top" | "Middle" | "Bottom";
   borderColor?: string;
   borderWidthPx?: number;
   borderStyle?: "Solid" | "Dashed" | "None";

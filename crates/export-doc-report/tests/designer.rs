@@ -217,3 +217,70 @@ fn body_flow_wraps_before_the_footer_when_the_next_block_does_not_fit() {
     assert!(!result.pages[0].svg.contains("SECOND FLOW"));
     assert!(result.pages[1].svg.contains("SECOND FLOW"));
 }
+
+#[test]
+fn detail_row_limits_force_structured_page_breaks_without_losing_rows() {
+    let mut design = Design::invoice();
+    if let Kind::Flow {
+        block: ReportBlock::DetailTable(table),
+        ..
+    } = &mut design.layers[1].elements[0].kind
+    {
+        table.print.first_page_rows = Some(2);
+        table.print.continuation_page_rows = Some(2);
+    }
+    let mut draft = InvoiceDraft::demo("2026-09-21", "PAGE-LIMIT");
+    let row = draft.rows[0].clone();
+    draft.rows = (0..5)
+        .map(|index| {
+            let mut row = row.clone();
+            row.cells[1] = format!("STYLE-{}", index + 1);
+            row
+        })
+        .collect();
+    let result = render_design(
+        &crate::ReportData::invoice(&draft.build().unwrap(), json!({}), json!({}), false).unwrap(),
+        &design,
+        &AtomicBool::new(false),
+    )
+    .unwrap();
+    assert_eq!(result.pages.len(), 3);
+    assert!(result.pages[0].svg.contains("STYLE-2"));
+    assert!(!result.pages[0].svg.contains("STYLE-3"));
+    assert!(result.pages[1].svg.contains("STYLE-3"));
+    assert!(result.pages[1].svg.contains("STYLE-4"));
+    assert!(result.pages[2].svg.contains("STYLE-5"));
+}
+
+#[test]
+fn grid_vertical_alignment_changes_text_origin() {
+    let mut design = grid();
+    if let Kind::Flow {
+        block: ReportBlock::Grid(block),
+        ..
+    } = &mut design.layers[1].elements[0].kind
+    {
+        block.rows[0].cells[1].style.vertical_align = Some("Bottom".into());
+        block.rows[0].height_mm = Some(40.);
+        block.rows[0].cells[1].style.font_size_pt = Some(6.);
+    }
+    let mut top_design = design.clone();
+    if let Kind::Flow {
+        block: ReportBlock::Grid(block),
+        ..
+    } = &mut top_design.layers[1].elements[0].kind
+    {
+        block.rows[0].cells[1].style.vertical_align = Some("Top".into());
+    }
+    let top = render_design(&data(), &top_design, &AtomicBool::new(false)).unwrap();
+    let bottom = render_design(&data(), &design, &AtomicBool::new(false)).unwrap();
+    let text_y = |svg: &str| {
+        svg.split("<text ")
+            .find_map(|part| part.contains("No: GRID-INVOICE").then_some(part))
+            .and_then(|part| part.split(" y=\"").nth(1))
+            .and_then(|part| part.split('"').next())
+            .and_then(|value| value.parse::<f32>().ok())
+            .unwrap()
+    };
+    assert!(text_y(&bottom.pages[0].svg) > text_y(&top.pages[0].svg));
+}

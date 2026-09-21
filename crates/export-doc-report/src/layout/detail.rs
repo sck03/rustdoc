@@ -1,4 +1,4 @@
-use super::{PT_MM, text_svg, wrap};
+use super::{PT_MM, measured_wrap, text_svg, wrap};
 use crate::{ReportData, Result, error::invalid};
 use export_doc_domain::designer::{
     DetailGroupFooter, DetailGroupFooterCell, DetailSummaryCell, DetailSummaryRow, DetailTable,
@@ -93,6 +93,8 @@ pub(super) fn render(
     }
     let mut chunks: Vec<Vec<Row>> = vec![Vec::new()];
     let mut used = 0.;
+    let mut page_index = 0usize;
+    let mut data_rows_on_page = 0usize;
     for row in rows {
         if cancelled.load(Ordering::Relaxed) {
             return Err(crate::Error {
@@ -103,11 +105,24 @@ pub(super) fn render(
         if row.height > capacity {
             return Err(invalid("单行商品内容超过一页,请调整明细列宽或字体。"));
         }
+        let row_limit = if page_index == 0 {
+            table.print.first_page_rows
+        } else {
+            table.print.continuation_page_rows
+        };
+        let row_limit_reached = row_limit
+            .is_some_and(|limit| matches!(row.kind, RowKind::Data) && data_rows_on_page >= limit);
         if (row.page_break_before && !chunks.last().is_some_and(Vec::is_empty))
             || (used + row.height > capacity && !chunks.last().is_some_and(Vec::is_empty))
+            || (row_limit_reached && !chunks.last().is_some_and(Vec::is_empty))
         {
             chunks.push(Vec::new());
             used = 0.;
+            page_index += 1;
+            data_rows_on_page = 0;
+        }
+        if matches!(row.kind, RowKind::Data) {
+            data_rows_on_page += 1;
         }
         used += row.height;
         chunks.last_mut().unwrap().push(row);
@@ -220,7 +235,13 @@ fn detail_rows(
             .zip(widths)
             .map(|(column, width)| {
                 let text = column_text(column, data, item);
-                wrap(&text, (width - 3.).max(size), size)
+                measured_wrap(
+                    &text,
+                    (width - 3.).max(size),
+                    "Noto Sans CJK SC",
+                    false,
+                    size,
+                )
             })
             .collect();
         for cell in group_sum_cells(table) {
@@ -304,7 +325,13 @@ fn group_footer_row(
             .find(|cell| cell.column_id == column.id)
             .map(|cell| footer_cell(cell, index, sums, count))
             .unwrap_or_default();
-        cells.push(wrap(&value, (widths[index] - 3.).max(size), size));
+        cells.push(measured_wrap(
+            &value,
+            (widths[index] - 3.).max(size),
+            "Noto Sans CJK SC",
+            false,
+            size,
+        ));
     }
     if let Some(first) = cells.first_mut() {
         first.insert(0, format!("{} {}", footer.label, group));
@@ -351,7 +378,13 @@ fn summary_row(
         let value = cell
             .map(|cell| summary_cell(cell, data))
             .unwrap_or_default();
-        cells.push(wrap(&value, (widths[index] - 3.).max(size), size));
+        cells.push(measured_wrap(
+            &value,
+            (widths[index] - 3.).max(size),
+            "Noto Sans CJK SC",
+            false,
+            size,
+        ));
     }
     if let Some(first) = cells.first_mut() {
         first.insert(0, summary.label.clone());

@@ -9,6 +9,7 @@ import {
   normalizeBorderForEditor,
   normalizeBorderLineStyle,
   normalizeNumber,
+  normalizeVerticalAlign,
   roundDesignerWidth,
 } from "./reportDesignerPropertiesModel.ts";
 
@@ -374,6 +375,17 @@ export function TextStyleEditor({
           <option value="Left">左</option>
           <option value="Center">中</option>
           <option value="Right">右</option>
+        </select>
+      </label>
+      <label>
+        <span>垂直对齐</span>
+        <select
+          value={style.verticalAlign ?? "Top"}
+          onChange={(event) => onChange({ ...style, verticalAlign: normalizeVerticalAlign(event.target.value) })}
+        >
+          <option value="Top">上</option>
+          <option value="Middle">中</option>
+          <option value="Bottom">下</option>
         </select>
       </label>
       <DesignerCheckbox checked={Boolean(style.bold)}
