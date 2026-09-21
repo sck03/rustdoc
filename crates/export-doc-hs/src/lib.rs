@@ -1,10 +1,14 @@
 //! Public third-party reference pages are evidence, never authoritative tariffs.
+pub mod lookup;
 pub mod parser;
 use export_doc_contracts::generated_api::ApiHsCodeDto;
 use std::{io::Read, time::Duration};
 pub const SOURCE: &str = "i5a6";
 const ORIGIN: &str = "https://www.i5a6.com";
 const MAX_PAGE: usize = 4 * 1024 * 1024;
+// Match the original provider's public-page negotiation. The source rejects
+// the product-only user agent with HTTP 403, even for static search pages.
+const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 pub fn trusted_url(value: &str) -> Result<url::Url, String> {
     let url = url::Url::parse(ORIGIN)
@@ -37,8 +41,8 @@ fn read(url: url::Url, check: &dyn Fn() -> Result<(), String>) -> Result<String,
         .into();
     let response = agent
         .get(url.as_str())
-        .header("User-Agent", "ExportDocManager/0.1 (HS reference lookup)")
-        .header("Accept-Language", "zh-CN,zh;q=0.9")
+        .header("User-Agent", USER_AGENT)
+        .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.7")
         .call()
         .map_err(|e| format!("参考数据源访问失败：{e}"))?;
     let mut reader = response.into_body().into_reader();

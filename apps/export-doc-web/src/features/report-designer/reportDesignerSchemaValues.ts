@@ -2,7 +2,7 @@ import type {
   ReportBorderStyle,
   ReportTextStyle,
 } from "./reportDesignerSchema.ts";
-import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
+import { portableReportSansFontFamily, portableReportSerifFontFamily } from "../../app/typographyPolicy.ts";
 
 export type ReportDesignerSchemaIssue = {
   severity: "error" | "warning";
@@ -12,7 +12,6 @@ export type ReportDesignerSchemaIssue = {
 
 const fieldPathPattern = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/;
 const cssColorPattern = /^#[0-9a-fA-F]{3,8}$/;
-const safeCssFontFamilyPattern = /^[A-Za-z0-9\s"',._-]+$/;
 const imageDataUrlPattern = /^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=\s]+$/i;
 const imageRemoteUrlPattern = /^https?:\/\/[^\s"'<>]+$/i;
 const imageRelativeUrlPattern = /^(?!.*(?:^|\/)\.\.(?:\/|$))(?![a-z][a-z0-9+.-]*:)[A-Za-z0-9][A-Za-z0-9._~/%+-]*$/i;
@@ -33,7 +32,8 @@ export function isReportDesignerImageSource(value: string) {
 }
 
 export function isSafeReportDesignerCssFontFamily(value: string) {
-  return safeCssFontFamilyPattern.test(value.trim());
+  const normalized = value.trim();
+  return normalized === portableReportSansFontFamily || normalized === portableReportSerifFontFamily;
 }
 
 export function isReportDesignerCssColor(value: string) {
@@ -170,7 +170,7 @@ export function readFontFamily(value: unknown, path: string, issues: ReportDesig
     return value.trim();
   }
 
-  issues.push(createIssue("warning", path, "默认字体无效，已回退为跨平台开源字体栈。"));
+  issues.push(createIssue("warning", path, "字体不在随包字体范围内，已使用 Noto Sans CJK SC。"));
   return portableReportSansFontFamily;
 }
 

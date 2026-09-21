@@ -31,6 +31,7 @@ pub(super) struct DetailLayout<'a> {
     pub top: f32,
     pub footer_top: f32,
     pub width: f32,
+    pub page_width: f32,
     pub height: f32,
     pub cancelled: &'a AtomicBool,
 }
@@ -46,6 +47,7 @@ pub(super) fn render(
         top,
         footer_top,
         width,
+        page_width,
         height,
         cancelled,
     } = layout;
@@ -116,7 +118,7 @@ pub(super) fn render(
     let count = chunks.len();
     let mut pages = Vec::with_capacity(count);
     for (index, rows) in chunks.iter().enumerate() {
-        let mut svg = canvas(width, height);
+        let mut svg = canvas(page_width, height);
         fixed(&mut svg, index, count)?;
         if let Some(side) = &table.side_band {
             render_side_band(&mut svg, table, side, data, left, top, footer_top, size)?;

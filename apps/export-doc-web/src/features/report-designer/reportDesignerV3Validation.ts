@@ -1,3 +1,4 @@
+import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
 import {
   isRecord,
   isReportDesignerCssColor,
@@ -617,14 +618,14 @@ function truncateString(value: string, maximumLength: number, path: string, issu
 function normalizeFontFamily(value: unknown, path: string, issues: ReportDesignerSchemaIssue[]) {
   if (typeof value !== "string") {
     if (value !== undefined) issues.push({ severity: "warning", path, message: "字体名称无效，已使用安全默认字体。" });
-    return "Arial, 'Microsoft YaHei', sans-serif";
+    return portableReportSansFontFamily;
   }
   const normalized = value.trim();
   if (normalized.length > REPORT_DESIGNER_V3_MAX_FONT_FAMILY_LENGTH || !isSafeReportDesignerCssFontFamily(normalized)) {
-    issues.push({ severity: "warning", path, message: "字体名称包含不受支持的字符或过长，已使用安全默认字体。" });
-    return "Arial, 'Microsoft YaHei', sans-serif";
+    issues.push({ severity: "warning", path, message: "字体不在随包字体范围内，已使用 Noto Sans CJK SC。" });
+    return portableReportSansFontFamily;
   }
-  return normalized || "Arial, 'Microsoft YaHei', sans-serif";
+  return normalized || portableReportSansFontFamily;
 }
 
 function normalizeId(value: unknown, fallback: string, ids: Set<string>, path: string, issues: ReportDesignerSchemaIssue[]) {

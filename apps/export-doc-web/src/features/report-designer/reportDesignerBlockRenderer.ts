@@ -1,4 +1,5 @@
 import type { ReportBlock, ReportBorderStyle, ReportTextStyle } from "./reportDesignerSchema.ts";
+import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
 import { renderReportField as renderFieldExpression, shippingMarksFieldPath, shippingMarksPreviewText } from "./reportDesignerFieldRendering.ts";
 import {
   isReportDesignerCssColor,
@@ -573,7 +574,7 @@ function renderDetailCellStyle(
   return [
     `text-align: ${alignToCss(align)}`,
     style.fontSizePt ? `font-size: ${style.fontSizePt}pt` : "",
-    style.bold ? "font-weight: 700" : "",
+    style.bold ? `font-weight: 700; font-family: ${portableReportSansFontFamily}` : "",
     style.marginTopMm ? `padding-top: ${style.marginTopMm}mm` : "",
     style.marginRightMm ? `padding-right: ${style.marginRightMm}mm` : "",
     style.marginBottomMm ? `padding-bottom: ${style.marginBottomMm}mm` : "",
@@ -620,7 +621,7 @@ function renderTextStyle(style: ReportTextStyle) {
 function renderTextPresentation(style: ReportTextStyle) {
   return [
     style.fontSizePt ? `font-size: ${style.fontSizePt}pt` : "",
-    style.bold ? "font-weight: 700" : "",
+    style.bold ? `font-weight: 700; font-family: ${portableReportSansFontFamily}` : "",
     style.align ? `text-align: ${alignToCss(style.align)}` : "",
   ].filter(Boolean).join("; ");
 }

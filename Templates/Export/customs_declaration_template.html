@@ -10,7 +10,7 @@
             size: A4 landscape; /* 横向 */
             margin: 1cm;
         }
-        body { margin: 0; font-family: var(--edm-report-font-serif, "Noto Serif CJK SC", "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, "Times New Roman", serif); color: black; }
+        body { margin: 0; font-family: var(--edm-report-font-serif, "Noto Serif CJK SC"); color: black; }
         .customs-page { position: relative; }
         table {
             border-collapse: separate; /* 使用 separate，避免边框合并 */
@@ -33,12 +33,12 @@
 			border-bottom: 0.5pt solid black;			
             border-right: 0.5pt solid black;
         }
-        .bold { font-weight: 700; }
+        .bold, .subheader.bold { font-family: var(--edm-report-font-sans, "Noto Sans CJK SC"); font-weight: 700; }
         .center { text-align: center; }
         .middle { vertical-align: middle; }
         .normal-wrap { white-space: normal; }
         .header { font-size: 13pt; }
-        .subheader { font-size: 9pt; font-family: var(--edm-report-font-serif, "Noto Serif CJK SC", "Songti SC", SimSun, serif); }
+        .subheader { font-size: 9pt; font-family: var(--edm-report-font-serif, "Noto Serif CJK SC"); }
         .small { font-size: 8pt; }
         .no-inner-vertical { border-left: none; border-right: none; }
         .outer-bordered td { 
@@ -108,7 +108,7 @@
         }
         .商品-row-first td { border-bottom: none; } /* 第一行无底部边框 */
         .商品-row-second td { border-top: none; } /* 第二行无顶部边框 */
-        .page-number { position: absolute; top: 0; right: 10pt; font-size: 9pt; font-family: var(--edm-report-font-serif, "Noto Serif CJK SC", "Songti SC", SimSun, serif); font-weight: 700; }
+        .page-number { position: absolute; top: 0; right: 10pt; font-size: 9pt; font-family: var(--edm-report-font-sans, "Noto Sans CJK SC"); font-weight: 700; }
         col { width: auto; }
         tr { height: auto; }
         @media print {
@@ -192,6 +192,7 @@
             padding-left: 180px; /* 整体向右偏移 */
             line-height: 1.1; /* 减小行间距 */
         }
+        th, b, strong { font-family: var(--edm-report-font-sans, "Noto Sans CJK SC"); }
     </style>
 </head>
 <body data-edm-report-font="serif" link="blue" vlink="purple">

@@ -82,6 +82,8 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | color_quant | 1.1.0 | MIT | native-desktop |
 | cargo | combine | 4.6.8 | MIT | native-desktop |
 | cargo | concurrent-queue | 2.5.0 | Apache-2.0 OR MIT | native-desktop |
+| cargo | console_error_panic_hook | 0.1.7 | Apache-2.0 OR MIT | native-desktop |
+| cargo | console_log | 1.1.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | const-oid | 0.10.2 | Apache-2.0 OR MIT | native-desktop |
 | cargo | cookie | 0.18.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | cookie_store | 0.22.1 | MIT OR Apache-2.0 | native-desktop |
@@ -142,6 +144,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | dunce | 1.0.5 | CC0-1.0 OR MIT-0 OR Apache-2.0 | native-desktop |
 | cargo | dyn-clone | 1.0.20 | MIT OR Apache-2.0 | native-desktop |
 | cargo | ego-tree | 0.11.0 | ISC | native-desktop |
+| cargo | either | 1.18.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | email_address | 0.2.9 | MIT | native-desktop |
 | cargo | email-encoding | 0.4.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | embed_plist | 1.2.2 | MIT OR Apache-2.0 | native-desktop |
@@ -256,6 +259,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | infer | 0.19.0 | MIT | native-desktop |
 | cargo | inout | 0.2.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | ipnet | 2.12.2 | MIT OR Apache-2.0 | native-desktop |
+| cargo | itertools | 0.15.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | itoa | 1.0.18 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | cargo | javascriptcore-rs | 1.1.2 | MIT | native-desktop |
 | cargo | javascriptcore-rs-sys | 1.1.1 | MIT | native-desktop |
@@ -297,6 +301,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | markup5ever | 0.39.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | matchit | 0.8.4 | MIT AND BSD-3-Clause | native-desktop |
 | cargo | matrixmultiply | 0.3.11 | MIT OR Apache-2.0 | ocr |
+| cargo | maybe-owned | 0.3.4 | MIT OR Apache-2.0 | native-desktop |
 | cargo | md-5 | 0.11.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | memchr | 2.8.2 | Unlicense OR MIT | excel-analyzer |
 | cargo | memchr | 2.8.3 | Unlicense OR MIT | native-desktop, ocr |
@@ -362,6 +367,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | parking_lot_core | 0.9.12 | MIT OR Apache-2.0 | native-desktop |
 | cargo | pbkdf2 | 0.13.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | pdf-writer | 0.15.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | pdfium-render | 0.9.4 | MIT OR Apache-2.0 | native-desktop |
 | cargo | pem-rfc7468 | 1.0.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | percent-encoding | 2.3.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | phf | 0.12.1 | MIT | native-desktop |
@@ -374,6 +380,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | pico-args | 0.5.0 | MIT | native-desktop |
 | cargo | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT | native-desktop, ocr |
 | cargo | piper | 0.2.5 | MIT OR Apache-2.0 | native-desktop |
+| cargo | piston-float | 1.0.1 | MIT | native-desktop |
 | cargo | pkg-config | 0.3.34 | MIT OR Apache-2.0 | native-desktop |
 | cargo | plist | 1.10.1 | MIT | native-desktop |
 | cargo | png | 0.17.16 | MIT OR Apache-2.0 | native-desktop |
@@ -604,10 +611,12 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | url | 2.5.8 | MIT OR Apache-2.0 | native-desktop |
 | cargo | urlpattern | 0.3.0 | MIT | native-desktop |
 | cargo | usvg | 0.47.0 | Apache-2.0 OR MIT | native-desktop |
+| cargo | utf16string | 0.2.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | utf8_iter | 1.0.4 | Apache-2.0 OR MIT | native-desktop |
 | cargo | utf8-zero | 0.8.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | uuid | 1.26.1 | Apache-2.0 OR MIT | native-desktop |
 | cargo | vcpkg | 0.2.15 | MIT OR Apache-2.0 | native-desktop |
+| cargo | vecmath | 1.0.0 | MIT | native-desktop |
 | cargo | version_check | 0.9.5 | MIT OR Apache-2.0 | native-desktop |
 | cargo | version-compare | 0.2.1 | MIT | native-desktop |
 | cargo | vswhom | 0.1.0 | MIT | native-desktop |

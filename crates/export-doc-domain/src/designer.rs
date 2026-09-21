@@ -2,6 +2,7 @@ use crate::generated_api::ApiReportTemplateFieldCatalogResponse;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+pub mod grid;
 mod report_blocks;
 pub use report_blocks::{
     BlockOutput, ConditionalContent, ConditionalRule, GridCell, GridCheckboxOption, GridColumn,

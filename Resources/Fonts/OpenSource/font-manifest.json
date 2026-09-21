@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "policy": "Only the font binaries listed in this manifest may be bundled with ExportDocManager. Proprietary operating-system fonts are fallback references only and must never be copied into a package.",
+  "policy": "Report templates and formal PDF output use only the three font files listed in this manifest: Noto Sans CJK SC Regular/Bold and Noto Serif CJK SC Regular. Use the bundled Sans Bold face for bold text. Do not add report font dependencies on operating-system fonts or copy unlisted font binaries into a package.",
   "sourceRepository": "https://github.com/notofonts/noto-cjk",
   "sourceCommit": "f8d157532fbfaeda587e826d4cd5b21a49186f7c",
   "license": "SIL Open Font License 1.1",

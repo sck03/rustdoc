@@ -1,3 +1,4 @@
+import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
 import type {
   ReportBlock,
   ReportConditionalContent,
@@ -17,6 +18,7 @@ import type {
 import { validateReportTypeFieldDomains } from "./reportDesignerSchemaDomains.ts";
 import { normalizeDetailTableBlock } from "./reportDesignerSchemaDetailTable.ts";
 import { normalizeBlockOutputSettings } from "./reportDesignerSchemaBlockSettings.ts";
+import { reportGridCellPlacements } from "./reportDesignerGridPlacement.ts";
 import {
   createIssue,
   isRecord,
@@ -134,7 +136,7 @@ export function normalizeEmbeddedReportDesignerBlock(
       marginRightMm: 0,
       marginBottomMm: 0,
       marginLeftMm: 0,
-      fontFamily: "Arial",
+      fontFamily: portableReportSansFontFamily,
       fontSizePt: 10,
     },
     sections: [{
@@ -509,14 +511,14 @@ function normalizeGridBlock(
   const rowIds = new Set<string>();
   const cellIds = new Set<string>();
   const rows = rawRows
-    .map((row, index) => normalizeGridRow(row, columns.length, `${path}.rows[${index}]`, rowIds, cellIds, issues))
+    .map((row, index) => normalizeGridRow(row, `${path}.rows[${index}]`, rowIds, cellIds, issues))
     .filter((row): row is ReportGridRow => Boolean(row));
   if (rows.length === 0) {
     issues.push(createIssue("error", `${path}.rows`, "普通表格没有可用行。"));
     return null;
   }
 
-  return {
+  const grid: ReportGridBlock = {
     id: normalizeId(value.id, "block-grid", blockIds, `${path}.id`, issues),
     type: "Grid",
     output: normalizeBlockOutputSettings(value.output, `${path}.output`, issues),
@@ -528,6 +530,8 @@ function normalizeGridBlock(
     border: normalizeBorderStyle(value.border, `${path}.border`, issues),
     defaultCellStyle: normalizeTextStyle(value.defaultCellStyle, `${path}.defaultCellStyle`, issues),
   };
+  reportGridCellPlacements(grid, path, issues);
+  return grid;
 }
 
 function normalizeGridColumn(
@@ -557,7 +561,6 @@ function normalizeGridColumnWidths(columns: ReportGridColumn[]) {
 
 function normalizeGridRow(
   value: unknown,
-  columnCount: number,
   path: string,
   rowIds: Set<string>,
   cellIds: Set<string>,
@@ -569,18 +572,14 @@ function normalizeGridRow(
   }
 
   const rawCells = Array.isArray(value.cells) ? value.cells : [];
-  if (!Array.isArray(value.cells) || rawCells.length === 0) {
-    issues.push(createIssue("error", `${path}.cells`, "普通表格行至少需要一个单元格。"));
+  if (!Array.isArray(value.cells)) {
+    issues.push(createIssue("error", `${path}.cells`, "普通表格单元格列表必须是数组。"));
     return null;
   }
 
   const cells = rawCells
-    .map((cell, index) => normalizeGridCell(cell, columnCount, `${path}.cells[${index}]`, cellIds, issues))
+    .map((cell, index) => normalizeGridCell(cell, `${path}.cells[${index}]`, cellIds, issues))
     .filter((cell): cell is ReportGridCell => Boolean(cell));
-  if (cells.length === 0) {
-    issues.push(createIssue("error", `${path}.cells`, "普通表格行没有可用单元格。"));
-    return null;
-  }
 
   return {
     id: normalizeId(value.id, "grid-row", rowIds, `${path}.id`, issues),
@@ -591,7 +590,6 @@ function normalizeGridRow(
 
 function normalizeGridCell(
   value: unknown,
-  columnCount: number,
   path: string,
   cellIds: Set<string>,
   issues: ReportDesignerSchemaIssue[],
@@ -604,8 +602,8 @@ function normalizeGridCell(
   const contentKind = readEnum(value.contentKind, ["Text", "Field", "CheckboxGroup"] as const, "Text", `${path}.contentKind`, issues);
   return {
     id: normalizeId(value.id, "grid-cell", cellIds, `${path}.id`, issues),
-    colSpan: Math.floor(readNumber(value.colSpan, 1, 1, Math.max(1, columnCount), `${path}.colSpan`, issues)),
-    rowSpan: Math.floor(readNumber(value.rowSpan, 1, 1, 80, `${path}.rowSpan`, issues)),
+    colSpan: readGridSpan(value.colSpan, 1, 1, 1000, `${path}.colSpan`, issues),
+    rowSpan: readGridSpan(value.rowSpan, 1, 1, 1000, `${path}.rowSpan`, issues),
     contentKind,
     text: readString(value.text, "", `${path}.text`, issues),
     label: readOptionalString(value.label, `${path}.label`, issues),
@@ -618,6 +616,23 @@ function normalizeGridCell(
     style: normalizeTextStyle(value.style, `${path}.style`, issues),
     border: normalizeOptionalBorderStyle(value.border, `${path}.border`, issues),
   };
+}
+
+function readGridSpan(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+  path: string,
+  issues: ReportDesignerSchemaIssue[],
+) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value) : Number.NaN;
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < min || parsed > max) {
+    issues.push(createIssue("error", path, `合并跨度和行跨度必须是 ${min}-${max} 的整数。`));
+    return Number.isFinite(parsed) ? Math.min(max, Math.max(min, Math.trunc(parsed))) : fallback;
+  }
+  return parsed;
 }
 
 function normalizeGridCheckboxOptions(

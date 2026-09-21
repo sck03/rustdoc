@@ -63,7 +63,7 @@ async function main() {
     coordinateUnit: "hundredth-mm",
     contractVersion: "3.0",
     reportType: "ExportDocument",
-    page: { size: "A4", orientation: "Portrait", widthHundredthMm: 21000, heightHundredthMm: 29700, marginTopHundredthMm: 1000, marginRightHundredthMm: 1000, marginBottomHundredthMm: 1000, marginLeftHundredthMm: 1000, fontFamily: "Arial, sans-serif", fontSizePt: 9 },
+    page: { size: "A4", orientation: "Portrait", widthHundredthMm: 21000, heightHundredthMm: 29700, marginTopHundredthMm: 1000, marginRightHundredthMm: 1000, marginBottomHundredthMm: 1000, marginLeftHundredthMm: 1000, fontFamily: "Noto Sans CJK SC", fontSizePt: 9 },
     grid: { enabled: true, sizeHundredthMm: 500, snap: true },
     layers: [
       { id: "header", name: "页眉", role: "Header", print: { repeatOnEveryPage: true, keepTogether: true, pinToPageBottom: false, minHeightHundredthMm: 1200 }, visible: true, locked: false, elements: [{ id: "header-title", type: "Text", xHundredthMm: 1000, yHundredthMm: 700, widthHundredthMm: 19000, heightHundredthMm: 700, rotationDeg: 0, zIndex: 0, visible: true, locked: false, style: { fontSizePt: 14, bold: true, align: "Center" }, outputEnabled: true, text: "V3 INVOICE HEADER" }] },

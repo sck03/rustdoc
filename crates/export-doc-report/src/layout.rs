@@ -6,6 +6,7 @@ use serde_json::Value;
 use std::{path::Path, sync::atomic::AtomicBool};
 
 mod detail;
+mod flow;
 
 const PT_MM: f32 = 25.4 / 72.0;
 pub fn field_value(invoice: &Value, item: Option<&Value>, path: &str) -> String {
@@ -104,8 +105,15 @@ pub(crate) fn text_svg(
         "Center" => ("middle", x + width / 2.),
         _ => ("start", x),
     };
+    // The approved palette has no Serif Bold face. Select the real bundled
+    // Sans Bold face instead of synthesizing weight or substituting regular.
+    let family = if bold {
+        " font-family=\"Noto Sans CJK SC\""
+    } else {
+        ""
+    };
     for (index, line) in lines.iter().enumerate() {
-        svg.push_str(&format!("<text x=\"{position}\" y=\"{}\" font-size=\"{size}\" font-weight=\"{}\" text-anchor=\"{anchor}\" fill=\"{}\">{}</text>",y+size+index as f32*size*1.35,if bold{700}else{400},escape(color),escape(line)));
+        svg.push_str(&format!("<text x=\"{position}\" y=\"{}\" font-size=\"{size}\" font-weight=\"{}\"{family} text-anchor=\"{anchor}\" fill=\"{}\">{}</text>",y+size+index as f32*size*1.35,if bold{700}else{400},escape(color),escape(line)));
     }
 }
 fn element(
@@ -263,7 +271,7 @@ fn fixed_elements(
                 ..
             } = &item.kind
             {
-                flow_element(svg, item, data)?;
+                flow::render(svg, item, data)?;
             } else if matches!(item.kind, Kind::Flow { .. }) {
                 continue;
             } else {
@@ -325,6 +333,7 @@ fn pages_data(
                 block: ReportBlock::DetailTable(table),
                 ..
             } = &element.kind
+                && table.output.as_ref().is_none_or(|output| output.enabled)
             {
                 Some((*element, table))
             } else {
@@ -362,159 +371,13 @@ fn pages_data(
             top,
             footer_top: footer,
             width: table_width,
+            page_width: width,
             height,
             cancelled,
         },
         |svg, index, count| fixed_elements(svg, design, data, index, count),
     );
 }
-fn flow_element(svg: &mut String, element: &Element, data: &crate::ReportData) -> Result<()> {
-    let Kind::Flow { block, .. } = &element.kind else {
-        return Ok(());
-    };
-    let x = element.x_hundredth_mm as f32 / 100.;
-    let y = element.y_hundredth_mm as f32 / 100.;
-    let width = element.width_hundredth_mm as f32 / 100.;
-    let size = element.style.font_size_pt * PT_MM;
-    match block {
-        ReportBlock::Row(block) => {
-            let columns = &block.columns;
-            let total: f32 = columns
-                .iter()
-                .map(|column| column.width_percent.max(1.))
-                .sum();
-            let mut left = x;
-            for column in columns {
-                let column_width = width * column.width_percent.max(1.) / total;
-                let text = if column.content_kind == "Field" {
-                    let value = data.text(&column.field_path);
-                    if value.is_empty() {
-                        column.fallback_text.clone()
-                    } else {
-                        value
-                    }
-                } else {
-                    column.text.clone()
-                };
-                text_svg(
-                    svg,
-                    &wrap(&text, (column_width - 2.).max(size), size),
-                    left + 1.,
-                    y + 1.,
-                    column_width - 2.,
-                    size,
-                    column.style.bold.unwrap_or(false),
-                    "#173f3b",
-                    column.style.align.as_deref().unwrap_or("Left"),
-                );
-                left += column_width;
-            }
-        }
-        ReportBlock::Grid(block) => {
-            let title = &block.title;
-            let columns = &block.columns;
-            let rows = &block.rows;
-            let total: f32 = columns
-                .iter()
-                .map(|column| column.width_percent.max(1.))
-                .sum();
-            let mut top = y;
-            if !title.is_empty() {
-                text_svg(
-                    svg,
-                    &wrap(title, width - 2., size),
-                    x + 1.,
-                    top,
-                    width - 2.,
-                    size,
-                    true,
-                    "#173f3b",
-                    "Left",
-                );
-                top += size * 1.35;
-            }
-            for row in rows {
-                let row_height = row.height_mm.unwrap_or(8.);
-                let mut left = x;
-                for (index, cell) in row.cells.iter().enumerate() {
-                    let column_width = columns
-                        .get(index)
-                        .map(|column| width * column.width_percent.max(1.) / total)
-                        .unwrap_or(width / row.cells.len().max(1) as f32);
-                    let text = if cell.content_kind == "Field" {
-                        let value = data.text(&cell.field_path);
-                        if value.is_empty() {
-                            cell.fallback_text.clone()
-                        } else {
-                            value
-                        }
-                    } else if cell.content_kind == "CheckboxGroup" {
-                        let value = data.text(&cell.field_path);
-                        cell.checkbox_options
-                            .iter()
-                            .map(|option| {
-                                format!(
-                                    "{} {}",
-                                    if value == option.value { "☑" } else { "☐" },
-                                    option.label
-                                )
-                            })
-                            .collect()
-                    } else {
-                        cell.text.clone()
-                    };
-                    svg.push_str(&format!(
-                        "<rect x=\"{left}\" y=\"{top}\" width=\"{column_width}\" height=\"{row_height}\" fill=\"white\" stroke=\"#bdcdc8\" stroke-width=\"0.2\"/>"
-                    ));
-                    text_svg(
-                        svg,
-                        &wrap(&text, (column_width - 2.).max(size), size),
-                        left + 1.,
-                        top + 1.,
-                        column_width - 2.,
-                        size,
-                        cell.style.bold.unwrap_or(false),
-                        "#173f3b",
-                        cell.style.align.as_deref().unwrap_or("Left"),
-                    );
-                    left += column_width;
-                }
-                top += row_height;
-            }
-        }
-        ReportBlock::Conditional(block) => {
-            let condition = &block.condition;
-            let content = &block.content;
-            let value = data.text(&condition.field_path);
-            let visible = match condition.operator.as_str() {
-                "Equals" => value == condition.value,
-                "NotEquals" => value != condition.value,
-                _ => !value.is_empty(),
-            };
-            if visible {
-                let text = if content.kind == "Field" {
-                    data.text(&content.field_path)
-                } else {
-                    content.text.clone()
-                };
-                text_svg(
-                    svg,
-                    &wrap(&text, width - 2., size),
-                    x + 1.,
-                    y + 1.,
-                    width - 2.,
-                    size,
-                    element.style.bold,
-                    "#173f3b",
-                    &element.style.align,
-                );
-            }
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
 pub fn pdf(
     invoice: &ApiInvoiceDetailDto,
     design: &Design,

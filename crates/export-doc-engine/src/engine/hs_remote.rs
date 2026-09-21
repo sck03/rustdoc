@@ -9,7 +9,7 @@ use crate::{generated_api::*, operation};
 use export_doc_domain::hs as rules;
 use export_doc_hs::parser::{RemoteRecord, RemoteRecordKind, SearchBundle};
 use serde_json::{Value, json};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 pub const OPERATIONS: &[Operation] = &[
     SEARCH_REMOTE_HS_CODES,
@@ -18,8 +18,6 @@ pub const OPERATIONS: &[Operation] = &[
     RESOLVE_REMOTE_HS_CODE_DETAIL,
     GET_HS_CODE_REMOTE_HEALTH,
 ];
-const MAX_DETAIL_LOOKUPS: usize = 12;
-const MAX_RECOMMENDATION_DEPTH: usize = 3;
 
 fn check() -> std::result::Result<(), String> {
     operation::check().map_err(|error| error.to_string())
@@ -65,8 +63,9 @@ pub fn handle(
     let seed: ApiHsCodeDto =
         serde_json::from_value(body.clone()).map_err(|error| invalid(error.to_string()))?;
     export_doc_hs::trusted_url(&seed.detail_url).map_err(invalid)?;
-    let detail = export_doc_hs::detail(&seed, &observed, &check).map_err(unavailable)?;
+    let detail = export_doc_hs::detail(&seed, &observed, &check);
     operation::check()?;
+    let detail = detail.map_err(unavailable)?;
     if operation == FETCH_REMOTE_HS_CODE_DETAIL {
         return Ok(serde_json::to_value(dto_from_detail(&detail))?);
     }
@@ -74,141 +73,23 @@ pub fn handle(
 }
 
 fn search_bundle(keyword: &str, observed: &str) -> Result<SearchBundle> {
-    let initial = export_doc_hs::search(keyword, observed, &check).map_err(unavailable)?;
-    enrich(keyword, initial, observed)
-}
-
-fn enrich(keyword: &str, initial: SearchBundle, observed: &str) -> Result<SearchBundle> {
-    let mut records = initial.records;
-    let mut replacements = initial.replacements;
-    let mut visited_queries = BTreeSet::from([normalize_identity(keyword)]);
-    let mut visited_details = BTreeSet::new();
-    let mut detail_lookups = 0usize;
-
-    for depth in 0..=MAX_RECOMMENDATION_DEPTH {
-        operation::check()?;
-        let recommended = recommended_from_records(&records, &replacements);
-        let obsolete_details = records
-            .iter()
-            .filter(|record| {
-                record.kind == RemoteRecordKind::DeclarationExample
-                    && !record.item.detail_url.is_empty()
-            })
-            .map(|record| record.item.normalized_code.clone())
-            .filter(|code| visited_details.insert(code.clone()))
-            .take(MAX_DETAIL_LOOKUPS.saturating_sub(detail_lookups))
-            .collect::<Vec<_>>();
-        let mut additions = Vec::new();
-        for code in obsolete_details {
-            if detail_lookups >= MAX_DETAIL_LOOKUPS {
-                break;
-            }
-            let Some(record) = records
-                .iter()
-                .find(|record| record.item.normalized_code == code)
-                .cloned()
-            else {
-                continue;
-            };
-            detail_lookups += 1;
-            if let Ok(detail) = export_doc_hs::detail(&record.item, observed, &check) {
-                if !detail.expired {
-                    additions.push(RemoteRecord {
-                        item: detail.item.clone(),
-                        kind: RemoteRecordKind::StandardCode,
-                        expired: false,
-                        instance_count: detail.instance_count,
-                        summary_url: record.summary_url,
-                        evidence_url: detail.evidence_url.clone(),
-                    });
-                }
-                if !detail.recommended_keywords.is_empty() {
-                    replacements.push(export_doc_hs::parser::ReplacementEvidence {
-                        old_code: record.item.normalized_code,
-                        recommended_keywords: detail.recommended_keywords,
-                        evidence_url: detail.evidence_url,
-                    });
-                }
-            }
+    struct Source<'a> {
+        observed: &'a str,
+    }
+    impl export_doc_hs::lookup::Source for Source<'_> {
+        fn search(&mut self, keyword: &str) -> std::result::Result<SearchBundle, String> {
+            export_doc_hs::search(keyword, self.observed, &check)
         }
-        records.extend(additions);
-        if depth == MAX_RECOMMENDATION_DEPTH || has_current_standard(&records) {
-            break;
-        }
-        for recommendation in recommended {
-            let identity = normalize_identity(&recommendation);
-            if !visited_queries.insert(identity) {
-                continue;
-            }
-            operation::check()?;
-            if let Ok(nested) = export_doc_hs::search(&recommendation, observed, &check) {
-                records.extend(nested.records);
-                replacements.extend(nested.replacements);
-            }
-            if has_current_standard(&records) {
-                break;
-            }
+        fn detail(
+            &mut self,
+            seed: &ApiHsCodeDto,
+        ) -> std::result::Result<export_doc_hs::parser::DetailBundle, String> {
+            export_doc_hs::detail(seed, self.observed, &check)
         }
     }
-    Ok(SearchBundle {
-        records: deduplicate(records),
-        replacements,
-    })
-}
-
-fn normalize_identity(value: &str) -> String {
-    rules::code(value)
-        .map(|code| code.to_ascii_lowercase())
-        .unwrap_or_else(|_| rules::text(value).to_ascii_lowercase())
-}
-
-fn has_current_standard(records: &[RemoteRecord]) -> bool {
-    records
-        .iter()
-        .any(|record| record.kind == RemoteRecordKind::StandardCode && !record.expired)
-}
-
-fn recommended_from_records(
-    records: &[RemoteRecord],
-    replacements: &[export_doc_hs::parser::ReplacementEvidence],
-) -> Vec<String> {
-    let mut values = BTreeSet::new();
-    for item in replacements {
-        values.extend(item.recommended_keywords.iter().cloned());
-    }
-    for record in records {
-        if let Some(items) = record
-            .item
-            .recommended_keywords
-            .as_ref()
-            .and_then(Value::as_array)
-        {
-            values.extend(items.iter().filter_map(Value::as_str).map(str::to_string));
-        }
-    }
-    values
-        .into_iter()
-        .filter(|value| !value.trim().is_empty())
-        .collect()
-}
-
-fn deduplicate(records: Vec<RemoteRecord>) -> Vec<RemoteRecord> {
-    let mut seen = BTreeSet::new();
-    records
-        .into_iter()
-        .filter(|record| {
-            seen.insert(
-                format!(
-                    "{}|{}|{}|{}",
-                    record.kind.as_str(),
-                    record.item.normalized_code,
-                    record.item.name.trim(),
-                    record.item.description.trim()
-                )
-                .to_ascii_lowercase(),
-            )
-        })
-        .collect()
+    let result = export_doc_hs::lookup::search(keyword, &mut Source { observed }, &check);
+    operation::check()?;
+    result.map_err(unavailable)
 }
 
 fn search_response(bundle: &SearchBundle, captured: bool) -> Value {
@@ -221,7 +102,7 @@ fn search_response(bundle: &SearchBundle, captured: bool) -> Value {
     json!({
         "items": standard,
         "count": standard.len(),
-        "source": export_doc_hs::SOURCE,
+        "source": "remote",
         "storagePolicy": if captured {
             "联网查询结果已返回,申报实例已进入待审核候选池;确认后才会进入正式共享实例库。"
         } else {
@@ -233,23 +114,30 @@ fn search_response(bundle: &SearchBundle, captured: bool) -> Value {
 }
 
 fn standard_items(bundle: &SearchBundle) -> Vec<ApiHsCodeDto> {
-    let mut grouped = BTreeMap::<String, RemoteRecord>::new();
+    let mut positions = BTreeMap::<String, usize>::new();
+    let mut grouped: Vec<RemoteRecord> = Vec::new();
     for record in bundle
         .records
         .iter()
         .filter(|record| record.kind == RemoteRecordKind::StandardCode && !record.expired)
     {
         let code = record.item.normalized_code.clone();
-        let replace = grouped.get(&code).is_none_or(|previous| {
-            record.instance_count.is_some() && previous.instance_count.is_none()
-                || !record.item.description.trim().is_empty()
-                    && previous.item.description.trim().is_empty()
-        });
-        if replace {
-            grouped.insert(code, record.clone());
+        if let Some(&index) = positions.get(&code) {
+            let rank = |r: &RemoteRecord| {
+                (
+                    r.instance_count.is_some(),
+                    !r.item.description.trim().is_empty(),
+                )
+            };
+            if rank(record) > rank(&grouped[index]) {
+                grouped[index] = record.clone();
+            }
+        } else {
+            positions.insert(code, grouped.len());
+            grouped.push(record.clone());
         }
     }
-    grouped.into_values().map(dto_from_record).collect()
+    grouped.into_iter().map(dto_from_record).collect()
 }
 
 fn dto_from_record(record: RemoteRecord) -> ApiHsCodeDto {
@@ -304,8 +192,8 @@ fn resolve(
     detail: &export_doc_hs::parser::DetailBundle,
     observed: &str,
 ) -> Result<Value> {
+    capture_detail(service, actor, seed, detail)?;
     if !detail.expired {
-        capture_detail(service, actor, seed, detail)?;
         return Ok(json!({
             "items": [dto_from_detail(detail)],
             "removedItems": [],
@@ -320,19 +208,23 @@ fn resolve(
         }));
     }
     let mut replacement_items = Vec::<ApiHsCodeDto>::new();
-    for keyword in detail
-        .recommended_keywords
-        .iter()
-        .take(MAX_RECOMMENDATION_DEPTH)
-    {
+    for keyword in &detail.recommended_keywords {
         operation::check()?;
         let bundle = search_bundle(keyword, observed)?;
+        capture(service, actor, &seed.name, &bundle)?;
         let items = standard_items(&bundle);
-        if items.is_empty() {
-            continue;
+        for item in items {
+            let replacement = export_doc_hs::detail(&item, observed, &check);
+            operation::check()?;
+            let replacement = replacement.map_err(unavailable)?;
+            capture_detail(service, actor, seed, &replacement)?;
+            if !replacement.expired {
+                replacement_items.push(dto_from_detail(&replacement));
+            }
         }
-        replacement_items.extend(items);
-        break;
+        if !replacement_items.is_empty() {
+            break;
+        }
     }
     let removed = dto_from_detail(detail);
     Ok(json!({
@@ -435,4 +327,39 @@ fn capture_detail(
         },
     };
     capture(service, actor, &seed.name, &bundle)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn response_preserves_source_order_and_prefers_instance_evidence_before_description() {
+        let record = |code: &str, count: Option<i64>, description: &str| RemoteRecord {
+            item: ApiHsCodeDto {
+                code: code.into(),
+                normalized_code: code.into(),
+                description: description.into(),
+                ..Default::default()
+            },
+            kind: RemoteRecordKind::StandardCode,
+            expired: false,
+            instance_count: count,
+            summary_url: String::new(),
+            evidence_url: String::new(),
+        };
+        let bundle = SearchBundle {
+            records: vec![
+                record("6109909000", Some(7), ""),
+                record("6109100000", Some(0), "cotton"),
+                record("6109909000", None, "inferior duplicate"),
+            ],
+            replacements: vec![],
+        };
+        let response = search_response(&bundle, false);
+        assert_eq!(response["source"], "remote");
+        assert_eq!(response["items"][0]["code"], "6109909000");
+        assert_eq!(response["items"][0]["instanceCount"], 7);
+        assert_eq!(response["items"][1]["code"], "6109100000");
+    }
 }

@@ -79,6 +79,18 @@ landscapeSchema.layers = landscapeSchema.layers.filter(layer => layer.role === "
 landscapeSchema.layers[0].elements.push({ ...api.createV3TextElement(1000, 1000), id: "title", text: "标题" });
 assert(landscapeSchema.page.widthHundredthMm === 29700 && landscapeSchema.page.heightHundredthMm === 21000, "横版 A4 尺寸错误");
 
+for (const family of ["Noto Sans CJK SC", "Noto Serif CJK SC", "Arial, sans-serif", "SimSun"]) {
+  const draft = structuredClone(landscapeSchema);
+  draft.page.fontFamily = family;
+  draft.layers[0].elements[0].style = { fontFamily: family };
+  const result = api.normalizeReportDesignerV3Schema(draft);
+  const expected = family.startsWith("Noto ") ? family : "Noto Sans CJK SC";
+  assert(result.schema.page.fontFamily === expected && result.schema.layers[0].elements[0].style.fontFamily === expected, "页面和组件应统一使用随包字体");
+  draft.layers[0].elements[0].style.bold = true;
+  const html = api.exportReportDesignerV3SchemaToHtml(draft);
+  assert(/class="edm-v3-element edm-v3-element-text" style="[^"]*font-family: Noto Sans CJK SC;[^\"]*font-weight: 700/.test(html), "衬线正文加粗应选择已有 Sans Bold 字体");
+}
+
 const normalized = api.normalizeReportDesignerV3Schema({ ...landscapeSchema, page: { ...landscapeSchema.page, size: "Custom", widthHundredthMm: 99999, heightHundredthMm: 99999 } });
 assert(normalized.schema?.page.size === "A4", "v3 校验不得保留非 A4 页面");
 assert(normalized.schema?.page.widthHundredthMm === 29700 && normalized.schema?.page.heightHundredthMm === 21000, "v3 校验必须恢复标准横版 A4 尺寸");
@@ -399,6 +411,47 @@ const selectedGridPreview = api.renderReportDesignerBlockPreviewToHtml(borderSyn
 assert(selectedGridPreview.includes('data-report-grid-cell-id="a"') && selectedGridPreview.includes('data-report-grid-cell-id="b"'), "画布预览必须为每个普通表格单元格提供稳定命中标识");
 assert(!selectedGridPreview.includes('class="is-designer-selected-cell"') && selectedGridPreview.includes("border-right: 0") && selectedGridPreview.includes("2px dashed #123456"), "预览 HTML 只承载内容与边框，选区由画布更新，不能重建整表");
 assert(!api.renderReportDesignerBlockToHtml(borderSyncedGrid).includes("data-report-grid-cell-id"), "编辑器单元格命中标识不得进入正式报表 HTML");
+{
+  const flowSchemaFor = (block) => {
+    const flow = api.createV3FlowElement(block, 1000, 1000);
+    return {
+      ...landscapeSchema,
+      layers: landscapeSchema.layers.map((layer) => layer.role === "Body"
+        ? { ...layer, elements: [flow] }
+        : { ...layer, elements: [] }),
+    };
+  };
+  const coveredRows = {
+    ...baseGrid,
+    rows: [
+      { ...baseGrid.rows[0], cells: [{ ...baseGrid.rows[0].cells[0], id: "covered", rowSpan: 2, colSpan: 1 }] },
+      { ...baseGrid.rows[1], cells: [{ ...baseGrid.rows[1].cells[1], id: "right-cell" }] },
+    ],
+  };
+  const covered = api.normalizeReportDesignerV3Schema(flowSchemaFor(coveredRows));
+  assert(!covered.issues.some((issue) => issue.severity === "error"), "被 rowSpan 完整覆盖的空行必须是合法的 V3 普通表格");
+
+  const columnOverflow = {
+    ...baseGrid,
+    rows: [{ ...baseGrid.rows[0], cells: [{ ...baseGrid.rows[0].cells[0], colSpan: 3 }] }],
+  };
+  const overflow = api.normalizeReportDesignerV3Schema(flowSchemaFor(columnOverflow));
+  assert(overflow.issues.some((issue) => issue.severity === "error" && issue.message.includes("越界")), "普通表格 colSpan 越界必须在保存前被拒绝");
+
+  const overlap = {
+    ...baseGrid,
+    rows: [
+      { ...baseGrid.rows[0], cells: [
+        { ...baseGrid.rows[0].cells[0], id: "wide" },
+        { ...baseGrid.rows[0].cells[1], id: "tail", rowSpan: 2 },
+      ] },
+      { ...baseGrid.rows[1], cells: [{ ...baseGrid.rows[1].cells[0], id: "overlap", colSpan: 2 }] },
+    ],
+  };
+  const overlapping = api.normalizeReportDesignerV3Schema(flowSchemaFor(overlap));
+  assert(overlapping.issues.some((issue) => issue.severity === "error" && issue.message.includes("重叠")), "普通表格合并范围重叠必须在保存前被拒绝");
+}
+
 const styledGrid = api.applyGridDefaultCellStyle({ ...baseGrid, defaultCellStyle: { fontSizePt: 15, bold: true, align: "Center", marginTopMm: 2, marginBottomMm: 3 } });
 const styledGridHtml = api.renderReportDesignerBlockToHtml(styledGrid);
 assert(styledGridHtml.includes("font-size: 15pt") && styledGridHtml.includes("font-weight: 700") && styledGridHtml.includes("text-align: center"), "整表字号、粗体和对齐必须立即进入每个单元格输出");
@@ -568,7 +621,7 @@ const featureSchema = {
     marginRightHundredthMm: 1000,
     marginBottomHundredthMm: 1000,
     marginLeftHundredthMm: 1000,
-    fontFamily: "Arial, sans-serif",
+    fontFamily: "Noto Sans CJK SC",
     fontSizePt: 9,
   },
   grid: { enabled: true, sizeHundredthMm: 500, snap: true },

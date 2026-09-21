@@ -35,6 +35,9 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
         return Err("不受支持的 V3 合同。".into());
     }
     let page = &design.page;
+    if !["Noto Sans CJK SC", "Noto Serif CJK SC"].contains(&page.font_family.as_str()) {
+        return Err("模板只能使用随包 Noto Sans CJK SC 或 Noto Serif CJK SC 字体。".into());
+    }
     if page.size != "A4"
         || !matches!(
             (page.width_hundredth_mm, page.height_hundredth_mm),
@@ -234,6 +237,7 @@ fn validate_flow(
             for row in rows {
                 validate_grid_row(row, fields, ids)?;
             }
+            crate::designer::grid::placements(block)?;
         }
         ReportBlock::Conditional(block) => {
             let condition = &block.condition;
@@ -293,7 +297,6 @@ fn validate_grid_row(
     if row
         .height_mm
         .is_some_and(|height| !height.is_finite() || !(0. ..=500.).contains(&height))
-        || row.cells.is_empty()
         || row.cells.len() > 100
         || !ids.insert(row.id.clone())
     {
@@ -798,5 +801,18 @@ mod tests {
     #[test]
     fn foreign_templates_are_rejected_without_silent_conversion() {
         assert!(Design::from_html("<html>Original</html>").is_err());
+    }
+
+    #[test]
+    fn template_fonts_are_restricted_to_the_bundled_families() {
+        for family in ["Noto Sans CJK SC", "Noto Serif CJK SC", "Arial", "SimSun"] {
+            let mut design = Design::invoice();
+            design.page.font_family = family.into();
+            let supported = family.starts_with("Noto ");
+            assert_eq!(validate(&design, &fields()).is_ok(), supported);
+            design.page.font_family = "Noto Sans CJK SC".into();
+            design.layers[0].elements[0].style.font_family = family.into();
+            assert_eq!(validate(&design, &fields()).is_ok(), supported);
+        }
     }
 }

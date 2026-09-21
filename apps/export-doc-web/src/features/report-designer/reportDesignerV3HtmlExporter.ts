@@ -1,3 +1,4 @@
+import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
 import type { ReportBlock } from "./reportDesignerSchema.ts";
 import { renderReportDesignerBlockToHtml } from "./reportDesignerBlockRenderer.ts";
 import { renderReportField } from "./reportDesignerFieldRendering.ts";
@@ -14,9 +15,9 @@ import {
 } from "./reportDesignerV3Validation.ts";
 import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { isControlledReportImageFieldPath } from "./reportDesignerSchemaDomains.ts";
+import { isSafeReportDesignerCssFontFamily } from "./reportDesignerSchemaValues.ts";
 
 const colorPattern = /^#[0-9a-fA-F]{3,8}$/;
-const fontFamilyPattern = /^[A-Za-z0-9 \t"',._-]+$/;
 const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
 
 /**
@@ -328,7 +329,7 @@ function renderElementPositionStyle(element: ReportDesignerV3Element, yOffset = 
 function renderElementStyle(element: ReportDesignerV3Element) {
   const style = element.style;
   return [
-    style.fontFamily ? `font-family: ${renderFontFamily(style.fontFamily)}` : "",
+    style.bold ? `font-family: ${portableReportSansFontFamily}` : style.fontFamily ? `font-family: ${renderFontFamily(style.fontFamily)}` : "",
     style.fontSizePt ? `font-size: ${style.fontSizePt}pt` : "",
     style.bold ? "font-weight: 700" : "",
     style.color && colorPattern.test(style.color) ? `color: ${style.color}` : "",
@@ -362,7 +363,7 @@ function renderBorder(style: ReportDesignerV3Element["style"]) {
 }
 
 function renderFontFamily(value: string) {
-  return value.split(",").map((part) => fontFamilyPattern.test(part.trim()) ? part.trim() : "Arial").join(", ");
+  return isSafeReportDesignerCssFontFamily(value) ? value.trim() : portableReportSansFontFamily;
 }
 
 function escapeHtml(value: string) {

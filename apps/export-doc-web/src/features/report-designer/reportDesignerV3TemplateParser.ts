@@ -1,3 +1,4 @@
+import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
 import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { normalizeReportDesignerV3Schema } from "./reportDesignerV3Validation.ts";
 import {
@@ -123,7 +124,7 @@ function createEmptyReportDesignerV3Schema(reportType: ReportDesignerReportType)
       marginRightHundredthMm: 1000,
       marginBottomHundredthMm: 800,
       marginLeftHundredthMm: 1000,
-      fontFamily: "Arial, Noto Sans CJK SC, Microsoft YaHei",
+      fontFamily: portableReportSansFontFamily,
       fontSizePt: 9,
     },
     grid: { enabled: true, sizeHundredthMm: 500, snap: true },

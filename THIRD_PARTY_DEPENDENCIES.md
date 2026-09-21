@@ -118,7 +118,7 @@ Runtime image boundary: Debian libraries and PostgreSQL 18 are OS/container inpu
 | undici-types | 7.18.2 | MIT | web |
 | vite | 8.3.0 | MIT | web |
 
-## cargo (728)
+## cargo (737)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -198,6 +198,8 @@ Runtime image boundary: Debian libraries and PostgreSQL 18 are OS/container inpu
 | color_quant | 1.1.0 | MIT | native-desktop |
 | combine | 4.6.8 | MIT | native-desktop |
 | concurrent-queue | 2.5.0 | Apache-2.0 OR MIT | native-desktop |
+| console_error_panic_hook | 0.1.7 | Apache-2.0 OR MIT | native-desktop |
+| console_log | 1.1.0 | MIT OR Apache-2.0 | native-desktop |
 | const-oid | 0.10.2 | Apache-2.0 OR MIT | native-desktop |
 | cookie | 0.18.2 | MIT OR Apache-2.0 | native-desktop |
 | cookie_store | 0.22.1 | MIT OR Apache-2.0 | native-desktop |
@@ -258,6 +260,7 @@ Runtime image boundary: Debian libraries and PostgreSQL 18 are OS/container inpu
 | dunce | 1.0.5 | CC0-1.0 OR MIT-0 OR Apache-2.0 | native-desktop |
 | dyn-clone | 1.0.20 | MIT OR Apache-2.0 | native-desktop |
 | ego-tree | 0.11.0 | ISC | native-desktop |
+| either | 1.18.0 | MIT OR Apache-2.0 | native-desktop |
 | email_address | 0.2.9 | MIT | native-desktop |
 | email-encoding | 0.4.2 | MIT OR Apache-2.0 | native-desktop |
 | embed_plist | 1.2.2 | MIT OR Apache-2.0 | native-desktop |
@@ -372,6 +375,7 @@ Runtime image boundary: Debian libraries and PostgreSQL 18 are OS/container inpu
 | infer | 0.19.0 | MIT | native-desktop |
 | inout | 0.2.2 | MIT OR Apache-2.0 | native-desktop |
 | ipnet | 2.12.2 | MIT OR Apache-2.0 | native-desktop |
+| itertools | 0.15.0 | MIT OR Apache-2.0 | native-desktop |
 | itoa | 1.0.18 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | javascriptcore-rs | 1.1.2 | MIT | native-desktop |
 | javascriptcore-rs-sys | 1.1.1 | MIT | native-desktop |
@@ -413,6 +417,7 @@ Runtime image boundary: Debian libraries and PostgreSQL 18 are OS/container inpu
 | markup5ever | 0.39.0 | MIT OR Apache-2.0 | native-desktop |
 | matchit | 0.8.4 | MIT AND BSD-3-Clause | native-desktop |
 | matrixmultiply | 0.3.11 | MIT OR Apache-2.0 | ocr |
+| maybe-owned | 0.3.4 | MIT OR Apache-2.0 | native-desktop |
 | md-5 | 0.11.0 | MIT OR Apache-2.0 | native-desktop |
 | memchr | 2.8.2 | Unlicense OR MIT | excel-analyzer |
 | memchr | 2.8.3 | Unlicense OR MIT | native-desktop, ocr |
@@ -478,6 +483,7 @@ Runtime image boundary: Debian libraries and PostgreSQL 18 are OS/container inpu
 | parking_lot_core | 0.9.12 | MIT OR Apache-2.0 | native-desktop |
 | pbkdf2 | 0.13.0 | MIT OR Apache-2.0 | native-desktop |
 | pdf-writer | 0.15.0 | MIT OR Apache-2.0 | native-desktop |
+| pdfium-render | 0.9.4 | MIT OR Apache-2.0 | native-desktop |
 | pem-rfc7468 | 1.0.0 | Apache-2.0 OR MIT | native-desktop |
 | percent-encoding | 2.3.2 | MIT OR Apache-2.0 | native-desktop |
 | phf | 0.12.1 | MIT | native-desktop |
@@ -490,6 +496,7 @@ Runtime image boundary: Debian libraries and PostgreSQL 18 are OS/container inpu
 | pico-args | 0.5.0 | MIT | native-desktop |
 | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT | native-desktop, ocr |
 | piper | 0.2.5 | MIT OR Apache-2.0 | native-desktop |
+| piston-float | 1.0.1 | MIT | native-desktop |
 | pkg-config | 0.3.34 | MIT OR Apache-2.0 | native-desktop |
 | plist | 1.10.1 | MIT | native-desktop |
 | png | 0.17.16 | MIT OR Apache-2.0 | native-desktop |
@@ -720,10 +727,12 @@ Runtime image boundary: Debian libraries and PostgreSQL 18 are OS/container inpu
 | url | 2.5.8 | MIT OR Apache-2.0 | native-desktop |
 | urlpattern | 0.3.0 | MIT | native-desktop |
 | usvg | 0.47.0 | Apache-2.0 OR MIT | native-desktop |
+| utf16string | 0.2.0 | MIT OR Apache-2.0 | native-desktop |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT | native-desktop |
 | utf8-zero | 0.8.1 | MIT OR Apache-2.0 | native-desktop |
 | uuid | 1.26.1 | Apache-2.0 OR MIT | native-desktop |
 | vcpkg | 0.2.15 | MIT OR Apache-2.0 | native-desktop |
+| vecmath | 1.0.0 | MIT | native-desktop |
 | version_check | 0.9.5 | MIT OR Apache-2.0 | native-desktop |
 | version-compare | 0.2.1 | MIT | native-desktop |
 | vswhom | 0.1.0 | MIT | native-desktop |

@@ -1,3 +1,8 @@
+mod detail;
+pub use detail::detail;
+#[cfg(test)]
+mod tests;
+
 use export_doc_contracts::generated_api::ApiHsCodeDto;
 use export_doc_domain::hs;
 use scraper::{ElementRef, Html, Selector};
@@ -64,7 +69,8 @@ fn select(value: &str) -> Selector {
     Selector::parse(value).expect("static selector")
 }
 fn text(element: ElementRef<'_>) -> String {
-    normalize_text(&element.text().collect::<Vec<_>>().join(" "))
+    // Inline search highlights must not insert spaces into names or specs.
+    normalize_text(&element.text().collect::<String>())
 }
 fn normalize_text(value: &str) -> String {
     value
@@ -244,7 +250,18 @@ fn summary_url(row: ElementRef<'_>) -> (String, Option<i64>) {
 }
 fn recommended_keywords(value: &str) -> Vec<String> {
     let document = Html::parse_fragment(value);
-    let mut result = BTreeSet::new();
+    let mut result = Vec::new();
+    let mut seen = BTreeSet::new();
+    let mut append = |value: &str| {
+        for digits in value
+            .split(|c: char| !c.is_ascii_digit())
+            .filter(|v| v.len() >= 4)
+        {
+            if seen.insert(digits.to_string()) {
+                result.push(digits.to_string());
+            }
+        }
+    };
     for link in document.select(&select("a[href]")) {
         if let Some(code) = link
             .value()
@@ -252,15 +269,31 @@ fn recommended_keywords(value: &str) -> Vec<String> {
             .and_then(|href| crate::trusted_url(href).ok())
             .and_then(|url| url.path().strip_prefix("/hscode/key/").and_then(leading))
         {
-            result.insert(code);
+            append(&code);
+            append(&text(link));
         }
     }
-    result.into_iter().collect()
+    let content = text(document.root_element());
+    for (offset, _) in content
+        .match_indices("推荐查询")
+        .chain(content.match_indices("或者"))
+    {
+        let suffix = &content[offset..];
+        let suffix = suffix
+            .strip_prefix("推荐查询")
+            .or_else(|| suffix.strip_prefix("或者"))
+            .unwrap();
+        let suffix =
+            suffix.trim_start_matches(|c: char| c.is_whitespace() || c == ':' || c == '：');
+        let code: String = suffix.chars().take_while(char::is_ascii_digit).collect();
+        append(&code);
+    }
+    result
 }
 fn source_name(kind: RemoteRecordKind) -> &'static str {
     match kind {
-        RemoteRecordKind::StandardCode => "i5a6(第三方参考)",
-        RemoteRecordKind::DeclarationExample => "i5a6(第三方申报实例)",
+        RemoteRecordKind::StandardCode => "i5a6（第三方参考）",
+        RemoteRecordKind::DeclarationExample => "i5a6（第三方申报实例）",
     }
 }
 fn deduplicate(records: Vec<RemoteRecord>) -> Vec<RemoteRecord> {
@@ -484,72 +517,6 @@ fn mobile_cards(document: &Html, observed: &str) -> Vec<RemoteRecord> {
     }
     records
 }
-fn following_table<'a>(document: &'a Html, labels: &[&str]) -> Option<ElementRef<'a>> {
-    let selector = select("div,h1,h2,h3,h4,caption,header,section");
-    for node in document.select(&selector) {
-        let own = normalize_text(&node.text().collect::<Vec<_>>().join(" "));
-        if own.is_empty() || own.chars().count() > 240 {
-            continue;
-        }
-        if labels.iter().any(|label| own.contains(label)) {
-            if let Some(table) = node.select(&select("table")).next() {
-                return Some(table);
-            }
-            let mut sibling = node.next_sibling();
-            while let Some(value) = sibling {
-                if let Some(element) = ElementRef::wrap(value) {
-                    if element.value().name() == "table" {
-                        return Some(element);
-                    }
-                }
-                sibling = value.next_sibling();
-            }
-        }
-    }
-    None
-}
-fn heading_value(document: &Html, label: &str) -> String {
-    let selector = select("div,h1,h2,h3,h4,header,section");
-    document
-        .select(&selector)
-        .find_map(|node| {
-            let value = normalize_text(&node.text().collect::<Vec<_>>().join(" "));
-            (value.contains(label) && value.chars().count() <= 160).then(|| {
-                value
-                    .replace(label, "")
-                    .trim()
-                    .trim_matches(['「', '」', '[', ']'])
-                    .to_string()
-            })
-        })
-        .unwrap_or_default()
-}
-fn reference_entries(table: Option<ElementRef<'_>>) -> Vec<RemoteReferenceEntry> {
-    let Some(table) = table else {
-        return Vec::new();
-    };
-    table
-        .select(&select("tr"))
-        .filter_map(|row| {
-            let cells = row.select(&select("td,th")).map(text).collect::<Vec<_>>();
-            if cells.len() < 2 {
-                return None;
-            }
-            let code = cells[0].trim();
-            let name = cells[1].trim();
-            if code.is_empty()
-                || name.is_empty()
-                || (code.contains("编码") && (name.contains("名称") || name.contains("信息")))
-            {
-                return None;
-            }
-            Some(RemoteReferenceEntry {
-                code: code.to_string(),
-                name: name.to_string(),
-            })
-        })
-        .collect()
-}
 pub fn empty_result(html: &str) -> bool {
     let document = Html::parse_document(html);
     let value = text(document.root_element());
@@ -573,231 +540,10 @@ pub fn search(html: &str, observed: &str) -> Result<SearchBundle, String> {
         records = mobile_cards(&document, observed);
     }
     let records = deduplicate(records);
-    replacements.sort_by(|left, right| left.old_code.cmp(&right.old_code));
-    replacements.dedup_by(|left, right| left.old_code == right.old_code);
+    let mut seen = BTreeSet::new();
+    replacements.retain(|item| seen.insert(item.old_code.clone()));
     Ok(SearchBundle {
         records,
         replacements,
     })
-}
-pub fn detail(html: &str, seed: &ApiHsCodeDto, observed: &str) -> Result<DetailBundle, String> {
-    let document = Html::parse_document(html);
-    let root = document
-        .select(&select("#hscode-detail"))
-        .next()
-        .or_else(|| {
-            best_table(
-                &document,
-                |table| {
-                    let content = text(table);
-                    ["商品编码", "商品名称", "申报要素", "法定第一单位"]
-                        .iter()
-                        .filter(|label| content.contains(**label))
-                        .count() as i64
-                },
-                9,
-            )
-        })
-        .unwrap_or_else(|| document.root_element());
-    let mut fields = std::collections::BTreeMap::new();
-    for row in root.select(&select("tr")) {
-        let cells = row.select(&select("th,td")).map(text).collect::<Vec<_>>();
-        for pair in cells.chunks_exact(2) {
-            fields
-                .entry(pair[0].trim_matches([':', ':']).to_string())
-                .or_insert_with(|| pair[1].clone());
-        }
-    }
-    let read = |labels: &[&str]| {
-        labels
-            .iter()
-            .find_map(|label| fields.get(*label))
-            .cloned()
-            .unwrap_or_default()
-    };
-    let code = read(&["商品编码", "HS编码"]);
-    let name = read(&["商品名称", "品名"]);
-    if code.is_empty() && name.is_empty() {
-        return Err("详情页面格式变化或需要交互验证,未读取到编码资料。".into());
-    }
-    let mut item = seed.clone();
-    if let Some(code) = leading(&code) {
-        item.code = code.clone();
-        item.normalized_code = code;
-    }
-    if !name.is_empty() {
-        item.name = name;
-    }
-    for (target, labels) in [
-        (&mut item.elements, vec!["申报要素", "规范申报要素"]),
-        (&mut item.unit, vec!["法定第一单位", "第一法定单位"]),
-        (&mut item.rebate_rate, vec!["出口退税率", "退税率"]),
-        (
-            &mut item.supervision_conditions,
-            vec!["海关监管条件", "监管条件"],
-        ),
-        (
-            &mut item.inspection_category,
-            vec!["检验检疫类别", "检验检疫"],
-        ),
-        (
-            &mut item.normal_tariff_rate,
-            vec!["普通进口税率", "普通税率"],
-        ),
-        (
-            &mut item.preferential_tariff_rate,
-            vec!["最惠国进口税率", "优惠税率", "最惠国税率"],
-        ),
-        (&mut item.consumption_tax_rate, vec!["消费税率"]),
-        (
-            &mut item.value_added_tax_rate,
-            vec!["增值税率", "进口增值税率"],
-        ),
-        (&mut item.export_tariff_rate, vec!["出口关税率", "出口税率"]),
-        (&mut item.description, vec!["英文名称", "英文品名"]),
-    ] {
-        let value = read(&labels);
-        if !value.is_empty() {
-            *target = value;
-        }
-    }
-    let expired = text(root).contains("已作废");
-    item.status = if expired { "Obsolete" } else { "ReferenceOnly" }.into();
-    item.source_name = source_name(RemoteRecordKind::StandardCode).into();
-    item.last_verified_at = Some(observed.into());
-    item.observed_at = Some(observed.into());
-    item.update_time = Some(observed.into());
-    let recommendations = if item.code.is_empty() {
-        Vec::new()
-    } else {
-        recommended_keywords(&document.root_element().html())
-    };
-    let evidence_url = if seed.detail_url.is_empty() {
-        String::new()
-    } else {
-        format!("{}#sbsl", seed.detail_url.split('#').next().unwrap_or(""))
-    };
-    let examples = parse_declaration_table(
-        following_table(&document, &["申报实例汇总", "申报实例", "申报案例"]),
-        observed,
-        &evidence_url,
-        &item.code,
-    );
-    Ok(DetailBundle {
-        item,
-        expired,
-        instance_count: seed.instance_count,
-        recommended_keywords: recommendations,
-        declaration_examples: examples,
-        personal_postal_tax_code: heading_value(&document, "个人行邮税号"),
-        ciq_entries: reference_entries(following_table(
-            &document,
-            &["10位HS编码+3位CIQ", "CIQ代码"],
-        )),
-        classification_entries: reference_entries(following_table(
-            &document,
-            &["所属分类及章节", "所属分类", "章节、品目"],
-        )),
-        evidence_url,
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const OBSERVED: &str = "2026-09-20T00:00:00+08:00";
-
-    #[test]
-    fn standard_table_keeps_description_separate_from_elements() {
-        let html = r#"
-        <div id="resultfind">您查询的相关hs编码 15 条</div>
-        <table>
-          <tr><td>HS编码</td><td>品名</td><td>实例汇总</td><td>申报要素·退税</td><td>编码对比</td></tr>
-          <tr>
-            <td><b>61083200.00</b></td>
-            <td><span class="showdesc">化纤制针织或钩编女睡衣及睡衣裤</span><br/><span>[Knitted women's pyjamas]</span></td>
-            <td><a href="//www.i5a6.com/hscode/detail/6108320000#sbsl">534条</a></td>
-            <td><a href="//www.i5a6.com/hscode/detail/6108320000">查看详情</a></td>
-            <td>--</td>
-          </tr>
-        </table>
-        "#;
-        let bundle = search(html, OBSERVED).unwrap();
-        let standard = bundle
-            .records
-            .iter()
-            .find(|record| record.kind == RemoteRecordKind::StandardCode)
-            .unwrap();
-        assert_eq!(standard.item.code, "6108320000");
-        assert_eq!(standard.item.name, "化纤制针织或钩编女睡衣及睡衣裤");
-        assert_eq!(standard.item.description, "Knitted women's pyjamas");
-        assert_eq!(standard.instance_count, Some(534));
-        assert_eq!(
-            standard.summary_url,
-            "https://www.i5a6.com/hscode/detail/6108320000#sbsl"
-        );
-    }
-
-    #[test]
-    fn declaration_table_stays_reference_only_and_uses_description() {
-        let html = r#"
-        <div id="hssbsl">申报实例查询结果</div>
-        <div id="hscasefind"><table>
-          <tr><td>HS编码</td><td>商品名称</td><td>商品规格</td></tr>
-          <tr><td><a href="//www.i5a6.com/hscode/detail/6109100010">61091000.10</a></td><td>棉制男T恤</td><td>针织|男式|100%棉</td></tr>
-        </table></div>
-        "#;
-        let bundle = search(html, OBSERVED).unwrap();
-        let example = bundle
-            .records
-            .iter()
-            .find(|record| record.kind == RemoteRecordKind::DeclarationExample)
-            .unwrap();
-        assert_eq!(example.item.code, "6109100010");
-        assert_eq!(example.item.description, "针织|男式|100%棉");
-        assert_eq!(example.item.elements, "");
-        assert_eq!(example.item.status, "ReferenceOnly");
-    }
-
-    #[test]
-    fn detail_reads_reference_entries_and_examples() {
-        let examples = (1..=20)
-            .map(|index| {
-                format!(
-                    "<tr><td>61083200.00</td><td>女式睡衣{index}</td><td>针织|女式|100%涤纶</td></tr>"
-                )
-            })
-            .collect::<String>();
-        let html = format!(
-            r#"
-            <div id="hscode-detail"><table>
-              <tr><td>商品编码</td><td>61083200.00</td></tr>
-              <tr><td>商品名称</td><td>化纤制针织或钩编女睡衣及睡衣裤</td></tr>
-              <tr><td>申报要素</td><td>织造方法;类别;成分含量</td></tr>
-              <tr><td>法定第一单位</td><td>件</td></tr>
-            </table></div>
-            <div class="detail-hd"><span>个人行邮税号 「04019900」</span></div>
-            <div class="detail-hd">10位HS编码+3位CIQ代码(中国海关申报13位海关编码)</div>
-            <table><tr><td class="tdtoth">10位HS编码+3位CIQ代码</td><td class="tdtoth">商品信息</td></tr>
-              <tr><td>6108320000.101</td><td>儿童服装</td></tr></table>
-            <div class="detail-hd">所属分类及章节、品目</div>
-            <table><tr><td>类目</td><td>第十一类 纺织原料及纺织制品</td></tr></table>
-            <div class="detail-hd" id="sbsl">申报实例汇总</div>
-            <table><tr><td>HS编码</td><td>商品名称</td><td>商品规格</td></tr>{examples}</table>
-            "#
-        );
-        let seed = ApiHsCodeDto {
-            code: "6108320000".into(),
-            normalized_code: "6108320000".into(),
-            detail_url: "https://www.i5a6.com/hscode/detail/6108320000".into(),
-            ..Default::default()
-        };
-        let bundle = detail(&html, &seed, OBSERVED).unwrap();
-        assert_eq!(bundle.personal_postal_tax_code, "04019900");
-        assert_eq!(bundle.ciq_entries.len(), 1);
-        assert_eq!(bundle.classification_entries.len(), 1);
-        assert_eq!(bundle.declaration_examples.len(), 20);
-        assert_eq!(bundle.item.elements, "织造方法;类别;成分含量");
-    }
 }

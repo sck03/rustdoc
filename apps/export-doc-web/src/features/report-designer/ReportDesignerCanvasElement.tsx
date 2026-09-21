@@ -1,5 +1,6 @@
 import { memo, useLayoutEffect, useMemo, useRef, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { ReportBlock } from "./reportDesignerSchema.ts";
+import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { ReportResourceImage } from "./ReportResourceImage.tsx";
 import { renderReportDesignerBlockPreviewToHtml } from "./reportDesignerBlockRenderer.ts";
@@ -102,7 +103,7 @@ export function reportDesignerCanvasElementStyle(element: ReportDesignerV3Elemen
     height: `${hundredthMmToMm(element.heightHundredthMm)}mm`,
     zIndex: element.zIndex,
     transform: element.rotationDeg ? `rotate(${element.rotationDeg}deg)` : undefined,
-    fontFamily: usesOuterStyle ? element.style.fontFamily : undefined,
+    fontFamily: usesOuterStyle ? (element.style.bold ? portableReportSansFontFamily : element.style.fontFamily) : undefined,
     fontSize: usesOuterStyle && element.style.fontSizePt ? `${element.style.fontSizePt}pt` : undefined,
     fontWeight: usesOuterStyle && element.style.bold ? 700 : undefined,
     color: usesOuterStyle ? element.style.color : undefined,
