@@ -1,5 +1,8 @@
 //! Vector PDF output. Layout, pagination and embedded fonts run inside Rust.
-use crate::error::{Result, invalid};
+use crate::{
+    canvas::Canvas,
+    error::{Result, invalid},
+};
 use export_doc_contracts::generated_api::ApiInvoiceDetailDto;
 use export_doc_domain::designer::{Design, Element, Kind, ReportBlock};
 use serde_json::Value;
@@ -255,6 +258,7 @@ fn fixed_elements(
     data: &crate::ReportData,
     index: usize,
     count: usize,
+    render_body_flow: bool,
 ) -> Result<()> {
     for layer in design.layers.iter().filter(|l| l.visible) {
         if (layer.role == "Header" && index > 0 && !layer.print.repeat_on_every_page)
@@ -266,6 +270,9 @@ fn fixed_elements(
         let mut elements: Vec<_> = layer.elements.iter().collect();
         elements.sort_by_key(|e| e.z_index);
         for item in elements {
+            if !render_body_flow && layer.role == "Body" && matches!(item.kind, Kind::Flow { .. }) {
+                continue;
+            }
             if let Kind::Flow {
                 block: ReportBlock::Row(_) | ReportBlock::Grid(_) | ReportBlock::Conditional(_),
                 ..
@@ -326,6 +333,26 @@ fn pages_data(
         .flat_map(|layer| &layer.elements)
         .filter(|element| element.visible && element.output_enabled)
         .collect();
+    let body_flows: Vec<_> = design
+        .layers
+        .iter()
+        .filter(|layer| layer.visible && layer.role == "Body")
+        .flat_map(|layer| &layer.elements)
+        .filter(|element| {
+            element.visible
+                && element.output_enabled
+                && matches!(
+                    &element.kind,
+                    Kind::Flow {
+                        block: ReportBlock::Row(_)
+                            | ReportBlock::Grid(_)
+                            | ReportBlock::Conditional(_)
+                            | ReportBlock::PageBreak(_),
+                        ..
+                    }
+                )
+        })
+        .collect();
     let tables: Vec<_> = elements
         .iter()
         .filter_map(|element| {
@@ -342,8 +369,11 @@ fn pages_data(
         })
         .collect();
     if tables.is_empty() {
-        let mut canvas = crate::canvas::Canvas::new(width, height);
-        fixed_elements(&mut canvas.svg, design, data, 0, 1)?;
+        if !body_flows.is_empty() {
+            return render_body_flow(design, data, &body_flows, width, height, cancelled);
+        }
+        let mut canvas = Canvas::new(width, height);
+        fixed_elements(&mut canvas.svg, design, data, 0, 1, true)?;
         return Ok(vec![canvas.finish().svg]);
     }
     if tables.len() > 1 {
@@ -375,8 +405,148 @@ fn pages_data(
             height,
             cancelled,
         },
-        |svg, index, count| fixed_elements(svg, design, data, index, count),
+        |svg, index, count| fixed_elements(svg, design, data, index, count, true),
     );
+}
+
+enum FlowStep<'a> {
+    Element { element: &'a Element, gap_mm: f32 },
+    Break,
+}
+
+fn render_body_flow(
+    design: &Design,
+    data: &crate::ReportData,
+    flows: &[&Element],
+    width: f32,
+    height: f32,
+    cancelled: &AtomicBool,
+) -> Result<Vec<String>> {
+    let header_bottom = design
+        .layers
+        .iter()
+        .filter(|layer| layer.role == "Header" && layer.visible)
+        .flat_map(|layer| {
+            layer
+                .elements
+                .iter()
+                .filter(|element| element.visible && element.output_enabled)
+                .map(|element| (element.y_hundredth_mm + element.height_hundredth_mm) as f32 / 100.)
+                .chain(std::iter::once(
+                    layer.print.min_height_hundredth_mm as f32 / 100.,
+                ))
+        })
+        .fold(0., f32::max);
+    let footer_top = design
+        .layers
+        .iter()
+        .filter(|layer| layer.role == "Footer" && layer.visible)
+        .flat_map(|layer| {
+            layer
+                .elements
+                .iter()
+                .filter(|element| element.visible && element.output_enabled)
+                .map(|element| element.y_hundredth_mm as f32 / 100.)
+                .chain(std::iter::once(
+                    height - layer.print.min_height_hundredth_mm as f32 / 100.,
+                ))
+        })
+        .fold(height, f32::min);
+    let capacity = footer_top - header_bottom;
+    if capacity <= 0. {
+        return Err(invalid("页眉与页脚之间没有足够的 Flow 空间。"));
+    }
+
+    let mut ordered = flows.to_vec();
+    ordered.sort_by_key(|element| (element.y_hundredth_mm, element.z_index));
+    let mut steps = Vec::with_capacity(ordered.len());
+    let mut previous_bottom = 0.;
+    for element in ordered {
+        if matches!(
+            &element.kind,
+            Kind::Flow {
+                block: ReportBlock::PageBreak(_),
+                ..
+            }
+        ) {
+            steps.push(FlowStep::Break);
+        } else {
+            let top = element.y_hundredth_mm as f32 / 100.;
+            let gap_mm = if previous_bottom == 0. {
+                top
+            } else {
+                (top - previous_bottom).max(0.)
+            };
+            steps.push(FlowStep::Element { element, gap_mm });
+        }
+        previous_bottom = (element.y_hundredth_mm + element.height_hundredth_mm) as f32 / 100.;
+    }
+
+    let mut pages: Vec<Vec<(&Element, f32)>> = Vec::new();
+    let mut current = Vec::new();
+    let mut used = 0.;
+    for step in steps {
+        if cancelled.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(crate::Error {
+                kind: crate::ErrorKind::Cancelled,
+                message: "报表输出已取消。".into(),
+            });
+        }
+        match step {
+            FlowStep::Break => {
+                if !current.is_empty() {
+                    pages.push(std::mem::take(&mut current));
+                    used = 0.;
+                }
+            }
+            FlowStep::Element { element, gap_mm } => {
+                let item_height = element.height_hundredth_mm as f32 / 100.;
+                let gap_mm = if current.is_empty() { 0. } else { gap_mm };
+                if item_height > capacity {
+                    return Err(invalid(format!(
+                        "报表组件“{}”高度超过当前页可用空间。",
+                        element.label
+                    )));
+                }
+                if used + gap_mm + item_height > capacity && !current.is_empty() {
+                    pages.push(std::mem::take(&mut current));
+                    used = 0.;
+                }
+                current.push((element, gap_mm));
+                used += gap_mm + item_height;
+            }
+        }
+        if pages.len() > 500 {
+            return Err(invalid("报表页数超过 500 页限制。"));
+        }
+    }
+    if !current.is_empty() {
+        pages.push(current);
+    }
+    if pages.is_empty() {
+        pages.push(Vec::new());
+    }
+
+    let count = pages.len();
+    let mut rendered = Vec::with_capacity(count);
+    for (index, items) in pages.iter().enumerate() {
+        let mut canvas = Canvas::new(width, height);
+        fixed_elements(&mut canvas.svg, design, data, index, count, false)?;
+        let mut cursor = 0.;
+        for (element, gap_mm) in items {
+            cursor += gap_mm;
+            let target_y = header_bottom + cursor;
+            let offset = target_y - element.y_hundredth_mm as f32 / 100.;
+            canvas
+                .svg
+                .push_str(&format!("<g transform=\"translate(0 {offset})\">"));
+            flow::render(&mut canvas.svg, element, data)?;
+            canvas.svg.push_str("</g>");
+            cursor += element.height_hundredth_mm as f32 / 100.;
+        }
+        rendered.push(canvas.finish().svg);
+    }
+    Ok(rendered)
 }
 pub fn pdf(
     invoice: &ApiInvoiceDetailDto,

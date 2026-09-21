@@ -46,6 +46,65 @@ fn grid() -> Design {
     design
 }
 
+fn body_flow_design(with_break: bool) -> Design {
+    let mut design = Design::invoice();
+    for layer in &mut design.layers {
+        layer.elements.clear();
+    }
+    let mut element = Design::invoice().layers[0].elements[0].clone();
+    element.id = "flow-block".into();
+    element.label = "Flow block".into();
+    element.x_hundredth_mm = 1000;
+    element.y_hundredth_mm = 2000;
+    element.width_hundredth_mm = 19000;
+    element.height_hundredth_mm = 10000;
+    element.kind = Kind::Flow {
+        flow_kind: "Grid".into(),
+        block: serde_json::from_value(json!({
+            "id":"body-grid", "type":"Grid",
+            "columns":[{"id":"c1","widthPercent":100}],
+            "rows":[{"id":"r1","heightMm":10,"cells":[
+                {"id":"cell-1","contentKind":"Field","fieldPath":"Invoice.InvoiceNo"}
+            ]}]
+        }))
+        .unwrap(),
+    };
+    design.layers[1].elements.push(element);
+    design.layers[0].elements.clear();
+    design.layers[2].elements.clear();
+    if with_break {
+        let mut page_break = Design::invoice().layers[0].elements[0].clone();
+        page_break.id = "page-break".into();
+        page_break.label = "Page break".into();
+        page_break.x_hundredth_mm = 1000;
+        page_break.y_hundredth_mm = 20000;
+        page_break.width_hundredth_mm = 19000;
+        page_break.height_hundredth_mm = 100;
+        page_break.kind = Kind::Flow {
+            flow_kind: "PageBreak".into(),
+            block: serde_json::from_value(json!({"id":"page-break","type":"PageBreak"})).unwrap(),
+        };
+        design.layers[1].elements.push(page_break);
+        let mut after = design.layers[1].elements[0].clone();
+        after.id = "after-break".into();
+        after.label = "After break".into();
+        after.y_hundredth_mm = 21000;
+        if let Kind::Flow {
+            block: ReportBlock::Grid(block),
+            ..
+        } = &mut after.kind
+        {
+            block.id = "after-grid".into();
+            block.rows[0].cells[0].id = "after-cell".into();
+            block.rows[0].cells[0].text = "AFTER BREAK".into();
+            block.rows[0].cells[0].content_kind = "Text".into();
+            block.rows[0].cells[0].field_path.clear();
+        }
+        design.layers[1].elements.push(after);
+    }
+    design
+}
+
 #[test]
 fn grid_merge_uses_real_column_occupancy_styles_and_vertical_text() {
     let result = render_design(&data(), &grid(), &AtomicBool::new(false)).unwrap();
@@ -120,4 +179,41 @@ fn detail_width_does_not_change_a4_page_viewbox() {
     let result = render_design(&data(), &Design::invoice(), &AtomicBool::new(false)).unwrap();
     assert_eq!(result.pages[0].width_mm, 210.);
     assert!(result.pages[0].svg.contains("viewBox=\"0 0 210 297\""));
+}
+
+#[test]
+fn body_page_break_starts_a_new_physical_page() {
+    let result = render_design(&data(), &body_flow_design(true), &AtomicBool::new(false)).unwrap();
+    assert_eq!(result.pages.len(), 2);
+    assert!(result.pages[0].svg.contains("GRID-INVOICE"));
+    assert!(!result.pages[0].svg.contains("AFTER BREAK"));
+    assert!(result.pages[1].svg.contains("AFTER BREAK"));
+    assert!(!result.pages[1].svg.contains("GRID-INVOICE"));
+}
+
+#[test]
+fn body_flow_wraps_before_the_footer_when_the_next_block_does_not_fit() {
+    let mut design = body_flow_design(false);
+    let mut second = design.layers[1].elements[0].clone();
+    second.id = "second-flow".into();
+    second.label = "Second flow".into();
+    second.y_hundredth_mm = 26500;
+    if let Kind::Flow {
+        block: ReportBlock::Grid(block),
+        ..
+    } = &mut second.kind
+    {
+        block.id = "second-grid".into();
+        block.rows[0].cells[0].id = "second-cell".into();
+        block.rows[0].cells[0].text = "SECOND FLOW".into();
+        block.rows[0].cells[0].content_kind = "Text".into();
+        block.rows[0].cells[0].field_path.clear();
+    }
+    design.layers[1].elements.push(second);
+
+    let result = render_design(&data(), &design, &AtomicBool::new(false)).unwrap();
+    assert_eq!(result.pages.len(), 2);
+    assert!(result.pages[0].svg.contains("GRID-INVOICE"));
+    assert!(!result.pages[0].svg.contains("SECOND FLOW"));
+    assert!(result.pages[1].svg.contains("SECOND FLOW"));
 }
