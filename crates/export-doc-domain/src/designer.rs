@@ -2,6 +2,14 @@ use crate::generated_api::ApiReportTemplateFieldCatalogResponse;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+mod report_blocks;
+pub use report_blocks::{
+    BlockOutput, ConditionalContent, ConditionalRule, GridCell, GridCheckboxOption, GridColumn,
+    GridRow, ReportBlock, ReportBlockBase, ReportBlockOutput, ReportBorderStyle,
+    ReportConditionalBlock, ReportGridBlock, ReportPageBreakBlock, ReportRowBlock, ReportTextStyle,
+    RowColumn,
+};
+
 pub const PROFILE_MARKER: &str = "<!-- EXPORTDOC_NATIVE_VALIDATION_PROFILE_1 -->";
 pub const SCHEMA_MARKER: &str = "<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA";
 
@@ -135,7 +143,7 @@ pub enum Kind {
     Flow {
         #[serde(rename = "flowKind")]
         flow_kind: String,
-        block: DetailTable,
+        block: ReportBlock,
     },
 }
 impl Kind {
@@ -145,7 +153,14 @@ impl Kind {
             Self::Field { .. } => "字段",
             Self::Line { .. } => "线条",
             Self::Rectangle => "矩形",
-            Self::Flow { .. } => "商品明细表",
+            Self::Flow { block, .. } => match block.kind() {
+                "Row" => "多列行",
+                "Grid" => "普通表格",
+                "Conditional" => "条件块",
+                "DetailTable" => "明细表(自动重复)",
+                "PageBreak" => "分页符",
+                _ => "流组件",
+            },
             Self::Image { purpose, .. } => {
                 if purpose == "Stamp" {
                     "印章"
@@ -193,11 +208,31 @@ impl Default for Style {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DetailTable {
     pub id: String,
+    #[serde(default = "detail_table_type")]
     pub r#type: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub title: String,
     pub source_path: String,
+    #[serde(default = "default_repeat_mode")]
+    pub repeat_mode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<BlockOutput>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail_width_mm: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub side_band: Option<DetailSideBand>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grouping: Option<DetailGrouping>,
     pub columns: Vec<DetailColumn>,
     pub print: DetailPrint,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary_row: Option<DetailSummaryRow>,
+    #[serde(default)]
+    pub header_style: ReportTextStyle,
+    #[serde(default)]
+    pub body_style: ReportTextStyle,
+    #[serde(default)]
+    pub border: ReportBorderStyle,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -210,10 +245,112 @@ pub struct DetailPrint {
 pub struct DetailColumn {
     pub id: String,
     pub title: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub header_group_title: String,
+    #[serde(default = "one")]
+    pub header_group_span: i32,
+    #[serde(default = "field_content_kind")]
+    pub content_kind: String,
     pub field_path: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub content: Vec<DetailCellContent>,
     #[serde(deserialize_with = "json_float")]
     pub width_mm: f32,
     pub align: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub format: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub border: Option<ReportBorderStyle>,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DetailSideBand {
+    pub title: String,
+    #[serde(deserialize_with = "json_float")]
+    pub width_mm: f32,
+    pub content_kind: String,
+    #[serde(default)]
+    pub text: String,
+    #[serde(default)]
+    pub field_path: String,
+    #[serde(default)]
+    pub style: ReportTextStyle,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DetailGrouping {
+    pub field_path: String,
+    pub label: String,
+    pub show_field_value: bool,
+    pub keep_together: bool,
+    #[serde(default)]
+    pub page_break_before: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub footer: Option<DetailGroupFooter>,
+    #[serde(default)]
+    pub style: ReportTextStyle,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DetailGroupFooter {
+    pub label: String,
+    pub label_column_span: i32,
+    #[serde(default)]
+    pub cells: Vec<DetailGroupFooterCell>,
+    #[serde(default)]
+    pub style: ReportTextStyle,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DetailGroupFooterCell {
+    pub column_id: String,
+    pub content_kind: String,
+    #[serde(default)]
+    pub text: String,
+    #[serde(default)]
+    pub field_path: String,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DetailSummaryRow {
+    pub label: String,
+    pub label_column_span: i32,
+    #[serde(default)]
+    pub cells: Vec<DetailSummaryCell>,
+    #[serde(default)]
+    pub style: ReportTextStyle,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DetailSummaryCell {
+    pub column_id: String,
+    pub content_kind: String,
+    #[serde(default)]
+    pub text: String,
+    #[serde(default)]
+    pub field_path: String,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DetailCellContent {
+    pub id: String,
+    pub kind: String,
+    #[serde(default)]
+    pub text: String,
+    #[serde(default)]
+    pub field_path: String,
+}
+fn one() -> i32 {
+    1
+}
+fn default_repeat_mode() -> String {
+    "ScribanFor".into()
+}
+fn field_content_kind() -> String {
+    "Field".into()
+}
+fn detail_table_type() -> String {
+    "DetailTable".into()
 }
 
 // JSON keeps business decimals exact. Read layout numbers through Value too,
@@ -396,9 +533,15 @@ impl Design {
         .map(|(index, (title, path, width, align))| DetailColumn {
             id: format!("col-{index}"),
             title: title.into(),
+            header_group_title: String::new(),
+            header_group_span: one(),
+            content_kind: field_content_kind(),
             field_path: path.into(),
+            content: vec![],
             width_mm: width,
             align: align.into(),
+            format: String::new(),
+            border: None,
         })
         .collect();
         design.insert(
@@ -406,17 +549,29 @@ impl Design {
             "details",
             Kind::Flow {
                 flow_kind: "DetailTable".into(),
-                block: DetailTable {
+                block: ReportBlock::DetailTable(DetailTable {
                     id: "detail-block".into(),
                     r#type: "DetailTable".into(),
                     title: "商品明细".into(),
                     source_path: "Invoice.Items".into(),
+                    repeat_mode: default_repeat_mode(),
+                    output: None,
+                    detail_width_mm: None,
+                    side_band: None,
+                    grouping: None,
                     columns,
                     print: DetailPrint {
                         repeat_header_on_page_break: true,
                         keep_rows_together: true,
                     },
-                },
+                    summary_row: None,
+                    header_style: ReportTextStyle::default(),
+                    body_style: ReportTextStyle::default(),
+                    border: ReportBorderStyle {
+                        width_px: 0.2,
+                        ..Default::default()
+                    },
+                }),
             },
             [1000, 7000, 19000, 13500],
             9.,

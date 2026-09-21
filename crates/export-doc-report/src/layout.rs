@@ -1,9 +1,11 @@
 //! Vector PDF output. Layout, pagination and embedded fonts run inside Rust.
 use crate::error::{Result, invalid};
 use export_doc_contracts::generated_api::ApiInvoiceDetailDto;
-use export_doc_domain::designer::{Design, DetailTable, Element, Kind};
+use export_doc_domain::designer::{Design, Element, Kind, ReportBlock};
 use serde_json::Value;
 use std::{path::Path, sync::atomic::AtomicBool};
+
+mod detail;
 
 const PT_MM: f32 = 25.4 / 72.0;
 pub fn field_value(invoice: &Value, item: Option<&Value>, path: &str) -> String {
@@ -161,8 +163,13 @@ fn element(
         } else {
             style.border_width_px * 25.4 / 96.
         };
+        let dash = if style.border_style == "Dashed" {
+            " stroke-dasharray=\"1.1 0.7\""
+        } else {
+            ""
+        };
         if !matches!(element.kind, Kind::Line { .. } | Kind::Flow { .. }) {
-            svg.push_str(&format!("<rect x=\"{x}\" y=\"{y}\" width=\"{width}\" height=\"{height}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"{border}\"/>",escape(&style.background_color),escape(&style.border_color)));
+            svg.push_str(&format!("<rect x=\"{x}\" y=\"{y}\" width=\"{width}\" height=\"{height}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"{border}\"{dash}/>",escape(&style.background_color),escape(&style.border_color)));
         }
         let text = match &element.kind {
             Kind::Line { direction } => {
@@ -171,7 +178,7 @@ fn element(
                 } else {
                     (x + width, y)
                 };
-                svg.push_str(&format!("<line x1=\"{x}\" y1=\"{y}\" x2=\"{x2}\" y2=\"{y2}\" stroke=\"{}\" stroke-width=\"{}\"/>",escape(&style.border_color),border.max(0.2)));
+                svg.push_str(&format!("<line x1=\"{x}\" y1=\"{y}\" x2=\"{x2}\" y2=\"{y2}\" stroke=\"{}\" stroke-width=\"{}\"{dash}/>",escape(&style.border_color),border.max(0.2)));
                 return Ok(());
             }
             Kind::Rectangle | Kind::Flow { .. } | Kind::Image { .. } => return Ok(()),
@@ -251,7 +258,17 @@ fn fixed_elements(
         let mut elements: Vec<_> = layer.elements.iter().collect();
         elements.sort_by_key(|e| e.z_index);
         for item in elements {
-            element(svg, item, data, index, count)?;
+            if let Kind::Flow {
+                block: ReportBlock::Row(_) | ReportBlock::Grid(_) | ReportBlock::Conditional(_),
+                ..
+            } = &item.kind
+            {
+                flow_element(svg, item, data)?;
+            } else if matches!(item.kind, Kind::Flow { .. }) {
+                continue;
+            } else {
+                element(svg, item, data, index, count)?;
+            }
         }
     }
     Ok(())
@@ -304,8 +321,12 @@ fn pages_data(
     let tables: Vec<_> = elements
         .iter()
         .filter_map(|element| {
-            if let Kind::Flow { block, .. } = &element.kind {
-                Some((*element, block))
+            if let Kind::Flow {
+                block: ReportBlock::DetailTable(table),
+                ..
+            } = &element.kind
+            {
+                Some((*element, table))
             } else {
                 None
             }
@@ -333,143 +354,165 @@ fn pages_data(
     let top = table.y_hundredth_mm as f32 / 100.;
     let left = table.x_hundredth_mm as f32 / 100.;
     let table_width = table.width_hundredth_mm as f32 / 100.;
-    let size = table.style.font_size_pt * PT_MM;
-    let total_width: f32 = block.columns.iter().map(|column| column.width_mm).sum();
-    if total_width <= 0. {
-        return Err(invalid("商品明细列宽无效。"));
-    }
-    let widths: Vec<_> = block
-        .columns
-        .iter()
-        .map(|column| column.width_mm / total_width * table_width)
-        .collect();
-    let header_lines: Vec<_> = block
-        .columns
-        .iter()
-        .zip(&widths)
-        .map(|(column, width)| wrap(&column.title, width - 3., size))
-        .collect();
-    let header_height =
-        header_lines.iter().map(Vec::len).max().unwrap_or(1) as f32 * size * 1.35 + 4.;
-    let capacity = footer - 3. - top - header_height;
-    if capacity < 10. {
-        return Err(invalid("页眉与页脚之间没有足够的明细空间。"));
-    }
-    let items = data.items();
-    let mut chunks: Vec<Vec<(Vec<Vec<String>>, f32)>> = vec![vec![]];
-    let mut used = 0.;
-    for item in items {
-        if cancelled.load(std::sync::atomic::Ordering::Relaxed) {
-            return Err(crate::Error {
-                kind: crate::ErrorKind::Cancelled,
-                message: "报表输出已取消。".into(),
-            });
-        }
-        let lines: Vec<_> = block
-            .columns
-            .iter()
-            .zip(&widths)
-            .map(|(column, width)| {
-                wrap(
-                    &crate::data::plain(data.value(&column.field_path, Some(item))),
-                    width - 3.,
-                    size,
-                )
-            })
-            .collect();
-        let row_height = lines.iter().map(Vec::len).max().unwrap_or(1) as f32 * size * 1.35 + 4.;
-        if row_height > capacity {
-            return Err(invalid("单行商品内容超过一页，请调整明细列宽或字体。"));
-        }
-        if used + row_height > capacity {
-            chunks.push(vec![]);
-            used = 0.;
-        }
-        chunks.last_mut().unwrap().push((lines, row_height));
-        used += row_height;
-        if chunks.len() > 500 {
-            return Err(invalid("报表页数超过 500 页限制。"));
-        }
-    }
-    let count = chunks.len();
-    let mut pages = vec![];
-    for (index, rows) in chunks.iter().enumerate() {
-        let mut svg = format!(
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" font-family=\"Noto Sans CJK SC\" width=\"{}\" height=\"{}\" viewBox=\"0 0 {width} {height}\"><rect width=\"{width}\" height=\"{height}\" fill=\"white\"/>",
-            width / PT_MM,
-            height / PT_MM
-        );
-        fixed_elements(&mut svg, design, data, index, count)?;
-        let mut y = top;
-        table_row(
-            &mut svg,
-            block,
-            &header_lines,
-            &widths,
+    return detail::render(
+        detail::DetailLayout {
+            table: block,
+            data,
             left,
-            y,
-            header_height,
-            size,
-            true,
-        );
-        y += header_height;
-        for (lines, row_height) in rows {
-            table_row(
-                &mut svg,
-                block,
-                lines,
-                &widths,
-                left,
-                y,
-                *row_height,
-                size,
-                false,
-            );
-            y += row_height;
-        }
-        text_svg(
-            &mut svg,
-            &[format!("{} / {count}", index + 1)],
-            width - 25.,
-            height - 7.,
-            15.,
-            2.6,
-            false,
-            "#526866",
-            "Right",
-        );
-        svg.push_str("</svg>");
-        pages.push(svg);
-    }
-    Ok(pages)
+            top,
+            footer_top: footer,
+            width: table_width,
+            height,
+            cancelled,
+        },
+        |svg, index, count| fixed_elements(svg, design, data, index, count),
+    );
 }
-fn table_row(
-    svg: &mut String,
-    block: &DetailTable,
-    lines: &[Vec<String>],
-    widths: &[f32],
-    left: f32,
-    y: f32,
-    height: f32,
-    size: f32,
-    header: bool,
-) {
-    let mut x = left;
-    for ((column, lines), width) in block.columns.iter().zip(lines).zip(widths) {
-        svg.push_str(&format!("<rect x=\"{x}\" y=\"{y}\" width=\"{width}\" height=\"{height}\" fill=\"{}\" stroke=\"#bdcdc8\" stroke-width=\"0.2\"/>",if header{"#eef6f4"}else{"white"}));
-        text_svg(
-            svg,
-            lines,
-            x + 1.5,
-            y + 1.5,
-            width - 3.,
-            size,
-            header,
-            "#173f3b",
-            &column.align,
-        );
-        x += width;
+fn flow_element(svg: &mut String, element: &Element, data: &crate::ReportData) -> Result<()> {
+    let Kind::Flow { block, .. } = &element.kind else {
+        return Ok(());
+    };
+    let x = element.x_hundredth_mm as f32 / 100.;
+    let y = element.y_hundredth_mm as f32 / 100.;
+    let width = element.width_hundredth_mm as f32 / 100.;
+    let size = element.style.font_size_pt * PT_MM;
+    match block {
+        ReportBlock::Row(block) => {
+            let columns = &block.columns;
+            let total: f32 = columns
+                .iter()
+                .map(|column| column.width_percent.max(1.))
+                .sum();
+            let mut left = x;
+            for column in columns {
+                let column_width = width * column.width_percent.max(1.) / total;
+                let text = if column.content_kind == "Field" {
+                    let value = data.text(&column.field_path);
+                    if value.is_empty() {
+                        column.fallback_text.clone()
+                    } else {
+                        value
+                    }
+                } else {
+                    column.text.clone()
+                };
+                text_svg(
+                    svg,
+                    &wrap(&text, (column_width - 2.).max(size), size),
+                    left + 1.,
+                    y + 1.,
+                    column_width - 2.,
+                    size,
+                    column.style.bold.unwrap_or(false),
+                    "#173f3b",
+                    column.style.align.as_deref().unwrap_or("Left"),
+                );
+                left += column_width;
+            }
+        }
+        ReportBlock::Grid(block) => {
+            let title = &block.title;
+            let columns = &block.columns;
+            let rows = &block.rows;
+            let total: f32 = columns
+                .iter()
+                .map(|column| column.width_percent.max(1.))
+                .sum();
+            let mut top = y;
+            if !title.is_empty() {
+                text_svg(
+                    svg,
+                    &wrap(title, width - 2., size),
+                    x + 1.,
+                    top,
+                    width - 2.,
+                    size,
+                    true,
+                    "#173f3b",
+                    "Left",
+                );
+                top += size * 1.35;
+            }
+            for row in rows {
+                let row_height = row.height_mm.unwrap_or(8.);
+                let mut left = x;
+                for (index, cell) in row.cells.iter().enumerate() {
+                    let column_width = columns
+                        .get(index)
+                        .map(|column| width * column.width_percent.max(1.) / total)
+                        .unwrap_or(width / row.cells.len().max(1) as f32);
+                    let text = if cell.content_kind == "Field" {
+                        let value = data.text(&cell.field_path);
+                        if value.is_empty() {
+                            cell.fallback_text.clone()
+                        } else {
+                            value
+                        }
+                    } else if cell.content_kind == "CheckboxGroup" {
+                        let value = data.text(&cell.field_path);
+                        cell.checkbox_options
+                            .iter()
+                            .map(|option| {
+                                format!(
+                                    "{} {}",
+                                    if value == option.value { "☑" } else { "☐" },
+                                    option.label
+                                )
+                            })
+                            .collect()
+                    } else {
+                        cell.text.clone()
+                    };
+                    svg.push_str(&format!(
+                        "<rect x=\"{left}\" y=\"{top}\" width=\"{column_width}\" height=\"{row_height}\" fill=\"white\" stroke=\"#bdcdc8\" stroke-width=\"0.2\"/>"
+                    ));
+                    text_svg(
+                        svg,
+                        &wrap(&text, (column_width - 2.).max(size), size),
+                        left + 1.,
+                        top + 1.,
+                        column_width - 2.,
+                        size,
+                        cell.style.bold.unwrap_or(false),
+                        "#173f3b",
+                        cell.style.align.as_deref().unwrap_or("Left"),
+                    );
+                    left += column_width;
+                }
+                top += row_height;
+            }
+        }
+        ReportBlock::Conditional(block) => {
+            let condition = &block.condition;
+            let content = &block.content;
+            let value = data.text(&condition.field_path);
+            let visible = match condition.operator.as_str() {
+                "Equals" => value == condition.value,
+                "NotEquals" => value != condition.value,
+                _ => !value.is_empty(),
+            };
+            if visible {
+                let text = if content.kind == "Field" {
+                    data.text(&content.field_path)
+                } else {
+                    content.text.clone()
+                };
+                text_svg(
+                    svg,
+                    &wrap(&text, width - 2., size),
+                    x + 1.,
+                    y + 1.,
+                    width - 2.,
+                    size,
+                    element.style.bold,
+                    "#173f3b",
+                    &element.style.align,
+                );
+            }
+        }
+        _ => {}
     }
+    Ok(())
 }
 
 pub fn pdf(
@@ -494,6 +537,113 @@ pub fn pdf(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use export_doc_domain::designer::{
+        DetailGroupFooter, DetailGroupFooterCell, DetailGrouping, DetailSideBand,
+        DetailSummaryCell, DetailSummaryRow, ReportTextStyle,
+    };
+    use serde_json::json;
+
+    fn structured_design() -> Design {
+        let mut design = Design::invoice();
+        if let Kind::Flow {
+            block: ReportBlock::DetailTable(table),
+            ..
+        } = &mut design.layers[1].elements[0].kind
+        {
+            table.grouping = Some(DetailGrouping {
+                field_path: "item.UnitEN".into(),
+                label: "GROUP".into(),
+                show_field_value: true,
+                keep_together: true,
+                page_break_before: false,
+                footer: Some(DetailGroupFooter {
+                    label: "SUBTOTAL".into(),
+                    label_column_span: 2,
+                    cells: vec![
+                        DetailGroupFooterCell {
+                            column_id: "col-2".into(),
+                            content_kind: "Sum".into(),
+                            text: String::new(),
+                            field_path: "item.Quantity".into(),
+                        },
+                        DetailGroupFooterCell {
+                            column_id: "col-5".into(),
+                            content_kind: "Sum".into(),
+                            text: String::new(),
+                            field_path: "item.TotalPrice".into(),
+                        },
+                    ],
+                    style: ReportTextStyle::default(),
+                }),
+                style: ReportTextStyle::default(),
+            });
+            table.summary_row = Some(DetailSummaryRow {
+                label: "GRAND TOTAL".into(),
+                label_column_span: 2,
+                cells: vec![DetailSummaryCell {
+                    column_id: "col-2".into(),
+                    content_kind: "Text".into(),
+                    text: "TOTAL QTY".into(),
+                    field_path: String::new(),
+                }],
+                style: ReportTextStyle::default(),
+            });
+            table.side_band = Some(DetailSideBand {
+                title: "MARK".into(),
+                width_mm: 35.,
+                content_kind: "Text".into(),
+                text: "SIDE-BAND-VALUE".into(),
+                field_path: String::new(),
+                style: ReportTextStyle::default(),
+            });
+        }
+        design
+    }
+
+    fn structured_data(rows: usize) -> crate::ReportData {
+        let mut draft = export_doc_domain::invoice::InvoiceDraft::demo("2026-09-16", "STRUCT-001");
+        let row = draft.rows[0].clone();
+        draft.rows = (0..rows)
+            .map(|index| {
+                let mut row = row.clone();
+                row.cells[1] = format!("STYLE-{}", index + 1);
+                row
+            })
+            .collect();
+        crate::ReportData::invoice(&draft.build().unwrap(), json!({}), json!({}), false).unwrap()
+    }
+
+    #[test]
+    fn structured_detail_renders_groups_subtotals_summary_and_side_band() {
+        let pages = pages_data(
+            &structured_data(3),
+            &structured_design(),
+            &AtomicBool::new(false),
+        )
+        .unwrap();
+        let svg = pages.join("");
+        assert!(svg.contains("GROUP"));
+        assert!(svg.contains("SUBTOTAL"));
+        assert!(svg.contains("GRAND TOTAL"));
+        assert!(svg.contains("SIDE-BAND-VALUE"));
+        assert!(svg.contains("STYLE-3"));
+    }
+
+    #[test]
+    fn structured_detail_repeats_header_and_keeps_last_group_on_later_pages() {
+        let pages = pages_data(
+            &structured_data(75),
+            &structured_design(),
+            &AtomicBool::new(false),
+        )
+        .unwrap();
+        assert!(pages.len() > 1);
+        assert!(pages[0].contains("品名 / DESCRIPTION"));
+        assert!(pages[1].contains("品名 / DESCRIPTION"));
+        assert!(pages.last().unwrap().contains("STYLE-75"));
+        assert!(pages.last().unwrap().contains("GRAND TOTAL"));
+    }
+
     #[test]
     fn long_invoice_paginates_without_losing_last_row_or_escaping_text() {
         let mut draft = export_doc_domain::invoice::InvoiceDraft::demo("2026-09-16", "TEST-<>&");
@@ -504,5 +654,38 @@ mod tests {
         assert!(output.len() > 1);
         assert!(output.last().unwrap().contains("END-75"));
         assert!(output[0].contains("TEST-&lt;&gt;&amp;"));
+    }
+
+    #[test]
+    fn dashed_styles_and_explicit_page_numbers_are_not_silently_replaced_or_appended() {
+        let mut design = Design::invoice();
+        let title = design.element_mut("title").unwrap();
+        title.style.border_width_px = 1.;
+        title.style.border_style = "Dashed".into();
+        let output = pages(
+            &export_doc_domain::invoice::InvoiceDraft::demo("2026-09-16", "DASH-001")
+                .build()
+                .unwrap(),
+            &design,
+        )
+        .unwrap();
+        assert!(output[0].contains("stroke-dasharray"));
+        assert!(!output[0].contains(" / 1</text>"));
+
+        let mut explicit = design.clone();
+        explicit.element_mut("title").unwrap().kind =
+            export_doc_domain::designer::Kind::PageNumber {
+                format: "CurrentOfTotal".into(),
+                prefix: "P".into(),
+                suffix: String::new(),
+            };
+        let output = pages(
+            &export_doc_domain::invoice::InvoiceDraft::demo("2026-09-16", "PAGE-001")
+                .build()
+                .unwrap(),
+            &explicit,
+        )
+        .unwrap();
+        assert!(output[0].contains("P1 / 1"));
     }
 }
