@@ -457,6 +457,28 @@ const styledGridHtml = api.renderReportDesignerBlockToHtml(styledGrid);
 assert(styledGridHtml.includes("font-size: 15pt") && styledGridHtml.includes("font-weight: 700") && styledGridHtml.includes("text-align: center"), "整表字号、粗体和对齐必须立即进入每个单元格输出");
 assert(styledGridHtml.includes("padding-top: 2mm") && styledGridHtml.includes("padding-bottom: 3mm") && !styledGridHtml.includes("margin-top: 2mm"), "表格单元格上下距必须按有效内边距渲染，不能使用无效的 table-cell margin");
 assert(styledGridHtml.indexOf("padding: 2mm") < styledGridHtml.indexOf("padding-top: 2mm"), "单元格自定义内边距必须排在边框默认留白之后并取得最终优先级");
+const diagonalGrid = {
+  ...baseGrid,
+  rows: baseGrid.rows.map((row, rowIndex) => rowIndex === 0
+    ? {
+        ...row,
+        cells: row.cells.map((cell, cellIndex) => cellIndex === 0
+          ? { ...cell, diagonalHeader: { upperLeftText: "项目", lowerRightText: "金额" } }
+          : cell),
+      }
+    : row),
+};
+const diagonalGridHtml = api.renderReportDesignerBlockToHtml(diagonalGrid);
+assert(diagonalGridHtml.includes("edm-report-grid-diagonal") && diagonalGridHtml.includes("项目") && diagonalGridHtml.includes("金额"), "斜线表头必须进入普通表格正式 HTML 输出");
+const diagonalFlow = api.createV3FlowElement(diagonalGrid, 1000, 1000);
+const normalizedDiagonalGrid = api.normalizeReportDesignerV3Schema({
+  ...landscapeSchema,
+  layers: landscapeSchema.layers.map((layer) => layer.role === "Body"
+    ? { ...layer, elements: [diagonalFlow] }
+    : { ...layer, elements: [] }),
+});
+const diagonalHeader = normalizedDiagonalGrid.schema?.layers.find((layer) => layer.role === "Body")?.elements[0]?.block?.rows[0]?.cells[0]?.diagonalHeader;
+assert(diagonalHeader?.upperLeftText === "项目" && diagonalHeader?.lowerRightText === "金额", "斜线表头必须通过 V3 规范化并保持两侧文字");
 
 const barrierElements = [
   { ...api.createV3TextElement(1000, 1000), id: "barrier-a", zIndex: 10 },

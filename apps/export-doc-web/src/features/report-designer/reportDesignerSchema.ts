@@ -122,6 +122,7 @@ export type ReportGridCell = {
   fallbackText?: string;
   checkboxOptions?: ReportGridCheckboxOption[];
   verticalText?: boolean;
+  diagonalHeader?: ReportGridDiagonalHeader;
   style: ReportTextStyle;
   border?: ReportBorderStyle;
 };
@@ -130,6 +131,11 @@ export type ReportGridCheckboxOption = {
   id: string;
   label: string;
   value: string;
+};
+
+export type ReportGridDiagonalHeader = {
+  upperLeftText: string;
+  lowerRightText: string;
 };
 
 export type ReportConditionalBlock = ReportBlockBase & {

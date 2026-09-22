@@ -6,6 +6,7 @@ import {
   isReportDesignerFieldPath,
   isReportDesignerImageSource,
 } from "./reportDesignerSchemaValidation.ts";
+import { renderGridDiagonalHeader } from "./reportDesignerGridDiagonal.ts";
 
 /** Shared structured-block renderer used by the v3 exporter for flow elements. */
 export function renderReportDesignerBlockToHtml(block: ReportBlock) {
@@ -83,6 +84,9 @@ function renderGridBlock(block: Extract<ReportBlock, { type: "Grid" }>, preview:
     const imageHeightMm = spannedRows.every((item) => item.heightMm)
       ? spannedRows.reduce((height, item) => height + item.heightMm!, 0) - (style.marginTopMm ?? 1.2) - (style.marginBottomMm ?? 1.2)
       : undefined;
+    if (cell.diagonalHeader) {
+      return `<td${spanAttributes}${previewAttributes} style="${renderGridCellStyle(block, cell)}">${renderGridDiagonalHeader(cell.diagonalHeader)}</td>`;
+    }
     return `<td${spanAttributes}${previewAttributes} style="${renderGridCellStyle(block, cell)}">${renderGridCellContent(cell, imageHeightMm)}</td>`;
   }).join("")}</tr>`).join("");
 
@@ -106,11 +110,14 @@ function renderGridCellStyle(
     renderTextPresentation(style),
     cell.verticalText ? "writing-mode: vertical-rl" : "",
     cell.verticalText ? "text-orientation: upright" : "",
+    cell.diagonalHeader ? "position: relative" : "",
+    cell.diagonalHeader ? "padding: 0" : "",
     `vertical-align: ${(style.verticalAlign ?? "Middle").toLowerCase()}`,
     renderBorderStyle(cell.border ?? block.border),
     renderCellPadding(style, 1.2),
   ].filter(Boolean).join("; ");
 }
+
 
 function renderGridCellContent(cell: Extract<ReportBlock, { type: "Grid" }>["rows"][number]["cells"][number], imageHeightMm?: number) {
   switch (cell.contentKind) {

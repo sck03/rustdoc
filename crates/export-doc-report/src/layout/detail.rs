@@ -38,7 +38,7 @@ pub(super) struct DetailLayout<'a> {
 
 pub(super) fn render(
     layout: DetailLayout<'_>,
-    fixed: impl Fn(&mut String, usize, usize) -> Result<()>,
+    fixed: impl Fn(&mut String, usize, usize, f32) -> Result<()>,
 ) -> Result<Vec<String>> {
     let DetailLayout {
         table,
@@ -133,8 +133,14 @@ pub(super) fn render(
     let count = chunks.len();
     let mut pages = Vec::with_capacity(count);
     for (index, rows) in chunks.iter().enumerate() {
+        let content_bottom =
+            top + if table.print.repeat_header_on_page_break || index == 0 {
+                header_height
+            } else {
+                0.
+            } + rows.iter().map(|row| row.height).sum::<f32>();
         let mut svg = canvas(page_width, height);
-        fixed(&mut svg, index, count)?;
+        fixed(&mut svg, index, count, content_bottom)?;
         if let Some(side) = &table.side_band {
             render_side_band(&mut svg, table, side, data, left, top, footer_top, size)?;
         }

@@ -35,6 +35,46 @@
   outline-offset: -2px;
 }
 
+.report-designer-v3-preview-flow-content .edm-report-grid-diagonal {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 8mm;
+  overflow: hidden;
+}
+
+.report-designer-v3-preview-flow-content .edm-report-grid-diagonal::after {
+  position: absolute;
+  inset: 0;
+  width: 141.42%;
+  height: 1px;
+  content: "";
+  background: currentColor;
+  opacity: 0.7;
+  transform: rotate(0);
+  transform-origin: left top;
+}
+
+.report-designer-v3-preview-flow-content .edm-report-grid-diagonal-upper-left,
+.report-designer-v3-preview-flow-content .edm-report-grid-diagonal-lower-right {
+  position: absolute;
+  z-index: 1;
+  font-size: 0.92em;
+  line-height: 1.25;
+}
+
+.report-designer-v3-preview-flow-content .edm-report-grid-diagonal-upper-left {
+  top: 1mm;
+  left: 1mm;
+  text-align: left;
+}
+
+.report-designer-v3-preview-flow-content .edm-report-grid-diagonal-lower-right {
+  right: 1mm;
+  bottom: 1mm;
+  text-align: right;
+}
+
 .report-designer-canvas-text-editor {
   position: absolute;
   z-index: 100020;

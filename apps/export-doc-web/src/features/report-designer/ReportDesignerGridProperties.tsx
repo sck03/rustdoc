@@ -103,7 +103,15 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
           <label><span>内容类型</span><select value={selected.cell.contentKind} onChange={(event) => updateCell((cell) => ({ ...cell, contentKind: normalizeGridCellContentKind(event.target.value) }))}><option value="Text">固定文本</option><option value="Field">业务字段</option><option value="CheckboxGroup">勾选组</option></select></label>
           <label><span>本行高度 (mm)</span><input type="number" min={2} max={80} step={0.5} value={selectedRow.heightMm ?? 9} onChange={(event) => onCommit({ ...block, rows: block.rows.map((row) => row.id === selectedRow.id ? { ...row, heightMm: normalizeNumber(event.target.value, row.heightMm ?? 9) } : row) })} /></label>
           <DesignerCheckbox checked={Boolean(selected.cell.verticalText)} onChange={(checked) => updateCell((cell) => ({ ...cell, verticalText: checked }))}>竖排文字</DesignerCheckbox>
+          <DesignerCheckbox checked={Boolean(selected.cell.diagonalHeader)} onChange={(checked) => updateCell((cell) => ({
+            ...cell,
+            diagonalHeader: checked ? cell.diagonalHeader ?? { upperLeftText: "", lowerRightText: "" } : undefined,
+          }))}>斜线表头</DesignerCheckbox>
         </div>
+        {selected.cell.diagonalHeader ? <div className="new-report-property-grid">
+          <label><span>斜线上方文字</span><input value={selected.cell.diagonalHeader.upperLeftText} onChange={(event) => updateCell((cell) => ({ ...cell, diagonalHeader: { upperLeftText: event.target.value, lowerRightText: cell.diagonalHeader?.lowerRightText ?? "" } }))} /></label>
+          <label><span>斜线下方文字</span><input value={selected.cell.diagonalHeader.lowerRightText} onChange={(event) => updateCell((cell) => ({ ...cell, diagonalHeader: { upperLeftText: cell.diagonalHeader?.upperLeftText ?? "", lowerRightText: event.target.value } }))} /></label>
+        </div> : null}
         {selected.cell.contentKind === "Text" ? <label className="new-report-property-wide"><span>文字内容</span><CommitTextField multiline rows={3} value={selected.cell.text} onCommit={(text) => updateCell((cell) => ({ ...cell, text }))} /></label> : null}
         {selected.cell.contentKind === "Field" || selected.cell.contentKind === "CheckboxGroup" ? <FieldPathInput className="new-report-property-wide" label={selected.cell.contentKind === "CheckboxGroup" ? "判断字段" : "业务字段"} value={selected.cell.fieldPath} fieldGroups={fieldGroups} onChange={(fieldPath) => updateCell((cell) => ({ ...cell, fieldPath }))} /> : null}
         {selected.cell.contentKind === "Field" ? <label><span>字段前标签（可选）</span><input value={selected.cell.label ?? ""} onChange={(event) => updateCell((cell) => ({ ...cell, label: event.target.value }))} /></label> : null}

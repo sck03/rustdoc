@@ -295,6 +295,8 @@ pub struct GridCell {
     pub checkbox_options: Vec<GridCheckboxOption>,
     #[serde(default)]
     pub vertical_text: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diagonal_header: Option<GridDiagonalHeader>,
     #[serde(default)]
     pub style: ReportTextStyle,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -306,6 +308,14 @@ pub struct GridCheckboxOption {
     pub id: String,
     pub label: String,
     pub value: String,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GridDiagonalHeader {
+    #[serde(default)]
+    pub upper_left_text: String,
+    #[serde(default)]
+    pub lower_right_text: String,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

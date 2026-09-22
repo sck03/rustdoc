@@ -400,6 +400,7 @@ export function createGridCell(
     fallbackText: "",
     checkboxOptions: checkboxOptions ?? [],
     verticalText,
+    diagonalHeader: undefined,
     style,
     border: defaultTableBorderStyle,
   };

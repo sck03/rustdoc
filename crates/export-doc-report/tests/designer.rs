@@ -33,11 +33,11 @@ fn grid() -> Design {
     element.kind = Kind::Flow {
         flow_kind: "Grid".into(),
         block: serde_json::from_value(json!({
-            "id":"grid", "type":"Grid", "columns":[{"id":"c1","widthPercent":25},{"id":"c2","widthPercent":25},{"id":"c3","widthPercent":50}],
+            "id":"grid", "type":"Grid", "columns":[{"id":"c1","widthPercent":20},{"id":"c2","widthPercent":20},{"id":"c3","widthPercent":20},{"id":"c4","widthPercent":40}],
             "defaultCellStyle":{"fontSizePt":12,"bold":true,"align":"Center","marginLeftMm":0,"marginTopMm":0},
             "border":{"color":"#ff0000","widthPx":1,"style":"Dashed","top":true,"right":false,"bottom":true,"left":false},
             "rows":[
-                {"id":"r1","heightMm":10,"cells":[{"id":"a","contentKind":"Text","text":"SPAN","colSpan":2,"rowSpan":2},{"id":"b","contentKind":"Field","fieldPath":"Invoice.InvoiceNo","label":"No"}]},
+                {"id":"r1","heightMm":14,"cells":[{"id":"a","contentKind":"Text","text":"SPAN","colSpan":2,"rowSpan":2},{"id":"b","contentKind":"Field","fieldPath":"Invoice.InvoiceNo","label":"No","style":{"fontSizePt":8}},{"id":"diag","contentKind":"Text","text":"","diagonalHeader":{"upperLeftText":"项目","lowerRightText":"金额"}}]},
                 {"id":"r2","heightMm":15,"cells":[{"id":"c","contentKind":"Text","text":"中文","verticalText":true}]}
             ]
         })).unwrap(),
@@ -110,20 +110,41 @@ fn grid_merge_uses_real_column_occupancy_styles_and_vertical_text() {
     let result = render_design(&data(), &grid(), &AtomicBool::new(false)).unwrap();
     let svg = &result.pages[0].svg;
     assert!(
-        svg.contains("x1=\"10\" y1=\"35\" x2=\"60\" y2=\"35\""),
-        "merged cell must cover 50 mm x 25 mm"
+        svg.contains("x1=\"10\" y1=\"39\" x2=\"50\" y2=\"39\""),
+        "merged cell must cover 40 mm x 28 mm"
     );
     assert!(
-        svg.contains("x1=\"60\" y1=\"20\" x2=\"110\" y2=\"20\""),
+        svg.contains("x1=\"50\" y1=\"24\" x2=\"70\" y2=\"24\""),
         "second-row cell must skip the rowspan"
     );
     assert!(svg.contains("stroke=\"#ff0000\""));
     assert!(svg.contains("stroke-dasharray=\"2 1\""));
     assert!(svg.contains("font-weight=\"700\" font-family=\"Noto Sans CJK SC\""));
     assert!(svg.contains("fill=\"#112233\""));
-    assert!(svg.contains("No: GRID-INVOICE"));
+    assert!(svg.contains("No: GRID-IN"));
+    assert!(svg.contains(">VOICE</text>"));
     assert!(svg.contains(">中</text>"));
     assert!(svg.contains(">文</text>"));
+    assert!(svg.contains("x1=\"70\" y1=\"24\" x2=\"110\" y2=\"10\""));
+    assert!(svg.contains(">项目</text>"));
+    assert!(svg.contains(">金额</text>"));
+}
+
+#[test]
+fn grid_content_that_does_not_fit_fails_instead_of_overlapping_neighbors() {
+    let mut design = grid();
+    if let Kind::Flow {
+        block: ReportBlock::Grid(block),
+        ..
+    } = &mut design.layers[1].elements[0].kind
+    {
+        block.rows[0].cells[1].style.font_size_pt = Some(24.);
+        block.rows[0].height_mm = Some(4.);
+        block.rows[0].cells[1].content_kind = "Text".into();
+        block.rows[0].cells[1].text = "THIS CONTENT CANNOT FIT".into();
+        block.rows[0].cells[1].field_path.clear();
+    }
+    assert!(render_design(&data(), &design, &AtomicBool::new(false)).is_err());
 }
 
 #[test]
@@ -166,7 +187,7 @@ fn invalid_merged_cells_fail_instead_of_drawing_over_other_columns() {
     } = &mut design.layers[1].elements[0].kind
     {
         block.rows[0].cells.truncate(1);
-        block.rows[0].cells[0].col_span = 3;
+        block.rows[0].cells[0].col_span = 4;
         block.rows[1].cells.clear();
     }
     // A row fully covered by a rowspan has no standalone cells in HTML/V3.
@@ -216,6 +237,72 @@ fn body_flow_wraps_before_the_footer_when_the_next_block_does_not_fit() {
     assert!(result.pages[0].svg.contains("GRID-INVOICE"));
     assert!(!result.pages[0].svg.contains("SECOND FLOW"));
     assert!(result.pages[1].svg.contains("SECOND FLOW"));
+}
+
+fn detail_with_surrounding_flows() -> Design {
+    let mut design = Design::invoice();
+    let mut before = design.layers[0].elements[0].clone();
+    before.id = "before-detail".into();
+    before.label = "Before detail".into();
+    before.x_hundredth_mm = 1000;
+    before.y_hundredth_mm = 2000;
+    before.width_hundredth_mm = 19000;
+    before.height_hundredth_mm = 800;
+    before.kind = Kind::Flow {
+        flow_kind: "Grid".into(),
+        block: serde_json::from_value(json!({
+            "id":"before-grid", "type":"Grid",
+            "columns":[{"id":"before-col","widthPercent":100}],
+            "rows":[{"id":"before-row","heightMm":8,"cells":[
+                {"id":"before-cell","contentKind":"Text","text":"BEFORE DETAIL"}
+            ]}]
+        }))
+        .unwrap(),
+    };
+    let mut after = before.clone();
+    after.id = "after-detail".into();
+    after.label = "After detail".into();
+    after.y_hundredth_mm = 12000;
+    if let Kind::Flow {
+        block: ReportBlock::Grid(block),
+        ..
+    } = &mut after.kind
+    {
+        block.id = "after-grid".into();
+        block.rows[0].cells[0].id = "after-cell".into();
+        block.rows[0].cells[0].text = "AFTER DETAIL".into();
+    }
+    design.layers[1].elements.insert(0, before);
+    design.layers[1].elements.push(after);
+    design
+}
+
+#[test]
+fn detail_table_allows_ordinary_flows_before_and_after_it() {
+    let result = render_design(
+        &data(),
+        &detail_with_surrounding_flows(),
+        &AtomicBool::new(false),
+    )
+    .unwrap();
+    let svg = &result.pages[0].svg;
+    let y = |needle: &str| {
+        svg.split("<text ")
+            .find_map(|part| part.contains(needle).then_some(part))
+            .and_then(|part| part.split(" y=\"").nth(1))
+            .and_then(|part| part.split('"').next())
+            .and_then(|value| value.parse::<f32>().ok())
+            .unwrap_or_default()
+    };
+    assert!(y("BEFORE DETAIL") < y("品名"));
+    assert!(y("品名") < y("AFTER DETAIL"));
+}
+
+#[test]
+fn detail_table_rejects_overlapping_following_flow() {
+    let mut design = detail_with_surrounding_flows();
+    design.layers[1].elements.last_mut().unwrap().y_hundredth_mm = 7001;
+    assert!(render_design(&data(), &design, &AtomicBool::new(false)).is_err());
 }
 
 #[test]
@@ -276,11 +363,11 @@ fn grid_vertical_alignment_changes_text_origin() {
     let bottom = render_design(&data(), &design, &AtomicBool::new(false)).unwrap();
     let text_y = |svg: &str| {
         svg.split("<text ")
-            .find_map(|part| part.contains("No: GRID-INVOICE").then_some(part))
+            .find_map(|part| part.contains("No: GRID-IN").then_some(part))
             .and_then(|part| part.split(" y=\"").nth(1))
             .and_then(|part| part.split('"').next())
             .and_then(|value| value.parse::<f32>().ok())
-            .unwrap()
+            .expect("invoice number text should be present")
     };
     assert!(text_y(&bottom.pages[0].svg) > text_y(&top.pages[0].svg));
 }

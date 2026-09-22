@@ -3,7 +3,9 @@
 use super::{PT_MM, measured_wrap, text_svg};
 use crate::{ReportData, Result, error::invalid};
 use export_doc_domain::{
-    designer::{Element, Kind, ReportBlock, ReportBorderStyle, ReportTextStyle, grid},
+    designer::{
+        Element, GridDiagonalHeader, Kind, ReportBlock, ReportBorderStyle, ReportTextStyle, grid,
+    },
     template::escape,
 };
 
@@ -119,21 +121,26 @@ pub(super) fn render(svg: &mut String, element: &Element, data: &ReportData) -> 
                     )
                 };
                 let style = inherit(&cell.style, &block.default_cell_style);
-                box_content(
-                    &mut content,
-                    &value,
-                    rect,
-                    &style,
-                    Some(cell.border.as_ref().unwrap_or(&block.border)),
-                    cell.vertical_text,
-                    element,
-                    data,
-                    if cell.content_kind == "Field" {
-                        &cell.field_path
-                    } else {
-                        ""
-                    },
-                )?;
+                let border = Some(cell.border.as_ref().unwrap_or(&block.border));
+                if let Some(header) = &cell.diagonal_header {
+                    diagonal_header(&mut content, header, rect, &style, border, element)?;
+                } else {
+                    box_content(
+                        &mut content,
+                        &value,
+                        rect,
+                        &style,
+                        border,
+                        cell.vertical_text,
+                        element,
+                        data,
+                        if cell.content_kind == "Field" {
+                            &cell.field_path
+                        } else {
+                            ""
+                        },
+                    )?;
+                }
             }
         }
         ReportBlock::Conditional(block) => {
@@ -265,6 +272,12 @@ fn box_content(
         )
     };
     let lines_height = lines.len() as f32 * size * 1.35;
+    if lines_height > h + size * 0.6 {
+        return Err(invalid(format!(
+            "普通表格单元格内容超出可用高度,请增高行高或缩小字号:{}",
+            value.chars().take(80).collect::<String>()
+        )));
+    }
     let top = match style.vertical_align.as_deref().unwrap_or("Top") {
         "Middle" => top + (h - lines_height).max(0.) / 2.,
         "Bottom" => top + (h - lines_height).max(0.),
@@ -280,6 +293,83 @@ fn box_content(
         style.bold.unwrap_or(element.style.bold),
         &element.style.color,
         style.align.as_deref().unwrap_or(&element.style.align),
+    );
+    Ok(())
+}
+
+fn diagonal_header(
+    svg: &mut String,
+    header: &GridDiagonalHeader,
+    rect: [f32; 4],
+    style: &ReportTextStyle,
+    border: Option<&ReportBorderStyle>,
+    element: &Element,
+) -> Result<()> {
+    let [x, y, width, height] = rect;
+    if let Some(border) = border {
+        draw_border(svg, rect, border);
+    }
+    let border_color = border
+        .map(|value| value.color.as_str())
+        .unwrap_or("#333333");
+    let stroke = border
+        .map(|value| (value.width_px * 25.4 / 96.).max(0.2))
+        .unwrap_or(0.2);
+    svg.push_str(&format!(
+        "<line x1=\"{x}\" y1=\"{}\" x2=\"{}\" y2=\"{y}\" stroke=\"{}\" stroke-width=\"{stroke}\"/>",
+        y + height,
+        x + width,
+        escape(border_color)
+    ));
+    let left = style.margin_left_mm.unwrap_or(1.2);
+    let right = style.margin_right_mm.unwrap_or(1.2);
+    let top = style.margin_top_mm.unwrap_or(1.2);
+    let bottom = style.margin_bottom_mm.unwrap_or(1.2);
+    let size = style.font_size_pt.unwrap_or(element.style.font_size_pt) * PT_MM;
+    let text_width = (width - left - right).max(size);
+    let bold = style.bold.unwrap_or(element.style.bold);
+    let upper_lines = measured_wrap(
+        &header.upper_left_text,
+        text_width,
+        &element.style.font_family,
+        bold,
+        size,
+    );
+    let lower_lines = measured_wrap(
+        &header.lower_right_text,
+        text_width,
+        &element.style.font_family,
+        bold,
+        size,
+    );
+    let upper_height = upper_lines.len() as f32 * size * 1.35;
+    let lower_height = lower_lines.len() as f32 * size * 1.35;
+    if upper_height > height - top - bottom - size * 0.4
+        || lower_height > height - top - bottom - size * 0.4
+    {
+        return Err(invalid("普通表格斜线表头文字超出单元格高度。"));
+    }
+    text_svg(
+        svg,
+        &upper_lines,
+        x + left,
+        y + top,
+        text_width,
+        size,
+        bold,
+        &element.style.color,
+        "Left",
+    );
+    text_svg(
+        svg,
+        &lower_lines,
+        x + left,
+        y + height - bottom - lower_height,
+        text_width,
+        size,
+        bold,
+        &element.style.color,
+        "Right",
     );
     Ok(())
 }

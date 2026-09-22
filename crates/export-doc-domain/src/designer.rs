@@ -6,9 +6,9 @@ pub mod grid;
 mod report_blocks;
 pub use report_blocks::{
     BlockOutput, ConditionalContent, ConditionalRule, GridCell, GridCheckboxOption, GridColumn,
-    GridRow, ReportBlock, ReportBlockBase, ReportBlockOutput, ReportBorderStyle,
-    ReportConditionalBlock, ReportGridBlock, ReportPageBreakBlock, ReportRowBlock, ReportTextStyle,
-    RowColumn,
+    GridDiagonalHeader, GridRow, ReportBlock, ReportBlockBase, ReportBlockOutput,
+    ReportBorderStyle, ReportConditionalBlock, ReportGridBlock, ReportPageBreakBlock,
+    ReportRowBlock, ReportTextStyle, RowColumn,
 };
 
 pub const PROFILE_MARKER: &str = "<!-- EXPORTDOC_NATIVE_VALIDATION_PROFILE_1 -->";

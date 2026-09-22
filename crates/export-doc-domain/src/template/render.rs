@@ -73,6 +73,10 @@ html,body {{ margin:0; padding:0; color:#173f3b; font-family:'Noto Sans CJK SC',
 .native-detail tr {{ break-inside:avoid; page-break-inside:avoid; }}
 .native-detail th,.native-detail td {{ border:0.2mm solid #c5d3cf; padding:2mm; vertical-align:top; overflow-wrap:anywhere; white-space:pre-wrap; }}
 .native-detail th {{ background:#eef6f5; font-weight:bold; }}
+.edm-report-grid-diagonal {{ position:relative; min-height:12mm; overflow:hidden; }}
+.edm-report-grid-diagonal::after {{ position:absolute; inset:0; width:141.42%; height:0.2mm; content:""; background:#333; transform-origin:left top; }}
+.edm-report-grid-diagonal-upper-left {{ position:absolute; top:1mm; left:1mm; }}
+.edm-report-grid-diagonal-lower-right {{ position:absolute; right:1mm; bottom:1mm; }}
 </style></head><body>{PROFILE_MARKER}
 {SCHEMA_MARKER}
 {schema}
@@ -203,19 +207,26 @@ fn render_grid(
     for row in rows {
         html.push_str("<tr>");
         for cell in &row.cells {
-            let content = match cell.content_kind.as_str() {
-                "Field" => format!(
-                    "{}{}",
-                    if cell.label.is_empty() {
-                        String::new()
-                    } else {
-                        format!("{}: ", escape(&cell.label))
-                    },
-                    expression(&cell.field_path, fields)?
-                ),
-                "CheckboxGroup" => {
-                    let value = expression(&cell.field_path, fields)?;
-                    cell.checkbox_options
+            let content = if let Some(header) = &cell.diagonal_header {
+                format!(
+                    "<div class=\"edm-report-grid-diagonal\"><span class=\"edm-report-grid-diagonal-upper-left\">{}</span><span class=\"edm-report-grid-diagonal-lower-right\">{}</span></div>",
+                    escape(&header.upper_left_text),
+                    escape(&header.lower_right_text)
+                )
+            } else {
+                match cell.content_kind.as_str() {
+                    "Field" => format!(
+                        "{}{}",
+                        if cell.label.is_empty() {
+                            String::new()
+                        } else {
+                            format!("{}: ", escape(&cell.label))
+                        },
+                        expression(&cell.field_path, fields)?
+                    ),
+                    "CheckboxGroup" => {
+                        let value = expression(&cell.field_path, fields)?;
+                        cell.checkbox_options
                         .iter()
                         .map(|option| {
                             format!(
@@ -225,8 +236,9 @@ fn render_grid(
                             )
                         })
                         .collect()
+                    }
+                    _ => escape(&cell.text),
                 }
-                _ => escape(&cell.text),
             };
             html.push_str(&format!(
                 "<td colspan=\"{}\" rowspan=\"{}\" style=\"{}{}\">{content}</td>",

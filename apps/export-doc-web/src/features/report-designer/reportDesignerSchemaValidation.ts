@@ -19,6 +19,7 @@ import { validateReportTypeFieldDomains } from "./reportDesignerSchemaDomains.ts
 import { normalizeDetailTableBlock } from "./reportDesignerSchemaDetailTable.ts";
 import { normalizeBlockOutputSettings } from "./reportDesignerSchemaBlockSettings.ts";
 import { reportGridCellPlacements } from "./reportDesignerGridPlacement.ts";
+import { normalizeGridDiagonalHeader } from "./reportDesignerGridDiagonalValidation.ts";
 import {
   createIssue,
   isRecord,
@@ -613,10 +614,12 @@ function normalizeGridCell(
     fallbackText: readOptionalString(value.fallbackText, `${path}.fallbackText`, issues),
     checkboxOptions: normalizeGridCheckboxOptions(value.checkboxOptions, `${path}.checkboxOptions`, issues),
     verticalText: readBoolean(value.verticalText, false, `${path}.verticalText`, issues),
+    diagonalHeader: normalizeGridDiagonalHeader(value.diagonalHeader, `${path}.diagonalHeader`, issues),
     style: normalizeTextStyle(value.style, `${path}.style`, issues),
     border: normalizeOptionalBorderStyle(value.border, `${path}.border`, issues),
   };
 }
+
 
 function readGridSpan(
   value: unknown,

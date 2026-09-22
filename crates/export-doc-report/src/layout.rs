@@ -9,6 +9,7 @@ use serde_json::Value;
 use std::{path::Path, sync::atomic::AtomicBool};
 
 mod detail;
+mod detail_mix;
 mod flow;
 
 const PT_MM: f32 = 25.4 / 72.0;
@@ -515,6 +516,16 @@ fn pages_data(
     let top = table.y_hundredth_mm as f32 / 100.;
     let left = table.x_hundredth_mm as f32 / 100.;
     let table_width = table.width_hundredth_mm as f32 / 100.;
+    let following_flows: Vec<_> = body_flows
+        .iter()
+        .copied()
+        .filter(|element| element.y_hundredth_mm > table.y_hundredth_mm)
+        .collect();
+    let preceding_flows: Vec<_> = body_flows
+        .iter()
+        .copied()
+        .filter(|element| element.y_hundredth_mm < table.y_hundredth_mm)
+        .collect();
     return detail::render(
         detail::DetailLayout {
             table: block,
@@ -527,7 +538,16 @@ fn pages_data(
             height,
             cancelled,
         },
-        |svg, index, count| fixed_elements(svg, design, data, index, count, true),
+        |svg, index, count, content_bottom| {
+            fixed_elements(svg, design, data, index, count, true)?;
+            if index == 0 {
+                detail_mix::render_preceding(svg, data, &preceding_flows, top)?;
+            }
+            if index + 1 == count {
+                detail_mix::render_following(svg, data, &following_flows, content_bottom, footer)?;
+            }
+            Ok(())
+        },
     );
 }
 
