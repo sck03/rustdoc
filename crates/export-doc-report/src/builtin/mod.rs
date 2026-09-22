@@ -1,12 +1,8 @@
-mod commercial;
-mod commercial_footer;
-mod commercial_header;
-mod customs;
-mod payment;
 use crate::{
     Document, ReportData, Result,
     error::{Error, ErrorKind, invalid},
 };
+use export_doc_domain::designer::Design;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,12 +25,12 @@ pub const BUILTINS: [Builtin; 6] = [
 impl Builtin {
     pub fn path(self) -> &'static str {
         match self {
-            Self::Invoice => "Templates/Export/invoice_template.html",
-            Self::PackingList => "Templates/Export/packing_list_template.html",
-            Self::Contract => "Templates/Export/contract_template.html",
-            Self::CustomsDeclaration => "Templates/Export/customs_declaration_template.html",
-            Self::PaymentVoucher => "Templates/Internal/payment_voucher_template.html",
-            Self::ExpenseReimbursement => "Templates/Internal/expense_reimbursement_template.html",
+            Self::Invoice => "Templates/Export/invoice_template.dtpl",
+            Self::PackingList => "Templates/Export/packing_list_template.dtpl",
+            Self::Contract => "Templates/Export/contract_template.dtpl",
+            Self::CustomsDeclaration => "Templates/Export/customs_declaration_template.dtpl",
+            Self::PaymentVoucher => "Templates/Internal/payment_voucher_template.dtpl",
+            Self::ExpenseReimbursement => "Templates/Internal/expense_reimbursement_template.dtpl",
         }
     }
     pub fn label(self) -> &'static str {
@@ -59,21 +55,21 @@ impl Builtin {
             .into_iter()
             .find(|template| template.path() == path)
     }
-    pub fn source(self) -> &'static str {
+    pub fn source(self) -> &'static [u8] {
         match self {
-            Self::Invoice => include_str!("../../../../Templates/Export/invoice_template.html"),
+            Self::Invoice => include_bytes!("../../../../Templates/Export/invoice_template.dtpl"),
             Self::PackingList => {
-                include_str!("../../../../Templates/Export/packing_list_template.html")
+                include_bytes!("../../../../Templates/Export/packing_list_template.dtpl")
             }
-            Self::Contract => include_str!("../../../../Templates/Export/contract_template.html"),
+            Self::Contract => include_bytes!("../../../../Templates/Export/contract_template.dtpl"),
             Self::CustomsDeclaration => {
-                include_str!("../../../../Templates/Export/customs_declaration_template.html")
+                include_bytes!("../../../../Templates/Export/customs_declaration_template.dtpl")
             }
             Self::PaymentVoucher => {
-                include_str!("../../../../Templates/Internal/payment_voucher_template.html")
+                include_bytes!("../../../../Templates/Internal/payment_voucher_template.dtpl")
             }
             Self::ExpenseReimbursement => {
-                include_str!("../../../../Templates/Internal/expense_reimbursement_template.html")
+                include_bytes!("../../../../Templates/Internal/expense_reimbursement_template.dtpl")
             }
         }
     }
@@ -87,20 +83,23 @@ pub fn render_builtin(
         return Err(invalid("模板与单据的数据域不一致。"));
     }
     check(cancelled)?;
-    let document = match template {
-        Builtin::Invoice | Builtin::PackingList | Builtin::Contract => {
-            commercial::render(template, data, cancelled)
-        }
-        Builtin::CustomsDeclaration => customs::render(data, cancelled),
-        Builtin::PaymentVoucher | Builtin::ExpenseReimbursement => {
-            payment::render(template, data, cancelled)
-        }
-    }?;
+    let design = Builtin::design(template)?;
+    let document = crate::render_design(data, &design, cancelled)?;
     if document.pages.len() > 500 {
         return Err(invalid("报表页数超过 500 页。"));
     }
     check(cancelled)?;
     Ok(document)
+}
+impl Builtin {
+    pub fn design(self) -> Result<Design> {
+        let design =
+            export_doc_domain::report_template_format::decode(self.source()).map_err(invalid)?;
+        if design.report_type != self.report_type() {
+            return Err(invalid("模板与单据的数据域不一致。"));
+        }
+        Ok(design)
+    }
 }
 fn check(cancelled: &AtomicBool) -> Result<()> {
     if cancelled.load(Ordering::Relaxed) {

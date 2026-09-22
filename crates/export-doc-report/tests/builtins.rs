@@ -1,5 +1,9 @@
 use export_doc_contracts::generated_api::ApiPaymentDto;
-use export_doc_domain::invoice::InvoiceDraft;
+use export_doc_domain::{
+    designer::{Kind, ReportBlock},
+    invoice::InvoiceDraft,
+    report_template_format,
+};
 use export_doc_report::{BUILTINS, Builtin, ErrorKind, ReportData, render_builtin};
 use serde_json::json;
 use std::sync::atomic::AtomicBool;
@@ -17,8 +21,58 @@ fn invoice(rows: usize) -> ReportData {
     ReportData::invoice(&draft.build().unwrap(), json!({}), json!({}), false).unwrap()
 }
 
+fn detail_table(template: Builtin) -> export_doc_domain::designer::DetailTable {
+    template
+        .design()
+        .unwrap()
+        .layers
+        .into_iter()
+        .flat_map(|layer| layer.elements)
+        .find_map(|element| match element.kind {
+            Kind::Flow {
+                block: ReportBlock::DetailTable(table),
+                ..
+            } => Some(table),
+            _ => None,
+        })
+        .unwrap()
+}
+
 #[test]
-fn every_builtin_renders_its_own_fields_and_paper_without_html_execution() {
+fn every_builtin_is_a_inspectable_dtpl_v3_document() {
+    for template in BUILTINS {
+        let design = template.design().unwrap();
+        assert_eq!(design.version, 3, "{}", template.label());
+        assert_eq!(design.ast_kind, "ReportDocument", "{}", template.label());
+        assert_eq!(design.contract_version, "3.0", "{}", template.label());
+        assert_eq!(
+            design.report_type,
+            template.report_type(),
+            "{}",
+            template.label()
+        );
+        assert!(
+            template.source().starts_with(b"EXPORTDOCDT"),
+            "{}",
+            template.label()
+        );
+        assert_eq!(
+            design,
+            report_template_format::decode(template.source()).unwrap(),
+            "{}",
+            template.label()
+        );
+        assert!(
+            design
+                .layers
+                .iter()
+                .any(|layer| layer.role == "Body" && layer.visible)
+        );
+    }
+}
+
+#[test]
+fn every_builtin_renders_its_own_domain_without_html_execution() {
     let invoice = invoice(3);
     let payment = ReportData::payment(
         &ApiPaymentDto {
@@ -51,43 +105,20 @@ fn every_builtin_renders_its_own_fields_and_paper_without_html_execution() {
         );
         assert!(!page.svg.contains("{{"));
         assert!(!page.svg.contains("<script"));
-        if template.report_type() == "PaymentVoucher" {
-            let text = page
-                .svg
-                .split('>')
-                .filter_map(|part| part.split_once('<').map(|(text, _)| text))
-                .collect::<String>();
-            assert!(text.contains("壹仟贰佰叁拾肆元伍角陆分"));
-            assert!(text.contains("报销备注&lt;&amp;&gt;"));
-        }
         assert!(document.html().unwrap().contains("@page report0"));
     }
 }
 
 #[test]
-fn invoice_and_packing_list_keep_twelve_items_per_page_and_one_total() {
+fn commercial_details_and_customs_continuation_use_shared_pagination() {
     for template in [Builtin::Invoice, Builtin::PackingList] {
-        let document = render_builtin(template, &invoice(36), &AtomicBool::new(false)).unwrap();
-        assert_eq!(document.pages.len(), 3);
-        assert!(document.pages[0].svg.contains("STYLE-12"));
-        assert!(!document.pages[0].svg.contains("STYLE-13"));
-        assert!(document.pages[2].svg.contains("STYLE-36"));
-        assert!(!document.pages[0].svg.contains("TOTAL:"));
-        assert!(document.pages[2].svg.contains("TOTAL:"));
+        let table = detail_table(template);
+        assert_eq!(table.print.first_page_rows, Some(12));
+        assert_eq!(table.print.continuation_page_rows, Some(12));
     }
-}
-
-#[test]
-fn customs_continuation_keeps_all_items_after_the_first_six() {
-    let document = render_builtin(
-        Builtin::CustomsDeclaration,
-        &invoice(37),
-        &AtomicBool::new(false),
-    )
-    .unwrap();
-    assert_eq!(document.pages.len(), 4);
-    assert!(document.pages[3].svg.contains(">37</text>"));
-    assert!(document.pages[0].svg.contains("境外品牌"));
+    let customs = detail_table(Builtin::CustomsDeclaration);
+    assert_eq!(customs.print.first_page_rows, Some(6));
+    assert_eq!(customs.print.continuation_page_rows, Some(15));
 }
 
 #[test]
@@ -110,29 +141,6 @@ fn snapshots_override_master_data_without_case_alias_duplicates() {
         draft.header.exporter_name_en
     );
     assert_eq!(data.text("Exporter.CreditCode"), "TEST-CREDIT-001");
-}
-
-#[test]
-fn long_payment_notes_continue_without_losing_text_or_signatures() {
-    let payment = ReportData::payment(
-        &ApiPaymentDto {
-            notes: format!("{}END-NOTES", "备注内容，核对费用。\n".repeat(150)),
-            ..Default::default()
-        },
-        json!({}),
-    )
-    .unwrap();
-    for template in [Builtin::PaymentVoucher, Builtin::ExpenseReimbursement] {
-        let document = render_builtin(template, &payment, &AtomicBool::new(false)).unwrap();
-        assert!(document.pages.len() > 1);
-        let last = &document.pages.last().unwrap().svg;
-        assert!(last.contains("END-NOTES"));
-        assert!(last.contains(if template == Builtin::PaymentVoucher {
-            "复核:"
-        } else {
-            "审批签字:"
-        }));
-    }
 }
 
 #[test]

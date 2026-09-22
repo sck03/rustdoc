@@ -140,7 +140,7 @@ export function InvoiceReportPreviewPanel({
       templates,
       currentPath: selectedTemplatePath,
       configuredPath: configuredTemplatePath,
-      fallbackFileName: "invoice_template.html",
+      fallbackFileName: "invoice_template.dtpl",
     });
     if (next !== selectedTemplatePath) {
       setSelectedTemplatePath(next);

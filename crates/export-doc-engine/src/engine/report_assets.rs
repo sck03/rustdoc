@@ -98,6 +98,13 @@ fn contains(value: &Value, id: &str) -> Result<bool> {
     }
 }
 fn schema(content: &str) -> Result<Value> {
+    schema_bytes(content.as_bytes())
+}
+fn schema_bytes(content: &[u8]) -> Result<Value> {
+    if let Ok(design) = export_doc_domain::report_template_format::decode(content) {
+        return serde_json::to_value(design).map_err(|_| invalid("报表模板结构无效。"));
+    }
+    let content = std::str::from_utf8(content).map_err(|_| invalid("报表模板文本编码无效。"))?;
     let value = content
         .split_once(crate::designer::SCHEMA_MARKER)
         .and_then(|(_, v)| v.split_once("-->"))
@@ -416,7 +423,7 @@ pub fn hydrate(
     store: &Store,
     actor: &Actor,
     data: &mut ReportData,
-    content: Option<&str>,
+    content: Option<&[u8]>,
 ) -> Result<()> {
     let tx = store.connection()?;
     if data.text("Invoice.ShippingMarksType") == "Image" {
@@ -438,7 +445,7 @@ pub fn hydrate(
         }
     }
     if let Some(content) = content {
-        let schema = schema(content)?;
+        let schema = schema_bytes(content)?;
         for resource in schema["resources"].as_array().into_iter().flatten() {
             let id = text(resource, "id");
             let image = read(&tx, actor, &id)?;

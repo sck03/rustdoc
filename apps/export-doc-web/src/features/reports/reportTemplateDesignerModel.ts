@@ -37,7 +37,7 @@ export const importStrategyOptions: Array<{ value: TemplateImportStrategyOption;
 export const previewSourcePageSize = 50;
 
 export function defaultTemplateFileName(reportType: ReportTypeOption) {
-  return reportType === "PaymentVoucher" ? "payment_voucher_template.html" : "invoice_template.html";
+  return reportType === "PaymentVoucher" ? "payment_voucher_template.dtpl" : "invoice_template.dtpl";
 }
 
 export function readReportTypeFromSearch(search: string): ReportTypeOption | null {
@@ -143,7 +143,7 @@ export function resolvePreviewSourceId(currentId: number, sourceIds: number[]) {
 export function buildNewTemplateFileName(reportType: ReportTypeOption) {
   const stamp = buildTimestamp(new Date());
   const prefix = reportType === "PaymentVoucher" ? "internal_template" : "export_template";
-  return `${prefix}_${stamp}.html`;
+  return `${prefix}_${stamp}.dtpl`;
 }
 
 export function buildTemplatePackageFileName() {
@@ -151,7 +151,7 @@ export function buildTemplatePackageFileName() {
 }
 
 export function buildTemplateFileName(reportType: ReportTypeOption) {
-  return `${reportType === "PaymentVoucher" ? "payment_voucher" : "export_document"}_template.html`;
+  return `${reportType === "PaymentVoucher" ? "payment_voucher" : "export_document"}_template.dtpl`;
 }
 
 export function buildUserTemplateKey(id: number) {

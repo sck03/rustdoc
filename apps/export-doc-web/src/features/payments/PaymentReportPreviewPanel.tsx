@@ -92,7 +92,7 @@ export function PaymentReportPreviewPanel({
       templates: templateViews,
       currentPath: selectedTemplatePath,
       configuredPath: configuredTemplatePath,
-      fallbackFileName: "payment_voucher_template.html",
+      fallbackFileName: "payment_voucher_template.dtpl",
     });
     if (next !== selectedTemplatePath) setSelectedTemplatePath(next);
   }, [configuredTemplatePath, selectedTemplatePath, settingsQuery.isFetching, templateViews]);

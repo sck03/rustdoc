@@ -1,6 +1,6 @@
 //! Report use cases. Storage, permissions and jobs stay here; physical layout
 //! and encoding live in export-doc-report.
-use super::report_templates::{report_type, validate_content};
+use super::report_templates::{report_type, validate_bytes, validate_content};
 use super::{
     NativeService, auth,
     error::{Result, conflict, error, invalid, unavailable, unsupported},
@@ -10,6 +10,7 @@ use super::{
     tasks::TaskOutput,
 };
 use crate::{contracts, designer::Design, generated_api::*, invoice::InvoiceDraft, paths};
+use base64::Engine;
 use export_doc_report::{self as render, Builtin, Document, ReportData};
 use serde_json::{Value, json};
 use std::{path::PathBuf, sync::atomic::AtomicBool};
@@ -42,30 +43,37 @@ enum Template {
         name: String,
         path: String,
     },
+    File {
+        design: Design,
+        content: Vec<u8>,
+        name: String,
+        path: String,
+    },
 }
 impl Template {
     fn label(&self) -> &str {
         match self {
             Self::Builtin(v) => v.label(),
-            Self::Custom { name, .. } => name,
+            Self::Custom { name, .. } | Self::File { name, .. } => name,
         }
     }
     fn path(&self) -> &str {
         match self {
             Self::Builtin(v) => v.path(),
-            Self::Custom { path, .. } => path,
+            Self::Custom { path, .. } | Self::File { path, .. } => path,
         }
     }
-    fn content(&self) -> &str {
+    fn content(&self) -> &[u8] {
         match self {
             Self::Builtin(v) => v.source(),
-            Self::Custom { content, .. } => content,
+            Self::Custom { content, .. } => content.as_bytes(),
+            Self::File { content, .. } => content,
         }
     }
     fn render(&self, data: &ReportData, cancelled: &AtomicBool) -> Result<Document> {
         match self {
             Self::Builtin(v) => render::render_builtin(*v, data, cancelled).map_err(Into::into),
-            Self::Custom { design, .. } => {
+            Self::Custom { design, .. } | Self::File { design, .. } => {
                 render::render_design(data, design, cancelled).map_err(Into::into)
             }
         }
@@ -142,8 +150,8 @@ fn template(
     {
         let (display, stored, content, _) =
             super::report_template_files::load_resolved_template(paths, kind, reference)?;
-        let design = validate_content(kind, &content)?;
-        return Ok(Template::Custom {
+        let design = validate_bytes(kind, &content)?;
+        return Ok(Template::File {
             design,
             content,
             name: display,
@@ -305,11 +313,7 @@ pub fn preview_document(
         &service.store,
         actor,
         &mut data,
-        if matches!(template, Template::Custom { .. }) {
-            Some(template.content())
-        } else {
-            None
-        },
+        Some(template.content()),
     )?;
     let document = template.render(&data, &crate::operation::cancellation_flag())?;
     let mut metadata = json!({"reportType":kind,"templatePath":template.path(),"storagePolicy":"预览只使用当前草稿，不写入正式单据。"});
@@ -353,11 +357,7 @@ fn prepare(
         store,
         actor,
         &mut data,
-        if matches!(template, Template::Custom { .. }) {
-            Some(template.content())
-        } else {
-            None
-        },
+        Some(template.content()),
     )?;
     Ok((data, template))
 }
@@ -545,7 +545,7 @@ pub fn handle(
                 false,
             )?;
             Ok(
-                json!({"reportType":kind,"displayName":template.label(),"templatePath":template.path(),"content":template.content(),"revision":super::media::digest(template.content().as_bytes()),"withSealDefault":false,"storagePolicy":"内置模板随程序提供，用户模板存入业务数据库。"}),
+                json!({"reportType":kind,"displayName":template.label(),"templatePath":template.path(),"content":base64::engine::general_purpose::STANDARD.encode(template.content()),"contentEncoding":"base64","revision":super::media::digest(template.content()),"withSealDefault":false,"storagePolicy":"内置模板随程序提供，用户模板存入业务数据库。"}),
             )
         }
         PREVIEW_INVOICE_REPORT_HTML
@@ -570,7 +570,7 @@ pub fn handle(
             let content = text(body, "content");
             let template = if let Some(preset) = render::BUILTINS
                 .into_iter()
-                .find(|v| v.source().trim() == content.trim())
+                .find(|v| v.source() == content.as_bytes())
             {
                 Template::Builtin(preset)
             } else {
@@ -603,11 +603,7 @@ pub fn handle(
                 &service.store,
                 actor,
                 &mut data,
-                if matches!(template, Template::Custom { .. }) {
-                    Some(template.content())
-                } else {
-                    None
-                },
+                Some(template.content()),
             )?;
             let html = template
                 .render(&data, &crate::operation::cancellation_flag())?

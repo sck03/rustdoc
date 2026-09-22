@@ -45,7 +45,7 @@ export function useReportTemplateFileMutations({
     }),
     onSuccess: (blob) => {
       const fileName = fileNameFromPath(fileExportPath.trim()) || buildTemplateFileName(reportType);
-      downloadBlob(blob, fileName.endsWith(".html") ? fileName : `${fileName}.html`);
+      downloadBlob(blob, fileName.endsWith(".dtpl") ? fileName : `${fileName}.dtpl`);
       onDownloaded();
     },
     onError,

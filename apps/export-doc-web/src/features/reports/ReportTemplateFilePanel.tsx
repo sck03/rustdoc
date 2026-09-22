@@ -79,7 +79,7 @@ export function ReportTemplateFilePanel({
             </button>
           ) : (
             <>
-              <input ref={uploadInputRef} type="file" accept=".html,text/html" hidden onChange={onUploadFileChange} />
+              <input ref={uploadInputRef} type="file" accept=".dtpl,.html,application/octet-stream,text/html" hidden onChange={onUploadFileChange} />
               <button className="command-button secondary" type="button" disabled={!canUpload} onClick={onUpload}>
                 <Upload size={17} aria-hidden="true" />
                 <span>上传文件</span>

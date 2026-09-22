@@ -756,8 +756,11 @@ impl Design {
             .and_then(|(_, rest)| rest.split_once("-->"))
             .map(|(json, _)| json)
             .ok_or("模板缺少 V3 结构。")?;
-        let design: Self = serde_json::from_str(json)
-            .map_err(|error| format!("模板含验证版不支持的结构，已保留原内容：{error}"))?;
+        Self::from_source(json)
+    }
+    pub fn from_source(source: &str) -> Result<Self, String> {
+        let design: Self = serde_json::from_str(source.trim())
+            .map_err(|error| format!("模板含验证版不支持的结构,已保留原内容:{error}"))?;
         if design.version != 3
             || !["ExportDocument", "PaymentVoucher"].contains(&design.report_type.as_str())
             || design.contract_version != "3.0"

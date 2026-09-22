@@ -544,20 +544,16 @@ assert(inferred.sourceVersion === null && inferred.migrated, "无 V3 schema 的�
 assert(inferred.issues.some((issue) => issue.message.includes("高级 HTML") && issue.message.includes("确认")), "经典 HTML 必须明确保持高级 HTML，转换需人工确认");
 
 for (const classicPath of [
-  "Templates/Export/customs_declaration_template.html",
-  "Templates/Export/packing_list_template.html",
-  "Templates/Export/invoice_template.html",
-  "Templates/Export/contract_template.html",
-  "Templates/Internal/payment_voucher_template.html",
-  "Templates/Internal/expense_reimbursement_template.html",
+  "Templates/Export/customs_declaration_template.dtpl",
+  "Templates/Export/packing_list_template.dtpl",
+  "Templates/Export/invoice_template.dtpl",
+  "Templates/Export/contract_template.dtpl",
+  "Templates/Internal/payment_voucher_template.dtpl",
+  "Templates/Internal/expense_reimbursement_template.dtpl",
 ]) {
-  const classicSource = fs.readFileSync(path.join(repoRoot, classicPath), "utf8");
-  const classic = api.parseReportDesignerV3FromHtml(classicSource, classicPath.includes("Internal") ? "PaymentVoucher" : "ExportDocument");
-  assert(classic.sourceVersion === null && !classic.hadSchema, `${classicPath} 必须保持无 schema 的高级 HTML 模式`);
-  assert(classic.migrated && classic.issues.some((issue) => issue.message.includes("高级 HTML")), `${classicPath} 打开时只能提示可选 V3 草稿，不能当作 V3 运行`);
-  if (classicPath.endsWith("invoice_template.html") || classicPath.endsWith("packing_list_template.html")) {
-    assertFixedRightMetadataLayout(classicSource, classicPath);
-  }
+  const source = fs.readFileSync(path.join(repoRoot, classicPath));
+  assert(source.subarray(0, 11).toString("ascii") === "EXPORTDOCDT", "default template must use the project-owned .dtpl container");
+  assert(source[0] !== 0x7b, "default template must not be directly editable JSON");
 }
 
 const brokenV3 = api.parseReportDesignerV3FromHtml(

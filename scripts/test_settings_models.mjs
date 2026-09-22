@@ -95,21 +95,21 @@ assert(clearedNotifyParty.notifyPartyName === "" && clearedNotifyParty.notifyPar
 assert(masterDataModel.normalizeCustomerRecord({ id: 10, notifyPartyMode: "Legacy" }, 10).notifyPartyMode === "None", "unknown notify mode is rejected at the UI boundary");
 
 const templatePaths = [
-  { templatePath: "builtin:Export/invoice_template.html" },
+  { templatePath: "builtin:Export/invoice_template.dtpl" },
   { templatePath: "user:Export/customer_invoice.html" },
 ];
 assert(reportTemplateSelection.resolveReportTemplatePath({
   templates: templatePaths,
   currentPath: "",
   configuredPath: "user:Export/customer_invoice.html",
-  fallbackFileName: "invoice_template.html",
+  fallbackFileName: "invoice_template.dtpl",
 }) === "user:Export/customer_invoice.html", "configured report template wins");
 assert(reportTemplateSelection.resolveReportTemplatePath({
   templates: templatePaths,
-  currentPath: "builtin:Export/invoice_template.html",
+  currentPath: "builtin:Export/invoice_template.dtpl",
   configuredPath: "user:Export/customer_invoice.html",
-  fallbackFileName: "invoice_template.html",
-}) === "builtin:Export/invoice_template.html", "current user selection remains stable");
+  fallbackFileName: "invoice_template.dtpl",
+}) === "builtin:Export/invoice_template.dtpl", "current user selection remains stable");
 assert(reportTemplateSelection.readDefaultReportTemplatePath({
   reportTemplateDefaults: { paymentVoucherTemplatePath: "user:Internal/payment.html" },
 }, "PaymentVoucher") === "user:Internal/payment.html", "payment default template setting");

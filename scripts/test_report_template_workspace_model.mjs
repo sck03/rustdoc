@@ -70,7 +70,7 @@ assertEqual(resolveReportTypeOptions(true, false, false).length, 0, "通用模�
 
 const templates = [
   { templatePath: "E:/app/Templates/Export/custom.html", displayName: "自定义发票", reportType: "ExportDocument", withSealDefault: false },
-  { templatePath: "E:/app/Templates/Export/invoice_template.html", displayName: "发票", reportType: "ExportDocument", withSealDefault: true },
+  { templatePath: "E:/app/Templates/Export/invoice_template.dtpl", displayName: "发票", reportType: "ExportDocument", withSealDefault: true },
 ];
 
 assertEqual(
@@ -156,11 +156,11 @@ assertEqual("sourceTemplatePath" in blankCreate, false, "新建命令不得混�
 assertEqual(blankCreate.name, "新建空白模板", "新模板名称应在提交前规范化");
 const builtInClone = buildUserTemplateClonePayload({
   reportType: "ExportDocument",
-  selectedTemplatePath: "  builtin:Export/invoice_template.html  ",
+  selectedTemplatePath: "  builtin:Export/invoice_template.dtpl  ",
   selectedUserTemplateId: 0,
   name: "  内置模板副本  ",
 });
-assertEqual(builtInClone.sourceTemplatePath, "builtin:Export/invoice_template.html", "内置模板复制只提交受管引用");
+assertEqual(builtInClone.sourceTemplatePath, "builtin:Export/invoice_template.dtpl", "内置模板复制只提交受管引用");
 assertEqual("contentHtml" in builtInClone, false, "复制命令不得上传浏览器模板正文");
 const userClone = buildUserTemplateClonePayload({
   reportType: "ExportDocument",
@@ -189,9 +189,9 @@ const baseWorkspaceStateInput = {
   designerDraftValid: true,
   content: "<html>{{ Invoice.InvoiceNo }}</html>",
   loadedContent: "<html>{{ Invoice.InvoiceNo }}</html>",
-  contentTemplatePath: "builtin:Export/invoice_template.html",
-  selectedTemplatePath: "builtin:Export/invoice_template.html",
-  selectedContentTemplatePath: "builtin:Export/invoice_template.html",
+  contentTemplatePath: "builtin:Export/invoice_template.dtpl",
+  selectedTemplatePath: "builtin:Export/invoice_template.dtpl",
+  selectedContentTemplatePath: "builtin:Export/invoice_template.dtpl",
   currentUserTemplate: null,
   templatePreviewMode: "savedSource",
   templatePreviewSampleProfile: "apiSample",

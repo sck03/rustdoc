@@ -130,7 +130,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
     const templates = reportTemplatesQuery.data ?? [];
     if (!templates.length || settingsQuery.isFetching) return;
     const nextPath = resolveReportTemplatePath({ templates, currentPath: reportTemplatePath,
-      configuredPath: configuredReportTemplatePath, fallbackFileName: "invoice_template.html" });
+      configuredPath: configuredReportTemplatePath, fallbackFileName: "invoice_template.dtpl" });
     if (nextPath === reportTemplatePath) return;
     const preferredTemplate = templates.find((template) => template.templatePath === nextPath);
     operations.setReportTemplatePath(nextPath);

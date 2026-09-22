@@ -12,9 +12,29 @@ pub fn download(
         auth::authorize(actor, PERMISSION, "export")?;
         let resolved =
             resolve_editable(service, kind, &parameter(parameters, "templatePath"), true)?;
+        let extension = resolved
+            .path
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or(REPORT_TEMPLATE_EXTENSION_NAME);
+        let is_html = extension == HTML_EXTENSION_NAME;
+        let file_name = resolved
+            .path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("");
         return Ok(FileOutput {
-            file_name: "template.html".into(),
-            media_type: "text/html; charset=utf-8".into(),
+            file_name: if file_name.is_empty() {
+                format!("template.{}", if is_html { "html" } else { "dtpl" })
+            } else {
+                file_name.into()
+            },
+            media_type: if is_html {
+                "text/html; charset=utf-8"
+            } else {
+                "application/json"
+            }
+            .into(),
             content: fs::read(&resolved.path)?,
         });
     }
@@ -39,12 +59,14 @@ fn upload_template_name(file_name: &str) -> Result<String> {
         .ok_or_else(|| invalid("模板文件名不能为空。"))?;
     let name: String = name.nfc().collect();
     if !paths::valid_file_name(&name)
-        || Path::new(&name)
-            .extension()
-            .and_then(|value| value.to_str())
-            != Some(EXTENSION_NAME)
+        || !matches!(
+            Path::new(&name)
+                .extension()
+                .and_then(|value| value.to_str()),
+            Some(REPORT_TEMPLATE_EXTENSION_NAME) | Some(HTML_EXTENSION_NAME)
+        )
     {
-        return Err(invalid("报表模板文件只支持小写 .html 扩展名。"));
+        return Err(invalid("报表模板文件只支持小写 .dtpl 或 .html 扩展名。"));
     }
     Ok(name)
 }

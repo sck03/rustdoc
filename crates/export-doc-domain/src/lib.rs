@@ -15,6 +15,7 @@ pub mod party;
 pub mod payment;
 pub mod permissions;
 pub mod product;
+pub mod report_template_format;
 pub mod sales;
 pub mod supplier;
 pub mod template;

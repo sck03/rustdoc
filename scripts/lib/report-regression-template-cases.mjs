@@ -155,7 +155,7 @@ const templateCatalog = [
   },
   {
     slug: "built-in-invoice-template",
-    relativePath: "Templates/Export/invoice_template.html",
+    relativePath: "Templates/Export/invoice_template.dtpl",
     expectedTemplatePageOrientation: "portrait",
     profiles: {
       visual: {
@@ -209,7 +209,7 @@ const templateCatalog = [
   },
   {
     slug: "built-in-packing-list-template",
-    relativePath: "Templates/Export/packing_list_template.html",
+    relativePath: "Templates/Export/packing_list_template.dtpl",
     expectedTemplatePageOrientation: "portrait",
     profiles: {
       visual: {
@@ -263,7 +263,7 @@ const templateCatalog = [
   },
   {
     slug: "built-in-contract-template",
-    relativePath: "Templates/Export/contract_template.html",
+    relativePath: "Templates/Export/contract_template.dtpl",
     expectedTemplatePageOrientation: "portrait",
     profiles: {
       visual: {
@@ -314,7 +314,7 @@ const templateCatalog = [
   },
   {
     slug: "built-in-customs-declaration-template",
-    relativePath: "Templates/Export/customs_declaration_template.html",
+    relativePath: "Templates/Export/customs_declaration_template.dtpl",
     expectedTemplatePageOrientation: "landscape",
     profiles: {
       visual: {
@@ -363,7 +363,7 @@ const templateCatalog = [
   },
   {
     slug: "built-in-payment-voucher-template",
-    relativePath: "Templates/Internal/payment_voucher_template.html",
+    relativePath: "Templates/Internal/payment_voucher_template.dtpl",
     profiles: {
       visual: {
         viewport: { width: 900, height: 1270 },
@@ -413,7 +413,7 @@ const templateCatalog = [
   },
   {
     slug: "built-in-expense-reimbursement-template",
-    relativePath: "Templates/Internal/expense_reimbursement_template.html",
+    relativePath: "Templates/Internal/expense_reimbursement_template.dtpl",
     profiles: {
       visual: {
         viewport: { width: 900, height: 1270 },

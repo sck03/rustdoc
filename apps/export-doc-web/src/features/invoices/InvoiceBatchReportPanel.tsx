@@ -28,7 +28,7 @@ export function InvoiceBatchReportPanel({ client, selected, onChange }: {
   const settingsQuery = useQuery({ queryKey: queryKeys.settings(), queryFn: ({ signal }) => client.getSettings({ signal }), enabled: open });
   const templates = templatesQuery.data ?? [];
   const resolvedTemplate = resolveReportTemplatePath({ templates, currentPath: templatePath,
-    configuredPath: readDefaultReportTemplatePath(settingsQuery.data?.settings, "ExportDocument"), fallbackFileName: "invoice_template.html" });
+    configuredPath: readDefaultReportTemplatePath(settingsQuery.data?.settings, "ExportDocument"), fallbackFileName: "invoice_template.dtpl" });
   const withSeal = withSealOverride ?? templates.find((item) => item.templatePath === resolvedTemplate)?.withSealDefault ?? true;
   const exportMutation = useMutation({
     mutationFn: () => run((signal) => createInvoiceReportExport(client, {

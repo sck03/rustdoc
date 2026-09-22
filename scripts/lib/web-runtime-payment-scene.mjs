@@ -715,10 +715,10 @@ export function createPaymentSmokeScene(runtime) {
     }
 
     const preferredTemplate =
-      templates.find((template) => smokeFileNameFromPath(template?.templatePath).toLowerCase() === "payment_voucher_template.html") ??
+      templates.find((template) => smokeFileNameFromPath(template?.templatePath).toLowerCase() === "payment_voucher_template.dtpl") ??
       templates[0];
     const reimbursementTemplate =
-      templates.find((template) => smokeFileNameFromPath(template?.templatePath).toLowerCase() === "expense_reimbursement_template.html") ??
+      templates.find((template) => smokeFileNameFromPath(template?.templatePath).toLowerCase() === "expense_reimbursement_template.dtpl") ??
       null;
     const disabledTemplate =
       templates.find(
@@ -838,7 +838,7 @@ export function createPaymentSmokeScene(runtime) {
     if (!settings.reimbursementPath) {
       return {
         skipped: true,
-        reason: "No expense_reimbursement_template.html was available in the PaymentVoucher template catalog.",
+        reason: "No expense_reimbursement_template.dtpl was available in the PaymentVoucher template catalog.",
       };
     }
 

@@ -43,7 +43,7 @@ await require("esbuild").build({ stdin: { resolveDir: web, loader: "tsx", conten
   window.__requests=[];window.__errors=[];window.addEventListener('error',event=>window.__errors.push(event.message));
   const paged=items=>({items,pageNumber:1,pageSize:20,totalCount:items.length,totalPages:1});
   const client={listJobs:async()=>paged([]),getSettings:async()=>({settings:{}}),
-    listReportTemplates:async()=>[{templatePath:'invoice_template.html',displayName:'出口发票',withSealDefault:true}],
+    listReportTemplates:async()=>[{templatePath:'invoice_template.dtpl',displayName:'出口发票',withSealDefault:true}],
     listInvoices:async input=>{window.__requests.push({kind:'search',keyword:input.keyword});return paged(invoices.filter(invoice=>(invoice.invoiceNo+' '+invoice.customerName).includes(input.keyword||'')).slice(0,20))},
     startInvoiceReportPdfZipDownloadJob:async input=>{window.__requests.push({kind:'zip',body:input.body});throw new Error('模拟依赖不可用，请稍后重试。')},
   };

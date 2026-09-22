@@ -36,9 +36,11 @@ use unicode_normalization::UnicodeNormalization;
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 const PERMISSION: &str = "document.report-templates";
-const EXTENSION: &str = ".html";
+const EXTENSION: &str = ".dtpl";
+const HTML_EXTENSION: &str = ".html";
 /// `Path::extension()` 不含点，与 `EXTENSION` 后缀分开比较。
-const EXTENSION_NAME: &str = "html";
+pub(super) const REPORT_TEMPLATE_EXTENSION_NAME: &str = "dtpl";
+pub(super) const HTML_EXTENSION_NAME: &str = "html";
 pub(super) const PACKAGE_EXTENSION: &str = ".edtpl";
 pub(super) const PACKAGE_SCHEMA_VERSION: &str = "1.3";
 const CATALOG_FILE: &str = "report_templates.json";
@@ -100,9 +102,9 @@ pub(super) fn load_resolved_template(
     paths: &RuntimePaths,
     kind: &str,
     stored: &str,
-) -> Result<(String, String, String, Option<bool>)> {
+) -> Result<(String, String, Vec<u8>, Option<bool>)> {
     let resolved = catalog::resolve_template(paths, kind, stored)?;
-    let content = fs::read_to_string(&resolved.path)?;
+    let content = fs::read(&resolved.path)?;
     if content.len() > MAX_TEMPLATE_BYTES {
         return Err(invalid("报表模板内容超过允许的大小。"));
     }

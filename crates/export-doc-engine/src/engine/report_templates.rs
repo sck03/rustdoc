@@ -66,10 +66,20 @@ pub fn fields(kind: &str) -> Result<ApiReportTemplateFieldCatalogResponse> {
     .map_err(Into::into)
 }
 pub fn validate_content(kind: &str, content: &str) -> Result<Design> {
-    if content.trim().is_empty() || content.len() > 4 * 1024 * 1024 {
-        return Err(invalid("报表模板内容不能为空或超过 4 MiB。"));
+    validate_bytes(kind, content.as_bytes())
+}
+
+pub fn validate_bytes(kind: &str, content: &[u8]) -> Result<Design> {
+    if content.is_empty() || content.len() > 10 * 1024 * 1024 {
+        return Err(invalid("报表模板内容不能为空或超过 10 MiB。"));
     }
-    let design = Design::from_html(content).map_err(invalid)?;
+    let design = export_doc_domain::report_template_format::decode(content)
+        .or_else(|_| {
+            std::str::from_utf8(content)
+                .map_err(|_| "报表模板文本编码无效。".to_string())
+                .and_then(Design::from_html)
+        })
+        .map_err(invalid)?;
     if design.report_type != report_type(kind)? {
         return Err(invalid("模板与单据的数据域不一致。"));
     }

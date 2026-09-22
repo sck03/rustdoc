@@ -87,7 +87,7 @@ async function open(scenario, file = false) {
   if (page) await cdp.send("Target.closeTarget", { targetId: page.targetId });
   page = await createPageSession(cdp);
   await page.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-  await page.send("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/?scenario=${scenario}#/reports/templates?reportType=ExportDocument&${file ? "template=invoice_template.html" : "userTemplateId=23"}` });
+  await page.send("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/?scenario=${scenario}#/reports/templates?reportType=ExportDocument&${file ? "template=invoice_template.dtpl" : "userTemplateId=23"}` });
   await waitFor("document.querySelector('.report-template-layout')"); await settle();
 }
 async function record(name) { assert.deepEqual(await read("window.__errors"), [], name); results.push(name); }

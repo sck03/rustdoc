@@ -143,10 +143,14 @@ pub(super) fn to_absolute(paths: &RuntimePaths, stored: &str) -> Result<PathBuf>
     })
 }
 pub(super) fn validate_existing(path: &Path) -> Result<()> {
-    if path.extension().and_then(|value| value.to_str()) != Some(EXTENSION_NAME)
-        || !paths::valid_file_name(file_name(path))
+    if !matches!(
+        path.extension().and_then(|value| value.to_str()),
+        Some(REPORT_TEMPLATE_EXTENSION_NAME) | Some(HTML_EXTENSION_NAME)
+    ) || !paths::valid_file_name(file_name(path))
     {
-        return Err(invalid("报表模板必须使用安全文件名和小写 .html 扩展名。"));
+        return Err(invalid(
+            "报表模板必须使用安全文件名和小写 .dtpl 或 .html 扩展名。",
+        ));
     }
     Ok(())
 }
@@ -156,8 +160,11 @@ pub(super) fn normalize_new(path: &Path) -> Result<PathBuf> {
         let mut name = file_name(path).to_owned();
         name.push_str(EXTENSION);
         normalized.set_file_name(name);
-    } else if path.extension().and_then(|value| value.to_str()) != Some(EXTENSION_NAME) {
-        return Err(invalid("报表模板扩展名必须使用小写 .html。"));
+    } else if !matches!(
+        path.extension().and_then(|value| value.to_str()),
+        Some(REPORT_TEMPLATE_EXTENSION_NAME) | Some(HTML_EXTENSION_NAME)
+    ) {
+        return Err(invalid("报表模板扩展名必须使用小写 .dtpl 或 .html。"));
     }
     let name: String = file_name(&normalized).nfc().collect();
     if !paths::valid_file_name(&name) {
@@ -332,7 +339,7 @@ pub(super) fn default_file_name(service: &NativeService, kind: &str) -> Result<S
     };
     let now = service.clock.now().map_err(unavailable)?;
     Ok(format!(
-        "{}_{}{}.html",
+        "{}_{}{}.dtpl",
         prefix,
         now.utc_now.format("%Y%m%d%H%M%S"),
         &paths::nonce().map_err(unavailable)?[..8]
@@ -444,7 +451,10 @@ pub(super) fn catalog_entries(paths: &RuntimePaths, kind: &str) -> Result<Vec<Va
                 continue;
             }
             if file_name(&path) == CATALOG_FILE
-                || path.extension().and_then(|value| value.to_str()) != Some(EXTENSION_NAME)
+                || !matches!(
+                    path.extension().and_then(|value| value.to_str()),
+                    Some(REPORT_TEMPLATE_EXTENSION_NAME) | Some(HTML_EXTENSION_NAME)
+                )
             {
                 continue;
             }

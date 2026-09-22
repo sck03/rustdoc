@@ -39,12 +39,11 @@ pub(super) fn template_files(paths: &RuntimePaths) -> Result<Vec<(String, Vec<u8
             if relative == CATALOG_FILE {
                 continue;
             }
-            if path
-                .extension()
-                .and_then(|value| value.to_str())
-                .is_some_and(|value| value.eq_ignore_ascii_case("html") && value != "html")
-            {
-                return Err(invalid("报表模板扩展名必须使用小写 .html。"));
+            if !matches!(
+                path.extension().and_then(|value| value.to_str()),
+                Some(REPORT_TEMPLATE_EXTENSION_NAME) | Some(HTML_EXTENSION_NAME)
+            ) {
+                return Err(invalid("报表模板扩展名必须使用小写 .dtpl 或 .html。"));
             }
             let bytes = fs::read(&path)?;
             if bytes.len() > MAX_TEMPLATE_BYTES {
