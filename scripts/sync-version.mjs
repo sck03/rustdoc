@@ -1,224 +1,84 @@
-import { access, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeReleaseVersion } from "./lib/release-version.mjs";
 
-const scriptPath = fileURLToPath(import.meta.url);
-const repoRoot = path.resolve(path.dirname(scriptPath), "..");
-const versionConfig = JSON.parse(await readText("version.json"));
-const requestedVersion = String(process.argv[2] || "").trim();
-const version = requireSemver(requestedVersion || versionConfig.version);
-const assemblyVersion = requestedVersion
-  ? toAssemblyVersion(version)
-  : requireAssemblyVersion(versionConfig.assemblyVersion || toAssemblyVersion(version));
-const fileVersion = requestedVersion
-  ? assemblyVersion
-  : requireAssemblyVersion(versionConfig.fileVersion || assemblyVersion);
-
-if (requestedVersion) {
-  versionConfig.version = version;
-  versionConfig.assemblyVersion = assemblyVersion;
-  versionConfig.fileVersion = fileVersion;
-  await writeIfChanged("version.json", `${JSON.stringify(versionConfig, null, 2)}\n`);
-}
-
-await writeDirectoryBuildProps();
-
-for (const file of [
-  "apps/export-doc-web/package.json",
-  "apps/export-doc-tauri/package.json",
-  "apps/license-keygen-tauri/package.json",
-  "apps/export-doc-web/package-lock.json",
-  "apps/export-doc-tauri/package-lock.json",
-  "apps/license-keygen-tauri/package-lock.json",
-  "apps/export-doc-tauri/src-tauri/tauri.conf.json",
-  "apps/license-keygen-tauri/src-tauri/tauri.conf.json",
-]) {
-  if (isPrivateToolPath(file) && !(await fileExists(file))) {
-    continue;
-  }
-  await updateJson(file, (json) => {
-    json.version = version;
-    if (json.packages?.[""]) {
-      json.packages[""].version = version;
+export async function syncVersion(root, requestedVersion) {
+  const changes = new Map();
+  const read = file => readFile(path.join(root, file), "utf8");
+  const updateJson = async (file, mutate) => {
+    const value = JSON.parse(await read(file));
+    mutate(value);
+    changes.set(file, `${JSON.stringify(value, null, 2)}\n`);
+  };
+  const config = JSON.parse(await read("version.json"));
+  const version = normalizeReleaseVersion(requestedVersion || config.version);
+  await updateJson("version.json", value => {
+    value.version = version;
+    value.assemblyVersion = value.fileVersion = `${version.split("-")[0]}.0`;
+  });
+  for (const directory of ["apps/export-doc-web", "apps/export-doc-tauri"]) {
+    for (const file of ["package.json", "package-lock.json"]) {
+      await updateJson(`${directory}/${file}`, value => {
+        value.version = version;
+        if (value.packages?.[""]) value.packages[""].version = version;
+      });
     }
+  }
+  await updateJson("apps/export-doc-tauri/src-tauri/tauri.conf.json", value => { value.version = version; });
+
+  const workspace = await read("Cargo.toml");
+  const members = workspace.match(/^members\s*=\s*\[([^\]]+)\]/mu)?.[1];
+  if (!members) throw new Error("Cargo workspace members are missing.");
+  changes.set("Cargo.toml", replaceVersion(workspace, "workspace.package", version));
+  const packageNames = [];
+  for (const [, directory] of members.matchAll(/"([^"]+)"/gu)) {
+    const file = `${directory}/Cargo.toml`;
+    const manifest = await read(file);
+    const name = manifest.match(/^name\s*=\s*"([^"]+)"/mu)?.[1];
+    if (!name) throw new Error(`Package name missing in ${file}.`);
+    packageNames.push(name);
+    if (!/^version\.workspace\s*=\s*true\s*$/mu.test(manifest)) {
+      changes.set(file, replaceVersion(manifest, "package", version));
+    }
+  }
+  const rootLock = await read("Cargo.lock");
+  for (const directory of ["apps/exportdoc-ocr-rs", "tools/excel-analyzer-rs"]) {
+    const manifest = await read(`${directory}/Cargo.toml`);
+    const name = manifest.match(/^name\s*=\s*"([^"]+)"/mu)?.[1];
+    if (!name) throw new Error(`Package name missing in ${directory}.`);
+    if (rootLock.includes(`name = "${name}"`)) packageNames.push(name);
+    changes.set(`${directory}/Cargo.toml`, replaceVersion(manifest, "package", version));
+    changes.set(`${directory}/Cargo.lock`, updateLock(await read(`${directory}/Cargo.lock`), [name], version));
+  }
+  changes.set("Cargo.lock", updateLock(rootLock, packageNames, version));
+  // Validate every input before writing; missing or stale layouts fail before mutation.
+  for (const [file, content] of changes) {
+    if (await read(file) !== content) await writeFile(path.join(root, file), content, "utf8");
+  }
+  return version;
+}
+
+function replaceVersion(text, section, version) {
+  const escaped = section.replaceAll(".", "\\.");
+  const pattern = new RegExp(`(\\[${escaped}\\][^\\[]*?\\nversion\\s*=\\s*")[^"]+(")`, "u");
+  if (!pattern.test(text)) throw new Error(`Missing explicit version in [${section}].`);
+  return text.replace(pattern, (_match, prefix, suffix) => `${prefix}${version}${suffix}`);
+}
+
+function updateLock(text, names, version) {
+  const remaining = new Set(names);
+  const blocks = text.split(/(?=^\[\[package\]\])/mu).map(block => {
+    const name = block.match(/^name = "([^"]+)"/mu)?.[1];
+    if (!remaining.has(name) || /^source = /mu.test(block)) return block;
+    remaining.delete(name);
+    return block.replace(/^version = "[^"]+"/mu, `version = "${version}"`);
   });
+  if (remaining.size) throw new Error(`Local packages missing from Cargo lock: ${[...remaining].join(", ")}`);
+  return blocks.join("");
 }
 
-for (const file of [
-  "apps/export-doc-tauri/src-tauri/Cargo.toml",
-  "apps/license-keygen-tauri/src-tauri/Cargo.toml",
-  "tools/excel-analyzer-rs/Cargo.toml",
-]) {
-  if (isPrivateToolPath(file) && !(await fileExists(file))) {
-    continue;
-  }
-  await updateCargoTomlPackageVersion(file);
-}
-
-await updateCargoLockPackageVersion("apps/export-doc-tauri/src-tauri/Cargo.lock", "export-doc-tauri");
-if (await fileExists("apps/license-keygen-tauri/src-tauri/Cargo.lock")) {
-  await updateCargoLockPackageVersion("apps/license-keygen-tauri/src-tauri/Cargo.lock", "export-doc-license-keygen-tauri");
-}
-await updateCargoLockPackageVersion("tools/excel-analyzer-rs/Cargo.lock", "exportdoc-excel-analyzer");
-
-console.log(`Synced ExportDocManager version ${version}.`);
-
-async function writeDirectoryBuildProps() {
-  const relativePath = "Directory.Build.props";
-  let content;
-  try {
-    content = await readText(relativePath);
-  } catch {
-    content = "<Project>\n  <PropertyGroup>\n  </PropertyGroup>\n</Project>\n";
-  }
-
-  for (const [propertyName, propertyValue] of [
-    ["Version", version],
-    ["AssemblyVersion", assemblyVersion],
-    ["FileVersion", fileVersion],
-    ["InformationalVersion", version],
-  ]) {
-    content = upsertXmlProperty(content, propertyName, propertyValue);
-  }
-
-  const requiredBuildProperties = [
-    [
-      "SelfContained",
-      "    <SelfContained Condition=\"'$(SelfContained)' == ''\">false</SelfContained>",
-    ],
-  ];
-  const missingBuildProperties = requiredBuildProperties
-    .filter(([propertyName]) => !new RegExp(`<${escapeRegExp(propertyName)}(?:\\s|>)`).test(content))
-    .map(([, xml]) => xml);
-  if (missingBuildProperties.length > 0) {
-    content = insertIntoFirstPropertyGroup(content, missingBuildProperties.join("\n"));
-  }
-
-  if (!content.endsWith("\n")) {
-    content += "\n";
-  }
-
-  await writeIfChanged(relativePath, content);
-}
-
-function upsertXmlProperty(content, propertyName, propertyValue) {
-  const pattern = new RegExp(
-    `(<${escapeRegExp(propertyName)}(?:\\s[^>]*)?>)[\\s\\S]*?(</${escapeRegExp(propertyName)}>)`,
-  );
-  if (pattern.test(content)) {
-    return content.replace(pattern, `$1${propertyValue}$2`);
-  }
-
-  return insertIntoFirstPropertyGroup(content, `    <${propertyName}>${propertyValue}</${propertyName}>`);
-}
-
-function insertIntoFirstPropertyGroup(content, xml) {
-  const closingTag = "  </PropertyGroup>";
-  const index = content.indexOf(closingTag);
-  if (index < 0) {
-    throw new Error("Directory.Build.props is missing a PropertyGroup closing tag.");
-  }
-
-  const prefix = content.slice(0, index).replace(/\s*$/, "\n");
-  return `${prefix}${xml}\n${content.slice(index)}`;
-}
-
-async function updateJson(relativePath, mutate) {
-  const value = JSON.parse(await readText(relativePath));
-  mutate(value);
-  await writeIfChanged(relativePath, `${JSON.stringify(value, null, 2)}\n`);
-}
-
-async function updateCargoTomlPackageVersion(relativePath) {
-  const text = await readText(relativePath);
-  let matched = false;
-  const updated = text.replace(
-    /(\[package\][\s\S]*?\nversion\s*=\s*")[^"]+(")/,
-    (_match, prefix, suffix) => {
-      matched = true;
-      return `${prefix}${version}${suffix}`;
-    },
-  );
-  if (!matched) {
-    throw new Error(`Package version was not found in ${relativePath}.`);
-  }
-
-  await writeIfChanged(relativePath, updated);
-}
-
-async function updateCargoLockPackageVersion(relativePath, packageName) {
-  const text = await readText(relativePath);
-  const pattern = new RegExp(`(name = "${escapeRegExp(packageName)}"\\r?\\nversion = ")[^"]+(")`, "g");
-  let matched = false;
-  const updated = text.replace(pattern, (_match, prefix, suffix) => {
-    matched = true;
-    return `${prefix}${version}${suffix}`;
-  });
-  if (!matched) {
-    throw new Error(`Package ${packageName} was not found in ${relativePath}.`);
-  }
-
-  await writeIfChanged(relativePath, updated);
-}
-
-async function readText(relativePath) {
-  return await readFile(path.join(repoRoot, relativePath), "utf8");
-}
-
-async function fileExists(relativePath) {
-  try {
-    await access(path.join(repoRoot, relativePath));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function isPrivateToolPath(relativePath) {
-  return relativePath.replaceAll("\\", "/").startsWith("apps/license-keygen-tauri/");
-}
-
-async function writeIfChanged(relativePath, content) {
-  const absolutePath = path.join(repoRoot, relativePath);
-  let previous = "";
-  try {
-    previous = await readFile(absolutePath, "utf8");
-  } catch {
-    previous = "";
-  }
-
-  if (previous !== content) {
-    await writeFile(absolutePath, content, "utf8");
-  }
-}
-
-function requireSemver(value) {
-  const text = String(value || "").trim();
-  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(text)) {
-    throw new Error(`version.json version must be SemVer, got '${value}'.`);
-  }
-
-  return text;
-}
-
-function requireAssemblyVersion(value) {
-  const text = String(value || "").trim();
-  if (!/^\d+\.\d+\.\d+\.\d+$/.test(text)) {
-    throw new Error(`Assembly/File version must have four numeric parts, got '${value}'.`);
-  }
-
-  return text;
-}
-
-function toAssemblyVersion(semver) {
-  const parts = semver.split(/[+-]/, 1)[0].split(".").map((part) => Number.parseInt(part, 10));
-  while (parts.length < 4) {
-    parts.push(0);
-  }
-
-  return parts.slice(0, 4).join(".");
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  console.log(`Synced Rust/React/Tauri version ${await syncVersion(root, process.argv[2])}.`);
 }

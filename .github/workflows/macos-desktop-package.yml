@@ -1,5 +1,5 @@
-name: Build Web server package
-run-name: Web ${{ inputs.version }} / ${{ inputs.os }} / ${{ inputs.architecture }}
+name: Build macOS desktop package
+run-name: macOS desktop ${{ inputs.version }} / ${{ inputs.architecture }}
 
 on:
   workflow_dispatch:
@@ -8,18 +8,12 @@ on:
         description: '程序版本，例如 0.1.2、v0.1.2 或 0.1.2-beta.1'
         required: true
         type: string
-      os:
-        description: '服务器系统（Windows 仅 x64，macOS 仅 ARM64）'
-        required: true
-        default: linux
-        type: choice
-        options: [linux, windows, macos, all]
       architecture:
-        description: '架构（all 构建所选系统支持的全部架构）'
+        description: 'macOS 架构（仅 Apple Silicon）'
         required: true
-        default: all
+        default: arm64
         type: choice
-        options: [x64, arm64, all]
+        options: [arm64]
       publish_release:
         description: '构建成功后上传到对应版本的 GitHub Release'
         type: boolean
@@ -34,8 +28,8 @@ jobs:
       contents: write
     uses: ./.github/workflows/native-package-reusable.yml
     with:
-      product: web
-      os: ${{ inputs.os }}
+      product: desktop
+      os: macos
       architecture: ${{ inputs.architecture }}
       version: ${{ inputs.version }}
       publish_release: ${{ inputs.publish_release }}

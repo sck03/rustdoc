@@ -14,3 +14,5 @@ if ($destinationPath.EndsWith('.zip', [StringComparison]::OrdinalIgnoreCase)) {
 } elseif ($destinationPath.EndsWith('.tar.gz', [StringComparison]::OrdinalIgnoreCase)) {
     Invoke-ExportDocExternal -FilePath tar -Arguments @('-czf', $destinationPath, '-C', (Split-Path -Parent $sourcePath), (Split-Path -Leaf $sourcePath)) -TimeoutSeconds 600 -DisplayName 'Archive native release with executable modes and symlinks'
 } else { throw 'Release archive must be zip or tar.gz.' }
+$digest = (Get-FileHash -LiteralPath $destinationPath -Algorithm SHA256).Hash.ToLowerInvariant()
+"$digest  $([IO.Path]::GetFileName($destinationPath))" | Set-Content -LiteralPath "$destinationPath.sha256" -Encoding utf8

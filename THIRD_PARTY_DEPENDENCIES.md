@@ -4,7 +4,7 @@ Generated from committed npm/Cargo lock files, Cargo metadata and signed native-
 
 Runtime image boundary: PostgreSQL client tools and their native library closure ship in web/server packages under Tools/PostgreSQL with license texts. The database server remains a separate OS/container input. Rust containers do not include .NET or a browser rendering service.
 
-## npm (109)
+## npm (129)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -35,25 +35,25 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | @esbuild/win32-arm64 | 0.28.2 | MIT | web |
 | @esbuild/win32-ia32 | 0.28.2 | MIT | web |
 | @esbuild/win32-x64 | 0.28.2 | MIT | web |
-| @oxc-project/types | 0.149.0 | MIT | web |
-| @rolldown/binding-android-arm-eabi | 1.2.8 | MIT | web |
-| @rolldown/binding-android-arm64 | 1.2.8 | MIT | web |
-| @rolldown/binding-darwin-arm64 | 1.2.8 | MIT | web |
-| @rolldown/binding-darwin-x64 | 1.2.8 | MIT | web |
-| @rolldown/binding-freebsd-x64 | 1.2.8 | MIT | web |
-| @rolldown/binding-linux-arm-gnueabihf | 1.2.8 | MIT | web |
-| @rolldown/binding-linux-arm64-gnu | 1.2.8 | MIT | web |
-| @rolldown/binding-linux-arm64-musl | 1.2.8 | MIT | web |
-| @rolldown/binding-linux-ppc64-gnu | 1.2.8 | MIT | web |
-| @rolldown/binding-linux-s390x-gnu | 1.2.8 | MIT | web |
-| @rolldown/binding-linux-x64-gnu | 1.2.8 | MIT | web |
-| @rolldown/binding-linux-x64-musl | 1.2.8 | MIT | web |
-| @rolldown/binding-openharmony-arm64 | 1.2.8 | MIT | web |
-| @rolldown/binding-win32-arm64-msvc | 1.2.8 | MIT | web |
-| @rolldown/binding-win32-x64-msvc | 1.2.8 | MIT | web |
+| @oxc-project/types | 0.151.0 | MIT | web |
+| @rolldown/binding-android-arm-eabi | 1.2.11 | MIT | web |
+| @rolldown/binding-android-arm64 | 1.2.11 | MIT | web |
+| @rolldown/binding-darwin-arm64 | 1.2.11 | MIT | web |
+| @rolldown/binding-darwin-x64 | 1.2.11 | MIT | web |
+| @rolldown/binding-freebsd-x64 | 1.2.11 | MIT | web |
+| @rolldown/binding-linux-arm-gnueabihf | 1.2.11 | MIT | web |
+| @rolldown/binding-linux-arm64-gnu | 1.2.11 | MIT | web |
+| @rolldown/binding-linux-arm64-musl | 1.2.11 | MIT | web |
+| @rolldown/binding-linux-ppc64-gnu | 1.2.11 | MIT | web |
+| @rolldown/binding-linux-s390x-gnu | 1.2.11 | MIT | web |
+| @rolldown/binding-linux-x64-gnu | 1.2.11 | MIT | web |
+| @rolldown/binding-linux-x64-musl | 1.2.11 | MIT | web |
+| @rolldown/binding-openharmony-arm64 | 1.2.11 | MIT | web |
+| @rolldown/binding-win32-arm64-msvc | 1.2.11 | MIT | web |
+| @rolldown/binding-win32-x64-msvc | 1.2.11 | MIT | web |
 | @rolldown/pluginutils | 1.0.1 | MIT | web |
-| @tanstack/query-core | 5.103.0 | MIT | web |
-| @tanstack/react-query | 5.103.0 | MIT | web |
+| @tanstack/query-core | 5.103.2 | MIT | web |
+| @tanstack/react-query | 5.103.2 | MIT | web |
 | @tauri-apps/api | 2.11.1 | Apache-2.0 OR MIT | web |
 | @tauri-apps/cli | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
 | @tauri-apps/cli-darwin-arm64 | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
@@ -68,13 +68,33 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | @tauri-apps/cli-win32-ia32-msvc | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
 | @tauri-apps/cli-win32-x64-msvc | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
 | @tweenjs/tween.js | 23.1.3 | MIT | web |
-| @types/node | 24.13.5 | MIT | web |
+| @types/node | 26.6.2 | MIT | web |
 | @types/pngjs | 6.0.5 | MIT | web |
 | @types/react | 19.3.0 | MIT | web |
 | @types/react-dom | 19.3.0 | MIT | web |
 | @types/stats.js | 0.17.4 | MIT | web |
 | @types/three | 0.186.0 | MIT | web |
 | @types/webxr | 0.5.24 | MIT | web |
+| @typescript/typescript-aix-ppc64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-darwin-arm64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-darwin-x64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-freebsd-arm64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-freebsd-x64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-linux-arm | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-linux-arm64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-linux-loong64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-linux-mips64el | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-linux-ppc64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-linux-riscv64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-linux-s390x | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-linux-x64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-netbsd-arm64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-netbsd-x64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-openbsd-arm64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-openbsd-x64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-sunos-x64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-win32-arm64 | 7.0.2 | Apache-2.0 | web |
+| @typescript/typescript-win32-x64 | 7.0.2 | Apache-2.0 | web |
 | @vitejs/plugin-react | 6.1.1 | MIT | web |
 | axe-core | 4.13.0 | MPL-2.0 | web |
 | cookie | 1.1.1 | MIT | web |
@@ -96,7 +116,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | lightningcss-linux-x64-musl | 1.33.0 | MPL-2.0 | web |
 | lightningcss-win32-arm64-msvc | 1.33.0 | MPL-2.0 | web |
 | lightningcss-win32-x64-msvc | 1.33.0 | MPL-2.0 | web |
-| lucide-react | 1.46.0 | ISC | web |
+| lucide-react | 1.48.0 | ISC | web |
 | meshoptimizer | 1.1.1 | MIT | web |
 | nanoid | 3.3.19 | MIT | web |
 | picocolors | 1.1.1 | ISC | web |
@@ -108,15 +128,15 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | react-dom | 19.3.0 | MIT | web |
 | react-router | 7.18.4 | MIT | web |
 | react-router-dom | 7.18.4 | MIT | web |
-| rolldown | 1.2.8 | MIT | web |
+| rolldown | 1.2.11 | MIT | web |
 | scheduler | 0.28.0 | MIT | web |
 | set-cookie-parser | 2.7.2 | MIT | web |
 | source-map-js | 1.2.1 | BSD-3-Clause | web |
-| three | 0.186.0 | MIT | web |
+| three | 0.186.1 | MIT | web |
 | tinyglobby | 0.2.17 | MIT | web |
-| typescript | 6.0.3 | Apache-2.0 | web |
-| undici-types | 7.18.2 | MIT | web |
-| vite | 8.3.0 | MIT | web |
+| typescript | 7.0.2 | Apache-2.0 | web |
+| undici-types | 8.9.0 | MIT | web |
+| vite | 8.3.1 | MIT | web |
 
 ## cargo (737)
 
@@ -868,7 +888,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | bblanchon.pdfium.macos | 152.0.7961 | Apache-2.0 | Rust native library only; managed assemblies excluded |
 | bblanchon.pdfium.win32 | 152.0.7961 | Apache-2.0 | Rust native library only; managed assemblies excluded |
 | microsoft.ml.onnxruntime | 1.29.0 | MIT | Rust native library only; managed assemblies excluded |
-| postgresql-client | 18.4 | PostgreSQL | Rust web/server backup and migration clients; excluded from desktop |
+| postgresql-client | 18.6 | PostgreSQL | Rust web/server backup and migration clients; excluded from desktop |
 
 ## Windows x64 OCR app-local CRT assets
 

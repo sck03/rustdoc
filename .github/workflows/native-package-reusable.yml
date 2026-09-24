@@ -1,0 +1,169 @@
+name: Native package implementation
+
+on:
+  workflow_call:
+    inputs:
+      product:
+        type: string
+        required: true
+      os:
+        type: string
+        required: true
+      architecture:
+        type: string
+        required: true
+      version:
+        type: string
+        required: true
+      publish_release:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-package-${{ inputs.product }}-${{ inputs.os }}-${{ inputs.architecture }}-${{ inputs.version }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 26
+      - name: Validate version and supported targets
+        id: plan
+        env:
+          RELEASE_PRODUCT: ${{ inputs.product }}
+          RELEASE_OS: ${{ inputs.os }}
+          RELEASE_ARCHITECTURE: ${{ inputs.architecture }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: node scripts/github/prepare-native-release.mjs
+
+  package:
+    needs: prepare
+    name: ${{ inputs.product }} / ${{ matrix.artifact }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    env:
+      CARGO_HOME: ${{ github.workspace }}/.codex-runtime/cargo-home
+      RUSTUP_HOME: ${{ github.workspace }}/.codex-runtime/rustup-home
+      CARGO_TARGET_DIR: ${{ github.workspace }}/.codex-runtime/cargo-target-native
+      CARGO_BUILD_JOBS: 2
+      npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
+      TMPDIR: ${{ github.workspace }}/.codex-runtime/temp
+      TEMP: ${{ github.workspace }}/.codex-runtime/temp
+      TMP: ${{ github.workspace }}/.codex-runtime/temp
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_PRODUCT: ${{ inputs.product }}
+      RUST_TARGET: ${{ matrix.target }}
+      BUNDLE_TARGETS: ${{ matrix.bundles }}
+      ARTIFACT_PLATFORM: ${{ matrix.artifact }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Prepare runtime directories
+        shell: pwsh
+        run: |
+          @($env:CARGO_HOME, $env:RUSTUP_HOME, $env:CARGO_TARGET_DIR, $env:TEMP) |
+            ForEach-Object { New-Item -ItemType Directory -Force -Path $_ | Out-Null }
+      - name: Install Linux build libraries
+        if: runner.os == 'Linux'
+        env:
+          PRODUCT: ${{ inputs.product }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+          if [ "$PRODUCT" = desktop ]; then
+            sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          fi
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c
+        with:
+          toolchain: 1.98.1
+          targets: ${{ matrix.target }}
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 26
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
+        with:
+          path: |
+            .codex-runtime/cargo-home/registry
+            .codex-runtime/cargo-home/git
+            .codex-runtime/npm-cache
+          key: native-package-${{ matrix.target }}-${{ hashFiles('Cargo.lock', '**/package-lock.json') }}
+      - name: Synchronize program versions and locked graphs
+        shell: pwsh
+        run: |
+          node scripts/sync-version.mjs $env:RELEASE_VERSION
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo metadata --locked --no-deps --format-version 1 | Out-Null
+          exit $LASTEXITCODE
+      - name: Provision report fonts before compilation
+        run: node scripts/provision-report-fonts.mjs
+      - name: Install macOS PostgreSQL 18 client
+        if: runner.os == 'macOS' && inputs.product == 'web'
+        run: brew install postgresql@18
+      - name: Verify desktop dependency boundaries
+        if: inputs.product == 'desktop'
+        shell: pwsh
+        run: node scripts/verify-native-desktop.mjs --target $env:RUST_TARGET
+      - name: Build and archive Full package
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_PRODUCT -eq 'desktop') {
+            ./scripts/build-native.ps1 -NoPause -RustTarget $env:RUST_TARGET -Bundles $env:BUNDLE_TARGETS
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $source = 'artifacts/native-desktop/ExportDocManager.Tauri'
+          } else {
+            ./scripts/package-native-web-server.ps1 -Configuration Release -RuntimeIdentifier $env:RUST_TARGET -NoPause
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $source = 'artifacts/native-web-server'
+          }
+          $extension = if ($IsWindows) { 'zip' } else { 'tar.gz' }
+          $prefix = "artifacts/releases/exportdoc-$env:RELEASE_PRODUCT-$env:RELEASE_VERSION-$env:ARTIFACT_PLATFORM"
+          ./scripts/lib/archive-native-release.ps1 -Source $source -Destination "$prefix.$extension"
+          if ($env:RELEASE_PRODUCT -eq 'desktop') {
+            $bundles = Join-Path $env:CARGO_TARGET_DIR "$env:RUST_TARGET/release/bundle"
+            ./scripts/lib/archive-native-release.ps1 -Source $bundles -Destination "$prefix-installers.$extension"
+          }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: exportdoc-${{ inputs.product }}-${{ needs.prepare.outputs.version }}-${{ matrix.artifact }}
+          path: artifacts/releases/*
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    if: inputs.publish_release
+    needs: [prepare, package]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    concurrency:
+      group: native-github-release-publication
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 26
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: exportdoc-${{ inputs.product }}-${{ needs.prepare.outputs.version }}-*
+          path: artifacts/releases
+          merge-multiple: true
+      - name: Publish verified archives to version release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: node scripts/github/publish-native-release.mjs

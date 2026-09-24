@@ -104,6 +104,7 @@ $marker = [ordered]@{
     schemaVersion = 1
     purpose = 'rust-native-web-server-package'
     product = 'ExportDocManager'
+    version = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'version.json') -Raw | ConvertFrom-Json).version
     frontend = 'React'
     server = 'Rust HTTP'
     database = 'PostgreSQL 18'

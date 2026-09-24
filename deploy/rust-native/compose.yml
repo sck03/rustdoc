@@ -1,7 +1,7 @@
 name: exportdoc-rust-native
 services:
   postgres:
-    image: postgres:18.4-trixie
+    image: postgres:18.6-trixie
     restart: unless-stopped
     environment:
       POSTGRES_DB: exportdoc_native
@@ -20,7 +20,7 @@ services:
     stop_grace_period: 45s
     networks: [database]
   initialize:
-    image: exportdoc-rust-native:local
+    image: '${NATIVE_IMAGE:-exportdoc-rust-native:local}'
     build:
       context: ../..
       dockerfile: deploy/rust-native/Dockerfile
@@ -38,7 +38,7 @@ services:
       postgres: {condition: service_healthy}
     networks: [database]
   restore:
-    image: exportdoc-rust-native:local
+    image: '${NATIVE_IMAGE:-exportdoc-rust-native:local}'
     profiles: [maintenance]
     command: [--app-root, /opt/exportdoc, --data-root, /var/lib/exportdoc, --restore-pending]
     environment:
@@ -55,7 +55,7 @@ services:
       postgres: {condition: service_healthy}
     networks: [database]
   application:
-    image: exportdoc-rust-native:local
+    image: '${NATIVE_IMAGE:-exportdoc-rust-native:local}'
     restart: unless-stopped
     environment:
       EXPORTDOCMANAGER_POSTGRES_CONNECTION_FILE: /run/secrets/app_connection

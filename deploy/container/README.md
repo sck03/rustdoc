@@ -512,7 +512,7 @@ Browser 服务分配 `shm_size: 512mb`，让 Chromium 使用内存文件系统�
 
 Compose 默认资源档位为 API `2 CPU / 2 GiB / 512 PID`、Browser `1.5 CPU / 1536 MiB / 512 PID`、PostgreSQL `2 CPU / 2 GiB / 256 PID`、Web `0.5 CPU / 256 MiB / 128 PID`，均可在 `.env` 中按主机容量调整。API、Browser、PostgreSQL 和 Web 分别有 60/15/45/15 秒停止宽限，避免长任务无限占用主机或升级时粗暴截断数据库。
 
-Compose 固定使用 Debian 13 基线的 `postgres:18.4-trixie`，初始化参数为：
+Compose 固定使用 Debian 13 基线的 `postgres:18.6-trixie`，初始化参数为：
 
 ```text
 --encoding=UTF8 --locale-provider=builtin --builtin-locale=PG_UNICODE_FAST

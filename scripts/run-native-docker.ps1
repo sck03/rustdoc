@@ -3,6 +3,8 @@ param(
     [string]$RuntimeRoot,
     [ValidateRange(1024, 65535)][int]$Port = 5188,
     [string]$BindAddress = '127.0.0.1',
+    [string]$Image = 'exportdoc-rust-native:local',
+    [switch]$SkipBuild,
     [switch]$PrepareOnly,
     [switch]$Stop,
     [switch]$RestorePending,
@@ -17,6 +19,8 @@ trap {
     exit 1
 }
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
+if ($Image -notmatch '\A[a-z0-9][a-z0-9./:_@-]*\z') { throw 'Invalid container image reference.' }
+if ($Image -ne 'exportdoc-rust-native:local' -and -not $SkipBuild -and -not $Stop -and -not $PrepareOnly -and -not $RestorePending) { throw 'Use -SkipBuild to run a published image.' }
 if ([string]::IsNullOrWhiteSpace($RuntimeRoot)) { $RuntimeRoot = Join-Path $repositoryRoot 'deploy/rust-native/runtime' }
 $runtimePath = [System.IO.Path]::GetFullPath($RuntimeRoot)
 if ($runtimePath -eq [System.IO.Path]::GetPathRoot($runtimePath) -or (Test-ExportDocPathEqual -Left $runtimePath -Right $repositoryRoot)) { throw 'Use a dedicated native runtime directory.' }
@@ -99,7 +103,7 @@ if ($PrepareOnly) {
     Write-Host "Native Docker configuration prepared: $runtimePath"
 } else {
     $docker = (Get-Command docker -ErrorAction Stop).Source
-    $environment = @{ NATIVE_RUNTIME_ROOT = $runtimePath.Replace('\', '/'); NATIVE_PORT = "$Port"; NATIVE_BIND_ADDRESS = $BindAddress }
+    $environment = @{ NATIVE_RUNTIME_ROOT = $runtimePath.Replace('\', '/'); NATIVE_PORT = "$Port"; NATIVE_BIND_ADDRESS = $BindAddress; NATIVE_IMAGE = $Image }
     $arguments = @('compose', '--project-name', 'exportdoc-rust-native', '--file', (Join-Path $repositoryRoot 'deploy/rust-native/compose.yml'))
     if ($RestorePending) {
         Invoke-ExportDocExternal -FilePath $docker -Arguments ($arguments + @('stop', 'application')) -Environment $environment -WorkingDirectory $repositoryRoot -TimeoutSeconds 240 -DisplayName 'Stop API before database maintenance'
@@ -108,7 +112,7 @@ if ($PrepareOnly) {
         Wait-ExportDocInteractiveExit -Enabled $interactiveLaunch -ExitCode 0
         return
     }
-    $arguments += $(if ($Stop) { @('down') } else { @('up', '--build', '--detach', '--wait', '--wait-timeout', '180') })
+    $arguments += $(if ($Stop) { @('down') } else { @('up', $(if ($SkipBuild) { '--no-build' } else { '--build' }), '--detach', '--wait', '--wait-timeout', '180') })
     Invoke-ExportDocExternal -FilePath $docker -Arguments $arguments -Environment $environment -WorkingDirectory $repositoryRoot -TimeoutSeconds 3600 -DisplayName 'Rust native Docker application'
     if (-not $Stop) { Write-Host "Native web application: http://${BindAddress}:$Port" }
 }

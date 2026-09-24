@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24-trixie-slim AS report-fonts
+FROM node:26.10.0-trixie-slim AS report-fonts
 WORKDIR /src
 COPY scripts/provision-report-fonts.mjs scripts/verify-font-license-policy.mjs scripts/
 COPY Resources/Fonts/OpenSource/font-manifest.json Resources/Fonts/OpenSource/OFL-Noto-CJK.txt Resources/Fonts/OpenSource/README.md Resources/Fonts/OpenSource/

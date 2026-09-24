@@ -1,0 +1,64 @@
+name: Release script validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/**'
+      - 'version.json'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'deploy/rust-native/**'
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/**'
+      - 'version.json'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'deploy/rust-native/**'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: release-scripts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scripts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 26
+      - name: Validate release contracts
+        run: node scripts/test_native_release_contract.mjs
+      - name: Validate action pins and updater boundary
+        run: |
+          node scripts/verify-github-workflow-actions.mjs
+          node scripts/test_tauri_updater_release_contract.mjs
+          node scripts/verify-documentation-links.mjs
+      - name: Validate script syntax and process contracts
+        shell: pwsh
+        run: ./scripts/verify-script-suite.ps1
+      - name: Validate workflow syntax with checksum-verified actionlint
+        run: |
+          mkdir -p .codex-runtime/tools/actionlint
+          cd .codex-runtime/tools/actionlint
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 120 -o actionlint.tar.gz https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          curl --fail --location --retry 3 --connect-timeout 20 --max-time 120 -o checksums.txt https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_checksums.txt
+          awk '$2 == "actionlint_1.7.12_linux_amd64.tar.gz" {print $1 "  actionlint.tar.gz"}' checksums.txt | sha256sum --check --strict
+          tar -xzf actionlint.tar.gz
+          cd "$GITHUB_WORKSPACE"
+          .codex-runtime/tools/actionlint/actionlint -color -shellcheck=''

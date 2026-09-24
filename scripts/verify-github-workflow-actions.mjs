@@ -42,8 +42,8 @@ for (const entry of readdirSync(workflowRoot, { withFileTypes: true })) {
     }
     if (action === "actions/setup-node") {
       const localBlock = lines.slice(index + 1, index + 8).join("\n");
-      if (!/node-version:\s*["']?24["']?\s*$/mu.test(localBlock)) {
-        failures.push(`${entry.name}:${index + 1}: actions/setup-node must explicitly select Node 24.`);
+      if (!/node-version:\s*["']?26["']?\s*$/mu.test(localBlock)) {
+        failures.push(`${entry.name}:${index + 1}: actions/setup-node must explicitly select Node 26.`);
       }
     }
     if (action === "dtolnay/rust-toolchain") {
@@ -57,8 +57,8 @@ for (const entry of readdirSync(workflowRoot, { withFileTypes: true })) {
     }
   }
 
-  if (/node-version:\s*["']?(?:20|22)["']?\b/mu.test(lines.join("\n"))) {
-    failures.push(`${entry.name}: workflow still declares Node 20 or Node 22.`);
+  if (/node-version:\s*["']?(?:20|22|24)["']?\b/mu.test(lines.join("\n"))) {
+    failures.push(`${entry.name}: workflow still declares an older Node runtime.`);
   }
   if (/\b(?:osx-x64|mac-x64|macos-[^\s"']*-intel)\b/mu.test(lines.join("\n"))) {
     failures.push(`${entry.name}: workflow still declares the retired Intel macOS desktop target.`);

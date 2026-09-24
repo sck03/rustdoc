@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "verifiedAt": "2026-09-20",
+  "verifiedAt": "2026-09-25",
   "postgresqlClient": {
-    "version": "18.4",
+    "version": "18.6",
     "license": "PostgreSQL",
     "source": "https://www.postgresql.org/download/",
-    "windowsArchive": "https://get.enterprisedb.com/postgresql/postgresql-18.4-1-windows-x64-binaries.zip",
-    "windowsSha256": "7effe34c0bf89027b3f171447d351cbc460f4566c8d0f643daec67f140787858",
-    "linuxImage": "postgres:18.4-bookworm",
+    "windowsArchive": "https://get.enterprisedb.com/postgresql/postgresql-18.6-1-windows-x64-binaries.zip",
+    "windowsSha256": "fbe23da234ee31547bf8a36d29dfd81e82b849df2d2b78d2eecb43d360252f8c",
+    "linuxImage": "postgres:18.6-bookworm",
     "macosFormula": "postgresql@18"
   },
   "packages": {

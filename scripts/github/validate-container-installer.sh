@@ -166,7 +166,7 @@ sudo docker run --detach --name "$postgres_probe" \
   --env POSTGRES_PASSWORD=container-installer-db-validation \
   --env 'POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale-provider=builtin --builtin-locale=PG_UNICODE_FAST' \
   --volume "$installer_root/runtime/postgres:/var/lib/postgresql" \
-  postgres:18.4-trixie >/dev/null
+  postgres:18.6-trixie >/dev/null
 for attempt in $(seq 1 60); do
   if sudo docker exec "$postgres_probe" pg_isready -U exportdoc -d exportdoc >/dev/null 2>&1; then
     break
@@ -182,7 +182,7 @@ sudo docker run --rm \
   --user 10001:10001 \
   --entrypoint sh \
   --volume "$installer_root/runtime/api-data:/runtime-data" \
-  postgres:18.4-trixie \
+  postgres:18.6-trixie \
   -ec 'test -r /runtime-data/Config/appsettings.json; probe=/runtime-data/Config/.write-probe-$$; printf ok > "$probe"; mv "$probe" "${probe}.done"; rm "${probe}.done"'
 trap - EXIT
 sudo chown -R "$(id -u):$(id -g)" "$installer_root"

@@ -747,7 +747,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | native-resource | bblanchon.pdfium.macos | 152.0.7961 | Apache-2.0 | Rust native library only; managed assemblies excluded |
 | native-resource | bblanchon.pdfium.win32 | 152.0.7961 | Apache-2.0 | Rust native library only; managed assemblies excluded |
 | native-resource | microsoft.ml.onnxruntime | 1.29.0 | MIT | Rust native library only; managed assemblies excluded |
-| native-resource | postgresql-client | 18.4 | PostgreSQL | Rust web/server backup and migration clients; excluded from desktop |
+| native-resource | postgresql-client | 18.6 | PostgreSQL | Rust web/server backup and migration clients; excluded from desktop |
 | npm | @dimforge/rapier3d-compat | 0.12.0 | Apache-2.0 | web |
 | npm | @esbuild/aix-ppc64 | 0.28.2 | MIT | web |
 | npm | @esbuild/android-arm | 0.28.2 | MIT | web |
@@ -775,25 +775,25 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | @esbuild/win32-arm64 | 0.28.2 | MIT | web |
 | npm | @esbuild/win32-ia32 | 0.28.2 | MIT | web |
 | npm | @esbuild/win32-x64 | 0.28.2 | MIT | web |
-| npm | @oxc-project/types | 0.149.0 | MIT | web |
-| npm | @rolldown/binding-android-arm-eabi | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-android-arm64 | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-darwin-arm64 | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-darwin-x64 | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-freebsd-x64 | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-linux-arm-gnueabihf | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-linux-arm64-gnu | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-linux-arm64-musl | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-linux-ppc64-gnu | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-linux-s390x-gnu | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-linux-x64-gnu | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-linux-x64-musl | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-openharmony-arm64 | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-win32-arm64-msvc | 1.2.8 | MIT | web |
-| npm | @rolldown/binding-win32-x64-msvc | 1.2.8 | MIT | web |
+| npm | @oxc-project/types | 0.151.0 | MIT | web |
+| npm | @rolldown/binding-android-arm-eabi | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-android-arm64 | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-darwin-arm64 | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-darwin-x64 | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-freebsd-x64 | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-linux-arm-gnueabihf | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-linux-arm64-gnu | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-linux-arm64-musl | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-linux-ppc64-gnu | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-linux-s390x-gnu | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-linux-x64-gnu | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-linux-x64-musl | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-openharmony-arm64 | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-win32-arm64-msvc | 1.2.11 | MIT | web |
+| npm | @rolldown/binding-win32-x64-msvc | 1.2.11 | MIT | web |
 | npm | @rolldown/pluginutils | 1.0.1 | MIT | web |
-| npm | @tanstack/query-core | 5.103.0 | MIT | web |
-| npm | @tanstack/react-query | 5.103.0 | MIT | web |
+| npm | @tanstack/query-core | 5.103.2 | MIT | web |
+| npm | @tanstack/react-query | 5.103.2 | MIT | web |
 | npm | @tauri-apps/api | 2.11.1 | Apache-2.0 OR MIT | web |
 | npm | @tauri-apps/cli | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
 | npm | @tauri-apps/cli-darwin-arm64 | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
@@ -808,13 +808,33 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | @tauri-apps/cli-win32-ia32-msvc | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
 | npm | @tauri-apps/cli-win32-x64-msvc | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
 | npm | @tweenjs/tween.js | 23.1.3 | MIT | web |
-| npm | @types/node | 24.13.5 | MIT | web |
+| npm | @types/node | 26.6.2 | MIT | web |
 | npm | @types/pngjs | 6.0.5 | MIT | web |
 | npm | @types/react | 19.3.0 | MIT | web |
 | npm | @types/react-dom | 19.3.0 | MIT | web |
 | npm | @types/stats.js | 0.17.4 | MIT | web |
 | npm | @types/three | 0.186.0 | MIT | web |
 | npm | @types/webxr | 0.5.24 | MIT | web |
+| npm | @typescript/typescript-aix-ppc64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-darwin-arm64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-darwin-x64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-freebsd-arm64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-freebsd-x64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-linux-arm | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-linux-arm64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-linux-loong64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-linux-mips64el | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-linux-ppc64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-linux-riscv64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-linux-s390x | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-linux-x64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-netbsd-arm64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-netbsd-x64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-openbsd-arm64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-openbsd-x64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-sunos-x64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-win32-arm64 | 7.0.2 | Apache-2.0 | web |
+| npm | @typescript/typescript-win32-x64 | 7.0.2 | Apache-2.0 | web |
 | npm | @vitejs/plugin-react | 6.1.1 | MIT | web |
 | npm | axe-core | 4.13.0 | MPL-2.0 | web |
 | npm | cookie | 1.1.1 | MIT | web |
@@ -836,7 +856,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | lightningcss-linux-x64-musl | 1.33.0 | MPL-2.0 | web |
 | npm | lightningcss-win32-arm64-msvc | 1.33.0 | MPL-2.0 | web |
 | npm | lightningcss-win32-x64-msvc | 1.33.0 | MPL-2.0 | web |
-| npm | lucide-react | 1.46.0 | ISC | web |
+| npm | lucide-react | 1.48.0 | ISC | web |
 | npm | meshoptimizer | 1.1.1 | MIT | web |
 | npm | nanoid | 3.3.19 | MIT | web |
 | npm | picocolors | 1.1.1 | ISC | web |
@@ -848,15 +868,15 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | react-dom | 19.3.0 | MIT | web |
 | npm | react-router | 7.18.4 | MIT | web |
 | npm | react-router-dom | 7.18.4 | MIT | web |
-| npm | rolldown | 1.2.8 | MIT | web |
+| npm | rolldown | 1.2.11 | MIT | web |
 | npm | scheduler | 0.28.0 | MIT | web |
 | npm | set-cookie-parser | 2.7.2 | MIT | web |
 | npm | source-map-js | 1.2.1 | BSD-3-Clause | web |
-| npm | three | 0.186.0 | MIT | web |
+| npm | three | 0.186.1 | MIT | web |
 | npm | tinyglobby | 0.2.17 | MIT | web |
-| npm | typescript | 6.0.3 | Apache-2.0 | web |
-| npm | undici-types | 7.18.2 | MIT | web |
-| npm | vite | 8.3.0 | MIT | web |
+| npm | typescript | 7.0.2 | Apache-2.0 | web |
+| npm | undici-types | 8.9.0 | MIT | web |
+| npm | vite | 8.3.1 | MIT | web |
 
 ## Bundled runtime assets
 

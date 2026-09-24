@@ -16,6 +16,7 @@ on:
       - "scripts/test_dependency_policy.mjs"
       - "scripts/verify-github-workflow-actions.mjs"
       - ".github/workflows/dependency-governance.yml"
+      - "scripts/verify-rustsec-glib-exception.mjs"
   pull_request:
     paths:
       - "**/package.json"
@@ -27,6 +28,7 @@ on:
       - "scripts/test_dependency_policy.mjs"
       - "scripts/verify-github-workflow-actions.mjs"
       - ".github/workflows/dependency-governance.yml"
+      - "scripts/verify-rustsec-glib-exception.mjs"
 
 concurrency:
   group: dependency-governance-${{ github.ref }}
@@ -49,7 +51,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          node-version: 24
+          node-version: 26
           cache: npm
           cache-dependency-path: |
             apps/export-doc-web/package-lock.json
@@ -60,6 +62,7 @@ jobs:
           toolchain: 1.98.1
 
       - name: Restore locked dependency graphs
+        id: restore
         run: |
           npm ci --prefix apps/export-doc-web
           npm ci --prefix apps/export-doc-tauri
@@ -67,7 +70,7 @@ jobs:
           cargo fetch --locked --manifest-path apps/exportdoc-ocr-rs/Cargo.toml
           cargo fetch --locked --manifest-path tools/excel-analyzer-rs/Cargo.toml
 
-      - name: Validate Node 24 and artifact Action policy
+      - name: Validate Node 26 and artifact Action policy
         run: node scripts/verify-github-workflow-actions.mjs
 
       - name: Verify exact dependency policy pins
@@ -84,14 +87,19 @@ jobs:
 
       - name: Audit Rust lock files
         run: |
-          "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file Cargo.lock
-          "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file apps/exportdoc-ocr-rs/Cargo.lock
-          "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file tools/excel-analyzer-rs/Cargo.lock
+          mkdir -p artifacts/dependency-governance
+          status=0
+          "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file Cargo.lock --json > artifacts/dependency-governance/rustsec-workspace.json || status=1
+          "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file apps/exportdoc-ocr-rs/Cargo.lock --json > artifacts/dependency-governance/rustsec-ocr.json || status=1
+          "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file tools/excel-analyzer-rs/Cargo.lock --json > artifacts/dependency-governance/rustsec-excel.json || status=1
+          exit "$status"
 
       - name: Generate SPDX, CycloneDX and third-party inventory
+        if: ${{ !cancelled() && steps.restore.outcome == 'success' }}
         run: node scripts/generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository
 
       - name: Recheck generated dependency evidence
+        if: ${{ !cancelled() && steps.restore.outcome == 'success' }}
         run: node scripts/verify-dependency-policy.mjs --generated-only
 
       - name: Upload dependency governance evidence

@@ -1,113 +1,191 @@
-name: Rust native container release
+name: Build and publish Docker image
+run-name: Docker ${{ inputs.version }} / ${{ inputs.architecture }}
 
 on:
   workflow_dispatch:
     inputs:
-      publish:
-        description: Publish images to GHCR
+      version:
+        description: '镜像与程序版本，例如 0.1.2、v0.1.2 或 0.1.2-beta.1'
         required: true
-        default: false
+        type: string
+      architecture:
+        description: '容器架构（x64 对应 linux/amd64）'
+        required: true
+        type: choice
+        default: all
+        options: [x64, arm64, all]
+      publish:
+        description: '生命周期验收通过后发布到 GitHub Container Registry（GHCR）'
         type: boolean
+        default: false
+      publish_latest:
+        description: '同时更新 latest（仅全部架构的稳定版）'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-  packages: write
+
+defaults:
+  run:
+    shell: bash
 
 concurrency:
-  group: rust-native-container-release-${{ github.ref }}
+  group: native-container-release
   cancel-in-progress: false
 
 jobs:
-  lifecycle:
-    name: Docker lifecycle ${{ matrix.runner }}
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      image: ${{ steps.plan.outputs.image }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 26
+      - name: Validate version and architecture
+        id: plan
+        env:
+          RELEASE_PRODUCT: container
+          RELEASE_OS: linux
+          RELEASE_ARCHITECTURE: ${{ inputs.architecture }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          PUBLISH: ${{ inputs.publish }}
+          PUBLISH_LATEST: ${{ inputs.publish_latest }}
+        run: node scripts/github/prepare-native-release.mjs
+
+  image:
+    needs: prepare
+    name: Build and verify ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 75
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            platform: linux/amd64
-            artifact: linux-amd64
-          - runner: ubuntu-24.04-arm
-            platform: linux/arm64
-            artifact: linux-arm64
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      IMAGE: ${{ needs.prepare.outputs.image }}
+      ARCHITECTURE: ${{ matrix.architecture }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - name: Build and start isolated containers
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 26
+      - name: Apply requested program version
+        run: node scripts/sync-version.mjs "$RELEASE_VERSION"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
+      - name: Build the exact image to validate and publish
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
+        with:
+          context: .
+          file: deploy/rust-native/Dockerfile
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: exportdoc-rust-native:local
+          labels: |
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Start isolated containers without rebuilding
         shell: pwsh
-        run: ./scripts/run-native-docker.ps1 -NoPause -Port 5195
-      - name: Verify web, API and file tasks
+        run: ./scripts/run-native-docker.ps1 -SkipBuild -NoPause -Port 5195
+      - name: Verify React, API and file tasks
         run: node scripts/verify-native-docker.mjs --url http://127.0.0.1:5195 --runtime deploy/rust-native/runtime --isolated-validation
-      - name: Stop containers while retaining the databases
+      - name: Stop containers while retaining databases
         shell: pwsh
         run: ./scripts/run-native-docker.ps1 -Stop -NoPause
-      - name: Restart and verify persisted output
+      - name: Restart the same image and verify persistence
         shell: pwsh
         run: |
-          ./scripts/run-native-docker.ps1 -NoPause -Port 5195
+          ./scripts/run-native-docker.ps1 -SkipBuild -NoPause -Port 5195
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/verify-native-docker.mjs --url http://127.0.0.1:5195 --runtime deploy/rust-native/runtime --isolated-validation --resume
           exit $LASTEXITCODE
       - name: Stop containers
         if: always()
         shell: pwsh
-        run: ./scripts/run-native-docker.ps1 -Stop -NoPause
-
-  publish:
-    name: Publish GHCR image
-    if: inputs.publish == true
-    needs: lifecycle
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            architecture: amd64
-          - runner: ubuntu-24.04-arm
-            architecture: arm64
-    steps:
-      - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # reviewed
+        run: |
+          if (Test-Path -LiteralPath 'deploy/rust-native/runtime/native-runtime.json') {
+            ./scripts/run-native-docker.ps1 -Stop -NoPause
+          }
       - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v3
+        if: inputs.publish
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push Rust native image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # reviewed
+      - name: Export validated image for download
+        if: ${{ !inputs.publish }}
+        run: |
+          mkdir -p artifacts/container-images
+          docker save exportdoc-rust-native:local | gzip > "artifacts/container-images/exportdoc-container-$RELEASE_VERSION-$ARCHITECTURE.tar.gz"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: ${{ !inputs.publish }}
         with:
-          context: .
-          file: deploy/rust-native/Dockerfile
-          push: true
-          platforms: linux/${{ matrix.architecture }}
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/exportdoc-rust-native:${{ github.sha }}-${{ matrix.architecture }}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+          name: exportdoc-container-${{ needs.prepare.outputs.version }}-${{ matrix.architecture }}
+          path: artifacts/container-images/*.tar.gz
+          if-no-files-found: error
+      - name: Push validated image and record immutable digest
+        if: inputs.publish
+        run: |
+          reference="$IMAGE:run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$ARCHITECTURE"
+          docker tag exportdoc-rust-native:local "$reference"
+          docker push "$reference"
+          digest=$(docker buildx imagetools inspect "$reference" --format '{{.Manifest.Digest}}')
+          mkdir -p artifacts/container-digests
+          jq -n --arg image "$IMAGE" --arg digest "$digest" --arg version "$RELEASE_VERSION" \
+            --arg revision "$GITHUB_SHA" --arg architecture "$ARCHITECTURE" \
+            '{image:$image,digest:$digest,version:$version,revision:$revision,architecture:$architecture}' \
+            > "artifacts/container-digests/$ARCHITECTURE.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: inputs.publish
+        with:
+          name: container-digest-${{ matrix.architecture }}
+          path: artifacts/container-digests/*.json
+          if-no-files-found: error
 
   manifest:
-    name: Publish multi-architecture index
-    if: inputs.publish == true
-    needs: publish
+    if: inputs.publish
+    needs: [prepare, image]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v3
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 26
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Combine validated native images
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: container-digest-*
+          path: artifacts/container-digests
+          merge-multiple: true
+      - name: Publish version index only after all selected architectures pass
         env:
-          IMAGE: ghcr.io/${{ github.repository_owner }}/exportdoc-rust-native
-          REVISION: ${{ github.sha }}
-        run: docker buildx imagetools create --tag "$IMAGE:$REVISION" --tag "$IMAGE:latest" "$IMAGE:$REVISION-amd64" "$IMAGE:$REVISION-arm64"
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_ARCHITECTURE: ${{ inputs.architecture }}
+          IMAGE: ${{ needs.prepare.outputs.image }}
+          PUBLISH_LATEST: ${{ inputs.publish_latest }}
+        run: node scripts/github/promote-native-container.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: exportdoc-container-${{ needs.prepare.outputs.version }}-manifest
+          path: artifacts/container-release.json
+          if-no-files-found: error

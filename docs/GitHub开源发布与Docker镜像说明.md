@@ -24,7 +24,11 @@ Docker 使用 `deploy/rust-native`，本地私密运行配置位于其忽略的 
 
 桌面 SQLite 不能代替团队 PostgreSQL。当前支持单 API、多浏览器用户，不支持把多个 API 指向同一业务库当作高可用部署。数据库、受管文件、备份与配置一起按现有恢复流程验证。
 
-`rust-native-container-release.yml` 先做生命周期验收，只有显式 publish 才发布 GHCR。镜像名称、tag、平台与产物以当次工作流和清单为准，不沿用已删除的 container-images.yml 或旧三镜像版本提升流程。
+`rust-native-container-release.yml` 接受版本号、x64/ARM64/all、publish 和 publish_latest。每个原生 runner 只构建一次，启动、认证/文件任务与重启持久化均验证该镜像；通过后发布临时唯一标签并记录 digest。所有所选架构通过后，按 digest 合并 `ghcr.io/<owner>/exportdoc-rust-native:<version>`。只有显式选中 publish_latest 的全部架构稳定版才更新 latest；已有不同内容的版本标签拒绝覆盖。
+
+未选择 publish 时可下载 `docker save` 的 tar.gz，使用 `docker load -i <文件>` 导入。发布后下载的 `container-release.json` 保存版本、源码和各架构 digest。镜像首次发布的访问权限由 GitHub Packages 设置决定；需要公开拉取时在该包设置中选择 Public。工作流不改变包的可见性。
+
+使用 `scripts/run-native-docker.ps1 -Image ghcr.io/<owner>/exportdoc-rust-native:<version> -SkipBuild -NoPause` 运行已发布镜像；停止、重启和维护时保持同一个镜像引用。正式数据继续通过 Compose 卷与受管私有配置维护，不进入镜像。
 
 ## 验收
 

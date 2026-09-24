@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-当前 Rust 桌面配置默认没有更新端点或正式公钥，手工桌面 workflow 生成构建 Artifact。四产品版的旧 C# 发布通道、旧 publish_release 参数和旧 latest-*.json 不能视为 Rust 已完成的发布流程。正式更新须在配置受信公钥、保管私钥及完成真实升级验收后启用；不宣称旧 .NET 安装包可直接升级为 Rust。
+当前 Rust 桌面配置默认没有更新端点或正式公钥。三个操作系统的手工工作流生成 Full 构建 Artifact，`publish_release` 可上传归档到对应版本的 GitHub Release，供人工下载安装。此开关不启用 Tauri 自动更新，也不发布旧 C# 四产品通道或 latest-*.json。正式更新须在配置受信公钥、保管私钥及完成真实升级验收后启用；不宣称旧 .NET 安装包可直接升级为 Rust。
 
 ## 信任边界
 

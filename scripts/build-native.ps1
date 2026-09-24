@@ -98,6 +98,7 @@ foreach ($copy in $copies.GetEnumerator()) {
 @{ schemaVersion = 1; target = 'tauri-desktop'; backend = 'Rust' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputFullPath 'runtime-layout.json') -Encoding utf8
 $packageMarker = [ordered]@{
     schemaVersion = 1; purpose = 'rust-native-application'; product = 'ExportDocManager'
+    version = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'version.json') -Raw | ConvertFrom-Json).version
     configuration = $Configuration; backend = 'Rust'; frontend = 'Tauri'; webView = $true; ocr = (-not $WithoutOcr)
     builtAt = [DateTimeOffset]::UtcNow.ToString('o')
 }

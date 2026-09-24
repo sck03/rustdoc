@@ -20,7 +20,7 @@ default-members = ["apps/export-doc-tauri/src-tauri", "crates/export-doc-engine"
 exclude = ["apps/exportdoc-ocr-rs", "tools/excel-analyzer-rs"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.98.1"
 publish = false

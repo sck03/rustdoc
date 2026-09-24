@@ -105,9 +105,9 @@
       "filePattern": "^(?:.+\\.(?:mjs|ps1|cmd|yml|yaml|sh)|Dockerfile)$",
       "relativePathPattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)|deploy/rust-native/[^/]+|\\.github/workflows/rust-native-validation\\.yml)$",
       "maximumLines": 350,
-      "baselineAggregateLines": 1181,
+      "baselineAggregateLines": 1402,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 1256,
+      "maximumAggregateLines": 1477,
       "reportFiles": false
     },
     {

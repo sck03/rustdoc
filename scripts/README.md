@@ -55,14 +55,23 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 | 工作流 | 用途 |
 | --- | --- |
-| `rust-native-desktop-release.yml` | 手工构建 Windows x64／ARM64、Linux x64／ARM64、macOS ARM64 桌面及平台安装包，默认含 OCR |
-| `rust-native-web-server-release.yml` | 手工构建 React + Rust PostgreSQL 服务包 |
-| `rust-native-container-release.yml` | 手工 Docker 生命周期验收；显式选择 publish 才发布 GHCR |
+| `windows-desktop-package.yml` | Windows 桌面；选择 x64／ARM64／all，版本号及 GitHub Release 开关 |
+| `linux-desktop-package.yml` | Linux 桌面；选择 x64／ARM64／all，版本号及 GitHub Release 开关 |
+| `macos-desktop-package.yml` | macOS ARM64 桌面；版本号及 GitHub Release 开关 |
+| `rust-native-web-server-release.yml` | React + Rust PostgreSQL 服务包；选择系统、架构、版本号及 GitHub Release 开关 |
+| `rust-native-container-release.yml` | Docker 版本号与 x64／ARM64／all；验证同一镜像后按 publish 选择发布 GHCR，publish_latest 单独控制 |
+| `release-script-validation.yml` | 自动检查发布参数、版本同步、发布冲突、脚本语法及 workflow 语法 |
 | `rust-native-validation.yml` | Rust 测试、生成契约、依赖边界与跨平台构建／容器验收 |
 | `dependency-governance.yml` | npm／Cargo／原生资源的许可与 SBOM；不调用 .NET |
 | `browser-compatibility.yml` | 仅手工 Firefox／WebKit 验收 |
 
 Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公钥和私钥，私钥不写仓库。便携包不执行安装器更新。不执行 Windows Authenticode、Developer ID 或 Apple 公证。未实跑的 CI／系统／架构不写成已通过。
+
+桌面和 Web 共用 `native-package-reusable.yml`，该内部工作流不提供手工运行入口。`version` 接受 `0.1.2`、`v0.1.2`、`0.1.2-beta.1`，同时进入 Rust/npm/Tauri、包内标记和归档名称。只改 CI checkout，不自动提交版本文件。已有不同源码的 GitHub Release 标签或不同内容的同名附件拒绝覆盖。完整参数及下载步骤见[工作流手册](../docs/GitHub%20Actions工作流用途与运行手册.md)。
+
+本地需要变更程序版本时先运行 `node scripts/sync-version.mjs 0.1.2`，再使用现有构建入口。该脚本同步 Rust 主工作区、独立 OCR/Excel 工具及各自锁文件，不修改保留 C# 对照的构建属性，也不升级第三方依赖。
+
+运行已发布镜像：`./scripts/run-native-docker.ps1 -Image ghcr.io/<owner>/exportdoc-rust-native:0.1.2 -SkipBuild -NoPause`。后续启动、停止和恢复均使用同一 `-Image` 参数。`-SkipBuild` 使用已有/拉取的镜像；默认本地命令仍从源码构建。
 
 ## 验证和证据
 

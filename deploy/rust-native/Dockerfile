@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:24-trixie-slim AS web
+FROM node:26.10.0-trixie-slim AS web
 WORKDIR /workspace
 ENV npm_config_cache=/workspace/.cache/npm
 COPY apps/export-doc-web/package.json apps/export-doc-web/package-lock.json apps/export-doc-web/
@@ -35,7 +35,7 @@ COPY Templates/ Templates/
 RUN --mount=type=cache,target=/workspace/.cache/cargo/registry,sharing=locked cargo build --locked --release -p export-doc-server \
     && cargo build --locked --release --manifest-path apps/exportdoc-ocr-rs/Cargo.toml
 
-FROM postgres:18.4-trixie AS postgres-client
+FROM postgres:18.6-trixie AS postgres-client
 COPY scripts/lib/copy-postgresql-client.sh /copy-postgresql-client.sh
 RUN sh /copy-postgresql-client.sh /client
 
