@@ -277,6 +277,8 @@ pub struct GridRow {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GridCell {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label_position: Option<String>,
     pub id: String,
     #[serde(default = "one")]
     pub col_span: i32,
@@ -312,6 +314,8 @@ pub struct GridCheckboxOption {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GridDiagonalHeader {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direction: Option<String>,
     #[serde(default)]
     pub upper_left_text: String,
     #[serde(default)]

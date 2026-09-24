@@ -40,6 +40,8 @@ export type ReportDesignerV3Schema = {
   page: ReportDesignerV3Page;
   layers: ReportDesignerV3Layer[];
   grid: ReportDesignerV3GridSettings;
+  /** Minimum distance between successive product rows; positions remain page coordinates. */
+  detailRowHeightHundredthMm?: number;
   contractVersion: typeof REPORT_DESIGNER_V3_CONTRACT_VERSION;
   resources?: ReportDesignerV3ImageResource[];
   release?: ReportDesignerV3Release;
@@ -73,6 +75,9 @@ export type ReportDesignerV3Layer = {
   elements: ReportDesignerV3Element[];
 };
 export type ReportDesignerV3LayerPrintSettings = {
+  /** Place the footer immediately after the final detail row. */
+  followBody?: boolean;
+  firstPageOnly?: boolean;
   /** Repeat the band in the browser print header/footer area on every page. */
   repeatOnEveryPage: boolean;
   /** Keep the band together when the browser lays out a page break. */

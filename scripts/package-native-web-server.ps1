@@ -77,6 +77,16 @@ foreach ($file in Get-ChildItem -LiteralPath $webRoot -Recurse -File) {
     $copyMap[$file.FullName] = Join-Path 'Web' ([IO.Path]::GetRelativePath($webRoot, $file.FullName))
 }
 Add-ExportDocRustPackageResources -RepositoryRoot $repositoryRoot -Configuration $Configuration -RustTarget $RuntimeIdentifier -Copies $copyMap -WithoutOcr:$WithoutOcr -SkipBuild:$SkipBuild
+$clientRoot = Join-Path $runtimeRoot 'postgresql-client'
+$platform = if ($IsWindows) { 'windows' } elseif ($IsMacOS) { 'macos' } else { 'linux' }
+$clientVersion = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'eng/native-runtime-packages.json') -Raw | ConvertFrom-Json).postgresqlClient.version
+$clientRoot = Join-Path $clientRoot "$clientVersion-$platform-$([Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)"
+if (-not (Test-Path -LiteralPath (Join-Path $clientRoot 'postgresql-client.json'))) {
+    Invoke-ExportDocExternal -FilePath pwsh -Arguments @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'provision-postgresql-client.ps1'), '-Platform', $platform, '-Destination', $clientRoot) -WorkingDirectory $repositoryRoot -TimeoutSeconds 1800 -DisplayName 'Prepare PostgreSQL 18 clients'
+}
+$clientMarker = Get-Content -LiteralPath (Join-Path $clientRoot 'postgresql-client.json') -Raw | ConvertFrom-Json
+if ($clientMarker.version -ne $clientVersion -or $clientMarker.platform -ne $platform) { throw 'PostgreSQL client cache does not match the declared platform/version.' }
+foreach ($file in Get-ChildItem -LiteralPath $clientRoot -Recurse -File) { $copyMap[$file.FullName] = Join-Path 'Tools/PostgreSQL' ([IO.Path]::GetRelativePath($clientRoot, $file.FullName)) }
 foreach ($entry in $copyMap.GetEnumerator()) {
     if (-not (Test-Path -LiteralPath $entry.Key)) {
         throw "Required web server package input is missing: $($entry.Key)"
@@ -97,6 +107,7 @@ $marker = [ordered]@{
     frontend = 'React'
     server = 'Rust HTTP'
     database = 'PostgreSQL 18'
+    ocr = (-not $WithoutOcr)
     configuration = $Configuration
     runtimeIdentifier = if ([string]::IsNullOrWhiteSpace($RuntimeIdentifier)) { 'host' } else { $RuntimeIdentifier }
     builtAt = [DateTimeOffset]::UtcNow.ToString('o')

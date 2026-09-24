@@ -8,6 +8,7 @@ import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
 import { verifyDesignerEditingUi } from "./lib/report-designer-editing-ui-scenarios.mjs";
+import { verifyProductFieldsUi } from "./lib/report-designer-product-fields-ui.mjs";
 import { verifyShippingMarksUi } from "./lib/report-shipping-marks-ui-scenarios.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
@@ -32,7 +33,7 @@ await esbuild.build({
     import { permissionResources } from ${source("app/permissionCatalog.ts")};
     import { ConfirmationProvider } from ${source("ui/ConfirmationProvider.tsx")};
     import { ReportDesignerV3Workspace } from ${source("features/report-designer/ReportDesignerV3Workspace.tsx")};
-    import { parseReportDesignerV3FromHtml } from ${source("features/report-designer/reportDesignerV3TemplateParser.ts")};
+    import { parseReportDesignerV3Source } from ${source("features/report-designer/reportDesignerV3TemplateParser.ts")};
     import { exportReportDesignerV3SchemaToHtml } from ${source("features/report-designer/reportDesignerV3HtmlExporter.ts")};
     import { createV3FlowElement, createV3TextElement, createV3FieldElement, createV3LineElement, createV3PageNumberElement, createV3ImageElement } from ${source("features/report-designer/reportDesignerV3ElementFactories.ts")};
     import { createGridBlock, createDetailTableBlock, createRowBlock, createConditionalBlock, createDetailTableSideBand } from ${source("features/report-designer/reportDesignerBlockFactories.ts")};
@@ -45,13 +46,14 @@ await esbuild.build({
     import ${source("styles/routes/reports.css")};
     const imageScenario = new URLSearchParams(location.search).has('images');
     const reportType = imageScenario ? 'PaymentVoucher' : 'ExportDocument';
-    const schema = parseReportDesignerV3FromHtml('', reportType).schema;
+    const schema = parseReportDesignerV3Source('', reportType).schema;
     schema.layers.forEach(layer => { layer.elements = []; if (layer.role === 'Header') layer.designHeightHundredthMm = 6000; });
     const header = schema.layers.find(layer => layer.role === 'Header');
     const body = schema.layers.find(layer => layer.role === 'Body');
     const grid = { ...createV3FlowElement(createGridBlock(), 1000, 700), id:'review-grid', zIndex:10000 };
     header.elements.push(grid);
     body.elements.push({ ...createV3FlowElement(createDetailTableBlock(), 1000, 14500), id:'review-detail', zIndex:10000 });
+    if (new URLSearchParams(location.search).has('products')) schema.layers.forEach(layer=>layer.elements=[]);
     const stress = new URLSearchParams(location.search).has('stress');
     if (new URLSearchParams(location.search).has('editing')) {
       const style={fontSizePt:12,bold:true,align:'Right',color:'#334455',backgroundColor:'#fff0dd',borderStyle:'Solid',borderWidthPx:2,paddingHundredthMm:200};
@@ -81,22 +83,24 @@ await esbuild.build({
       const overlay=schema.layers.find(layer=>layer.role==='Overlay');
       overlay.elements.push(...[0,1].map(index=>({...createV3ImageElement(1500+index*7000,6000),id:'image-'+index,resourceId:images[0].id,altText:'真实付款图片'})));
     }
-    if(new URLSearchParams(location.search).has('marks')) Object.assign(schema,createShippingMarksScenario({parseReportDesignerV3FromHtml,createRowBlock,createGridBlock,createConditionalBlock,createDetailTableBlock,createDetailTableSideBand,createV3FlowElement,createV3FieldElement}));
+    if(new URLSearchParams(location.search).has('marks')) Object.assign(schema,createShippingMarksScenario({parseReportDesignerV3Source,createRowBlock,createGridBlock,createConditionalBlock,createDetailTableBlock,createDetailTableSideBand,createV3FlowElement,createV3FieldElement}));
     window.__designerSchema = schema;
     window.__designerUpdates = 0;
     window.__designerErrors = [];
     window.addEventListener('error', event => window.__designerErrors.push(event.message));
     window.addEventListener('unhandledrejection', event => window.__designerErrors.push(String(event.reason)));
-    const content = exportReportDesignerV3SchemaToHtml(schema, reportType);
+    const content = JSON.stringify(schema);
     const fieldCatalog={reportType:'ExportDocument',categoryOrder:['单据备用字段','明细备用列'],fields:['Invoice','item'].flatMap(root=>Array.from({length:10},(_,index)=>({
       category:root==='Invoice'?'单据备用字段':'明细备用列',label:index===9?(root==='Invoice'?'船名航次':'客户货号'):(root==='Invoice'?'发票':'明细')+'备用 '+(index+1),value:'{{ '+root+'.Spare'+(index+1)+' }}',reportType:'ExportDocument'})))};
     fieldCatalog.fields.push({category:'单据信息',label:'唛头（文字 / 图片自动）',value:'{{ Invoice.ShippingMarks }}',reportType:'ExportDocument'});
+    fieldCatalog.fields.push({category:'单据信息',label:'发票号',value:'{{ Invoice.InvoiceNo }}',reportType:'ExportDocument'});
     window.__designerHtml = content;
+    window.__exportDesignerHtml=()=>exportReportDesignerV3SchemaToHtml(window.__designerSchema);
     window.__renderMarksPreview=profile=>renderReportDesignerLocalPreviewSample(window.__designerHtml,profile);
     createRoot(document.getElementById('root')).render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><PermissionAccessProvider grants={[]} permissions={['view','upload','recycle'].map(action=>({resourceKey:permissionResources.reportResources,action,dataScope:'all'}))} canManageSettings={false}><ConfirmationProvider><div className="work-surface" style={{margin:'12px',padding:'8px'}}>
       <ReportDesignerV3Workspace client={imageScenario?client:undefined} reportType={reportType} displayName="表格设计交互验证" content={content} fieldCatalog={imageScenario?{reportType,fields:[],categoryOrder:[]}:fieldCatalog} editable={!new URLSearchParams(location.search).has('readonly')} onDesignerDraftChange={({content: html, isDirty, isValid}) => {
         window.__designerDraftState={isDirty,isValid};
-        if(isValid) { window.__designerUpdates++; window.__designerHtml=isDirty?html:content; window.__designerSchema=parseReportDesignerV3FromHtml(window.__designerHtml,reportType).schema; }
+        if(isValid) { window.__designerUpdates++; window.__designerHtml=isDirty?html:content; window.__designerSchema=parseReportDesignerV3Source(window.__designerHtml,reportType).schema; }
       }} />
     </div></ConfirmationProvider></PermissionAccessProvider></QueryClientProvider>);
   ` },
@@ -266,6 +270,7 @@ try {
   await waitFor(page,'window.__designerSchema.layers.flatMap(layer=>layer.elements).find(element=>element.id==="stress-0").text === "0"');
   results.push({test:'902-element text input commits once and undoes as one operation',passed:true});
   await verifyDesignerEditingUi({page,url,read,waitFor,click,key,modifier:primaryModifier,results});
+  await verifyProductFieldsUi({page,url,read,waitFor,click,results});
   await page.send("Page.navigate",{url});
   await waitFor(page,'document.querySelector("[data-v3-element-id=review-grid]")');
   await read(page,"[...document.querySelectorAll('button')].find(node=>node.textContent.trim()==='字段').click()");

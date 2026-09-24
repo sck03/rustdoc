@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
+import { inflateRawSync } from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { verifyDesignerEditingMutations } from "./lib/report-designer-editing-contracts.mjs";
 import { createShippingMarksScenario } from "./lib/report-shipping-marks-fixture.mjs";
@@ -48,11 +49,13 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerTableMutations.ts"
 export * from ${JSON.stringify(importSpecifier("reportDesignerLayerBands.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3WorkspaceHelpers.tsx"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerFields.ts"))};
+export { resolveDefaultTemplatePath } from ${JSON.stringify(importSpecifier("../reports/reportTemplateDesignerModel.ts"))};
 `);
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 const api = await import(pathToFileURL(bundlePath).href);
 verifyDesignerEditingMutations(api);
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
+assert(api.resolveDefaultTemplatePath({ templates: [{templatePath:"builtin:Export/invoice.dtpl"},{templatePath:"user:Export/invoice.dtpl"}], reportType:"ExportDocument", requestedTemplateFileName:"user:Export/invoice.dtpl", currentTemplatePath:"", userTemplateSelected:false }) === "user:Export/invoice.dtpl", "完整模板引用必须区分同名内置模板与用户副本");
 
 function assertFixedRightMetadataLayout(source, templatePath) {
   assert(
@@ -74,7 +77,8 @@ function assertFixedRightMetadataLayout(source, templatePath) {
   );
 }
 
-const landscapeSchema = api.parseReportDesignerV3FromHtml("<style>@page { size: A4 landscape; }</style>", "ExportDocument").schema;
+const landscapeSchema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
+Object.assign(landscapeSchema.page, {orientation: "Landscape", widthHundredthMm: 29700, heightHundredthMm: 21000});
 landscapeSchema.layers = landscapeSchema.layers.filter(layer => layer.role === "Body").map(layer => ({ ...layer, elements: [] }));
 landscapeSchema.layers[0].elements.push({ ...api.createV3TextElement(1000, 1000), id: "title", text: "标题" });
 assert(landscapeSchema.page.widthHundredthMm === 29700 && landscapeSchema.page.heightHundredthMm === 21000, "横版 A4 尺寸错误");
@@ -185,8 +189,8 @@ const conditionalValidation = api.normalizeReportDesignerV3Schema(conditionalSch
 assert(!conditionalValidation.issues.some((issue) => issue.severity === "error" && issue.path.includes("conditional-export-flow")), "出口条件显示的合法字段应通过 V3 校验");
 const conditionalHtml = api.exportReportDesignerV3SchemaToHtml(conditionalSchema, "ExportDocument");
 assert(conditionalHtml.includes("{{ if Invoice.SpecialTerms }}") && conditionalHtml.includes(conditionalText), "V3 条件显示导出必须生成结构化白名单条件");
-const standardConditionalPreview = api.renderReportDesignerLocalPreviewSample(conditionalHtml.replace(/<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA[\s\S]*?-->/, ""), "exportStandard");
-const longConditionalPreview = api.renderReportDesignerLocalPreviewSample(conditionalHtml.replace(/<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA[\s\S]*?-->/, ""), "exportLongItems");
+const standardConditionalPreview = api.renderReportDesignerLocalPreviewSample(JSON.stringify(conditionalSchema), "exportStandard");
+const longConditionalPreview = api.renderReportDesignerLocalPreviewSample(JSON.stringify(conditionalSchema), "exportLongItems");
 assert(!standardConditionalPreview.includes(conditionalText), "空条件字段的本地预览不得显示条件内容");
 assert(longConditionalPreview.includes(conditionalText), "有值条件字段的本地预览必须显示条件内容");
 
@@ -536,12 +540,10 @@ assert(verticalElements[0].yHundredthMm === 1800 && verticalElements[2].yHundred
 const exported = api.exportReportDesignerV3SchemaToHtml(landscapeSchema);
 assert(exported.includes("@page { size: 297mm 210mm"), "V3 导出必须输出横版 A4");
 assert(!exported.includes("http://") && !exported.includes("https://"), "V3 导出不得产生外部图片 URL");
-const parsedRoundtrip = api.parseReportDesignerV3FromHtml(exported, "ExportDocument");
-assert(parsedRoundtrip.schema.page.size === "A4" && parsedRoundtrip.schema.page.orientation === "Landscape", "V3 HTML roundtrip 必须保留 A4 横版");
-const inferred = api.parseReportDesignerV3FromHtml("<style>@page { size: A4 landscape; }</style>", "ExportDocument");
-assert(inferred.schema.page.orientation === "Landscape", "无 schema 的旧模板应识别 @page 方向并创建 V3 替换草稿");
-assert(inferred.sourceVersion === null && inferred.migrated, "无 V3 schema 的旧模板必须只创建一次性 V3 替换草稿");
-assert(inferred.issues.some((issue) => issue.message.includes("高级 HTML") && issue.message.includes("确认")), "经典 HTML 必须明确保持高级 HTML，转换需人工确认");
+const parsedRoundtrip = api.parseReportDesignerV3Source(JSON.stringify(landscapeSchema), "ExportDocument");
+assert(parsedRoundtrip.schema.page.size === "A4" && parsedRoundtrip.schema.page.orientation === "Landscape", "V3 JSON roundtrip 必须保留 A4 横版");
+const rejectedHtml = api.parseReportDesignerV3Source("<style>@page { size: A4 landscape; }</style>", "ExportDocument");
+assert(rejectedHtml.issues.some((issue) => issue.message.includes(".dtpl V3 JSON")), "HTML 模板必须被明确拒绝");
 
 for (const classicPath of [
   "Templates/Export/customs_declaration_template.dtpl",
@@ -554,13 +556,23 @@ for (const classicPath of [
   const source = fs.readFileSync(path.join(repoRoot, classicPath));
   assert(source.subarray(0, 11).toString("ascii") === "EXPORTDOCDT", "default template must use the project-owned .dtpl container");
   assert(source[0] !== 0x7b, "default template must not be directly editable JSON");
+  const payload = source.subarray(49);
+  const start = 30 + payload.readUInt16LE(26) + payload.readUInt16LE(28);
+  const document = JSON.parse(inflateRawSync(payload.subarray(start, start + payload.readUInt32LE(18))).toString("utf8"));
+  const parsed = api.parseReportDesignerV3Source(JSON.stringify(document), document.reportType);
+  assert(parsed.issues.length === 0, `${classicPath}: ${JSON.stringify(parsed.issues)}`);
+  const geometry = value => value.layers.map(layer => [layer.id, layer.role, layer.designHeightHundredthMm ?? 0, layer.elements.map(element => [element.id, element.xHundredthMm, element.yHundredthMm, element.widthHundredthMm, element.heightHundredthMm])]);
+  assert(JSON.stringify(geometry(parsed.schema)) === JSON.stringify(geometry(document)), `${classicPath}: opening must not resize elements or alter design bands`);
+  assert(!api.validateReportDesignerV3Export(parsed.schema, document.reportType).blocked, `${classicPath} must remain editable`);
+  const originalDetails = document.layers.flatMap(layer => layer.elements).filter(element => element.flowKind === "DetailTable");
+  const parsedDetails = parsed.schema.layers.flatMap(layer => layer.elements).filter(element => element.flowKind === "DetailTable");
+  assert(JSON.stringify(parsedDetails.map(e => e.block.columns.map(c => c.widthMm))) === JSON.stringify(originalDetails.map(e => e.block.columns.map(c => c.widthMm))), `${classicPath}: opening in the designer must preserve column geometry`);
+  assert(JSON.stringify(parsedDetails.map(e => e.block.introRow?.cells.map(c => c.fieldPath))) === JSON.stringify(originalDetails.map(e => e.block.introRow?.cells.map(c => c.fieldPath))), `${classicPath}: introductory bindings survive normalization`);
+  fs.writeFileSync(path.join(workspaceRoot, path.basename(classicPath).replace(/\.dtpl$/, ".json")), JSON.stringify(parsed.schema, null, 2));
 }
 
-const brokenV3 = api.parseReportDesignerV3FromHtml(
-  "<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA { this-is-not-json } -->",
-  "ExportDocument",
-);
-assert(brokenV3.sourceVersion === 3 && brokenV3.migrated, "损坏的 V3 schema 必须保留 sourceVersion=3 并要求确认");
+const brokenV3 = api.parseReportDesignerV3Source("{ this-is-not-json }", "ExportDocument");
+assert(brokenV3.sourceVersion === null && !brokenV3.migrated, "损坏的 V3 JSON 必须停留在只读错误状态");
 assert(brokenV3.issues.some((issue) => issue.severity === "error"), "损坏的 V3 schema 必须产生阻断错误");
 
 const paymentCrossDomain = {
@@ -604,10 +616,10 @@ const exportValidation = api.normalizeReportDesignerV3Schema(exportCrossDomain, 
 assert(exportValidation.issues.some((issue) => issue.severity === "error" && issue.path.includes("fieldPath")), "出口模板混用 Payment.* 字段必须阻断");
 assert(api.validateReportDesignerV3Export(exportCrossDomain, "ExportDocument").blocked, "出口模板导出状态必须暴露字段域阻断错误");
 assert(workspaceSource.includes("当前草稿不能保存"), "V3 工作区必须明确提示阻断草稿不能保存");
-assert(workspaceSource.includes("exportValidation.blocked") && workspaceSource.includes("isDirty: draftDirty") && workspaceSource.includes("isValid: !exportValidation.blocked"), "阻断导出时必须独立报告修改状态与校验状态");
+assert(workspaceSource.includes("exportValidation.blocked") && workspaceSource.includes("isDirty: draftDirty") && workspaceSource.includes("isValid: sourceValid && !exportValidation.blocked"), "阻断导出时必须独立报告修改状态与校验状态");
 
-const v3NeedsReview = api.parseReportDesignerV3FromHtml(
-  exported.replace('"size": "A4"', '"size": "Letter"'),
+const v3NeedsReview = api.parseReportDesignerV3Source(
+  JSON.stringify({...landscapeSchema,page:{...landscapeSchema.page,size:"Letter"}}),
   "ExportDocument",
 );
 assert(v3NeedsReview.sourceVersion === 3 && v3NeedsReview.migrated, "带规范化警告的 V3 模板必须要求显式确认");
@@ -692,7 +704,7 @@ assert(canvasSource.includes("data-v3-layer-name={layer.name}") && canvasElement
 assert(canvasSource.includes("createV3RegionMoveConstraint") && canvasSource.includes("findReportDesignerElementNodes") && canvasSource.includes("translate3d"), "复杂模板拖动必须预计算边界、缓存元素节点并使用合成层位移");
 assert(canvasSource.includes("--v3-page-ratio") && canvasCss.includes("aspect-ratio: var(--v3-page-ratio"), "V3 画布必须按 A4 物理宽高比渲染横竖版页面");
 assert(canvasCss.includes("report-designer-v3-layer::before") && canvasCss.includes("report-designer-v3-preview-line-horizontal"), "V3 画布样式必须显示图层标识和细线方向");
-assert(resourcePanelsSource.includes('label="普通表格"') && resourcePanelsSource.includes("明细表（自动重复）") && !resourcePanelsSource.includes('label="票据格"'), "组件入口必须清楚区分普通表格和自动重复明细表");
+assert(resourcePanelsSource.includes('label="普通表格"') && resourcePanelsSource.includes("商品字段（逐行输出）") && resourcePanelsSource.includes("高级表格组件"), "组件入口必须区分自由商品字段、普通表格和高级组合表格");
 assert(gridPropertiesSource.includes("new-report-grid-cell-picker") && gridPropertiesSource.includes("向右合并") && gridPropertiesSource.includes("向下合并") && gridPropertiesSource.includes("快速版式"), "普通表格属性栏必须提供可视化选格、预设和直接合并操作");
 assert(gridPropertiesSource.includes("修改整表样式会立即应用到全部单元格") && !gridPropertiesSource.includes("套用样式") && !gridPropertiesSource.includes("套用边框"), "整表样式和边框必须即时应用，不能依赖容易漏掉的二次套用按钮");
 assert(gridCss.includes("data-report-grid-cell-id") && gridCss.includes("is-designer-selected-cell"), "画布样式必须支持单元格直接命中和选中反馈");
@@ -807,7 +819,7 @@ const unsafeImageHtml = api.exportReportDesignerV3SchemaToHtml(unsafeImageSchema
 assert(!unsafeImageHtml.includes("evil.example") && !unsafeImageHtml.includes("https://"), "非法资源标识必须被清理，不能进入导出 HTML");
 
 {
-  const schema = api.parseReportDesignerV3FromHtml("", "ExportDocument").schema;
+  const schema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
   schema.layers.forEach(layer => { layer.elements = []; if (layer.role === "Header") layer.designHeightHundredthMm = 6000; });
   const header = schema.layers.find(layer => layer.role === "Header");
   const body = schema.layers.find(layer => layer.role === "Body");
@@ -849,14 +861,27 @@ assert(!unsafeImageHtml.includes("evil.example") && !unsafeImageHtml.includes("h
   assert(api.findV3Element(shifted.schema, shifted.selectedIds[0]).layer.id === overlay.id, "覆盖层元素不得因拖动自动改变打印语义");
 }
 
+{
+  const block = api.createDetailTableBlock();
+  block.rowSeparators = false;
+  block.bodyStyle.verticalAlign = "Bottom";
+  const schema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
+  schema.layers.find(layer => layer.role === "Body").elements = [api.createV3FlowElement(block)];
+  const loaded = api.parseReportDesignerV3Source(JSON.stringify(schema), "ExportDocument").schema;
+  const saved = loaded.layers.find(layer => layer.role === "Body").elements[0].block;
+  assert(saved.rowSeparators === false && saved.bodyStyle.verticalAlign === "Bottom", "隐藏商品横线和底部对齐必须保存回读");
+  const html = api.renderReportDesignerBlockPreviewToHtml(saved);
+  assert(html.includes("vertical-align: bottom") && html.includes("border-top: 0") && html.includes("border-bottom: 0"), "设计画布必须执行明细横线与垂直对齐设置");
+}
+
 const markSchema = createShippingMarksScenario(api);
 const markHtml = api.exportReportDesignerV3SchemaToHtml(markSchema, "ExportDocument");
 assert(markHtml.length > 0, "唛头必须可用于自由画布、普通行、表格、条件内容和明细旁栏");
 assert(!markHtml.includes("shipping_marks_image_data"), "模板只保存统一唛头绑定");
-const markImagePreview = api.renderReportDesignerLocalPreviewSample(markHtml, "exportImageMarks");
+const markImagePreview = api.renderReportDesignerLocalPreviewSample(JSON.stringify(markSchema), "exportImageMarks");
 assert((markImagePreview.match(/<img class="edm-shipping-marks-image"/g) ?? []).length === 5, "图片样例在全部五个位置显示图片");
 assert(!markImagePreview.includes("ORDER SAMPLE"), "图片样例不能输出残留文字");
-const markTextPreview = api.renderReportDesignerLocalPreviewSample(markHtml, "exportStandard");
+const markTextPreview = api.renderReportDesignerLocalPreviewSample(JSON.stringify(markSchema), "exportStandard");
 assert(!markTextPreview.includes("<img") && (markTextPreview.match(/ORDER SAMPLE/g) ?? []).length === 5, "文字样例保留换行且不输出图片");
 const markGroups = api.buildReportDesignerFieldGroups({ reportType: "ExportDocument", fields: [{ category: "单据信息", label: "唛头", value: "{{ Invoice.ShippingMarks }}" }] });
 assert(markGroups.flatMap(group => group.fields).filter(field => field.label.includes("唛头")).length === 1, "字段目录只能提供一个唛头");

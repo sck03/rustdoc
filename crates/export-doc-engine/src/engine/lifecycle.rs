@@ -25,6 +25,7 @@ impl NativeService {
             jobs,
             bootstrap_token: String::new(),
             clock: crate::clock::BusinessClock::default(),
+            license_gate: Default::default(),
             packing_gate: Default::default(),
             #[cfg(feature = "ocr")]
             ocr_gate: Default::default(),
@@ -56,7 +57,8 @@ impl NativeService {
         retention: tasks::retention::Retention,
     ) -> Result<Arc<Self>> {
         export_doc_report::configure(&paths.font_path);
-        let store = Arc::new(Store::open_postgres(connection_string)?);
+        super::team_backup::postgres::ensure_no_pending(&paths)?;
+        let store = Arc::new(Store::open_postgres(&paths, connection_string)?);
         packing::seed(&store)?;
         #[cfg(feature = "mail")]
         email::recover(&store)?;
@@ -73,6 +75,7 @@ impl NativeService {
             jobs,
             bootstrap_token,
             clock,
+            license_gate: Default::default(),
             packing_gate: Default::default(),
             #[cfg(feature = "ocr")]
             ocr_gate: Default::default(),

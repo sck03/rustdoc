@@ -568,6 +568,7 @@ pub(super) fn upload_latest(service: &NativeService, actor: &Actor) -> Result<Va
                 detail: format!("已上传 {name}({size} 字节)到 WebDAV。"),
                 destination: None,
                 directory: None,
+                managed_file: None,
             })
         },
     )
@@ -650,6 +651,7 @@ pub(super) fn download(service: &NativeService, actor: &Actor, body: &Value) -> 
                 detail: format!("{remote_name}({size} 字节)已通过校验并导入受管备份目录。"),
                 destination: Some(target),
                 directory: None,
+                managed_file: None,
             })
         },
     )

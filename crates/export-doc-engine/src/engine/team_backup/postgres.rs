@@ -24,7 +24,6 @@ use std::{
 
 const PG_DUMP: &str = "pg_dump";
 const PG_RESTORE: &str = "pg_restore";
-const CONNECTION_ENVIRONMENT: &str = "EXPORTDOCMANAGER_POSTGRES_CONNECTION";
 const BACKUP_SUFFIX: &str = ".dump";
 const SAFETY_PREFIX: &str = ".";
 const RESTART_MARKER: &str = ".pending-restore.json";
@@ -39,66 +38,43 @@ pub(super) struct Endpoint {
     port: String,
     database: String,
     username: String,
-    password: String,
+    password: zeroize::Zeroizing<String>,
+    ssl_mode: &'static str,
 }
 impl Endpoint {
     fn read(service: &NativeService) -> Result<Self> {
         Self::read_parts(&service.store, &service.protector)
     }
-    /// 后台任务复用同一读取路径：任务开始时重新读取当前连接配置。
-    fn read_parts(store: &Store, protector: &crate::secrets::Protector) -> Result<Self> {
-        if let Ok(url) = std::env::var(CONNECTION_ENVIRONMENT) {
-            if !url.is_empty() {
-                return Self::parse_url(&url);
-            }
+    /// Use the connection injected into this service, including secret-file deployments.
+    fn read_parts(store: &Store, _protector: &crate::secrets::Protector) -> Result<Self> {
+        #[cfg(feature = "postgres")]
+        {
+            Self::parse_url(store.postgres_connection()?)
         }
-        let settings = super::settings::current(store)?;
-        let system = &settings["system"];
-        let password = super::settings::credential(store, protector, "/system/postgreSqlPassword")
-            .map(|value| value.to_string())
-            .unwrap_or_default();
-        Ok(Self {
-            host: text(system, "postgreSqlHost"),
-            port: system["postgreSqlPort"]
-                .as_i64()
-                .map(|value| value.to_string())
-                .unwrap_or_else(|| "5432".into()),
-            database: text(system, "postgreSqlDatabase"),
-            username: text(system, "postgreSqlUsername"),
-            password,
-        })
+        #[cfg(not(feature = "postgres"))]
+        {
+            let _ = store;
+            Err(unsupported("当前构建不包含 PostgreSQL。"))
+        }
     }
-    fn parse_url(url: &str) -> Result<Self> {
-        let rest = url
-            .strip_prefix("postgres://")
-            .or_else(|| url.strip_prefix("postgresql://"))
-            .ok_or_else(|| invalid("部署连接串必须是 postgres:// 或 postgresql:// 开头的 URL。"))?;
-        let (userinfo, rest) = match rest.split_once('@') {
-            Some((userinfo, rest)) => (Some(userinfo), rest),
-            None => (None, rest),
-        };
-        let (authority, database) = match rest.split_once(['/', '?', '#']) {
-            Some((authority, rest)) => (authority, rest.split(['?', '#']).next().unwrap_or("")),
-            None => (rest, ""),
-        };
-        let (username, password) = match userinfo {
-            Some(userinfo) => match userinfo.split_once(':') {
-                Some((username, password)) => (username.to_string(), password.to_string()),
-                None => (userinfo.to_string(), String::new()),
-            },
-            None => (String::new(), String::new()),
-        };
-        let (host, port) = match authority.split_once(':') {
-            Some((host, port)) => (host.to_string(), port.to_string()),
-            None => (authority.to_string(), "5432".to_string()),
-        };
-        Ok(Self {
-            host,
-            port,
-            database: database.to_string(),
-            username,
-            password,
-        })
+    fn parse_url(connection: &str) -> Result<Self> {
+        #[cfg(feature = "postgres")]
+        {
+            let options = export_doc_storage::postgres_client_parameters(connection)?;
+            Ok(Self {
+                host: options.host,
+                port: options.port,
+                database: options.database,
+                username: options.username,
+                password: zeroize::Zeroizing::new(options.password),
+                ssl_mode: options.ssl_mode,
+            })
+        }
+        #[cfg(not(feature = "postgres"))]
+        {
+            let _ = connection;
+            Err(unsupported("当前构建不包含 PostgreSQL。"))
+        }
     }
     fn configured(&self) -> bool {
         !self.host.is_empty() && !self.database.is_empty() && !self.username.is_empty()
@@ -109,7 +85,15 @@ impl Endpoint {
             .args(["--port", &self.port])
             .args(["--username", &self.username])
             .arg("--no-password");
-        command.env("PGPASSWORD", &self.password);
+        command
+            .env("PGPASSWORD", self.password.as_str())
+            .env("PGSSLMODE", self.ssl_mode)
+            .env("PGCONNECT_TIMEOUT", "10")
+            .env_remove("PGSERVICE")
+            .env_remove("PGSERVICEFILE");
+        if self.ssl_mode == "verify-full" {
+            command.env("PGSSLROOTCERT", "system");
+        }
     }
 }
 
@@ -183,11 +167,6 @@ pub(super) fn require_ready(service: &NativeService) -> Result<Tools> {
     }
     Ok(tools)
 }
-/// 读取当前 PostgreSQL 连接配置（还原计划脚本与服务器迁移共用）。
-pub(super) fn endpoint_for(service: &NativeService) -> Result<Endpoint> {
-    require_team(service)?;
-    Endpoint::read(service)
-}
 /// 团队库连接是否完整配置（状态接口在 SQLite 桌面上也返回明确的 supported=false）。
 pub(super) fn team_configured(service: &NativeService) -> Result<bool> {
     if service.provider()? != "PostgreSQL" {
@@ -202,12 +181,23 @@ pub(super) fn team_tools(paths: &RuntimePaths) -> Tools {
 
 fn backup_name(prefix: &str) -> Result<String> {
     Ok(format!(
-        "{prefix}-{}{BACKUP_SUFFIX}",
-        chrono::Utc::now().format("%Y%m%d-%H%M%S")
+        "{prefix}-{}-{}{BACKUP_SUFFIX}",
+        chrono::Utc::now().format("%Y%m%d-%H%M%S"),
+        crate::paths::nonce().map_err(unavailable)?
     ))
 }
 
 fn run(command: &mut Command, timeout: Duration) -> Result<Output> {
+    if cfg!(target_os = "linux") {
+        if let Some(root) = Path::new(command.get_program())
+            .parent()
+            .and_then(Path::parent)
+        {
+            let libraries = root.join("lib");
+            crate::paths::ensure_safe_absolute(&libraries).map_err(invalid)?;
+            command.env("LD_LIBRARY_PATH", libraries);
+        }
+    }
     controlled_process::run(command, Vec::new(), OUTPUT_LIMIT, timeout)
 }
 
@@ -302,6 +292,7 @@ pub(super) fn create_backup(service: &NativeService, actor: &Actor) -> Result<Va
         "PostgreSqlPhysicalBackup",
         "创建 PostgreSQL 物理备份",
         move |_| {
+            let _gate = super::package::lock(&paths)?;
             let actor = auth::current_actor(&store, actor_id)?;
             auth::authorize_operation(&actor, CREATE_POSTGRE_SQL_PHYSICAL_BACKUP, &[])?;
             let endpoint = Endpoint::read_parts(&store, &protector)?;
@@ -313,7 +304,7 @@ pub(super) fn create_backup(service: &NativeService, actor: &Actor) -> Result<Va
             let name = backup_name("edm-postgresql")?;
             let root = postgres_root(&paths)?;
             let target = root.join(&name);
-            let temporary = root.join(".work.tmp");
+            let temporary = root.join(format!(".{name}.tmp"));
             let result = (|| {
                 crate::paths::ensure_safe_absolute(&temporary).map_err(invalid)?;
                 let mut command = Command::new(&pg_dump);
@@ -353,6 +344,7 @@ pub(super) fn create_backup(service: &NativeService, actor: &Actor) -> Result<Va
                 detail: format!("{name} 已写入运行目录，可通过下载票据安全获取。"),
                 destination: Some(target),
                 directory: None,
+                managed_file: None,
             })
         },
     )
@@ -365,7 +357,6 @@ pub(super) fn create_restore_plan(
 ) -> Result<Value> {
     auth::authorize(actor, "system.backup", "manage")?;
     require_ready(service)?;
-    let endpoint = endpoint_for(service)?;
     let backup_file_name = super::records_text(body, "backupFileName");
     let target_database = super::records_text(body, "targetDatabase");
     let application_role = super::records_text(body, "applicationRole");
@@ -407,44 +398,25 @@ pub(super) fn create_restore_plan(
     ));
     crate::paths::ensure_safe_absolute(&plan_root).map_err(invalid)?;
     fs::create_dir_all(&plan_root)?;
-    let script_name = if cfg!(windows) {
-        "restore.cmd"
-    } else {
-        "restore.sh"
-    };
-    let restore_script_path = plan_root.join(script_name);
+    let restore_script_path = plan_root.join("restore.ps1");
     let ownership_sql_path = plan_root.join("post_restore_ownership.sql");
+    let quote = |value: &str| format!("'{}'", value.replace('\'', "''"));
     let script = format!(
-        "pg_restore --host {host} --port {port} --username {user} --dbname {db} --clean --if-exists --exit-on-error --no-password \"{backup}\"\npsql --host {host} --port {port} --username {user} --dbname {db} --no-password --file \"{sql}\"\n",
-        host = endpoint.host,
-        port = endpoint.port,
-        user = endpoint.username,
-        db = target_database,
-        backup = backup_path.display(),
-        sql = ownership_sql_path.display()
+        "param([Parameter(Mandatory)][ValidatePattern('^[A-Za-z_][A-Za-z0-9_]*$')][string]$OwnerRole)\n$ErrorActionPreference = 'Stop'\n# Stop the API first. Supply maintenance credentials through PG environment variables.\n& pg_restore --dbname {db} --role $OwnerRole --clean --if-exists --single-transaction --exit-on-error --no-owner --no-privileges --no-password {backup}\nif ($LASTEXITCODE -ne 0) {{ exit $LASTEXITCODE }}\n& psql -X --dbname {db} --no-password --set ON_ERROR_STOP=1 --set \"owner_role=$OwnerRole\" --single-transaction --file {sql}\nexit $LASTEXITCODE\n",
+        db = quote(&target_database),
+        backup = quote(&backup_path.to_string_lossy()),
+        sql = quote(&ownership_sql_path.to_string_lossy())
     );
     managed_write(&restore_script_path, script.as_bytes())?;
-    let mut sql = String::new();
-    sql.push_str(&format!("-- 还原后归属修复脚本：{target_database}\n"));
-    sql.push_str("-- 执行前请由管理员按目标服务器复核。\n");
+    let mut sql = String::from(
+        "-- Maintenance and NOLOGIN ownership remain separate from the business login.\n",
+    );
     for role in &old_owner_roles {
         sql.push_str(&format!(
-            "REASSIGN OWNED BY {role} TO {application_role};\n"
+            "REASSIGN OWNED BY \"{role}\" TO :\"owner_role\";\n"
         ));
     }
-    sql.push_str(&format!(
-        "ALTER DATABASE {target_database} OWNER TO {application_role};\n"
-    ));
-    sql.push_str(&format!(
-        "GRANT ALL ON DATABASE {target_database} TO {application_role};\n"
-    ));
-    sql.push_str(&format!("\\connect {target_database}\n"));
-    sql.push_str(&format!(
-        "GRANT ALL ON SCHEMA public TO {application_role};\n"
-    ));
-    sql.push_str(&format!(
-        "ALTER SCHEMA public OWNER TO {application_role};\n"
-    ));
+    sql.push_str(&format!("SET ROLE :\"owner_role\";\nREVOKE CREATE ON SCHEMA public FROM PUBLIC;\nGRANT USAGE ON SCHEMA public TO \"{application_role}\";\nGRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{application_role}\";\nGRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{application_role}\";\nALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO \"{application_role}\";\nALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO \"{application_role}\";\n"));
     managed_write(&ownership_sql_path, sql.as_bytes())?;
     super::audit(
         &service.store,
@@ -490,7 +462,7 @@ pub(super) fn create_download_ticket(
 ) -> Result<Value> {
     auth::authorize(actor, "system.backup", "manage")?;
     require_team(service)?;
-    let file_name = super::header(parameters, super::PG_BACKUP_FILE_NAME_HEADER);
+    let file_name = super::header(parameters, "fileName");
     let path = super::managed_file(&postgres_root(&service.paths)?, file_name, "dump")?;
     if !path.is_file() {
         return Err(error(404, "未找到指定的 PostgreSQL 备份。"));
@@ -521,8 +493,16 @@ pub(super) fn download_with_ticket(
 
 /// 写入暂存恢复标记（物理备份与服务器迁移共用）。
 pub(super) fn stage_restore_marker(service: &NativeService, file_name: &str) -> Result<()> {
+    ensure_no_pending(&service.paths)?;
+    let path = super::managed_file(&postgres_root(&service.paths)?, file_name, "dump")?;
+    let content = fs::read(&path)?;
+    if !content.starts_with(b"PGDMP") {
+        return Err(invalid("请选择 PostgreSQL custom-format 备份。"));
+    }
     let marker = json!({
+        "restoreId": crate::paths::nonce().map_err(unavailable)?,
         "sourceFileName": file_name,
+        "sha256": super::sha256_hex(&content),
         "scheduledAtUtc": chrono::Utc::now().to_rfc3339(),
     });
     managed_write(
@@ -569,7 +549,7 @@ pub(super) fn schedule_restore(
     restore_response(
         &service.paths,
         file_name,
-        "PostgreSQL 物理备份恢复已安排。请尽快重启服务，恢复会在重新建立数据库连接之前执行。",
+        "备份已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。",
         PG_STORAGE_POLICY,
     )
 }
@@ -577,7 +557,7 @@ pub(super) fn schedule_restore(
 pub(super) fn restore(
     service: &NativeService,
     actor: &Actor,
-    parameters: &[(&str, String)],
+    _parameters: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
     auth::authorize(actor, "system.backup", "manage")?;
@@ -585,15 +565,17 @@ pub(super) fn restore(
     super::verify_admin_password(
         &service.store,
         actor,
-        &super::records_text(body, "adminPassword"),
+        body["adminPassword"].as_str().unwrap_or(""),
     )?;
-    super::sensitive_ticket(parameters, actor, super::ACTION_RESTORE_DATABASE)?;
-    super::confirmation(parameters)?;
+    if super::records_text(body, "confirmationText") != super::CONFIRM_RESTORE_DATABASE {
+        return Err(invalid("请输入 RESTORE DATABASE 确认恢复。"));
+    }
     let file_name = super::records_text(body, "backupFileName");
     if file_name.is_empty() {
         return Err(invalid("请选择要恢复的 PostgreSQL 备份。"));
     }
     let backup_path = super::managed_file(&postgres_root(&service.paths)?, &file_name, "dump")?;
+    let _gate = super::package::lock(&service.paths)?;
     if !backup_path.is_file() {
         return Err(error(404, "未找到指定的 PostgreSQL 备份。"));
     }
@@ -614,96 +596,17 @@ pub(super) fn upload_and_restore(
     if content.is_empty() {
         return Err(invalid("上传的备份文件为空。"));
     }
-    let staged = super::managed_file(&postgres_root(&service.paths)?, file_name, "dump")?;
+    let _gate = super::package::lock(&service.paths)?;
+    ensure_no_pending(&service.paths)?;
+    super::managed_file(&postgres_root(&service.paths)?, file_name, "dump")?;
+    if !content.starts_with(b"PGDMP") {
+        return Err(invalid("请选择 PostgreSQL custom-format 备份。"));
+    }
+    let staged = postgres_root(&service.paths)?.join(backup_name("uploaded")?);
     managed_write(&staged, content)?;
     schedule_restore(service, actor, &staged)
 }
 
-/// 服务器迁移包与物理备份共用 pg_dump 通道。
-pub(super) fn dump_for_migration(
-    store: &Store,
-    protector: &crate::secrets::Protector,
-    paths: &RuntimePaths,
-    pg_dump: &Path,
-) -> Result<PathBuf> {
-    let endpoint = Endpoint::read_parts(store, protector)?;
-    if !endpoint.configured() {
-        return Err(invalid(
-            "当前未完整配置 PostgreSQL 团队数据库，不能创建迁移包。",
-        ));
-    }
-    let name = backup_name("edm-migration-source")?;
-    let target = postgres_root(paths)?.join(&name);
-    crate::paths::ensure_safe_absolute(&target).map_err(invalid)?;
-    let mut command = Command::new(pg_dump);
-    endpoint.apply(&mut command);
-    command
-        .args(["--format", "custom"])
-        .args(["--file", &target.to_string_lossy()])
-        .arg("--dbname")
-        .arg(&endpoint.database);
-    let output = run(&mut command, BACKUP_TIMEOUT)?;
-    if !output.status.success() {
-        let _ = fs::remove_file(&target);
-        return Err(unavailable(format!(
-            "pg_dump 执行失败（{}）：{}",
-            output.status,
-            output.stderr.trim()
-        )));
-    }
-    if !target.is_file() || fs::metadata(&target)?.len() == 0 {
-        return Err(unavailable("pg_dump 未生成有效的物理备份文件。"));
-    }
-    Ok(target)
-}
-
-/// 启动时执行已排队的 PostgreSQL 暂存恢复，必须在建立业务连接之前调用。
-pub fn apply_pending(paths: &RuntimePaths, connection_url: &str) -> Result<()> {
-    apply_pending_marker(paths, connection_url, &restart_marker(paths)?)
-}
-
-/// 服务器迁移与物理备份共用：按指定标记文件执行暂存恢复。
-pub(super) fn apply_pending_marker(
-    paths: &RuntimePaths,
-    connection_url: &str,
-    marker: &Path,
-) -> Result<()> {
-    if !marker.is_file() {
-        return Ok(());
-    }
-    let value: Value = serde_json::from_str(&fs::read_to_string(marker)?)
-        .map_err(|cause| invalid(format!("暂存恢复标记无效：{cause}")))?;
-    let source_name = value["sourceFileName"]
-        .as_str()
-        .ok_or_else(|| invalid("暂存恢复标记缺少备份文件名。"))?;
-    let endpoint = Endpoint::parse_url(connection_url)?;
-    let tools = Tools::resolve(paths);
-    if !tools.ready() {
-        return Err(unavailable(format!(
-            "PostgreSQL 客户端工具未就绪（缺少 {}），不能执行暂存恢复。",
-            tools.missing()
-        )));
-    }
-    let backup_path = super::managed_file(&postgres_root(paths)?, source_name, "dump")?;
-    if !backup_path.is_file() {
-        return Err(unavailable(format!(
-            "暂存恢复引用的备份 {source_name} 已不存在，请删除标记后重试。"
-        )));
-    }
-    let mut command = Command::new(&tools.pg_restore);
-    endpoint.apply(&mut command);
-    command
-        .args(["--dbname", &endpoint.database])
-        .args(["--clean", "--if-exists", "--exit-on-error"])
-        .arg(&backup_path);
-    let output = run(&mut command, RESTORE_TIMEOUT)?;
-    if !output.status.success() {
-        return Err(unavailable(format!(
-            "pg_restore 执行失败（{}）：{}",
-            output.status,
-            output.stderr.trim()
-        )));
-    }
-    fs::remove_file(marker)?;
-    Ok(())
-}
+mod recovery;
+pub use recovery::apply_pending;
+pub(crate) use recovery::{dump_to, ensure_no_pending};

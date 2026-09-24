@@ -14,6 +14,7 @@ const COOKIE: &str = "ExportDocManager.DownloadSession";
 const LIFETIME: Duration = Duration::from_secs(300);
 #[derive(Clone)]
 struct Ticket {
+    operation: &'static str,
     job_id: String,
     session: String,
     binding: String,
@@ -48,6 +49,22 @@ impl Tickets {
         binding: &str,
         secure: bool,
     ) -> Result<(Value, String), ApiError> {
+        self.issue_for(
+            export_doc_contracts::generated_api::DOWNLOAD_JOB_RESULT_WITH_TICKET,
+            job_id,
+            session,
+            binding,
+            secure,
+        )
+    }
+    pub fn issue_for(
+        &self,
+        operation: export_doc_contracts::generated_api::Operation,
+        job_id: &str,
+        session: &str,
+        binding: &str,
+        secure: bool,
+    ) -> Result<(Value, String), ApiError> {
         let mut entries = self
             .0
             .lock()
@@ -73,6 +90,7 @@ impl Tickets {
         entries.insert(
             token.clone(),
             Ticket {
+                operation: operation.id,
                 job_id: job_id.into(),
                 session: session.into(),
                 binding: binding.clone(),
@@ -80,9 +98,7 @@ impl Tickets {
             },
         );
         let expiry = (chrono::Utc::now() + chrono::Duration::seconds(300)).to_rfc3339();
-        let url = export_doc_contracts::generated_api::DOWNLOAD_JOB_RESULT_WITH_TICKET
-            .path
-            .replace("{token}", &token);
+        let url = operation.path.replace("{token}", &token);
         Ok((
             json!({"token":token,"downloadUrl":url,"expiresAtUtc":expiry}),
             format!(
@@ -92,6 +108,18 @@ impl Tickets {
         ))
     }
     pub fn resolve(&self, token: &str, binding: &str) -> Result<(String, String), ApiError> {
+        self.resolve_for(
+            export_doc_contracts::generated_api::DOWNLOAD_JOB_RESULT_WITH_TICKET,
+            token,
+            binding,
+        )
+    }
+    pub fn resolve_for(
+        &self,
+        operation: export_doc_contracts::generated_api::Operation,
+        token: &str,
+        binding: &str,
+    ) -> Result<(String, String), ApiError> {
         let mut entries = self
             .0
             .lock()
@@ -100,7 +128,8 @@ impl Tickets {
         let ticket = entries
             .get(token)
             .filter(|ticket| {
-                !binding.is_empty()
+                ticket.operation == operation.id
+                    && !binding.is_empty()
                     && ticket
                         .binding
                         .as_bytes()

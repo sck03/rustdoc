@@ -8,10 +8,14 @@ export function ReportDesignerDetailTableSummaryProperties({
   block,
   fieldGroups,
   onCommit,
+  title = "表尾合计行",
+  rowOnly = false,
 }: {
   block: ReportDetailTableBlock;
   fieldGroups: ReportDesignerFieldGroup[];
   onCommit: (block: ReportBlock) => void;
+  title?: string;
+  rowOnly?: boolean;
 }) {
   const summaryLabelSpan = block.summaryRow
     ? Math.min(block.columns.length, Math.max(1, Math.floor(block.summaryRow.labelColumnSpan)))
@@ -41,7 +45,7 @@ export function ReportDesignerDetailTableSummaryProperties({
     <>
       <div className="new-report-detail-style-group">
         <div className="new-report-detail-column-title">
-          <strong>表尾合计行</strong>
+          <strong>{title}</strong>
           {block.summaryRow ? (
             <button className="command-button secondary" type="button" onClick={() => onCommit({ ...block, summaryRow: undefined })}>
               移除
@@ -80,7 +84,7 @@ export function ReportDesignerDetailTableSummaryProperties({
                 }
               />
             </label>
-            {block.columns.slice(summaryLabelSpan).map((column) => {
+            {block.columns.map((column) => {
               const cell = block.summaryRow!.cells.find((candidate) => candidate.columnId === column.id) ?? createEmptySummaryCell(column.id);
 
               return (
@@ -141,7 +145,7 @@ export function ReportDesignerDetailTableSummaryProperties({
           <div className="new-report-designer-muted">用于发票总数量、总箱数、总金额等报表尾部汇总，不随明细循环重复。</div>
         )}
       </div>
-      <div className="new-report-detail-style-group">
+      {!rowOnly ? <><div className="new-report-detail-style-group">
         <div className="new-report-designer-muted">表头样式</div>
         <TextStyleEditor style={block.headerStyle} onChange={(headerStyle) => onCommit({ ...block, headerStyle })} />
       </div>
@@ -150,6 +154,7 @@ export function ReportDesignerDetailTableSummaryProperties({
         <TextStyleEditor style={block.bodyStyle} onChange={(bodyStyle) => onCommit({ ...block, bodyStyle })} />
       </div>
       <BorderEditor border={block.border} onChange={(border) => onCommit({ ...block, border })} />
+      </> : null}
     </>
   );
 }

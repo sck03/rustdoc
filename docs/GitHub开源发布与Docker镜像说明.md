@@ -1,111 +1,33 @@
 # GitHub 开源发布与 Docker 镜像说明
 
-> 2026-09-20 Rust 主支覆盖说明：桌面恢复 Tauri 2 + 原版 React，业务后端统一 Rust。下方 ASP.NET 发布内容只用于历史对照；当前入口以本节为准。
+> 2026-09-23。当前交付为 React + Rust，桌面使用 Tauri；旧 ASP.NET/Chromium sidecar 发布入口已经退役。
 
-## Rust 主支发布入口
+## 公开边界
 
-公开源码仓库只包含构建代码和校验清单，不提交客户数据、数据库、私钥、注册机或大型运行资源。Tauri/WebView2 平台代码与脚本来自 ExportDocManager_CS；后端发布已经改为 Rust，不构建 ASP.NET API sidecar。
+仓库公开源码、契约、测试、资源清单和许可说明。客户文件、业务数据库、真实配置、私钥、注册机、运行日志、缓存与大型原生资源不提交。原生归档从中央清单的核验来源准备，不引入 NuGet 客户端或 .NET 运行依赖。
 
-| 入口 | 用途 | 产物 |
+提交前运行 `scripts/github/verify-public-source.ps1` 并检查暂存区。源码推送与发布包、镜像发布是不同动作，发布入口见[工作流手册](./GitHub%20Actions工作流用途与运行手册.md)。
+
+## 产品入口
+
+| 形态 | 本地脚本 | 运行要求 |
 | --- | --- | --- |
-| [`rust-native-desktop-release.yml`](../.github/workflows/rust-native-desktop-release.yml) | 远端手工构建 Tauri 2 + React + Rust + SQLite 绿色桌面版 | Windows x64/ARM64、Linux x64/ARM64、macOS ARM64 桌面包 Artifact |
-| [`rust-native-web-server-release.yml`](../.github/workflows/rust-native-web-server-release.yml) | 远端手工构建 React + Rust HTTP 网页服务端 | Windows x64、Linux x64/ARM64、macOS ARM64 服务端包 Artifact |
-| [`rust-native-container-release.yml`](../.github/workflows/rust-native-container-release.yml) | Docker Compose 生命周期验收和可选 GHCR 发布 | `exportdoc-rust-native` 容器镜像 |
-| [`rust-native-validation.yml`](../.github/workflows/rust-native-validation.yml) | Rust 主支持续门禁 | 测试、编译和依赖边界结果 |
-| [`dependency-governance.yml`](../.github/workflows/dependency-governance.yml) | npm/Cargo 依赖治理 | 审计和 SBOM 证据 |
-| [`browser-compatibility.yml`](../.github/workflows/browser-compatibility.yml) | Firefox/WebKit 手工验收 | 浏览器兼容结果 |
+| 桌面 Full | build-native.ps1 / run-native.ps1 | Tauri、平台 WebView、Rust、SQLite；正式包默认 OCR |
+| 网页服务器 | package-native-web-server.ps1 | React + Rust HTTP、PostgreSQL 18 |
+| Docker | run-native-docker.ps1 | 同一 React、Rust HTTP、PostgreSQL 18 容器 |
 
-本地运行 `scripts/build-native.ps1`，默认输出 `artifacts/native-desktop/ExportDocManager.Tauri`；原版名称 `build-windows-desktop-run.cmd` 和 `build-windows-installers.cmd` 共用该 Rust 打包器。远端同时生成 NSIS、deb/AppImage、app/dmg 等对应平台产物。网页服务端包由 `scripts/package-native-web-server.ps1` 生成，Docker 由 `scripts/run-native-docker.ps1` 管理。当前只开放 Full 打包，四版功能裁剪与发布通道须另行完成 Rust 验收。
+普通用户使用 scripts 根目录入口，详细参数见[脚本说明](../scripts/README.md)。当前仅开放 Full 打包；其它产品的裁剪、更新与权限须单独完成 Rust 验收。
 
-> 本节以下旧清单与 `container-images.yml`、`windows-desktop-package.yml`、`linux-desktop-package.yml`、`macos-desktop-package.yml`、`browser-server-package-reusable.yml` 等描述只保留为历史对照;这些工作流已从 Rust 主支删除,不得继续作为发布入口或重命名目标。
+## 容器与团队模式
 
-> 更新日期：2026-08-08
+Docker 使用 `deploy/rust-native`，本地私密运行配置位于其忽略的 runtime 目录。默认只绑定回环地址；局域网和公网绑定由部署者明确配置。首次管理员初始化需要私有 bootstrap token，日常 API 使用受限 PostgreSQL 业务账号；数据库维护角色与运行账号分离。
 
-## 1. 公开仓库边界
+桌面 SQLite 不能代替团队 PostgreSQL。当前支持单 API、多浏览器用户，不支持把多个 API 指向同一业务库当作高可用部署。数据库、受管文件、备份与配置一起按现有恢复流程验证。
 
-公开仓库只包含主程序、API、Web、Tauri 客户端、公钥验签代码、测试、部署文件和文档。以下内容必须留在本机或独立私有仓库：
+`rust-native-container-release.yml` 先做生命周期验收，只有显式 publish 才发布 GHCR。镜像名称、tag、平台与产物以当次工作流和清单为准，不沿用已删除的 container-images.yml 或旧三镜像版本提升流程。
 
-- `apps/license-keygen-tauri/` 注册机源码；
-- 签发私钥、证书私钥、`.pem/.key/.p8/.p12/.pfx/.snk`；
-- `KEY/ExportDocLicenseKeyGen.exe`、注册机 WebView2 依赖和任何注册机发布包；
-- `.env`、容器真实数据库配置、运行数据库、日志、缓存和客户数据。
+## 验收
 
-主程序只公开 ECDSA 公钥验签，不公开签发方法。Windows 客户程序默认构建不再生成注册机；只有本机恢复私有源码后显式使用 `-IncludeLicenseKeygen` 才构建内部工具。
+在对应平台完成启动、认证/授权、资源检查、上传下载、实际 PDF、任务取消、备份恢复、停止重启和卷持久化。跨平台编译、端点存在和历史 C# 测试不能替代这些结果。
 
-## 2. 初始化与推送
-
-先在 GitHub 网页创建一个空仓库，不要勾选自动生成 README、License 或 `.gitignore`。然后在项目根运行：
-
-```powershell
-pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
-  -RemoteUrl https://github.com/你的账号/你的仓库.git `
-  -CreateCommit
-```
-
-确认 `git status` 和暂存文件后，再推送：
-
-```powershell
-pwsh -NoProfile -File scripts/github/initialize-github-repository.ps1 `
-  -RemoteUrl https://github.com/你的账号/你的仓库.git `
-  -CreateCommit `
-  -Push
-```
-
-如果使用 SSH，把地址改为 `git@github.com:你的账号/你的仓库.git`。脚本在暂存前后都会执行公开源码守卫；发现注册机路径、私钥标记、注册生成 API 或超过 95 MiB 的文件时停止。
-
-## 3. GitHub Actions 与 GHCR
-
-- `public-source-guard.yml`：当前只允许手工运行，检查公开边界、Action Node 24/Artifact 版本政策和 updater 信任契约。
-- `cross-platform-validation.yml`：只手工运行，检查 Windows、Linux、macOS 的 .NET/Web/Tauri 契约。
-- `browser-compatibility.yml`：Web/API 相关 push、PR 或手工运行；在真实 Firefox、WebKit 的桌面和手机视口检查登录、响应式分类、横向溢出、页面异常、HTTP 500 和严重无障碍问题。
-- `container-images.yml`：只手工运行；启动时填写版本号并选择是否更新 `latest`，先分别构建 `linux/amd64`、`linux/arm64` 的 API/Browser/Web 三个不可变 revision 镜像，三者全部成功后才原子提升版本标签并生成带 digest/revision 的发布清单。
-- `windows-desktop-package.yml`：只手工运行；选择版本和 Document/Sales/Full，构建 Windows x64 NSIS 安装包和 ZIP 绿色便携包。
-- `linux-desktop-package.yml`：只手工运行；选择版本、产品版本和 x64/ARM64 架构，构建对应 deb/AppImage，并额外生成 tar.gz 绿色便携包。
-- `macos-desktop-package.yml`：只手工运行；选择版本和产品版本，固定构建 Apple Silicon ARM64 macOS dmg 和完整 `.app` tar.gz 绿色便携包，并内置官方 `mac-arm64` Chrome Headless Shell。
-- `desktop-package-reusable.yml`：上述三个桌面入口共用的内部编排，不会单独出现在手工运行列表中。
-- `windows-browser-server-package.yml`：只手工运行；生成无需 Docker 的 Windows x64 浏览器服务器 ZIP。
-- `linux-browser-server-package.yml`：只手工运行；生成无需 Docker 的 Linux x64 浏览器服务器 tar.gz。
-- `browser-server-package-reusable.yml`：两个浏览器服务器入口共用的内部编排，将 React、ASP.NET Core API、Chrome Headless Shell、PostgreSQL 配置模板、`initialize-windows.ps1`/`initialize-linux.sh` 和启动脚本合并到同一发布包。
-
-公开源码守卫、跨平台验证、容器发布和三个桌面打包入口当前都在仓库 Actions 页面点击 “Run workflow” 后执行；字体、PostgreSQL、容器生命周期和依赖治理另按各自路径/定时规则运行。项目当前不启用 Dependabot 自动版本 PR，避免多个依赖生态同时创建分支并放大 Actions 数量；依赖升级由维护者集中检查 package/lock 文件后人工提交。
-
-手工发布 Docker 镜像时：进入 Actions → Build and publish container images → Run workflow，填写 `version`，例如 `0.1.2` 或 `0.1.2-beta.1`；`publish_latest=true` 时只会在三个版本标签全部核验成功后更新 `latest`。工作流会在临时 runner 中同步 `.NET/Web/Tauri/Rust` 内部版本，不会反向修改或提交仓库源码。构建阶段只推送绑定“完整提交 + 版本”的 `sha-<完整提交>-<版本>` 候选标签，避免同一提交用不同版本参数运行时相互覆盖；版本标签已存在且 digest 不同会直接失败，不能覆盖。最终 Artifact `export-doc-manager-container-<版本>-manifest` 记录三个镜像的 digest、版本和完整源码 revision，部署时必须同时使用版本与该 revision。
-
-手工生成桌面包时，进入对应的 `Build Windows/Linux/macOS desktop package` → `Run workflow`，填写版本并选择产品版；macOS 固定为 Apple Silicon ARM64。默认会得到 `...-installer` 与 `...-portable` 两个 Artifact，保留 14 天。便携包按平台使用 Windows ZIP、Linux tar.gz（内含已解包复验并真实启动的 AppImage）和 macOS tar.gz（内含已真实启动的完整 `.app`），解包目录旁的 `App_Data` 是唯一便携运行数据根；归档自带 `SHA256SUMS` 和独立 `.sha256`。只有把 `publish_release` 改为 `true` 才会发布：Document、Sales、Full 分别进入 `exportdocmanager-document-v<版本>`、`exportdocmanager-sales-v<版本>`、`exportdocmanager-full-v<版本>` 的不可覆盖版本 Release，并分别更新自己的稳定或预发布通道清单。Document 与 Full 会自动下载当前平台的 Chrome Headless Shell，并在打包前后验证浏览器可执行文件已经进入 Tauri 资源目录；Sales 不提供报表渲染、OCR、单证资源或 Excel 分析能力，因此明确裁剪这些运行时，不再携带数百 MiB 的无用浏览器和模型。三产品版都不要求普通用户另行补装其已启用能力所需的资源，源码仓库仍不保存大体积二进制。虽然 Chrome for Testing 仍提供 `mac-x64`，ONNX Runtime `1.28.0` 官方包已不提供 Intel macOS native，因此项目不生成残缺的 Intel dmg 或 `.app` 便携包；Windows ARM64 没有对应官方 Chrome Headless Shell，仍只保留应用编译契约，不能把 x64 浏览器伪装成 ARM64 交付。
-
-三产品版使用独立应用身份和更新信任材料：identifier 分别为 `com.exportdocmanager.desktop.document`、`com.exportdocmanager.desktop.sales`、`com.exportdocmanager.desktop.full`；仓库 Variables/Secrets 也按 `_DOCUMENT / _SALES / _FULL` 分开配置 updater 公钥、带密码私钥和私钥密码。`publish_release=false` 生成未签名验收 Artifact；`publish_release=true` 强制生成并校验 Tauri updater `.sig` 和独立 `latest-*.json`。Windows Authenticode、macOS Developer ID 和 Apple 公证按当前项目阶段暂缓，不是本轮 GitHub 构建门禁；正式商业分发前再配置并完成安装、升级、回滚和卸载验收。系统级代码签名暂缓不影响 updater 包签名继续强制。
-
-非 Docker 浏览器服务器版在 Actions 中选择 `Build Windows browser server package` 或 `Build Linux browser server package`。生成包由单个 ASP.NET Core 进程同时提供 React 页面与 `/api`，使用同源访问，不需要 Nginx 容器；包内自带 Chrome Headless Shell、启动脚本和“初始化配置并可立即启动”脚本。部署机器仍需原生 PostgreSQL，建议运行 `initialize-windows.ps1` 或 `initialize-linux.sh`，不要把数据库密码和首次部署令牌写进启动命令历史；脚本不会自动安装数据库、改防火墙或注册系统服务。GitHub 只负责编译和保存下载包，不提供长期运行服务器。
-
-镜像名称为：
-
-```text
-ghcr.io/<github-owner>/export-doc-manager-api:<tag>
-ghcr.io/<github-owner>/export-doc-manager-browser:<tag>
-ghcr.io/<github-owner>/export-doc-manager-web:<tag>
-```
-
-仓库第一次发布后，在 GitHub 的 Packages 页面把需要公开拉取的镜像可见性设置为 Public。GitHub Actions 和 GHCR 可以免费构建/保存公开项目镜像，但 GitHub Pages 只能托管静态文件，不能运行 ASP.NET Core API 和 PostgreSQL，因此不能替代完整 Docker 服务器。
-
-## 4. 使用 GHCR 镜像部署
-
-复制 `.env.example` 为 `.env`，再增加：
-
-```dotenv
-EXPORTDOCMANAGER_IMAGE_NAMESPACE=ghcr.io/你的github账号
-EXPORTDOCMANAGER_IMAGE_TAG=0.1.2
-EXPORTDOCMANAGER_IMAGE_REVISION=与0.1.2发布清单一致的完整40位提交SHA
-```
-
-初始化运行目录并启动（初始化脚本会自动选择不与宿主机接口、路由表和 Docker 网络重叠的紧凑 `/28`；企业 VPN 有大范围路由时可用 `-ContainerSubnet/-ReverseProxyIp` 显式指定 `/24` 至 `/28`）：
-
-```powershell
-pwsh -NoProfile -File deploy/container/initialize-container-runtime.ps1
-docker compose -f deploy/container/docker-compose.ghcr.yml --env-file deploy/container/.env up -d
-```
-
-数据库、配置、日志、缓存和导出任务全部位于 `EXPORTDOCMANAGER_RUNTIME_ROOT` 指定目录，默认是 `deploy/container/runtime/`，不会写入源码仓库，也不依赖系统 C 盘用户目录。隔离 Browser 的可重建 profile/缓存位于 `runtime/browser/`；API 临时报表目录以只读方式共享给 Browser，数据库 secrets 和 backend 网络不会进入 Browser 容器。正式部署应使用已发布的精确版本标签和同一发布清单中的完整 revision，不使用可变 `latest`，也不要混合三次构建的组件标签。
-
-## 5. 是否可从 GitHub 网页直接上传
-
-可以在仓库网页使用 “Add file → Upload files”，但不建议用于本项目首次上传：网页上传适合少量文件，单文件受网页上传大小限制，目录多时也很难可靠审查忽略规则。项目包含大量源码、模型和跨平台文件，优先使用本页脚本、Git 命令行、GitHub Desktop 或 VS Code Source Control；这样 `.gitignore` 和敏感文件守卫才会完整生效。
+系统级 Windows/macOS 签名与 Apple 公证不执行；Tauri updater 的独立签名信任合同保留。推送 main 不自动生成或发布新的安装包。

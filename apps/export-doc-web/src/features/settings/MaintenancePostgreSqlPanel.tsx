@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
+import { encodeHeaderText } from "../../api/headerText.ts";
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { downloadJobResultWhenReady, startDownloadFromTicket, waitForJobCompletion } from "../../ui/downloadJobResult.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
@@ -109,8 +110,8 @@ export function PostgreSqlMaintenancePanel({
       return client.stageServerMigrationRestore({
         body: migrationRestoreFile as File,
         "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket,
-        "X-ExportDocManager-Migration-Password": migrationRestorePassword,
-        "X-ExportDocManager-Migration-File-Name": migrationRestoreFile?.name ?? "migration.edmmigration",
+        "X-ExportDocManager-Migration-Password": encodeHeaderText(migrationRestorePassword),
+        "X-ExportDocManager-Migration-File-Name": encodeHeaderText(migrationRestoreFile?.name ?? "migration.edmmigration"),
         "X-ExportDocManager-Restore-Confirmation": migrationRestoreConfirmation.trim(),
       }, { signal });
     }),
@@ -136,7 +137,7 @@ export function PostgreSqlMaintenancePanel({
       return client.uploadAndRestorePostgreSqlPhysicalBackup({
         body: databaseUploadFile as File,
         "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket,
-        "X-ExportDocManager-PostgreSql-Backup-File-Name": databaseUploadFile?.name ?? "database.dump",
+        "X-ExportDocManager-PostgreSql-Backup-File-Name": encodeHeaderText(databaseUploadFile?.name ?? "database.dump"),
         "X-ExportDocManager-Restore-Confirmation": databaseRestoreConfirmation.trim(),
       }, { signal });
     }),

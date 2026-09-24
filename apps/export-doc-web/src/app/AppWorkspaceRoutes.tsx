@@ -81,12 +81,14 @@ export function AppWorkspaceRoutes({
   client,
   routeAccessAllowed,
   user,
+  sessionToken,
 }: {
   activeProduct: ProductEditionPresentation;
   canManageAuditLogs: boolean;
   client: ExportDocManagerApiClient;
   routeAccessAllowed: boolean;
   user: ApiUserDto;
+  sessionToken: string;
 }) {
   if (!routeAccessAllowed) {
     return <NoModuleAccessPage />;
@@ -175,7 +177,7 @@ export function AppWorkspaceRoutes({
         <Route path="/tools/container-packing" element={<ContainerPackingPage client={client} />} />
         <Route path="/tools/exchange-rates" element={<ExchangeRatePage client={client} />} />
         <Route path="/tools/email" element={<EmailPage client={client} businessTimeZone={user.businessTimeZone} />} />
-        <Route path="/system/update" element={<UpdateCenterPage client={client} />} />
+        <Route path="/system/update" element={<UpdateCenterPage client={client} sessionToken={sessionToken} />} />
         <Route path="/system/license" element={<LicensePage client={client} />} />
         <Route path="/system/about" element={<AboutPage client={client} product={activeProduct} />} />
         <Route path="/access-denied" element={<NoModuleAccessPage />} />

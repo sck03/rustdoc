@@ -15,9 +15,10 @@ export function createV3TextElement(x = 1500, y = 1500): ReportDesignerV3Element
 }
 
 export function createV3FieldElement(fieldPath: string, x = 1500, y = 1500): ReportDesignerV3Element {
+  if (fieldPath.startsWith("item.")) return createBase("Field", x, y, 3000, 600, { fontSizePt: 9, align: "Left" }, { fieldPath, fallbackText: "" });
   if (isShippingMarksField(fieldPath))
     return createBase("Field", x, y, 5000, 3500, { fontSizePt: 10, align: "Left" }, { fieldPath });
-  return createBase("Field", x, y, 9000, 1200, { fontSizePt: 10, align: "Left" }, { fieldPath, fallbackText: fieldPath });
+  return createBase("Field", x, y, 9000, 1200, { fontSizePt: 10, align: "Left" }, { fieldPath, fallbackText: "" });
 }
 
 export function createV3RectangleElement(x = 1500, y = 1500): ReportDesignerV3Element {

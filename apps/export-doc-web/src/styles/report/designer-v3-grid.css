@@ -101,3 +101,12 @@
   line-height: 1.5;
   outline: none;
 }
+
+/* Diagonal geometry is an SVG shared with the preview renderer. */
+.report-designer-v3-preview-flow-content .edm-report-grid-diagonal::after { display: none; }
+.edm-detail-omit-empty-lines > .edm-detail-composite-line:not(:has(span:not(:empty))) { display: none !important; }
+.new-report-detail-properties [hidden], .new-report-detail-column-card[hidden] { display: none !important; }
+.report-designer-product-guides { position: absolute; inset: 0; pointer-events: none; }
+.report-designer-product-copy { position: absolute; opacity: .25; border: 1px dashed #0f766e; }
+.report-designer-product-row-label { position: absolute; left: 0; right: 0; border-top: 1px dashed #0f766e; color: #0f766e; font-size: 7pt; transform: translateY(-100%); }
+.report-designer-product-row-label.is-copy { opacity: .5; }

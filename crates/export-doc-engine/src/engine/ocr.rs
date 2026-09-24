@@ -90,7 +90,7 @@ impl NativeService {
         token: &str,
     ) -> Result<tasks::FileOutput> {
         let actor = self.sessions.actor(&self.store, token)?;
-        super::auth::authorize_operation(&actor, PREVIEW_OCR_IMAGE, query)?;
+        self.authorize_operation(&actor, PREVIEW_OCR_IMAGE, query)?;
         preview(query)
     }
 }

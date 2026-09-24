@@ -112,6 +112,7 @@ export type ReportGridRow = {
 };
 
 export type ReportGridCell = {
+  labelPosition?: "Above" | "Inline";
   id: string;
   colSpan?: number;
   rowSpan?: number;
@@ -134,6 +135,7 @@ export type ReportGridCheckboxOption = {
 };
 
 export type ReportGridDiagonalHeader = {
+  direction?: "Up" | "Down";
   upperLeftText: string;
   lowerRightText: string;
 };
@@ -178,6 +180,7 @@ export type ReportImageBlock = ReportBlockBase & {
 
 export type ReportDetailTableBlock = ReportBlockBase & {
   type: "DetailTable";
+  rowSeparators?: boolean;
   title?: string;
   detailWidthMm?: number;
   sourcePath: "Invoice.Items";
@@ -187,6 +190,7 @@ export type ReportDetailTableBlock = ReportBlockBase & {
   grouping?: ReportDetailTableGrouping;
   columns: ReportDetailTableColumn[];
   summaryRow?: ReportDetailTableSummaryRow;
+  introRow?: ReportDetailTableSummaryRow;
   headerStyle: ReportTextStyle;
   bodyStyle: ReportTextStyle;
   border: ReportBorderStyle;
@@ -200,6 +204,7 @@ export type ReportDetailTablePrintSettings = {
 };
 
 export type ReportDetailTableSideBand = {
+  firstPageOnly?: boolean;
   title: string;
   widthMm: number;
   contentKind: "Text" | "Field";
@@ -233,6 +238,7 @@ export type ReportDetailTableGroupFooterCell = {
 };
 
 export type ReportDetailTableColumn = {
+  omitEmptyLines?: boolean;
   id: string;
   title: string;
   headerGroupTitle?: string;
@@ -248,7 +254,9 @@ export type ReportDetailTableColumn = {
 
 export type ReportDetailTableCellContent = {
   id: string;
-  kind: "Text" | "Field" | "LineBreak";
+  kind: "Text" | "Field" | "LineBreak" | "ColumnBreak";
+  positionPercent?: number;
+  visible?: boolean;
   text: string;
   fieldPath: string;
 };

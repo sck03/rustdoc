@@ -2,6 +2,7 @@ use crate::generated_api::ApiReportTemplateFieldCatalogResponse;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+pub mod composite;
 pub mod grid;
 mod report_blocks;
 pub use report_blocks::{
@@ -25,6 +26,8 @@ pub struct Design {
     pub page: Page,
     pub layers: Vec<Layer>,
     pub grid: Grid,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail_row_height_hundredth_mm: Option<i32>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub resources: Vec<ImageResource>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -83,6 +86,10 @@ pub struct Print {
     pub repeat_on_every_page: bool,
     pub keep_together: bool,
     pub pin_to_page_bottom: bool,
+    #[serde(default)]
+    pub follow_body: bool,
+    #[serde(default)]
+    pub first_page_only: bool,
     pub min_height_hundredth_mm: i32,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -211,6 +218,8 @@ impl Default for Style {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DetailTable {
     pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub row_separators: Option<bool>,
     #[serde(default = "detail_table_type")]
     pub r#type: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -230,6 +239,8 @@ pub struct DetailTable {
     pub print: DetailPrint,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub summary_row: Option<DetailSummaryRow>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intro_row: Option<DetailSummaryRow>,
     #[serde(default)]
     pub header_style: ReportTextStyle,
     #[serde(default)]
@@ -261,6 +272,8 @@ pub struct DetailColumn {
     pub field_path: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub content: Vec<DetailCellContent>,
+    #[serde(default)]
+    pub omit_empty_lines: bool,
     #[serde(deserialize_with = "json_float")]
     pub width_mm: f32,
     pub align: String,
@@ -282,6 +295,8 @@ pub struct DetailSideBand {
     pub field_path: String,
     #[serde(default)]
     pub style: ReportTextStyle,
+    #[serde(default)]
+    pub first_page_only: bool,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -346,6 +361,10 @@ pub struct DetailCellContent {
     pub text: String,
     #[serde(default)]
     pub field_path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub position_percent: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visible: Option<bool>,
 }
 fn one() -> i32 {
     1
@@ -429,6 +448,7 @@ impl Design {
                 size_hundredth_mm: 500,
             },
             layers: vec![],
+            detail_row_height_hundredth_mm: None,
             resources: vec![],
             release: None,
             metadata: None,
@@ -444,6 +464,8 @@ impl Design {
                     repeat_on_every_page: role != "Body",
                     keep_together: true,
                     pin_to_page_bottom: role == "Footer",
+                    follow_body: false,
+                    first_page_only: false,
                     min_height_hundredth_mm: 0,
                 },
                 elements: vec![],
@@ -538,6 +560,7 @@ impl Design {
         .into_iter()
         .enumerate()
         .map(|(index, (title, path, width, align))| DetailColumn {
+            omit_empty_lines: false,
             id: format!("col-{index}"),
             title: title.into(),
             header_group_title: String::new(),
@@ -558,6 +581,7 @@ impl Design {
                 flow_kind: "DetailTable".into(),
                 block: ReportBlock::DetailTable(DetailTable {
                     id: "detail-block".into(),
+                    row_separators: None,
                     r#type: "DetailTable".into(),
                     title: "商品明细".into(),
                     source_path: "Invoice.Items".into(),
@@ -574,6 +598,7 @@ impl Design {
                         continuation_page_rows: None,
                     },
                     summary_row: None,
+                    intro_row: None,
                     header_style: ReportTextStyle::default(),
                     body_style: ReportTextStyle::default(),
                     border: ReportBorderStyle {
@@ -749,14 +774,6 @@ impl Design {
                 });
             }
         }
-    }
-    pub fn from_html(html: &str) -> Result<Self, String> {
-        let json = html
-            .split_once(SCHEMA_MARKER)
-            .and_then(|(_, rest)| rest.split_once("-->"))
-            .map(|(json, _)| json)
-            .ok_or("模板缺少 V3 结构。")?;
-        Self::from_source(json)
     }
     pub fn from_source(source: &str) -> Result<Self, String> {
         let design: Self = serde_json::from_str(source.trim())

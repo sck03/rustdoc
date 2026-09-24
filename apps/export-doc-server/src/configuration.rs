@@ -12,6 +12,7 @@ pub struct Configuration {
     pub bootstrap_token: String,
     pub initialize_schema: bool,
     pub initialize_only: bool,
+    pub restore_pending: bool,
     pub business_clock: export_doc_engine::clock::BusinessClock,
 }
 
@@ -45,6 +46,7 @@ impl Configuration {
         let mut bind: SocketAddr = "127.0.0.1:5188".parse().unwrap();
         let mut initialize_schema = false;
         let mut initialize_only = false;
+        let mut restore_pending = false;
         let mut args = env::args().skip(1);
         while let Some(argument) = args.next() {
             match argument.as_str() {
@@ -66,6 +68,7 @@ impl Configuration {
                         .map_err(|_| "监听地址须为 IP:端口。")?
                 }
                 "--initialize-schema" => initialize_schema = true,
+                "--restore-pending" => restore_pending = true,
                 "--initialize-only" => {
                     initialize_schema = true;
                     initialize_only = true;
@@ -91,12 +94,15 @@ impl Configuration {
         if connection.is_empty() && !initialize_only {
             return Err("团队版必须设置 PostgreSQL 18 业务连接。".into());
         }
-        let maintenance_connection = if initialize_schema {
+        if initialize_schema && restore_pending {
+            return Err("建表与恢复不能同时执行。".into());
+        }
+        let maintenance_connection = if initialize_schema || restore_pending {
             secret("EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION")?
         } else {
             String::new()
         };
-        if initialize_schema && maintenance_connection.is_empty() {
+        if (initialize_schema || restore_pending) && maintenance_connection.is_empty() {
             return Err("建表需要独立的 PostgreSQL 维护连接。".into());
         }
         Ok(Self {
@@ -111,6 +117,7 @@ impl Configuration {
             bootstrap_token: secret("EXPORTDOCMANAGER_BOOTSTRAP_TOKEN")?,
             initialize_schema,
             initialize_only,
+            restore_pending,
             business_clock: export_doc_engine::clock::BusinessClock::new(
                 &env::var("EXPORTDOCMANAGER_BUSINESS_TIME_ZONE")
                     .unwrap_or_else(|_| "Asia/Shanghai".into()),

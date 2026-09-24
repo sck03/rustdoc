@@ -1,4 +1,4 @@
-import type { DragEvent } from "react";
+import { useState } from "react";
 import { ArrowDown, ArrowUp, Copy, Trash2 } from "lucide-react";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import {
@@ -7,7 +7,6 @@ import {
   duplicateDetailTableColumn,
   moveDetailTableColumn,
   removeDetailTableColumn,
-  reorderDetailTableColumn,
 } from "./reportDesignerMutations.ts";
 import type { ReportBlock, ReportDetailTableBlock, ReportDetailTableCellContent, ReportDetailTableColumn } from "./reportDesignerSchema.ts";
 import {
@@ -17,7 +16,7 @@ import {
   normalizeDetailCellPartKind,
   normalizeNumber,
 } from "./reportDesignerPropertiesModel.ts";
-import { BorderEditor, FieldPathInput } from "./ReportDesignerPropertyControls.tsx";
+import { BorderEditor, FieldPathInput, DesignerCheckbox } from "./ReportDesignerPropertyControls.tsx";
 
 export function ReportDesignerDetailTableColumnsProperties({
   block,
@@ -28,6 +27,9 @@ export function ReportDesignerDetailTableColumnsProperties({
   fieldGroups: ReportDesignerFieldGroup[];
   onCommit: (block: ReportBlock) => void;
 }) {
+  const [selectedId, setSelectedId] = useState(block.columns[0]?.id ?? "");
+  const selected = block.columns.some(column => column.id === selectedId) ? selectedId : block.columns[0]?.id;
+  const fields = fieldGroups.flatMap(group => group.fields);
   function updateColumn(columnId: string, update: (column: ReportDetailTableColumn) => ReportDetailTableColumn) {
     onCommit({
       ...block,
@@ -61,30 +63,9 @@ export function ReportDesignerDetailTableColumnsProperties({
     }));
   }
 
-  function handleColumnDragStart(event: DragEvent<HTMLDivElement>, columnId: string) {
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("application/x-exportdoc-detail-column", columnId);
-  }
-
-  function handleColumnDragOver(event: DragEvent<HTMLDivElement>) {
-    if (event.dataTransfer.types.includes("application/x-exportdoc-detail-column")) {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-    }
-  }
-
-  function handleColumnDrop(event: DragEvent<HTMLDivElement>, targetColumnId: string) {
-    const sourceColumnId = event.dataTransfer.getData("application/x-exportdoc-detail-column");
-    if (!sourceColumnId) {
-      return;
-    }
-
-    event.preventDefault();
-    onCommit(reorderDetailTableColumn(block, sourceColumnId, targetColumnId));
-  }
-
   function addColumn() {
     const column = createDetailTableColumn();
+    setSelectedId(column.id);
     onCommit({
       ...block,
       columns: [...block.columns, column],
@@ -110,18 +91,18 @@ export function ReportDesignerDetailTableColumnsProperties({
 
   return (
     <>
+      <label><span>选择要修改的列</span><select value={selected} onChange={event => setSelectedId(event.target.value)}>
+        {block.columns.map((column, index) => <option key={column.id} value={column.id}>{index + 1}. {column.title || "未命名列"}</option>)}
+      </select></label>
       <div className="new-report-detail-column-list">
         {block.columns.map((column, index) => (
           <div
             className="new-report-detail-column-card"
             key={column.id}
-            draggable
-            onDragStart={(event) => handleColumnDragStart(event, column.id)}
-            onDragOver={handleColumnDragOver}
-            onDrop={(event) => handleColumnDrop(event, column.id)}
+            hidden={column.id !== selected}
           >
             <div className="new-report-detail-column-title">
-              <strong>列 {index + 1}</strong>
+              <strong>{column.title || `列 ${index + 1}`}</strong>
               <div className="new-report-detail-column-actions" aria-label={`列 ${index + 1} 操作`}>
                 <button
                   className="icon-button compact-icon-button"
@@ -166,6 +147,19 @@ export function ReportDesignerDetailTableColumnsProperties({
                 <input value={column.title} onChange={(event) => updateColumn(column.id, (current) => ({ ...current, title: event.target.value }))} />
               </label>
               <label>
+                <span>宽度(mm)</span>
+                <input type="number" min={8} max={180} step="any" value={column.widthMm} onChange={event => updateColumn(column.id, current => ({...current, widthMm: normalizeNumber(event.target.value, current.widthMm)}))} />
+              </label>
+              {column.contentKind !== "Composite" ? <FieldPathInput selectOnly className="new-report-property-wide" label="显示内容" value={column.fieldPath} fieldGroups={fieldGroups} onChange={fieldPath => updateColumn(column.id, current => ({...current, fieldPath}))} /> : null}
+              <label><span>对齐方式</span><select value={column.align} onChange={event => updateColumn(column.id, current => ({...current, align: normalizeAlign(event.target.value)}))}><option value="Left">靠左</option><option value="Center">居中</option><option value="Right">靠右</option></select></label>
+            </div>
+            {column.contentKind === "Composite" ? <fieldset className="new-report-detail-style-group"><legend>显示哪些商品信息</legend>
+              {(column.content ?? []).filter(part => part.kind === "Field").map(part => <DesignerCheckbox key={part.id} checked={part.visible !== false} onChange={visible => updateColumnContentPart(column.id, part.id, current => ({...current, visible}))}>{fields.find(field => field.value === part.fieldPath)?.label ?? "未识别的商品信息（请在高级设置中修正）"}</DesignerCheckbox>)}
+            </fieldset> : null}
+            <details onInvalidCapture={event => { event.currentTarget.open = true; }}>
+              <summary>高级列设置</summary>
+              <div className="new-report-property-grid">
+              <label>
                 <span>跨列表头</span>
                 <input
                   value={column.headerGroupTitle ?? ""}
@@ -189,22 +183,6 @@ export function ReportDesignerDetailTableColumnsProperties({
                 />
               </label>
               <label>
-                <span>宽度(mm)</span>
-                <input
-                  type="number"
-                  min={8}
-                  max={180}
-                  step={1}
-                  value={column.widthMm}
-                  onChange={(event) =>
-                    updateColumn(column.id, (current) => ({
-                      ...current,
-                      widthMm: normalizeNumber(event.target.value, current.widthMm),
-                    }))
-                  }
-                />
-              </label>
-              <label>
                 <span>内容</span>
                 <select
                   value={column.contentKind ?? "Field"}
@@ -219,38 +197,14 @@ export function ReportDesignerDetailTableColumnsProperties({
                     }))
                   }
                 >
-                  <option value="Field">单字段</option>
-                  <option value="Composite">组合内容</option>
-                </select>
-              </label>
-              {column.contentKind === "Composite" ? null : (
-                <FieldPathInput
-                  className="new-report-property-wide"
-                  label="字段"
-                  value={column.fieldPath}
-                  fieldGroups={fieldGroups}
-                  onChange={(fieldPath) =>
-                    updateColumn(column.id, (current) => ({
-                      ...current,
-                      fieldPath,
-                    }))
-                  }
-                />
-              )}
-              <label>
-                <span>对齐</span>
-                <select
-                  value={column.align}
-                  onChange={(event) => updateColumn(column.id, (current) => ({ ...current, align: normalizeAlign(event.target.value) }))}
-                >
-                  <option value="Left">左</option>
-                  <option value="Center">中</option>
-                  <option value="Right">右</option>
+                  <option value="Field">一项商品信息</option>
+                  <option value="Composite">多项信息组合排版</option>
                 </select>
               </label>
             </div>
             {column.contentKind === "Composite" ? (
               <div className="new-report-detail-style-group">
+                <DesignerCheckbox checked={column.omitEmptyLines === true} onChange={checked => updateColumn(column.id, current => ({...current,omitEmptyLines:checked}))}>不显示空内容行</DesignerCheckbox>
                 <div className="new-report-detail-column-title">
                   <strong>组合内容</strong>
                   <div className="new-report-detail-column-actions">
@@ -263,12 +217,14 @@ export function ReportDesignerDetailTableColumnsProperties({
                     <button className="command-button secondary" type="button" onClick={() => addColumnContentPart(column.id, "LineBreak")}>
                       换行
                     </button>
+                    <button className="command-button secondary" type="button" onClick={() => addColumnContentPart(column.id, "ColumnBreak")}>分栏</button>
                   </div>
                 </div>
                 <div className="new-report-detail-column-list">
                   {(column.content ?? []).map((part, partIndex) => (
                     <div className="new-report-summary-cell-editor" key={part.id}>
                       <strong>片段 {partIndex + 1}</strong>
+                      <DesignerCheckbox checked={part.visible !== false} onChange={checked => updateColumnContentPart(column.id,part.id,current=>({...current,visible:checked}))}>显示此片段</DesignerCheckbox>
                       <label>
                         <span>类型</span>
                         <select
@@ -277,12 +233,14 @@ export function ReportDesignerDetailTableColumnsProperties({
                             updateColumnContentPart(column.id, part.id, (current) => ({
                               ...current,
                               kind: normalizeDetailCellPartKind(event.target.value),
+                              ...(event.target.value === "ColumnBreak" ? {positionPercent: current.positionPercent ?? 50} : {}),
                             }))
                           }
                         >
                           <option value="Text">固定文本</option>
                           <option value="Field">明细字段</option>
                           <option value="LineBreak">换行</option>
+                          <option value="ColumnBreak">分栏对齐</option>
                         </select>
                       </label>
                       {part.kind === "Text" ? (
@@ -299,8 +257,10 @@ export function ReportDesignerDetailTableColumnsProperties({
                           />
                         </label>
                       ) : null}
+                      {part.kind === "ColumnBreak" ? <label><span>距单元格左侧 (%)</span><input type="number" min={1} max={99} step="any" value={part.positionPercent ?? 50} onChange={event => updateColumnContentPart(column.id, part.id, current => ({...current, positionPercent:normalizeNumber(event.target.value, 50)}))} /></label> : null}
                       {part.kind === "Field" ? (
                         <FieldPathInput
+                          selectOnly
                           label="字段"
                           value={part.fieldPath}
                           fieldGroups={fieldGroups}
@@ -324,6 +284,7 @@ export function ReportDesignerDetailTableColumnsProperties({
               <div className="new-report-designer-muted">列边框覆盖</div>
               <BorderEditor border={column.border ?? block.border} onChange={(border) => updateColumn(column.id, (current) => ({ ...current, border }))} />
             </div>
+            </details>
           </div>
         ))}
       </div>

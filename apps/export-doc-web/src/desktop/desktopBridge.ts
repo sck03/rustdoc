@@ -311,35 +311,37 @@ export async function logFrontendError(payload: {
   return true;
 }
 
-export async function checkTauriUpdate(endpoint?: string) {
+export async function checkTauriUpdate(sessionToken: string, endpoint?: string) {
   const invoke = getInvoke();
   if (!invoke) {
     return null;
   }
 
   return invoke<TauriUpdaterCheckResult>("check_tauri_update", {
+    sessionToken,
     endpoint: normalizeOptionalText(endpoint),
   });
 }
 
-export async function installTauriUpdate(endpoint?: string) {
+export async function installTauriUpdate(sessionToken: string, endpoint?: string) {
   const invoke = getInvoke();
   if (!invoke) {
     return null;
   }
 
   return invoke<TauriUpdaterInstallResult>("install_tauri_update", {
+    sessionToken,
     endpoint: normalizeOptionalText(endpoint),
   });
 }
 
-export async function cancelTauriUpdate() {
+export async function cancelTauriUpdate(sessionToken: string) {
   const invoke = getInvoke();
   if (!invoke) {
     return null;
   }
 
-  return invoke<TauriUpdaterCancelResult>("cancel_tauri_update");
+  return invoke<TauriUpdaterCancelResult>("cancel_tauri_update", { sessionToken });
 }
 
 export async function subscribeToTauriUpdaterProgress(handler: (progress: TauriUpdaterProgress) => void) {

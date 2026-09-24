@@ -2,7 +2,7 @@
 
 Generated from committed npm/Cargo lock files, Cargo metadata and signed native-resource archive manifests. The retained C# comparison graph is excluded from Rust delivery; NPOI 2.7.6 remains enforced separately by verify-dependency-policy.mjs. The exact application build version is recorded in the accompanying machine-readable SBOM files.
 
-Runtime image boundary: Debian libraries and PostgreSQL 18 are OS/container inputs; their copyright files remain under /usr/share/doc. Rust containers do not include .NET or a browser rendering service.
+Runtime image boundary: PostgreSQL client tools and their native library closure ship in web/server packages under Tools/PostgreSQL with license texts. The database server remains a separate OS/container input. Rust containers do not include .NET or a browser rendering service.
 
 ## npm (109)
 
@@ -860,7 +860,7 @@ Runtime image boundary: Debian libraries and PostgreSQL 18 are OS/container inpu
 | zvariant_derive | 5.15.0 | MIT | native-desktop |
 | zvariant_utils | 4.2.0 | MIT | native-desktop |
 
-## native-resource (4)
+## native-resource (5)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -868,6 +868,7 @@ Runtime image boundary: Debian libraries and PostgreSQL 18 are OS/container inpu
 | bblanchon.pdfium.macos | 152.0.7961 | Apache-2.0 | Rust native library only; managed assemblies excluded |
 | bblanchon.pdfium.win32 | 152.0.7961 | Apache-2.0 | Rust native library only; managed assemblies excluded |
 | microsoft.ml.onnxruntime | 1.29.0 | MIT | Rust native library only; managed assemblies excluded |
+| postgresql-client | 18.4 | PostgreSQL | Rust web/server backup and migration clients; excluded from desktop |
 
 ## Windows x64 OCR app-local CRT assets
 

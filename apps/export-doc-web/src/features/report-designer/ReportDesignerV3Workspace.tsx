@@ -18,10 +18,7 @@ import type {
 } from "../../api/index.ts";
 import { buildReportDesignerFieldGroups } from "./reportDesignerFields.ts";
 import { useReportDesignerV3History } from "./reportDesignerV3History.ts";
-import {
-  exportReportDesignerV3SchemaToHtml,
-  validateReportDesignerV3Export,
-} from "./reportDesignerV3HtmlExporter.ts";
+import { validateReportDesignerV3Export } from "./reportDesignerV3HtmlExporter.ts";
 import {
   createV3FieldElement, createV3FlowElement, createV3ImageElement, createV3LineElement,
   createV3PageNumberElement, createV3RectangleElement, createV3TextElement,
@@ -30,7 +27,7 @@ import {
   moveSelectedV3Elements, resizeV3Element, setV3ElementZIndex,
   toggleV3Selection, updateV3Element, updateV3Grid, type ReportDesignerV3DocumentState,
 } from "./reportDesignerV3Mutations.ts";
-import { parseReportDesignerV3FromHtml } from "./reportDesignerV3TemplateParser.ts";
+import { parseReportDesignerV3Source } from "./reportDesignerV3TemplateParser.ts";
 import {
   reportDesignerV3PageSize,
   type ReportDesignerV3Element,
@@ -44,8 +41,6 @@ import {
   countElements,
   clampReportDesignerV3Zoom,
   filterFieldGroups,
-  migrationNoticeDescription,
-  migrationNoticeTitle,
   REPORT_DESIGNER_V3_ZOOM_PRESETS,
 } from "./reportDesignerV3WorkspaceHelpers.tsx";
 import {
@@ -75,7 +70,7 @@ export function ReportDesignerV3Workspace({
   editable: boolean;
   onDesignerDraftChange?: (draft: ReportDesignerDraft) => void;
 }) {
-  const parsed = useMemo(() => parseReportDesignerV3FromHtml(content, reportType), [content, reportType]);
+  const parsed = useMemo(() => parseReportDesignerV3Source(content, reportType), [content, reportType]);
   const history = useReportDesignerV3History(parsed.schema);
   const fieldGroups = useMemo(() => buildReportDesignerFieldGroups(fieldCatalog, reportType), [fieldCatalog, reportType]);
   const [sidebarTab, setSidebarTab] = useState<V3SidebarTab>("components");
@@ -83,6 +78,7 @@ export function ReportDesignerV3Workspace({
   const [fitRequest, setFitRequest] = useState(0);
   const [showGuides, setShowGuides] = useState(true);
   const [fieldQuery, setFieldQuery] = useState("");
+  const [productFieldsOnly, setProductFieldsOnly] = useState(false);
   const [fieldFocusRequest, setFieldFocusRequest] = useState(0);
   const [capacityNotice, setCapacityNotice] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
@@ -90,10 +86,7 @@ export function ReportDesignerV3Workspace({
   const workspaceRef = useRef<HTMLElement>(null);
   const documentContentRef = useRef(content);
   documentContentRef.current = content;
-  // Converting advanced HTML (or a damaged/removed V2 structure) is explicit;
-  // opening a template must never create a dirty V3 draft.
-  const legacyMigrationPending = parsed.migrated;
-  const [migrationAccepted, setMigrationAccepted] = useState(!legacyMigrationPending);
+  const sourceValid = !parsed.issues.some(issue => issue.severity === "error");
   const [draftEnabled, setDraftEnabled] = useState(false);
   const historyRef = useRef(history);
   const selected = useMemo(
@@ -107,35 +100,32 @@ export function ReportDesignerV3Workspace({
     () => validateReportDesignerV3Export(history.state.schema, reportType),
     [history.state.schema, reportType],
   );
-  const exportedHtml = useMemo(
-    () => exportValidation.blocked ? "" : exportReportDesignerV3SchemaToHtml(history.state.schema, reportType),
-    [exportValidation.blocked, history.state.schema, reportType],
+  const exportedContent = useMemo(
+    () => exportValidation.blocked ? "" : JSON.stringify(history.state.schema, null, 2),
+    [exportValidation.blocked, history.state.schema],
   );
   const pageSize = reportDesignerV3PageSize(history.state.schema.page);
-  const visibleFieldGroups = useMemo(() => filterFieldGroups(fieldGroups, fieldQuery), [fieldGroups, fieldQuery]);
+  const visibleFieldGroups = useMemo(() => filterFieldGroups(productFieldsOnly ? fieldGroups.map(group => ({ ...group, fields: group.fields.filter(field => field.value.startsWith("item.")) })).filter(group => group.fields.length) : fieldGroups, fieldQuery), [fieldGroups, fieldQuery, productFieldsOnly]);
   useEffect(() => {
-    setMigrationAccepted(!legacyMigrationPending);
     setDraftEnabled(false);
     setGridCellSelection(null);
-  }, [legacyMigrationPending, content, reportType]);
-  const schemaChanged = JSON.stringify(history.state.schema) !== JSON.stringify(parsed.schema);
-  const draftDirty = migrationAccepted && draftEnabled && (parsed.migrated || schemaChanged);
+  }, [content, reportType]);
+  const schemaChanged = useMemo(
+    () => JSON.stringify(history.state.schema) !== JSON.stringify(parsed.schema),
+    [history.state.schema, parsed.schema],
+  );
+  const draftDirty = sourceValid && draftEnabled && schemaChanged;
   useEffect(() => {
     onDesignerDraftChange?.({
-      content: draftDirty && !exportValidation.blocked ? exportedHtml : "",
+      content: draftDirty && !exportValidation.blocked ? exportedContent : "",
       isDirty: draftDirty || imageUploading,
-      isValid: !exportValidation.blocked && !imageUploading,
+      isValid: sourceValid && !exportValidation.blocked && !imageUploading,
     });
-  }, [draftDirty, exportValidation.blocked, exportedHtml, imageUploading, onDesignerDraftChange]);
-  const editingEnabled = editable && (!legacyMigrationPending || migrationAccepted);
+  }, [sourceValid, draftDirty, exportValidation.blocked, exportedContent, imageUploading, onDesignerDraftChange]);
+  const editingEnabled = editable && sourceValid;
   const { hasClipboard, canCopyStyle, canPasteStyle, copySelection, pasteClipboard, copyStyle, pasteStyle } = useReportDesignerV3Clipboard({
     state: history.state, editable: editingEnabled, content, reportType, onCommit: commit, onNotice: setCapacityNotice,
   });
-  function enableDraftEditing() {
-    if (!editable) return;
-    setMigrationAccepted(true);
-    setDraftEnabled(true);
-  }
   function commit(next: ReportDesignerV3DocumentState, options?: { coalesce?: boolean }) {
     if (next.schema !== history.state.schema) {
       if (!editingEnabled) return;
@@ -162,8 +152,7 @@ export function ReportDesignerV3Workspace({
     setGridCellSelection({ elementId, cellId });
   }
   function activeLayerId() {
-    const active = history.state.schema.layers.find((layer) => layer.id === history.state.activeLayerId && layer.visible && !layer.locked);
-    return active?.id ?? history.state.schema.layers.find((layer) => layer.visible && !layer.locked)?.id ?? history.state.schema.layers[0]?.id ?? null;
+    return history.state.activeLayerId;
   }
   function placeElement(element: ReportDesignerV3Element) {
     if (!editingEnabled) return;
@@ -186,7 +175,24 @@ export function ReportDesignerV3Workspace({
   }
   function insertField(field: { label: string; value: string }) {
     if (!field.value.trim()) return;
-    placeElement(createV3FieldElement(field.value));
+    const item = field.value.startsWith("item.");
+    if (item && history.state.schema.layers.some(layer => layer.elements.some(element => element.type === "Flow" && element.flowKind === "DetailTable"))) { setCapacityNotice("当前模板使用高级明细表。请先删除该表，再拖入自由商品字段；可随时撤销。"); return; }
+    const existing = history.state.schema.layers.flatMap(layer => layer.elements).filter(element => element.type === "Field" && element.fieldPath.startsWith("item."));
+    const previous = existing.at(-1);
+    const element = { ...createV3FieldElement(field.value, previous ? previous.xHundredthMm + previous.widthHundredthMm + 100 : 1500, item ? (existing[0]?.yHundredthMm ?? 10000) : 1500), label: field.label };
+    const layerId = activeLayerId();
+    if (item && layerId) { commit(insertV3Element(history.state, layerId, element)); setCapacityNotice(null); } else placeElement(element);
+  }
+  function dropField(path: string, x: number, y: number) {
+    const field = fieldGroups.flatMap(group => group.fields).find(field => field.value === path);
+    if (!field || !editingEnabled) return;
+    if (path.startsWith("item.") && history.state.schema.layers.some(layer => layer.elements.some(element => element.type === "Flow" && element.flowKind === "DetailTable"))) { setCapacityNotice("请先删除高级明细表，再拖入自由商品字段；可随时撤销。"); return; }
+    const layerId = activeLayerId();
+    if (!layerId) return;
+    const grid = history.state.schema.grid;
+    const snap = (value: number) => grid.snap ? Math.round(value / grid.sizeHundredthMm) * grid.sizeHundredthMm : value;
+    commit(insertV3Element(history.state, layerId, { ...createV3FieldElement(path, snap(x), snap(y)), label: field.label }));
+    setCapacityNotice(null);
   }
   function openFieldPanel() {
     setSidebarTab("fields");
@@ -203,6 +209,7 @@ export function ReportDesignerV3Workspace({
     grid: () => insertFlow(createGridBlock(reportType)),
     conditional: () => insertFlow(createConditionalBlock(reportType)),
     detailTable: reportType === "ExportDocument" ? () => insertFlow(createDetailTableBlock()) : undefined,
+    productFields: reportType === "ExportDocument" ? () => { setFieldQuery(""); setProductFieldsOnly(true); openFieldPanel(); } : undefined,
     pageBreak: () => insertFlow(createPageBreakBlock()),
   };
   const zoomPercent = Math.round(zoom * 100);
@@ -298,7 +305,7 @@ export function ReportDesignerV3Workspace({
   useReportDesignerV3Shortcuts({ workspaceRef, history, editable: editingEnabled, commit, copySelection, pasteClipboard, duplicateSelection, clearSelection });
   return (
     <ReportDesignerUploadState.Provider value={setImageUploading}>
-    <section ref={workspaceRef} className="report-designer-v3-workspace" aria-label="报表模板 V3 自由画布设计器">
+    <section ref={workspaceRef} className="report-designer-v3-workspace" aria-label="报表模板可视化设计器">
       <header className="report-designer-v3-header">
         <div>
             <span className="report-designer-v3-eyebrow">可视化排版</span>
@@ -307,7 +314,7 @@ export function ReportDesignerV3Workspace({
           {!editable ? <small>只读预览：当前权限或设备不支持设计操作。</small> : null}
         </div>
         <div className="report-designer-v3-header-actions">
-           <button className="command-button secondary" type="button" disabled={!editable} onClick={() => { history.reset(parsed.schema); setDraftEnabled(false); setMigrationAccepted(!parsed.migrated); onDesignerDraftChange?.(EMPTY_REPORT_DESIGNER_DRAFT); }}>
+           <button className="command-button secondary" type="button" disabled={!editingEnabled} onClick={() => { history.reset(parsed.schema); setDraftEnabled(false); onDesignerDraftChange?.(EMPTY_REPORT_DESIGNER_DRAFT); }}>
             <RotateCcw size={16} aria-hidden="true" />
             <span>重新载入</span>
           </button>
@@ -326,17 +333,6 @@ export function ReportDesignerV3Workspace({
           <strong>当前草稿不能保存</strong>
           <span>{exportValidation.issues.filter((issue) => issue.severity === "error").slice(0, 3).map((issue) => issue.message).join("；") || "请修正设计结构后再保存。"}</span>
           {exportValidation.issues.filter((issue) => issue.severity === "error").length > 3 ? <small>还有更多阻断问题，请逐项检查右侧属性。</small> : null}
-        </div>
-      ) : null}
-      {legacyMigrationPending && !migrationAccepted ? (
-        <div className="report-designer-v3-notice warning" role="status">
-          <strong>{migrationNoticeTitle(parsed.sourceVersion, parsed.issues.some((issue) => issue.severity === "error"))}</strong>
-          <span>{migrationNoticeDescription(parsed.sourceVersion)} 当前仅提供只读浏览；具备编辑权限时确认后才允许修改。</span>
-          {editable ? (
-            <button className="command-button secondary" type="button" onClick={enableDraftEditing}>
-              开始 V3 编辑
-            </button>
-          ) : null}
         </div>
       ) : null}
       {capacityNotice ? <div className="report-designer-v3-notice warning" role="status"><strong>已达到设计器限制</strong><span>{capacityNotice}</span></div> : null}
@@ -399,7 +395,7 @@ export function ReportDesignerV3Workspace({
           </div>
           {sidebarTab === "components" ? <ComponentPalette reportType={reportType} actions={insertionActions} canEdit={editingEnabled} /> : null}
           {sidebarTab === "fields" ? (
-            <FieldPanel query={fieldQuery} groups={visibleFieldGroups} focusRequest={fieldFocusRequest} onQueryChange={setFieldQuery} onInsert={insertField} canEdit={editingEnabled} />
+            <><label><input type="checkbox" checked={productFieldsOnly} onChange={event => setProductFieldsOnly(event.target.checked)} /> 只看商品信息（逐行输出）</label><FieldPanel query={fieldQuery} groups={visibleFieldGroups} focusRequest={fieldFocusRequest} onQueryChange={setFieldQuery} onInsert={insertField} canEdit={editingEnabled} /></>
           ) : null}
           {sidebarTab === "layers" ? <LayerPanel state={history.state} onSelect={selectLayer} onCommit={commit} canEdit={editingEnabled} /> : null}
         </aside> : null}
@@ -430,6 +426,7 @@ export function ReportDesignerV3Workspace({
             onCommitLayerBand={(role, height) => commit(setReportDesignerLayerRoleHeight(history.state, role, height))}
             onClearSelection={clearSelection}
             onCommitText={commitCanvasText}
+            onDropField={dropField}
           />
         </main>
 

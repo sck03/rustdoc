@@ -72,7 +72,14 @@ fn compose_router(
                 },
             )
             .layer(DefaultBodyLimit::max(
-                if operation == UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB {
+                if [
+                    STAGE_SERVER_MIGRATION_RESTORE,
+                    UPLOAD_AND_RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP,
+                ]
+                .contains(&operation)
+                {
+                    257 * 1024 * 1024
+                } else if operation == UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB {
                     129 * 1024 * 1024
                 } else if [
                     IMPORT_HS_CODE_KNOWLEDGE,

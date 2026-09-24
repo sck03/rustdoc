@@ -31,6 +31,8 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 共享字体、Excel 模板、原版报表模板、PDFium、notices 和 OCR 资源通过 `lib/native-package-resources.ps1` 组装，桌面与网页服务不维护重复清单。临时文件和下载缓存写仓库 `.codex-runtime/`。AppRoot 与 DataRoot 显式传入；桌面 WebView profile 写 DataRoot/WebView。
 
+六份默认报表统一为 `.dtpl`。开发维护源为 `lib/default-report-designs.mjs`，通过 `node scripts/generate_default_dtpl_templates.mjs` 重建容器，再运行 `node scripts/test_report_designer_v3_contract.mjs` 校验设计器读写与尺寸保留。生成源和六份资产同时提交；旧 HTML 仅可作只读版式参考，不进入目录或发布包。
+
 ## 网页与 Docker
 
 `run-native-docker.ps1 -PrepareOnly -NoPause` 只生成私有配置；普通运行构建并启动，`-Stop -NoPause` 停止并保留数据库。默认绑定 `127.0.0.1:5188`；局域网地址须显式设置。凭据保存在忽略的 `deploy/rust-native/runtime/`，不进入 Git 或镜像。
@@ -38,6 +40,18 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接只供初始化／维护使用。桌面 SQLite 空库仍为 admin 空密码，数据库使用独立 Rust 基线 4，不能打开 C# v19 或旧 Rust 试验库。
 
 ## 远端入口
+
+### 备份、迁移与恢复
+
+- 桌面 `.edmrecovery` 灾备包包含 SQLite 快照、Security 主密钥和 DataRoot/Templates；从本机明确选择的文件校验并暂存后，退出重开即可恢复。启动先取得实例锁，校验暂存内容，保存原文件并记录替换日志；失败停止启动，保留恢复目录。
+- PostgreSQL API 沿用“物理备份”名称，实际为 `pg_dump` custom-format `.dump`，只恢复数据库。换服务器使用另含主密钥和用户模板的 `.edmmigration` 完整包。加密包明文及下载上限为 256 MiB；超大数据库由部署管理员使用 PostgreSQL 原生离线备份工具。
+- 服务器在界面完成密码/确认及暂存后，停止正常 API，使用同一个 AppRoot/DataRoot 执行 `ExportDocManager.Server --app-root <AppRoot> --data-root <DataRoot> --restore-pending`。维护进程需提供 `EXPORTDOCMANAGER_POSTGRES_CONNECTION`、独立 `EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION` 和 NOLOGIN 所有者 `EXPORTDOCMANAGER_POSTGRES_OWNER`；两种连接须指向同一数据库，均可使用对应 `_FILE`。命令完成即退出，再以业务连接启动 API。
+- Docker 使用 `scripts/run-native-docker.ps1 -RestorePending -NoPause`：停 API、运行独立 restore 容器、成功后再启动。普通 application 容器没有维护密钥；数据库实例锁阻止 API 与恢复同时操作。
+- 恢复先生成安全 dump，再以 `pg_restore --single-transaction --no-owner --no-privileges --role <NOLOGIN-owner>` 执行，存储层验证 schema 并重新授予业务账号必要表/序列权限。失败保留标记和安全备份；不得删除标记冒充恢复完成。
+- 主密钥、暂存目录与恢复前副本使用共同的 Windows 私有 ACL／Unix 0700 目录边界。环境变量提供主密钥的部署明确拒绝独立密钥包操作，须由管理员安排密钥迁移。
+- 网页包随附 `Tools/PostgreSQL` 客户端和许可；版本、来源及 Windows SHA-256 在 `eng/native-runtime-packages.json`。Linux 客户端采用官方 bookworm 资源以避免在 Ubuntu 24.04 上引入更高 glibc 要求；容器使用 trixie 资源。macOS 构建机先安装 PostgreSQL 18 Homebrew formula，版本须与中央清单一致。
+
+### GitHub 构建产物
 
 | 工作流 | 用途 |
 | --- | --- |
@@ -51,6 +65,8 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公钥和私钥，私钥不写仓库。便携包不执行安装器更新。不执行 Windows Authenticode、Developer ID 或 Apple 公证。未实跑的 CI／系统／架构不写成已通过。
 
 ## 验证和证据
+
+文档整理后运行 `node scripts/verify-documentation-links.mjs`，检查 docs、根 README 和本页的本地文件链接；当前入口不应引用已退役的文档或工作流。
 
 按用户要求先集中完成一批页面、后端和操作，再统一联调与最终门禁。开发中只做必要编译和针对失败的回归。
 

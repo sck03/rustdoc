@@ -35,7 +35,9 @@ pub mod cloud;
 pub mod disaster;
 pub mod migration;
 pub mod ownership;
+mod package;
 pub mod postgres;
+mod restore_files;
 mod sealed;
 #[cfg(test)]
 mod tests;
@@ -84,7 +86,6 @@ const SENSITIVE_TICKET_SECONDS: u64 = 300;
 const DOWNLOAD_TICKET_SECONDS: u64 = 300;
 const CONFIRMATION_HEADER: &str = "X-ExportDocManager-Restore-Confirmation";
 const TICKET_HEADER: &str = "X-ExportDocManager-Sensitive-Operation-Ticket";
-const PG_BACKUP_FILE_NAME_HEADER: &str = "X-ExportDocManager-PostgreSql-Backup-Name";
 const MIGRATION_PASSWORD_HEADER: &str = "X-ExportDocManager-Migration-Password";
 pub(super) const ACTION_RESTORE_DATABASE: &str = "restore-database";
 pub(super) const ACTION_RESTORE_SERVER: &str = "restore-server";
@@ -138,7 +139,7 @@ pub(super) fn migration_marker(paths: &RuntimePaths) -> Result<PathBuf> {
 }
 fn directory(path: PathBuf) -> Result<PathBuf> {
     ensure_safe_absolute(&path).map_err(invalid)?;
-    fs::create_dir_all(&path)?;
+    crate::secrets::private_directory(&path).map_err(unavailable)?;
     ensure_safe_absolute(&path).map_err(invalid)?;
     Ok(path)
 }
@@ -375,7 +376,7 @@ pub fn handle(
     actor: &Actor,
     operation: Operation,
     parameters: &[(&str, String)],
-    _query: &[(&str, String)],
+    query: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
     match operation {
@@ -393,7 +394,7 @@ pub fn handle(
         CREATE_POSTGRE_SQL_PHYSICAL_BACKUP => postgres::create_backup(service, actor),
         CREATE_POSTGRE_SQL_RESTORE_PLAN => postgres::create_restore_plan(service, actor, body),
         CREATE_POSTGRE_SQL_PHYSICAL_BACKUP_DOWNLOAD_TICKET => {
-            postgres::create_download_ticket(service, actor, parameters)
+            postgres::create_download_ticket(service, actor, query)
         }
         RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP => postgres::restore(service, actor, parameters, body),
         GET_SERVER_MIGRATION_STATUS => migration::status(service, actor),

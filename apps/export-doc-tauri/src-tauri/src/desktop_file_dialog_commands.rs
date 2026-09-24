@@ -205,7 +205,7 @@ pub(crate) fn select_report_template_package_file() -> Result<Option<String>, St
 pub(crate) fn select_report_template_file() -> Result<Option<String>, String> {
     Ok(pick_file(
         "选择报表模板文件",
-        &[("HTML 模板", &["html"]), ("全部文件", &["*"])],
+        &[("V3 报表模板", &["dtpl"]), ("全部文件", &["*"])],
     ))
 }
 
@@ -279,7 +279,7 @@ pub(crate) fn select_save_report_template_file_path(
 ) -> Result<Option<String>, String> {
     let mut dialog = rfd::FileDialog::new()
         .set_title("选择报表模板文件保存位置")
-        .add_filter("HTML 模板", &["html"]);
+        .add_filter("V3 报表模板", &["dtpl"]);
 
     if let Some(file_name) = default_file_name
         .map(|value| value.trim().to_owned())

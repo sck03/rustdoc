@@ -16,6 +16,7 @@ export function normalizeGridDiagonalHeader(
     return undefined;
   }
   return {
+    direction: value.direction === "Down" ? "Down" : "Up",
     upperLeftText: readString(value.upperLeftText, "", `${path}.upperLeftText`, issues),
     lowerRightText: readString(value.lowerRightText, "", `${path}.lowerRightText`, issues),
   };

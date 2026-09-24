@@ -615,7 +615,8 @@ function App() {
         onDismissNotice={() => setWorkspaceNotice(null)}
         sessionAttention={sessionAttention}
       >
-        <AppWorkspaceRoutes
+      <AppWorkspaceRoutes
+        sessionToken={session.accessToken}
           activeProduct={activeProduct}
           canManageAuditLogs={canManageAuditLogs}
           client={client}

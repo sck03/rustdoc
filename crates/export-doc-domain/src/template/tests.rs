@@ -103,6 +103,7 @@ fn original_v3_flow_blocks_round_trip_and_export() {
                     label: String::new(),
                     field_path: "Invoice.Spare1".into(),
                     fallback_text: String::new(),
+                    label_position: None,
                     checkbox_options: vec![],
                     vertical_text: false,
                     diagonal_header: None,
@@ -152,7 +153,10 @@ fn original_v3_flow_blocks_round_trip_and_export() {
         12000,
     );
     let html = export(&design, &fields()).unwrap();
-    let parsed = Design::from_html(&html).unwrap();
+    let parsed = crate::report_template_format::decode(
+        &crate::report_template_format::encode(&design).unwrap(),
+    )
+    .unwrap();
     assert_eq!(parsed.layers[1].elements.len(), 4);
     assert!(html.contains("edm-report-row"));
     assert!(html.contains("edm-report-grid"));
@@ -234,6 +238,7 @@ fn structured_detail_html_contains_groups_subtotals_summary_and_side_band() {
             style: ReportTextStyle::default(),
         });
         table.side_band = Some(crate::designer::DetailSideBand {
+            first_page_only: false,
             title: "MARK".into(),
             width_mm: 35.,
             content_kind: "Text".into(),
@@ -278,9 +283,11 @@ fn grid_diagonal_header_round_trips_through_html_export() {
                     label: String::new(),
                     field_path: String::new(),
                     fallback_text: String::new(),
+                    label_position: None,
                     checkbox_options: vec![],
                     vertical_text: false,
                     diagonal_header: Some(crate::designer::GridDiagonalHeader {
+                        direction: None,
                         upper_left_text: "项目".into(),
                         lower_right_text: "金额".into(),
                     }),
@@ -296,7 +303,10 @@ fn grid_diagonal_header_round_trips_through_html_export() {
         6000,
     );
     let html = export(&design, &fields()).unwrap();
-    let parsed = Design::from_html(&html).unwrap();
+    let parsed = crate::report_template_format::decode(
+        &crate::report_template_format::encode(&design).unwrap(),
+    )
+    .unwrap();
     let Kind::Flow {
         block: ReportBlock::Grid(grid),
         ..
@@ -325,7 +335,7 @@ fn static_text_cannot_become_html_or_scriban_code() {
 
 #[test]
 fn foreign_templates_are_rejected_without_silent_conversion() {
-    assert!(Design::from_html("<html>Original</html>").is_err());
+    assert!(Design::from_source("<html>Original</html>").is_err());
 }
 
 #[test]

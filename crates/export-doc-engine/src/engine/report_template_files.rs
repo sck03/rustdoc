@@ -1,5 +1,4 @@
-//! Legacy file-based report template catalog: managed template roots,
-//! builtin:/user: storage paths, single HTML file transfer and .edtpl packages.
+//! Managed .dtpl template catalog, builtin:/user: identities and .edtpl packages.
 mod catalog;
 mod package;
 mod transaction;
@@ -31,16 +30,15 @@ use std::{
     path::{Path, PathBuf},
 };
 pub(super) use transaction::FileTransaction;
+pub(super) use transaction::lock as storage_lock;
 pub use transfer::{download, upload};
 use unicode_normalization::UnicodeNormalization;
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 const PERMISSION: &str = "document.report-templates";
 const EXTENSION: &str = ".dtpl";
-const HTML_EXTENSION: &str = ".html";
 /// `Path::extension()` 不含点，与 `EXTENSION` 后缀分开比较。
 pub(super) const REPORT_TEMPLATE_EXTENSION_NAME: &str = "dtpl";
-pub(super) const HTML_EXTENSION_NAME: &str = "html";
 pub(super) const PACKAGE_EXTENSION: &str = ".edtpl";
 pub(super) const PACKAGE_SCHEMA_VERSION: &str = "1.3";
 const CATALOG_FILE: &str = "report_templates.json";
@@ -54,7 +52,7 @@ pub(super) const MAX_PACKAGE_BYTES: usize = 50 * 1024 * 1024;
 const MAX_PACKAGE_ENTRIES: usize = 2000;
 const STORAGE_POLICY: &str = "内置模板从程序根 Templates/ 只读加载；新建、编辑副本、重命名、删除和模板包导入统一写入运行数据根 Templates/，不会改写已安装程序资源。";
 const PACKAGE_POLICY: &str = "模板包导出路径来自用户显式输入，相对路径解析到运行数据根 TemplatePackages/；只打包和导入用户模板，内置模板保持只读；临时文件使用运行数据根缓存目录。";
-const FILE_POLICY: &str = "单个 HTML 模板文件通过用户显式路径导入或导出；导入仍写入运行数据根 Templates/，内置模板不会被改写。";
+const FILE_POLICY: &str = "单个 .dtpl 模板文件通过用户显式路径导入或导出；导入仍写入运行数据根 Templates/，内置模板不会被改写。";
 const CHECK_POLICY: &str =
     "程序根 Templates/ 仅保存随程序发布的只读内置模板；可写性检查只创建短生命周期探针并立即删除。";
 
@@ -91,7 +89,7 @@ pub(super) fn load_template_content(
 ) -> Result<(String, String)> {
     auth::authorize(actor, PERMISSION, "view")?;
     let resolved = resolve_editable(service, kind, stored, true)?;
-    let content = fs::read_to_string(&resolved.path)?;
+    let content = report_templates::editable_content(kind, &fs::read(&resolved.path)?)?;
     if content.len() > MAX_TEMPLATE_BYTES {
         return Err(invalid("报表模板内容超过允许的大小。"));
     }
@@ -119,6 +117,33 @@ pub(super) fn load_resolved_template(
 pub(super) fn catalog_entries(paths: &RuntimePaths, kind: &str) -> Result<Vec<Value>> {
     catalog::catalog_entries(paths, kind)
 }
+
+/// File templates use the template and source-domain view grants. Inspect the
+/// authoritative containers instead of keeping a second persistent index.
+pub(super) fn resource_access(
+    paths: &RuntimePaths,
+    actor: &Actor,
+) -> Result<std::collections::HashMap<String, bool>> {
+    let mut ids = std::collections::HashMap::new();
+    for (path, bytes) in template_files(paths)? {
+        crate::operation::check()?;
+        let kind = kind_of_category(path.split('/').next().unwrap_or(""));
+        let design = report_templates::validate_bytes(kind, &bytes)
+            .map_err(|_| unavailable("文件模板资源索引损坏，已停止图片操作。"))?;
+        let visible = auth::authorize(actor, PERMISSION, "view").is_ok()
+            && report_templates::demand_type(actor, kind).is_ok();
+        for resource in design.resources {
+            let accessible = ids.entry(resource.id).or_insert(false);
+            *accessible |= visible;
+        }
+    }
+    Ok(ids)
+}
+
+pub(super) fn template_revision(content: &[u8], display: &str) -> String {
+    catalog::revision(content, display)
+}
+
 pub fn handle(
     service: &NativeService,
     actor: &Actor,
@@ -254,11 +279,13 @@ fn create_template(
         let display = display_name(&text(body, "displayName"), &path);
         let content = report_templates::starter::create(kind, &display)?;
         report_templates::validate_content(kind, &content)?;
+        let stored_content = report_templates::stored_content(kind, &content)?;
         files.capture(&path)?;
+        files.capture(&user_root(&service.paths).join(CATALOG_FILE))?;
         service.store.transaction(|tx| {
-            report_assets::validate_template(tx, actor, &content)?;
+            report_assets::validate_template(tx, actor, &content, Some(&service.paths))?;
             fs::create_dir_all(path.parent().unwrap_or(&path))?;
-            paths::atomic_write(&path, content.as_bytes()).map_err(unavailable)?;
+            paths::atomic_write(&path, &stored_content).map_err(unavailable)?;
             let stored = to_stored(&service.paths, &path)?;
             let with_seal = if kind == "PaymentVoucher" {
                 None
@@ -266,7 +293,7 @@ fn create_template(
                 Some(true)
             };
             upsert_catalog_row(&service.paths, kind, &stored, &display, with_seal)?;
-            Ok(content_dto(kind, &stored, &display, with_seal, &content))
+            content_dto(kind, &stored, &display, with_seal, &stored_content)
         })
     })
 }
@@ -280,12 +307,24 @@ fn save_template_content(
     content: &str,
 ) -> Result<Value> {
     report_templates::validate_content(kind, content)?;
+    replace_template_content(service, actor, kind, stored, expected_revision, content)
+}
+
+pub(super) fn replace_template_content(
+    service: &NativeService,
+    actor: &Actor,
+    kind: &str,
+    stored: &str,
+    expected_revision: &str,
+    content: &str,
+) -> Result<Value> {
     let mut files = FileTransaction::new(&service.paths)?;
     files.execute(|files| {
         service.store.transaction(|tx| {
             let mut resolved = resolve_editable(service, kind, stored, false)?;
             validate_revision(&resolved.path, &resolved.display, expected_revision)?;
-            report_assets::validate_template(tx, actor, content)?;
+            report_assets::validate_template(tx, actor, content, Some(&service.paths))?;
+            let stored_content = report_templates::stored_content(kind, content)?;
             if within(&resolved.path, &builtin_root(&service.paths)) {
                 let copy = user_copy_path(&service.paths, &resolved.path)?;
                 if copy.exists() {
@@ -295,8 +334,9 @@ fn save_template_content(
                 resolved.path = copy;
             }
             files.capture(&resolved.path)?;
+            files.capture(&user_root(&service.paths).join(CATALOG_FILE))?;
             fs::create_dir_all(resolved.path.parent().unwrap_or(&resolved.path))?;
-            paths::atomic_write(&resolved.path, content.as_bytes()).map_err(unavailable)?;
+            paths::atomic_write(&resolved.path, &stored_content).map_err(unavailable)?;
             let stored = to_stored(&service.paths, &resolved.path)?;
             upsert_catalog_row(
                 &service.paths,
@@ -305,13 +345,13 @@ fn save_template_content(
                 &resolved.display,
                 resolved.with_seal,
             )?;
-            Ok(content_dto(
+            content_dto(
                 kind,
                 &stored,
                 &resolved.display,
                 resolved.with_seal,
-                content,
-            ))
+                &stored_content,
+            )
         })
     })
 }
@@ -366,14 +406,8 @@ fn rename_template(
                     }
                 }
             })?;
-            let content = fs::read_to_string(&target)?;
-            Ok(content_dto(
-                kind,
-                &stored,
-                &current.display,
-                current.with_seal,
-                &content,
-            ))
+            let content = fs::read(&target)?;
+            content_dto(kind, &stored, &current.display, current.with_seal, &content)
         })
     })
 }
@@ -384,23 +418,21 @@ fn update_display_name(
     kind: &str,
     body: &Value,
 ) -> Result<Value> {
-    let resolved = resolve_editable(service, kind, &text(body, "templatePath"), true)?;
-    validate_revision(
-        &resolved.path,
-        &resolved.display,
-        &text(body, "expectedRevision"),
-    )?;
-    let stored = to_stored(&service.paths, &resolved.path)?;
-    let display = display_name(&text(body, "displayName"), &resolved.path);
-    upsert_catalog_row(&service.paths, kind, &stored, &display, resolved.with_seal)?;
-    let content = fs::read_to_string(&resolved.path)?;
-    Ok(content_dto(
-        kind,
-        &stored,
-        &display,
-        resolved.with_seal,
-        &content,
-    ))
+    let mut files = FileTransaction::new(&service.paths)?;
+    files.execute(|files| {
+        let resolved = resolve_editable(service, kind, &text(body, "templatePath"), true)?;
+        validate_revision(
+            &resolved.path,
+            &resolved.display,
+            &text(body, "expectedRevision"),
+        )?;
+        let stored = to_stored(&service.paths, &resolved.path)?;
+        let display = display_name(&text(body, "displayName"), &resolved.path);
+        files.capture(&user_root(&service.paths).join(CATALOG_FILE))?;
+        upsert_catalog_row(&service.paths, kind, &stored, &display, resolved.with_seal)?;
+        let content = fs::read(&resolved.path)?;
+        content_dto(kind, &stored, &display, resolved.with_seal, &content)
+    })
 }
 
 fn delete_template(
@@ -450,6 +482,7 @@ fn set_default_template(
     kind: &str,
     body: &Value,
 ) -> Result<Value> {
+    let _access = storage_lock(&service.paths)?;
     let path = text(body, "templatePath");
     let (stored, label) = if let Some(id) = path.trim().strip_prefix(USER_TEMPLATE_PREFIX) {
         let id = id
@@ -493,8 +526,8 @@ fn import_template_file(
     if bytes.is_empty() {
         return Err(invalid("模板文件不能为空。"));
     }
-    let content = utf8_template(&bytes)?;
-    save_template_content(
+    let content = report_templates::editable_content(kind, &bytes)?;
+    replace_template_content(
         service,
         actor,
         kind,
@@ -512,8 +545,8 @@ fn save_template_file_to_path(
 ) -> Result<Value> {
     let target = export_path(&text(body, "filePath"))?;
     let resolved = resolve_editable(service, kind, &text(body, "templatePath"), true)?;
-    let content = fs::read_to_string(&resolved.path)?;
-    paths::atomic_write(&target, content.as_bytes()).map_err(unavailable)?;
+    let content = fs::read(&resolved.path)?;
+    paths::atomic_write(&target, &content).map_err(unavailable)?;
     Ok(contracts::project(
         contracts::schema("ApiReportTemplateFileExportResponse"),
         json!({

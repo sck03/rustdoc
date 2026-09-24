@@ -89,11 +89,11 @@ export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, iss
               }
             });
           });
-          block.summaryRow?.cells.forEach((cell, cellIndex) => {
+          (["summaryRow", "introRow"] as const).forEach(key => block[key]?.cells.forEach((cell, cellIndex) => {
             if (cell.contentKind === "Field") {
-              validateReportTypeFieldPath(schema.reportType, cell.fieldPath, `${blockPath}.summaryRow.cells[${cellIndex}].fieldPath`, issues);
+              validateReportTypeFieldPath(schema.reportType, cell.fieldPath, `${blockPath}.${key}.cells[${cellIndex}].fieldPath`, issues);
             }
-          });
+          }));
           if (block.sideBand?.contentKind === "Field") {
             validateReportTypeFieldPath(schema.reportType, block.sideBand.fieldPath, `${blockPath}.sideBand.fieldPath`, issues);
           }
@@ -164,6 +164,7 @@ export function validateReportTypeFieldPath(
     return;
   }
 
+  if (["total_by_ctn_unit", "total_by_qty_unit", "total_cartons_and_quantity"].includes(fieldPath)) return;
   issues.push(createIssue("error", path, "出口单据模板只能使用 Invoice/Customer/Exporter/item 或模板系统字段。"));
 }
 

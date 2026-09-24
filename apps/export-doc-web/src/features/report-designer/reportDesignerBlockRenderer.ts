@@ -7,6 +7,8 @@ import {
   isReportDesignerImageSource,
 } from "./reportDesignerSchemaValidation.ts";
 import { renderGridDiagonalHeader } from "./reportDesignerGridDiagonal.ts";
+import { renderDetailFixedRow } from "./reportDesignerDetailFixedRows.ts";
+import { renderDetailComposite } from "./reportDesignerDetailComposite.ts";
 
 /** Shared structured-block renderer used by the v3 exporter for flow elements. */
 export function renderReportDesignerBlockToHtml(block: ReportBlock) {
@@ -122,7 +124,7 @@ function renderGridCellStyle(
 function renderGridCellContent(cell: Extract<ReportBlock, { type: "Grid" }>["rows"][number]["cells"][number], imageHeightMm?: number) {
   switch (cell.contentKind) {
     case "Field":
-      return `${cell.label ? `${escapeHtml(cell.label)}: ` : ""}${renderFieldExpression(cell.fieldPath, cell.fallbackText, imageHeightMm)}`;
+      return `${cell.label ? (cell.labelPosition === "Above" ? `<span style="display:block">${escapeHtml(cell.label)}</span>` : `${escapeHtml(cell.label)}: `) : ""}${renderFieldExpression(cell.fieldPath, cell.fallbackText, imageHeightMm)}`;
     case "CheckboxGroup":
       return renderGridCheckboxGroup(cell);
     case "Text":
@@ -234,12 +236,17 @@ function renderConditionalExpression(block: Extract<ReportBlock, { type: "Condit
 }
 
 function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>) {
-  const summaryRow = renderDetailTableSummaryRow(block);
+  const renderers = { style: renderDetailCellStyle, field: renderFieldExpression, text: escapeHtml };
+  const summaryRow = renderDetailFixedRow(block, block.summaryRow, renderers);
   const detailPrintClasses = renderDetailPrintClassNames(block);
   const detailRow = `<tr>${block.columns
-    .map((column) => `<td style="${renderDetailCellStyle(block.bodyStyle, column.border ?? block.border, column.align)}">${renderDetailCellContent(column)}</td>`)
+    .map((column) => {
+      const border = column.border ?? block.border;
+      return `<td style="${renderDetailCellStyle(block.bodyStyle, block.rowSeparators === false ? { ...border, top: false, bottom: false } : border, column.align)}">${renderDetailCellContent(column, block.bodyStyle.verticalAlign)}</td>`;
+    })
     .join("")}</tr>`;
-  const table = `<table class="edm-detail-table ${detailPrintClasses}">${renderProportionalColumns(block.columns.map(column => column.widthMm))}<thead>${renderDetailTableHeaderRows(block)}</thead><tbody>${renderDetailTableRows(block, detailRow)}${summaryRow}</tbody></table>`;
+  const introRow = renderDetailFixedRow(block, block.introRow, renderers);
+  const table = `<table class="edm-detail-table ${detailPrintClasses}" style="${renderBorderStyle(block.border)}">${renderProportionalColumns(block.columns.map(column => column.widthMm))}<thead>${renderDetailTableHeaderRows(block)}</thead><tbody>${introRow}${renderDetailTableRows(block, detailRow)}${summaryRow}</tbody></table>`;
 
   if (!block.sideBand) {
     return table;
@@ -510,40 +517,15 @@ function renderDetailHeaderRepeatClassName(block: Extract<ReportBlock, { type: "
   return block.print.repeatHeaderOnPageBreak ? "edm-detail-repeat-header" : "edm-detail-no-repeat-header";
 }
 
-function renderDetailTableSummaryRow(block: Extract<ReportBlock, { type: "DetailTable" }>) {
-  if (!block.summaryRow) {
-    return "";
-  }
-
-  const labelColumnSpan = Math.min(block.columns.length, Math.max(1, Math.floor(block.summaryRow.labelColumnSpan)));
-  const cellsByColumnId = new Map(block.summaryRow.cells.map((cell) => [cell.columnId, cell]));
-  const valueCells = block.columns.slice(labelColumnSpan).map((column) => {
-    const cell = cellsByColumnId.get(column.id);
-    const content = cell ? renderSummaryCellContent(cell) : "";
-
-    return `<td style="${renderDetailCellStyle(block.summaryRow!.style, block.border, column.align)}">${content}</td>`;
-  }).join("");
-
-  return `<tr class="edm-detail-summary-row"><td colspan="${labelColumnSpan}" style="${renderDetailCellStyle(block.summaryRow.style, block.border, "Right")}">${escapeHtml(block.summaryRow.label)}</td>${valueCells}</tr>`;
-}
-
-function renderSummaryCellContent(cell: NonNullable<Extract<ReportBlock, { type: "DetailTable" }>["summaryRow"]>["cells"][number]) {
-  switch (cell.contentKind) {
-    case "Field":
-      return renderFieldExpression(cell.fieldPath);
-    case "Text":
-      return escapeHtml(cell.text);
-    case "Empty":
-      return "";
-  }
-}
-
-function renderDetailCellContent(column: Extract<ReportBlock, { type: "DetailTable" }>["columns"][number]) {
+function renderDetailCellContent(column: Extract<ReportBlock, { type: "DetailTable" }>["columns"][number], verticalAlign?: ReportTextStyle["verticalAlign"]) {
   if (column.contentKind !== "Composite" || !column.content || column.content.length === 0) {
     return renderDetailItemExpression(column.fieldPath);
   }
+  if (column.omitEmptyLines || column.content.some(part => part.kind === "ColumnBreak")) {
+    return `<div class="${column.omitEmptyLines ? "edm-detail-omit-empty-lines" : ""}">${renderDetailComposite(column.content, part => part.kind === "Text" ? escapeHtml(part.text) : renderDetailItemExpression(part.fieldPath), verticalAlign)}</div>`;
+  }
 
-  return column.content.map((part) => {
+  return column.content.filter(part => part.visible !== false).map((part) => {
     switch (part.kind) {
       case "Text":
         return escapeHtml(part.text);
@@ -582,6 +564,7 @@ function renderDetailCellStyle(
 ) {
   return [
     `text-align: ${alignToCss(align)}`,
+    `vertical-align: ${(style.verticalAlign ?? "Top").toLowerCase()}`,
     style.fontSizePt ? `font-size: ${style.fontSizePt}pt` : "",
     style.bold ? `font-weight: 700; font-family: ${portableReportSansFontFamily}` : "",
     style.marginTopMm ? `padding-top: ${style.marginTopMm}mm` : "",
@@ -591,6 +574,7 @@ function renderDetailCellStyle(
     "overflow-wrap: anywhere",
     "word-break: break-word",
     renderBorderStyle(border),
+    renderCellPadding(style, 2),
   ].filter(Boolean).join("; ");
 }
 

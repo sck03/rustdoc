@@ -1,15 +1,18 @@
-import { useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { ConfirmationRequest } from "../../ui/ConfirmationProvider.tsx";
 import type { ReportTypeOption } from "./reportTemplateDesignerModel.ts";
 import type { ReportTemplateReturnTarget } from "./reportTemplateReturnNavigation.ts";
-import { fileNameFromPath } from "./reportTemplateDesignerModel.ts";
+import { matchesTemplatePath } from "./reportTemplateDesignerModel.ts";
 import { useConfirmUnsavedChanges } from "../../ui/unsavedChangesGuard.tsx";
 
 export function useReportTemplateWorkspaceNavigation({
   reportType,
   selectedTemplatePath,
   selectedUserTemplateId,
+  savedTemplatePath,
+  onSavedReferenceApplied,
+  hasUnsavedChanges,
   locationState,
   returnTarget,
   confirmDiscardChanges,
@@ -20,6 +23,9 @@ export function useReportTemplateWorkspaceNavigation({
   reportType: ReportTypeOption;
   selectedTemplatePath: string;
   selectedUserTemplateId: number;
+  savedTemplatePath: string | null;
+  onSavedReferenceApplied: () => void;
+  hasUnsavedChanges: boolean;
   locationState: unknown;
   returnTarget: ReportTemplateReturnTarget | null;
   confirmDiscardChanges: (actionLabel?: string) => Promise<boolean>;
@@ -28,13 +34,23 @@ export function useReportTemplateWorkspaceNavigation({
   refetchTemplates: () => Promise<unknown>;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const confirmAllDrafts = useConfirmUnsavedChanges();
-  const buildTemplateWorkspaceLocation = useCallback((pathname: string) => {
-    const params = new URLSearchParams({ reportType });
+  const buildTemplateWorkspaceLocation = useCallback((pathname: string, search = "") => {
+    const params = new URLSearchParams(search);
+    params.set("reportType", reportType);
+    params.delete("template");
+    params.delete("userTemplateId");
     if (selectedUserTemplateId > 0) params.set("userTemplateId", String(selectedUserTemplateId));
-    else if (selectedTemplatePath) params.set("template", fileNameFromPath(selectedTemplatePath));
+    else if (selectedTemplatePath) params.set("template", selectedTemplatePath);
     return `${pathname}?${params.toString()}`;
   }, [reportType, selectedTemplatePath, selectedUserTemplateId]);
+  useEffect(() => {
+    if (location.pathname !== "/reports/templates" || hasUnsavedChanges || !savedTemplatePath || !matchesTemplatePath(savedTemplatePath, selectedTemplatePath)) return;
+    const target = buildTemplateWorkspaceLocation(location.pathname, location.search);
+    if (target !== `${location.pathname}${location.search}`) navigate(target, { replace: true, state: location.state });
+    onSavedReferenceApplied();
+  }, [buildTemplateWorkspaceLocation, hasUnsavedChanges, savedTemplatePath, onSavedReferenceApplied, location.pathname, location.search, location.state, navigate, selectedTemplatePath]);
   const handleRefreshTemplates = useCallback(async () => {
     if (await confirmDiscardChanges("刷新报表模板")) await refetchTemplates();
   }, [confirmDiscardChanges, refetchTemplates]);

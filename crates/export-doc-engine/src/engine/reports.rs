@@ -1,6 +1,6 @@
 //! Report use cases. Storage, permissions and jobs stay here; physical layout
 //! and encoding live in export-doc-report.
-use super::report_templates::{report_type, validate_bytes, validate_content};
+use super::report_templates::{editable_content, report_type, validate_bytes, validate_content};
 use super::{
     NativeService, auth,
     error::{Result, conflict, error, invalid, unavailable, unsupported},
@@ -10,7 +10,6 @@ use super::{
     tasks::TaskOutput,
 };
 use crate::{contracts, designer::Design, generated_api::*, invoice::InvoiceDraft, paths};
-use base64::Engine;
 use export_doc_report::{self as render, Builtin, Document, ReportData};
 use serde_json::{Value, json};
 use std::{path::PathBuf, sync::atomic::AtomicBool};
@@ -311,6 +310,7 @@ pub fn preview_document(
     };
     report_assets::hydrate(
         &service.store,
+        &service.paths,
         actor,
         &mut data,
         Some(template.content()),
@@ -353,12 +353,7 @@ fn prepare(
         invoice_data(store, actor, source, body["withSeal"] == true)?
     };
     let template = template(store, paths, actor, &text(body, "templatePath"), kind, true)?;
-    report_assets::hydrate(
-        store,
-        actor,
-        &mut data,
-        Some(template.content()),
-    )?;
+    report_assets::hydrate(store, paths, actor, &mut data, Some(template.content()))?;
     Ok((data, template))
 }
 fn destination(body: &Value, local: bool, zip: bool) -> Result<Option<PathBuf>> {
@@ -544,9 +539,20 @@ pub fn handle(
                 kind,
                 false,
             )?;
-            Ok(
-                json!({"reportType":kind,"displayName":template.label(),"templatePath":template.path(),"content":base64::engine::general_purpose::STANDARD.encode(template.content()),"contentEncoding":"base64","revision":super::media::digest(template.content()),"withSealDefault":false,"storagePolicy":"内置模板随程序提供，用户模板存入业务数据库。"}),
-            )
+            let content = match &template {
+                Template::Custom { content, .. } => content.clone(),
+                _ => editable_content(kind, template.content())?,
+            };
+            Ok(json!({
+                "reportType":kind,
+                "displayName":template.label(),
+                "templatePath":template.path(),
+                "content":content,
+                "contentEncoding":"v3-json",
+                "revision":super::report_template_files::template_revision(template.content(), template.label()),
+                "withSealDefault":false,
+                "storagePolicy":"内置模板随程序提供，用户模板存入业务数据库。"
+            }))
         }
         PREVIEW_INVOICE_REPORT_HTML
         | PREVIEW_INVOICE_REPORT_DRAFT_HTML
@@ -601,6 +607,7 @@ pub fn handle(
             };
             report_assets::hydrate(
                 &service.store,
+                &service.paths,
                 actor,
                 &mut data,
                 Some(template.content()),

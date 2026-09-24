@@ -221,6 +221,7 @@ export function ElementInspector({
   return (
     <div className="report-designer-v3-inspector-content">
       <InspectorTitle title={element.type === "Flow" ? reportDesignerV3ElementText(element) : reportDesignerV3ElementKindLabel(element)} subtitle={`${v3RegionNames[layer.role]}区域${element.locked || layer.locked ? " · 已锁定" : ""}`} />
+      {element.type === "Field" && element.fieldPath.startsWith("item.") ? <><p>这是商品信息，每件商品按此列位自动输出。拖动这个字段即可调整位置。</p><NumberField label="商品行距 (mm)" value={(state.schema.detailRowHeightHundredthMm ?? 1200) / 100} min={4} max={100} disabled={!editable} onCommit={value => onCommit({ ...state, schema: { ...state.schema, detailRowHeightHundredthMm: Math.round(value * 100) } })} /><small>所有商品列共用行距，长文字会自动撑高这一行。</small></> : null}
       {element.type === "Flow" ? <><RegionSelector state={state} onCommit={onCommit} disabled={!editable} />{geometry}{content}{output}</> :
         <DesignerPropertyTabs value={tab} options={tabs} onChange={setTab}>
           {tab === "content" ? content : tab === "style" ? <ElementStyleEditor element={element} editable={editable} onPatch={onPatchStyle} /> :
@@ -238,7 +239,7 @@ function ElementContentEditor({ element, reportType, resources, fieldGroups, edi
     case "Field": {
       const options = [
         { value: "", label: "请选择字段" },
-        ...flattenFields(fieldGroups).map((field) => ({ value: field.value, label: `${field.label} · ${field.value}` })),
+        ...flattenFields(fieldGroups).map((field) => ({ value: field.value, label: field.label })),
       ];
       return <><SelectField label="字段" value={element.fieldPath} options={options} disabled={!editable} onChange={(fieldPath) => onPatch({ fieldPath })} />
         {isShippingMarksField(element.fieldPath) && <small>按发票所选类型显示。文字使用下方样式，图片在此区域内等比例缩放。</small>}

@@ -37,6 +37,23 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
     networks: [database]
+  restore:
+    image: exportdoc-rust-native:local
+    profiles: [maintenance]
+    command: [--app-root, /opt/exportdoc, --data-root, /var/lib/exportdoc, --restore-pending]
+    environment:
+      EXPORTDOCMANAGER_POSTGRES_CONNECTION_FILE: /run/secrets/app_connection
+      EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION_FILE: /run/secrets/maintenance_connection
+      EXPORTDOCMANAGER_POSTGRES_OWNER: exportdoc_owner
+    secrets: [app_connection, maintenance_connection]
+    volumes:
+      - app_data:/var/lib/exportdoc
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [database]
   application:
     image: exportdoc-rust-native:local
     restart: unless-stopped

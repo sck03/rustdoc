@@ -34,6 +34,7 @@ $environment = @{
     CARGO_TARGET_DIR = $(if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $runtimeRoot 'cargo-target-native' })
 }
 $clusterStarted = $false
+$environment['EXPORTDOC_TEST_PG_BIN'] = $PostgresBin
 try {
     Invoke-ExportDocExternal -FilePath $initdb -Arguments @('-D', $dataRoot, '-U', 'native_bootstrap', '--auth=scram-sha-256', "--pwfile=$passwordFile", '--encoding=UTF8', '--locale=C') -Environment $environment -TimeoutSeconds 120 -DisplayName 'Initialize isolated native test cluster'
     Invoke-ExportDocExternal -FilePath $pgCtl -Arguments @('-D', $dataRoot, '-l', (Join-Path $testRoot 'postgres.log'), '-o', "-h 127.0.0.1 -p $port", '-w', '-t', '30', 'start') -Environment $environment -TimeoutSeconds 40 -DisplayName 'Start isolated native test cluster'
@@ -46,6 +47,7 @@ GRANT native_owner TO native_maintenance;
 CREATE DATABASE native_storage OWNER native_owner;
 CREATE DATABASE native_engine OWNER native_owner;
 CREATE DATABASE native_api OWNER native_owner;
+CREATE DATABASE native_recovery OWNER native_owner;
 "@
     [System.IO.File]::WriteAllText($sqlFile, $sql, [System.Text.UTF8Encoding]::new($false))
     $common = @('-X', '-h', '127.0.0.1', '-p', "$port", '-U', 'native_bootstrap', '-v', 'ON_ERROR_STOP=1')
@@ -58,10 +60,10 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT SELECT, IN
 ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO native_app;
 '@
     [System.IO.File]::WriteAllText($sqlFile, $sql, [System.Text.UTF8Encoding]::new($false))
-    foreach ($database in @('native_storage', 'native_engine', 'native_api')) {
+    foreach ($database in @('native_storage', 'native_engine', 'native_api', 'native_recovery')) {
         Invoke-ExportDocExternal -FilePath $psql -Arguments ($common + @('-d', $database, '-f', $sqlFile)) -Environment $environment -TimeoutSeconds 30 -DisplayName "Set minimum privileges for $database"
     }
-    foreach ($target in @(@('POSTGRES', 'native_storage'), @('ENGINE', 'native_engine'))) {
+    foreach ($target in @(@('POSTGRES', 'native_storage'), @('ENGINE', 'native_engine'), @('RECOVERY', 'native_recovery'))) {
         foreach ($role in @(@('APP', 'native_app'), @('MAINTENANCE', 'native_maintenance'))) {
             $environment["EXPORTDOC_TEST_$($target[0])_$($role[0])"] = "host=127.0.0.1 port=$port user=$($role[1]) password=$password dbname=$($target[1]) sslmode=disable"
         }

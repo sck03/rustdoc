@@ -241,6 +241,7 @@ export function removeDetailTableColumn(
   return {
     ...block,
     columns,
+    introRow: block.introRow ? { ...block.introRow, labelColumnSpan: Math.min(block.introRow.labelColumnSpan, columns.length), cells: block.introRow.cells.filter(cell => cell.columnId !== columnId) } : undefined,
     summaryRow: block.summaryRow
       ? {
           ...block.summaryRow,

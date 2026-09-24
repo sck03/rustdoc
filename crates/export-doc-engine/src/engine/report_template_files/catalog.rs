@@ -143,14 +143,10 @@ pub(super) fn to_absolute(paths: &RuntimePaths, stored: &str) -> Result<PathBuf>
     })
 }
 pub(super) fn validate_existing(path: &Path) -> Result<()> {
-    if !matches!(
-        path.extension().and_then(|value| value.to_str()),
-        Some(REPORT_TEMPLATE_EXTENSION_NAME) | Some(HTML_EXTENSION_NAME)
-    ) || !paths::valid_file_name(file_name(path))
+    if path.extension().and_then(|value| value.to_str()) != Some(REPORT_TEMPLATE_EXTENSION_NAME)
+        || !paths::valid_file_name(file_name(path))
     {
-        return Err(invalid(
-            "报表模板必须使用安全文件名和小写 .dtpl 或 .html 扩展名。",
-        ));
+        return Err(invalid("报表模板必须使用安全文件名和小写 .dtpl 扩展名。"));
     }
     Ok(())
 }
@@ -160,11 +156,10 @@ pub(super) fn normalize_new(path: &Path) -> Result<PathBuf> {
         let mut name = file_name(path).to_owned();
         name.push_str(EXTENSION);
         normalized.set_file_name(name);
-    } else if !matches!(
-        path.extension().and_then(|value| value.to_str()),
-        Some(REPORT_TEMPLATE_EXTENSION_NAME) | Some(HTML_EXTENSION_NAME)
-    ) {
-        return Err(invalid("报表模板扩展名必须使用小写 .dtpl 或 .html。"));
+    } else if path.extension().and_then(|value| value.to_str())
+        != Some(REPORT_TEMPLATE_EXTENSION_NAME)
+    {
+        return Err(invalid("报表模板扩展名必须使用小写 .dtpl。"));
     }
     let name: String = file_name(&normalized).nfc().collect();
     if !paths::valid_file_name(&name) {
@@ -223,15 +218,27 @@ pub(super) fn display_name(raw: &str, path: &Path) -> String {
         trimmed.nfc().collect()
     }
 }
-pub(super) fn revision(content: &str, display: &str) -> String {
-    let payload = serde_json::to_vec(&[content, display]).unwrap_or_default();
+fn resolved_display(paths: &RuntimePaths, raw: &str, absolute: &Path) -> String {
+    if raw.trim().is_empty()
+        && let Ok(relative) = absolute.strip_prefix(builtin_root(paths))
+    {
+        let reference = format!("Templates/{}", normalize_relative(relative));
+        if let Some(builtin) = export_doc_report::Builtin::find(&reference) {
+            return builtin.label().into();
+        }
+    }
+    display_name(raw, absolute)
+}
+pub(super) fn revision(content: &[u8], display: &str) -> String {
+    let mut payload = content.to_vec();
+    payload.extend_from_slice(display.as_bytes());
     Sha256::digest(&payload)
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
 }
 pub(super) fn validate_revision(path: &Path, display: &str, expected: &str) -> Result<()> {
-    let revision = match fs::read_to_string(path) {
+    let revision = match fs::read(path) {
         Ok(content) => revision(&content, display),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(error) => {
@@ -385,7 +392,7 @@ pub(super) fn resolve_editable(
                 || file_name(&absolute) == file_name_of_stored(&text(row, "fileName"))
         })
         .unwrap_or_default();
-    let display = display_name(&text(&row, "name"), &absolute);
+    let display = resolved_display(&service.paths, &text(&row, "name"), &absolute);
     let with_seal = if kind == "PaymentVoucher" {
         None
     } else {
@@ -422,7 +429,7 @@ pub(super) fn resolve_template(paths: &RuntimePaths, kind: &str, stored: &str) -
         .unwrap_or_default();
     Ok(Resolved {
         path: absolute.clone(),
-        display: display_name(&text(&metadata, "name"), &absolute),
+        display: resolved_display(paths, &text(&metadata, "name"), &absolute),
         with_seal: if kind == "PaymentVoucher" {
             None
         } else {
@@ -453,7 +460,7 @@ pub(super) fn catalog_entries(paths: &RuntimePaths, kind: &str) -> Result<Vec<Va
             if file_name(&path) == CATALOG_FILE
                 || !matches!(
                     path.extension().and_then(|value| value.to_str()),
-                    Some(REPORT_TEMPLATE_EXTENSION_NAME) | Some(HTML_EXTENSION_NAME)
+                    Some(REPORT_TEMPLATE_EXTENSION_NAME)
                 )
             {
                 continue;
@@ -491,15 +498,16 @@ pub(super) fn catalog_entries(paths: &RuntimePaths, kind: &str) -> Result<Vec<Va
 
 /// Reads one managed report-template file for callers that need to create a
 /// copy. Path validation and catalog lookup stay in this module; callers only
-/// receive the validated template identity and HTML content.
+/// receive the validated template identity and editable V3 JSON content.
 pub(super) fn content_dto(
     kind: &str,
     stored: &str,
     display: &str,
     with_seal: Option<bool>,
-    content: &str,
-) -> Value {
-    contracts::project(
+    content: &[u8],
+) -> Result<Value> {
+    let editable = report_templates::editable_content(kind, content)?;
+    Ok(contracts::project(
         contracts::schema("ApiReportTemplateContentDto"),
         json!({
             "success":true,
@@ -507,11 +515,12 @@ pub(super) fn content_dto(
             "displayName":display,
             "templatePath":stored,
             "withSealDefault":with_seal,
-            "content":content,
+            "content":editable,
+            "contentEncoding":"v3-json",
             "revision":revision(content, display),
             "storagePolicy":STORAGE_POLICY
         }),
-    )
+    ))
 }
 pub(super) fn lifecycle_target(
     service: &NativeService,

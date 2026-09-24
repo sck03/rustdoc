@@ -19,6 +19,7 @@ export type PaletteActions = {
   pageBreak: () => void;
   image?: () => void;
   detailTable?: () => void;
+  productFields?: () => void;
 };
 
 const layerPurposes: Record<ReportDesignerV3Layer["role"], string> = {
@@ -42,11 +43,12 @@ export function ComponentPalette({ reportType, actions, canEdit = true }: { repo
         {actions.image ? <PaletteAction label="图片/印章" onClick={actions.image} icon={<ImageIcon size={15} aria-hidden="true" />} disabled={!canEdit} /> : null}
       </PaletteSection>
       <PaletteSection title="业务组件">
+        {actions.productFields ? <PaletteAction label="商品字段（逐行输出）" onClick={actions.productFields} icon={<Columns3 size={15} aria-hidden="true" />} disabled={!canEdit} /> : null}
         <PaletteAction label="多列行" onClick={actions.row} icon={<Columns3 size={15} aria-hidden="true" />} disabled={!canEdit} />
         <PaletteAction label="普通表格" onClick={actions.grid} icon={<Table2 size={15} aria-hidden="true" />} disabled={!canEdit} />
         <PaletteAction label="条件块" onClick={actions.conditional} icon={<ListFilter size={15} aria-hidden="true" />} disabled={!canEdit} />
-        {actions.detailTable ? <PaletteAction label="明细表（自动重复）" onClick={actions.detailTable} icon={<Table2 size={15} aria-hidden="true" />} disabled={!canEdit} /> : null}
       </PaletteSection>
+      {actions.detailTable ? <details><summary>高级表格组件</summary><PaletteAction label="明细表（分组与组合排版）" onClick={actions.detailTable} icon={<Table2 size={15} aria-hidden="true" />} disabled={!canEdit} /></details> : null}
       <PaletteSection title="打印">
         <PaletteAction label="分页符" onClick={actions.pageBreak} icon={<FilePlus2 size={15} aria-hidden="true" />} disabled={!canEdit} />
       </PaletteSection>
@@ -95,14 +97,15 @@ export function FieldPanel({
         <span>搜索字段</span>
         <input ref={searchRef} aria-label="搜索字段" value={query} placeholder="发票号、客户、金额..." onChange={(event) => onQueryChange(event.target.value)} />
       </label>
+      <p className="report-designer-v3-help">拖到纸上即可，也可点击添加后移动。商品字段按同一列位逐行输出；发票号、唛头等单据信息单独显示。</p>
       {groups.length === 0 ? <p className="report-designer-v3-muted">暂无可用字段</p> : groups.map((group) => (
         <details key={group.category} open={Boolean(query.trim()) || groups.length <= 4}>
           <summary>{group.category}<small>{group.fields.length}</small></summary>
           <div className="report-designer-v3-field-list">
             {group.fields.map((field) => (
-               <button type="button" key={field.value} disabled={!canEdit} title={`插入 ${field.label}（${field.value}）`} aria-label={`插入字段 ${field.label}`} onClick={() => onInsert(field)}>
+               <button type="button" key={field.value} disabled={!canEdit} draggable={canEdit} onDragStart={event => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("application/x-exportdoc-field", field.value); }} title={`拖动或点击添加 ${field.label}`} aria-label={`插入字段 ${field.label}`} onClick={() => onInsert(field)}>
                 <span>{field.label}</span>
-                <small>{field.value}</small>
+                <small>{field.value.startsWith("item.") ? "每件商品一行" : "单据信息"}</small>
               </button>
             ))}
           </div>
@@ -179,7 +182,9 @@ function LayerPrintControls({ layer, state, onCommit, canEdit }: { layer: Report
       <div className="report-designer-v3-layer-print-fields">
         <CheckRow checked={print.repeatOnEveryPage} disabled={!canEdit || layer.role === "Body"} onChange={(checked) => patch({ repeatOnEveryPage: checked })}>每页重复{layer.role === "Body" ? "（主体不支持）" : ""}</CheckRow>
         <CheckRow checked={print.keepTogether} disabled={!canEdit} onChange={(checked) => patch({ keepTogether: checked })}>保持图层完整</CheckRow>
-        <CheckRow checked={print.pinToPageBottom} disabled={!canEdit || layer.role !== "Footer"} onChange={(checked) => patch({ pinToPageBottom: checked })}>页脚贴底{layer.role !== "Footer" ? "（仅页脚）" : ""}</CheckRow>
+        <CheckRow checked={print.pinToPageBottom} disabled={!canEdit || layer.role !== "Footer"} onChange={(checked) => patch({ pinToPageBottom: checked, followBody: checked ? false : print.followBody })}>页脚贴底{layer.role !== "Footer" ? "（仅页脚）" : ""}</CheckRow>
+        <CheckRow checked={print.followBody === true} disabled={!canEdit || layer.role !== "Footer"} onChange={checked => patch({ followBody: checked, pinToPageBottom: checked ? false : print.pinToPageBottom })}>跟随正文（签字区、条款）</CheckRow>
+        <CheckRow checked={print.firstPageOnly === true} disabled={!canEdit || layer.role === "Body"} onChange={checked => patch({ firstPageOnly: checked })}>仅首页输出</CheckRow>
         <NumberField label="最小高度 (mm)" value={hundredthMmToMm(print.minHeightHundredthMm)} min={0} max={260} disabled={!canEdit} onCommit={(value) => patch({ minHeightHundredthMm: Math.round(value * 100) })} />
       </div>
     </details>

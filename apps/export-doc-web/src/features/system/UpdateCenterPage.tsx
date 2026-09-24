@@ -18,7 +18,7 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { readUpdaterEndpoint } from "./updaterEndpointModel.ts";
 
-export function UpdateCenterPage({ client }: { client: ExportDocManagerApiClient }) {
+export function UpdateCenterPage({ client, sessionToken }: { client: ExportDocManagerApiClient; sessionToken: string }) {
   const [checkResult, setCheckResult] = useState<TauriUpdaterCheckResult | null>(null);
   const [installResult, setInstallResult] = useState<TauriUpdaterInstallResult | null>(null);
   const [checkedEndpoint, setCheckedEndpoint] = useState<string | null>(null);
@@ -78,7 +78,7 @@ export function UpdateCenterPage({ client }: { client: ExportDocManagerApiClient
     setInstallResult(null);
     setUpdateProgress(null);
     try {
-      const result = await checkTauriUpdate(updaterEndpoint || undefined);
+      const result = await checkTauriUpdate(sessionToken, updaterEndpoint || undefined);
       if (!result) {
         throw new Error("当前不是桌面运行环境，无法检查软件更新。");
       }
@@ -116,7 +116,7 @@ export function UpdateCenterPage({ client }: { client: ExportDocManagerApiClient
     setMessage(null);
     setUpdateProgress({ phase: "preparing", downloadedBytes: 0, statusText: "正在准备更新下载。" });
     try {
-      const result = await installTauriUpdate(checkedEndpoint || undefined);
+      const result = await installTauriUpdate(sessionToken, checkedEndpoint || undefined);
       if (!result) {
         throw new Error("当前不是桌面运行环境，无法安装软件更新。");
       }
@@ -138,7 +138,7 @@ export function UpdateCenterPage({ client }: { client: ExportDocManagerApiClient
   async function cancelUpdate() {
     setIsCanceling(true);
     try {
-      const result = await cancelTauriUpdate();
+      const result = await cancelTauriUpdate(sessionToken);
       if (!result) {
         throw new Error("当前不是桌面运行环境，无法取消软件更新。");
       }

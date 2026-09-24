@@ -88,7 +88,7 @@ export function ImageSourceEditor({ element, reportType, resources, editable, cl
       ) : (
         <div className="report-designer-v3-resource-picker">
           <SelectField label="已上传图片" value={element.resourceId ?? ""} options={resourceOptions} disabled={!editable || uploading || resources.length === 0} onChange={(resourceId) => onPatch({ resourceId: resourceId || undefined })} />
-          <input ref={inputRef} type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp" onChange={(event) => {
+          <input ref={inputRef} type="file" hidden accept="image/png,image/jpeg,.png,.jpg,.jpeg" onChange={(event) => {
             const file = event.currentTarget.files?.[0];
             event.currentTarget.value = "";
             if (file) void upload(file);
@@ -97,7 +97,7 @@ export function ImageSourceEditor({ element, reportType, resources, editable, cl
             <Upload size={15} aria-hidden="true" />
             <span>{uploading ? "正在上传…" : "选择图片并上传"}</span>
           </button>
-          <small className="report-designer-v3-resource-help">支持静态 PNG/JPEG/WebP 和 GIF，最大 32 MB、单边 8192 像素、总像素 3200 万；上传后自动绑定。</small>
+          <small className="report-designer-v3-resource-help">支持静态 PNG/JPEG，最大 32 MB、单边 8192 像素、总像素 3200 万；上传后自动绑定。</small>
           {feedback ? <div className={`report-designer-v3-upload-feedback is-${feedback.tone}`} role={feedback.tone === "error" ? "alert" : "status"}>{feedback.text}</div> : null}
           {client && canView ? <ReportImageResourceGallery client={client} editable={editable && !uploading} resources={resources} onChoose={resource => onUploaded(element.id, resource)} /> : null}
         </div>

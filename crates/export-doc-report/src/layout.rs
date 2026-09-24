@@ -8,9 +8,16 @@ use export_doc_domain::designer::{Design, Element, Kind, ReportBlock};
 use serde_json::Value;
 use std::{path::Path, sync::atomic::AtomicBool};
 
+mod bands;
 mod detail;
+use bands::{
+    footer_applies, footer_content_bottom, footer_content_height, footer_top_for, layer_footer_top,
+    layer_header_bottom,
+};
+mod detail_content;
 mod detail_mix;
 mod flow;
+mod free_detail;
 
 const PT_MM: f32 = 25.4 / 72.0;
 pub fn field_value(invoice: &Value, item: Option<&Value>, path: &str) -> String {
@@ -306,15 +313,20 @@ fn fixed_elements(
     index: usize,
     count: usize,
     render_body_flow: bool,
+    body_bottom: Option<f32>,
 ) -> Result<()> {
     for layer in design.layers.iter().filter(|l| l.visible) {
-        if (layer.role == "Header" && index > 0 && !layer.print.repeat_on_every_page)
-            || (layer.role == "Footer" && index + 1 < count && !layer.print.repeat_on_every_page)
+        if (layer.print.first_page_only && index > 0)
+            || (layer.role == "Header" && index > 0 && !layer.print.repeat_on_every_page)
+            || (layer.role == "Footer" && !footer_applies(layer, index, index + 1 == count))
             || (layer.role == "Body" && index > 0)
         {
             continue;
         }
-        let pinned_footer_offset = if layer.role == "Footer" && layer.print.pin_to_page_bottom {
+        let pinned_footer_offset = if layer.role == "Footer" && layer.print.follow_body {
+            body_bottom.unwrap_or(0.)
+                - (footer_content_bottom(layer) - footer_content_height(layer))
+        } else if layer.role == "Footer" && layer.print.pin_to_page_bottom {
             design.page.height_hundredth_mm as f32 / 100. - footer_content_bottom(layer)
         } else {
             0.
@@ -327,6 +339,9 @@ fn fixed_elements(
         let mut elements: Vec<_> = layer.elements.iter().collect();
         elements.sort_by_key(|e| e.z_index);
         for item in elements {
+            if free_detail::is_item(item) {
+                continue;
+            }
             if !render_body_flow && layer.role == "Body" && matches!(item.kind, Kind::Flow { .. }) {
                 continue;
             }
@@ -349,74 +364,6 @@ fn fixed_elements(
     Ok(())
 }
 
-fn layer_header_bottom(design: &Design, height: f32) -> f32 {
-    design
-        .layers
-        .iter()
-        .filter(|layer| layer.role == "Header" && layer.visible)
-        .fold(0., |bottom, layer| {
-            let content = layer
-                .elements
-                .iter()
-                .filter(|element| element.visible && element.output_enabled)
-                .map(|element| (element.y_hundredth_mm + element.height_hundredth_mm) as f32 / 100.)
-                .fold(0., f32::max);
-            bottom
-                .max(content)
-                .max(layer.print.min_height_hundredth_mm as f32 / 100.)
-                .min(height)
-        })
-}
-
-fn layer_footer_top(design: &Design, height: f32) -> f32 {
-    design
-        .layers
-        .iter()
-        .filter(|layer| layer.role == "Footer" && layer.visible)
-        .fold(height, |top, layer| {
-            let reserved = if layer.print.pin_to_page_bottom {
-                footer_content_height(layer)
-            } else {
-                layer
-                    .elements
-                    .iter()
-                    .filter(|element| element.visible && element.output_enabled)
-                    .map(|element| element.y_hundredth_mm as f32 / 100.)
-                    .fold(height, f32::min)
-                    .min(height)
-            };
-            top.min((height - layer.print.min_height_hundredth_mm as f32 / 100.).max(0.))
-                .min((height - reserved).max(0.))
-        })
-}
-
-fn footer_content_bottom(layer: &export_doc_domain::designer::Layer) -> f32 {
-    let bottom = layer
-        .elements
-        .iter()
-        .filter(|element| element.visible && element.output_enabled)
-        .map(|element| (element.y_hundredth_mm + element.height_hundredth_mm) as f32 / 100.)
-        .fold(0., f32::max);
-    if bottom > 0. {
-        bottom
-    } else {
-        layer.print.min_height_hundredth_mm as f32 / 100.
-    }
-}
-
-fn footer_content_height(layer: &export_doc_domain::designer::Layer) -> f32 {
-    let top = layer
-        .elements
-        .iter()
-        .filter(|element| element.visible && element.output_enabled)
-        .map(|element| element.y_hundredth_mm as f32 / 100.)
-        .fold(f32::INFINITY, f32::min);
-    if top.is_finite() {
-        footer_content_bottom(layer) - top
-    } else {
-        layer.print.min_height_hundredth_mm as f32 / 100.
-    }
-}
 pub fn render_design(
     data: &crate::ReportData,
     design: &Design,
@@ -462,6 +409,9 @@ fn pages_data(
         .flat_map(|layer| &layer.elements)
         .filter(|element| element.visible && element.output_enabled)
         .collect();
+    if elements.iter().any(|element| free_detail::is_item(element)) {
+        return free_detail::render(design, data, cancelled);
+    }
     let body_flows: Vec<_> = design
         .layers
         .iter()
@@ -502,7 +452,15 @@ fn pages_data(
             return render_body_flow(design, data, &body_flows, width, height, cancelled);
         }
         let mut canvas = Canvas::new(width, height);
-        fixed_elements(&mut canvas.svg, design, data, 0, 1, true)?;
+        let body_bottom = design
+            .layers
+            .iter()
+            .filter(|l| l.role == "Body" && l.visible)
+            .flat_map(|l| &l.elements)
+            .filter(|e| e.visible && e.output_enabled)
+            .map(|e| (e.y_hundredth_mm + e.height_hundredth_mm) as f32 / 100.)
+            .fold(0., f32::max);
+        fixed_elements(&mut canvas.svg, design, data, 0, 1, true, Some(body_bottom))?;
         return Ok(vec![canvas.finish().svg]);
     }
     if tables.len() > 1 {
@@ -532,14 +490,29 @@ fn pages_data(
             data,
             left,
             top,
-            footer_top: footer,
+            continuation_top: if design.layers.iter().any(|layer| {
+                layer.role == "Header"
+                    && layer.visible
+                    && layer.print.repeat_on_every_page
+                    && !layer.elements.is_empty()
+            }) {
+                top
+            } else {
+                design.page.margin_top_hundredth_mm as f32 / 100.
+            },
+            bottoms: detail::PageBottoms {
+                first: footer_top_for(design, height, 0, false),
+                continuation: footer_top_for(design, height, 1, false),
+                last: footer_top_for(design, height, 1, true),
+                single: footer,
+            },
             width: table_width,
             page_width: width,
             height,
             cancelled,
         },
         |svg, index, count, content_bottom| {
-            fixed_elements(svg, design, data, index, count, true)?;
+            fixed_elements(svg, design, data, index, count, false, Some(content_bottom))?;
             if index == 0 {
                 detail_mix::render_preceding(svg, data, &preceding_flows, top)?;
             }
@@ -615,7 +588,7 @@ fn render_body_flow(
             }
             FlowStep::Element { element, gap_mm } => {
                 let item_height = element.height_hundredth_mm as f32 / 100.;
-                let gap_mm = if current.is_empty() { 0. } else { gap_mm };
+                let mut gap_mm = if current.is_empty() { 0. } else { gap_mm };
                 if item_height > capacity {
                     return Err(invalid(format!(
                         "报表组件“{}”高度超过当前页可用空间。",
@@ -625,6 +598,7 @@ fn render_body_flow(
                 if used + gap_mm + item_height > capacity && !current.is_empty() {
                     pages.push(std::mem::take(&mut current));
                     used = 0.;
+                    gap_mm = 0.;
                 }
                 current.push((element, gap_mm));
                 used += gap_mm + item_height;
@@ -645,7 +619,20 @@ fn render_body_flow(
     let mut rendered = Vec::with_capacity(count);
     for (index, items) in pages.iter().enumerate() {
         let mut canvas = Canvas::new(width, height);
-        fixed_elements(&mut canvas.svg, design, data, index, count, false)?;
+        let body_bottom = header_bottom
+            + items
+                .iter()
+                .map(|(element, gap)| gap + element.height_hundredth_mm as f32 / 100.)
+                .sum::<f32>();
+        fixed_elements(
+            &mut canvas.svg,
+            design,
+            data,
+            index,
+            count,
+            false,
+            Some(body_bottom),
+        )?;
         let mut cursor = 0.;
         for (element, gap_mm) in items {
             cursor += gap_mm;
@@ -736,6 +723,7 @@ mod tests {
                 style: ReportTextStyle::default(),
             });
             table.side_band = Some(DetailSideBand {
+                first_page_only: false,
                 title: "MARK".into(),
                 width_mm: 35.,
                 content_kind: "Text".into(),

@@ -171,6 +171,9 @@ function selectedCargoLicense(item) { return normalizeLicense(item.license); }
 function collectNativeResources() {
   const manifest = JSON.parse(readRequiredText("eng/native-runtime-packages.json"));
   if (manifest.schemaVersion !== 1) throw new Error("Invalid native resource manifest.");
+  const client = manifest.postgresqlClient;
+  if (!client || !/^18\.\d+$/.test(client.version) || client.license !== "PostgreSQL" || !/^[0-9a-f]{64}$/.test(client.windowsSha256)) throw new Error("Invalid PostgreSQL client manifest.");
+  addComponent({ecosystem:"native-resource",scope:"Rust web/server backup and migration clients; excluded from desktop",name:"postgresql-client",version:client.version,license:client.license,downloadLocation:client.source,purl:`pkg:generic/postgresql-client@${client.version}`});
   for (const [name, item] of Object.entries(manifest.packages)) {
     if (!/^[a-z0-9.]+$/u.test(name) || !/^\d+(?:\.\d+){2,3}$/u.test(item.version) || Buffer.from(item.sha512,"base64").length !== 64) throw new Error(`Invalid native package ${name}`);
     const source = `https://api.nuget.org/v3-flatcontainer/${name}/${item.version}/${name}.${item.version}.nupkg`;
@@ -289,6 +292,7 @@ function buildNotices(items) {
     "- Noto CJK report fonts are redistributed under the SIL Open Font License. The complete text is included below and is also shipped at `Resources/Fonts/OpenSource/OFL-Noto-CJK.txt`.",
     "- PaddleOCR/PP-OCRv6 model provenance and notices are shipped at `OcrModels/PaddleOCR/V6/THIRD_PARTY_NOTICES.md`.",
     "- The Rust Excel analyzer notice is shipped at `Tools/EXCEL_ANALYZER_NOTICES.md`.",
+    "- Web/server packages include PostgreSQL 18 pg_dump, pg_restore and psql under Tools/PostgreSQL. The PostgreSQL license and upstream native library notices are preserved in that directory; these tools are excluded from desktop SQLite packages. Windows uses the checksum-pinned EnterpriseDB archive, Linux uses the official PostgreSQL image, and macOS uses the version-checked Homebrew formula and its dylib closure.",
     "- Windows x64 OCR packages carry only four Microsoft Visual C++ app-local CRT DLLs beside ONNX Runtime, with `sidecar/ocr/msvc-runtime.json` and `sidecar/ocr/MSVC_RUNTIME_NOTICES.md`. These Microsoft redistribution terms are separate from the open-source package licenses; the full installer is a build-time source and is not shipped.",
     "- The Rust desktop uses the system WebView (WebView2 on Windows, WebKitGTK on Linux, WKWebView on macOS). Windows x64 portable packages carry the pinned Microsoft WebView2 installer and its notice under `WebView2Runtime/`. Rust PDF generation does not ship Chromium. Retained C# browser/NuGet dependencies are excluded from this Rust delivery inventory.",
     "",
@@ -335,7 +339,7 @@ function buildInventory(items) {
     "Generated from committed npm/Cargo lock files, Cargo metadata and signed native-resource archive manifests. The retained C# comparison graph is excluded from Rust delivery; NPOI 2.7.6 remains enforced separately by verify-dependency-policy.mjs. " +
       "The exact application build version is recorded in the accompanying machine-readable SBOM files.",
     "",
-    "Runtime image boundary: Debian libraries and PostgreSQL 18 are OS/container inputs; their copyright files remain under /usr/share/doc. Rust containers do not include .NET or a browser rendering service.",
+    "Runtime image boundary: PostgreSQL client tools and their native library closure ship in web/server packages under Tools/PostgreSQL with license texts. The database server remains a separate OS/container input. Rust containers do not include .NET or a browser rendering service.",
     "",
   ];
   for (const ecosystem of ["npm", "cargo", "native-resource"]) {

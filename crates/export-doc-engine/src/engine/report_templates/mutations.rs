@@ -40,9 +40,16 @@ fn transition(value: &mut Value, action: Action) -> Result<()> {
     value["shareScope"] = json!(scope);
     Ok(())
 }
-fn persist(tx: &Connection, actor: &Actor, id: i64, value: Value, action: &str) -> Result<Value> {
+fn persist(
+    tx: &Connection,
+    paths: &crate::paths::RuntimePaths,
+    actor: &Actor,
+    id: i64,
+    value: Value,
+    action: &str,
+) -> Result<Value> {
     unique(tx, &value)?;
-    report_assets::validate_template(tx, actor, &text(&value, "contentHtml"))?;
+    report_assets::validate_template(tx, actor, &text(&value, "contentHtml"), Some(paths))?;
     let saved = store::save(tx, KIND, id, value, None, actor, action)?;
     history(tx, actor, &saved, action)?;
     Ok(saved)
@@ -118,18 +125,19 @@ pub(super) fn save(
         value["name"] = json!(text(body, "name"));
         value["contentHtml"] = json!(content);
         if id > 0 && value == previous { return Ok(value); }
-        persist(tx, actor, id, value, if operation == CLONE_USER_REPORT_TEMPLATE { "复制草稿" } else { "保存草稿" })
+        persist(tx, &service.paths, actor, id, value, if operation == CLONE_USER_REPORT_TEMPLATE { "复制草稿" } else { "保存草稿" })
     })
 }
 
 pub(super) fn lifecycle(
-    store: &Store,
+    service: &crate::engine::NativeService,
     actor: &Actor,
     operation: Operation,
     parameters: &[(&str, String)],
     queries: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
+    let store = &service.store;
     let id = super::super::records::id(parameters)?;
     let (permission, action, label) = match operation {
         PUBLISH_USER_REPORT_TEMPLATE => ("publish", Action::Publish, "发布"),
@@ -193,6 +201,6 @@ pub(super) fn lifecycle(
         }
         transition(&mut value, action)?;
         validate_content(&text(&value, "reportType"), &text(&value, "contentHtml"))?;
-        persist(tx, actor, id, value, label)
+        persist(tx, &service.paths, actor, id, value, label)
     })
 }

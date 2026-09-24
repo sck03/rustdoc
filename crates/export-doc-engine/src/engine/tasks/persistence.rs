@@ -134,6 +134,15 @@ pub fn finish(store: &Store, actor: &Actor, id: &str, result: Result<TaskOutput>
                     return Err(invalid("任务输出文件名、类型或容量不符合要求。"));
                 }
             }
+            if let Some(path) = &output.managed_file {
+                if output.file.is_some()
+                    || output.destination.is_some()
+                    || output.directory.is_some()
+                {
+                    return Err(invalid("任务输出来源重复。"));
+                }
+                job["_managedOutput"] = super::managed_output::describe(store, actor, path)?;
+            }
             Ok(output)
         });
         if job["cancelRequested"] == true {
@@ -149,6 +158,9 @@ pub fn finish(store: &Store, actor: &Actor, id: &str, result: Result<TaskOutput>
             });
             match result {
                 Ok(output) => {
+                    if output.managed_file.is_some() {
+                        job["outputPath"] = job["_managedOutput"]["fileName"].clone();
+                    }
                     if let Some(file) = output.file {
                         let digest = digest(&file.content);
                         connection.insert_blob(&BlobWrite {
@@ -272,6 +284,10 @@ pub fn download(store: &Store, actor: &Actor, id: &str) -> Result<FileOutput> {
     let job = checked(&connection, actor, id)?;
     if job["status"] != "Succeeded" || text(&job, "outputPath").is_empty() {
         return Err(conflict("任务没有可下载的结果。"));
+    }
+    if job["_managedOutput"].is_object() {
+        drop(connection);
+        return super::managed_output::read(store, actor, &job["_managedOutput"]);
     }
     let record_id = job["id"]
         .as_i64()

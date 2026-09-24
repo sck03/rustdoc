@@ -59,7 +59,12 @@ export function exportReportDesignerV3SchemaToHtml(
     .sort((left, right) => left.yHundredthMm - right.yHundredthMm || left.zIndex - right.zIndex);
   const headerReserve = measureRepeatedLayerReserve(visibleLayers, "Header", normalized.page.heightHundredthMm);
   const footerReserve = measureRepeatedLayerReserve(visibleLayers, "Footer", normalized.page.heightHundredthMm);
-  const flowStream = renderFlowStream(flowElements, headerReserve, footerReserve);
+  const productFields = visibleLayers.flatMap(layer => layer.elements).filter(isProductField);
+  const productTop = productFields.length ? Math.min(...productFields.map(field => field.yHundredthMm)) : 0;
+  const productHeight = Math.max(normalized.detailRowHeightHundredthMm ?? 1200, ...productFields.map(field => field.yHundredthMm + field.heightHundredthMm - productTop + 100));
+  const flowStream = productFields.length
+    ? `<section style="padding-top:${hundredthMmToMm(productTop)}mm">{{ for item in Invoice.Items }}<div class="edm-v3-product-row" style="position:relative;height:${hundredthMmToMm(productHeight)}mm;break-inside:avoid">${productFields.map(field => renderElement(field, -productTop)).join("")}</div>{{ end }}</section>`
+    : renderFlowStream(flowElements, headerReserve, footerReserve);
   const repeatedLayers = visibleLayers
     .filter((layer) => layer.print.repeatOnEveryPage)
     .map((layer) => renderRepeatedLayer(layer, normalized.page))
@@ -115,6 +120,7 @@ export function exportReportDesignerV3SchemaToHtml(
     .edm-detail-table thead { display: table-header-group; }
     .edm-detail-no-repeat-header thead { display: table-row-group; }
     .edm-detail-table tr { page-break-inside: avoid; break-inside: avoid; }
+    .edm-detail-omit-empty-lines > .edm-detail-composite-line:not(:has(span:not(:empty))) { display:none !important; }
     .edm-detail-split-rows tr { page-break-inside: auto; break-inside: auto; }
     .edm-detail-repeat-header, .edm-detail-no-repeat-header { break-inside: auto; page-break-inside: auto; }
     .report-page-break-row { page-break-before: always; break-before: page; height: 0; }
@@ -139,6 +145,8 @@ ${repeatedLayers}
 </html>`;
 }
 
+function isProductField(element: ReportDesignerV3Element) { return element.visible && element.outputEnabled && element.type === "Field" && element.fieldPath.startsWith("item."); }
+
 function renderStaticLayer(
   layer: ReportDesignerV3Schema["layers"][number],
   page: ReportDesignerV3Schema["page"],
@@ -155,7 +163,7 @@ function renderStaticLayer(
     : "";
   const yOffset = getFooterPinOffset(layer, page);
   const elements = [...layer.elements]
-    .filter((element) => element.visible && element.outputEnabled && !(layer.role === "Body" && element.type === "Flow"))
+    .filter((element) => element.visible && element.outputEnabled && !isProductField(element) && !(layer.role === "Body" && element.type === "Flow"))
     .sort((left, right) => left.zIndex - right.zIndex)
     .map((element) => renderElement(element, yOffset, layer.role !== "Body"))
     .join("\n");
@@ -279,7 +287,7 @@ function renderElementContent(element: ReportDesignerV3Element) {
       case "Text":
         return `<div class="edm-v3-text">${escapeHtml(element.text)}</div>`;
       case "Field":
-        return `<div class="edm-v3-field">${element.label ? `${escapeHtml(element.label)}: ` : ""}${renderReportField(element.fieldPath, element.fallbackText)}</div>`;
+        return `<div class="edm-v3-field">${renderReportField(element.fieldPath, element.fallbackText)}</div>`;
       case "Image":
         return renderImage(element);
       case "PageNumber":

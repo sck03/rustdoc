@@ -1,6 +1,5 @@
 import type {
   ReportDetailTableBlock,
-  ReportDetailTableCellContent,
   ReportDetailTableColumn,
   ReportDetailTableGroupFooter,
   ReportDetailTableGroupFooterCell,
@@ -11,6 +10,7 @@ import type {
   ReportDetailTableSummaryRow,
 } from "./reportDesignerSchema.ts";
 import { normalizeBlockOutputSettings } from "./reportDesignerSchemaBlockSettings.ts";
+import { normalizeDetailTableCellContentList } from "./reportDesignerDetailComposite.ts";
 import {
   createIssue,
   isRecord,
@@ -51,12 +51,10 @@ export function normalizeDetailTableBlock(
     return null;
   }
 
-  const sourcePath = value.sourcePath === "Invoice.Items" ? "Invoice.Items" : "Invoice.Items";
   if (value.sourcePath !== "Invoice.Items") {
     issues.push(createIssue("warning", `${path}.sourcePath`, "明细表数据源已回退为 Invoice.Items。"));
   }
 
-  const repeatMode = value.repeatMode === "ScribanFor" ? "ScribanFor" : "ScribanFor";
   if (value.repeatMode !== "ScribanFor") {
     issues.push(createIssue("warning", `${path}.repeatMode`, "明细表循环模式已回退为 ScribanFor。"));
   }
@@ -64,16 +62,18 @@ export function normalizeDetailTableBlock(
   const block: ReportDetailTableBlock = {
     id: normalizeId(value.id, "block-detail-table", blockIds, `${path}.id`, issues),
     type: "DetailTable",
+    rowSeparators: readBoolean(value.rowSeparators, true, `${path}.rowSeparators`, issues),
     output: normalizeBlockOutputSettings(value.output, `${path}.output`, issues),
     title: readOptionalString(value.title, `${path}.title`, issues),
     detailWidthMm: readOptionalNumber(value.detailWidthMm, 132, 40, 240, `${path}.detailWidthMm`, issues),
-    sourcePath,
-    repeatMode,
+    sourcePath: "Invoice.Items",
+    repeatMode: "ScribanFor",
     print: normalizeDetailTablePrintSettings(value.print, `${path}.print`, issues),
     sideBand: normalizeDetailTableSideBand(value.sideBand, `${path}.sideBand`, issues),
     grouping: normalizeDetailTableGrouping(value.grouping, columns, `${path}.grouping`, issues),
     columns,
     summaryRow: normalizeDetailTableSummaryRow(value.summaryRow, columns, `${path}.summaryRow`, issues),
+    introRow: normalizeDetailTableSummaryRow(value.introRow, columns, `${path}.introRow`, issues),
     headerStyle: normalizeTextStyle(value.headerStyle, `${path}.headerStyle`, issues),
     bodyStyle: normalizeTextStyle(value.bodyStyle, `${path}.bodyStyle`, issues),
     border: normalizeBorderStyle(value.border, `${path}.border`, issues),
@@ -281,6 +281,7 @@ function normalizeDetailTableSideBand(
   const contentKind = readEnum(value.contentKind, ["Text", "Field"] as const, "Field", `${path}.contentKind`, issues);
   return {
     title: readString(value.title, "唛头 Marks", `${path}.title`, issues),
+    firstPageOnly: value.firstPageOnly === true,
     widthMm: readNumber(value.widthMm, 36, 16, 120, `${path}.widthMm`, issues),
     contentKind,
     text: readString(value.text, "", `${path}.text`, issues),
@@ -310,51 +311,10 @@ function normalizeDetailTableColumn(
     contentKind: readOptionalEnum(value.contentKind, ["Field", "Composite"] as const, `${path}.contentKind`, issues) ?? "Field",
     fieldPath: readRequiredFieldPath(value.fieldPath, `${path}.fieldPath`, issues),
     content: normalizeDetailTableCellContentList(value.content, `${path}.content`, issues),
+    omitEmptyLines: value.omitEmptyLines === true,
     widthMm: readNumber(value.widthMm, 30, 8, 180, `${path}.widthMm`, issues),
     align: readEnum(value.align, ["Left", "Center", "Right"] as const, "Left", `${path}.align`, issues),
     format: readOptionalString(value.format, `${path}.format`, issues),
     border: normalizeOptionalBorderStyle(value.border, `${path}.border`, issues),
-  };
-}
-
-function normalizeDetailTableCellContentList(
-  value: unknown,
-  path: string,
-  issues: ReportDesignerSchemaIssue[],
-): ReportDetailTableCellContent[] {
-  if (value === undefined || value === null) {
-    return [];
-  }
-
-  if (!Array.isArray(value)) {
-    issues.push(createIssue("warning", path, "明细单元格组合内容必须是数组，已使用单字段列。"));
-    return [];
-  }
-
-  const partIds = new Set<string>();
-  return value
-    .map((part, index) => normalizeDetailTableCellContent(part, `${path}[${index}]`, partIds, issues))
-    .filter((part): part is ReportDetailTableCellContent => Boolean(part));
-}
-
-function normalizeDetailTableCellContent(
-  value: unknown,
-  path: string,
-  partIds: Set<string>,
-  issues: ReportDesignerSchemaIssue[],
-): ReportDetailTableCellContent | null {
-  if (!isRecord(value)) {
-    issues.push(createIssue("warning", path, "明细单元格组合片段无效，已忽略。"));
-    return null;
-  }
-
-  const kind = readEnum(value.kind, ["Text", "Field", "LineBreak"] as const, "Text", `${path}.kind`, issues);
-  return {
-    id: normalizeId(value.id, "detail-cell-part", partIds, `${path}.id`, issues),
-    kind,
-    text: kind === "Text" ? readString(value.text, "", `${path}.text`, issues) : readOptionalString(value.text, `${path}.text`, issues) ?? "",
-    fieldPath: kind === "Field"
-      ? readRequiredFieldPath(value.fieldPath, `${path}.fieldPath`, issues)
-      : readOptionalFieldPath(value.fieldPath, `${path}.fieldPath`, issues),
   };
 }

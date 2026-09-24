@@ -12,6 +12,8 @@ use export_doc_engine::{
 use export_doc_report::Builtin;
 use serde_json::{Value, json};
 use std::{fs, io::Cursor, path::PathBuf, sync::atomic::AtomicBool};
+#[path = "support/report_resource_contract.rs"]
+mod resource_contract;
 
 #[test]
 fn original_react_empty_template_requests_create_server_drafts_and_keep_empty_updates_invalid() {
@@ -22,7 +24,7 @@ fn original_react_empty_template_requests_create_server_drafts_and_keep_empty_up
             json!({"reportType":kind,"name":format!("空白模板-{kind}"),"contentHtml":""}),
         );
         let content = created["contentHtml"].as_str().unwrap();
-        let mut design = Design::from_html(content).unwrap();
+        let mut design = Design::from_source(content).unwrap();
         assert_eq!(design.report_type, kind);
         assert_eq!(created["status"], "Draft");
         assert_eq!(created["shareScope"], "Private");
@@ -44,7 +46,8 @@ fn original_react_empty_template_requests_create_server_drafts_and_keep_empty_up
         design.layers[0].elements[0].kind = export_doc_engine::designer::Kind::Text {
             text: "可视化编辑回读".into(),
         };
-        let edited = template::export(&design, &field_catalog(&fields)).unwrap();
+        template::validate(&design, &field_catalog(&fields)).unwrap();
+        let edited = serde_json::to_string(&design).unwrap();
         let saved = fixture.request(SAVE_USER_REPORT_TEMPLATE_DRAFT, &parameters, &[],
             Some(json!({"reportType":kind,"name":created["name"],"contentHtml":edited,"expectedVersion":created["versionNumber"]})));
         assert!(
@@ -136,6 +139,7 @@ impl Fixture {
             json!({"code":format!("ROLE-{name}"),"name":name,"isActive":true,"grants":[
                 {"resourceKey":"document.report-templates","action":"view","dataScope":"company"},
                 {"resourceKey":"document.report-templates","action":"design","dataScope":"own"},
+                {"resourceKey":"document.report-templates","action":"clone","dataScope":"own"},
                 {"resourceKey":"document.report-resources","action":"view","dataScope":"own"},
                 {"resourceKey":"document.report-resources","action":"upload","dataScope":"own"},
                 {"resourceKey":"document.report-resources","action":"recycle","dataScope":"own"},
@@ -292,7 +296,7 @@ fn builtins_images_pdf_jobs_and_backup_restore_share_the_business_store() {
 #[test]
 fn template_publication_sharing_history_and_concurrency_are_not_generic_record_updates() {
     let fixture = Fixture::new();
-    let content = template::export(&Design::invoice(), &field_catalog(&fixture.fields())).unwrap();
+    let content = serde_json::to_string(&Design::invoice()).unwrap();
     let template = fixture.create(
         CREATE_USER_REPORT_TEMPLATE,
         json!({"reportType":"ExportDocument","name":"共享模板","contentHtml":content}),
@@ -449,7 +453,8 @@ fn report_images_enforce_upload_ownership_and_references() {
     );
     let mut design = Design::invoice();
     design.resources.push(serde_json::from_value(json!({"id":image["id"],"mediaType":image["mediaType"],"byteLength":image["byteLength"],"sha256":image["sha256"],"altText":"验证图片"})).unwrap());
-    let content = template::export(&design, &field_catalog(&fixture.fields())).unwrap();
+    template::validate(&design, &field_catalog(&fixture.fields())).unwrap();
+    let content = serde_json::to_string(&design).unwrap();
     let saved: Value = uploader
         .json(
             CREATE_USER_REPORT_TEMPLATE,

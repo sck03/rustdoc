@@ -747,6 +747,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | native-resource | bblanchon.pdfium.macos | 152.0.7961 | Apache-2.0 | Rust native library only; managed assemblies excluded |
 | native-resource | bblanchon.pdfium.win32 | 152.0.7961 | Apache-2.0 | Rust native library only; managed assemblies excluded |
 | native-resource | microsoft.ml.onnxruntime | 1.29.0 | MIT | Rust native library only; managed assemblies excluded |
+| native-resource | postgresql-client | 18.4 | PostgreSQL | Rust web/server backup and migration clients; excluded from desktop |
 | npm | @dimforge/rapier3d-compat | 0.12.0 | Apache-2.0 | web |
 | npm | @esbuild/aix-ppc64 | 0.28.2 | MIT | web |
 | npm | @esbuild/android-arm | 0.28.2 | MIT | web |
@@ -862,6 +863,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 - Noto CJK report fonts are redistributed under the SIL Open Font License. The complete text is included below and is also shipped at `Resources/Fonts/OpenSource/OFL-Noto-CJK.txt`.
 - PaddleOCR/PP-OCRv6 model provenance and notices are shipped at `OcrModels/PaddleOCR/V6/THIRD_PARTY_NOTICES.md`.
 - The Rust Excel analyzer notice is shipped at `Tools/EXCEL_ANALYZER_NOTICES.md`.
+- Web/server packages include PostgreSQL 18 pg_dump, pg_restore and psql under Tools/PostgreSQL. The PostgreSQL license and upstream native library notices are preserved in that directory; these tools are excluded from desktop SQLite packages. Windows uses the checksum-pinned EnterpriseDB archive, Linux uses the official PostgreSQL image, and macOS uses the version-checked Homebrew formula and its dylib closure.
 - Windows x64 OCR packages carry only four Microsoft Visual C++ app-local CRT DLLs beside ONNX Runtime, with `sidecar/ocr/msvc-runtime.json` and `sidecar/ocr/MSVC_RUNTIME_NOTICES.md`. These Microsoft redistribution terms are separate from the open-source package licenses; the full installer is a build-time source and is not shipped.
 - The Rust desktop uses the system WebView (WebView2 on Windows, WebKitGTK on Linux, WKWebView on macOS). Windows x64 portable packages carry the pinned Microsoft WebView2 installer and its notice under `WebView2Runtime/`. Rust PDF generation does not ship Chromium. Retained C# browser/NuGet dependencies are excluded from this Rust delivery inventory.
 

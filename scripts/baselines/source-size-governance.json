@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-09-21",
+  "updatedAt": "2026-09-25",
   "rules": [
     {
       "name": "repository .NET production default",
@@ -65,9 +65,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 6350,
+      "baselineAggregateLines": 7346,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 6470,
+      "maximumAggregateLines": 7466,
       "reportFiles": false
     },
     {

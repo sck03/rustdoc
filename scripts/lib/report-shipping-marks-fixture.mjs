@@ -1,7 +1,7 @@
 /** One scenario shared by the exporter and real browser checks. */
 export function createShippingMarksScenario(api) {
   const fieldPath = "Invoice.ShippingMarks";
-  const schema = api.parseReportDesignerV3FromHtml("", "ExportDocument").schema;
+  const schema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
   schema.layers.forEach(layer => { layer.elements = []; });
   const row = api.createRowBlock();
   Object.assign(row.columns[0], { contentKind: "Field", fieldPath, label: "", fallbackText: "N/M" });

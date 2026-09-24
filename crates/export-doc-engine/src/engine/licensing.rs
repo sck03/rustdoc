@@ -130,10 +130,14 @@ struct Identity {
     fingerprint_hash: String,
     binding_hash: String,
 }
-fn machine_identity(anchor: &Anchor) -> Identity {
+fn machine_identity(anchor: &Anchor, provider: &str) -> Identity {
     let fingerprint_hash = sha256_hex(&format!(
         "device-v{BINDING_VERSION}|{}",
-        device_fingerprint()
+        if provider == "PostgreSQL" {
+            "managed-server-installation".into()
+        } else {
+            device_fingerprint()
+        }
     ));
     let binding_hash = sha256_hex(&format!(
         "local-binding-v{BINDING_VERSION}|{}",
@@ -225,8 +229,8 @@ fn status(
 ) -> Result<Value> {
     let today = clock.now().map_err(unavailable)?.today;
     let mut anchor = ensure_anchor(store, protector, today)?;
-    let identity = machine_identity(&anchor);
-    let mut changed = anchor.refresh(&identity, today)?;
+    let identity = machine_identity(&anchor, store.provider()?);
+    let changed = anchor.refresh(&identity, today)?;
     let mut response = contracts::initial(contracts::schema("ApiLicenseStatusResponse"));
     response["machineId"] = json!(identity.machine_id);
     response["trialDays"] = json!(TRIAL_DAYS);
@@ -250,8 +254,6 @@ fn status(
             Ok(Some(unix)) => {
                 let expire = expire_date(clock, unix)?;
                 if effective > expire {
-                    anchor.license_key.clear();
-                    changed = true;
                     response["isTrialExpired"] = json!(true);
                     response["expireDate"] = json!(expire.to_string());
                     Some("授权已过期，请重新注册。")
@@ -264,16 +266,13 @@ fn status(
                     None
                 }
             }
-            Err(_) => {
-                anchor.license_key.clear();
-                changed = true;
-                Some("注册码无效或机器码已变更。")
-            }
+            Err(_) => Some("注册码无效或机器码已变更。"),
         }
     } else {
         None
     };
     if let Some(message) = terminal {
+        response["isTrialExpired"] = json!(true);
         response["message"] = json!(message);
     } else if !response["isRegistered"].as_bool().unwrap_or(false) {
         let used = effective
@@ -281,7 +280,7 @@ fn status(
             .num_days();
         let remaining = TRIAL_DAYS - used;
         response["daysRemaining"] = json!(remaining.max(0));
-        if used > TRIAL_DAYS {
+        if used >= TRIAL_DAYS {
             response["isTrialExpired"] = json!(true);
             response["message"] = json!("试用期已过，请注册。");
         } else {
@@ -311,7 +310,7 @@ fn register(
     }
     let today = clock.now().map_err(unavailable)?.today;
     let mut anchor = ensure_anchor(store, protector, today)?;
-    let identity = machine_identity(&anchor);
+    let identity = machine_identity(&anchor, store.provider()?);
     let expire = verifier
         .validate(&identity.machine_id, &key)
         .map_err(invalid)?;
@@ -319,10 +318,14 @@ fn register(
         None => NaiveDate::MAX,
         Some(unix) => expire_date(clock, unix)?,
     };
+    let effective = anchor.effective(today)?;
+    if registered < effective {
+        return Err(invalid("注册码已过期，当前授权未更改。"));
+    }
     anchor.license_key = key;
     anchor.fingerprint_hash = identity.fingerprint_hash.clone();
     anchor.binding_hash = identity.binding_hash.clone();
-    anchor.last_run_date = today.to_string();
+    anchor.last_run_date = effective.to_string();
     write_anchor(store, protector, &anchor)?;
     store.transaction(|tx| {
         tx.append_audit_details(
@@ -666,6 +669,10 @@ pub fn handle(
     _query: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
+    let _gate = service
+        .license_gate
+        .lock()
+        .map_err(|_| unavailable("授权状态异常。"))?;
     match operation {
         GET_LICENSE_STATUS => status(
             &service.store,
@@ -690,6 +697,34 @@ pub fn handle(
         CLEANUP_SYSTEM_LOGS => cleanup_system_logs(&service.store, &service.paths, actor),
         _ => Err(unsupported("此项原生操作尚未接入。")),
     }
+}
+pub(super) fn check_operation(service: &NativeService, operation: Operation) -> Result<()> {
+    let required = contracts::contract()["operations"][operation.id]["policy"]["requiresLicense"]
+        .as_bool()
+        .ok_or_else(|| unavailable("端点缺少许可证策略。"))?;
+    if !required {
+        return Ok(());
+    }
+    let _gate = service
+        .license_gate
+        .lock()
+        .map_err(|_| unavailable("授权状态异常。"))?;
+    let state = status(
+        &service.store,
+        &service.protector,
+        &service.clock,
+        &verifier()?,
+    )?;
+    if state["isRegistered"] == true
+        || (state["isTrialExpired"] == false
+            && state["daysRemaining"].as_i64().is_some_and(|days| days > 0))
+    {
+        return Ok(());
+    }
+    Err(super::error::error(
+        403,
+        state["message"].as_str().unwrap_or("授权无效，请注册。"),
+    ))
 }
 pub fn download(
     service: &NativeService,

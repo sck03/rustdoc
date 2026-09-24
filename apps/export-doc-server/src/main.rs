@@ -25,6 +25,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return result.map_err(Into::into);
     }
     let configuration = Configuration::load()?;
+    if configuration.restore_pending {
+        export_doc_engine::engine::apply_pending_postgres_restore(
+            &configuration.paths,
+            &configuration.maintenance_connection,
+            &configuration.owner,
+            &configuration.connection,
+        )?;
+        return Ok(());
+    }
     if configuration.initialize_schema {
         Connection::initialize_postgres(
             &configuration.maintenance_connection,

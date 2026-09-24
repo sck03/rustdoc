@@ -79,7 +79,7 @@ fn body_flow_design(with_break: bool) -> Design {
         page_break.x_hundredth_mm = 1000;
         page_break.y_hundredth_mm = 20000;
         page_break.width_hundredth_mm = 19000;
-        page_break.height_hundredth_mm = 100;
+        page_break.height_hundredth_mm = 400;
         page_break.kind = Kind::Flow {
             flow_kind: "PageBreak".into(),
             block: serde_json::from_value(json!({"id":"page-break","type":"PageBreak"})).unwrap(),
@@ -237,6 +237,55 @@ fn body_flow_wraps_before_the_footer_when_the_next_block_does_not_fit() {
     assert!(result.pages[0].svg.contains("GRID-INVOICE"));
     assert!(!result.pages[0].svg.contains("SECOND FLOW"));
     assert!(result.pages[1].svg.contains("SECOND FLOW"));
+}
+
+#[test]
+fn detail_row_that_only_fits_a_continuation_page_never_overlaps_the_footer() {
+    let mut design = Design::invoice();
+    design.layers[0].print.repeat_on_every_page = false;
+    let element = &mut design.layers[1].elements[0];
+    element.y_hundredth_mm = 22000;
+    element.height_hundredth_mm = 3000;
+    if let Kind::Flow {
+        block: ReportBlock::DetailTable(table),
+        ..
+    } = &mut element.kind
+    {
+        table.columns.truncate(1);
+        table.columns[0].content_kind = "Composite".into();
+        table.columns[0].content = serde_json::from_value(json!([
+            {"id":"long-cell","kind":"Text","text":"LONG ROW\n".repeat(25)}
+        ]))
+        .unwrap();
+    }
+    let result = render_design(&data(), &design, &AtomicBool::new(false)).unwrap();
+    assert!(!result.pages[0].svg.contains("LONG ROW"));
+    assert!(result.pages[1].svg.contains("LONG ROW"));
+}
+
+#[test]
+fn detail_header_and_body_styles_control_measurement_and_output() {
+    let mut design = Design::invoice();
+    if let Kind::Flow {
+        block: ReportBlock::DetailTable(table),
+        ..
+    } = &mut design.layers[1].elements[0].kind
+    {
+        table.header_style.font_size_pt = Some(18.);
+        table.header_style.bold = Some(false);
+        table.body_style.font_size_pt = Some(8.);
+        table.body_style.bold = Some(true);
+        table.body_style.margin_left_mm = Some(4.);
+        table.border.color = "#aa1122".into();
+    }
+    let result = render_design(&data(), &design, &AtomicBool::new(false)).unwrap();
+    assert!(
+        result.pages[0]
+            .svg
+            .contains("font-size=\"6.35\" font-weight=\"400\"")
+    );
+    assert!(result.pages[0].svg.contains("font-weight=\"700\""));
+    assert!(result.pages[0].svg.contains("stroke=\"#aa1122\""));
 }
 
 fn detail_with_surrounding_flows() -> Design {

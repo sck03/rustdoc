@@ -1,6 +1,7 @@
 use super::*;
 use crate::paths::{RuntimePaths, nonce};
 use std::{fs, path::PathBuf, sync::Arc};
+mod storage_safety;
 
 struct Workspace(PathBuf);
 impl Workspace {
@@ -87,6 +88,24 @@ fn created_template_roundtrips_and_blocks_stale_revisions() {
     )
     .unwrap();
     assert_eq!(created["success"], true);
+    assert_eq!(created["contentEncoding"], "v3-json");
+    assert!(
+        created["content"]
+            .as_str()
+            .unwrap()
+            .trim_start()
+            .starts_with('{'),
+        "文件模板 API 必须返回可编辑 V3 JSON"
+    );
+    let created_path = to_absolute(
+        &workspace.paths(),
+        created["templatePath"].as_str().unwrap(),
+    )
+    .unwrap();
+    assert!(
+        fs::read(&created_path).unwrap().starts_with(b"EXPORTDOCDT"),
+        "磁盘上的 .dtpl 必须保持二进制容器"
+    );
     let stored = created["templatePath"].as_str().unwrap().to_string();
     let revision = created["revision"].as_str().unwrap().to_string();
 
@@ -150,8 +169,8 @@ fn uploaded_file_is_listed_and_downloaded_unchanged() {
             "expectedRevision":created["revision"],
             "displayName":"上传模板"
         }),
-        "uploaded.html",
-        content.as_bytes(),
+        "uploaded.dtpl",
+        &report_templates::stored_content("ExportDocument", &content).unwrap(),
     )
     .unwrap();
     assert_eq!(uploaded["success"], true);
@@ -184,7 +203,10 @@ fn uploaded_file_is_listed_and_downloaded_unchanged() {
         ],
     )
     .unwrap();
-    assert_eq!(output.content, content.as_bytes());
+    assert_eq!(
+        output.content,
+        report_templates::stored_content("ExportDocument", &content).unwrap()
+    );
 }
 
 #[test]
@@ -200,7 +222,7 @@ fn save_to_path_writes_the_chosen_local_file() {
         &json!({"reportType":"PaymentVoucher","displayName":"测试付款模板"}),
     )
     .unwrap();
-    let target = workspace.paths().data_root.join("exported.html");
+    let target = workspace.paths().data_root.join("exported.dtpl");
     let saved = handle(
         &service,
         &admin(),
@@ -216,10 +238,136 @@ fn save_to_path_writes_the_chosen_local_file() {
     .unwrap();
     assert_eq!(saved["success"], true);
     assert!(target.is_file());
+    assert!(fs::read(&target).unwrap().starts_with(b"EXPORTDOCDT"));
+}
+
+#[test]
+fn builtin_dtpl_opens_as_editable_v3_json() {
+    let workspace = Workspace::new();
+    let service = open(&workspace);
+    for (kind, path) in [
+        ("ExportDocument", "Templates/Export/invoice_template.dtpl"),
+        (
+            "ExportDocument",
+            "Templates/Export/packing_list_template.dtpl",
+        ),
+        ("ExportDocument", "Templates/Export/contract_template.dtpl"),
+        (
+            "ExportDocument",
+            "Templates/Export/customs_declaration_template.dtpl",
+        ),
+        (
+            "PaymentVoucher",
+            "Templates/Internal/payment_voucher_template.dtpl",
+        ),
+        (
+            "PaymentVoucher",
+            "Templates/Internal/expense_reimbursement_template.dtpl",
+        ),
+    ] {
+        let builtin_path = workspace.paths().app_root.join(path);
+        fs::create_dir_all(builtin_path.parent().unwrap()).unwrap();
+        let builtin = export_doc_report::Builtin::find(path).unwrap();
+        fs::write(&builtin_path, builtin.source()).unwrap();
+        let response = crate::engine::reports::handle(
+            &service,
+            &admin(),
+            GET_REPORT_TEMPLATE_CONTENT,
+            &[],
+            &[("reportType", kind.into()), ("templatePath", path.into())],
+            &json!({}),
+        )
+        .unwrap();
+        assert_eq!(response["contentEncoding"], "v3-json", "{path}");
+        let content = response["content"].as_str().unwrap();
+        assert!(content.trim_start().starts_with('{'), "{path}");
+        let design = crate::designer::Design::from_source(content).unwrap();
+        assert_eq!(design.report_type, kind, "{path}");
+        assert!(!design.layers.is_empty(), "{path}");
+        let mut edited: Value = serde_json::from_str(content).unwrap();
+        edited["layers"][0]["name"] = json!("编辑后的页眉");
+        let saved = save_template_content(
+            &service,
+            &admin(),
+            kind,
+            path,
+            response["revision"].as_str().unwrap(),
+            &edited.to_string(),
+        )
+        .unwrap();
+        let stored = saved["templatePath"].as_str().unwrap();
+        assert!(stored.starts_with("user:"));
+        let downloaded = download(
+            &service,
+            &admin(),
+            DOWNLOAD_REPORT_TEMPLATE_FILE,
+            &[("reportType", kind.into()), ("templatePath", stored.into())],
+        )
+        .unwrap();
+        let reopened = report_templates::validate_bytes(kind, &downloaded.content).unwrap();
+        assert_eq!(reopened.layers[0].name, "编辑后的页眉");
+        assert_eq!(fs::read(&builtin_path).unwrap(), builtin.source());
+        let reread = crate::engine::reports::handle(
+            &service,
+            &admin(),
+            GET_REPORT_TEMPLATE_CONTENT,
+            &[],
+            &[("reportType", kind.into()), ("templatePath", stored.into())],
+            &json!({}),
+        )
+        .unwrap();
+        assert_eq!(saved["revision"], reread["revision"], "{path}");
+    }
+}
+
+#[test]
+fn html_extensions_and_disguised_payloads_are_rejected_without_overwrite() {
+    let workspace = Workspace::new();
+    let service = open(&workspace);
+    let created = create_template(
+        &service,
+        &admin(),
+        "ExportDocument",
+        &json!({"displayName":"单一格式"}),
+    )
+    .unwrap();
+    let path = created["templatePath"].as_str().unwrap();
+    let absolute = to_absolute(&service.paths, path).unwrap();
+    let before = fs::read(&absolute).unwrap();
+    let mut corrupt = before.clone();
+    *corrupt.last_mut().unwrap() ^= 1;
+    for (name, bytes) in [
+        ("old.html", before.as_slice()),
+        ("fake.dtpl", b"<html>old template</html>".as_slice()),
+        ("json.dtpl", created["content"].as_str().unwrap().as_bytes()),
+        ("corrupt.dtpl", corrupt.as_slice()),
+    ] {
+        let result = upload(
+            &service,
+            &admin(),
+            UPLOAD_REPORT_TEMPLATE_FILE,
+            &[],
+            &json!({"reportType":"ExportDocument","templatePath":path,"expectedRevision":created["revision"]}),
+            name,
+            bytes,
+        );
+        assert_eq!(result.unwrap_err().status, Some(400), "{name}");
+        assert_eq!(fs::read(&absolute).unwrap(), before);
+    }
+    assert!(normalize_new(Path::new("invalid.html")).is_err());
     assert!(
-        fs::read_to_string(&target)
-            .unwrap()
-            .contains("ReportDocument")
+        report_templates::validate_content("ExportDocument", "<html>old template</html>").is_err()
+    );
+    let mut cross_domain: Value =
+        serde_json::from_str(created["content"].as_str().unwrap()).unwrap();
+    cross_domain["layers"][0]["elements"][0]["type"] = json!("Field");
+    cross_domain["layers"][0]["elements"][0]["fieldPath"] = json!("Payment.CNYAmount");
+    assert!(
+        report_templates::validate_content("ExportDocument", &cross_domain.to_string()).is_err()
+    );
+    assert!(
+        report_templates::validate_content("PaymentVoucher", created["content"].as_str().unwrap())
+            .is_err()
     );
 }
 
@@ -284,8 +432,8 @@ fn managed_file_template_can_be_cloned_into_an_editable_user_draft() {
             "expectedRevision":created["revision"],
             "displayName":"可复制源模板"
         }),
-        "clone-source.html",
-        source_content.as_bytes(),
+        "clone-source.dtpl",
+        &report_templates::stored_content("ExportDocument", &source_content).unwrap(),
     )
     .unwrap();
     let cloned = crate::engine::report_templates::handle(
@@ -372,8 +520,8 @@ fn file_transaction_restores_modified_and_created_templates_on_failure() {
     let paths = workspace.paths();
     let root = user_root(&paths);
     fs::create_dir_all(root.join(EXPORT_CATEGORY)).unwrap();
-    let modified = root.join(EXPORT_CATEGORY).join("modified.html");
-    let created = root.join(EXPORT_CATEGORY).join("created.html");
+    let modified = root.join(EXPORT_CATEGORY).join("modified.dtpl");
+    let created = root.join(EXPORT_CATEGORY).join("created.dtpl");
     fs::write(&modified, b"before").unwrap();
 
     let mut transaction = FileTransaction::new(&paths).unwrap();
@@ -415,10 +563,12 @@ fn non_v3_managed_template_clone_is_rejected_without_creating_a_draft() {
             "expectedRevision":created["revision"],
             "displayName":"旧格式源模板"
         }),
-        "legacy-source.html",
-        report_templates::starter::create("ExportDocument", "旧格式源模板")
-            .unwrap()
-            .as_bytes(),
+        "legacy-source.dtpl",
+        &report_templates::stored_content(
+            "ExportDocument",
+            &report_templates::starter::create("ExportDocument", "旧格式源模板").unwrap(),
+        )
+        .unwrap(),
     )
     .unwrap();
     let stored_path = uploaded["templatePath"].as_str().unwrap();

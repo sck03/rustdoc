@@ -81,23 +81,24 @@ jobs:
         run: node scripts/verify-native-desktop.mjs --target ${{ matrix.target }}
       - name: Build green desktop package
         shell: pwsh
-        run: ./scripts/build-native.ps1 -NoPause -RustTarget ${{ matrix.target }} -Bundles ${{ matrix.bundles }}
-      - name: Normalize package directory name
+        run: ./scripts/build-native.ps1 -NoPause -RustTarget ${{ matrix.target }} -Bundles '${{ matrix.bundles }}'
+      - name: Archive portable package and platform bundles
         shell: pwsh
         run: |
+          $extension = if ($IsWindows) { 'zip' } else { 'tar.gz' }
           $source = Join-Path $env:GITHUB_WORKSPACE 'artifacts/native-desktop/ExportDocManager.Tauri'
-          $target = Join-Path $env:GITHUB_WORKSPACE 'artifacts/native-desktop/exportdoc-native-desktop-${{ matrix.artifact }}'
-          Move-Item -LiteralPath $source -Destination $target -Force
+          ./scripts/lib/archive-native-release.ps1 -Source $source -Destination "artifacts/releases/exportdoc-desktop-${{ matrix.artifact }}.$extension"
+          ./scripts/lib/archive-native-release.ps1 -Source '.codex-runtime/cargo-target-native/${{ matrix.target }}/release/bundle' -Destination "artifacts/releases/exportdoc-installers-${{ matrix.artifact }}.$extension"
       - name: Upload green desktop package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: exportdoc-native-desktop-${{ matrix.artifact }}
-          path: artifacts/native-desktop/exportdoc-native-desktop-${{ matrix.artifact }}
+          path: artifacts/releases/exportdoc-desktop-${{ matrix.artifact }}.*
           if-no-files-found: error
 
       - name: Upload platform installers and application bundles
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: exportdoc-tauri-bundles-${{ matrix.artifact }}
-          path: .codex-runtime/cargo-target-native/${{ matrix.target }}/release/bundle/
+          path: artifacts/releases/exportdoc-installers-${{ matrix.artifact }}.*
           if-no-files-found: error

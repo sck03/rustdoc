@@ -75,6 +75,7 @@ mod supplier_overview;
 pub mod tasks;
 #[allow(dead_code)]
 mod team_backup;
+pub use team_backup::postgres::apply_pending as apply_pending_postgres_restore;
 mod workflows;
 mod worklist;
 
@@ -95,6 +96,7 @@ pub struct NativeService {
     jobs: tasks::Jobs,
     bootstrap_token: String,
     clock: crate::clock::BusinessClock,
+    license_gate: std::sync::Mutex<()>,
     packing_gate: std::sync::Mutex<()>,
     #[cfg(feature = "ocr")]
     ocr_gate: std::sync::Mutex<()>,
@@ -102,12 +104,22 @@ pub struct NativeService {
     exchange: export_doc_exchange::ExchangeRates,
 }
 impl NativeService {
+    pub(crate) fn authorize_operation(
+        &self,
+        actor: &Actor,
+        operation: Operation,
+        query: &[(&str, String)],
+    ) -> Result<()> {
+        auth::authorize_operation(actor, operation, query)?;
+        licensing::check_operation(self, operation)
+    }
     pub fn download_job(&self, job_id: &str, token: &str) -> Result<tasks::FileOutput> {
         let _access = self
             .maintenance
             .read()
             .map_err(|_| unavailable("数据库维护状态异常。"))?;
         let actor = self.sessions.actor(&self.store, token)?;
+        self.authorize_operation(&actor, DOWNLOAD_JOB_RESULT, &[])?;
         self.jobs.download(&actor, job_id)
     }
     pub fn provider(&self) -> Result<&'static str> {
@@ -127,7 +139,7 @@ impl NativeService {
             .read()
             .map_err(|_| unavailable("数据库维护状态异常。"))?;
         let actor = self.sessions.actor(&self.store, token)?;
-        auth::authorize_operation(&actor, operation, &[])?;
+        self.authorize_operation(&actor, operation, &[])?;
         let (document, _) = reports::preview_document(self, &actor, operation, parameters, body)?;
         export_doc_report::pdf_document(
             &document,
@@ -139,6 +151,13 @@ impl NativeService {
     pub fn session_actor(&self, token: &str) -> Result<Actor> {
         self.sessions.actor(&self.store, token)
     }
+    pub fn authorize_administrator(&self, token: &str) -> Result<()> {
+        auth::authorize(
+            &self.sessions.actor(&self.store, token)?,
+            "system.settings",
+            "manage",
+        )
+    }
     pub fn document_package_preview_pdf(
         &self,
         actor: &Actor,
@@ -149,6 +168,7 @@ impl NativeService {
             .maintenance
             .read()
             .map_err(|_| unavailable("数据库维护状态异常。"))?;
+        self.authorize_operation(actor, PREVIEW_INVOICE_DOCUMENT_PACKAGE_HTML, &[])?;
         document_packages::preview_pdf(self, actor, invoice_id, body)
     }
     pub fn download_report_resource(
@@ -161,8 +181,8 @@ impl NativeService {
             .read()
             .map_err(|_| unavailable("数据库维护状态异常。"))?;
         let actor = self.sessions.actor(&self.store, token)?;
-        auth::authorize_operation(&actor, DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE, &[])?;
-        report_assets::download(&self.store, &actor, parameters)
+        self.authorize_operation(&actor, DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE, &[])?;
+        report_assets::download(self, &actor, parameters)
     }
     /// Direct file downloads that are not backed by a persisted job result.
     pub fn download_file(
@@ -176,7 +196,7 @@ impl NativeService {
             .read()
             .map_err(|_| unavailable("数据库维护状态异常。"))?;
         let actor = self.sessions.actor(&self.store, token)?;
-        auth::authorize_operation(&actor, operation, &[])?;
+        self.authorize_operation(&actor, operation, &[])?;
         match operation {
             DOWNLOAD_REPORT_TEMPLATE_FILE | DOWNLOAD_REPORT_TEMPLATE_PACKAGE => {
                 report_template_files::download(self, &actor, operation, parameters)
@@ -202,7 +222,7 @@ impl NativeService {
             auth::bootstrap(
                 &self.store,
                 &records::text(request, "username"),
-                &records::text(request, "password"),
+                request["password"].as_str().unwrap_or(""),
                 &self.bootstrap_token,
                 bootstrap_token,
             )?;
@@ -258,7 +278,7 @@ impl NativeService {
                 &self.store,
                 &self.clock,
                 &records::text(&body_value, "username"),
-                &records::text(&body_value, "password"),
+                body_value["password"].as_str().unwrap_or(""),
             )?,
             GET_HEALTH | GET_LIVENESS | GET_READINESS => {
                 self.health()?;
@@ -270,7 +290,7 @@ impl NativeService {
             }
             _ => {
                 let actor = self.sessions.actor(&self.store, token)?;
-                auth::authorize_operation(&actor, operation, query)?;
+                self.authorize_operation(&actor, operation, query)?;
                 if operation == START_PDF_MERGE_SAVE_TO_PATH_JOB {
                     return serde_json::to_vec(&pdf_merge::local(self, &actor, &body_value)?)
                         .map_err(Into::into);
@@ -522,11 +542,11 @@ impl NativeService {
                     .map_err(Into::into);
                 }
                 if operation == DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE {
-                    return Ok(report_assets::download(&self.store, &actor, parameters)?.content);
+                    return Ok(report_assets::download(self, &actor, parameters)?.content);
                 }
                 if report_assets::OPERATIONS.contains(&operation) {
                     return serde_json::to_vec(&report_assets::handle(
-                        &self.store,
+                        self,
                         &actor,
                         operation,
                         parameters,

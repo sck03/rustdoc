@@ -1,12 +1,9 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { ApiReportTemplatePreviewResponse } from "../../api/index.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { hasValidReportDesignerV3Schema } from "../report-designer/reportDesignerV3TemplateParser.ts";
 import type { ReportDesignerPreviewSampleProfile } from "../report-designer/reportDesignerPreviewSamples.ts";
-import { formatReportTemplateSource } from "./reportTemplateFormatter.ts";
 import {
   normalizePreviewSampleProfile,
-  type DesignerMode,
   type ReportTypeOption,
   type TemplatePreviewMode,
   type TemplateWorkspaceMode,
@@ -16,29 +13,21 @@ type MessageType = "success" | "error" | null;
 
 export function useReportTemplateEditingActions({
   canDesignTemplates,
-  canFormatSource,
   canManageTemplates,
   canRenderTemplatePreview,
   content,
   currentUserTemplateCanEdit,
-  designerDraftContent,
-  designerDraftValid,
-  designerMode,
-  isLimitedReportView,
   isLocalSamplePreview,
   isUserTemplate,
   reportType,
   selectedTemplateContentActive,
   selectedTemplatePath,
   templatePreviewMode,
-  workspaceHasUnappliedDesignerChanges,
   renderInvoicePreview,
   renderPaymentPreview,
   renderSamplePreview,
   saveDefaultTemplateContent,
   saveUserTemplateContent,
-  setContent,
-  setDesignerMode,
   setMessage,
   setMessageType,
   setPreview,
@@ -47,29 +36,21 @@ export function useReportTemplateEditingActions({
   setWorkspaceMode,
 }: {
   canDesignTemplates: boolean;
-  canFormatSource: boolean;
   canManageTemplates: boolean;
   canRenderTemplatePreview: boolean;
   content: string;
   currentUserTemplateCanEdit: boolean;
-  designerDraftContent: string;
-  designerDraftValid: boolean;
-  designerMode: DesignerMode;
-  isLimitedReportView: boolean;
   isLocalSamplePreview: boolean;
   isUserTemplate: boolean;
   reportType: ReportTypeOption;
   selectedTemplateContentActive: boolean;
   selectedTemplatePath: string;
   templatePreviewMode: TemplatePreviewMode;
-  workspaceHasUnappliedDesignerChanges: boolean;
   renderInvoicePreview: () => void;
   renderPaymentPreview: () => void;
   renderSamplePreview: () => void;
   saveDefaultTemplateContent: (content: string) => void;
   saveUserTemplateContent: (content: string) => void;
-  setContent: (content: string) => void;
-  setDesignerMode: (mode: DesignerMode) => void;
   setMessage: Dispatch<SetStateAction<string | null>>;
   setMessageType: Dispatch<SetStateAction<MessageType>>;
   setPreview: Dispatch<SetStateAction<ApiReportTemplatePreviewResponse | null>>;
@@ -77,43 +58,13 @@ export function useReportTemplateEditingActions({
   setTemplatePreviewSampleProfile: Dispatch<SetStateAction<ReportDesignerPreviewSampleProfile>>;
   setWorkspaceMode: Dispatch<SetStateAction<TemplateWorkspaceMode>>;
 }) {
-  const requestConfirmation = useConfirmation();
-
   async function confirmStructuredTemplateOverwrite() {
-    if (!content.trim() || hasValidReportDesignerV3Schema(content)) {
+    if (hasValidReportDesignerV3Schema(content)) {
       return true;
     }
-
-    return requestConfirmation({
-      title: "转换为 V3 可视化模板",
-      description: "当前模板使用高级 HTML 运行时，适合复杂表格、合并单元格和精确分页。继续后会在内存中创建新的 A4 V3 草稿，原 HTML 只有在明确保存时才会被替换。",
-      details: ["如需保持原版式，请继续使用高级 HTML。", "建议在转换前导出模板包备份。"],
-      confirmLabel: "确认启用",
-    });
-  }
-
-  function handleDesignerModeChange(mode: DesignerMode) {
-    if (isLimitedReportView || (mode === "v3" && designerMode === "advancedHtml")) {
-      return;
-    }
-    // The header keeps the selected designer mode while preview is open. A
-    // second click on that same tab therefore needs to restore the workspace,
-    // rather than being treated as a no-op.
-    if (mode === designerMode) {
-      setWorkspaceMode("design");
-      return;
-    }
-    if (designerMode === "v3" && !designerDraftValid) {
-      setMessage("请先修正画布中的校验问题，再切换为高级 HTML。");
-      setMessageType("error");
-      return;
-    }
-    if (designerMode === "v3" && workspaceHasUnappliedDesignerChanges) {
-      setContent(designerDraftContent);
-      setPreview(null);
-    }
-    setWorkspaceMode("design");
-    setDesignerMode(mode);
+    setMessage("模板格式无效，不能保存。请重新加载或新建 .dtpl 模板。");
+    setMessageType("error");
+    return false;
   }
 
   async function handleSaveNewReportDesignerContent(nextContent: string) {
@@ -137,17 +88,6 @@ export function useReportTemplateEditingActions({
     } else {
       saveDefaultTemplateContent(nextContent);
     }
-  }
-
-  function handleFormatSource() {
-    if (!canFormatSource) {
-      return;
-    }
-
-    setContent(formatReportTemplateSource(content));
-    setPreview(null);
-    setMessage("高级 HTML 已格式化，保存后写入模板文件。");
-    setMessageType("success");
   }
 
   function handleTemplatePreviewModeChange(nextMode: TemplatePreviewMode) {
@@ -190,8 +130,6 @@ export function useReportTemplateEditingActions({
   }
 
   return {
-    handleDesignerModeChange,
-    handleFormatSource,
     handleRenderTemplatePreview,
     handleSaveNewReportDesignerContent,
     handleTemplatePreviewModeChange,

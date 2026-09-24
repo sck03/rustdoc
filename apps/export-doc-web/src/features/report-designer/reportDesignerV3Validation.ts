@@ -85,6 +85,8 @@ export function normalizeReportDesignerV3Schema(
     return { schema: null, issues };
   }
   validateBodyFlowOverlaps(layers, issues);
+  const hasProductFields = layers.some(layer => layer.elements.some(element => element.type === "Field" && element.fieldPath.startsWith("item.")));
+  if (hasProductFields && layers.some(layer => layer.elements.some(element => element.type === "Flow" && element.flowKind === "DetailTable"))) issues.push({ severity: "error", path: "$.layers", message: "自由商品字段与高级明细表不能混用，请选择一种商品排版方式。" });
 
   const resources = normalizeResources(input.resources, issues);
   if (resources === null) return { schema: null, issues };
@@ -98,6 +100,7 @@ export function normalizeReportDesignerV3Schema(
       page,
       layers,
       grid,
+      detailRowHeightHundredthMm: input.detailRowHeightHundredthMm === undefined ? undefined : readInteger(input.detailRowHeightHundredthMm, 1200, 400, 10000, "$.detailRowHeightHundredthMm", issues),
       contractVersion: normalizeMarker(input.contractVersion, REPORT_DESIGNER_V3_CONTRACT_VERSION, "$.contractVersion", issues),
       resources,
       release: normalizeRelease(input.release, issues),
@@ -297,6 +300,7 @@ function normalizeElement(
       case "Field": {
         const fieldPath = normalizeFieldPath(value.fieldPath, `${path}.fieldPath`, issues);
         validateReportTypeFieldPath(reportType, fieldPath, `${path}.fieldPath`, issues);
+        if (fieldPath.startsWith("item.") && (layerRole !== "Body" || base.rotationDeg !== 0)) issues.push({ severity: "error", path, message: "商品字段须放在主体区域，并保持不旋转。" });
         return {
           ...base,
           type: "Field",
@@ -426,7 +430,9 @@ function normalizeLayerPrint(
     issues.push({ severity: "warning", path: `${path}.pinToPageBottom`, message: "只有页脚图层支持贴底，已关闭该设置。" });
   }
   const minHeightHundredthMm = readInteger(value.minHeightHundredthMm, 0, 0, 26000, `${path}.minHeightHundredthMm`, issues);
-  return { repeatOnEveryPage: role === "Body" ? false : repeat, keepTogether, pinToPageBottom, minHeightHundredthMm };
+  return { repeatOnEveryPage: role === "Body" ? false : repeat, keepTogether, pinToPageBottom, minHeightHundredthMm,
+    followBody: role === "Footer" && !pinToPageBottom && value.followBody === true,
+    firstPageOnly: value.firstPageOnly === true };
 }
 
 function createLegacyV3LayerPrintDefaults() {

@@ -1,10 +1,7 @@
-import path from "node:path";
-
 export function createReportTemplateSmokeScene(runtime) {
   const {
     evaluate,
     redactDesktopAccessToken,
-    waitFor,
     waitForPageExpression,
     waitForRuntimeDiagnostics,
   } = runtime;
@@ -54,7 +51,7 @@ export function createReportTemplateSmokeScene(runtime) {
       );
       const loadedDesignerCheck = await waitForPageExpression(
         page,
-        `Boolean(document.querySelector(".new-report-designer")) && document.body && (document.body.innerText || "").includes("字段目录")`,
+        `Boolean(document.querySelector('.report-designer-v3-workspace [data-v3-element-id]'))`,
         timeoutMs,
         `Timed out waiting for structured report designer: ${check.reportType}/${check.templateFileName}`,
       );
@@ -65,7 +62,7 @@ export function createReportTemplateSmokeScene(runtime) {
         `Timed out waiting for report template debug readouts to be absent: ${check.reportType}/${check.templateFileName}`,
       );
       const previewWorkspaceCheck = await waitForReportTemplatePreviewWorkspaceCheck(page, timeoutMs);
-      const advancedHtmlFormatCheck = await waitForReportTemplateAdvancedHtmlFormatCheck(page, timeoutMs);
+      const singleFormatCheck = await waitForPageExpression(page, `!document.querySelector('textarea[aria-label="模板高级 HTML"]') && !Array.from(document.querySelectorAll('button')).some(button => button.textContent.includes('高级 HTML'))`, timeoutMs, 'Legacy HTML template controls must remain absent.');
 
       results.push({
         reportType: check.reportType,
@@ -76,7 +73,7 @@ export function createReportTemplateSmokeScene(runtime) {
         loadedDesignerCheck,
         debugReadoutRemovedCheck,
         previewWorkspaceCheck,
-        advancedHtmlFormatCheck,
+        singleFormatCheck,
       });
     }
 
@@ -138,85 +135,6 @@ export function createReportTemplateSmokeScene(runtime) {
     );
   }
 
-  async function waitForReportTemplateAdvancedHtmlFormatCheck(page, timeoutMs) {
-    await evaluate(
-      page,
-      `(() => {
-        const buttons = Array.from(document.querySelectorAll('button'));
-        const advancedHtmlTab = buttons.find((button) => (button.innerText || '').includes('高级 HTML'));
-        if (!advancedHtmlTab) {
-          throw new Error('Report template advanced HTML tab was not found.');
-        }
-
-        advancedHtmlTab.click();
-        window.__reportTemplateAdvancedHtmlFormatClicked = false;
-        delete window.__reportTemplateAdvancedHtmlFormatOriginal;
-        return true;
-      })()`,
-      true,
-    );
-
-    return waitFor(async () => {
-      const state = await evaluate(
-        page,
-        `(() => {
-          const textarea = document.querySelector('textarea[aria-label="模板高级 HTML"]');
-          if (!textarea) {
-            return null;
-          }
-
-          const setNativeValue = (control, value) => {
-            const prototype = Object.getPrototypeOf(control);
-            const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
-            if (descriptor && typeof descriptor.set === 'function') {
-              descriptor.set.call(control, value);
-            } else {
-              control.value = value;
-            }
-            control.focus();
-            control.dispatchEvent(new Event('input', { bubbles: true }));
-            control.dispatchEvent(new Event('change', { bubbles: true }));
-          };
-
-          if (typeof window.__reportTemplateAdvancedHtmlFormatOriginal !== 'string') {
-            window.__reportTemplateAdvancedHtmlFormatOriginal = textarea.value || '';
-          }
-
-          if (!window.__reportTemplateAdvancedHtmlFormatClicked) {
-            setNativeValue(textarea, '<div><span>{{\\n Invoice.InvoiceNo \\n}}</span></div>');
-            const buttons = Array.from(document.querySelectorAll('button'));
-            const formatButton = buttons.find((button) => (button.innerText || '').includes('格式化'));
-            if (!formatButton || formatButton.disabled) {
-              return null;
-            }
-
-            formatButton.click();
-            window.__reportTemplateAdvancedHtmlFormatClicked = true;
-            return null;
-          }
-
-          const formatted = textarea.value || '';
-          const expected = '<div>\\n  <span>{{ Invoice.InvoiceNo }}</span>\\n</div>';
-          if (!formatted.includes(expected)) {
-            return null;
-          }
-
-          setNativeValue(textarea, window.__reportTemplateAdvancedHtmlFormatOriginal || '');
-          return {
-            advancedHtmlTabVisible: true,
-            formatButtonFound: true,
-            formattedIncludesExpected: true,
-            expected,
-            formatted,
-            restoredOriginalDraft: true,
-          };
-        })()`,
-        true,
-      ).catch(() => ({ value: null }));
-
-      return state.value ?? null;
-    }, timeoutMs, () => "Timed out waiting for report template advanced HTML formatter check.");
-  }
 
   function buildReportTemplateCheckUrl(webUrl, check) {
     const url = new URL(webUrl);

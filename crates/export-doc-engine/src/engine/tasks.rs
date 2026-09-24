@@ -26,7 +26,9 @@ pub struct FileOutput {
     pub content: Vec<u8>,
 }
 
+mod managed_output;
 pub struct TaskOutput {
+    pub managed_file: Option<std::path::PathBuf>,
     pub file: Option<FileOutput>,
     pub detail: String,
     pub destination: Option<std::path::PathBuf>,
@@ -37,6 +39,15 @@ pub struct DirectoryOutput {
     pub files: Vec<FileOutput>,
 }
 impl TaskOutput {
+    pub fn managed_file(path: std::path::PathBuf, detail: String) -> Self {
+        Self {
+            file: None,
+            detail,
+            destination: None,
+            directory: None,
+            managed_file: Some(path),
+        }
+    }
     pub fn file(file_name: String, media_type: &str, content: Vec<u8>) -> Self {
         Self {
             file: Some(FileOutput {
@@ -47,6 +58,7 @@ impl TaskOutput {
             detail: "文件已生成，可下载或保存。".into(),
             destination: None,
             directory: None,
+            managed_file: None,
         }
     }
 }
@@ -197,6 +209,7 @@ impl Jobs {
                 detail: detail.into(),
                 destination: None,
                 directory: None,
+                managed_file: None,
             }),
         )?;
         retention::prune(&self.store, self.retention, chrono::Utc::now())?;

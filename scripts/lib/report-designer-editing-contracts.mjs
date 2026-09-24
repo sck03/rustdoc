@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 export function verifyDesignerEditingMutations(api) {
-  const schema = api.parseReportDesignerV3FromHtml("", "ExportDocument").schema;
+  const schema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
   schema.layers.forEach(layer => { layer.elements = []; });
   const overlay = schema.layers.find(layer => layer.role === "Overlay");
   const header = schema.layers.find(layer => layer.role === "Header");

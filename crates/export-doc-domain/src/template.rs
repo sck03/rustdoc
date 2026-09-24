@@ -26,6 +26,12 @@ fn safe_color(value: &str) -> bool {
 }
 
 pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
+    if design
+        .detail_row_height_hundredth_mm
+        .is_some_and(|height| !(400..=10000).contains(&height))
+    {
+        return Err("商品行距须在 4–100 mm 之间。".into());
+    }
     if design.version != 3
         || design.ast_kind != "ReportDocument"
         || design.coordinate_unit != "hundredth-mm"
@@ -50,6 +56,9 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
     let mut ids = std::collections::BTreeSet::new();
     let mut block_ids = std::collections::BTreeSet::new();
     for layer in &design.layers {
+        if layer.print.follow_body && (layer.role != "Footer" || layer.print.pin_to_page_bottom) {
+            return Err("跟随正文仅适用于不贴底的页脚。".into());
+        }
         if !matches!(
             layer.role.as_str(),
             "Header" | "Body" | "Footer" | "Overlay"
@@ -62,8 +71,8 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
             }
             if element.x_hundredth_mm < 0
                 || element.y_hundredth_mm < 0
-                || element.width_hundredth_mm < 100
-                || element.height_hundredth_mm < 100
+                || element.width_hundredth_mm < 400
+                || element.height_hundredth_mm < 400
                 || element.x_hundredth_mm + element.width_hundredth_mm > page.width_hundredth_mm
                 || element.y_hundredth_mm + element.height_hundredth_mm > page.height_hundredth_mm
             {
@@ -85,8 +94,12 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
             match &element.kind {
                 Kind::Field { field_path, .. } => {
                     expression(field_path, fields)?;
-                    if field_path.starts_with("item.") {
-                        return Err("商品字段只能放在明细表中。".into());
+                    if field_path.starts_with("item.")
+                        && (layer.role != "Body"
+                            || design.report_type != "ExportDocument"
+                            || element.rotation_deg != 0)
+                    {
+                        return Err("商品字段须放在主体区域，并保持不旋转。".into());
                     }
                 }
                 Kind::Text { text } if text.chars().count() > 32768 => {
@@ -116,8 +129,12 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
                     match source_kind.as_str() {
                         "Resource" if design.resources.iter().any(|r| r.id == *resource_id) => {}
                         "Field"
-                            if ["doc_seal_path", "customs_seal_path"]
-                                .contains(&field_path.as_str())
+                            if [
+                                "doc_seal_path",
+                                "customs_seal_path",
+                                "Invoice.ShippingMarks",
+                            ]
+                            .contains(&field_path.as_str())
                                 && design.report_type == "ExportDocument" => {}
                         _ => return Err("图片必须绑定已登记资源或出口商印章。".into()),
                     }
@@ -137,6 +154,7 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
             }
         }
     }
+    if detail_count > 0 && design.layers.iter().flat_map(|layer| &layer.elements).any(|element| matches!(&element.kind, Kind::Field { field_path, .. } if field_path.starts_with("item."))) { return Err("自由商品字段和高级明细表不能混用，请先选择一种排版方式。".into()); }
     if detail_count > 1 {
         return Err("当前模板只能包含一个可见的商品明细表。".into());
     }
@@ -303,6 +321,13 @@ fn validate_grid_row(
         return Err("V3 普通表格行设置无效。".into());
     }
     for cell in &row.cells {
+        if cell
+            .label_position
+            .as_deref()
+            .is_some_and(|v| !["Above", "Inline"].contains(&v))
+        {
+            return Err("单元格标签位置无效。".into());
+        }
         if cell.col_span < 1
             || cell.row_span < 1
             || !ids.insert(cell.id.clone())
@@ -316,7 +341,11 @@ fn validate_grid_row(
             validate_border(border)?;
         }
         if let Some(header) = &cell.diagonal_header
-            && (header.upper_left_text.chars().count() > 2048
+            && (header
+                .direction
+                .as_deref()
+                .is_some_and(|v| !["Up", "Down"].contains(&v))
+                || header.upper_left_text.chars().count() > 2048
                 || header.lower_right_text.chars().count() > 2048)
         {
             return Err("V3 普通表格斜线表头文字超过上限。".into());
@@ -433,7 +462,7 @@ fn validate_detail_table(
             }
         }
     }
-    if let Some(summary) = &table.summary_row {
+    for summary in [&table.intro_row, &table.summary_row].into_iter().flatten() {
         if summary.label_column_span < 1
             || summary.label_column_span as usize > table.columns.len()
             || summary.label.chars().count() > 200
@@ -487,9 +516,20 @@ fn validate_detail_column(column: &DetailColumn, fields: &[Field]) -> Result<(),
     if let Some(border) = &column.border {
         validate_border(border)?;
     }
+    let mut position = 0.;
     for part in &column.content {
-        if !["Text", "Field", "LineBreak"].contains(&part.kind.as_str()) {
+        if !["Text", "Field", "LineBreak", "ColumnBreak"].contains(&part.kind.as_str()) {
             return Err("明细单元格组合内容无效。".into());
+        }
+        if part.kind == "LineBreak" {
+            position = 0.;
+        }
+        if part.kind == "ColumnBreak" {
+            let next = part.position_percent.ok_or("请设置分栏位置。")?;
+            if !next.is_finite() || next <= position || next >= 100. {
+                return Err("分栏位置必须在 0—100% 之间，且同一行从左向右递增。".into());
+            }
+            position = next;
         }
         if part.kind == "Field" {
             expression(&part.field_path, fields)?;

@@ -27,6 +27,7 @@ pub(crate) fn create(kind: &str, title: &str) -> Result<String> {
             size_hundredth_mm: 500,
         },
         layers: vec![],
+        detail_row_height_hundredth_mm: None,
         resources: vec![],
         release: None,
         metadata: None,
@@ -47,6 +48,8 @@ pub(crate) fn create(kind: &str, title: &str) -> Result<String> {
                 repeat_on_every_page: matches!(role, "Header" | "Footer"),
                 keep_together: matches!(role, "Header" | "Footer"),
                 pin_to_page_bottom: role == "Footer",
+                follow_body: false,
+                first_page_only: false,
                 min_height_hundredth_mm: 0,
             },
             elements: vec![],
@@ -72,9 +75,5 @@ pub(crate) fn create(kind: &str, title: &str) -> Result<String> {
         },
         kind: Kind::Text { text: title.into() },
     });
-    template::export(
-        &design,
-        &crate::designer::field_catalog(&super::fields(kind)?),
-    )
-    .map_err(invalid)
+    serde_json::to_string_pretty(&design).map_err(Into::into)
 }

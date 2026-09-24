@@ -450,6 +450,60 @@
       "category": "明细备用列",
       "label": "备用 10 (item.Spare10)",
       "value": "{{ item.Spare10 }}"
+    },
+    {
+      "value": "{{ item.RowNumber }}",
+      "label": "商品序号",
+      "category": "商品明细",
+      "reportType": "ExportDocument"
+    },
+    {
+      "value": "{{ item.StyleNameCN }}",
+      "label": "中文品名",
+      "category": "商品明细",
+      "reportType": "ExportDocument"
+    },
+    {
+      "value": "{{ item.UnitCN }}",
+      "label": "中文单位",
+      "category": "商品明细",
+      "reportType": "ExportDocument"
+    },
+    {
+      "value": "{{ item.FabricComposition }}",
+      "label": "成分",
+      "category": "商品明细",
+      "reportType": "ExportDocument"
+    },
+    {
+      "value": "{{ item.Brand }}",
+      "label": "品牌",
+      "category": "商品明细",
+      "reportType": "ExportDocument"
+    },
+    {
+      "value": "{{ item.Origin }}",
+      "label": "境内货源地",
+      "category": "商品明细",
+      "reportType": "ExportDocument"
+    },
+    {
+      "value": "{{ total_by_qty_unit }}",
+      "label": "分单位数量合计",
+      "category": "其它字段",
+      "reportType": "ExportDocument"
+    },
+    {
+      "value": "{{ total_by_ctn_unit }}",
+      "label": "分单位箱数合计",
+      "category": "其它字段",
+      "reportType": "ExportDocument"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "其它字段",
+      "label": "箱数及数量分单位合计",
+      "value": "{{ total_cartons_and_quantity }}"
     }
   ]
 }

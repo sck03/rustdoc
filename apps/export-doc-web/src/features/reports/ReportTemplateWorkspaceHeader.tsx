@@ -1,28 +1,24 @@
-import { ArrowLeft, Code2, Eye, LayoutTemplate, Save } from "lucide-react";
-import { type DesignerMode, type TemplateWorkspaceMode } from "./reportTemplateDesignerModel.ts";
+import { ArrowLeft, Eye, LayoutTemplate, Save } from "lucide-react";
+import { type TemplateWorkspaceMode } from "./reportTemplateDesignerModel.ts";
 import { Button } from "../../ui/Button.tsx";
 
 export function ReportTemplateWorkspaceHeader({
   title,
-  designerMode,
   workspaceMode,
   canPreview,
   canSave,
   designDisabled,
-  v3Disabled,
   onBackToManagement,
-  onDesignerModeChange,
+  onDesign,
   onPreview,
 }: {
   title: string;
-  designerMode: DesignerMode;
   workspaceMode: TemplateWorkspaceMode;
   canPreview: boolean;
   canSave: boolean;
   designDisabled?: boolean;
-  v3Disabled?: boolean;
   onBackToManagement: () => void;
-  onDesignerModeChange: (mode: DesignerMode) => void;
+  onDesign: () => void;
   onPreview: () => void;
 }) {
   return (
@@ -38,36 +34,22 @@ export function ReportTemplateWorkspaceHeader({
         </div>
         <div className="toolbar-actions">
           <div
-            className={`segmented-control report-template-view-tabs ${designerMode === "advancedHtml" ? "has-advanced-html" : "v3-only"}`}
+            className="segmented-control report-template-view-tabs v3-only"
             role="tablist"
             aria-label="报表设计视图"
           >
             <button
-              className={workspaceMode === "design" && designerMode === "v3" ? "segmented-active" : ""}
+              className={workspaceMode === "design" ? "segmented-active" : ""}
               type="button"
               role="tab"
-              aria-selected={workspaceMode === "design" && designerMode === "v3"}
-              disabled={designDisabled || v3Disabled}
-              title={designDisabled ? "当前设备仅提供模板选择与预览，完整设计请使用桌面端" : v3Disabled ? "高级 HTML 模板保持独立运行，请使用高级 HTML 编辑" : undefined}
-              onClick={() => onDesignerModeChange("v3")}
+              aria-selected={workspaceMode === "design"}
+              disabled={designDisabled}
+              onClick={onDesign}
+              title={designDisabled ? "当前设备仅提供模板选择与预览，完整设计请使用桌面端" : undefined}
             >
               <LayoutTemplate size={16} aria-hidden="true" />
               <span>可视化设计</span>
             </button>
-            {designerMode === "advancedHtml" ? (
-              <button
-                className={workspaceMode === "design" ? "segmented-active" : ""}
-                type="button"
-                role="tab"
-                aria-selected={workspaceMode === "design"}
-                disabled={designDisabled}
-                title={designDisabled ? "高级 HTML 编辑请使用桌面端" : "适合复杂表格、合并单元格和精确分页"}
-                onClick={() => onDesignerModeChange("advancedHtml")}
-              >
-                <Code2 size={16} aria-hidden="true" />
-                <span>高级 HTML</span>
-              </button>
-            ) : null}
             <button
               className={workspaceMode === "preview" ? "segmented-active" : ""}
               type="button"

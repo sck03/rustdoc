@@ -1,11 +1,19 @@
 #[cfg(feature = "postgres")]
 mod postgres;
+#[cfg(feature = "postgres")]
+pub use postgres::tools::{
+    ClientParameters as PostgresClientParameters, MaintenanceLease as PostgresMaintenanceLease,
+    client_parameters as postgres_client_parameters,
+};
 mod sqlite;
 use serde_json::Value;
 use std::{cell::Cell, path::Path};
 
 pub type Result<T> = std::result::Result<T, Error>;
 pub const SCHEMA_VERSION: i64 = 4;
+pub fn verify_sqlite_backup(path: &Path) -> Result<()> {
+    sqlite::Sqlite::verify_file(path)
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
     Conflict,

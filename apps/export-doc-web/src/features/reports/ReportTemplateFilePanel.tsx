@@ -57,7 +57,7 @@ export function ReportTemplateFilePanel({
         <small>HTML 导入 / 导出</small>
       </summary>
       <div className="template-management-content template-package-content">
-        <p className="template-management-note">适合备份或交换当前选中的一个 HTML 模板；导入会覆盖当前模板内容。</p>
+        <p className="template-management-note">适合备份或交换当前选中的一个 .dtpl 模板；导入会覆盖当前模板内容。</p>
         <section className="template-management-section template-package-command-section" aria-label="导出单个模板文件">
           <div className="template-management-section-title"><strong>导出</strong></div>
           <button
@@ -79,7 +79,7 @@ export function ReportTemplateFilePanel({
             </button>
           ) : (
             <>
-              <input ref={uploadInputRef} type="file" accept=".dtpl,.html,application/octet-stream,text/html" hidden onChange={onUploadFileChange} />
+              <input ref={uploadInputRef} type="file" accept=".dtpl,application/vnd.exportdoc.dtpl,application/octet-stream" hidden onChange={onUploadFileChange} />
               <button className="command-button secondary" type="button" disabled={!canUpload} onClick={onUpload}>
                 <Upload size={17} aria-hidden="true" />
                 <span>上传文件</span>

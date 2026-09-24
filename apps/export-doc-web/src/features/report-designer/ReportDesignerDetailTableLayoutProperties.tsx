@@ -38,7 +38,7 @@ export function ReportDesignerDetailTableLayoutProperties({
             type="number"
             min={40}
             max={240}
-            step={1}
+            step="any"
             value={block.detailWidthMm ?? 132}
             onChange={(event) => onCommit({ ...block, detailWidthMm: normalizeNumber(event.target.value, block.detailWidthMm ?? 132) })}
           />
@@ -59,6 +59,7 @@ export function ReportDesignerDetailTableLayoutProperties({
             </button>
           </div>
         </div>
+        <DesignerCheckbox checked={block.rowSeparators !== false} onChange={checked => onCommit({ ...block, rowSeparators: checked })}>商品之间显示横线</DesignerCheckbox>
         <div className="new-report-property-readout">
           <span>列总宽</span>
           <strong>{detailColumnWidthTotal}mm / {block.columns.length} 列</strong>
@@ -158,6 +159,7 @@ export function ReportDesignerDetailTableLayoutProperties({
         </div>
         {block.sideBand ? (
           <div className="new-report-property-grid">
+            <DesignerCheckbox checked={block.sideBand.firstPageOnly === true} onChange={checked => onCommit({...block,sideBand:{...block.sideBand!,firstPageOnly:checked}})}>唛头内容仅首页显示</DesignerCheckbox>
             <label>
               <span>侧栏标题</span>
               <input
@@ -171,7 +173,7 @@ export function ReportDesignerDetailTableLayoutProperties({
                 type="number"
                 min={16}
                 max={120}
-                step={1}
+                step="any"
                 value={block.sideBand.widthMm}
                 onChange={(event) =>
                   onCommit({

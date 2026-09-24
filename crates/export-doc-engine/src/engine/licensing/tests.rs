@@ -1,4 +1,4 @@
-﻿#![allow(unused_imports, dead_code)]
+#![allow(unused_imports, dead_code)]
 
 use super::p256::*;
 use super::*;
@@ -117,6 +117,48 @@ fn fresh_installation_reports_an_active_trial() {
     assert!(status["daysRemaining"].as_i64().unwrap() > 0);
     assert_eq!(status["machineId"].as_str().unwrap().len(), 64);
     assert!(status["message"].as_str().unwrap().contains("试用期"));
+}
+#[test]
+fn expired_trial_blocks_business_but_keeps_license_management_available() {
+    let workspace = Workspace::new();
+    let service = open(&workspace);
+    let today = service.clock.now().unwrap().today;
+    let mut anchor = ensure_anchor(&service.store, &service.protector, today).unwrap();
+    anchor.install_date = (today - chrono::Duration::days(TRIAL_DAYS)).to_string();
+    write_anchor(&service.store, &service.protector, &anchor).unwrap();
+    assert!(check_operation(&service, GET_LICENSE_STATUS).is_ok());
+    assert!(
+        matches!(check_operation(&service, LIST_INVOICES), Err(cause) if cause.status == Some(403))
+    );
+    // Invalid stored licenses remain invalid on subsequent reads instead of reverting to trial.
+    anchor.install_date = today.to_string();
+    anchor.license_key = "invalid-signature".into();
+    write_anchor(&service.store, &service.protector, &anchor).unwrap();
+    for _ in 0..2 {
+        assert!(check_operation(&service, LIST_INVOICES).is_err());
+    }
+}
+#[test]
+fn registration_rejects_expired_keys_without_resetting_the_trial_clock() {
+    let workspace = Workspace::new();
+    let service = open(&workspace);
+    assert!(
+        register(
+            &service.store,
+            &service.protector,
+            &service.clock,
+            &TestVerifier,
+            &admin(),
+            "TEST-2000-01-01"
+        )
+        .is_err()
+    );
+    let today = service.clock.now().unwrap().today;
+    let anchor = ensure_anchor(&service.store, &service.protector, today).unwrap();
+    assert!(anchor.license_key.is_empty());
+    let first = machine_identity(&anchor, "PostgreSQL");
+    let second = machine_identity(&anchor, "PostgreSQL");
+    assert_eq!(first.machine_id, second.machine_id);
 }
 #[test]
 fn registration_persists_and_survives_reopening_the_data_root() {

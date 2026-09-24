@@ -8,8 +8,6 @@ import {
   type ReportDesignerV3Schema,
 } from "./reportDesignerV3Schema.ts";
 
-const schemaCommentPattern = /<!--\s*EXPORTDOC_REPORT_DESIGNER_SCHEMA\s*([\s\S]*?)\s*-->/i;
-
 export type ReportDesignerV3ParseResult = {
   schema: ReportDesignerV3Schema;
   migrated: boolean;
@@ -19,14 +17,14 @@ export type ReportDesignerV3ParseResult = {
 };
 
 export function hasReportDesignerV3Schema(content: string) {
-  return schemaCommentPattern.test(content);
+  return parseReportDesignerV3Json(content) !== null;
 }
 
 export function hasValidReportDesignerV3Schema(content: string) {
-  const match = content.match(schemaCommentPattern);
-  if (!match) return false;
+  const source = parseReportDesignerV3Json(content);
+  if (!source) return false;
   try {
-    const parsed = JSON.parse(match[1]) as unknown;
+    const parsed = JSON.parse(source) as unknown;
     if (!isRecordWithVersion(parsed, 3)) return false;
     const normalized = normalizeReportDesignerV3Schema(parsed);
     return normalized.schema !== null &&
@@ -37,28 +35,25 @@ export function hasValidReportDesignerV3Schema(content: string) {
 }
 
 /**
- * V3 is the only structured design format. Older templates stay on the
- * advanced HTML runtime until the user explicitly opts into a V3 replacement.
- * V2 comments are never interpreted or migrated automatically.
+ * `.dtpl` exposes the V3 JSON document directly. There is no HTML or V2
+ * compatibility parser in the visual designer.
  */
-export function parseReportDesignerV3FromHtml(
+export function parseReportDesignerV3Source(
   content: string,
   reportType: ReportDesignerReportType,
 ): ReportDesignerV3ParseResult {
-  const match = content.match(schemaCommentPattern);
-  if (!match) {
-    const inferredOrientation = inferTemplateOrientation(content);
-    const replacement = createReplacementDraft(reportType, false, [
-      { severity: "warning", path: "$", message: "当前模板使用高级 HTML 运行时，适合复杂表格、合并单元格和精确分页；确认后才会创建新的 V3 A4 编辑草稿。" },
+  if (!content.trim()) {
+    return { schema: createEmptyReportDesignerV3Schema(reportType), migrated: false, hadSchema: false, sourceVersion: 3, issues: [] };
+  }
+  const source = parseReportDesignerV3Json(content);
+  if (!source) {
+    return createReplacementDraft(reportType, false, [
+      { severity: "error", path: "$", message: "模板必须是统一 .dtpl V3 JSON；旧 HTML、V2 或损坏内容不受支持。" },
     ]);
-    replacement.schema.page.orientation = inferredOrientation ?? "Portrait";
-    replacement.schema.page.widthHundredthMm = inferredOrientation === "Landscape" ? 29700 : 21000;
-    replacement.schema.page.heightHundredthMm = inferredOrientation === "Landscape" ? 21000 : 29700;
-    return replacement;
   }
 
   try {
-    const parsed = JSON.parse(match[1]) as unknown;
+    const parsed = JSON.parse(source) as unknown;
     if (isRecordWithVersion(parsed, 3)) {
       const normalized = normalizeReportDesignerV3Schema(parsed, reportType);
       if (normalized.schema) {
@@ -78,7 +73,7 @@ export function parseReportDesignerV3FromHtml(
     }
 
     return createReplacementDraft(reportType, true, [
-      { severity: "error", path: "$.version", message: "模板包含已移除的 V2 或未知设计结构；请继续使用高级 HTML，或确认创建新的 V3 A4 模板。" },
+      { severity: "error", path: "$.version", message: "模板必须使用 version: 3 的 .dtpl V3 结构；V2 和 HTML 不受支持。" },
     ]);
   } catch {
     const replacement = createReplacementDraft(reportType, true, [
@@ -89,9 +84,15 @@ export function parseReportDesignerV3FromHtml(
   }
 }
 
-function inferTemplateOrientation(content: string): "Portrait" | "Landscape" | null {
-  const pageRule = content.match(/@page\s*\{[^}]*\bsize\s*:\s*A4\s+(portrait|landscape)\b/i);
-  return pageRule?.[1]?.toLowerCase() === "landscape" ? "Landscape" : pageRule ? "Portrait" : null;
+function parseReportDesignerV3Json(content: string) {
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    return isRecordWithVersion(parsed, 3) ? trimmed : null;
+  } catch {
+    return null;
+  }
 }
 
 function createReplacementDraft(
@@ -101,7 +102,7 @@ function createReplacementDraft(
 ): ReportDesignerV3ParseResult {
   return {
     schema: createEmptyReportDesignerV3Schema(reportType),
-    migrated: true,
+    migrated: false,
     hadSchema,
     sourceVersion: null,
     issues,

@@ -191,10 +191,10 @@ export function createPageBreakBlock(): ReportBlock {
 
 export function createDetailTableBlock(): ReportBlock {
   const columns = [
-    createDetailTableColumn("Product", "Invoice.Items.StyleName", 72, "Left"),
-    createDetailTableColumn("Quantity", "Invoice.Items.Quantity", 24, "Right"),
-    createDetailTableColumn("Unit Price", "Invoice.Items.UnitPrice", 28, "Right"),
-    createDetailTableColumn("Amount", "Invoice.Items.TotalPrice", 30, "Right"),
+    createDetailTableColumn("Product", "item.StyleName", 72, "Left"),
+    createDetailTableColumn("Quantity", "item.Quantity", 24, "Right"),
+    createDetailTableColumn("Unit Price", "item.UnitPrice", 28, "Right"),
+    createDetailTableColumn("Amount", "item.TotalPrice", 30, "Right"),
   ];
 
   return {
@@ -272,7 +272,7 @@ export function createDetailTableSideBand() {
 }
 
 export function createDetailTableGrouping(
-  fieldPath = "Invoice.Items.StyleName",
+  fieldPath = "item.StyleName",
   label = "Group",
 ): ReportDetailTableGrouping {
   return {
@@ -338,7 +338,7 @@ export function createRowColumn(
 
 export function createDetailTableColumn(
   title = "Column",
-  fieldPath = "Invoice.Items.StyleName",
+  fieldPath = "item.StyleName",
   widthMm = 30,
   align: "Left" | "Center" | "Right" = "Left",
 ) {
@@ -353,12 +353,13 @@ export function createDetailTableColumn(
   };
 }
 
-export function createDetailTableCellContent(kind: "Text" | "Field" | "LineBreak" = "Field"): ReportDetailTableCellContent {
+export function createDetailTableCellContent(kind: ReportDetailTableCellContent["kind"] = "Field"): ReportDetailTableCellContent {
   return {
     id: createReportBlockId("detail-cell-part"),
     kind,
     text: kind === "Text" ? "Text" : "",
-    fieldPath: kind === "Field" ? "Invoice.Items.StyleName" : "",
+    fieldPath: kind === "Field" ? "item.StyleName" : "",
+    ...(kind === "ColumnBreak" ? { positionPercent: 50 } : {}),
   };
 }
 

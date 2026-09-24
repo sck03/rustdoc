@@ -116,13 +116,33 @@ pub(super) fn render(svg: &mut String, element: &Element, data: &ReportData) -> 
                         &cell.content_kind,
                         &cell.text,
                         &cell.field_path,
-                        &cell.label,
+                        if cell.label_position.as_deref() == Some("Above") {
+                            ""
+                        } else {
+                            &cell.label
+                        },
                         &cell.fallback_text,
                     )
                 };
+                let value =
+                    if cell.label_position.as_deref() == Some("Above") && !cell.label.is_empty() {
+                        format!("{}\n{value}", cell.label)
+                    } else {
+                        value
+                    };
                 let style = inherit(&cell.style, &block.default_cell_style);
                 let border = Some(cell.border.as_ref().unwrap_or(&block.border));
-                if let Some(header) = &cell.diagonal_header {
+                if cell.content_kind == "CheckboxGroup" {
+                    checkbox_group(
+                        &mut content,
+                        &cell.checkbox_options,
+                        &data.text(&cell.field_path),
+                        rect,
+                        &style,
+                        border,
+                        element,
+                    )?;
+                } else if let Some(header) = &cell.diagonal_header {
                     diagonal_header(&mut content, header, rect, &style, border, element)?;
                 } else {
                     box_content(
@@ -297,6 +317,58 @@ fn box_content(
     Ok(())
 }
 
+fn checkbox_group(
+    svg: &mut String,
+    options: &[export_doc_domain::designer::GridCheckboxOption],
+    selected: &str,
+    rect: [f32; 4],
+    style: &ReportTextStyle,
+    border: Option<&ReportBorderStyle>,
+    element: &Element,
+) -> Result<()> {
+    let [x, y, width, height] = rect;
+    if let Some(border) = border {
+        draw_border(svg, rect, border);
+    }
+    let size = style.font_size_pt.unwrap_or(element.style.font_size_pt) * PT_MM;
+    let bold = style.bold.unwrap_or(element.style.bold);
+    let widths: Vec<_> = options
+        .iter()
+        .map(|option| {
+            super::measure(&element.style.font_family, bold, &option.label, size) + size + 4.
+        })
+        .collect();
+    let total: f32 = widths.iter().sum();
+    if total > width - 2. || size + 2. > height {
+        return Err(invalid("勾选项超出单元格空间，请增大列宽或缩小字号。"));
+    }
+    let mut cursor = match style.align.as_deref().unwrap_or("Left") {
+        "Center" => x + (width - total) / 2.,
+        "Right" => x + width - total - 1.,
+        _ => x + 1.,
+    };
+    let top = y + (height - size) / 2.;
+    for (option, slot) in options.iter().zip(widths) {
+        svg.push_str(&format!("<rect x=\"{cursor}\" y=\"{top}\" width=\"{size}\" height=\"{size}\" fill=\"none\" stroke=\"{}\" stroke-width=\"0.18\"/>", escape(&element.style.color)));
+        if selected == option.value {
+            svg.push_str(&format!("<path d=\"M {} {} l {} {} l {} {}\" fill=\"none\" stroke=\"{}\" stroke-width=\"0.3\"/>",cursor+size*0.15,top+size*0.5,size*0.25,size*0.25,size*0.5,-size*0.6,escape(&element.style.color)));
+        }
+        text_svg(
+            svg,
+            &[option.label.clone()],
+            cursor + size + 1.,
+            top,
+            slot - size - 1.,
+            size,
+            bold,
+            &element.style.color,
+            "Left",
+        );
+        cursor += slot;
+    }
+    Ok(())
+}
+
 fn diagonal_header(
     svg: &mut String,
     header: &GridDiagonalHeader,
@@ -315,10 +387,12 @@ fn diagonal_header(
     let stroke = border
         .map(|value| (value.width_px * 25.4 / 96.).max(0.2))
         .unwrap_or(0.2);
+    let descending = header.direction.as_deref() == Some("Down");
     svg.push_str(&format!(
-        "<line x1=\"{x}\" y1=\"{}\" x2=\"{}\" y2=\"{y}\" stroke=\"{}\" stroke-width=\"{stroke}\"/>",
-        y + height,
+        "<line x1=\"{x}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"{}\" stroke-width=\"{stroke}\"/>",
+        if descending { y } else { y + height },
         x + width,
+        if descending { y + height } else { y },
         escape(border_color)
     ));
     let left = style.margin_left_mm.unwrap_or(1.2);
@@ -358,7 +432,7 @@ fn diagonal_header(
         size,
         bold,
         &element.style.color,
-        "Left",
+        if descending { "Right" } else { "Left" },
     );
     text_svg(
         svg,
@@ -369,12 +443,12 @@ fn diagonal_header(
         size,
         bold,
         &element.style.color,
-        "Right",
+        if descending { "Left" } else { "Right" },
     );
     Ok(())
 }
 
-fn draw_border(svg: &mut String, [x, y, w, h]: [f32; 4], border: &ReportBorderStyle) {
+pub(super) fn draw_border(svg: &mut String, [x, y, w, h]: [f32; 4], border: &ReportBorderStyle) {
     if border.width_px <= 0. || border.style == "None" {
         return;
     }

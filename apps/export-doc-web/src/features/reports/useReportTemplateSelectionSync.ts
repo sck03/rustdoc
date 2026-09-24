@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useEffect } from "react";
+import { Dispatch, SetStateAction, useEffect, useRef } from "react";
 import {
   ApiReportTemplateContentDto,
   ApiReportTemplateDto,
@@ -6,6 +6,7 @@ import {
 } from "../../api/index.ts";
 import {
   matchesTemplatePath,
+  matchesTemplateFileName,
   readPreferredPreviewSampleProfile,
   readUserTemplateIdFromKey,
   resolveDefaultTemplatePath,
@@ -69,6 +70,7 @@ export function useReportTemplateSelectionSync({
   onUserTemplateLoaded: (template: ApiUserReportTemplateDto) => void;
   onDefaultTemplateLoaded: (template: ApiReportTemplateContentDto) => void;
 }) {
+  const appliedRequest = useRef("");
   useEffect(() => {
     if (requestedReportType && availableReportTypeOptions.some((option) => option.value === requestedReportType)) {
       setReportType((current) => (current === requestedReportType ? current : requestedReportType));
@@ -106,17 +108,23 @@ export function useReportTemplateSelectionSync({
       return;
     }
 
-    setSelectedTemplatePath((current) =>
-      resolveDefaultTemplatePath({
+    const requestKey = `${requestedReportType ?? ""}|${requestedTemplateFileName}|${requestedUserTemplateId}`;
+    const requestChanged = appliedRequest.current !== requestKey;
+    if (requestChanged && requestedReportType && requestedReportType !== reportType) return;
+    appliedRequest.current = requestKey;
+    if (requestChanged) setSelectedUserTemplateId(requestedUserTemplateId);
+    setSelectedTemplatePath((current) => {
+      if (current && (!requestChanged || matchesTemplateFileName(current, requestedTemplateFileName))) return current;
+      return resolveDefaultTemplatePath({
         templates,
         reportType,
         requestedTemplateFileName,
         configuredTemplatePath,
-        currentTemplatePath: current,
-        userTemplateSelected: selectedUserTemplateId > 0,
-      }),
-    );
-  }, [configuredTemplatePath, preserveSelection, reportType, requestedTemplateFileName, selectedUserTemplateId, setSelectedTemplatePath, templates, templatesLoaded]);
+        currentTemplatePath: requestChanged ? "" : current,
+        userTemplateSelected: (requestChanged ? requestedUserTemplateId : selectedUserTemplateId) > 0,
+      });
+    });
+  }, [configuredTemplatePath, preserveSelection, reportType, requestedReportType, requestedTemplateFileName, requestedUserTemplateId, selectedUserTemplateId, setSelectedTemplatePath, setSelectedUserTemplateId, templates, templatesLoaded]);
 
   useEffect(() => {
     if (!templatesLoaded || selectedUserTemplateId > 0) {
@@ -130,14 +138,6 @@ export function useReportTemplateSelectionSync({
       setSelectedUserTemplateId(targetId);
     }
   }, [configuredTemplatePath, selectedTemplatePath, selectedUserTemplateId, setSelectedUserTemplateId, templatesLoaded]);
-
-  useEffect(() => {
-    if (requestedUserTemplateId <= 0 || preserveSelection) {
-      return;
-    }
-
-    setSelectedUserTemplateId(requestedUserTemplateId);
-  }, [preserveSelection, requestedUserTemplateId, setSelectedUserTemplateId]);
 
   useEffect(() => {
     if (selectedUserTemplateId <= 0 || userTemplateContent?.id !== selectedUserTemplateId) {

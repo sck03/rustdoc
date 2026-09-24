@@ -267,7 +267,10 @@ fn collect_image(
     let id = reference
         .strip_prefix(prefix)
         .ok_or_else(|| invalid("单据图片不是受管资源。"))?;
-    assets.insert(field.into(), report_assets::read(tx, actor, id)?.bytes);
+    assets.insert(
+        field.into(),
+        report_assets::read(tx, actor, id, None)?.bytes,
+    );
     Ok(())
 }
 fn export(service: &NativeService, actor: &Actor, id: i64) -> Result<Vec<u8>> {

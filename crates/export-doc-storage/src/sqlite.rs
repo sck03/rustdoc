@@ -30,6 +30,12 @@ impl From<rusqlite::Error> for Error {
     }
 }
 impl Sqlite {
+    pub fn verify_file(path: &Path) -> Result<()> {
+        Self::validate(&SqliteConnection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?)
+    }
     pub fn open(path: &Path) -> Result<Self> {
         let fresh = !path.exists();
         let connection = SqliteConnection::open(path)?;

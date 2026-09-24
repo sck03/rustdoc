@@ -6,7 +6,7 @@ use super::{
     error::{Result, error, invalid, unavailable},
     records::text,
     report_assets,
-    store::{self, Actor, Store},
+    store::{self, Actor},
 };
 use crate::{
     designer::{Design, field_catalog},
@@ -46,7 +46,7 @@ fn query<'a>(values: &'a [(&str, String)], name: &str) -> &'a str {
         .map(|(_, value)| value.as_str())
         .unwrap_or("")
 }
-fn demand_type(actor: &Actor, kind: &str) -> Result<()> {
+pub(super) fn demand_type(actor: &Actor, kind: &str) -> Result<()> {
     auth::authorize(
         actor,
         if report_type(kind)? == "PaymentVoucher" {
@@ -66,25 +66,43 @@ pub fn fields(kind: &str) -> Result<ApiReportTemplateFieldCatalogResponse> {
     .map_err(Into::into)
 }
 pub fn validate_content(kind: &str, content: &str) -> Result<Design> {
-    validate_bytes(kind, content.as_bytes())
+    if content.is_empty() || content.len() > 10 * 1024 * 1024 {
+        return Err(invalid("报表模板内容不能为空或超过 10 MiB。"));
+    }
+    let design = Design::from_source(content)
+        .map_err(|message| invalid(format!("仅支持统一 V3 JSON 模板：{message}")))?;
+    validate_design(kind, design)
 }
 
 pub fn validate_bytes(kind: &str, content: &[u8]) -> Result<Design> {
     if content.is_empty() || content.len() > 10 * 1024 * 1024 {
         return Err(invalid("报表模板内容不能为空或超过 10 MiB。"));
     }
-    let design = export_doc_domain::report_template_format::decode(content)
-        .or_else(|_| {
-            std::str::from_utf8(content)
-                .map_err(|_| "报表模板文本编码无效。".to_string())
-                .and_then(Design::from_html)
-        })
-        .map_err(invalid)?;
+    let design = export_doc_domain::report_template_format::decode(content).map_err(invalid)?;
+    validate_design(kind, design)
+}
+
+fn validate_design(kind: &str, design: Design) -> Result<Design> {
     if design.report_type != report_type(kind)? {
         return Err(invalid("模板与单据的数据域不一致。"));
     }
     template::validate(&design, &field_catalog(&fields(kind)?)).map_err(invalid)?;
     Ok(design)
+}
+
+/// API content is the editable V3 JSON document. Managed `.dtpl` files stay a
+/// binary container on disk and are decoded at this boundary.
+pub fn editable_content(kind: &str, content: &[u8]) -> Result<String> {
+    let design = validate_bytes(kind, content)?;
+    serde_json::to_string_pretty(&design).map_err(Into::into)
+}
+
+/// Converts API-supplied V3 text back to the managed `.dtpl` container without
+/// changing the shared OpenAPI response shape.
+pub fn stored_content(kind: &str, content: &str) -> Result<Vec<u8>> {
+    let design = validate_content(kind, content)?;
+    export_doc_domain::report_template_format::encode(&design)
+        .map_err(|message| invalid(format!("模板容器编码失败:{message}")))
 }
 
 fn record(actor: &Actor, value: &Value, content: bool) -> Value {
@@ -177,6 +195,7 @@ pub fn handle(
         versions.sort_by_key(|v| std::cmp::Reverse(v["versionNumber"].as_i64().unwrap_or(0)));
         return Ok(store::paged(versions, query_values));
     }
+    let _access = super::report_template_files::storage_lock(&service.paths)?;
     let saved = if [
         CREATE_USER_REPORT_TEMPLATE,
         SAVE_USER_REPORT_TEMPLATE_DRAFT,
@@ -186,7 +205,7 @@ pub fn handle(
     {
         mutations::save(service, actor, operation, parameters, body)?
     } else {
-        mutations::lifecycle(store, actor, operation, parameters, query_values, body)?
+        mutations::lifecycle(service, actor, operation, parameters, query_values, body)?
     };
     Ok(record(actor, &saved, true))
 }

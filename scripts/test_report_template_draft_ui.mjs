@@ -15,17 +15,18 @@ fs.mkdirSync(output, { recursive: true });
 const source = name => JSON.stringify(path.join(web, "src", name).split(path.sep).join("/"));
 const setup = `
 import {ApiError} from ${source("api/index.ts")};
-import {parseReportDesignerV3FromHtml} from ${source("features/report-designer/reportDesignerV3TemplateParser.ts")};
+import {parseReportDesignerV3Source} from ${source("features/report-designer/reportDesignerV3TemplateParser.ts")};
 import {exportReportDesignerV3SchemaToHtml} from ${source("features/report-designer/reportDesignerV3HtmlExporter.ts")};
 import {createV3TextElement} from ${source("features/report-designer/reportDesignerV3ElementFactories.ts")};
 const scenario=new URLSearchParams(location.search).get('scenario');
-if(scenario==='v3'){
- const schema=parseReportDesignerV3FromHtml('','ExportDocument').schema;
+const designContent = text => {
+ const schema=parseReportDesignerV3Source('','ExportDocument').schema;
  schema.layers.forEach(layer=>layer.elements=[]);
- schema.layers.find(layer=>layer.role==='Body').elements.push({...createV3TextElement(1000,4000),text:'BASELINE CANVAS'});
- userTemplates[0]={...userTemplates[0],contentHtml:exportReportDesignerV3SchemaToHtml(schema,'ExportDocument')};
-}
-let file={...templates[0],content:'<html><body>File baseline</body></html>',revision:'file-1',storagePolicy:''};
+ schema.layers.find(layer=>layer.role==='Body').elements.push({...createV3TextElement(1000,4000),id:'baseline-text',text});
+ return JSON.stringify(schema);
+};
+userTemplates[0]={...userTemplates[0],contentHtml:designContent(scenario==='v3'?'BASELINE CANVAS':'Shared template')};
+let file={...templates[0],content:designContent(scenario==='dtpl'?'DTPL CANVAS':'File baseline'),revision:scenario==='dtpl'?'dtpl-1':'file-1',storagePolicy:''};
 client.getReportTemplateFieldCatalog=()=>call('fields',{}, {reportType:'ExportDocument',categoryOrder:[],fields:[]});
 client.listUserReportTemplates=input=>window.__failReload?Promise.reject(new Error('reload unavailable')):call('userTemplates',input,page(userTemplates.map(({contentHtml,...item})=>item),input));
 client.getUserReportTemplate=input=>window.__failReload?Promise.reject(new Error('reload unavailable')):window.__missingTemplate?Promise.reject(new ApiError(404,'Not Found','模板已删除')):call('userTemplateContent',input,exact(userTemplates,input.id));
@@ -44,8 +45,8 @@ client.saveReportTemplateContent=input=>{
  return Promise.resolve(structuredClone(file));
 };
 window.__remoteRefresh=async()=>{
- userTemplates[0]={...userTemplates[0],contentHtml:'<html><body>REMOTE VERSION</body></html>',versionNumber:2};
- file={...file,content:'<html><body>REMOTE FILE</body></html>',revision:'file-2'};
+ userTemplates[0]={...userTemplates[0],contentHtml:designContent('REMOTE VERSION'),versionNumber:2};
+ file={...file,content:designContent('REMOTE FILE'),revision:'file-2'};
  await queries.refetchQueries();
 };
 window.__remoteRemove=async()=>{
@@ -65,7 +66,7 @@ const server = http.createServer((request, response) => {
 });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 let chrome, cdp, page;
-const results = [], editor = 'textarea[aria-label="模板高级 HTML"]';
+const results = [], editor = '[data-v3-element-id="baseline-text"]';
 const saveEnabled = "[...document.querySelectorAll('.report-template-layout button[type=submit]')].some(node=>!node.disabled)";
 const read = async expression => (await evaluate(page, expression, true)).value;
 async function waitFor(expression) {
@@ -83,6 +84,14 @@ async function click(text, selector = "button") {
 async function input(selector, value) {
   await read(`(()=>{const node=document.querySelector(${JSON.stringify(selector)});const proto=node instanceof HTMLSelectElement?HTMLSelectElement.prototype:HTMLTextAreaElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(node,${JSON.stringify(value)});node.dispatchEvent(new Event('input',{bubbles:true}));node.dispatchEvent(new Event('change',{bubbles:true}));})()`);
 }
+async function editText(value) {
+ await read(`document.querySelector(${JSON.stringify(editor)}).dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`);
+ const selector='textarea[aria-label="在画布编辑文字"]';
+ await waitFor(`document.querySelector(${JSON.stringify(selector)})`);
+ await input(selector,value);
+ await read(`document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',ctrlKey:true,bubbles:true}))`);
+ await settle();
+}
 async function open(scenario, file = false) {
   if (page) await cdp.send("Target.closeTarget", { targetId: page.targetId });
   page = await createPageSession(cdp);
@@ -94,21 +103,21 @@ async function record(name) { assert.deepEqual(await read("window.__errors"), []
 try {
   chrome = await startChrome({ browserExecutable: locateChromeForTesting(repo, "headless-shell"), userDataDir: path.join(output, "browser-profile"), timeoutMs: 30000 });
   cdp = await CdpClient.connect(chrome.browserWebSocketUrl);
-  await open("classic"); await waitFor(`document.querySelector(${JSON.stringify(editor)})?.value.includes('Shared template')`);
+  await open("classic"); await waitFor(`document.querySelector(${JSON.stringify(editor)})?.textContent.includes('Shared template')`);
   assert.equal(await read(saveEnabled), false); await record("database-template-first-load");
-  await input(editor, "<html><body>LOCAL DRAFT</body></html>"); await waitFor(saveEnabled);
+  await editText("LOCAL DRAFT"); await waitFor(saveEnabled);
   await read("window.__remoteRefresh()"); await settle();
-  assert((await read(`document.querySelector(${JSON.stringify(editor)}).value`)).includes("LOCAL DRAFT")); await record("query-refresh-retains-draft");
+  assert((await read(`document.querySelector(${JSON.stringify(editor)}).textContent`)).includes("LOCAL DRAFT")); await record("query-refresh-retains-draft");
   await click("保存"); await waitFor("document.body.innerText.includes('模板版本冲突')");
   assert.equal(await read("window.__calls.find(call=>call.name==='saveUser').input.body.expectedVersion"), 1);
-  assert((await read(`document.querySelector(${JSON.stringify(editor)}).value`)).includes("LOCAL DRAFT")); await record("save-uses-loaded-version-and-keeps-conflict-draft");
+  assert((await read(`document.querySelector(${JSON.stringify(editor)}).textContent`)).includes("LOCAL DRAFT")); await record("save-uses-loaded-version-and-keeps-conflict-draft");
   await click("重新加载"); await waitFor("document.querySelector('.confirmation-dialog')"); await click("取消", ".confirmation-dialog button");
-  assert((await read(`document.querySelector(${JSON.stringify(editor)}).value`)).includes("LOCAL DRAFT")); await record("cancel-reload-retains-draft");
+  assert((await read(`document.querySelector(${JSON.stringify(editor)}).textContent`)).includes("LOCAL DRAFT")); await record("cancel-reload-retains-draft");
   await read("window.__failReload=true"); await click("重新加载"); await waitFor("document.querySelector('.confirmation-dialog')"); await click("刷新报表模板", ".confirmation-dialog button"); await settle();
-  assert((await read(`document.querySelector(${JSON.stringify(editor)}).value`)).includes("LOCAL DRAFT")); await record("failed-reload-retains-draft");
+  assert((await read(`document.querySelector(${JSON.stringify(editor)}).textContent`)).includes("LOCAL DRAFT")); await record("failed-reload-retains-draft");
   await read("window.__failReload=false"); await click("重新加载"); await waitFor("document.querySelector('.confirmation-dialog')"); await click("刷新报表模板", ".confirmation-dialog button"); await settle();
-  assert((await read(`document.querySelector(${JSON.stringify(editor)}).value`)).includes("REMOTE VERSION")); assert.equal(await read(saveEnabled), false); await record("confirmed-reload-adopts-new-baseline");
-  await input(editor, "<html><body>NEW LOCAL DRAFT</body></html>"); await waitFor(saveEnabled); await click("保存"); await settle();
+  assert((await read(`document.querySelector(${JSON.stringify(editor)}).textContent`)).includes("REMOTE VERSION")); assert.equal(await read(saveEnabled), false); await record("confirmed-reload-adopts-new-baseline");
+  await editText("NEW LOCAL DRAFT"); await waitFor(saveEnabled); await click("保存"); await settle();
   assert.equal(await read("window.__calls.filter(call=>call.name==='saveUser').at(-1).input.body.expectedVersion"), 2); assert.equal(await read(saveEnabled), false); await record("save-after-reload");
 
   await open("v3"); await waitFor("document.querySelector('[data-v3-element-id]')");
@@ -125,6 +134,11 @@ try {
   await record("pending-save-prevents-further-canvas-edits");
   await read("window.__pauseSave=false;window.__finishSave()"); await waitFor("document.body.innerText.includes('模板版本冲突')");
   assert.equal(await read("document.querySelectorAll('[data-v3-element-id]').length"), count); assert.equal(await read(saveEnabled), true); await record("failed-save-retains-canvas");
+  await open("dtpl", true); await waitFor("document.querySelector('[data-v3-element-id]')");
+  assert.equal(await read("document.querySelectorAll('[data-v3-element-id]').length"), 1);
+  assert((await read("document.body.innerText")).includes("DTPL CANVAS"));
+  assert.equal(await read('document.querySelector(".report-template-editor textarea")'), null);
+  await record("dtpl-v3-json-opens-in-visual-designer");
   await read('document.querySelector(".report-designer-v3-toolbar button[aria-label=图片]").click()'); await waitFor("document.querySelector('.report-designer-v3-image-editor select')");
   await input(".report-designer-v3-image-editor select", "Field"); await waitFor("document.querySelectorAll('.report-designer-v3-image-editor select').length===2");
   await input(".report-designer-v3-image-editor label:nth-child(2) select", ""); await waitFor(`!(${saveEnabled})`);
@@ -133,16 +147,16 @@ try {
   await captureScreenshot(page, path.join(output, "invalid-draft-preserved.png"));
   await click("返回模板管理"); await waitFor("document.querySelector('.confirmation-dialog')"); await click("返回模板管理", ".confirmation-dialog button"); await waitFor("window.__route.startsWith('/reports/templates/manage')"); await record("confirmed-leave-discards-invalid-draft");
 
-  await open("file", true); await waitFor(`document.querySelector(${JSON.stringify(editor)})?.value.includes('File baseline')`);
-  await input(editor, "<html><body>LOCAL FILE DRAFT</body></html>"); await waitFor(saveEnabled); await read("window.__remoteRefresh()"); await settle();
+  await open("file", true); await waitFor(`document.querySelector(${JSON.stringify(editor)})?.textContent.includes('File baseline')`);
+  await editText("LOCAL FILE DRAFT"); await waitFor(saveEnabled); await read("window.__remoteRefresh()"); await settle();
   await click("保存"); await waitFor("document.body.innerText.includes('文件版本冲突')");
   assert.equal(await read("window.__calls.find(call=>call.name==='saveFile').input.body.expectedRevision"), "file-1");
-  assert((await read(`document.querySelector(${JSON.stringify(editor)}).value`)).includes("LOCAL FILE DRAFT")); await record("file-refresh-and-conflict-retain-draft-and-revision");
+  assert((await read(`document.querySelector(${JSON.stringify(editor)}).textContent`)).includes("LOCAL FILE DRAFT")); await record("file-refresh-and-conflict-retain-draft-and-revision");
   for (const fileTemplate of [false, true]) {
     await open("classic", fileTemplate); await waitFor(`document.querySelector(${JSON.stringify(editor)})`);
-    await input(editor, "<html><body>DELETED REMOTELY, LOCAL DRAFT RETAINED</body></html>"); await waitFor(saveEnabled);
+    await editText("DELETED REMOTELY, LOCAL DRAFT RETAINED"); await waitFor(saveEnabled);
     await read("window.__remoteRemove()"); await settle();
-    assert((await read(`document.querySelector(${JSON.stringify(editor)})?.value`))?.includes("LOCAL DRAFT RETAINED"));
+    assert((await read(`document.querySelector(${JSON.stringify(editor)})?.textContent`))?.includes("LOCAL DRAFT RETAINED"));
     if (!fileTemplate) assert.equal(await read(saveEnabled), false);
     await click("返回模板管理"); await waitFor("document.querySelector('.confirmation-dialog')"); await click("取消", ".confirmation-dialog button");
     await record(fileTemplate ? "missing-file-keeps-draft-and-leave-guard" : "missing-database-template-keeps-draft-and-leave-guard");

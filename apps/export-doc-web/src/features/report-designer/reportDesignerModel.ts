@@ -152,7 +152,7 @@ export function collectReportDesignerBlockFieldBindings(block: ReportBlock): Rep
         ...(block.grouping?.footer?.cells ?? [])
           .filter((cell) => cell.contentKind === "Sum")
           .map((cell) => ({ label: "分组小计", fieldPath: cell.fieldPath })),
-        ...(block.summaryRow?.cells ?? [])
+        ...[...(block.summaryRow?.cells ?? []), ...(block.introRow?.cells ?? [])]
           .filter((cell) => cell.contentKind === "Field")
           .map((cell) => ({ label: "表尾合计", fieldPath: cell.fieldPath })),
       ]);

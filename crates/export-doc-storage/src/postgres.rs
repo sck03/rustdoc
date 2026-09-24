@@ -1,4 +1,5 @@
 use super::*;
+pub(super) mod tools;
 use ::postgres::{Client, Config};
 use postgres_native_tls::MakeTlsConnector;
 use serde_json::json;

@@ -151,7 +151,7 @@ impl NativeService {
             .read()
             .map_err(|_| unavailable("数据库维护状态异常。"))?;
         let actor = self.sessions.actor(&self.store, token)?;
-        auth::authorize_operation(&actor, UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB, &[])?;
+        self.authorize_operation(&actor, UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB, &[])?;
         pdf_merge::upload(self, &actor, files)
     }
     pub fn upload(
@@ -168,7 +168,7 @@ impl NativeService {
             .read()
             .map_err(|_| unavailable("数据库维护状态异常。"))?;
         let actor = self.sessions.actor(&self.store, token)?;
-        auth::authorize_operation(&actor, operation, &[])?;
+        self.authorize_operation(&actor, operation, &[])?;
         #[cfg(feature = "invoice-transfer")]
         if invoice_transfer::UPLOADS.contains(&operation) {
             return invoice_transfer::upload(

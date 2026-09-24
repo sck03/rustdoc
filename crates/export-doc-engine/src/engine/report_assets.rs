@@ -1,10 +1,12 @@
 //! Owned report resources, shipping marks and seals. Metadata and bytes share
 //! the business transaction, so backups and restores retain the same images.
+mod references;
 use super::{
     auth,
     error::{Result, conflict, error, invalid, unavailable},
     media,
     records::text,
+    report_template_files,
     store::{self, Actor, Connection, Store},
     tasks::FileOutput,
 };
@@ -12,6 +14,7 @@ use crate::generated_api::*;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use export_doc_report::{RasterImage, ReportData};
 use export_doc_storage::BlobWrite;
+use references::References;
 use serde_json::{Value, json};
 
 const KIND: &str = "report-images";
@@ -49,9 +52,7 @@ fn resource_id(value: &str) -> Result<&str> {
 }
 fn find(tx: &Connection, id: &str) -> Result<Value> {
     resource_id(id)?;
-    tx.all(KIND)?
-        .into_iter()
-        .find(|v| v["resourceId"] == id)
+    tx.find_identity(KIND, id)?
         .ok_or_else(|| error(404, "图片资源不存在。"))
 }
 fn owns(actor: &Actor, resource: &Value) -> bool {
@@ -60,42 +61,8 @@ fn owns(actor: &Actor, resource: &Value) -> bool {
         .is_some_and(|v| v.iter().any(|id| id.as_i64() == Some(actor.id)))
 }
 pub(super) fn template_visible(actor: &Actor, template: &Value) -> bool {
-    auth::template_visible(actor, "document.report-templates", template)
-}
-fn contains(value: &Value, id: &str) -> Result<bool> {
-    match value {
-        Value::String(v) => Ok(v == id
-            || v == &format!("Files/ShippingMarks/{id}")
-            || v == &format!("Files/Seals/{id}")),
-        Value::Array(v) => {
-            for value in v {
-                if contains(value, id)? {
-                    return Ok(true);
-                }
-            }
-            Ok(false)
-        }
-        Value::Object(v) => {
-            for (key, value) in v {
-                let found = if key == "contentHtml" {
-                    let root = schema(
-                        value
-                            .as_str()
-                            .ok_or_else(|| unavailable("模板资源索引损坏。"))?,
-                    )
-                    .map_err(|_| unavailable("模板资源索引损坏，已停止图片回收。"))?;
-                    contains(&root, id)?
-                } else {
-                    contains(value, id)?
-                };
-                if found {
-                    return Ok(true);
-                }
-            }
-            Ok(false)
-        }
-        _ => Ok(false),
-    }
+    super::report_templates::demand_type(actor, &text(template, "reportType")).is_ok()
+        && auth::template_visible(actor, "document.report-templates", template)
 }
 fn schema(content: &str) -> Result<Value> {
     schema_bytes(content.as_bytes())
@@ -105,54 +72,22 @@ fn schema_bytes(content: &[u8]) -> Result<Value> {
         return serde_json::to_value(design).map_err(|_| invalid("报表模板结构无效。"));
     }
     let content = std::str::from_utf8(content).map_err(|_| invalid("报表模板文本编码无效。"))?;
-    let value = content
-        .split_once(crate::designer::SCHEMA_MARKER)
-        .and_then(|(_, v)| v.split_once("-->"))
-        .map(|(v, _)| v)
-        .ok_or_else(|| invalid("模板缺少 V3 结构。"))?;
-    serde_json::from_str(value).map_err(|_| invalid("报表模板结构无效。"))
+    if let Ok(design) = export_doc_domain::designer::Design::from_source(content) {
+        return serde_json::to_value(design).map_err(|_| invalid("报表模板结构无效。"));
+    }
+    Err(invalid("模板必须是统一 .dtpl V3 结构。"))
 }
-fn referenced(tx: &Connection, id: &str) -> Result<bool> {
-    for kind in [
-        "invoices",
-        "exporters",
-        "report-templates",
-        "template-versions",
-        "report-files",
-    ] {
-        for value in tx.all(kind)? {
-            if contains(&value, id)? {
-                return Ok(true);
-            }
-        }
-    }
-    Ok(false)
-}
-fn readable(tx: &Connection, actor: &Actor, resource: &Value) -> Result<bool> {
-    if actor.admin || owns(actor, resource) {
-        return Ok(true);
-    }
-    let id = text(resource, "resourceId");
-    for template in tx.all("report-templates")? {
-        if template_visible(actor, &template) && contains(&template, &id)? {
-            return Ok(true);
-        }
-    }
-    for (kind, permission) in [
-        ("invoices", "document.invoices"),
-        ("exporters", "document.master-data"),
-    ] {
-        for record in tx.all(kind)? {
-            if auth::visible(actor, permission, "view", &record) && contains(&record, &id)? {
-                return Ok(true);
-            }
-        }
-    }
-    Ok(false)
-}
-pub(super) fn read(tx: &Connection, actor: &Actor, id: &str) -> Result<RasterImage> {
+pub(super) fn read(
+    tx: &Connection,
+    actor: &Actor,
+    id: &str,
+    paths: Option<&crate::paths::RuntimePaths>,
+) -> Result<RasterImage> {
     let entry = find(tx, id)?;
-    if !readable(tx, actor, &entry)? {
+    if !actor.admin
+        && !owns(actor, &entry)
+        && !References::load(tx, actor, paths)?.readable.contains(id)
+    {
         return Err(error(403, "没有读取此图片的权限。"));
     }
     read_entry(tx, &entry)
@@ -285,13 +220,14 @@ pub fn upload(
 }
 
 pub fn handle(
-    store: &Store,
+    service: &super::NativeService,
     actor: &Actor,
     operation: Operation,
     parameters: &[(&str, String)],
     query: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
+    let store = &service.store;
     match operation {
         SAVE_SHIPPING_MARK_IMAGE => {
             if auth::authorize(actor, "document.invoices", "edit").is_err() {
@@ -323,32 +259,39 @@ pub fn handle(
             auth::authorize(actor, "document.invoices", "view")?;
             let path = text(body, "imagePath");
             let id = stored_id(&path, "Files/ShippingMarks/")?;
-            let image = read(&*store.connection()?, actor, id)?;
+            let image = read(&*store.connection()?, actor, id, None)?;
             Ok(
                 json!({"imagePath":path,"fileName":id,"contentType":image.media_type,"sizeBytes":image.bytes.len(),"dataUrl":image.data_url()?,"storagePolicy":"受控唛头预览"}),
             )
         }
         QUERY_REPORT_TEMPLATE_V3_IMAGE_RESOURCES => {
+            let _access = report_template_files::storage_lock(&service.paths)?;
             let tx = store.connection()?;
+            let references = References::load(&tx, actor, Some(&service.paths))?;
             let mut items = vec![];
             for entry in tx.all(KIND)? {
-                if !readable(&tx, actor, &entry)? {
+                let id = text(&entry, "resourceId");
+                let own = owns(actor, &entry);
+                if !actor.admin && !own && !references.readable.contains(&id) {
                     continue;
                 }
-                let is_referenced = referenced(&tx, &text(&entry, "resourceId"))?;
-                let own = owns(actor, &entry);
+                let is_referenced = references.all.contains(&id);
                 items.push(json!({"id":entry["resourceId"],"mediaType":entry["mediaType"],"byteLength":entry["byteLength"],"sha256":entry["sha256"],"ownsUpload":own,"isReferenced":is_referenced,"canRecycle":(actor.admin||own)&&!is_referenced}));
             }
             Ok(store::paged(items, query))
         }
         RECYCLE_REPORT_TEMPLATE_V3_IMAGE_RESOURCE => {
             let id = parameter_id(parameters)?;
+            let _access = report_template_files::storage_lock(&service.paths)?;
             store.transaction(|tx| {
                 let mut entry = find(tx, id)?;
                 if !actor.admin && !owns(actor, &entry) {
                     return Err(error(403, "只能回收自己上传的图片。"));
                 }
-                if referenced(tx, id)? {
+                if References::load(tx, actor, Some(&service.paths))?
+                    .all
+                    .contains(id)
+                {
                     return Err(conflict(
                         "图片仍被单据、印章、模板或模板历史引用，不能回收。",
                     ));
@@ -393,9 +336,19 @@ fn stored_id<'a>(path: &'a str, prefix: &str) -> Result<&'a str> {
             .ok_or_else(|| invalid("只允许使用受控图片引用。"))?,
     )
 }
-pub fn download(store: &Store, actor: &Actor, parameters: &[(&str, String)]) -> Result<FileOutput> {
+pub fn download(
+    service: &super::NativeService,
+    actor: &Actor,
+    parameters: &[(&str, String)],
+) -> Result<FileOutput> {
     let id = parameter_id(parameters)?;
-    let image = read(&*store.connection()?, actor, id)?;
+    let _access = report_template_files::storage_lock(&service.paths)?;
+    let image = read(
+        &*service.store.connection()?,
+        actor,
+        id,
+        Some(&service.paths),
+    )?;
     Ok(FileOutput {
         file_name: id.into(),
         media_type: image.media_type,
@@ -412,25 +365,36 @@ pub fn validate_invoice(tx: &Connection, actor: &Actor, value: &mut Value) -> Re
         "Image" => {
             let path = text(value, "shippingMarksImage");
             let id = stored_id(&path, "Files/ShippingMarks/")?;
-            read(tx, actor, id)?;
+            read(tx, actor, id, None)?;
             value["shippingMarks"] = json!("");
         }
         _ => return Err(invalid("唛头类型只能是文字或图片。")),
     }
     Ok(())
 }
+pub fn validate_exporter(tx: &Connection, actor: &Actor, value: &Value) -> Result<()> {
+    for field in ["docSealPath", "customsSealPath"] {
+        let path = text(value, field);
+        if !path.is_empty() {
+            read(tx, actor, stored_id(&path, "Files/Seals/")?, None)?;
+        }
+    }
+    Ok(())
+}
 pub fn hydrate(
     store: &Store,
+    paths: &crate::paths::RuntimePaths,
     actor: &Actor,
     data: &mut ReportData,
     content: Option<&[u8]>,
 ) -> Result<()> {
+    let _access = report_template_files::storage_lock(paths)?;
     let tx = store.connection()?;
     if data.text("Invoice.ShippingMarksType") == "Image" {
         let reference = data.text("Invoice.ShippingMarksImage");
         let id = stored_id(&reference, "Files/ShippingMarks/")?;
         data.images
-            .insert("Invoice.ShippingMarks".into(), read(&tx, actor, id)?);
+            .insert("Invoice.ShippingMarks".into(), read(&tx, actor, id, None)?);
     }
     if data.root["ShowSeal"] == true {
         for (source, field) in [
@@ -440,37 +404,56 @@ pub fn hydrate(
             let path = data.text(source);
             if !path.is_empty() {
                 let id = stored_id(&path, "Files/Seals/")?;
-                data.images.insert(field.into(), read(&tx, actor, id)?);
+                data.images
+                    .insert(field.into(), read(&tx, actor, id, None)?);
             }
         }
     }
     if let Some(content) = content {
-        let schema = schema_bytes(content)?;
-        for resource in schema["resources"].as_array().into_iter().flatten() {
-            let id = text(resource, "id");
-            let image = read(&tx, actor, &id)?;
-            if resource["sha256"] != media::digest(&image.bytes)
-                || resource["byteLength"].as_u64() != Some(image.bytes.len() as u64)
-                || resource["mediaType"] != image.media_type
-            {
-                return Err(invalid("模板图片清单与受控资源不一致。"));
-            }
+        template_images(&tx, actor, content, Some(paths), |id, image| {
             data.images.insert(id, image);
-        }
+        })?;
     }
     Ok(())
 }
-pub fn validate_template(tx: &Connection, actor: &Actor, content: &str) -> Result<()> {
-    let schema = schema(content)?;
+pub fn validate_template(
+    tx: &Connection,
+    actor: &Actor,
+    content: &str,
+    paths: Option<&crate::paths::RuntimePaths>,
+) -> Result<()> {
+    template_images(tx, actor, content.as_bytes(), paths, |_, _| {})
+}
+
+fn template_images(
+    tx: &Connection,
+    actor: &Actor,
+    content: &[u8],
+    paths: Option<&crate::paths::RuntimePaths>,
+    mut consume: impl FnMut(String, RasterImage),
+) -> Result<()> {
+    let schema = schema_bytes(content)?;
+    let mut references = None;
     for resource in schema["resources"].as_array().into_iter().flatten() {
+        crate::operation::check()?;
         let id = text(resource, "id");
-        let image = read(tx, actor, &id)?;
+        let entry = find(tx, &id)?;
+        if !actor.admin && !owns(actor, &entry) {
+            if references.is_none() {
+                references = Some(References::load(tx, actor, paths)?);
+            }
+            if !references.as_ref().unwrap().readable.contains(&id) {
+                return Err(error(403, "没有读取此图片的权限。"));
+            }
+        }
+        let image = read_entry(tx, &entry)?;
         if resource["sha256"] != media::digest(&image.bytes)
             || resource["byteLength"].as_u64() != Some(image.bytes.len() as u64)
             || resource["mediaType"] != image.media_type
         {
             return Err(invalid("模板图片清单与受控资源不一致。"));
         }
+        consume(id, image);
     }
     Ok(())
 }

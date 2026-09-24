@@ -7,17 +7,12 @@ pub fn download(
     parameters: &[(&str, String)],
 ) -> Result<FileOutput> {
     if operation == DOWNLOAD_REPORT_TEMPLATE_FILE {
+        let _access = storage_lock(&service.paths)?;
         let kind = report_templates::report_type(&parameter(parameters, "reportType"))?;
         demand_type(actor, kind)?;
         auth::authorize(actor, PERMISSION, "export")?;
         let resolved =
             resolve_editable(service, kind, &parameter(parameters, "templatePath"), true)?;
-        let extension = resolved
-            .path
-            .extension()
-            .and_then(|value| value.to_str())
-            .unwrap_or(REPORT_TEMPLATE_EXTENSION_NAME);
-        let is_html = extension == HTML_EXTENSION_NAME;
         let file_name = resolved
             .path
             .file_name()
@@ -25,21 +20,16 @@ pub fn download(
             .unwrap_or("");
         return Ok(FileOutput {
             file_name: if file_name.is_empty() {
-                format!("template.{}", if is_html { "html" } else { "dtpl" })
+                "template.dtpl".into()
             } else {
                 file_name.into()
             },
-            media_type: if is_html {
-                "text/html; charset=utf-8"
-            } else {
-                "application/json"
-            }
-            .into(),
+            media_type: "application/vnd.exportdoc.dtpl".into(),
             content: fs::read(&resolved.path)?,
         });
     }
     auth::authorize(actor, PERMISSION, "export")?;
-    let (bytes, _) = package_bytes(service)?;
+    let (bytes, _) = package_bytes(service, actor)?;
     Ok(FileOutput {
         file_name: format!(
             "templates_{}{}.edtpl",
@@ -63,10 +53,10 @@ fn upload_template_name(file_name: &str) -> Result<String> {
             Path::new(&name)
                 .extension()
                 .and_then(|value| value.to_str()),
-            Some(REPORT_TEMPLATE_EXTENSION_NAME) | Some(HTML_EXTENSION_NAME)
+            Some(REPORT_TEMPLATE_EXTENSION_NAME)
         )
     {
-        return Err(invalid("报表模板文件只支持小写 .dtpl 或 .html 扩展名。"));
+        return Err(invalid("报表模板文件只支持小写 .dtpl 扩展名。"));
     }
     Ok(name)
 }
@@ -127,15 +117,15 @@ pub fn upload(
         let _ = fs::remove_file(&temporary);
         return result;
     }
-    let _ = upload_template_name(file_name)?;
+    upload_template_name(file_name)?;
     let kind = report_templates::report_type(&upload_value(parameters, metadata, "reportType"))?;
     demand_type(actor, kind)?;
     auth::authorize(actor, PERMISSION, "import")?;
     if content.is_empty() {
         return Err(invalid("模板文件不能为空。"));
     }
-    let content = utf8_template(content)?;
-    save_template_content(
+    let content = report_templates::editable_content(kind, content)?;
+    replace_template_content(
         service,
         actor,
         kind,

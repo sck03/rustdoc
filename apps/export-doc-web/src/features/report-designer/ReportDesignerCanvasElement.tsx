@@ -22,8 +22,7 @@ export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCa
     case "Field":
       return (
         <span className="report-designer-v3-preview-field">
-          {element.label ? `${element.label}: ` : ""}
-          {isShippingMarksField(element.fieldPath) ? shippingMarksPreviewText : `{{ ${element.fieldPath || "字段"} }}`}
+          {isShippingMarksField(element.fieldPath) ? shippingMarksPreviewText : element.label || `{{ ${element.fieldPath || "字段"} }}`}
         </span>
       );
     case "Image":

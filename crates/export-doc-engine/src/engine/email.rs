@@ -473,6 +473,7 @@ fn document_email(
                     count
                 ),
                 directory: None,
+                managed_file: None,
             })
         },
     )

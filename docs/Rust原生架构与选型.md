@@ -25,11 +25,11 @@ Tauri 是桌面宿主；浏览器与 Docker 不运行 Tauri 窗口。Node 只用
 - `export-doc-storage`：SQLite／PostgreSQL 18、事务、版本、单实例锁与持久化。
 - Excel、报表、邮件、汇率、HS、AI、单一窗口分别使用现有独立 crate；同一功能不复制另一套实现。
 
-2026-09-20 用户确认报表继续使用 **krilla + PDFium** 联动：`export-doc-report` 负责模型、排版和 krilla PDF 编码，隔离的 PDFium worker 负责已有 PDF 的预览、文字提取、OCR 页图及合并。完整 V3 和高级 HTML 的模板语义/原生布局在上游补齐，不通过更换 PDF 库代替。当前原生包版本及逐项差距见[《Rust 与 C# 后端功能差距及修正方案》](./Rust与CSharp后端功能差距及修正方案.md)；封装/原生包升级单独验证和治理。
+2026-09-20 用户确认报表继续使用 **krilla + PDFium** 联动：`export-doc-report` 负责统一 V3 模型、排版和 krilla PDF 编码，隔离的 PDFium worker 负责已有 PDF 的预览、文字提取、OCR 页图及合并。HTML/Scriban 不作为报表模板运行时。当前原生包版本及逐项差距见[《Rust 与 C# 后端功能差距及修正方案》](./Rust与CSharp后端功能差距及修正方案.md)；封装/原生包升级单独验证和治理。
 
 当前已使用 `pdfium-render 0.9.4`，启用 `pdfium_7881 + image_025`，原生包仍为 `152.0.7961`。手写 C ABI 比较保留为历史，不再描述为当前实现；封装加载、原生包组合与各平台运行仍需独立验收，见[《PDFium 跨平台绑定与验收方案》](./PDFium跨平台绑定与验收方案.md)。
 
-2026-09-21 用户选择统一 V3 轻量原生模板路线。六份默认 HTML 按原版字段/布局逐份转成可编辑 V3，预览与 PDF 共用 Rust 排版；不建设任意 HTML/CSS/Scriban 原生解释器。当前六份仍使用专用 Builtin 布局，尚未完成转换。五份用户 PDF 的版式检查与通用能力缺口见[《Rust统一V3模板与原版PDF验收方案》](./Rust统一V3模板与原版PDF验收方案.md)。
+2026-09-21 选择轻量原生路线，2026-09-23 收口为唯一 `.dtpl` 模板格式。六份默认模板按原版字段/布局生成可编辑结构化文档，预览与 PDF 共用 Rust 排版；不建设任意 HTML/CSS/Scriban 原生解释器。文件模板 API 返回可编辑 JSON，磁盘保持带校验的二进制容器，React 可视化设计器可直接打开。内部 schema 版本仍为 3，产品界面不附版本号。`export-doc-report` 的 Builtin 读取同一套 `.dtpl` 资产，没有另一套硬编码票面；默认引用也指向这些文件。六份匿名 PDF 已生成并检查，客户数据逐页签字与跨平台打印仍须独立验收，见[《模板与原版 PDF 验收方案》](./Rust统一V3模板与原版PDF验收方案.md)。
 
 模板字体固定使用已随包的 Noto Sans CJK SC Regular/Bold 与 Noto Serif CJK SC Regular，清单及哈希由 `Resources/Fonts/OpenSource/font-manifest.json` 管理。三文件均为 SIL OFL 1.1，允许商业使用、随包分发与 PDF 嵌入；字体替换后校准原版布局，不将参考 PDF 中的微软雅黑/其它字体作为新依赖。需要加粗时使用已有 Sans Bold。
 

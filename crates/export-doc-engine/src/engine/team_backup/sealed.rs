@@ -12,7 +12,7 @@ use pbkdf2::pbkdf2_hmac_array;
 use sha2::Sha256;
 use std::{
     fs,
-    io::Write,
+    io::{Read, Write},
     path::{Path, PathBuf},
 };
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
@@ -20,7 +20,7 @@ use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 const PBKDF2_ITERATIONS: u32 = 200_000;
 const SALT_LENGTH: usize = 32;
 const NONCE_LENGTH: usize = 12;
-const MAX_PLAINTEXT_BYTES: usize = 8 * 1024 * 1024 * 1024;
+pub(super) const MAX_PLAINTEXT_BYTES: usize = 256 * 1024 * 1024;
 
 /// 一个待密封的文件条目：磁盘路径 + 包内相对路径。
 pub(super) struct Entry<'a> {
@@ -31,10 +31,18 @@ pub(super) struct Entry<'a> {
 /// 生成 zip 负载。条目顺序与清单顺序一致，调用方负责写清单。
 pub(super) fn zip_payload(entries: &[Entry<'_>]) -> Result<Vec<u8>> {
     let mut writer = ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let mut total = 0usize;
     for entry in entries {
+        crate::operation::check()?;
+        crate::paths::ensure_safe_absolute(entry.source).map_err(invalid)?;
+        let size = fs::metadata(entry.source)?.len();
+        total = total
+            .checked_add(usize::try_from(size).map_err(|_| invalid("包容量超限。"))?)
+            .filter(|n| *n <= MAX_PLAINTEXT_BYTES)
+            .ok_or_else(|| invalid("包内容超过 256 MiB 上限。"))?;
         let bytes = fs::read(entry.source)?;
         if bytes.len() > MAX_PLAINTEXT_BYTES {
-            return Err(invalid("包内容超过 8 GiB 明文上限。"));
+            return Err(invalid("包内容超过 256 MiB 明文上限。"));
         }
         writer
             .start_file(
@@ -55,12 +63,17 @@ pub(super) fn zip_payload(entries: &[Entry<'_>]) -> Result<Vec<u8>> {
 /// 派生密钥并密封负载。返回magic || salt || nonce || ciphertext。
 pub(super) fn seal(magic: &[u8], password: &str, payload: &[u8]) -> Result<Vec<u8>> {
     if payload.len() > MAX_PLAINTEXT_BYTES {
-        return Err(invalid("包内容超过 8 GiB 明文上限。"));
+        return Err(invalid("包内容超过 256 MiB 明文上限。"));
     }
     let mut salt = vec![0u8; SALT_LENGTH];
     getrandom::fill(&mut salt).map_err(|_| unavailable("无法生成包随机盐。"))?;
-    let key = pbkdf2_hmac_array::<Sha256, 32>(password.as_bytes(), &salt, PBKDF2_ITERATIONS);
-    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|_| unavailable("包密钥长度无效。"))?;
+    let key = zeroize::Zeroizing::new(pbkdf2_hmac_array::<Sha256, 32>(
+        password.as_bytes(),
+        &salt,
+        PBKDF2_ITERATIONS,
+    ));
+    let cipher =
+        Aes256Gcm::new_from_slice(key.as_ref()).map_err(|_| unavailable("包密钥长度无效。"))?;
     let mut nonce = [0u8; NONCE_LENGTH];
     getrandom::fill(&mut nonce).map_err(|_| unavailable("无法生成包随机数。"))?;
     let encrypted = cipher
@@ -97,8 +110,13 @@ pub(super) fn open(magic: &[u8], password: &str, sealed: &[u8]) -> Result<Vec<u8
         .try_into()
         .expect("validated nonce length");
     let ciphertext = &sealed[magic.len() + SALT_LENGTH + NONCE_LENGTH..];
-    let key = pbkdf2_hmac_array::<Sha256, 32>(password.as_bytes(), salt, PBKDF2_ITERATIONS);
-    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|_| unavailable("包密钥长度无效。"))?;
+    let key = zeroize::Zeroizing::new(pbkdf2_hmac_array::<Sha256, 32>(
+        password.as_bytes(),
+        salt,
+        PBKDF2_ITERATIONS,
+    ));
+    let cipher =
+        Aes256Gcm::new_from_slice(key.as_ref()).map_err(|_| unavailable("包密钥长度无效。"))?;
     cipher
         .decrypt(
             &Nonce::from(nonce),
@@ -117,21 +135,42 @@ pub(super) fn unpack(payload: &[u8], destination: &Path) -> Result<Vec<(String, 
     let mut archive = zip::ZipArchive::new(std::io::Cursor::new(payload))
         .map_err(|cause| invalid(format!("包内容不是有效 zip：{cause}")))?;
     let mut entries = Vec::new();
+    if archive.len() > 4096 {
+        return Err(invalid("包内文件数量超过上限。"));
+    }
+    let mut names = std::collections::BTreeSet::new();
+    let mut total = 0usize;
     for index in 0..archive.len() {
+        crate::operation::check()?;
         let mut file = archive
             .by_index(index)
             .map_err(|cause| unavailable(cause.to_string()))?;
         // 统一分隔符后再校验：Windows 上 zip 会把条目名中的 / 转成 \，
         // 直接按原始名字符判断会把合法的嵌套条目误判为非法路径。
-        let name = file.name().replace('\\', "/");
-        if name.is_empty() || name.contains("..") || name.starts_with('/') {
+        let name = file.name().to_string();
+        if name
+            .split('/')
+            .any(|part| !crate::paths::valid_file_name(part))
+            || name.contains('\\')
+            || !names.insert(name.to_lowercase())
+            || file
+                .unix_mode()
+                .is_some_and(|mode| mode & 0o170000 == 0o120000)
+        {
             return Err(invalid("包内含非法路径条目。"));
         }
         let mut bytes = Vec::new();
-        std::io::copy(&mut file, &mut bytes).map_err(|cause| unavailable(cause.to_string()))?;
-        if bytes.len() > MAX_PLAINTEXT_BYTES {
+        let remaining = MAX_PLAINTEXT_BYTES - total;
+        if file.size() > remaining as u64 {
+            return Err(invalid("包解压容量超过上限。"));
+        }
+        Read::by_ref(&mut file)
+            .take(remaining as u64 + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() > remaining {
             return Err(invalid("包内条目超过容量上限。"));
         }
+        total += bytes.len();
         let digest = sha256_hex(&bytes);
         let path = destination.join(&name);
         crate::paths::ensure_safe_absolute(&path).map_err(invalid)?;
@@ -149,13 +188,20 @@ pub(super) fn unpack(payload: &[u8], destination: &Path) -> Result<Vec<(String, 
 }
 
 /// 清单中记录的文件摘要。
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ManifestFile {
+    #[serde(rename = "relativePath")]
     pub name: String,
     pub size_bytes: u64,
     pub sha256: String,
 }
 impl ManifestFile {
     pub(super) fn from_path(name: &str, path: &Path) -> Result<Self> {
+        crate::paths::ensure_safe_absolute(path).map_err(invalid)?;
+        if fs::metadata(path)?.len() > MAX_PLAINTEXT_BYTES as u64 {
+            return Err(invalid("包内容超过 256 MiB 上限。"));
+        }
         let bytes = fs::read(path)?;
         Ok(Self {
             name: name.into(),
@@ -172,11 +218,22 @@ pub(super) fn verify_manifest(
     entries: &[(String, Vec<u8>, String)],
     files: &[ManifestFile],
 ) -> Result<()> {
+    let entries: Vec<_> = entries
+        .iter()
+        .filter(|(name, _, _)| name != "manifest.json")
+        .collect();
     if entries.len() != files.len() {
         return Err(invalid("包内文件数与清单不一致。"));
     }
-    for (index, file) in files.iter().enumerate() {
-        let (name, bytes, digest) = &entries[index];
+    let mut seen = std::collections::BTreeSet::new();
+    for file in files {
+        if !seen.insert(&file.name) {
+            return Err(invalid("包清单含重复文件。"));
+        }
+        let (name, bytes, digest) = entries
+            .iter()
+            .find(|(name, _, _)| name == &file.name)
+            .ok_or_else(|| invalid("清单引用的文件缺失。"))?;
         if name != &file.name || *digest != file.sha256 || bytes.len() as u64 != file.size_bytes {
             return Err(invalid(format!(
                 "包内文件 {} 与清单校验不一致。",

@@ -1,6 +1,9 @@
 //! 团队备份与灾备：受管路径辅助、密封包格式、一次性票据与状态接口的最小回归。
 use super::sealed::{Entry, ManifestFile, open, seal, unpack, verify_manifest, zip_payload};
 use super::*;
+#[cfg(feature = "postgres")]
+mod postgres_recovery;
+mod recovery;
 use crate::paths::nonce;
 use std::{fs, path::PathBuf, sync::Arc};
 

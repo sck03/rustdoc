@@ -59,8 +59,16 @@ jobs:
     name: Publish GHCR image
     if: inputs.publish == true
     needs: lifecycle
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            architecture: amd64
+          - runner: ubuntu-24.04-arm
+            architecture: arm64
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -78,10 +86,28 @@ jobs:
           context: .
           file: deploy/rust-native/Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/${{ matrix.architecture }}
           tags: |
-            ghcr.io/${{ github.repository_owner }}/exportdoc-rust-native:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/exportdoc-rust-native:latest
+            ghcr.io/${{ github.repository_owner }}/exportdoc-rust-native:${{ github.sha }}-${{ matrix.architecture }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+
+  manifest:
+    name: Publish multi-architecture index
+    if: inputs.publish == true
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Combine validated native images
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/exportdoc-rust-native
+          REVISION: ${{ github.sha }}
+        run: docker buildx imagetools create --tag "$IMAGE:$REVISION" --tag "$IMAGE:latest" "$IMAGE:$REVISION-amd64" "$IMAGE:$REVISION-arm64"

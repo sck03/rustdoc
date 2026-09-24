@@ -66,8 +66,8 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
           onSelectCell(next.rows[0].cells[0].id);
           onCommit(next);
         }}><option value="">选择...</option><option value="Blank">空白 3 × 3</option><option value="Form">标签/内容表单</option><option value="Approval">审批签字栏</option></select></label>
-        <label><span>上距 (mm)</span><input type="number" min={0} max={30} step={0.5} value={block.marginTopMm ?? 0} onChange={(event) => onCommit({ ...block, marginTopMm: normalizeNumber(event.target.value, block.marginTopMm ?? 0) })} /></label>
-        <label><span>下距 (mm)</span><input type="number" min={0} max={30} step={0.5} value={block.marginBottomMm ?? 0} onChange={(event) => onCommit({ ...block, marginBottomMm: normalizeNumber(event.target.value, block.marginBottomMm ?? 0) })} /></label>
+        <label><span>上距 (mm)</span><input type="number" min={0} max={30} step="any" value={block.marginTopMm ?? 0} onChange={(event) => onCommit({ ...block, marginTopMm: normalizeNumber(event.target.value, block.marginTopMm ?? 0) })} /></label>
+        <label><span>下距 (mm)</span><input type="number" min={0} max={30} step="any" value={block.marginBottomMm ?? 0} onChange={(event) => onCommit({ ...block, marginBottomMm: normalizeNumber(event.target.value, block.marginBottomMm ?? 0) })} /></label>
       </div>
 
       <section className="new-report-grid-structure" aria-label="表格结构">
@@ -101,7 +101,7 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
         </div>
         <div className="new-report-property-grid">
           <label><span>内容类型</span><select value={selected.cell.contentKind} onChange={(event) => updateCell((cell) => ({ ...cell, contentKind: normalizeGridCellContentKind(event.target.value) }))}><option value="Text">固定文本</option><option value="Field">业务字段</option><option value="CheckboxGroup">勾选组</option></select></label>
-          <label><span>本行高度 (mm)</span><input type="number" min={2} max={80} step={0.5} value={selectedRow.heightMm ?? 9} onChange={(event) => onCommit({ ...block, rows: block.rows.map((row) => row.id === selectedRow.id ? { ...row, heightMm: normalizeNumber(event.target.value, row.heightMm ?? 9) } : row) })} /></label>
+          <label><span>本行高度 (mm)</span><input type="number" min={2} max={80} step="any" value={selectedRow.heightMm ?? 9} onChange={(event) => onCommit({ ...block, rows: block.rows.map((row) => row.id === selectedRow.id ? { ...row, heightMm: normalizeNumber(event.target.value, row.heightMm ?? 9) } : row) })} /></label>
           <DesignerCheckbox checked={Boolean(selected.cell.verticalText)} onChange={(checked) => updateCell((cell) => ({ ...cell, verticalText: checked }))}>竖排文字</DesignerCheckbox>
           <DesignerCheckbox checked={Boolean(selected.cell.diagonalHeader)} onChange={(checked) => updateCell((cell) => ({
             ...cell,
@@ -109,12 +109,14 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
           }))}>斜线表头</DesignerCheckbox>
         </div>
         {selected.cell.diagonalHeader ? <div className="new-report-property-grid">
-          <label><span>斜线上方文字</span><input value={selected.cell.diagonalHeader.upperLeftText} onChange={(event) => updateCell((cell) => ({ ...cell, diagonalHeader: { upperLeftText: event.target.value, lowerRightText: cell.diagonalHeader?.lowerRightText ?? "" } }))} /></label>
-          <label><span>斜线下方文字</span><input value={selected.cell.diagonalHeader.lowerRightText} onChange={(event) => updateCell((cell) => ({ ...cell, diagonalHeader: { upperLeftText: cell.diagonalHeader?.upperLeftText ?? "", lowerRightText: event.target.value } }))} /></label>
+          <label><span>斜线方向</span><select value={selected.cell.diagonalHeader.direction ?? "Up"} onChange={(event) => updateCell(cell => ({...cell,diagonalHeader:{...cell.diagonalHeader!,direction:event.target.value === "Down" ? "Down" : "Up"}}))}><option value="Up">左下至右上</option><option value="Down">左上至右下</option></select></label>
+          <label><span>斜线上方文字</span><input value={selected.cell.diagonalHeader.upperLeftText} onChange={(event) => updateCell((cell) => ({ ...cell, diagonalHeader: { ...cell.diagonalHeader, upperLeftText: event.target.value, lowerRightText: cell.diagonalHeader?.lowerRightText ?? "" } }))} /></label>
+          <label><span>斜线下方文字</span><input value={selected.cell.diagonalHeader.lowerRightText} onChange={(event) => updateCell((cell) => ({ ...cell, diagonalHeader: { ...cell.diagonalHeader, upperLeftText: cell.diagonalHeader?.upperLeftText ?? "", lowerRightText: event.target.value } }))} /></label>
         </div> : null}
         {selected.cell.contentKind === "Text" ? <label className="new-report-property-wide"><span>文字内容</span><CommitTextField multiline rows={3} value={selected.cell.text} onCommit={(text) => updateCell((cell) => ({ ...cell, text }))} /></label> : null}
         {selected.cell.contentKind === "Field" || selected.cell.contentKind === "CheckboxGroup" ? <FieldPathInput className="new-report-property-wide" label={selected.cell.contentKind === "CheckboxGroup" ? "判断字段" : "业务字段"} value={selected.cell.fieldPath} fieldGroups={fieldGroups} onChange={(fieldPath) => updateCell((cell) => ({ ...cell, fieldPath }))} /> : null}
         {selected.cell.contentKind === "Field" ? <label><span>字段前标签（可选）</span><input value={selected.cell.label ?? ""} onChange={(event) => updateCell((cell) => ({ ...cell, label: event.target.value }))} /></label> : null}
+        {selected.cell.contentKind === "Field" ? <label><span>标签位置</span><select value={selected.cell.labelPosition ?? "Inline"} onChange={event => updateCell(cell => ({...cell,labelPosition:event.target.value === "Above" ? "Above" : "Inline"}))}><option value="Inline">与内容同一行</option><option value="Above">在内容上方</option></select></label> : null}
         {selected.cell.contentKind === "CheckboxGroup" ? <label className="new-report-property-wide"><span>勾选项（每行：名称=值）</span><textarea rows={4} value={(selected.cell.checkboxOptions ?? []).map((option) => `${option.label}=${option.value}`).join("\n")} onChange={(event) => updateCheckboxOptions(event.target.value)} /></label> : null}
         <TextStyleEditor style={selected.cell.style} onChange={(style) => updateCell((cell) => ({ ...cell, style }))} />
         <BorderEditor border={selected.cell.border ?? block.border} onChange={(border) => onCommit(updateGridCellBorder(block, selected.cell.id, border))} />

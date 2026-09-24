@@ -3,11 +3,11 @@ use super::*;
 
 pub(super) fn save_template_package_to_path(
     service: &NativeService,
-    _actor: &Actor,
+    actor: &Actor,
     body: &Value,
 ) -> Result<Value> {
     let target = package_path(&service.paths, &text(body, "packagePath"))?;
-    let (bytes, count) = package_bytes(service)?;
+    let (bytes, count) = package_bytes(service, actor)?;
     paths::atomic_write(&target, &bytes).map_err(unavailable)?;
     Ok(contracts::project(
         contracts::schema("ApiReportTemplatePackageExportResponse"),
@@ -25,10 +25,12 @@ pub(super) fn template_files(paths: &RuntimePaths) -> Result<Vec<(String, Vec<u8
         return Ok(vec![]);
     }
     let mut files = vec![];
+    let mut total_bytes = 0usize;
     let mut stack = vec![root.clone()];
     while let Some(directory) = stack.pop() {
         ensure_managed(&directory, &root)?;
         for entry in fs::read_dir(&directory)? {
+            crate::operation::check()?;
             let path = entry?.path();
             ensure_managed(&path, &root)?;
             if path.is_dir() {
@@ -41,13 +43,14 @@ pub(super) fn template_files(paths: &RuntimePaths) -> Result<Vec<(String, Vec<u8
             }
             if !matches!(
                 path.extension().and_then(|value| value.to_str()),
-                Some(REPORT_TEMPLATE_EXTENSION_NAME) | Some(HTML_EXTENSION_NAME)
+                Some(REPORT_TEMPLATE_EXTENSION_NAME)
             ) {
-                return Err(invalid("报表模板扩展名必须使用小写 .dtpl 或 .html。"));
+                return Err(invalid("报表模板扩展名必须使用小写 .dtpl。"));
             }
-            let bytes = fs::read(&path)?;
-            if bytes.len() > MAX_TEMPLATE_BYTES {
-                return Err(invalid("模板文件超过 10 MB。"));
+            let bytes = media::read_local(&path, MAX_TEMPLATE_BYTES)?;
+            total_bytes = total_bytes.saturating_add(bytes.len());
+            if files.len() >= MAX_PACKAGE_ENTRIES || total_bytes > MAX_PACKAGE_BYTES {
+                return Err(invalid("模板目录超过 2000 个文件或 50 MiB，请先整理模板。"));
             }
             files.push((relative, bytes));
         }
@@ -96,11 +99,18 @@ pub(super) fn manifest_items(items: &Value, show_seal: bool) -> Vec<Value> {
         .collect()
 }
 
-pub(super) fn package_bytes(service: &NativeService) -> Result<(Vec<u8>, i64)> {
+pub(super) fn package_bytes(service: &NativeService, actor: &Actor) -> Result<(Vec<u8>, i64)> {
+    let _access = storage_lock(&service.paths)?;
     let root = user_root(&service.paths);
     fs::create_dir_all(&root)?;
     ensure_managed(&root, &root)?;
     let files = template_files(&service.paths)?;
+    for (relative, _) in &files {
+        demand_type(
+            actor,
+            kind_of_category(relative.split('/').next().unwrap_or("")),
+        )?;
+    }
     let settings = settings_of(&service.store)?;
     let mut templates = vec![];
     for row in catalog_rows(&service.paths)? {
@@ -125,8 +135,8 @@ pub(super) fn package_bytes(service: &NativeService) -> Result<(Vec<u8>, i64)> {
         "PackageVersion": PACKAGE_SCHEMA_VERSION,
         "Templates": templates.clone(),
         "TemplateDefaults": {
-            "ExportDocumentTemplatePath": defaults["ExportDocumentTemplatePath"],
-            "PaymentVoucherTemplatePath": defaults["PaymentVoucherTemplatePath"],
+            "ExportDocumentTemplatePath": normalize_default(&service.paths, &text(&defaults, "exportDocumentTemplatePath"), "ExportDocument")?,
+            "PaymentVoucherTemplatePath": normalize_default(&service.paths, &text(&defaults, "paymentVoucherTemplatePath"), "PaymentVoucher")?,
         },
         "ExportTemplates": manifest_items(&settings["batchExport"]["items"], true),
         "InternalTemplates": manifest_items(&settings["paymentTemplates"], false),
@@ -366,11 +376,6 @@ pub(super) fn merge_items(
     )
 }
 
-pub(super) fn utf8_template(bytes: &[u8]) -> Result<String> {
-    let bytes = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(bytes);
-    String::from_utf8(bytes.to_vec()).map_err(|_| invalid("模板文件必须是 UTF-8 文本。"))
-}
-
 pub(super) fn import_template_package(
     service: &NativeService,
     actor: &Actor,
@@ -419,20 +424,20 @@ pub(super) fn import_template_package(
         for (relative, bytes) in &templates {
             crate::operation::check()?;
             let kind = kind_of_category(relative.split('/').next().unwrap_or(EXPORT_CATEGORY));
+            demand_type(actor, kind)?;
             let target = root.join(relative);
             ensure_managed(&target, &root)?;
             validate_existing(&target)?;
             ensure_no_collision(&target, None)?;
             files.capture(&target)?;
-            let content =
-                std::str::from_utf8(bytes).map_err(|_| invalid("模板文件必须是 UTF-8 文本。"))?;
-            report_templates::validate_content(kind, content)?;
-            report_assets::validate_template(tx, actor, content)?;
+            let editable = report_templates::editable_content(kind, bytes)?;
+            report_assets::validate_template(tx, actor, &editable, Some(&service.paths))?;
+            let stored = report_templates::stored_content(kind, &editable)?;
             if strategy == "AddOnly" && target.exists() {
                 continue;
             }
             fs::create_dir_all(target.parent().unwrap_or(&target))?;
-            paths::atomic_write(&target, bytes).map_err(unavailable)?;
+            paths::atomic_write(&target, &stored).map_err(unavailable)?;
         }
         let mut rows = catalog_rows(&service.paths)?;
         files.capture(&root.join(CATALOG_FILE))?;
@@ -456,16 +461,18 @@ pub(super) fn import_template_package(
         }
         rows = merge_rows(rows, incoming, strategy);
         save_catalog(&service.paths, &rows)?;
+        let defaults = &manifest["TemplateDefaults"];
+        let export_default = normalize_default(&service.paths, &text(defaults, "ExportDocumentTemplatePath"), "ExportDocument")?;
+        let payment_default = normalize_default(&service.paths, &text(defaults, "PaymentVoucherTemplatePath"), "PaymentVoucher")?;
         update_settings(tx, |settings| {
-            let defaults = settings["reportTemplateDefaults"].clone();
             for (key, incoming) in [
                 (
                     "exportDocumentTemplatePath",
-                    defaults["ExportDocumentTemplatePath"].as_str().unwrap_or(""),
+                    export_default.as_str(),
                 ),
                 (
                     "paymentVoucherTemplatePath",
-                    defaults["PaymentVoucherTemplatePath"].as_str().unwrap_or(""),
+                    payment_default.as_str(),
                 ),
             ] {
                 let existing = settings["reportTemplateDefaults"][key].as_str().unwrap_or("");

@@ -5,6 +5,7 @@ param(
     [string]$BindAddress = '127.0.0.1',
     [switch]$PrepareOnly,
     [switch]$Stop,
+    [switch]$RestorePending,
     [switch]$NoPause
 )
 $ErrorActionPreference = 'Stop'
@@ -28,7 +29,7 @@ while ($currentPath) {
 }
 $bindIp = $null
 if (-not [System.Net.IPAddress]::TryParse($BindAddress, [ref]$bindIp) -or $bindIp.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) { throw 'BindAddress must be an explicit IPv4 address.' }
-if ($PrepareOnly -and $Stop) { throw 'PrepareOnly and Stop cannot be combined.' }
+if (@($PrepareOnly, $Stop, $RestorePending).Where({ $_ }).Count -gt 1) { throw 'PrepareOnly, Stop and RestorePending cannot be combined.' }
 $markerPath = Join-Path $runtimePath 'native-runtime.json'
 if (Test-Path -LiteralPath $runtimePath) {
     if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf) -and @(Get-ChildItem -LiteralPath $runtimePath -Force).Count -gt 0) { throw 'Refusing to adopt an unmarked non-empty runtime directory.' }
@@ -100,6 +101,13 @@ if ($PrepareOnly) {
     $docker = (Get-Command docker -ErrorAction Stop).Source
     $environment = @{ NATIVE_RUNTIME_ROOT = $runtimePath.Replace('\', '/'); NATIVE_PORT = "$Port"; NATIVE_BIND_ADDRESS = $BindAddress }
     $arguments = @('compose', '--project-name', 'exportdoc-rust-native', '--file', (Join-Path $repositoryRoot 'deploy/rust-native/compose.yml'))
+    if ($RestorePending) {
+        Invoke-ExportDocExternal -FilePath $docker -Arguments ($arguments + @('stop', 'application')) -Environment $environment -WorkingDirectory $repositoryRoot -TimeoutSeconds 240 -DisplayName 'Stop API before database maintenance'
+        Invoke-ExportDocExternal -FilePath $docker -Arguments ($arguments + @('--profile', 'maintenance', 'run', '--rm', 'restore')) -Environment $environment -WorkingDirectory $repositoryRoot -TimeoutSeconds 3600 -DisplayName 'Apply staged restore with maintenance credentials'
+        Invoke-ExportDocExternal -FilePath $docker -Arguments ($arguments + @('up', '--detach', '--wait', '--wait-timeout', '180', 'application')) -Environment $environment -WorkingDirectory $repositoryRoot -TimeoutSeconds 240 -DisplayName 'Restart restored API'
+        Wait-ExportDocInteractiveExit -Enabled $interactiveLaunch -ExitCode 0
+        return
+    }
     $arguments += $(if ($Stop) { @('down') } else { @('up', '--build', '--detach', '--wait', '--wait-timeout', '180') })
     Invoke-ExportDocExternal -FilePath $docker -Arguments $arguments -Environment $environment -WorkingDirectory $repositoryRoot -TimeoutSeconds 3600 -DisplayName 'Rust native Docker application'
     if (-not $Stop) { Write-Host "Native web application: http://${BindAddress}:$Port" }

@@ -7,6 +7,8 @@ use export_doc_domain::{
 use export_doc_report::{BUILTINS, Builtin, ErrorKind, ReportData, render_builtin};
 use serde_json::json;
 use std::sync::atomic::AtomicBool;
+#[path = "support/commercial_alignment.rs"]
+mod commercial_alignment;
 
 fn invoice(rows: usize) -> ReportData {
     let mut draft = InvoiceDraft::demo("2026-09-16", "REPORT-<>&-001");
@@ -119,6 +121,114 @@ fn commercial_details_and_customs_continuation_use_shared_pagination() {
     let customs = detail_table(Builtin::CustomsDeclaration);
     assert_eq!(customs.print.first_page_rows, Some(6));
     assert_eq!(customs.print.continuation_page_rows, Some(15));
+}
+
+#[test]
+fn invoice_terms_and_packing_header_follow_their_separate_templates() {
+    let data = invoice(36);
+    let document = render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();
+    assert!(document.pages[0].svg.contains(">FOB</text>"));
+    assert!(
+        document
+            .pages
+            .iter()
+            .skip(1)
+            .all(|page| !page.svg.contains(">FOB</text>"))
+    );
+    assert!(document.pages[0].svg.contains("Issued by:"));
+    let position = |text: &str| {
+        let node = document.pages[0]
+            .svg
+            .split("<text ")
+            .find(|node| node.contains(&format!(">{text}</text>")))
+            .unwrap();
+        node.split("x=\"")
+            .nth(1)
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap()
+            .parse::<f32>()
+            .unwrap()
+    };
+    assert!(position("1000PCS") - position("20CTNS") > 15.);
+    assert!(position("@USD4.50") - position("1000PCS") > 15.);
+    let packing =
+        render_builtin(Builtin::PackingList, &invoice(3), &AtomicBool::new(false)).unwrap();
+    for label in ["From:", "Payment Terms:", "Issued by:"] {
+        assert!(!packing.pages[0].svg.contains(label));
+    }
+}
+
+#[test]
+fn multipage_builtins_repeat_only_the_required_bands() {
+    let mut data = invoice(36);
+    data.root["Invoice"]["shippingMarks"] = json!("FIRST-PAGE-MARKS");
+    for template in [Builtin::Invoice, Builtin::PackingList] {
+        let result = render_builtin(template, &data, &AtomicBool::new(false)).unwrap();
+        assert_eq!(result.pages.len(), 3, "{}", template.label());
+        assert!(result.pages[0].svg.contains("FIRST-PAGE-MARKS"));
+        assert!(
+            result
+                .pages
+                .iter()
+                .skip(1)
+                .all(|p| !p.svg.contains("FIRST-PAGE-MARKS"))
+        );
+        assert!(
+            result
+                .pages
+                .iter()
+                .take(2)
+                .all(|p| !p.svg.contains("TOTAL:"))
+        );
+        assert!(result.pages[2].svg.contains("TOTAL:"));
+    }
+    let contract = render_builtin(Builtin::Contract, &data, &AtomicBool::new(false)).unwrap();
+    assert_eq!(contract.pages.len(), 2);
+    assert!(contract.pages[0].svg.contains("售货合同"));
+    assert!(!contract.pages[1].svg.contains("售货合同"));
+    assert!(!contract.pages[0].svg.contains("The buyers"));
+    assert!(contract.pages[1].svg.contains("The buyers"));
+    let customs =
+        render_builtin(Builtin::CustomsDeclaration, &data, &AtomicBool::new(false)).unwrap();
+    assert_eq!(customs.pages.len(), 3);
+    assert!(customs.pages[0].svg.contains("特殊关系确认"));
+    assert!(
+        customs
+            .pages
+            .iter()
+            .skip(1)
+            .all(|p| !p.svg.contains("特殊关系确认") && !p.svg.contains("境内发货人"))
+    );
+}
+
+#[test]
+fn empty_or_hidden_po_and_style_do_not_leave_blank_composite_lines() {
+    let mut data = invoice(1);
+    data.root["items"][0]["poNumber"] = json!("");
+    data.root["items"][0]["styleNo"] = json!("");
+    let design = Builtin::Invoice.design().unwrap();
+    let no_optional =
+        export_doc_report::render_design(&data, &design, &AtomicBool::new(false)).unwrap();
+    assert!(no_optional.pages[0].svg.contains("20CTNS"));
+    let mut hidden = design.clone();
+    if let Kind::Flow {
+        block: ReportBlock::DetailTable(table),
+        ..
+    } = &mut hidden.layers[1].elements[0].kind
+    {
+        for part in &mut table.columns[0].content {
+            if ["item.PoNumber", "item.StyleNo"].contains(&part.field_path.as_str()) {
+                part.visible = Some(false);
+            }
+        }
+    }
+    data.root["items"][0]["poNumber"] = json!("HIDDEN-PO");
+    data.root["items"][0]["styleNo"] = json!("HIDDEN-STYLE");
+    let hidden_result =
+        export_doc_report::render_design(&data, &hidden, &AtomicBool::new(false)).unwrap();
+    assert_eq!(no_optional.pages[0].svg, hidden_result.pages[0].svg);
 }
 
 #[test]

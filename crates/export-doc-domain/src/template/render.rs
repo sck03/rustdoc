@@ -300,8 +300,52 @@ fn render_conditional(
     })
 }
 
+fn render_detail_fixed_row(table: &DetailTable, row: &crate::designer::DetailSummaryRow) -> String {
+    let span = row.label_column_span.clamp(1, table.columns.len() as i32) as usize;
+    let content = |column: &crate::designer::DetailColumn| {
+        row.cells
+            .iter()
+            .find(|cell| cell.column_id == column.id)
+            .map(summary_cell_html)
+            .unwrap_or_default()
+    };
+    let mut label = vec![escape(&row.label)];
+    label.extend(
+        table
+            .columns
+            .iter()
+            .take(span)
+            .map(content)
+            .filter(|value| !value.is_empty()),
+    );
+    let mut html = format!(
+        "<tr class=\"native-detail-summary\"><td colspan=\"{span}\">{}</td>",
+        label.join("<br>")
+    );
+    for column in table.columns.iter().skip(span) {
+        html.push_str(&format!(
+            "<td style=\"text-align:{}\">{}</td>",
+            column.align.to_ascii_lowercase(),
+            content(column)
+        ));
+    }
+    html.push_str("</tr>");
+    html
+}
+
 fn render_detail_table(table: &DetailTable, fields: &[Field]) -> Result<String, String> {
     let total_width: f32 = table.columns.iter().map(|column| column.width_mm).sum();
+    let vertical = table
+        .body_style
+        .vertical_align
+        .as_deref()
+        .unwrap_or("Top")
+        .to_ascii_lowercase();
+    let grid_align = match vertical.as_str() {
+        "bottom" => "end",
+        "middle" => "center",
+        _ => "start",
+    };
     let mut table_html = String::from("<table class=\"native-detail\"><colgroup>");
     for column in &table.columns {
         table_html.push_str(&format!(
@@ -318,6 +362,9 @@ fn render_detail_table(table: &DetailTable, fields: &[Field]) -> Result<String, 
         ));
     }
     table_html.push_str("</tr></thead><tbody>");
+    if let Some(intro) = &table.intro_row {
+        table_html.push_str(&render_detail_fixed_row(table, intro));
+    }
     if let Some(grouping) = &table.grouping {
         table_html.push_str(&format!(
             "{{{{ group = item.{} }}}}{{{{ if group != previous_group }}}}<tr class=\"native-detail-group\"><td colspan=\"{}\">{}{{{{ if show_group_value }}}} {{{{ group }}}}{{{{ end }}}}</td></tr>{{{{ end }}}}{{{{ previous_group = group }}}}",
@@ -328,10 +375,22 @@ fn render_detail_table(table: &DetailTable, fields: &[Field]) -> Result<String, 
     }
     table_html.push_str("{{ for item in Invoice.Items }}<tr>");
     for column in &table.columns {
-        let content = if column.content_kind == "Composite" && !column.content.is_empty() {
+        let content = if column.omit_empty_lines
+            || column.content.iter().any(|part| part.kind == "ColumnBreak")
+        {
+            crate::designer::composite::rows(&column.content).iter().map(|row| {
+                let widths = row.iter().enumerate().map(|(index, slot)| format!("{}%", row.get(index+1).map_or(100., |next| next.position)-slot.position)).collect::<Vec<_>>().join(" ");
+                let cells = row.iter().map(|slot| {
+                    let text: String = slot.parts.iter().map(|part| if part.kind == "Text" { escape(&part.text) } else { format!("{{{{ {} }}}}", escape(&detail_field(&part.field_path))) }).collect();
+                    format!("<span style=\"min-width:0;padding-right:1mm\">{text}</span>")
+                }).collect::<String>();
+                format!("<div style=\"display:grid;align-items:{grid_align};grid-template-columns:{widths};min-height:1.3em\">{cells}</div>")
+            }).collect::<String>()
+        } else if column.content_kind == "Composite" && !column.content.is_empty() {
             column
                 .content
                 .iter()
+                .filter(|part| part.visible != Some(false))
                 .map(|part| match part.kind.as_str() {
                     "Text" => escape(&part.text),
                     "LineBreak" => "<br>".into(),
@@ -342,8 +401,13 @@ fn render_detail_table(table: &DetailTable, fields: &[Field]) -> Result<String, 
             format!("{{{{ {} }}}}", escape(&detail_field(&column.field_path)))
         };
         table_html.push_str(&format!(
-            "<td style=\"text-align:{}\">{}</td>",
+            "<td style=\"text-align:{};vertical-align:{vertical};{}\">{}</td>",
             column.align.to_ascii_lowercase(),
+            if table.row_separators == Some(false) {
+                "border-top:0;border-bottom:0;"
+            } else {
+                ""
+            },
             content
         ));
     }
@@ -375,28 +439,7 @@ fn render_detail_table(table: &DetailTable, fields: &[Field]) -> Result<String, 
         }
     }
     if let Some(summary) = &table.summary_row {
-        table_html.push_str(&format!(
-            "<tr class=\"native-detail-summary\"><td colspan=\"{}\" style=\"text-align:right\">{}</td>",
-            summary.label_column_span.clamp(1, table.columns.len() as i32),
-            escape(&summary.label)
-        ));
-        for column in table.columns.iter().skip(
-            summary
-                .label_column_span
-                .clamp(1, table.columns.len() as i32) as usize,
-        ) {
-            let content = summary
-                .cells
-                .iter()
-                .find(|cell| cell.column_id == column.id)
-                .map(|cell| summary_cell_html(cell))
-                .unwrap_or_default();
-            table_html.push_str(&format!(
-                "<td style=\"text-align:{}\">{content}</td>",
-                column.align.to_ascii_lowercase()
-            ));
-        }
-        table_html.push_str("</tr>");
+        table_html.push_str(&render_detail_fixed_row(table, summary));
     }
     table_html.push_str("</tbody></table>");
     if let Some(side) = &table.side_band {

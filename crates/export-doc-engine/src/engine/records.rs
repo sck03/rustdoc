@@ -573,6 +573,7 @@ fn validate(
             *value = contracts::overlay(value.clone(), &serde_json::to_value(dto)?);
             super::report_assets::validate_invoice(connection, actor, value)?;
         }
+        "exporters" => super::report_assets::validate_exporter(connection, actor, value)?,
         "payments" => {
             let payment: crate::generated_api::ApiPaymentDto =
                 serde_json::from_value(value.clone())
@@ -640,12 +641,9 @@ fn validate(
                 value["status"] = previous["status"].clone();
             }
             if resource.key == "report-templates" {
-                crate::designer::Design::from_html(&text(value, "contentHtml")).map_err(invalid)?;
-                super::report_assets::validate_template(
-                    connection,
-                    actor,
-                    &text(value, "contentHtml"),
-                )?;
+                let content = text(value, "contentHtml");
+                crate::designer::Design::from_source(&content).map_err(invalid)?;
+                super::report_assets::validate_template(connection, actor, &content, None)?;
             }
         }
         "hs-codes" => {

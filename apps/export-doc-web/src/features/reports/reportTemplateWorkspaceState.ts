@@ -63,7 +63,6 @@ export function deriveReportTemplateWorkspaceState({
   currentTemplateDisplayName,
   persistedDisplayName,
   defaultTemplatePath,
-  canUseAdvancedTools,
   selectedContentTemplatePath,
   currentUserTemplate,
   templatePreviewMode,
@@ -101,7 +100,6 @@ export function deriveReportTemplateWorkspaceState({
   currentTemplateDisplayName: string;
   persistedDisplayName: string;
   defaultTemplatePath: string;
-  canUseAdvancedTools: boolean;
   selectedContentTemplatePath: string;
   currentUserTemplate: ApiUserReportTemplateDto | null;
   templatePreviewMode: TemplatePreviewMode;
@@ -226,6 +224,5 @@ export function deriveReportTemplateWorkspaceState({
       currentTemplateDisplayName.trim() !== persistedDisplayName,
     canSetDefault: Boolean(selectedTemplatePath) && canManageTemplates && !isBusy &&
       !matchesTemplatePath(selectedTemplatePath, defaultTemplatePath),
-    canFormatSource: canEditCurrentTemplate && canUseAdvancedTools,
   };
 }

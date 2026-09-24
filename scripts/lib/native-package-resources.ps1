@@ -45,7 +45,7 @@ function Add-ExportDocRustPackageResources {
     Assert-NativePackagePath -Path $PdfiumPath
     $copies[$PdfiumPath] = 'Resources/Pdf/' + [System.IO.Path]::GetFileName($PdfiumPath)
     $templateRoot = Join-Path $repositoryRoot 'Templates'
-    foreach ($template in Get-ChildItem -LiteralPath $templateRoot -Recurse -File) {
+    foreach ($template in Get-ChildItem -LiteralPath $templateRoot -Recurse -File -Filter '*.dtpl') {
         Assert-NativePackagePath -Path $template.FullName
         $relative = [System.IO.Path]::GetRelativePath($repositoryRoot, $template.FullName)
         $copies[$template.FullName] = $relative

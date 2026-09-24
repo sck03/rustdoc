@@ -88,6 +88,17 @@ impl ReportData {
             }
         }
         data.root["items"] = value_at(&data.root["Invoice"], "Items").clone();
+        if let Some(items) = data.root["items"].as_array_mut() {
+            for (index, item) in items.iter_mut().enumerate() {
+                item["RowNumber"] = json!(index + 1);
+                if value_at(item, "styleNameCN")
+                    .as_str()
+                    .is_none_or(str::is_empty)
+                {
+                    item["styleNameCN"] = value_at(item, "styleName").clone();
+                }
+            }
+        }
         data.root["total_amount_words"] =
             json!(format!("{} ONLY", english_money(invoice.total_amount)?));
         for (name, quantity, unit) in [
@@ -135,25 +146,37 @@ impl ReportData {
         value
     }
     pub fn text(&self, path: &str) -> String {
-        plain(self.value(path, None))
+        if path == "total_cartons_and_quantity" {
+            format!(
+                "{}    {}",
+                self.unit_totals("total_by_ctn_unit"),
+                self.unit_totals("total_by_qty_unit")
+            )
+        } else if matches!(path, "total_by_qty_unit" | "total_by_ctn_unit") {
+            self.unit_totals(path)
+        } else {
+            self.display(path, None)
+        }
+    }
+    pub fn display(&self, path: &str, item: Option<&Value>) -> String {
+        let value = self.value(path, item);
+        let name = path.rsplit('.').next().unwrap_or(path);
+        if value.is_number()
+            && (name.ends_with("Amount") || name.ends_with("Expense") || name == "TotalPrice")
+        {
+            return decimal(value)
+                .map(|v| format_decimal(v, 2))
+                .unwrap_or_else(|_| plain(value));
+        }
+        if value.is_number() && name == "UnitPrice" {
+            return decimal(value)
+                .map(|v| format_decimal(v, v.scale().clamp(2, 4)))
+                .unwrap_or_else(|_| plain(value));
+        }
+        plain(value)
     }
     pub fn item_text(&self, item: &Value, field: &str) -> String {
         plain(value_at(item, field))
-    }
-    pub(crate) fn date(&self, path: &str, chinese: bool) -> Result<String> {
-        let value = self.text(path);
-        if value.is_empty() {
-            return Ok(value);
-        }
-        if !export_doc_domain::invoice::valid_date(&value) {
-            return Err(invalid("报表日期必须是有效的业务自然日。"));
-        }
-        let (year, month, day) = (&value[..4], &value[5..7], &value[8..10]);
-        Ok(if chinese {
-            format!("{year}年{month}月{day}日")
-        } else {
-            format!("{month}/{day}/{year}")
-        })
     }
     pub fn number(&self, path: &str, precision: u32) -> Result<String> {
         Ok(format_decimal(decimal(self.value(path, None))?, precision))

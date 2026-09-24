@@ -182,8 +182,10 @@ const TAURI_UPDATER_PROGRESS_EVENT: &str = "exportdoc://updater-progress";
 #[tauri::command]
 pub(crate) async fn check_tauri_update(
     app: tauri::AppHandle,
+    session_token: String,
     endpoint: Option<String>,
 ) -> Result<TauriUpdaterCheckResult, String> {
+    desktop_runtime::authorize_update(&app, session_token).await?;
     let portable = app.state::<RuntimePaths>().portable;
     let updater = build_tauri_updater(&app, endpoint)?;
     match updater.check().await.map_err(describe_updater_error)? {
@@ -234,33 +236,40 @@ pub(crate) async fn check_tauri_update(
 #[tauri::command]
 pub(crate) async fn install_tauri_update(
     app: tauri::AppHandle,
+    session_token: String,
     endpoint: Option<String>,
     state: tauri::State<'_, TauriUpdaterState>,
 ) -> Result<TauriUpdaterInstallResult, String> {
+    desktop_runtime::authorize_update(&app, session_token.clone()).await?;
     let cancellation = state.begin()?;
-    let result = install_tauri_update_core(app, endpoint, cancellation.clone()).await;
+    let result =
+        install_tauri_update_core(app, endpoint, session_token, cancellation.clone()).await;
     state.finish(&cancellation);
     result
 }
 
 #[tauri::command]
-pub(crate) fn cancel_tauri_update(
+pub(crate) async fn cancel_tauri_update(
+    app: tauri::AppHandle,
+    session_token: String,
     state: tauri::State<'_, TauriUpdaterState>,
-) -> TauriUpdaterCancelResult {
+) -> Result<TauriUpdaterCancelResult, String> {
+    desktop_runtime::authorize_update(&app, session_token).await?;
     let accepted = state.request_cancel();
-    TauriUpdaterCancelResult {
+    Ok(TauriUpdaterCancelResult {
         accepted,
         status_text: if accepted {
             "已请求取消更新下载，正在停止网络传输。".to_owned()
         } else {
             "当前没有可取消的更新下载；进入安装阶段后不能中断。".to_owned()
         },
-    }
+    })
 }
 
 async fn install_tauri_update_core(
     app: tauri::AppHandle,
     endpoint: Option<String>,
+    session_token: String,
     cancellation: Arc<UpdaterCancellation>,
 ) -> Result<TauriUpdaterInstallResult, String> {
     ensure_updater_install_supported(app.state::<RuntimePaths>().portable)?;
@@ -313,6 +322,7 @@ async fn install_tauri_update_core(
         Err(error) => return Err(format!("软件更新下载任务失败：{error}")),
     };
 
+    desktop_runtime::authorize_update(&app, session_token).await?;
     if !cancellation.begin_install() {
         emit_updater_progress(&app, "canceled", 0, None, "更新下载已取消。");
         return Err("软件更新下载已取消。".to_owned());

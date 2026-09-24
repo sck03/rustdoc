@@ -15,7 +15,10 @@ use std::{
 use unicode_normalization::UnicodeNormalization;
 
 pub struct Store {
+    pub(crate) data_root: std::path::PathBuf,
     connection: Mutex<Connection>,
+    #[cfg(feature = "postgres")]
+    postgres_connection: Option<zeroize::Zeroizing<String>>,
     _lock: Option<File>,
 }
 #[derive(Clone, Debug)]
@@ -42,15 +45,19 @@ impl Store {
             .write(true)
             .open(lock_path)?;
         lock.try_lock_exclusive().map_err(|cause| {
-            if cause.kind() == std::io::ErrorKind::WouldBlock {
+            if cause.raw_os_error() == fs2::lock_contended_error().raw_os_error() {
                 error(429, "此数据目录已由另一个原生程序打开。")
             } else {
                 unavailable(format!("无法取得数据库实例锁：{cause}"))
             }
         })?;
+        super::team_backup::disaster::apply_pending(paths)?;
         let connection = Connection::sqlite(&database_path)?;
         Ok(Self {
+            data_root: paths.data_root.clone(),
             connection: Mutex::new(connection),
+            #[cfg(feature = "postgres")]
+            postgres_connection: None,
             _lock: Some(lock),
         })
     }
@@ -65,9 +72,11 @@ impl Store {
         Ok(connection)
     }
     #[cfg(feature = "postgres")]
-    pub fn open_postgres(connection_string: &str) -> Result<Self> {
+    pub fn open_postgres(paths: &RuntimePaths, connection_string: &str) -> Result<Self> {
         Ok(Self {
+            data_root: paths.data_root.clone(),
             connection: Mutex::new(Connection::postgres(connection_string)?),
+            postgres_connection: Some(zeroize::Zeroizing::new(connection_string.into())),
             _lock: None,
         })
     }
@@ -88,6 +97,13 @@ impl Store {
                 Err(error)
             }
         }
+    }
+    #[cfg(feature = "postgres")]
+    pub fn postgres_connection(&self) -> Result<&str> {
+        self.postgres_connection
+            .as_ref()
+            .map(|value| value.as_str())
+            .ok_or_else(|| unavailable("当前不是 PostgreSQL 数据库。"))
     }
     pub fn get(&self, kind: &str, id: i64) -> Result<Value> {
         get(&*self.connection()?, kind, id)

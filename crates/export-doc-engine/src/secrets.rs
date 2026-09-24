@@ -6,6 +6,7 @@ use aes_gcm::{
     aead::{Aead, KeyInit, Payload},
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
+pub(crate) use private_files::directory as private_directory;
 use std::{
     fs::{File, OpenOptions},
     io::{Read, Write},

@@ -11,7 +11,6 @@ import {
 } from "../report-designer/reportDesignerPreviewSamples.ts";
 
 export type ReportTypeOption = "ExportDocument" | "PaymentVoucher";
-export type DesignerMode = "v3" | "advancedHtml";
 export type TemplateWorkspaceMode = "design" | "preview";
 
 export type { ReportTemplatePermissionAccess } from "../../app/permissionCatalog.ts";
@@ -78,7 +77,7 @@ export function readPreviewSourceIdFromSearch(search: string, reportType: Report
 
 export function matchesTemplateFileName(templatePath: string, requestedTemplateFileName: string) {
   const requested = requestedTemplateFileName.trim();
-  return fileNameFromPath(templatePath) === requested;
+  return matchesTemplatePath(templatePath, requested) || fileNameFromPath(templatePath) === requested;
 }
 
 export function matchesTemplatePath(left: string, right: string) {
@@ -245,7 +244,7 @@ export function buildPaymentPreviewOptions(payments: ApiPaymentDto[], selectedPa
 }
 
 export function buildRawPreviewHtml(content: string) {
-  return content.trim() ? content : "<!doctype html><html><body></body></html>";
+  return `<!doctype html><html><body>${content.trim() ? "请生成模板预览。" : ""}</body></html>`;
 }
 
 function normalizeTemplatePath(path: string) {

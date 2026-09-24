@@ -35,12 +35,17 @@ COPY Templates/ Templates/
 RUN --mount=type=cache,target=/workspace/.cache/cargo/registry,sharing=locked cargo build --locked --release -p export-doc-server \
     && cargo build --locked --release --manifest-path apps/exportdoc-ocr-rs/Cargo.toml
 
+FROM postgres:18.4-trixie AS postgres-client
+COPY scripts/lib/copy-postgresql-client.sh /copy-postgresql-client.sh
+RUN sh /copy-postgresql-client.sh /client
+
 FROM debian:trixie-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libssl3t64 && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 exportdoc && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /var/lib/exportdoc exportdoc \
     && mkdir -p /opt/exportdoc /var/lib/exportdoc && chown 10001:10001 /var/lib/exportdoc
 WORKDIR /opt/exportdoc
 COPY --from=rust /workspace/target/release/export-doc-server ./ExportDocManager.Server
+COPY --from=postgres-client /client/ ./Tools/PostgreSQL/
 COPY --from=rust /workspace/target/release/exportdoc-ocr ./sidecar/ocr/exportdoc-ocr
 COPY --from=ocr-assets /workspace/artifacts/ocr-runtime/ocr/ ./sidecar/ocr/
 COPY --from=ocr-assets /workspace/artifacts/ocr-runtime/pdf/ ./Resources/Pdf/

@@ -67,7 +67,13 @@ async fn execute(
         .try_acquire_owned()
         .map_err(|_| error(429, "当前请求较多，请稍后重试。"))?;
     let scope = OperationScope::new(Duration::from_secs(request_seconds(operation)));
-    let bulk_permit = if operation == UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB {
+    let bulk_permit = if [
+        UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB,
+        STAGE_SERVER_MIGRATION_RESTORE,
+        UPLOAD_AND_RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP,
+    ]
+    .contains(&operation)
+    {
         Some(
             state
                 .bulk_uploads
@@ -118,10 +124,10 @@ async fn execute(
             if let Some(value) = parts.headers.get(name) {
                 parameters.insert(
                     name.to_owned(),
-                    value
-                        .to_str()
-                        .map_err(|_| error(400, "请求头格式无效。"))?
-                        .to_owned(),
+                    header_text(
+                        name,
+                        value.to_str().map_err(|_| error(400, "请求头格式无效。"))?,
+                    )?,
                 );
             }
         }
@@ -149,8 +155,24 @@ async fn execute(
             .iter()
             .find(|(key, _)| key == "fileName" || key == "sourceName")
             .map(|(_, value)| value.clone())
+            .or_else(|| {
+                parameters
+                    .get(if operation == STAGE_SERVER_MIGRATION_RESTORE {
+                        "X-ExportDocManager-Migration-File-Name"
+                    } else {
+                        "X-ExportDocManager-PostgreSql-Backup-File-Name"
+                    })
+                    .cloned()
+            })
             .unwrap_or_default();
         let limit = if [
+            STAGE_SERVER_MIGRATION_RESTORE,
+            UPLOAD_AND_RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP,
+        ]
+        .contains(&operation)
+        {
+            257
+        } else if [
             IMPORT_HS_CODE_KNOWLEDGE,
             UPLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
             UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE,
@@ -318,6 +340,21 @@ async fn execute(
                     .download_job(&id, &session)
                     .map(response::Reply::file);
             }
+            if operation == DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET {
+                let ticket = parameters
+                    .iter()
+                    .find(|(name, _)| *name == "token")
+                    .map(|(_, value)| value.as_str())
+                    .unwrap_or("");
+                let (token, session) =
+                    state
+                        .tickets
+                        .resolve_for(operation, ticket, &cookie_binding)?;
+                return state
+                    .service
+                    .download_file(operation, &[("token", token)], &session)
+                    .map(response::Reply::file);
+            }
             if [DOWNLOAD_JOB_RESULT, CREATE_JOB_DOWNLOAD_TICKET].contains(&operation) {
                 let id = parameters
                     .iter()
@@ -385,6 +422,26 @@ async fn execute(
                     &token,
                     &bootstrap,
                 )?;
+                if operation == CREATE_POSTGRE_SQL_PHYSICAL_BACKUP_DOWNLOAD_TICKET {
+                    let original: Value = serde_json::from_slice(&result)
+                        .map_err(|_| error(503, "备份下载票据无效。"))?;
+                    let id = original["token"]
+                        .as_str()
+                        .ok_or_else(|| error(503, "备份下载票据缺失。"))?;
+                    let (ticket, cookie) = state.tickets.issue_for(
+                        DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
+                        id,
+                        &token,
+                        &cookie_binding,
+                        secure_cookie,
+                    )?;
+                    return Ok(response::Reply {
+                        bytes: serde_json::to_vec(&ticket)
+                            .map_err(|_| error(503, "票据编码失败。"))?,
+                        file: None,
+                        cookie: Some(cookie),
+                    });
+                }
                 if operation == LOGOUT {
                     state.tickets.revoke(&token)?;
                 }
@@ -461,6 +518,53 @@ async fn execute(
         .await
         .map_err(|_| error(504, "请求超过时限，服务正在取消操作。"))?
         .map_err(|_| error(503, "应用服务意外中断。"))?
+}
+
+fn header_text(name: &str, value: &str) -> Result<String, ApiError> {
+    if ![
+        "X-ExportDocManager-Migration-Password",
+        "X-ExportDocManager-Migration-File-Name",
+        "X-ExportDocManager-PostgreSql-Backup-File-Name",
+    ]
+    .contains(&name)
+    {
+        return Ok(value.into());
+    }
+    let Some(encoded) = value.strip_prefix("UTF-8''") else {
+        return Ok(value.into());
+    };
+    let bytes = encoded.as_bytes();
+    let mut result = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            let hex = encoded
+                .get(index + 1..index + 3)
+                .ok_or_else(|| error(400, "请求头编码不完整。"))?;
+            result.push(u8::from_str_radix(hex, 16).map_err(|_| error(400, "请求头编码无效。"))?);
+            index += 3;
+        } else {
+            result.push(bytes[index]);
+            index += 1;
+        }
+    }
+    String::from_utf8(result).map_err(|_| error(400, "请求头不是有效 UTF-8 文本。"))
+}
+
+#[cfg(test)]
+mod header_tests {
+    use super::*;
+    #[test]
+    fn backup_header_unicode_and_literal_password_characters_roundtrip() {
+        let name = "X-ExportDocManager-Migration-Password";
+        assert_eq!(
+            header_text(name, "UTF-8''%E4%B8%AD%E6%96%87%20%2B%25").unwrap(),
+            "中文 +%"
+        );
+        assert_eq!(header_text(name, "plain+%41").unwrap(), "plain+%41");
+        assert!(header_text(name, "UTF-8''%GG").is_err());
+        assert!(header_text(name, "UTF-8''%FF").is_err());
+    }
 }
 
 fn request_seconds(operation: Operation) -> u64 {

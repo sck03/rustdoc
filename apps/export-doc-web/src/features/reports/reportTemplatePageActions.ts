@@ -1,7 +1,6 @@
 import type { FormEvent } from "react";
 import type { ApiUserReportTemplateDto } from "../../api/index.ts";
 import type { ConfirmationRequest } from "../../ui/ConfirmationProvider.tsx";
-import type { DesignerMode } from "./reportTemplateDesignerModel.ts";
 import type { UserReportTemplateLifecycleAction } from "./useUserReportTemplateLifecycleMutations.ts";
 
 type Confirm = (request: ConfirmationRequest) => Promise<boolean>;
@@ -29,7 +28,6 @@ export function createReportTemplatePageActions({
   deleteUserTemplate,
   deleteTemplate,
   canSave,
-  designerMode,
   workspaceHasUnappliedDesignerChanges,
   previewContent,
   saveNewDesignerContent,
@@ -60,7 +58,6 @@ export function createReportTemplatePageActions({
   deleteUserTemplate: () => void;
   deleteTemplate: () => void;
   canSave: boolean;
-  designerMode: DesignerMode;
   workspaceHasUnappliedDesignerChanges: boolean;
   previewContent: string;
   saveNewDesignerContent: (content: string) => Promise<void>;
@@ -163,7 +160,7 @@ export function createReportTemplatePageActions({
   function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSave) return;
-    if (designerMode === "v3" && workspaceHasUnappliedDesignerChanges) {
+    if (workspaceHasUnappliedDesignerChanges) {
       void saveNewDesignerContent(previewContent);
     } else if (isUserTemplate) {
       saveUserTemplate();

@@ -18,6 +18,7 @@ pub(crate) struct DesktopRuntimeContext {
 }
 
 pub(crate) struct DesktopRuntime {
+    service: std::sync::Weak<NativeService>,
     context: DesktopRuntimeContext,
     host: Mutex<Option<DesktopHost>>,
     stopping: AtomicBool,
@@ -31,8 +32,9 @@ pub(crate) fn start(
         std::env::var(key).ok()
     })?;
     let service = NativeService::open_with_retention(paths, retention)?;
-    let host = DesktopHost::start(service, !cfg!(feature = "custom-protocol"))?;
+    let host = DesktopHost::start(service.clone(), !cfg!(feature = "custom-protocol"))?;
     Ok(DesktopRuntime {
+        service: std::sync::Arc::downgrade(&service),
         context: DesktopRuntimeContext {
             api_base_url: host.api_base_url.clone(),
             desktop_access_token: host.access_token.clone(),
@@ -43,6 +45,23 @@ pub(crate) fn start(
         host: Mutex::new(Some(host)),
         stopping: AtomicBool::new(false),
     })
+}
+pub(crate) async fn authorize_update(app: &tauri::AppHandle, token: String) -> Result<(), String> {
+    let state = app.state::<DesktopRuntime>();
+    if state.stopping.load(Ordering::Acquire) {
+        return Err("程序正在关闭。".into());
+    }
+    let service = state
+        .service
+        .upgrade()
+        .ok_or_else(|| "后端已关闭。".to_owned())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        service
+            .authorize_administrator(&token)
+            .map_err(|cause| cause.to_string())
+    })
+    .await
+    .map_err(|_| "账号验证任务失败。".to_owned())?
 }
 
 #[tauri::command]

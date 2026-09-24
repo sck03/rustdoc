@@ -1,6 +1,8 @@
 import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { documentSpareKeys } from "../../ui/documentSpareFields.ts";
 import { isShippingMarksField } from "./reportDesignerFieldRendering.ts";
+import { parseReportDesignerV3Source, hasValidReportDesignerV3Schema } from "./reportDesignerV3TemplateParser.ts";
+import { exportReportDesignerV3SchemaToHtml } from "./reportDesignerV3HtmlExporter.ts";
 
 const shippingMarksSampleDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAABkCAAAAAAk3WRTAAADcUlEQVR4Ac3BCZIiwQEEwYgy/v/lFOTuzHI1fZUk3A3fbfDlBl9u8OUGX27w5QZf7sJcQpjJMJFUmMcwjfwKswymkX9kFsMcUgGpMIVhBqlQUmGCwQxS4Y9QMoHhNKlwRyqcZThJKjyRCucMTpIKz0LJOYYzpMJbUuEEw3FSYZFUOGxwnFRYFkoOMxwkFVZIhWMMh0iFDaTCEYNDpMIWoeQIw35SYTOpsJthL6mwi1TYabCXVNgnlOxk2EUqHCAV9jDsIBUOkgrbDXaQCkeFku0MW0mFU6TCRoZtpMJpUmGTwTZS4bxQsolhA6kwiVRYZ1glFSaSCmsGq6TCTKFkjeEzqTCdVPjI8IlUKCH8I4RnQighPBDCHanwweATqfBL9pB78iSUfHBhmVTYQR4YPglyJWHJhSVS4ZHhIHkjyJWE9wYLpMIuAuGO/JD3Qsl7g7eUm4QXsov8IUsSbpR3LrwhFY4IjwxrglxJeDF4JRXek0XyKPwQCItCyYvBM+UmYYIAArIi4UZ5Mnik3CS8F0AWCIQXIlfho4Qb5cHggVT4SDYLV3IV1oSSe4M7yk3CsvBReBL+COsSbpR/Br+Um4SPAsg78k7YIeFG+TH4IRX+K8JGoeSvwYOEVQHklUB4FSBslnDvwgMJ04U95MHgRyhZFUCeCYTTpMJfF34FuZLwfyMVfg3uJNwonwWQV+Ec5Sbhn8GDULJOHshpUuHehUdBriR8EJlOKjy68CzIlYRlEeSOQDhOKjwbvAol/ztS4cWFN4JcSVgSeRaOkgpvXHgryJWETeQ4qfDWYEEoWRAmkQrvXVgS5ErCKoFwhFRYcmFZkCsJb0ROkwrLBp+EknVhP6nwwYWPglxJeBE5RSp8ZFgjFaaSCisGq0LJTFJhjWEDqTCJVFhn2EQqTCAVthhsE0rOkwqbGLaSCqdIhY0M20mFw6TCZoMdQslRUmE7wy5S4QCpsIdhJ6mwk1TYZ7BXKNlHKuxk2E8qbCYVdjMcIRU2kQoHDA4JJVtIhSMMB0mFFVLhGMNhUuEDqXDU4LhQskwqHGY4Qyq8JRVOMJwjFV5IhVMGJ4WSZ1LhHMNpUuGOVDjLMIFU+EsqnDeYIZT8IRUmMMwhFZAKUxhmkTthksE04Z8wi2EiqTCPYSohzGT4boMvN/hygy83+HKDL/cfVmETodyaiYAAAAAASUVORK5CYII=";
 
@@ -49,9 +51,15 @@ export function isLocalReportDesignerPreviewSample(
 }
 
 export function renderReportDesignerLocalPreviewSample(
-  sourceHtml: string,
+  source: string,
   profile: Exclude<ReportDesignerPreviewSampleProfile, "apiSample">,
 ) {
+  if (!hasValidReportDesignerV3Schema(source)) return "";
+  const kind = profile === "paymentVoucher" ? "PaymentVoucher" : "ExportDocument";
+  const parsed = parseReportDesignerV3Source(source, kind);
+  if (parsed.issues.some(issue => issue.severity === "error")) return "";
+  const sourceHtml = exportReportDesignerV3SchemaToHtml(parsed.schema, kind)
+    .replace(/<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA[\s\S]*?-->/, "");
   const data = createPreviewSampleData(profile);
   const expandedLoops = expandInvoiceItemLoops(sourceHtml, data);
   const evaluatedConditionals = evaluateSimpleScribanConditionals(expandedLoops, data, {});

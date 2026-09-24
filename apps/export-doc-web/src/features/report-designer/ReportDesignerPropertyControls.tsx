@@ -321,7 +321,7 @@ export function BorderEditor({
             type="number"
             min={0}
             max={8}
-            step={1}
+            step="any"
             value={current.widthPx}
             onChange={(event) => update({ widthPx: normalizeNumber(event.target.value, current.widthPx) })}
           />
@@ -361,7 +361,7 @@ export function TextStyleEditor({
           type="number"
           min={6}
           max={48}
-          step={0.5}
+          step="any"
           value={style.fontSizePt ?? 10}
           onChange={(event) => onChange({ ...style, fontSizePt: normalizeNumber(event.target.value, 10) })}
         />
@@ -396,7 +396,7 @@ export function TextStyleEditor({
           type="number"
           min={0}
           max={30}
-          step={0.5}
+          step="any"
           value={style.marginTopMm ?? 0}
           onChange={(event) => onChange({ ...style, marginTopMm: normalizeNumber(event.target.value, 0) })}
         />
@@ -407,7 +407,7 @@ export function TextStyleEditor({
           type="number"
           min={0}
           max={30}
-          step={0.5}
+          step="any"
           value={style.marginBottomMm ?? 0}
           onChange={(event) => onChange({ ...style, marginBottomMm: normalizeNumber(event.target.value, 0) })}
         />

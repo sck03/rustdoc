@@ -100,7 +100,7 @@ export function normalizeGroupFooterContentKind(value: string): ReportDetailTabl
 }
 
 export function normalizeDetailCellPartKind(value: string): ReportDetailTableCellContent["kind"] {
-  if (value === "Field" || value === "LineBreak") {
+  if (value === "Field" || value === "LineBreak" || value === "ColumnBreak") {
     return value;
   }
 

@@ -24,6 +24,7 @@ import {
 import { fitReportDesignerV3Zoom } from "./reportDesignerV3WorkspaceHelpers.tsx";
 import { reportDesignerLayerBandStyle } from "./reportDesignerLayerBands.ts";
 import { ReportDesignerLayerResizers } from "./ReportDesignerLayerResizers.tsx";
+import { ReportDesignerProductRows } from "./ReportDesignerProductRows.tsx";
 import {
   ReportDesignerCanvasElementPreview,
   ReportDesignerCanvasResizeHandles,
@@ -72,6 +73,7 @@ export function ReportDesignerV3Canvas({
   onCommitLayerBand,
   onClearSelection,
   onCommitText,
+  onDropField,
   }: {
   state: ReportDesignerV3DocumentState;
   client?: ExportDocManagerApiClient;
@@ -88,6 +90,7 @@ export function ReportDesignerV3Canvas({
   onCommitLayerBand: (role: "Header" | "Footer", heightHundredthMm: number) => void;
   onClearSelection: () => void;
   onCommitText: (elementId: string, cellId: string | undefined, text: string) => void;
+  onDropField?: (fieldPath: string, x: number, y: number) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -434,6 +437,15 @@ export function ReportDesignerV3Canvas({
               transformOrigin: "top left",
             } as CSSProperties}
           onPointerMove={updateGesture}
+          onDragOver={event => { if (!disabled && event.dataTransfer.types.includes("application/x-exportdoc-field")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; } }}
+          onDrop={event => {
+            if (disabled) return;
+            const field = event.dataTransfer.getData("application/x-exportdoc-field");
+            const rect = event.currentTarget.getBoundingClientRect();
+            if (!field || !rect.width || !rect.height) return;
+            event.preventDefault();
+            onDropField?.(field, Math.round((event.clientX - rect.left) / rect.width * state.schema.page.widthHundredthMm), Math.round((event.clientY - rect.top) / rect.height * state.schema.page.heightHundredthMm));
+          }}
           onPointerUp={(event) => finishGesture(event)}
           onPointerCancel={(event) => finishGesture(event, true)}
           onLostPointerCapture={handleLostPointerCapture}
@@ -485,7 +497,7 @@ export function ReportDesignerV3Canvas({
                 })}
             </div>
           ))}
-          {showGuides ? <ReportDesignerLayerResizers schema={state.schema} disabled={disabled} onCommit={onCommitLayerBand} /> : null}
+          {showGuides ? <><ReportDesignerProductRows schema={state.schema} /><ReportDesignerLayerResizers schema={state.schema} disabled={disabled} onCommit={onCommitLayerBand} /></> : null}
           {textEdit ? <ReportDesignerCanvasTextEditor key={`${textEdit.elementId}:${textEdit.cellId ?? ""}`} edit={textEdit} zoom={zoom} onCancel={() => finishTextEdit()} onCommit={finishTextEdit} /> : null}
           </div>
         </div>
