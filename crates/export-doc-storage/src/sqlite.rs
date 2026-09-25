@@ -131,6 +131,44 @@ impl Adapter for Sqlite {
         body.map(|body| serde_json::from_str(&body).map_err(Into::into))
             .transpose()
     }
+    fn query_records(&self, q: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let connection = self.connection.borrow();
+        let filter = "kind=?1 AND company=?2 AND (?3 IS NULL OR department=?3) AND (?4 IS NULL OR owner_id=?4) AND (?5 IS NULL OR json_extract(body,'$.employeeId')=?5) AND (?6 IS NULL OR json_extract(body,'$.status')=?6) AND (?7 IS NULL OR json_extract(body,'$.requestId')=?7)";
+        let count = connection.query_row(
+            &format!("SELECT COUNT(*) FROM records WHERE {filter}"),
+            params![
+                q.kind,
+                q.company,
+                q.department,
+                q.owner,
+                q.employee,
+                q.status,
+                q.parent
+            ],
+            |row| row.get(0),
+        )?;
+        let mut statement = connection.prepare(&format!(
+            "SELECT body FROM records WHERE {filter} ORDER BY id DESC LIMIT ?8 OFFSET ?9"
+        ))?;
+        let rows = statement
+            .query_map(
+                params![
+                    q.kind,
+                    q.company,
+                    q.department,
+                    q.owner,
+                    q.employee,
+                    q.status,
+                    q.parent,
+                    q.limit.clamp(1, 100),
+                    q.offset.max(0)
+                ],
+                |row| row.get::<_, String>(0),
+            )?
+            .map(|row| serde_json::from_str(&row?).map_err(Into::into))
+            .collect::<Result<Vec<_>>>()?;
+        Ok((count, rows))
+    }
     fn insert(&self, r: &RecordWrite<'_>) -> Result<i64> {
         let c = self.connection.borrow();
         let b = r.body;

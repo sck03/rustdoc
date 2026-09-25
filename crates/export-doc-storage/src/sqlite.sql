@@ -1,6 +1,6 @@
 PRAGMA foreign_keys = ON;
-CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 4));
-INSERT INTO schema_version VALUES (4);
+CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 5));
+INSERT INTO schema_version VALUES (5);
 CREATE TABLE records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kind TEXT NOT NULL,
@@ -15,6 +15,9 @@ CREATE TABLE records (
 );
 CREATE INDEX records_kind_id ON records(kind, id DESC);
 CREATE INDEX records_scope ON records(kind, company, department, owner_id);
+CREATE INDEX records_company_page ON records(kind, company, id DESC);
+CREATE INDEX records_office_employee ON records(kind, company, json_extract(body,'$.employeeId'), json_extract(body,'$.status')) WHERE kind IN ('oa-leave','oa-expense','oa-travel','oa-overtime','oa-purchase','oa-general');
+CREATE INDEX records_office_parent ON records(kind, company, json_extract(body,'$.requestId'), id DESC) WHERE kind IN ('oa-event','oa-attachment');
 CREATE TABLE history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kind TEXT NOT NULL,

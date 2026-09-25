@@ -19,7 +19,7 @@ Tauri 是桌面宿主；浏览器与 Docker 不运行 Tauri 窗口。Node 只用
 - `apps/export-doc-web`：唯一 React 界面；页面组合、hook 查询与变更、纯 model、平台 bridge 分层。
 - `apps/export-doc-tauri/src-tauri`：Tauri 窗口、文件对话框、WebView 预检、退出、更新、运行目录与迁移。`desktop_runtime` 仅管理共用 Rust 后端生命周期。
 - `apps/export-doc-server`：HTTP 请求、上传下载、认证适配、容量与超时。桌面关闭默认 `postgres` feature，在随机 `127.0.0.1` 端口启动相同 router；团队二进制启用 PostgreSQL。
-- `crates/export-doc-contracts`：由原官方 `/openapi/v1.json` 生成的契约、权限与配置元数据。生成文件不能手改。
+- `crates/export-doc-contracts`：Rust OpenAPI 组合器保留原官方导出并扩展新能力，统一生成契约、权限和配置元数据。逐项比较原 schema/端点/认证/错误的回归保护既有接口，生成文件不能手改。
 - `export-doc-domain`：精确金额、数量、日期与纯业务规则，不依赖 UI、HTTP、数据库或宿主文件系统。
 - `export-doc-engine`：应用用例、权限、任务、报表及各可选能力编排；不放 SQL 或 Tauri command。
 - `export-doc-storage`：SQLite／PostgreSQL 18、事务、版本、单实例锁与持久化。
@@ -39,7 +39,7 @@ Slint 和 egui 客户端、专用构建与许可引用已退役。原 C# 源码�
 
 桌面令牌由 Rust 宿主生成，仅由主窗口受限 IPC 获取，不写 URL 或日志。随机回环端口、精确 Host／Origin 校验、官方 endpoint policy、登录会话与对象权限共同控制桌面访问。网络服务不安装本机文件／进程能力。
 
-AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。Rust 开发库使用独立空库基线 4，不打开原 C# v19 数据库，不做猜测迁移。
+AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。Rust 开发库使用独立空库基线 5，不打开原 C# v19 数据库，不做猜测迁移。
 
 ## 版本与许可
 

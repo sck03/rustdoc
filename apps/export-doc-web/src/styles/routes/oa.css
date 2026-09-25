@@ -1,0 +1,17 @@
+@layer route {
+.oa-workspace { display: grid; gap: calc(4 * 0.25rem); }
+.oa-heading { display: flex; align-items: start; justify-content: space-between; gap: calc(4 * 0.25rem); flex-wrap: wrap; }
+.oa-heading h2, .oa-detail h2 { margin: 0; }
+.oa-workspace a { color: var(--edm-primary-750); text-decoration: none; }
+.oa-workspace a:hover { text-decoration: underline; }
+.oa-workspace > .command-button { justify-self: start; }
+.oa-detail, .oa-lines, .oa-attachments { display: grid; gap: calc(3 * 0.25rem); min-width: 0; }
+.oa-line { padding: calc(3 * 0.25rem); border: 1px solid var(--edm-neutral-250); border-radius: var(--edm-radius-md); min-width: 0; }
+.oa-reason { white-space: pre-wrap; overflow-wrap: anywhere; }
+.oa-title-button { background: transparent; border: 0; padding: 0; color: var(--edm-neutral-850); text-align: left; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.oa-history { padding-inline-start: calc(5 * 0.25rem); }
+.oa-history li { padding-block: calc(2 * 0.25rem); }
+.oa-history p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.oa-attachments ul { padding: 0; list-style: none; }
+.oa-attachments li { margin-block: calc(2 * 0.25rem); overflow-wrap: anywhere; }
+}

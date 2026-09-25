@@ -395,13 +395,14 @@ async fn execute(
                     .map(response::Reply::bytes)
                     .map_err(|_| error(503, "上传结果编码失败。"))
             } else {
-                if [
-                    DOWNLOAD_REPORT_TEMPLATE_FILE,
-                    DOWNLOAD_REPORT_TEMPLATE_PACKAGE,
-                    DOWNLOAD_SUPPORT_PACKAGE,
-                    DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
-                ]
-                .contains(&operation)
+                if export_doc_engine::engine::oa::is_download(operation)
+                    || [
+                        DOWNLOAD_REPORT_TEMPLATE_FILE,
+                        DOWNLOAD_REPORT_TEMPLATE_PACKAGE,
+                        DOWNLOAD_SUPPORT_PACKAGE,
+                        DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
+                    ]
+                    .contains(&operation)
                 {
                     return state
                         .service

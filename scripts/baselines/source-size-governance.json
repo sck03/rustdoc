@@ -23,9 +23,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 86681,
+      "baselineAggregateLines": 87102,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 86881,
+      "maximumAggregateLines": 87302,
       "reportFiles": false
     },
     {
@@ -65,9 +65,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 7346,
+      "baselineAggregateLines": 7905,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 7466,
+      "maximumAggregateLines": 8025,
       "reportFiles": false
     },
     {

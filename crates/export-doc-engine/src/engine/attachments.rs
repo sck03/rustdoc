@@ -1,23 +1,17 @@
 use super::{
     auth,
     error::{Result, conflict, error, invalid, unavailable},
+    media::digest,
     records::{required, text},
     store::{self, Actor, Store},
 };
 use crate::{contracts, generated_api::*, paths};
 use export_doc_storage::{AuditWrite, BlobWrite};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use unicode_normalization::UnicodeNormalization;
 
 pub const FILE_LIMIT: usize = 16 * 1024 * 1024;
 pub const INVOICE_LIMIT: i64 = 256 * 1024 * 1024;
-fn digest(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
-}
 pub const OPERATIONS: &[Operation] = &[
     LIST_BUSINESS_ATTACHMENTS,
     GET_BUSINESS_ATTACHMENT,

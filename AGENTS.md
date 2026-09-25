@@ -59,7 +59,7 @@
 
 ### 3.3 API、错误和契约
 
-- `/openapi/v1.json` 是唯一 API 契约事实源。迁移期间从原 .NET 官方 OpenAPI 导出契约，Rust DTO、路由和权限元数据通过 `scripts/generate-native-api-client.mjs` 生成，React 客户端仍从相同契约生成；禁止手工修改生成文件或建立第二套 endpoint/schema。切换到 Rust 契约生成器须独立验证全部 schema、错误、认证及权限元数据，不能静默变更契约。
+- `/openapi/v1.json` 是唯一 API 契约事实源。当前由 `export-doc-contracts::openapi` 组合冻结的官方 .NET 基线与新增 Rust 能力；基线端点、schema、认证、错误和权限须逐项保留验证。Rust DTO、路由和权限元数据通过 `scripts/generate-native-api-client.mjs` 生成，React 客户端从相同文档生成；禁止手工修改生成文件或建立第二套 endpoint/schema。切换到 Rust 契约生成器须独立验证全部 schema、错误、认证及权限元数据，不能静默变更契约。
 - 端点认证、桌面令牌和许可证要求使用 endpoint metadata；不要按 `/api` 前缀、路径白名单或前端路由猜测授权。
 - 业务错误按现有分类映射：校验 400、权限 403、明确资源不存在 404、冲突 409、繁忙 429、依赖不可用 503、超时 504；不要把数据库、文件或外部工具故障包装成 404/409。
 - 所有异步公共操作都要有明确取消边界、超时和资源清理；后台任务完成、失败、取消和输出清理必须可观察且幂等。

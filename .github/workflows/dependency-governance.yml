@@ -88,8 +88,9 @@ jobs:
       - name: Audit Rust lock files
         run: |
           mkdir -p artifacts/dependency-governance
+          node scripts/verify-rustsec-glib-exception.mjs
           status=0
-          "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file Cargo.lock --json > artifacts/dependency-governance/rustsec-workspace.json || status=1
+          "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --ignore RUSTSEC-2024-0429 --file Cargo.lock --json > artifacts/dependency-governance/rustsec-workspace.json || status=1
           "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file apps/exportdoc-ocr-rs/Cargo.lock --json > artifacts/dependency-governance/rustsec-ocr.json || status=1
           "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file tools/excel-analyzer-rs/Cargo.lock --json > artifacts/dependency-governance/rustsec-excel.json || status=1
           exit "$status"

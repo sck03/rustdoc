@@ -124,7 +124,8 @@ export function PersonnelClearancePanel({ client, user, record }: { client: Expo
       {user.capabilities.canManageUsers && <> <Link to="/system/organization">前往组织架构</Link></>}
     </InlineNotice>}
     <InlineNotice tone={data.isClear ? "success" : "warning"} title={data.isClear ? "行政交接已结清" : "还有事项需要处理"}>
-      {data.isClear ? "目前没有未结清的预约、钥匙或借用物品。" : `预约 ${data.meetingCount} 笔，物品申请／借用 ${data.supplyCount} 笔。请先完成归还，或取消未交接申请。`}
+      {data.isClear ? "目前没有未结清的行政或人事事项。" : `预约 ${data.meetingCount} 笔，物品申请／借用 ${data.supplyCount} 笔，行政与人事申请 ${data.approvalCount ?? 0} 笔。请先完成办理或取消申请。`}
+      {(data.approvalCount ?? 0) > 0 && <> <Link to="/office/approvals">前往申请与审批中心</Link></>}
     </InlineNotice>
     {data.items.length > 0 && <ul>{data.items.map((item) => {
       const kind = item.kind === "rooms" ? "rooms" : "supplies";

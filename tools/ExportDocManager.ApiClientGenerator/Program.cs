@@ -3,7 +3,10 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 
 var options = GeneratorOptions.Parse(args);
-var document = await OfficialOpenApiDocumentLoader.LoadAsync(options.BaseUrl);
+var document = options.OpenApiPath is null
+    ? await OfficialOpenApiDocumentLoader.LoadAsync(options.BaseUrl)
+    : JsonNode.Parse(await File.ReadAllTextAsync(options.OpenApiPath)) as JsonObject
+        ?? throw new InvalidOperationException("OpenAPI document could not be parsed.");
 string generated = TypeScriptClientGenerator.Generate(document);
 string? outputDirectory = Path.GetDirectoryName(options.OutputPath);
 if (!string.IsNullOrWhiteSpace(outputDirectory))

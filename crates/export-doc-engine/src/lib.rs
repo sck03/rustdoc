@@ -10,7 +10,6 @@ pub mod operation;
 pub mod paths;
 pub mod pdf;
 pub mod runtime;
-pub mod workspace;
 
 pub mod secrets;
 

@@ -135,6 +135,45 @@ pub fn initialize(connection_string: &str, owner: &str) -> Result<()> {
     validate_schema(&mut client)
 }
 impl Adapter for Postgres {
+    fn query_records(&self, q: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let mut client = self.client.borrow_mut();
+        let filter = "kind=$1 AND company=$2 AND ($3::text IS NULL OR department=$3) AND ($4::bigint IS NULL OR owner_id=$4) AND ($5::bigint IS NULL OR (body->>'employeeId')::bigint=$5) AND ($6::text IS NULL OR body->>'status'=$6) AND ($7::bigint IS NULL OR (body->>'requestId')::bigint=$7)";
+        let count = client
+            .query_one(
+                &format!("SELECT COUNT(*) FROM records WHERE {filter}"),
+                &[
+                    &q.kind,
+                    &q.company,
+                    &q.department,
+                    &q.owner,
+                    &q.employee,
+                    &q.status,
+                    &q.parent,
+                ],
+            )?
+            .try_get(0)?;
+        let rows = client
+            .query(
+                &format!(
+                    "SELECT body::text FROM records WHERE {filter} ORDER BY id DESC LIMIT $8 OFFSET $9"
+                ),
+                &[
+                    &q.kind,
+                    &q.company,
+                    &q.department,
+                    &q.owner,
+                    &q.employee,
+                    &q.status,
+                    &q.parent,
+                    &q.limit.clamp(1, 100),
+                    &q.offset.max(0),
+                ],
+            )?
+            .into_iter()
+            .map(|row| serde_json::from_str(&row.try_get::<_, String>(0)?).map_err(Into::into))
+            .collect::<Result<Vec<_>>>()?;
+        Ok((count, rows))
+    }
     fn provider(&self) -> &'static str {
         "PostgreSQL"
     }

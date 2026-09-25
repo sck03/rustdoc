@@ -52,6 +52,8 @@ Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ub
 
 ## 签名与验收边界
 
+2026-09-25 修复 run `36081725495` 的相邻仓库链接依赖：证据链接改用本仓库保留的 C# 对照源码，干净 checkout 即可校验。修复 run `36081725496` 时启用上述单项 GLib 例外：先验证固定版本和所有锁定依赖源码，再仅对主锁图传入 `--ignore RUSTSEC-2024-0429`；OCR/Excel 审计不豁免，`unsound`/`yanked` 及其它公告继续阻断。本机扫描 22,212 个 Rust 文件通过；这不表示上游漏洞已修复，Tauri/GLib 升级时必须移除或重新评估例外。
+
 GitHub Release 附件供人工下载安装，不启用 Tauri updater 通道。系统级 Authenticode、Developer ID 和 Apple 公证不执行；Tauri 的签名/固定公钥校验保留，正式升级须另按[更新合同](./Tauri正式更新签名与发布配置.md)验收。
 
 只有对应 OS/架构成功运行的 GitHub 结果才作为该项证据；本机 GNU 构建不替代 Windows MSVC，编译不替代 Linux/macOS/ARM64 真机、输入法、PDF/打印与更新验收。

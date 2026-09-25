@@ -10,7 +10,7 @@ use serde_json::Value;
 use std::{cell::Cell, path::Path};
 
 pub type Result<T> = std::result::Result<T, Error>;
-pub const SCHEMA_VERSION: i64 = 4;
+pub const SCHEMA_VERSION: i64 = 5;
 pub fn verify_sqlite_backup(path: &Path) -> Result<()> {
     sqlite::Sqlite::verify_file(path)
 }
@@ -60,6 +60,19 @@ pub struct RecordWrite<'a> {
     pub identity: Option<&'a str>,
     pub body: &'a Value,
 }
+/// Indexed, bounded reads with authorization scope applied before pagination.
+#[derive(Default)]
+pub struct RecordQuery<'a> {
+    pub kind: &'a str,
+    pub company: &'a str,
+    pub department: Option<&'a str>,
+    pub owner: Option<i64>,
+    pub employee: Option<i64>,
+    pub parent: Option<i64>,
+    pub status: Option<&'a str>,
+    pub offset: i64,
+    pub limit: i64,
+}
 pub struct AuditWrite<'a> {
     pub kind: &'a str,
     pub record_id: i64,
@@ -101,6 +114,7 @@ trait Adapter: Send {
     fn get(&self, kind: &str, id: i64) -> Result<Option<Value>>;
     fn find_identity(&self, kind: &str, identity: &str) -> Result<Option<Value>>;
     fn all(&self, kind: &str) -> Result<Vec<Value>>;
+    fn query_records(&self, query: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)>;
     fn insert(&self, record: &RecordWrite<'_>) -> Result<i64>;
     fn update(&self, id: i64, expected: i64, record: &RecordWrite<'_>) -> Result<bool>;
     fn set_body(&self, id: i64, body: &Value) -> Result<()>;
@@ -142,6 +156,10 @@ pub struct Connection {
     failed: Cell<bool>,
 }
 impl Connection {
+    pub fn query_records(&self, query: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        self.health()?;
+        self.adapter.query_records(query)
+    }
     pub fn sqlite(path: &Path) -> Result<Self> {
         Ok(Self {
             adapter: Box::new(sqlite::Sqlite::open(path)?),

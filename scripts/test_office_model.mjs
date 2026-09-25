@@ -13,6 +13,7 @@ const source = name => JSON.stringify(path.join(web, "src", name).replaceAll("\\
 const bundle = path.join(output, "model.mjs");
 await require("esbuild").build({ stdin: { contents: `
   export * as office from ${source("features/office/officeModel.ts")};
+  export * as oa from ${source("features/oa/oaModel.ts")};
   export * as personnel from ${source("features/office/personnelModel.ts")};
   export * as organization from ${source("features/organization/organizationModel.ts")};
   export * as navigation from ${source("app/workspaceNavigation.ts")};
@@ -20,7 +21,7 @@ await require("esbuild").build({ stdin: { contents: `
   export { isRouteAccessAllowed } from ${source("app/routeAccess.ts")};
   export { createRequestKey } from ${source("ui/createRequestKey.ts")};
 `, loader: "ts", resolveDir: web }, bundle: true, platform: "node", format: "esm", outfile: bundle, logLevel: "silent" });
-const { office, personnel, organization, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey } = await import(pathToFileURL(bundle).href);
+const { office, oa, personnel, organization, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey } = await import(pathToFileURL(bundle).href);
 const grants = scope => ["office.rooms", "office.supplies"].flatMap(resourceKey =>
   ["view", "create", "cancel", "approve", "issue", "return", "restock", "manage"].map(action => ({ resourceKey, action, dataScope: scope })));
 const user = { id: 1, companyScope: "C1", departmentId: "D1", businessDate: "2026-09-07",
@@ -32,6 +33,11 @@ const manager = { ...user, capabilities: { ...user.capabilities, permissions: gr
 assert.deepEqual(office.officeRequestActions(row, manager, "rooms").map(entry => entry.action), ["approve", "reject", "cancel"]);
 assert(!office.officeRequestActions({ ...row, ownerUserId: 1 }, manager, "rooms").some(entry => entry.action === "approve"), "self approval must not be offered");
 assert(!office.officeAccess({ ...user, capabilities: { permissions: grants("unknown") } }, "rooms").allows("approve"));
+const oaUser = { ...user, capabilities: { permissions: ["view","edit","approve"].map(action => ({ resourceKey:"office.leave", action, dataScope:action==="view"?"company":"own" })) } };
+assert.deepEqual(oa.oaActions({ ...row, kind:"leave" }, oaUser), [], "broad read access must not expose out-of-scope approval actions");
+const oaManager = { ...oaUser, capabilities: { permissions: oaUser.capabilities.permissions.map(grant => ({ ...grant, dataScope:"company" })) } };
+assert(!oa.oaActions({ ...row, kind:"leave", ownerUserId:user.id }, oaManager).includes("approve"), "team self-approval remains unavailable");
+assert.equal(oa.oaActionLabel("complete","expense",false), "移交财务", "expense completion records handoff without implying payment");
 assert.equal(office.officeStatus({ ...row, status: "InUse" }, user.businessDate, Date.parse(row.endsAt)), "超时未归还");
 assert.equal(office.officeStatus({ status: "Issued", isReturnable: true, returnDueDate: "2026-09-06", quantity: 2, returnedQuantity: 1 }, user.businessDate), "逾期未归还");
 assert.equal(office.officeStatus({ status: "Issued", isReturnable: true, returnDueDate: "2026-09-08", quantity: 2, returnedQuantity: 1 }, user.businessDate), "部分归还");
@@ -89,7 +95,7 @@ const registerUser = { ...manager, capabilities: { ...manager.capabilities, prod
   canManageSettings:true, canManageUsers:true, enabledModules:["office.rooms","office.supplies","office.people","system.about"],
   permissions:[...grants("all"), ...["view","view-details"].map(action=>({resourceKey:"office.people",action,dataScope:"all"}))] } };
 assert.equal(getDefaultWorkspaceRoute(registerUser.capabilities), "/office/people");
-assert.equal(navigation.filterWorkspaceNavGroups({ ...registerUser.capabilities, isDesktopRuntime:true }).find(group=>group.key==='office').items.length,4);
+assert.equal(navigation.filterWorkspaceNavGroups({ ...registerUser.capabilities, isDesktopRuntime:true }).filter(group=>['office','personnel'].includes(group.key)).flatMap(group=>group.items).length,4);
 const fullRegisterUser = { ...registerUser, capabilities: { ...registerUser.capabilities, productEdition: "Full", canUseDocumentWorkspace: true, canUseSalesWorkspace: true } };
 for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supplies"]) {
   assert(isRouteAccessAllowed({ pathname, user: fullRegisterUser, canManageSystem: true, isDesktopRuntime: true }), "Full desktop permits direct administration routes");

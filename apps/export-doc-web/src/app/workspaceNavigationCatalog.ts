@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { permissionActions, permissionResources } from "./permissionCatalog.ts";
 import { settingsFeatureLinks } from "../features/settings/settingsFeatureLinks.ts";
+import { oaKinds, oaModules, type OaKind } from "../features/oa/oaModel.ts";
 
 export type WorkspacePermissionRequirement = { resourceKey: string; action: string };
 export type WorkspacePermissionGrant = WorkspacePermissionRequirement & { dataScope?: string };
@@ -57,6 +58,9 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     items: [
       { label: "我的待办", description: "查看需要办理的业务事项，进入对应业务继续处理", to: "/worklist", icon: ClipboardList,
         isActive: (path) => path === "/worklist", requiredFeature: "worklist" },
+      { label: "申请与审批", description: "查看行政和人事申请进度，办理审批与归档", to: "/office/approvals", icon: ClipboardList,
+        isActive: (path) => path === "/office/approvals", workspace: "office", permissionMatch: "any",
+        requiredPermissions: oaKinds.map((kind) => ({ resourceKey: oaModules[kind].resource, action: "view" })) },
       { label: "工作概览", description: "按业务权限查看单证与销售概况", to: "/dashboard", icon: LayoutDashboard,
         isActive: (path) => isDashboardRoute(path) || path.startsWith("/crm/dashboard"), showSectionNav: true, children: [
       { label: "单证概览", description: "查看业务金额、近期单据与单证进度", keywords: "仪表盘", to: "/dashboard", icon: LayoutDashboard,
@@ -131,7 +135,7 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     ],
   },
   {
-    key: "office", label: "公司行政", shortLabel: "行政", icon: CalendarDays,
+    key: "personnel", label: "人事管理", shortLabel: "人事", icon: UsersRound,
     items: [
       { label: "人员档案", description: "查找人员，办理入职、转正、调岗和离职", keywords: "人员信息管理 人事 误录修正", to: "/office/people", icon: UsersRound,
         isActive: (path) => path.startsWith("/office/people"), workspace: "office", moduleKey: "office.people",
@@ -139,12 +143,19 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
       { label: "公司通讯录", description: "查找同事的工作电话、邮箱和办公地点", keywords: "联系 同事 部门", to: "/office/directory", icon: ContactRound,
         isActive: (path) => path.startsWith("/office/directory"), workspace: "office", moduleKey: "office.people",
         requiredPermissions: [{ resourceKey: permissionResources.officePeople, action: permissionActions.view }] },
+      ...(["leave", "overtime"] as const).map(oaNavigation),
+    ],
+  },
+  {
+    key: "office", label: "行政办公", shortLabel: "行政", icon: CalendarDays,
+    items: [
       { label: "会议室预约", description: "查看日程，办理会议室预约与钥匙交接", to: "/office/meeting-rooms", icon: CalendarDays,
         isActive: (path) => path.startsWith("/office/meeting-rooms"), workspace: "office", moduleKey: "office.rooms",
         requiredPermissions: [{ resourceKey: permissionResources.officeRooms, action: permissionActions.view }] },
       { label: "物品领用", description: "登记办公物品领用，办理发放、归还与库存补充", to: "/office/supplies", icon: Package,
         isActive: (path) => path.startsWith("/office/supplies"), workspace: "office", moduleKey: "office.supplies",
         requiredPermissions: [{ resourceKey: permissionResources.officeSupplies, action: permissionActions.view }] },
+      ...(["expense", "travel", "purchase", "general"] as const).map(oaNavigation),
     ],
   },
   {
@@ -191,6 +202,14 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     ],
   },
 ];
+
+function oaNavigation(kind: OaKind): WorkspaceNavItem {
+  const module = oaModules[kind];
+  const to = `/office/requests/${kind}`;
+  return { label: module.name, description: module.description, to, icon: ClipboardList,
+    isActive: (path) => path === to, workspace: "office", moduleKey: module.resource,
+    requiredPermissions: [{ resourceKey: module.resource, action: "view" }] };
+}
 
 export function isDashboardRoute(pathname: string) { return pathname === "/" || pathname.startsWith("/dashboard"); }
 export function isLicenseRoute(pathname: string) { return pathname.startsWith("/system/license"); }

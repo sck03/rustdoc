@@ -38,6 +38,9 @@ impl NativeService {
             )
     }
     pub fn supports(operation: Operation) -> bool {
+        if oa::metadata(operation).is_some() {
+            return true;
+        }
         #[cfg(feature = "invoice-transfer")]
         if invoice_transfer::OPERATIONS.contains(&operation) {
             return true;
@@ -173,6 +176,11 @@ impl NativeService {
         if invoice_transfer::UPLOADS.contains(&operation) {
             return invoice_transfer::upload(
                 self, &actor, operation, &metadata, file_name, content,
+            );
+        }
+        if oa::metadata(operation).is_some() {
+            return oa::upload(
+                self, &actor, operation, parameters, &metadata, file_name, content,
             );
         }
         if team_backup::UPLOADS.contains(&operation) {

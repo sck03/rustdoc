@@ -248,9 +248,16 @@ fn session_version(store: &Store, user: &Value) -> Result<(i64, i64)> {
 }
 
 fn actor_from(store: &Store, user: &Value) -> Result<Actor> {
+    actor_from_connection(&*store.connection()?, user)
+}
+
+fn actor_from_connection(
+    connection: &export_doc_storage::Connection,
+    user: &Value,
+) -> Result<Actor> {
     let grants = if let Some(template) = user["permissionTemplateId"].as_i64().filter(|id| *id > 0)
     {
-        let template = store.connection()?.get("permission-templates", template)?;
+        let template = connection.get("permission-templates", template)?;
         if let Some(template) = template.filter(|template| template["isActive"] == true) {
             let grants: Vec<Grant> = serde_json::from_value(template["grants"].clone())?;
             permissions::effective(&grants).map_err(unavailable)?
@@ -274,11 +281,15 @@ fn actor_from(store: &Store, user: &Value) -> Result<Actor> {
 }
 
 pub fn current_actor(store: &Store, id: i64) -> Result<Actor> {
-    let user = store.get("users", id)?;
+    current_actor_in(&*store.connection()?, id)
+}
+
+pub fn current_actor_in(connection: &export_doc_storage::Connection, id: i64) -> Result<Actor> {
+    let user = store::get(connection, "users", id)?;
     if user["isActive"] != true {
         return Err(error(403, "账号已停用。"));
     }
-    actor_from(store, &user)
+    actor_from_connection(connection, &user)
 }
 
 pub fn user_dto(

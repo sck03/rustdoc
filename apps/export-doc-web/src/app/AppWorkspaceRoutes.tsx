@@ -6,6 +6,7 @@ import { permissionActions, permissionResources, resolveReportTemplateAccess } f
 import { getDefaultWorkspaceRoute, type ProductEditionPresentation } from "./productEdition.ts";
 import { PageState } from "../ui/PageState.tsx";
 import { isDesktopBridgeAvailable } from "../desktop/desktopBridge.ts";
+import { oaRoutes } from "../features/oa/oaRoutes.tsx";
 
 type NamedComponent<TModule, TExport extends keyof TModule> =
   TModule[TExport] extends ComponentType<infer TProps> ? ComponentType<TProps> : never;
@@ -131,6 +132,7 @@ export function AppWorkspaceRoutes({
         <Route path="/invoices" element={<InvoiceListPage client={client} />} />
         <Route path="/office/meeting-rooms" element={<MeetingRoomsPage client={client} user={user} />} />
         <Route path="/office/supplies" element={<OfficeSuppliesPage client={client} user={user} />} />
+        {oaRoutes(client, user)}
         <Route path="/office/people" element={<PersonnelPage key="records" client={client} user={user} />} />
         <Route path="/office/people/:employeeId" element={<PersonnelPage key="records" client={client} user={user} />} />
         <Route path="/office/directory" element={<PersonnelPage key="directory" client={client} user={user} directoryOnly />} />

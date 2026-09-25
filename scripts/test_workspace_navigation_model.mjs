@@ -74,12 +74,12 @@ assert(model.findActiveWorkspaceNavGroupKey("/tools/ocr") === "resources", "tool
 assert(model.findActiveWorkspaceNavGroupKey("/master-data/hs-knowledge/search") === "documents", "classification belongs to document work");
 assert(model.findActiveWorkspaceNavGroupKey("/business-attachments") === "documents", "business files belong to document work");
 assert(model.findActiveWorkspaceNavGroupKey("/jobs") === "workspace", "file progress is distinct from business entry");
-assert(model.workspaceNavGroups.length === 6, "navigation uses six task groups");
+assert(model.workspaceNavGroups.length === 7, "navigation separates personnel from office services");
 assert(model.createInitialWorkspaceNavGroupState("/settings").size === 1, "only the current group starts expanded");
 assert(model.createInitialWorkspaceNavGroupState("/settings").has("system"), "active group starts expanded");
 const navigationItems = model.workspaceNavGroups.flatMap((group) => group.items);
 const routeItems = model.getWorkspaceRouteItems();
-assert(navigationItems.length === 28, "primary navigation has 28 business entries");
+assert(navigationItems.length === 35, "primary navigation includes six request modules and approval center");
 const allModules = [...new Set(routeItems.flatMap((item) => item.moduleKey ? [item.moduleKey] : []))];
 const allPermissions = routeItems.flatMap((item) => item.requiredPermissions ?? [])
   .map((requirement) => permissionGrant(requirement.resourceKey, requirement.action));
@@ -95,7 +95,8 @@ const salesEditionAdminGroups = model.filterWorkspaceNavGroups({ productEdition:
 const browserAdminGroups = model.filterWorkspaceNavGroups({ productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, isDesktopRuntime: false, ...fullNavigationGrants });
 const fullDesktopCapabilities = { productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, usesOfficeRegister: true, isDesktopRuntime: true, ...fullNavigationGrants };
 const adminGroups = model.filterWorkspaceNavGroups(fullDesktopCapabilities);
-assert(adminGroups.find((group) => group.key === "office")?.items.length === 4, "Full desktop includes every administration entry");
+assert(adminGroups.find((group) => group.key === "office")?.items.length === 6, "Full desktop includes office resources and four administrative request modules");
+assert(adminGroups.find((group) => group.key === "personnel")?.items.length === 4, "Full desktop separates directory, personnel, leave and overtime");
 assert(product.getDefaultWorkspaceRoute(fullDesktopCapabilities) === "/dashboard", "Full desktop retains its business home after enabling administration");
 for (const item of navigationItems) {
   assert(navigationItems.filter((candidate) => candidate.isActive(item.to)).length === 1, `each route has one navigation owner: ${item.to}`);

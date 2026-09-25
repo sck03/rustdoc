@@ -3,6 +3,8 @@
 mod account_scope;
 #[path = "support/business_contract.rs"]
 mod business_contract;
+#[path = "support/oa_contract.rs"]
+mod oa_contract;
 #[path = "support/office_contract.rs"]
 mod office_contract;
 #[path = "support/tools_contract.rs"]
@@ -240,6 +242,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
         &|op, id, query, body| request(staff_token, op, id, query, body),
         None,
     );
+    oa_contract::exercise(&service, admin_token, staff_token, None);
     account_scope::exercise(&service, admin_token);
     service.close().unwrap();
     drop(Arc::clone(&service));

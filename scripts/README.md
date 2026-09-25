@@ -37,7 +37,7 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 `run-native-docker.ps1 -PrepareOnly -NoPause` 只生成私有配置；普通运行构建并启动，`-Stop -NoPause` 停止并保留数据库。默认绑定 `127.0.0.1:5188`；局域网地址须显式设置。凭据保存在忽略的 `deploy/rust-native/runtime/`，不进入 Git 或镜像。
 
-首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接只供初始化／维护使用。桌面 SQLite 空库仍为 admin 空密码，数据库使用独立 Rust 基线 4，不能打开 C# v19 或旧 Rust 试验库。
+首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接只供初始化／维护使用。桌面 SQLite 空库仍为 admin 空密码，数据库使用独立 Rust 基线 5，不能打开 C# v19 或旧 Rust 试验库。
 
 ## 远端入口
 
@@ -74,6 +74,10 @@ Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公
 运行已发布镜像：`./scripts/run-native-docker.ps1 -Image ghcr.io/<owner>/exportdoc-rust-native:0.1.2 -SkipBuild -NoPause`。后续启动、停止和恢复均使用同一 `-Image` 参数。`-SkipBuild` 使用已有/拉取的镜像；默认本地命令仍从源码构建。
 
 ## 验证和证据
+
+开发时通过 `generate-api-client.ps1` 运行 Rust OpenAPI 组合器，再生成 Rust 与 React 客户端。`crates/export-doc-contracts/src/reference_openapi.json` 是保留的官方 .NET 基线，新增能力只修改 Rust 组合器，不能覆盖生成文件或另建前端 URL/schema。TypeScript 代码生成工具仍是开发期 C# 工具，不随 Rust 产品交付。`--OpenApiPath` 仅用于显式指定已审阅的契约输入。
+
+OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --example office_review`，再执行 `npm --prefix apps/export-doc-web run test:oa-ui`。回环测试宿主使用独立 DataRoot，覆盖六类申请、附件、办理记录和窄屏；不代替 PostgreSQL 18 或 Tauri 验收。
 
 文档整理后运行 `node scripts/verify-documentation-links.mjs`，检查 docs、根 README 和本页的本地文件链接；当前入口不应引用已退役的文档或工作流。
 

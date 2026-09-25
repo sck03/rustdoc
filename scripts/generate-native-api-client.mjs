@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -98,14 +98,25 @@ const format = spawnSync("rustfmt", ["--edition", "2024", "--emit", "stdout"], {
 if (format.status !== 0) throw new Error(`rustfmt failed: ${format.stderr}`);
 output = format.stdout.replace(/\r\n/gu, "\n");
 const contractPath = fileURLToPath(new URL("../crates/export-doc-contracts/src/generated_contract.json", import.meta.url));
-const contract = `${JSON.stringify({ source: "official /openapi/v1.json", digest, configuration: input.configuration, permissions: input.permissions, operations: Object.fromEntries(operations.map(op => [op.operationId, { policy: op["x-exportdoc-policy"], parameters: op.parameters ?? [], requestBody: op.requestBody ?? null, responses: op.responses, request: op.requestBody?.content?.["application/json"]?.schema ?? null, response: Object.entries(op.responses ?? {}).find(([code]) => /^2\d\d$/u.test(code))?.[1]?.content?.["application/json"]?.schema ?? null }])), schemas: input.schemas }, null, 2)}\n`;
+const contract = `${JSON.stringify({ source: "official /openapi/v1.json", digest, configuration: input.configuration, permissions: input.permissions, operations: Object.fromEntries(operations.map(op => [op.operationId, { policy: op["x-exportdoc-policy"], office: op["x-exportdoc-office"] ?? null, parameters: op.parameters ?? [], requestBody: op.requestBody ?? null, responses: op.responses, request: op.requestBody?.content?.["application/json"]?.schema ?? null, response: Object.entries(op.responses ?? {}).find(([code]) => /^2\d\d$/u.test(code))?.[1]?.content?.["application/json"]?.schema ?? null }])), schemas: input.schemas }, null, 2)}\n`;
 const openapiPath = fileURLToPath(new URL("../crates/export-doc-contracts/src/openapi.json", import.meta.url));
 const openapi = JSON.stringify(document, null, 2) + "\n";
 if (args.includes("--check")) {
   if (readFileSync(destination, "utf8").replace(/\r\n/gu, "\n") !== output || readFileSync(contractPath, "utf8").replace(/\r\n/gu, "\n") !== contract || readFileSync(openapiPath, "utf8").replace(/\r\n/gu, "\n") !== openapi) throw new Error("Native API contract drift. Regenerate from the current official OpenAPI.");
 } else {
-  writeFileSync(destination, output, "utf8");
-  writeFileSync(contractPath, contract, "utf8");
-  writeFileSync(openapiPath, openapi, "utf8");
+  writeGenerated(destination, output);
+  writeGenerated(contractPath, contract);
+  writeGenerated(openapiPath, openapi);
 }
 console.log(`Native OpenAPI client: ${operations.length} operations, ${names.length} schemas; ${args.includes("--check") ? "verified" : "generated"}.`);
+
+function writeGenerated(file, contents) {
+  if (existsSync(file) && readFileSync(file, "utf8") === contents) return;
+  // Replace from the same directory: Windows readers may map the old file,
+  // which forbids truncation, while a replacement also prevents partial JSON.
+  const temporary = `${file}.${process.pid}.tmp`;
+  try {
+    writeFileSync(temporary, contents, { encoding: "utf8", flag: "wx" });
+    renameSync(temporary, file);
+  } finally { rmSync(temporary, { force: true }); }
+}

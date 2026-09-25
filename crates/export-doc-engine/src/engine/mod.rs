@@ -43,6 +43,7 @@ mod licensing;
 mod lifecycle;
 mod maintenance;
 mod media;
+pub mod oa;
 #[cfg(feature = "ocr")]
 mod ocr;
 mod office;
@@ -197,6 +198,9 @@ impl NativeService {
             .map_err(|_| unavailable("数据库维护状态异常。"))?;
         let actor = self.sessions.actor(&self.store, token)?;
         self.authorize_operation(&actor, operation, &[])?;
+        if oa::is_download(operation) {
+            return oa::download(self, &actor, operation, parameters);
+        }
         match operation {
             DOWNLOAD_REPORT_TEMPLATE_FILE | DOWNLOAD_REPORT_TEMPLATE_PACKAGE => {
                 report_template_files::download(self, &actor, operation, parameters)
@@ -291,6 +295,17 @@ impl NativeService {
             _ => {
                 let actor = self.sessions.actor(&self.store, token)?;
                 self.authorize_operation(&actor, operation, query)?;
+                if oa::metadata(operation).is_some() {
+                    return serde_json::to_vec(&oa::handle(
+                        self,
+                        &actor,
+                        operation,
+                        parameters,
+                        query,
+                        &body_value,
+                    )?)
+                    .map_err(Into::into);
+                }
                 if operation == START_PDF_MERGE_SAVE_TO_PATH_JOB {
                     return serde_json::to_vec(&pdf_merge::local(self, &actor, &body_value)?)
                         .map_err(Into::into);

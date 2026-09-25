@@ -287,10 +287,12 @@ fn clearance_for(
         .collect::<Vec<_>>();
     let meeting_count = meetings.len();
     let supply_count = supplies.len();
-    let clear = meeting_count == 0 && supply_count == 0;
+    let approval_count =
+        super::oa::references(tx, company.as_str().unwrap_or(""), employee, account, true)?;
+    let clear = meeting_count == 0 && supply_count == 0 && approval_count == 0;
     meetings.sort_by_key(|r| r["requestId"].as_i64());
     supplies.sort_by_key(|r| r["requestId"].as_i64());
     Ok(
-        json!({"meetingCount":meeting_count,"supplyCount":supply_count,"items":meetings.into_iter().take(20).chain(supplies.into_iter().take(20)).collect::<Vec<_>>(),"canDepart":clear&&departments.is_empty(),"isClear":clear,"managedDepartments":departments}),
+        json!({"meetingCount":meeting_count,"supplyCount":supply_count,"approvalCount":approval_count,"items":meetings.into_iter().take(20).chain(supplies.into_iter().take(20)).collect::<Vec<_>>(),"canDepart":clear&&departments.is_empty(),"isClear":clear,"managedDepartments":departments}),
     )
 }

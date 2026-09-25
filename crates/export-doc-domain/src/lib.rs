@@ -9,6 +9,7 @@ pub mod invoice_calculation;
 pub mod invoice_columns;
 pub mod invoice_grid;
 pub mod invoice_query;
+pub mod oa;
 pub mod organization;
 pub mod packing;
 pub mod party;

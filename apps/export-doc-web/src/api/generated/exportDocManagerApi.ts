@@ -3914,6 +3914,119 @@ export interface MeetingRoomSaveRequest {
 
 export type NotifyPartyMode = "None" | "SameAsConsignee" | "Separate";
 
+export interface OaAction {
+  expectedVersion: number;
+  note: string;
+}
+
+export interface OaAttachment {
+  fileName: string;
+  id: number;
+  mediaType: string;
+  sizeBytes: number;
+}
+
+export interface OaEvent {
+  action: string;
+  actorName: string;
+  id: number;
+  note: string;
+  occurredAt: string;
+  requestVersion: number;
+}
+
+export interface OaEventPage {
+  items: OaEvent[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface OaExpenseLine {
+  amount: string;
+  category: "Travel" | "Transport" | "Meals" | "Office" | "Other";
+  description: string;
+  spentOn: string;
+}
+
+export interface OaLeave {
+  category: "Annual" | "Sick" | "Personal" | "Other";
+  endPeriod: "AM" | "PM";
+  endsOn: string;
+  startPeriod: "AM" | "PM";
+  startsOn: string;
+}
+
+export interface OaOvertime {
+  endsAt: string;
+  location: string;
+  startsAt: string;
+}
+
+export interface OaPurchaseLine {
+  name: string;
+  quantity: string;
+  specification?: string;
+  unit: string;
+  unitPrice: string;
+}
+
+export interface OaRequest {
+  attachments: OaAttachment[];
+  category?: "Seal" | "Certificate" | "IT" | "Repair" | "Other";
+  createdAt: string;
+  currency?: "CNY" | "USD" | "EUR" | "HKD" | "JPY" | "GBP";
+  departmentId: string;
+  durationDays: string;
+  durationHours: string;
+  employeeId: number;
+  employeeName: string;
+  expectedVersion?: number;
+  id: number;
+  kind: "leave" | "expense" | "travel" | "overtime" | "purchase" | "general";
+  leave?: OaLeave;
+  lines?: OaExpenseLine[];
+  overtime?: OaOvertime;
+  ownerUserId: number;
+  purchaseLines?: OaPurchaseLine[];
+  reason: string;
+  requestKey: string;
+  status: "Draft" | "Pending" | "Approved" | "Rejected" | "Cancelled" | "Completed" | "HandedOff";
+  title: string;
+  totalAmount: string;
+  travel?: OaTravel;
+  updatedAt: string;
+  versionNumber: number;
+}
+
+export interface OaRequestPage {
+  items: OaRequest[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface OaRequestSave {
+  category?: "Seal" | "Certificate" | "IT" | "Repair" | "Other";
+  currency?: "CNY" | "USD" | "EUR" | "HKD" | "JPY" | "GBP";
+  employeeId?: number;
+  expectedVersion?: number;
+  leave?: OaLeave;
+  lines?: OaExpenseLine[];
+  overtime?: OaOvertime;
+  purchaseLines?: OaPurchaseLine[];
+  reason: string;
+  requestKey: string;
+  title: string;
+  travel?: OaTravel;
+}
+
+export interface OaTravel {
+  destination: string;
+  endsOn: string;
+  startsOn: string;
+}
+
 export interface OfficeDecisionRequest {
   expectedVersion: number;
   note?: string;
@@ -4146,6 +4259,7 @@ export interface PersonnelAccountRequest {
 }
 
 export interface PersonnelClearance {
+  approvalCount?: number;
   canDepart: boolean;
   isClear: boolean;
   items: PersonnelClearanceItem[];
@@ -4871,6 +4985,21 @@ export interface AnalyzeInvoiceProfitRequest {
   body: ApiInvoiceProfitAnalysisRequest;
 }
 
+export interface ApproveExpenseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface ApproveGeneralRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface ApproveLeaveRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
 export interface ApproveMeetingBookingRequest {
   id: number;
   body: OfficeDecisionRequest;
@@ -4879,6 +5008,21 @@ export interface ApproveMeetingBookingRequest {
 export interface ApproveOfficeSupplyRequestRequest {
   id: number;
   body: OfficeReturnRequest;
+}
+
+export interface ApproveOvertimeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface ApprovePurchaseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface ApproveTravelRequestRequest {
+  id: number;
+  body: OaAction;
 }
 
 export interface ArchiveEmailTemplateRequest {
@@ -4916,8 +5060,23 @@ export interface BuildCustomsCooExportReviewRequest {
   invoiceId: number;
 }
 
+export interface CancelExpenseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface CancelGeneralRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
 export interface CancelJobRequest {
   jobId: string;
+}
+
+export interface CancelLeaveRequestRequest {
+  id: number;
+  body: OaAction;
 }
 
 export interface CancelMeetingBookingRequest {
@@ -4928,6 +5087,21 @@ export interface CancelMeetingBookingRequest {
 export interface CancelOfficeSupplyRequestRequest {
   id: number;
   body: OfficeReturnRequest;
+}
+
+export interface CancelOvertimeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface CancelPurchaseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface CancelTravelRequestRequest {
+  id: number;
+  body: OaAction;
 }
 
 export interface CaptureRemoteHsCodesRequest {
@@ -4971,6 +5145,36 @@ export interface CommitHsCodesImportRequest {
 export interface CompleteCrmFollowUpRequest {
   id: number;
   body: ApiCrmLifecycleRequest;
+}
+
+export interface CompleteExpenseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface CompleteGeneralRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface CompleteLeaveRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface CompleteOvertimeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface CompletePurchaseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface CompleteTravelRequestRequest {
+  id: number;
+  body: OaAction;
 }
 
 export interface ConfirmPersonnelRequest {
@@ -5017,8 +5221,16 @@ export interface CreateEmailTemplateRequest {
   body: ApiEmailTemplateDraftRequest;
 }
 
+export interface CreateExpenseRequestRequest {
+  body: OaRequestSave;
+}
+
 export interface CreateExporterRequest {
   body: ApiExporterDto;
+}
+
+export interface CreateGeneralRequestRequest {
+  body: OaRequestSave;
 }
 
 export interface CreateHsCodeRequest {
@@ -5031,6 +5243,10 @@ export interface CreateInvoiceRequest {
 
 export interface CreateJobDownloadTicketRequest {
   jobId: string;
+}
+
+export interface CreateLeaveRequestRequest {
+  body: OaRequestSave;
 }
 
 export interface CreateMeetingBookingRequest {
@@ -5055,6 +5271,10 @@ export interface CreateOrganizationCompanyRequest {
 
 export interface CreateOrganizationDepartmentRequest {
   body: ApiOrganizationDepartmentSaveRequest;
+}
+
+export interface CreateOvertimeRequestRequest {
+  body: OaRequestSave;
 }
 
 export interface CreatePayeeRequest {
@@ -5089,6 +5309,10 @@ export interface CreateProductRequest {
   body: ApiProductDto;
 }
 
+export interface CreatePurchaseRequestRequest {
+  body: OaRequestSave;
+}
+
 export interface CreateReportTemplateRequest {
   body: ApiReportTemplateCreateRequest;
 }
@@ -5120,6 +5344,10 @@ export interface CreateSupplierProductLinkRequest {
   body: ApiSupplierProductLinkSaveRequest;
 }
 
+export interface CreateTravelRequestRequest {
+  body: OaRequestSave;
+}
+
 export interface CreateUnitRequest {
   body: ApiUnitDto;
 }
@@ -5142,6 +5370,42 @@ export interface DeactivateSupplierProductLinkRequest {
   supplierId: number;
   id: number;
   body: ApiSupplierLifecycleRequest;
+}
+
+export interface DeleteAttachmentOfExpenseRequestRequest {
+  id: number;
+  attachmentId: number;
+  body: OaAction;
+}
+
+export interface DeleteAttachmentOfGeneralRequestRequest {
+  id: number;
+  attachmentId: number;
+  body: OaAction;
+}
+
+export interface DeleteAttachmentOfLeaveRequestRequest {
+  id: number;
+  attachmentId: number;
+  body: OaAction;
+}
+
+export interface DeleteAttachmentOfOvertimeRequestRequest {
+  id: number;
+  attachmentId: number;
+  body: OaAction;
+}
+
+export interface DeleteAttachmentOfPurchaseRequestRequest {
+  id: number;
+  attachmentId: number;
+  body: OaAction;
+}
+
+export interface DeleteAttachmentOfTravelRequestRequest {
+  id: number;
+  attachmentId: number;
+  body: OaAction;
 }
 
 export interface DeleteAuditLogsByCriteriaRequest {
@@ -5335,6 +5599,36 @@ export interface DownloadAgentConsignmentSubmitPackageRequest {
   body: ApiSingleWindowSubmitPackageRequest;
 }
 
+export interface DownloadAttachmentOfExpenseRequestRequest {
+  id: number;
+  attachmentId: number;
+}
+
+export interface DownloadAttachmentOfGeneralRequestRequest {
+  id: number;
+  attachmentId: number;
+}
+
+export interface DownloadAttachmentOfLeaveRequestRequest {
+  id: number;
+  attachmentId: number;
+}
+
+export interface DownloadAttachmentOfOvertimeRequestRequest {
+  id: number;
+  attachmentId: number;
+}
+
+export interface DownloadAttachmentOfPurchaseRequestRequest {
+  id: number;
+  attachmentId: number;
+}
+
+export interface DownloadAttachmentOfTravelRequestRequest {
+  id: number;
+  attachmentId: number;
+}
+
 export interface DownloadAuditLogsRequest {
   body: ApiAuditLogFilterRequest;
 }
@@ -5456,7 +5750,15 @@ export interface GetCustomsCooProducerProfileRequest {
   id: number;
 }
 
+export interface GetExpenseRequestRequest {
+  id: number;
+}
+
 export interface GetExporterRequest {
+  id: number;
+}
+
+export interface GetGeneralRequestRequest {
   id: number;
 }
 
@@ -5478,6 +5780,10 @@ export interface GetInvoiceHsCodeRequest {
 
 export interface GetJobRequest {
   jobId: string;
+}
+
+export interface GetLeaveRequestRequest {
+  id: number;
 }
 
 export interface GetMeetingBookingHistoryRequest {
@@ -5502,6 +5808,10 @@ export interface GetOfficeSupplyRequestHistoryRequest {
   id: number;
   pageNumber?: number;
   pageSize?: number;
+}
+
+export interface GetOvertimeRequestRequest {
+  id: number;
 }
 
 export interface GetPayeeRequest {
@@ -5543,6 +5853,10 @@ export interface GetProductRequest {
   id: number;
 }
 
+export interface GetPurchaseRequestRequest {
+  id: number;
+}
+
 export interface GetReportTemplateContentRequest {
   reportType?: string;
   templatePath?: string;
@@ -5566,6 +5880,10 @@ export interface GetSingleWindowOperationCenterDetailRequest {
 }
 
 export interface GetSupplierRequest {
+  id: number;
+}
+
+export interface GetTravelRequestRequest {
   id: number;
 }
 
@@ -5717,6 +6035,13 @@ export interface ListExchangeRatesRequest {
   forceRefresh?: boolean;
 }
 
+export interface ListExpenseRequestRequest {
+  pageNumber?: number;
+  pageSize?: number;
+  status?: string;
+  mineOnly?: boolean;
+}
+
 export interface ListExportersRequest {
   keyword?: string;
 }
@@ -5725,6 +6050,49 @@ export interface ListExportersPageRequest {
   pageNumber: number;
   pageSize: number;
   keyword?: string;
+}
+
+export interface ListGeneralRequestRequest {
+  pageNumber?: number;
+  pageSize?: number;
+  status?: string;
+  mineOnly?: boolean;
+}
+
+export interface ListHistoryOfExpenseRequestRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListHistoryOfGeneralRequestRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListHistoryOfLeaveRequestRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListHistoryOfOvertimeRequestRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListHistoryOfPurchaseRequestRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListHistoryOfTravelRequestRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListHsCodeKnowledgeExamplesRequest {
@@ -5763,6 +6131,13 @@ export interface ListJobsRequest {
   keyword?: string;
   pageNumber?: number;
   pageSize?: number;
+}
+
+export interface ListLeaveRequestRequest {
+  pageNumber?: number;
+  pageSize?: number;
+  status?: string;
+  mineOnly?: boolean;
 }
 
 export interface ListMeetingBookingsRequest {
@@ -5813,6 +6188,13 @@ export interface ListOrganizationManagersRequest {
   pageSize?: number;
 }
 
+export interface ListOvertimeRequestRequest {
+  pageNumber?: number;
+  pageSize?: number;
+  status?: string;
+  mineOnly?: boolean;
+}
+
 export interface ListPayeesRequest {
   keyword?: string;
 }
@@ -5861,6 +6243,13 @@ export interface ListProductsRequest {
   pageSize?: number;
 }
 
+export interface ListPurchaseRequestRequest {
+  pageNumber?: number;
+  pageSize?: number;
+  status?: string;
+  mineOnly?: boolean;
+}
+
 export interface ListQueriedInvoicesRequest {
   startDate?: string;
   endDateExclusive?: string;
@@ -5894,6 +6283,13 @@ export interface ListSingleWindowOperationCenterRequest {
 
 export interface ListSupplierAssessmentsRequest {
   supplierId: number;
+}
+
+export interface ListTravelRequestRequest {
+  pageNumber?: number;
+  pageSize?: number;
+  status?: string;
+  mineOnly?: boolean;
 }
 
 export interface ListUnitsRequest {
@@ -6114,6 +6510,21 @@ export interface RehirePersonnelRequest {
   body: PersonnelTransitionRequest;
 }
 
+export interface RejectExpenseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface RejectGeneralRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface RejectLeaveRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
 export interface RejectMeetingBookingRequest {
   id: number;
   body: OfficeDecisionRequest;
@@ -6122,6 +6533,21 @@ export interface RejectMeetingBookingRequest {
 export interface RejectOfficeSupplyRequestRequest {
   id: number;
   body: OfficeReturnRequest;
+}
+
+export interface RejectOvertimeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface RejectPurchaseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface RejectTravelRequestRequest {
+  id: number;
+  body: OaAction;
 }
 
 export interface RenameReportTemplateRequest {
@@ -6461,6 +6887,36 @@ export interface StocktakeOfficeSupplyRequest {
   body: OfficeStockRequest;
 }
 
+export interface SubmitExpenseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface SubmitGeneralRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface SubmitLeaveRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface SubmitOvertimeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface SubmitPurchaseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface SubmitTravelRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
 export interface SuggestEmailServerConfigRequest {
   body: ApiEmailServerSuggestionRequest;
 }
@@ -6544,9 +7000,19 @@ export interface UpdateCustomsCooProducerProfileRequest {
   body: ApiCustomsCooProducerProfileSaveRequest;
 }
 
+export interface UpdateExpenseRequestRequest {
+  id: number;
+  body: OaRequestSave;
+}
+
 export interface UpdateExporterRequest {
   id: number;
   body: ApiExporterDto;
+}
+
+export interface UpdateGeneralRequestRequest {
+  id: number;
+  body: OaRequestSave;
 }
 
 export interface UpdateHsCodeRequest {
@@ -6557,6 +7023,11 @@ export interface UpdateHsCodeRequest {
 export interface UpdateInvoiceRequest {
   id: number;
   body: ApiInvoiceDetailDto;
+}
+
+export interface UpdateLeaveRequestRequest {
+  id: number;
+  body: OaRequestSave;
 }
 
 export interface UpdateMeetingBookingRequest {
@@ -6589,6 +7060,11 @@ export interface UpdateOrganizationDepartmentRequest {
   body: ApiOrganizationDepartmentSaveRequest;
 }
 
+export interface UpdateOvertimeRequestRequest {
+  id: number;
+  body: OaRequestSave;
+}
+
 export interface UpdatePayeeRequest {
   id: number;
   body: ApiPayeeDto;
@@ -6617,6 +7093,11 @@ export interface UpdatePortRequest {
 export interface UpdateProductRequest {
   id: number;
   body: ApiProductDto;
+}
+
+export interface UpdatePurchaseRequestRequest {
+  id: number;
+  body: OaRequestSave;
 }
 
 export interface UpdateReportTemplateDisplayNameRequest {
@@ -6659,6 +7140,11 @@ export interface UpdateSupplierProductLinkRequest {
   body: ApiSupplierProductLinkSaveRequest;
 }
 
+export interface UpdateTravelRequestRequest {
+  id: number;
+  body: OaRequestSave;
+}
+
 export interface UpdateUnitRequest {
   id: number;
   body: ApiUnitDto;
@@ -6677,6 +7163,36 @@ export interface UploadAndStartBookingSheetConvertDownloadJobRequest {
 }
 
 export interface UploadAndStartPdfMergeDownloadJobRequest {
+  body: FormData;
+}
+
+export interface UploadAttachmentToExpenseRequestRequest {
+  id: number;
+  body: FormData;
+}
+
+export interface UploadAttachmentToGeneralRequestRequest {
+  id: number;
+  body: FormData;
+}
+
+export interface UploadAttachmentToLeaveRequestRequest {
+  id: number;
+  body: FormData;
+}
+
+export interface UploadAttachmentToOvertimeRequestRequest {
+  id: number;
+  body: FormData;
+}
+
+export interface UploadAttachmentToPurchaseRequestRequest {
+  id: number;
+  body: FormData;
+}
+
+export interface UploadAttachmentToTravelRequestRequest {
+  id: number;
   body: FormData;
 }
 
@@ -6750,6 +7266,66 @@ export interface UploadSingleWindowSubmitPackageRequest {
 
 export interface ValidateSettingsRequest {
   body: ApiSettingsValidationRequest;
+}
+
+export interface VoidExpenseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface VoidGeneralRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface VoidLeaveRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface VoidOvertimeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface VoidPurchaseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface VoidTravelRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface WithdrawExpenseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface WithdrawGeneralRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface WithdrawLeaveRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface WithdrawOvertimeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface WithdrawPurchaseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface WithdrawTravelRequestRequest {
+  id: number;
+  body: OaAction;
 }
 
 export interface CreateUserAccountRequest {
@@ -6848,6 +7424,30 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public approveExpenseRequest(request: ApproveExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/approve`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public approveGeneralRequest(request: ApproveGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/approve`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public approveLeaveRequest(request: ApproveLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/approve`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public approveMeetingBooking(request: ApproveMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
     const path = `/api/office/bookings/${encodePath(request.id)}/approve`;
     return this.request<MeetingBookingRecord>("POST", path, {
@@ -6859,6 +7459,30 @@ export class ExportDocManagerApiClient {
   public approveOfficeSupplyRequest(request: ApproveOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
     const path = `/api/office/supply-requests/${encodePath(request.id)}/approve`;
     return this.request<OfficeSupplyRequestRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public approveOvertimeRequest(request: ApproveOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/approve`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public approvePurchaseRequest(request: ApprovePurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/approve`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public approveTravelRequest(request: ApproveTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/approve`;
+    return this.request<OaRequest>("POST", path, {
       body: request.body,
       init,
     });
@@ -6920,9 +7544,33 @@ export class ExportDocManagerApiClient {
     return this.request<SingleWindowExportReview>("POST", path, { init });
   }
 
+  public cancelExpenseRequest(request: CancelExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/cancel`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public cancelGeneralRequest(request: CancelGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/cancel`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public cancelJob(request: CancelJobRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/jobs/${encodePath(request.jobId)}/cancel`;
     return this.request<ApiCommandResponse>("POST", path, { init });
+  }
+
+  public cancelLeaveRequest(request: CancelLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/cancel`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public cancelMeetingBooking(request: CancelMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
@@ -6936,6 +7584,30 @@ export class ExportDocManagerApiClient {
   public cancelOfficeSupplyRequest(request: CancelOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
     const path = `/api/office/supply-requests/${encodePath(request.id)}/cancel`;
     return this.request<OfficeSupplyRequestRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public cancelOvertimeRequest(request: CancelOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/cancel`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public cancelPurchaseRequest(request: CancelPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/cancel`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public cancelTravelRequest(request: CancelTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/cancel`;
+    return this.request<OaRequest>("POST", path, {
       body: request.body,
       init,
     });
@@ -7036,6 +7708,54 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public completeExpenseRequest(request: CompleteExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/complete`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public completeGeneralRequest(request: CompleteGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/complete`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public completeLeaveRequest(request: CompleteLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/complete`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public completeOvertimeRequest(request: CompleteOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/complete`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public completePurchaseRequest(request: CompletePurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/complete`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public completeTravelRequest(request: CompleteTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/complete`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public confirmPersonnel(request: ConfirmPersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
     const path = `/api/office/people/${encodePath(request.id)}/confirm`;
     return this.request<PersonnelRecord>("POST", path, {
@@ -7123,9 +7843,25 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public createExpenseRequest(request: CreateExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = "/api/office/expense-requests";
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public createExporter(request: CreateExporterRequest, init?: ApiRequestInit): Promise<ApiExporterDto> {
     const path = "/api/master-data/exporters";
     return this.request<ApiExporterDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public createGeneralRequest(request: CreateGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = "/api/office/general-requests";
+    return this.request<OaRequest>("POST", path, {
       body: request.body,
       init,
     });
@@ -7150,6 +7886,14 @@ export class ExportDocManagerApiClient {
   public createJobDownloadTicket(request: CreateJobDownloadTicketRequest, init?: ApiRequestInit): Promise<ApiDownloadTicket> {
     const path = `/api/jobs/${encodePath(request.jobId)}/download-ticket`;
     return this.request<ApiDownloadTicket>("POST", path, { init });
+  }
+
+  public createLeaveRequest(request: CreateLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = "/api/office/leave-requests";
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public createMeetingBooking(request: CreateMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
@@ -7195,6 +7939,14 @@ export class ExportDocManagerApiClient {
   public createOrganizationDepartment(request: CreateOrganizationDepartmentRequest, init?: ApiRequestInit): Promise<ApiOrganizationDepartmentDto> {
     const path = "/api/organization-directory/departments";
     return this.request<ApiOrganizationDepartmentDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public createOvertimeRequest(request: CreateOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = "/api/office/overtime-requests";
+    return this.request<OaRequest>("POST", path, {
       body: request.body,
       init,
     });
@@ -7271,6 +8023,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public createPurchaseRequest(request: CreatePurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = "/api/office/purchase-requests";
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public createReportTemplate(request: CreateReportTemplateRequest, init?: ApiRequestInit): Promise<ApiReportTemplateContentDto> {
     const path = "/api/reports/templates";
     return this.request<ApiReportTemplateContentDto>("POST", path, {
@@ -7327,6 +8087,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public createTravelRequest(request: CreateTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = "/api/office/travel-requests";
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public createUnit(request: CreateUnitRequest, init?: ApiRequestInit): Promise<ApiUnitDto> {
     const path = "/api/master-data/units";
     return this.request<ApiUnitDto>("POST", path, {
@@ -7362,6 +8130,54 @@ export class ExportDocManagerApiClient {
   public deactivateSupplierProductLink(request: DeactivateSupplierProductLinkRequest, init?: ApiRequestInit): Promise<ApiSupplierProductLinkDto> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/products/${encodePath(request.id)}/deactivate`;
     return this.request<ApiSupplierProductLinkDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deleteAttachmentOfExpenseRequest(request: DeleteAttachmentOfExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<OaRequest>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deleteAttachmentOfGeneralRequest(request: DeleteAttachmentOfGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<OaRequest>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deleteAttachmentOfLeaveRequest(request: DeleteAttachmentOfLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<OaRequest>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deleteAttachmentOfOvertimeRequest(request: DeleteAttachmentOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<OaRequest>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deleteAttachmentOfPurchaseRequest(request: DeleteAttachmentOfPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<OaRequest>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deleteAttachmentOfTravelRequest(request: DeleteAttachmentOfTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<OaRequest>("DELETE", path, {
       body: request.body,
       init,
     });
@@ -7683,6 +8499,36 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public downloadAttachmentOfExpenseRequest(request: DownloadAttachmentOfExpenseRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
+  public downloadAttachmentOfGeneralRequest(request: DownloadAttachmentOfGeneralRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
+  public downloadAttachmentOfLeaveRequest(request: DownloadAttachmentOfLeaveRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
+  public downloadAttachmentOfOvertimeRequest(request: DownloadAttachmentOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
+  public downloadAttachmentOfPurchaseRequest(request: DownloadAttachmentOfPurchaseRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
+  public downloadAttachmentOfTravelRequest(request: DownloadAttachmentOfTravelRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
   public downloadAuditLogs(request: DownloadAuditLogsRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = "/api/audit-logs/download";
     return this.request<Blob>("POST", path, {
@@ -7915,9 +8761,19 @@ export class ExportDocManagerApiClient {
     return this.request<ApiEmailStatusResponse>("GET", path, { init });
   }
 
+  public getExpenseRequest(request: GetExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("GET", path, { init });
+  }
+
   public getExporter(request: GetExporterRequest, init?: ApiRequestInit): Promise<ApiExporterDto> {
     const path = `/api/master-data/exporters/${encodePath(request.id)}`;
     return this.request<ApiExporterDto>("GET", path, { init });
+  }
+
+  public getGeneralRequest(request: GetGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("GET", path, { init });
   }
 
   public getHsCode(request: GetHsCodeRequest, init?: ApiRequestInit): Promise<ApiHsCodeDto> {
@@ -7948,6 +8804,11 @@ export class ExportDocManagerApiClient {
   public getJob(request: GetJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/jobs/${encodePath(request.jobId)}`;
     return this.request<BackgroundJobSnapshot>("GET", path, { init });
+  }
+
+  public getLeaveRequest(request: GetLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("GET", path, { init });
   }
 
   public getLicenseStatus(init?: ApiRequestInit): Promise<ApiLicenseStatusResponse> {
@@ -8004,6 +8865,11 @@ export class ExportDocManagerApiClient {
     return this.request<ApiOrganizationDirectoryResponse>("GET", path, { init });
   }
 
+  public getOvertimeRequest(request: GetOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("GET", path, { init });
+  }
+
   public getPayee(request: GetPayeeRequest, init?: ApiRequestInit): Promise<ApiPayeeDto> {
     const path = `/api/master-data/payees/${encodePath(request.id)}`;
     return this.request<ApiPayeeDto>("GET", path, { init });
@@ -8058,6 +8924,11 @@ export class ExportDocManagerApiClient {
   public getProduct(request: GetProductRequest, init?: ApiRequestInit): Promise<ApiProductDto> {
     const path = `/api/master-data/products/${encodePath(request.id)}`;
     return this.request<ApiProductDto>("GET", path, { init });
+  }
+
+  public getPurchaseRequest(request: GetPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("GET", path, { init });
   }
 
   public getReportTemplateContent(request: GetReportTemplateContentRequest = {}, init?: ApiRequestInit): Promise<ApiReportTemplateContentDto> {
@@ -8134,6 +9005,11 @@ export class ExportDocManagerApiClient {
   public getSupplierAssessmentOverview(init?: ApiRequestInit): Promise<ApiSupplierAssessmentOverviewDto> {
     const path = "/api/suppliers/assessment-overview";
     return this.request<ApiSupplierAssessmentOverviewDto>("GET", path, { init });
+  }
+
+  public getTravelRequest(request: GetTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("GET", path, { init });
   }
 
   public getUnit(request: GetUnitRequest, init?: ApiRequestInit): Promise<ApiUnitDto> {
@@ -8438,6 +9314,19 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listExpenseRequest(request: ListExpenseRequestRequest = {}, init?: ApiRequestInit): Promise<OaRequestPage> {
+    const path = "/api/office/expense-requests";
+    return this.request<OaRequestPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "status": request.status,
+        "mineOnly": request.mineOnly,
+      },
+      init,
+    });
+  }
+
   public listExporters(request: ListExportersRequest = {}, init?: ApiRequestInit): Promise<ApiExporterDto[]> {
     const path = "/api/master-data/exporters";
     return this.request<ApiExporterDto[]>("GET", path, {
@@ -8455,6 +9344,85 @@ export class ExportDocManagerApiClient {
         "pageNumber": request.pageNumber,
         "pageSize": request.pageSize,
         "keyword": request.keyword,
+      },
+      init,
+    });
+  }
+
+  public listGeneralRequest(request: ListGeneralRequestRequest = {}, init?: ApiRequestInit): Promise<OaRequestPage> {
+    const path = "/api/office/general-requests";
+    return this.request<OaRequestPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "status": request.status,
+        "mineOnly": request.mineOnly,
+      },
+      init,
+    });
+  }
+
+  public listHistoryOfExpenseRequest(request: ListHistoryOfExpenseRequestRequest, init?: ApiRequestInit): Promise<OaEventPage> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/history`;
+    return this.request<OaEventPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listHistoryOfGeneralRequest(request: ListHistoryOfGeneralRequestRequest, init?: ApiRequestInit): Promise<OaEventPage> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/history`;
+    return this.request<OaEventPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listHistoryOfLeaveRequest(request: ListHistoryOfLeaveRequestRequest, init?: ApiRequestInit): Promise<OaEventPage> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/history`;
+    return this.request<OaEventPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listHistoryOfOvertimeRequest(request: ListHistoryOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaEventPage> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/history`;
+    return this.request<OaEventPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listHistoryOfPurchaseRequest(request: ListHistoryOfPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaEventPage> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/history`;
+    return this.request<OaEventPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listHistoryOfTravelRequest(request: ListHistoryOfTravelRequestRequest, init?: ApiRequestInit): Promise<OaEventPage> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/history`;
+    return this.request<OaEventPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
       },
       init,
     });
@@ -8524,6 +9492,19 @@ export class ExportDocManagerApiClient {
         "keyword": request.keyword,
         "pageNumber": request.pageNumber,
         "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listLeaveRequest(request: ListLeaveRequestRequest = {}, init?: ApiRequestInit): Promise<OaRequestPage> {
+    const path = "/api/office/leave-requests";
+    return this.request<OaRequestPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "status": request.status,
+        "mineOnly": request.mineOnly,
       },
       init,
     });
@@ -8602,6 +9583,19 @@ export class ExportDocManagerApiClient {
         "keyword": request.keyword,
         "pageNumber": request.pageNumber,
         "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listOvertimeRequest(request: ListOvertimeRequestRequest = {}, init?: ApiRequestInit): Promise<OaRequestPage> {
+    const path = "/api/office/overtime-requests";
+    return this.request<OaRequestPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "status": request.status,
+        "mineOnly": request.mineOnly,
       },
       init,
     });
@@ -8712,6 +9706,19 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listPurchaseRequest(request: ListPurchaseRequestRequest = {}, init?: ApiRequestInit): Promise<OaRequestPage> {
+    const path = "/api/office/purchase-requests";
+    return this.request<OaRequestPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "status": request.status,
+        "mineOnly": request.mineOnly,
+      },
+      init,
+    });
+  }
+
   public listQueriedInvoices(request: ListQueriedInvoicesRequest = {}, init?: ApiRequestInit): Promise<ApiPagedResponseOfApiQueryInvoiceRowDto> {
     const path = "/api/query/invoices";
     return this.request<ApiPagedResponseOfApiQueryInvoiceRowDto>("GET", path, {
@@ -8765,6 +9772,19 @@ export class ExportDocManagerApiClient {
   public listSupplierAssessments(request: ListSupplierAssessmentsRequest, init?: ApiRequestInit): Promise<ApiSupplierAssessmentDto[]> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/assessments`;
     return this.request<ApiSupplierAssessmentDto[]>("GET", path, { init });
+  }
+
+  public listTravelRequest(request: ListTravelRequestRequest = {}, init?: ApiRequestInit): Promise<OaRequestPage> {
+    const path = "/api/office/travel-requests";
+    return this.request<OaRequestPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "status": request.status,
+        "mineOnly": request.mineOnly,
+      },
+      init,
+    });
   }
 
   public listUnits(request: ListUnitsRequest = {}, init?: ApiRequestInit): Promise<ApiUnitDto[]> {
@@ -9183,6 +10203,30 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public rejectExpenseRequest(request: RejectExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/reject`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public rejectGeneralRequest(request: RejectGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/reject`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public rejectLeaveRequest(request: RejectLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/reject`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public rejectMeetingBooking(request: RejectMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
     const path = `/api/office/bookings/${encodePath(request.id)}/reject`;
     return this.request<MeetingBookingRecord>("POST", path, {
@@ -9194,6 +10238,30 @@ export class ExportDocManagerApiClient {
   public rejectOfficeSupplyRequest(request: RejectOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
     const path = `/api/office/supply-requests/${encodePath(request.id)}/reject`;
     return this.request<OfficeSupplyRequestRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public rejectOvertimeRequest(request: RejectOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/reject`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public rejectPurchaseRequest(request: RejectPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/reject`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public rejectTravelRequest(request: RejectTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/reject`;
+    return this.request<OaRequest>("POST", path, {
       body: request.body,
       init,
     });
@@ -9819,6 +10887,54 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public submitExpenseRequest(request: SubmitExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/submit`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public submitGeneralRequest(request: SubmitGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/submit`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public submitLeaveRequest(request: SubmitLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/submit`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public submitOvertimeRequest(request: SubmitOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/submit`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public submitPurchaseRequest(request: SubmitPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/submit`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public submitTravelRequest(request: SubmitTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/submit`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public suggestEmailServerConfig(request: SuggestEmailServerConfigRequest, init?: ApiRequestInit): Promise<ApiEmailServerSuggestionResponse> {
     const path = "/api/tools/email/server-suggestion";
     return this.request<ApiEmailServerSuggestionResponse>("POST", path, {
@@ -9965,9 +11081,25 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public updateExpenseRequest(request: UpdateExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public updateExporter(request: UpdateExporterRequest, init?: ApiRequestInit): Promise<ApiExporterDto> {
     const path = `/api/master-data/exporters/${encodePath(request.id)}`;
     return this.request<ApiExporterDto>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public updateGeneralRequest(request: UpdateGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("PUT", path, {
       body: request.body,
       init,
     });
@@ -9984,6 +11116,14 @@ export class ExportDocManagerApiClient {
   public updateInvoice(request: UpdateInvoiceRequest, init?: ApiRequestInit): Promise<ApiInvoiceSaveResponse> {
     const path = `/api/invoices/${encodePath(request.id)}`;
     return this.request<ApiInvoiceSaveResponse>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public updateLeaveRequest(request: UpdateLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("PUT", path, {
       body: request.body,
       init,
     });
@@ -10037,6 +11177,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public updateOvertimeRequest(request: UpdateOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public updatePayee(request: UpdatePayeeRequest, init?: ApiRequestInit): Promise<ApiPayeeDto> {
     const path = `/api/master-data/payees/${encodePath(request.id)}`;
     return this.request<ApiPayeeDto>("PUT", path, {
@@ -10080,6 +11228,14 @@ export class ExportDocManagerApiClient {
   public updateProduct(request: UpdateProductRequest, init?: ApiRequestInit): Promise<ApiProductDto> {
     const path = `/api/master-data/products/${encodePath(request.id)}`;
     return this.request<ApiProductDto>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public updatePurchaseRequest(request: UpdatePurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("PUT", path, {
       body: request.body,
       init,
     });
@@ -10149,6 +11305,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public updateTravelRequest(request: UpdateTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public updateUnit(request: UpdateUnitRequest, init?: ApiRequestInit): Promise<ApiUnitDto> {
     const path = `/api/master-data/units/${encodePath(request.id)}`;
     return this.request<ApiUnitDto>("PUT", path, {
@@ -10186,6 +11350,54 @@ export class ExportDocManagerApiClient {
   public uploadAndStartPdfMergeDownloadJob(request: UploadAndStartPdfMergeDownloadJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/tools/pdf/merge/upload";
     return this.request<BackgroundJobSnapshot>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadAttachmentToExpenseRequest(request: UploadAttachmentToExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/attachments`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadAttachmentToGeneralRequest(request: UploadAttachmentToGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/attachments`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadAttachmentToLeaveRequest(request: UploadAttachmentToLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/attachments`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadAttachmentToOvertimeRequest(request: UploadAttachmentToOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/attachments`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadAttachmentToPurchaseRequest(request: UploadAttachmentToPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/attachments`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadAttachmentToTravelRequest(request: UploadAttachmentToTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/attachments`;
+    return this.request<OaRequest>("POST", path, {
       body: request.body,
       init,
     });
@@ -10324,6 +11536,102 @@ export class ExportDocManagerApiClient {
   public validateSettings(request: ValidateSettingsRequest, init?: ApiRequestInit): Promise<ApiSettingsValidationResponse> {
     const path = "/api/settings/validate";
     return this.request<ApiSettingsValidationResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public voidExpenseRequest(request: VoidExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/void`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public voidGeneralRequest(request: VoidGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/void`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public voidLeaveRequest(request: VoidLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/void`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public voidOvertimeRequest(request: VoidOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/void`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public voidPurchaseRequest(request: VoidPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/void`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public voidTravelRequest(request: VoidTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/void`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public withdrawExpenseRequest(request: WithdrawExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/withdraw`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public withdrawGeneralRequest(request: WithdrawGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/withdraw`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public withdrawLeaveRequest(request: WithdrawLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/withdraw`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public withdrawOvertimeRequest(request: WithdrawOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/withdraw`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public withdrawPurchaseRequest(request: WithdrawPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/withdraw`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public withdrawTravelRequest(request: WithdrawTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/withdraw`;
+    return this.request<OaRequest>("POST", path, {
       body: request.body,
       init,
     });

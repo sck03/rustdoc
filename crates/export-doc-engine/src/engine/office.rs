@@ -336,6 +336,16 @@ fn validate_department(connection: &Connection, actor: &Actor, code: &str) -> Re
 }
 pub fn can_correct(connection: &Connection, id: i64) -> Result<bool> {
     let person = store::get(connection, "people", id)?;
+    if super::oa::references(
+        connection,
+        &text(&person, "companyScope"),
+        Some(id),
+        None,
+        false,
+    )? > 0
+    {
+        return Ok(false);
+    }
     if person["account"].is_object() {
         return Ok(false);
     }
@@ -428,7 +438,7 @@ pub fn action(
         if matches!(operation, "TransferPersonnel" | "DepartPersonnel") {
             let clearance = super::office_queries::clearance(tx, &value)?;
             if clearance["isClear"] != true {
-                return Err(conflict("仍有未结清的预约或领用申请，请先完成交接。"));
+                return Err(conflict("仍有未结清的行政或人事申请，请先完成交接。"));
             }
             if operation == "DepartPersonnel" && clearance["canDepart"] != true {
                 return Err(conflict("请先移交部门负责人职责。"));
