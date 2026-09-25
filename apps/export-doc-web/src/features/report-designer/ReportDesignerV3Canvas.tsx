@@ -465,7 +465,7 @@ export function ReportDesignerV3Canvas({
                   const selected = selectedSet.has(element.id);
                   return (
                     <div
-                      className={`report-designer-v3-element report-designer-v3-element-${element.type.toLowerCase()}${selected ? " is-selected" : ""}${element.locked || layer.locked ? " is-locked" : ""}`}
+                      className={`report-designer-v3-element report-designer-v3-element-${element.type.toLowerCase()}${element.type === "Field" && element.fieldPath.startsWith("item.") ? " is-product-field" : ""}${selected ? " is-selected" : ""}${element.locked || layer.locked ? " is-locked" : ""}`}
                       key={element.id}
                       style={reportDesignerCanvasElementStyle(element)}
                       data-v3-element-id={element.id}

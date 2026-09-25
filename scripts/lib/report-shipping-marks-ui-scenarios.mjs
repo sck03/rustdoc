@@ -15,7 +15,6 @@ export async function verifyShippingMarksUi({ page, url, read, waitFor, click, k
   await waitFor(page, 'window.__designerSchema.layers.flatMap(layer=>layer.elements).filter(element=>element.fieldPath==="Invoice.ShippingMarks").length===1');
   await read(page, 'document.querySelector("[data-v3-element-id=marks-field]").focus()');
   await key(page, "Enter");
-  await read(page, "[...document.querySelectorAll('.report-designer-v3-inspector button')].find(node=>node.textContent.trim()==='布局').click()");
   await read(page, "(()=>{const node=[...document.querySelectorAll('.report-designer-v3-inspector label')].find(label=>label.firstElementChild?.textContent==='高 (mm)').querySelector('input');node.focus();node.select()})()");
   await page.send("Input.insertText", { text: "22" });
   await key(page, "Enter");

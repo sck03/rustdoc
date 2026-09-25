@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 
-export async function verifyProductFieldsUi({ page, url, read, waitFor, click, results }) {
+export async function verifyProductFieldsUi({ page, url, read, waitFor, click, results, capture }) {
   await page.send('Page.navigate', { url: url + '?products=1' });
   await waitFor(page, '!!document.querySelector("[data-v3-page-canvas]")');
-  await click(page, 'button[aria-label="选择字段"]');
+  await click(page, 'button[aria-label="商品字段"]');
   await read(page, `(()=>{for(const node of document.querySelectorAll('.report-designer-v3-sidebar details'))node.open=true;})()`);
   const drop = async (label, x, y) => {
     await read(page, `(()=>{const source=document.querySelector('button[aria-label="插入字段 ${label}"]'); const canvas=document.querySelector('[data-v3-page-canvas]');const rect=canvas.getBoundingClientRect();const data=new DataTransfer();source.dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:data}));canvas.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:data,clientX:rect.left+rect.width*${x}/21000,clientY:rect.top+rect.height*${y}/29700}));})()`);
@@ -14,10 +14,28 @@ export async function verifyProductFieldsUi({ page, url, read, waitFor, click, r
   await waitFor(page, "window.__designerSchema.layers.flatMap(l=>l.elements).filter(e=>e.fieldPath?.startsWith('item.')).length===2");
   const positions=await read(page,"window.__designerSchema.layers.flatMap(l=>l.elements).filter(e=>e.fieldPath?.startsWith('item.')).map(e=>[e.xHundredthMm,e.yHundredthMm])");
   assert.deepEqual(positions,[[6000,11000],[13000,11000]]);
-  assert.equal(await read(page,"document.querySelectorAll('.report-designer-product-copy').length"),4);
+  assert.equal(await read(page,"document.querySelectorAll('.is-product-field').length"),2);
+  assert.equal(await read(page,"document.querySelectorAll('.report-designer-product-row-label').length"),1);
+  await click(page,'button[aria-label="插入字段 明细备用 2"]');
+  await waitFor(page,"window.__designerSchema.layers.flatMap(l=>l.elements).some(e=>e.fieldPath==='item.Spare2')");
+  const automatic=await read(page,"window.__designerSchema.layers.flatMap(l=>l.elements).find(e=>e.fieldPath==='item.Spare2')");
+  assert.equal(automatic.locked,false);
+  assert.equal(automatic.yHundredthMm,11000);
+  assert(automatic.xHundredthMm>=9000 && automatic.xHundredthMm+automatic.widthHundredthMm<=13000);
+  const automaticPoint=await read(page,`(()=>{const n=document.querySelector('[data-v3-element-id="${automatic.id}"]');n.scrollIntoView({block:'center'});const r=n.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+  await page.send('Input.dispatchMouseEvent',{type:'mousePressed',...automaticPoint,button:'left',clickCount:1});
+  await page.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:automaticPoint.x,y:automaticPoint.y+25,button:'left',buttons:1});
+  await page.send('Input.dispatchMouseEvent',{type:'mouseReleased',x:automaticPoint.x,y:automaticPoint.y+25,button:'left',clickCount:1});
+  await waitFor(page,"window.__designerSchema.layers.flatMap(l=>l.elements).find(e=>e.fieldPath==='item.Spare2').yHundredthMm!==11000");
+  await click(page,'button[aria-label="撤销"]');
+  await waitFor(page,"window.__designerSchema.layers.flatMap(l=>l.elements).find(e=>e.fieldPath==='item.Spare2').yHundredthMm===11000");
+  await click(page,'button[aria-label="撤销"]');
+  await waitFor(page,"!window.__designerSchema.layers.flatMap(l=>l.elements).some(e=>e.fieldPath==='item.Spare2')");
+  results.push({test:'automatically placed product fields remain manually draggable and undoable',passed:true});
+  await click(page, 'button[aria-label="选择字段"]');
   await drop('发票号',1000,7000);
   await waitFor(page,"window.__designerSchema.layers.flatMap(l=>l.elements).filter(e=>e.fieldPath==='Invoice.InvoiceNo').length===1");
-  assert.equal(await read(page,"document.querySelectorAll('.report-designer-product-copy').length"),4,'fixed document fields must never repeat with products');
+  assert.equal(await read(page,"document.querySelectorAll('.is-product-field').length"),2,'fixed document fields must never repeat with products');
   await click(page,'button[aria-label="撤销"]');
   await waitFor(page,"!window.__designerSchema.layers.flatMap(l=>l.elements).some(e=>e.fieldPath==='Invoice.InvoiceNo')");
   await click(page,'button[aria-label="重做"]');
@@ -25,4 +43,43 @@ export async function verifyProductFieldsUi({ page, url, read, waitFor, click, r
   assert.equal(await read(page,"window.__designerDraftState.isValid"),true);
   assert.deepEqual(await read(page,'window.__designerErrors'),[]);
   results.push({test:'free product fields retain physical drop positions, repeat guides, fixed document fields and undo/redo',passed:true});
+  await page.send('Page.navigate', {url:url+'?invoice=1'});
+  await waitFor(page,'!!document.querySelector("[data-v3-element-id=item-cartons]")');
+  assert.equal(await read(page,"document.querySelectorAll('.report-designer-v3-advanced-tools[open]').length"),0);
+  assert.equal(await read(page,"window.__designerSchema.layers.flatMap(l=>l.elements).filter(e=>e.flowKind==='DetailTable').length"),0);
+  const before=await read(page,"window.__designerSchema.layers.flatMap(l=>l.elements)");
+  const point=await read(page,`(()=>{const node=document.querySelector('[data-v3-element-id=item-cartons]');node.scrollIntoView({block:'center'});const r=node.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+  await page.send('Input.dispatchMouseEvent',{type:'mouseMoved',...point});
+  await page.send('Input.dispatchMouseEvent',{type:'mousePressed',...point,button:'left',clickCount:1});
+  await page.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:point.x+20,y:point.y,button:'left',buttons:1});
+  await page.send('Input.dispatchMouseEvent',{type:'mouseReleased',x:point.x+20,y:point.y,button:'left',clickCount:1});
+  await waitFor(page,`window.__designerSchema.layers.flatMap(l=>l.elements).find(e=>e.id==='item-cartons').xHundredthMm!==8500`);
+  const after=await read(page,"window.__designerSchema.layers.flatMap(l=>l.elements)");
+  assert.deepEqual(after.filter(e=>e.id!=='item-cartons'),before.filter(e=>e.id!=='item-cartons'),'dragging cartons must not move the row, totals or document fields');
+  assert.equal(await read(page,"window.__designerDraftState.isValid"),true);
+  await read(page,"[...document.querySelectorAll('.report-designer-v3-inspector button')].find(n=>n.textContent==='合计与明细同列对齐').click()");
+  await waitFor(page,"(()=>{const fields=window.__designerSchema.layers.flatMap(l=>l.elements);return fields.find(e=>e.id==='total-cartons').xHundredthMm===fields.find(e=>e.id==='item-cartons').xHundredthMm})()");
+  await click(page,'button[aria-label="撤销"]');
+  await waitFor(page,"window.__designerSchema.layers.flatMap(l=>l.elements).find(e=>e.id==='total-cartons').xHundredthMm===8500");
+  await click(page,'button[aria-label="撤销"]');
+  await waitFor(page,"window.__designerSchema.layers.flatMap(l=>l.elements).find(e=>e.id==='item-cartons').xHundredthMm===8500");
+  const fields=await read(page,"window.__designerSchema.layers.flatMap(l=>l.elements)");
+  const byId=id=>fields.find(e=>e.id===id);
+  assert.equal(byId('total-cartons').xHundredthMm,byId('item-cartons').xHundredthMm);
+  assert.equal(byId('total-quantity').xHundredthMm,byId('item-quantity').xHundredthMm);
+  for(const id of ['total-cartons','total-quantity','total-amount']) assert.equal(byId(id).yHundredthMm,byId('total-label').yHundredthMm);
+  assert(await read(page,"document.querySelector('.report-designer-v3-inspector').textContent.includes('商品明细字段')"));
+  for(const [face,family,bold] of [['serif','Noto Serif CJK SC',false],['sans-bold','Noto Sans CJK SC',true],['sans','Noto Sans CJK SC',false]]) {
+    await read(page,`(()=>{const node=[...document.querySelectorAll('.report-designer-v3-inspector label')].find(n=>n.firstElementChild?.textContent==='字体').querySelector('select');node.value=${JSON.stringify(face)};node.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await waitFor(page,`(()=>{const s=window.__designerSchema.layers.flatMap(l=>l.elements).find(e=>e.id==='item-cartons').style;return s.fontFamily===${JSON.stringify(family)}&&s.bold===${bold}})()`);
+    assert((await read(page,"getComputedStyle(document.querySelector('[data-v3-element-id=item-cartons]')).fontFamily")).includes(family));
+  }
+  await click(page,'button[aria-label="商品字段"]');
+  await waitFor(page,"[...document.querySelectorAll('button')].some(n=>n.getAttribute('aria-label')==='插入字段 箱数 (Item Cartons)')");
+  await click(page,'[aria-label="插入字段 箱数 (Item Cartons)"]');
+  assert.equal(await read(page,"window.__designerSchema.layers.flatMap(l=>l.elements).filter(e=>e.fieldPath==='item.Cartons').length"),1,'clicking an existing field picks it without creating an overlapping duplicate');
+  if(capture) await capture();
+  assert.deepEqual(await read(page,'window.__designerErrors'),[]);
+  results.push({test:'default invoice exposes independently draggable fields and aligned ordinary totals with advanced controls collapsed',passed:true});
+  results.push({test:'three bundled fonts survive draft serialization, summary alignment undoes, and field picking avoids duplicates',passed:true});
 }

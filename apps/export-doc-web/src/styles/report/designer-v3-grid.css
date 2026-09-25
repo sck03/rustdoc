@@ -107,6 +107,12 @@
 .edm-detail-omit-empty-lines > .edm-detail-composite-line:not(:has(span:not(:empty))) { display: none !important; }
 .new-report-detail-properties [hidden], .new-report-detail-column-card[hidden] { display: none !important; }
 .report-designer-product-guides { position: absolute; inset: 0; pointer-events: none; }
-.report-designer-product-copy { position: absolute; opacity: .25; border: 1px dashed #0f766e; }
-.report-designer-product-row-label { position: absolute; left: 0; right: 0; border-top: 1px dashed #0f766e; color: #0f766e; font-size: 7pt; transform: translateY(-100%); }
-.report-designer-product-row-label.is-copy { opacity: .5; }
+.report-designer-product-row-end { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--edm-primary-650); }
+.report-designer-product-row-label { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--edm-primary-650); color: var(--edm-primary-650); font-size: 7pt; transform: translateY(-100%); }
+.report-designer-v3-element.is-product-field { outline: 1px dashed var(--edm-primary-650); }
+.report-designer-v3-advanced-tools { position: relative; }
+.report-designer-v3-advanced-tools > summary { cursor: pointer; padding: 6px 10px; }
+.report-designer-v3-advanced-tools > div { position: absolute; top: 100%; left: 0; z-index: 30; width: 180px; padding: 8px; background: var(--edm-white); border: 1px solid var(--edm-neutral-350); display: grid; gap: 6px; }
+.report-designer-field-scope { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.report-designer-field-scope button { padding: 8px 4px; border: 1px solid var(--edm-neutral-350); border-radius: 4px; background: var(--edm-white); cursor: pointer; }
+.report-designer-field-scope button.is-active { color: var(--edm-white); background: var(--edm-primary-650); }

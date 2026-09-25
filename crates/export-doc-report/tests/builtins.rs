@@ -113,7 +113,7 @@ fn every_builtin_renders_its_own_domain_without_html_execution() {
 
 #[test]
 fn commercial_details_and_customs_continuation_use_shared_pagination() {
-    for template in [Builtin::Invoice, Builtin::PackingList] {
+    for template in [Builtin::PackingList] {
         let table = detail_table(template);
         assert_eq!(table.print.first_page_rows, Some(12));
         assert_eq!(table.print.continuation_page_rows, Some(12));
@@ -151,8 +151,8 @@ fn invoice_terms_and_packing_header_follow_their_separate_templates() {
             .parse::<f32>()
             .unwrap()
     };
-    assert!(position("1000PCS") - position("20CTNS") > 15.);
-    assert!(position("@USD4.50") - position("1000PCS") > 15.);
+    assert!(position("1000") - position("20") > 15.);
+    assert!(position("4.50") - position("1000") > 15.);
     let packing =
         render_builtin(Builtin::PackingList, &invoice(3), &AtomicBool::new(false)).unwrap();
     for label in ["From:", "Payment Terms:", "Issued by:"] {
@@ -166,7 +166,12 @@ fn multipage_builtins_repeat_only_the_required_bands() {
     data.root["Invoice"]["shippingMarks"] = json!("FIRST-PAGE-MARKS");
     for template in [Builtin::Invoice, Builtin::PackingList] {
         let result = render_builtin(template, &data, &AtomicBool::new(false)).unwrap();
-        assert_eq!(result.pages.len(), 3, "{}", template.label());
+        assert_eq!(
+            result.pages.len(),
+            if template == Builtin::Invoice { 4 } else { 3 },
+            "{}",
+            template.label()
+        );
         assert!(result.pages[0].svg.contains("FIRST-PAGE-MARKS"));
         assert!(
             result
@@ -179,10 +184,18 @@ fn multipage_builtins_repeat_only_the_required_bands() {
             result
                 .pages
                 .iter()
-                .take(2)
+                .take(result.pages.len() - 1)
                 .all(|p| !p.svg.contains("TOTAL:"))
         );
-        assert!(result.pages[2].svg.contains("TOTAL:"));
+        assert!(result.pages.last().unwrap().svg.contains("TOTAL:"));
+        for index in 1..=36 {
+            let all = result
+                .pages
+                .iter()
+                .map(|page| page.svg.as_str())
+                .collect::<String>();
+            assert_eq!(all.matches(&format!(">STYLE-{index}</text>")).count(), 1);
+        }
     }
     let contract = render_builtin(Builtin::Contract, &data, &AtomicBool::new(false)).unwrap();
     assert_eq!(contract.pages.len(), 2);
@@ -208,7 +221,7 @@ fn empty_or_hidden_po_and_style_do_not_leave_blank_composite_lines() {
     let mut data = invoice(1);
     data.root["items"][0]["poNumber"] = json!("");
     data.root["items"][0]["styleNo"] = json!("");
-    let design = Builtin::Invoice.design().unwrap();
+    let design = Builtin::PackingList.design().unwrap();
     let no_optional =
         export_doc_report::render_design(&data, &design, &AtomicBool::new(false)).unwrap();
     assert!(no_optional.pages[0].svg.contains("20CTNS"));

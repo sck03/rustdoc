@@ -50,6 +50,7 @@ import {
 } from "./ReportDesignerV3Panels.tsx";
 import { ComponentPalette, FieldPanel, LayerPanel, type PaletteActions } from "./ReportDesignerV3ResourcePanels.tsx";
 import { focusDesignerNode } from "./ReportDesignerV3InspectorControls.tsx";
+import { insertProductField } from "./reportDesignerProductFields.ts";
 
 type V3SidebarTab = "components" | "fields" | "layers";
 
@@ -73,7 +74,7 @@ export function ReportDesignerV3Workspace({
   const parsed = useMemo(() => parseReportDesignerV3Source(content, reportType), [content, reportType]);
   const history = useReportDesignerV3History(parsed.schema);
   const fieldGroups = useMemo(() => buildReportDesignerFieldGroups(fieldCatalog, reportType), [fieldCatalog, reportType]);
-  const [sidebarTab, setSidebarTab] = useState<V3SidebarTab>("components");
+  const [sidebarTab, setSidebarTab] = useState<V3SidebarTab>("fields");
   const [zoom, setZoom] = useState(0.72);
   const [fitRequest, setFitRequest] = useState(0);
   const [showGuides, setShowGuides] = useState(true);
@@ -105,7 +106,7 @@ export function ReportDesignerV3Workspace({
     [exportValidation.blocked, history.state.schema],
   );
   const pageSize = reportDesignerV3PageSize(history.state.schema.page);
-  const visibleFieldGroups = useMemo(() => filterFieldGroups(productFieldsOnly ? fieldGroups.map(group => ({ ...group, fields: group.fields.filter(field => field.value.startsWith("item.")) })).filter(group => group.fields.length) : fieldGroups, fieldQuery), [fieldGroups, fieldQuery, productFieldsOnly]);
+  const visibleFieldGroups = useMemo(() => filterFieldGroups(fieldGroups.map(group => ({ ...group, fields: group.fields.filter(field => field.value.startsWith("item.") === productFieldsOnly) })).filter(group => group.fields.length), fieldQuery), [fieldGroups, fieldQuery, productFieldsOnly]);
   useEffect(() => {
     setDraftEnabled(false);
     setGridCellSelection(null);
@@ -177,11 +178,13 @@ export function ReportDesignerV3Workspace({
     if (!field.value.trim()) return;
     const item = field.value.startsWith("item.");
     if (item && history.state.schema.layers.some(layer => layer.elements.some(element => element.type === "Flow" && element.flowKind === "DetailTable"))) { setCapacityNotice("当前模板使用高级明细表。请先删除该表，再拖入自由商品字段；可随时撤销。"); return; }
-    const existing = history.state.schema.layers.flatMap(layer => layer.elements).filter(element => element.type === "Field" && element.fieldPath.startsWith("item."));
-    const previous = existing.at(-1);
-    const element = { ...createV3FieldElement(field.value, previous ? previous.xHundredthMm + previous.widthHundredthMm + 100 : 1500, item ? (existing[0]?.yHundredthMm ?? 10000) : 1500), label: field.label };
-    const layerId = activeLayerId();
-    if (item && layerId) { commit(insertV3Element(history.state, layerId, element)); setCapacityNotice(null); } else placeElement(element);
+    if (item) {
+      const result = insertProductField(history.state, field);
+      commit(result.state);
+      setCapacityNotice(result.notice);
+      const id = result.state.selectedIds[0];
+      if (id) focusDesignerNode(`[data-v3-element-id="${CSS.escape(id)}"]`);
+    } else placeElement({ ...createV3FieldElement(field.value), label: field.label });
   }
   function dropField(path: string, x: number, y: number) {
     const field = fieldGroups.flatMap(group => group.fields).find(field => field.value === path);
@@ -335,26 +338,27 @@ export function ReportDesignerV3Workspace({
           {exportValidation.issues.filter((issue) => issue.severity === "error").length > 3 ? <small>还有更多阻断问题，请逐项检查右侧属性。</small> : null}
         </div>
       ) : null}
-      {capacityNotice ? <div className="report-designer-v3-notice warning" role="status"><strong>已达到设计器限制</strong><span>{capacityNotice}</span></div> : null}
+      {capacityNotice ? <div className="report-designer-v3-notice warning" role="status"><strong>添加字段提示</strong><span>{capacityNotice}</span></div> : null}
       {imageUploading ? <div className="report-designer-v3-notice" role="status">图片正在上传，完成后可保存。</div> : null}
       <div className="report-designer-v3-editing-surface">
       <div className="report-designer-v3-toolbar" role="toolbar" aria-label="设计器工具栏">
         {editingEnabled ? <>
         <div className="report-designer-v3-toolbar-group" role="group" aria-label="插入基础元素">
           <ToolbarButton label="文本" icon={<Pilcrow size={15} />} onClick={insertionActions.text} disabled={!editingEnabled} />
-          <ToolbarButton label="选择字段" icon={<Braces size={15} />} onClick={openFieldPanel} />
+          <ToolbarButton label="选择字段" title="普通字段：发票号、客户、唛头与合计" icon={<Braces size={15} />} onClick={() => { setProductFieldsOnly(false); openFieldPanel(); }} />
+          {insertionActions.productFields ? <ToolbarButton label="商品字段" icon={<Columns3 size={15} />} onClick={insertionActions.productFields} /> : null}
           {insertionActions.image ? <ToolbarButton label="图片" icon={<ImageIcon size={15} />} onClick={insertionActions.image} disabled={!editingEnabled} /> : null}
           <ToolbarButton label="矩形" icon={<span className="report-designer-v3-tool-glyph">□</span>} onClick={insertionActions.rectangle} disabled={!editingEnabled} />
           <ToolbarButton label="线" icon={<span className="report-designer-v3-tool-glyph">╱</span>} onClick={insertionActions.line} disabled={!editingEnabled} />
           <ToolbarButton label="页码" icon={<Hash size={15} />} onClick={insertionActions.pageNumber} disabled={!editingEnabled} />
         </div>
-        <div className="report-designer-v3-toolbar-group" role="group" aria-label="插入结构组件">
+        <details className="report-designer-v3-advanced-tools"><summary>高级排版</summary><div role="group" aria-label="插入结构组件">
           <ToolbarButton label="多列行" icon={<Columns3 size={15} />} onClick={insertionActions.row} disabled={!editingEnabled} />
           <ToolbarButton label="普通表格" icon={<Grid2X2 size={15} />} onClick={insertionActions.grid} disabled={!editingEnabled} />
           <ToolbarButton label="条件块" icon={<ListFilter size={15} />} onClick={insertionActions.conditional} disabled={!editingEnabled} />
           {insertionActions.detailTable ? <ToolbarButton label="明细表" icon={<Table2 size={15} />} onClick={insertionActions.detailTable} disabled={!editingEnabled} /> : null}
           <ToolbarButton label="分页符" icon={<FilePlus2 size={15} />} onClick={insertionActions.pageBreak} disabled={!editingEnabled} />
-        </div>
+        </div></details>
         <div className="report-designer-v3-toolbar-group" role="group" aria-label="编辑">
           <ToolbarButton label="撤销" title="撤销 (Ctrl+Z)" icon={<Undo2 size={15} />} onClick={history.undo} disabled={!editingEnabled || !history.canUndo} />
           <ToolbarButton label="重做" title="重做 (Ctrl+Y)" icon={<Redo2 size={15} />} onClick={history.redo} disabled={!editingEnabled || !history.canRedo} />
@@ -367,7 +371,7 @@ export function ReportDesignerV3Workspace({
           <ToolbarButton label="复制样式" title="复制单个基础组件的外观" icon={<Paintbrush size={15} />} onClick={copyStyle} disabled={!canCopyStyle} />
           <ToolbarButton label="应用样式" title="将已复制的外观应用到所选基础组件，保留内容和位置" icon={<ClipboardPaste size={15} />} onClick={pasteStyle} disabled={!canPasteStyle} />
         </div>
-        <div className="report-designer-v3-toolbar-group report-designer-v3-arrangement-group" role="group" aria-label="对齐与分布">
+        {history.state.selectedIds.length >= 2 ? <div className="report-designer-v3-toolbar-group report-designer-v3-arrangement-group" role="group" aria-label="对齐与分布">
           <ToolbarButton label="左对齐" icon={<AlignHorizontalJustifyStart size={15} />} onClick={() => alignSelection("left")} disabled={history.state.selectedIds.length < 2 || !editingEnabled} />
           <ToolbarButton label="水平居中" icon={<AlignHorizontalJustifyCenter size={15} />} onClick={() => alignSelection("center-horizontal")} disabled={history.state.selectedIds.length < 2 || !editingEnabled} />
           <ToolbarButton label="右对齐" icon={<AlignHorizontalJustifyEnd size={15} />} onClick={() => alignSelection("right")} disabled={history.state.selectedIds.length < 2 || !editingEnabled} />
@@ -376,7 +380,7 @@ export function ReportDesignerV3Workspace({
           <ToolbarButton label="底端对齐" icon={<AlignVerticalJustifyEnd size={15} />} onClick={() => alignSelection("bottom")} disabled={history.state.selectedIds.length < 2 || !editingEnabled} />
           <ToolbarButton label="水平分布" icon={<ArrowLeftRight size={15} />} onClick={() => distributeSelection("horizontal")} disabled={history.state.selectedIds.length < 3 || !editingEnabled} />
           <ToolbarButton label="垂直分布" icon={<ArrowUpDown size={15} />} onClick={() => distributeSelection("vertical")} disabled={history.state.selectedIds.length < 3 || !editingEnabled} />
-        </div>
+        </div> : null}
         </> : null}
         <div className="report-designer-v3-toolbar-group report-designer-v3-toolbar-group-end" role="group" aria-label="视图缩放">
           <ToolbarButton label="缩小" icon={<ZoomOut size={15} />} onClick={() => setZoom((value) => clampReportDesignerV3Zoom(value - 0.05))} />
@@ -395,7 +399,7 @@ export function ReportDesignerV3Workspace({
           </div>
           {sidebarTab === "components" ? <ComponentPalette reportType={reportType} actions={insertionActions} canEdit={editingEnabled} /> : null}
           {sidebarTab === "fields" ? (
-            <><label><input type="checkbox" checked={productFieldsOnly} onChange={event => setProductFieldsOnly(event.target.checked)} /> 只看商品信息（逐行输出）</label><FieldPanel query={fieldQuery} groups={visibleFieldGroups} focusRequest={fieldFocusRequest} onQueryChange={setFieldQuery} onInsert={insertField} canEdit={editingEnabled} /></>
+            <FieldPanel query={fieldQuery} groups={visibleFieldGroups} productFields={productFieldsOnly} onProductFieldsChange={reportType === "ExportDocument" ? value => { setProductFieldsOnly(value); setFieldQuery(""); } : undefined} focusRequest={fieldFocusRequest} onQueryChange={setFieldQuery} onInsert={insertField} canEdit={editingEnabled} />
           ) : null}
           {sidebarTab === "layers" ? <LayerPanel state={history.state} onSelect={selectLayer} onCommit={commit} canEdit={editingEnabled} /> : null}
         </aside> : null}

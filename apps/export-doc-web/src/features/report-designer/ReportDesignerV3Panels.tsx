@@ -1,4 +1,6 @@
 import { ImageSourceEditor } from "./ReportDesignerV3ImageProperties.tsx";
+import { portableReportFontFaces, portableReportSerifFontFamily, portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
+import { alignProductSummary } from "./reportDesignerProductFields.ts";
 import { isShippingMarksField } from "./reportDesignerFieldRendering.ts";
 import { NumberField, SelectField, InspectorTitle, focusDesignerNode } from "./ReportDesignerV3InspectorControls.tsx";
 import { useState } from "react";
@@ -189,7 +191,9 @@ export function ElementInspector({
   onImageResourceUploaded: (elementId: string, resource: ApiReportTemplateImageResourceResponse) => void;
 }) {
   const { element, layer } = located;
+  const productField = element.type === "Field" && element.fieldPath.startsWith("item.");
   const editable = canEdit && !element.locked && !layer.locked;
+  const alignedSummary = alignProductSummary(state, element.id);
   const [tab, setTab] = useState<"content" | "style" | "layout">(element.type === "Rectangle" || element.type === "Line" ? "style" : "content");
   const tabs = [
     ...(element.type === "Rectangle" ? [] : [{ value: "content" as const, label: "内容" }]),
@@ -202,12 +206,11 @@ export function ElementInspector({
         <NumberField label="Y (mm)" value={hundredthMmToMm(element.yHundredthMm)} disabled={!editable} onCommit={(value) => onPatch({ yHundredthMm: Math.round(value * 100) })} />
         <NumberField label="宽 (mm)" value={hundredthMmToMm(element.widthHundredthMm)} min={4} disabled={!editable} onCommit={(value) => onPatch({ widthHundredthMm: Math.round(value * 100) })} />
         <NumberField label="高 (mm)" value={hundredthMmToMm(element.heightHundredthMm)} min={4} disabled={!editable} onCommit={(value) => onPatch({ heightHundredthMm: Math.round(value * 100) })} />
-        <NumberField label="旋转角度 (°)" value={element.rotationDeg} min={-360} max={360} disabled={!editable} onCommit={(value) => onPatch({ rotationDeg: Math.round(value * 100) / 100 })} />
       </div>
-      <div className="report-designer-v3-element-actions">
+      <details><summary>旋转与居中</summary><NumberField label="旋转角度 (°)" value={element.rotationDeg} min={-360} max={360} disabled={!editable} onCommit={(value) => onPatch({ rotationDeg: Math.round(value * 100) / 100 })} /><div className="report-designer-v3-element-actions">
         <button type="button" disabled={!editable} onClick={() => onCommit(alignSelectedV3Elements(state, "center-horizontal", "page"))}>页面水平居中</button>
         <button type="button" disabled={!editable} onClick={() => onCommit(alignSelectedV3Elements(state, "center-vertical", "page"))}>页面垂直居中</button>
-      </div>
+      </div></details>
     </details>;
   const content = <ElementContentEditor element={element} reportType={state.schema.reportType} resources={state.schema.resources ?? []} fieldGroups={fieldGroups} editable={editable} client={client} onPatch={onPatch} onFlowCommit={onFlowCommit} selectedGridCellId={selectedGridCellId} onSelectGridCell={onSelectGridCell} onImageResourceUploaded={onImageResourceUploaded} />;
   const output = <details className="report-designer-property-section"><summary>排列与输出</summary>
@@ -220,9 +223,12 @@ export function ElementInspector({
     </details>;
   return (
     <div className="report-designer-v3-inspector-content">
-      <InspectorTitle title={element.type === "Flow" ? reportDesignerV3ElementText(element) : reportDesignerV3ElementKindLabel(element)} subtitle={`${v3RegionNames[layer.role]}区域${element.locked || layer.locked ? " · 已锁定" : ""}`} />
-      {element.type === "Field" && element.fieldPath.startsWith("item.") ? <><p>这是商品信息，每件商品按此列位自动输出。拖动这个字段即可调整位置。</p><NumberField label="商品行距 (mm)" value={(state.schema.detailRowHeightHundredthMm ?? 1200) / 100} min={4} max={100} disabled={!editable} onCommit={value => onCommit({ ...state, schema: { ...state.schema, detailRowHeightHundredthMm: Math.round(value * 100) } })} /><small>所有商品列共用行距，长文字会自动撑高这一行。</small></> : null}
-      {element.type === "Flow" ? <><RegionSelector state={state} onCommit={onCommit} disabled={!editable} />{geometry}{content}{output}</> :
+      <InspectorTitle title={element.type === "Field" ? element.fieldPath.startsWith("item.") ? "商品明细字段" : "普通字段" : element.type === "Flow" ? reportDesignerV3ElementText(element) : reportDesignerV3ElementKindLabel(element)} subtitle={`${element.label || v3RegionNames[layer.role]}${element.locked || layer.locked ? " · 已锁定" : ""}`} />
+      {element.type === "Field" ? <small>{productField ? "每件商品重复一次，直接拖动字段排好这一行。" : "普通字段独立显示，不随商品重复。"}</small> : null}
+      {alignedSummary !== state ? <button type="button" className="command-button secondary" disabled={!editable} onClick={() => onCommit(alignedSummary)}>合计与明细同列对齐</button> : null}
+      {element.type === "Field" ? <>{content}<ElementStyleEditor element={element} editable={editable} onPatch={onPatchStyle} />{geometry}
+        {productField ? <details className="report-designer-property-section"><summary>商品行距</summary><NumberField label="商品行距 (mm)" value={(state.schema.detailRowHeightHundredthMm ?? 1200) / 100} min={4} max={100} disabled={!editable} onCommit={value => onCommit({ ...state, schema: { ...state.schema, detailRowHeightHundredthMm: Math.round(value * 100) } })} /><small>所有商品列共用最小行距，长文字自动撑高。</small></details> : null}
+        <details className="report-designer-property-section"><summary>高级设置</summary><RegionSelector state={state} onCommit={onCommit} disabled={!editable} />{output}</details></> : element.type === "Flow" ? <><RegionSelector state={state} onCommit={onCommit} disabled={!editable} />{geometry}{content}{output}</> :
         <DesignerPropertyTabs value={tab} options={tabs} onChange={setTab}>
           {tab === "content" ? content : tab === "style" ? <ElementStyleEditor element={element} editable={editable} onPatch={onPatchStyle} /> :
             <><RegionSelector state={state} onCommit={onCommit} disabled={!editable} />{geometry}{output}</>}
@@ -239,12 +245,12 @@ function ElementContentEditor({ element, reportType, resources, fieldGroups, edi
     case "Field": {
       const options = [
         { value: "", label: "请选择字段" },
-        ...flattenFields(fieldGroups).map((field) => ({ value: field.value, label: field.label })),
+        ...flattenFields(fieldGroups).filter(field => field.value.startsWith("item.") === element.fieldPath.startsWith("item.")).map((field) => ({ value: field.value, label: field.label })),
       ];
       return <><SelectField label="字段" value={element.fieldPath} options={options} disabled={!editable} onChange={(fieldPath) => onPatch({ fieldPath })} />
         {isShippingMarksField(element.fieldPath) && <small>按发票所选类型显示。文字使用下方样式，图片在此区域内等比例缩放。</small>}
-        <label><span>字段标签（选填）</span><CommitTextField value={element.label ?? ""} disabled={!editable} onCommit={(label) => onPatch({ label: label || undefined })} /></label>
-        <label><span>占位文本</span><CommitTextField value={element.fallbackText ?? ""} disabled={!editable} onCommit={(fallbackText) => onPatch({ fallbackText: fallbackText || undefined })} /></label></>;
+        <details className="report-designer-property-section"><summary>标签与空值</summary><label><span>字段标签（选填）</span><CommitTextField value={element.label ?? ""} disabled={!editable} onCommit={(label) => onPatch({ label: label || undefined })} /></label>
+        <label><span>占位文本</span><CommitTextField value={element.fallbackText ?? ""} disabled={!editable} onCommit={(fallbackText) => onPatch({ fallbackText: fallbackText || undefined })} /></label></details></>;
     }
     case "Image": {
       return <ImageSourceEditor element={element} reportType={reportType} resources={resources} editable={editable} client={client} onPatch={onPatch} onUploaded={onImageResourceUploaded} />;
@@ -266,13 +272,15 @@ function ElementStyleEditor({ element, editable, onPatch }: { element: ReportDes
   const text = element.type === "Text" || element.type === "Field" || element.type === "PageNumber";
   return <div className="report-designer-v3-style-editor">
     {text && <>
+      <SelectField label="字体" value={style.bold ? "sans-bold" : style.fontFamily === portableReportSerifFontFamily ? "serif" : "sans"} options={portableReportFontFaces.map(({value,label}) => ({value,label}))} disabled={!editable} onChange={value => { const face = portableReportFontFaces.find(face => face.value === value); if (face) onPatch({ fontFamily: face.fontFamily, bold: face.bold }); }} />
       <strong>文字</strong><div className="report-designer-v3-inspector-grid">
         <NumberField label="字号 pt" value={style.fontSizePt ?? 10} min={6} max={96} disabled={!editable} onCommit={(fontSizePt) => onPatch({ fontSizePt })} />
         <SelectField label="对齐" value={style.align ?? "Left"} options={[{ value: "Left", label: "左" }, { value: "Center", label: "中" }, { value: "Right", label: "右" }]} disabled={!editable} onChange={(align) => onPatch({ align: align as "Left" | "Center" | "Right" })} />
       </div>
-      <CheckRow checked={style.bold === true} disabled={!editable} onChange={(bold) => onPatch({ bold })}>粗体</CheckRow>
-      <ReportDesignerV3ColorField label="文字颜色" value={style.color ?? "#1f2933"} disabled={!editable} onCommit={(color) => onPatch({ color })} />
+      <CheckRow checked={style.bold === true} disabled={!editable} onChange={(bold) => onPatch({ bold, ...(bold ? { fontFamily: portableReportSansFontFamily } : {}) })}>粗体</CheckRow>
     </>}
+    <details className="report-designer-property-section" open={element.type !== "Field"}><summary>颜色与边框</summary>
+    {text && <ReportDesignerV3ColorField label="文字颜色" value={style.color ?? "#1f2933"} disabled={!editable} onCommit={(color) => onPatch({ color })} />}
     {!line && <ReportDesignerV3ColorField label="背景颜色" value={style.backgroundColor ?? ""} allowEmpty disabled={!editable} onCommit={(backgroundColor) => onPatch({ backgroundColor: backgroundColor || undefined })} />}
     <strong>{line ? "线条" : "边框"}</strong>
     <div className="report-designer-v3-inspector-grid">
@@ -282,6 +290,7 @@ function ElementStyleEditor({ element, editable, onPatch }: { element: ReportDes
     </div>
     <ReportDesignerV3ColorField label={line ? "线条颜色" : "边框颜色"} value={style.borderColor ?? "#334155"} disabled={!editable} onCommit={(borderColor) => onPatch({ borderColor })} />
     {(text || element.type === "Image") && <NumberField label="内边距 (mm)" value={hundredthMmToMm(style.paddingHundredthMm ?? 0)} min={0} max={20} disabled={!editable} onCommit={(value) => onPatch({ paddingHundredthMm: Math.round(value * 100) })} />}
+    </details>
   </div>;
 }
 

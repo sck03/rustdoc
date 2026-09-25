@@ -232,12 +232,15 @@ fn element(
         }
         let text = match &element.kind {
             Kind::Line { direction } => {
-                let (x2, y2) = if direction == "Vertical" {
-                    (x, y + height)
+                if style.border_style == "None" {
+                    return Ok(());
+                }
+                let (x1, y1, x2, y2) = if direction == "Vertical" {
+                    (x + width / 2., y, x + width / 2., y + height)
                 } else {
-                    (x + width, y)
+                    (x, y + height / 2., x + width, y + height / 2.)
                 };
-                svg.push_str(&format!("<line x1=\"{x}\" y1=\"{y}\" x2=\"{x2}\" y2=\"{y2}\" stroke=\"{}\" stroke-width=\"{}\"{dash}/>",escape(&style.border_color),border.max(0.2)));
+                svg.push_str(&format!("<line x1=\"{x1}\" y1=\"{y1}\" x2=\"{x2}\" y2=\"{y2}\" stroke=\"{}\" stroke-width=\"{}\"{dash}/>",escape(&style.border_color),border.max(0.2)));
                 return Ok(());
             }
             Kind::Rectangle | Kind::Flow { .. } | Kind::Image { .. } => return Ok(()),
@@ -282,11 +285,19 @@ fn element(
             )));
         }
         let mut content = String::new();
+        let spare_height = (height - padding * 2. - lines.len() as f32 * size * 1.35).max(0.);
+        let text_y = y
+            + padding
+            + match style.vertical_align.as_str() {
+                "Middle" => spare_height / 2.,
+                "Bottom" => spare_height,
+                _ => 0.,
+            };
         text_svg(
             &mut content,
             &lines,
             x + padding,
-            y,
+            text_y,
             width - padding * 2.,
             size,
             style.bold,

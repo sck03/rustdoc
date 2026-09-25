@@ -49,12 +49,24 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerTableMutations.ts"
 export * from ${JSON.stringify(importSpecifier("reportDesignerLayerBands.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3WorkspaceHelpers.tsx"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerFields.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerProductFields.ts"))};
 export { resolveDefaultTemplatePath } from ${JSON.stringify(importSpecifier("../reports/reportTemplateDesignerModel.ts"))};
 `);
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 const api = await import(pathToFileURL(bundlePath).href);
 verifyDesignerEditingMutations(api);
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
+let productState = api.createReportDesignerV3DocumentState(api.parseReportDesignerV3Source("", "ExportDocument").schema);
+for (const name of ["StyleName", "Cartons", "Quantity", "UnitEN", "UnitPrice", "TotalPrice"]) {
+  const next = api.insertProductField(productState, { label: name, value: `item.${name}` });
+  assert(!next.notice, "常用商品字段应自动找到同行空位");
+  productState = next.state;
+}
+const productElements = productState.schema.layers.flatMap(l=>l.elements);
+assert(productElements.every((e,i)=>e.yHundredthMm===productElements[0].yHundredthMm && (!i||e.xHundredthMm>=productElements[i-1].xHundredthMm+productElements[i-1].widthHundredthMm)), "点击添加商品字段不能重叠，且应同一行");
+assert(api.insertProductField(productState,{label:"箱数",value:"item.Cartons"}).state.schema===productState.schema, "重复点击已有字段只定位，不新增组件");
+const fullRow = api.insertProductField(productState,{label:"PO",value:"item.PoNumber"});
+assert(fullRow.state===productState && fullRow.notice, "满行必须保留原稿并提示，不能挤到页边重叠");
 assert(api.resolveDefaultTemplatePath({ templates: [{templatePath:"builtin:Export/invoice.dtpl"},{templatePath:"user:Export/invoice.dtpl"}], reportType:"ExportDocument", requestedTemplateFileName:"user:Export/invoice.dtpl", currentTemplatePath:"", userTemplateSelected:false }) === "user:Export/invoice.dtpl", "完整模板引用必须区分同名内置模板与用户副本");
 
 function assertFixedRightMetadataLayout(source, templatePath) {
@@ -138,7 +150,7 @@ assert(imagePropertiesSource.includes('type="file"') && imagePropertiesSource.in
 assert(imagePropertiesSource.includes("uploadReportTemplateV3ImageResource") && imagePropertiesSource.includes("已上传图片"), "图片属性栏必须调用受控资源 API 并支持下拉复用已绑定资源");
 assert(imagePropertiesSource.includes("无需填写资源 ID") && imagePropertiesSource.includes("最大 32 MB"), "图片上传必须说明自动绑定行为和文件大小边界");
 assert(inspectorCss.includes("report-designer-v3-upload-button") && inspectorCss.includes("report-designer-v3-upload-feedback.is-error"), "图片上传控件和错误反馈必须具有独立可见样式");
-assert(workspaceSource.includes("onClick={openFieldPanel}"), "工具栏的选择字段按钮必须打开字段面板而不是静默插入首个字段");
+assert(workspaceSource.includes("setProductFieldsOnly(false); openFieldPanel();"), "工具栏的选择字段按钮必须打开普通字段面板而不是静默插入首个字段");
 assert(workspaceSource.includes("report-designer-v3-zoom-select") && workspaceSource.includes("适合窗口"), "V3 工作区必须提供缩放预设和适合窗口操作");
 assert(workspaceSource.includes("fitRequest") && workspaceSource.includes("showGuides") && workspaceSource.includes("onFitZoom={handleFitZoom}"), "V3 工作区必须把适合窗口和参考线状态传递到画布");
 assert(canvasSource.includes("scroll.clientWidth - horizontalPadding") && canvasSource.includes("scroll.clientHeight - verticalPadding"), "适合窗口必须按画布真实内容区计算可用尺寸");
@@ -704,7 +716,7 @@ assert(canvasSource.includes("data-v3-layer-name={layer.name}") && canvasElement
 assert(canvasSource.includes("createV3RegionMoveConstraint") && canvasSource.includes("findReportDesignerElementNodes") && canvasSource.includes("translate3d"), "复杂模板拖动必须预计算边界、缓存元素节点并使用合成层位移");
 assert(canvasSource.includes("--v3-page-ratio") && canvasCss.includes("aspect-ratio: var(--v3-page-ratio"), "V3 画布必须按 A4 物理宽高比渲染横竖版页面");
 assert(canvasCss.includes("report-designer-v3-layer::before") && canvasCss.includes("report-designer-v3-preview-line-horizontal"), "V3 画布样式必须显示图层标识和细线方向");
-assert(resourcePanelsSource.includes('label="普通表格"') && resourcePanelsSource.includes("商品字段（逐行输出）") && resourcePanelsSource.includes("高级表格组件"), "组件入口必须区分自由商品字段、普通表格和高级组合表格");
+assert(resourcePanelsSource.includes('label="普通表格"') && resourcePanelsSource.includes("商品字段（逐行输出）") && resourcePanelsSource.includes("高级排版"), "组件入口必须区分自由商品字段、普通表格和高级组合表格");
 assert(gridPropertiesSource.includes("new-report-grid-cell-picker") && gridPropertiesSource.includes("向右合并") && gridPropertiesSource.includes("向下合并") && gridPropertiesSource.includes("快速版式"), "普通表格属性栏必须提供可视化选格、预设和直接合并操作");
 assert(gridPropertiesSource.includes("修改整表样式会立即应用到全部单元格") && !gridPropertiesSource.includes("套用样式") && !gridPropertiesSource.includes("套用边框"), "整表样式和边框必须即时应用，不能依赖容易漏掉的二次套用按钮");
 assert(gridCss.includes("data-report-grid-cell-id") && gridCss.includes("is-designer-selected-cell"), "画布样式必须支持单元格直接命中和选中反馈");

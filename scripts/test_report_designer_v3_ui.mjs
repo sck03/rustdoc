@@ -19,6 +19,7 @@ fs.mkdirSync(output, { recursive: true });
 const esbuild = require("esbuild");
 const source = name => JSON.stringify(path.join(web, "src", name).replaceAll("\\", "/"));
 const rasterImages = JSON.parse(fs.readFileSync(path.join(repo, "tests/ReportTemplateFixtures/raster-images.json"), "utf8"));
+const reportFields = JSON.parse(fs.readFileSync(path.join(repo, "crates/export-doc-engine/resources/report-fields.json"), "utf8"));
 const imageFixtures = ["png", "pngAlternate", "jpeg"].map((format, index) => {
   const bytes = Buffer.from(rasterImages[format], "base64"), sha256 = createHash("sha256").update(bytes).digest("hex");
   return { id: `img-${sha256}.${format === "jpeg" ? "jpg" : "png"}`, sha256, mediaType: format === "jpeg" ? "image/jpeg" : "image/png", byteLength: bytes.length,
@@ -38,6 +39,7 @@ await esbuild.build({
     import { createV3FlowElement, createV3TextElement, createV3FieldElement, createV3LineElement, createV3PageNumberElement, createV3ImageElement } from ${source("features/report-designer/reportDesignerV3ElementFactories.ts")};
     import { createGridBlock, createDetailTableBlock, createRowBlock, createConditionalBlock, createDetailTableSideBand } from ${source("features/report-designer/reportDesignerBlockFactories.ts")};
     import { createShippingMarksScenario } from ${JSON.stringify(path.join(repo, "scripts/lib/report-shipping-marks-fixture.mjs").replaceAll("\\", "/"))};
+    import { defaultReportDesigns } from ${JSON.stringify(path.join(repo, "scripts/lib/default-report-designs.mjs").replaceAll("\\", "/"))};
     import { renderReportDesignerLocalPreviewSample } from ${source("features/report-designer/reportDesignerPreviewSamples.ts")};
     import ${source("styles/cascade.css")};
     import ${source("styles/foundation.css")};
@@ -84,6 +86,7 @@ await esbuild.build({
       overlay.elements.push(...[0,1].map(index=>({...createV3ImageElement(1500+index*7000,6000),id:'image-'+index,resourceId:images[0].id,altText:'真实付款图片'})));
     }
     if(new URLSearchParams(location.search).has('marks')) Object.assign(schema,createShippingMarksScenario({parseReportDesignerV3Source,createRowBlock,createGridBlock,createConditionalBlock,createDetailTableBlock,createDetailTableSideBand,createV3FlowElement,createV3FieldElement}));
+    if(new URLSearchParams(location.search).has('invoice')) Object.assign(schema,defaultReportDesigns()[0][1]);
     window.__designerSchema = schema;
     window.__designerUpdates = 0;
     window.__designerErrors = [];
@@ -94,6 +97,7 @@ await esbuild.build({
       category:root==='Invoice'?'单据备用字段':'明细备用列',label:index===9?(root==='Invoice'?'船名航次':'客户货号'):(root==='Invoice'?'发票':'明细')+'备用 '+(index+1),value:'{{ '+root+'.Spare'+(index+1)+' }}',reportType:'ExportDocument'})))};
     fieldCatalog.fields.push({category:'单据信息',label:'唛头（文字 / 图片自动）',value:'{{ Invoice.ShippingMarks }}',reportType:'ExportDocument'});
     fieldCatalog.fields.push({category:'单据信息',label:'发票号',value:'{{ Invoice.InvoiceNo }}',reportType:'ExportDocument'});
+    if(new URLSearchParams(location.search).has('invoice')) Object.assign(fieldCatalog,${JSON.stringify(reportFields)});
     window.__designerHtml = content;
     window.__exportDesignerHtml=()=>exportReportDesignerV3SchemaToHtml(window.__designerSchema);
     window.__renderMarksPreview=profile=>renderReportDesignerLocalPreviewSample(window.__designerHtml,profile);
@@ -270,7 +274,7 @@ try {
   await waitFor(page,'window.__designerSchema.layers.flatMap(layer=>layer.elements).find(element=>element.id==="stress-0").text === "0"');
   results.push({test:'902-element text input commits once and undoes as one operation',passed:true});
   await verifyDesignerEditingUi({page,url,read,waitFor,click,key,modifier:primaryModifier,results});
-  await verifyProductFieldsUi({page,url,read,waitFor,click,results});
+  await verifyProductFieldsUi({page,url,read,waitFor,click,results,capture:() => captureScreenshot(page,path.join(output,'invoice-fields.png'))});
   await page.send("Page.navigate",{url});
   await waitFor(page,'document.querySelector("[data-v3-element-id=review-grid]")');
   await read(page,"[...document.querySelectorAll('button')].find(node=>node.textContent.trim()==='字段').click()");

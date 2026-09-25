@@ -42,16 +42,19 @@ export function ComponentPalette({ reportType, actions, canEdit = true }: { repo
         {base.map(([label, onClick, icon]) => <PaletteAction key={label} label={label} onClick={onClick} icon={icon} disabled={!canEdit} />)}
         {actions.image ? <PaletteAction label="图片/印章" onClick={actions.image} icon={<ImageIcon size={15} aria-hidden="true" />} disabled={!canEdit} /> : null}
       </PaletteSection>
-      <PaletteSection title="业务组件">
+      <PaletteSection title="商品明细">
         {actions.productFields ? <PaletteAction label="商品字段（逐行输出）" onClick={actions.productFields} icon={<Columns3 size={15} aria-hidden="true" />} disabled={!canEdit} /> : null}
+      </PaletteSection>
+      <details><summary>高级排版</summary><PaletteSection title="表格与分组">
         <PaletteAction label="多列行" onClick={actions.row} icon={<Columns3 size={15} aria-hidden="true" />} disabled={!canEdit} />
         <PaletteAction label="普通表格" onClick={actions.grid} icon={<Table2 size={15} aria-hidden="true" />} disabled={!canEdit} />
         <PaletteAction label="条件块" onClick={actions.conditional} icon={<ListFilter size={15} aria-hidden="true" />} disabled={!canEdit} />
       </PaletteSection>
-      {actions.detailTable ? <details><summary>高级表格组件</summary><PaletteAction label="明细表（分组与组合排版）" onClick={actions.detailTable} icon={<Table2 size={15} aria-hidden="true" />} disabled={!canEdit} /></details> : null}
+      {actions.detailTable ? <PaletteAction label="明细表（分组与组合排版）" onClick={actions.detailTable} icon={<Table2 size={15} aria-hidden="true" />} disabled={!canEdit} /> : null}
       <PaletteSection title="打印">
         <PaletteAction label="分页符" onClick={actions.pageBreak} icon={<FilePlus2 size={15} aria-hidden="true" />} disabled={!canEdit} />
       </PaletteSection>
+      </details>
       <div className="report-designer-v3-help">双击文字或单元格直接编辑，也可选中后按 F2。拖动移动，拖动边角调大小；更多设置在右侧。</div>
       <div className="report-designer-v3-report-type">当前数据域：{reportType === "PaymentVoucher" ? "付款/报销" : "出口单据"}</div>
     </div>
@@ -69,6 +72,8 @@ function PaletteAction({ label, icon, onClick, disabled = false }: { label: stri
 export function FieldPanel({
   query,
   groups,
+  productFields = false,
+  onProductFieldsChange,
   onQueryChange,
   onInsert,
   focusRequest = 0,
@@ -76,6 +81,8 @@ export function FieldPanel({
 }: {
   query: string;
   groups: ReportDesignerFieldGroup[];
+  productFields?: boolean;
+  onProductFieldsChange?: (value: boolean) => void;
   onQueryChange: (value: string) => void;
   onInsert: (field: { label: string; value: string }) => void;
   focusRequest?: number;
@@ -88,16 +95,19 @@ export function FieldPanel({
   }, [focusRequest]);
   return (
     <div className="report-designer-v3-panel-content">
+      {onProductFieldsChange ? <div className="report-designer-field-scope" role="tablist" aria-label="字段用途">
+        {[false, true].map(value => <button key={String(value)} className={productFields === value ? "is-active" : ""} type="button" role="tab" aria-selected={productFields === value} onClick={() => onProductFieldsChange(value)}>{value ? "商品明细字段" : "普通字段"}</button>)}
+      </div> : null}
       <div className="report-designer-v3-panel-caption">
         <Pilcrow size={15} aria-hidden="true" />
-        <span>选择字段</span>
+        <span>{productFields ? "商品明细字段" : "普通字段"}</span>
         <small>{fieldCount} 个可用字段</small>
       </div>
       <label className="report-designer-v3-field-search">
         <span>搜索字段</span>
         <input ref={searchRef} aria-label="搜索字段" value={query} placeholder="发票号、客户、金额..." onChange={(event) => onQueryChange(event.target.value)} />
       </label>
-      <p className="report-designer-v3-help">拖到纸上即可，也可点击添加后移动。商品字段按同一列位逐行输出；发票号、唛头等单据信息单独显示。</p>
+      <p className="report-designer-v3-help">{productFields ? "把商品字段拖到明细行，各字段可单独移动。只设计一行，打印时按商品逐件重复。" : "把字段拖到纸上即可。发票号、唛头和合计等普通字段不随商品重复。"}</p>
       {groups.length === 0 ? <p className="report-designer-v3-muted">暂无可用字段</p> : groups.map((group) => (
         <details key={group.category} open={Boolean(query.trim()) || groups.length <= 4}>
           <summary>{group.category}<small>{group.fields.length}</small></summary>

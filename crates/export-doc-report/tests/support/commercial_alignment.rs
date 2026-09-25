@@ -11,19 +11,40 @@ fn attribute(node: &str, name: &str) -> f32 {
         .unwrap()
 }
 
+// The last-page totals are positioned with a following-footer group transform.
+fn nodes<'a>(svg: &'a str, tag: &str) -> Vec<(&'a str, f32)> {
+    let mut stack = vec![0.];
+    let mut result = Vec::new();
+    for node in svg.split('<').skip(1) {
+        if node.starts_with("g ") {
+            let offset = node
+                .split("transform=\"translate(0 ")
+                .nth(1)
+                .and_then(|v| v.split(')').next())
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(0.);
+            stack.push(stack.last().unwrap() + offset);
+        } else if node.starts_with("/g>") {
+            stack.pop();
+        } else if node.starts_with(&format!("{tag} ")) {
+            result.push((node, *stack.last().unwrap()));
+        }
+    }
+    result
+}
+
 fn text_y(svg: &str, text: &str) -> f32 {
-    attribute(
-        svg.split("<text ")
-            .find(|node| node.contains(&format!(">{text}</text>")))
-            .unwrap_or_else(|| panic!("Missing text: {text}")),
-        "y",
-    )
+    let (node, offset) = nodes(svg, "text")
+        .into_iter()
+        .find(|(node, _)| node.ends_with(&format!(">{text}")))
+        .unwrap_or_else(|| panic!("Missing text: {text}"));
+    attribute(node, "y") + offset
 }
 
 fn horizontal_between(svg: &str, start: f32, end: f32) -> bool {
-    svg.split("<line ").skip(1).any(|node| {
-        let y = attribute(node, "y1");
-        (y - attribute(node, "y2")).abs() < 0.001 && y > start && y < end
+    nodes(svg, "line").into_iter().any(|(node, offset)| {
+        let y = attribute(node, "y1") + offset;
+        (y - attribute(node, "y2") - offset).abs() < 0.001 && y > start && y < end
     })
 }
 
@@ -37,7 +58,7 @@ fn commercial_rows_have_no_dividers_and_values_share_the_lower_baseline() {
         let svg = &document.pages[0].svg;
         let baseline = text_y(svg, "LOWER-1");
         for value in if template == Builtin::Invoice {
-            vec!["20CTNS", "1000PCS", "@USD4.50", "USD 4500.00"]
+            vec!["20", "CTNS", "1000", "PCS", "4.50", "4500.00"]
         } else {
             vec!["20CTNS", "1000PCS", "250 KGS", "230 KGS", "1.2 CBM"]
         } {
@@ -50,12 +71,11 @@ fn commercial_rows_have_no_dividers_and_values_share_the_lower_baseline() {
         }
         let next = text_y(svg, "LOWER-2");
         let total_y = text_y(svg, "TOTAL:");
-        let total_border = svg
-            .split("<line ")
-            .skip(1)
-            .filter_map(|node| {
-                let y = attribute(node, "y1");
-                ((y - attribute(node, "y2")).abs() < 0.001 && y < total_y).then_some(y)
+        let total_border = nodes(svg, "line")
+            .into_iter()
+            .filter_map(|(node, offset)| {
+                let y = attribute(node, "y1") + offset;
+                ((y - attribute(node, "y2") - offset).abs() < 0.001 && y < total_y).then_some(y)
             })
             .fold(0.0_f32, f32::max);
         assert!(
@@ -77,7 +97,9 @@ fn commercial_rows_have_no_dividers_and_values_share_the_lower_baseline() {
         }
         let bordered =
             export_doc_report::render_design(&data, &design, &AtomicBool::new(false)).unwrap();
-        assert!(horizontal_between(&bordered.pages[0].svg, baseline, next));
+        if template == Builtin::PackingList {
+            assert!(horizontal_between(&bordered.pages[0].svg, baseline, next));
+        }
     }
 }
 
@@ -88,10 +110,66 @@ fn invoice_amount_stays_with_price_when_po_is_empty_or_style_wraps() {
         ("PO-ALIGN", "VERY-LONG-STYLE-".repeat(12)),
     ] {
         let mut data = invoice(1);
+        data.root["Invoice"]["totalAmount"] = json!(9000);
         data.root["items"][0]["poNumber"] = json!(po);
         data.root["items"][0]["styleNo"] = json!(style);
         let document = render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();
         let svg = &document.pages[0].svg;
-        assert!((text_y(svg, "@USD4.50") - text_y(svg, "USD 4500.00")).abs() < 0.02);
+        assert!((text_y(svg, "4.50") - text_y(svg, "4500.00")).abs() < 0.02);
+    }
+}
+
+#[test]
+fn independent_invoice_fields_and_totals_share_columns_and_total_baseline() {
+    let data = invoice(2);
+    let document = render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();
+    let svg = &document.pages[0].svg;
+    let x = |value: &str| {
+        attribute(
+            nodes(svg, "text")
+                .into_iter()
+                .find(|(node, _)| node.ends_with(&format!(">{value}")))
+                .unwrap()
+                .0,
+            "x",
+        )
+    };
+    for (detail, total) in [
+        ("20", "40CTNS"),
+        ("1000", "2000PCS"),
+        ("4500.00", "9000.00"),
+    ] {
+        assert!((x(detail) - x(total)).abs() < 0.01);
+        assert!((text_y(svg, "TOTAL:") - text_y(svg, total)).abs() < 0.01);
+    }
+    let design = Builtin::Invoice.design().unwrap();
+    assert!(
+        design
+            .layers
+            .iter()
+            .flat_map(|layer| &layer.elements)
+            .all(|e| !matches!(
+                &e.kind,
+                Kind::Flow {
+                    block: ReportBlock::DetailTable(_),
+                    ..
+                }
+            ))
+    );
+    for path in [
+        "item.StyleName",
+        "item.Cartons",
+        "item.Quantity",
+        "item.UnitPrice",
+        "item.TotalPrice",
+    ] {
+        assert!(
+            design
+                .layers
+                .iter()
+                .flat_map(|layer| &layer.elements)
+                .any(|e| !e.locked
+                    && matches!(&e.kind, Kind::Field {field_path,..} if field_path == path))
+        );
     }
 }
