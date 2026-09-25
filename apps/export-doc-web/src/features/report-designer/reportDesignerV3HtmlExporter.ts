@@ -120,7 +120,8 @@ export function exportReportDesignerV3SchemaToHtml(
     .edm-detail-table thead { display: table-header-group; }
     .edm-detail-no-repeat-header thead { display: table-row-group; }
     .edm-detail-table tr { page-break-inside: avoid; break-inside: avoid; }
-    .edm-detail-omit-empty-lines > .edm-detail-composite-line:not(:has(span:not(:empty))) { display:none !important; }
+    .edm-detail-composite-line { display: grid; }
+    .edm-detail-omit-empty-lines > .edm-detail-composite-line:not(:has(span:not(:empty))) { display: none; }
     .edm-detail-split-rows tr { page-break-inside: auto; break-inside: auto; }
     .edm-detail-repeat-header, .edm-detail-no-repeat-header { break-inside: auto; page-break-inside: auto; }
     .report-page-break-row { page-break-before: always; break-before: page; height: 0; }

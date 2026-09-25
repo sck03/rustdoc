@@ -71,6 +71,6 @@ export function renderDetailComposite(parts: ReportDetailTableCellContent[], ren
   return rows.map(row => {
     const widths = row.map((slot,index)=>(row[index+1]?.position ?? 100)-slot.position);
     const align = verticalAlign === "Bottom" ? "end" : verticalAlign === "Middle" ? "center" : "start";
-    return `<div class="edm-detail-composite-line" style="display:grid;align-items:${align};grid-template-columns:${widths.map(w=>`${w}%`).join(" ")};min-height:1.3em">${row.map(slot=>`<span style="min-width:0;padding-right:1mm;overflow-wrap:anywhere">${slot.html}</span>`).join("")}</div>`;
+    return `<div class="edm-detail-composite-line" style="align-items:${align};grid-template-columns:${widths.map(w=>`${w}%`).join(" ")};min-height:1.3em">${row.map(slot=>`<span style="min-width:0;padding-right:1mm;overflow-wrap:anywhere">${slot.html}</span>`).join("")}</div>`;
   }).join("");
 }

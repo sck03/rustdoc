@@ -42,7 +42,7 @@
     "test:session-channel": "node ../../scripts/test_session_channel.mjs",
     "test:business-date-refresh": "node ../../scripts/test_business_date_refresh_model.mjs",
     "test:service-availability-model": "node ../../scripts/test_service_availability_model.mjs",
-    "test:accessibility-contracts": "node ../../scripts/test_frontend_accessibility_contracts.mjs",
+    "test:accessibility-contracts": "node ../../scripts/test_frontend_accessibility_scanner.mjs && node ../../scripts/test_frontend_accessibility_contracts.mjs",
     "test:font-policy": "node ../../scripts/verify-font-license-policy.mjs",
     "test:font-policy:release": "node ../../scripts/verify-font-license-policy.mjs --require-files",
     "test:visual-baselines": "node ../../scripts/test_frontend_visual_baselines.mjs",

@@ -10,6 +10,7 @@ import { startChrome, createPageSession, evaluate, captureScreenshot } from "./l
 import { verifyDesignerEditingUi } from "./lib/report-designer-editing-ui-scenarios.mjs";
 import { verifyProductFieldsUi } from "./lib/report-designer-product-fields-ui.mjs";
 import { verifyShippingMarksUi } from "./lib/report-shipping-marks-ui-scenarios.mjs";
+import { verifyDetailVisibility } from "./lib/report-designer-visibility-ui.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -41,6 +42,7 @@ await esbuild.build({
     import { createShippingMarksScenario } from ${JSON.stringify(path.join(repo, "scripts/lib/report-shipping-marks-fixture.mjs").replaceAll("\\", "/"))};
     import { defaultReportDesigns } from ${JSON.stringify(path.join(repo, "scripts/lib/default-report-designs.mjs").replaceAll("\\", "/"))};
     import { renderReportDesignerLocalPreviewSample } from ${source("features/report-designer/reportDesignerPreviewSamples.ts")};
+    import { renderDetailComposite } from ${source("features/report-designer/reportDesignerDetailComposite.ts")};
     import ${source("styles/cascade.css")};
     import ${source("styles/foundation.css")};
     import ${source("styles/workspaces.css")};
@@ -100,6 +102,7 @@ await esbuild.build({
     if(new URLSearchParams(location.search).has('invoice')) Object.assign(fieldCatalog,${JSON.stringify(reportFields)});
     window.__designerHtml = content;
     window.__exportDesignerHtml=()=>exportReportDesignerV3SchemaToHtml(window.__designerSchema);
+    window.__visibilityComposite=()=>'<div class="edm-detail-omit-empty-lines">'+renderDetailComposite([{kind:'Field',fieldPath:'empty'},{kind:'LineBreak'},{kind:'Text',text:'Widget'},{kind:'LineBreak'},{kind:'Field',fieldPath:'empty'},{kind:'ColumnBreak',positionPercent:50},{kind:'Text',text:'10'}],part=>part.kind==='Text'?part.text:'')+'</div>';
     window.__renderMarksPreview=profile=>renderReportDesignerLocalPreviewSample(window.__designerHtml,profile);
     createRoot(document.getElementById('root')).render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><PermissionAccessProvider grants={[]} permissions={['view','upload','recycle'].map(action=>({resourceKey:permissionResources.reportResources,action,dataScope:'all'}))} canManageSettings={false}><ConfirmationProvider><div className="work-surface" style={{margin:'12px',padding:'8px'}}>
       <ReportDesignerV3Workspace client={imageScenario?client:undefined} reportType={reportType} displayName="表格设计交互验证" content={content} fieldCatalog={imageScenario?{reportType,fields:[],categoryOrder:[]}:fieldCatalog} editable={!new URLSearchParams(location.search).has('readonly')} onDesignerDraftChange={({content: html, isDirty, isValid}) => {
@@ -274,6 +277,7 @@ try {
   await waitFor(page,'window.__designerSchema.layers.flatMap(layer=>layer.elements).find(element=>element.id==="stress-0").text === "0"');
   results.push({test:'902-element text input commits once and undoes as one operation',passed:true});
   await verifyDesignerEditingUi({page,url,read,waitFor,click,key,modifier:primaryModifier,results});
+  await verifyDetailVisibility({page,url,read,waitFor,results});
   await verifyProductFieldsUi({page,url,read,waitFor,click,results,capture:() => captureScreenshot(page,path.join(output,'invoice-fields.png'))});
   await page.send("Page.navigate",{url});
   await waitFor(page,'document.querySelector("[data-v3-element-id=review-grid]")');

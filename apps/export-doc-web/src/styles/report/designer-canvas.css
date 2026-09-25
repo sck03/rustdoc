@@ -419,8 +419,9 @@
   min-width: 0;
 }
 
+.new-report-detail-column-card:not([hidden]) { display: grid; }
+
 .new-report-detail-column-card {
-  display: grid;
   gap: 8px;
   min-width: 0;
   padding: 8px;

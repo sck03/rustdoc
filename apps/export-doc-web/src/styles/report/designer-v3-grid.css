@@ -104,8 +104,8 @@
 
 /* Diagonal geometry is an SVG shared with the preview renderer. */
 .report-designer-v3-preview-flow-content .edm-report-grid-diagonal::after { display: none; }
-.edm-detail-omit-empty-lines > .edm-detail-composite-line:not(:has(span:not(:empty))) { display: none !important; }
-.new-report-detail-properties [hidden], .new-report-detail-column-card[hidden] { display: none !important; }
+.edm-detail-composite-line { display: grid; }
+.edm-detail-omit-empty-lines > .edm-detail-composite-line:not(:has(span:not(:empty))) { display: none; }
 .report-designer-product-guides { position: absolute; inset: 0; pointer-events: none; }
 .report-designer-product-row-end { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--edm-primary-650); }
 .report-designer-product-row-label { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--edm-primary-650); color: var(--edm-primary-650); font-size: 7pt; transform: translateY(-100%); }
