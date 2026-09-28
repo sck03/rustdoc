@@ -5,6 +5,10 @@
 .oa-workspace a { color: var(--edm-primary-750); text-decoration: none; }
 .oa-workspace a:hover { text-decoration: underline; }
 .oa-workspace > .command-button { justify-self: start; }
+.oa-toolbar .office-field { display: flex; align-items: center; gap: calc(2 * 0.25rem); }
+.oa-toolbar .office-field > span { white-space: nowrap; }
+.oa-toolbar .office-field select { width: auto; min-width: 8rem; }
+.oa-toolbar .command-button { min-height: 40px; }
 .oa-detail, .oa-lines, .oa-attachments { display: grid; gap: calc(3 * 0.25rem); min-width: 0; }
 .oa-line { padding: calc(3 * 0.25rem); border: 1px solid var(--edm-neutral-250); border-radius: var(--edm-radius-md); min-width: 0; }
 .oa-reason { white-space: pre-wrap; overflow-wrap: anywhere; }

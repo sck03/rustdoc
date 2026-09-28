@@ -24,9 +24,10 @@ pub(super) fn install(paths: &RuntimePaths, staging: &Path, sqlite: bool) -> Res
     ];
     if sqlite {
         targets.extend([
-            ("exportdoc-native.db", Some(package::SQLITE)),
-            ("exportdoc-native.db-wal", None),
-            ("exportdoc-native.db-shm", None),
+            (package::SQLITE, Some(package::SQLITE)),
+            ("Database/exportdoc-native.db-wal", None),
+            ("Database/exportdoc-native.db-shm", None),
+            ("Database/exportdoc-native.db-journal", None),
         ]);
     }
     let entries: Vec<_> = targets
@@ -59,7 +60,10 @@ pub(super) fn install(paths: &RuntimePaths, staging: &Path, sqlite: bool) -> Res
             }
         }
         if sqlite {
-            export_doc_storage::verify_sqlite_backup(&paths.data_root.join("exportdoc-native.db"))?;
+            let database = paths.sqlite_database_path();
+            export_doc_storage::verify_sqlite_backup(&database)?;
+            // Keep upgrades inside the installation journal so failure restores all original files.
+            export_doc_storage::Connection::sqlite(&database)?.checkpoint()?;
         }
         Ok(())
     })();
@@ -82,9 +86,10 @@ pub(super) fn rollback(paths: &RuntimePaths, staging: &Path) -> Result<()> {
             entry.target.as_str(),
             package::KEY
                 | "Templates"
-                | "exportdoc-native.db"
-                | "exportdoc-native.db-wal"
-                | "exportdoc-native.db-shm"
+                | package::SQLITE
+                | "Database/exportdoc-native.db-wal"
+                | "Database/exportdoc-native.db-shm"
+                | "Database/exportdoc-native.db-journal"
         ) {
             return Err(invalid("恢复日志路径无效。"));
         }

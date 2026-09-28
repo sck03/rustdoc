@@ -85,7 +85,6 @@ impl MaintenanceLease {
         {
             return Err(Error::unavailable("业务角色名称无效。"));
         }
-        validate_schema(&mut self.client)?;
         let valid: bool = self.client.query_one("SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1 AND rolcanlogin AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole) AND NOT pg_has_role($1,$2,'MEMBER')", &[&application,&owner])?.try_get(0)?;
         if !valid {
             return Err(Error::unavailable(
@@ -94,6 +93,7 @@ impl MaintenanceLease {
         }
         let mut transaction = self.client.transaction()?;
         transaction.batch_execute(&format!("SET LOCAL ROLE \"{owner}\"; REVOKE CREATE ON SCHEMA public FROM PUBLIC; GRANT USAGE ON SCHEMA public TO \"{application}\"; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO \"{application}\"; GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{application}\"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO \"{application}\"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE,SELECT ON SEQUENCES TO \"{application}\";"))?;
+        super::migrate_schema(&mut transaction)?;
         transaction.commit()?;
         Ok(())
     }

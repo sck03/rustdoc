@@ -4,7 +4,10 @@ use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
-    sync::OnceLock,
+    sync::{
+        OnceLock,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use tauri::{Emitter, Manager};
@@ -35,6 +38,8 @@ mod windows_runtime_installation;
 mod windows_runtime_probe;
 
 static RUNTIME_DIAGNOSTIC_LOG_ROOT: OnceLock<PathBuf> = OnceLock::new();
+static STARTUP_FINISHED: AtomicBool = AtomicBool::new(false);
+static STARTUP_FAILURE_SHOWN: AtomicBool = AtomicBool::new(false);
 const DESKTOP_SMOKE_ENVIRONMENT_VARIABLE: &str = "EXPORTDOCMANAGER_DESKTOP_SMOKE";
 const DESKTOP_ACCESS_TOKEN_ENVIRONMENT_VARIABLE: &str = "EXPORTDOCMANAGER_DESKTOP_TOKEN";
 
@@ -120,15 +125,20 @@ fn run_tauri_app() -> tauri::Result<()> {
         ])
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            let paths = runtime_paths::prepare_runtime_paths(app)?;
-            set_runtime_diagnostic_log_root(&paths.log_root);
-            runtime_prerequisites::check(&paths)?;
-            let runtime = desktop_runtime::start(&paths)?;
-            app.manage(runtime);
-            app.manage(paths.clone());
-            app.manage(tauri_updater_commands::TauriUpdaterState::default());
-            window::open_main_window(app, &paths)?;
-            Ok(())
+            let result: Result<(), Box<dyn std::error::Error>> = (|| {
+                let paths = runtime_paths::prepare_runtime_paths(app)?;
+                set_runtime_diagnostic_log_root(&paths.log_root);
+                runtime_prerequisites::check(&paths)?;
+                let runtime = desktop_runtime::start(&paths)?;
+                app.manage(runtime);
+                app.manage(paths.clone());
+                app.manage(tauri_updater_commands::TauriUpdaterState::default());
+                window::open_main_window(app, &paths)?;
+                STARTUP_FINISHED.store(true, Ordering::Release);
+                Ok(())
+            })();
+            // Tauri panics on setup errors inside its event loop; they never reach main's Result.
+            result.inspect_err(|error| show_startup_failure(&error.to_string()))
         })
         .on_window_event(|window, event| {
             if window.label() != "main" {
@@ -204,6 +214,9 @@ fn set_runtime_diagnostic_log_root(log_root: &Path) {
 }
 
 fn show_startup_failure(error: &str) {
+    if STARTUP_FAILURE_SHOWN.swap(true, Ordering::AcqRel) {
+        return;
+    }
     let _ = write_tauri_error(&format!("Desktop startup failed: {error}"));
     let log_path = append_diagnostic_log(
         "tauri-bootstrap-error.log",
@@ -227,6 +240,9 @@ fn show_startup_failure(error: &str) {
 fn install_panic_log_hook() {
     std::panic::set_hook(Box::new(|panic_info| {
         let _ = write_tauri_error(&format!("Tauri panic: {panic_info}"));
+        if !STARTUP_FINISHED.load(Ordering::Acquire) {
+            show_startup_failure(&format!("初始化异常：{panic_info}"));
+        }
     }));
 }
 

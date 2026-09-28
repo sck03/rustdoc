@@ -1,18 +1,15 @@
 use super::error::{Result, conflict, error, unavailable};
-use crate::{
-    contracts,
-    paths::{RuntimePaths, ensure_safe_absolute},
-};
+use crate::{contracts, paths::RuntimePaths};
 use chrono::Utc;
 pub use export_doc_storage::Connection;
 use export_doc_storage::{AuditWrite, RecordWrite};
-use fs2::FileExt;
 use serde_json::{Value, json};
 use std::{
-    fs::{File, OpenOptions},
+    fs::File,
     sync::{Mutex, MutexGuard},
 };
 use unicode_normalization::UnicodeNormalization;
+mod sqlite_layout;
 
 pub struct Store {
     pub(crate) data_root: std::path::PathBuf,
@@ -33,24 +30,8 @@ pub struct Actor {
 
 impl Store {
     pub fn open(paths: &RuntimePaths) -> Result<Self> {
-        let lock_path = paths.data_root.join("native-instance.lock");
-        let database_path = paths.data_root.join("exportdoc-native.db");
-        for path in [&lock_path, &database_path] {
-            ensure_safe_absolute(path).map_err(unavailable)?;
-        }
-        let lock = OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .read(true)
-            .write(true)
-            .open(lock_path)?;
-        lock.try_lock_exclusive().map_err(|cause| {
-            if cause.raw_os_error() == fs2::lock_contended_error().raw_os_error() {
-                error(429, "此数据目录已由另一个原生程序打开。")
-            } else {
-                unavailable(format!("无法取得数据库实例锁：{cause}"))
-            }
-        })?;
+        let lock = sqlite_layout::prepare(paths)?;
+        let database_path = paths.sqlite_database_path();
         super::team_backup::disaster::apply_pending(paths)?;
         let connection = Connection::sqlite(&database_path)?;
         Ok(Self {

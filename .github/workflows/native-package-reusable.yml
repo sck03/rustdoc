@@ -120,11 +120,11 @@ jobs:
         shell: pwsh
         run: |
           if ($env:RELEASE_PRODUCT -eq 'desktop') {
-            ./scripts/build-native.ps1 -NoPause -RustTarget $env:RUST_TARGET -Bundles $env:BUNDLE_TARGETS
+            pwsh -NoProfile -File ./scripts/build-native.ps1 -NoPause -RustTarget $env:RUST_TARGET -Bundles $env:BUNDLE_TARGETS
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             $source = 'artifacts/native-desktop/ExportDocManager.Tauri'
           } else {
-            ./scripts/package-native-web-server.ps1 -Configuration Release -RuntimeIdentifier $env:RUST_TARGET -NoPause
+            pwsh -NoProfile -File ./scripts/package-native-web-server.ps1 -Configuration Release -RuntimeIdentifier $env:RUST_TARGET -NoPause
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             $source = 'artifacts/native-web-server'
           }

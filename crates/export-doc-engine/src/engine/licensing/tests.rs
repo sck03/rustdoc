@@ -186,7 +186,7 @@ fn registration_persists_and_survives_reopening_the_data_root() {
     assert_eq!(status["isRegistered"], true);
     assert_eq!(status["expireDate"], "2099-12-31");
     // the anchor is sealed: neither the key nor the plaintext anchor may appear on disk
-    let database = fs::read(paths.data_root.join("exportdoc-native.db")).unwrap();
+    let database = fs::read(paths.sqlite_database_path()).unwrap();
     assert!(!String::from_utf8_lossy(&database).contains("TEST-2099-12-31"));
     assert!(!String::from_utf8_lossy(&database).contains("local_binding_secret"));
     drop(service);

@@ -27,3 +27,9 @@
 2026-09-20 本地 Windows x64 DLL 与 Linux x64 ELF 静态导出检查均包含当前 19/19 个所需符号；本轮没有执行 Linux/macOS/ARM64 加载或功能调用，不据此宣称跨平台运行通过。详细平台矩阵、符号/加载/回调/资源限制检查见[《PDFium 跨平台绑定与验收方案》](./PDFium跨平台绑定与验收方案.md)。
 
 本批实际验证统一记入进度文档。平台完整验收包括原版导航和页签、表格滚动／编辑、中文 IME、撤销与粘贴、缩放、保存取消、路径与链接拒绝、登录授权、后台任务、真实 PDF／打印、备份恢复和退出清理。未经实跑不声明通过，不执行 Windows Authenticode、Developer ID 或 Apple 公证。
+
+## 2026-09-28 Windows 退出清理
+
+`desktop_runtime` 区分运行、正在清理和清理完成；并发退出只启动一个清理线程，其余请求继续等待。后端关闭在工作线程执行，保持现有 45 秒等待上限和错误日志；退出前显式销毁 WebView 窗口，让 wry 关闭平台控制器，不依赖 `App::run` 直接退出进程后的 Rust 析构。
+
+`scripts/test_native_desktop_shutdown.mjs` 在隔离 DataRoot 启动实际 GNU Release EXE，通过 WebView2 CDP 检查 React 登录页和退出事件，记录对应进程及 HTTP 端口。两次正常退出、一次连续 12 次退出 IPC、一次只终止宿主的异常退出均观察到本实例 6 个 WebView2 进程归零、HTTP 监听关闭；期间独立测试窗口持续响应，最后也正常清空。该结果证明本机测试场景，不能推导为所有崩溃条件或 Linux/macOS/ARM64 已验收。

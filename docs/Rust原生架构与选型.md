@@ -39,7 +39,7 @@ Slint 和 egui 客户端、专用构建与许可引用已退役。原 C# 源码�
 
 桌面令牌由 Rust 宿主生成，仅由主窗口受限 IPC 获取，不写 URL 或日志。随机回环端口、精确 Host／Origin 校验、官方 endpoint policy、登录会话与对象权限共同控制桌面访问。网络服务不安装本机文件／进程能力。
 
-AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。Rust 开发库使用独立空库基线 5，不打开原 C# v19 数据库，不做猜测迁移。
+AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，业务 SQLite 在 DataRoot/Database，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。Rust 数据库保留版本 5 建库基线，从版本 5 起按存储层有序事务迁移升级；不打开原 C# v19 或版本 4 及更早试验库，不做猜测迁移。
 
 ## 版本与许可
 

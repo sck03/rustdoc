@@ -155,6 +155,7 @@ try {
     await page.send("Emulation.setDeviceMetricsOverride", {width,height:1000,deviceScaleFactor:1,mobile:width<500});
     await page.send("Page.navigate",{url});
     await waitFor(page, 'Boolean(document.querySelector("[data-v3-element-id=review-grid]"))');
+    assert(await read(page, `[...document.querySelectorAll('.report-designer-v3-layer')].every(layer=>getComputedStyle(layer,'::after').backgroundColor==='rgba(0, 0, 0, 0)')`), "layer guides do not tint the report content");
     await read(page, `document.querySelector('[data-v3-element-id="review-grid"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerId:77,clientX:0,clientY:0}));window.dispatchEvent(new PointerEvent('pointercancel',{pointerId:77}));`);
     await waitFor(page, 'document.querySelector(".report-designer-property-tabs [role=tab][aria-selected=true]")?.textContent === "单元格"');
     const controls = await read(page, `Array.from(document.querySelectorAll('.report-designer-v3-inspector input[type=checkbox]')).filter(input=>input.getClientRects().length).map(input=>{const r=input.getBoundingClientRect();return {width:r.width,height:r.height}})`);

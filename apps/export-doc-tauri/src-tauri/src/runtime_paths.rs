@@ -31,16 +31,12 @@ use std::fs;
 
 const RUNTIME_CONFIG_ROOT_ENVIRONMENT_VARIABLE: &str = "EXPORTDOCMANAGER_RUNTIME_CONFIG_ROOT";
 pub(crate) const RUNTIME_DATA_ROOT_DIRECTORY_NAME: &str = "ExportDocManager_Data";
-pub(crate) const RUNTIME_DATA_DIRECTORIES: [&str; 11] = [
+pub(crate) const RUNTIME_DATA_DIRECTORIES: [&str; 7] = [
     "Database",
     "Templates",
-    "Files",
-    "Exports",
-    "SingleWindow",
     "Backups",
     "Cache",
-    "Config",
-    "Security",
+    "Locks",
     "WebView",
     "Logs",
 ];

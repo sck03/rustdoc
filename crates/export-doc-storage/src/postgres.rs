@@ -91,14 +91,36 @@ fn acquire_lock(client: &mut Client) -> Result<()> {
     Ok(())
 }
 
-fn validate_schema(client: &mut Client) -> Result<()> {
+fn schema_version(client: &mut impl ::postgres::GenericClient) -> Result<i64> {
     let rows = client.query("SELECT version FROM schema_version", &[])?;
-    if rows.len() != 1 || rows[0].try_get::<_, i64>(0)? != super::SCHEMA_VERSION {
+    if rows.len() != 1 {
         return Err(Error::unavailable(
-            "PostgreSQL 数据库不是当前 Rust schema 基线。",
+            "数据库版本标记必须唯一且有效，已保留原库并拒绝启动。",
+        ));
+    }
+    let version = rows[0].try_get::<_, i64>(0)?;
+    migrations::pending(version)?;
+    Ok(version)
+}
+fn validate_schema(client: &mut impl ::postgres::GenericClient) -> Result<()> {
+    if schema_version(client)? != SCHEMA_VERSION {
+        return Err(Error::unavailable(
+            "PostgreSQL 数据库需要升级，请停机后通过维护账号运行初始化/升级命令；原库已保留。",
         ));
     }
     Ok(())
+}
+
+fn migrate_schema(client: &mut impl ::postgres::GenericClient) -> Result<()> {
+    let version = schema_version(client)?;
+    for (index, migration) in migrations::pending(version)?.iter().enumerate() {
+        client.batch_execute(migration.postgres)?;
+        client.execute(
+            "UPDATE schema_version SET version=$1",
+            &[&(version + index as i64 + 1)],
+        )?;
+    }
+    validate_schema(client)
 }
 
 pub fn initialize(connection_string: &str, owner: &str) -> Result<()> {
@@ -118,8 +140,8 @@ pub fn initialize(connection_string: &str, owner: &str) -> Result<()> {
             &[],
         )?
         .try_get(0)?;
-    if count != 0 {
-        return validate_schema(&mut client);
+    if count != 0 && schema_version(&mut client)? == SCHEMA_VERSION {
+        return Ok(());
     }
     let role = client.query_opt("SELECT rolcanlogin, rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname=$1", &[&owner])?
         .ok_or_else(|| Error::unavailable("请先创建独立的 NOLOGIN 数据库所有者角色。"))?;
@@ -130,7 +152,10 @@ pub fn initialize(connection_string: &str, owner: &str) -> Result<()> {
     }
     let mut transaction = client.transaction()?;
     transaction.batch_execute(&format!("SET LOCAL ROLE \"{owner}\""))?;
-    transaction.batch_execute(include_str!("postgres.sql"))?;
+    if count == 0 {
+        transaction.batch_execute(include_str!("postgres.sql"))?;
+    }
+    migrate_schema(&mut transaction)?;
     transaction.commit()?;
     validate_schema(&mut client)
 }

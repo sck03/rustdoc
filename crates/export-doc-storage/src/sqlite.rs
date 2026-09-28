@@ -30,6 +30,24 @@ impl From<rusqlite::Error> for Error {
     }
 }
 impl Sqlite {
+    pub fn prepare_restore_file(source: &Path, destination: &Path) -> Result<()> {
+        let source =
+            SqliteConnection::open_with_flags(source, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        Self::validate(&source)?;
+        // The caller supplies a managed scratch path; never overwrite a backup or business file.
+        drop(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(destination)?,
+        );
+        {
+            let mut target = SqliteConnection::open(destination)?;
+            copy(&source, &mut target)?;
+        }
+        Self::open(destination)?.checkpoint()?;
+        Ok(())
+    }
     pub fn verify_file(path: &Path) -> Result<()> {
         Self::validate(&SqliteConnection::open_with_flags(
             path,
@@ -37,24 +55,37 @@ impl Sqlite {
         )?)
     }
     pub fn open(path: &Path) -> Result<Self> {
-        let fresh = !path.exists();
-        let connection = SqliteConnection::open(path)?;
+        let fresh = !path.try_exists()?;
+        let mut connection = SqliteConnection::open(path)?;
         connection.busy_timeout(Duration::from_secs(5))?;
         connection.pragma_update(None, "foreign_keys", true)?;
+        // Reject invalid existing files before changing their journal mode. Configure WAL before
+        // migration DDL so the same connection can checkpoint immediately after the commit.
+        if !fresh {
+            Self::validate(&connection)?;
+        }
         connection.pragma_update(None, "journal_mode", "WAL")?;
         connection.pragma_update(None, "synchronous", "FULL")?;
+        let transaction =
+            connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         if fresh {
-            connection.execute_batch(&format!(
-                "BEGIN IMMEDIATE;{}COMMIT;",
-                include_str!("sqlite.sql")
-            ))?;
+            transaction.execute_batch(include_str!("sqlite.sql"))?;
         }
-        Self::validate(&connection)?;
+        let version = Self::version(&transaction)?;
+        for (index, migration) in migrations::pending(version)?.iter().enumerate() {
+            transaction.execute_batch(migration.sqlite)?;
+            transaction.execute(
+                "UPDATE schema_version SET version=?1",
+                [version + index as i64 + 1],
+            )?;
+        }
+        Self::validate(&transaction)?;
+        transaction.commit()?;
         Ok(Self {
             connection: RefCell::new(connection),
         })
     }
-    fn validate(connection: &SqliteConnection) -> Result<()> {
+    fn version(connection: &SqliteConnection) -> Result<i64> {
         let (count, version): (i64, Option<i64>) = connection
             .query_row(
                 "SELECT COUNT(*), MIN(version) FROM schema_version",
@@ -62,9 +93,15 @@ impl Sqlite {
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .map_err(|_| Error::unavailable("数据库缺少有效版本标记，已拒绝启动。"))?;
-        if count != 1 || version != Some(SCHEMA_VERSION) {
-            return Err(Error::unavailable("数据库版本不受当前 Rust 程序支持。"));
+        if count != 1 || version.is_none() {
+            return Err(Error::unavailable(
+                "数据库版本标记必须唯一且有效，已保留原库并拒绝启动。",
+            ));
         }
+        Ok(version.expect("validated marker"))
+    }
+    fn validate(connection: &SqliteConnection) -> Result<()> {
+        migrations::pending(Self::version(connection)?)?;
         let integrity: String = connection.query_row("PRAGMA quick_check", [], |r| r.get(0))?;
         if integrity != "ok" {
             return Err(Error::unavailable("数据库完整性检查失败。"));
@@ -306,6 +343,11 @@ impl Adapter for Sqlite {
         let source =
             SqliteConnection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         Self::validate(&source)?;
+        if Self::version(&source)? != SCHEMA_VERSION {
+            return Err(Error::unavailable(
+                "请先在受管暂存目录升级备份，再替换当前业务库。",
+            ));
+        }
         let mut destination = self.connection.borrow_mut();
         copy(&source, &mut destination)?;
         Self::validate(&destination)

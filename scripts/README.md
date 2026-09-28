@@ -23,6 +23,10 @@
 
 ## 桌面启动检查与资源
 
+桌面业务库统一位于 `App_Data/Database/exportdoc-native.db`，实例锁位于 `App_Data/Locks`。旧位置 `App_Data/exportdoc-native.db` 中受支持的数据库会通过 SQLite 快照自动搬入 Database，原文件保留在 `Backups/DatabaseLayout`；新旧两处同时有库则停止并提示核对。不要手工只移动正在使用的主文件：它可能还有未合并的 WAL。WebView 内部数据库保留在 `WebView` profile 中。
+
+便携包重复构建会保留已有 `App_Data`。Rust 数据库从版本 5 起逐版升级，当前为 6；只有数据库不存在才新建，已有库失败不覆盖。版本 4 及以前不做兼容：确认无需使用后，先退出程序并将原 `App_Data` 整体另存，再启动初始化。不要直接修改版本标记。初始化错误及启动期 panic 会显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；运行目录不可写时提示备用日志位置或日志写入失败。
+
 Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便携包携带原版固定清单验证的微软离线安装器；缺少 WebView2 时显示安装／退出选择，保留取消、繁忙、超时和需重启处理。构建时核对微软签名、版本、大小和 SHA-256。Windows GNU 构建同时携带 `WebView2Loader.dll`。
 
 程序随后读取本包资源清单，核对中文字体、PDFium 及已声明的 OCR 工具、ONNX 和模型。Windows OCR 只携带四个 app-local CRT DLL，不安装全局 .NET 或整个 VC 运行库。Linux 使用 WebKitGTK 4.1，macOS 使用系统 WKWebView；其它平台必须在对应 runner／设备验收。
@@ -37,7 +41,7 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 `run-native-docker.ps1 -PrepareOnly -NoPause` 只生成私有配置；普通运行构建并启动，`-Stop -NoPause` 停止并保留数据库。默认绑定 `127.0.0.1:5188`；局域网地址须显式设置。凭据保存在忽略的 `deploy/rust-native/runtime/`，不进入 Git 或镜像。
 
-首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接只供初始化／维护使用。桌面 SQLite 空库仍为 admin 空密码，数据库使用独立 Rust 基线 5，不能打开 C# v19 或旧 Rust 试验库。
+首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接只供初始化／升级／恢复使用。桌面 SQLite 空库仍为 admin 空密码；当前数据库版本 6，支持从 Rust 版本 5 升级，不兼容 C# v19 或版本 4 及更早试验库。
 
 ## 远端入口
 
@@ -88,6 +92,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 - React：项目 `build`、API／登录／权限／草稿／无障碍及相应页面回归；真正的 Tauri 窗口和输出仍需实跑。
 - 依赖：`generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository`，要求 `unresolved=0 / disallowed=0`。
 - 平台：`verify-native-desktop.mjs` 验证 Tauri／SQLite，排除 Slint／egui／PostgreSQL 桌面依赖；`assert-tauri-command-permissions.ps1` 校验 command 与能力白名单。
+- Windows 退出：`node scripts/test_native_desktop_shutdown.mjs [便携包目录] [EXE路径]` 使用隔离 DataRoot 验证真实 React/WebView2、重复退出、宿主异常终止、独立窗口不受影响及 HTTP 端口释放。调试端口仅注入测试子进程，不修改正式配置；其它 OS 需独立验收。
 - 脚本：`verify-script-suite.ps1`、`verify-github-workflow-actions.mjs`、`test_tauri_updater_release_contract.mjs`、`github/verify-public-source.ps1`、`git diff --check`。
 
 Rust notices 不列保留 C# 的运行图。`verify-dependency-policy.mjs` 仍单独约束未删除的 C# 对照锁文件，NPOI 2.7.6 只属于该对照规则，与 Rust 业务运行无关。

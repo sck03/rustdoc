@@ -5,14 +5,21 @@ pub use postgres::tools::{
     ClientParameters as PostgresClientParameters, MaintenanceLease as PostgresMaintenanceLease,
     client_parameters as postgres_client_parameters,
 };
+mod migrations;
 mod sqlite;
+pub use migrations::{MIN_SUPPORTED_SCHEMA_VERSION, SCHEMA_VERSION};
 use serde_json::Value;
 use std::{cell::Cell, path::Path};
 
 pub type Result<T> = std::result::Result<T, Error>;
-pub const SCHEMA_VERSION: i64 = 5;
+pub fn validate_schema_version(version: i64) -> Result<()> {
+    migrations::pending(version).map(|_| ())
+}
 pub fn verify_sqlite_backup(path: &Path) -> Result<()> {
     sqlite::Sqlite::verify_file(path)
+}
+pub fn prepare_sqlite_restore(source: &Path, destination: &Path) -> Result<()> {
+    sqlite::Sqlite::prepare_restore_file(source, destination)
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {

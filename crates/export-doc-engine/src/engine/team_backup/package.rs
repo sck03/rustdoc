@@ -12,7 +12,7 @@ use std::{
 };
 
 pub(super) const KEY: &str = "Security/native-master-key.bin";
-pub(super) const SQLITE: &str = "Database/exportdoc-native.db";
+pub(super) const SQLITE: &str = crate::paths::SQLITE_DATABASE_RELATIVE_PATH;
 pub(super) const POSTGRES: &str = "Database/postgresql-physical.dump";
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -173,12 +173,11 @@ fn validate_entries(entries: &[(String, Vec<u8>, String)], database: &str) -> Re
             .1,
     )
     .map_err(|_| invalid("恢复包清单无效。"))?;
-    if manifest.schema_version != 1
-        || manifest.database_schema != export_doc_storage::SCHEMA_VERSION
-        || manifest.database != database
-    {
+    if manifest.schema_version != 1 || manifest.database != database {
         return Err(invalid("恢复包的数据库类型或版本不匹配。"));
     }
+    export_doc_storage::validate_schema_version(manifest.database_schema)
+        .map_err(|cause| invalid(cause.to_string()))?;
     sealed::verify_manifest(entries, &manifest.files)?;
     if !entries
         .iter()
@@ -238,4 +237,53 @@ pub(super) fn staged(marker: &Path, database: &str) -> Result<Option<PathBuf>> {
     }
     validate_entries(&entries, database)?;
     Ok(Some(staging))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recovery_manifests_accept_supported_versions_and_still_verify_payloads() {
+        for database in [SQLITE, POSTGRES] {
+            for (version, supported) in [
+                (4, false),
+                (5, true),
+                (export_doc_storage::SCHEMA_VERSION, true),
+                (export_doc_storage::SCHEMA_VERSION + 1, false),
+            ] {
+                let mut entries: Vec<_> = [(database, vec![1]), (KEY, vec![2; 32])]
+                    .into_iter()
+                    .map(|(name, bytes)| {
+                        (
+                            name.to_owned(),
+                            bytes.clone(),
+                            super::super::sha256_hex(&bytes),
+                        )
+                    })
+                    .collect();
+                let manifest = Manifest {
+                    schema_version: 1,
+                    database_schema: version,
+                    database: database.into(),
+                    files: entries
+                        .iter()
+                        .map(|(name, bytes, digest)| sealed::ManifestFile {
+                            name: name.clone(),
+                            size_bytes: bytes.len() as u64,
+                            sha256: digest.clone(),
+                        })
+                        .collect(),
+                };
+                entries.push((
+                    "manifest.json".into(),
+                    serde_json::to_vec(&manifest).unwrap(),
+                    String::new(),
+                ));
+                assert_eq!(validate_entries(&entries, database).is_ok(), supported);
+                entries[0].2 = "tampered".into();
+                assert!(validate_entries(&entries, database).is_err());
+            }
+        }
+    }
 }

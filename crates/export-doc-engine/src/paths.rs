@@ -6,6 +6,8 @@ use std::{
 };
 use unicode_normalization::UnicodeNormalization;
 
+pub const SQLITE_DATABASE_RELATIVE_PATH: &str = "Database/exportdoc-native.db";
+
 #[derive(Clone)]
 pub struct RuntimePaths {
     pub app_root: PathBuf,
@@ -22,6 +24,10 @@ struct PackageMarker {
 }
 
 impl RuntimePaths {
+    pub fn sqlite_database_path(&self) -> PathBuf {
+        self.data_root.join(SQLITE_DATABASE_RELATIVE_PATH)
+    }
+
     pub fn server(app_root: &Path, data_root: &Path) -> Result<Self, String> {
         ensure_safe_absolute(app_root)?;
         ensure_safe_absolute(data_root)?;

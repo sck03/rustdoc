@@ -201,6 +201,38 @@ fn postgres_matches_the_sqlite_contract_and_holds_the_instance_lock() {
     let maintenance = std::env::var("EXPORTDOC_TEST_POSTGRES_MAINTENANCE")
         .expect("isolated maintenance connection");
     let app = std::env::var("EXPORTDOC_TEST_POSTGRES_APP").expect("isolated app connection");
+    {
+        let mut baseline = postgres::Client::connect(&maintenance, postgres::NoTls).unwrap();
+        baseline.batch_execute("SET ROLE native_owner;").unwrap();
+        baseline
+            .batch_execute(include_str!("../src/postgres.sql"))
+            .unwrap();
+        baseline
+            .execute(
+                "INSERT INTO settings VALUES ('v5-preserved', 1, $1::text::jsonb)",
+                &[&json!({"value":"原有业务数据"}).to_string()],
+            )
+            .unwrap();
+    }
+    assert!(
+        Connection::postgres(&app).is_err(),
+        "business account cannot perform DDL migrations"
+    );
+    {
+        let mut raw = postgres::Client::connect(&maintenance, postgres::NoTls).unwrap();
+        raw.batch_execute("SET ROLE native_owner; ALTER TABLE schema_version ADD CONSTRAINT migration_failure CHECK(version = 5);").unwrap();
+        assert!(Connection::initialize_postgres(&maintenance, "native_owner").is_err());
+        assert_eq!(
+            raw.query_one("SELECT version FROM schema_version", &[])
+                .unwrap()
+                .get::<_, i64>(0),
+            5
+        );
+        assert!(raw.query_one("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='schema_version_version_check'", &[]).unwrap().get::<_, String>(0).contains("= 5"), "failed version update must roll back the earlier DDL too");
+        raw.batch_execute("ALTER TABLE schema_version DROP CONSTRAINT migration_failure;")
+            .unwrap();
+    }
+    Connection::initialize_postgres(&maintenance, "native_owner").unwrap();
     Connection::initialize_postgres(&maintenance, "native_owner").unwrap();
     assert!(
         Connection::postgres(&maintenance).is_err(),
@@ -208,6 +240,10 @@ fn postgres_matches_the_sqlite_contract_and_holds_the_instance_lock() {
     );
     {
         let connection = Connection::postgres(&app).unwrap();
+        assert_eq!(
+            connection.settings("v5-preserved").unwrap().unwrap()["value"],
+            "原有业务数据"
+        );
         assert!(matches!(Connection::postgres(&app), Err(error) if error.kind == ErrorKind::Busy));
         roundtrip(&connection);
         assert_eq!(connection.provider(), "PostgreSQL");

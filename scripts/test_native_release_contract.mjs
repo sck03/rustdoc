@@ -71,12 +71,39 @@ try {
   assert.equal(JSON.parse(await readFile(path.join(temporary, "version.json"))).version, "2.3.4-beta.1", "validate all files before writing any version");
 
   await testPublication();
+  await testPackageWorkflow();
   testContainerPromotion();
   console.log("Native release version, architecture, lock preservation and publication contracts passed.");
 } finally {
   // Only the freshly allocated test directory may be removed.
   assert.equal(path.dirname(temporary), scratch);
   await rm(temporary, { recursive: true, force: true });
+}
+
+async function testPackageWorkflow() {
+  const workflow = await readFile(path.join(root, ".github/workflows/native-package-reusable.yml"), "utf8");
+  const block = workflow.match(/name: Build and archive Full package\r?\n\s+shell: pwsh\r?\n\s+run: \|\r?\n([\s\S]*?)(?=      - uses:)/u)?.[1];
+  assert(block, "package workflow contains an executable build/archive step");
+  await write("workflow.ps1", "$ErrorActionPreference = 'Stop'\n" + block.replace(/^          /gmu, ""));
+  const stub = "New-Item -ItemType Directory -Force -Path 'artifacts/native-desktop/ExportDocManager.Tauri', 'artifacts/native-web-server', 'target/test/release/bundle' | Out-Null\n";
+  for (const script of ["build-native", "package-native-web-server"]) await write(`scripts/${script}.ps1`, stub);
+  await write("scripts/lib/archive-native-release.ps1", "param($Source,$Destination)\nif (!(Test-Path -LiteralPath $Source)) { throw 'Missing package' }\nNew-Item -ItemType Directory -Force -Path (Split-Path -Parent $Destination) | Out-Null\nSet-Content -LiteralPath $Destination -Value archive\n");
+  const execute = promisify(execFile);
+  for (const product of ["desktop", "web"]) {
+    const env = { ...process.env, RELEASE_PRODUCT: product, RELEASE_VERSION: "1.2.3", ARTIFACT_PLATFORM: "test", RUST_TARGET: "test", BUNDLE_TARGETS: "test", CARGO_TARGET_DIR: path.join(temporary, "target") };
+    await execute("pwsh", ["-NoProfile", "-File", path.join(temporary, "workflow.ps1")], { cwd: temporary, env, timeout: 30000 });
+    const extension = process.platform === "win32" ? "zip" : "tar.gz";
+    assert.equal((await readFile(path.join(temporary, `artifacts/releases/exportdoc-${product}-1.2.3-test.${extension}`), "utf8")).trim(), "archive");
+    if (product === "desktop") assert.equal((await readFile(path.join(temporary, `artifacts/releases/exportdoc-desktop-1.2.3-test-installers.${extension}`), "utf8")).trim(), "archive");
+    await write(`scripts/${product === "desktop" ? "build-native" : "package-native-web-server"}.ps1`, "exit 23\n");
+    await assert.rejects(execute("pwsh", ["-NoProfile", "-File", path.join(temporary, "workflow.ps1")], { cwd: temporary, env, timeout: 30000 }), error => error.code === 23);
+  }
+  const dockerfile = await readFile(path.join(root, "deploy/rust-native/Dockerfile"), "utf8");
+  const rustStage = dockerfile.split(" AS rust")[1].split("FROM postgres:")[0];
+  for (const resource of ["singlewindow_reference_catalogs.json", "customs_coo_issuing_authorities.json", "customs_coo_issuing_authorities.address_overrides.json"]) {
+    assert.match(rustStage, /^COPY Resources\/SingleWindow\/ Resources\/SingleWindow\/$/mu, `${resource} must be available when compiling Domain`);
+    JSON.parse(await readFile(path.join(root, "Resources/SingleWindow", resource), "utf8"));
+  }
 }
 
 function testContainerPromotion() {

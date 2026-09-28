@@ -19,6 +19,9 @@ fn disaster_package_download_restore_and_restart_preserve_data_keys_and_template
     let workspace = Workspace::new();
     let paths = workspace.paths();
     let service = open_service(&workspace);
+    assert!(paths.sqlite_database_path().is_file());
+    assert!(paths.data_root.join("Locks/native-instance.lock").is_file());
+    assert!(!paths.data_root.join("exportdoc-native.db").exists());
     service
         .store
         .connection()
@@ -85,6 +88,8 @@ fn disaster_package_download_restore_and_restart_preserve_data_keys_and_template
     service.close().unwrap();
     drop(service);
     let restored = open_service(&workspace);
+    assert!(paths.sqlite_database_path().is_file());
+    assert!(!paths.data_root.join("exportdoc-native.db").exists());
     assert_eq!(
         restored.store.settings("recovery-test").unwrap().unwrap()["value"],
         "original"
@@ -110,4 +115,73 @@ fn staged_package_rejects_path_traversal_before_reading_external_files() {
     let marker = workspace.0.join("pending.json");
     fs::write(&marker, br#"{"stagingDirectoryName":"../../escape"}"#).unwrap();
     assert!(package::staged(&marker, package::SQLITE).is_err());
+}
+
+#[test]
+fn misplaced_database_blocks_new_database_creation_without_changing_original() {
+    let workspace = Workspace::new();
+    let paths = workspace.paths();
+    let original = paths.data_root.join("exportdoc-native.db");
+    fs::write(&original, b"preserved database").unwrap();
+    assert!(matches!(Store::open(&paths), Err(cause) if cause.status == Some(503)));
+    assert_eq!(fs::read(original).unwrap(), b"preserved database");
+    assert!(!paths.sqlite_database_path().exists());
+}
+
+#[test]
+fn supported_root_database_is_relocated_with_data_and_an_original_backup() {
+    let workspace = Workspace::new();
+    let paths = workspace.paths();
+    let original = paths.data_root.join("exportdoc-native.db");
+    let connection = export_doc_storage::Connection::sqlite(&original).unwrap();
+    connection
+        .set_settings("layout-test", 1, &json!({"value":"保留已有业务"}))
+        .unwrap();
+    connection.checkpoint().unwrap();
+    drop(connection);
+    let store = Store::open(&paths).unwrap();
+    assert_eq!(
+        store.settings("layout-test").unwrap().unwrap()["value"],
+        "保留已有业务"
+    );
+    assert!(paths.sqlite_database_path().is_file());
+    assert!(!original.exists());
+    let backup = fs::read_dir(paths.data_root.join("Backups/DatabaseLayout"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    export_doc_storage::verify_sqlite_backup(&backup.join("exportdoc-native.db")).unwrap();
+    drop(store);
+    assert_eq!(
+        Store::open(&paths)
+            .unwrap()
+            .settings("layout-test")
+            .unwrap()
+            .unwrap()["value"],
+        "保留已有业务"
+    );
+}
+
+#[test]
+fn layout_relocation_refuses_an_old_running_instance_or_ambiguous_copies() {
+    use fs2::FileExt;
+    let workspace = Workspace::new();
+    let paths = workspace.paths();
+    drop(
+        export_doc_storage::Connection::sqlite(&paths.data_root.join("exportdoc-native.db"))
+            .unwrap(),
+    );
+    let lock = fs::File::create(paths.data_root.join("native-instance.lock")).unwrap();
+    lock.lock_exclusive().unwrap();
+    assert!(matches!(Store::open(&paths), Err(cause) if cause.status == Some(429)));
+    assert!(!paths.sqlite_database_path().exists());
+    drop(lock);
+    fs::write(paths.sqlite_database_path(), b"another database").unwrap();
+    assert!(matches!(Store::open(&paths), Err(cause) if cause.status == Some(503)));
+    assert_eq!(
+        fs::read(paths.sqlite_database_path()).unwrap(),
+        b"another database"
+    );
 }

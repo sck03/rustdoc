@@ -30,13 +30,9 @@ pub fn health(paths: &RuntimePaths, provider: &str) -> Result<Value> {
     } else {
         "postgresql"
     });
-    value["databaseRoot"] = json!(paths.data_root);
+    value["databaseRoot"] = json!(paths.data_root.join("Database"));
     value["sqliteDatabasePath"] = json!(if provider == "SQLite" {
-        paths
-            .data_root
-            .join("exportdoc-native.db")
-            .to_string_lossy()
-            .into_owned()
+        paths.sqlite_database_path().to_string_lossy().into_owned()
     } else {
         String::new()
     });

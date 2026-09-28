@@ -104,11 +104,25 @@ pub fn restore(store: &Store, paths: &RuntimePaths, actor: &Actor, body: &Value)
     let source_path = root(paths)?.join(name);
     paths::ensure_safe_absolute(&source_path).map_err(invalid)?;
     store.connection()?.verify_backup(&source_path)?;
-    // Preserve a verified copy of the current database before the atomic restore.
-    create_verified(store, paths)?;
-    let connection = store.connection()?;
-    connection.restore(&source_path)?;
-    connection.checkpoint()?;
+    let working = paths
+        .cache_root
+        .join("DatabaseRestore")
+        .join(paths::nonce().map_err(unavailable)?);
+    paths::ensure_safe_absolute(&working).map_err(unavailable)?;
+    crate::secrets::private_directory(&working).map_err(unavailable)?;
+    let result: Result<()> = (|| {
+        let snapshot = working.join("restore.sqlite3");
+        export_doc_storage::prepare_sqlite_restore(&source_path, &snapshot)?;
+        // Upgrade the snapshot first; an incompatible backup cannot replace the running database.
+        create_verified(store, paths)?;
+        let connection = store.connection()?;
+        connection.restore(&snapshot)?;
+        connection.checkpoint()?;
+        Ok(())
+    })();
+    let cleanup = fs::remove_dir_all(&working);
+    result?;
+    cleanup?;
     Ok(())
 }
 

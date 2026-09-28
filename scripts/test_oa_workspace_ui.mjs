@@ -58,6 +58,8 @@ try {
   for (const [kind, name] of [["leave", "员工请假"], ["overtime", "加班申请"], ["expense", "费用报销"], ["travel", "出差申请"], ["purchase", "采购申请"], ["general", "通用申请"]]) {
     await navigate(`${url}/#/office/requests/${kind}`);
     await wait(`document.querySelector('.oa-workspace')?.getAttribute('aria-label')===${JSON.stringify(name)}`, `${name} page missing`);
+    assert(await run(`(() => {const items=[...document.querySelectorAll('.oa-toolbar > label, .oa-toolbar > button')];const centers=items.map(e=>{const r=e.getBoundingClientRect();return r.top+r.height/2;});return centers.length>=4 && Math.max(...centers)-Math.min(...centers)<2;})()`), `${name}: toolbar controls share one baseline`);
+    await captureScreenshot(page, path.join(output, `${kind}-toolbar.png`));
     await click(`新建${name}`);
     await wait("document.querySelector('[role=dialog] .remote-select-field select option[value]:not([value=\"\"])')", "Employee options missing");
     await run("(() => {const select=document.querySelector('[role=dialog] .remote-select-field select');select.value=[...select.options].find(o=>o.value).value;select.dispatchEvent(new Event('change',{bubbles:true}));})()");

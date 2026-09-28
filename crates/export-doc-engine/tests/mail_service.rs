@@ -37,7 +37,7 @@ fn encrypted_credentials_are_masked_retained_and_bound_to_their_field() {
         Some(json!({"settings":settings,"updateSecrets":true})),
     );
     assert_eq!(preserved["secrets"]["emailPasswordSet"], true);
-    let database = std::fs::read(fixture.root.join("exportdoc-native.db")).unwrap();
+    let database = std::fs::read(fixture.root.join("Database/exportdoc-native.db")).unwrap();
     assert!(
         !database
             .windows(b"smtp-canary-credential".len())
@@ -78,7 +78,7 @@ fn settings_save_encrypts_credentials_without_plaintext_in_the_database() {
             .to_string()
             .contains("native-settings-credential-canary")
     );
-    let database = std::fs::read(fixture.root.join("exportdoc-native.db")).unwrap();
+    let database = std::fs::read(fixture.root.join("Database/exportdoc-native.db")).unwrap();
     assert!(
         !database
             .windows(b"native-settings-credential-canary".len())

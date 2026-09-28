@@ -23,7 +23,7 @@ export function OaRequestsPage({ client, user, kind }: { client: ExportDocManage
       {model.detail.isPending ? <PageState tone="loading" title="正在读取申请" /> : model.detail.isError ? <PageState tone="error" title="申请读取失败" description={readApiError(model.detail.error)} action={<button className="command-button" type="button" onClick={() => void model.detail.refetch()}>重新读取</button>} />
         : model.detail.data && <OaRequestDetails key={model.detail.data.id} client={client} user={user} row={model.detail.data} onEdit={() => setEditing(model.detail.data!)} />}
     </> : <>
-      <div className="office-toolbar">
+      <div className="office-toolbar oa-toolbar">
         <label className="checkbox-field"><input type="checkbox" checked={model.mineOnly} onChange={(event) => model.changeMine(event.target.checked)} />仅本人提交</label>
         <label className="office-field"><span>状态</span><select value={model.status} onChange={(event) => model.changeStatus(event.target.value)}><option value="">全部状态</option>{Object.entries(oaStatus).filter(([key]) => kind === "expense" ? key !== "Completed" : key !== "HandedOff").map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
         <button type="button" className="command-button secondary" disabled={model.query.isFetching} onClick={() => void model.query.refetch()}>刷新</button>
