@@ -125,19 +125,24 @@ export function FieldPanel({
   );
 }
 
-export function LayerPanel({ state, onSelect, onCommit, canEdit = true }: { state: ReportDesignerV3DocumentState; onSelect: (id: string) => void; onCommit: (next: ReportDesignerV3DocumentState) => void; canEdit?: boolean }) {
+export function LayerPanel({ state, onSelect, onCommit, canEdit = true, multiSelect = false }: { state: ReportDesignerV3DocumentState; onSelect: (id: string) => void; onCommit: (next: ReportDesignerV3DocumentState) => void; canEdit?: boolean; multiSelect?: boolean }) {
+  const [query, setQuery] = useState("");
+  const search = query.trim().toLocaleLowerCase();
   return (
     <div className="report-designer-v3-panel-content report-designer-v3-layer-list">
       <div className="report-designer-v3-panel-caption"><Layers3 size={15} aria-hidden="true" /><span>图层与元素</span></div>
-      <p className="report-designer-v3-layer-help">点击图层可定位画布；选择元素后可在右侧精确编辑。眼睛和锁定状态会同步到输出。</p>
-      {state.schema.layers.map((layer) => <LayerRow key={layer.id} layer={layer} state={state} onSelect={onSelect} onCommit={onCommit} canEdit={canEdit} />)}
+      <label className="report-designer-v3-field-search"><span>搜索已放置的内容</span><input aria-label="搜索已放置的内容" value={query} onChange={event => setQuery(event.target.value)} placeholder="标题、货名、金额…" /></label>
+      <p className="report-designer-v3-layer-help">{multiSelect ? "多选已开启：点击列表逐项选择，再统一对齐或调整大小。" : "点击列表定位内容；打开工具栏“多选”可批量排版。隐藏图层不输出，锁定防止误改。"}</p>
+      {state.schema.layers.map((layer) => <LayerRow key={layer.id} layer={layer} state={state} onSelect={onSelect} onCommit={onCommit} canEdit={canEdit} search={search} multiSelect={multiSelect} />)}
     </div>
   );
 }
 
-function LayerRow({ layer, state, onSelect, onCommit, canEdit }: { layer: ReportDesignerV3Layer; state: ReportDesignerV3DocumentState; onSelect: (id: string) => void; onCommit: (next: ReportDesignerV3DocumentState) => void; canEdit: boolean }) {
+function LayerRow({ layer, state, onSelect, onCommit, canEdit, search, multiSelect }: { layer: ReportDesignerV3Layer; state: ReportDesignerV3DocumentState; onSelect: (id: string) => void; onCommit: (next: ReportDesignerV3DocumentState) => void; canEdit: boolean; search: string; multiSelect: boolean }) {
   const [elementsOpen, setElementsOpen] = useState(layer.elements.length <= 12);
   const selectedCount = layer.elements.filter((element) => state.selectedIds.includes(element.id)).length;
+  const elements = layer.elements.filter(element => !search || `${element.label ?? ""} ${reportDesignerV3ElementText(element)} ${reportDesignerV3ElementKindLabel(element)} ${element.type === "Field" ? element.fieldPath : ""}`.toLocaleLowerCase().includes(search));
+  if (search && !elements.length) return null;
   return (
     <section className={`report-designer-v3-layer-row${state.activeLayerId === layer.id ? " is-active" : ""}${layer.visible ? "" : " is-hidden"}`} aria-label={`${layer.name}图层`}>
       <div className="report-designer-v3-layer-heading">
@@ -156,16 +161,18 @@ function LayerRow({ layer, state, onSelect, onCommit, canEdit }: { layer: Report
       <LayerDesignControls layer={layer} state={state} onCommit={onCommit} canEdit={canEdit} />
       <LayerPrintControls layer={layer} state={state} onCommit={onCommit} canEdit={canEdit} />
       {layer.elements.length ? (
-        <details className="report-designer-v3-layer-elements-disclosure" open={elementsOpen} onToggle={(event) => setElementsOpen(event.currentTarget.open)}>
+        <details className="report-designer-v3-layer-elements-disclosure" open={Boolean(search) || elementsOpen} onToggle={(event) => { if (!search) setElementsOpen(event.currentTarget.open); }}>
           <summary>元素列表 <small>{selectedCount ? `已选 ${selectedCount}` : "点击定位"}</small></summary>
           <div className="report-designer-v3-layer-elements">
-            {[...layer.elements].sort((left, right) => right.zIndex - left.zIndex).map((element) => (
-              <button className={state.selectedIds.includes(element.id) ? "is-selected" : ""} type="button" key={element.id} onClick={() => {
-                onCommit({ ...state, selectedIds: [element.id], activeLayerId: layer.id });
-                focusDesignerNode(`[data-v3-element-id="${CSS.escape(element.id)}"]`);
+            {[...elements].sort((left, right) => right.zIndex - left.zIndex).map((element) => (
+              <button className={state.selectedIds.includes(element.id) ? "is-selected" : ""} type="button" key={element.id} aria-pressed={state.selectedIds.includes(element.id)} onClick={(event) => {
+                const additive = multiSelect || event.ctrlKey || event.metaKey || event.shiftKey;
+                const selectedIds = additive ? state.selectedIds.includes(element.id) ? state.selectedIds.filter(id => id !== element.id) : [...state.selectedIds, element.id] : [element.id];
+                onCommit({ ...state, selectedIds, activeLayerId: layer.id });
+                if (!additive) focusDesignerNode(`[data-v3-element-id="${CSS.escape(element.id)}"]`);
               }}>
                 <span>{element.type !== "Flow" ? <strong>{reportDesignerV3ElementKindLabel(element)} </strong> : null}{reportDesignerV3ElementText(element) || reportDesignerV3ElementKindLabel(element)}</span>
-                <small>{element.locked ? "已锁定" : `${hundredthMmToMm(element.xHundredthMm).toFixed(1)}, ${hundredthMmToMm(element.yHundredthMm).toFixed(1)} mm`}</small>
+                <small>{!element.visible ? "已隐藏 · " : ""}{element.locked ? "已锁定" : `${hundredthMmToMm(element.xHundredthMm).toFixed(1)}, ${hundredthMmToMm(element.yHundredthMm).toFixed(1)} mm`}</small>
               </button>
             ))}
           </div>

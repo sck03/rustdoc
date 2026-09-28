@@ -1,5 +1,23 @@
 /* Responsive behavior is isolated from the V3 component skin so each route
    stylesheet stays small and the canvas rules remain easy to audit. */
+.report-designer-v3-compact-tabs { display: none; }
+.report-designer-v3-canvas-scroll { height: 590px; }
+.report-designer-v3-quick-start {
+  padding: 8px 12px;
+  color: var(--edm-neutral-750);
+  background: var(--edm-white);
+  border: 1px solid var(--edm-neutral-300);
+  border-radius: 8px;
+  font-size: .8125rem;
+  line-height: 1.6;
+}
+.report-designer-v3-quick-start summary { cursor: pointer; font-weight: 700; }
+.report-designer-v3-quick-start ol { margin: 6px 0; padding-left: 24px; }
+.report-designer-v3-tool-button[aria-pressed="true"] {
+  color: var(--edm-primary-850);
+  background: var(--edm-primary-75);
+  border-color: var(--edm-primary-500);
+}
 @media (max-width: 1180px) {
   .report-designer-v3-layout {
     grid-template-columns: minmax(190px, 220px) minmax(0, 1fr);
@@ -12,6 +30,29 @@
 }
 
 @media (max-width: 760px) {
+  .report-designer-v3-compact-tabs {
+    display: flex;
+    gap: 6px;
+    margin: 8px 0;
+  }
+  .report-designer-v3-compact-tabs button {
+    flex: 1;
+    min-height: 40px;
+    border: 1px solid var(--edm-neutral-300);
+    border-radius: 6px;
+    color: var(--edm-neutral-750);
+    background: var(--edm-white);
+  }
+  .report-designer-v3-compact-tabs button[aria-pressed="true"] {
+    color: var(--edm-white);
+    background: var(--edm-primary-650);
+  }
+  .report-designer-v3-workspace[data-compact-panel="canvas"] .report-designer-v3-sidebar,
+  .report-designer-v3-workspace[data-compact-panel="canvas"] .report-designer-v3-inspector,
+  .report-designer-v3-workspace[data-compact-panel="resources"] .report-designer-v3-inspector,
+  .report-designer-v3-workspace[data-compact-panel="resources"] .report-designer-v3-layout:not(.is-read-only) .report-designer-v3-canvas-column,
+  .report-designer-v3-workspace[data-compact-panel="properties"] .report-designer-v3-sidebar,
+  .report-designer-v3-workspace[data-compact-panel="properties"] .report-designer-v3-layout:not(.is-read-only) .report-designer-v3-canvas-column { display: none; }
   .report-designer-v3-workspace {
     padding: 8px;
   }
@@ -55,7 +96,15 @@
   .report-designer-v3-canvas-scroll {
     min-height: 460px;
     padding: 14px;
+    max-height: 75dvh;
   }
+}
+
+@media (pointer: coarse) {
+  .report-designer-v3-handle { width: 18px; height: 18px; }
+  .report-designer-v3-tool-button,
+  .report-designer-v3-layer-elements button,
+  .report-designer-v3-field-list button { min-height: 40px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -62,6 +62,8 @@ export function ReportDesignerV3Canvas({
   client,
   zoom,
   fitRequest = 0,
+  autoFit = false,
+  multiSelect = false,
   showGuides = true,
   onFitZoom,
   disabled = false,
@@ -79,6 +81,8 @@ export function ReportDesignerV3Canvas({
   client?: ExportDocManagerApiClient;
   zoom: number;
   fitRequest?: number;
+  autoFit?: boolean;
+  multiSelect?: boolean;
   showGuides?: boolean;
   onFitZoom?: (zoom: number) => void;
   disabled?: boolean;
@@ -116,24 +120,36 @@ export function ReportDesignerV3Canvas({
     return "未选择元素 · 单击选中 · 按住 Ctrl/Shift 多选 · Ctrl+A 全选 · 拖动移动 · 拖拽角点缩放 · 单位: 毫米(mm)";
   }, [state.selectedIds, state.schema]);
 
-  useEffect(() => {
-    if (fitRequest <= 0 || !onFitZoom) return;
+  useLayoutEffect(() => {
+    if (!autoFit || !onFitZoom) return;
     const scroll = scrollRef.current;
     const canvas = canvasRef.current;
     if (!scroll || !canvas) return;
-    const styles = getComputedStyle(scroll);
-    const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
-    const verticalPadding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
-    const viewportWidth = Math.max(0, scroll.clientWidth - horizontalPadding);
-    const viewportHeight = Math.max(0, scroll.clientHeight - verticalPadding);
-    onFitZoom(fitReportDesignerV3Zoom(viewportWidth, viewportHeight, canvas.offsetWidth, canvas.offsetHeight));
-  }, [fitRequest, onFitZoom]);
+    let frame = 0;
+    const measure = () => {
+      if (gesture.current || !scroll.clientWidth || !canvas.offsetWidth) return;
+      const styles = getComputedStyle(scroll);
+      const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+      const verticalPadding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+      const width = scroll.clientWidth - horizontalPadding;
+      const height = scroll.clientHeight - verticalPadding;
+      onFitZoom(fitReportDesignerV3Zoom(width, height, canvas.offsetWidth, canvas.offsetHeight));
+    };
+    const fit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
+    measure();
+    const observer = new ResizeObserver(fit);
+    observer.observe(scroll);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
+  }, [fitRequest, onFitZoom, autoFit, page.widthMm, page.heightMm]);
 
   function beginMove(event: ReactPointerEvent<HTMLDivElement>, element: ReportDesignerV3Element, layerId: string) {
     if (event.button !== 0) return;
     if (disabled) return;
     event.stopPropagation();
-    const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+    const additive = multiSelect || event.shiftKey || event.ctrlKey || event.metaKey;
     const alreadySelected = state.selectedIds.includes(element.id);
     const selectedIds = alreadySelected && !additive
       ? state.selectedIds
@@ -146,7 +162,7 @@ export function ReportDesignerV3Canvas({
     // A modifier click on an already selected element is a selection toggle,
     // not the start of a drag.  Starting a gesture here would preview a move
     // while simultaneously removing the element from the selection.
-    if (additive && alreadySelected) return;
+    if (multiSelect || (additive && alreadySelected)) return;
     const layer = state.schema.layers.find((candidate) => candidate.id === layerId);
     if (element.locked || layer?.locked) return;
     const baseState: ReportDesignerV3DocumentState = {
@@ -476,7 +492,7 @@ export function ReportDesignerV3Canvas({
                         if (!disabled && event.key === "F2") { event.preventDefault(); beginTextEdit(event.currentTarget, element); }
                         if (!disabled && (event.key === "Enter" || event.key === " ")) {
                           event.preventDefault();
-                          onSelect(element.id, event.shiftKey || event.ctrlKey || event.metaKey);
+                          onSelect(element.id, multiSelect || event.shiftKey || event.ctrlKey || event.metaKey);
                         }
                       }}
                       title={`${reportDesignerV3ElementText(element)}${element.locked ? "（已锁定）" : ""}`}

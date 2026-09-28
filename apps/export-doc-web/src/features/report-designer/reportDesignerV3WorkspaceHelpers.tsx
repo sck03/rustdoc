@@ -2,7 +2,7 @@ import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import type { ReportDesignerV3Layer } from "./reportDesignerV3Schema.ts";
 
 export const REPORT_DESIGNER_V3_ZOOM_PRESETS = [50, 75, 100, 125, 150] as const;
-export const REPORT_DESIGNER_V3_MIN_ZOOM = 0.45;
+export const REPORT_DESIGNER_V3_MIN_ZOOM = 0.2;
 export const REPORT_DESIGNER_V3_MAX_ZOOM = 1.5;
 
 export function clampReportDesignerV3Zoom(value: number) {

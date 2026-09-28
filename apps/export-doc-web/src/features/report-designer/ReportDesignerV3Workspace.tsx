@@ -51,6 +51,7 @@ import {
 import { ComponentPalette, FieldPanel, LayerPanel, type PaletteActions } from "./ReportDesignerV3ResourcePanels.tsx";
 import { focusDesignerNode } from "./ReportDesignerV3InspectorControls.tsx";
 import { insertProductField } from "./reportDesignerProductFields.ts";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 
 type V3SidebarTab = "components" | "fields" | "layers";
 
@@ -77,6 +78,10 @@ export function ReportDesignerV3Workspace({
   const [sidebarTab, setSidebarTab] = useState<V3SidebarTab>("fields");
   const [zoom, setZoom] = useState(0.72);
   const [fitRequest, setFitRequest] = useState(0);
+  const [autoFit, setAutoFit] = useState(true);
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [compactPanel, setCompactPanel] = useState<"resources" | "canvas" | "properties">("canvas");
+  const confirmation = useConfirmation();
   const [showGuides, setShowGuides] = useState(true);
   const [fieldQuery, setFieldQuery] = useState("");
   const [productFieldsOnly, setProductFieldsOnly] = useState(false);
@@ -101,20 +106,16 @@ export function ReportDesignerV3Workspace({
     () => validateReportDesignerV3Export(history.state.schema, reportType),
     [history.state.schema, reportType],
   );
-  const exportedContent = useMemo(
-    () => exportValidation.blocked ? "" : JSON.stringify(history.state.schema, null, 2),
-    [exportValidation.blocked, history.state.schema],
-  );
+  const serializedContent = useMemo(() => JSON.stringify(history.state.schema), [history.state.schema]);
+  const originalContent = useMemo(() => JSON.stringify(parsed.schema), [parsed.schema]);
+  const exportedContent = exportValidation.blocked ? "" : serializedContent;
   const pageSize = reportDesignerV3PageSize(history.state.schema.page);
   const visibleFieldGroups = useMemo(() => filterFieldGroups(fieldGroups.map(group => ({ ...group, fields: group.fields.filter(field => field.value.startsWith("item.") === productFieldsOnly) })).filter(group => group.fields.length), fieldQuery), [fieldGroups, fieldQuery, productFieldsOnly]);
   useEffect(() => {
     setDraftEnabled(false);
     setGridCellSelection(null);
   }, [content, reportType]);
-  const schemaChanged = useMemo(
-    () => JSON.stringify(history.state.schema) !== JSON.stringify(parsed.schema),
-    [history.state.schema, parsed.schema],
-  );
+  const schemaChanged = serializedContent !== originalContent;
   const draftDirty = sourceValid && draftEnabled && schemaChanged;
   useEffect(() => {
     onDesignerDraftChange?.({
@@ -199,9 +200,19 @@ export function ReportDesignerV3Workspace({
   }
   function openFieldPanel() {
     setSidebarTab("fields");
+    setCompactPanel("resources");
     setFieldFocusRequest((value) => value + 1);
   }
   const handleFitZoom = useCallback((value: number) => setZoom(clampReportDesignerV3Zoom(value)), []);
+  function setManualZoom(value: number) { setAutoFit(false); setZoom(clampReportDesignerV3Zoom(value)); }
+  async function reloadDesign() {
+    const current = historyRef.current.state.schema;
+    if (draftDirty && !await confirmation({ title: "重新载入模板", description: "将放弃本次未保存的修改，恢复到打开时的模板。", confirmLabel: "放弃修改并载入", tone: "warning" })) return;
+    if (historyRef.current.state.schema !== current || documentContentRef.current !== content) return;
+    history.reset(parsed.schema);
+    setDraftEnabled(false);
+    onDesignerDraftChange?.(EMPTY_REPORT_DESIGNER_DRAFT);
+  }
   const insertionActions: PaletteActions = {
     text: () => placeElement(createV3TextElement()),
     rectangle: () => placeElement(createV3RectangleElement()),
@@ -308,22 +319,28 @@ export function ReportDesignerV3Workspace({
   useReportDesignerV3Shortcuts({ workspaceRef, history, editable: editingEnabled, commit, copySelection, pasteClipboard, duplicateSelection, clearSelection });
   return (
     <ReportDesignerUploadState.Provider value={setImageUploading}>
-    <section ref={workspaceRef} className="report-designer-v3-workspace" aria-label="报表模板可视化设计器">
+    <section ref={workspaceRef} className="report-designer-v3-workspace" data-compact-panel={compactPanel} aria-label="报表模板可视化设计器">
       <header className="report-designer-v3-header">
         <div>
             <span className="report-designer-v3-eyebrow">可视化排版</span>
           <h2>{displayName || "报表模板"}</h2>
-          <p>A4 固定页面 · {history.state.schema.page.orientation === "Landscape" ? "横版 297 × 210 mm" : "竖版 210 × 297 mm"} · 坐标精度 0.01 mm</p>
+          <p>在现有模板上修改：双击文字编辑，拖动字段排版，再预览并保存。</p>
           {!editable ? <small>只读预览：当前权限或设备不支持设计操作。</small> : null}
         </div>
         <div className="report-designer-v3-header-actions">
-           <button className="command-button secondary" type="button" disabled={!editingEnabled} onClick={() => { history.reset(parsed.schema); setDraftEnabled(false); onDesignerDraftChange?.(EMPTY_REPORT_DESIGNER_DRAFT); }}>
+           <button className="command-button secondary" type="button" disabled={!editingEnabled || imageUploading} onClick={() => void reloadDesign()}>
             <RotateCcw size={16} aria-hidden="true" />
             <span>重新载入</span>
           </button>
           <span className="report-designer-v3-element-count">{countElements(history.state.schema)} 个元素</span>
+          <span className="report-designer-v3-element-count" role="status">{imageUploading ? "图片上传中" : draftDirty ? "有未保存的修改" : "与已载入模板一致"}</span>
         </div>
       </header>
+      {editingEnabled ? <details className="report-designer-v3-quick-start"><summary>第一次使用？三步修改模板</summary>
+        <ol><li><strong>选内容：</strong>双击纸上的文字直接修改；在“字段”中搜索中文名称，点击或拖到纸上。</li>
+          <li><strong>调排版：</strong>拖动移动、边角缩放。在“图层”中搜索和多选内容，统一对齐、大小；改错可撤销。</li>
+          <li><strong>看效果：</strong>点击页面上方“预览”检查样例或当前单据，再保存。商品明细只需设计一行。</li></ol>
+      </details> : null}
       {parsed.issues.length > 0 ? (
         <div className={parsed.issues.some((issue) => issue.severity === "error") ? "report-designer-v3-notice error" : "report-designer-v3-notice warning"} role="status">
           <strong>{parsed.issues.some((issue) => issue.severity === "error") ? "模板结构需要处理" : parsed.migrated ? "模板已规范化，请复核" : "模板存在校验提示"}</strong>
@@ -360,6 +377,7 @@ export function ReportDesignerV3Workspace({
           <ToolbarButton label="分页符" icon={<FilePlus2 size={15} />} onClick={insertionActions.pageBreak} disabled={!editingEnabled} />
         </div></details>
         <div className="report-designer-v3-toolbar-group" role="group" aria-label="编辑">
+          <button className="report-designer-v3-tool-button" type="button" aria-pressed={multiSelect} onClick={() => setMultiSelect(value => !value)} title="开启后逐个点击选择多个元素，适用于触屏">多选</button>
           <ToolbarButton label="撤销" title="撤销 (Ctrl+Z)" icon={<Undo2 size={15} />} onClick={history.undo} disabled={!editingEnabled || !history.canUndo} />
           <ToolbarButton label="重做" title="重做 (Ctrl+Y)" icon={<Redo2 size={15} />} onClick={history.redo} disabled={!editingEnabled || !history.canRedo} />
           <ToolbarButton label="复制" title="复制所选到剪贴板 (Ctrl+C)" icon={<Copy size={15} />} onClick={copySelection} disabled={history.state.selectedIds.length === 0 || !editingEnabled} />
@@ -383,13 +401,16 @@ export function ReportDesignerV3Workspace({
         </div> : null}
         </> : null}
         <div className="report-designer-v3-toolbar-group report-designer-v3-toolbar-group-end" role="group" aria-label="视图缩放">
-          <ToolbarButton label="缩小" icon={<ZoomOut size={15} />} onClick={() => setZoom((value) => clampReportDesignerV3Zoom(value - 0.05))} />
-          <select className="report-designer-v3-zoom-select" aria-label="选择缩放比例" value={String(zoomPercent)} onChange={(event) => setZoom(clampReportDesignerV3Zoom(Number(event.target.value) / 100))}>{zoomOptions.map((value) => <option key={value} value={value}>{value}%</option>)}</select>
+          <ToolbarButton label="缩小" icon={<ZoomOut size={15} />} onClick={() => setManualZoom(zoom - 0.05)} />
+          <select className="report-designer-v3-zoom-select" aria-label="选择缩放比例" value={String(zoomPercent)} onChange={(event) => setManualZoom(Number(event.target.value) / 100)}>{zoomOptions.map((value) => <option key={value} value={value}>{value}%</option>)}</select>
           <span className="report-designer-v3-zoom-readout" aria-live="polite">{zoomPercent}%</span>
-          <ToolbarButton label="放大" icon={<ZoomIn size={15} />} onClick={() => setZoom((value) => clampReportDesignerV3Zoom(value + 0.05))} />
-          <ToolbarButton label="适合窗口" icon={<Maximize2 size={15} />} onClick={() => setFitRequest((value) => value + 1)} />
+          <ToolbarButton label="放大" icon={<ZoomIn size={15} />} onClick={() => setManualZoom(zoom + 0.05)} />
+          <ToolbarButton label="适合窗口" icon={<Maximize2 size={15} />} onClick={() => { setAutoFit(true); setFitRequest((value) => value + 1); }} />
         </div>
       </div>
+      {editingEnabled ? <div className="report-designer-v3-compact-tabs" role="group" aria-label="设计工作区切换">
+        {([['resources', '添加内容'], ['canvas', '画布'], ['properties', '属性']] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={compactPanel === value} onClick={() => setCompactPanel(value)}>{label}{value === "properties" && history.state.selectedIds.length ? `（${history.state.selectedIds.length}）` : ""}</button>)}
+      </div> : null}
       <div className={`report-designer-v3-layout${editingEnabled ? "" : " is-read-only"}`}>
         {editingEnabled ? <aside className="report-designer-v3-sidebar">
           <div className="report-designer-v3-sidebar-tabs" role="tablist" aria-label="设计器资源面板">
@@ -401,7 +422,7 @@ export function ReportDesignerV3Workspace({
           {sidebarTab === "fields" ? (
             <FieldPanel query={fieldQuery} groups={visibleFieldGroups} productFields={productFieldsOnly} onProductFieldsChange={reportType === "ExportDocument" ? value => { setProductFieldsOnly(value); setFieldQuery(""); } : undefined} focusRequest={fieldFocusRequest} onQueryChange={setFieldQuery} onInsert={insertField} canEdit={editingEnabled} />
           ) : null}
-          {sidebarTab === "layers" ? <LayerPanel state={history.state} onSelect={selectLayer} onCommit={commit} canEdit={editingEnabled} /> : null}
+          {sidebarTab === "layers" ? <LayerPanel state={history.state} onSelect={selectLayer} onCommit={commit} canEdit={editingEnabled} multiSelect={multiSelect} /> : null}
         </aside> : null}
 
         <main className="report-designer-v3-canvas-column">
@@ -419,6 +440,8 @@ export function ReportDesignerV3Workspace({
             state={history.state}
             zoom={zoom}
             fitRequest={fitRequest}
+            autoFit={autoFit}
+            multiSelect={multiSelect}
             showGuides={editingEnabled && showGuides}
             onFitZoom={handleFitZoom}
             disabled={!editingEnabled}

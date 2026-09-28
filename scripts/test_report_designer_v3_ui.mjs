@@ -11,6 +11,7 @@ import { verifyDesignerEditingUi } from "./lib/report-designer-editing-ui-scenar
 import { verifyProductFieldsUi } from "./lib/report-designer-product-fields-ui.mjs";
 import { verifyShippingMarksUi } from "./lib/report-shipping-marks-ui-scenarios.mjs";
 import { verifyDetailVisibility } from "./lib/report-designer-visibility-ui.mjs";
+import { verifyDesignerUsability } from "./lib/report-designer-usability-ui.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -158,6 +159,7 @@ try {
     assert(await read(page, `[...document.querySelectorAll('.report-designer-v3-layer')].every(layer=>getComputedStyle(layer,'::after').backgroundColor==='rgba(0, 0, 0, 0)')`), "layer guides do not tint the report content");
     await read(page, `document.querySelector('[data-v3-element-id="review-grid"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerId:77,clientX:0,clientY:0}));window.dispatchEvent(new PointerEvent('pointercancel',{pointerId:77}));`);
     await waitFor(page, 'document.querySelector(".report-designer-property-tabs [role=tab][aria-selected=true]")?.textContent === "单元格"');
+    if (width < 500) await click(page,'.report-designer-v3-compact-tabs button:nth-child(3)');
     const controls = await read(page, `Array.from(document.querySelectorAll('.report-designer-v3-inspector input[type=checkbox]')).filter(input=>input.getClientRects().length).map(input=>{const r=input.getBoundingClientRect();return {width:r.width,height:r.height}})`);
     assert(controls.length >= 5 && controls.every(control=>control.width>=14&&control.width<=18&&control.height>=14&&control.height<=18), JSON.stringify(controls));
     await click(page,'.report-designer-property-tabs [role=tab]:nth-child(2)');
@@ -322,6 +324,7 @@ try {
   assert.equal(await read(page,'Boolean(document.querySelector(".report-designer-v3-inspector"))'),false);
   results.push({test:'read-only payment canvas displays authorized images',passed:true});
   await verifyShippingMarksUi({page,url,read,waitFor,click,key,results,output});
+  await verifyDesignerUsability({page,url,read,waitFor,click,key,results});
   fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify({passed:true,results},null,2));
   console.log(`Report designer UI contracts passed (${results.length} cases).`);
 } finally {

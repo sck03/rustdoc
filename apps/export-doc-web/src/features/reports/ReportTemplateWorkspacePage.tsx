@@ -245,11 +245,6 @@ export function ReportTemplateWorkspacePage({
     setMessageType(null);
   }, []);
 
-  useEffect(() => {
-    if (view === "designer" && isLimitedReportView) {
-      setWorkspaceMode("preview");
-    }
-  }, [isLimitedReportView, view]);
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: hasUnsavedTemplateChanges,
     message: "当前报表模板有未保存的修改。",
@@ -790,7 +785,7 @@ export function ReportTemplateWorkspacePage({
           workspaceMode={workspaceMode}
           canPreview={canRenderTemplatePreview}
           canSave={canSave}
-          designDisabled={isLimitedReportView}
+          designDisabled={false}
           onBackToManagement={() => void handleBackToManagement()}
           onDesign={() => setWorkspaceMode("design")}
           onPreview={handleRenderTemplatePreview}
@@ -798,10 +793,8 @@ export function ReportTemplateWorkspacePage({
 
         <WorkspaceDeviceNotice
           mode={workspaceDeviceMode}
-          phone="当前设备提供模板预览；返回模板管理可切换模板，完整设计请使用桌面端。"
-          tablet={workspaceDeviceCapabilities.canUseAdvancedTools
-            ? "可预览并使用统一 可视化设计。"
-            : "当前设备提供模板预览；连接鼠标或触控板后可使用统一 可视化设计。"}
+          phone="点击“设计”可修改模板；用“添加内容 / 画布 / 属性”切换面板，多选按钮支持触屏批量排版。"
+          tablet="可触控编辑模板；小屏可切换面板，复杂表格也可连接鼠标操作。"
         />
 
         <ReportTemplateFeedback message={effectiveMessage} type={effectiveMessageType} onReload={!isBusy ? () => void handleRefreshTemplates() : undefined} />
@@ -811,7 +804,7 @@ export function ReportTemplateWorkspacePage({
             {selectedTemplateContentActive && <ReportTemplateDesignWorkspace
               key={contentTemplatePath}
               client={client}
-              editable={!isBusy && workspaceDeviceCapabilities.canUseAdvancedTools && (
+              editable={!isBusy && (
                 isUserTemplate
                   ? currentUserTemplate?.canEdit === true && canDesignTemplates
                   : canManageTemplates
