@@ -324,7 +324,7 @@ fn validate_grid_row(
         if cell
             .label_position
             .as_deref()
-            .is_some_and(|v| !["Above", "Inline"].contains(&v))
+            .is_some_and(|v| !["Above", "Inline", "Prefix"].contains(&v))
         {
             return Err("单元格标签位置无效。".into());
         }

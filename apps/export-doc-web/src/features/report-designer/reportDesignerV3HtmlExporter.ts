@@ -288,7 +288,7 @@ function renderElementContent(element: ReportDesignerV3Element) {
       case "Text":
         return `<div class="edm-v3-text">${escapeHtml(element.text)}</div>`;
       case "Field":
-        return `<div class="edm-v3-field">${renderReportField(element.fieldPath, element.fallbackText)}</div>`;
+        return `<div class="edm-v3-field">${element.fieldFormat === "Currency" ? "{{ Invoice.Currency }}" : ""}${renderReportField(element.fieldPath, element.fallbackText)}</div>`;
       case "Image":
         return renderImage(element);
       case "PageNumber":

@@ -13,7 +13,13 @@ use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 pub const MAX_INPUT: usize = 25 * 1024 * 1024;
 const MAX_DATA: usize = 32 * 1024 * 1024;
-pub const ASSET_FIELDS: &[&str] = &["shippingMarksImage", "docSealPath", "customsSealPath"];
+pub const ASSET_FIELDS: &[&str] = &[
+    "shippingMarksImage",
+    "docSealPath",
+    "customsSealPath",
+    "invoiceDocSealPath",
+    "invoiceCustomsSealPath",
+];
 pub struct Package {
     pub invoice: Value,
     pub customer: Option<Value>,
@@ -191,7 +197,7 @@ pub fn read(bytes: &[u8]) -> Result<Package> {
     if let Some(resources) = root.get("Resources") {
         let resources = resources
             .as_object()
-            .filter(|r| r.len() <= 3)
+            .filter(|r| r.len() <= ASSET_FIELDS.len())
             .ok_or_else(|| invalid("单据包图片目录无效。"))?;
         for (field, metadata) in resources {
             if !ASSET_FIELDS.contains(&field.as_str()) {

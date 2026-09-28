@@ -13,7 +13,7 @@ export function renderDetailFixedRow(block: ReportDetailTableBlock, row: ReportD
   const cells = new Map(row.cells.map(cell => [cell.columnId, cell]));
   const cellContent = (id: string) => {
     const cell = cells.get(id);
-    return cell?.contentKind === "Field" ? render.field(cell.fieldPath) : cell?.contentKind === "Text" ? render.text(cell.text) : "";
+    return cell?.contentKind === "Field" ? `${cell.fieldFormat === "Currency" ? render.field("Invoice.Currency") : ""}${render.field(cell.fieldPath)}` : cell?.contentKind === "Text" ? render.text(cell.text) : "";
   };
   const values = block.columns.slice(span).map(column => {
     const content = cellContent(column.id);

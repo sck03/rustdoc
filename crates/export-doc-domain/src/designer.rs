@@ -123,6 +123,12 @@ pub enum Kind {
         #[serde(rename = "fallbackText")]
         #[serde(default)]
         fallback_text: String,
+        #[serde(
+            rename = "fieldFormat",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        field_format: Option<FieldFormat>,
     },
     Image {
         #[serde(rename = "sourceKind")]
@@ -153,6 +159,10 @@ pub enum Kind {
         flow_kind: String,
         block: ReportBlock,
     },
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum FieldFormat {
+    Currency,
 }
 impl Kind {
     pub fn name(&self) -> &str {
@@ -347,6 +357,8 @@ pub struct DetailSummaryRow {
 pub struct DetailSummaryCell {
     pub column_id: String,
     pub content_kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field_format: Option<FieldFormat>,
     #[serde(default)]
     pub text: String,
     #[serde(default)]
@@ -476,6 +488,7 @@ impl Design {
         let field = |path: &str| Kind::Field {
             field_path: path.into(),
             fallback_text: String::new(),
+            field_format: None,
         };
         design.insert(
             0,

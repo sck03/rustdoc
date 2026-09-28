@@ -83,6 +83,8 @@ Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公
 
 OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --example office_review`，再执行 `npm --prefix apps/export-doc-web run test:oa-ui`。回环测试宿主使用独立 DataRoot，覆盖六类申请、附件、办理记录和窄屏；不代替 PostgreSQL 18 或 Tauri 验收。
 
+发票印章与模板预览回归复用该隔离宿主：先构建 React 和 `office_review`，再运行 `node scripts/test_invoice_report_ui.mjs`，验证无出口商关联的上传按钮、图片保存回读及样例/真实单据的原生排版。
+
 文档整理后运行 `node scripts/verify-documentation-links.mjs`，检查 docs、根 README 和本页的本地文件链接；当前入口不应引用已退役的文档或工作流。
 
 按用户要求先集中完成一批页面、后端和操作，再统一联调与最终门禁。开发中只做必要编译和针对失败的回归。

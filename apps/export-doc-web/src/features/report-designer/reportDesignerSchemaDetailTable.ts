@@ -257,6 +257,7 @@ function normalizeDetailTableSummaryCell(
   return {
     columnId,
     contentKind,
+    fieldFormat: value.fieldFormat === undefined ? undefined : readEnum(value.fieldFormat, ["Currency"] as const, "Currency", `${path}.fieldFormat`, issues),
     text: readString(value.text, "", `${path}.text`, issues),
     fieldPath: contentKind === "Field"
       ? readRequiredFieldPath(value.fieldPath, `${path}.fieldPath`, issues)

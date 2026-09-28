@@ -4,14 +4,11 @@ import {
   ApiUserReportTemplateDto,
 } from "../../api/index.ts";
 import {
-  isLocalReportDesignerPreviewSample,
-  renderReportDesignerLocalPreviewSample,
   type ReportDesignerPreviewSampleProfile,
 } from "../report-designer/reportDesignerPreviewSamples.ts";
 import {
   buildInvoicePreviewOptions,
   buildPaymentPreviewOptions,
-  buildRawPreviewHtml,
   buildUserTemplateKey,
   fileNameFromPath,
   matchesTemplatePath,
@@ -66,7 +63,6 @@ export function deriveReportTemplateWorkspaceState({
   selectedContentTemplatePath,
   currentUserTemplate,
   templatePreviewMode,
-  templatePreviewSampleProfile,
   previewHtml,
   previewInvoices,
   previewPayments,
@@ -137,13 +133,7 @@ export function deriveReportTemplateWorkspaceState({
   const selectedPreviewSourceLabel =
     previewDocumentOptions.find((option) => option.value === selectedPreviewSourceValue)?.label ?? "";
   const previewContent = designerDraftContent.trim() ? designerDraftContent : content;
-  const isLocalSamplePreview =
-    templatePreviewMode === "sample" && isLocalReportDesignerPreviewSample(templatePreviewSampleProfile);
-  const localSamplePreviewHtml =
-    isLocalSamplePreview && previewContent.trim()
-      ? renderReportDesignerLocalPreviewSample(previewContent, templatePreviewSampleProfile)
-      : "";
-  const renderedPreviewHtml = localSamplePreviewHtml || previewHtml || buildRawPreviewHtml(previewContent);
+  const renderedPreviewHtml = previewHtml || "<!doctype html><html lang=\"zh-CN\"><body><p>请选择预览数据并点击预览。</p></body></html>";
   const selectedTemplateContentLoaded =
     isUserTemplate ||
     (Boolean(selectedTemplatePath) && (matchesTemplatePath(selectedContentTemplatePath, selectedTemplatePath) ||
@@ -162,9 +152,7 @@ export function deriveReportTemplateWorkspaceState({
   const canRenderTemplatePreview = designerDraftValid && (
     templatePreviewMode === "savedSource"
       ? canPreviewSavedSource && canPreviewRendered && !isBusy
-      : isLocalSamplePreview
-        ? Boolean(previewContent.trim()) && !isBusy
-        : canDesignTemplates && Boolean(previewContent.trim()) && Boolean(selectedTemplatePath) && !isBusy);
+      : canDesignTemplates && Boolean(previewContent.trim()) && Boolean(selectedTemplatePath) && !isBusy);
   const canCreateTemplate = canManageTemplates && Boolean(newTemplateFileName.trim()) && !isBusy;
   const canCreateBlankUserTemplate =
     canDesignTemplates && Boolean(newUserTemplateName.trim()) && !isBusy;
@@ -190,7 +178,6 @@ export function deriveReportTemplateWorkspaceState({
     selectedPreviewSourceValue,
     selectedPreviewSourceLabel,
     previewContent,
-    isLocalSamplePreview,
     renderedPreviewHtml,
     selectedTemplateContentActive,
     isBusy,

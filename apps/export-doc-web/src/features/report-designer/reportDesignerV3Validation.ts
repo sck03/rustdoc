@@ -306,6 +306,7 @@ function normalizeElement(
           type: "Field",
           fieldPath,
           fallbackText: normalizeOptionalString(value.fallbackText, REPORT_DESIGNER_V3_MAX_FALLBACK_LENGTH, `${path}.fallbackText`, issues),
+          fieldFormat: value.fieldFormat === undefined ? undefined : readEnum(value.fieldFormat, ["Currency"] as const, "Currency", `${path}.fieldFormat`, issues),
         };
       }
       case "Image": {

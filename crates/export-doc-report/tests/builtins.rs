@@ -107,7 +107,15 @@ fn every_builtin_renders_its_own_domain_without_html_execution() {
         );
         assert!(!page.svg.contains("{{"));
         assert!(!page.svg.contains("<script"));
-        assert!(document.html().unwrap().contains("@page report0"));
+        // HTML font outlining is covered by the engine tests with RuntimePaths.
+        assert_eq!(
+            document.pages[0].width_mm,
+            if template == Builtin::CustomsDeclaration {
+                297.
+            } else {
+                210.
+            }
+        );
     }
 }
 
@@ -152,11 +160,30 @@ fn invoice_terms_and_packing_header_follow_their_separate_templates() {
             .unwrap()
     };
     assert!(position("1000") - position("20") > 15.);
-    assert!(position("4.50") - position("1000") > 15.);
+    assert!(position("USD4.50") - position("1000") > 15.);
     let packing =
         render_builtin(Builtin::PackingList, &invoice(3), &AtomicBool::new(false)).unwrap();
     for label in ["From:", "Payment Terms:", "Issued by:"] {
         assert!(!packing.pages[0].svg.contains(label));
+    }
+}
+
+#[test]
+fn default_totals_and_yuan_prefixes_join_currency_without_added_punctuation() {
+    let contract = render_builtin(Builtin::Contract, &invoice(2), &AtomicBool::new(false)).unwrap();
+    assert!(contract.pages[0].svg.contains(">USD9000.00</text>"));
+    let payment = ReportData::payment(
+        &ApiPaymentDto {
+            cny_amount: rust_decimal::Decimal::new(12345, 2),
+            ..Default::default()
+        },
+        json!({}),
+    )
+    .unwrap();
+    for template in [Builtin::PaymentVoucher, Builtin::ExpenseReimbursement] {
+        let document = render_builtin(template, &payment, &AtomicBool::new(false)).unwrap();
+        assert!(document.pages[0].svg.contains("￥123.45</text>"));
+        assert!(!document.pages[0].svg.contains("￥:"));
     }
 }
 

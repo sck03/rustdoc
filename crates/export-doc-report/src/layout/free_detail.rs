@@ -78,11 +78,12 @@ pub(super) fn render(
             let Kind::Field {
                 field_path,
                 fallback_text,
+                field_format,
             } = &source.kind
             else {
                 unreachable!()
             };
-            let value = data.display(field_path, Some(item));
+            let value = data.field_text(field_path, Some(item), field_format.as_ref());
             let text = if value.is_empty() {
                 fallback_text.clone()
             } else {

@@ -99,15 +99,13 @@ export function InvoicePartiesPanel({
       bankName: exporter.bankName ?? "",
       bankAccount: exporter.bankAccount ?? "",
       swiftCode: exporter.swiftCode ?? "",
+      docSealPath: exporter.docSealPath ?? "",
+      customsSealPath: exporter.customsSealPath ?? "",
     });
   }
 
-  const sealActionDisabled = !canManageExporterSeals || !selectedExporter || sealBusy;
-  const sealActionTitle = !selectedExporter
-    ? "请先选择出口商档案"
-    : !canManageExporterSeals
-      ? "当前权限不能维护出口商印章"
-      : undefined;
+  const sealActionDisabled = !isEditable || !canManageExporterSeals || isBusy || sealBusy;
+  const sealActionTitle = !isEditable || !canManageExporterSeals ? "当前发票不可编辑" : undefined;
 
   return (
     <section className="form-section information-tier-required" aria-label="客户与出口商">
@@ -178,8 +176,9 @@ export function InvoicePartiesPanel({
               <TextField className="field-grid-span-all" label="银行名称" value={invoice.bankName ?? ""} disabled={!isEditable} onChange={(value) => onChange({ bankName: value })} />
               <TextField className="field-grid-span-all" label="银行账号" value={invoice.bankAccount ?? ""} disabled={!isEditable} onChange={(value) => onChange({ bankAccount: value })} />
               <TextField className="field-grid-span-all" label="SWIFT" value={invoice.swiftCode ?? ""} disabled={!isEditable} onChange={(value) => onChange({ swiftCode: value })} />
-              <ExporterSealField label="单证章" value={selectedExporter?.docSealPath ?? ""} inputReadOnly actionDisabled={sealActionDisabled} actionTitle={sealActionTitle} onUploadFile={(file) => onSealUpload("document", file)} onError={onSealError} />
-              <ExporterSealField label="报关章" value={selectedExporter?.customsSealPath ?? ""} inputReadOnly actionDisabled={sealActionDisabled} actionTitle={sealActionTitle} onUploadFile={(file) => onSealUpload("customs", file)} onError={onSealError} />
+              <ExporterSealField label="单证章" value={invoice.docSealPath ?? selectedExporter?.docSealPath ?? ""} inputReadOnly actionDisabled={sealActionDisabled} actionTitle={sealActionTitle} onPathChange={(docSealPath) => onChange({ docSealPath })} onUploadFile={(file) => onSealUpload("document", file)} onError={onSealError} />
+              <ExporterSealField label="报关章" value={invoice.customsSealPath ?? selectedExporter?.customsSealPath ?? ""} inputReadOnly actionDisabled={sealActionDisabled} actionTitle={sealActionTitle} onPathChange={(customsSealPath) => onChange({ customsSealPath })} onUploadFile={(file) => onSealUpload("customs", file)} onError={onSealError} />
+              <small className="field-grid-span-all">印章随当前发票保存；选择出口商档案可带入档案印章。</small>
             </div>
           </details>
         </section>

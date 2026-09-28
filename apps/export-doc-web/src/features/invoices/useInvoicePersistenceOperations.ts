@@ -10,6 +10,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { isConcurrencyConflict, readApiError } from "../../ui/formUtils.ts";
 import type { ExporterSealType } from "../master-data/ExporterSealField.tsx";
 import { getInvoiceStatusLabel, normalizeInvoiceForSave, normalizeInvoiceStatus } from "./invoiceModel.ts";
+import { invoiceSealDataUrl } from "./invoiceSealImage.ts";
 
 type NullableTextSetter = Dispatch<SetStateAction<string | null>>;
 
@@ -18,7 +19,6 @@ export function useInvoicePersistenceOperations({
   invoice,
   invoiceId,
   isNew,
-  refreshSelectedExporter,
   resetItemEditHistory,
   setConcurrencyMessage,
   setInvoice,
@@ -32,7 +32,6 @@ export function useInvoicePersistenceOperations({
   invoice: ApiInvoiceDetailDto | null;
   invoiceId: number;
   isNew: boolean;
-  refreshSelectedExporter: () => Promise<unknown>;
   resetItemEditHistory: () => void;
   setConcurrencyMessage: NullableTextSetter;
   setInvoice: Dispatch<SetStateAction<ApiInvoiceDetailDto | null>>;
@@ -46,24 +45,16 @@ export function useInvoicePersistenceOperations({
   const queryClient = useQueryClient();
 
   const exporterSealMutation = useMutation({
-    mutationFn: async ({ sealType, file }: { sealType: ExporterSealType; file: File }) => {
-      const exporterId = invoice?.exporterId ?? 0;
-      if (exporterId <= 0) throw new Error("请先选择出口商档案，再设置印章。");
-
-      return client.uploadExporterSeal({
-        id: exporterId,
-        sealType,
-        fileName: file.name,
-        body: file,
-      });
+    mutationFn: async ({ file }: { sealType: ExporterSealType; file: File }) => {
+      if (!invoice) throw new Error("请先打开需要编辑的发票。");
+      const imageDataUrl = await invoiceSealDataUrl(file);
+      return client.saveInvoiceSealImage({ body: { imageDataUrl } });
     },
-    onSuccess: async (_saved, variables) => {
+    onSuccess: (saved, variables) => {
+      const field = variables.sealType === "document" ? "docSealPath" : "customsSealPath";
+      setInvoice(current => current ? { ...current, [field]: saved.imagePath } : current);
       setMessage(null);
-      setSuccessMessage(variables.sealType === "document" ? "出口商单证章已保存。" : "出口商报关章已保存。");
-      await Promise.all([
-        refreshSelectedExporter(),
-        queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("exporters") }),
-      ]);
+      setSuccessMessage(variables.sealType === "document" ? "单证章已上传，请保存发票。" : "报关章已上传，请保存发票。");
     },
     onError: (error) => {
       setMessage(readApiError(error));

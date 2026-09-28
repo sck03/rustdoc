@@ -119,6 +119,7 @@ export function ReportDesignerDetailTableSummaryProperties({
                       }
                     />
                   ) : null}
+                  {cell.contentKind === "Field" ? <label><span>显示格式</span><select value={cell.fieldFormat ?? ""} onChange={event => updateSummaryCell(column.id,current=>({...current,fieldFormat:event.target.value === "Currency" ? "Currency" : undefined}))}><option value="">原始值</option><option value="Currency">币种与金额</option></select></label> : null}
                   {cell.contentKind === "Text" ? (
                     <label>
                       <span>固定文本</span>

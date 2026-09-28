@@ -248,6 +248,7 @@ function ElementContentEditor({ element, reportType, resources, fieldGroups, edi
         ...flattenFields(fieldGroups).filter(field => field.value.startsWith("item.") === element.fieldPath.startsWith("item.")).map((field) => ({ value: field.value, label: field.label })),
       ];
       return <><SelectField label="字段" value={element.fieldPath} options={options} disabled={!editable} onChange={(fieldPath) => onPatch({ fieldPath })} />
+        {reportType === "ExportDocument" && <SelectField label="显示格式" value={element.fieldFormat ?? ""} options={[{ value: "", label: "原始值" }, { value: "Currency", label: "币种与金额" }]} disabled={!editable} onChange={(fieldFormat) => onPatch({ fieldFormat: fieldFormat === "Currency" ? "Currency" : undefined })} />}
         {isShippingMarksField(element.fieldPath) && <small>按发票所选类型显示。文字使用下方样式，图片在此区域内等比例缩放。</small>}
         <details className="report-designer-property-section"><summary>标签与空值</summary><label><span>字段标签（选填）</span><CommitTextField value={element.label ?? ""} disabled={!editable} onCommit={(label) => onPatch({ label: label || undefined })} /></label>
         <label><span>占位文本</span><CommitTextField value={element.fallbackText ?? ""} disabled={!editable} onCommit={(fallbackText) => onPatch({ fallbackText: fallbackText || undefined })} /></label></details></>;

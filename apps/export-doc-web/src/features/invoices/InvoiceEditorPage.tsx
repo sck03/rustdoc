@@ -163,7 +163,6 @@ export function InvoiceEditorPage({
     invoice,
     invoiceId: parsedInvoiceId,
     isNew,
-    refreshSelectedExporter: async () => selectedExporterQuery.refetch(),
     resetItemEditHistory: itemsWorkspace.resetEditHistory,
     setConcurrencyMessage,
     setInvoice,
@@ -735,7 +734,7 @@ export function InvoiceEditorPage({
               canTransitionStatus={!isNew && isInvoiceIdValid && invoicePermission.canOperate && Boolean(getNextInvoiceStatus(invoice.status))}
               canCancelStatus={!isNew && isInvoiceIdValid && invoicePermission.canManage && normalizeInvoiceStatus(invoice.status) !== "Cancelled"}
               canUseAdvancedTools={workspaceDeviceCapabilities.canUseAdvancedTools}
-              canManageExporterSeals={masterDataPermission.canOperate}
+              canManageExporterSeals={isInvoiceEditable}
               cloneInvoiceTypeBusy={cloneInvoiceTypeMutation.isPending}
               unverifyInvoiceBusy={unverifyInvoiceMutation.isPending}
               transitionStatusBusy={statusTransitionMutation.isPending}

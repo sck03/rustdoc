@@ -112,7 +112,7 @@ export type ReportGridRow = {
 };
 
 export type ReportGridCell = {
-  labelPosition?: "Above" | "Inline";
+  labelPosition?: "Above" | "Inline" | "Prefix";
   id: string;
   colSpan?: number;
   rowSpan?: number;
@@ -270,6 +270,7 @@ export type ReportDetailTableSummaryRow = {
 
 export type ReportDetailTableSummaryCell = {
   columnId: string;
+  fieldFormat?: "Currency";
   contentKind: "Empty" | "Text" | "Field";
   text: string;
   fieldPath: string;

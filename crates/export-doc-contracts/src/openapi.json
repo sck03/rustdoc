@@ -47557,6 +47557,67 @@
           }
         ]
       }
+    },
+    "/api/invoices/seals/image": {
+      "post": {
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "SaveInvoiceSealImage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiInvoiceSealImageSaveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiInvoiceSealImageSaveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": {
+            "readModule": "document.invoices",
+            "writeModule": null,
+            "readAccessLevel": null,
+            "writeAccessLevel": null,
+            "selector": 0,
+            "disabled": false,
+            "overridesParent": false
+          },
+          "requirements": [],
+          "permissionBypass": false
+        }
+      }
     }
   },
   "components": {
@@ -54491,6 +54552,20 @@
             "items": {
               "$ref": "#/components/schemas/HsCodeKnowledgeFeedbackInput"
             }
+          },
+          "docSealPath": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "受控发票印章；null 继承出口商档案，空字符串不盖章。"
+          },
+          "customsSealPath": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "受控发票印章；null 继承出口商档案，空字符串不盖章。"
           }
         }
       },
@@ -57817,6 +57892,9 @@
         "properties": {
           "templatePath": {
             "type": "string"
+          },
+          "content": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -58786,6 +58864,9 @@
           },
           "withSeal": {
             "type": "boolean"
+          },
+          "content": {
+            "type": "string"
           }
         }
       },
@@ -59170,6 +59251,9 @@
               "null",
               "boolean"
             ]
+          },
+          "sampleProfile": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -69584,6 +69668,46 @@
           "pageNumber",
           "pageSize"
         ]
+      },
+      "ApiInvoiceSealImageSaveRequest": {
+        "type": "object",
+        "properties": {
+          "imageDataUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiInvoiceSealImageSaveResponse": {
+        "required": [
+          "imagePath",
+          "fileName",
+          "contentType",
+          "sizeBytes",
+          "storagePolicy"
+        ],
+        "type": "object",
+        "properties": {
+          "imagePath": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "storagePolicy": {
+            "type": "string"
+          }
+        }
       }
     },
     "securitySchemes": {

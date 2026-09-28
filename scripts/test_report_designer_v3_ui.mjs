@@ -41,7 +41,7 @@ await esbuild.build({
     import { createGridBlock, createDetailTableBlock, createRowBlock, createConditionalBlock, createDetailTableSideBand } from ${source("features/report-designer/reportDesignerBlockFactories.ts")};
     import { createShippingMarksScenario } from ${JSON.stringify(path.join(repo, "scripts/lib/report-shipping-marks-fixture.mjs").replaceAll("\\", "/"))};
     import { defaultReportDesigns } from ${JSON.stringify(path.join(repo, "scripts/lib/default-report-designs.mjs").replaceAll("\\", "/"))};
-    import { renderReportDesignerLocalPreviewSample } from ${source("features/report-designer/reportDesignerPreviewSamples.ts")};
+    import { renderReportDesignerLocalPreviewSample } from ${JSON.stringify(path.join(repo, "scripts/lib/report-preview-html-fixture.ts"))};
     import { renderDetailComposite } from ${source("features/report-designer/reportDesignerDetailComposite.ts")};
     import ${source("styles/cascade.css")};
     import ${source("styles/foundation.css")};

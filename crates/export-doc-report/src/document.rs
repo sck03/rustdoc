@@ -23,6 +23,7 @@ pub struct Document {
 }
 impl Document {
     pub fn html(&self) -> Result<String> {
+        let options = crate::fonts::svg_options()?;
         let mut html = String::from(
             "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>html,body{margin:0;padding:0;background:#e8ebed}.report-page{margin:12px auto;background:white;break-after:page;page-break-after:always;max-width:100%}.report-page:last-child{break-after:auto;page-break-after:auto}.report-page svg{display:block;width:100%;height:auto}@media print{html,body{background:white}.report-page{margin:0;max-width:none}}@page{margin:0}",
         );
@@ -31,9 +32,38 @@ impl Document {
         }
         html.push_str("</style></head><body>");
         for (index, page) in self.pages.iter().enumerate() {
+            let tree = usvg::Tree::from_str(&page.svg, &options)
+                .map_err(|error| invalid(format!("报表预览布局无效：{error}")))?;
+            let mut svg = tree.to_string(&usvg::WriteOptions::default());
+            // usvg writes absolute dimensions without a viewBox. Restore the
+            // viewport so CSS resizing scales the entire A4 page, including glyphs.
+            svg.insert_str(
+                4,
+                &format!(
+                    " viewBox=\"0 0 {} {}\"",
+                    tree.size().width(),
+                    tree.size().height()
+                ),
+            );
+            // Outlined glyphs keep preview identical to PDF even when the web
+            // client has none of our fonts. Retain readable page content for AT.
+            let source = usvg::roxmltree::Document::parse(&page.svg)
+                .map_err(|error| invalid(error.to_string()))?;
+            let text = source
+                .descendants()
+                .filter(|node| node.has_tag_name("text"))
+                .filter_map(|node| node.text())
+                .collect::<Vec<_>>()
+                .join("\n");
+            if let Some(end) = svg.find('>') {
+                svg.insert_str(
+                    end + 1,
+                    &format!("<desc>{}</desc>", crate::layout::escape(&text)),
+                );
+            }
             html.push_str(&format!(
                 "<section class=\"report-page\" id=\"report{index}\">{}</section>",
-                page.svg
+                svg
             ));
             if html.len() > 96 * 1024 * 1024 {
                 return Err(invalid("报表预览超过容量上限。"));

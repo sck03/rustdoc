@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "f3bc75df8a7f90c83c716e051bf8fec5be89a9fcdbba86a671b55066d59271ef",
+  "digest": "0fa45edd419c75e3acf2215edcc8f15e50ca91e730aefe4c9da5947e56171553",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -39592,6 +39592,63 @@
         "$ref": "#/components/schemas/HsCodeDeclarationExample"
       }
     },
+    "SaveInvoiceSealImage": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": {
+          "readModule": "document.invoices",
+          "writeModule": null,
+          "readAccessLevel": null,
+          "writeAccessLevel": null,
+          "selector": 0,
+          "disabled": false,
+          "overridesParent": false
+        },
+        "requirements": [],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiInvoiceSealImageSaveRequest"
+            }
+          }
+        },
+        "required": true
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiInvoiceSealImageSaveResponse"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "503": {
+          "description": "Service Unavailable"
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/ApiInvoiceSealImageSaveRequest"
+      },
+      "response": {
+        "$ref": "#/components/schemas/ApiInvoiceSealImageSaveResponse"
+      }
+    },
     "SaveInvoiceTransferPackageToPath": {
       "policy": {
         "requiresAuthentication": true,
@@ -58444,6 +58501,20 @@
           "items": {
             "$ref": "#/components/schemas/HsCodeKnowledgeFeedbackInput"
           }
+        },
+        "docSealPath": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "受控发票印章；null 继承出口商档案，空字符串不盖章。"
+        },
+        "customsSealPath": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "受控发票印章；null 继承出口商档案，空字符串不盖章。"
         }
       }
     },
@@ -59157,6 +59228,46 @@
         },
         "invoice": {
           "$ref": "#/components/schemas/ApiInvoiceDetailDto"
+        }
+      }
+    },
+    "ApiInvoiceSealImageSaveRequest": {
+      "type": "object",
+      "properties": {
+        "imageDataUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "ApiInvoiceSealImageSaveResponse": {
+      "required": [
+        "imagePath",
+        "fileName",
+        "contentType",
+        "sizeBytes",
+        "storagePolicy"
+      ],
+      "type": "object",
+      "properties": {
+        "imagePath": {
+          "type": "string"
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "contentType": {
+          "type": "string"
+        },
+        "sizeBytes": {
+          "pattern": "^-?(?:0|[1-9]\\d*)$",
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int64"
+        },
+        "storagePolicy": {
+          "type": "string"
         }
       }
     },
@@ -61770,6 +61881,9 @@
       "properties": {
         "templatePath": {
           "type": "string"
+        },
+        "content": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -62739,6 +62853,9 @@
         },
         "withSeal": {
           "type": "boolean"
+        },
+        "content": {
+          "type": "string"
         }
       }
     },
@@ -63123,6 +63240,9 @@
             "null",
             "boolean"
           ]
+        },
+        "sampleProfile": {
+          "type": "string"
         }
       },
       "additionalProperties": false

@@ -91,7 +91,7 @@ export function ExporterSealField({
         hidden
         type="file"
         aria-label={`${sealLabel}图片文件`}
-        accept="image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp"
+        accept="image/png,image/jpeg,.png,.jpg,.jpeg"
         disabled={actionDisabled}
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];

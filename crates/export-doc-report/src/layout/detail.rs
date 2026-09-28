@@ -533,7 +533,7 @@ fn summary_row(
 fn summary_cell(cell: &DetailSummaryCell, data: &ReportData) -> String {
     match cell.content_kind.as_str() {
         "Text" => cell.text.clone(),
-        "Field" => data.text(&cell.field_path),
+        "Field" => data.field_text(&cell.field_path, None, cell.field_format.as_ref()),
         _ => String::new(),
     }
 }

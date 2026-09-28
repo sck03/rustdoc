@@ -248,8 +248,9 @@ fn element(
             Kind::Field {
                 field_path,
                 fallback_text,
+                field_format,
             } => {
-                let value = data.text(field_path);
+                let value = data.field_text(field_path, None, field_format.as_ref());
                 if value.is_empty() {
                     fallback_text.clone()
                 } else {
@@ -726,6 +727,7 @@ mod tests {
                 label: "GRAND TOTAL".into(),
                 label_column_span: 2,
                 cells: vec![DetailSummaryCell {
+                    field_format: None,
                     column_id: "col-2".into(),
                     content_kind: "Text".into(),
                     text: "TOTAL QTY".into(),

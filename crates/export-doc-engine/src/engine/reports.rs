@@ -13,6 +13,7 @@ use crate::{contracts, designer::Design, generated_api::*, invoice::InvoiceDraft
 use export_doc_report::{self as render, Builtin, Document, ReportData};
 use serde_json::{Value, json};
 use std::{path::PathBuf, sync::atomic::AtomicBool};
+mod samples;
 
 pub const OPERATIONS: &[Operation] = &[
     LIST_REPORT_TEMPLATES,
@@ -274,7 +275,7 @@ pub fn preview_document(
     if id < 0 {
         return Err(invalid("单据编号不能小于零。"));
     }
-    let (mut data, template) = if draft {
+    let (mut data, mut template) = if draft {
         if id > 0 {
             subject(&service.store, actor, resource, id, "preview")?;
         }
@@ -308,6 +309,17 @@ pub fn preview_document(
             "preview",
         )?
     };
+    // The source and selected template retain their usual access checks. Only
+    // template designers may render an unsaved layout over that source.
+    if let Some(content) = body["content"].as_str().filter(|v| !v.trim().is_empty()) {
+        auth::authorize(actor, "document.report-templates", "design")?;
+        template = Template::Custom {
+            design: validate_content(kind, content)?,
+            content: content.into(),
+            name: template.label().into(),
+            path: template.path().into(),
+        };
+    }
     report_assets::hydrate(
         &service.store,
         &service.paths,
@@ -588,23 +600,13 @@ pub fn handle(
                     path: "".into(),
                 }
             };
-            let mut data = if kind == "ExportDocument" {
-                let date = service.clock.now().map_err(unavailable)?.today.to_string();
-                ReportData::invoice(
-                    &InvoiceDraft::demo(&date, "PREVIEW-001")
-                        .build()
-                        .map_err(invalid)?,
-                    json!({}),
-                    json!({}),
-                    body["withSeal"] == true,
-                )?
-            } else {
-                let value = contracts::overlay(
-                    contracts::initial(contracts::schema("ApiPaymentDto")),
-                    &json!({"payerName":"示例公司","payeeName":"示例收款单位","department":"业务部","project":"费用支付","cnyAmount":1234.56,"usdAmount":100,"invoiceNo":"PREVIEW-001","paymentMethod":"电汇"}),
-                );
-                ReportData::payment(&serde_json::from_value(value)?, json!({}))?
-            };
+            let date = service.clock.now().map_err(unavailable)?.today.to_string();
+            let mut data = samples::data(
+                kind,
+                &text(body, "sampleProfile"),
+                &date,
+                body["withSeal"] == true,
+            )?;
             report_assets::hydrate(
                 &service.store,
                 &service.paths,

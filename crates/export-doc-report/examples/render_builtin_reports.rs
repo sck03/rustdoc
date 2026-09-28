@@ -24,6 +24,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let invoice = ReportData::invoice(&draft.build()?, json!({}), json!({}), false)?;
     let payment = ReportData::payment(
         &ApiPaymentDto {
+            payer_name: "宁波样例贸易有限公司".into(),
+            payee_name: "样例服务有限公司".into(),
+            department: "业务部".into(),
+            project: "货物检验及运输服务".into(),
+            invoice_no: "REPORT-VALIDATION-001".into(),
+            payment_method: "电汇".into(),
+            bank_name: "中国银行样例支行".into(),
+            account_no: "6222 0000 0000 0000".into(),
+            cny_amount: 12345.into(),
+            travel_expense: 2345.into(),
+            freight_misc_expense: 10000.into(),
+            notes: "样例付款与费用报销，核对中文、金额、账号及签字区。".into(),
             payment_date: Some("2026-09-16".into()),
             shipment_date: Some("2026-09-16".into()),
             ..Default::default()

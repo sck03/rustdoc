@@ -10,6 +10,8 @@ export function useReportTemplatePreviewMutations({
   reportType,
   selectedTemplatePath,
   content,
+  sampleProfile,
+  canDesignTemplates,
   withSeal,
   previewInvoiceId,
   previewPaymentId,
@@ -20,6 +22,8 @@ export function useReportTemplatePreviewMutations({
   reportType: ReportTypeOption;
   selectedTemplatePath: string;
   content: string;
+  sampleProfile: string;
+  canDesignTemplates: boolean;
   withSeal: boolean;
   previewInvoiceId: number;
   previewPaymentId: number;
@@ -30,8 +34,8 @@ export function useReportTemplatePreviewMutations({
     mutationFn: (nextContent?: string) =>
       client.previewReportTemplateContent({
         body: reportType === "ExportDocument"
-          ? { reportType, content: nextContent ?? content, withSeal }
-          : { reportType, content: nextContent ?? content },
+          ? { reportType, content: nextContent ?? content, withSeal, sampleProfile }
+          : { reportType, content: nextContent ?? content, sampleProfile },
       }),
     onSuccess: onPreviewed,
     onError,
@@ -41,7 +45,7 @@ export function useReportTemplatePreviewMutations({
     mutationFn: () =>
       client.previewInvoiceReportHtml({
         invoiceId: previewInvoiceId,
-        body: { reportType, templatePath: selectedTemplatePath, withSeal },
+        body: { reportType, templatePath: selectedTemplatePath, withSeal, content: canDesignTemplates ? content : undefined },
       }),
     onSuccess: (response) => onPreviewed({ reportType: response.reportType, withSeal: response.withSeal ?? withSeal, html: response.html }),
     onError,
@@ -51,7 +55,7 @@ export function useReportTemplatePreviewMutations({
     mutationFn: () =>
       client.previewPaymentVoucherHtml({
         paymentId: previewPaymentId,
-        body: { templatePath: selectedTemplatePath },
+        body: { templatePath: selectedTemplatePath, content: canDesignTemplates ? content : undefined },
       }),
     onSuccess: (response) => onPreviewed({ reportType: response.reportType, withSeal: null, html: response.html }),
     onError,

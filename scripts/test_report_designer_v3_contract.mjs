@@ -41,7 +41,7 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerV3Mutations.ts"))}
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3TemplateParser.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3HtmlExporter.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerBlockRenderer.ts"))};
-export * from ${JSON.stringify(importSpecifier("reportDesignerPreviewSamples.ts"))};
+export * from ${JSON.stringify(path.join(repoRoot, "scripts/lib/report-preview-html-fixture.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerGridMutations.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerBlockFactories.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3Regions.ts"))};

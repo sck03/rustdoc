@@ -21,6 +21,7 @@ const KIND: &str = "report-images";
 const MAX_RESOURCE: usize = 32 * 1024 * 1024;
 pub const OPERATIONS: &[Operation] = &[
     SAVE_SHIPPING_MARK_IMAGE,
+    SAVE_INVOICE_SEAL_IMAGE,
     PREVIEW_SHIPPING_MARK_IMAGE,
     UPLOAD_EXPORTER_SEAL,
     UPLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
@@ -229,18 +230,18 @@ pub fn handle(
 ) -> Result<Value> {
     let store = &service.store;
     match operation {
-        SAVE_SHIPPING_MARK_IMAGE => {
+        SAVE_SHIPPING_MARK_IMAGE | SAVE_INVOICE_SEAL_IMAGE => {
             if auth::authorize(actor, "document.invoices", "edit").is_err() {
                 auth::authorize(actor, "document.invoices", "create")?;
             }
             let url = text(body, "imageDataUrl");
             let (kind, encoded) = url
                 .split_once(";base64,")
-                .ok_or_else(|| invalid("唛头必须是 PNG/JPEG 图片数据。"))?;
+                .ok_or_else(|| invalid("请选择 PNG/JPEG 图片。"))?;
             if !["data:image/png", "data:image/jpeg"].contains(&kind)
                 || encoded.len() > 7 * 1024 * 1024
             {
-                return Err(invalid("唛头图片类型无效或超过 5 MiB。"));
+                return Err(invalid("图片类型无效或超过 5 MiB。"));
             }
             let bytes = STANDARD
                 .decode(encoded)
@@ -250,9 +251,14 @@ pub fn handle(
                 return Err(invalid("图片内容与声明类型不一致。"));
             }
             let saved =
-                store.transaction(|tx| register(tx, actor, &bytes, "唛头", 5 * 1024 * 1024))?;
+                store.transaction(|tx| register(tx, actor, &bytes, "单据图片", 5 * 1024 * 1024))?;
+            let folder = if operation == SAVE_INVOICE_SEAL_IMAGE {
+                "Seals"
+            } else {
+                "ShippingMarks"
+            };
             Ok(
-                json!({"imagePath":format!("Files/ShippingMarks/{}",text(&saved,"resourceId")),"fileName":saved["resourceId"],"contentType":saved["mediaType"],"sizeBytes":saved["byteLength"],"storagePolicy":"唛头保存在业务数据库，随备份恢复。"}),
+                json!({"imagePath":format!("Files/{folder}/{}",text(&saved,"resourceId")),"fileName":saved["resourceId"],"contentType":saved["mediaType"],"sizeBytes":saved["byteLength"],"storagePolicy":"图片保存在业务数据库，随单据保存引用并随备份恢复。"}),
             )
         }
         PREVIEW_SHIPPING_MARK_IMAGE => {
@@ -357,6 +363,7 @@ pub fn download(
 }
 
 pub fn validate_invoice(tx: &Connection, actor: &Actor, value: &mut Value) -> Result<()> {
+    validate_exporter(tx, actor, value)?;
     match text(value, "shippingMarksType").as_str() {
         "" | "Text" => {
             value["shippingMarksType"] = json!("Text");
@@ -397,11 +404,23 @@ pub fn hydrate(
             .insert("Invoice.ShippingMarks".into(), read(&tx, actor, id, None)?);
     }
     if data.root["ShowSeal"] == true {
-        for (source, field) in [
-            ("Exporter.DocSealPath", "doc_seal_path"),
-            ("Exporter.CustomsSealPath", "customs_seal_path"),
+        for (source, fallback, field) in [
+            (
+                "Invoice.DocSealPath",
+                "Exporter.DocSealPath",
+                "doc_seal_path",
+            ),
+            (
+                "Invoice.CustomsSealPath",
+                "Exporter.CustomsSealPath",
+                "customs_seal_path",
+            ),
         ] {
-            let path = data.text(source);
+            let path = data.text(if data.value(source, None).is_null() {
+                fallback
+            } else {
+                source
+            });
             if !path.is_empty() {
                 let id = stored_id(&path, "Files/Seals/")?;
                 data.images

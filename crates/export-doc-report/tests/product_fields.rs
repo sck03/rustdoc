@@ -31,6 +31,7 @@ fn design() -> Design {
         field.kind = Kind::Field {
             field_path: path.into(),
             fallback_text: String::new(),
+            field_format: None,
         };
         design.layers[1].elements.push(field);
     }

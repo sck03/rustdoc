@@ -175,6 +175,25 @@ impl ReportData {
         }
         plain(value)
     }
+    pub fn field_text(
+        &self,
+        path: &str,
+        item: Option<&Value>,
+        format: Option<&export_doc_domain::designer::FieldFormat>,
+    ) -> String {
+        let value = if item.is_some() {
+            self.display(path, item)
+        } else {
+            self.text(path)
+        };
+        if format.is_some() && !value.is_empty() {
+            let currency = self.text("Invoice.Currency");
+            if !currency.trim().is_empty() {
+                return format!("{}{value}", currency.trim());
+            }
+        }
+        value
+    }
     pub fn item_text(&self, item: &Value, field: &str) -> String {
         plain(value_at(item, field))
     }

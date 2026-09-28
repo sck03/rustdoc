@@ -19,7 +19,7 @@ await require("esbuild").build({ stdin: { loader: "ts", resolveDir: web, content
   export * from ${source("ui/documentSpareFields.ts")};
   export * from ${source("features/report-designer/reportDesignerFields.ts")};
   export * from ${source("features/report-designer/reportDesignerPropertiesModel.ts")};
-  export * from ${source("features/report-designer/reportDesignerPreviewSamples.ts")};
+  export * from ${JSON.stringify(path.join(repo, "scripts/lib/report-preview-html-fixture.ts"))};
   export * from ${source("features/report-designer/reportDesignerBlockFactories.ts")};
   export * from ${source("features/report-designer/reportDesignerV3ElementFactories.ts")};
   export * from ${source("features/report-designer/reportDesignerV3TemplateParser.ts")};

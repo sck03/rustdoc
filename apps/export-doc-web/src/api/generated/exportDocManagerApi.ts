@@ -1457,8 +1457,10 @@ export interface ApiInvoiceDetailDto {
   customerNameEN: string;
   customsBrokerCode: string;
   customsBrokerName: string;
+  customsSealPath?: string | null;
   departmentId: string;
   destinationCountry: string;
+  docSealPath?: string | null;
   exchangeRate?: number | null;
   exporterAddressCN: string;
   exporterAddressEN: string;
@@ -1675,6 +1677,18 @@ export interface ApiInvoiceSaveResponse {
   invoice: ApiInvoiceDetailDto;
   isUpdate: boolean;
   success: boolean;
+}
+
+export interface ApiInvoiceSealImageSaveRequest {
+  imageDataUrl?: string;
+}
+
+export interface ApiInvoiceSealImageSaveResponse {
+  contentType: string;
+  fileName: string;
+  imagePath: string;
+  sizeBytes: number;
+  storagePolicy: string;
 }
 
 export interface ApiInvoiceStatusHistoryDto {
@@ -2204,6 +2218,7 @@ export interface ApiPaymentDto {
 }
 
 export interface ApiPaymentReportHtmlPreviewRequest {
+  content?: string;
   templatePath?: string;
 }
 
@@ -2430,6 +2445,7 @@ export interface ApiQueryInvoiceRowDto {
 }
 
 export interface ApiReportHtmlPreviewRequest {
+  content?: string;
   reportType?: string;
   templatePath?: string;
   withSeal?: boolean;
@@ -2551,6 +2567,7 @@ export interface ApiReportTemplatePackageImportResponse {
 export interface ApiReportTemplatePreviewRequest {
   content?: string;
   reportType?: string;
+  sampleProfile?: string;
   withSeal?: boolean | null;
 }
 
@@ -6714,6 +6731,10 @@ export interface SaveHsCodeKnowledgeExampleRequest {
   body: HsCodeExampleInput;
 }
 
+export interface SaveInvoiceSealImageRequest {
+  body: ApiInvoiceSealImageSaveRequest;
+}
+
 export interface SaveInvoiceTransferPackageToPathRequest {
   id: number;
   body: ApiInvoiceTransferPathRequest;
@@ -10554,6 +10575,14 @@ export class ExportDocManagerApiClient {
   public saveHsCodeKnowledgeExample(request: SaveHsCodeKnowledgeExampleRequest, init?: ApiRequestInit): Promise<HsCodeDeclarationExample> {
     const path = "/api/master-data/hs-knowledge/examples";
     return this.request<HsCodeDeclarationExample>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public saveInvoiceSealImage(request: SaveInvoiceSealImageRequest, init?: ApiRequestInit): Promise<ApiInvoiceSealImageSaveResponse> {
+    const path = "/api/invoices/seals/image";
+    return this.request<ApiInvoiceSealImageSaveResponse>("POST", path, {
       body: request.body,
       init,
     });

@@ -58,9 +58,9 @@ fn commercial_rows_have_no_dividers_and_values_share_the_lower_baseline() {
         let svg = &document.pages[0].svg;
         let baseline = text_y(svg, "LOWER-1");
         for value in if template == Builtin::Invoice {
-            vec!["20", "CTNS", "1000", "PCS", "4.50", "4500.00"]
+            vec!["20", "CTNS", "1000", "PCS", "USD4.50", "USD4500.00"]
         } else {
-            vec!["20CTNS", "1000PCS", "250 KGS", "230 KGS", "1.2 CBM"]
+            vec!["20CTNS", "1000PCS", "250KGS", "230KGS", "1.2CBM"]
         } {
             assert!(
                 (baseline - text_y(svg, value)).abs() < 0.02,
@@ -115,7 +115,7 @@ fn invoice_amount_stays_with_price_when_po_is_empty_or_style_wraps() {
         data.root["items"][0]["styleNo"] = json!(style);
         let document = render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();
         let svg = &document.pages[0].svg;
-        assert!((text_y(svg, "4.50") - text_y(svg, "4500.00")).abs() < 0.02);
+        assert!((text_y(svg, "USD4.50") - text_y(svg, "USD4500.00")).abs() < 0.02);
     }
 }
 
@@ -134,14 +134,24 @@ fn independent_invoice_fields_and_totals_share_columns_and_total_baseline() {
             "x",
         )
     };
-    for (detail, total) in [
-        ("20", "40CTNS"),
-        ("1000", "2000PCS"),
-        ("4500.00", "9000.00"),
+    for (detail, unit, total, left) in [
+        ("20", "CTNS", "40CTNS", 85.3),
+        ("1000", "PCS", "2000PCS", 108.3),
     ] {
-        assert!((x(detail) - x(total)).abs() < 0.01);
+        assert!(
+            (x(unit) - x(detail)).abs() < 0.01,
+            "numbers and units must be joined without a gap"
+        );
+        assert!((x(total) - left).abs() < 0.01);
         assert!((text_y(svg, "TOTAL:") - text_y(svg, total)).abs() < 0.01);
     }
+    assert!((x("USD4500.00") - x("USD9000.00") - 0.3).abs() < 0.01);
+    assert!((text_y(svg, "TOTAL:") - text_y(svg, "USD9000.00")).abs() < 0.01);
+    assert!(
+        !nodes(svg, "text")
+            .iter()
+            .any(|(node, _)| node.ends_with(">USD"))
+    );
     let design = Builtin::Invoice.design().unwrap();
     assert!(
         design

@@ -259,7 +259,8 @@ const localSamplePreviewState = deriveReportTemplateWorkspaceState({
   templatePreviewMode: "sample",
   templatePreviewSampleProfile: "exportStandard",
 });
-assertEqual(localSamplePreviewState.canRenderTemplatePreview, true, "只读用户仍可使用不读取业务数据的本地 V3 样例");
+assertEqual(localSamplePreviewState.canRenderTemplatePreview, false, "全部样例须通过后端设计权限检查");
+assertEqual(deriveReportTemplateWorkspaceState({ ...baseWorkspaceStateInput, previewHtml: "native-pages", templatePreviewMode: "sample", templatePreviewSampleProfile: "exportStandard" }).renderedPreviewHtml, "native-pages", "样例预览必须展示后端实际排版结果");
 
 assertMatch(workspaceStateSource, /hasUnsavedChanges\s*=\s*hasChanges\s*\|\|\s*hasUnappliedDesignerChanges/, "保存和离开保护必须同时覆盖源码与画布草稿");
 const dirtyDesignerInput = { ...baseWorkspaceStateInput, designerDraftContent: "<html>Changed</html>", designerDraftDirty: true, canManageTemplates: true };

@@ -58,13 +58,16 @@ export async function verifyProductFieldsUi({ page, url, read, waitFor, click, r
   assert.deepEqual(after.filter(e=>e.id!=='item-cartons'),before.filter(e=>e.id!=='item-cartons'),'dragging cartons must not move the row, totals or document fields');
   assert.equal(await read(page,"window.__designerDraftState.isValid"),true);
   await read(page,"[...document.querySelectorAll('.report-designer-v3-inspector button')].find(n=>n.textContent==='合计与明细同列对齐').click()");
-  await waitFor(page,"(()=>{const fields=window.__designerSchema.layers.flatMap(l=>l.elements);return fields.find(e=>e.id==='total-cartons').xHundredthMm===fields.find(e=>e.id==='item-cartons').xHundredthMm})()");
+  await waitFor(page,"(()=>{const fields=window.__designerSchema.layers.flatMap(l=>l.elements),total=fields.find(e=>e.id==='total-cartons'),item=fields.find(e=>e.id==='item-cartons');return total.xHundredthMm+total.widthHundredthMm===item.xHundredthMm+item.widthHundredthMm})()");
   await click(page,'button[aria-label="撤销"]');
   await waitFor(page,"window.__designerSchema.layers.flatMap(l=>l.elements).find(e=>e.id==='total-cartons').xHundredthMm===8500");
   await click(page,'button[aria-label="撤销"]');
   await waitFor(page,"window.__designerSchema.layers.flatMap(l=>l.elements).find(e=>e.id==='item-cartons').xHundredthMm===8500");
   const fields=await read(page,"window.__designerSchema.layers.flatMap(l=>l.elements)");
   const byId=id=>fields.find(e=>e.id===id);
+  assert.equal(byId('item-price').fieldFormat,'Currency');
+  assert.equal(byId('item-amount').fieldFormat,'Currency');
+  assert.equal(byId('total-amount').fieldFormat,'Currency');
   assert.equal(byId('total-cartons').xHundredthMm,byId('item-cartons').xHundredthMm);
   assert.equal(byId('total-quantity').xHundredthMm,byId('item-quantity').xHundredthMm);
   for(const id of ['total-cartons','total-quantity','total-amount']) assert.equal(byId(id).yHundredthMm,byId('total-label').yHundredthMm);

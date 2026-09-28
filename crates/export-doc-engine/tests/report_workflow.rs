@@ -12,6 +12,8 @@ use export_doc_engine::{
 use export_doc_report::Builtin;
 use serde_json::{Value, json};
 use std::{fs, io::Cursor, path::PathBuf, sync::atomic::AtomicBool};
+#[path = "support/invoice_preview_contract.rs"]
+mod invoice_preview_contract;
 #[path = "support/report_resource_contract.rs"]
 mod resource_contract;
 

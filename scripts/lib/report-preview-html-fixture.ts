@@ -1,0 +1,300 @@
+// Test-only expansion of exported HTML; product previews are rendered by Rust.
+import type { ReportDesignerReportType } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerSchema.ts";
+import { documentSpareKeys } from "../../apps/export-doc-web/src/ui/documentSpareFields.ts";
+import { isShippingMarksField } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerFieldRendering.ts";
+import { parseReportDesignerV3Source, hasValidReportDesignerV3Schema } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerV3TemplateParser.ts";
+import { exportReportDesignerV3SchemaToHtml } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerV3HtmlExporter.ts";
+
+const shippingMarksSampleDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAABkCAAAAAAk3WRTAAADcUlEQVR4Ac3BCZIiwQEEwYgy/v/lFOTuzHI1fZUk3A3fbfDlBl9u8OUGX27w5QZf7sJcQpjJMJFUmMcwjfwKswymkX9kFsMcUgGpMIVhBqlQUmGCwQxS4Y9QMoHhNKlwRyqcZThJKjyRCucMTpIKz0LJOYYzpMJbUuEEw3FSYZFUOGxwnFRYFkoOMxwkFVZIhWMMh0iFDaTCEYNDpMIWoeQIw35SYTOpsJthL6mwi1TYabCXVNgnlOxk2EUqHCAV9jDsIBUOkgrbDXaQCkeFku0MW0mFU6TCRoZtpMJpUmGTwTZS4bxQsolhA6kwiVRYZ1glFSaSCmsGq6TCTKFkjeEzqTCdVPjI8IlUKCH8I4RnQighPBDCHanwweATqfBL9pB78iSUfHBhmVTYQR4YPglyJWHJhSVS4ZHhIHkjyJWE9wYLpMIuAuGO/JD3Qsl7g7eUm4QXsov8IUsSbpR3LrwhFY4IjwxrglxJeDF4JRXek0XyKPwQCItCyYvBM+UmYYIAArIi4UZ5Mnik3CS8F0AWCIQXIlfho4Qb5cHggVT4SDYLV3IV1oSSe4M7yk3CsvBReBL+COsSbpR/Br+Um4SPAsg78k7YIeFG+TH4IRX+K8JGoeSvwYOEVQHklUB4FSBslnDvwgMJ04U95MHgRyhZFUCeCYTTpMJfF34FuZLwfyMVfg3uJNwonwWQV+Ec5Sbhn8GDULJOHshpUuHehUdBriR8EJlOKjy68CzIlYRlEeSOQDhOKjwbvAol/ztS4cWFN4JcSVgSeRaOkgpvXHgryJWETeQ4qfDWYEEoWRAmkQrvXVgS5ErCKoFwhFRYcmFZkCsJb0ROkwrLBp+EknVhP6nwwYWPglxJeBE5RSp8ZFgjFaaSCisGq0LJTFJhjWEDqTCJVFhn2EQqTCAVthhsE0rOkwqbGLaSCqdIhY0M20mFw6TCZoMdQslRUmE7wy5S4QCpsIdhJ6mwk1TYZ7BXKNlHKuxk2E8qbCYVdjMcIRU2kQoHDA4JJVtIhSMMB0mFFVLhGMNhUuEDqXDU4LhQskwqHGY4Qyq8JRVOMJwjFV5IhVMGJ4WSZ1LhHMNpUuGOVDjLMIFU+EsqnDeYIZT8IRUmMMwhFZAKUxhmkTthksE04Z8wi2EiqTCPYSohzGT4boMvN/hygy83+HKDL/cfVmETodyaiYAAAAAASUVORK5CYII=";
+
+const spareSamples = Object.fromEntries(documentSpareKeys.map((key, index) => [
+  key[0].toUpperCase() + key.slice(1), `备用 ${index + 1} 示例`,
+]));
+
+export type ReportDesignerPreviewSampleProfile =
+  | "apiSample"
+  | "exportStandard"
+  | "exportImageMarks"
+  | "exportLongItems"
+  | "paymentVoucher";
+
+type PreviewSampleData = {
+  globals: Record<string, string | boolean>;
+  Invoice?: Record<string, string>;
+  Customer?: Record<string, string>;
+  Exporter?: Record<string, string>;
+  Payee?: Record<string, string>;
+  Payment?: Record<string, string>;
+  items?: Array<Record<string, string>>;
+  shippingMarksImage?: string;
+};
+
+export function getReportDesignerPreviewSampleProfiles(reportType: ReportDesignerReportType) {
+  if (reportType === "PaymentVoucher") {
+    return [
+      { value: "apiSample" as const, label: "后端样例" },
+      { value: "paymentVoucher" as const, label: "付款票据样例" },
+    ];
+  }
+
+  return [
+    { value: "apiSample" as const, label: "后端样例" },
+    { value: "exportStandard" as const, label: "常规发票样例" },
+    { value: "exportImageMarks" as const, label: "图片唛头样例" },
+    { value: "exportLongItems" as const, label: "长明细分页样例" },
+  ];
+}
+
+export function isLocalReportDesignerPreviewSample(
+  profile: ReportDesignerPreviewSampleProfile,
+): profile is Exclude<ReportDesignerPreviewSampleProfile, "apiSample"> {
+  return profile !== "apiSample";
+}
+
+export function renderReportDesignerLocalPreviewSample(
+  source: string,
+  profile: Exclude<ReportDesignerPreviewSampleProfile, "apiSample">,
+) {
+  if (!hasValidReportDesignerV3Schema(source)) return "";
+  const kind = profile === "paymentVoucher" ? "PaymentVoucher" : "ExportDocument";
+  const parsed = parseReportDesignerV3Source(source, kind);
+  if (parsed.issues.some(issue => issue.severity === "error")) return "";
+  const sourceHtml = exportReportDesignerV3SchemaToHtml(parsed.schema, kind)
+    .replace(/<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA[\s\S]*?-->/, "");
+  const data = createPreviewSampleData(profile);
+  const expandedLoops = expandInvoiceItemLoops(sourceHtml, data);
+  const evaluatedConditionals = evaluateSimpleScribanConditionals(expandedLoops, data, {});
+  const withFields = replaceScribanValues(evaluatedConditionals, data, {});
+  return removeScribanControlLines(withFields);
+}
+
+function createPreviewSampleData(profile: Exclude<ReportDesignerPreviewSampleProfile, "apiSample">): PreviewSampleData {
+  if (profile === "paymentVoucher") {
+    return {
+      globals: {
+        cny_amount_upper: "人民币壹万贰仟叁佰肆拾伍元陆角柒分",
+      },
+      Payee: {
+        Name: "宁波样例供应商有限公司",
+        BankName: "中国银行宁波分行",
+        RMBAccount: "6222 0200 0000 0000",
+      },
+      Payment: {
+        ...spareSamples,
+        VoucherNo: "PAY-2026-0707",
+        PayerName: "宁波样例付款有限公司",
+        Department: "外贸业务部",
+        InvoiceNo: "INV-2026-0707",
+        PaymentDate: "2026-07-07",
+        PayeeName: "宁波样例供应商有限公司",
+        PaymentMethod: "电汇",
+        BankName: "中国银行宁波分行",
+        AccountNo: "6222 0200 0000 0000",
+        CNYAmount: "12345.67",
+        USDAmount: "0.00",
+        GoodsName: "样例夹克（合并付款）",
+        Quantity: "120",
+        QuantityUnit: "件",
+        TradeMethod: "T/T",
+        TaxRebateRate: "13%",
+        ShipmentCountry: "德国",
+        ShipmentDate: "2026-07-07",
+        ReceiptDate: "2026-07-07",
+        Notes: "样品采购及报关杂费",
+      },
+    };
+  }
+
+  const itemCount = profile === "exportLongItems" ? 72 : 8;
+  return {
+    globals: {
+      cny_amount_upper: "美元壹万贰仟叁佰肆拾伍元陆角柒分",
+      doc_seal_path: "",
+      customs_seal_path: "",
+      ShowSeal: true,
+    },
+    shippingMarksImage: profile === "exportImageMarks" ? shippingMarksSampleDataUrl : undefined,
+    Invoice: {
+      ...spareSamples,
+      InvoiceNo: profile === "exportLongItems" ? "INV-LONG-2026-0707" : "INV-STD-2026-0707",
+      InvoiceDate: "2026-07-07",
+      ContractNo: "BRG-CT-2026-0707",
+      PortOfLoading: "NINGBO, CHINA",
+      PortOfDestination: "LE HAVRE, FRANCE",
+      TradeTerms: "FOB NINGBO",
+      PaymentTerms: "T/T 30 DAYS",
+      ShippingMarks: "N/M\nORDER SAMPLE\nMADE IN CHINA",
+      SpecialTerms: profile === "exportLongItems" ? "Partial shipment allowed" : "",
+      TotalQuantity: String(itemCount * 12),
+      TotalCartons: String(itemCount * 3),
+      TotalGrossWeight: `${(itemCount * 18.4).toFixed(2)} KGS`,
+      TotalNetWeight: `${(itemCount * 15.2).toFixed(2)} KGS`,
+      TotalAmount: "12345.67",
+    },
+    Customer: {
+      CustomerNameEN: "EURO DISNEY ASSOCIES S.A.S",
+      AddressEN: "1 rond-point d'Isigny, 77700 Chessy, France",
+    },
+    Exporter: {
+      ExporterNameEN: "NINGBO BRIDGE IMP & EXP CO.,LTD",
+      AddressEN: "Ningbo, Zhejiang, China",
+    },
+    items: Array.from({ length: itemCount }, (_, index) => {
+      const number = index + 1;
+      return {
+        ...spareSamples,
+        StyleName: `Sample product ${String(number).padStart(2, "0")} with controlled wrapping`,
+        StyleNameCN: `样例商品${number}`,
+        StyleNo: `SKU-${String(number).padStart(3, "0")}-${profile === "exportLongItems" ? "LONG-CODE-" + "X".repeat(18) : "STD"}`,
+        Description: `Spec ${number}`,
+        Quantity: String(10 + number),
+        UnitEN: "PCS",
+        Cartons: String(2 + (number % 5)),
+        UnitPrice: (5.8 + number / 10).toFixed(2),
+        TotalPrice: (128.5 + number * 3.25).toFixed(2),
+        GWTotal: (18 + number / 10).toFixed(2),
+        NWTotal: (15 + number / 10).toFixed(2),
+        Volume: (0.08 + number / 100).toFixed(3),
+      };
+    }),
+  };
+}
+
+function expandInvoiceItemLoops(sourceHtml: string, data: PreviewSampleData) {
+  const loopOpenPattern = /{{\s*for\s+item\s+in\s+Invoice\.Items\s*}}/g;
+  let result = "";
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = loopOpenPattern.exec(sourceHtml)) !== null) {
+    const loopStart = match.index;
+    const contentStart = loopOpenPattern.lastIndex;
+    const loopEnd = findMatchingScribanEnd(sourceHtml, contentStart);
+    if (loopEnd < 0) {
+      break;
+    }
+
+    result += sourceHtml.slice(cursor, loopStart);
+    const rowTemplate = sourceHtml.slice(contentStart, loopEnd);
+    result += (data.items ?? []).map((item) => renderLoopItem(rowTemplate, data, item)).join("");
+    cursor = loopEnd + "{{ end }}".length;
+    loopOpenPattern.lastIndex = cursor;
+  }
+
+  return result + sourceHtml.slice(cursor);
+}
+
+function findMatchingScribanEnd(sourceHtml: string, startIndex: number) {
+  const tagPattern = /{{\s*(for\s+item\s+in\s+Invoice\.Items|if\b[^}]*|end)\s*}}/g;
+  tagPattern.lastIndex = startIndex;
+  let depth = 1;
+  let match: RegExpExecArray | null;
+
+  while ((match = tagPattern.exec(sourceHtml)) !== null) {
+    const tag = match[1].trim();
+    if (tag.startsWith("for ") || tag.startsWith("if ")) {
+      depth += 1;
+    } else if (tag === "end") {
+      depth -= 1;
+      if (depth === 0) {
+        return match.index;
+      }
+    }
+  }
+
+  return -1;
+}
+
+function renderLoopItem(template: string, data: PreviewSampleData, item: Record<string, string>) {
+  const evaluatedConditionals = evaluateSimpleScribanConditionals(template, data, item);
+  const withFields = replaceScribanValues(evaluatedConditionals, data, item);
+  return removeScribanControlLines(withFields);
+}
+
+function evaluateSimpleScribanConditionals(sourceHtml: string, data: PreviewSampleData, item: Record<string, string>) {
+  let result = sourceHtml;
+  const conditionalPattern = /{{\s*if\s+([^{}]+?)\s*}}([\s\S]*?)(?:{{\s*else\s*}}([\s\S]*?))?{{\s*end\s*}}/g;
+
+  for (let guard = 0; guard < 8; guard += 1) {
+    const next = result.replace(conditionalPattern, (_match, expression: string, whenTrue: string, whenFalse = "") =>
+      evaluateScribanCondition(expression, data, item) ? whenTrue : whenFalse,
+    );
+    if (next === result) {
+      return result;
+    }
+
+    result = next;
+  }
+
+  return result;
+}
+
+function evaluateScribanCondition(expression: string, data: PreviewSampleData, item: Record<string, string>) {
+  const normalized = expression.trim();
+  const equality = normalized.match(/^([A-Za-z_][A-Za-z0-9_.]*)\s*(==|!=)\s*"([^"]*)"$/);
+  if (equality) {
+    const actual = String(readSampleValue(equality[1], data, item) ?? "");
+    return equality[2] === "==" ? actual === equality[3] : actual !== equality[3];
+  }
+
+  const falseCheck = normalized.match(/^([A-Za-z_][A-Za-z0-9_.]*)\s*==\s*false$/);
+  if (falseCheck) {
+    return !readSampleValue(falseCheck[1], data, item);
+  }
+
+  return Boolean(readSampleValue(normalized, data, item));
+}
+
+function replaceScribanValues(sourceHtml: string, data: PreviewSampleData, item: Record<string, string>) {
+  return sourceHtml.replace(/{{\s*([A-Za-z_][A-Za-z0-9_.]*)\s*}}/g, (_match, path: string) => {
+    if (isShippingMarksField(path) && data.shippingMarksImage)
+      return `<img class="edm-shipping-marks-image" src="${data.shippingMarksImage}" alt="唛头样例" style="display:inline-block;max-width:100%;max-height:var(--edm-field-image-height,60mm);width:auto;height:auto;object-fit:contain;vertical-align:top">`;
+    const value = readSampleValue(path, data, item);
+    return escapeHtml(value === undefined ? "" : String(value));
+  });
+}
+
+function readSampleValue(path: string, data: PreviewSampleData, item: Record<string, string>) {
+  const normalized = path.trim();
+  if (normalized.startsWith("item.")) {
+    return item[normalized.slice("item.".length)];
+  }
+
+  if (normalized.startsWith("Invoice.Items.")) {
+    return item[normalized.slice("Invoice.Items.".length)];
+  }
+
+  if (normalized.startsWith("Invoice.")) {
+    return data.Invoice?.[normalized.slice("Invoice.".length)];
+  }
+
+  if (normalized.startsWith("Customer.")) {
+    return data.Customer?.[normalized.slice("Customer.".length)];
+  }
+
+  if (normalized.startsWith("Exporter.")) {
+    return data.Exporter?.[normalized.slice("Exporter.".length)];
+  }
+
+  if (normalized.startsWith("Payee.")) {
+    return data.Payee?.[normalized.slice("Payee.".length)];
+  }
+
+  if (normalized.startsWith("Payment.")) {
+    return data.Payment?.[normalized.slice("Payment.".length)];
+  }
+
+  return data.globals[normalized];
+}
+
+function removeScribanControlLines(sourceHtml: string) {
+  return sourceHtml.replace(/{{\s*[^{}]+\s*}}/g, "");
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}

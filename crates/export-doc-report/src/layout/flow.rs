@@ -116,7 +116,7 @@ pub(super) fn render(svg: &mut String, element: &Element, data: &ReportData) -> 
                         &cell.content_kind,
                         &cell.text,
                         &cell.field_path,
-                        if cell.label_position.as_deref() == Some("Above") {
+                        if matches!(cell.label_position.as_deref(), Some("Above" | "Prefix")) {
                             ""
                         } else {
                             &cell.label
@@ -127,6 +127,8 @@ pub(super) fn render(svg: &mut String, element: &Element, data: &ReportData) -> 
                 let value =
                     if cell.label_position.as_deref() == Some("Above") && !cell.label.is_empty() {
                         format!("{}\n{value}", cell.label)
+                    } else if cell.label_position.as_deref() == Some("Prefix") {
+                        format!("{}{value}", cell.label)
                     } else {
                         value
                     };

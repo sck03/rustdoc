@@ -74,8 +74,12 @@ fn collect(kind: &str, value: &Value, ids: &mut HashSet<String>) -> Result<()> {
         Ok(())
     };
     match kind {
-        "invoices" if value["shippingMarksType"] == "Image" => {
-            add_path("shippingMarksImage", "Files/ShippingMarks/")?
+        "invoices" => {
+            if value["shippingMarksType"] == "Image" {
+                add_path("shippingMarksImage", "Files/ShippingMarks/")?;
+            }
+            add_path("docSealPath", "Files/Seals/")?;
+            add_path("customsSealPath", "Files/Seals/")?;
         }
         "exporters" => {
             add_path("docSealPath", "Files/Seals/")?;

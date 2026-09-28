@@ -614,7 +614,7 @@ function normalizeGridCell(
     fallbackText: readOptionalString(value.fallbackText, `${path}.fallbackText`, issues),
     checkboxOptions: normalizeGridCheckboxOptions(value.checkboxOptions, `${path}.checkboxOptions`, issues),
     verticalText: readBoolean(value.verticalText, false, `${path}.verticalText`, issues),
-    labelPosition: value.labelPosition === "Above" ? "Above" : "Inline",
+    labelPosition: value.labelPosition === "Above" || value.labelPosition === "Prefix" ? value.labelPosition : "Inline",
     diagonalHeader: normalizeGridDiagonalHeader(value.diagonalHeader, `${path}.diagonalHeader`, issues),
     style: normalizeTextStyle(value.style, `${path}.style`, issues),
     border: normalizeOptionalBorderStyle(value.border, `${path}.border`, issues),

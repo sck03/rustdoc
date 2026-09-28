@@ -127,6 +127,7 @@ export type ReportDesignerV3FieldElement = ReportDesignerV3ElementBase & {
   type: "Field";
   fieldPath: string;
   fallbackText?: string;
+  fieldFormat?: "Currency";
 };
 export type ReportDesignerV3ImageElement = ReportDesignerV3ElementBase & {
   type: "Image";

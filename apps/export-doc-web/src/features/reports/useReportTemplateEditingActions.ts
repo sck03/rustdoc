@@ -17,7 +17,6 @@ export function useReportTemplateEditingActions({
   canRenderTemplatePreview,
   content,
   currentUserTemplateCanEdit,
-  isLocalSamplePreview,
   isUserTemplate,
   reportType,
   selectedTemplateContentActive,
@@ -40,7 +39,6 @@ export function useReportTemplateEditingActions({
   canRenderTemplatePreview: boolean;
   content: string;
   currentUserTemplateCanEdit: boolean;
-  isLocalSamplePreview: boolean;
   isUserTemplate: boolean;
   reportType: ReportTypeOption;
   selectedTemplateContentActive: boolean;
@@ -112,12 +110,6 @@ export function useReportTemplateEditingActions({
 
     setWorkspaceMode("preview");
     if (templatePreviewMode === "sample") {
-      if (isLocalSamplePreview) {
-        setPreview(null);
-        setMessage(null);
-        setMessageType(null);
-        return;
-      }
       renderSamplePreview();
       return;
     }

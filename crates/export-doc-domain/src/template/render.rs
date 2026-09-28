@@ -219,6 +219,8 @@ fn render_grid(
                         "{}{}",
                         if cell.label.is_empty() {
                             String::new()
+                        } else if cell.label_position.as_deref() == Some("Prefix") {
+                            escape(&cell.label)
                         } else {
                             format!("{}: ", escape(&cell.label))
                         },
@@ -487,7 +489,15 @@ fn footer_cell_html(cell: &crate::designer::DetailGroupFooterCell) -> String {
 fn summary_cell_html(cell: &crate::designer::DetailSummaryCell) -> String {
     match cell.content_kind.as_str() {
         "Text" => escape(&cell.text),
-        "Field" => format!("{{{{ {} }}}}", escape(&detail_field(&cell.field_path))),
+        "Field" => format!(
+            "{}{{{{ {} }}}}",
+            if cell.field_format.is_some() {
+                "{{ Invoice.Currency }}"
+            } else {
+                ""
+            },
+            escape(&detail_field(&cell.field_path))
+        ),
         _ => String::new(),
     }
 }
@@ -538,7 +548,18 @@ fn render_element(element: &Element, fields: &[Field]) -> Result<String, String>
     );
     let content = match &element.kind {
         Kind::Text { text } => escape(text),
-        Kind::Field { field_path, .. } => expression(field_path, fields)?,
+        Kind::Field {
+            field_path,
+            field_format,
+            ..
+        } => {
+            let value = expression(field_path, fields)?;
+            if field_format.is_some() {
+                format!("{{{{ Invoice.Currency }}}}{value}")
+            } else {
+                value
+            }
+        }
         Kind::Rectangle => String::new(),
         Kind::Image {
             source_kind,

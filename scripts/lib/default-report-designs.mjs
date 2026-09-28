@@ -70,20 +70,20 @@ function invoice() {
   d.detailRowHeightHundredthMm=mm(12);
   d.layers[0].elements.push(
     grid("invoice-headings",15,78,180,[32/1.8,115/1.8,33/1.8],[[8,[cell("marks-heading","唛头 / Marks"),cell("goods-heading","货品名称 / Quantities and Descriptions"),cell("amount-heading","金额 / Amount")]]],7,sans),
-    namedField("currency","币种","Invoice.Currency",164,92,29,4,"Right"),
   );
   d.layers[1].elements=[
     namedField("item-name","货品名称","item.StyleName",49,100,34),
     namedField("item-po","客户 PO","item.PoNumber",49,104,34),
     namedField("item-style","款号","item.StyleNo",49,108,34),
-    namedField("item-cartons","箱数","item.Cartons",85,108,10),
+    namedField("item-cartons","箱数","item.Cartons",85,108,10,4,"Right"),
     namedField("item-carton-unit","箱数单位","item.CtnUnitEN",95,108,12),
-    namedField("item-quantity","数量","item.Quantity",108,108,12),
+    namedField("item-quantity","数量","item.Quantity",108,108,12,4,"Right"),
     namedField("item-quantity-unit","数量单位","item.UnitEN",120,108,12),
     namedField("item-price","单价","item.UnitPrice",134,108,26,4,"Right"),
     namedField("item-amount","金额","item.TotalPrice",164,108,29,4,"Right"),
   ];
-  for(const e of d.layers[1].elements) if(e.yHundredthMm===mm(108)) e.style.verticalAlign="Bottom";
+  for(const e of d.layers[1].elements) if(e.yHundredthMm===mm(108)) { e.style.verticalAlign="Bottom"; e.style.paddingHundredthMm=0; }
+  for(const e of d.layers[1].elements) if(["item-price","item-amount"].includes(e.id)) e.fieldFormat="Currency";
   const first={...d.layers[0],id:"invoice-first",name:"首页单据信息",print:{...d.layers[0].print,firstPageOnly:true},elements:[
     namedField("shipping-marks","唛头","Invoice.ShippingMarks",16,100,30,100),
     namedField("trade-terms","价格条款","Invoice.TradeTerms",164,86,29,5,"Right"),
@@ -101,6 +101,7 @@ function invoice() {
     seal("seal","doc_seal_path",150,134,40,25),
   ];
   d.layers.push(first);
+  final.elements.find(e=>e.id==="total-amount").fieldFormat="Currency";
   const labels={company:"公司名称", "company-address":"公司地址",customer:"客户名称","customer-address":"客户地址","invoice-no":"发票号码","contract-no":"合同号码","invoice-date":"发票日期",loading:"起运港",destination:"目的港",terms:"付款条件"};
   for(const layer of d.layers) for(const e of layer.elements) if(labels[e.id]) e.label=labels[e.id];
   return d;
@@ -111,9 +112,9 @@ function packing() {
     column("description","货品名称 / Description","item.StyleNo",50,"Left",[F("item.StyleName"),NL(),F("item.PoNumber"),NL(),F("item.StyleNo")]),
     column("cartons","箱数\nCartons","item.Cartons",18,"Right",[F("item.Cartons"),F("item.CtnUnitEN")]),
     column("quantity","数量\nQuantity","item.Quantity",22,"Right",[F("item.Quantity"),F("item.UnitEN")]),
-    column("gross","毛重\nGross Weight","item.GWTotal",20,"Right",[F("item.GWTotal"),T(" KGS")]),
-    column("net","净重\nNet Weight","item.NWTotal",20,"Right",[F("item.NWTotal"),T(" KGS")]),
-    column("volume","体积\nMEAS.","item.Volume",18,"Right",[F("item.Volume"),T(" CBM")]),
+    column("gross","毛重\nGross Weight","item.GWTotal",20,"Right",[F("item.GWTotal"),T("KGS")]),
+    column("net","净重\nNet Weight","item.NWTotal",20,"Right",[F("item.NWTotal"),T("KGS")]),
+    column("volume","体积\nMEAS.","item.Volume",18,"Right",[F("item.Volume"),T("CBM")]),
   ],6.5);
   t.heightHundredthMm=mm(165);
   t.block.sideBand={title:"唛头 / Marks",widthMm:32,contentKind:"Field",text:"",fieldPath:"Invoice.ShippingMarks",style:{fontSizePt:7}};
@@ -132,6 +133,7 @@ function contract() {
   const t=table("contract-items",15,88,180,[column("goods","Name of Commodity, Specification, Packing and Shipping Marks","item.StyleNo",110,"Left",[F("item.StyleNo"),T(" "),F("item.StyleName")]),column("quantity","Quantity","item.Quantity",23,"Right",[F("item.Quantity"),F("item.UnitEN")]),column("price","Unit Price","item.UnitPrice",23,"Right",[F("Invoice.Currency"),F("item.UnitPrice")]),column("amount","Total Amount","item.TotalPrice",24,"Right",[F("Invoice.Currency"),F("item.TotalPrice")])],7,20,20);
   t.block.print.firstPageRows=24; t.block.print.continuationPageRows=40;
   t.heightHundredthMm=mm(40); summary(t,{quantity:"total_by_qty_unit",amount:"Invoice.TotalAmount"});
+  t.block.summaryRow.cells.find(cell=>cell.columnId==="amount").fieldFormat="Currency";
   d.layers[1].elements=[t,
     grid("delivery",15,132,180,[20,25,25,30],[[10,[binding("shipment","Invoice.ShipmentDate",2,{label:"装运期限 / Time of shipment"}),cell("partial","装运港允许分批装运\nShipment quantity 5% more or less allowed",2)]],[10,[binding("loading","Invoice.PortOfLoading",2,{label:"装运港 / Port of loading"}),binding("destination","Invoice.PortOfDestination",2,{label:"目的港 / Port of destination"})]]],7,sans,false),
     grid("clauses",15,154,180,[100],[[32,[cell("delivery-insurance","(9)交货条件：FOB/CFR/CIF 若无另外规定均按照《国际贸易术语解释通则（ TNCOTERMS）1990》办理。\nTerms of delivery: FOB/CFR/CIF shall conform to 《INCOTERMS1990》unless otherwise agreed.\n(10)保 险：由卖方按发票总值的110%投保一切险加战争险，如买方欲增加其他险别或超过上述额度保险时须事先征得卖方同意，增加的保费由买方承担。\nInsurance: To be covered by the sellers for 110% of the total value against, all risks and war risks. Should the Buyers desire to cover for other risks besides the above mentioned or for an amount exceeding the above mentioned limit. The sellers’ approval must be obtained first and all additional premium charges incurred therewith shall be for buyers’ account.")]], [9,[binding("payment","Invoice.PaymentTerms",1,{label:"(11)付款条件 / Terms of payment"})]], [12,[binding("special","Invoice.SpecialTerms")]]],7,sans,false),
@@ -191,12 +193,12 @@ function payment(expense) {
       [12,[cell("amount-label","金额",1,{style:{align:"Center"}}),...fields.map((s,i)=>binding(`expense-${i}`,`Payment.${s}`,1,{style:{align:"Center"}}))]],
       [18,[cell("attachments","附件\n(张)",1,{style:{align:"Center"}}),...fields.map((_,i)=>cell(`attachment-${i}`,""))]],
       [12,[cell("notes-label","备注",1,{style:{align:"Center"}}),binding("notes","Payment.Notes",8)]],
-      [11,[binding("upper","cny_amount_upper",6,{label:"报销净额"}),binding("total","Payment.CNYAmount",3,{label:"小计: ￥"})]],
+      [11,[binding("upper","cny_amount_upper",6,{label:"报销净额"}),binding("total","Payment.CNYAmount",3,{label:"小计: ￥",labelPosition:"Prefix"})]],
     ],10,serif),grid("expense-signatures",15,111,180,[35,35,30],[[7,[cell("applicant","报销人："),cell("supervisor","主管签字："),cell("approval","审批签字：")]]],10,serif,false)];
   } else {
     d.layers[1].elements=[grid("payment-grid",14,34,170,[12,9,16,13,24,11,15],[
       [15,[cell("purpose","用款事项",1,{rowSpan:5,verticalText:true,style:{align:"Center",bold:true}}),cell("project-label","项目"),binding("project","Payment.Project"),cell("invoice-label","出口发票号码"),binding("invoice","Payment.InvoiceNo"),cell("shipment-label","出货日期"),binding("shipment","Payment.ShipmentDate")]],
-      [15,[cell("usd-label","美元"),binding("usd","Payment.USDAmount"),cell("cny-label","人民币(大写)"),binding("cny-upper","cny_amount_upper"),cell("small","(小写)"),binding("cny","Payment.CNYAmount",1,{label:"￥"})]],
+      [15,[cell("usd-label","美元"),binding("usd","Payment.USDAmount"),cell("cny-label","人民币(大写)"),binding("cny-upper","cny_amount_upper"),cell("small","(小写)"),binding("cny","Payment.CNYAmount",1,{label:"￥",labelPosition:"Prefix"})]],
       [10,[binding("payee","Payment.PayeeName",3,{label:"支付单位名称"}),cell("method","",3,{contentKind:"CheckboxGroup",fieldPath:"Payment.PaymentMethod",checkboxOptions:["支票","电汇","预付"].map((name,i)=>({id:`method-${i}`,label:name,value:name})),style:{align:"Center"}})]],
       [9,[binding("bank","Payment.BankName",3,{label:"开户行"}),binding("notes","Payment.Notes",3,{rowSpan:2,label:"备注"})]],
       [9,[binding("account","Payment.AccountNo",3,{label:"账号"})]],

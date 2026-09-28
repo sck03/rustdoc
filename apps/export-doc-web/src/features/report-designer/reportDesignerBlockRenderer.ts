@@ -124,7 +124,7 @@ function renderGridCellStyle(
 function renderGridCellContent(cell: Extract<ReportBlock, { type: "Grid" }>["rows"][number]["cells"][number], imageHeightMm?: number) {
   switch (cell.contentKind) {
     case "Field":
-      return `${cell.label ? (cell.labelPosition === "Above" ? `<span style="display:block">${escapeHtml(cell.label)}</span>` : `${escapeHtml(cell.label)}: `) : ""}${renderFieldExpression(cell.fieldPath, cell.fallbackText, imageHeightMm)}`;
+      return `${cell.label ? (cell.labelPosition === "Above" ? `<span style="display:block">${escapeHtml(cell.label)}</span>` : `${escapeHtml(cell.label)}${cell.labelPosition === "Prefix" ? "" : ": "}`) : ""}${renderFieldExpression(cell.fieldPath, cell.fallbackText, imageHeightMm)}`;
     case "CheckboxGroup":
       return renderGridCheckboxGroup(cell);
     case "Text":

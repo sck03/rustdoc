@@ -230,6 +230,7 @@ fn structured_detail_html_contains_groups_subtotals_summary_and_side_band() {
             label: "GRAND TOTAL".into(),
             label_column_span: 2,
             cells: vec![crate::designer::DetailSummaryCell {
+                field_format: None,
                 column_id: "col-2".into(),
                 content_kind: "Text".into(),
                 text: "TOTAL QTY".into(),

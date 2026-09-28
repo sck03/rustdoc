@@ -114,6 +114,7 @@ fn image(
     package: &Package,
     value: &mut Value,
     field: &str,
+    asset: &str,
     prefix: &str,
 ) -> Result<()> {
     if text(value, field).is_empty() {
@@ -121,7 +122,7 @@ fn image(
     }
     let bytes = package
         .assets
-        .get(field)
+        .get(asset)
         .ok_or_else(|| invalid("单据包包含未随包提供的图片，请补齐图片后重新导出。"))?;
     let record = report_assets::register(tx, actor, bytes, field, 5 * 1024 * 1024)?;
     value[field] = json!(format!("{prefix}{}", text(&record, "resourceId")));
@@ -167,7 +168,7 @@ fn party(
     );
     if kind == "exporters" {
         for key in ["docSealPath", "customsSealPath"] {
-            image(tx, actor, package, &mut value, key, "Files/Seals/")?;
+            image(tx, actor, package, &mut value, key, key, "Files/Seals/")?;
         }
     }
     Ok(
@@ -244,7 +245,10 @@ fn import(
         if action!="AppendItems"||id==0 {
             invoice["customerId"]=json!(party(tx,actor,"customers",package.customer.as_ref(),&invoice,package,date)?);
             invoice["exporterId"]=json!(party(tx,actor,"exporters",package.exporter.as_ref(),&invoice,package,date)?);
-            image(tx,actor,package,&mut invoice,"shippingMarksImage","Files/ShippingMarks/")?;
+            image(tx,actor,package,&mut invoice,"shippingMarksImage","shippingMarksImage","Files/ShippingMarks/")?;
+            for (field,asset) in [("docSealPath","invoiceDocSealPath"),("customsSealPath","invoiceCustomsSealPath")] {
+                image(tx,actor,package,&mut invoice,field,asset,"Files/Seals/")?;
+            }
             invoice["letterOfCreditSourcePath"]=json!("");
         }
         invoice["id"]=json!(id);invoice["status"]=json!("Draft");
@@ -257,6 +261,7 @@ fn collect_image(
     actor: &Actor,
     record: &Value,
     field: &str,
+    asset: &str,
     prefix: &str,
     assets: &mut BTreeMap<String, Vec<u8>>,
 ) -> Result<()> {
@@ -268,7 +273,7 @@ fn collect_image(
         .strip_prefix(prefix)
         .ok_or_else(|| invalid("单据图片不是受管资源。"))?;
     assets.insert(
-        field.into(),
+        asset.into(),
         report_assets::read(tx, actor, id, None)?.bytes,
     );
     Ok(())
@@ -300,13 +305,36 @@ fn export(service: &NativeService, actor: &Actor, id: i64) -> Result<Vec<u8>> {
             actor,
             &source,
             "shippingMarksImage",
+            "shippingMarksImage",
             "Files/ShippingMarks/",
             &mut assets,
         )?;
         if let Some(exporter) = &exporter {
             for field in ["docSealPath", "customsSealPath"] {
-                collect_image(tx, actor, exporter, field, "Files/Seals/", &mut assets)?;
+                collect_image(
+                    tx,
+                    actor,
+                    exporter,
+                    field,
+                    field,
+                    "Files/Seals/",
+                    &mut assets,
+                )?;
             }
+        }
+        for (field, asset) in [
+            ("docSealPath", "invoiceDocSealPath"),
+            ("customsSealPath", "invoiceCustomsSealPath"),
+        ] {
+            collect_image(
+                tx,
+                actor,
+                &source,
+                field,
+                asset,
+                "Files/Seals/",
+                &mut assets,
+            )?;
         }
         let mut invoice = clean("ApiInvoiceDetailDto", source);
         invoice["letterOfCreditSourcePath"] = json!("");

@@ -8,7 +8,7 @@ use rustybuzz::{Face, UnicodeBuffer};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::RwLock,
+    sync::{Arc, Mutex, RwLock},
 };
 
 const FONT_FILES: [&str; 3] = [
@@ -25,12 +25,14 @@ enum FaceKey {
 }
 
 struct FaceData {
-    data: Vec<u8>,
+    data: Arc<Vec<u8>>,
 }
 
 struct FontSet {
     root: PathBuf,
     faces: std::result::Result<HashMap<FaceKey, FaceData>, String>,
+    database: std::result::Result<Arc<usvg::fontdb::Database>, String>,
+    widths: Mutex<HashMap<(FaceKey, String), f32>>,
 }
 
 static FONTS: RwLock<Option<FontSet>> = RwLock::new(None);
@@ -48,8 +50,23 @@ pub fn configure(path: &Path) {
         return;
     }
     let faces = load_faces(&root);
+    let database = faces
+        .as_ref()
+        .map(|faces| {
+            let mut database = usvg::fontdb::Database::new();
+            for face in faces.values() {
+                database.load_font_source(usvg::fontdb::Source::Binary(face.data.clone()));
+            }
+            Arc::new(database)
+        })
+        .map_err(Clone::clone);
     if let Ok(mut current) = FONTS.write() {
-        *current = Some(FontSet { root, faces });
+        *current = Some(FontSet {
+            root,
+            faces,
+            database,
+            widths: Mutex::new(HashMap::new()),
+        });
     }
 }
 
@@ -66,12 +83,17 @@ fn load_faces(root: &Path) -> std::result::Result<HashMap<FaceKey, FaceData>, St
         if Face::from_slice(&data, 0).is_none() {
             return Err(format!("随包报表字体 {} 无法解析。", path.display()));
         }
-        faces.insert(key, FaceData { data });
+        faces.insert(
+            key,
+            FaceData {
+                data: Arc::new(data),
+            },
+        );
     }
     Ok(faces)
 }
 
-fn with_face<T>(key: FaceKey, action: impl FnOnce(&Face<'_>) -> Result<T>) -> Result<T> {
+fn with_face<T>(key: FaceKey, action: impl FnOnce(&FaceData, &FontSet) -> Result<T>) -> Result<T> {
     let fonts = FONTS
         .read()
         .map_err(|_| unavailable("报表字体缓存不可用。"))?;
@@ -85,9 +107,7 @@ fn with_face<T>(key: FaceKey, action: impl FnOnce(&Face<'_>) -> Result<T>) -> Re
     let data = faces
         .get(&key)
         .ok_or_else(|| unavailable("报表字体未随包提供。"))?;
-    let face =
-        Face::from_slice(&data.data, 0).ok_or_else(|| unavailable("随包报表字体无法解析。"))?;
-    action(&face)
+    action(data, fonts)
 }
 
 /// Width of `text` in millimetres using the approved face selected by family
@@ -98,20 +118,58 @@ pub fn text_width_mm(text: &str, family: &str, bold: bool, size_mm: f32) -> Resu
         return Ok(0.);
     }
     let key = face_key(family, bold);
-    with_face(key, |face| {
+    with_face(key, |data, fonts| {
+        // Cache normalized widths, independent of font size. Only short strings
+        // are retained and the bounded cache is replaced with the governed fonts.
+        let cache_key = (text.len() <= 512).then(|| (key, text.to_owned()));
+        if let Some(key) = &cache_key
+            && let Ok(cache) = fonts.widths.lock()
+            && let Some(width) = cache.get(key)
+        {
+            return Ok(width * size_mm);
+        }
+        let face =
+            Face::from_slice(&data.data, 0).ok_or_else(|| unavailable("随包报表字体无法解析。"))?;
         let units_per_em = face.units_per_em() as f32;
         if units_per_em <= 0. {
             return Err(unavailable("随包报表字体缺少有效的 em 单位。"));
         }
         let mut buffer = UnicodeBuffer::new();
         buffer.push_str(text);
-        let glyphs = rustybuzz::shape(face, &[], buffer);
+        let glyphs = rustybuzz::shape(&face, &[], buffer);
         let width_units: i64 = glyphs
             .glyph_positions()
             .iter()
             .map(|position| i64::from(position.x_advance))
             .sum();
-        Ok(width_units as f32 / units_per_em * size_mm)
+        let width = width_units as f32 / units_per_em;
+        if let Some(key) = cache_key
+            && let Ok(mut cache) = fonts.widths.lock()
+        {
+            if cache.len() >= 8192 {
+                cache.clear();
+            }
+            cache.insert(key, width);
+        }
+        Ok(width * size_mm)
+    })
+}
+
+pub(crate) fn svg_options() -> Result<usvg::Options<'static>> {
+    let fonts = FONTS
+        .read()
+        .map_err(|_| unavailable("报表字体缓存不可用。"))?;
+    let fonts = fonts
+        .as_ref()
+        .ok_or_else(|| unavailable("报表字体尚未初始化。"))?;
+    Ok(usvg::Options {
+        fontdb: fonts
+            .database
+            .as_ref()
+            .map_err(|error| unavailable(error.clone()))?
+            .clone(),
+        font_family: "Noto Sans CJK SC".into(),
+        ..Default::default()
     })
 }
 
