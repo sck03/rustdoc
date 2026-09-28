@@ -336,7 +336,7 @@ function buildInventory(items) {
   const lines = [
     "# ExportDocManager third-party dependency inventory",
     "",
-    "Generated from committed npm/Cargo lock files, Cargo metadata and signed native-resource archive manifests. The retained C# comparison graph is excluded from Rust delivery; NPOI 2.7.6 remains enforced separately by verify-dependency-policy.mjs. " +
+    "Generated from committed npm/Cargo lock files, Cargo metadata and signed native-resource archive manifests. Managed .NET projects are retired; verify-dependency-policy.mjs enforces the Rust-only source and delivery boundary. " +
       "The exact application build version is recorded in the accompanying machine-readable SBOM files.",
     "",
     "Runtime image boundary: PostgreSQL client tools and their native library closure ship in web/server packages under Tools/PostgreSQL with license texts. The database server remains a separate OS/container input. Rust containers do not include .NET or a browser rendering service.",

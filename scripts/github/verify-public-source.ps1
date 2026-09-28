@@ -34,18 +34,16 @@ foreach ($rule in $requiredIgnoreRules) {
     }
 }
 
-$deploymentAssetRoot = Join-Path $repositoryRoot "deploy\container"
+$deploymentAssetRoot = Join-Path $repositoryRoot "deploy/rust-native"
 $deploymentManifestPath = Join-Path $deploymentAssetRoot "deployment-assets.sha256"
 $expectedDeploymentAssets = @(
-    "docker-compose.ghcr.yml",
-    "docker-compose.acme.yml",
-    "nginx.acme.conf",
-    "postgres-init-roles.sh",
-    "install-container.sh"
+    "Dockerfile",
+    "compose.yml",
+    "postgres-init.sh"
 )
 $deploymentManifest = @{}
 if (-not (Test-Path -LiteralPath $deploymentManifestPath -PathType Leaf)) {
-    $errors.Add("Container deployment checksum manifest is missing: deploy/container/deployment-assets.sha256")
+    $errors.Add("Container deployment checksum manifest is missing: deploy/rust-native/deployment-assets.sha256")
 } else {
     foreach ($line in Get-Content -LiteralPath $deploymentManifestPath -Encoding UTF8) {
         if ([string]::IsNullOrWhiteSpace($line)) {
@@ -66,7 +64,7 @@ if (-not (Test-Path -LiteralPath $deploymentManifestPath -PathType Leaf)) {
 foreach ($assetName in $expectedDeploymentAssets) {
     $assetPath = Join-Path $deploymentAssetRoot $assetName
     if (-not (Test-Path -LiteralPath $assetPath -PathType Leaf)) {
-        $errors.Add("Container deployment asset is missing: deploy/container/$assetName")
+        $errors.Add("Container deployment asset is missing: deploy/rust-native/$assetName")
         continue
     }
     if (-not $deploymentManifest.ContainsKey($assetName)) {

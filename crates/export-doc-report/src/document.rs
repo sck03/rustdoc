@@ -8,7 +8,6 @@ use krilla::geom::Size;
 use krilla::page::PageSettings;
 use krilla_svg::{SurfaceExt, SvgSettings};
 use std::{
-    path::Path,
     sync::atomic::{AtomicBool, Ordering},
     time::{Duration, Instant},
 };
@@ -22,8 +21,8 @@ pub struct Document {
     pub pages: Vec<Page>,
 }
 impl Document {
-    pub fn html(&self) -> Result<String> {
-        let options = crate::fonts::svg_options()?;
+    pub fn html(&self, fonts: &crate::Fonts) -> Result<String> {
+        let options = fonts.svg_options()?;
         let mut html = String::from(
             "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>html,body{margin:0;padding:0;background:#e8ebed}.report-page{margin:12px auto;background:white;break-after:page;page-break-after:always;max-width:100%}.report-page:last-child{break-after:auto;page-break-after:auto}.report-page svg{display:block;width:100%;height:auto}@media print{html,body{background:white}.report-page{margin:0;max-width:none}}@page{margin:0}",
         );
@@ -74,26 +73,16 @@ impl Document {
     }
 }
 
-pub fn pdf_document(document: &Document, font: &Path, cancelled: &AtomicBool) -> Result<Vec<u8>> {
+pub fn pdf_document(
+    document: &Document,
+    fonts: &crate::Fonts,
+    cancelled: &AtomicBool,
+) -> Result<Vec<u8>> {
     let started = Instant::now();
     if document.pages.is_empty() || document.pages.len() > 500 {
         return Err(invalid("报表页数必须为 1–500。"));
     }
-    let mut options = usvg::Options::default();
-    options
-        .fontdb_mut()
-        .load_font_file(font)
-        .map_err(|e| unavailable(format!("无法读取随包中文字体:{e}")))?;
-    for name in ["NotoSansCJKsc-Bold.otf", "NotoSerifCJKsc-Regular.otf"] {
-        let path = font.with_file_name(name);
-        if path.is_file() {
-            options
-                .fontdb_mut()
-                .load_font_file(path)
-                .map_err(|e| unavailable(e.to_string()))?;
-        }
-    }
-    options.font_family = "Noto Sans CJK SC".into();
+    let options = fonts.svg_options()?;
     let mut output = PdfDocument::new();
     for input in &document.pages {
         if cancelled.load(Ordering::Relaxed) {

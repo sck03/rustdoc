@@ -336,6 +336,7 @@ fn document_email(
     ]))?);
     let store = service.store.clone();
     let paths = service.paths.clone();
+    let fonts = service.report_fonts.clone();
     let clock = service.clock.clone();
     let protector = service.protector.clone();
     let (email_check, _) = config(&service.store, &service.protector)?;
@@ -366,6 +367,7 @@ fn document_email(
             let files = super::document_packages::files(
                 &store,
                 &paths,
+                &fonts,
                 &actor,
                 invoice_id,
                 &items,

@@ -16,7 +16,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .ok_or("Pass an explicit evidence output directory.")?,
     );
     std::fs::create_dir_all(&output)?;
-    export_doc_report::configure(&font);
+    let fonts = export_doc_report::Fonts::new(&font);
+    let _fonts = fonts.enter()?;
     let edited_root = args.next().map(PathBuf::from);
     let mut draft = InvoiceDraft::demo("2026-09-16", "REPORT-VALIDATION-001");
     draft.header.exporter_credit_code = "TEST-CREDIT-001".into();
@@ -62,10 +63,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             render_builtin(template, data, &cancelled)?
         };
         let name = format!("builtin-{}", index + 1);
-        std::fs::write(output.join(format!("{name}.html")), document.html()?)?;
+        std::fs::write(output.join(format!("{name}.html")), document.html(&fonts)?)?;
         std::fs::write(
             output.join(format!("{name}.pdf")),
-            pdf_document(&document, &font, &cancelled)?,
+            pdf_document(&document, &fonts, &cancelled)?,
         )?;
         summary.push(json!({"template":template.label(),"file":format!("{name}.pdf"),"pages":document.pages.len()}));
     }
@@ -88,7 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let name = format!("{name}-36-items.pdf");
         std::fs::write(
             output.join(&name),
-            pdf_document(&document, &font, &cancelled)?,
+            pdf_document(&document, &fonts, &cancelled)?,
         )?;
         summary.push(json!({"template":template.label(),"file":name,"pages":document.pages.len(),"items":36}));
     }

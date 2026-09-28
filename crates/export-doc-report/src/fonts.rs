@@ -6,9 +6,12 @@
 use crate::{Result, error::unavailable};
 use rustybuzz::{Face, UnicodeBuffer};
 use std::{
+    cell::RefCell,
     collections::HashMap,
+    marker::PhantomData,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, RwLock},
+    rc::Rc,
+    sync::{Arc, Mutex, OnceLock},
 };
 
 const FONT_FILES: [&str; 3] = [
@@ -29,44 +32,78 @@ struct FaceData {
 }
 
 struct FontSet {
-    root: PathBuf,
-    faces: std::result::Result<HashMap<FaceKey, FaceData>, String>,
-    database: std::result::Result<Arc<usvg::fontdb::Database>, String>,
+    faces: HashMap<FaceKey, FaceData>,
+    database: Arc<usvg::fontdb::Database>,
     widths: Mutex<HashMap<(FaceKey, String), f32>>,
 }
 
-static FONTS: RwLock<Option<FontSet>> = RwLock::new(None);
+/// Owned by one runtime. Loading is lazy; all its requests/jobs share the same
+/// immutable faces, SVG database and bounded measurement cache.
+pub struct Fonts {
+    root: PathBuf,
+    loaded: OnceLock<std::result::Result<Arc<FontSet>, String>>,
+}
 
-/// Register the directory containing the approved Noto files. The engine's
-/// `RuntimePaths.font_path` remains the single source of the runtime location.
-pub fn configure(path: &Path) {
-    let root = path
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
-    if let Ok(current) = FONTS.read()
-        && current.as_ref().is_some_and(|fonts| fonts.root == root)
-    {
-        return;
+thread_local! {
+    // Only the current synchronous layout owns this binding. No filesystem
+    // paths or default runtime are cached globally or retained after the scope.
+    static ACTIVE_FONTS: RefCell<Option<Arc<FontSet>>> = const { RefCell::new(None) };
+}
+
+#[must_use = "Keep the guard alive for the entire synchronous layout"]
+pub struct FontScope {
+    previous: Option<Arc<FontSet>>,
+    _thread: PhantomData<Rc<()>>,
+}
+impl Drop for FontScope {
+    fn drop(&mut self) {
+        ACTIVE_FONTS.with(|active| *active.borrow_mut() = self.previous.take());
     }
-    let faces = load_faces(&root);
-    let database = faces
-        .as_ref()
-        .map(|faces| {
-            let mut database = usvg::fontdb::Database::new();
-            for face in faces.values() {
-                database.load_font_source(usvg::fontdb::Source::Binary(face.data.clone()));
-            }
-            Arc::new(database)
+}
+
+impl Fonts {
+    pub fn new(path: &Path) -> Self {
+        Self {
+            root: path.parent().unwrap_or(path).to_path_buf(),
+            loaded: OnceLock::new(),
+        }
+    }
+
+    fn load(&self) -> Result<Arc<FontSet>> {
+        self.loaded
+            .get_or_init(|| {
+                let faces = load_faces(&self.root)?;
+                let mut database = usvg::fontdb::Database::new();
+                for face in faces.values() {
+                    database.load_font_source(usvg::fontdb::Source::Binary(face.data.clone()));
+                }
+                Ok(Arc::new(FontSet {
+                    faces,
+                    database: Arc::new(database),
+                    widths: Mutex::new(HashMap::new()),
+                }))
+            })
+            .as_ref()
+            .cloned()
+            .map_err(|error| unavailable(error.clone()))
+    }
+
+    /// Scope a synchronous layout. The guard is thread-bound and must not span
+    /// an await. Nested callers are restored even when the layout unwinds.
+    pub fn enter(&self) -> Result<FontScope> {
+        let fonts = self.load()?;
+        Ok(FontScope {
+            previous: ACTIVE_FONTS.with(|active| active.replace(Some(fonts))),
+            _thread: PhantomData,
         })
-        .map_err(Clone::clone);
-    if let Ok(mut current) = FONTS.write() {
-        *current = Some(FontSet {
-            root,
-            faces,
-            database,
-            widths: Mutex::new(HashMap::new()),
-        });
+    }
+
+    pub(crate) fn svg_options(&self) -> Result<usvg::Options<'static>> {
+        Ok(usvg::Options {
+            fontdb: self.load()?.database.clone(),
+            font_family: "Noto Sans CJK SC".into(),
+            ..Default::default()
+        })
     }
 }
 
@@ -94,20 +131,14 @@ fn load_faces(root: &Path) -> std::result::Result<HashMap<FaceKey, FaceData>, St
 }
 
 fn with_face<T>(key: FaceKey, action: impl FnOnce(&FaceData, &FontSet) -> Result<T>) -> Result<T> {
-    let fonts = FONTS
-        .read()
-        .map_err(|_| unavailable("报表字体缓存不可用。"))?;
-    let fonts = fonts
-        .as_ref()
+    let fonts = ACTIVE_FONTS
+        .with(|active| active.borrow().clone())
         .ok_or_else(|| unavailable("报表字体尚未初始化,无法进行受控测量。"))?;
-    let faces = fonts
+    let data = fonts
         .faces
-        .as_ref()
-        .map_err(|message| unavailable(message.clone()))?;
-    let data = faces
         .get(&key)
         .ok_or_else(|| unavailable("报表字体未随包提供。"))?;
-    action(data, fonts)
+    action(data, &fonts)
 }
 
 /// Width of `text` in millimetres using the approved face selected by family
@@ -155,24 +186,6 @@ pub fn text_width_mm(text: &str, family: &str, bold: bool, size_mm: f32) -> Resu
     })
 }
 
-pub(crate) fn svg_options() -> Result<usvg::Options<'static>> {
-    let fonts = FONTS
-        .read()
-        .map_err(|_| unavailable("报表字体缓存不可用。"))?;
-    let fonts = fonts
-        .as_ref()
-        .ok_or_else(|| unavailable("报表字体尚未初始化。"))?;
-    Ok(usvg::Options {
-        fontdb: fonts
-            .database
-            .as_ref()
-            .map_err(|error| unavailable(error.clone()))?
-            .clone(),
-        font_family: "Noto Sans CJK SC".into(),
-        ..Default::default()
-    })
-}
-
 fn face_key(family: &str, bold: bool) -> FaceKey {
     if family.eq_ignore_ascii_case("Noto Serif CJK SC") {
         FaceKey::SerifRegular
@@ -180,5 +193,82 @@ fn face_key(family: &str, bold: bool) -> FaceKey {
         FaceKey::SansBold
     } else {
         FaceKey::SansRegular
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{sync::mpsc, time::Duration};
+
+    fn fonts() -> Fonts {
+        Fonts::new(
+            &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../Resources/Fonts/OpenSource/NotoSansCJKsc-Regular.otf"),
+        )
+    }
+
+    #[test]
+    fn concurrent_runtimes_cannot_replace_each_others_fonts() {
+        let good = fonts();
+        assert!(
+            good.loaded.get().is_none(),
+            "startup must not load unused report resources"
+        );
+        let missing =
+            Fonts::new(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml/font.otf"));
+        let (ready_tx, ready_rx) = mpsc::channel();
+        let (changed_tx, changed_rx) = mpsc::channel();
+        std::thread::scope(|threads| {
+            let good = &good;
+            threads.spawn(move || {
+                let _scope = good.enter().unwrap();
+                let width = text_width_mm("并发 Invoice", "Noto Sans CJK SC", false, 4.).unwrap();
+                assert!(width > 0.);
+                ready_tx.send(()).unwrap();
+                changed_rx.recv_timeout(Duration::from_secs(30)).unwrap();
+                assert_eq!(
+                    text_width_mm("并发 Invoice", "Noto Sans CJK SC", false, 4.).unwrap(),
+                    width
+                );
+                assert!(Arc::ptr_eq(
+                    &good.svg_options().unwrap().fontdb,
+                    &good.svg_options().unwrap().fontdb
+                ));
+            });
+            threads.spawn(move || {
+                ready_rx.recv_timeout(Duration::from_secs(30)).unwrap();
+                assert!(missing.enter().is_err());
+                assert!(missing.svg_options().is_err());
+                assert!(
+                    text_width_mm("no inherited runtime", "Noto Sans CJK SC", false, 4.).is_err()
+                );
+                changed_tx.send(()).unwrap();
+            });
+        });
+        assert!(ACTIVE_FONTS.with(|active| active.borrow().is_none()));
+    }
+
+    #[test]
+    fn nested_scope_restores_the_caller_on_unwind_and_releases_the_binding() {
+        let outer = fonts();
+        let inner = fonts();
+        {
+            let _outer = outer.enter().unwrap();
+            let first = ACTIVE_FONTS.with(|active| active.borrow().clone().unwrap());
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let _inner = inner.enter().unwrap();
+                assert!(
+                    !ACTIVE_FONTS
+                        .with(|active| Arc::ptr_eq(active.borrow().as_ref().unwrap(), &first))
+                );
+                panic!("test layout failure");
+            }));
+            assert!(result.is_err());
+            assert!(
+                ACTIVE_FONTS.with(|active| Arc::ptr_eq(active.borrow().as_ref().unwrap(), &first))
+            );
+        }
+        assert!(ACTIVE_FONTS.with(|active| active.borrow().is_none()));
     }
 }

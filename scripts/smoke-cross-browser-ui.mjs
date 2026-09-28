@@ -1,16 +1,13 @@
 import {
-  cpSync,
   existsSync,
   mkdirSync,
   readFileSync,
   rmSync,
 } from "node:fs";
-import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
-import { resolveDotnetCommand } from "./lib/dotnet-command.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const playwrightBrowsersPath = path.resolve(
@@ -22,20 +19,11 @@ const legacyWindowsFirefoxSandboxDisabled = shouldDisableLegacyWindowsFirefoxSan
 const closeTimeoutMs = 10_000;
 const browserCloseTimeoutMs = 30_000;
 const runtimeIdentifier = `${platformPrefix()}-${architectureName()}`;
-const apiOutputRoot = path.join(
-  repositoryRoot,
-  "src",
-  "ExportDocManager.Api",
-  "bin",
-  "Release",
-  "net10.0",
-  runtimeIdentifier,
-);
-const apiDll = path.join(apiOutputRoot, "ExportDocManager.Api.dll");
-const playwrightEntry = path.join(apiOutputRoot, ".playwright", "package", "index.mjs");
+const apiExecutable = path.join(process.env.CARGO_TARGET_DIR || path.join(repositoryRoot, "target"), "debug", "examples", process.platform === "win32" ? "office_review.exe" : "office_review");
+const playwrightEntry = path.join(repositoryRoot, "apps/export-doc-web/node_modules/playwright/index.mjs");
 const webDist = path.join(repositoryRoot, "apps", "export-doc-web", "dist");
 const axeSource = path.join(repositoryRoot, "apps", "export-doc-web", "node_modules", "axe-core", "axe.min.js");
-for (const requiredPath of [apiDll, playwrightEntry, path.join(webDist, "index.html"), axeSource]) {
+for (const requiredPath of [apiExecutable, playwrightEntry, path.join(webDist, "index.html"), axeSource]) {
   if (!existsSync(requiredPath)) {
     throw new Error(`Cross-browser prerequisite is missing: ${requiredPath}`);
   }
@@ -48,31 +36,15 @@ if (!existsSync(playwrightBrowsersPath)) {
 }
 
 const playwright = await import(pathToFileURL(playwrightEntry).href);
-const runtimeRoot = path.join(repositoryRoot, "artifacts", "cross-browser-ui");
-const appRoot = path.join(runtimeRoot, "app");
+const runtimeRoot = path.join(repositoryRoot, "artifacts", "cross-browser-ui", `${Date.now()}-${process.pid}`);
 const dataRoot = path.join(runtimeRoot, "data");
-rmSync(runtimeRoot, { recursive: true, force: true });
-mkdirSync(appRoot, { recursive: true });
 mkdirSync(dataRoot, { recursive: true });
-cpSync(webDist, path.join(appRoot, "wwwroot"), { recursive: true });
-if (!existsSync(path.join(appRoot, "wwwroot", "index.html"))) {
-  throw new Error("Cross-browser frontend staging did not produce app/wwwroot/index.html");
-}
-
-const port = await getFreePort();
-const baseUrl = `http://127.0.0.1:${port}`;
 const apiProcess = spawnProcessTree(
-  resolveDotnetCommand(),
-  [apiDll, "--app-root", appRoot, "--data-root", dataRoot, "--urls", baseUrl],
+  apiExecutable,
+  [dataRoot],
   {
     cwd: repositoryRoot,
-    env: {
-      ...process.env,
-      DOTNET_CLI_TELEMETRY_OPTOUT: "1",
-      DOTNET_NOLOGO: "1",
-      Logging__LogLevel__Default: "Warning",
-      "Logging__LogLevel__Microsoft.EntityFrameworkCore": "Warning",
-    },
+    env: process.env,
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   },
@@ -82,6 +54,7 @@ apiProcess.stdout.on("data", (chunk) => { apiOutput += chunk.toString(); });
 apiProcess.stderr.on("data", (chunk) => { apiOutput += chunk.toString(); });
 
 try {
+  const baseUrl = await readReviewUrl();
   await waitForHealth(`${baseUrl}/healthz`, 30_000);
   const results = [];
   for (const browserName of requestedBrowsers) {
@@ -190,8 +163,8 @@ async function runViewportAcceptance(browser, browserName, baseUrl, axeSource, v
   });
   try {
     await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: operationTimeout });
-    await page.locator('input[autocomplete="username"]').fill("admin");
-    await page.locator('input[autocomplete="current-password"]').fill("");
+    await page.locator('input[autocomplete="username"]').fill("oa-review");
+    await page.locator('input[autocomplete="current-password"]').fill("Review-2026-Test");
     await page.getByRole("button", { name: "登录" }).click();
     await page.locator(".app-shell").waitFor({ state: "visible", timeout: operationTimeout });
 
@@ -439,16 +412,18 @@ function browserOperationTimeout(browserName) {
     : 30_000;
 }
 
-async function getFreePort() {
-  return await new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      const port = typeof address === "object" && address ? address.port : 0;
-      server.close(() => resolve(port));
-    });
-  });
+async function readReviewUrl() {
+  const deadline = Date.now() + 30_000;
+  let failure;
+  apiProcess.once("error", error => { failure = error; });
+  while (Date.now() < deadline) {
+    if (failure) throw failure;
+    if (apiProcess.exitCode !== null) throw new Error(`Rust review host exited: ${apiOutput}`);
+    const match = apiOutput.match(/\{"url":"(http:\/\/127\.0\.0\.1:\d+)"\}/u);
+    if (match) return match[1];
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  throw new Error(`Rust review host startup timed out: ${apiOutput}`);
 }
 
 async function waitForHealth(url, timeoutMs) {

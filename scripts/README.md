@@ -79,7 +79,7 @@ Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公
 
 ## 验证和证据
 
-开发时通过 `generate-api-client.ps1` 运行 Rust OpenAPI 组合器，再生成 Rust 与 React 客户端。`crates/export-doc-contracts/src/reference_openapi.json` 是保留的官方 .NET 基线，新增能力只修改 Rust 组合器，不能覆盖生成文件或另建前端 URL/schema。TypeScript 代码生成工具仍是开发期 C# 工具，不随 Rust 产品交付。`--OpenApiPath` 仅用于显式指定已审阅的契约输入。
+开发时通过 `generate-api-client.ps1` 调用 `cargo run --locked -p export-doc-contracts --example generate_clients`，由 Rust 从同一 OpenAPI 文档生成 Rust 与 React 客户端；`-Check` 只校验生成文件。`crates/export-doc-contracts/src/reference_openapi.json` 是保留的官方 .NET 基线，新增能力只修改 Rust 组合器，不能覆盖生成文件或另建前端 URL/schema。`-OpenApiPath` 可指定已审阅的输入，并同时更新两端；不需要 .NET SDK。Rust 生成器回归随 workspace tests 执行，校验完整生成结果、端点策略、上传下载、请求头、默认值和类型投影；请求运行行为由现有 React/API 测试校验。
 
 OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --example office_review`，再执行 `npm --prefix apps/export-doc-web run test:oa-ui`。回环测试宿主使用独立 DataRoot，覆盖六类申请、附件、办理记录和窄屏；不代替 PostgreSQL 18 或 Tauri 验收。
 
@@ -97,7 +97,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 - Windows 退出：`node scripts/test_native_desktop_shutdown.mjs [便携包目录] [EXE路径]` 使用隔离 DataRoot 验证真实 React/WebView2、重复退出、宿主异常终止、独立窗口不受影响及 HTTP 端口释放。调试端口仅注入测试子进程，不修改正式配置；其它 OS 需独立验收。
 - 脚本：`verify-script-suite.ps1`、`verify-github-workflow-actions.mjs`、`test_tauri_updater_release_contract.mjs`、`github/verify-public-source.ps1`、`git diff --check`。
 
-Rust notices 不列保留 C# 的运行图。`verify-dependency-policy.mjs` 仍单独约束未删除的 C# 对照锁文件，NPOI 2.7.6 只属于该对照规则，与 Rust 业务运行无关。
+本分支已删除旧 C# 源码/测试/工程与 `deploy/container`；`verify-dependency-policy.mjs` 拒绝重新引入托管工程或将其依赖列入 Rust notices。原生 NuGet 归档仍按中央资源清单校验。手动跨浏览器验收使用锁定的 npm Playwright 和隔离 Rust `office_review` 宿主，不读取旧 .NET DLL；Firefox/WebKit 仍只在手动工作流执行。
 
 报表原版 React 设计器可复用，但 Rust 渲染仍有明确未完成项；当前事实见 `docs/Rust原生功能迁移核对表.md`。旧 Slint 的 `--validation --ui-smoke` 入口已退役。
 

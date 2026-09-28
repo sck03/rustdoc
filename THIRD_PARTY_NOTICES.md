@@ -862,6 +862,8 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | picocolors | 1.1.1 | ISC | web |
 | npm | picomatch | 4.0.7 | MIT | web |
 | npm | pixelmatch | 7.2.0 | ISC | web |
+| npm | playwright | 1.63.0 | Apache-2.0 | web |
+| npm | playwright-core | 1.63.0 | Apache-2.0 | web |
 | npm | pngjs | 7.0.0 | MIT | web |
 | npm | postcss | 8.5.28 | MIT | web |
 | npm | react | 19.3.0 | MIT | web |

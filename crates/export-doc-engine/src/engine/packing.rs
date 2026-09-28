@@ -46,10 +46,11 @@ pub fn handle(
     ) {
         let request: ApiContainerPackingPdfRequest =
             serde_json::from_value(body.clone()).map_err(|e| invalid(e.to_string()))?;
+        let _fonts = service.report_fonts.enter()?;
         let document = export_doc_report::packing::document(&request)?;
         let bytes = export_doc_report::pdf_document(
             &document,
-            &service.paths.font_path,
+            &service.report_fonts,
             &operation::cancellation_flag(),
         )?;
         operation::check()?;

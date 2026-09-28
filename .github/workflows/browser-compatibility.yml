@@ -41,7 +41,7 @@ jobs:
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
-          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/ExportDocManager.Api/packages.lock.json') }}-firefox-webkit
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('apps/export-doc-web/package-lock.json') }}-firefox-webkit
 
       - name: Install frontend dependencies
         run: npm ci --prefix apps/export-doc-web
@@ -49,9 +49,11 @@ jobs:
       - name: Build frontend and API
         shell: pwsh
         run: |
+          node scripts/provision-report-fonts.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm --prefix apps/export-doc-web run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo build --locked --release -p export-doc-server
+          cargo build --locked -p export-doc-server --example office_review
           exit $LASTEXITCODE
 
       - name: Install Firefox and WebKit runtimes

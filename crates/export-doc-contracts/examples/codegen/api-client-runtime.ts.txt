@@ -1,0 +1,239 @@
+export type AccessTokenProvider = string | ((signal?: AbortSignal) => string | undefined | Promise<string | undefined>);
+export type ApiRequestInit = RequestInit & { timeoutMs?: number };
+type QueryValue = string | number | boolean | null | undefined;
+const desktopAccessTokenHeaderName = "X-ExportDocManager-Desktop-Token";
+
+export interface ApiClientOptions {
+  baseUrl: string;
+  accessToken?: AccessTokenProvider;
+  desktopAccessToken?: AccessTokenProvider;
+  defaultTimeoutMs?: number;
+  fetch?: typeof globalThis.fetch;
+}
+
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly statusText: string,
+    public readonly responseText: string,
+  ) {
+    super(`API request failed with status ${status} ${statusText}`);
+    this.name = "ApiError";
+  }
+}
+
+export function createExportDocManagerApiClient(options: ApiClientOptions): ExportDocManagerApiClient {
+  return new ExportDocManagerApiClient(options);
+}
+
+export class ExportDocManagerApiClient {
+  private readonly baseUrl: string;
+  private readonly accessToken?: AccessTokenProvider;
+  private readonly desktopAccessToken?: AccessTokenProvider;
+  private readonly defaultTimeoutMs: number;
+  private readonly fetchImpl: typeof globalThis.fetch;
+
+  constructor(options: ApiClientOptions) {
+    this.baseUrl = `${options.baseUrl.replace(/\/+$/, "")}/`;
+    this.accessToken = options.accessToken;
+    this.desktopAccessToken = options.desktopAccessToken;
+    this.defaultTimeoutMs = normalizeTimeout(options.defaultTimeoutMs ?? 60_000);
+    if (typeof options.fetch === "function") {
+      this.fetchImpl = options.fetch;
+    } else if (typeof globalThis.fetch === "function") {
+      this.fetchImpl = globalThis.fetch.bind(globalThis);
+    } else {
+      throw new Error("A fetch implementation is required to use ExportDocManagerApiClient.");
+    }
+  }
+
+  public resolveUrl(path: string): string {
+    return new URL(path, this.baseUrl).toString();
+  }
+
+/* GENERATED_METHODS */
+  private async resolveAccessToken(signal?: AbortSignal): Promise<string | undefined> {
+    const provider = this.accessToken;
+    if (typeof provider === "function") {
+      throwIfAborted(signal);
+      return awaitWithSignal(Promise.resolve().then(() => provider(signal)), signal);
+    }
+
+    return provider;
+  }
+
+  private async resolveDesktopAccessToken(signal?: AbortSignal): Promise<string | undefined> {
+    const provider = this.desktopAccessToken;
+    if (typeof provider === "function") {
+      throwIfAborted(signal);
+      return awaitWithSignal(Promise.resolve().then(() => provider(signal)), signal);
+    }
+
+    return provider;
+  }
+
+  private async request<T>(
+    method: string,
+    path: string,
+    options: { query?: Record<string, QueryValue>; body?: unknown; init?: ApiRequestInit } = {},
+  ): Promise<T> {
+    const { headers: initHeaders, body: _ignoredBody, signal: callerSignal, timeoutMs, ...restInit } = options.init ?? {};
+    const timeout = createRequestTimeout(callerSignal, timeoutMs ?? this.defaultTimeoutMs);
+    try {
+      const headers = new Headers(initHeaders);
+      const isFormDataBody = typeof FormData !== "undefined" && options.body instanceof FormData;
+      const isBlobBody = typeof Blob !== "undefined" && options.body instanceof Blob;
+      if (!headers.has("Accept")) {
+        headers.set("Accept", "application/json");
+      }
+
+      if (options.body !== undefined && !headers.has("Content-Type")) {
+        if (isBlobBody) {
+          headers.set("Content-Type", "application/octet-stream");
+        } else if (!isFormDataBody) {
+          headers.set("Content-Type", "application/json");
+        }
+      }
+
+      const requestSignal = timeout.signal;
+      const desktopToken = await this.resolveDesktopAccessToken(requestSignal);
+      if (desktopToken && !headers.has(desktopAccessTokenHeaderName)) {
+        headers.set(desktopAccessTokenHeaderName, desktopToken);
+      }
+
+      const token = await this.resolveAccessToken(requestSignal);
+      if (token && !headers.has("Authorization")) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+
+      const relativePath = appendQuery(path, options.query).replace(/^\/+/, "");
+      const url = new URL(relativePath, this.baseUrl);
+      const requestInit: RequestInit = { ...restInit, method, headers, signal: requestSignal };
+      if (options.body !== undefined) {
+        requestInit.body = isFormDataBody || isBlobBody ? options.body as BodyInit : JSON.stringify(options.body);
+      }
+
+      throwIfAborted(requestSignal);
+      const response = await this.fetchImpl(url, requestInit);
+      const contentType = response.headers.get("content-type") ?? "";
+      const contentDisposition = response.headers.get("content-disposition") ?? "";
+      const isBinaryResponse = contentType.startsWith("image/") || contentType.startsWith("audio/") ||
+        contentType.startsWith("video/") || contentType.includes("application/pdf") ||
+        contentType.includes("application/octet-stream") || contentDisposition.toLowerCase().includes("attachment");
+      if (isBinaryResponse) {
+        if (!response.ok) {
+          throw new ApiError(response.status, response.statusText, await response.text());
+        }
+
+        return await response.blob() as T;
+      }
+
+      const responseText = await response.text();
+      if (!response.ok) {
+        throw new ApiError(response.status, response.statusText, responseText);
+      }
+
+      if (!responseText) {
+        return undefined as T;
+      }
+
+      return (contentType.includes("application/json") ? JSON.parse(responseText) : responseText) as T;
+    } finally {
+      timeout.dispose();
+    }
+  }
+}
+
+function normalizeTimeout(value: number): number {
+  if (!Number.isFinite(value) || value < 0 || value > 60 * 60 * 1000) {
+    throw new RangeError("API request timeout must be between 0 and 3600000 milliseconds.");
+  }
+  return Math.trunc(value);
+}
+
+function throwIfAborted(signal: AbortSignal | null | undefined): void {
+  if (!signal?.aborted) return;
+  throw signal.reason ?? new DOMException("The operation was aborted.", "AbortError");
+}
+
+async function awaitWithSignal<T>(value: PromiseLike<T> | T, signal: AbortSignal | null | undefined): Promise<T> {
+  throwIfAborted(signal);
+  if (!signal) return await value;
+  return await new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => signal.removeEventListener("abort", onAbort);
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) onAbort();
+    Promise.resolve(value).then(result => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(result);
+    }, error => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    });
+  });
+}
+
+function createRequestTimeout(callerSignal: AbortSignal | null | undefined, timeoutMs: number): { signal?: AbortSignal; dispose: () => void } {
+  const normalizedTimeout = normalizeTimeout(timeoutMs);
+  if (normalizedTimeout === 0) {
+    return { signal: callerSignal ?? undefined, dispose: () => undefined };
+  }
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), normalizedTimeout);
+  const signals = [callerSignal, timeoutController.signal].filter((signal): signal is AbortSignal => Boolean(signal));
+  if (signals.length === 1) {
+    return { signal: signals[0], dispose: () => clearTimeout(timeoutId) };
+  }
+  const combinedController = new AbortController();
+  const abort = () => combinedController.abort();
+  for (const signal of signals) {
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+  }
+  return {
+    signal: combinedController.signal,
+    dispose: () => {
+      clearTimeout(timeoutId);
+      for (const signal of signals) signal.removeEventListener("abort", abort);
+    },
+  };
+}
+
+function appendQuery(path: string, query?: Record<string, QueryValue>): string {
+  const entries = Object.entries(query ?? {}).filter(([, value]) => value !== undefined && value !== null && value !== "");
+  if (entries.length === 0) {
+    return path;
+  }
+
+  const search = new URLSearchParams();
+  for (const [key, value] of entries) {
+    search.append(key, String(value));
+  }
+
+  return `${path}?${search.toString()}`;
+}
+
+function encodePath(value: string | number | boolean): string {
+  return encodeURIComponent(String(value));
+}
+
+function mergeHeaders(initHeaders: HeadersInit | undefined, values: Record<string, string | undefined>): Headers {
+  const headers = new Headers(initHeaders);
+  for (const [name, value] of Object.entries(values)) {
+    if (value !== undefined) {
+      headers.set(name, value);
+    }
+  }
+  return headers;
+}

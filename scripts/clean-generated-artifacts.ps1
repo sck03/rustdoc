@@ -2,7 +2,6 @@
 param(
     [switch]$IncludeNodeModules,
     [switch]$IncludePackageCaches,
-    [switch]$PruneUnusedNuGetVersions,
     [switch]$IncludeCodexRuntimeWorkspaces,
     [switch]$IncludeCodexRuntime,
     [switch]$IncludeLegacyRuntimeAssets,
@@ -17,6 +16,7 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $workspaceRoot = (Resolve-Path (Join-Path $scriptRoot "..")).Path
 $workspaceRootFullPath = [System.IO.Path]::GetFullPath($workspaceRoot)
 . (Join-Path $scriptRoot "lib/platform-path-safety.ps1")
+. (Join-Path $scriptRoot "lib/generated-artifact-protection.ps1")
 
 function Assert-WorkspaceChildPath {
     param(
@@ -57,62 +57,6 @@ function Get-DirectorySizeBytes {
     }
 
     return [long]$sum.Sum
-}
-
-function Get-LockedNuGetPackageVersions {
-    $lockedVersions = [System.Collections.Generic.HashSet[string]]::new(
-        [System.StringComparer]::OrdinalIgnoreCase)
-    $lockFiles = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
-
-    foreach ($sourceTreeName in @("apps", "eng", "src", "tests", "tools")) {
-        $sourceTreePath = Join-Path $workspaceRoot $sourceTreeName
-        if (-not (Test-Path -LiteralPath $sourceTreePath -PathType Container)) {
-            continue
-        }
-
-        Get-ChildItem -LiteralPath $sourceTreePath -Recurse -File -Filter "*packages.lock.json" -ErrorAction SilentlyContinue |
-            Where-Object {
-                $_.FullName -notmatch '[\\/](bin|obj|node_modules|target|artifacts|\.codex-runtime)[\\/]'
-            } |
-            ForEach-Object { [void]$lockFiles.Add($_) }
-    }
-
-    foreach ($lockFile in $lockFiles) {
-        try {
-            $lockDocument = Get-Content -LiteralPath $lockFile.FullName -Raw | ConvertFrom-Json
-        }
-        catch {
-            throw "Could not parse NuGet lock file '$($lockFile.FullName)': $($_.Exception.Message)"
-        }
-
-        foreach ($targetFramework in $lockDocument.dependencies.PSObject.Properties) {
-            foreach ($package in $targetFramework.Value.PSObject.Properties) {
-                $resolvedVersion = [string]$package.Value.resolved
-                if ([string]::IsNullOrWhiteSpace($resolvedVersion)) {
-                    continue
-                }
-
-                [void]$lockedVersions.Add("$($package.Name)`n$resolvedVersion")
-            }
-        }
-    }
-
-    if ($lockFiles.Count -eq 0 -or $lockedVersions.Count -eq 0) {
-        throw "Refusing to prune the NuGet cache because no usable packages.lock.json files were found."
-    }
-
-    # The repository's commercial dependency policy requires this exact NPOI version.
-    [void]$lockedVersions.Add("NPOI`n2.7.6")
-    return ,$lockedVersions
-}
-
-function Test-IsSdkManagedNuGetPackage {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$PackageId
-    )
-
-    return $PackageId -match '^microsoft\.(netcore|aspnetcore|windowsdesktop)\.app\.(host|runtime)\.'
 }
 
 function Grant-CurrentUserGeneratedPathAccess {
@@ -165,6 +109,11 @@ function Remove-DirectoryWithRetry {
 
     if (-not (Test-Path -LiteralPath $Path)) {
         return
+    }
+
+    $Path = Assert-WorkspaceChildPath -Path $Path -Purpose "generated artifact"
+    if (Test-ExportDocProtectedArtifact -Path $Path) {
+        throw "Refusing to remove protected data or linked content: $Path"
     }
 
     for ($attempt = 1; $attempt -le $RetryCount; $attempt++) {
@@ -227,54 +176,6 @@ function ConvertTo-ExtendedLengthPath {
     return "\\?\$fullPath"
 }
 
-function Stop-RepositoryDotNetBuildServers {
-    $runtimeRoot = Join-Path $workspaceRoot ".codex-runtime"
-    if (-not (Test-Path -LiteralPath $runtimeRoot)) {
-        return
-    }
-
-    $dotnetFileName = if ($IsWindows -or $PSVersionTable.Platform -eq "Win32NT") {
-        "dotnet.exe"
-    }
-    else {
-        "dotnet"
-    }
-
-    $localDotnet = Get-ChildItem -LiteralPath $runtimeRoot -Directory -Filter "dotnet-sdk-*" -ErrorAction SilentlyContinue |
-        Sort-Object -Property LastWriteTime -Descending |
-        ForEach-Object { Join-Path $_.FullName $dotnetFileName } |
-        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
-        Select-Object -First 1
-
-    if ([string]::IsNullOrWhiteSpace($localDotnet)) {
-        return
-    }
-
-    Write-Host "Stopping repository-local .NET compiler build servers..."
-    $previousDotNetCliHome = $env:DOTNET_CLI_HOME
-    $previousDotNetTelemetryOptOut = $env:DOTNET_CLI_TELEMETRY_OPTOUT
-    $previousDotNetSkipFirstTimeExperience = $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE
-    $shutdownExitCode = 0
-    try {
-        $env:DOTNET_CLI_HOME = Join-Path $runtimeRoot "dotnet-cli"
-        $env:DOTNET_CLI_TELEMETRY_OPTOUT = "1"
-        $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = "1"
-        New-Item -ItemType Directory -Force -Path $env:DOTNET_CLI_HOME | Out-Null
-
-        & $localDotnet build-server shutdown
-        $shutdownExitCode = $LASTEXITCODE
-    }
-    finally {
-        $env:DOTNET_CLI_HOME = $previousDotNetCliHome
-        $env:DOTNET_CLI_TELEMETRY_OPTOUT = $previousDotNetTelemetryOptOut
-        $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = $previousDotNetSkipFirstTimeExperience
-    }
-
-    if ($shutdownExitCode -ne 0) {
-        Write-Warning "Repository-local .NET build-server shutdown returned exit code $shutdownExitCode; cleanup retries will still be attempted."
-    }
-}
-
 function New-CleanupTarget {
     param(
         [Parameter(Mandatory = $true)]
@@ -289,6 +190,10 @@ function New-CleanupTarget {
     }
 
     $fullPath = Assert-WorkspaceChildPath -Path $Path -Purpose $Reason
+    if (Test-ExportDocProtectedArtifact -Path $fullPath) {
+        Write-Verbose "Preserving data or linked content: $fullPath"
+        return $null
+    }
     [PSCustomObject]@{
         Path = $fullPath
         Reason = $Reason
@@ -349,6 +254,8 @@ function Get-GeneratedArtifactCleanupPlan {
     # cleanup switches are supplied. This prevents newly introduced test or
     # screenshot directories from accumulating indefinitely.
     $releaseOutputNames = @(
+        "native-desktop",
+        "native-web-server",
         "windows-desktop-run",
         "windows-installers",
         "desktop-portable",
@@ -424,7 +331,7 @@ function Get-GeneratedArtifactCleanupPlan {
     # data, release outputs, downloaded tools, stable resources and .git are
     # never traversed by this generic rule.
     $sourceTreeDirectories = @()
-    foreach ($sourceTreeName in @("apps", "src", "tests", "tools")) {
+    foreach ($sourceTreeName in @("apps", "crates", "src", "tests", "tools")) {
         $sourceTreePath = Join-Path $workspaceRoot $sourceTreeName
         if (Test-Path -LiteralPath $sourceTreePath) {
             $sourceTreeDirectories += Get-ChildItem -LiteralPath $sourceTreePath -Recurse -Directory -Force -ErrorAction SilentlyContinue
@@ -462,25 +369,6 @@ function Get-GeneratedArtifactCleanupPlan {
         Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "apps/export-doc-tauri/.codex-runtime/npm-cache") -Reason "Tauri npm download cache"
         Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "apps/export-doc-web/.codex-runtime/npm-cache") -Reason "Web npm download cache"
     }
-    elseif ($PruneUnusedNuGetVersions) {
-        $lockedNuGetVersions = Get-LockedNuGetPackageVersions
-        $nugetPackagesRoot = Join-Path $codexRuntimeRoot "nuget-packages"
-        if (Test-Path -LiteralPath $nugetPackagesRoot -PathType Container) {
-            foreach ($packageDirectory in Get-ChildItem -LiteralPath $nugetPackagesRoot -Directory -Force -ErrorAction SilentlyContinue) {
-                if (Test-IsSdkManagedNuGetPackage -PackageId $packageDirectory.Name) {
-                    continue
-                }
-
-                foreach ($versionDirectory in Get-ChildItem -LiteralPath $packageDirectory.FullName -Directory -Force -ErrorAction SilentlyContinue) {
-                    $packageVersionKey = "$($packageDirectory.Name)`n$($versionDirectory.Name)"
-                    if (-not $lockedNuGetVersions.Contains($packageVersionKey)) {
-                        Add-Target -Targets $targets -Path $versionDirectory.FullName -Reason "NuGet package version not referenced by repository lock files"
-                    }
-                }
-            }
-        }
-    }
-
     if ($IncludeLegacyRuntimeAssets) {
         Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "Browsers\ChromeForTesting") -Reason "optional browser renderer asset copy"
     }
@@ -523,9 +411,6 @@ if ($ListOnly) {
     return
 }
 
-if ($plan.Count -gt 0) {
-    Stop-RepositoryDotNetBuildServers
-}
 
 $cleanupFailures = [System.Collections.Generic.List[object]]::new()
 foreach ($target in $plan) {

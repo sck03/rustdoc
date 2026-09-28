@@ -70,7 +70,13 @@ impl Template {
             Self::File { content, .. } => content,
         }
     }
-    fn render(&self, data: &ReportData, cancelled: &AtomicBool) -> Result<Document> {
+    fn render(
+        &self,
+        data: &ReportData,
+        fonts: &render::Fonts,
+        cancelled: &AtomicBool,
+    ) -> Result<Document> {
+        let _fonts = fonts.enter()?;
         match self {
             Self::Builtin(v) => render::render_builtin(*v, data, cancelled).map_err(Into::into),
             Self::Custom { design, .. } | Self::File { design, .. } => {
@@ -327,7 +333,11 @@ pub fn preview_document(
         &mut data,
         Some(template.content()),
     )?;
-    let document = template.render(&data, &crate::operation::cancellation_flag())?;
+    let document = template.render(
+        &data,
+        &service.report_fonts,
+        &crate::operation::cancellation_flag(),
+    )?;
     let mut metadata = json!({"reportType":kind,"templatePath":template.path(),"storagePolicy":"预览只使用当前草稿，不写入正式单据。"});
     metadata[id_field] = json!(id);
     if !payment {
@@ -406,6 +416,7 @@ fn output_name(data: &ReportData, template: &Template, id: i64) -> String {
 pub(super) fn invoice_document(
     store: &Store,
     paths: &crate::paths::RuntimePaths,
+    fonts: &render::Fonts,
     actor: &Actor,
     id: i64,
     item: &Value,
@@ -414,7 +425,7 @@ pub(super) fn invoice_document(
 ) -> Result<(Document, String)> {
     let (data, template) = prepare(store, paths, actor, id, item, false, action)?;
     Ok((
-        template.render(&data, cancelled)?,
+        template.render(&data, fonts, cancelled)?,
         output_name(&data, &template, id),
     ))
 }
@@ -466,6 +477,7 @@ fn start(
     }
     let store = service.store.clone();
     let paths = service.paths.clone();
+    let fonts = service.report_fonts.clone();
     let body = body.clone();
     let actor_id = actor.id;
     let replay = super::tasks::retry::Replay::new(operation, parameters, &body);
@@ -494,9 +506,8 @@ fn start(
                 auth::authorize_operation(&actor, operation, &[])?;
                 let (data, template) =
                     prepare(&store, &paths, &actor, *id, &body, payment, "export-pdf")?;
-                export_doc_report::configure(&paths.font_path);
-                let document = template.render(&data, cancelled)?;
-                let pdf = render::pdf_document(&document, &paths.font_path, cancelled)?;
+                let document = template.render(&data, &fonts, cancelled)?;
+                let pdf = render::pdf_document(&document, &fonts, cancelled)?;
                 files.push((output_name(&data, &template, *id), pdf));
             }
             let actor = auth::current_actor(&store, actor_id)?;
@@ -572,7 +583,7 @@ pub fn handle(
         | PREVIEW_PAYMENT_VOUCHER_DRAFT_HTML => {
             let (document, mut response) =
                 preview_document(service, actor, operation, parameters, body)?;
-            response["html"] = json!(document.html()?);
+            response["html"] = json!(document.html(&service.report_fonts)?);
             Ok(response)
         }
         PREVIEW_REPORT_TEMPLATE_CONTENT => {
@@ -615,8 +626,12 @@ pub fn handle(
                 Some(template.content()),
             )?;
             let html = template
-                .render(&data, &crate::operation::cancellation_flag())?
-                .html()?;
+                .render(
+                    &data,
+                    &service.report_fonts,
+                    &crate::operation::cancellation_flag(),
+                )?
+                .html(&service.report_fonts)?;
             Ok(json!({"reportType":kind,"withSeal":body["withSeal"],"html":html}))
         }
         _ => start(service, actor, operation, parameters, body),

@@ -90,7 +90,7 @@ jobs:
         run: |
           cargo fmt --all --check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node scripts/generate-native-api-client.mjs --openapi crates/export-doc-contracts/src/openapi.json --check
+          cargo run --locked -p export-doc-contracts --example generate_clients -- --check
           exit $LASTEXITCODE
       - name: Domain, storage and application tests
         run: cargo test --locked -p export-doc-contracts -p export-doc-domain -p export-doc-storage -p export-doc-excel -p export-doc-exchange -p export-doc-report -p export-doc-engine -p export-doc-server --target ${{ matrix.target }}

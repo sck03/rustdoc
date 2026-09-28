@@ -33,7 +33,7 @@ Tauri 是桌面宿主；浏览器与 Docker 不运行 Tauri 窗口。Node 只用
 
 模板字体固定使用已随包的 Noto Sans CJK SC Regular/Bold 与 Noto Serif CJK SC Regular，清单及哈希由 `Resources/Fonts/OpenSource/font-manifest.json` 管理。三文件均为 SIL OFL 1.1，允许商业使用、随包分发与 PDF 嵌入；字体替换后校准原版布局，不将参考 PDF 中的微软雅黑/其它字体作为新依赖。需要加粗时使用已有 Sans Bold。
 
-Slint 和 egui 客户端、专用构建与许可引用已退役。原 C# 源码和历史测试仍作行为对照，不进入 Rust 包。
+Slint 和 egui 客户端已退役。2026-09-28 按用户清理要求移除本分支重复的 C# 源码、测试、工程、生成器与旧部署；相邻只读工作树和 Git 历史仍提供对照。冻结 OpenAPI、单一窗口参考数据和共用夹具继续用于 Rust 契约验收。
 
 ## 通信与运行目录
 

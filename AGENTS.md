@@ -33,7 +33,7 @@
 - UI 状态／事件、应用用例、业务校验、存储、文件、报表／PDF、Excel、OCR、邮件和系统集成须按职责分模块。能力依赖按 Cargo feature 或独立 crate 裁剪，核心不得为了单一可选功能拉入整套浏览器实现。
 - Excel 能力位于 `crates/export-doc-excel`，由组合根显式启用 `excel` feature；现有 `tools/excel-analyzer-rs` 同时提供库和对照 CLI，禁止复制第二套表头／字段识别器。文件任务位于 `engine::tasks`，状态和结果事务化发布，文件预览不得隐式写入正式业务数据。
 - Windows、Linux、macOS 桌面共同维护一套 Tauri 2 + React + Rust + SQLite 源码；Windows 在当前宿主优先运行验证，其它目标在对应 runner／设备验收。原生窗口句柄、对话框、剪贴板、打印、进程树和安装包进入平台适配边界，禁止把 Windows 路径、COM／Win32 或 Linux／macOS 命令散入业务层。每个平台分别记录编译、运行和功能证据，预留接口不等于已支持。
-- 相邻 `ExportDocManager_CS` 只读作为界面、后端和操作流程基线；当前 `apps/export-doc-web` 与 Tauri 平台适配器直接复用其代码。原 C# `src/` 和测试仅作行为对照，相关 .NET 门禁只适用于被修改的 C# 源码。删除 `apps/export-doc-slint` 与 `apps/export-doc-native`，不再维护第二套桌面界面。
+- 相邻 `ExportDocManager_CS` 与 Git 历史只读作为界面、后端和操作流程基线。按用户 2026-09-28 清理要求，本分支删除已退役的 C# 源码、测试、工程和部署文件；只保留仍被 Rust 使用的冻结契约、参考数据和跨实现夹具。Slint／egui 已删除，不维护第二套桌面界面；清理旧源码不代表剩余迁移差距已验收。
 - 不以通用 JSON 表单或同名路由代替原有完整业务。逐项对照主导航、页签、表单顺序、表格编辑、键盘／中文 IME、权限、并发、导入导出、报表和维护流程；未完成或未验收的能力须明确记录。
 - 按用户 2026-09-20 的要求，优先逐页完成原版界面、后端用例和操作衔接，积累一批后集中联调，最后统一执行完整门禁。开发中只做必要的快速编译和针对实际失败的回归，不在每个模块后重复全量构建／测试；已经通过且未受后续修改影响的检查不重复运行。
 - 原生界面统一提供可折叠分区：常用内容默认展开，地址／银行明细、备用字段、信用证、高级设置等低频内容默认收起。展开状态保存在当前界面会话内；收起不丢失草稿、已保存数据或校验，出错时自动展开对应分区。
@@ -59,7 +59,7 @@
 
 ### 3.3 API、错误和契约
 
-- `/openapi/v1.json` 是唯一 API 契约事实源。当前由 `export-doc-contracts::openapi` 组合冻结的官方 .NET 基线与新增 Rust 能力；基线端点、schema、认证、错误和权限须逐项保留验证。Rust DTO、路由和权限元数据通过 `scripts/generate-native-api-client.mjs` 生成，React 客户端从相同文档生成；禁止手工修改生成文件或建立第二套 endpoint/schema。切换到 Rust 契约生成器须独立验证全部 schema、错误、认证及权限元数据，不能静默变更契约。
+- `/openapi/v1.json` 是唯一 API 契约事实源。当前由 `export-doc-contracts::openapi` 组合冻结的官方 .NET 基线与新增 Rust 能力；基线端点、schema、认证、错误和权限须逐项保留验证。Rust DTO、路由和权限元数据通过 `crates/export-doc-contracts/examples/generate_clients.rs` 生成，React 客户端从相同文档生成；禁止手工修改生成文件或建立第二套 endpoint/schema。切换到 Rust 契约生成器须独立验证全部 schema、错误、认证及权限元数据，不能静默变更契约。
 - 端点认证、桌面令牌和许可证要求使用 endpoint metadata；不要按 `/api` 前缀、路径白名单或前端路由猜测授权。
 - 业务错误按现有分类映射：校验 400、权限 403、明确资源不存在 404、冲突 409、繁忙 429、依赖不可用 503、超时 504；不要把数据库、文件或外部工具故障包装成 404/409。
 - 所有异步公共操作都要有明确取消边界、超时和资源清理；后台任务完成、失败、取消和输出清理必须可观察且幂等。
@@ -74,7 +74,7 @@
 
 ## 4. 依赖与许可证策略（硬约束）
 
-当前交付依赖以 Cargo workspace 的 `Cargo.toml`／`Cargo.lock`、React／Tauri 的 `package.json`／`package-lock.json` 和 `eng/native-runtime-packages.json` 为准。升级后同步 notices、锁文件和治理证据。保留 C# 对照的 `Directory.Packages.props`／`global.json` 不再决定 Rust 交付依赖或构建工具。
+当前交付依赖以 Cargo workspace 的 `Cargo.toml`／`Cargo.lock`、React／Tauri 的 `package.json`／`package-lock.json` 和 `eng/native-runtime-packages.json` 为准。升级后同步 notices、锁文件和治理证据。本分支不再保留 .NET 工程与 SDK 配置，API 契约与两端客户端统一由 Rust 生成；Node 用于前端构建与开发验证。
 
 普通依赖的精确版本以中央清单和锁文件为准，不在本规范复制容易过期的版本表。本分支已批准 Tauri 2 + React + Rust 迁移，根 Cargo workspace 集中管理 Rust 基线及共享依赖；React 19、原 .NET 10 和 xUnit v3 保持现有代际，不把无关升级混入迁移。
 
@@ -112,19 +112,9 @@
 
 批次实现和集中联调完成后统一执行最终门禁，开发中只做必要编译与针对失败的回归，不逐模块重复全量验证。最终 Rust 主工作区至少执行 `cargo fmt --all --check`、`cargo test --locked --workspace` 和 `cargo check --locked --workspace --all-features`。数据库变更须用隔离的真实 PostgreSQL 18 与 SQLite 验证同一业务契约；忽略的实库测试不算通过。HTTP 变更须验证真实 React 请求、认证、授权、错误、上传下载和会话；桌面界面须启动 Tauri + React，检查截图、表格滚动／编辑、中文输入及实际 PDF。发布时执行对应平台 locked build 和包内依赖审查。
 
-下列 .NET 和原 Web 门禁按被修改的对照源码适用；只改 Rust 不要求把完整 C# 构建当作 Rust 验收，更不能借旧测试结果宣称新实现等价：
+前端与工程门禁如下；C# 对照通过相邻只读工作树或 Git 历史追溯，旧测试结果不作为 Rust 验收：
 
 ```powershell
-# 依赖还原（锁定模式）
-dotnet restore ExportDocManager.sln --locked-mode --configfile NuGet.Config
-
-# C# 格式和严格构建
-dotnet format ExportDocManager.sln --verify-no-changes --no-restore
-dotnet build ExportDocManager.sln -c Release --no-restore -warnaserror -m:1 -p:BuildInParallel=false
-
-# 完整 .NET 测试；有 Chromium 时启用真实 PDF 测试
-./scripts/run-tests.ps1 -Configuration Release -NoRestore -RequireBrowserPdfTests -NoPause
-
 # Web
 npm --prefix apps/export-doc-web ci
 npm --prefix apps/export-doc-web run build
@@ -168,7 +158,6 @@ pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntime
 
 清理脚本默认只删除可重建的 `artifacts/`、`bin/`、`obj/`、`dist/`、`target/`、`TestResults/` 和一次性测试工作区，并保留交付输出及可复用依赖/浏览器缓存。只有用户明确确认后，才使用：
 
-- `-PruneUnusedNuGetVersions`：按全部 `packages.lock.json` 删除未引用的普通 NuGet 精确版本，保留当前锁图、SDK Runtime/Host packs 和 NPOI `2.7.6`；
 - `-IncludeNodeModules`：删除 npm 安装树；
 - `-IncludePackageCaches`：删除 NuGet/npm/Cargo 审计缓存；
 - `-IncludeCodexRuntime`：删除整个本地代理运行缓存；

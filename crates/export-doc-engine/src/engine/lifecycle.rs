@@ -9,7 +9,6 @@ impl NativeService {
         paths: RuntimePaths,
         retention: tasks::retention::Retention,
     ) -> Result<Arc<Self>> {
-        export_doc_report::configure(&paths.font_path);
         let store = Arc::new(Store::open(&paths)?);
         auth::seed(&store)?;
         packing::seed(&store)?;
@@ -19,6 +18,7 @@ impl NativeService {
         Ok(Arc::new(Self {
             maintenance: RwLock::new(()),
             protector: crate::secrets::Protector::new(&paths.data_root),
+            report_fonts: Arc::new(export_doc_report::Fonts::new(&paths.font_path)),
             paths,
             store,
             sessions: auth::Sessions::default(),
@@ -56,7 +56,6 @@ impl NativeService {
         clock: crate::clock::BusinessClock,
         retention: tasks::retention::Retention,
     ) -> Result<Arc<Self>> {
-        export_doc_report::configure(&paths.font_path);
         super::team_backup::postgres::ensure_no_pending(&paths)?;
         let store = Arc::new(Store::open_postgres(&paths, connection_string)?);
         packing::seed(&store)?;
@@ -69,6 +68,7 @@ impl NativeService {
         Ok(Arc::new(Self {
             maintenance: RwLock::new(()),
             protector: crate::secrets::Protector::new(&paths.data_root),
+            report_fonts: Arc::new(export_doc_report::Fonts::new(&paths.font_path)),
             paths,
             store,
             sessions: auth::Sessions::default(),

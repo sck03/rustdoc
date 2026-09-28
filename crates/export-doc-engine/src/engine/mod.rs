@@ -91,6 +91,7 @@ use store::{Actor, Store};
 pub struct NativeService {
     maintenance: RwLock<()>,
     pub paths: RuntimePaths,
+    report_fonts: Arc<export_doc_report::Fonts>,
     protector: crate::secrets::Protector,
     store: Arc<Store>,
     sessions: auth::Sessions,
@@ -144,7 +145,7 @@ impl NativeService {
         let (document, _) = reports::preview_document(self, &actor, operation, parameters, body)?;
         export_doc_report::pdf_document(
             &document,
-            &self.paths.font_path,
+            &self.report_fonts,
             &crate::operation::cancellation_flag(),
         )
         .map_err(Into::into)

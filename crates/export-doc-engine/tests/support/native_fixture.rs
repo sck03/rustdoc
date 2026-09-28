@@ -31,7 +31,7 @@ impl Fixture {
             data_root: root.clone(),
             cache_root: root.join("Cache"),
             log_root: root.join("Logs"),
-            font_path: root.join("font.otf"),
+            font_path: root.join("NotoSansCJKsc-Regular.otf"),
         };
         let client = ApiClient::native(paths.clone())
             .unwrap()

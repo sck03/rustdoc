@@ -6,7 +6,7 @@ use crate::{
 use export_doc_contracts::generated_api::ApiInvoiceDetailDto;
 use export_doc_domain::designer::{Design, Element, Kind, ReportBlock};
 use serde_json::Value;
-use std::{path::Path, sync::atomic::AtomicBool};
+use std::sync::atomic::AtomicBool;
 
 mod bands;
 mod detail;
@@ -664,9 +664,10 @@ fn render_body_flow(
 pub fn pdf(
     invoice: &ApiInvoiceDetailDto,
     design: &Design,
-    font: &Path,
+    fonts: &crate::Fonts,
     cancelled: &AtomicBool,
 ) -> Result<Vec<u8>> {
+    let _fonts = fonts.enter()?;
     let document = crate::Document {
         pages: pages(invoice, design)?
             .into_iter()
@@ -677,7 +678,7 @@ pub fn pdf(
             })
             .collect(),
     };
-    crate::pdf_document(&document, font, cancelled)
+    crate::pdf_document(&document, fonts, cancelled)
 }
 
 #[cfg(test)]

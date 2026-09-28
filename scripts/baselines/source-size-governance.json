@@ -4,20 +4,6 @@
   "updatedAt": "2026-09-25",
   "rules": [
     {
-      "name": "repository .NET production default",
-      "directories": [
-        "src",
-        "Shared",
-        "tools/ExportDocManager.ApiClientGenerator"
-      ],
-      "filePattern": "^.+\\.cs$",
-      "maximumLines": 850,
-      "baselineAggregateLines": 127054,
-      "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 127254,
-      "reportFiles": false
-    },
-    {
       "name": "repository web production default",
       "directory": "apps/export-doc-web/src",
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
@@ -65,19 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 8460,
+      "baselineAggregateLines": 9343,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 8580,
-      "reportFiles": false
-    },
-    {
-      "name": "repository test source default",
-      "directory": "tests",
-      "filePattern": "^.+\\.cs$",
-      "maximumLines": 3700,
-      "baselineAggregateLines": 46744,
-      "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 46864,
+      "maximumAggregateLines": 9463,
       "reportFiles": false
     },
     {
@@ -122,24 +98,6 @@
       "reportFiles": false
     },
     {
-      "name": "business attachment services",
-      "directory": "src/ExportDocManager.Infrastructure.Attachments",
-      "filePattern": "^.+\\.cs$",
-      "maximumLines": 220,
-      "baselineAggregateLines": 518,
-      "maximumAggregateGrowthLines": 50,
-      "maximumAggregateLines": 568
-    },
-    {
-      "name": "worklist services",
-      "directory": "src/ExportDocManager.Infrastructure.Worklist",
-      "filePattern": "^.+\\.cs$",
-      "maximumLines": 140,
-      "baselineAggregateLines": 244,
-      "maximumAggregateGrowthLines": 40,
-      "maximumAggregateLines": 284
-    },
-    {
       "name": "business attachment workspace",
       "directory": "apps/export-doc-web/src/features/attachments",
       "filePattern": "^.+\\.(?:ts|tsx)$",
@@ -158,61 +116,12 @@
       "maximumAggregateLines": 124
     },
     {
-      "name": "office collaboration services",
-      "directory": "src/ExportDocManager.Infrastructure/Services/Office",
-      "filePattern": "^.+\\.cs$",
-      "maximumLines": 300,
-      "maximumAggregateLines": 940,
-      "excludePattern": "/(?:PersonnelService(?:\\..+)?|PersonnelImagePolicy)\\.cs$"
-    },
-    {
       "name": "office workspace components",
       "directory": "apps/export-doc-web/src/features/office",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 220,
       "maximumAggregateLines": 900,
       "excludePattern": "/(?:Personnel.*|personnelModel|usePersonnelData|usePersonnelImage)\\.(?:ts|tsx)$"
-    },
-    {
-      "name": "HS knowledge partials",
-      "directory": "src/ExportDocManager.Infrastructure/Services/MasterData",
-      "filePattern": "^HsCodeKnowledgeService(?:\\..+)?\\.cs$",
-      "maximumLines": 560,
-      "maximumAggregateLines": 2300
-    },
-    {
-      "name": "shared database maintenance partials",
-      "directory": "src/ExportDocManager.Infrastructure/Services",
-      "filePattern": "^SharedDatabaseMaintenanceService(?:\\..+)?\\.cs$",
-      "maximumLines": 450,
-      "maximumAggregateLines": 2000
-    },
-    {
-      "name": "runtime license service partials",
-      "directory": "src/ExportDocManager.Infrastructure/Services/Security",
-      "filePattern": "^RuntimeLicenseService(?:\\..+)?\\.cs$",
-      "maximumLines": 420,
-      "maximumAggregateLines": 1150
-    },
-    {
-      "name": "server migration components",
-      "directory": "src/ExportDocManager.Infrastructure/Services/ServerMigration",
-      "filePattern": "^ServerMigration.*\\.cs$",
-      "maximumLines": 520
-    },
-    {
-      "name": "report template package components",
-      "directory": "src/ExportDocManager.Infrastructure/Services/Reporting",
-      "filePattern": "^ReportTemplatePackageService(?:\\..+)?\\.cs$",
-      "maximumLines": 320,
-      "maximumAggregateLines": 1250
-    },
-    {
-      "name": "built-in Excel analyzer partials",
-      "directory": "src/ExportDocManager.Infrastructure.Excel/Services/Data",
-      "filePattern": "^BuiltInExcelImportAnalyzer(?:\\..+)?\\.cs$",
-      "maximumLines": 600,
-      "maximumAggregateLines": 1550
     },
     {
       "name": "maintenance settings panels",
@@ -237,13 +146,6 @@
       "baselineAggregateLines": 891
     },
     {
-      "name": "HS API endpoint modules",
-      "directory": "src/ExportDocManager.Api/Hosting",
-      "filePattern": "^ApiMasterDataHsCode.*EndpointRouteBuilderExtensions\\.cs$",
-      "maximumLines": 520,
-      "maximumAggregateLines": 1700
-    },
-    {
       "name": "Tauri desktop command modules",
       "directory": "apps/export-doc-tauri/src-tauri/src",
       "filePattern": "^desktop_(?:commands|file_dialog_commands|open_commands|pdf_commands)\\.rs$",
@@ -263,13 +165,6 @@
       "filePattern": "^runtime_data_root_(?:migration|network|storage)\\.rs$",
       "maximumLines": 420,
       "maximumAggregateLines": 850
-    },
-    {
-      "name": "Tauri sidecar components",
-      "directory": "apps/export-doc-tauri/src-tauri/src",
-      "filePattern": "^sidecar(?:_endpoint|_process|_shutdown)?\\.rs$",
-      "maximumLines": 360,
-      "maximumAggregateLines": 900
     },
     {
       "name": "Windows desktop prerequisite modules",
@@ -295,13 +190,6 @@
       "filePattern": "^(?:main|workbook_analysis|document_fields|table_analysis|table_values|tests)\\.rs$",
       "maximumLines": 1000,
       "maximumAggregateLines": 3150
-    },
-    {
-      "name": "official OpenAPI infrastructure",
-      "directory": "src/ExportDocManager.Api/Hosting",
-      "filePattern": "^(?:ApiOpenApiDocumentTransformer|ApiOpenApiLandingPage|NullableOpenApiSchemaTransformer)\\.cs$",
-      "maximumLines": 100,
-      "maximumAggregateLines": 220
     },
     {
       "name": "application shell orchestration",
@@ -434,27 +322,12 @@
       "maximumLines": 8
     },
     {
-      "name": "personnel services",
-      "directory": "src/ExportDocManager.Infrastructure/Services/Office",
-      "filePattern": "^PersonnelService(?:\\..+)?\\.cs$",
-      "excludePattern": "/PersonnelService\\.(?:Profile|Images)\\.cs$",
-      "maximumLines": 300,
-      "maximumAggregateLines": 500
-    },
-    {
       "name": "personnel workspace components",
       "directory": "apps/export-doc-web/src/features/office",
       "filePattern": "^(?:Personnel.*|personnelModel|usePersonnelData)\\.(?:ts|tsx)$",
       "excludePattern": "/Personnel(?:Avatar|IdentityFields|ImagesPanel)\\.tsx$",
       "maximumLines": 220,
       "maximumAggregateLines": 500
-    },
-    {
-      "name": "personnel profile and image services",
-      "directory": "src/ExportDocManager.Infrastructure/Services/Office",
-      "filePattern": "^(?:PersonnelService\\.(?:Profile|Images)|PersonnelImagePolicy)\\.cs$",
-      "maximumLines": 160,
-      "maximumAggregateLines": 320
     },
     {
       "name": "personnel image and identity workspace",
@@ -464,25 +337,11 @@
       "maximumAggregateLines": 240
     },
     {
-      "name": "organization directory services",
-      "directory": "src/ExportDocManager.Infrastructure/Security",
-      "filePattern": "^OrganizationDirectoryService(?:\\..+)?\\.cs$",
-      "maximumLines": 220,
-      "maximumAggregateLines": 370
-    },
-    {
       "name": "organization directory workspace",
       "directory": "apps/export-doc-web/src/features/organization",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 200,
       "maximumAggregateLines": 420
-    },
-    {
-      "name": "personnel identity and organization regression",
-      "directory": "tests",
-      "filePattern": "^(?:PersonnelIdentityAndImageTests|OrganizationHierarchyTests|ApiPersonnelImageAndOrganizationTests|PersonnelPostgreSqlScenarios\\.ImagesAndOrganization)\\.cs$",
-      "maximumLines": 180,
-      "maximumAggregateLines": 460
     }
   ]
 }

@@ -462,7 +462,10 @@ fn managed_file_template_can_be_cloned_into_an_editable_user_draft() {
 #[test]
 fn managed_file_template_is_published_to_the_report_catalog_and_preview() {
     let workspace = Workspace::new();
-    let service = open(&workspace);
+    let mut paths = workspace.paths();
+    paths.font_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../Resources/Fonts/OpenSource/NotoSansCJKsc-Regular.otf");
+    let service = NativeService::open(paths).unwrap();
     let created = handle(
         &service,
         &admin(),

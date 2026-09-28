@@ -12,15 +12,17 @@ use std::{fs, path::PathBuf, sync::atomic::AtomicBool};
 fn provision_font(fixture: &native_fixture::Fixture) {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let workspace = manifest.parent().unwrap().parent().unwrap();
-    fs::copy(
-        workspace
-            .join("Resources")
-            .join("Fonts")
-            .join("OpenSource")
-            .join("NotoSansCJKsc-Regular.otf"),
-        fixture.root.join("font.otf"),
-    )
-    .unwrap();
+    for name in [
+        "NotoSansCJKsc-Regular.otf",
+        "NotoSansCJKsc-Bold.otf",
+        "NotoSerifCJKsc-Regular.otf",
+    ] {
+        fs::copy(
+            workspace.join("Resources/Fonts/OpenSource").join(name),
+            fixture.root.join(name),
+        )
+        .unwrap();
+    }
 }
 
 fn configure(fixture: &native_fixture::Fixture, port: u16) -> Value {

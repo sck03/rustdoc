@@ -1,10 +1,10 @@
 # ExportDocManager third-party dependency inventory
 
-Generated from committed npm/Cargo lock files, Cargo metadata and signed native-resource archive manifests. The retained C# comparison graph is excluded from Rust delivery; NPOI 2.7.6 remains enforced separately by verify-dependency-policy.mjs. The exact application build version is recorded in the accompanying machine-readable SBOM files.
+Generated from committed npm/Cargo lock files, Cargo metadata and signed native-resource archive manifests. Managed .NET projects are retired; verify-dependency-policy.mjs enforces the Rust-only source and delivery boundary. The exact application build version is recorded in the accompanying machine-readable SBOM files.
 
 Runtime image boundary: PostgreSQL client tools and their native library closure ship in web/server packages under Tools/PostgreSQL with license texts. The database server remains a separate OS/container input. Rust containers do not include .NET or a browser rendering service.
 
-## npm (129)
+## npm (131)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -122,6 +122,8 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | picocolors | 1.1.1 | ISC | web |
 | picomatch | 4.0.7 | MIT | web |
 | pixelmatch | 7.2.0 | ISC | web |
+| playwright | 1.63.0 | Apache-2.0 | web |
+| playwright-core | 1.63.0 | Apache-2.0 | web |
 | pngjs | 7.0.0 | MIT | web |
 | postcss | 8.5.28 | MIT | web |
 | react | 19.3.0 | MIT | web |
