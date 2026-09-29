@@ -17,7 +17,10 @@ members = [
     "apps/export-doc-server",
 ]
 default-members = ["apps/export-doc-tauri/src-tauri", "crates/export-doc-engine", "crates/export-doc-domain"]
-exclude = ["apps/exportdoc-ocr-rs", "tools/excel-analyzer-rs"]
+exclude = ["apps/exportdoc-ocr-rs", "tools/excel-analyzer-rs", "third_party/calamine-0.36.1"]
+
+[patch.crates-io]
+calamine = { path = "third_party/calamine-0.36.1" }
 
 [workspace.package]
 version = "0.1.1"

@@ -153,7 +153,8 @@ function collectCargoMetadata(scope, relativeManifestPath) {
   }
   const metadata = JSON.parse(result.stdout);
   for (const item of metadata.packages || []) {
-    if (!item.source) continue;
+    const vendored = path.relative(repositoryRoot, item.manifest_path).replaceAll("\\", "/").startsWith("third_party/");
+    if (!item.source && !vendored) continue;
     addComponent({
       ecosystem: "cargo",
       scope,
@@ -272,6 +273,9 @@ function buildNotices(items) {
     );
   }
 
+  lines.push("", "## Reviewed source patch", "",
+    "calamine 0.36.1 includes a two-line BIFF8 row-index overflow correction. The application and standalone analyzer use the same source; archive checksum and patch provenance are recorded in third_party/README.md.",
+    "", readRequiredText("third_party/calamine-0.36.1/LICENSE-MIT.md"));
   const usedExtractedLicenses = resolveUsedExtractedLicenses(items);
   if (usedExtractedLicenses.length > 0) {
     lines.push("", "## Extracted package license references", "");

@@ -26,6 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libs
 COPY Cargo.toml Cargo.lock ./
 COPY .cargo/ .cargo/
 COPY crates/ crates/
+COPY third_party/ third_party/
 COPY apps/export-doc-server/ apps/export-doc-server/
 COPY apps/exportdoc-ocr-rs/ apps/exportdoc-ocr-rs/
 COPY apps/export-doc-tauri/src-tauri/ apps/export-doc-tauri/src-tauri/

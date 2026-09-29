@@ -140,7 +140,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | undici-types | 8.9.0 | MIT | web |
 | vite | 8.3.1 | MIT | web |
 
-## cargo (737)
+## cargo (736)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -199,8 +199,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | bytes | 1.12.1 | MIT | native-desktop |
 | cairo-rs | 0.18.5 | MIT | native-desktop |
 | cairo-sys-rs | 0.18.2 | MIT | native-desktop |
-| calamine | 0.36.0 | MIT | excel-analyzer |
-| calamine | 0.36.1 | MIT | native-desktop |
+| calamine | 0.36.1 | MIT | excel-analyzer, native-desktop |
 | camino | 1.2.6 | MIT OR Apache-2.0 | native-desktop |
 | cargo_metadata | 0.19.2 | MIT | native-desktop |
 | cargo_toml | 0.22.3 | Apache-2.0 OR MIT | native-desktop |

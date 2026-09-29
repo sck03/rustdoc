@@ -61,8 +61,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | bytes | 1.12.1 | MIT | native-desktop |
 | cargo | cairo-rs | 0.18.5 | MIT | native-desktop |
 | cargo | cairo-sys-rs | 0.18.2 | MIT | native-desktop |
-| cargo | calamine | 0.36.0 | MIT | excel-analyzer |
-| cargo | calamine | 0.36.1 | MIT | native-desktop |
+| cargo | calamine | 0.36.1 | MIT | excel-analyzer, native-desktop |
 | cargo | camino | 1.2.6 | MIT OR Apache-2.0 | native-desktop |
 | cargo | cargo_metadata | 0.19.2 | MIT | native-desktop |
 | cargo | cargo_toml | 0.22.3 | Apache-2.0 OR MIT | native-desktop |
@@ -880,6 +879,34 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | undici-types | 8.9.0 | MIT | web |
 | npm | vite | 8.3.1 | MIT | web |
 
+## Reviewed source patch
+
+calamine 0.36.1 includes a two-line BIFF8 row-index overflow correction. The application and standalone analyzer use the same source; archive checksum and patch provenance are recorded in third_party/README.md.
+
+The MIT License (MIT)
+
+Copyright (c) 2016 Johann Tuffe
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
 ## Bundled runtime assets
 
 - Noto CJK report fonts are redistributed under the SIL Open Font License. The complete text is included below and is also shipped at `Resources/Fonts/OpenSource/OFL-Noto-CJK.txt`.
@@ -1010,7 +1037,7 @@ Commercial use is allowed by these licenses. Redistributors must preserve the ap
 
 # Rust Excel analyzer notices
 
-- `calamine` 0.36.0: MIT License.
+- `calamine` 0.36.1: MIT License. The application and analyzer use the same reviewed source patch for BIFF8 last-row formula references; provenance and the original license are preserved in `third_party/`.
 - `serde` and `serde_json`: MIT OR Apache-2.0.
 
 These dependencies are open source and permit commercial use, modification and redistribution subject to their license terms. Preserve the applicable copyright and license notices when redistributing the analyzer.
