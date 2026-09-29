@@ -12,6 +12,8 @@
 
 Tauri 是桌面宿主；浏览器与 Docker 不运行 Tauri 窗口。Node 只用于前端构建，运行包没有 Node 或 .NET 业务服务。
 
+2026-09-29 起桌面仅交付 Document/单证版与 Sales/业务员版，默认优先单证版；Sales 定位个人外贸工作台。网页/Docker 保留 Full 完整功能，账号、组织、权限及行政人事审批在多用户部署中使用。共享服务和冻结契约保留原版本类型用于行为验证，不据此提供 Full/Administration 单机发布包。
+
 ## 原版来源与职责
 
 原版只读来源为相邻 `ExportDocManager_CS/apps/export-doc-web` 与 `apps/export-doc-tauri`。页面、导航、五页签发票、商品表格、设计器、草稿保护及操作顺序直接复用原版；保留本分支已升级 Vite／TypeScript 所需构建配置，不重写一套页面。

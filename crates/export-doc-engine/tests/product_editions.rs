@@ -11,6 +11,10 @@ fn editions_limit_admin_capabilities_and_requests_after_login_and_renewal() {
         let user = fixture.request(GET_CURRENT_USER, None, None);
         assert_eq!(user["capabilities"]["productEdition"], edition);
         let grants = user["capabilities"]["permissions"].as_array().unwrap();
+        assert_eq!(
+            user["capabilities"]["canManageUsers"],
+            matches!(edition, "Full" | "Administration")
+        );
         let policy = export_doc_domain::permissions::ProductEdition::parse(edition).unwrap();
         assert!(
             grants
@@ -23,6 +27,8 @@ fn editions_limit_admin_capabilities_and_requests_after_login_and_renewal() {
             (LIST_PERSONNEL, "office.people"),
             (LIST_MEETING_ROOMS, "office.rooms"),
             (LIST_OFFICE_SUPPLIES, "office.supplies"),
+            (LIST_USERS, "system.users"),
+            (LIST_PERMISSION_TEMPLATES, "system.permissions"),
         ] {
             let result: Result<Value, _> = fixture.client().json(operation, &[], &[], None);
             if policy.allows(resource) {
@@ -39,7 +45,7 @@ fn editions_limit_admin_capabilities_and_requests_after_login_and_renewal() {
         let worklist = fixture.request(GET_WORKLIST, None, None);
         assert!(worklist.is_object());
         fixture.request(GET_LICENSE_STATUS, None, None);
-        if edition == "Administration" {
+        if matches!(edition, "Full" | "Administration") {
             fixture.employee();
             fixture.request(GET_ORGANIZATION_DIRECTORY, None, None);
             for kind in [

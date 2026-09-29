@@ -16,8 +16,8 @@ const operations = new Map(Object.entries(openapi.paths).flatMap(([url, methods]
   Object.entries(methods).filter(([, value]) => value.operationId).map(([method, value]) => [value.operationId, { url, method }])));
 const results = [];
 
-for (const edition of ['Full', 'Sales', 'Document', 'Administration']) {
-  const name = `ExportDocManager.Tauri${edition === 'Full' ? '' : `.${edition}`}`;
+for (const edition of Object.keys(productEditionCatalog.editions)) {
+  const name = `ExportDocManager.Tauri.${edition}`;
   const appRoot = path.join(packages, name);
   const marker = JSON.parse(fs.readFileSync(path.join(appRoot, 'exportdoc-native-package.json'), 'utf8'));
   assert.equal(marker.edition, edition);
@@ -66,14 +66,15 @@ for (const edition of ['Full', 'Sales', 'Document', 'Administration']) {
     assert.equal(login.body.user.capabilities.productEdition, edition);
     const statuses = {};
     for (const [id, editions] of [
-      ['ListInvoices', ['Full', 'Document']], ['GetCrmDashboard', ['Full', 'Sales']],
-      ['ListPersonnel', ['Full', 'Administration']], ['ListGeneralRequest', ['Full', 'Administration']],
+      ['ListInvoices', ['Document']], ['GetCrmDashboard', ['Sales']],
+      ['ListPersonnel', []], ['ListGeneralRequest', []], ['ListUsers', []],
     ]) {
       statuses[id] = (await request(id, login.body.accessToken)).status;
       assert.equal(statuses[id], editions.includes(edition) ? 200 : 403, `${edition} ${id}`);
     }
     const unauthorized = await request('CreatePersonnel', login.body.accessToken, {});
-    if (['Sales', 'Document'].includes(edition)) assert.equal(unauthorized.status, 403);
+    assert.equal(unauthorized.status, 403);
+    assert.equal(login.body.user.capabilities.canManageUsers, false);
     await run("document.querySelector('input[autocomplete=username]').focus()");
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
@@ -84,18 +85,12 @@ for (const edition of ['Full', 'Sales', 'Document', 'Administration']) {
     assert(!await run("!!document.querySelector('input[autocomplete=username]')"), `${edition}: React login failed`);
     await delay(500);
     const text = await run('document.body.innerText');
-    const expectedHome = edition === 'Sales' ? '/crm/dashboard' : edition === 'Administration' ? '/office/people' : '/dashboard';
+    const expectedHome = edition === 'Sales' ? '/crm/dashboard' : '/dashboard';
     assert.equal(await run('location.hash'), `#${expectedHome}`, `${edition}: fixed edition home`);
     assert(!text.includes('当前页面不可用'), `${edition}: first login must not show a permission redirect warning`);
     assert(text.includes(productEditionCatalog.editions[edition].displayName), `${edition}: wrong product title`);
     await captureScreenshot(cdp, path.join(output, `${edition}.png`));
-    if (edition === 'Administration') {
-      assert(text.includes('人事管理') && text.includes('行政办公'));
-      await run("location.hash = '#/office/requests/general'");
-      await delay(800);
-      assert((await run('document.body.innerText')).includes('通用申请'));
-      await captureScreenshot(cdp, path.join(output, `${edition}-general.png`));
-    }
+    assert(!text.includes('人事管理') && !text.includes('行政办公') && !text.includes('账号与权限'));
     results.push({ edition, home: expectedHome, ocr: marker.ocr, documentResources: marker.documentResources, statuses, screenshot: `${edition}.png` });
     await run("setTimeout(() => window.__TAURI_INTERNALS__.invoke('request_app_exit'), 100); true");
     const exitDeadline = Date.now() + 50000;
@@ -108,4 +103,4 @@ for (const edition of ['Full', 'Sales', 'Document', 'Administration']) {
   }
 }
 fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify(results, null, 2));
-console.log(`Four Windows desktop editions passed: ${output}`);
+console.log(`Document and Sales Windows desktop editions passed: ${output}`);

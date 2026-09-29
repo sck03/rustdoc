@@ -87,12 +87,10 @@ export async function runSettingsWorkspaceCases({ open, currentPage, read, click
   await waitFor(page, "window.__calls.some(c=>c.name==='listPostgreSqlPhysicalBackups')");
   await audit(page, "settings-postgresql-backup-and-scoped-defaults");
 
-  for (const edition of ["Sales", "Administration"]) {
-    await start(`&edition=${edition}&section=documentFields`);
-    assert.equal(await read(page, "document.querySelector('.settings-category-nav').textContent.includes('单据设置')"), false);
-    assert(await read(page, "Boolean(document.querySelector('[aria-label=数据库连接]'))"));
-    await audit(page, `settings-${edition}-category-filter`);
-  }
+  await start("&edition=Sales&desktop=1&section=documentFields");
+  assert.equal(await read(page, "document.querySelector('.settings-category-nav').textContent.includes('单据设置')"), false);
+  assert(await read(page, "Boolean(document.querySelector('[aria-label=数据库连接]'))"));
+  await audit(page, "settings-Sales-category-filter");
   await start("&section=documentFields&group=payment&role=reader", 390);
   assert.equal(await read(page, "document.querySelector('[aria-label=单据字段名称] select').value"), "payment");
   assert(await read(page, "[...document.querySelectorAll('[aria-label=单据字段名称] input')].every(n=>n.matches(':disabled'))"));

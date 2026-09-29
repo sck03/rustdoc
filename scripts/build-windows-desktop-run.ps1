@@ -1,7 +1,7 @@
 # Original public Windows entry retained; shared Rust packaging owns the build.
 [CmdletBinding()]
 param(
-    [ValidateSet('All', 'Full', 'Document', 'Sales', 'Administration')][string]$Edition = 'All',
+    [ValidateSet('All', 'Document', 'Sales')][string]$Edition = 'All',
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
     [string]$RustTarget, [string]$OutputDir, [string]$CargoTargetDir,
     [switch]$PreflightOnly, [switch]$SkipMainBuild, [switch]$WithoutOcr, [switch]$NoPause
@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
 if ($env:OS -ne 'Windows_NT') { throw 'This entry requires Windows.' }
 if ($CargoTargetDir) { $env:CARGO_TARGET_DIR = [IO.Path]::GetFullPath($CargoTargetDir) }
-$editions = if ($Edition -eq 'All') { @('Full', 'Sales', 'Document', 'Administration') } else { @($Edition) }
+$editions = if ($Edition -eq 'All') { @(Get-ExportDocProductEditionNames) } else { @($Edition) }
 $interactiveLaunch = Test-ExportDocPauseEnabled -NoPauseRequested $NoPause
 try {
     for ($index = 0; $index -lt $editions.Count; $index++) {
@@ -22,7 +22,7 @@ try {
         if ($index -gt 0) { $arguments += '-SkipFrontendBuild' }
         if ($RustTarget) { $arguments += @('-RustTarget', $RustTarget) }
         if ($OutputDir) {
-            $name = if ($current -eq 'Full') { 'ExportDocManager.Tauri' } else { "ExportDocManager.Tauri.$current" }
+            $name = "ExportDocManager.Tauri.$current"
             $arguments += @('-OutputRoot', (Join-Path $OutputDir $name))
         }
         Invoke-ExportDocExternal -FilePath 'pwsh' -Arguments $arguments -WorkingDirectory (Split-Path -Parent $PSScriptRoot) -DisplayName "Package $current desktop"

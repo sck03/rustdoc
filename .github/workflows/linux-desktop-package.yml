@@ -15,10 +15,10 @@ on:
         type: choice
         options: [x64, arm64, all]
       edition:
-        description: '产品版本；All 生成全能、业务、单证、行政人事四版'
+        description: '单机产品；All 生成单证、业务员两版'
         type: choice
         default: All
-        options: [All, Full, Sales, Document, Administration]
+        options: [All, Document, Sales]
       publish_release:
         description: '构建成功后上传到对应版本的 GitHub Release'
         type: boolean

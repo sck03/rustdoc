@@ -102,14 +102,14 @@ jobs:
         run: cargo check --locked -p export-doc-server --target ${{ matrix.target }}
       - name: Verify native dependency boundaries
         run: node scripts/verify-native-desktop.mjs --target ${{ matrix.target }}
-      - name: Build full native desktop package including OCR
+      - name: Build Document desktop package including OCR
         shell: pwsh
         run: ./scripts/build-native.ps1 -NoPause -RustTarget ${{ matrix.target }}
       - name: Upload green desktop package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: exportdoc-native-desktop-${{ matrix.target }}
-          path: artifacts/native-desktop/ExportDocManager.Tauri
+          name: exportdoc-native-desktop-Document-${{ matrix.target }}
+          path: artifacts/native-desktop/ExportDocManager.Tauri.Document
           if-no-files-found: error
 
   browser-server:

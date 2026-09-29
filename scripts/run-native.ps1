@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$AppRoot, [switch]$NoPause)
+param([ValidateSet('Document', 'Sales')][string]$Edition = 'Document', [string]$AppRoot, [switch]$NoPause)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
 $interactiveLaunch = Test-ExportDocPauseEnabled -NoPauseRequested $NoPause
@@ -9,7 +9,7 @@ trap {
     exit 1
 }
 if ([string]::IsNullOrWhiteSpace($AppRoot)) {
-    $AppRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/native-desktop/ExportDocManager.Tauri'
+    $AppRoot = Join-Path (Split-Path -Parent $PSScriptRoot) "artifacts/native-desktop/ExportDocManager.Tauri.$Edition"
 }
 $executableName = if ($env:OS -eq 'Windows_NT') { 'ExportDocManager.exe' } else { 'ExportDocManager' }
 $executable = Join-Path $AppRoot $executableName

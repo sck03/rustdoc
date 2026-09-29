@@ -3,7 +3,7 @@ import { createReleasePlan } from "../lib/native-release-plan.mjs";
 
 const plan = createReleasePlan({ product: process.env.RELEASE_PRODUCT, os: process.env.RELEASE_OS,
   architecture: process.env.RELEASE_ARCHITECTURE, version: process.env.RELEASE_VERSION,
-  repository: process.env.GITHUB_REPOSITORY, edition: process.env.RELEASE_EDITION || 'Full' });
+  repository: process.env.GITHUB_REPOSITORY, edition: process.env.RELEASE_EDITION });
 if (process.env.PUBLISH_LATEST === "true" && (process.env.PUBLISH !== "true"
     || process.env.RELEASE_ARCHITECTURE !== "all" || plan.version.includes("-"))) {
   throw new Error("latest 仅允许在发布全部架构的稳定版本时更新。");

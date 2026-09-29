@@ -82,70 +82,21 @@ export function stageReportHtmlWithBundledFonts(repoRoot, sourcePath, destinatio
 }
 
 export function locateChromeForTesting(repoRoot, preference = "headless-shell") {
-  const playwrightCacheRoot = path.join(repoRoot, "artifacts", "playwright-browsers");
+  const playwrightCacheRoot = path.resolve(process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(repoRoot, "artifacts", "playwright-browsers"));
   const playwrightChromiumRoots = fs.existsSync(playwrightCacheRoot)
     ? fs.readdirSync(playwrightCacheRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory() && entry.name.startsWith("chromium-"))
+      .filter((entry) => entry.isDirectory() && /^chromium[-_]/u.test(entry.name))
       .map((entry) => path.join(playwrightCacheRoot, entry.name))
     : [];
-  const manifestRoots = [
-    path.join(repoRoot, "Browsers", "ChromeForTesting"),
-    path.join(repoRoot, "ExportDocManager", "Browsers", "ChromeForTesting"),
-    path.join(repoRoot, "src", "ExportDocManager.Api", "bin"),
-    ...playwrightChromiumRoots,
-  ];
-
   const candidates = [];
-  const seenExecutablePaths = new Set();
 
-  function addCandidate(manifestPath, executablePath, isHeadlessShell, rootIndex) {
-    if (!executablePath || !fs.existsSync(executablePath)) {
-      return;
-    }
-
-    const normalizedPath = path.resolve(executablePath).toLowerCase();
-    if (seenExecutablePaths.has(normalizedPath)) {
-      return;
-    }
-
-    seenExecutablePaths.add(normalizedPath);
-    candidates.push({ manifestPath, executablePath, isHeadlessShell, rootIndex });
-  }
-
-  for (let rootIndex = 0; rootIndex < manifestRoots.length; rootIndex += 1) {
-    const root = manifestRoots[rootIndex];
-    if (!fs.existsSync(root)) {
-      continue;
-    }
-
-    for (const manifestPath of findFiles(root, "chrome-for-testing.manifest.json")) {
-      try {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-        const isHeadlessShell =
-          manifest.product === "ChromeHeadlessShell" ||
-          String(manifest.executablePath || manifestPath).toLowerCase().includes("headless");
-        addCandidate(manifestPath, manifest.executablePath, isHeadlessShell, rootIndex);
-
-        const expectedFileName = isHeadlessShell
-          ? process.platform === "win32"
-            ? "chrome-headless-shell.exe"
-            : "chrome-headless-shell"
-          : process.platform === "win32"
-            ? "chrome.exe"
-            : "chrome";
-        for (const executablePath of findFiles(path.dirname(manifestPath), expectedFileName)) {
-          addCandidate(manifestPath, executablePath, isHeadlessShell, rootIndex);
-        }
-      } catch {
-        // Try the next manifest.
-      }
-    }
-
+  for (let rootIndex = 0; rootIndex < playwrightChromiumRoots.length; rootIndex += 1) {
+    const root = playwrightChromiumRoots[rootIndex];
     for (const fileName of process.platform === "win32"
       ? ["chrome-headless-shell.exe", "chrome.exe"]
-      : ["chrome-headless-shell", "chrome"]) {
+      : ["chrome-headless-shell", "chrome", "Chromium", "Google Chrome for Testing"]) {
       for (const executablePath of findFiles(root, fileName)) {
-        addCandidate(executablePath, executablePath, fileName.includes("headless"), rootIndex);
+        candidates.push({ executablePath, isHeadlessShell: fileName.includes("headless"), rootIndex });
       }
     }
   }
@@ -153,7 +104,7 @@ export function locateChromeForTesting(repoRoot, preference = "headless-shell") 
   const ordered = candidates.sort((left, right) => {
     const leftRank = rankChromeCandidate(left, preference);
     const rightRank = rankChromeCandidate(right, preference);
-    return leftRank - rightRank || left.rootIndex - right.rootIndex || left.manifestPath.length - right.manifestPath.length;
+    return leftRank - rightRank || left.rootIndex - right.rootIndex || left.executablePath.length - right.executablePath.length;
   });
   const selected = ordered.find((candidate) => preference !== "full-chrome" || !candidate.isHeadlessShell);
   if (selected) {
@@ -161,9 +112,9 @@ export function locateChromeForTesting(repoRoot, preference = "headless-shell") 
   }
 
   throw new Error(
-    preference === "full-chrome"
-      ? "Full Chromium for PDF viewer regression was not found under program-root Browsers or the repository Playwright cache."
-      : "Chrome for Testing was not found. Run scripts/provision-chrome-for-testing.ps1 first.",
+    `Test Chromium (${preference}) is missing from ${playwrightCacheRoot}. ` +
+    "Set PLAYWRIGHT_BROWSERS_PATH to the repository artifacts/playwright-browsers directory, then run " +
+    "node apps/export-doc-web/node_modules/playwright/cli.js install chromium.",
   );
 }
 

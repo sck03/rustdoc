@@ -8,6 +8,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { normalizeReleaseVersion } from "./lib/release-version.mjs";
 import { createReleasePlan } from "./lib/native-release-plan.mjs";
+import { normalizeProductEdition, productEditionCatalog } from "./lib/product-editions.mjs";
 import { syncVersion } from "./sync-version.mjs";
 import { promoteContainerRelease } from "./lib/container-release.mjs";
 
@@ -28,12 +29,24 @@ try {
   const base = { product: "desktop", os: "all", architecture: "all", version: "v2.3.4", repository: "Owner/RustDoc" };
   const plan = createReleasePlan(base);
   assert.equal(plan.matrix.include.length, 5);
+  assert(plan.matrix.include.every(item => item.edition === 'Document'));
+  assert.deepEqual(Object.keys(productEditionCatalog.editions), ['Document', 'Sales']);
+  assert.equal(normalizeProductEdition(), 'Document');
+  assert.equal(normalizeProductEdition(' sales '), 'Sales');
   const allEditions = createReleasePlan({ ...base, edition: 'All' }).matrix.include;
-  assert.equal(allEditions.length, 20);
-  assert.equal(new Set(allEditions.map(item => `${item.artifact}-${item.edition}`)).size, 20);
-  assert.deepEqual(createReleasePlan({ ...base, os: 'windows', architecture: 'x64', edition: 'Administration' }).matrix.include.map(item => item.edition), ['Administration']);
+  assert.equal(allEditions.length, 10);
+  assert.equal(new Set(allEditions.map(item => `${item.artifact}-${item.edition}`)).size, 10);
+  for (const edition of ['Full', 'Administration']) {
+    assert.throws(() => createReleasePlan({ ...base, edition }));
+    assert.throws(() => normalizeProductEdition(edition));
+  }
+  assert.deepEqual(createReleasePlan({ ...base, os: 'windows', architecture: 'x64', edition: 'Sales' }).matrix.include.map(item => item.edition), ['Sales']);
   assert.throws(() => createReleasePlan({ ...base, edition: 'invalid' }));
   assert.throws(() => createReleasePlan({ ...base, product: 'web', edition: 'All' }));
+  for (const product of ['web', 'container']) {
+    assert.doesNotThrow(() => createReleasePlan({ ...base, product, os: 'linux', edition: 'Full' }));
+    assert.throws(() => createReleasePlan({ ...base, product, os: 'linux', edition: 'Sales' }));
+  }
   assert.equal(plan.image, "ghcr.io/owner/exportdoc-rust-native");
   assert.deepEqual(createReleasePlan({ ...base, product: "container", os: "linux" }).matrix.include.map(item => item.platform), ["linux/amd64", "linux/arm64"]);
   assert.deepEqual(createReleasePlan({ ...base, product: "web" }).matrix.include.map(item => item.artifact), ["windows-x64", "linux-x64", "linux-arm64", "macos-arm64"]);
@@ -93,11 +106,11 @@ async function testPackageWorkflow() {
   const block = workflow.match(/name: Build and archive product package\r?\n\s+shell: pwsh\r?\n\s+run: \|\r?\n([\s\S]*?)(?=      - uses:)/u)?.[1];
   assert(block, "package workflow contains an executable build/archive step");
   await write("workflow.ps1", "$ErrorActionPreference = 'Stop'\n" + block.replace(/^          /gmu, ""));
-  const stub = "param($Edition='Full')\n$desktop = 'artifacts/native-desktop/ExportDocManager.Tauri'\nif ($Edition -ne 'Full') { $desktop += \".$Edition\" }\nNew-Item -ItemType Directory -Force -Path $desktop, 'artifacts/native-web-server', 'target/test/release/bundle' | Out-Null\n";
+  const stub = "param($Edition='Document')\n$desktop = \"artifacts/native-desktop/ExportDocManager.Tauri.$Edition\"\nNew-Item -ItemType Directory -Force -Path $desktop, 'artifacts/native-web-server', 'target/test/release/bundle' | Out-Null\n";
   for (const script of ["build-native", "package-native-web-server"]) await write(`scripts/${script}.ps1`, stub);
   await write("scripts/lib/archive-native-release.ps1", "param($Source,$Destination)\nif (!(Test-Path -LiteralPath $Source)) { throw 'Missing package' }\nNew-Item -ItemType Directory -Force -Path (Split-Path -Parent $Destination) | Out-Null\nSet-Content -LiteralPath $Destination -Value archive\n");
   const execute = promisify(execFile);
-  for (const [product, edition] of [["desktop", "Full"], ["desktop", "Sales"], ["desktop", "Document"], ["desktop", "Administration"], ["web", "Full"]]) {
+  for (const [product, edition] of [["desktop", "Document"], ["desktop", "Sales"], ["web", "Full"]]) {
     const buildScript = `scripts/${product === "desktop" ? "build-native" : "package-native-web-server"}.ps1`;
     await write(buildScript, stub);
     const env = { ...process.env, RELEASE_PRODUCT: product, RELEASE_EDITION: edition, RELEASE_VERSION: "1.2.3", ARTIFACT_PLATFORM: "test", RUST_TARGET: "test", BUNDLE_TARGETS: "test", CARGO_TARGET_DIR: path.join(temporary, "target") };

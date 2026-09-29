@@ -14,7 +14,7 @@
 
 Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ubuntu 24.04 x64/ARM64 runner；macOS 使用 Apple Silicon runner。按用户确认继续停用 Intel macOS。Windows 网页服务只开放 x64，因为当前受管 PostgreSQL 客户端仅提供 Windows x64；macOS 网页服务仅 ARM64。选择不存在的组合在构建前报错；all 只包含已定义的目标。
 
-桌面和 Web 共用 [native-package-reusable.yml](../.github/workflows/native-package-reusable.yml)，它仅接受内部调用，不显示另一个手工打包入口。桌面入口默认 edition=All，按版本与平台建立独立构建任务，也可选择 Full、Sales、Document、Administration；Web 保持 Full。Full/Document 包含 OCR 和单证模板，Sales/Administration 不附这些资源；四版保留 PDFium、字体及许可。Full 归档沿用原名，其它版本在平台后追加版本名，避免同名覆盖。
+桌面和 Web 共用 [native-package-reusable.yml](../.github/workflows/native-package-reusable.yml)，它仅接受内部调用，不显示另一个手工打包入口。桌面入口默认 edition=All，只生成 Document、Sales 两版，也可单选；内部省略版本时默认 Document。Web/Docker 保持 Full 完整功能，行政人事及团队协作集中于多用户部署。Document 包含 OCR 和单证模板，Sales 不附这些资源；两版均保留 PDFium、字体及许可。桌面归档在平台后追加版本名，Full/Administration 桌面构建参数拒绝，旧发布资产不自动转换。
 
 ## 版本号与下载
 
@@ -23,7 +23,7 @@ Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ub
 3. 仅下载构建产物时保持发布开关关闭。运行成功后从该次 Actions 页面下载 Artifacts。
 4. 桌面/Web 选择 `publish_release`，所有所选目标成功后上传至 `v<version>` 的 GitHub Release。首次创建先使用 draft，附件上传完成后公开；预发布版本标记 prerelease。此流程不更新 latest 发布指针或自动更新通道。
 
-版本统一进入 version.json、Rust workspace、Tauri、React/npm 锁文件、独立 OCR/Excel 工具和包内标记。归档名称形如 `exportdoc-desktop-0.1.2-windows-x64.zip`、`exportdoc-web-0.1.2-linux-arm64.tar.gz`，每份附 SHA-256。CI 不自动提交源码版本；本地用 `node scripts/sync-version.mjs 0.1.2` 同步。
+版本统一进入 version.json、Rust workspace、Tauri、React/npm 锁文件、独立 OCR/Excel 工具和包内标记。归档名称形如 `exportdoc-desktop-0.1.2-windows-x64-Document.zip`、`exportdoc-web-0.1.2-linux-arm64.tar.gz`，每份附 SHA-256。CI 不自动提交源码版本；本地用 `node scripts/sync-version.mjs 0.1.2` 同步。
 
 同一版本的其它系统包可随后上传，但必须选择同一源码提交。已有标签指向另一提交或同名附件内容不同会明确失败，不覆盖旧包。重复上传相同字节会复用已有附件；重新构建若产生不同字节，应使用新版本。Unix 先 tar.gz 再上传，以保留执行位及 .app 链接结构。
 

@@ -11,7 +11,7 @@ import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs"
 // Windows integration gate: run against a built package, with isolated writable data.
 assert.equal(process.platform, "win32", "WebView2 lifecycle verification requires Windows");
 const repo = path.resolve(import.meta.dirname, "..");
-const appRoot = path.resolve(process.argv[2] || path.join(repo, "artifacts/native-desktop/ExportDocManager.Tauri"));
+const appRoot = path.resolve(process.argv[2] || path.join(repo, "artifacts/native-desktop/ExportDocManager.Tauri.Document"));
 const executable = path.resolve(process.argv[3] || path.join(appRoot, "ExportDocManager.exe"));
 const output = path.join(repo, "artifacts/desktop-shutdown", `${Date.now()}`);
 fs.mkdirSync(output, { recursive: true });

@@ -94,11 +94,11 @@ const salesGroups = model.filterWorkspaceNavGroups({
 });
 const salesEditionAdminGroups = model.filterWorkspaceNavGroups({ productEdition: "Sales", canManageSettings: true, canUseSalesWorkspace: true, isDesktopRuntime: true, ...fullNavigationGrants });
 const browserAdminGroups = model.filterWorkspaceNavGroups({ productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, isDesktopRuntime: false, ...fullNavigationGrants });
-const fullDesktopCapabilities = { productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, usesOfficeRegister: true, isDesktopRuntime: true, ...fullNavigationGrants };
-const adminGroups = model.filterWorkspaceNavGroups(fullDesktopCapabilities);
-assert(adminGroups.find((group) => group.key === "office")?.items.length === 6, "Full desktop includes office resources and four administrative request modules");
-assert(adminGroups.find((group) => group.key === "personnel")?.items.length === 4, "Full desktop separates directory, personnel, leave and overtime");
-assert(product.getDefaultWorkspaceRoute(fullDesktopCapabilities) === "/dashboard", "Full desktop retains its business home after enabling administration");
+const fullTeamCapabilities = { productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, isDesktopRuntime: false, ...fullNavigationGrants };
+const adminGroups = model.filterWorkspaceNavGroups(fullTeamCapabilities);
+assert(adminGroups.find((group) => group.key === "office")?.items.length === 6, "Full team edition includes office resources and four administrative request modules");
+assert(adminGroups.find((group) => group.key === "personnel")?.items.length === 4, "Full team edition separates directory, personnel, leave and overtime");
+assert(product.getDefaultWorkspaceRoute(fullTeamCapabilities) === "/dashboard", "Full team edition retains its business home");
 for (const item of navigationItems) {
   assert(navigationItems.filter((candidate) => candidate.isActive(item.to)).length === 1, `each route has one navigation owner: ${item.to}`);
   for (const route of item.children ?? [item]) assert(model.getRequiredModule(route.to) === (route.moduleKey ?? null), `leaf route keeps its permission module: ${route.to}`);
@@ -212,17 +212,17 @@ assert(product.getDefaultWorkspaceRoute({ canUseDocumentWorkspace: true, enabled
 assert(product.getDefaultWorkspaceRoute({ productEdition: "Sales", canUseSalesWorkspace: true, enabledModules: ["sales.dashboard"], permissions: salesPermissions }) === "/crm/dashboard", "sales edition fixed home");
 assert(product.getDefaultWorkspaceRoute({ productEdition: "Sales", canUseSalesWorkspace: true, enabledModules: ["sales.opportunities"], permissions: [permissionGrant("sales.opportunities", "view")] }) === "/access-denied", "custom permissions do not change the fixed edition home");
 assert(product.getDefaultWorkspaceRoute({ enabledModules: [] }) === "/access-denied", "empty permission template uses access denied route");
-assert(product.getProductEditionPresentation("Document").displayName === "外贸业务综合管理系统（单证员版）", "document edition brand name");
+assert(product.getProductEditionPresentation("Document").displayName === "外贸业务综合管理系统（单证版）", "document edition brand name");
 assert(product.getProductEditionPresentation("Sales").displayName === "外贸业务综合管理系统（业务员版）", "sales edition brand name");
 assert(product.getProductEditionPresentation("Full").displayName === "外贸业务综合管理系统（全功能版）", "full edition brand name");
 assert(product.getProductEditionPresentation("Administration").editionName === "行政人事版", "administration includes human resources");
 const editionPermissions = JSON.parse(fs.readFileSync(path.join(repoRoot, "crates/export-doc-contracts/src/generated_contract.json"), "utf8")).permissions;
-for (const edition of ["Full", "Document", "Sales", "Administration"]) {
+for (const edition of ["Full", "Document", "Sales"]) {
   const resources = editionPermissions.resources.filter(resource => edition === "Full" || editionPermissions.editions[edition].includes(resource.key));
   const enabledModules = [...new Set(resources.map(resource => resource.moduleKey))];
   const editionCapabilities = {
     productEdition: edition,
-    enabledModules, isDesktopRuntime: true, usesOfficeRegister: true, canManageSettings: true,
+    enabledModules, isDesktopRuntime: edition !== "Full", canManageSettings: true,
     canManageUsers: resources.some(resource => resource.key === "system.users"),
     canUseDocumentWorkspace: edition === "Full" || edition === "Document",
     canUseSalesWorkspace: edition === "Full" || edition === "Sales",
@@ -234,11 +234,10 @@ for (const edition of ["Full", "Document", "Sales", "Administration"]) {
   assert(globalThis.__routeAccess.isWorkspaceModuleAccessAllowed("/", { capabilities: editionCapabilities }), `${edition}: root is a neutral landing redirect`);
   const routes = model.getWorkspaceRouteItems(groups).map(item => item.to);
   for (const route of ["/office/people", "/office/directory", "/office/meeting-rooms", "/office/supplies", "/office/approvals", "/office/requests/leave", "/office/requests/overtime", "/office/requests/expense", "/office/requests/travel", "/office/requests/purchase", "/office/requests/general"]) {
-    assert(routes.includes(route) === ["Full", "Administration"].includes(edition), `${edition}: office and personnel route ${route}`);
+    assert(routes.includes(route) === (edition === "Full"), `${edition}: office and personnel route ${route}`);
   }
-  if (edition === "Administration") {
-    assert(groups.some(group => group.label === "人事管理") && groups.some(group => group.label === "行政办公"), "both office navigation sections remain visible");
-    assert(!routes.includes("/invoices") && !routes.includes("/crm/follow-ups"), "administration has no document or sales routes");
+  for (const route of ["/system/access-control", "/system/organization", "/audit-logs"]) {
+    assert(routes.includes(route) === (edition === "Full"), `${edition}: team administration route ${route}`);
   }
 }
 assert(new Set(["Document", "Sales", "Full"].map((edition) => product.getProductEditionPresentation(edition).productName)).size === 1, "all editions share the same product brand");

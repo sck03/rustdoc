@@ -10,7 +10,9 @@ const runtime = read("apps/export-doc-tauri/src-tauri/src/tauri_updater_commands
 assert.deepEqual(config.plugins.updater.endpoints, []);
 assert.equal(config.plugins.updater.pubkey, "");
 assert.deepEqual(config.bundle.windows.webviewInstallMode, { type: "downloadBootstrapper", silent: true });
-assert.equal(config.identifier, "com.exportdocmanager.desktop.full");
+const catalog = JSON.parse(read("scripts/product-editions.json"));
+assert.equal(config.identifier, catalog.editions[catalog.defaultEdition].identifier);
+assert.equal(config.productName, catalog.editions[catalog.defaultEdition].productName);
 assert.equal(JSON.parse(permissions).remote, undefined, "release IPC must not grant external pages a desktop capability");
 for (const requirement of ["TAURI_SIGNING_PRIVATE_KEY", "TAURI_SIGNING_PRIVATE_KEY_PASSWORD", "EXPORTDOCMANAGER_UPDATER_PUBLIC_KEY", "createUpdaterArtifacts: true", "EXPORTDOCMANAGER_ALLOW_INSECURE_UPDATER_ENDPOINT", "--locked"]) {
   assert.ok(build.includes(requirement), `missing updater build requirement ${requirement}`);

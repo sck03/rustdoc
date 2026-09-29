@@ -41,7 +41,7 @@ export function AboutPage({
           <DetailItem label="产品" value={product.displayName} />
           <DetailItem label="版本" value={productVersionText} />
           <DetailItem label="版本形态" value={product.editionName} />
-          <DetailItem label="使用方式" value={isDesktopRuntime ? "桌面工作区" : "多人协作工作区"} />
+          <DetailItem label="使用方式" value={isDesktopRuntime ? "单机工作区" : "多人协作工作区"} />
           <DetailItem label="发行方" value="steven.sck 施" />
           <DetailItem label="版权" value="Copyright © 2026 steven.sck 施" wide />
         </div>

@@ -49,21 +49,21 @@ for (const [day, hours] of [["2026-03-08", 23], ["2026-11-01", 25]]) {
 assert.equal(office.officeDayRange("2026-02-30", "Asia/Shanghai"), null);
 assert.equal(office.shiftOfficeBookingEnd("2026-03-08T02:30", "America/New_York"), "");
 assert.equal(office.shiftOfficeBookingEnd("2026-09-07T10:30", "Asia/Shanghai"), "2026-09-07T11:30");
-assert.equal(getDefaultWorkspaceRoute(user.capabilities), "/office/meeting-rooms", "office-only employees need a usable landing page");
+assert.equal(getDefaultWorkspaceRoute(user.capabilities), "/access-denied", "missing fixed home permission must not choose an unrelated business page");
 assert(navigation.filterWorkspaceNavGroups(user.capabilities).some(group => group.key === "office"));
 assert(!navigation.filterWorkspaceNavGroups({ ...user.capabilities, isDesktopRuntime: true }).some(group => group.key === "office"));
 for (const pathname of ["/office/meeting-rooms", "/office/supplies"]) {
-  const args = { pathname, user, canManageSystem: false, isFullEdition: true, isDesktopRuntime: false };
+  const args = { pathname, user, canManageSystem: false, isDesktopRuntime: false };
   assert(isRouteAccessAllowed(args));
   assert(!isRouteAccessAllowed({ ...args, isDesktopRuntime: true }), "desktop deep links must be denied even with a stale capability snapshot");
   assert(!isRouteAccessAllowed({ ...args, user: { ...user, capabilities: { ...user.capabilities, enabledModules: [] } } }));
 }
 const descriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
 const personnelUser = { ...user, capabilities: { ...user.capabilities, enabledModules: ["office.people"], permissions: [{resourceKey:"office.people",action:"view",dataScope:"company"}] } };
-assert.equal(getDefaultWorkspaceRoute(personnelUser.capabilities), "/office/directory");
-assert(isRouteAccessAllowed({ pathname:"/office/directory",user:personnelUser,canManageSystem:false,isFullEdition:false,isDesktopRuntime:false }));
-assert(!isRouteAccessAllowed({ pathname:"/office/people",user:personnelUser,canManageSystem:false,isFullEdition:false,isDesktopRuntime:false }));
-assert(!isRouteAccessAllowed({ pathname:"/office/people",user:personnelUser,canManageSystem:true,isFullEdition:true,isDesktopRuntime:true }));
+assert.equal(getDefaultWorkspaceRoute(personnelUser.capabilities), "/access-denied");
+assert(isRouteAccessAllowed({ pathname:"/office/directory",user:personnelUser,canManageSystem:false,isDesktopRuntime:false }));
+assert(!isRouteAccessAllowed({ pathname:"/office/people",user:personnelUser,canManageSystem:false,isDesktopRuntime:false }));
+assert(!isRouteAccessAllowed({ pathname:"/office/people",user:personnelUser,canManageSystem:true,isDesktopRuntime:true }));
 assert(!personnel.canViewPersonnelDetails(personnelUser));
 assert(personnel.canViewPersonnelDetails({ ...personnelUser, capabilities:{permissions:[{resourceKey:"office.people",action:"view-details",dataScope:"department"}]} }));
 assert.deepEqual(personnel.personnelWorkflows({ canTransition:false,employee:{status:"Active"} }), []);
@@ -96,10 +96,11 @@ const registerUser = { ...manager, capabilities: { ...manager.capabilities, prod
   permissions:[...grants("all"), ...["view","view-details"].map(action=>({resourceKey:"office.people",action,dataScope:"all"}))] } };
 assert.equal(getDefaultWorkspaceRoute(registerUser.capabilities), "/office/people");
 assert.equal(navigation.filterWorkspaceNavGroups({ ...registerUser.capabilities, isDesktopRuntime:true }).filter(group=>['office','personnel'].includes(group.key)).flatMap(group=>group.items).length,4);
-const fullRegisterUser = { ...registerUser, capabilities: { ...registerUser.capabilities, productEdition: "Full", canUseDocumentWorkspace: true, canUseSalesWorkspace: true } };
+// The retained SQLite registration fixture is not a shipping desktop edition.
+const fullTeamUser = { ...registerUser, capabilities: { ...registerUser.capabilities, productEdition: "Full", usesOfficeRegister:false, canUseDocumentWorkspace: true, canUseSalesWorkspace: true } };
 for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supplies"]) {
-  assert(isRouteAccessAllowed({ pathname, user: fullRegisterUser, canManageSystem: true, isDesktopRuntime: true }), "Full desktop permits direct administration routes");
-  assert(!isRouteAccessAllowed({ pathname, user: { ...fullRegisterUser, capabilities: { ...fullRegisterUser.capabilities, enabledModules: [], permissions: [] } }, canManageSystem: true, isDesktopRuntime: true }), "edition availability never overrides missing grants");
+  assert(isRouteAccessAllowed({ pathname, user: fullTeamUser, canManageSystem: true, isDesktopRuntime: false }), "Full team edition permits direct administration routes");
+  assert(!isRouteAccessAllowed({ pathname, user: { ...fullTeamUser, capabilities: { ...fullTeamUser.capabilities, enabledModules: [], permissions: [] } }, canManageSystem: true, isDesktopRuntime: false }), "edition availability never overrides missing grants");
 }
 for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supplies", "/system/access-control", "/system/organization"]) {
   assert(isRouteAccessAllowed({ pathname, user:registerUser, canManageSystem:true, isDesktopRuntime:true }));

@@ -4,7 +4,6 @@ param(
     [switch]$IncludePackageCaches,
     [switch]$IncludeCodexRuntimeWorkspaces,
     [switch]$IncludeCodexRuntime,
-    [switch]$IncludeLegacyRuntimeAssets,
     [switch]$IncludeReleaseOutputs,
     [switch]$ListOnly
 )
@@ -378,9 +377,6 @@ function Get-GeneratedArtifactCleanupPlan {
         Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "apps/.codex-runtime/npm-cache") -Reason "legacy app npm download cache"
         Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "apps/export-doc-tauri/.codex-runtime/npm-cache") -Reason "Tauri npm download cache"
         Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "apps/export-doc-web/.codex-runtime/npm-cache") -Reason "Web npm download cache"
-    }
-    if ($IncludeLegacyRuntimeAssets) {
-        Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "Browsers\ChromeForTesting") -Reason "optional browser renderer asset copy"
     }
 
     $topLevelTargets = [System.Collections.Generic.List[object]]::new()

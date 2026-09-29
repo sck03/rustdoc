@@ -26,16 +26,15 @@ await require("esbuild").build({ stdin: { resolveDir: web, loader: "tsx", conten
   import {ConfirmationProvider} from './src/ui/ConfirmationProvider.tsx';
   import {JobCenterPage} from './src/features/jobs/JobCenterPage.tsx';
   import './src/styles.css'; import './src/theme.css'; import './src/responsiveOverrides.css';
-  const params=new URLSearchParams(location.search), edition=params.get('edition')||'Full', desktop=params.get('runtime')!=='browser';
-  const workspaces=edition==='Full'?['document','sales','office']:edition==='Administration'?['office']:edition==='Sales'?['sales']:['document'];
-  if(!desktop&&!workspaces.includes('office'))workspaces.push('office');
-  const items=getWorkspaceRouteItems().filter(item=>(!item.workspace||workspaces.includes(item.workspace))&&!(edition==='Administration'&&item.moduleKey?.startsWith('common.')));
+  const params=new URLSearchParams(location.search), edition=params.get('edition')||'Full', desktop=edition!=='Full';
+  const workspaces=edition==='Full'?['document','sales','office']:edition==='Sales'?['sales']:['document'];
+  const items=getWorkspaceRouteItems().filter(item=>!item.workspace||workspaces.includes(item.workspace));
   const modules=[...new Set(items.flatMap(item=>item.moduleKey?[item.moduleKey]:[]))];
   const permissions=items.flatMap(item=>item.requiredPermissions||[]).map(item=>({...item,dataScope:'all'}));
   permissions.push({resourceKey:'document.invoice-output',action:'export-zip',dataScope:'all'});
-  const capabilities={productEdition:edition,canManageSettings:true,canManageUsers:edition==='Full'||edition==='Administration',
+  const capabilities={productEdition:edition,canManageSettings:true,canManageUsers:edition==='Full',
     canUseDocumentWorkspace:workspaces.includes('document'),canUseSalesWorkspace:workspaces.includes('sales'),
-    usesOfficeRegister:desktop&&workspaces.includes('office'),isDesktopRuntime:desktop,
+    isDesktopRuntime:desktop,
     enabledModules:modules,moduleAccess:modules.map(moduleKey=>({moduleKey,accessLevel:'manage'})),permissions,availableFeatures:['worklist',...(workspaces.includes('document')?['business-attachments']:[])]};
   if(params.has('denied')){capabilities.enabledModules=[];capabilities.moduleAccess=[];capabilities.permissions=[];capabilities.canManageSettings=false;}
   const user={id:1,username:'demo',fullName:'示例操作员',role:'Admin',isActive:true,companyScope:'DEMO',departmentId:'OFFICE',businessDate:'2026-09-09',capabilities};
@@ -102,16 +101,16 @@ try {
   await open(1366);
   assert.equal(await read("document.querySelector('.workspace-header h1').textContent"), "工作概览");
   assert.equal(await read("document.querySelectorAll('.nav-group-button[aria-expanded=true]').length"), 1);
-  assert.equal(await read("document.querySelectorAll('.nav-group-button').length"), 6); await audit("full-desktop");
-  await click('[data-nav-group="office"]'); await click('.nav-item[href="/office/people"]');
+  assert.equal(await read("document.querySelectorAll('.nav-group-button').length"), 7); await audit("full-team");
+  await click('[data-nav-group="personnel"]'); await click('.nav-item[href="/office/people"]');
   await waitFor("document.activeElement===document.querySelector('.workspace-header h1')");
   assert.equal(await read("document.querySelector('.workspace-header h1').textContent"), "人员档案"); await audit("full-administration");
   await input('.nav-search input', "任务中心"); assert.equal(await read("document.querySelectorAll('.nav-item').length"), 1);
   await key("Enter"); assert(await read("document.activeElement.classList.contains('nav-item')"), await read("document.activeElement.outerHTML"));
   await key("Enter"); await waitFor("document.querySelector('.job-table')");
   assert.equal(await read("document.querySelector('.nav-search input').value"), ""); results.push("search-keyboard-navigation");
-  await open(1024); assert.equal(await read("document.querySelectorAll('.nav-rail-item').length"), 7); await audit("compact-groups");
-  await click('.nav-rail-item[aria-label="展开公司行政"]');
+  await open(1024); assert.equal(await read("document.querySelectorAll('.nav-rail-item').length"), 8); await audit("compact-groups");
+  await click('.nav-rail-item[aria-label="展开行政办公"]');
   assert(await read("document.activeElement.dataset.navGroup==='office'"));
   assert.equal(await read("document.querySelectorAll('.nav-group-button[aria-expanded=true]').length"), 1); results.push("compact-expand-focus");
   for (const width of [390, 320]) {
@@ -131,9 +130,10 @@ try {
   await open(1366, "edition=Sales"); await input('.nav-search input', "行政");
   assert.equal(await read("document.querySelectorAll('.nav-item').length"), 0); results.push("specialist-search-boundary");
   await open(1366, "edition=Sales&path=/office/people"); assert(await read("document.body.innerText.includes('当前页面无权限')"));
-  await open(1366, "edition=Administration"); assert.equal(await read("document.querySelector('.workspace-header h1').textContent"), "人员档案");
+  await open(1366, "edition=Document&path=/office/people"); assert(await read("document.body.innerText.includes('当前页面无权限')"));
+  await open(1366, "path=/office/people"); assert.equal(await read("document.querySelector('.workspace-header h1').textContent"), "人员档案");
   await open(1366, "path=/office/people&denied=1"); assert(await read("document.body.innerText.includes('当前页面无权限')")); results.push("direct-route-boundaries");
-  await open(1366, "runtime=browser&path=/jobs"); await waitFor("document.querySelector('.job-table')");
+  await open(1366, "path=/jobs"); await waitFor("document.querySelector('.job-table')");
   assert.equal(await read("window.__requests.filter(request=>request.kind==='search').length"), 0, "viewing progress does not fetch invoices until the creation panel is opened");
   await click('.job-create-panel summary'); await waitFor("document.querySelector('.job-invoice-selection select')?.options.length>1");
   const select = '.job-invoice-selection select';

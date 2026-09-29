@@ -24,7 +24,12 @@ fn configure_product_edition() {
     let editions = catalog["editions"]
         .as_object()
         .expect("missing product editions");
-    let requested = env::var("EXPORTDOCMANAGER_PRODUCT_EDITION").unwrap_or_else(|_| "Full".into());
+    let requested = env::var("EXPORTDOCMANAGER_PRODUCT_EDITION").unwrap_or_else(|_| {
+        catalog["defaultEdition"]
+            .as_str()
+            .expect("missing default desktop edition")
+            .into()
+    });
     let (edition, metadata) = editions
         .iter()
         .find(|(name, _)| name.eq_ignore_ascii_case(requested.trim()))

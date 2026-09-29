@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Full', 'Document', 'Sales', 'Administration')][string]$Edition = 'Full',
+    [ValidateSet('Document', 'Sales')][string]$Edition = 'Document',
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
     [string]$OutputRoot,
     [string]$PdfiumPath,
@@ -41,7 +41,7 @@ if ($PreflightOnly) {
     return
 }
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    $packageName = if ($Edition -eq 'Full') { 'ExportDocManager.Tauri' } else { "ExportDocManager.Tauri.$Edition" }
+    $packageName = "ExportDocManager.Tauri.$Edition"
     $OutputRoot = Join-Path $repositoryRoot "artifacts/native-desktop/$packageName"
 }
 $outputFullPath = [System.IO.Path]::GetFullPath($OutputRoot)

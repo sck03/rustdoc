@@ -16,7 +16,7 @@
 | 网页服务器 | package-native-web-server.ps1 | React + Rust HTTP、PostgreSQL 18 |
 | Docker | run-native-docker.ps1 | 同一 React、Rust HTTP、PostgreSQL 18 容器 |
 
-普通用户使用 scripts 根目录入口，详细参数见[脚本说明](../scripts/README.md)。桌面入口可选择 Full、Document、Sales、Administration 或 All；Web/容器保持 Full。各平台实际运行和签名更新仍须单独验收。
+普通用户使用 scripts 根目录入口，详细参数见[脚本说明](../scripts/README.md)。桌面入口仅选择 Document、Sales 或 All（两版），单版默认 Document；Web/容器保持 Full 完整功能，包含行政人事与团队协作。各平台实际运行和签名更新仍须单独验收。
 
 ## 容器与团队模式
 

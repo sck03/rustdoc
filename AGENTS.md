@@ -27,6 +27,8 @@
 
 ## 2. 项目形态与目录边界
 
+- 2026-09-29 产品定位：桌面单机仅交付 Document 单证版与 Sales 业务员版。单证版为主力，优先完成制单与交付；业务员版定位个人外贸工作台。网页/Docker 多用户 Full 保留完整功能，承接团队协作、行政人事及 OA 审批；不恢复 Full/Administration 单机包，不删除共享业务实现或已有数据。桌面单版构建默认 Document，批量 All 只生成 Document、Sales。
+
 - 正式桌面为 `apps/export-doc-tauri`，复用 `apps/export-doc-web` 的原版 React 界面；Tauri 在进程内托管共用 Rust HTTP 适配器与 SQLite 应用服务，不启动 .NET sidecar。Node 仅用于构建，WebView 是明确采用的桌面显示组件。
 - 网页前端继续位于 `apps/export-doc-web`，保留 React 19、原布局和操作；`apps/export-doc-server` 是 Rust HTTP 组合根，团队及 Docker 使用 PostgreSQL 18，不能改用 SQLite 或把数据库账号交给前端。
 - `crates/export-doc-contracts` 管理生成的 API 契约；`export-doc-domain` 放纯业务规则；`export-doc-engine` 编排用例；`export-doc-storage` 提供存储边界与 SQLite／PostgreSQL 适配。数据库 SQL 不进入 UI 或用例协调器，Domain 不引用 GUI、HTTP、数据库、进程或宿主文件系统。
@@ -162,7 +164,6 @@ pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntime
 - `-IncludePackageCaches`：删除 NuGet/npm/Cargo 审计缓存；
 - `-IncludeCodexRuntime`：删除整个本地代理运行缓存；
 - `-IncludeReleaseOutputs`：删除便携包、安装器或注册机输出；
-- `-IncludeLegacyRuntimeAssets`：删除本地浏览器资源副本。
 
 绝不通过清理脚本或手工命令删除 `.git`、`App_Data`、`Templates`、`OcrModels`、`Resources`、业务数据库、用户备份、已确认仍需的浏览器资源或系统外目录。已推送且干净的临时 Git worktree 应使用精确的 `git worktree remove --force <path>`，完成后运行 `git worktree prune`；不要直接递归删除包含未提交工作的 worktree。
 

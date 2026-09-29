@@ -6,10 +6,10 @@
 
 | 入口 | 用途 |
 | --- | --- |
-| `build-windows-desktop-run.cmd`／`.ps1` | 默认自动生成 Full、Sales、Document、Administration 四个 Windows 便携目录；可用 `-Edition` 选择一版 |
-| `build-windows-installers.cmd`／`.ps1` | 生成 Tauri NSIS 安装器，使用同一 Rust 业务与资源 |
-| `build-native.cmd`／`.ps1` | 当前平台 Rust + Tauri + React 便携包；默认目录 `artifacts/native-desktop/ExportDocManager.Tauri` |
-| `run-native.cmd`／`.ps1` | 启动已构建便携包；`-AppRoot` 可指定包目录 |
+| `build-windows-desktop-run.cmd`／`.ps1` | 默认按 Document、Sales 顺序生成两个 Windows 单机便携目录；可用 `-Edition` 选择一版 |
+| `build-windows-installers.cmd`／`.ps1` | 生成 Tauri NSIS 安装器，默认 Document，也可选择 Sales |
+| `build-native.cmd`／`.ps1` | 当前平台 Rust + Tauri + React 便携包；默认 Document，目录 `artifacts/native-desktop/ExportDocManager.Tauri.Document` |
+| `run-native.cmd`／`.ps1` | 默认启动 Document；`-Edition Sales` 启动业务员版，`-AppRoot` 可指定包目录 |
 | `package-native-web-server.ps1` | 原版 React 构建、Rust HTTP 服务、报表与可选 OCR 资源；目标数据库 PostgreSQL 18 |
 | `run-native-docker.cmd`／`.ps1` | React + Rust HTTP + PostgreSQL 18 容器构建、启动和停止 |
 
@@ -17,24 +17,23 @@
 
 `build-native.ps1 -PreflightOnly -NoPause` 只检查 Rust、Node、curl 等构建工具。`-Configuration Debug` 用于联调，默认 Release。`-RustTarget` 明确目标架构；`-Bundles nsis`、`-Bundles deb,appimage` 或 `-Bundles app,dmg` 生成对应平台安装／应用包。安装器需要对应平台工具链。
 
-`-SkipBuild` 只整理已经构建好的相同 profile／target 二进制与资源。Full/Document 正式包默认包含 OCR；`-WithoutOcr` 仅生成明确不提供文字识别的轻量验收包，不能用它代替 Full 功能验收。
+`-SkipBuild` 只整理已经构建好的相同 profile／target 二进制与资源。Document 正式包默认包含 OCR；`-WithoutOcr` 仅生成明确不提供文字识别的轻量验收包，不能用它代替完整单证版验收。网页/Docker Full 继续包含 OCR。
 
 直接 Cargo 命令、本地打包、实库/界面回归与 GitHub 工作流默认共用仓库 `target/`；不再分别写入 `.codex-runtime/cargo-target-native` 和 `artifacts/cargo-target-native`。`CARGO_TARGET_DIR` 可显式覆盖，相对路径按仓库根解析；公共入口同时把下载缓存和临时目录放入 `.codex-runtime`。手工运行 Cargo 时也应设置仓库内的 `CARGO_HOME`，以复用脚本的下载缓存。`-SkipBuild` 会先检查主程序及所需 OCR 程序，缺失时在创建/改动输出包之前报错；所有文件复制前统一验证来源和目标边界。
 
-Windows 批量入口默认 `-Edition All`；四版共用一次 React 构建和同一 Cargo 输出根，分别编译桌面身份，不复制依赖构建树。默认位于 `artifacts/native-desktop`：Full 沿用 `ExportDocManager.Tauri`，另外三版为 `ExportDocManager.Tauri.Sales`、`.Document`、`.Administration`。`-OutputDir` 指定包含这些子目录的父目录；`build-native.ps1 -Edition Administration -OutputRoot <目录>` 则直接指定单版目录。每版保留各自 `App_Data`，不能在同一目录覆盖另一版本。
+Windows 批量入口默认 `-Edition All`；两版共用一次 React 构建和同一 Cargo 输出根，分别编译桌面身份，不复制依赖构建树。默认位于 `artifacts/native-desktop/ExportDocManager.Tauri.Document` 和 `.Sales`。`-OutputDir` 指定包含这两个子目录的父目录；`build-native.ps1 -Edition Sales -OutputRoot <目录>` 则直接指定单版目录。每版保留各自 `App_Data`，不能在同一目录覆盖另一版本。Full/Administration 桌面参数直接拒绝；旧包和旧数据不自动删除、转版或搬入新目录。
 
-首次进入和登录后使用固定首页：Full/Document 为单证概览，Sales 为销售概览，Administration 为人员档案。根地址只负责跳转，不作为单证页面检查权限；账号缺少本版首页权限时显示权限说明，可从导航进入已授权功能，不再根据权限列表自动选一个业务页面。
+首次进入和登录后使用固定首页：Document 单机与 Full 多用户为单证概览，Sales 单机为销售概览。根地址只负责跳转，不作为单证页面检查权限；账号缺少本版首页权限时显示权限说明，可从导航进入已授权功能，不根据权限列表自动选一个业务页面。
 
 | 版本参数 | 功能范围 | 随包资源 |
 | --- | --- | --- |
-| Full | 单证、销售、行政、人事及新增 OA 申请审批 | OCR、单证/Excel 模板、PDFium、字体 |
-| Document | 单证与申报、报表和相关工具 | OCR、单证/Excel 模板、PDFium、字体 |
-| Sales | 客户、跟进、商机、报价、供应商及相关工具 | PDFium、字体；不附 OCR 和单证模板 |
-| Administration | 人事档案/通讯录/请假/加班，行政会议室/物品/报销/出差/采购/通用申请及审批 | PDFium、字体；不附 OCR 和单证模板 |
+| Document（单机主力） | 单证与申报、报表和相关工具，优先完成制单与交付 | OCR、单证/Excel 模板、PDFium、字体 |
+| Sales（单机） | 个人外贸工作台：客户、联系人、跟进、商机、报价、供应商、邮件及相关工具 | PDFium、字体；不附 OCR 和单证模板 |
+| Full（仅多用户 Web/Docker） | 完整单证、销售、行政、人事、OA 申请审批及账号/组织/权限管理 | OCR、单证/Excel 模板、PDFium、字体、PostgreSQL 客户端 |
 
-后端使用官方契约的版本资源目录限制权限，管理员也不能越过产品边界；账号自身的权限和数据范围继续生效。三版的共用 Rust 库仍包含共享实现，不宣称所有代码均按版本从二进制剔除。安装器使用 `build-windows-installers.ps1 -Edition <版本>`，Tauri identifier 与更新频道按版本区分；签名更新仍需独立配置和实际升级验收。
+后端使用官方契约的版本资源目录限制权限，管理员也不能越过产品边界；单机不开放 OA 或账号/组织/权限管理，多用户 Full 通过岗位授权使用完整模块。共用 Rust 库仍包含共享实现，不宣称所有代码均按版本从二进制剔除。安装器使用 `build-windows-installers.ps1 -Edition <Document或Sales>`，Tauri identifier 与更新频道按版本区分；签名更新仍需独立配置和实际升级验收。
 
-`-SkipMainBuild`（单版入口为 `-SkipBuild`）只复用 `target/<profile>/editions/<版本>` 下已构建的该版 EXE，校验版本及 SHA-256 构建记录。不会将最后一次 Cargo 输出复制成另外三版；缺少记录或校验失败须正常重建。Full 和 Document 默认提供 OCR，只有显式 `-WithoutOcr` 才生成轻量检查包。
+`-SkipMainBuild`（单版入口为 `-SkipBuild`）只复用 `target/<profile>/editions/<版本>` 下已构建的该版 EXE，校验版本及 SHA-256 构建记录。不会将最后一次 Cargo 输出复制成另一版；缺少记录或校验失败须正常重建。Document 默认提供 OCR，只有显式 `-WithoutOcr` 才生成轻量检查包。
 
 ## 桌面启动检查与资源
 
@@ -113,6 +112,8 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 - 脚本：`verify-script-suite.ps1`、`verify-github-workflow-actions.mjs`、`test_tauri_updater_release_contract.mjs`、`github/verify-public-source.ps1`、`git diff --check`。
 
 本分支已删除旧 C# 源码/测试/工程与 `deploy/container`；`verify-dependency-policy.mjs` 拒绝重新引入托管工程或将其依赖列入 Rust notices。原生 NuGet 归档仍按中央资源清单校验。手动跨浏览器验收使用锁定的 npm Playwright 和隔离 Rust `office_review` 宿主，不读取旧 .NET DLL；Firefox/WebKit 仍只在手动工作流执行。
+
+浏览器仅用于开发验收，正式 Rust PDF 和 Tauri 系统 WebView 不依赖根 `Browsers` 目录。旧副本清理后，前端回归统一从既有 `artifacts/playwright-browsers` 缓存定位 Chromium，不再搜索旧 .NET 输出或调用已删除的浏览器准备脚本。需要重建测试缓存时，在仓库根设置 `$env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $PWD 'artifacts/playwright-browsers'`，再执行 `node apps/export-doc-web/node_modules/playwright/cli.js install chromium`；普通界面回归可加 `--only-shell` 只下载无界面浏览器，PDF 查看器回归需要完整 Chromium。这不影响用户正常运行程序，默认清理继续保留该可复用缓存。
 
 报表原版 React 设计器可复用，但 Rust 渲染仍有明确未完成项；当前事实见 `docs/Rust原生功能迁移核对表.md`。旧 Slint 的 `--validation --ui-smoke` 入口已退役。
 

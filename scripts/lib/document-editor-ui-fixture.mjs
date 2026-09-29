@@ -94,7 +94,7 @@ createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries=
       <Route path='/invoices/:invoiceId' element={<InvoiceEditorPage client={client} businessDate={date} mode='edit'/>}/>
       <Route path='/payments/:paymentId' element={<PaymentEditorPage client={client} businessDate={date} mode='edit'/>}/>
       <Route path='/payments/new' element={<PaymentEditorPage client={client} businessDate={date} mode='new'/>}/>
-      <Route path='/settings' element={<SettingsPage client={client} canManageSettings={!readonly} canManageUsers={!readonly} canUseDocumentWorkspace={!['Sales','Administration'].includes(params.get('edition'))} isDesktopRuntime={params.has('desktop')} productName='单据工作台'/>}/>
+      <Route path='/settings' element={<SettingsPage client={client} canManageSettings={!readonly} canManageUsers={!readonly&&!params.has('desktop')} canUseDocumentWorkspace={params.get('edition')!=='Sales'} isDesktopRuntime={params.has('desktop')} productName='单据工作台'/>}/>
       <Route path='/export-defaults' element={<ExportDefaultsFixture/>}/>
       <Route path='*' element={<p>已返回列表</p>}/>
     </Routes></main>

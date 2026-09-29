@@ -20,8 +20,6 @@ __cuscustoms_*
 apps/export-doc-web/vite.config.js
 apps/export-doc-web/vite.config.d.ts
 Browsers/**
-!Browsers/
-!Browsers/README.md
 Resources/Fonts/OpenSource/*.otf
 WebView2Runtime/**
 !WebView2Runtime/

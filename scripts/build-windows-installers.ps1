@@ -1,6 +1,6 @@
 # Original installer entry, now packages the shared Rust backend in Tauri.
 [CmdletBinding()]
-param([ValidateSet('Full', 'Document', 'Sales', 'Administration')][string]$Edition = 'Full', [string]$RustTarget, [string]$OutputDir, [string]$CargoTargetDir, [switch]$PreflightOnly, [switch]$NoPause)
+param([ValidateSet('Document', 'Sales')][string]$Edition = 'Document', [string]$RustTarget, [string]$OutputDir, [string]$CargoTargetDir, [switch]$PreflightOnly, [switch]$NoPause)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
 if ($env:OS -ne 'Windows_NT') { throw 'This entry requires Windows.' }

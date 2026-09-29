@@ -8,7 +8,7 @@ on:
         required: true
       edition:
         type: string
-        default: Full
+        default: ''
       os:
         type: string
         required: true
@@ -127,8 +127,7 @@ jobs:
           if ($env:RELEASE_PRODUCT -eq 'desktop') {
             pwsh -NoProfile -File ./scripts/build-native.ps1 -NoPause -Edition $env:RELEASE_EDITION -RustTarget $env:RUST_TARGET -Bundles $env:BUNDLE_TARGETS
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            $source = 'artifacts/native-desktop/ExportDocManager.Tauri'
-            if ($env:RELEASE_EDITION -ne 'Full') { $source += ".$env:RELEASE_EDITION" }
+            $source = "artifacts/native-desktop/ExportDocManager.Tauri.$env:RELEASE_EDITION"
           } else {
             pwsh -NoProfile -File ./scripts/package-native-web-server.ps1 -Configuration Release -RuntimeIdentifier $env:RUST_TARGET -NoPause
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -136,7 +135,7 @@ jobs:
           }
           $extension = if ($IsWindows) { 'zip' } else { 'tar.gz' }
           $prefix = "artifacts/releases/exportdoc-$env:RELEASE_PRODUCT-$env:RELEASE_VERSION-$env:ARTIFACT_PLATFORM"
-          if ($env:RELEASE_PRODUCT -eq 'desktop' -and $env:RELEASE_EDITION -ne 'Full') { $prefix += "-$env:RELEASE_EDITION" }
+          if ($env:RELEASE_PRODUCT -eq 'desktop') { $prefix += "-$env:RELEASE_EDITION" }
           ./scripts/lib/archive-native-release.ps1 -Source $source -Destination "$prefix.$extension"
           if ($env:RELEASE_PRODUCT -eq 'desktop') {
             $bundles = Join-Path $env:CARGO_TARGET_DIR "$env:RUST_TARGET/release/bundle"
