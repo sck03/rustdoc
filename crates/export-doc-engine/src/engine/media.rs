@@ -5,6 +5,41 @@ use std::{
     io::{Cursor, Read},
     path::Path,
 };
+use unicode_normalization::UnicodeNormalization;
+
+pub const DOCUMENT_LIMIT: usize = 10 * 1024 * 1024;
+
+/// Shared evidence-file validation for personnel and office requests.
+pub fn document_type(file_name: &str, bytes: &[u8]) -> Result<(String, &'static str)> {
+    let name = file_name.nfc().collect::<String>();
+    if !crate::paths::valid_file_name(&name) || bytes.is_empty() || bytes.len() > DOCUMENT_LIMIT {
+        return Err(invalid("文件名无效，或文件为空、超过 10 MiB。"));
+    }
+    let pdf = bytes.starts_with(b"%PDF-")
+        && bytes[bytes.len().saturating_sub(1024)..]
+            .windows(5)
+            .any(|part| part == b"%%EOF");
+    let media_type = if pdf {
+        "application/pdf"
+    } else {
+        image_type(bytes, DOCUMENT_LIMIT)?
+    };
+    let extension = Path::new(&name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !match media_type {
+        "application/pdf" => extension == "pdf",
+        "image/png" => extension == "png",
+        _ => matches!(extension.as_str(), "jpg" | "jpeg"),
+    } {
+        return Err(invalid(
+            "附件扩展名与实际类型不一致，只支持 PDF、PNG、JPEG。",
+        ));
+    }
+    Ok((name, media_type))
+}
 
 pub fn digest(bytes: &[u8]) -> String {
     Sha256::digest(bytes)

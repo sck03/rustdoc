@@ -159,6 +159,13 @@ impl Sessions {
             .map_err(|_| unavailable("登录状态异常。"))?
             .remove(&key);
         let record = record.ok_or_else(|| error(401, "登录失败。"))?;
+        let version = store.transaction(|tx| {
+            let current = store::get(tx, "users", record["id"].as_i64().unwrap_or(0))?;
+            if current["isActive"] != true || current["versionNumber"] != record["versionNumber"] {
+                return Err(error(401, "账号在登录期间发生变化，请重新登录。"));
+            }
+            session_version_in(tx, &current)
+        })?;
         let token = nonce().map_err(unavailable)? + &nonce().map_err(unavailable)?;
         self.values
             .lock()
@@ -168,7 +175,7 @@ impl Sessions {
                 (
                     record["id"].as_i64().unwrap_or(0),
                     Utc::now() + Duration::hours(12),
-                    session_version(store, &record)?,
+                    version,
                 ),
             );
         Ok(
@@ -219,17 +226,10 @@ impl Sessions {
             .values
             .lock()
             .map_err(|_| unavailable("会话状态异常。"))?;
-        if values.remove(token).is_none() {
-            return Err(error(401, "会话已撤销，请重新登录。"));
-        }
-        values.insert(
-            replacement.clone(),
-            (
-                actor.id,
-                expires,
-                session_version(store, &store.get("users", actor.id)?)?,
-            ),
-        );
+        let (_, _, version) = values
+            .remove(token)
+            .ok_or_else(|| error(401, "会话已撤销，请重新登录。"))?;
+        values.insert(replacement.clone(), (actor.id, expires, version));
         Ok(
             json!({"accessToken":replacement,"tokenType":"Bearer","expiresAt":expires.to_rfc3339(),"user":user}),
         )
@@ -237,9 +237,14 @@ impl Sessions {
 }
 
 fn session_version(store: &Store, user: &Value) -> Result<(i64, i64)> {
+    session_version_in(&*store.connection()?, user)
+}
+fn session_version_in(
+    connection: &export_doc_storage::Connection,
+    user: &Value,
+) -> Result<(i64, i64)> {
     let template = match user["permissionTemplateId"].as_i64().filter(|id| *id > 0) {
-        Some(id) => store
-            .connection()?
+        Some(id) => connection
             .get("permission-templates", id)?
             .and_then(|item| item["versionNumber"].as_i64())
             .unwrap_or(0),

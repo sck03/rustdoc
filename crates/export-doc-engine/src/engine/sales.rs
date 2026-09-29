@@ -222,7 +222,7 @@ fn save(store: &Store, actor: &Actor, record_id: i64, body: &Value) -> Result<Va
     request.id = record_id;
     sales::normalize(&mut request).map_err(invalid)?;
     let action = if record_id == 0 { "create" } else { "edit" };
-    store.transaction(|tx| {
+    store.transaction_as(actor, |tx, actor| {
         let previous = if record_id > 0 {
             let previous = checked(tx, actor, record_id, action, false)?;
             store::check_version(&previous, request.expected_version.unwrap_or(0))?;
@@ -303,7 +303,7 @@ fn action(
     } else {
         "transition"
     };
-    store.transaction(|tx| {
+    store.transaction_as(actor, |tx, actor| {
         let mut value = checked(tx, actor, record_id, action, false)?;
         store::check_version(&value, store::expected(body))?;
         let (change_type, note) = if operation == ARCHIVE_SALES_OPPORTUNITY {

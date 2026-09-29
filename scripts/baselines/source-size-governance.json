@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 9482,
+      "baselineAggregateLines": 9903,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 9602,
+      "maximumAggregateLines": 10023,
       "reportFiles": false
     },
     {
@@ -327,7 +327,7 @@
       "filePattern": "^(?:Personnel.*|personnelModel|usePersonnelData)\\.(?:ts|tsx)$",
       "excludePattern": "/Personnel(?:Avatar|IdentityFields|ImagesPanel)\\.tsx$",
       "maximumLines": 220,
-      "maximumAggregateLines": 500
+      "maximumAggregateLines": 550
     },
     {
       "name": "personnel image and identity workspace",

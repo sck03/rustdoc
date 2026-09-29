@@ -1,6 +1,7 @@
 //! Official contract composition. The frozen .NET export is preserved verbatim;
 //! new Rust capabilities are added here and both clients consume the same output.
 mod office;
+mod personnel;
 mod reports;
 use serde_json::Value;
 
@@ -8,6 +9,7 @@ pub fn document() -> Value {
     let mut document: Value = serde_json::from_str(include_str!("reference_openapi.json"))
         .expect("reviewed reference OpenAPI");
     office::extend(&mut document);
+    personnel::extend(&mut document);
     reports::extend(&mut document);
     document
 }
@@ -29,6 +31,10 @@ mod tests {
     fn preserves_every_reference_schema_endpoint_and_security_contract() {
         let baseline: Value = serde_json::from_str(include_str!("reference_openapi.json")).unwrap();
         let mut current = document();
+        current["components"]["schemas"]["PersonnelRecord"]["properties"]
+            .as_object_mut()
+            .unwrap()
+            .remove("attachments");
         for (schema, fields) in reports::FIELDS {
             for field in *fields {
                 current["components"]["schemas"][schema]["properties"]

@@ -9,9 +9,12 @@ import { OaTemporalFields } from "./OaTemporalFields.tsx";
 import { oaApi } from "./oaApi.ts";
 import { oaDraft, oaModules, type OaKind } from "./oaModel.ts";
 import { useOfficeOperation } from "../office/useOfficeData.ts";
+import { useAttachmentDraft } from "../../ui/useAttachmentDraft.ts";
+import { AttachmentDraftFields } from "../../ui/AttachmentDraftFields.tsx";
 
 export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind; record?: OaRequest; onClose: () => void; onSaved: (record: OaRequest) => void }) {
   const operation = useOfficeOperation();
+  const attachments = useAttachmentDraft(record);
   const [draft, storeDraft] = useState<OaRequestSave>(() => record ? { ...record, expectedVersion: record.versionNumber,
     ...(record.overtime ? { overtime: { ...record.overtime, startsAt: toBusinessDateTimeLocalInput(record.overtime.startsAt, user.businessTimeZone), endsAt: toBusinessDateTimeLocalInput(record.overtime.endsAt, user.businessTimeZone) } } : {}) } : oaDraft(kind, user));
   const [employee, setEmployee] = useState<PersonnelDirectoryRecord | null>(null);
@@ -29,11 +32,14 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
         body.overtime = { ...draft.overtime, startsAt, endsAt };
       }
       const api = oaApi(client, kind);
-      return record ? api.update(record.id, body, { signal }) : api.create(body, { signal });
+      return attachments.save(JSON.stringify(body), signal,
+        (current, signal) => current ? api.update(current.id, { ...body, expectedVersion: current.versionNumber }, { signal }) : api.create(body, { signal }),
+        (current, entry, signal) => { const form = new FormData(); form.set("file", entry.file); form.set("expectedVersion", String(current.versionNumber)); return api.upload(current.id, form, { signal }); });
     }, (result) => { setDirty(false); onSaved(result); });
   }
   return <OfficeDialog title={`${record ? "编辑" : "新建"}${oaModules[kind].name}`} onClose={onClose} {...operation} protectChanges hasChanges={dirty}>
-    <p className="office-muted">{oaModules[kind].description}先保存草稿，再上传附件和提交审批。</p>
+    <p className="office-muted">{oaModules[kind].description}填写资料并选择附件，一次保存草稿，核对后提交审批。</p>
+    {operation.error && attachments.saved && <p role="status">资料已保存。待保存文件仍在下方，再次保存会继续处理；也可稍后从草稿回访。</p>}
     <form onSubmit={submit} onChangeCapture={() => setDirty(true)}><fieldset disabled={operation.busy} className="office-form-grid">
       {user.capabilities.usesOfficeRegister && !record && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={(value) => { setEmployee(value); setDirty(true); }} disabled={operation.busy} />}
       {record && <p className="office-field-wide">申请人：{record.employeeName}</p>}
@@ -44,6 +50,7 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
         <OfficeField label="币种"><select value={draft.currency} onChange={(event) => setDraft({ ...draft, currency: event.target.value as OaRequestSave["currency"] })}>{["CNY", "USD", "EUR", "HKD", "JPY", "GBP"].map((currency) => <option key={currency}>{currency}</option>)}</select></OfficeField>
         <OaLineEditor draft={draft} setDraft={setDraft} purchase={kind === "purchase"} businessDate={user.businessDate} />
       </>}
+      <AttachmentDraftFields draft={attachments} busy={operation.busy} onChange={() => setDirty(true)} />
     </fieldset><OfficeSubmit busy={operation.busy} label="保存草稿" disabled={user.capabilities.usesOfficeRegister && !record && !employee} /></form>
   </OfficeDialog>;
 }

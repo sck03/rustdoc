@@ -40,7 +40,8 @@ pub fn action(
     {
         return Err(invalid("取消或驳回须填写处理原因，备注不得超过 500 字。"));
     }
-    store.transaction(|tx| {
+    store.transaction_as(actor, |tx, actor| {
+        auth::authorize(actor, permission, action)?;
         let mut value = store::get(tx, kind, id)?;
         if value["companyScope"] != actor.company
             || !auth::visible(actor, permission, action, &value)

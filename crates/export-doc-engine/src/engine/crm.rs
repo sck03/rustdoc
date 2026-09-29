@@ -179,7 +179,7 @@ fn save(
         return Err(invalid("新增跟进不能包含已有编号。"));
     }
     let action = if record_id > 0 { "edit" } else { "create" };
-    store.transaction(|tx| {
+    store.transaction_as(actor, |tx, actor| {
         let mut row = if record_id > 0 {
             let value = checked(tx, actor, record_id, action)?;
             store::check_version(&value, request.expected_version.unwrap_or(0))?;
@@ -254,7 +254,7 @@ fn mutate(
         _ => "delete",
     };
     let permission_action = auth::operation_action(operation, PERMISSION, action)?;
-    store.transaction(|tx| {
+    store.transaction_as(actor, |tx, actor| {
         let mut row = checked(tx, actor, record_id, permission_action)?;
         let version = if operation == DELETE_CRM_FOLLOW_UP {
             query
@@ -371,7 +371,7 @@ pub fn batch_status(store: &Store, actor: &Actor, body: &Value) -> Result<Value>
             "单次最多修改 500 家 CRM 客户，请分批提交；超出部分不会被静默忽略。",
         ));
     }
-    let affected = store.transaction(|transaction| {
+    let affected = store.transaction_as(actor, |transaction, actor| {
         let mut count = 0;
         for mut row in store::all(transaction, "crm-customers")?
             .into_iter()

@@ -37,6 +37,9 @@ fn directory_entry(actor: &Actor, record: &Value, departments: &[Value]) -> Valu
 }
 
 pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value> {
+    if record.get("attachments").is_none() {
+        record["attachments"] = json!([]);
+    }
     record["employee"] = employee(tx, actor, &record)?;
     let editable = record["status"] != "Departed";
     let correct = office::can_correct(

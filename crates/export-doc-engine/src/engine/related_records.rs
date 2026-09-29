@@ -177,7 +177,7 @@ pub fn handle(
         }
     };
     let permission_action = auth::operation_action(operation, resource.permission, action)?;
-    store.transaction(|tx| {
+    store.transaction_as(actor, |tx, actor| {
         let parent = store::get(tx, parent_kind, parent_id)?;
         if !auth::visible(actor, resource.permission, permission_action, &parent) {
             return Err(error(403, "所属客户或供应商不在当前账号的操作范围内。"));

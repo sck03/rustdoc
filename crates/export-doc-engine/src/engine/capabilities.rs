@@ -129,6 +129,7 @@ impl NativeService {
             || attachments::OPERATIONS.contains(&operation)
             || attachment_categories::OPERATIONS.contains(&operation)
             || personnel::OPERATIONS.contains(&operation)
+            || personnel_files::OPERATIONS.contains(&operation)
             || report_assets::OPERATIONS.contains(&operation)
             || document_packages::OPERATIONS.contains(&operation)
             || reports::OPERATIONS.contains(&operation)
@@ -231,6 +232,14 @@ impl NativeService {
             return party_files::upload(self, &actor, operation, file_name, content);
         }
         match operation {
+            UPLOAD_PERSONNEL_ATTACHMENT => personnel_files::upload(
+                &self.store,
+                &actor,
+                parameters,
+                &metadata,
+                file_name,
+                content,
+            ),
             UPLOAD_PERSONNEL_IMAGE => {
                 personnel::upload(&self.store, &actor, parameters, metadata, content)
             }
@@ -244,5 +253,6 @@ impl NativeService {
             ),
             _ => Err(unsupported("此文件上传尚未完成原生迁移。")),
         }
+        .map(|value| contracts::dto(contracts::response(operation.id), value))
     }
 }

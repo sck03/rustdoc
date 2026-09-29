@@ -4275,6 +4275,13 @@ export interface PersonnelAccountRequest {
   userId: number;
 }
 
+export interface PersonnelAttachment {
+  fileName: string;
+  id: string;
+  mediaType: string;
+  sizeBytes: number;
+}
+
 export interface PersonnelClearance {
   approvalCount?: number;
   canDepart: boolean;
@@ -4376,6 +4383,7 @@ export interface PersonnelProfile {
 
 export interface PersonnelRecord {
   account?: null | PersonnelAccountRecord;
+  attachments?: PersonnelAttachment[];
   canCorrectRegistration: boolean;
   canDelete: boolean;
   canEdit: boolean;
@@ -5539,6 +5547,12 @@ export interface DeletePersonnelRequest {
   body: DeleteRecordRequest;
 }
 
+export interface DeletePersonnelAttachmentRequest {
+  id: number;
+  attachmentId: string;
+  body: OaAction;
+}
+
 export interface DeletePersonnelImageRequest {
   id: number;
   kind: PersonnelImageKind;
@@ -5678,6 +5692,11 @@ export interface DownloadJobResultRequest {
 
 export interface DownloadJobResultWithTicketRequest {
   token: string;
+}
+
+export interface DownloadPersonnelAttachmentRequest {
+  id: number;
+  attachmentId: string;
 }
 
 export interface DownloadPostgreSqlPhysicalBackupWithTicketRequest {
@@ -7245,6 +7264,11 @@ export interface UploadOcrImageRequest {
   body: Blob;
 }
 
+export interface UploadPersonnelAttachmentRequest {
+  id: number;
+  body: FormData;
+}
+
 export interface UploadPersonnelImageRequest {
   id: number;
   kind: PersonnelImageKind;
@@ -8391,6 +8415,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public deletePersonnelAttachment(request: DeletePersonnelAttachmentRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<PersonnelRecord>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public deletePersonnelImage(request: DeletePersonnelImageRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
     const path = `/api/office/people/${encodePath(request.id)}/images/${encodePath(request.kind)}`;
     return this.request<PersonnelRecord>("DELETE", path, {
@@ -8599,6 +8631,11 @@ export class ExportDocManagerApiClient {
 
   public downloadJobResultWithTicket(request: DownloadJobResultWithTicketRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = `/downloads/jobs/${encodePath(request.token)}`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
+  public downloadPersonnelAttachment(request: DownloadPersonnelAttachmentRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/people/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return this.request<Blob>("GET", path, { init });
   }
 
@@ -11485,6 +11522,14 @@ export class ExportDocManagerApiClient {
         "sourceName": request.sourceName,
         "sourceMimeType": request.sourceMimeType,
       },
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadPersonnelAttachment(request: UploadPersonnelAttachmentRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}/attachments`;
+    return this.request<PersonnelRecord>("POST", path, {
       body: request.body,
       init,
     });

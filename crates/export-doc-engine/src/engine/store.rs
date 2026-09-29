@@ -83,6 +83,18 @@ impl Store {
             }
         }
     }
+    /// Refresh account status, organization and grants after acquiring the write
+    /// transaction, so a queued request cannot write with a stale authorization.
+    pub fn transaction_as<T>(
+        &self,
+        actor: &Actor,
+        operation: impl FnOnce(&Connection, &Actor) -> Result<T>,
+    ) -> Result<T> {
+        self.transaction(|connection| {
+            let current = super::auth::current_actor_in(connection, actor.id, self.edition)?;
+            operation(connection, &current)
+        })
+    }
     #[cfg(feature = "postgres")]
     pub fn postgres_connection(&self) -> Result<&str> {
         self.postgres_connection

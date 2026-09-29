@@ -395,7 +395,8 @@ async fn execute(
                     .map(response::Reply::bytes)
                     .map_err(|_| error(503, "上传结果编码失败。"))
             } else {
-                if export_doc_engine::engine::oa::is_download(operation)
+                if operation == DOWNLOAD_PERSONNEL_ATTACHMENT
+                    || export_doc_engine::engine::oa::is_download(operation)
                     || [
                         DOWNLOAD_REPORT_TEMPLATE_FILE,
                         DOWNLOAD_REPORT_TEMPLATE_PACKAGE,

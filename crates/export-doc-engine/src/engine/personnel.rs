@@ -12,7 +12,7 @@ pub fn save(
     tx: &export_doc_storage::Connection,
     actor: &Actor,
     id: i64,
-    value: Value,
+    mut value: Value,
     action: &str,
     note: &str,
 ) -> Result<Value> {
@@ -20,6 +20,7 @@ pub fn save(
         "create" => "Hire",
         "edit" => "Edit",
         "image-upload" | "image-delete" => "Image",
+        "attachment-upload" | "attachment-delete" => "Edit",
         "account-link" => "LinkAccount",
         "ConfirmPersonnel" => "Confirm",
         "TransferPersonnel" => "Transfer",
@@ -32,6 +33,34 @@ pub fn save(
     } else {
         action
     };
+    if let Some(user_id) = value["account"]["id"].as_i64() {
+        let mut user = store::get(tx, "users", user_id)?;
+        if user["companyScope"] != value["companyScope"] || user["role"] == "Admin" {
+            return Err(unavailable("人员关联账号不符合公司或角色约束。"));
+        }
+        let departed = value["status"] == "Departed";
+        if user["fullName"] != value["profile"]["fullName"]
+            || user["departmentId"] != value["departmentId"]
+            || (departed && user["isActive"] == true)
+        {
+            user["fullName"] = value["profile"]["fullName"].clone();
+            user["departmentId"] = value["departmentId"].clone();
+            if departed {
+                user["isActive"] = json!(false);
+            }
+            let username = records::text(&user, "username");
+            user = store::save(
+                tx,
+                "users",
+                user_id,
+                user,
+                Some(username),
+                actor,
+                "personnel-sync",
+            )?;
+        }
+        value["account"] = contracts::dto(contracts::schema("PersonnelAccountRecord"), user);
+    }
     let identity = records::text(&value, "employeeNumber");
     let saved = store::save(tx, "people", id, value, Some(identity), actor, audit_action)?;
     store::save(
@@ -61,9 +90,14 @@ pub const OPERATIONS: &[Operation] = &[
     GET_PERSONNEL_AVATAR,
 ];
 
-fn person(store: &Store, actor: &Actor, id: i64, action: &str) -> Result<Value> {
+pub(super) fn person(
+    tx: &export_doc_storage::Connection,
+    actor: &Actor,
+    id: i64,
+    action: &str,
+) -> Result<Value> {
     auth::authorize(actor, "office.people", action)?;
-    let value = store.get("people", id)?;
+    let value = store::get(tx, "people", id)?;
     if !auth::visible(actor, "office.people", action, &value) {
         return Err(error(403, "没有访问此人员档案的权限。"));
     }
@@ -91,13 +125,15 @@ pub fn upload(
 ) -> Result<Value> {
     let id = records::id(parameters)?;
     let kind = image_kind(parameters)?;
-    person(store, actor, id, "edit")?;
     let content_type = media::image_type(bytes, 5 * 1024 * 1024)?;
     let hash = media::digest(bytes);
-    store.transaction(|tx| {
-        let mut person = store::get(tx, "people", id)?;
-        store::check_version(&person, store::expected(&metadata))?;
+    store.transaction_as(actor, |tx, actor| {
+        let mut person = person(tx, actor, id, "edit")?;
         if person["status"] == "Departed" { return Err(conflict("离职人员的图片不能修改。")); }
+        if person["images"].as_array().is_some_and(|images| images.iter().any(|image| image["kind"] == kind && image["contentHash"] == hash)) {
+            return super::personnel_queries::detail(tx, actor, person);
+        }
+        store::check_version(&person, store::expected(&metadata))?;
         let images = person["images"].as_array_mut().ok_or_else(|| unavailable("人员图片记录损坏。"))?;
         images.retain(|image| image["kind"] != kind);
         images.push(json!({"kind":kind,"contentType":content_type,"byteLength":bytes.len(),"contentHash":hash}));
@@ -124,7 +160,7 @@ pub fn handle(
         DELETE_PERSONNEL_IMAGE => "edit",
         _ => "assign",
     };
-    let current = person(store, actor, id, action)?;
+    let current = person(&*store.connection()?, actor, id, action)?;
     let result = match operation {
         GET_PERSONNEL_CLEARANCE => {
             store.transaction(|tx| super::office_queries::clearance(tx, &current))?
@@ -151,8 +187,8 @@ pub fn handle(
                 .find(|(key, _)| *key == "expectedVersion")
                 .and_then(|(_, value)| value.parse().ok())
                 .unwrap_or(0);
-            store.transaction(|tx| {
-                let mut person = store::get(tx, "people", id)?;
+            store.transaction_as(actor, |tx, actor| {
+                let mut person = person(tx, actor, id, "edit")?;
                 store::check_version(&person, expected)?;
                 if person["status"] == "Departed" {
                     return Err(conflict("离职档案不能修改。"));
@@ -197,8 +233,11 @@ pub fn handle(
                     .collect();
                 store::paged(accounts, query)
             } else {
-                store.transaction(|tx| {
-                    let mut person = store::get(tx, "people", id)?;
+                store.transaction_as(actor, |tx, actor| {
+                    let mut person = person(tx, actor, id, "assign")?;
+                    if !actor.admin {
+                        return Err(error(403, "只有管理员可以关联账号。"));
+                    }
                     store::check_version(&person, store::expected(body))?;
                     if person["status"] == "Departed" {
                         return Err(conflict("离职档案不能关联账号。"));

@@ -148,6 +148,7 @@ async function clickText(page,text,selector="button"){await read(page,`(()=>{con
 async function input(page,selector,value){await read(page,`(()=>{const node=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(node instanceof HTMLSelectElement?HTMLSelectElement.prototype:node instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(node,${JSON.stringify(value)});node.dispatchEvent(new Event('input',{bubbles:true}));node.dispatchEvent(new Event('change',{bubbles:true}))})()`);await delay(60);}
 async function audit(page,label){
   await read(page,"document.fonts.ready.then(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true)))))");
+  await read(page,"Promise.all(document.getAnimations().filter(animation=>animation.effect?.getTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>{})))");
   await evaluate(page,fs.readFileSync(require.resolve("axe-core/axe.min.js"),"utf8"),false);
   const violations=await read(page,"axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(result=>result.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})))");
   if(violations.length)await captureScreenshot(page,path.join(output,`${label}-failed.png`));

@@ -300,7 +300,10 @@ pub fn handle(
             query,
         );
     }
-    let mut request = body.ok_or_else(|| invalid("请求内容不能为空。"))?;
+    let mut request = contracts::dto(
+        contracts::request(operation.id),
+        body.ok_or_else(|| invalid("请求内容不能为空。"))?,
+    );
     if !request.is_object() {
         return Err(invalid("请求内容须为业务对象。"));
     }
@@ -335,7 +338,8 @@ pub fn handle(
         return super::accounts::save(store, actor, record_id, request);
     }
     let business_date = clock.now().map_err(invalid)?.today;
-    let value = store.transaction(|transaction| {
+    let value = store.transaction_as(actor, |transaction, actor| {
+        auth::authorize(actor, resource.permission, action)?;
         if transaction.provider() == "PostgreSQL"
             && matches!(resource.key, "bookings" | "supply-requests")
             && request["employeeId"].as_i64().is_some()
@@ -412,6 +416,8 @@ pub(super) fn save_in_transaction(
     request: &Value,
     business_date: chrono::NaiveDate,
 ) -> Result<Value> {
+    let current = auth::current_actor_in(transaction, actor.id, actor.edition)?;
+    let actor = &current;
     let action = if record_id > 0 { "edit" } else { "create" };
     auth::authorize(actor, resource.permission, action)?;
     if record_id > 0
@@ -433,6 +439,29 @@ pub(super) fn save_in_transaction(
         store::check_version(&previous, store::expected(&request))?;
     }
     let mut value = contracts::overlay(previous.clone(), &request);
+    if resource.key == "people" && record_id == 0 {
+        required(request, "requestKey", "请求编号", 100)?;
+        let mut submitted = request.clone();
+        submitted.sort_all_objects();
+        let digest = super::media::digest(&serde_json::to_vec(&submitted)?);
+        if let Some(existing) = store::all(transaction, "people")?
+            .into_iter()
+            .find(|person| {
+                person["companyScope"] == actor.company
+                    && person["ownerUserId"] == actor.id
+                    && person["requestKey"] == request["requestKey"]
+            })
+        {
+            if existing["registrationDigest"] != digest {
+                return Err(conflict("同一请求编号不能用于不同入职资料。"));
+            }
+            if !auth::visible(actor, "office.people", "create", &existing) {
+                return Err(error(403, "档案已不在当前登记范围内。"));
+            }
+            return super::personnel_queries::detail(transaction, actor, existing);
+        }
+        value["registrationDigest"] = json!(digest);
+    }
     if !matches!(resource.key, "users" | "people") {
         value["ownerUserId"] = if record_id > 0 {
             previous["ownerUserId"].clone()
@@ -701,7 +730,8 @@ pub fn delete(
                 json!(value.parse::<i64>().map_err(|_| invalid("版本号无效。"))?);
         }
     }
-    store.transaction(|transaction| {
+    store.transaction_as(actor, |transaction, actor| {
+        auth::authorize(actor, resource.permission, "delete")?;
         let previous = store::get(transaction, resource.key, record_id)?;
         if !auth::visible(actor, resource.permission, "delete", &previous) {
             return Err(error(403, "没有删除此记录的权限。"));

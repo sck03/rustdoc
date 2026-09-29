@@ -1,8 +1,6 @@
 use super::super::{media, tasks::FileOutput};
 use super::*;
 use export_doc_storage::BlobWrite;
-use unicode_normalization::UnicodeNormalization;
-const FILE_LIMIT: usize = 10 * 1024 * 1024;
 
 pub(in crate::engine) fn upload(
     service: &NativeService,
@@ -17,39 +15,17 @@ pub(in crate::engine) fn upload(
     if meta["action"] != "upload" {
         return Err(invalid("该操作不能上传附件。"));
     }
-    let name = file_name.nfc().collect::<String>();
-    if !crate::paths::valid_file_name(&name) || bytes.is_empty() || bytes.len() > FILE_LIMIT {
-        return Err(invalid("文件名无效，或文件超过 10 MiB。"));
-    }
-    let pdf = bytes.starts_with(b"%PDF-")
-        && bytes[bytes.len().saturating_sub(1024)..]
-            .windows(5)
-            .any(|w| w == b"%%EOF");
-    let media_type = if pdf {
-        "application/pdf"
-    } else {
-        media::image_type(bytes, FILE_LIMIT)?
-    };
-    let extension = std::path::Path::new(&name)
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-    if !match media_type {
-        "application/pdf" => extension == "pdf",
-        "image/png" => extension == "png",
-        _ => matches!(extension.as_str(), "jpg" | "jpeg"),
-    } {
-        return Err(invalid(
-            "附件扩展名与实际类型不一致，只支持 PDF、PNG、JPEG。",
-        ));
-    }
+    let (name, media_type) = media::document_type(file_name, bytes)?;
     let digest = media::digest(bytes);
     service.store.transaction(|tx| {
         let (actor,row)=current(tx,actor,meta,records::id(parameters)?)?;
-        store::check_version(&row,store::expected(body))?; mutable(&row)?;
+        mutable(&row)?;
         let (count,existing)=children(tx,&row,"oa-attachment",0,20)?;
-        if existing.iter().any(|item| item["digest"]==digest) { return Err(conflict("该凭证已上传，请勿重复添加。")); }
+        if let Some(existing) = existing.iter().find(|item| item["digest"]==digest) {
+            if existing["fileName"] == name { return project(tx, row, true); }
+            return Err(conflict("该凭证已上传，请勿重复添加。"));
+        }
+        store::check_version(&row,store::expected(body))?;
         let size: u64=existing.iter().map(|v| v["sizeBytes"].as_u64().unwrap_or(0)).sum();
         if count>=20 || size+bytes.len() as u64>50*1024*1024 { return Err(invalid("每份申请最多 20 个附件、合计 50 MiB。")); }
         let record=store::save_in_scope(tx,"oa-attachment",0,json!({"requestId":row["id"],"fileName":name,"mediaType":media_type,"sizeBytes":bytes.len(),"digest":digest}),Some(format!("{}:{digest}",row["id"])),&actor,"upload",Some(&row))?;

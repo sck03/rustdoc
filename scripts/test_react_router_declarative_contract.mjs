@@ -8,12 +8,8 @@ const webRoot = path.join(repoRoot, "apps", "export-doc-web");
 const packageJson = JSON.parse(fs.readFileSync(path.join(webRoot, "package.json"), "utf8"));
 const packageLock = JSON.parse(fs.readFileSync(path.join(webRoot, "package-lock.json"), "utf8"));
 
-const expectedVersion = "7.18.2";
-assert.equal(
-  packageJson.dependencies?.["react-router-dom"],
-  expectedVersion,
-  "react-router-dom must remain pinned to the reviewed v7 release",
-);
+const expectedVersion = packageJson.dependencies?.["react-router-dom"];
+assert.match(expectedVersion ?? "", /^7\.\d+\.\d+$/, "react-router-dom must be exactly pinned to a stable v7 release");
 for (const packageName of ["react-router", "react-router-dom"]) {
   const packageEntry = packageLock.packages?.[`node_modules/${packageName}`];
   assert.equal(

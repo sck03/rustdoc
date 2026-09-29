@@ -22,7 +22,7 @@ pub fn handle(
     query: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
-    store.transaction(|tx| {
+    store.transaction_as(actor, |tx, actor| {
         let can_manage=actor.admin && auth::authorize(actor,"document.invoices","manage").is_ok();
         let attachments=store::all(tx,"attachments")?;
         let count=|id:&Value| attachments.iter().filter(|row|row["categoryId"]==*id).count();

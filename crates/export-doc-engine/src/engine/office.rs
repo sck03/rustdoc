@@ -138,13 +138,8 @@ pub fn validate(
                 employee[key] = value["profile"][key].clone();
             }
             employee["canViewDetails"] = json!(true);
+            employee["avatarHash"] = previous["employee"]["avatarHash"].clone();
             value["employee"] = employee;
-            value["canEdit"] = json!(true);
-            value["canTransition"] = json!(true);
-            value["canLinkAccount"] = json!(true);
-            let correct = id == 0 || can_correct(connection, id)?;
-            value["canDelete"] = json!(correct);
-            value["canCorrectRegistration"] = json!(correct);
         }
         "rooms" => {
             required(value, "name", "会议室名称", 120)?;
@@ -352,8 +347,15 @@ pub fn can_correct(connection: &Connection, id: i64) -> Result<bool> {
     if store::history(connection, "people", id)?
         .iter()
         .any(|event| {
-            !["create", "edit", "image-upload", "image-delete"]
-                .contains(&text(event, "action").as_str())
+            ![
+                "create",
+                "edit",
+                "image-upload",
+                "image-delete",
+                "attachment-upload",
+                "attachment-delete",
+            ]
+            .contains(&text(event, "action").as_str())
         })
     {
         return Ok(false);
@@ -423,7 +425,8 @@ pub fn action(
         return super::office_workflows::action(store, actor, operation, id, body, business_date);
     }
     auth::authorize(actor, "office.people", "transition")?;
-    store.transaction(|tx| {
+    store.transaction_as(actor, |tx, actor| {
+        auth::authorize(actor, "office.people", "transition")?;
         let mut value = store::get(tx, "people", id)?;
         if !auth::visible(actor, "office.people", "transition", &value) {
             return Err(super::error::error(403, "没有办理此人员档案的权限。"));

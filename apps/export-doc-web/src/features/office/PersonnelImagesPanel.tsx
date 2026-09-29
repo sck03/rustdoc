@@ -6,6 +6,7 @@ import { OfficeDialog } from "./OfficeUi.tsx";
 import type { useOfficeOperation } from "./useOfficeData.ts";
 import { usePersonnelImage } from "./usePersonnelImage.ts";
 import { useBlobUrl } from "../../ui/useBlobUrl.ts";
+import { PersonnelAttachments } from "./PersonnelAttachments.tsx";
 
 const imageLabels: Record<PersonnelImageKind, string> = { Avatar: "人员头像", IdentityFront: "身份证人像面（正面）", IdentityBack: "身份证国徽面（反面）" };
 
@@ -33,6 +34,7 @@ export function PersonnelImagesPanel({ client, record, operation, onPendingChang
     <div className="personnel-images">{(Object.keys(imageLabels) as PersonnelImageKind[]).map((kind) =>
       <PersonnelImageEditor key={kind} client={client} id={record.employee.id} kind={kind} image={record.images.find((item) => item.kind === kind)}
         editable={record.canEdit} busy={operation.busy} upload={upload} remove={() => void remove(kind)} onPendingChange={onPendingChange} />)}</div>
+    <PersonnelAttachments client={client} record={record} />
   </div>;
 }
 

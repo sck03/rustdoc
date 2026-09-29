@@ -6,27 +6,36 @@ import { useOfficeOperation } from "./useOfficeData.ts";
 import { employmentTypeLabels, readPersonnelCreate, readPersonnelUpdate } from "./personnelModel.ts";
 import { PersonnelIdentityFields } from "./PersonnelIdentityFields.tsx";
 import { departmentOptions } from "../organization/organizationModel.ts";
+import { useAttachmentDraft } from "../../ui/useAttachmentDraft.ts";
+import { AttachmentDraftFields } from "../../ui/AttachmentDraftFields.tsx";
 
 export function PersonnelFormDialog({ client, user, departments, record, onClose, onSaved }: {
   client: ExportDocManagerApiClient; user: ApiUserDto; departments: PersonnelDepartmentRecord[]; record?: PersonnelRecord;
   onClose: () => void; onSaved: (record: PersonnelRecord) => void;
 }) {
   const operation = useOfficeOperation();
+  const attachments = useAttachmentDraft(record);
   const [requestKey] = useState(createRequestKey);
   const [hireDate, setHireDate] = useState(record?.hireDate ?? user.businessDate);
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    void operation.run(async (signal) => record
-      ? client.updatePersonnel({ id: record.employee.id, body: readPersonnelUpdate(form, record.versionNumber) }, { signal })
-      : client.createPersonnel({ body: readPersonnelCreate(form, requestKey) }, { signal }), onSaved);
+    void operation.run(signal => attachments.save(JSON.stringify(readPersonnelUpdate(form, 0)), signal,
+      (current, signal) => current
+        ? client.updatePersonnel({ id: current.employee.id, body: readPersonnelUpdate(form, current.versionNumber) }, { signal })
+        : client.createPersonnel({ body: readPersonnelCreate(form, requestKey) }, { signal }),
+      (current, entry, signal) => {
+        const body = new FormData(); body.set("file", entry.file); body.set("expectedVersion", String(current.versionNumber));
+        return entry.kind === "document" ? client.uploadPersonnelAttachment({ id: current.employee.id, body }, { signal })
+          : client.uploadPersonnelImage({ id: current.employee.id, kind: entry.kind as "Avatar" | "IdentityFront" | "IdentityBack", body }, { signal });
+      }), onSaved);
   }
   const canCorrectRegistration = !record || record.canCorrectRegistration;
   return <OfficeDialog title={record ? `编辑档案 · ${record.employee.fullName}` : "入职登记"} onClose={onClose} {...operation} protectChanges>
     <form className="personnel-form" onSubmit={submit} autoComplete="off">
       <fieldset className="office-form-grid" disabled={operation.busy}>
         <legend>基本信息</legend>
-        {canCorrectRegistration && <OfficeField label="工号（公司内唯一）"><input name="employeeNumber" required maxLength={40} defaultValue={record?.employee.employeeNumber} autoFocus={!record} /></OfficeField>}
+        {canCorrectRegistration && <OfficeField label="工号（系统内唯一）"><input name="employeeNumber" required maxLength={40} defaultValue={record?.employee.employeeNumber} autoFocus={!record} /></OfficeField>}
         <OfficeField label="姓名"><input name="fullName" required maxLength={100} defaultValue={record?.profile.fullName ?? ""} autoFocus={Boolean(record)} /></OfficeField>
         {canCorrectRegistration && <>
           <OfficeField label="所属部门"><select name="departmentId" required defaultValue={record?.employee.departmentId ?? user.departmentId ?? ""}>
@@ -51,7 +60,15 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
       <details className="personnel-private-fields"><summary>个人资料与人事备注（限人事档案权限）</summary>
         <PersonnelPrivateFields profile={record?.profile} busy={operation.busy} />
       </details>
-      {!record && <p className="office-muted">保存后可在“照片与证件”中上传头像及身份证正反面。{!user.capabilities.usesOfficeRegister && "需要使用系统的员工可由管理员关联已有账号。"}</p>}
+      <fieldset className="office-form-grid" disabled={operation.busy}><legend>照片与文档</legend>
+        <AttachmentDraftFields draft={attachments} busy={operation.busy} kind="Avatar" label="选择人员头像" />
+        <details className="personnel-private-fields office-field-wide"><summary>身份证照片（限人事档案权限）</summary>
+          <AttachmentDraftFields draft={attachments} busy={operation.busy} kind="IdentityFront" label="选择身份证人像面（正面）" />
+          <AttachmentDraftFields draft={attachments} busy={operation.busy} kind="IdentityBack" label="选择身份证国徽面（反面）" />
+        </details>
+        <AttachmentDraftFields draft={attachments} busy={operation.busy} label="选择档案图片或文档" />
+      </fieldset>
+      {operation.error && attachments.saved && <p role="status">档案已保存，待保存文件仍保留。再次保存会继续处理剩余文件。</p>}
       <OfficeSubmit busy={operation.busy} label={record ? "保存档案" : "登记入职"} />
     </form>
   </OfficeDialog>;

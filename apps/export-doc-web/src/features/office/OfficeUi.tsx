@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { useModalDialog } from "../../ui/useModalDialog.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
@@ -20,12 +20,16 @@ export function OfficeDialog({ title, children, onClose, busy = false, error = "
       .then((accepted) => { if (accepted) onClose(); });
   }
   const ref = useModalDialog(close, { canClose: !busy });
+  useEffect(() => { if (error) ref.current?.querySelectorAll("details").forEach(section => { section.open = true; }); }, [error, ref]);
   return <div className="office-dialog-backdrop">
     <div className="office-dialog" ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <header className="office-dialog-header"><h2 id={titleId}>{title}</h2>
         <button type="button" className="icon-button" aria-label="关闭窗口" disabled={busy} onClick={close}><X size={18} aria-hidden="true" /></button>
       </header>
-      <div className="office-dialog-body" onChangeCapture={() => setDirty(true)}>
+      <div className="office-dialog-body" onChangeCapture={() => setDirty(true)} onInvalidCapture={event => {
+        let section = (event.target as HTMLElement).closest("details");
+        while (section) { section.open = true; section = section.parentElement?.closest("details") ?? null; }
+      }}>
         {error && <InlineNotice tone="error" title="操作未完成">{error}</InlineNotice>}
         {children}
       </div>

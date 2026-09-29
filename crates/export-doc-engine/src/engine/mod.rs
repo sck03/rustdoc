@@ -6,6 +6,8 @@ mod attachments;
 pub mod audit;
 mod audit_values;
 mod auth;
+#[cfg(test)]
+mod authorization_tests;
 mod capabilities;
 pub mod catalog;
 mod crm;
@@ -58,6 +60,7 @@ mod party_files;
 mod pdf_merge;
 mod permission_templates;
 mod personnel;
+mod personnel_files;
 mod personnel_queries;
 mod product_options;
 mod records;
@@ -201,6 +204,9 @@ impl NativeService {
         self.authorize_operation(&actor, operation, &[])?;
         if oa::is_download(operation) {
             return oa::download(self, &actor, operation, parameters);
+        }
+        if operation == DOWNLOAD_PERSONNEL_ATTACHMENT {
+            return personnel_files::download(&self.store, &actor, parameters);
         }
         match operation {
             DOWNLOAD_REPORT_TEMPLATE_FILE | DOWNLOAD_REPORT_TEMPLATE_PACKAGE => {
@@ -591,6 +597,16 @@ impl NativeService {
                         parameters,
                         &body_value,
                     )?)
+                    .map_err(Into::into);
+                }
+                if operation == DOWNLOAD_PERSONNEL_ATTACHMENT {
+                    return Ok(personnel_files::download(&self.store, &actor, parameters)?.content);
+                }
+                if operation == DELETE_PERSONNEL_ATTACHMENT {
+                    return serde_json::to_vec(&contracts::dto(
+                        contracts::response(operation.id),
+                        personnel_files::remove(&self.store, &actor, parameters, &body_value)?,
+                    ))
                     .map_err(Into::into);
                 }
                 if personnel::OPERATIONS.contains(&operation) {

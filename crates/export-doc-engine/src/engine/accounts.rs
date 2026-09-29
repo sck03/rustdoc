@@ -38,7 +38,8 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
     } else {
         None
     };
-    store.transaction(|tx| {
+    store.transaction_as(actor, |tx, actor| {
+        auth::authorize(actor, "system.users", "manage")?;
         let previous = if id > 0 {
             Some(store::get(tx, "users", id)?)
         } else {

@@ -86,7 +86,7 @@ pub fn action(
     let resource = catalog::resource(kind).ok_or_else(|| invalid("业务资源未注册。"))?;
     let permission_action = auth::operation_action(operation, resource.permission, action)?;
     auth::authorize(actor, resource.permission, permission_action)?;
-    let mut saved=store.transaction(|transaction|{
+    let mut saved=store.transaction_as(actor, |transaction, actor|{
         let mut value=store::get(transaction,kind,id)?;
         if !auth::visible(actor,resource.permission,permission_action,&value){return Err(super::error::error(403,"没有办理此记录的权限。"));}
         let cloning=matches!(operation.id,"CloneInvoice"|"CloneInvoiceAsType"|"CloneUserReportTemplate");

@@ -34,7 +34,9 @@ fn check(schema: &Value, value: &Value, path: &str, depth: usize) -> Result<(), 
                 .count();
             if (key == "allOf" && passed != options.len())
                 || (key == "anyOf" && passed == 0)
-                || (key == "oneOf" && passed != 1)
+                // The frozen .NET document sometimes repeats null through a
+                // nullable referenced DTO and an explicit null alternative.
+                || (key == "oneOf" && passed != 1 && !(value.is_null() && passed > 0))
             {
                 return Err(format!("{path}: {key} mismatch"));
             }
@@ -96,6 +98,19 @@ fn check(schema: &Value, value: &Value, path: &str, depth: usize) -> Result<(), 
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn nullable_reference_accepts_null_but_non_null_unions_stay_exclusive() {
+        let schema = &contracts::schema("PersonnelRecord")["properties"]["account"];
+        assert!(structure(schema, &Value::Null).is_ok());
+        assert!(structure(schema, &json!({"id":1})).is_err());
+        assert!(
+            structure(
+                &json!({"oneOf":[{"type":"integer"},{"type":"number"}]}),
+                &json!(1)
+            )
+            .is_err()
+        );
+    }
     #[test]
     fn missing_nested_paging_and_invalid_scalars_are_reported() {
         assert!(

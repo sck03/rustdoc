@@ -24,8 +24,16 @@ pub const OPERATIONS: &[Operation] = &[
 ];
 
 fn invoice(store: &Store, actor: &Actor, id: i64, action: &str) -> Result<Value> {
+    invoice_in(&*store.connection()?, actor, id, action)
+}
+fn invoice_in(
+    tx: &export_doc_storage::Connection,
+    actor: &Actor,
+    id: i64,
+    action: &str,
+) -> Result<Value> {
     auth::authorize(actor, "document.invoices", action)?;
-    let invoice = store.get("invoices", id)?;
+    let invoice = store::get(tx, "invoices", id)?;
     if !auth::visible(actor, "document.invoices", action, &invoice) {
         return Err(error(403, "没有访问此发票资料的权限。"));
     }
@@ -39,7 +47,6 @@ pub fn upload(
     file_name: &str,
     bytes: &[u8],
 ) -> Result<Value> {
-    let invoice = invoice(store, actor, invoice_id, "operate")?;
     let name = file_name.nfc().collect::<String>();
     if !paths::valid_file_name(&name) {
         return Err(invalid("资料文件名无效。"));
@@ -52,11 +59,10 @@ pub fn upload(
     let hash = digest(bytes);
     let attachment_id = metadata["attachmentId"].as_i64().unwrap_or(0);
     let category_id = metadata["categoryId"].as_i64().unwrap_or(0);
-    let category = store.get("attachment-categories", category_id)?;
-    if category["companyScope"] != invoice["companyScope"] {
-        return Err(error(403, "资料分类不属于发票所在公司。"));
-    }
-    store.transaction(|transaction|{
+    store.transaction_as(actor, |transaction, actor|{
+        let invoice = invoice_in(transaction, actor, invoice_id, "operate")?;
+        let category = store::get(transaction,"attachment-categories",category_id)?;
+        if category["companyScope"] != invoice["companyScope"] { return Err(error(403,"资料分类不属于发票所在公司。")); }
         let attachments=store::all(transaction,"attachments")?;
         if let Some(existing)=attachments.iter().find(|item|item["lastUploadKey"]==metadata["uploadKey"]){
             if existing["invoiceId"]==invoice_id&&existing["lastDigest"]==hash{return Ok(existing.clone());}
@@ -81,7 +87,7 @@ pub fn upload(
         let content_type=match std::path::Path::new(&name).extension().and_then(|value|value.to_str()).unwrap_or("").to_ascii_lowercase().as_str(){"pdf"=>"application/pdf","png"=>"image/png","jpg"|"jpeg"=>"image/jpeg","txt"=>"text/plain",_=>"application/octet-stream"};
         let revision_record=json!({"revision":revision,"fileName":name,"contentType":content_type,"length":bytes.len(),"sha256":hash,"uploadedBy":actor.name,"note":text(&metadata,"note"),"createdAt":store::timestamp()});
         if !record["revisions"].is_array(){record["revisions"]=json!([]);}record["revisions"].as_array_mut().unwrap().push(revision_record);
-        let record=store::save(transaction,"attachments",attachment_id,record,None,actor,"upload")?;
+        let record=store::save_in_scope(transaction,"attachments",attachment_id,record,None,actor,"upload",Some(&invoice))?;
         transaction.insert_blob(&BlobWrite{kind:&format!("attachment:{revision}"),record_id:record["id"].as_i64().unwrap_or(0),file_name:&name,media_type:content_type,digest:&hash,content:bytes,created_at:&store::timestamp()})?;
         Ok(record)
     })
@@ -212,8 +218,14 @@ pub fn handle(
             }
             UPDATE_BUSINESS_ATTACHMENT
             | EDIT_BUSINESS_ATTACHMENT_METADATA
-            | DELETE_BUSINESS_ATTACHMENT => store.transaction(|transaction| {
+            | DELETE_BUSINESS_ATTACHMENT => store.transaction_as(actor, |transaction, actor| {
                 let mut record = store::get(transaction, "attachments", id)?;
+                let parent = invoice_in(
+                    transaction,
+                    actor,
+                    record["invoiceId"].as_i64().unwrap_or(0),
+                    action,
+                )?;
                 store::check_version(&record, store::expected(&body))?;
                 required(&body, "note", "变更说明", 500)?;
                 if operation == DELETE_BUSINESS_ATTACHMENT {
@@ -258,7 +270,7 @@ pub fn handle(
                         "attachment-categories",
                         body["categoryId"].as_i64().unwrap_or(0),
                     )?;
-                    if category["companyScope"] != record["companyScope"] {
+                    if category["companyScope"] != parent["companyScope"] {
                         return Err(error(403, "不能使用其他公司的资料分类。"));
                     }
                     for key in ["title", "categoryId", "poNumber", "styleNo"] {
