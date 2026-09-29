@@ -34,11 +34,12 @@ fn nodes<'a>(svg: &'a str, tag: &str) -> Vec<(&'a str, f32)> {
 }
 
 fn text_y(svg: &str, text: &str) -> f32 {
-    let (node, offset) = nodes(svg, "text")
+    nodes(svg, "text")
         .into_iter()
-        .find(|(node, _)| node.ends_with(&format!(">{text}")))
-        .unwrap_or_else(|| panic!("Missing text: {text}"));
-    attribute(node, "y") + offset
+        .filter(|(node, _)| node.ends_with(&format!(">{text}")))
+        .map(|(node, offset)| attribute(node, "y") + offset)
+        .min_by(f32::total_cmp)
+        .unwrap_or_else(|| panic!("Missing text: {text}"))
 }
 
 fn horizontal_between(svg: &str, start: f32, end: f32) -> bool {
@@ -56,6 +57,32 @@ fn commercial_rows_have_no_dividers_and_values_share_the_lower_baseline() {
         data.root["items"][1]["styleNo"] = json!("LOWER-2");
         let document = render_builtin(template, &data, &AtomicBool::new(false)).unwrap();
         let svg = &document.pages[0].svg;
+        assert!(
+            !svg.contains("#f2f2f2"),
+            "commercial headers must have a white background"
+        );
+        let marks = nodes(svg, "text")
+            .into_iter()
+            .find(|(node, _)| node.ends_with(">唛头 / Marks"))
+            .unwrap()
+            .0;
+        assert!(marks.contains("font-weight=\"700\""));
+        if template == Builtin::PackingList {
+            assert!(
+                (text_y(svg, "唛头 / Marks") - text_y(svg, "货品名称 / Description")).abs() < 0.02
+            );
+            let header_bottom = nodes(svg, "line").into_iter().find(|(node, offset)| {
+                let y = attribute(node, "y1") + offset;
+                attribute(node, "x1") == 15.
+                    && attribute(node, "x2") == 47.
+                    && y > text_y(svg, "唛头 / Marks")
+                    && y < text_y(svg, "LOWER-1")
+            });
+            assert!(
+                header_bottom.is_some(),
+                "marks header needs its own bottom rule"
+            );
+        }
         let baseline = text_y(svg, "LOWER-1");
         for value in if template == Builtin::Invoice {
             vec!["20", "CTNS", "1000", "PCS", "USD4.50", "USD4500.00"]
@@ -104,6 +131,43 @@ fn commercial_rows_have_no_dividers_and_values_share_the_lower_baseline() {
 }
 
 #[test]
+fn invoice_amount_header_rule_is_not_covered_by_document_fields() {
+    for count in [1, 36] {
+        let mut data = invoice(count);
+        data.root["Invoice"]["tradeTerms"] = json!("FOB");
+        let document = render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();
+        for page in &document.pages {
+            let svg = &page.svg;
+            let (rule, _) = nodes(svg, "line")
+                .into_iter()
+                .find(|(node, offset)| {
+                    (attribute(node, "x1") - 162.).abs() < 0.01
+                        && (attribute(node, "x2") - 195.).abs() < 0.01
+                        && (attribute(node, "y1") + offset - 86.).abs() < 0.01
+                        && (attribute(node, "y2") + offset - 86.).abs() < 0.01
+                })
+                .expect("amount header must have a complete bottom rule");
+            let rule_position = svg.find(rule).unwrap();
+            for (rect, offset) in nodes(svg, "rect") {
+                if svg.find(rect).unwrap() < rule_position {
+                    continue;
+                }
+                let x = attribute(rect, "x");
+                let y = attribute(rect, "y") + offset;
+                let covers = x < 195.
+                    && x + attribute(rect, "width") > 162.
+                    && y < 86.1
+                    && y + attribute(rect, "height") > 85.9;
+                assert!(
+                    !covers,
+                    "a later field background obscures the amount header rule"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn invoice_amount_stays_with_price_when_po_is_empty_or_style_wraps() {
     for (po, style) in [
         ("", "STYLE".to_owned()),
@@ -134,18 +198,17 @@ fn independent_invoice_fields_and_totals_share_columns_and_total_baseline() {
             "x",
         )
     };
-    for (detail, unit, total, left) in [
-        ("20", "CTNS", "40CTNS", 85.3),
-        ("1000", "PCS", "2000PCS", 108.3),
-    ] {
+    for (detail, unit, total, anchor) in [("20", "CTNS", "40", 95.), ("1000", "PCS", "2000", 120.)]
+    {
         assert!(
             (x(unit) - x(detail)).abs() < 0.01,
             "numbers and units must be joined without a gap"
         );
-        assert!((x(total) - left).abs() < 0.01);
+        assert!((x(total) - anchor).abs() < 0.01);
+        assert!((x(total) - x(detail)).abs() < 0.01);
         assert!((text_y(svg, "TOTAL:") - text_y(svg, total)).abs() < 0.01);
     }
-    assert!((x("USD4500.00") - x("USD9000.00") - 0.3).abs() < 0.01);
+    assert!((x("USD4500.00") - x("USD9000.00")).abs() < 0.01);
     assert!((text_y(svg, "TOTAL:") - text_y(svg, "USD9000.00")).abs() < 0.01);
     assert!(
         !nodes(svg, "text")
@@ -180,6 +243,48 @@ fn independent_invoice_fields_and_totals_share_columns_and_total_baseline() {
                 .flat_map(|layer| &layer.elements)
                 .any(|e| !e.locked
                     && matches!(&e.kind, Kind::Field {field_path,..} if field_path == path))
+        );
+    }
+}
+
+#[test]
+fn invoice_grouped_totals_keep_each_number_and_unit_on_the_same_line() {
+    let mut draft = InvoiceDraft::demo("2026-09-16", "UNIT-TOTALS")
+        .build()
+        .unwrap();
+    draft.items[1].ctn_unit_en = "BOXES".into();
+    draft.items[1].unit_en = "SETS".into();
+    let data = ReportData::invoice(&draft, json!({}), json!({}), false).unwrap();
+    assert_eq!(data.text("total_by_ctn_unit.Value"), "12\n28");
+    assert_eq!(data.text("total_by_ctn_unit.Key"), "BOXES\nCTNS");
+    assert_eq!(data.text("total_by_qty_unit.Value"), "1400\n600");
+    assert_eq!(data.text("total_by_qty_unit.Key"), "PCS\nSETS");
+    let rendered = render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();
+    let svg = &rendered.pages.last().unwrap().svg;
+    let totals: Vec<_> = nodes(svg, "text")
+        .into_iter()
+        .filter(|(node, _)| node.contains("font-weight=\"700\""))
+        .collect();
+    for (number, unit, anchor) in [
+        ("12", "BOXES", 95.),
+        ("28", "CTNS", 95.),
+        ("1400", "PCS", 120.),
+        ("600", "SETS", 120.),
+    ] {
+        let (number_node, number_offset) = totals
+            .iter()
+            .find(|(node, _)| node.ends_with(&format!(">{number}")))
+            .unwrap();
+        let (unit_node, unit_offset) = totals
+            .iter()
+            .find(|(node, _)| node.ends_with(&format!(">{unit}")))
+            .unwrap();
+        assert!((attribute(number_node, "x") - anchor).abs() < 0.01);
+        assert!((attribute(unit_node, "x") - anchor).abs() < 0.01);
+        assert!(
+            (attribute(number_node, "y") + number_offset - attribute(unit_node, "y") - unit_offset)
+                .abs()
+                < 0.01
         );
     }
 }

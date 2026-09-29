@@ -13,6 +13,13 @@ use unicode_normalization::UnicodeNormalization;
 
 fn text(cell: Option<&Data>) -> String {
     match cell {
+        // Excel stores numeric cells with 15 significant decimal digits. Drop
+        // binary calculation noise here; text cells keep their exact precision.
+        Some(Data::Float(value)) if value.is_finite() => {
+            Decimal::from_scientific(&format!("{value:.14e}"))
+                .map(|number| number.normalize().to_string())
+                .unwrap_or_else(|_| value.to_string())
+        }
         Some(value @ (Data::DateTime(_) | Data::DateTimeIso(_))) => value
             .as_date()
             .map(|date| date.format("%Y-%m-%d").to_string())
@@ -36,6 +43,38 @@ fn configured(range: &Range<Data>, settings: &Value, key: &str) -> String {
 }
 fn score(value: f32) -> Decimal {
     Decimal::from_str(&format!("{value:.4}")).unwrap_or_default()
+}
+
+// BIFF files can retain formatted/empty records through row 65536. Count
+// content, not formatting, and keep original coordinates for field mappings.
+fn content_range(range: Range<Data>, total: &mut usize, check: Check<'_>) -> Result<Range<Data>> {
+    let Some((row_offset, col_offset)) = range.start() else {
+        return Ok(range);
+    };
+    let mut bounds: Option<((u32, u32), (u32, u32))> = None;
+    for (row, cells) in range.rows().enumerate() {
+        check()?;
+        for (col, cell) in cells.iter().enumerate() {
+            let value = text(Some(cell));
+            if value.is_empty() {
+                continue;
+            }
+            *total = total.checked_add(1).ok_or("Excel 容量无效。")?;
+            if *total > 500_000 {
+                return Err("Excel 有效单元格超过 500000 个。".into());
+            }
+            if value.chars().count() > 4096 {
+                return Err("Excel 单元格文本超过 4096 字。".into());
+            }
+            let point = (row_offset + row as u32, col_offset + col as u32);
+            let (start, end) = bounds.get_or_insert((point, point));
+            start.0 = start.0.min(point.0);
+            start.1 = start.1.min(point.1);
+            end.0 = end.0.max(point.0);
+            end.1 = end.1.max(point.1);
+        }
+    }
+    Ok(bounds.map_or_else(Range::empty, |(start, end)| range.range(start, end)))
 }
 
 pub fn preview(
@@ -68,28 +107,17 @@ pub fn preview(
         let range = workbook
             .worksheet_range(&name)
             .map_err(|e| format!("工作表 {name} 无法读取：{e}"))?;
+        let range = content_range(range, &mut total_cells, check)?;
         let (height, width) = range.get_size();
-        total_cells = total_cells
-            .checked_add(height.saturating_mul(width))
-            .ok_or("Excel 容量无效。")?;
-        if height > 10000 || width > 128 || total_cells > 500_000 {
-            return Err("Excel 工作表超过 10000 行、128 列或总单元格上限。".into());
-        }
         if range.is_empty() {
             continue;
         }
         let end = range.end().ok_or("Excel 工作表范围无效。")?;
-        if end.0 > 10000 || end.1 > 128 {
-            return Err("Excel 有效内容超出可导入区域。".into());
-        }
         let mut cells = vec![];
         for row in 0..=end.0.min(119) {
             let mut values = vec![];
             for col in 0..=end.1.min(47) {
                 let value = text(range.get_value((row, col)));
-                if value.chars().count() > 4096 {
-                    return Err("Excel 单元格文本超过 4096 字。".into());
-                }
                 values.push(value);
             }
             cells.push(values);
@@ -135,6 +163,13 @@ pub fn preview(
         });
     };
     let detected = analysis.table.as_ref().ok_or("缺少表格识别结果。")?;
+    let end = range.end().ok_or("Excel 工作表范围无效。")?;
+    if end.0 >= 10000 || end.1 >= 128 {
+        return Err(format!(
+            "选中的工作表 {} 有效内容超出 10000 行或 128 列，请检查末尾数据或公式。",
+            analysis.name
+        ));
+    }
     let mut columns = BTreeMap::new();
     for field in &detected.fields {
         if let Some(index) = ITEM_COLUMNS
@@ -252,6 +287,9 @@ pub fn preview(
         if [1, 2, 3]
             .iter()
             .all(|&index| row.cells[index].trim().is_empty())
+            // A footer may occupy the description columns. Product rows also
+            // need a value in a mapped numeric column; explicit zero is valid.
+            || !changed.iter().any(|&index| ITEM_COLUMNS[index].numeric)
         {
             continue;
         }

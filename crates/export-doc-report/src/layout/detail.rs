@@ -87,7 +87,13 @@ pub(super) fn render(
         .zip(&widths)
         .map(|(column, width)| header_style.wrap(&column.title, *width))
         .collect();
-    let header_height = header_style.height(&header_lines);
+    let header_height = table
+        .side_band
+        .as_ref()
+        .map_or(0., |side| {
+            header_style.height(&[header_style.wrap(&side.title, side.width_mm)])
+        })
+        .max(header_style.height(&header_lines));
     let page_capacity = |index: usize| {
         (if index == 0 {
             bottoms.first
@@ -228,25 +234,16 @@ pub(super) fn render(
                 top,
                 content_bottom,
                 size,
+                if table.print.repeat_header_on_page_break || index == 0 {
+                    header_height
+                } else {
+                    0.
+                },
                 !side.first_page_only || index == 0,
             )?;
         }
-        let mut y = top;
-        if table.print.repeat_header_on_page_break || index == 0 {
-            table_row(
-                &mut svg,
-                table,
-                &header_lines,
-                &widths,
-                body_left,
-                y,
-                header_height,
-                size,
-                true,
-                None,
-            );
-            y += header_height;
-        }
+        let show_header = table.print.repeat_header_on_page_break || index == 0;
+        let mut y = top + if show_header { header_height } else { 0. };
         for row in rows {
             match &row.kind {
                 RowKind::Group(label) => group_row(
@@ -269,6 +266,21 @@ pub(super) fn render(
                 ),
             }
             y += row.height;
+        }
+        // Paint the header last so the first row's white fill cannot cover its bottom rule.
+        if show_header {
+            table_row(
+                &mut svg,
+                table,
+                &header_lines,
+                &widths,
+                body_left,
+                top,
+                header_height,
+                size,
+                true,
+                None,
+            );
         }
         if table.row_separators == Some(false) {
             super::flow::draw_border(
@@ -547,6 +559,7 @@ fn render_side_band(
     top: f32,
     bottom: f32,
     size: f32,
+    header_height: f32,
     show_content: bool,
 ) -> Result<()> {
     let value = if side.content_kind == "Field" {
@@ -554,29 +567,30 @@ fn render_side_band(
     } else {
         side.text.clone()
     };
-    svg.push_str(&format!(
-        "<rect x=\"{x}\" y=\"{top}\" width=\"{}\" height=\"{}\" fill=\"white\" stroke=\"#000000\" stroke-width=\"0.2\"/>",
-        side.width_mm,
-        (bottom - top).max(1.)
-    ));
-    text_svg(
-        svg,
-        &wrap(&side.title, side.width_mm - 2., size),
-        x + 1.,
-        top + 1.,
-        side.width_mm - 2.,
-        size,
-        true,
-        "#000000",
-        side.style.align.as_deref().unwrap_or("Left"),
-    );
+    super::flow::draw_border(svg, [x, top, side.width_mm, bottom - top], &table.border);
+    if header_height > 0. {
+        let style = CellStyle::new(&table.header_style, size, true);
+        let lines = style.wrap(&side.title, side.width_mm);
+        text_svg(
+            svg,
+            &lines,
+            x + style.left,
+            top + style.content_top(header_height, lines.len() as f32 * style.size * 1.35),
+            side.width_mm - style.left - style.right,
+            style.size,
+            style.bold,
+            "#000000",
+            side.style.align.as_deref().unwrap_or("Left"),
+        );
+        super::flow::draw_border(svg, [x, top, side.width_mm, header_height], &table.border);
+    }
     if !show_content {
         return Ok(());
     }
     if side.content_kind == "Field"
         && let Some(image) = data.images.get(&side.field_path)
     {
-        let image_y = top + size * 1.35 + 3.;
+        let image_y = top + header_height + 1.;
         svg.push_str(&format!("<image x=\"{}\" y=\"{image_y}\" width=\"{}\" height=\"{}\" preserveAspectRatio=\"xMidYMid meet\" href=\"{}\"/>",x+1.,side.width_mm-2.,(bottom-image_y-1.).max(1.),image.data_url()?));
         return Ok(());
     }
@@ -584,14 +598,13 @@ fn render_side_band(
         svg,
         &wrap(&value, side.width_mm - 2., size),
         x + 1.,
-        top + size * 1.35 + 2.,
+        top + header_height + 1.5,
         side.width_mm - 2.,
         size,
         false,
         "#000000",
         side.style.align.as_deref().unwrap_or("Left"),
     );
-    let _ = table;
     Ok(())
 }
 
@@ -686,8 +699,7 @@ fn table_row(
     for (index, ((column, lines), width)) in table.columns.iter().zip(lines).zip(widths).enumerate()
     {
         svg.push_str(&format!(
-            "<rect x=\"{x}\" y=\"{y}\" width=\"{width}\" height=\"{height}\" fill=\"{}\"/>",
-            if header { "#f2f2f2" } else { "white" }
+            "<rect x=\"{x}\" y=\"{y}\" width=\"{width}\" height=\"{height}\" fill=\"white\"/>"
         ));
         let mut border = column.border.as_ref().unwrap_or(&table.border).clone();
         if !header && table.row_separators == Some(false) {

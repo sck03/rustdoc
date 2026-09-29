@@ -72,6 +72,22 @@ try {
     if (kind === "purchase") { await fill("物品名称", "办公纸"); await fill("预算单价", "18.25"); }
     await click("保存草稿");
     await wait("!document.querySelector('[role=dialog]') && document.querySelector('.oa-detail')", `${name} save failed`);
+    const savedId = await run("new URLSearchParams(location.hash.split('?')[1]).get('requestId')");
+    await captureScreenshot(page, path.join(output, `${kind}-draft.png`));
+    await navigate(`${url}/#/office/approvals`);
+    await wait("document.querySelector('[aria-label=\"申请与审批中心\"]')", "Navigation away failed");
+    await navigate(`${url}/#/office/requests/${kind}`);
+    await wait(`document.querySelector('.office-resource-grid')?.innerText.includes(${JSON.stringify(`${name}真实界面验收`)})`, `${name}: saved draft missing after navigation`);
+    assert.equal(await run("document.querySelector('.oa-toolbar select').value"), "", "Default list includes drafts for approvers");
+    await click(`${name}真实界面验收`);
+    await wait("document.querySelector('.oa-detail .office-badge')?.textContent==='草稿'", "Draft did not reopen");
+    assert.equal(await run("new URLSearchParams(location.hash.split('?')[1]).get('requestId')"), savedId);
+    assert.equal(await run("getComputedStyle(document.querySelector('.oa-detail-content')).backgroundColor"), "rgb(255, 255, 255)");
+    await click("编辑草稿");
+    await wait("document.querySelector('[role=dialog] textarea')", "Draft editor missing");
+    await fill("申请说明", "切换导航后继续编辑，保存内容仍然存在。");
+    await click("保存草稿");
+    await wait("!document.querySelector('[role=dialog]') && document.querySelector('.oa-reason')?.innerText.includes('切换导航后继续编辑')", "Draft edit was not persisted");
     if (kind === "expense") {
       const fixture = path.join(output, "receipt.pdf"); fs.writeFileSync(fixture, "%PDF-1.7\n1 0 obj<</Type/Catalog>>endobj\n%%EOF\n");
       const { root } = await page.send("DOM.getDocument");

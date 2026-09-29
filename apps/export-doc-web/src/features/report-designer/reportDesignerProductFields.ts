@@ -26,7 +26,7 @@ export function insertProductField(state: ReportDesignerV3DocumentState, field: 
   return { state: next, notice: next === state ? "当前图层无法添加字段。" : null };
 }
 
-const totals: Record<string, string> = { "item.Cartons": "total_by_ctn_unit", "item.Quantity": "total_by_qty_unit", "item.TotalPrice": "Invoice.TotalAmount" };
+const totals: Record<string, string> = { "item.Cartons": "total_by_ctn_unit.Value", "item.CtnUnitEN": "total_by_ctn_unit.Key", "item.Quantity": "total_by_qty_unit.Value", "item.UnitEN": "total_by_qty_unit.Key", "item.TotalPrice": "Invoice.TotalAmount" };
 
 /** A deliberate one-click alignment; totals remain ordinary, individually editable fields. */
 export function alignProductSummary(state: ReportDesignerV3DocumentState, selectedId: string) {

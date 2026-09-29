@@ -69,7 +69,7 @@ function invoice() {
   const namedField=(id,label,path,x,y,w,h=4,align="Left",bold=false)=>({...field(id,path,x,y,w,h,7,align,bold),label});
   d.detailRowHeightHundredthMm=mm(12);
   d.layers[0].elements.push(
-    grid("invoice-headings",15,78,180,[32/1.8,115/1.8,33/1.8],[[8,[cell("marks-heading","唛头 / Marks"),cell("goods-heading","货品名称 / Quantities and Descriptions"),cell("amount-heading","金额 / Amount")]]],7,sans),
+    grid("invoice-headings",15,78,180,[32/1.8,115/1.8,33/1.8],[[8,[cell("marks-heading","唛头 / Marks",1,{style:{bold:true}}),cell("goods-heading","货品名称 / Quantities and Descriptions",1,{style:{bold:true}}),cell("amount-heading","金额 / Amount",1,{style:{bold:true}})]]],7,sans),
   );
   d.layers[1].elements=[
     namedField("item-name","货品名称","item.StyleName",49,100,34),
@@ -86,7 +86,7 @@ function invoice() {
   for(const e of d.layers[1].elements) if(["item-price","item-amount"].includes(e.id)) e.fieldFormat="Currency";
   const first={...d.layers[0],id:"invoice-first",name:"首页单据信息",print:{...d.layers[0].print,firstPageOnly:true},elements:[
     namedField("shipping-marks","唛头","Invoice.ShippingMarks",16,100,30,100),
-    namedField("trade-terms","价格条款","Invoice.TradeTerms",164,86,29,5,"Right"),
+    namedField("trade-terms","价格条款","Invoice.TradeTerms",164,87,29,5,"Right"),
   ]};
   const lines=[15,47,162,195].map((x,i)=>({...element(`invoice-rule-${i}`,"Line",x-2,86,4,159,{direction:"Vertical"}),style:{borderStyle:"Solid",borderWidthPx:0.6,borderColor:"#000000"}}));
   d.layers[3].elements=[...lines,{...rule("invoice-bottom",15,245,180),style:{borderStyle:"Solid",borderWidthPx:0.6,borderColor:"#000000"}}];
@@ -95,11 +95,14 @@ function invoice() {
   final.print.followBody=true;
   final.elements=[
     rule("total-rule",47,117,148),text("total-label","TOTAL:",49,121,34,9,7,"Left",true),
-    namedField("total-cartons","总箱数","total_by_ctn_unit",85,121,22,9,"Left",true),
-    namedField("total-quantity","总数量","total_by_qty_unit",108,121,24,9,"Left",true),
+    namedField("total-cartons","总箱数","total_by_ctn_unit.Value",85,121,10,9,"Right",true),
+    namedField("total-carton-unit","总箱数单位","total_by_ctn_unit.Key",95,121,12,9,"Left",true),
+    namedField("total-quantity","总数量","total_by_qty_unit.Value",108,121,12,9,"Right",true),
+    namedField("total-quantity-unit","总数量单位","total_by_qty_unit.Key",120,121,12,9,"Left",true),
     namedField("total-amount","总金额","Invoice.TotalAmount",164,121,29,9,"Right",true),
     seal("seal","doc_seal_path",150,134,40,25),
   ];
+  for(const e of final.elements) if(e.type === "Field" || e.type === "Text") { e.yHundredthMm+=e.style.paddingHundredthMm; e.style.paddingHundredthMm=0; }
   d.layers.push(first);
   final.elements.find(e=>e.id==="total-amount").fieldFormat="Currency";
   const labels={company:"公司名称", "company-address":"公司地址",customer:"客户名称","customer-address":"客户地址","invoice-no":"发票号码","contract-no":"合同号码","invoice-date":"发票日期",loading:"起运港",destination:"目的港",terms:"付款条件"};

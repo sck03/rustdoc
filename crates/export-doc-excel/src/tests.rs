@@ -49,7 +49,7 @@ fn booking_uses_the_existing_layout_and_round_trips_exact_invoice_amounts() {
 
 #[test]
 fn reordered_columns_and_line_amount_driven_prices_are_preserved() {
-    let data=table(&[("amount","金额"),("name","英文品名"),("quantity","数量"),("style","款号"),("price","单价"),("hs","HS 编码")],&[json!({"amount":5,"name":"COTTON & SILK SHIRT","quantity":3,"style":"00123","price":1.66,"hs":"6109100000"})],&check).unwrap();
+    let data=table(&[("amount","金额"),("name","英文品名"),("quantity","数量"),("style","款号"),("price","单价"),("hs","HS 编码")],&[json!({"amount":5.000000000000001,"name":"COTTON & SILK SHIRT","quantity":3,"style":"00123","price":1.6600000000000001,"hs":"6109100000"})],&check).unwrap();
     let result = preview(&data, "导入.xlsx", &settings(), "2026-09-16", &check).unwrap();
     assert!(result.success, "{result:#?}");
     let invoice = result.invoice.unwrap();
@@ -112,4 +112,56 @@ fn audit_sized_workbooks_reopen_with_all_rows_and_support_cancellation() {
         "审计 & 第 49999 条"
     );
     assert!(table(&[("id", "编号")], &rows, &|| Err("已取消".into())).is_err());
+}
+
+#[test]
+fn import_ignores_empty_tail_records_but_rejects_real_out_of_bounds_content() {
+    let fixture = include_bytes!("../tests/fixtures/last-row-formulas.xls");
+    let mut workbook = open_workbook_auto_from_rs(Cursor::new(fixture)).unwrap();
+    let formulas = workbook.worksheet_formula("Notes").unwrap();
+    assert_eq!(formulas.get_value((65535, 9)).unwrap(), "H65536*I65536");
+    assert!(formulas.get_value((65535, 10)).unwrap().ends_with("65536"));
+    let imported = preview(
+        fixture,
+        "last-row-formulas.xls",
+        &settings(),
+        "2026-09-29",
+        &check,
+    )
+    .unwrap();
+    assert!(imported.success, "{:?}", imported.errors);
+    assert_eq!(imported.invoice.unwrap().items.len(), 3);
+    let report = imported.analysis_report.unwrap();
+    assert_eq!(report.selected_worksheet_name, "Items");
+    assert_eq!(report.sheets[0].used_row_count, 11);
+    assert_eq!(report.sheets[1].used_row_count, 65536);
+    let bytes = table(
+        &[
+            ("name", "英文品名"),
+            ("style", "款号"),
+            ("quantity", "数量"),
+        ],
+        &[json!({"name":"SHIRT", "style":"A-1", "quantity":3})],
+        &check,
+    )
+    .unwrap();
+    for (tail, succeeds) in [("   ", true), ("unexpected data", false)] {
+        let mut package = archive::Package::open(&bytes, &check).unwrap();
+        let sheet =
+            String::from_utf8(package.get("xl/worksheets/sheet1.xml").unwrap().to_vec()).unwrap();
+        let sheet = sheet.replace("</sheetData>", &format!("<row r=\"65536\"><c r=\"J65536\" t=\"inlineStr\"><is><t>{tail}</t></is></c></row></sheetData>"));
+        package
+            .0
+            .insert("xl/worksheets/sheet1.xml".into(), sheet.into_bytes());
+        let bytes = package.finish(&check).unwrap();
+        let result = preview(&bytes, "empty-tail.xlsx", &settings(), "2026-09-29", &check);
+        if succeeds {
+            let result = result.unwrap();
+            assert!(result.success, "{:?}", result.errors);
+            assert_eq!(result.invoice.unwrap().items.len(), 1);
+            assert_eq!(result.analysis_report.unwrap().sheets[0].used_row_count, 2);
+        } else {
+            assert!(result.unwrap_err().contains("有效内容超出"));
+        }
+    }
 }

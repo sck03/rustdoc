@@ -18,14 +18,17 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
   const editable = ["Draft", "Rejected"].includes(row.status) && oaAccess(user, row.kind, "edit", row);
   const api = oaApi(client, row.kind);
   return <article className="oa-detail">
+    <header className="oa-detail-summary">
     <div className="office-card-heading"><h2>{row.title}</h2><span className="office-badge" data-state={row.status}>{oaStatus[row.status]}</span></div>
-    <p className="office-muted">#{row.id} · {row.employeeName} · {row.departmentId} · 更新于 {formatBusinessDateTime(row.updatedAt, user.businessTimeZone)}</p>
+    <dl className="oa-facts"><div><dt>申请编号</dt><dd>#{row.id}</dd></div><div><dt>申请人</dt><dd>{row.employeeName}</dd></div><div><dt>所属部门</dt><dd>{row.departmentId}</dd></div><div><dt>更新时间</dt><dd>{formatBusinessDateTime(row.updatedAt, user.businessTimeZone)}</dd></div></dl>
     {(editable || oaActions(row, user).length > 0) && <div className="office-card-actions">
       {editable && <button type="button" className="command-button secondary" onClick={onEdit}>编辑草稿</button>}
-      {oaActions(row, user).map((action) => <button type="button" className="command-button" key={action} disabled={operation.busy} onClick={() => setAction(action)}>{oaActionLabel(action, row.kind, user.capabilities.usesOfficeRegister)}</button>)}
+      {oaActions(row, user).map((action) => <button type="button" className={`command-button${["cancel", "withdraw", "reject", "void"].includes(action) ? " secondary" : ""}`} key={action} disabled={operation.busy} onClick={() => setAction(action)}>{oaActionLabel(action, row.kind, user.capabilities.usesOfficeRegister)}</button>)}
     </div>}
     {row.status === "HandedOff" && <InlineNotice tone="success" title="已移交独立财务软件">此状态仅记录资料移交，不代表已记账或已付款。</InlineNotice>}
-    <p className="oa-reason">{row.reason}</p>
+    </header>
+    <section className="oa-detail-content" aria-label="申请内容"><h3>申请内容</h3>
+    <div className="oa-reason"><h4>申请说明</h4><p>{row.reason}</p></div>
     {row.leave && <p>{leaveCategories[row.leave.category]} · {row.leave.startsOn} {row.leave.startPeriod === "AM" ? "上午" : "下午"} 至 {row.leave.endsOn} {row.leave.endPeriod === "AM" ? "上午" : "下午"} · {row.durationDays} 个自然日</p>}
     {row.travel && <p>{row.travel.destination} · {row.travel.startsOn} 至 {row.travel.endsOn} · {row.durationDays} 天</p>}
     {row.overtime && <p>{row.overtime.location} · {formatBusinessDateTime(row.overtime.startsAt, user.businessTimeZone)} 至 {formatBusinessDateTime(row.overtime.endsAt, user.businessTimeZone)} · {row.durationHours} 小时</p>}
@@ -33,6 +36,7 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
     {row.totalAmount && <p><strong>{row.kind === "purchase" ? "预算合计" : "报销合计"}：{row.currency} {row.totalAmount}</strong></p>}
     {row.lines && <ol className="oa-lines">{row.lines.map((line, index) => <li key={`${row.id}-${index}`} className="oa-line">{expenseCategories[line.category]} · {line.spentOn} · {line.description} · {line.amount} {row.currency}</li>)}</ol>}
     {row.purchaseLines && <ol className="oa-lines">{row.purchaseLines.map((line, index) => <li key={`${row.id}-${index}`} className="oa-line">{line.name} {line.specification} · {line.quantity} {line.unit} × {line.unitPrice} {row.currency}</li>)}</ol>}
+    </section>
     <section className="oa-attachments" aria-label="申请附件"><h3>{row.kind === "expense" ? "报销凭证" : "申请附件"}</h3>
       <p className="office-muted">支持 PDF、PNG、JPEG；每个 10 MiB，最多 20 个、合计 50 MiB。{row.kind === "expense" && "提交报销前至少上传一份凭证。"}</p>
       {editable && <OfficeField label="上传附件"><input type="file" accept=".pdf,.png,.jpg,.jpeg" disabled={operation.busy} onChange={(event) => {
@@ -50,7 +54,7 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
         {editable && <button className="command-button secondary" type="button" disabled={operation.busy} onClick={() => setAction(file.id)}>移除</button>}
       </li>)}</ul>
     </section>
-    <details><summary>审批与办理记录</summary><OaHistory client={client} user={user} row={row} /></details>
+    <details className="oa-detail-history"><summary>审批与办理记录</summary><OaHistory client={client} user={user} row={row} /></details>
     {action !== null && <OaActionDialog client={client} user={user} row={row} action={action} onClose={() => setAction(null)} />}
   </article>;
 }

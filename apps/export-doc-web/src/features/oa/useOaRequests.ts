@@ -10,7 +10,7 @@ export function useOaRequests(client: ExportDocManagerApiClient, user: ApiUserDt
   const selected = Number(params.get("requestId")) || 0;
   const [page, setPage] = useState(1);
   const [mineOnly, setMine] = useState(!oaAccess(user, kind, "approve"));
-  const [status, setStatus] = useState(oaAccess(user, kind, "approve") ? "Pending" : "");
+  const [status, setStatus] = useState("");
   const api = oaApi(client, kind);
   const key = ["office", "oa", kind, user.id, user.companyScope];
   const query = useQuery({ queryKey: [...key, "list", page, mineOnly, status], enabled: oaAccess(user, kind, "view"),

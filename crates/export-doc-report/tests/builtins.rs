@@ -107,6 +107,10 @@ fn every_builtin_renders_its_own_domain_without_html_execution() {
         );
         assert!(!page.svg.contains("{{"));
         assert!(!page.svg.contains("<script"));
+        assert!(
+            !page.svg.contains("#f2f2f2"),
+            "detail headers must stay white"
+        );
         // HTML font outlining is covered by the engine tests with RuntimePaths.
         assert_eq!(
             document.pages[0].width_mm,
@@ -121,6 +125,13 @@ fn every_builtin_renders_its_own_domain_without_html_execution() {
 
 #[test]
 fn commercial_details_and_customs_continuation_use_shared_pagination() {
+    for template in [
+        Builtin::PackingList,
+        Builtin::Contract,
+        Builtin::CustomsDeclaration,
+    ] {
+        assert_eq!(detail_table(template).header_style.bold, Some(true));
+    }
     for template in [Builtin::PackingList] {
         let table = detail_table(template);
         assert_eq!(table.print.first_page_rows, Some(12));

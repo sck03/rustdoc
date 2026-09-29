@@ -164,7 +164,7 @@ export function validateReportTypeFieldPath(
     return;
   }
 
-  if (["total_by_ctn_unit", "total_by_qty_unit", "total_cartons_and_quantity"].includes(fieldPath)) return;
+  if (/^total_by_(ctn|qty)_unit(?:\.(Value|Key))?$/.test(fieldPath) || fieldPath === "total_cartons_and_quantity") return;
   issues.push(createIssue("error", path, "出口单据模板只能使用 Invoice/Customer/Exporter/item 或模板系统字段。"));
 }
 

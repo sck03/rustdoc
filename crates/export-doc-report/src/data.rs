@@ -152,7 +152,10 @@ impl ReportData {
                 self.unit_totals("total_by_ctn_unit"),
                 self.unit_totals("total_by_qty_unit")
             )
-        } else if matches!(path, "total_by_qty_unit" | "total_by_ctn_unit") {
+        } else if matches!(
+            path.split('.').next().unwrap_or(path),
+            "total_by_qty_unit" | "total_by_ctn_unit"
+        ) {
             self.unit_totals(path)
         } else {
             self.display(path, None)
@@ -210,14 +213,19 @@ impl ReportData {
             .unwrap_or(&[])
     }
     pub fn unit_totals(&self, key: &str) -> String {
+        let (key, member) = key.split_once('.').unwrap_or((key, ""));
         self.root[key]
             .as_array()
             .map(|items| {
                 items
                     .iter()
-                    .map(|v| format!("{}{}", plain(&v["Value"]), plain(&v["Key"])))
+                    .map(|v| match member {
+                        "Value" | "Key" => plain(&v[member]),
+                        "" => format!("{}{}", plain(&v["Value"]), plain(&v["Key"])),
+                        _ => String::new(),
+                    })
                     .collect::<Vec<_>>()
-                    .join("; ")
+                    .join(if member.is_empty() { "; " } else { "\n" })
             })
             .unwrap_or_default()
     }

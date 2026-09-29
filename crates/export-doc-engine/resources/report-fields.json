@@ -488,6 +488,30 @@
       "reportType": "ExportDocument"
     },
     {
+      "value": "{{ total_by_qty_unit.Value }}",
+      "label": "分单位数量合计（数值）",
+      "category": "其它字段",
+      "reportType": "ExportDocument"
+    },
+    {
+      "value": "{{ total_by_qty_unit.Key }}",
+      "label": "分单位数量合计（单位）",
+      "category": "其它字段",
+      "reportType": "ExportDocument"
+    },
+    {
+      "value": "{{ total_by_ctn_unit.Value }}",
+      "label": "分单位箱数合计（数值）",
+      "category": "其它字段",
+      "reportType": "ExportDocument"
+    },
+    {
+      "value": "{{ total_by_ctn_unit.Key }}",
+      "label": "分单位箱数合计（单位）",
+      "category": "其它字段",
+      "reportType": "ExportDocument"
+    },
+    {
       "value": "{{ total_by_qty_unit }}",
       "label": "分单位数量合计",
       "category": "其它字段",

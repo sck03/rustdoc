@@ -677,8 +677,8 @@
 
 .report-designer-v3-preview-flow-content .edm-detail-layout > thead th,
 .report-designer-v3-preview-flow-content .edm-detail-table thead th {
-  background: var(--edm-info-100);
-  font-weight: 800;
+  background: var(--edm-white);
+  font-weight: 700;
 }
 
 .report-designer-v3-preview-flow-content .edm-detail-layout > tbody > tr > td {
