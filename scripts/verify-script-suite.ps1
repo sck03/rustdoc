@@ -63,8 +63,12 @@ $dependencyPolicyScript = Join-Path $scriptRoot "verify-dependency-policy.mjs"
 Invoke-ExportDocExternal -FilePath "node" -Arguments @($dependencyPolicyScript) -WorkingDirectory $repoRoot
 $dependencyPolicyTestScript = Join-Path $scriptRoot "test_dependency_policy.mjs"
 Invoke-ExportDocExternal -FilePath "node" -Arguments @($dependencyPolicyTestScript) -WorkingDirectory $repoRoot
-& (Join-Path $scriptRoot "test_generated_artifact_protection.ps1")
-& (Join-Path $scriptRoot "test_rust_build_paths.ps1")
+foreach ($test in @('test_generated_artifact_protection.ps1', 'test_rust_build_paths.ps1')) {
+    # Negative subprocess tests must not leak their expected LASTEXITCODE into the CI host.
+    Invoke-ExportDocExternal -FilePath (Resolve-ExportDocPowerShellExecutable) `
+        -Arguments @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scriptRoot $test)) `
+        -WorkingDirectory $repoRoot
+}
 Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_cargo_paths.mjs') -WorkingDirectory $repoRoot
 $bashPath = Get-Command bash -CommandType Application -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty Source
@@ -150,9 +154,7 @@ foreach ($file in $powerShellScripts) {
     }
 }
 
-$approvedDirectNativeCommands = @{
-    "provision-tauri-nsis.ps1" = @("curl.exe")
-}
+$approvedDirectNativeCommands = @{}
 $nativeCommandNames = @("dotnet", "node", "npm", "cargo", "rustc", "curl.exe", "cmd.exe", "pwsh.exe", "powershell.exe")
 $directNativeCommands = New-Object System.Collections.Generic.List[object]
 foreach ($file in $powerShellScripts) {
@@ -194,3 +196,4 @@ foreach ($file in $powerShellScripts) {
     PublicCommandEntryCount = $publicCommandScripts.Count
     ApprovedDirectNativeCommandCount = $directNativeCommands.Count
 } | ConvertTo-Json -Depth 4
+exit 0

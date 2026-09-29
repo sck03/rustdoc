@@ -112,20 +112,20 @@ export function AppWorkspaceRoutes({
           : <Navigate to={defaultRoute} replace />} />
         <Route path="/crm/dashboard" element={canViewSalesDashboard
           ? <SalesDashboardPage businessTimeZone={user.businessTimeZone} client={client} />
-          : <Navigate to="/dashboard" replace />} />
+          : <Navigate to={defaultRoute} replace />} />
         <Route path="/suppliers" element={hasPermission(permissions, permissionResources.suppliers, permissionActions.view)
           ? <SupplierDirectoryPage businessDate={user.businessDate} client={client} />
-          : <Navigate to="/dashboard" replace />} />
+          : <Navigate to={defaultRoute} replace />} />
         <Route path="/crm/email-templates" element={hasPermission(permissions, permissionResources.emailTemplates, permissionActions.view)
           ? <EmailTemplatePage client={client} />
-          : <Navigate to="/dashboard" replace />} />
+          : <Navigate to={defaultRoute} replace />} />
         <Route path="/crm/opportunities" element={hasPermission(permissions, permissionResources.salesOpportunities, permissionActions.view)
           ? <SalesOpportunityPage businessTimeZone={user.businessTimeZone} client={client} />
-          : <Navigate to="/dashboard" replace />} />
+          : <Navigate to={defaultRoute} replace />} />
         <Route path="/crm/follow-ups" element={hasPermission(permissions, permissionResources.crmCustomers, permissionActions.view) ||
           hasPermission(permissions, permissionResources.crmFollowUps, permissionActions.view)
           ? <CustomerFollowUpPage businessTimeZone={user.businessTimeZone} client={client} />
-          : <Navigate to="/dashboard" replace />} />
+          : <Navigate to={defaultRoute} replace />} />
         <Route path="/worklist" element={features.includes("worklist") ? <WorklistPage client={client} user={user} /> : <NoModuleAccessPage />} />
         <Route path="/business-attachments" element={features.includes("business-attachments") ? <BusinessAttachmentsPage client={client} user={user} /> : <NoModuleAccessPage />} />
         <Route path="/invoices/:invoiceId/attachments" element={features.includes("business-attachments") ? <BusinessAttachmentsPage client={client} user={user} /> : <NoModuleAccessPage />} />
@@ -160,7 +160,7 @@ export function AppWorkspaceRoutes({
               client={client}
               templateAccess={reportTemplateAccess}
               canManageSettings={user.capabilities.canManageSettings === true}
-            /> : <Navigate to="/dashboard" replace />
+            /> : <Navigate to={defaultRoute} replace />
           }
         />
         <Route
@@ -170,7 +170,7 @@ export function AppWorkspaceRoutes({
               client={client}
               templateAccess={reportTemplateAccess}
               canManageSettings={user.capabilities.canManageSettings === true}
-            /> : <Navigate to="/dashboard" replace />
+            /> : <Navigate to={defaultRoute} replace />
           }
         />
         <Route path="/jobs" element={<JobCenterPage client={client} />} />
@@ -219,7 +219,7 @@ function RouteLoadingPanel() {
 function NoModuleAccessPage() {
   return (
     <section className="work-surface">
-      <PageState tone="permission" title="当前账号尚未分配可用模块" description="请联系系统管理员启用权限模板或重新分配岗位权限。账号本身仍可安全退出登录。" />
+      <PageState tone="permission" title="当前账号没有此页面权限" description="请从导航选择已授权的功能，或联系管理员分配本版本首页权限。" />
     </section>
   );
 }

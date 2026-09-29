@@ -683,13 +683,13 @@ impl NativeService {
             ),
             RENEW_SESSION => self.sessions.renew(&self.store, token, &self.clock),
             GET_ORGANIZATION_DIRECTORY => {
-                auth::authorize(actor, "system.organization", "view")?;
+                auth::authorize(actor, "system.users", "manage")?;
                 Ok(
                     json!({"companies":self.store.all("companies")?,"departments":organization::departments(&self.store)?}),
                 )
             }
             LIST_ORGANIZATION_MANAGERS => {
-                auth::authorize(actor, "system.organization", "view")?;
+                auth::authorize(actor, "system.users", "manage")?;
                 organization::managers(&self.store, query)
             }
             GET_PERSONNEL_OPTIONS => personnel_queries::options(&self.store, actor),

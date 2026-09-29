@@ -42,7 +42,7 @@ fn mutable(row: &Value) -> Result<()> {
     Ok(())
 }
 fn current(tx: &Connection, actor: &Actor, meta: &Value, id: i64) -> Result<(Actor, Value)> {
-    let actor = auth::current_actor_in(tx, actor.id)?;
+    let actor = auth::current_actor_in(tx, actor.id, actor.edition)?;
     let row = store::get(tx, &kind(meta), id)?;
     access(&actor, meta, &row)?;
     Ok((actor, row))
@@ -209,7 +209,7 @@ pub(super) fn handle(
         .map_err(super::error::unavailable)?
         .today;
     service.store.transaction(|tx| {
-        let actor = auth::current_actor_in(tx, actor.id)?;
+        let actor = auth::current_actor_in(tx, actor.id, actor.edition)?;
         auth::authorize(&actor, &text(meta, "resource"), &text(meta, "permission"))?;
         if action == "list" {
             return list(tx, &actor, meta, query);

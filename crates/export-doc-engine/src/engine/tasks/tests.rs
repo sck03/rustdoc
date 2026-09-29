@@ -24,6 +24,7 @@ impl Fixture {
             root,
             paths,
             actor: Actor {
+                edition: Default::default(),
                 id: 1,
                 name: "任务用户".into(),
                 company: "DEFAULT".into(),
@@ -83,6 +84,7 @@ fn output_and_snapshot_survive_restart_and_cleanup_is_idempotent() {
     assert_eq!(file.file_name, "测试.pdf");
     assert_eq!(file.content, bytes);
     let other = Actor {
+        edition: Default::default(),
         id: 2,
         ..fixture.actor.clone()
     };
@@ -194,6 +196,7 @@ fn queries_filter_status_and_text_without_disclosing_another_users_jobs() {
     assert_eq!(
         jobs.list(
             &Actor {
+                edition: Default::default(),
                 id: 2,
                 ..fixture.actor.clone()
             },
@@ -358,6 +361,7 @@ fn retry_survives_restart_reauthorizes_and_keeps_private_requests_off_the_wire()
         retry::execute(
             &service,
             &Actor {
+                edition: Default::default(),
                 id: actor.id + 100,
                 admin: false,
                 ..actor.clone()

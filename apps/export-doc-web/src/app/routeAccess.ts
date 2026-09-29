@@ -34,6 +34,8 @@ export function isRouteAccessAllowed({
 }
 
 export function isWorkspaceModuleAccessAllowed(pathname: string, user: ApiUserDto) {
+  // The root only redirects to the edition's home; it is not a document page.
+  if (pathname === "/") return true;
   const requiredWorkspace = getRequiredWorkspace(pathname);
   const workspaceAllowed = requiredWorkspace === "sales"
     ? user.capabilities.canUseSalesWorkspace

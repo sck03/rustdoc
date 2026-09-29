@@ -28,6 +28,12 @@ try {
   const base = { product: "desktop", os: "all", architecture: "all", version: "v2.3.4", repository: "Owner/RustDoc" };
   const plan = createReleasePlan(base);
   assert.equal(plan.matrix.include.length, 5);
+  const allEditions = createReleasePlan({ ...base, edition: 'All' }).matrix.include;
+  assert.equal(allEditions.length, 20);
+  assert.equal(new Set(allEditions.map(item => `${item.artifact}-${item.edition}`)).size, 20);
+  assert.deepEqual(createReleasePlan({ ...base, os: 'windows', architecture: 'x64', edition: 'Administration' }).matrix.include.map(item => item.edition), ['Administration']);
+  assert.throws(() => createReleasePlan({ ...base, edition: 'invalid' }));
+  assert.throws(() => createReleasePlan({ ...base, product: 'web', edition: 'All' }));
   assert.equal(plan.image, "ghcr.io/owner/exportdoc-rust-native");
   assert.deepEqual(createReleasePlan({ ...base, product: "container", os: "linux" }).matrix.include.map(item => item.platform), ["linux/amd64", "linux/arm64"]);
   assert.deepEqual(createReleasePlan({ ...base, product: "web" }).matrix.include.map(item => item.artifact), ["windows-x64", "linux-x64", "linux-arm64", "macos-arm64"]);
@@ -72,6 +78,8 @@ try {
 
   await testPublication();
   await testPackageWorkflow();
+  await testContainerRestartWorkflows();
+  await testScriptSuiteExitStatus();
   testContainerPromotion();
   console.log("Native release version, architecture, lock preservation and publication contracts passed.");
 } finally {
@@ -82,20 +90,23 @@ try {
 
 async function testPackageWorkflow() {
   const workflow = await readFile(path.join(root, ".github/workflows/native-package-reusable.yml"), "utf8");
-  const block = workflow.match(/name: Build and archive Full package\r?\n\s+shell: pwsh\r?\n\s+run: \|\r?\n([\s\S]*?)(?=      - uses:)/u)?.[1];
+  const block = workflow.match(/name: Build and archive product package\r?\n\s+shell: pwsh\r?\n\s+run: \|\r?\n([\s\S]*?)(?=      - uses:)/u)?.[1];
   assert(block, "package workflow contains an executable build/archive step");
   await write("workflow.ps1", "$ErrorActionPreference = 'Stop'\n" + block.replace(/^          /gmu, ""));
-  const stub = "New-Item -ItemType Directory -Force -Path 'artifacts/native-desktop/ExportDocManager.Tauri', 'artifacts/native-web-server', 'target/test/release/bundle' | Out-Null\n";
+  const stub = "param($Edition='Full')\n$desktop = 'artifacts/native-desktop/ExportDocManager.Tauri'\nif ($Edition -ne 'Full') { $desktop += \".$Edition\" }\nNew-Item -ItemType Directory -Force -Path $desktop, 'artifacts/native-web-server', 'target/test/release/bundle' | Out-Null\n";
   for (const script of ["build-native", "package-native-web-server"]) await write(`scripts/${script}.ps1`, stub);
   await write("scripts/lib/archive-native-release.ps1", "param($Source,$Destination)\nif (!(Test-Path -LiteralPath $Source)) { throw 'Missing package' }\nNew-Item -ItemType Directory -Force -Path (Split-Path -Parent $Destination) | Out-Null\nSet-Content -LiteralPath $Destination -Value archive\n");
   const execute = promisify(execFile);
-  for (const product of ["desktop", "web"]) {
-    const env = { ...process.env, RELEASE_PRODUCT: product, RELEASE_VERSION: "1.2.3", ARTIFACT_PLATFORM: "test", RUST_TARGET: "test", BUNDLE_TARGETS: "test", CARGO_TARGET_DIR: path.join(temporary, "target") };
+  for (const [product, edition] of [["desktop", "Full"], ["desktop", "Sales"], ["desktop", "Document"], ["desktop", "Administration"], ["web", "Full"]]) {
+    const buildScript = `scripts/${product === "desktop" ? "build-native" : "package-native-web-server"}.ps1`;
+    await write(buildScript, stub);
+    const env = { ...process.env, RELEASE_PRODUCT: product, RELEASE_EDITION: edition, RELEASE_VERSION: "1.2.3", ARTIFACT_PLATFORM: "test", RUST_TARGET: "test", BUNDLE_TARGETS: "test", CARGO_TARGET_DIR: path.join(temporary, "target") };
     await execute("pwsh", ["-NoProfile", "-File", path.join(temporary, "workflow.ps1")], { cwd: temporary, env, timeout: 30000 });
     const extension = process.platform === "win32" ? "zip" : "tar.gz";
-    assert.equal((await readFile(path.join(temporary, `artifacts/releases/exportdoc-${product}-1.2.3-test.${extension}`), "utf8")).trim(), "archive");
-    if (product === "desktop") assert.equal((await readFile(path.join(temporary, `artifacts/releases/exportdoc-desktop-1.2.3-test-installers.${extension}`), "utf8")).trim(), "archive");
-    await write(`scripts/${product === "desktop" ? "build-native" : "package-native-web-server"}.ps1`, "exit 23\n");
+    const suffix = edition === 'Full' ? '' : `-${edition}`;
+    assert.equal((await readFile(path.join(temporary, `artifacts/releases/exportdoc-${product}-1.2.3-test${suffix}.${extension}`), "utf8")).trim(), "archive");
+    if (product === "desktop") assert.equal((await readFile(path.join(temporary, `artifacts/releases/exportdoc-desktop-1.2.3-test${suffix}-installers.${extension}`), "utf8")).trim(), "archive");
+    await write(buildScript, "exit 23\n");
     await assert.rejects(execute("pwsh", ["-NoProfile", "-File", path.join(temporary, "workflow.ps1")], { cwd: temporary, env, timeout: 30000 }), error => error.code === 23);
   }
   const dockerfile = await readFile(path.join(root, "deploy/rust-native/Dockerfile"), "utf8");
@@ -103,6 +114,48 @@ async function testPackageWorkflow() {
   for (const resource of ["singlewindow_reference_catalogs.json", "customs_coo_issuing_authorities.json", "customs_coo_issuing_authorities.address_overrides.json"]) {
     assert.match(rustStage, /^COPY Resources\/SingleWindow\/ Resources\/SingleWindow\/$/mu, `${resource} must be available when compiling Domain`);
     JSON.parse(await readFile(path.join(root, "Resources/SingleWindow", resource), "utf8"));
+  }
+}
+
+async function testScriptSuiteExitStatus() {
+  const workflow = await readFile(path.join(root, '.github/workflows/release-script-validation.yml'), 'utf8');
+  const command = workflow.match(/name: Validate script syntax and process contracts\r?\n\s+shell: pwsh\r?\n\s+run: ([^\r\n]+)/u)?.[1];
+  assert(command, 'script validation workflow has an executable PowerShell step');
+  // Match Actions' PowerShell prologue/epilogue, including its LASTEXITCODE propagation.
+  const wrapper = `$ErrorActionPreference = 'Stop'\n$LASTEXITCODE = 37\n${command}\nif (Test-Path -LiteralPath variable:\\LASTEXITCODE) { exit $LASTEXITCODE }\n`;
+  await write('script-suite-workflow.ps1', wrapper);
+  const execute = promisify(execFile);
+  const run = cwd => execute('pwsh', ['-NoProfile', '-NonInteractive', '-Command', ". '" + path.join(temporary, 'script-suite-workflow.ps1').replaceAll("'", "''") + "'"], {
+    cwd, timeout: 120000, windowsHide: true,
+  });
+  const result = await run(root);
+  assert.match(result.stdout, /"Success": true/u, 'expected negative tests do not fail the successful suite');
+  const fixture = path.join(temporary, 'script-suite-fixture');
+  for (const name of ['verify-script-suite.ps1', 'lib/build-script-support.ps1', 'lib/platform-path-safety.ps1', 'lib/product-editions.ps1', 'lib/rust-build-paths.ps1', 'lib/web-runtime-smoke-arguments.ps1']) {
+    await write(`script-suite-fixture/scripts/${name}`, await readFile(path.join(root, 'scripts', name)));
+  }
+  await write('script-suite-fixture/scripts/invalid.ps1', 'function Invalid {\n');
+  await assert.rejects(run(fixture), error => error.code === 1 && /PowerShell syntax validation failed/u.test(error.stdout + error.stderr),
+    'a real script failure still fails the Actions step');
+}
+
+async function testContainerRestartWorkflows() {
+  const execute = promisify(execFile);
+  for (const name of ['rust-native-validation', 'rust-native-container-release']) {
+    const workflow = await readFile(path.join(root, `.github/workflows/${name}.yml`), 'utf8');
+    const block = workflow.match(/name: Restart[^\n]+\r?\n\s+shell: pwsh\r?\n\s+run: \|\r?\n([\s\S]*?)(?=      - name:)/u)?.[1];
+    assert(block, `${name} has a persistence verification step`);
+    await write('restart.ps1', "$ErrorActionPreference = 'Stop'\n" + block.replace(/^          /gmu, ''));
+    await write('scripts/run-native-docker.ps1', '# Successful PowerShell scripts need not set LASTEXITCODE.\n');
+    await write('scripts/verify-native-docker.mjs', "import {writeFileSync} from 'node:fs'; writeFileSync('verified.txt', 'verified');\n");
+    const verifyPath = path.join(temporary, 'verified.txt');
+    await rm(verifyPath, { force: true });
+    await execute('pwsh', ['-NoProfile', '-File', path.join(temporary, 'restart.ps1')], { cwd: temporary, timeout: 30000 });
+    assert.equal(await readFile(verifyPath, 'utf8'), 'verified');
+    await rm(verifyPath);
+    await write('scripts/run-native-docker.ps1', 'exit 23\n');
+    await assert.rejects(execute('pwsh', ['-NoProfile', '-File', path.join(temporary, 'restart.ps1')], { cwd: temporary, timeout: 30000 }), error => error.code === 23);
+    await assert.rejects(readFile(verifyPath), error => error.code === 'ENOENT');
   }
 }
 

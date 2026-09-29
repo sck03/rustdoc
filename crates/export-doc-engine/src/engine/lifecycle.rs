@@ -9,7 +9,18 @@ impl NativeService {
         paths: RuntimePaths,
         retention: tasks::retention::Retention,
     ) -> Result<Arc<Self>> {
-        let store = Arc::new(Store::open(&paths)?);
+        Self::open_desktop(paths, retention, "Full")
+    }
+    pub fn open_desktop(
+        paths: RuntimePaths,
+        retention: tasks::retention::Retention,
+        edition: &str,
+    ) -> Result<Arc<Self>> {
+        let edition =
+            export_doc_domain::permissions::ProductEdition::parse(edition).map_err(invalid)?;
+        let mut store = Store::open(&paths)?;
+        store.edition = edition;
+        let store = Arc::new(store);
         auth::seed(&store)?;
         packing::seed(&store)?;
         #[cfg(feature = "mail")]

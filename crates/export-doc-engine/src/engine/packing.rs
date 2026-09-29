@@ -173,6 +173,7 @@ pub fn seed(store: &Store) -> Result<()> {
     store.transaction(|tx| {
         let existing = store::all(tx, TYPES)?;
         let actor = Actor {
+            edition: Default::default(),
             id: 0,
             name: "系统".into(),
             company: String::new(),

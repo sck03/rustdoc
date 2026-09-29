@@ -3,6 +3,8 @@
 use crate::contracts;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, sync::OnceLock};
+mod edition;
+pub use edition::ProductEdition;
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -250,12 +252,28 @@ pub fn allows_operation(
     operation: crate::generated_api::Operation,
     query: &[(&str, String)],
 ) -> bool {
+    allows_edition_operation(
+        grants,
+        administrator,
+        ProductEdition::Full,
+        operation,
+        query,
+    )
+}
+
+pub fn allows_edition_operation(
+    grants: &[Grant],
+    administrator: bool,
+    edition: ProductEdition,
+    operation: crate::generated_api::Operation,
+    query: &[(&str, String)],
+) -> bool {
     let policy = &contracts::contract()["operations"][operation.id]["policy"];
     if !policy.is_object() {
         return false;
     }
     let allows = |key: &str, action: &str| {
-        !key.is_empty()
+        edition.allows(key)
             && !action.is_empty()
             && (administrator
                 || (!key.starts_with("system.")
@@ -324,9 +342,18 @@ pub fn allows_operation(
         "manage" => 3,
         _ => 0,
     };
+    let allowed_grants: Vec<_> = grants
+        .iter()
+        .filter(|grant| edition.allows(&grant.resource_key))
+        .cloned()
+        .collect();
     rank(level) > 0
+        && catalog()
+            .resources
+            .iter()
+            .any(|resource| resource.module_key == module && edition.allows(&resource.key))
         && (administrator
-            || module_access(grants)
+            || module_access(&allowed_grants)
                 .get(module)
                 .is_some_and(|actual| rank(actual) >= rank(level)))
 }

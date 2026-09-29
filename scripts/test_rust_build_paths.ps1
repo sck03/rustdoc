@@ -22,11 +22,22 @@ try {
     $release = Join-Path $env:CARGO_TARGET_DIR 'release'
     New-Item -ItemType Directory -Path $release -Force | Out-Null
     foreach ($name in @('export-doc-tauri', 'export-doc-server')) { [IO.File]::WriteAllText((Join-Path $release "$name$suffix"), 'fixture') }
+    $editionRoot = Join-Path $release 'editions/Full'
+    New-Item -ItemType Directory -Force -Path $editionRoot | Out-Null
+    $binary = Join-Path $editionRoot "export-doc-tauri$suffix"
+    Copy-Item -LiteralPath (Join-Path $release "export-doc-tauri$suffix") -Destination $binary
+    @{edition='Full';version=(Get-Content (Join-Path $repo 'version.json') -Raw | ConvertFrom-Json).version;sha256=(Get-FileHash $binary -Algorithm SHA256).Hash} | ConvertTo-Json | Set-Content (Join-Path $editionRoot 'build.json')
     foreach ($script in @('build-native.ps1', 'package-native-web-server.ps1')) {
         $message = & pwsh -NoProfile -File (Join-Path $PSScriptRoot $script) -SkipBuild -NoPause -OutputRoot $output 2>&1 | Out-String
         if ($LASTEXITCODE -eq 0 -or $message -notmatch 'exportdoc-ocr') { throw "Missing OCR preflight failed: $script" }
         if (Test-Path -LiteralPath $output) { throw 'Missing OCR must not create a partial package' }
     }
+    [IO.File]::AppendAllText($binary, 'changed')
+    $message = & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'build-native.ps1') -SkipBuild -WithoutOcr -NoPause -OutputRoot $output 2>&1 | Out-String
+    if ($LASTEXITCODE -eq 0 -or $message -notmatch 'does not match its build receipt') { throw 'Modified edition binary was accepted' }
+    $message = & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'build-native.ps1') -Edition Sales -SkipBuild -NoPause -OutputRoot $output 2>&1 | Out-String
+    if ($LASTEXITCODE -eq 0 -or $message -notmatch 'SkipBuild requires existing binaries') { throw 'Full build must not be reused as Sales' }
+    if (Test-Path -LiteralPath $output) { throw 'Invalid edition must not create a package' }
     $good = Join-Path $fixture 'input.txt'
     [IO.File]::WriteAllText($good, 'new')
     New-Item -ItemType Directory -Path $output | Out-Null

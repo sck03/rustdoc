@@ -37,6 +37,7 @@ fn seed_admin(store: &Store, password: &str) -> Result<()> {
         return Ok(());
     }
     let admin = Actor {
+        edition: store.edition,
         id: 1,
         name: "系统管理员".into(),
         company: "DEFAULT".into(),
@@ -248,12 +249,13 @@ fn session_version(store: &Store, user: &Value) -> Result<(i64, i64)> {
 }
 
 fn actor_from(store: &Store, user: &Value) -> Result<Actor> {
-    actor_from_connection(&*store.connection()?, user)
+    actor_from_connection(&*store.connection()?, user, store.edition)
 }
 
 fn actor_from_connection(
     connection: &export_doc_storage::Connection,
     user: &Value,
+    edition: permissions::ProductEdition,
 ) -> Result<Actor> {
     let grants = if let Some(template) = user["permissionTemplateId"].as_i64().filter(|id| *id > 0)
     {
@@ -268,6 +270,7 @@ fn actor_from_connection(
         permissions::role_grants(user["role"].as_str().unwrap_or("")).map_err(unavailable)?
     };
     Ok(Actor {
+        edition,
         id: user["id"].as_i64().unwrap_or(0),
         name: user["fullName"].as_str().unwrap_or("").into(),
         company: user["companyScope"].as_str().unwrap_or("").into(),
@@ -275,21 +278,26 @@ fn actor_from_connection(
         admin: user["role"] == "Admin",
         grants: grants
             .into_iter()
+            .filter(|grant| edition.allows(&grant.resource_key))
             .map(|grant| serde_json::to_value(grant).expect("permission grant"))
             .collect(),
     })
 }
 
 pub fn current_actor(store: &Store, id: i64) -> Result<Actor> {
-    current_actor_in(&*store.connection()?, id)
+    current_actor_in(&*store.connection()?, id, store.edition)
 }
 
-pub fn current_actor_in(connection: &export_doc_storage::Connection, id: i64) -> Result<Actor> {
+pub fn current_actor_in(
+    connection: &export_doc_storage::Connection,
+    id: i64,
+    edition: permissions::ProductEdition,
+) -> Result<Actor> {
     let user = store::get(connection, "users", id)?;
     if user["isActive"] != true {
         return Err(error(403, "账号已停用。"));
     }
-    actor_from_connection(connection, &user)
+    actor_from_connection(connection, &user, edition)
 }
 
 pub fn user_dto(
@@ -310,11 +318,14 @@ pub fn user_dto(
         .iter()
         .map(|(module, level)| json!({"moduleKey":module,"accessLevel":level}))
         .collect();
-    user["capabilities"] = json!({"canManageSettings":actor.admin,"canManageUsers":actor.admin,"canViewAllBusinessData":actor.admin,"canUseDocumentWorkspace":enabled.iter().any(|module|module.starts_with("document.")),"canUseSalesWorkspace":enabled.iter().any(|module|module.starts_with("sales.")),"productEdition":"Full","enabledModules":enabled,"moduleAccess":access,"permissions":actor.grants,"usesOfficeRegister":store.provider()? == "SQLite","availableFeatures":["worklist","business-attachments"]});
+    user["capabilities"] = json!({"canManageSettings":actor.admin,"canManageUsers":actor.admin && actor.edition.allows("system.users"),"canViewAllBusinessData":actor.admin,"canUseDocumentWorkspace":enabled.iter().any(|module|module.starts_with("document.")),"canUseSalesWorkspace":enabled.iter().any(|module|module.starts_with("sales.")),"productEdition":actor.edition.name(),"enabledModules":enabled,"moduleAccess":access,"permissions":actor.grants,"usesOfficeRegister":store.provider()? == "SQLite","availableFeatures":["worklist","business-attachments"]});
     Ok(user)
 }
 
 pub fn authorize(actor: &Actor, resource: &str, action: &str) -> Result<()> {
+    if !actor.edition.allows(resource) {
+        return Err(error(403, "当前产品版本不包含此功能。"));
+    }
     let action = permissions::service_action(resource, action);
     if actor.admin
         || (!resource.starts_with("system.")
@@ -329,6 +340,9 @@ pub fn authorize(actor: &Actor, resource: &str, action: &str) -> Result<()> {
     }
 }
 pub fn visible(actor: &Actor, resource: &str, action: &str, record: &Value) -> bool {
+    if !actor.edition.allows(resource) {
+        return false;
+    }
     if actor.admin {
         return true;
     }
@@ -364,7 +378,8 @@ pub fn authorize_operation(
         return Err(unavailable("API 缺少授权元数据。"));
     }
     let grants: Vec<Grant> = serde_json::from_value(json!(actor.grants))?;
-    if permissions::allows_operation(&grants, actor.admin, operation, query) {
+    if permissions::allows_edition_operation(&grants, actor.admin, actor.edition, operation, query)
+    {
         Ok(())
     } else {
         Err(error(403, "当前账号没有此功能权限。"))

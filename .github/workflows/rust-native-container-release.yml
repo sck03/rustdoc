@@ -105,7 +105,7 @@ jobs:
       - name: Restart the same image and verify persistence
         shell: pwsh
         run: |
-          ./scripts/run-native-docker.ps1 -SkipBuild -NoPause -Port 5195
+          pwsh -NoProfile -File ./scripts/run-native-docker.ps1 -SkipBuild -NoPause -Port 5195
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/verify-native-docker.mjs --url http://127.0.0.1:5195 --runtime deploy/rust-native/runtime --isolated-validation --resume
           exit $LASTEXITCODE

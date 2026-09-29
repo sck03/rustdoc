@@ -6,6 +6,9 @@ on:
       product:
         type: string
         required: true
+      edition:
+        type: string
+        default: Full
       os:
         type: string
         required: true
@@ -23,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: native-package-${{ inputs.product }}-${{ inputs.os }}-${{ inputs.architecture }}-${{ inputs.version }}-${{ github.ref }}
+  group: native-package-${{ inputs.product }}-${{ inputs.edition }}-${{ inputs.os }}-${{ inputs.architecture }}-${{ inputs.version }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -42,6 +45,7 @@ jobs:
         id: plan
         env:
           RELEASE_PRODUCT: ${{ inputs.product }}
+          RELEASE_EDITION: ${{ inputs.edition }}
           RELEASE_OS: ${{ inputs.os }}
           RELEASE_ARCHITECTURE: ${{ inputs.architecture }}
           RELEASE_VERSION: ${{ inputs.version }}
@@ -49,7 +53,7 @@ jobs:
 
   package:
     needs: prepare
-    name: ${{ inputs.product }} / ${{ matrix.artifact }}
+    name: ${{ inputs.product }} / ${{ matrix.edition }} / ${{ matrix.artifact }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     strategy:
@@ -66,6 +70,7 @@ jobs:
       TMP: ${{ github.workspace }}/.codex-runtime/temp
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
       RELEASE_PRODUCT: ${{ inputs.product }}
+      RELEASE_EDITION: ${{ matrix.edition || 'Full' }}
       RUST_TARGET: ${{ matrix.target }}
       BUNDLE_TARGETS: ${{ matrix.bundles }}
       ARTIFACT_PLATFORM: ${{ matrix.artifact }}
@@ -116,13 +121,14 @@ jobs:
         if: inputs.product == 'desktop'
         shell: pwsh
         run: node scripts/verify-native-desktop.mjs --target $env:RUST_TARGET
-      - name: Build and archive Full package
+      - name: Build and archive product package
         shell: pwsh
         run: |
           if ($env:RELEASE_PRODUCT -eq 'desktop') {
-            pwsh -NoProfile -File ./scripts/build-native.ps1 -NoPause -RustTarget $env:RUST_TARGET -Bundles $env:BUNDLE_TARGETS
+            pwsh -NoProfile -File ./scripts/build-native.ps1 -NoPause -Edition $env:RELEASE_EDITION -RustTarget $env:RUST_TARGET -Bundles $env:BUNDLE_TARGETS
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             $source = 'artifacts/native-desktop/ExportDocManager.Tauri'
+            if ($env:RELEASE_EDITION -ne 'Full') { $source += ".$env:RELEASE_EDITION" }
           } else {
             pwsh -NoProfile -File ./scripts/package-native-web-server.ps1 -Configuration Release -RuntimeIdentifier $env:RUST_TARGET -NoPause
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -130,6 +136,7 @@ jobs:
           }
           $extension = if ($IsWindows) { 'zip' } else { 'tar.gz' }
           $prefix = "artifacts/releases/exportdoc-$env:RELEASE_PRODUCT-$env:RELEASE_VERSION-$env:ARTIFACT_PLATFORM"
+          if ($env:RELEASE_PRODUCT -eq 'desktop' -and $env:RELEASE_EDITION -ne 'Full') { $prefix += "-$env:RELEASE_EDITION" }
           ./scripts/lib/archive-native-release.ps1 -Source $source -Destination "$prefix.$extension"
           if ($env:RELEASE_PRODUCT -eq 'desktop') {
             $bundles = Join-Path $env:CARGO_TARGET_DIR "$env:RUST_TARGET/release/bundle"
@@ -137,7 +144,7 @@ jobs:
           }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: exportdoc-${{ inputs.product }}-${{ needs.prepare.outputs.version }}-${{ matrix.artifact }}
+          name: exportdoc-${{ inputs.product }}-${{ needs.prepare.outputs.version }}-${{ matrix.artifact }}-${{ matrix.edition || 'Full' }}
           path: artifacts/releases/*
           if-no-files-found: error
           retention-days: 30

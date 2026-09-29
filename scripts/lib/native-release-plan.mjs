@@ -1,4 +1,5 @@
 import { normalizeReleaseVersion } from "./release-version.mjs";
+import { normalizeProductEdition, productEditionCatalog } from "./product-editions.mjs";
 
 const targets = [
   { os: "windows", architecture: "x64", runner: "windows-latest", target: "x86_64-pc-windows-msvc", bundles: "nsis" },
@@ -8,7 +9,7 @@ const targets = [
   { os: "macos", architecture: "arm64", runner: "macos-15", target: "aarch64-apple-darwin", bundles: "app,dmg" },
 ];
 
-export function createReleasePlan({ product, os, architecture, version, repository }) {
+export function createReleasePlan({ product, os, architecture, version, repository, edition = 'Full' }) {
   if (!["desktop", "web", "container"].includes(product)) throw new Error("Unknown release product.");
   if (!["windows", "linux", "macos", "all"].includes(os)) throw new Error("Unknown release OS.");
   if (!["x64", "arm64", "all"].includes(architecture)) throw new Error("Unknown release architecture.");
@@ -21,6 +22,9 @@ export function createReleasePlan({ product, os, architecture, version, reposito
     .map(target => ({ ...target, artifact: `${target.os}-${target.architecture}`,
       ...(product === "container" ? { platform: `linux/${target.architecture === "x64" ? "amd64" : "arm64"}` } : {}) }));
   if (!include.length) throw new Error("该产品没有支持的 OS/架构组合；macOS 仅 ARM64，Windows 网页服务仅 x64。");
-  return { version: normalizeReleaseVersion(version), matrix: { include },
+  if (product !== 'desktop' && edition !== 'Full') throw new Error('Edition selection is for desktop packages only.');
+  const editions = edition === 'All' ? Object.keys(productEditionCatalog.editions) : [normalizeProductEdition(edition)];
+  const matrix = { include: product === 'desktop' ? include.flatMap(target => editions.map(edition => ({ ...target, edition }))) : include };
+  return { version: normalizeReleaseVersion(version), matrix,
     image: `ghcr.io/${repository.split("/")[0].toLowerCase()}/exportdoc-rust-native` };
 }

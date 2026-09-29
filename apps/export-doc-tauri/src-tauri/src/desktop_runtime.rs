@@ -62,7 +62,8 @@ pub(crate) fn start(
     let retention = export_doc_engine::engine::tasks::retention::Retention::from_lookup(|key| {
         std::env::var(key).ok()
     })?;
-    let service = NativeService::open_with_retention(paths, retention)?;
+    let service =
+        NativeService::open_desktop(paths, retention, env!("EXPORTDOCMANAGER_PRODUCT_EDITION"))?;
     let host = DesktopHost::start(service.clone(), !cfg!(feature = "custom-protocol"))?;
     Ok(DesktopRuntime {
         service: std::sync::Arc::downgrade(&service),

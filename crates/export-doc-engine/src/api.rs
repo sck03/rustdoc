@@ -57,9 +57,16 @@ impl ApiClient {
         paths: crate::paths::RuntimePaths,
         retention: crate::engine::tasks::retention::Retention,
     ) -> Result<Self, ApiError> {
+        Self::native_edition(paths, retention, "Full")
+    }
+    pub fn native_edition(
+        paths: crate::paths::RuntimePaths,
+        retention: crate::engine::tasks::retention::Retention,
+        edition: &str,
+    ) -> Result<Self, ApiError> {
         Ok(Self {
-            native: Some(crate::engine::NativeService::open_with_retention(
-                paths, retention,
+            native: Some(crate::engine::NativeService::open_desktop(
+                paths, retention, edition,
             )?),
             base_url: "native://local".into(),
             access_token: String::new(),

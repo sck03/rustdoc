@@ -10,7 +10,6 @@ const generatedRoot = path.join(repositoryRoot, "artifacts", "tauri-updater-conf
 const tauriCliPath = path.join(tauriRoot, "node_modules", "@tauri-apps", "cli", "tauri.js");
 const buildArguments = process.argv.slice(2);
 const productEdition = normalizeProductEdition(process.env.EXPORTDOCMANAGER_PRODUCT_EDITION);
-if (productEdition !== "Full") throw new Error("Rust edition feature/permission parity is not yet validated; package Full only.");
 const editionMetadata = editionCatalog.editions?.[productEdition];
 if (!editionMetadata) {
   throw new Error(`Product edition metadata is missing for ${productEdition}.`);

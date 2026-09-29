@@ -67,6 +67,7 @@ fn actor_snapshot(actor: &Actor, record: &Value) -> Value {
 }
 pub(super) fn owner(job: &Value) -> Result<Actor> {
     Ok(Actor {
+        edition: Default::default(),
         id: job["requestedByUserId"]
             .as_i64()
             .ok_or_else(|| unavailable("任务所有者缺失。"))?,

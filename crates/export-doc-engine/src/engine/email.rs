@@ -526,6 +526,7 @@ pub fn recover(store: &Store) -> Result<()> {
             row["status"] = json!("Uncertain");
             row["errorMessage"] = json!("程序在投递完成前退出，结果未知，未自动重发。");
             let actor = Actor {
+                edition: Default::default(),
                 id: 0,
                 name: "系统".into(),
                 company: String::new(),

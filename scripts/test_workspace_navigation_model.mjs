@@ -28,6 +28,7 @@ const workspaceDevicePath = path
 const schemePath = path.join(repoRoot, "apps/export-doc-web/src/features/settings/permissionSchemeModel.ts").replaceAll("\\", "/");
 fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as product from ${JSON.stringify(productEditionPath)}; import * as permission from ${JSON.stringify(permissionAccessPath)}; import * as device from ${JSON.stringify(workspaceDevicePath)}; import * as scheme from ${JSON.stringify(schemePath)}; globalThis.__model = model; globalThis.__product = product; globalThis.__permission = permission; globalThis.__device = device; globalThis.__scheme = scheme;`, "utf8");
 fs.appendFileSync(entry, `import * as routeQuery from ${JSON.stringify(routeQueryPath)}; import * as permissionNavigation from ${JSON.stringify(permissionNavigationPath)}; globalThis.__routeQuery = routeQuery; globalThis.__permissionNavigation = permissionNavigation;`);
+fs.appendFileSync(entry, `import * as routeAccess from ${JSON.stringify(path.join(repoRoot, "apps/export-doc-web/src/app/routeAccess.ts").replaceAll("\\", "/"))}; globalThis.__routeAccess = routeAccess;`);
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -207,13 +208,39 @@ assert(model.getRequiredRouteAccessLevel("/master-data/products/new") === "opera
 assert(model.getRequiredRouteAccessLevel("/single-window/coo/8") === "operate", "COO editor route requires operate");
 assert(model.getRequiredRouteAccessLevel("/single-window/acd/8") === "operate", "ACD editor route requires operate");
 assert(model.getRequiredRouteAccessLevel("/invoices/8") === "view", "invoice detail route permits view");
-assert(product.getDefaultWorkspaceRoute({ canUseDocumentWorkspace: true, enabledModules: financeModules, permissions: financePermissions }) === "/payments", "finance default route");
-assert(product.getDefaultWorkspaceRoute({ canUseSalesWorkspace: true, enabledModules: ["sales.dashboard"], permissions: salesPermissions }) === "/crm/dashboard", "sales edition default route");
-assert(product.getDefaultWorkspaceRoute({ canUseSalesWorkspace: true, enabledModules: ["sales.opportunities"], permissions: [permissionGrant("sales.opportunities", "view")] }) === "/crm/opportunities", "custom permission template lands on its first usable route");
+assert(product.getDefaultWorkspaceRoute({ canUseDocumentWorkspace: true, enabledModules: financeModules, permissions: financePermissions }) === "/access-denied", "missing home permission must not choose an unrelated business page");
+assert(product.getDefaultWorkspaceRoute({ productEdition: "Sales", canUseSalesWorkspace: true, enabledModules: ["sales.dashboard"], permissions: salesPermissions }) === "/crm/dashboard", "sales edition fixed home");
+assert(product.getDefaultWorkspaceRoute({ productEdition: "Sales", canUseSalesWorkspace: true, enabledModules: ["sales.opportunities"], permissions: [permissionGrant("sales.opportunities", "view")] }) === "/access-denied", "custom permissions do not change the fixed edition home");
 assert(product.getDefaultWorkspaceRoute({ enabledModules: [] }) === "/access-denied", "empty permission template uses access denied route");
 assert(product.getProductEditionPresentation("Document").displayName === "外贸业务综合管理系统（单证员版）", "document edition brand name");
 assert(product.getProductEditionPresentation("Sales").displayName === "外贸业务综合管理系统（业务员版）", "sales edition brand name");
 assert(product.getProductEditionPresentation("Full").displayName === "外贸业务综合管理系统（全功能版）", "full edition brand name");
+assert(product.getProductEditionPresentation("Administration").editionName === "行政人事版", "administration includes human resources");
+const editionPermissions = JSON.parse(fs.readFileSync(path.join(repoRoot, "crates/export-doc-contracts/src/generated_contract.json"), "utf8")).permissions;
+for (const edition of ["Full", "Document", "Sales", "Administration"]) {
+  const resources = editionPermissions.resources.filter(resource => edition === "Full" || editionPermissions.editions[edition].includes(resource.key));
+  const enabledModules = [...new Set(resources.map(resource => resource.moduleKey))];
+  const editionCapabilities = {
+    productEdition: edition,
+    enabledModules, isDesktopRuntime: true, usesOfficeRegister: true, canManageSettings: true,
+    canManageUsers: resources.some(resource => resource.key === "system.users"),
+    canUseDocumentWorkspace: edition === "Full" || edition === "Document",
+    canUseSalesWorkspace: edition === "Full" || edition === "Sales",
+    availableFeatures: ["worklist", "business-attachments"],
+    permissions: resources.flatMap(resource => resource.actions.map(action => permissionGrant(resource.key, action.key, "all"))),
+  };
+  const groups = model.filterWorkspaceNavGroups(editionCapabilities);
+  assert(product.getDefaultWorkspaceRoute(editionCapabilities) === product.getProductEditionPresentation(edition).defaultRoute, `${edition}: fixed home`);
+  assert(globalThis.__routeAccess.isWorkspaceModuleAccessAllowed("/", { capabilities: editionCapabilities }), `${edition}: root is a neutral landing redirect`);
+  const routes = model.getWorkspaceRouteItems(groups).map(item => item.to);
+  for (const route of ["/office/people", "/office/directory", "/office/meeting-rooms", "/office/supplies", "/office/approvals", "/office/requests/leave", "/office/requests/overtime", "/office/requests/expense", "/office/requests/travel", "/office/requests/purchase", "/office/requests/general"]) {
+    assert(routes.includes(route) === ["Full", "Administration"].includes(edition), `${edition}: office and personnel route ${route}`);
+  }
+  if (edition === "Administration") {
+    assert(groups.some(group => group.label === "人事管理") && groups.some(group => group.label === "行政办公"), "both office navigation sections remain visible");
+    assert(!routes.includes("/invoices") && !routes.includes("/crm/follow-ups"), "administration has no document or sales routes");
+  }
+}
 assert(new Set(["Document", "Sales", "Full"].map((edition) => product.getProductEditionPresentation(edition).productName)).size === 1, "all editions share the same product brand");
 assert(device.getWorkspaceDeviceCapabilities("phone").canUseDenseWorkbench === false, "phone blocks dense workbench");
 assert(device.getWorkspaceDeviceCapabilities("phone").canImportExport === false, "phone blocks import and export operations");

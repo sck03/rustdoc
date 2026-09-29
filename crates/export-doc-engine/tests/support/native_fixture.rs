@@ -14,6 +14,9 @@ pub struct Fixture {
 }
 impl Fixture {
     pub fn new() -> Self {
+        Self::edition("Full")
+    }
+    pub fn edition(edition: &str) -> Self {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .unwrap()
@@ -33,7 +36,7 @@ impl Fixture {
             log_root: root.join("Logs"),
             font_path: root.join("NotoSansCJKsc-Regular.otf"),
         };
-        let client = ApiClient::native(paths.clone())
+        let client = ApiClient::native_edition(paths.clone(), Default::default(), edition)
             .unwrap()
             .login("admin".into(), String::new())
             .unwrap()

@@ -6,7 +6,7 @@
 
 | 入口 | 用途 |
 | --- | --- |
-| `build-windows-desktop-run.cmd`／`.ps1` | 沿用原版名称，调用统一 Rust 打包器，生成 Windows Full 便携目录 |
+| `build-windows-desktop-run.cmd`／`.ps1` | 默认自动生成 Full、Sales、Document、Administration 四个 Windows 便携目录；可用 `-Edition` 选择一版 |
 | `build-windows-installers.cmd`／`.ps1` | 生成 Tauri NSIS 安装器，使用同一 Rust 业务与资源 |
 | `build-native.cmd`／`.ps1` | 当前平台 Rust + Tauri + React 便携包；默认目录 `artifacts/native-desktop/ExportDocManager.Tauri` |
 | `run-native.cmd`／`.ps1` | 启动已构建便携包；`-AppRoot` 可指定包目录 |
@@ -17,11 +17,24 @@
 
 `build-native.ps1 -PreflightOnly -NoPause` 只检查 Rust、Node、curl 等构建工具。`-Configuration Debug` 用于联调，默认 Release。`-RustTarget` 明确目标架构；`-Bundles nsis`、`-Bundles deb,appimage` 或 `-Bundles app,dmg` 生成对应平台安装／应用包。安装器需要对应平台工具链。
 
-`-SkipBuild` 只整理已经构建好的相同 profile／target 二进制与资源。正式包默认包含 OCR；`-WithoutOcr` 仅生成明确不提供文字识别的轻量验收包，不能用它代替 Full 功能验收。
+`-SkipBuild` 只整理已经构建好的相同 profile／target 二进制与资源。Full/Document 正式包默认包含 OCR；`-WithoutOcr` 仅生成明确不提供文字识别的轻量验收包，不能用它代替 Full 功能验收。
 
 直接 Cargo 命令、本地打包、实库/界面回归与 GitHub 工作流默认共用仓库 `target/`；不再分别写入 `.codex-runtime/cargo-target-native` 和 `artifacts/cargo-target-native`。`CARGO_TARGET_DIR` 可显式覆盖，相对路径按仓库根解析；公共入口同时把下载缓存和临时目录放入 `.codex-runtime`。手工运行 Cargo 时也应设置仓库内的 `CARGO_HOME`，以复用脚本的下载缓存。`-SkipBuild` 会先检查主程序及所需 OCR 程序，缺失时在创建/改动输出包之前报错；所有文件复制前统一验证来源和目标边界。
 
-当前开放 Full 打包。原版 Document／Sales／Administration 的 Rust 资源裁剪、权限隔离和更新通道仍需分别验收；不通过更换标题冒充四版已完成。
+Windows 批量入口默认 `-Edition All`；四版共用一次 React 构建和同一 Cargo 输出根，分别编译桌面身份，不复制依赖构建树。默认位于 `artifacts/native-desktop`：Full 沿用 `ExportDocManager.Tauri`，另外三版为 `ExportDocManager.Tauri.Sales`、`.Document`、`.Administration`。`-OutputDir` 指定包含这些子目录的父目录；`build-native.ps1 -Edition Administration -OutputRoot <目录>` 则直接指定单版目录。每版保留各自 `App_Data`，不能在同一目录覆盖另一版本。
+
+首次进入和登录后使用固定首页：Full/Document 为单证概览，Sales 为销售概览，Administration 为人员档案。根地址只负责跳转，不作为单证页面检查权限；账号缺少本版首页权限时显示权限说明，可从导航进入已授权功能，不再根据权限列表自动选一个业务页面。
+
+| 版本参数 | 功能范围 | 随包资源 |
+| --- | --- | --- |
+| Full | 单证、销售、行政、人事及新增 OA 申请审批 | OCR、单证/Excel 模板、PDFium、字体 |
+| Document | 单证与申报、报表和相关工具 | OCR、单证/Excel 模板、PDFium、字体 |
+| Sales | 客户、跟进、商机、报价、供应商及相关工具 | PDFium、字体；不附 OCR 和单证模板 |
+| Administration | 人事档案/通讯录/请假/加班，行政会议室/物品/报销/出差/采购/通用申请及审批 | PDFium、字体；不附 OCR 和单证模板 |
+
+后端使用官方契约的版本资源目录限制权限，管理员也不能越过产品边界；账号自身的权限和数据范围继续生效。三版的共用 Rust 库仍包含共享实现，不宣称所有代码均按版本从二进制剔除。安装器使用 `build-windows-installers.ps1 -Edition <版本>`，Tauri identifier 与更新频道按版本区分；签名更新仍需独立配置和实际升级验收。
+
+`-SkipMainBuild`（单版入口为 `-SkipBuild`）只复用 `target/<profile>/editions/<版本>` 下已构建的该版 EXE，校验版本及 SHA-256 构建记录。不会将最后一次 Cargo 输出复制成另外三版；缺少记录或校验失败须正常重建。Full 和 Document 默认提供 OCR，只有显式 `-WithoutOcr` 才生成轻量检查包。
 
 ## 桌面启动检查与资源
 

@@ -7,6 +7,8 @@ use std::{fs, path::Path};
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Package {
+    #[serde(default)]
+    edition: Option<String>,
     schema_version: u32,
     backend: String,
     frontend: String,
@@ -34,6 +36,9 @@ pub(crate) fn check(paths: &RuntimePaths) -> Result<(), String> {
         serde_json::from_slice(&bytes).map_err(|e| format!("运行资源清单无效：{e}"))?;
     if package.schema_version != 1 || package.backend != "Rust" || package.frontend != "Tauri" {
         return Err("这不是 Tauri + Rust 程序资源包，请使用匹配的安装包。".into());
+    }
+    if package.edition.as_deref().unwrap_or("Full") != env!("EXPORTDOCMANAGER_PRODUCT_EDITION") {
+        return Err("程序版本与资源清单不匹配，请使用同一版本的完整程序包。".into());
     }
     let library = if cfg!(windows) {
         "pdfium.dll"

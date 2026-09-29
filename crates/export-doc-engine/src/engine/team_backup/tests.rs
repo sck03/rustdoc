@@ -44,6 +44,7 @@ fn open_service(workspace: &Workspace) -> Arc<NativeService> {
 }
 fn admin() -> Actor {
     Actor {
+        edition: Default::default(),
         id: 1,
         name: "系统管理员".into(),
         company: "DEFAULT".into(),

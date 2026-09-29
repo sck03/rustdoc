@@ -528,7 +528,7 @@ function App() {
       return;
     }
 
-    navigate("/dashboard", { replace: true });
+    navigate("/", { replace: true });
   }, [location.pathname, navigate, session]);
 
   useEffect(() => {

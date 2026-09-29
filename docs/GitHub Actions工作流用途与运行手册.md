@@ -6,20 +6,20 @@
 
 | Actions 名称 / 文件 | 系统与架构 | 结果 |
 | --- | --- | --- |
-| [Build Windows desktop package](../.github/workflows/windows-desktop-package.yml) | x64、arm64、all | Full 便携 ZIP、NSIS 安装器归档 |
-| [Build Linux desktop package](../.github/workflows/linux-desktop-package.yml) | x64、arm64、all | Full 便携 tar.gz、deb/AppImage 归档 |
-| [Build macOS desktop package](../.github/workflows/macos-desktop-package.yml) | arm64（Apple Silicon） | Full 便携 tar.gz、app/dmg 归档 |
+| [Build Windows desktop package](../.github/workflows/windows-desktop-package.yml) | x64、arm64、all | 所选版本便携 ZIP、NSIS 安装器归档 |
+| [Build Linux desktop package](../.github/workflows/linux-desktop-package.yml) | x64、arm64、all | 所选版本便携 tar.gz、deb/AppImage 归档 |
+| [Build macOS desktop package](../.github/workflows/macos-desktop-package.yml) | arm64（Apple Silicon） | 所选版本便携 tar.gz、app/dmg 归档 |
 | [Build Web server package](../.github/workflows/rust-native-web-server-release.yml) | 选择 linux/windows/macos/all，再选择 x64/arm64/all | React + Rust HTTP + PostgreSQL 18 客户端的服务包 |
 | [Build and publish Docker image](../.github/workflows/rust-native-container-release.yml) | x64（amd64）、arm64、all | 可下载镜像或 GHCR 版本索引 |
 
 Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ubuntu 24.04 x64/ARM64 runner；macOS 使用 Apple Silicon runner。按用户确认继续停用 Intel macOS。Windows 网页服务只开放 x64，因为当前受管 PostgreSQL 客户端仅提供 Windows x64；macOS 网页服务仅 ARM64。选择不存在的组合在构建前报错；all 只包含已定义的目标。
 
-桌面和 Web 共用 [native-package-reusable.yml](../.github/workflows/native-package-reusable.yml)，它仅接受内部调用，不显示另一个手工打包入口。所有包默认 Full 并包含 OCR、PDFium、字体、模板及许可。
+桌面和 Web 共用 [native-package-reusable.yml](../.github/workflows/native-package-reusable.yml)，它仅接受内部调用，不显示另一个手工打包入口。桌面入口默认 edition=All，按版本与平台建立独立构建任务，也可选择 Full、Sales、Document、Administration；Web 保持 Full。Full/Document 包含 OCR 和单证模板，Sales/Administration 不附这些资源；四版保留 PDFium、字体及许可。Full 归档沿用原名，其它版本在平台后追加版本名，避免同名覆盖。
 
 ## 版本号与下载
 
 1. 在 Actions 选择上表工作流，点击 Run workflow，选择要构建的源码分支。
-2. 填写 version，例如 `0.1.2`、`v0.1.2` 或 `0.1.2-beta.1`；选择目标系统/架构。
+2. 填写 version，例如 `0.1.2`、`v0.1.2` 或 `0.1.2-beta.1`；选择目标系统/架构；桌面同时选择 edition。
 3. 仅下载构建产物时保持发布开关关闭。运行成功后从该次 Actions 页面下载 Artifacts。
 4. 桌面/Web 选择 `publish_release`，所有所选目标成功后上传至 `v<version>` 的 GitHub Release。首次创建先使用 draft，附件上传完成后公开；预发布版本标记 prerelease。此流程不更新 latest 发布指针或自动更新通道。
 
@@ -47,6 +47,8 @@ Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ub
 | [浏览器兼容](../.github/workflows/browser-compatibility.yml) | 仅手工 Firefox/WebKit，不加入普通提交检查 |
 
 先查看第一个失败步骤及完整日志。依赖安全错误、下载故障、工具链和平台编译问题分别处理；取消、ignored、静态语法通过不计为运行验收。
+
+2026-09-29 核对 [run 36503387531](https://github.com/sck03/rustdoc/actions/runs/36503387531)：脚本套件输出 `Success: true`，但 GitHub PowerShell 包装器仍返回 1。原因是缺少构建产物的反向测试留下预期的 `$LASTEXITCODE=1`；后续检查通过未清除它。套件改为通过共用进程执行器隔离 PowerShell 回归，检查子进程真实结果，全部通过后显式返回 0。发布合同回归使用 Actions 相同的调用及退出码传播方式，验证成功和真实语法失败；不放宽文件保护、依赖、权限或发布检查。
 
 2026-09-25 核对 GitHub run 36044362655：`Audit Rust lock files` 被 glib 0.18.5 的 [RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429) 阻断，SBOM 未生成是连带结果。Tauri 2.11.6 的 GTK3 图使用该版本；修复版本 glib >=0.20 与此依赖图不兼容，0.18 分支没有发布修复。受影响 API 为 VariantStrIter/array_iter_str，当前项目及其它锁定依赖源码没有引用它们。`verify-rustsec-glib-exception.mjs` 为单项风险例外准备了保守检查：固定 Tauri/glib 版本，任何其它依赖或项目出现受影响符号即失败。源码检查不等于修复或形式化不可达证明；例外是否启用必须记录本次决定，不能全局关闭 unsound/yanked 门禁。
 

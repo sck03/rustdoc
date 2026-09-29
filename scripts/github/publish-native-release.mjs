@@ -51,7 +51,7 @@ if (!release) {
   release = await request("/releases", { method: "POST", body: {
     tag_name: tag, target_commitish: revision, name: `ExportDocManager ${version}`,
     draft: true, prerelease: version.includes("-"),
-    body: `Rust + React Full packages for ${revision}. SHA-256 checksums accompany each archive. Desktop installer updates require separately configured Tauri updater trust.`,
+    body: `Rust + React packages for ${revision}. Desktop edition names identify separate product packages; unsuffixed desktop archives are Full. SHA-256 checksums accompany each archive. Desktop installer updates require separately configured Tauri updater trust.`,
   } });
 }
 // Refuse an existing different asset; retries may reuse byte-identical assets.

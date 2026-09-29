@@ -1,0 +1,111 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { CdpClient, delay } from './lib/chromium-cdp.mjs';
+import { captureScreenshot, evaluate, getFreePort } from './lib/web-runtime-browser-session.mjs';
+import { spawnProcessTree, stopProcessTree } from './lib/child-process-tree.mjs';
+import { productEditionCatalog } from './lib/product-editions.mjs';
+
+assert.equal(process.platform, 'win32', 'This gate exercises Windows WebView2 packages.');
+const repo = path.resolve(import.meta.dirname, '..');
+const packages = path.resolve(process.argv[2] || path.join(repo, 'artifacts/native-desktop'));
+const output = path.join(repo, 'artifacts/edition-validation', `desktop-${Date.now()}`);
+fs.mkdirSync(output, { recursive: true });
+const openapi = JSON.parse(fs.readFileSync(path.join(repo, 'crates/export-doc-contracts/src/openapi.json'), 'utf8'));
+const operations = new Map(Object.entries(openapi.paths).flatMap(([url, methods]) =>
+  Object.entries(methods).filter(([, value]) => value.operationId).map(([method, value]) => [value.operationId, { url, method }])));
+const results = [];
+
+for (const edition of ['Full', 'Sales', 'Document', 'Administration']) {
+  const name = `ExportDocManager.Tauri${edition === 'Full' ? '' : `.${edition}`}`;
+  const appRoot = path.join(packages, name);
+  const marker = JSON.parse(fs.readFileSync(path.join(appRoot, 'exportdoc-native-package.json'), 'utf8'));
+  assert.equal(marker.edition, edition);
+  assert.equal(marker.ocr, productEditionCatalog.editions[edition].resourceProfile.ocr);
+  assert.equal(fs.existsSync(path.join(appRoot, 'sidecar/ocr/exportdoc-ocr.exe')), marker.ocr);
+  assert.equal(fs.existsSync(path.join(appRoot, 'Resources/ExcelTemplates/invoice-import-template.xlsx')), marker.documentResources);
+  const port = await getFreePort();
+  const child = spawnProcessTree(path.join(appRoot, 'ExportDocManager.exe'), ['--app-root', appRoot, '--data-root', path.join(output, edition)], {
+    cwd: appRoot, windowsHide: true, stdio: 'ignore', env: { ...process.env,
+      EXPORTDOCMANAGER_DESKTOP_SMOKE: '1', EXPORTDOCMANAGER_DESKTOP_TOKEN: 'isolated-edition-test',
+      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-address=127.0.0.1 --remote-debugging-port=${port}` },
+  });
+  let cdp, failure;
+  child.once('error', error => { failure = error; });
+  const run = async expression => (await evaluate(cdp, expression, true)).value;
+  try {
+    const deadline = Date.now() + 60000;
+    while (Date.now() < deadline) {
+      if (failure) throw failure;
+      assert.equal(child.exitCode, null, `${edition}: host exited before opening a window`);
+      try {
+        const pages = await (await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(1000) })).json();
+        const page = pages.find(page => page.type === 'page' && /tauri\.localhost/.test(page.url));
+        if (page) { cdp = await CdpClient.connect(page.webSocketDebuggerUrl); break; }
+      } catch { /* WebView may still be starting. */ }
+      await delay(200);
+    }
+    assert(cdp, `${edition}: packaged WebView did not open`);
+    while (Date.now() < deadline && !await run("!!document.querySelector('input[autocomplete=username]')")) await delay(100);
+    assert(await run("!!document.querySelector('input[autocomplete=username]')"), `${edition}: login missing`);
+    const context = await run("window.__TAURI_INTERNALS__.invoke('get_desktop_runtime_context')");
+    assert.equal(context.productEdition, edition);
+    const request = async (id, token, body) => {
+      const operation = operations.get(id);
+      assert(operation, `Unknown contract operation: ${id}`);
+      const response = await fetch(context.apiBaseUrl + operation.url, {
+        method: operation.method, signal: AbortSignal.timeout(15000),
+        headers: { 'Content-Type': 'application/json', 'X-ExportDocManager-Desktop-Token': context.desktopAccessToken,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+      return { status: response.status, body: await response.json() };
+    };
+    const login = await request('Login', '', { username: 'admin', password: '' });
+    assert.equal(login.status, 200);
+    assert.equal(login.body.user.capabilities.productEdition, edition);
+    const statuses = {};
+    for (const [id, editions] of [
+      ['ListInvoices', ['Full', 'Document']], ['GetCrmDashboard', ['Full', 'Sales']],
+      ['ListPersonnel', ['Full', 'Administration']], ['ListGeneralRequest', ['Full', 'Administration']],
+    ]) {
+      statuses[id] = (await request(id, login.body.accessToken)).status;
+      assert.equal(statuses[id], editions.includes(edition) ? 200 : 403, `${edition} ${id}`);
+    }
+    const unauthorized = await request('CreatePersonnel', login.body.accessToken, {});
+    if (['Sales', 'Document'].includes(edition)) assert.equal(unauthorized.status, 403);
+    await run("document.querySelector('input[autocomplete=username]').focus()");
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
+    await cdp.send('Input.insertText', { text: 'admin' });
+    await run("document.querySelector('button[type=submit]').click()");
+    const loginDeadline = Date.now() + 30000;
+    while (Date.now() < loginDeadline && await run("!!document.querySelector('input[autocomplete=username]')")) await delay(100);
+    assert(!await run("!!document.querySelector('input[autocomplete=username]')"), `${edition}: React login failed`);
+    await delay(500);
+    const text = await run('document.body.innerText');
+    const expectedHome = edition === 'Sales' ? '/crm/dashboard' : edition === 'Administration' ? '/office/people' : '/dashboard';
+    assert.equal(await run('location.hash'), `#${expectedHome}`, `${edition}: fixed edition home`);
+    assert(!text.includes('当前页面不可用'), `${edition}: first login must not show a permission redirect warning`);
+    assert(text.includes(productEditionCatalog.editions[edition].displayName), `${edition}: wrong product title`);
+    await captureScreenshot(cdp, path.join(output, `${edition}.png`));
+    if (edition === 'Administration') {
+      assert(text.includes('人事管理') && text.includes('行政办公'));
+      await run("location.hash = '#/office/requests/general'");
+      await delay(800);
+      assert((await run('document.body.innerText')).includes('通用申请'));
+      await captureScreenshot(cdp, path.join(output, `${edition}-general.png`));
+    }
+    results.push({ edition, home: expectedHome, ocr: marker.ocr, documentResources: marker.documentResources, statuses, screenshot: `${edition}.png` });
+    await run("setTimeout(() => window.__TAURI_INTERNALS__.invoke('request_app_exit'), 100); true");
+    const exitDeadline = Date.now() + 50000;
+    while (child.exitCode === null && Date.now() < exitDeadline) await delay(100);
+    assert.equal(child.exitCode, 0, `${edition}: graceful exit failed`);
+    await assert.rejects(fetch(context.apiBaseUrl + '/health', { signal: AbortSignal.timeout(1000) }));
+  } finally {
+    cdp?.close();
+    await stopProcessTree(child);
+  }
+}
+fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify(results, null, 2));
+console.log(`Four Windows desktop editions passed: ${output}`);

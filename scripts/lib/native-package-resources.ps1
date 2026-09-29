@@ -44,6 +44,7 @@ function Add-ExportDocRustPackageResources {
         [string]$RustTarget,
         [string]$PdfiumPath,
         [string]$OnnxRuntimePath,
+        [bool]$DocumentResources = $true,
         [switch]$WithoutOcr,
         [switch]$SkipBuild
     )
@@ -54,7 +55,7 @@ function Add-ExportDocRustPackageResources {
     foreach ($name in @('NotoSansCJKsc-Regular.otf', 'NotoSansCJKsc-Bold.otf', 'NotoSerifCJKsc-Regular.otf', 'OFL-Noto-CJK.txt', 'font-manifest.json')) {
         $copies[(Join-Path $repositoryRoot "Resources/Fonts/OpenSource/$name")] = "Resources/Fonts/OpenSource/$name"
     }
-    $copies[(Join-Path $repositoryRoot 'Resources/ExcelTemplates/invoice-import-template.xlsx')] = 'Resources/ExcelTemplates/invoice-import-template.xlsx'
+    if ($DocumentResources) { $copies[(Join-Path $repositoryRoot 'Resources/ExcelTemplates/invoice-import-template.xlsx')] = 'Resources/ExcelTemplates/invoice-import-template.xlsx' }
     if ([string]::IsNullOrWhiteSpace($PdfiumPath)) {
         $platform = if ($env:OS -eq 'Windows_NT') { 'win32' } elseif ($IsMacOS) { 'macos' } else { 'linux' }
         $ridPlatform = if ($env:OS -eq 'Windows_NT') { 'win' } elseif ($IsMacOS) { 'osx' } else { 'linux' }
@@ -65,10 +66,12 @@ function Add-ExportDocRustPackageResources {
     Assert-NativePackagePath -Path $PdfiumPath
     $copies[$PdfiumPath] = 'Resources/Pdf/' + [System.IO.Path]::GetFileName($PdfiumPath)
     $templateRoot = Join-Path $repositoryRoot 'Templates'
+    if ($DocumentResources) {
     foreach ($template in Get-ChildItem -LiteralPath $templateRoot -Recurse -File -Filter '*.dtpl') {
         Assert-NativePackagePath -Path $template.FullName
         $relative = [System.IO.Path]::GetRelativePath($repositoryRoot, $template.FullName)
         $copies[$template.FullName] = $relative
+    }
     }
     foreach ($name in @('THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_DEPENDENCIES.md')) {
         $copies[(Join-Path $repositoryRoot $name)] = $name

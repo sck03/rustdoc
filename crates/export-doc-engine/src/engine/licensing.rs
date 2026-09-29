@@ -681,7 +681,7 @@ pub fn handle(
             &verifier()?,
         ),
         REGISTER_LICENSE => {
-            auth::authorize(actor, "system.license", "manage")?;
+            auth::authorize(actor, "system.about", "manage")?;
             register(
                 &service.store,
                 &service.protector,

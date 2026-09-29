@@ -12,6 +12,7 @@ use unicode_normalization::UnicodeNormalization;
 mod sqlite_layout;
 
 pub struct Store {
+    pub(crate) edition: export_doc_domain::permissions::ProductEdition,
     pub(crate) data_root: std::path::PathBuf,
     connection: Mutex<Connection>,
     #[cfg(feature = "postgres")]
@@ -20,6 +21,7 @@ pub struct Store {
 }
 #[derive(Clone, Debug)]
 pub struct Actor {
+    pub edition: export_doc_domain::permissions::ProductEdition,
     pub id: i64,
     pub name: String,
     pub company: String,
@@ -35,6 +37,7 @@ impl Store {
         super::team_backup::disaster::apply_pending(paths)?;
         let connection = Connection::sqlite(&database_path)?;
         Ok(Self {
+            edition: Default::default(),
             data_root: paths.data_root.clone(),
             connection: Mutex::new(connection),
             #[cfg(feature = "postgres")]
@@ -55,6 +58,7 @@ impl Store {
     #[cfg(feature = "postgres")]
     pub fn open_postgres(paths: &RuntimePaths, connection_string: &str) -> Result<Self> {
         Ok(Self {
+            edition: Default::default(),
             data_root: paths.data_root.clone(),
             connection: Mutex::new(Connection::postgres(connection_string)?),
             postgres_connection: Some(zeroize::Zeroizing::new(connection_string.into())),

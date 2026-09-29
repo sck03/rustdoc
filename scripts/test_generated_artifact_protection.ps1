@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "lib/build-script-support.ps1")
 . (Join-Path $PSScriptRoot "lib/generated-artifact-protection.ps1")
 $fixtureRoot = Join-Path (Split-Path $PSScriptRoot -Parent) ".codex-runtime"
 $fixture = Join-Path $fixtureRoot ("cleanup-policy-" + [Guid]::NewGuid().ToString("N"))
@@ -59,5 +60,5 @@ try {
 } finally {
     $resolved = [System.IO.Path]::GetFullPath($fixture)
     if ([System.IO.Path]::GetDirectoryName($resolved) -ne [System.IO.Path]::GetFullPath($fixtureRoot)) { throw "Unexpected fixture path" }
-    Remove-Item -LiteralPath $resolved -Recurse -Force
+    Remove-ExportDocDirectoryWithRetry -Path $resolved -MaximumAttempts 5
 }

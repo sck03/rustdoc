@@ -16,9 +16,9 @@ const presentations: Record<ProductEdition, ProductEditionPresentation> = {
   Administration: {
     edition: "Administration",
     productName: "外贸业务综合管理系统",
-    displayName: "外贸业务综合管理系统（行政版）",
-    editionName: "行政版",
-    loginTagline: "人员、会议室与物品管理工作台",
+    displayName: "外贸业务综合管理系统（行政人事版）",
+    editionName: "行政人事版",
+    loginTagline: "人事、行政与申请审批工作台",
     englishName: "Foreign Trade Business Management System",
     defaultRoute: "/office/people",
   },
@@ -45,7 +45,7 @@ const presentations: Record<ProductEdition, ProductEditionPresentation> = {
     productName: "外贸业务综合管理系统",
     displayName: "外贸业务综合管理系统（全功能版）",
     editionName: "全功能版",
-    loginTagline: "单证、销售与行政一站式工作台",
+    loginTagline: "单证、销售、行政与人事一站式工作台",
     englishName: "Foreign Trade Business Management System",
     defaultRoute: "/dashboard",
   },
@@ -66,28 +66,6 @@ export function getDefaultWorkspaceRoute(capabilities: WorkspaceCapabilities) {
   const availableRoutes = new Set(
     getWorkspaceRouteItems(filterWorkspaceNavGroups(capabilities)).map((item) => item.to.split("?")[0]),
   );
-  const preferredRoutes = [
-    "/dashboard",
-    "/crm/dashboard",
-    "/payments",
-    "/query/invoices",
-    "/invoices",
-    "/crm/follow-ups",
-    "/crm/opportunities",
-    "/suppliers",
-    "/crm/email-templates",
-    "/reports/templates/manage",
-    "/jobs",
-    "/master-data",
-    "/single-window/operation-center",
-    "/tools/exchange-rates",
-    "/office/people",
-    "/office/directory",
-    "/office/meeting-rooms",
-    "/office/supplies",
-    "/tools/email",
-    "/system/about",
-    "/settings",
-  ];
-  return preferredRoutes.find((route) => availableRoutes.has(route)) ?? "/access-denied";
+  const home = getProductEditionPresentation(capabilities.productEdition).defaultRoute;
+  return availableRoutes.has(home) ? home : "/access-denied";
 }

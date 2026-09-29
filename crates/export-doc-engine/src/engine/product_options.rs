@@ -108,6 +108,7 @@ mod tests {
             let paths = RuntimePaths::server(&root, &root.join("Data")).unwrap();
             let store = Store::open(&paths).unwrap();
             let actor = Actor {
+                edition: Default::default(),
                 id: 1,
                 name: "采购员".into(),
                 company: "DEFAULT".into(),
