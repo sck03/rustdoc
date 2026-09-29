@@ -50,11 +50,13 @@ if (Test-Path -LiteralPath $outputFullPath) {
         throw 'Refusing to overwrite an unmarked existing directory.'
     }
 }
-if ([string]::IsNullOrWhiteSpace($env:CARGO_HOME)) { $env:CARGO_HOME = Join-Path $runtimeRoot 'cargo-home' }
-if ([string]::IsNullOrWhiteSpace($env:CARGO_TARGET_DIR)) { $env:CARGO_TARGET_DIR = Join-Path $runtimeRoot 'cargo-target-native' }
-$env:TEMP = Join-Path $runtimeRoot 'temp'
-$env:TMP = $env:TEMP
-New-Item -ItemType Directory -Force -Path $env:TEMP, $outputFullPath | Out-Null
+Initialize-ExportDocRustBuildEnvironment -RepositoryRoot $repositoryRoot
+$artifactDirectory = Get-ExportDocCargoArtifactDirectory -RepositoryRoot $repositoryRoot -Configuration $Configuration -RustTarget $RustTarget
+if ($SkipBuild) {
+    $requiredBinaries = @('export-doc-tauri')
+    if (-not $WithoutOcr) { $requiredBinaries += 'exportdoc-ocr' }
+    Assert-ExportDocRustBuildOutputs -ArtifactDirectory $artifactDirectory -Names $requiredBinaries
+}
 if (-not $SkipBuild) {
     $env:npm_config_cache = Join-Path $runtimeRoot 'npm-cache'
     Invoke-ExportDocExternal -FilePath 'npm' -Arguments @('--prefix', 'apps/export-doc-web', 'ci') -WorkingDirectory $repositoryRoot -DisplayName 'Restore shared React dependencies'
@@ -65,12 +67,6 @@ if (-not $SkipBuild) {
     Invoke-ExportDocExternal -FilePath 'cargo' -Arguments $cargoArguments -WorkingDirectory $repositoryRoot -DisplayName 'Build Tauri + React + Rust desktop'
 }
 $executableSuffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
-$profile = $Configuration.ToLowerInvariant()
-$artifactDirectory = if ([string]::IsNullOrWhiteSpace($RustTarget)) {
-    Join-Path $env:CARGO_TARGET_DIR $profile
-} else {
-    Join-Path (Join-Path $env:CARGO_TARGET_DIR $RustTarget) $profile
-}
 $copies = [ordered]@{}
 $copies[(Join-Path $artifactDirectory "export-doc-tauri$executableSuffix")] = "ExportDocManager$executableSuffix"
 $webviewLoader = Join-Path $artifactDirectory 'WebView2Loader.dll'
@@ -86,14 +82,7 @@ if ($targetIsWindowsX64) {
         $copies[(Join-Path $repositoryRoot "WebView2Runtime/$name")] = "WebView2Runtime/$name"
     }
 }
-foreach ($copy in $copies.GetEnumerator()) {
-    $destination = Join-Path $outputFullPath $copy.Value
-    Assert-NativePackagePath -Path $copy.Key
-    Assert-NativePackagePath -Path $destination
-    if (-not (Test-ExportDocPathUnderRoot -Path $destination -Root $outputFullPath)) { throw 'Package destination escaped output root.' }
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
-    Copy-Item -LiteralPath $copy.Key -Destination $destination -Force
-}
+Copy-ExportDocNativePackageFiles -Copies $copies -OutputRoot $outputFullPath
 @{ schemaVersion = 1; mode = 'portable' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputFullPath 'portable-runtime.json') -Encoding utf8
 @{ schemaVersion = 1; target = 'tauri-desktop'; backend = 'Rust' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputFullPath 'runtime-layout.json') -Encoding utf8
 $packageMarker = [ordered]@{

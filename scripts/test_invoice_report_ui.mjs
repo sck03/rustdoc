@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { cargoExampleExecutable } from './lib/cargo-paths.mjs';
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
@@ -17,7 +18,7 @@ const require = createRequire(path.join(web, "package.json"));
 const model = path.join(output, "models.mjs");
 await require("esbuild").build({ stdin: { loader: "ts", resolveDir: web, contents: `export {createEmptyInvoice} from ${JSON.stringify(path.join(web,"src/features/invoices/invoiceModel.ts"))}; export {createEmptyInvoiceItem} from ${JSON.stringify(path.join(web,"src/features/invoices/invoiceItemsEditorModel.ts"))};` }, bundle: true, platform: "node", format: "esm", outfile: model });
 const { createEmptyInvoice, createEmptyInvoiceItem } = await import(pathToFileURL(model).href);
-const executable = path.join(repo, "target/debug/examples", process.platform === "win32" ? "office_review.exe" : "office_review");
+const executable = cargoExampleExecutable(repo, 'office_review');
 const server = spawnProcessTree(executable, [path.join(output, "Data")], { cwd: repo, windowsHide: true, stdio: ["ignore","pipe","pipe"] });
 let chrome, cdp, page;
 const run = async expression => (await evaluate(page, expression, true)).value;

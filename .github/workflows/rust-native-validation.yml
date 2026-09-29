@@ -48,7 +48,7 @@ jobs:
     env:
       CARGO_HOME: ${{ github.workspace }}/.codex-runtime/cargo-home
       RUSTUP_HOME: ${{ github.workspace }}/.codex-runtime/rustup-home
-      CARGO_TARGET_DIR: ${{ github.workspace }}/artifacts/cargo-target-native
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
       CARGO_BUILD_JOBS: 2
       TMPDIR: ${{ github.workspace }}/.codex-runtime/temp
       TEMP: ${{ github.workspace }}/.codex-runtime/temp
@@ -117,7 +117,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
-      CARGO_TARGET_DIR: ${{ github.workspace }}/.codex-runtime/cargo-target-native
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
       CARGO_HOME: ${{ github.workspace }}/.codex-runtime/cargo-home
     timeout-minutes: 60
     strategy:

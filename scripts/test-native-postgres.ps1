@@ -31,7 +31,7 @@ $environment = @{
     TMP = Join-Path $runtimeRoot 'temp'
     PGPASSWORD = $password
     CARGO_HOME = $(if ($env:CARGO_HOME) { $env:CARGO_HOME } else { Join-Path $runtimeRoot 'cargo-home' })
-    CARGO_TARGET_DIR = $(if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $runtimeRoot 'cargo-target-native' })
+    CARGO_TARGET_DIR = Get-ExportDocCargoTargetDirectory -RepositoryRoot $repositoryRoot
 }
 $clusterStarted = $false
 $environment['EXPORTDOC_TEST_PG_BIN'] = $PostgresBin

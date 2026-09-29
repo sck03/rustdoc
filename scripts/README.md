@@ -19,6 +19,8 @@
 
 `-SkipBuild` 只整理已经构建好的相同 profile／target 二进制与资源。正式包默认包含 OCR；`-WithoutOcr` 仅生成明确不提供文字识别的轻量验收包，不能用它代替 Full 功能验收。
 
+直接 Cargo 命令、本地打包、实库/界面回归与 GitHub 工作流默认共用仓库 `target/`；不再分别写入 `.codex-runtime/cargo-target-native` 和 `artifacts/cargo-target-native`。`CARGO_TARGET_DIR` 可显式覆盖，相对路径按仓库根解析；公共入口同时把下载缓存和临时目录放入 `.codex-runtime`。手工运行 Cargo 时也应设置仓库内的 `CARGO_HOME`，以复用脚本的下载缓存。`-SkipBuild` 会先检查主程序及所需 OCR 程序，缺失时在创建/改动输出包之前报错；所有文件复制前统一验证来源和目标边界。
+
 当前开放 Full 打包。原版 Document／Sales／Administration 的 Rust 资源裁剪、权限隔离和更新通道仍需分别验收；不通过更换标题冒充四版已完成。
 
 ## 桌面启动检查与资源
@@ -106,3 +108,5 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 只需释放 Rust 构建空间时，可在确认编译/测试进程已结束、可运行文件及验证记录已另存后，定向执行 `cargo clean --target-dir target`。旧的仓库内独立 Cargo 输出也可用 `--target-dir` 指定其已盘点路径。不要把 Cargo 下载缓存或业务目录作为目标；清理后须重新编译，但保留的 Cargo/npm 下载缓存可继续复用。
 
 先 `clean-generated-artifacts.ps1 -ListOnly` 盘点，再按根 AGENTS 中已授权的范围清理。保留业务数据、模板、模型、已需资源、交付输出和可复用依赖缓存；依赖缓存、node_modules、整个运行缓存及发布输出只有用户明确同意后才能删除。
+
+带有效 `CACHEDIR.TAG` 的 Cargo 输出中，`debug/release/build/*/out` 下的生成资源可随构建目录清理；这不会放行业务数据库、备份、链接或其它位置的 `Resources/Templates`。PostgreSQL 的 `PG_VERSION`、SQLite 伴随文件同样受到保护。`-IncludeCodexRuntimeWorkspaces` 清理旧构建/一次性工作区时，仍保留原生归档、PostgreSQL 客户端、审计工具和包下载缓存；`artifacts/releases`、其它目录的 `exportdoc-desktop/web/container` 发布归档及 Cargo 安装器 `bundle` 默认按发布输出保护。清理后的下一次构建需要重新编译，但无需重复下载保留的依赖。

@@ -1,6 +1,26 @@
 . (Join-Path $PSScriptRoot 'native-ocr-resources.ps1')
 . (Join-Path $PSScriptRoot 'native-runtime-resources.ps1')
 
+function Copy-ExportDocNativePackageFiles {
+    param(
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Copies,
+        [Parameter(Mandatory = $true)][string]$OutputRoot
+    )
+    # Validate the complete plan before overwriting any part of an existing package.
+    foreach ($copy in $Copies.GetEnumerator()) {
+        $destination = Join-Path $OutputRoot $copy.Value
+        Assert-NativePackagePath -Path $copy.Key
+        Assert-NativePackagePath -Path $destination
+        if (-not (Test-Path -LiteralPath $copy.Key -PathType Leaf)) { throw "Package input is missing: $($copy.Key)" }
+        if (-not (Test-ExportDocPathUnderRoot -Path $destination -Root $OutputRoot)) { throw 'Package destination escaped output root.' }
+    }
+    foreach ($copy in $Copies.GetEnumerator()) {
+        $destination = Join-Path $OutputRoot $copy.Value
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+        Copy-Item -LiteralPath $copy.Key -Destination $destination -Force
+    }
+}
+
 function Assert-NativePackagePath {
     param([Parameter(Mandatory = $true)][string]$Path)
     $nativePath = [System.IO.Path]::GetFullPath($Path)

@@ -112,7 +112,7 @@ function Remove-DirectoryWithRetry {
     }
 
     $Path = Assert-WorkspaceChildPath -Path $Path -Purpose "generated artifact"
-    if (Test-ExportDocProtectedArtifact -Path $Path) {
+    if (Test-ExportDocProtectedArtifact -Path $Path -IncludeReleaseOutputs:$IncludeReleaseOutputs) {
         throw "Refusing to remove protected data or linked content: $Path"
     }
 
@@ -190,7 +190,7 @@ function New-CleanupTarget {
     }
 
     $fullPath = Assert-WorkspaceChildPath -Path $Path -Purpose $Reason
-    if (Test-ExportDocProtectedArtifact -Path $fullPath) {
+    if (Test-ExportDocProtectedArtifact -Path $fullPath -IncludeReleaseOutputs:$IncludeReleaseOutputs) {
         Write-Verbose "Preserving data or linked content: $fullPath"
         return $null
     }
@@ -254,6 +254,7 @@ function Get-GeneratedArtifactCleanupPlan {
     # cleanup switches are supplied. This prevents newly introduced test or
     # screenshot directories from accumulating indefinitely.
     $releaseOutputNames = @(
+        "releases",
         "native-desktop",
         "native-web-server",
         "windows-desktop-run",
@@ -294,9 +295,7 @@ function Get-GeneratedArtifactCleanupPlan {
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "tmp") -Reason "repository-local temporary output"
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "target") -Reason "root Rust workspace build output"
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".vs") -Reason "local Visual Studio workspace cache"
-    Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".dotnet-cli") -Reason "repo-local dotnet CLI home cache"
     Add-Target -Targets $targets -Path (Join-Path $workspaceRoot "apps/.codex-runtime/cargo-target-tauri") -Reason "legacy Tauri Cargo build output"
-    Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".pnpm-store") -Reason "unused legacy pnpm cache"
 
     if ($IncludeCodexRuntime) {
         Add-Target -Targets $targets -Path $codexRuntimeRoot -Reason "local Codex/Playwright runtime cache"
@@ -305,11 +304,16 @@ function Get-GeneratedArtifactCleanupPlan {
         $persistentRuntimeNames = @(
             ".dotnet",
             "cargo-audit",
+            "cargo-audit-tool",
             "cargo-home",
             "dotnet-cli",
             "gh-cli",
             "gh-config",
             "npm-cache",
+            "native-runtime-packages",
+            "native-ocr-crt",
+            "postgresql-client",
+            "postgresql-review",
             "nuget-http-cache",
             "nuget-packages",
             "playwright-browsers",
@@ -357,6 +361,12 @@ function Get-GeneratedArtifactCleanupPlan {
     }
 
     if ($IncludePackageCaches) {
+        foreach ($name in @('.pnpm-store', '.dotnet-cli')) {
+            Add-Target -Targets $targets -Path (Join-Path $workspaceRoot $name) -Reason 'explicitly requested legacy tool cache cleanup'
+        }
+        foreach ($name in @('native-runtime-packages', 'native-ocr-crt', 'postgresql-client', 'cargo-audit-tool')) {
+            Add-Target -Targets $targets -Path (Join-Path $codexRuntimeRoot $name) -Reason 'explicitly requested native resource or tool cache cleanup'
+        }
         Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".nuget") -Reason "repo-local NuGet cache"
         Add-Target -Targets $targets -Path (Join-Path $workspaceRoot ".npm") -Reason "repo-local npm cache"
         Add-Target -Targets $targets -Path (Join-Path $codexRuntimeRoot "nuget-packages") -Reason "repo-local NuGet package cache"

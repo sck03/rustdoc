@@ -6,6 +6,7 @@ import {
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { cargoExampleExecutable } from './lib/cargo-paths.mjs';
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
 
@@ -19,7 +20,7 @@ const legacyWindowsFirefoxSandboxDisabled = shouldDisableLegacyWindowsFirefoxSan
 const closeTimeoutMs = 10_000;
 const browserCloseTimeoutMs = 30_000;
 const runtimeIdentifier = `${platformPrefix()}-${architectureName()}`;
-const apiExecutable = path.join(process.env.CARGO_TARGET_DIR || path.join(repositoryRoot, "target"), "debug", "examples", process.platform === "win32" ? "office_review.exe" : "office_review");
+const apiExecutable = cargoExampleExecutable(repositoryRoot, 'office_review');
 const playwrightEntry = path.join(repositoryRoot, "apps/export-doc-web/node_modules/playwright/index.mjs");
 const webDist = path.join(repositoryRoot, "apps", "export-doc-web", "dist");
 const axeSource = path.join(repositoryRoot, "apps", "export-doc-web", "node_modules", "axe-core", "axe.min.js");

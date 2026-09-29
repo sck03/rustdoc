@@ -15,9 +15,8 @@ function Add-ExportDocNativeOcrResources {
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments $ocrArguments -WorkingDirectory $RepositoryRoot -DisplayName 'Build native Rust OCR worker'
     }
     $suffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
-    $profile = $Configuration.ToLowerInvariant()
-    $ocrTarget = if ($RustTarget) { Join-Path $env:CARGO_TARGET_DIR $RustTarget } else { $env:CARGO_TARGET_DIR }
-    $Copies[(Join-Path $ocrTarget "$profile/exportdoc-ocr$suffix")] = "sidecar/ocr/exportdoc-ocr$suffix"
+    $ocrTarget = Get-ExportDocCargoArtifactDirectory -RepositoryRoot $RepositoryRoot -Configuration $Configuration -RustTarget $RustTarget
+    $Copies[(Join-Path $ocrTarget "exportdoc-ocr$suffix")] = "sidecar/ocr/exportdoc-ocr$suffix"
     $Copies[(Join-Path $RepositoryRoot 'apps/exportdoc-ocr-rs/README.md')] = 'sidecar/ocr/README.md'
     $platform = if ($env:OS -eq 'Windows_NT') { 'win' } elseif ($IsMacOS) { 'osx' } else { 'linux' }
     $architecture = if ($RustTarget -like 'aarch64-*') { 'arm64' } elseif ($RustTarget -like 'x86_64-*') { 'x64' } else { [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant() }

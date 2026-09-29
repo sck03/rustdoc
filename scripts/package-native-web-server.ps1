@@ -37,19 +37,13 @@ if (Test-Path -LiteralPath $outputFullPath) {
     }
 }
 $runtimeRoot = Join-Path $repositoryRoot '.codex-runtime'
-if (-not $env:CARGO_HOME) { $env:CARGO_HOME = Join-Path $runtimeRoot 'cargo-home' }
-if (-not $env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR = Join-Path $runtimeRoot 'cargo-target-native' }
-$env:TEMP = Join-Path $runtimeRoot 'temp'
-$env:TMP = $env:TEMP
-New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
-$profile = $Configuration.ToLowerInvariant()
-$targetRoot = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $repositoryRoot 'target' }
-if ([string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
-    $targetDirectory = Join-Path $targetRoot $profile
-} else {
-    $targetDirectory = Join-Path (Join-Path $targetRoot $RuntimeIdentifier) $profile
+Initialize-ExportDocRustBuildEnvironment -RepositoryRoot $repositoryRoot
+$targetDirectory = Get-ExportDocCargoArtifactDirectory -RepositoryRoot $repositoryRoot -Configuration $Configuration -RustTarget $RuntimeIdentifier
+if ($SkipBuild) {
+    $requiredBinaries = @('export-doc-server')
+    if (-not $WithoutOcr) { $requiredBinaries += 'exportdoc-ocr' }
+    Assert-ExportDocRustBuildOutputs -ArtifactDirectory $targetDirectory -Names $requiredBinaries
 }
-New-Item -ItemType Directory -Force -Path $outputFullPath | Out-Null
 if (-not $SkipBuild) {
     $env:npm_config_cache = Join-Path $runtimeRoot 'npm-cache'
     Invoke-ExportDocExternal -FilePath 'npm' -Arguments @('--prefix', 'apps/export-doc-web', 'ci') -WorkingDirectory $repositoryRoot -DisplayName 'Restore shared React dependencies'
@@ -87,19 +81,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $clientRoot 'postgresql-client.json'
 $clientMarker = Get-Content -LiteralPath (Join-Path $clientRoot 'postgresql-client.json') -Raw | ConvertFrom-Json
 if ($clientMarker.version -ne $clientVersion -or $clientMarker.platform -ne $platform) { throw 'PostgreSQL client cache does not match the declared platform/version.' }
 foreach ($file in Get-ChildItem -LiteralPath $clientRoot -Recurse -File) { $copyMap[$file.FullName] = Join-Path 'Tools/PostgreSQL' ([IO.Path]::GetRelativePath($clientRoot, $file.FullName)) }
-foreach ($entry in $copyMap.GetEnumerator()) {
-    if (-not (Test-Path -LiteralPath $entry.Key)) {
-        throw "Required web server package input is missing: $($entry.Key)"
-    }
-    Assert-NativePackagePath -Path $entry.Key
-    $destination = Join-Path $outputFullPath $entry.Value
-    Assert-NativePackagePath -Path $destination
-    if (-not (Test-ExportDocPathUnderRoot -Path $destination -Root $outputFullPath)) {
-        throw 'Package destination escaped output root.'
-    }
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
-    Copy-Item -LiteralPath $entry.Key -Destination $destination -Force
-}
+Copy-ExportDocNativePackageFiles -Copies $copyMap -OutputRoot $outputFullPath
 $marker = [ordered]@{
     schemaVersion = 1
     purpose = 'rust-native-web-server-package'

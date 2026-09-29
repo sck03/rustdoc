@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { cargoExampleExecutable } from './lib/cargo-paths.mjs';
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
@@ -9,7 +10,7 @@ import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs"
 const repo = path.resolve(import.meta.dirname, "..");
 const output = path.join(repo, "artifacts/oa-native-ui", Date.now().toString());
 fs.mkdirSync(output, { recursive: true });
-const executable = path.join(repo, "target/debug/examples", process.platform === "win32" ? "office_review.exe" : "office_review");
+const executable = cargoExampleExecutable(repo, 'office_review');
 const server = spawnProcessTree(executable, [path.join(output, "Data")], { cwd: repo, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let chrome, cdp, page;
 const run = async expression => (await evaluate(page, expression, true)).value;

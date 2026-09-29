@@ -64,6 +64,8 @@ Invoke-ExportDocExternal -FilePath "node" -Arguments @($dependencyPolicyScript) 
 $dependencyPolicyTestScript = Join-Path $scriptRoot "test_dependency_policy.mjs"
 Invoke-ExportDocExternal -FilePath "node" -Arguments @($dependencyPolicyTestScript) -WorkingDirectory $repoRoot
 & (Join-Path $scriptRoot "test_generated_artifact_protection.ps1")
+& (Join-Path $scriptRoot "test_rust_build_paths.ps1")
+Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_cargo_paths.mjs') -WorkingDirectory $repoRoot
 $bashPath = Get-Command bash -CommandType Application -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty Source
 if ([string]::IsNullOrWhiteSpace($bashPath)) {
