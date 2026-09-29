@@ -66,7 +66,6 @@ mod product_options;
 mod records;
 mod related_records;
 mod report_assets;
-#[allow(dead_code)]
 mod report_template_files;
 mod report_templates;
 pub mod reports;
@@ -77,7 +76,6 @@ mod single_window;
 mod store;
 mod supplier_overview;
 pub mod tasks;
-#[allow(dead_code)]
 mod team_backup;
 pub use team_backup::postgres::apply_pending as apply_pending_postgres_restore;
 mod workflows;

@@ -28,6 +28,7 @@ const BACKUP_SUFFIX: &str = ".dump";
 const SAFETY_PREFIX: &str = ".";
 const RESTART_MARKER: &str = ".pending-restore.json";
 const BACKUP_TIMEOUT: Duration = Duration::from_secs(1800);
+#[cfg(feature = "postgres")]
 const RESTORE_TIMEOUT: Duration = Duration::from_secs(1800);
 const OUTPUT_LIMIT: usize = 64 * 1024 * 1024;
 const MAX_IDENTIFIER_BYTES: usize = 63;
@@ -57,24 +58,17 @@ impl Endpoint {
             Err(unsupported("当前构建不包含 PostgreSQL。"))
         }
     }
+    #[cfg(feature = "postgres")]
     fn parse_url(connection: &str) -> Result<Self> {
-        #[cfg(feature = "postgres")]
-        {
-            let options = export_doc_storage::postgres_client_parameters(connection)?;
-            Ok(Self {
-                host: options.host,
-                port: options.port,
-                database: options.database,
-                username: options.username,
-                password: zeroize::Zeroizing::new(options.password),
-                ssl_mode: options.ssl_mode,
-            })
-        }
-        #[cfg(not(feature = "postgres"))]
-        {
-            let _ = connection;
-            Err(unsupported("当前构建不包含 PostgreSQL。"))
-        }
+        let options = export_doc_storage::postgres_client_parameters(connection)?;
+        Ok(Self {
+            host: options.host,
+            port: options.port,
+            database: options.database,
+            username: options.username,
+            password: zeroize::Zeroizing::new(options.password),
+            ssl_mode: options.ssl_mode,
+        })
     }
     fn configured(&self) -> bool {
         !self.host.is_empty() && !self.database.is_empty() && !self.username.is_empty()
@@ -95,10 +89,6 @@ impl Endpoint {
             command.env("PGSSLROOTCERT", "system");
         }
     }
-}
-
-fn text(value: &Value, key: &str) -> String {
-    value[key].as_str().unwrap_or("").trim().to_string()
 }
 
 pub(super) fn postgres_root(paths: &RuntimePaths) -> Result<PathBuf> {

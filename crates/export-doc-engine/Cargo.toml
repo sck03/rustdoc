@@ -8,7 +8,6 @@ description = "Rust application services, runtime paths and persistence adapters
 
 [features]
 default = []
-reference-backend = []
 postgres = ["export-doc-storage/postgres"]
 excel = ["dep:export-doc-excel"]
 invoice-transfer = []

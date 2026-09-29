@@ -42,7 +42,6 @@ mod sealed;
 #[cfg(test)]
 mod tests;
 
-#[allow(dead_code)]
 pub const OPERATIONS: &[Operation] = &[
     CREATE_POSTGRE_SQL_PHYSICAL_BACKUP,
     CREATE_POSTGRE_SQL_PHYSICAL_BACKUP_DOWNLOAD_TICKET,
@@ -67,21 +66,17 @@ pub const OPERATIONS: &[Operation] = &[
     TRANSFER_SHARED_DATABASE_OWNERSHIP,
 ];
 /// 灾备包只能由受信任的桌面版创建和恢复；浏览器版请使用服务器迁移包。
-#[allow(dead_code)]
 pub const LOCAL: &[Operation] = &[
     CREATE_DISASTER_RECOVERY_PACKAGE,
     RESTORE_DISASTER_RECOVERY_PACKAGE,
 ];
 /// 上传型操作：上传并恢复 PostgreSQL 物理备份、暂存服务器迁移包。
-#[allow(dead_code)]
 pub const UPLOADS: &[Operation] = &[
     UPLOAD_AND_RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP,
     STAGE_SERVER_MIGRATION_RESTORE,
 ];
 
 const CONFIRM_RESTORE_DATABASE: &str = "RESTORE DATABASE";
-pub(super) const CONFIRM_MIGRATE: &str = "MIGRATE";
-pub(super) const CONFIRM_TRANSFER_OWNERSHIP: &str = "TRANSFER OWNERSHIP";
 const SENSITIVE_TICKET_SECONDS: u64 = 300;
 const DOWNLOAD_TICKET_SECONDS: u64 = 300;
 const CONFIRMATION_HEADER: &str = "X-ExportDocManager-Restore-Confirmation";
@@ -133,9 +128,6 @@ pub(super) fn migration_root(paths: &RuntimePaths) -> Result<PathBuf> {
 }
 pub(super) fn disaster_root(paths: &RuntimePaths) -> Result<PathBuf> {
     directory(paths.data_root.join("DisasterRecovery"))
-}
-pub(super) fn migration_marker(paths: &RuntimePaths) -> Result<PathBuf> {
-    Ok(migration_root(paths)?.join("pending-restore.json"))
 }
 fn directory(path: PathBuf) -> Result<PathBuf> {
     ensure_safe_absolute(&path).map_err(invalid)?;

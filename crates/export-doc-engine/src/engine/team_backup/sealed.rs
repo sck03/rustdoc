@@ -209,9 +209,6 @@ impl ManifestFile {
             sha256: sha256_hex(&bytes),
         })
     }
-    pub(super) fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({"relativePath":self.name,"sizeBytes":self.size_bytes,"sha256":self.sha256})
-    }
 }
 /// 校验解包结果与清单一致（名称、大小、摘要）。
 pub(super) fn verify_manifest(

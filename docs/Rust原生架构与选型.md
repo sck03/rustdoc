@@ -37,6 +37,8 @@ Tauri 是桌面宿主；浏览器与 Docker 不运行 Tauri 窗口。Node 只用
 
 Slint 和 egui 客户端已退役。2026-09-28 按用户清理要求移除本分支重复的 C# 源码、测试、工程、生成器与旧部署；相邻只读工作树和 Git 历史仍提供对照。冻结 OpenAPI、单一窗口参考数据和共用夹具继续用于 Rust 契约验收。
 
+2026-09-30 清除退役客户端残留的 `reference-backend` 回环传输 feature 和未使用的 Runtime 包装；`api::ApiClient` 仅持有进程内 Rust 服务，继续供集成工作流验证。Windows 子进程 Job 对象归入 `controlled_process` 私有平台模块，实际进程树清理机制保留。
+
 ## 通信与运行目录
 
 桌面令牌由 Rust 宿主生成，仅由主窗口受限 IPC 获取，不写 URL 或日志。随机回环端口、精确 Host／Origin 校验、官方 endpoint policy、登录会话与对象权限共同控制桌面访问。网络服务不安装本机文件／进程能力。

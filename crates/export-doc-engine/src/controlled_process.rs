@@ -1,4 +1,7 @@
 //! A bounded native process tree with cancellable pipes. No shell interpolation.
+#[cfg(windows)]
+mod windows_job;
+
 use crate::{api::ApiError, operation};
 use std::{
     io::{Read, Write},
@@ -16,7 +19,7 @@ struct Process {
     child: Child,
     stopped: bool,
     #[cfg(windows)]
-    job: Option<crate::runtime::ProcessJob>,
+    job: Option<windows_job::ProcessJob>,
 }
 impl Process {
     fn stop(&mut self) {
@@ -97,7 +100,7 @@ pub fn run(
     };
     #[cfg(windows)]
     {
-        process.job = Some(crate::runtime::ProcessJob::attach(&process.child).map_err(failure)?);
+        process.job = Some(windows_job::ProcessJob::attach(&process.child).map_err(failure)?);
     }
     let mut stdin = process
         .child

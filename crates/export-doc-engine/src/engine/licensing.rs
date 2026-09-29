@@ -33,7 +33,6 @@ use std::{
 };
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
-#[allow(dead_code)]
 pub const OPERATIONS: &[Operation] = &[
     GET_LICENSE_STATUS,
     REGISTER_LICENSE,
@@ -41,9 +40,6 @@ pub const OPERATIONS: &[Operation] = &[
     SAVE_SUPPORT_PACKAGE_TO_RUNTIME,
     CLEANUP_SYSTEM_LOGS,
 ];
-/// Writing a support package into the managed data root is a desktop-local operation.
-#[allow(dead_code)]
-pub const LOCAL: &[Operation] = &[SAVE_SUPPORT_PACKAGE_TO_RUNTIME];
 const TRIAL_DAYS: i64 = 7;
 const BINDING_VERSION: u8 = 3;
 const SIGNED_PREFIX: &str = "EDM2-";

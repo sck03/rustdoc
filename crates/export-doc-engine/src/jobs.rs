@@ -66,23 +66,6 @@ fn wait(
     }
     result
 }
-pub fn render_pdf(
-    client: &ApiClient,
-    invoice_id: i64,
-    template_path: &str,
-    cancelled: &AtomicBool,
-    progress: &mut impl FnMut(&BackgroundJobSnapshot),
-) -> Result<Vec<u8>, ApiError> {
-    render_report_pdf(
-        client,
-        START_INVOICE_REPORT_PDF_DOWNLOAD_JOB,
-        &[("invoiceId", invoice_id.to_string())],
-        json!({"reportType":"ExportDocument","templatePath":template_path,"withSeal":false}),
-        cancelled,
-        progress,
-    )
-}
-
 pub fn render_report_pdf(
     client: &ApiClient,
     operation: Operation,
