@@ -1,4 +1,6 @@
 use export_doc_storage::{BlobWrite, Connection, ErrorKind, RecordWrite};
+#[path = "support/communication_query.rs"]
+mod communication_query;
 use serde_json::json;
 use std::{
     fs,
@@ -50,6 +52,7 @@ fn sqlite_rejects_earlier_or_duplicate_schema_markers() {
 }
 
 fn roundtrip(connection: &Connection) {
+    communication_query::exercise(connection);
     connection.begin().unwrap();
     connection
         .append_audit_details(

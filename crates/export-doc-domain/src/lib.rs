@@ -1,4 +1,5 @@
 pub use export_doc_contracts::{contracts, generated_api};
+pub mod announcement;
 pub mod crm;
 pub mod designer;
 pub mod history;

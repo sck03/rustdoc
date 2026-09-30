@@ -10,6 +10,7 @@ mod auth;
 mod authorization_tests;
 mod capabilities;
 pub mod catalog;
+pub mod communication;
 mod crm;
 mod crm_dashboard;
 mod custom_options;
@@ -63,6 +64,7 @@ mod personnel;
 mod personnel_files;
 mod personnel_queries;
 mod product_options;
+mod record_documents;
 mod records;
 mod related_records;
 mod report_assets;
@@ -200,8 +202,8 @@ impl NativeService {
             .map_err(|_| unavailable("数据库维护状态异常。"))?;
         let actor = self.sessions.actor(&self.store, token)?;
         self.authorize_operation(&actor, operation, &[])?;
-        if oa::is_download(operation) {
-            return oa::download(self, &actor, operation, parameters);
+        if oa::is_download(operation) || communication::is_download(operation) {
+            return record_documents::download(self, &actor, operation, parameters);
         }
         if operation == DOWNLOAD_PERSONNEL_ATTACHMENT {
             return personnel_files::download(&self.store, &actor, parameters);
@@ -300,6 +302,17 @@ impl NativeService {
             _ => {
                 let actor = self.sessions.actor(&self.store, token)?;
                 self.authorize_operation(&actor, operation, query)?;
+                if communication::metadata(operation).is_some() {
+                    return serde_json::to_vec(&communication::handle(
+                        self,
+                        &actor,
+                        operation,
+                        parameters,
+                        query,
+                        &body_value,
+                    )?)
+                    .map_err(Into::into);
+                }
                 if oa::metadata(operation).is_some() {
                     return serde_json::to_vec(&oa::handle(
                         self,

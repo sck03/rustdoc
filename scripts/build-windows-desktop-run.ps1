@@ -1,7 +1,7 @@
 # Original public Windows entry retained; shared Rust packaging owns the build.
 [CmdletBinding()]
 param(
-    [ValidateSet('All', 'Document', 'Sales')][string]$Edition = 'All',
+    [ValidateSet('All', 'Document', 'Sales', 'Full')][string]$Edition = 'All',
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
     [string]$RustTarget, [string]$OutputDir, [string]$CargoTargetDir,
     [switch]$PreflightOnly, [switch]$SkipMainBuild, [switch]$WithoutOcr, [switch]$NoPause
@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
 if ($env:OS -ne 'Windows_NT') { throw 'This entry requires Windows.' }
 if ($CargoTargetDir) { $env:CARGO_TARGET_DIR = [IO.Path]::GetFullPath($CargoTargetDir) }
-$editions = if ($Edition -eq 'All') { @(Get-ExportDocProductEditionNames) } else { @($Edition) }
+$editions = @(if ($Edition -eq 'All') { Get-ExportDocProductEditionNames } else { $Edition })
 $interactiveLaunch = Test-ExportDocPauseEnabled -NoPauseRequested $NoPause
 try {
     for ($index = 0; $index -lt $editions.Count; $index++) {

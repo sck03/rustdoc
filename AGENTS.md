@@ -27,7 +27,7 @@
 
 ## 2. 项目形态与目录边界
 
-- 2026-09-29 产品定位：桌面单机仅交付 Document 单证版与 Sales 业务员版。单证版为主力，优先完成制单与交付；业务员版定位个人外贸工作台。网页/Docker 多用户 Full 保留完整功能，承接团队协作、行政人事及 OA 审批；不恢复 Full/Administration 单机包，不删除共享业务实现或已有数据。桌面单版构建默认 Document，批量 All 只生成 Document、Sales。
+- 2026-09-30 产品定位：正式桌面交付 Document 单证版与 Sales 业务员版，单证版为主力，Sales 定位个人外贸工作台；网页/Docker 多用户 Full 保留完整功能。按用户本日明确要求，本地脚本另支持显式 `-Edition Full` 生成 **Full + SQLite 单机测试便携包**，用于完整界面布局、公告通知与 OA 登记流程测试，使用独立 Full 目录和测试包身份。默认单版仍为 Document，批量 All/正式发布/安装器仍只生成 Document、Sales；不恢复 Administration 单机包，不删除共享实现或已有数据。Full SQLite 测试不替代 PostgreSQL 多用户权限、并发和部署验收。
 
 - 正式桌面为 `apps/export-doc-tauri`，复用 `apps/export-doc-web` 的原版 React 界面；Tauri 在进程内托管共用 Rust HTTP 适配器与 SQLite 应用服务，不启动 .NET sidecar。Node 仅用于构建，WebView 是明确采用的桌面显示组件。
 - 网页前端继续位于 `apps/export-doc-web`，保留 React 19、原布局和操作；`apps/export-doc-server` 是 Rust HTTP 组合根，团队及 Docker 使用 PostgreSQL 18，不能改用 SQLite 或把数据库账号交给前端。

@@ -32,6 +32,12 @@ fn configure_product_edition() {
     });
     let (edition, metadata) = editions
         .iter()
+        .chain(
+            catalog["localTestEditions"]
+                .as_object()
+                .expect("missing local test editions")
+                .iter(),
+        )
         .find(|(name, _)| name.eq_ignore_ascii_case(requested.trim()))
         .unwrap_or_else(|| panic!("unsupported product edition: {requested}"));
     let product_name = metadata["productName"]

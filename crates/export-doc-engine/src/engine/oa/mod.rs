@@ -1,6 +1,5 @@
 //! Independent office requests. Shared transitions, scoped persistence and files;
 //! no dependency on invoice/payment models, reports or financial software.
-mod files;
 mod validation;
 use super::{
     NativeService, auth,
@@ -10,7 +9,6 @@ use super::{
 };
 use crate::{contracts, generated_api::Operation};
 use export_doc_storage::{Connection, RecordQuery};
-pub(super) use files::{download, upload};
 use serde_json::{Value, json};
 
 pub fn metadata(operation: Operation) -> Option<&'static Value> {
@@ -33,7 +31,7 @@ fn access(actor: &Actor, meta: &Value, row: &Value) -> Result<()> {
     }
     Ok(())
 }
-fn mutable(row: &Value) -> Result<()> {
+pub(super) fn mutable(row: &Value) -> Result<()> {
     if !["Draft", "Rejected"].contains(&text(row, "status").as_str()) {
         return Err(conflict(
             "只有草稿或已驳回的申请可修改，请先撤回待审批申请。",
@@ -41,7 +39,12 @@ fn mutable(row: &Value) -> Result<()> {
     }
     Ok(())
 }
-fn current(tx: &Connection, actor: &Actor, meta: &Value, id: i64) -> Result<(Actor, Value)> {
+pub(super) fn current(
+    tx: &Connection,
+    actor: &Actor,
+    meta: &Value,
+    id: i64,
+) -> Result<(Actor, Value)> {
     let actor = auth::current_actor_in(tx, actor.id, actor.edition)?;
     let row = store::get(tx, &kind(meta), id)?;
     access(&actor, meta, &row)?;
@@ -63,7 +66,7 @@ fn children(
         ..Default::default()
     })?)
 }
-fn project(tx: &Connection, mut row: Value, detail: bool) -> Result<Value> {
+pub(super) fn project(tx: &Connection, mut row: Value, detail: bool) -> Result<Value> {
     row["attachments"] = if detail {
         json!(children(tx, &row, "oa-attachment", 0, 20)?.1)
     } else {
@@ -77,7 +80,7 @@ fn append_event(
     row: &Value,
     action: &str,
     note: &str,
-) -> Result<()> {
+) -> Result<Value> {
     store::save_in_scope(
         tx,
         "oa-event",
@@ -87,10 +90,9 @@ fn append_event(
         actor,
         "oa-event",
         Some(row),
-    )?;
-    Ok(())
+    )
 }
-fn save(
+pub(super) fn save(
     tx: &Connection,
     actor: &Actor,
     meta: &Value,
@@ -111,10 +113,11 @@ fn save(
         action,
         Some(&scope),
     )?;
-    append_event(tx, actor, &saved, action, note)?;
+    let event = append_event(tx, actor, &saved, action, note)?;
+    super::communication::on_event(tx, actor, &saved, &event, meta)?;
     project(tx, saved, true)
 }
-fn paging(query: &[(&str, String)]) -> Result<(i64, i64)> {
+pub(super) fn paging(query: &[(&str, String)]) -> Result<(i64, i64)> {
     let number = |key, default, max| -> Result<i64> {
         query
             .iter()
@@ -232,7 +235,7 @@ pub(super) fn handle(
         }
         store::check_version(&row, store::expected(body))?;
         if action == "delete-attachment" {
-            return files::remove(tx, &actor, meta, row, parameters, body);
+            return super::record_documents::remove(tx, &actor, meta, row, parameters, body);
         }
         if action == "update" {
             mutable(&row)?;

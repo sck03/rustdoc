@@ -12,7 +12,7 @@
 
 Tauri 是桌面宿主；浏览器与 Docker 不运行 Tauri 窗口。Node 只用于前端构建，运行包没有 Node 或 .NET 业务服务。
 
-2026-09-29 起桌面仅交付 Document/单证版与 Sales/业务员版，默认优先单证版；Sales 定位个人外贸工作台。网页/Docker 保留 Full 完整功能，账号、组织、权限及行政人事审批在多用户部署中使用。共享服务和冻结契约保留原版本类型用于行为验证，不据此提供 Full/Administration 单机发布包。
+正式桌面交付 Document/单证版与 Sales/业务员版，默认单证版；网页/Docker Full 用于完整多用户业务。2026-09-30 用户明确增加本地 Full + SQLite 单机测试便携包，复用同一 Tauri + React + Rust 服务，以 `-Edition Full` 单独生成，便于完整布局与流程测试。它在版本清单的 localTestEditions 中独立声明，不进入 All、安装器和正式发布矩阵；Administration 不打包。SQLite 登记流程不代替 PostgreSQL 团队验收。
 
 ## 原版来源与职责
 

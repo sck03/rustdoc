@@ -80,7 +80,7 @@ assert(model.createInitialWorkspaceNavGroupState("/settings").size === 1, "only 
 assert(model.createInitialWorkspaceNavGroupState("/settings").has("system"), "active group starts expanded");
 const navigationItems = model.workspaceNavGroups.flatMap((group) => group.items);
 const routeItems = model.getWorkspaceRouteItems();
-assert(navigationItems.length === 35, "primary navigation includes six request modules and approval center");
+assert(navigationItems.length === 37, "primary navigation includes six request modules, approval center, announcements and notifications");
 const allModules = [...new Set(routeItems.flatMap((item) => item.moduleKey ? [item.moduleKey] : []))];
 const allPermissions = routeItems.flatMap((item) => item.requiredPermissions ?? [])
   .map((requirement) => permissionGrant(requirement.resourceKey, requirement.action));

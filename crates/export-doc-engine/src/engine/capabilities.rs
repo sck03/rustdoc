@@ -38,7 +38,7 @@ impl NativeService {
             )
     }
     pub fn supports(operation: Operation) -> bool {
-        if oa::metadata(operation).is_some() {
+        if oa::metadata(operation).is_some() || communication::metadata(operation).is_some() {
             return true;
         }
         #[cfg(feature = "invoice-transfer")]
@@ -179,8 +179,8 @@ impl NativeService {
                 self, &actor, operation, &metadata, file_name, content,
             );
         }
-        if oa::metadata(operation).is_some() {
-            return oa::upload(
+        if oa::metadata(operation).is_some() || communication::metadata(operation).is_some() {
+            return record_documents::upload(
                 self, &actor, operation, parameters, &metadata, file_name, content,
             );
         }

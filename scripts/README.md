@@ -6,10 +6,10 @@
 
 | 入口 | 用途 |
 | --- | --- |
-| `build-windows-desktop-run.cmd`／`.ps1` | 默认按 Document、Sales 顺序生成两个 Windows 单机便携目录；可用 `-Edition` 选择一版 |
+| `build-windows-desktop-run.cmd`／`.ps1` | 默认生成 Document、Sales；可用 `-Edition Full` 单独生成 Full + SQLite 测试便携包 |
 | `build-windows-installers.cmd`／`.ps1` | 生成 Tauri NSIS 安装器，默认 Document，也可选择 Sales |
 | `build-native.cmd`／`.ps1` | 当前平台 Rust + Tauri + React 便携包；默认 Document，目录 `artifacts/native-desktop/ExportDocManager.Tauri.Document` |
-| `run-native.cmd`／`.ps1` | 默认启动 Document；`-Edition Sales` 启动业务员版，`-AppRoot` 可指定包目录 |
+| `run-native.cmd`／`.ps1` | 默认启动 Document；`-Edition Sales` 或 `-Edition Full` 启动业务员版或 Full SQLite 测试包，`-AppRoot` 可指定包目录 |
 | `package-native-web-server.ps1` | 原版 React 构建、Rust HTTP 服务、报表与可选 OCR 资源；目标数据库 PostgreSQL 18 |
 | `run-native-docker.cmd`／`.ps1` | React + Rust HTTP + PostgreSQL 18 容器构建、启动和停止 |
 
@@ -21,17 +21,31 @@
 
 直接 Cargo 命令、本地打包、实库/界面回归与 GitHub 工作流默认共用仓库 `target/`；不再分别写入 `.codex-runtime/cargo-target-native` 和 `artifacts/cargo-target-native`。`CARGO_TARGET_DIR` 可显式覆盖，相对路径按仓库根解析；公共入口同时把下载缓存和临时目录放入 `.codex-runtime`。手工运行 Cargo 时也应设置仓库内的 `CARGO_HOME`，以复用脚本的下载缓存。`-SkipBuild` 会先检查主程序及所需 OCR 程序，缺失时在创建/改动输出包之前报错；所有文件复制前统一验证来源和目标边界。
 
-Windows 批量入口默认 `-Edition All`；两版共用一次 React 构建和同一 Cargo 输出根，分别编译桌面身份，不复制依赖构建树。默认位于 `artifacts/native-desktop/ExportDocManager.Tauri.Document` 和 `.Sales`。`-OutputDir` 指定包含这两个子目录的父目录；`build-native.ps1 -Edition Sales -OutputRoot <目录>` 则直接指定单版目录。每版保留各自 `App_Data`，不能在同一目录覆盖另一版本。Full/Administration 桌面参数直接拒绝；旧包和旧数据不自动删除、转版或搬入新目录。
+Windows 批量入口默认 `-Edition All`，仅生成 Document、Sales，共用一次 React 构建及 Cargo 输出根。默认目录为 `artifacts/native-desktop/ExportDocManager.Tauri.Document` 和 `.Sales`；显式 `-Edition Full` 只生成 `.Full` 测试目录。`-OutputDir` 指定这些子目录的父目录，单版 `build-native.ps1 -OutputRoot <目录>` 直接指定包目录。每版保留自己的 `App_Data`，不能覆盖另一版本；Administration 参数仍拒绝。
 
-首次进入和登录后使用固定首页：Document 单机与 Full 多用户为单证概览，Sales 单机为销售概览。根地址只负责跳转，不作为单证页面检查权限；账号缺少本版首页权限时显示权限说明，可从导航进入已授权功能，不根据权限列表自动选一个业务页面。
+### 单独生成 Full + SQLite 测试版
+
+在仓库根执行：
+
+```powershell
+.\scripts\build-windows-desktop-run.cmd -Edition Full -NoPause
+.\scripts\run-native.cmd -Edition Full -NoPause
+```
+
+输出 `artifacts/native-desktop/ExportDocManager.Tauri.Full/ExportDocManager.exe`；可直接双击运行，无需安装 PostgreSQL。数据库位于该目录的 `App_Data/Database/exportdoc-native.db`，重新构建保留已有数据。此版采用独立 `com.exportdocmanager.desktop.fulltest` 身份，显示完整单证、销售、行政人事、公告通知及账号权限页面，用于本地界面和流程测试。SQLite 的 OA 使用选择人员、登记批准结果的单机语义，团队本人申请/禁止自批和并发仍须 PostgreSQL 实测。
+
+默认 Release 并包含 OCR 资源；仅检查布局时可加 `-Configuration Debug -WithoutOcr` 生成不含 OCR 的轻量测试包。Full 只通过显式参数生成，不进入 All、正式安装器、GitHub 桌面发布矩阵或自动更新频道。跨平台本地构建可使用 `build-native.ps1 -Edition Full`，每个平台仍需单独验收。
+
+首次进入和登录后使用固定首页：Document 与 Full 为单证概览，Sales 为销售概览。根地址只负责跳转，不作为单证页面检查权限；账号缺少本版首页权限时显示权限说明，可从导航进入已授权功能。
 
 | 版本参数 | 功能范围 | 随包资源 |
 | --- | --- | --- |
 | Document（单机主力） | 单证与申报、报表和相关工具，优先完成制单与交付 | OCR、单证/Excel 模板、PDFium、字体 |
 | Sales（单机） | 个人外贸工作台：客户、联系人、跟进、商机、报价、供应商、邮件及相关工具 | PDFium、字体；不附 OCR 和单证模板 |
 | Full（仅多用户 Web/Docker） | 完整单证、销售、行政、人事、OA 申请审批及账号/组织/权限管理 | OCR、单证/Excel 模板、PDFium、字体、PostgreSQL 客户端 |
+| Full（本地 SQLite 测试） | 完整界面、公告通知及 OA 登记流程验证 | 默认 OCR、单证/Excel 模板、PDFium、字体；不含 PostgreSQL 服务端 |
 
-后端使用官方契约的版本资源目录限制权限，管理员也不能越过产品边界；单机不开放 OA 或账号/组织/权限管理，多用户 Full 通过岗位授权使用完整模块。共用 Rust 库仍包含共享实现，不宣称所有代码均按版本从二进制剔除。安装器使用 `build-windows-installers.ps1 -Edition <Document或Sales>`，Tauri identifier 与更新频道按版本区分；签名更新仍需独立配置和实际升级验收。
+后端按统一版本资源目录限制权限，管理员也不能越过产品边界；Document/Sales 不开放 OA 或账号/组织/权限，Full 多用户及本地测试版开放完整模块并按岗位授权。共用 Rust 库保留共享实现。正式安装器使用 `build-windows-installers.ps1 -Edition <Document或Sales>`，签名更新独立验收。
 
 `-SkipMainBuild`（单版入口为 `-SkipBuild`）只复用 `target/<profile>/editions/<版本>` 下已构建的该版 EXE，校验版本及 SHA-256 构建记录。不会将最后一次 Cargo 输出复制成另一版；缺少记录或校验失败须正常重建。Document 默认提供 OCR，只有显式 `-WithoutOcr` 才生成轻量检查包。
 

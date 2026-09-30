@@ -15,13 +15,18 @@ const openapi = JSON.parse(fs.readFileSync(path.join(repo, 'crates/export-doc-co
 const operations = new Map(Object.entries(openapi.paths).flatMap(([url, methods]) =>
   Object.entries(methods).filter(([, value]) => value.operationId).map(([method, value]) => [value.operationId, { url, method }])));
 const results = [];
+const catalog = { ...productEditionCatalog.editions, ...productEditionCatalog.localTestEditions };
+const selected = process.argv[3] ? [process.argv[3]] : Object.keys(productEditionCatalog.editions);
+assert(selected.every(edition => catalog[edition]), 'Unknown desktop test edition');
+const withoutOcr = process.argv.includes('--without-ocr');
 
-for (const edition of Object.keys(productEditionCatalog.editions)) {
+for (const edition of selected) {
   const name = `ExportDocManager.Tauri.${edition}`;
   const appRoot = path.join(packages, name);
   const marker = JSON.parse(fs.readFileSync(path.join(appRoot, 'exportdoc-native-package.json'), 'utf8'));
   assert.equal(marker.edition, edition);
-  assert.equal(marker.ocr, productEditionCatalog.editions[edition].resourceProfile.ocr);
+  assert.equal(marker.ocr, !withoutOcr && catalog[edition].resourceProfile.ocr);
+  if (edition === 'Full') { assert.equal(marker.localTest, true); assert.equal(marker.database, 'SQLite'); }
   assert.equal(fs.existsSync(path.join(appRoot, 'sidecar/ocr/exportdoc-ocr.exe')), marker.ocr);
   assert.equal(fs.existsSync(path.join(appRoot, 'Resources/ExcelTemplates/invoice-import-template.xlsx')), marker.documentResources);
   const port = await getFreePort();
@@ -66,15 +71,19 @@ for (const edition of Object.keys(productEditionCatalog.editions)) {
     assert.equal(login.body.user.capabilities.productEdition, edition);
     const statuses = {};
     for (const [id, editions] of [
-      ['ListInvoices', ['Document']], ['GetCrmDashboard', ['Sales']],
-      ['ListPersonnel', []], ['ListGeneralRequest', []], ['ListUsers', []],
+      ['ListInvoices', ['Document', 'Full']], ['GetCrmDashboard', ['Sales', 'Full']],
+      ['ListPersonnel', ['Full']], ['ListGeneralRequest', ['Full']], ['ListUsers', ['Full']],
+      ['ListAnnouncements', ['Full']], ['ListNotifications', ['Full']],
     ]) {
       statuses[id] = (await request(id, login.body.accessToken)).status;
       assert.equal(statuses[id], editions.includes(edition) ? 200 : 403, `${edition} ${id}`);
     }
-    const unauthorized = await request('CreatePersonnel', login.body.accessToken, {});
-    assert.equal(unauthorized.status, 403);
-    assert.equal(login.body.user.capabilities.canManageUsers, false);
+    if (edition !== 'Full') {
+      const unauthorized = await request('CreatePersonnel', login.body.accessToken, {});
+      assert.equal(unauthorized.status, 403);
+    }
+    assert.equal(login.body.user.capabilities.canManageUsers, edition === 'Full');
+    assert.equal(login.body.user.capabilities.usesOfficeRegister, true);
     await run("document.querySelector('input[autocomplete=username]').focus()");
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
@@ -88,9 +97,16 @@ for (const edition of Object.keys(productEditionCatalog.editions)) {
     const expectedHome = edition === 'Sales' ? '/crm/dashboard' : '/dashboard';
     assert.equal(await run('location.hash'), `#${expectedHome}`, `${edition}: fixed edition home`);
     assert(!text.includes('当前页面不可用'), `${edition}: first login must not show a permission redirect warning`);
-    assert(text.includes(productEditionCatalog.editions[edition].displayName), `${edition}: wrong product title`);
+    assert(text.includes(catalog[edition].displayName), `${edition}: wrong product title`);
     await captureScreenshot(cdp, path.join(output, `${edition}.png`));
-    assert(!text.includes('人事管理') && !text.includes('行政办公') && !text.includes('账号与权限'));
+    if (edition === 'Full') {
+      assert(text.includes('人事管理') && text.includes('行政办公') && text.includes('公司公告') && text.includes('站内通知'));
+      await run("location.hash='#/office/announcements'; true");
+      const pageDeadline = Date.now() + 15000;
+      while (Date.now() < pageDeadline && !await run("!!document.querySelector('[aria-label=公司公告]')")) await delay(100);
+      assert(await run("!!document.querySelector('[aria-label=公司公告]')"), 'Full SQLite announcement page missing');
+      await captureScreenshot(cdp, path.join(output, `${edition}-announcements.png`));
+    } else { assert(!text.includes('人事管理') && !text.includes('行政办公') && !text.includes('账号与权限')); }
     results.push({ edition, home: expectedHome, ocr: marker.ocr, documentResources: marker.documentResources, statuses, screenshot: `${edition}.png` });
     await run("setTimeout(() => window.__TAURI_INTERNALS__.invoke('request_app_exit'), 100); true");
     const exitDeadline = Date.now() + 50000;
@@ -103,4 +119,4 @@ for (const edition of Object.keys(productEditionCatalog.editions)) {
   }
 }
 fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify(results, null, 2));
-console.log(`Document and Sales Windows desktop editions passed: ${output}`);
+console.log(`${selected.join(', ')} Windows desktop editions passed: ${output}`);

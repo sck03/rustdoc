@@ -31,6 +31,8 @@ try {
   assert.equal(plan.matrix.include.length, 5);
   assert(plan.matrix.include.every(item => item.edition === 'Document'));
   assert.deepEqual(Object.keys(productEditionCatalog.editions), ['Document', 'Sales']);
+  assert.deepEqual(Object.keys(productEditionCatalog.localTestEditions), ['Full']);
+  assert.equal(productEditionCatalog.localTestEditions.Full.resourceProfile.documentResources, true);
   assert.equal(normalizeProductEdition(), 'Document');
   assert.equal(normalizeProductEdition(' sales '), 'Sales');
   const allEditions = createReleasePlan({ ...base, edition: 'All' }).matrix.include;

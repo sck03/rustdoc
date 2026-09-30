@@ -174,7 +174,11 @@ pub fn generate(document: &Value, operations: &[Operation<'_>]) -> Result<(Strin
             )
             .unwrap();
         }
-        contracts.insert(op.id.into(), json!({"policy":op.value["x-exportdoc-policy"], "office":op.value["x-exportdoc-office"], "parameters":op.value.get("parameters").cloned().unwrap_or(json!([])), "requestBody":op.value["requestBody"], "responses":op.value["responses"], "request":request, "response":response}));
+        let mut contract = json!({"policy":op.value["x-exportdoc-policy"], "office":op.value["x-exportdoc-office"], "parameters":op.value.get("parameters").cloned().unwrap_or(json!([])), "requestBody":op.value["requestBody"], "responses":op.value["responses"], "request":request, "response":response});
+        if let Some(metadata) = op.value.get("x-exportdoc-communication") {
+            contract["communication"] = metadata.clone();
+        }
+        contracts.insert(op.id.into(), contract);
     }
     writeln!(
         output,

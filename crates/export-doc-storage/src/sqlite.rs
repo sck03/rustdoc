@@ -111,6 +111,28 @@ impl Sqlite {
     }
 }
 impl Adapter for Sqlite {
+    fn query_communications(&self, q: &CommunicationQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let sql = communication::sql(q, false);
+        let connection = self.connection.borrow();
+        let params = || rusqlite::params_from_iter(sql.values.iter());
+        let count = connection.query_row(
+            &format!("SELECT COUNT(*) FROM records r WHERE {}", sql.filter),
+            params(),
+            |row| row.get(0),
+        )?;
+        let mut statement = connection.prepare(&format!(
+            "SELECT r.body FROM records r WHERE {} ORDER BY {} LIMIT {} OFFSET {}",
+            sql.filter,
+            sql.order,
+            q.limit.clamp(1, 100),
+            q.offset.max(0)
+        ))?;
+        let rows = statement
+            .query_map(params(), |row| row.get::<_, String>(0))?
+            .map(|row| serde_json::from_str(&row?).map_err(Into::into))
+            .collect::<Result<Vec<_>>>()?;
+        Ok((count, rows))
+    }
     fn provider(&self) -> &'static str {
         "SQLite"
     }

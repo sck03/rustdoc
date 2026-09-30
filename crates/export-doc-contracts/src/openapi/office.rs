@@ -1,10 +1,10 @@
 mod schemas;
 use serde_json::{Value, json};
 
-fn reference(name: &str) -> Value {
+pub(super) fn reference(name: &str) -> Value {
     json!({"$ref":format!("#/components/schemas/{name}")})
 }
-fn object(properties: Value, required: &[&str]) -> Value {
+pub(super) fn object(properties: Value, required: &[&str]) -> Value {
     json!({"type":"object","properties":properties,"required":required})
 }
 
@@ -211,7 +211,7 @@ fn permissions(doc: &mut Value, kind: &str, resource: &str, label: &str, group: 
 }
 
 #[allow(clippy::too_many_arguments)]
-fn endpoint(
+pub(super) fn endpoint(
     doc: &mut Value,
     path: &str,
     method: &str,

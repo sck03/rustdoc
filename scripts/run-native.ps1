@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([ValidateSet('Document', 'Sales')][string]$Edition = 'Document', [string]$AppRoot, [switch]$NoPause)
+param([ValidateSet('Document', 'Sales', 'Full')][string]$Edition = 'Document', [string]$AppRoot, [switch]$NoPause)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
 $interactiveLaunch = Test-ExportDocPauseEnabled -NoPauseRequested $NoPause

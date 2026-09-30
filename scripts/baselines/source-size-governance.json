@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 9903,
+      "baselineAggregateLines": 10541,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 10023,
+      "maximumAggregateLines": 10661,
       "reportFiles": false
     },
     {

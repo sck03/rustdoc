@@ -397,6 +397,7 @@ async fn execute(
             } else {
                 if operation == DOWNLOAD_PERSONNEL_ATTACHMENT
                     || export_doc_engine::engine::oa::is_download(operation)
+                    || export_doc_engine::engine::communication::is_download(operation)
                     || [
                         DOWNLOAD_REPORT_TEMPLATE_FILE,
                         DOWNLOAD_REPORT_TEMPLATE_PACKAGE,

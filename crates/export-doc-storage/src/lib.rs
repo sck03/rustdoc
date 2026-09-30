@@ -5,7 +5,9 @@ pub use postgres::tools::{
     ClientParameters as PostgresClientParameters, MaintenanceLease as PostgresMaintenanceLease,
     client_parameters as postgres_client_parameters,
 };
+mod communication;
 mod migrations;
+pub use communication::{CommunicationQuery, CommunicationView, NotificationScope};
 mod sqlite;
 pub use migrations::{MIN_SUPPORTED_SCHEMA_VERSION, SCHEMA_VERSION};
 use serde_json::Value;
@@ -122,6 +124,7 @@ trait Adapter: Send {
     fn find_identity(&self, kind: &str, identity: &str) -> Result<Option<Value>>;
     fn all(&self, kind: &str) -> Result<Vec<Value>>;
     fn query_records(&self, query: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)>;
+    fn query_communications(&self, query: &CommunicationQuery<'_>) -> Result<(i64, Vec<Value>)>;
     fn insert(&self, record: &RecordWrite<'_>) -> Result<i64>;
     fn update(&self, id: i64, expected: i64, record: &RecordWrite<'_>) -> Result<bool>;
     fn set_body(&self, id: i64, body: &Value) -> Result<()>;
@@ -237,6 +240,7 @@ impl Connection {
     }
 }
 delegate! {
+    query_communications(query: &CommunicationQuery<'_>)->(i64, Vec<Value>);
     checkpoint()->();
     get(kind:&str,id:i64)->Option<Value>;
     find_identity(kind:&str,identity:&str)->Option<Value>;

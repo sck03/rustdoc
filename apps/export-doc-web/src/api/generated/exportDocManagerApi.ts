@@ -10,6 +10,70 @@ export interface AISettings {
   systemPrompt: string;
 }
 
+export interface Announcement {
+  attachments: OaAttachment[];
+  audienceDepartment: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+  expectedVersion?: number;
+  expiresAt: string;
+  id: number;
+  isPinned: boolean;
+  publishVersion: number;
+  publishedAt: string;
+  readAt: string;
+  requestKey: string;
+  startsAt: string;
+  status: "Draft" | "Published" | "Withdrawn" | "Archived";
+  title: string;
+  updatedAt: string;
+  versionNumber: number;
+}
+
+export interface AnnouncementDepartment {
+  code: string;
+  name: string;
+}
+
+export type AnnouncementDepartmentList = AnnouncementDepartment[];
+
+export interface AnnouncementPage {
+  items: Announcement[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface AnnouncementRead {
+  publishVersion: number;
+}
+
+export interface AnnouncementReceipt {
+  id: number;
+  publishVersion: number;
+  readAt: string;
+  readerName: string;
+}
+
+export interface AnnouncementReceiptPage {
+  items: AnnouncementReceipt[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface AnnouncementSave {
+  audienceDepartment: string;
+  body: string;
+  expectedVersion?: number;
+  expiresAt: string;
+  isPinned: boolean;
+  requestKey: string;
+  startsAt: string;
+  title: string;
+}
+
 export interface ApiAgentConsignmentDocumentDto {
   agentCode: string;
   codeTS: string;
@@ -3929,6 +3993,17 @@ export interface MeetingRoomSaveRequest {
   requiresKey: boolean;
 }
 
+export interface NotificationCount {
+  unreadCount: number;
+}
+
+export interface NotificationPage {
+  items: SiteNotification[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
 export type NotifyPartyMode = "None" | "SameAsConsignee" | "Separate";
 
 export interface OaAction {
@@ -4688,6 +4763,17 @@ export interface SingleWindowSettings {
   customsCooDefaults: CustomsCooDefaultProfile;
 }
 
+export interface SiteNotification {
+  action: string;
+  createdAt: string;
+  id: number;
+  readAt: string;
+  requestId: number;
+  requestKind: string;
+  status: "Unread" | "Read";
+  title: string;
+}
+
 export interface SupplyRequestCreateRequest {
   employeeId?: number | null;
   officeSupplyId: number;
@@ -5050,6 +5136,11 @@ export interface ApproveTravelRequestRequest {
   body: OaAction;
 }
 
+export interface ArchiveAnnouncementRequest {
+  id: number;
+  body: OaAction;
+}
+
 export interface ArchiveEmailTemplateRequest {
   id: number;
   expectedVersion: number;
@@ -5202,6 +5293,11 @@ export interface CompleteTravelRequestRequest {
   body: OaAction;
 }
 
+export interface ConfirmAnnouncementReadRequest {
+  id: number;
+  body: AnnouncementRead;
+}
+
 export interface ConfirmPersonnelRequest {
   id: number;
   body: PersonnelTransitionRequest;
@@ -5211,6 +5307,10 @@ export interface ConfirmSupplierAssessmentRequest {
   supplierId: number;
   id: number;
   expectedVersion?: number;
+}
+
+export interface CreateAnnouncementRequest {
+  body: AnnouncementSave;
 }
 
 export interface CreateBusinessAttachmentCategoryRequest {
@@ -5395,6 +5495,12 @@ export interface DeactivateSupplierProductLinkRequest {
   supplierId: number;
   id: number;
   body: ApiSupplierLifecycleRequest;
+}
+
+export interface DeleteAnnouncementAttachmentRequest {
+  id: number;
+  attachmentId: number;
+  body: OaAction;
 }
 
 export interface DeleteAttachmentOfExpenseRequestRequest {
@@ -5630,6 +5736,11 @@ export interface DownloadAgentConsignmentSubmitPackageRequest {
   body: ApiSingleWindowSubmitPackageRequest;
 }
 
+export interface DownloadAnnouncementAttachmentRequest {
+  id: number;
+  attachmentId: number;
+}
+
 export interface DownloadAttachmentOfExpenseRequestRequest {
   id: number;
   attachmentId: number;
@@ -5752,6 +5863,10 @@ export interface GetAgentConsignmentDocumentRequest {
 
 export interface GetAgentConsignmentLockedFieldsRequest {
   invoiceId: number;
+}
+
+export interface GetAnnouncementRequest {
+  id: number;
 }
 
 export interface GetBusinessAttachmentRequest {
@@ -6004,6 +6119,18 @@ export interface LinkPersonnelAccountRequest {
   body: PersonnelAccountRequest;
 }
 
+export interface ListAnnouncementReceiptsRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListAnnouncementsRequest {
+  pageNumber?: number;
+  pageSize?: number;
+  unreadOnly?: boolean;
+}
+
 export interface ListAuditLogsRequest {
   pageNumber?: number;
   pageSize?: number;
@@ -6196,6 +6323,12 @@ export interface ListMeetingRoomsRequest {
   pageSize?: number;
 }
 
+export interface ListNotificationsRequest {
+  pageNumber?: number;
+  pageSize?: number;
+  unreadOnly?: boolean;
+}
+
 export interface ListOfficeSuppliesRequest {
   keyword?: string;
   includeInactive?: boolean;
@@ -6357,6 +6490,11 @@ export interface LoginRequest {
   body: ApiLoginRequest;
 }
 
+export interface ManageAnnouncementsRequest {
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 export interface PreviewCrmCustomerImportRequest {
   fileName?: string;
   body: Blob;
@@ -6454,6 +6592,11 @@ export interface PreviewUploadedInvoiceTransferPackageRequest {
   body: Blob;
 }
 
+export interface PublishAnnouncementRequest {
+  id: number;
+  body: OaAction;
+}
+
 export interface PublishEmailTemplateRequest {
   id: number;
   body: ApiEmailTemplateLifecycleRequest;
@@ -6519,6 +6662,10 @@ export interface QuerySuppliersRequest {
   status?: string;
   pageNumber?: number;
   pageSize?: number;
+}
+
+export interface ReadNotificationRequest {
+  id: number;
 }
 
 export interface RecognizeOcrImageRequest {
@@ -7000,6 +7147,11 @@ export interface UnverifyInvoiceRequest {
   body: ApiInvoiceUnverifyRequest;
 }
 
+export interface UpdateAnnouncementRequest {
+  id: number;
+  body: AnnouncementSave;
+}
+
 export interface UpdateBusinessAttachmentRequest {
   id: number;
   body: BusinessAttachmentUpdate;
@@ -7206,6 +7358,11 @@ export interface UploadAndStartPdfMergeDownloadJobRequest {
   body: FormData;
 }
 
+export interface UploadAnnouncementAttachmentRequest {
+  id: number;
+  body: FormData;
+}
+
 export interface UploadAttachmentToExpenseRequestRequest {
   id: number;
   body: FormData;
@@ -7339,6 +7496,11 @@ export interface VoidPurchaseRequestRequest {
 }
 
 export interface VoidTravelRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface WithdrawAnnouncementRequest {
   id: number;
   body: OaAction;
 }
@@ -7528,6 +7690,14 @@ export class ExportDocManagerApiClient {
   public approveTravelRequest(request: ApproveTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/travel-requests/${encodePath(request.id)}/approve`;
     return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public archiveAnnouncement(request: ArchiveAnnouncementRequest, init?: ApiRequestInit): Promise<Announcement> {
+    const path = `/api/office/announcements/${encodePath(request.id)}/archive`;
+    return this.request<Announcement>("POST", path, {
       body: request.body,
       init,
     });
@@ -7801,6 +7971,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public confirmAnnouncementRead(request: ConfirmAnnouncementReadRequest, init?: ApiRequestInit): Promise<Announcement> {
+    const path = `/api/office/announcements/${encodePath(request.id)}/read`;
+    return this.request<Announcement>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public confirmPersonnel(request: ConfirmPersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
     const path = `/api/office/people/${encodePath(request.id)}/confirm`;
     return this.request<PersonnelRecord>("POST", path, {
@@ -7815,6 +7993,14 @@ export class ExportDocManagerApiClient {
       query: {
         "expectedVersion": request.expectedVersion,
       },
+      init,
+    });
+  }
+
+  public createAnnouncement(request: CreateAnnouncementRequest, init?: ApiRequestInit): Promise<Announcement> {
+    const path = "/api/office/announcements";
+    return this.request<Announcement>("POST", path, {
+      body: request.body,
       init,
     });
   }
@@ -8175,6 +8361,14 @@ export class ExportDocManagerApiClient {
   public deactivateSupplierProductLink(request: DeactivateSupplierProductLinkRequest, init?: ApiRequestInit): Promise<ApiSupplierProductLinkDto> {
     const path = `/api/suppliers/${encodePath(request.supplierId)}/products/${encodePath(request.id)}/deactivate`;
     return this.request<ApiSupplierProductLinkDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deleteAnnouncementAttachment(request: DeleteAnnouncementAttachmentRequest, init?: ApiRequestInit): Promise<Announcement> {
+    const path = `/api/office/announcements/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<Announcement>("DELETE", path, {
       body: request.body,
       init,
     });
@@ -8552,6 +8746,11 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public downloadAnnouncementAttachment(request: DownloadAnnouncementAttachmentRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/announcements/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
   public downloadAttachmentOfExpenseRequest(request: DownloadAttachmentOfExpenseRequestRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = `/api/office/expense-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return this.request<Blob>("GET", path, { init });
@@ -8744,6 +8943,11 @@ export class ExportDocManagerApiClient {
     return this.request<ApiSingleWindowLockedFieldsResponse>("GET", path, { init });
   }
 
+  public getAnnouncement(request: GetAnnouncementRequest, init?: ApiRequestInit): Promise<Announcement> {
+    const path = `/api/office/announcements/${encodePath(request.id)}`;
+    return this.request<Announcement>("GET", path, { init });
+  }
+
   public getBusinessAttachment(request: GetBusinessAttachmentRequest, init?: ApiRequestInit): Promise<BusinessAttachmentDetails> {
     const path = `/api/business-attachments/${encodePath(request.id)}`;
     return this.request<BusinessAttachmentDetails>("GET", path, { init });
@@ -8894,6 +9098,11 @@ export class ExportDocManagerApiClient {
       },
       init,
     });
+  }
+
+  public getNotificationUnreadCount(init?: ApiRequestInit): Promise<NotificationCount> {
+    const path = "/api/office/notifications/unread-count";
+    return this.request<NotificationCount>("GET", path, { init });
   }
 
   public getOfficeStockHistory(request: GetOfficeStockHistoryRequest, init?: ApiRequestInit): Promise<PagedResultOfOfficeStockMovementRecord> {
@@ -9214,6 +9423,34 @@ export class ExportDocManagerApiClient {
     const path = `/api/office/people/${encodePath(request.id)}/account`;
     return this.request<PersonnelRecord>("POST", path, {
       body: request.body,
+      init,
+    });
+  }
+
+  public listAnnouncementDepartments(init?: ApiRequestInit): Promise<AnnouncementDepartmentList> {
+    const path = "/api/office/announcements/departments";
+    return this.request<AnnouncementDepartmentList>("GET", path, { init });
+  }
+
+  public listAnnouncementReceipts(request: ListAnnouncementReceiptsRequest, init?: ApiRequestInit): Promise<AnnouncementReceiptPage> {
+    const path = `/api/office/announcements/${encodePath(request.id)}/receipts`;
+    return this.request<AnnouncementReceiptPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listAnnouncements(request: ListAnnouncementsRequest = {}, init?: ApiRequestInit): Promise<AnnouncementPage> {
+    const path = "/api/office/announcements";
+    return this.request<AnnouncementPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "unreadOnly": request.unreadOnly,
+      },
       init,
     });
   }
@@ -9600,6 +9837,18 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listNotifications(request: ListNotificationsRequest = {}, init?: ApiRequestInit): Promise<NotificationPage> {
+    const path = "/api/office/notifications";
+    return this.request<NotificationPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "unreadOnly": request.unreadOnly,
+      },
+      init,
+    });
+  }
+
   public listOfficeSupplies(request: ListOfficeSuppliesRequest = {}, init?: ApiRequestInit): Promise<PagedResultOfOfficeSupplyRecord> {
     const path = "/api/office/supplies";
     return this.request<PagedResultOfOfficeSupplyRecord>("GET", path, {
@@ -9915,6 +10164,17 @@ export class ExportDocManagerApiClient {
     return this.request<ApiLogoutResponse>("POST", path, { init });
   }
 
+  public manageAnnouncements(request: ManageAnnouncementsRequest = {}, init?: ApiRequestInit): Promise<AnnouncementPage> {
+    const path = "/api/office/announcements/manage";
+    return this.request<AnnouncementPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
   public previewCrmCustomerImport(request: PreviewCrmCustomerImportRequest, init?: ApiRequestInit): Promise<ApiCrmCustomerImportPreviewDto> {
     const path = "/api/crm/import/preview";
     return this.request<ApiCrmCustomerImportPreviewDto>("POST", path, {
@@ -10095,6 +10355,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public publishAnnouncement(request: PublishAnnouncementRequest, init?: ApiRequestInit): Promise<Announcement> {
+    const path = `/api/office/announcements/${encodePath(request.id)}/publish`;
+    return this.request<Announcement>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public publishEmailTemplate(request: PublishEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
     const path = `/api/email-templates/${encodePath(request.id)}/publish`;
     return this.request<ApiEmailTemplateDto>("POST", path, {
@@ -10214,6 +10482,16 @@ export class ExportDocManagerApiClient {
       },
       init,
     });
+  }
+
+  public readAllNotifications(init?: ApiRequestInit): Promise<NotificationCount> {
+    const path = "/api/office/notifications/read-all";
+    return this.request<NotificationCount>("POST", path, { init });
+  }
+
+  public readNotification(request: ReadNotificationRequest, init?: ApiRequestInit): Promise<SiteNotification> {
+    const path = `/api/office/notifications/${encodePath(request.id)}/read`;
+    return this.request<SiteNotification>("POST", path, { init });
   }
 
   public recognizeOcrImage(request: RecognizeOcrImageRequest, init?: ApiRequestInit): Promise<ApiOcrRecognizeImageResponse> {
@@ -11083,6 +11361,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public updateAnnouncement(request: UpdateAnnouncementRequest, init?: ApiRequestInit): Promise<Announcement> {
+    const path = `/api/office/announcements/${encodePath(request.id)}`;
+    return this.request<Announcement>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public updateBusinessAttachment(request: UpdateBusinessAttachmentRequest, init?: ApiRequestInit): Promise<BusinessAttachmentRecord> {
     const path = `/api/business-attachments/${encodePath(request.id)}`;
     return this.request<BusinessAttachmentRecord>("PUT", path, {
@@ -11421,6 +11707,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public uploadAnnouncementAttachment(request: UploadAnnouncementAttachmentRequest, init?: ApiRequestInit): Promise<Announcement> {
+    const path = `/api/office/announcements/${encodePath(request.id)}/attachments`;
+    return this.request<Announcement>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public uploadAttachmentToExpenseRequest(request: UploadAttachmentToExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/expense-requests/${encodePath(request.id)}/attachments`;
     return this.request<OaRequest>("POST", path, {
@@ -11658,6 +11952,14 @@ export class ExportDocManagerApiClient {
   public voidTravelRequest(request: VoidTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/travel-requests/${encodePath(request.id)}/void`;
     return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public withdrawAnnouncement(request: WithdrawAnnouncementRequest, init?: ApiRequestInit): Promise<Announcement> {
+    const path = `/api/office/announcements/${encodePath(request.id)}/withdraw`;
+    return this.request<Announcement>("POST", path, {
       body: request.body,
       init,
     });

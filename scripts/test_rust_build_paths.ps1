@@ -8,12 +8,20 @@ function Assert-Equal($actual, $expected) { if ($actual -ne $expected) { throw "
 try {
     New-Item -ItemType Directory -Path $fixture | Out-Null
     Assert-Equal ((Get-ExportDocProductEditionNames) -join ',') 'Document,Sales'
-    foreach ($edition in @('Full', 'Administration')) {
+    Assert-Equal ((Get-ExportDocProductEditionNames -IncludeLocalTests) -join ',') 'Document,Sales,Full'
+    Assert-Equal (Resolve-ExportDocProductEdition -Edition 'full' -IncludeLocalTests) 'Full'
+    if ($IsWindows) {
+        $message = & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'build-windows-desktop-run.ps1') -Edition Full -PreflightOnly -NoPause 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0 -or $message -notmatch 'Desktop/backend build uses Rust') { throw "Single-edition Full dispatch failed: $message" }
+    }
+    foreach ($edition in @('Administration')) {
         foreach ($script in @('build-native.ps1', 'build-windows-desktop-run.ps1', 'build-windows-installers.ps1', 'run-native.ps1')) {
             $message = & pwsh -NoProfile -File (Join-Path $PSScriptRoot $script) -Edition $edition -NoPause 2>&1 | Out-String
             if ($LASTEXITCODE -eq 0 -or $message -notmatch 'Edition') { throw "Retired desktop edition accepted: $script $edition" }
         }
     }
+    $message = & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'build-windows-installers.ps1') -Edition Full -NoPause 2>&1 | Out-String
+    if ($LASTEXITCODE -eq 0 -or $message -notmatch 'Edition') { throw 'Local Full testing must not enter installer releases.' }
     $env:CARGO_TARGET_DIR = ''
     Assert-Equal (Get-ExportDocCargoTargetDirectory $repo) (Join-Path $repo 'target')
     $env:CARGO_TARGET_DIR = '.codex-runtime/custom build'
@@ -42,8 +50,10 @@ try {
     [IO.File]::AppendAllText($binary, 'changed')
     $message = & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'build-native.ps1') -SkipBuild -WithoutOcr -NoPause -OutputRoot $output 2>&1 | Out-String
     if ($LASTEXITCODE -eq 0 -or $message -notmatch 'does not match its build receipt') { throw 'Modified edition binary was accepted' }
-    $message = & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'build-native.ps1') -Edition Sales -SkipBuild -NoPause -OutputRoot $output 2>&1 | Out-String
-    if ($LASTEXITCODE -eq 0 -or $message -notmatch 'SkipBuild requires existing binaries') { throw 'Document build must not be reused as Sales' }
+    foreach ($edition in @('Sales', 'Full')) {
+        $message = & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'build-native.ps1') -Edition $edition -SkipBuild -NoPause -OutputRoot $output 2>&1 | Out-String
+        if ($LASTEXITCODE -eq 0 -or $message -notmatch 'SkipBuild requires existing binaries') { throw "Document build must not be reused as $edition" }
+    }
     if (Test-Path -LiteralPath $output) { throw 'Invalid edition must not create a package' }
     $good = Join-Path $fixture 'input.txt'
     [IO.File]::WriteAllText($good, 'new')

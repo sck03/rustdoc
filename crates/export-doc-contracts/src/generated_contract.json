@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "1085b838fe4e6c9f50b9e145c5ed3e4b7898509aeb99be6ed61789f0ef9f564f",
+  "digest": "9f2cc673fc561d30015f5a775e8c42456175f02e3872e120c6fbe001f137705e",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -2249,6 +2249,58 @@
             "navigationAccessLevel": "manage"
           }
         ]
+      },
+      {
+        "key": "office.announcements",
+        "name": "公司公告",
+        "group": "行政办公",
+        "workspace": "office",
+        "moduleKey": "office.announcements",
+        "sortOrder": 410,
+        "isTechnical": false,
+        "supportsDataScope": false,
+        "actions": [
+          {
+            "key": "view",
+            "name": "阅读与确认",
+            "description": "阅读与确认",
+            "sortOrder": 0,
+            "navigationAccessLevel": "view"
+          },
+          {
+            "key": "manage",
+            "name": "发布管理",
+            "description": "发布管理",
+            "sortOrder": 10,
+            "navigationAccessLevel": "manage"
+          },
+          {
+            "key": "receipts",
+            "name": "回执统计",
+            "description": "回执统计",
+            "sortOrder": 20,
+            "navigationAccessLevel": "manage"
+          }
+        ]
+      },
+      {
+        "key": "office.notifications",
+        "name": "站内通知",
+        "group": "行政办公",
+        "workspace": "office",
+        "moduleKey": "office.notifications",
+        "sortOrder": 420,
+        "isTechnical": false,
+        "supportsDataScope": false,
+        "actions": [
+          {
+            "key": "view",
+            "name": "个人收件箱",
+            "description": "个人收件箱",
+            "sortOrder": 0,
+            "navigationAccessLevel": "view"
+          }
+        ]
       }
     ],
     "modules": [
@@ -2538,6 +2590,22 @@
         "group": "行政办公",
         "workspace": "office",
         "sortOrder": 400,
+        "isTechnical": false
+      },
+      {
+        "key": "office.announcements",
+        "name": "公司公告",
+        "group": "行政办公",
+        "workspace": "office",
+        "sortOrder": 410,
+        "isTechnical": false
+      },
+      {
+        "key": "office.notifications",
+        "name": "站内通知",
+        "group": "行政办公",
+        "workspace": "office",
+        "sortOrder": 420,
         "isTechnical": false
       }
     ],
@@ -3541,6 +3609,26 @@
             "resourceKey": "office.general",
             "action": "complete",
             "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "manage",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "receipts",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.notifications",
+            "action": "view",
+            "dataScope": "company"
           }
         ]
       },
@@ -3908,6 +3996,16 @@
             "resourceKey": "office.general",
             "action": "cancel",
             "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.notifications",
+            "action": "view",
+            "dataScope": "company"
           }
         ]
       },
@@ -4230,6 +4328,16 @@
             "resourceKey": "office.general",
             "action": "cancel",
             "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.notifications",
+            "action": "view",
+            "dataScope": "company"
           }
         ]
       },
@@ -4667,6 +4775,16 @@
             "resourceKey": "office.general",
             "action": "cancel",
             "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.notifications",
+            "action": "view",
+            "dataScope": "company"
           }
         ]
       },
@@ -4929,6 +5047,16 @@
             "resourceKey": "office.general",
             "action": "cancel",
             "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.notifications",
+            "action": "view",
+            "dataScope": "company"
           }
         ]
       },
@@ -5106,6 +5234,16 @@
             "resourceKey": "office.general",
             "action": "cancel",
             "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.notifications",
+            "action": "view",
+            "dataScope": "company"
           }
         ]
       },
@@ -5368,6 +5506,26 @@
             "resourceKey": "office.general",
             "action": "complete",
             "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "manage",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "receipts",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.notifications",
+            "action": "view",
+            "dataScope": "company"
           }
         ]
       },
@@ -5590,6 +5748,16 @@
             "resourceKey": "office.general",
             "action": "cancel",
             "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.notifications",
+            "action": "view",
+            "dataScope": "company"
           }
         ]
       }
@@ -6599,7 +6767,9 @@
         "office.expenses",
         "office.travel",
         "office.purchase",
-        "office.general"
+        "office.general",
+        "office.announcements",
+        "office.notifications"
       ],
       "Administration": [
         "system.about",
@@ -7940,6 +8110,148 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
+      }
+    },
+    "ArchiveAnnouncement": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OaAction"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Announcement"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/OaAction"
+      },
+      "response": {
+        "$ref": "#/components/schemas/Announcement"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "archive",
+        "resource": "office.announcements",
+        "permission": "manage"
       }
     },
     "ArchiveEmailTemplate": {
@@ -11322,6 +11634,148 @@
         "$ref": "#/components/schemas/OaRequest"
       }
     },
+    "ConfirmAnnouncementRead": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "view"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AnnouncementRead"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Announcement"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/AnnouncementRead"
+      },
+      "response": {
+        "$ref": "#/components/schemas/Announcement"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "read",
+        "resource": "office.announcements",
+        "permission": "view"
+      }
+    },
     "ConfirmPersonnel": {
       "policy": {
         "requiresAuthentication": true,
@@ -11527,6 +11981,137 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSupplierAssessmentDto"
+      }
+    },
+    "CreateAnnouncement": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AnnouncementSave"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Announcement"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/AnnouncementSave"
+      },
+      "response": {
+        "$ref": "#/components/schemas/Announcement"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "create",
+        "resource": "office.announcements",
+        "permission": "manage"
       }
     },
     "CreateBusinessAttachmentCategory": {
@@ -15344,6 +15929,158 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierProductLinkDto"
+      }
+    },
+    "DeleteAnnouncementAttachment": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "attachmentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OaAction"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Announcement"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/OaAction"
+      },
+      "response": {
+        "$ref": "#/components/schemas/Announcement"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "delete-attachment",
+        "resource": "office.announcements",
+        "permission": "manage"
       }
     },
     "DeleteAttachmentOfExpenseRequest": {
@@ -19673,6 +20410,146 @@
       },
       "response": null
     },
+    "DownloadAnnouncementAttachment": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "view"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "attachmentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": null,
+      "communication": {
+        "kind": "announcement",
+        "action": "download",
+        "resource": "office.announcements",
+        "permission": "view"
+      }
+    },
     "DownloadAttachmentOfExpenseRequest": {
       "policy": {
         "requiresAuthentication": true,
@@ -21924,6 +22801,137 @@
         "$ref": "#/components/schemas/ApiSingleWindowLockedFieldsResponse"
       }
     },
+    "GetAnnouncement": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "view"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Announcement"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/Announcement"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "get",
+        "resource": "office.announcements",
+        "permission": "view"
+      }
+    },
     "GetBusinessAttachment": {
       "policy": {
         "requiresAuthentication": true,
@@ -23839,6 +24847,126 @@
         "items": {
           "$ref": "#/components/schemas/MeetingBusySlot"
         }
+      }
+    },
+    "GetNotificationUnreadCount": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.notifications",
+            "action": "view"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationCount"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/NotificationCount"
+      },
+      "communication": {
+        "kind": "notification",
+        "action": "unread-count",
+        "resource": "office.notifications",
+        "permission": "view"
       }
     },
     "GetOfficeStockHistory": {
@@ -27472,6 +28600,417 @@
         "$ref": "#/components/schemas/PersonnelRecord"
       }
     },
+    "ListAnnouncementDepartments": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementDepartmentList"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/AnnouncementDepartmentList"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "departments",
+        "resource": "office.announcements",
+        "permission": "manage"
+      }
+    },
+    "ListAnnouncementReceipts": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "receipts"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "pageNumber",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "pageSize",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementReceiptPage"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/AnnouncementReceiptPage"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "receipts",
+        "resource": "office.announcements",
+        "permission": "receipts"
+      }
+    },
+    "ListAnnouncements": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "view"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "pageNumber",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "pageSize",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "unreadOnly",
+          "in": "query",
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementPage"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/AnnouncementPage"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "list",
+        "resource": "office.announcements",
+        "permission": "view"
+      }
+    },
     "ListAuditLogs": {
       "policy": {
         "requiresAuthentication": true,
@@ -30742,6 +32281,150 @@
         "$ref": "#/components/schemas/PagedResultOfMeetingRoomRecord"
       }
     },
+    "ListNotifications": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.notifications",
+            "action": "view"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "pageNumber",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "pageSize",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "unreadOnly",
+          "in": "query",
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationPage"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/NotificationPage"
+      },
+      "communication": {
+        "kind": "notification",
+        "action": "inbox",
+        "resource": "office.notifications",
+        "permission": "view"
+      }
+    },
     "ListOfficeSupplies": {
       "policy": {
         "requiresAuthentication": true,
@@ -33330,6 +35013,143 @@
         "$ref": "#/components/schemas/ApiLogoutResponse"
       }
     },
+    "ManageAnnouncements": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "pageNumber",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "pageSize",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementPage"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/AnnouncementPage"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "manage-list",
+        "resource": "office.announcements",
+        "permission": "manage"
+      }
+    },
     "PreviewCrmCustomerImport": {
       "policy": {
         "requiresAuthentication": true,
@@ -34698,6 +36518,148 @@
         "$ref": "#/components/schemas/ApiInvoiceTransferPreviewResponse"
       }
     },
+    "PublishAnnouncement": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OaAction"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Announcement"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/OaAction"
+      },
+      "response": {
+        "$ref": "#/components/schemas/Announcement"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "publish",
+        "resource": "office.announcements",
+        "permission": "manage"
+      }
+    },
     "PublishEmailTemplate": {
       "policy": {
         "requiresAuthentication": true,
@@ -35656,6 +37618,257 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiSupplierDto"
+      }
+    },
+    "ReadAllNotifications": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.notifications",
+            "action": "view"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationCount"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/NotificationCount"
+      },
+      "communication": {
+        "kind": "notification",
+        "action": "read-all",
+        "resource": "office.notifications",
+        "permission": "view"
+      }
+    },
+    "ReadNotification": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.notifications",
+            "action": "view"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteNotification"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/SiteNotification"
+      },
+      "communication": {
+        "kind": "notification",
+        "action": "notification-read",
+        "resource": "office.notifications",
+        "permission": "view"
       }
     },
     "RecognizeOcrImage": {
@@ -44259,6 +46472,148 @@
         "$ref": "#/components/schemas/ApiInvoiceSaveResponse"
       }
     },
+    "UpdateAnnouncement": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AnnouncementSave"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Announcement"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/AnnouncementSave"
+      },
+      "response": {
+        "$ref": "#/components/schemas/Announcement"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "update",
+        "resource": "office.announcements",
+        "permission": "manage"
+      }
+    },
     "UpdateBusinessAttachment": {
       "policy": {
         "requiresAuthentication": true,
@@ -48172,6 +50527,160 @@
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
       }
     },
+    "UploadAnnouncementAttachment": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "multipart/form-data": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "file": {
+                  "type": "string",
+                  "format": "binary"
+                },
+                "expectedVersion": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              },
+              "required": [
+                "file",
+                "expectedVersion"
+              ]
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Announcement"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/Announcement"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "upload",
+        "resource": "office.announcements",
+        "permission": "manage"
+      }
+    },
     "UploadAttachmentToExpenseRequest": {
       "policy": {
         "requiresAuthentication": true,
@@ -51147,6 +53656,148 @@
         "$ref": "#/components/schemas/OaRequest"
       }
     },
+    "WithdrawAnnouncement": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OaAction"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Announcement"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/OaAction"
+      },
+      "response": {
+        "$ref": "#/components/schemas/Announcement"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "withdraw",
+        "resource": "office.announcements",
+        "permission": "manage"
+      }
+    },
     "WithdrawExpenseRequest": {
       "policy": {
         "requiresAuthentication": true,
@@ -52020,6 +54671,263 @@
           "type": "string"
         }
       }
+    },
+    "Announcement": {
+      "type": "object",
+      "properties": {
+        "requestKey": {
+          "type": "string"
+        },
+        "expectedVersion": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "audienceDepartment": {
+          "type": "string"
+        },
+        "isPinned": {
+          "type": "boolean"
+        },
+        "startsAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "versionNumber": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "publishVersion": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Draft",
+            "Published",
+            "Withdrawn",
+            "Archived"
+          ]
+        },
+        "authorName": {
+          "type": "string"
+        },
+        "publishedAt": {
+          "type": "string"
+        },
+        "readAt": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/OaAttachment"
+          }
+        }
+      },
+      "required": [
+        "requestKey",
+        "title",
+        "body",
+        "audienceDepartment",
+        "isPinned",
+        "startsAt",
+        "expiresAt",
+        "id",
+        "versionNumber",
+        "publishVersion",
+        "status",
+        "authorName",
+        "publishedAt",
+        "readAt",
+        "createdAt",
+        "updatedAt",
+        "attachments"
+      ]
+    },
+    "AnnouncementDepartment": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "name"
+      ]
+    },
+    "AnnouncementDepartmentList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/AnnouncementDepartment"
+      }
+    },
+    "AnnouncementPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Announcement"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "items",
+        "totalCount",
+        "pageNumber",
+        "pageSize"
+      ]
+    },
+    "AnnouncementRead": {
+      "type": "object",
+      "properties": {
+        "publishVersion": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "publishVersion"
+      ]
+    },
+    "AnnouncementReceipt": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "readerName": {
+          "type": "string"
+        },
+        "publishVersion": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "readAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "readerName",
+        "publishVersion",
+        "readAt"
+      ]
+    },
+    "AnnouncementReceiptPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/AnnouncementReceipt"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "items",
+        "totalCount",
+        "pageNumber",
+        "pageSize"
+      ]
+    },
+    "AnnouncementSave": {
+      "type": "object",
+      "properties": {
+        "requestKey": {
+          "type": "string"
+        },
+        "expectedVersion": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "audienceDepartment": {
+          "type": "string"
+        },
+        "isPinned": {
+          "type": "boolean"
+        },
+        "startsAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "requestKey",
+        "title",
+        "body",
+        "audienceDepartment",
+        "isPinned",
+        "startsAt",
+        "expiresAt"
+      ]
     },
     "ApiAgentConsignmentDocumentDto": {
       "required": [
@@ -69998,6 +72906,47 @@
         }
       }
     },
+    "NotificationCount": {
+      "type": "object",
+      "properties": {
+        "unreadCount": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "unreadCount"
+      ]
+    },
+    "NotificationPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/SiteNotification"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "items",
+        "totalCount",
+        "pageNumber",
+        "pageSize"
+      ]
+    },
     "NotifyPartyMode": {
       "enum": [
         "None",
@@ -73615,6 +76564,52 @@
           "$ref": "#/components/schemas/CustomsCooDefaultProfile"
         }
       }
+    },
+    "SiteNotification": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "title": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "requestId": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "requestKind": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "readAt": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Unread",
+            "Read"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "action",
+        "requestId",
+        "requestKind",
+        "createdAt",
+        "readAt",
+        "status"
+      ]
     },
     "SupplyRequestCreateRequest": {
       "required": [

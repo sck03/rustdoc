@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Document', 'Sales')][string]$Edition = 'Document',
+    [ValidateSet('Document', 'Sales', 'Full')][string]$Edition = 'Document',
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
     [string]$OutputRoot,
     [string]$PdfiumPath,
@@ -16,8 +16,14 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
 . (Join-Path $PSScriptRoot 'lib/native-package-resources.ps1')
-$Edition = Resolve-ExportDocProductEdition -Edition $Edition
-$editionMetadata = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'product-editions.json') -Raw | ConvertFrom-Json).editions.$Edition
+$Edition = Resolve-ExportDocProductEdition -Edition $Edition -IncludeLocalTests
+$editionCatalog = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'product-editions.json') -Raw | ConvertFrom-Json
+$editionMetadata = $editionCatalog.editions.$Edition
+$localTest = $null -eq $editionMetadata
+if ($localTest) {
+    $editionMetadata = $editionCatalog.localTestEditions.$Edition
+    if ($Bundles) { throw 'Full SQLite testing uses a portable package; omit -Bundles.' }
+}
 $WithoutOcr = $WithoutOcr -or -not $editionMetadata.resourceProfile.ocr
 $env:EXPORTDOCMANAGER_PRODUCT_EDITION = $Edition
 $env:TAURI_CONFIG = @{ identifier = $editionMetadata.identifier; productName = $editionMetadata.productName } | ConvertTo-Json -Compress
@@ -112,6 +118,7 @@ $packageMarker = [ordered]@{
     version = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'version.json') -Raw | ConvertFrom-Json).version
     configuration = $Configuration; backend = 'Rust'; frontend = 'Tauri'; webView = $true; ocr = (-not $WithoutOcr)
     edition = $Edition; productName = $editionMetadata.productName; documentResources = $editionMetadata.resourceProfile.documentResources
+    localTest = $localTest; database = 'SQLite'
     builtAt = [DateTimeOffset]::UtcNow.ToString('o')
 }
 $packageMarker | ConvertTo-Json | Set-Content -LiteralPath $marker -Encoding utf8
