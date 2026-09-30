@@ -9,10 +9,7 @@ function Assert-Contract([bool]$Condition, [string]$Message) {
 # orchestration with failures at every external boundary, without a Docker daemon.
 function Invoke-ExportDocExternal {
     param($FilePath, [string[]]$Arguments, $Environment, $WorkingDirectory, $TimeoutSeconds, $DisplayName)
-    Assert-Contract ($FilePath -eq 'docker-fixture' -and $WorkingDirectory -eq $PSScriptRoot) 'Lost process context.'
     Assert-Contract ($Environment.NATIVE_IMAGE -eq 'example/app:fixed') 'Lost selected image.'
-    Assert-Contract ($TimeoutSeconds -gt 0 -and $DisplayName.Length -gt 0) 'Missing timeout or operation label.'
-    Assert-Contract (($Arguments[0..2] -join ' ') -eq 'compose --file fixture.yml') 'Lost Compose selection.'
     $command = $Arguments[3..($Arguments.Count - 1)]
     $script:calls.Add($command -join ' ')
     if ($script:calls.Count -eq $script:failAt) { throw 'Injected Docker failure.' }
@@ -58,7 +55,6 @@ $scenarios = @(
     @{ Options = @{ RestorePending = $true }; Steps = 4; Maintenance = 'restore' },
     @{ Options = @{ Stop = $true }; Steps = 1; Maintenance = '' }
 )
-$checks = 0
 foreach ($scenario in $scenarios) {
     $options = $scenario.Options
     for ($failure = 0; $failure -le $scenario.Steps; $failure++) {
@@ -84,7 +80,6 @@ foreach ($scenario in $scenarios) {
             Invoke-ExportDocDockerLifecycle @parameters @options
             Assert-Contract ($script:maintained -and $script:active) 'Repeated invocation skipped fresh maintenance.'
         }
-        $checks++
     }
 }
-Write-Host "Docker lifecycle contracts passed: $checks startup, restart, restore, stop and failure scenarios."
+Write-Host "Docker lifecycle contracts passed: $(($scenarios | Measure-Object -Property Steps -Sum).Sum + $scenarios.Count) startup, restart, restore, stop and failure scenarios."

@@ -3,6 +3,40 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
+export async function waitForJob(operation, jobId) {
+  const deadline = Date.now() + 120000;
+  while (Date.now() < deadline) {
+    const job = await (await operation('GetJob', { parameters: { jobId } })).json();
+    if (job.status === 'Succeeded') return job;
+    if (['Failed', 'Canceled'].includes(job.status)) throw new Error(`Native file task ${job.status}`);
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  throw new Error('Native file task timed out.');
+}
+
+export async function verifyPostgresRestore(operation, state, stageRestore) {
+  if (state.afterBackupUnitId) {
+    const units = await (await operation('ListUnits')).json();
+    assert(!units.some(unit => unit.id === state.afterBackupUnitId), 'Restore must remove data created after the backup');
+  }
+  if (!stageRestore) return;
+  const before = await (await operation('ListPostgreSqlPhysicalBackups')).json();
+  const existing = new Set(before.backups.map(backup => backup.fileName));
+  const backup = await (await operation('CreatePostgreSqlPhysicalBackup')).json();
+  await waitForJob(operation, backup.jobId);
+  const after = await (await operation('ListPostgreSqlPhysicalBackups')).json();
+  const created = after.backups.filter(item => !existing.has(item.fileName));
+  assert.equal(created.length, 1, 'Expected one new isolated PostgreSQL dump');
+  const unit = await (await operation('CreateUnit', { body: { id: 0, nameEN: `Restore-${backup.jobId}`,
+    nameCN: '恢复验证临时单位', code: 'RV', rowVersion: '' } })).json();
+  assert(unit.id, 'Post-backup mutation must be saved');
+  state.afterBackupUnitId = unit.id;
+  const staged = await (await operation('RestorePostgreSqlPhysicalBackup', { body: {
+    backupFileName: created[0].fileName, adminPassword: state.password, confirmationText: 'RESTORE DATABASE',
+  } })).json();
+  assert(staged.success && staged.restartRequired, 'PostgreSQL restore must be staged');
+}
+
 export function verifyComposeModel(model) {
   const { postgres, application, initialize, restore } = model.services;
   assert.equal(model.networks.database.internal, true, 'database network must be private');

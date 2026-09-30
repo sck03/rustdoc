@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { randomBytes, createHash } from "node:crypto";
 import path from "node:path";
-import { verifyDockerTopology } from './lib/native-docker-validation.mjs';
+import { verifyDockerTopology, verifyPostgresRestore, waitForJob } from './lib/native-docker-validation.mjs';
 
 const args=process.argv.slice(2);
 const option=name=>{const index=args.indexOf(name);return index<0?undefined:args[index+1];};
@@ -43,17 +43,7 @@ if(!resume){
   const job=await (await operation("StartExcelTemplateDownloadJob")).json();
   state.jobId=job.jobId;
 }
-async function waitForJob(jobId){
-  const deadline=Date.now()+120000;
-  while(Date.now()<deadline){
-    const job=await (await operation("GetJob",{parameters:{jobId}})).json();
-    if(job.status==="Succeeded")return job;
-    if(["Failed","Canceled"].includes(job.status))throw new Error(`Native file task ${job.status}`);
-    await new Promise(resolve=>setTimeout(resolve,250));
-  }
-  throw new Error("Native file task timed out.");
-}
-await waitForJob(state.jobId);
+await waitForJob(operation,state.jobId);
 const issued=await operation("CreateJobDownloadTicket",{parameters:{jobId:state.jobId}});
 const cookie=issued.headers.get("set-cookie")?.split(";")[0];
 const ticket=await issued.json();
@@ -68,27 +58,7 @@ if(bytes.subarray(0,2).toString()!=="PK")throw new Error("Native Excel output is
 const digest=createHash("sha256").update(bytes).digest("hex");
 if(resume&&digest!==state.digest)throw new Error("The saved task output changed across container restart.");
 if(!resume){state.digest=digest;writeFileSync(statePath,JSON.stringify(state),{mode:0o600,flag:"wx"});}
-if(state.afterBackupUnitId){
-  const units=await (await operation('ListUnits')).json();
-  if(units.some(unit=>unit.id===state.afterBackupUnitId))throw new Error('Restore did not remove data created after the backup.');
-}
-if(stageRestore){
-  const before=await (await operation('ListPostgreSqlPhysicalBackups')).json();
-  const existing=new Set(before.backups.map(backup=>backup.fileName));
-  const backup=await (await operation('CreatePostgreSqlPhysicalBackup')).json();
-  await waitForJob(backup.jobId);
-  const after=await (await operation('ListPostgreSqlPhysicalBackups')).json();
-  const created=after.backups.filter(item=>!existing.has(item.fileName));
-  if(created.length!==1)throw new Error('Expected one new isolated PostgreSQL dump.');
-  const unit=await (await operation('CreateUnit',{body:{id:0,nameEN:`Restore-${randomBytes(4).toString('hex')}`,
-    nameCN:'恢复验证临时单位',code:'RV',rowVersion:''}})).json();
-  if(!unit.id)throw new Error('Post-backup mutation was not saved.');
-  state.afterBackupUnitId=unit.id;
-  writeFileSync(statePath,JSON.stringify(state),{mode:0o600});
-  const staged=await (await operation('RestorePostgreSqlPhysicalBackup',{body:{
-    backupFileName:created[0].fileName,adminPassword:state.password,confirmationText:'RESTORE DATABASE',
-  }})).json();
-  if(!staged.success||!staged.restartRequired)throw new Error('PostgreSQL restore was not staged.');
-}
+await verifyPostgresRestore(operation,state,stageRestore);
+if(stageRestore)writeFileSync(statePath,JSON.stringify(state),{mode:0o600});
 await operation("Logout");
 console.log(`Native Docker validation passed: isolated PostgreSQL, React, Rust login, Excel, cookie-bound download${resume?", persisted output after restart":""}${stageRestore?", database restore staged":""}.`);

@@ -91,14 +91,12 @@ if (-not $Stop) {
     }
     $appPassword = Get-NativeSecret -Name 'app-password.txt'
     $maintenancePassword = Get-NativeSecret -Name 'maintenance-password.txt'
-    $postgresBootstrapPassword = Get-NativeSecret -Name 'postgres-bootstrap-password.txt'
-    $bootstrap = Get-NativeSecret -Name 'bootstrap-token.txt'
+    [void](Get-NativeSecret -Name 'postgres-bootstrap-password.txt')
+    [void](Get-NativeSecret -Name 'bootstrap-token.txt')
     Write-NativeSecret -Name 'app-connection.txt' -Value "host=postgres port=5432 dbname=exportdoc_native user=exportdoc_app password=$appPassword connect_timeout=10 sslmode=disable"
     Write-NativeSecret -Name 'maintenance-connection.txt' -Value "host=postgres port=5432 dbname=exportdoc_native user=exportdoc_maintenance password=$maintenancePassword connect_timeout=10 sslmode=disable"
     $appPassword = $null
     $maintenancePassword = $null
-    $postgresBootstrapPassword = $null
-    $bootstrap = $null
 }
 if ($PrepareOnly) {
     Write-Host "Native Docker configuration prepared: $runtimePath"
