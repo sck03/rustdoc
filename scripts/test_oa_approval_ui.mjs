@@ -25,6 +25,23 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   const saved = admin.waitForResponse(response => response.url().endsWith('/api/office/approval-settings') && response.request().method() === 'PUT');
   await admin.getByRole('button', { name: '保存审批设置', exact: true }).click();
   assert.equal((await saved).status(), 200);
+  // Another administrator saves while this form has unsaved changes.
+  const generalRule = admin.getByRole('region', { name: '通用申请审批规则', exact: true });
+  await generalRule.getByLabel('审批方式').selectOption('DepartmentChain');
+  const concurrent = await invoke('GetOaApprovalSettings', undefined, {}, token);
+  await invoke('SaveOaApprovalSettings', { ...concurrent, expectedVersion: concurrent.versionNumber }, {}, token);
+  const conflict = admin.waitForResponse(response => response.url().endsWith('/api/office/approval-settings') && response.request().method() === 'PUT');
+  await admin.getByRole('button', { name: '保存审批设置', exact: true }).click();
+  assert.equal((await conflict).status(), 409);
+  await admin.getByText('审批设置已被其他管理员修改。当前草稿已保留，请记录需要保留的内容后重新载入最新设置。', { exact: true }).waitFor();
+  assert.equal(await generalRule.getByLabel('审批方式').inputValue(), 'DepartmentChain');
+  await admin.getByRole('button', { name: '重新载入审批设置', exact: true }).click();
+  await admin.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
+  assert.equal(await generalRule.getByLabel('审批方式').inputValue(), 'DepartmentChain');
+  await admin.getByRole('button', { name: '重新载入审批设置', exact: true }).click();
+  await admin.getByRole('dialog').getByRole('button', { name: '重新载入审批设置', exact: true }).click();
+  await admin.getByText('审批设置已被其他管理员修改。当前草稿已保留，请记录需要保留的内容后重新载入最新设置。', { exact: true }).waitFor({ state: 'hidden' });
+  assert.equal(await generalRule.getByLabel('审批方式').inputValue(), 'Single');
   await admin.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
   assert.deepEqual(await admin.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)).map(v => v.id)), []);
   await admin.screenshot({ path: path.join(output, 'approval-settings.png'), fullPage: true });

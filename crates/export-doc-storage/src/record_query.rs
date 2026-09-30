@@ -51,20 +51,20 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
             filter += &format!(" AND {field}={}", bind(value.to_string(), "BIGINT"));
         }
     }
-    if let Some(ids) = q.approvers {
-        let ids = ids
-            .iter()
-            .map(|id| bind(id.to_string(), "BIGINT"))
-            .collect::<Vec<_>>();
+    if let Some(approvers) = q.approvers {
         let assigned = format!("COALESCE({},0)", property("currentApproverId", true));
-        filter += &format!(
-            " AND ({assigned}=0{} )",
-            if ids.is_empty() {
-                String::new()
-            } else {
-                format!(" OR {assigned} IN ({})", ids.join(","))
+        let mut choices = vec![format!("{assigned}=0")];
+        for approver in approvers {
+            let mut choice = format!(
+                "{assigned}={}",
+                bind(approver.user_id.to_string(), "BIGINT")
+            );
+            if let Some(department) = &approver.department {
+                choice += &format!(" AND r.department={}", bind(department.clone(), "TEXT"));
             }
-        );
+            choices.push(format!("({choice})"));
+        }
+        filter += &format!(" AND ({})", choices.join(" OR "));
     }
     if let Some(actor) = q.approval_actor {
         let actor = bind(actor.to_string(), "BIGINT");

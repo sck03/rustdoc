@@ -11,12 +11,18 @@ export function useApprovalSettings(client: ExportDocManagerApiClient, user: Api
 }
 export function useApprovalSettingsDraft(client: ExportDocManagerApiClient, initial: OaApprovalSettings) {
   const [draft, setDraft] = useState(initial);
+  const [baseline, setBaseline] = useState(initial);
   const operation = useOfficeOperation();
   const formRef = useRef<HTMLFormElement>(null);
   useEffect(() => { if (operation.error) formRef.current?.querySelectorAll("details").forEach(section => { section.open = true; }); }, [operation.error]);
-  useUnsavedChangesGuard({ isDirty: JSON.stringify(draft) !== JSON.stringify(initial), message: "审批规则或代理有未保存的修改。" });
+  const { confirmDiscardChanges } = useUnsavedChangesGuard({ isDirty: JSON.stringify(draft) !== JSON.stringify(baseline), message: "审批规则或代理有未保存的修改。" });
   const changeRule = (index: number, change: Partial<OaApprovalSettings["rules"][number]>) => setDraft(value => ({ ...value, rules: value.rules.map((rule, i) => i === index ? { ...rule, ...change } : rule) }));
   const changeDelegate = (index: number, change: Partial<OaApprovalSettings["delegations"][number]>) => setDraft(value => ({ ...value, delegations: value.delegations.map((item, i) => i === index ? { ...item, ...change } : item) }));
-  const save = () => operation.run(signal => client.saveOaApprovalSettings({ body: { expectedVersion: initial.versionNumber, rules: draft.rules, delegations: draft.delegations } }, { signal }), () => {});
-  return { draft, setDraft, operation, formRef, changeRule, changeDelegate, save };
+  const accept = (saved: OaApprovalSettings) => { setBaseline(saved); setDraft(saved); };
+  const save = () => operation.run(signal => client.saveOaApprovalSettings({ body: { expectedVersion: baseline.versionNumber, rules: draft.rules, delegations: draft.delegations } }, { signal }), accept);
+  const reload = async () => {
+    if (operation.busy || !await confirmDiscardChanges("重新载入审批设置")) return;
+    await operation.run(signal => client.getOaApprovalSettings({ signal }), accept);
+  };
+  return { draft, setDraft, operation, formRef, changeRule, changeDelegate, save, reload, changedElsewhere: initial.versionNumber !== baseline.versionNumber };
 }

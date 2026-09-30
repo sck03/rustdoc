@@ -227,14 +227,11 @@ fn list(tx: &Connection, actor: &Actor, meta: &Value, query: &[(&str, String)]) 
         return Err(error(403, "没有有效的申请数据访问范围。"));
     }
     let (page, size) = paging(query)?;
-    let mut approvers = vec![actor.id];
-    if approvals {
-        approvers.extend(
-            settings::principals(tx, actor)?
-                .into_iter()
-                .map(|(id, _)| id),
-        );
-    }
+    let approvers = if approvals {
+        approval::queue_approvers(tx, actor, &resource)?
+    } else {
+        vec![]
+    };
     let (count, rows) = tx.query_records(&RecordQuery {
         kind: &kind(meta),
         company: &actor.company,

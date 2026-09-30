@@ -146,6 +146,12 @@ const read=async(page,expression)=>(await evaluate(page,expression,true)).value;
 async function waitFor(page,expression){const until=Date.now()+20000;while(Date.now()<until){if(await read(page,`Boolean(${expression})`))return;await delay(60);}throw new Error(`Timed out: ${expression}; ${await read(page,"document.body.innerText.slice(0,2500)")}`);}
 async function clickText(page,text,selector="button"){await read(page,`(()=>{const node=[...document.querySelectorAll(${JSON.stringify(selector)})].find(n=>n.getClientRects().length&&n.textContent.trim()===${JSON.stringify(text)});if(!node)throw new Error('Missing button: '+${JSON.stringify(text)});node.click()})()`);await delay(100);}
 async function input(page,selector,value){await read(page,`(()=>{const node=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(node instanceof HTMLSelectElement?HTMLSelectElement.prototype:node instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(node,${JSON.stringify(value)});node.dispatchEvent(new Event('input',{bubbles:true}));node.dispatchEvent(new Event('change',{bubbles:true}))})()`);await delay(60);}
+async function selectEmployee(page){
+  await input(page,'input[role="combobox"]',"张宁");
+  await waitFor(page,"document.querySelector('[role=listbox] [role=option]')?.textContent.includes('EMP-001')");
+  await read(page,"document.querySelector('[role=listbox] [role=option]').click()");
+  await waitFor(page,"!document.querySelector('[role=listbox]') && document.querySelector('input[role=combobox]').value.includes('张宁')");
+}
 async function audit(page,label){
   await read(page,"document.fonts.ready.then(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true)))))");
   await read(page,"Promise.all(document.getAnimations().filter(animation=>animation.effect?.getTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>{})))");
@@ -231,17 +237,15 @@ try {
   assert(await read(page,"window.__officeCalls.find(c=>c.name==='savePermissions').input.body.grants.some(g=>g.resourceKey==='office.people' && g.action==='view-details')"));await audit(page,"personnel-permission-module-save");
   for(const width of [1024,390]){
     await open("rooms",width,"register");await clickText(page,"查看日程与预约");
-    await waitFor(page,"document.querySelector('.remote-select-controls select')?.options.length>1");
     assert(await read(page,"[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='登记预约').disabled"));
-    await input(page,".remote-select-controls select","1");await input(page,'input[name="title"]',"行政登记例会");
+    await selectEmployee(page);await input(page,'input[name="title"]',"行政登记例会");
     await audit(page,`local-booking-${width}`);await captureScreenshot(page,path.join(output,`local-booking-${width}.png`));
     await clickText(page,"登记预约");await waitFor(page,"window.__officeCalls.some(c=>c.name==='createBooking')");
     assert.equal((await read(page,"window.__officeCalls.find(c=>c.name==='createBooking').input.body")).employeeId,1);
     await clickText(page,"预约与钥匙交接记录");await waitFor(page,"document.querySelector('.office-request-card')");
     assert.equal(await read(page,"[...document.querySelectorAll('button')].some(n=>n.textContent.trim()==='批准')"),false);results.push(`local-booking-submit-${width}`);
     await open("supplies",width,"register");await clickText(page,"登记借用");
-    await waitFor(page,"document.querySelector('.remote-select-controls select')?.options.length>1");
-    await input(page,".remote-select-controls select","1");await input(page,'textarea[name="purpose"]',"培训使用");
+    await selectEmployee(page);await input(page,'textarea[name="purpose"]',"培训使用");
     await audit(page,`local-supply-${width}`);await clickText(page,"登记领用");await waitFor(page,"window.__officeCalls.some(c=>c.name==='createSupplyRequest')");
     assert.equal((await read(page,"window.__officeCalls.find(c=>c.name==='createSupplyRequest').input.body")).employeeId,1);results.push(`local-supply-submit-${width}`);
   }

@@ -201,6 +201,86 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
     assert_eq!(list(service, outsider, false)["totalCount"], 0);
     assert_eq!(list(service, delegate, false)["totalCount"], 1);
     assert_eq!(list(service, finance, true)["totalCount"], 0);
+    // Proxy queues must use the principal's current account and data scope too.
+    let own_scope = call(
+        service,
+        admin,
+        CREATE_PERMISSION_TEMPLATE,
+        0,
+        Some(json!({
+            "code":format!("OWN-{suffix}"),"name":"仅本人审批","isActive":true,
+            "grants":[{"resourceKey":"office.expenses","action":"view","dataScope":"company"},
+                      {"resourceKey":"office.expenses","action":"approve","dataScope":"own"}]
+        })),
+    )
+    .unwrap();
+    for change in [
+        json!({"isActive":false}),
+        json!({"role":"OfficeEmployee"}),
+        json!({"permissionTemplateId":own_scope["id"]}),
+    ] {
+        let account = call(service, admin, LIST_USERS, 0, None).unwrap()["users"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|u| u["id"] == users[2]["id"])
+            .unwrap()
+            .clone();
+        let mut update = account.clone();
+        update["expectedVersion"] = account["versionNumber"].clone();
+        for (key, value) in change.as_object().unwrap() {
+            update[key] = value.clone();
+        }
+        let saved = call(
+            service,
+            admin,
+            UPDATE_USER_ACCOUNT,
+            users[2]["id"].as_i64().unwrap(),
+            Some(update),
+        )
+        .unwrap();
+        assert_eq!(list(service, delegate, false)["totalCount"], 0);
+        assert_eq!(
+            call(service, delegate, operation("expense", "get"), id, None).unwrap()["canReview"],
+            false
+        );
+        assert_eq!(
+            call(
+                service,
+                delegate,
+                operation("expense", "approve"),
+                id,
+                Some(json!({"expectedVersion":row["versionNumber"],"note":"原审批人权限已失效"}))
+            )
+            .unwrap_err()
+            .status,
+            Some(403)
+        );
+        let mut restore = account;
+        restore["expectedVersion"] = saved["user"]["versionNumber"].clone();
+        call(
+            service,
+            admin,
+            UPDATE_USER_ACCOUNT,
+            users[2]["id"].as_i64().unwrap(),
+            Some(restore),
+        )
+        .unwrap();
+        assert_eq!(list(service, delegate, false)["totalCount"], 1);
+    }
+    // Account mutations revoke old sessions, including after restoring permissions.
+    let refreshed_first = call(
+        service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":users[2]["username"],"password":"Approval-Review-2026"})),
+    )
+    .unwrap()["accessToken"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let first = &refreshed_first;
     assert_eq!(
         call(
             service,

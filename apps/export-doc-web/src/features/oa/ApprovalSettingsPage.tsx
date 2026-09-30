@@ -14,15 +14,16 @@ export function ApprovalSettingsPage({ client, user }: { client: ExportDocManage
   const query = useApprovalSettings(client, user);
   if (!user.capabilities.canManageUsers) return <PageState tone="permission" title="只有管理员可以设置审批规则" />;
   if (query.isPending) return <PageState tone="loading" title="正在读取审批设置" />;
-  if (query.isError) return <PageState tone="error" title="审批设置读取失败" description={readApiError(query.error)} action={<button type="button" onClick={() => void query.refetch()}>重试</button>} />;
-  return <ApprovalSettingsEditor key={query.data.settings.versionNumber} client={client} user={user} initial={query.data.settings} accounts={query.data.accounts} />;
+  if (!query.data) return <PageState tone="error" title="审批设置读取失败" description={readApiError(query.error)} action={<button type="button" onClick={() => void query.refetch()}>重试</button>} />;
+  return <ApprovalSettingsEditor key={`${user.id}:${user.companyScope}`} client={client} user={user} initial={query.data.settings} accounts={query.data.accounts} />;
 }
 function ApprovalSettingsEditor({ client, user, initial, accounts }: { client: ExportDocManagerApiClient; user: ApiUserDto; initial: OaApprovalSettings; accounts: ApprovalAccount[] }) {
-  const { draft, setDraft, operation, formRef, changeRule, changeDelegate, save } = useApprovalSettingsDraft(client, initial);
+  const { draft, setDraft, operation, formRef, changeRule, changeDelegate, save, reload, changedElsewhere } = useApprovalSettingsDraft(client, initial);
   const accountOptions = <><option value={0}>请选择账号</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.fullName} · {account.username} · {account.departmentId}</option>)}</>;
   return <section className="work-surface office-workspace oa-workspace" aria-label="审批规则与代理">
     <header className="oa-heading"><h2>审批规则与代理</h2><Link to="/office/approvals">返回申请与审批</Link></header>
     <p className="office-muted">设置仅用于本公司后续提交的申请。在途申请保留提交时的步骤；代理按当前有效期校验，审批人与代理人仍须具有对应查看和审批权限。</p>
+    {changedElsewhere && <InlineNotice tone="warning">审批设置已被其他管理员修改。当前草稿已保留，请记录需要保留的内容后重新载入最新设置。</InlineNotice>}
     <form ref={formRef} onInvalidCapture={event => { const section = (event.target as HTMLElement).closest("details"); if (section) section.open = true; }} onSubmit={event => { event.preventDefault(); void save(); }}>
       <fieldset disabled={operation.busy} className="office-form-grid">
         <legend>六类申请审批规则</legend>
@@ -51,6 +52,7 @@ function ApprovalSettingsEditor({ client, user, initial, accounts }: { client: E
       </details>
       {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
       <OfficeSubmit busy={operation.busy} label="保存审批设置" />
+      <button className="command-button secondary" type="button" disabled={operation.busy} onClick={() => void reload()}>重新载入审批设置</button>
     </form>
   </section>;
 }

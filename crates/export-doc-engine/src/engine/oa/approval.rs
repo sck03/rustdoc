@@ -34,6 +34,34 @@ fn reviewer(tx: &Connection, actor: &Actor, id: i64, row: &Value) -> Result<Acto
     }
     Ok(reviewer)
 }
+pub(super) fn queue_approvers(
+    tx: &Connection,
+    actor: &Actor,
+    resource: &str,
+) -> Result<Vec<export_doc_storage::RecordApprover>> {
+    use export_doc_storage::RecordApprover;
+    let mut approvers = vec![RecordApprover {
+        user_id: actor.id,
+        department: None,
+    }];
+    for (id, _) in super::settings::principals(tx, actor)? {
+        let principal = match auth::current_actor_in(tx, id, actor.edition) {
+            Ok(principal) => principal,
+            Err(e) if e.status == Some(403) => continue,
+            Err(e) => return Err(e),
+        };
+        let rank = auth::scope_rank(&principal, resource, "view")
+            .min(auth::scope_rank(&principal, resource, "approve"));
+        // A named approver cannot own the request; own-only grants cannot review it.
+        if principal.company == actor.company && rank >= 2 {
+            approvers.push(RecordApprover {
+                user_id: id,
+                department: (rank == 2).then_some(principal.department),
+            });
+        }
+    }
+    Ok(approvers)
+}
 pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<()> {
     let settings = super::settings::load(tx, &actor.company)?;
     let rule = settings["rules"]
@@ -162,10 +190,6 @@ pub(in crate::engine) fn authority(
         .into_iter()
         .find(|(id, _)| *id == principal);
     if delegation.is_some() {
-        let current = store::get(tx, "users", principal)?;
-        if current["isActive"] != true {
-            return Ok(None);
-        }
         match reviewer(tx, actor, principal, row) {
             Ok(_) => {}
             Err(e) if e.status == Some(403) => return Ok(None),

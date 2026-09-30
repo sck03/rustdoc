@@ -76,8 +76,10 @@ export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickTe
   await open("people",390);
   assert(await read(page,"Boolean(document.querySelector('a[href*=organization]'))"));
   await clickText(page,"人员档案");await waitFor(page,"document.querySelector('.personnel-facts')");
-  assert.equal(await read(page,"document.querySelector('.personnel-facts').innerText.includes('11010519491231002X')"),false);
-  await clickText(page,"查看完整号码");assert(await read(page,"document.querySelector('.personnel-facts').innerText.includes('11010519491231002X')"));
+  assert.equal(await read(page,"document.querySelector('.personnel-detail-stack details').open"),false);
+  await clickText(page,"个人资料与证件私密资料 · 按需展开","summary");
+  assert.equal(await read(page,"document.querySelector('.personnel-detail-stack').innerText.includes('11010519491231002X')"),false);
+  await clickText(page,"查看完整号码");assert(await read(page,"document.querySelector('.personnel-detail-stack').innerText.includes('11010519491231002X')"));
   await clickText(page,"隐藏号码");results.push("identity-number-masked-and-explicit-reveal");
   await clickText(page,"编辑档案");await clickText(page,"个人资料与人事备注（限人事档案权限）","summary");
   await waitFor(page,"document.querySelector('input[name=identityNumber]')");
