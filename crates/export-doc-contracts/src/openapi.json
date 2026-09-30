@@ -51969,6 +51969,54 @@
           "permissionBypass": false
         }
       }
+    },
+    "/api/diagnostics/metrics": {
+      "get": {
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "GetRuntimeMetrics",
+        "responses": {
+          "200": {
+            "description": "Process counters and retained task counts; no business data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiRuntimeMetricsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Administrator required"
+          },
+          "503": {
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": false,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.settings",
+              "action": "view"
+            }
+          ],
+          "permissionBypass": false
+        }
+      }
     }
   },
   "components": {
@@ -74667,6 +74715,292 @@
             "type": "string"
           }
         }
+      },
+      "ApiRuntimeMetricBucket": {
+        "type": "object",
+        "properties": {
+          "upperBoundMicroseconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "upperBoundMicroseconds",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "ApiRuntimeLatencyMetrics": {
+        "type": "object",
+        "properties": {
+          "completed": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "failures": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "active": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "totalMicroseconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "maxMicroseconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "p95UpperBoundMicroseconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "p99UpperBoundMicroseconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "buckets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiRuntimeMetricBucket"
+            }
+          }
+        },
+        "required": [
+          "completed",
+          "failures",
+          "active",
+          "totalMicroseconds",
+          "maxMicroseconds",
+          "p95UpperBoundMicroseconds",
+          "p99UpperBoundMicroseconds",
+          "buckets"
+        ],
+        "additionalProperties": false
+      },
+      "ApiRuntimeDatabaseMetrics": {
+        "type": "object",
+        "properties": {
+          "capacity": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "leased": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "boolean"
+          },
+          "acquireTimeouts": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "acquireTimeoutMilliseconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "wait": {
+            "$ref": "#/components/schemas/ApiRuntimeLatencyMetrics"
+          },
+          "operations": {
+            "$ref": "#/components/schemas/ApiRuntimeLatencyMetrics"
+          },
+          "writeWait": {
+            "$ref": "#/components/schemas/ApiRuntimeLatencyMetrics"
+          },
+          "writeTransactions": {
+            "$ref": "#/components/schemas/ApiRuntimeLatencyMetrics"
+          },
+          "writeCoordinatorFailed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "capacity",
+          "leased",
+          "failed",
+          "acquireTimeouts",
+          "acquireTimeoutMilliseconds",
+          "wait",
+          "operations",
+          "writeWait",
+          "writeTransactions",
+          "writeCoordinatorFailed"
+        ],
+        "additionalProperties": false
+      },
+      "ApiRuntimeJobMetrics": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "workerHandles": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "stopping": {
+            "type": "boolean"
+          },
+          "failed": {
+            "type": "boolean"
+          },
+          "persistedCounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        },
+        "required": [
+          "active",
+          "workerHandles",
+          "stopping",
+          "failed",
+          "persistedCounts"
+        ],
+        "additionalProperties": false
+      },
+      "ApiRuntimeHttpMetrics": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "$ref": "#/components/schemas/ApiRuntimeLatencyMetrics"
+          },
+          "queueWait": {
+            "$ref": "#/components/schemas/ApiRuntimeLatencyMetrics"
+          },
+          "queueCapacity": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "queuedRequests": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "admissionRejected": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "bulkRejected": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "requestCapacity": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "availableRequestSlots": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "bulkCapacity": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "availableBulkSlots": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "uptimeSeconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "logsDropped": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "logWriteErrors": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "requests",
+          "queueWait",
+          "queueCapacity",
+          "queuedRequests",
+          "admissionRejected",
+          "bulkRejected",
+          "requestCapacity",
+          "availableRequestSlots",
+          "bulkCapacity",
+          "availableBulkSlots",
+          "uptimeSeconds",
+          "logsDropped",
+          "logWriteErrors"
+        ],
+        "additionalProperties": false
+      },
+      "ApiRuntimeMetricsResponse": {
+        "type": "object",
+        "properties": {
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/ApiRuntimeDatabaseMetrics"
+          },
+          "jobs": {
+            "$ref": "#/components/schemas/ApiRuntimeJobMetrics"
+          },
+          "http": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApiRuntimeHttpMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "checkedAt",
+          "storage",
+          "jobs",
+          "http"
+        ],
+        "additionalProperties": false
       }
     },
     "securitySchemes": {

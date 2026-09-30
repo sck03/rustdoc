@@ -31,30 +31,27 @@ pub fn validate_assignment(connection: &Connection, company: &str, department: &
 }
 
 pub fn departments(store: &Store) -> Result<Vec<Value>> {
-    store.transaction(|tx| {
-        let people = store::all(tx, "people")?;
-        store::all(tx, "departments")?
-            .into_iter()
-            .map(|record| {
-                let mut department = crate::contracts::overlay(
-                    crate::contracts::initial(crate::contracts::schema(
-                        "ApiOrganizationDepartmentDto",
-                    )),
-                    &record,
-                );
-                if let Some(id) = record["managerEmployeeId"].as_i64() {
-                    let person = people
-                        .iter()
-                        .find(|person| {
-                            person["id"] == id && person["companyScope"] == record["companyCode"]
-                        })
-                        .ok_or_else(|| super::error::unavailable("部门负责人引用无效。"))?;
-                    department["managerName"] = person["profile"]["fullName"].clone();
-                }
-                Ok(department)
-            })
-            .collect()
-    })
+    let mut rows = store.catalog("departments")?;
+    enrich_departments(store, &mut rows)?;
+    Ok(rows)
+}
+pub(super) fn enrich_departments(store: &Store, rows: &mut [Value]) -> Result<()> {
+    let tx = store.connection()?;
+    for row in rows {
+        let mut department = crate::contracts::overlay(
+            crate::contracts::initial(crate::contracts::schema("ApiOrganizationDepartmentDto")),
+            row,
+        );
+        if let Some(id) = row["managerEmployeeId"].as_i64() {
+            let person = tx
+                .get("people", id)?
+                .filter(|person| person["companyScope"] == row["companyCode"])
+                .ok_or_else(|| super::error::unavailable("部门负责人引用无效。"))?;
+            department["managerName"] = person["profile"]["fullName"].clone();
+        }
+        *row = department;
+    }
+    Ok(())
 }
 
 pub fn managers(store: &Store, query: &[(&str, String)]) -> Result<Value> {

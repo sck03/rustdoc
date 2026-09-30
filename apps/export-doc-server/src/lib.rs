@@ -1,9 +1,14 @@
+mod admission;
 #[cfg(feature = "postgres")]
 pub mod configuration;
 pub mod desktop;
 mod downloads;
 mod request;
 mod response;
+mod telemetry;
+const MAX_REQUESTS: usize = 16;
+const MAX_QUEUED_REQUESTS: usize = 16;
+const MAX_BULK_UPLOADS: usize = 2;
 
 use axum::{
     Router,
@@ -18,8 +23,9 @@ use tower_http::services::{ServeDir, ServeFile};
 
 #[derive(Clone)]
 pub struct ServerState {
+    telemetry: Arc<telemetry::Telemetry>,
     pub service: Arc<NativeService>,
-    requests: Arc<Semaphore>,
+    requests: Arc<admission::Admission>,
     bulk_uploads: Arc<Semaphore>,
     tickets: Arc<downloads::Tickets>,
     desktop_token: Option<Arc<str>>,
@@ -34,10 +40,16 @@ fn compose_router(
     web_root: Option<&Path>,
     desktop_token: Option<Arc<str>>,
 ) -> Router {
+    let telemetry = Arc::new(telemetry::Telemetry::new(service.paths.log_root.clone()));
     let state = ServerState {
+        telemetry,
         service,
-        requests: Arc::new(Semaphore::new(16)),
-        bulk_uploads: Arc::new(Semaphore::new(2)),
+        requests: Arc::new(admission::Admission::new(
+            MAX_REQUESTS,
+            MAX_QUEUED_REQUESTS,
+            std::time::Duration::from_secs(5),
+        )),
+        bulk_uploads: Arc::new(Semaphore::new(MAX_BULK_UPLOADS)),
         tickets: Arc::default(),
         desktop_token,
     };

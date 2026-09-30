@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$PostgresBin,
-    [ValidateRange(60, 7200)][int]$TimeoutSeconds = 1800
+    [ValidateRange(60, 7200)][int]$TimeoutSeconds = 1800,
+    [ValidateSet('All', 'Storage', 'Engine', 'Capacity')][string]$Scope = 'All'
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
@@ -35,6 +36,17 @@ $environment = @{
 }
 $clusterStarted = $false
 $environment['EXPORTDOC_TEST_PG_BIN'] = $PostgresBin
+$databaseTargets = @()
+if ($Scope -in @('All', 'Storage')) { $databaseTargets += ,@('POSTGRES', 'native_storage') }
+if ($Scope -in @('All', 'Engine')) {
+    $databaseTargets += ,@('ENGINE', 'native_engine')
+    $databaseTargets += ,@('RECOVERY', 'native_recovery')
+}
+if ($Scope -eq 'Capacity') {
+    $databaseTargets += ,@('CAPACITY_ONE', 'native_capacity_1')
+    $databaseTargets += ,@('CAPACITY_FOUR', 'native_capacity_4')
+}
+$databaseStatements = ($databaseTargets | ForEach-Object { "CREATE DATABASE $($_[1]) OWNER native_owner;" }) -join [Environment]::NewLine
 try {
     Invoke-ExportDocExternal -FilePath $initdb -Arguments @('-D', $dataRoot, '-U', 'native_bootstrap', '--auth=scram-sha-256', "--pwfile=$passwordFile", '--encoding=UTF8', '--locale=C') -Environment $environment -TimeoutSeconds 120 -DisplayName 'Initialize isolated native test cluster'
     Invoke-ExportDocExternal -FilePath $pgCtl -Arguments @('-D', $dataRoot, '-l', (Join-Path $testRoot 'postgres.log'), '-o', "-h 127.0.0.1 -p $port", '-w', '-t', '30', 'start') -Environment $environment -TimeoutSeconds 40 -DisplayName 'Start isolated native test cluster'
@@ -44,9 +56,9 @@ CREATE ROLE native_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE;
 CREATE ROLE native_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD '$password';
 CREATE ROLE native_maintenance LOGIN NOSUPERUSER CREATEDB NOCREATEROLE PASSWORD '$password';
 GRANT native_owner TO native_maintenance;
-CREATE DATABASE native_storage OWNER native_owner;
-CREATE DATABASE native_engine OWNER native_owner;
-CREATE DATABASE native_recovery OWNER native_owner;
+-- Isolated fault drills only; never granted by production deployment scripts.
+GRANT pg_signal_backend TO native_maintenance;
+$databaseStatements
 "@
     [System.IO.File]::WriteAllText($sqlFile, $sql, [System.Text.UTF8Encoding]::new($false))
     $common = @('-X', '-h', '127.0.0.1', '-p', "$port", '-U', 'native_bootstrap', '-v', 'ON_ERROR_STOP=1')
@@ -59,16 +71,27 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT SELECT, IN
 ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO native_app;
 '@
     [System.IO.File]::WriteAllText($sqlFile, $sql, [System.Text.UTF8Encoding]::new($false))
-    foreach ($database in @('native_storage', 'native_engine', 'native_recovery')) {
+    foreach ($target in $databaseTargets) {
+        $database = $target[1]
         Invoke-ExportDocExternal -FilePath $psql -Arguments ($common + @('-d', $database, '-f', $sqlFile)) -Environment $environment -TimeoutSeconds 30 -DisplayName "Set minimum privileges for $database"
     }
-    foreach ($target in @(@('POSTGRES', 'native_storage'), @('ENGINE', 'native_engine'), @('RECOVERY', 'native_recovery'))) {
+    foreach ($target in $databaseTargets) {
         foreach ($role in @(@('APP', 'native_app'), @('MAINTENANCE', 'native_maintenance'))) {
             $environment["EXPORTDOC_TEST_$($target[0])_$($role[0])"] = "host=127.0.0.1 port=$port user=$($role[1]) password=$password dbname=$($target[1]) sslmode=disable"
         }
     }
-    Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('test', '--locked', '-p', 'export-doc-storage', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--', '--ignored', '--test-threads=1') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL storage, durable files and team workflows'
-    [ordered]@{ schemaVersion = 1; database = 'PostgreSQL 18'; succeeded = $true; completedAt = [DateTimeOffset]::UtcNow.ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $testRoot 'result.json') -Encoding utf8
+    if ($Scope -in @('All', 'Storage')) {
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--test', 'contract', '--', '--ignored', '--test-threads=1') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL storage contract'
+    }
+    if ($Scope -in @('All', 'Engine')) {
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--lib', '--test', 'team_service', '--', '--ignored', '--test-threads=1') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL recovery and team workflows'
+    }
+    if ($Scope -eq 'Capacity') {
+        $environment['EXPORTDOC_CAPACITY_ISOLATED'] = '1'
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('build', '--locked', '-p', 'export-doc-server') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Build the measured Rust HTTP service'
+        Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_native_capacity.mjs') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Twenty-session query, approval and PDF capacity comparison'
+    }
+    [ordered]@{ schemaVersion = 1; database = 'PostgreSQL 18'; scope = $Scope; succeeded = $true; completedAt = [DateTimeOffset]::UtcNow.ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $testRoot 'result.json') -Encoding utf8
     Write-Host "Native PostgreSQL evidence: $testRoot"
 } finally {
     if ($clusterStarted -or (Test-Path -LiteralPath (Join-Path $dataRoot 'postmaster.pid'))) {

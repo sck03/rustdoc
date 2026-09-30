@@ -229,13 +229,8 @@ pub fn handle(
             if row["versionNumber"] == version {
                 return Ok(dto(actor, &row));
             }
-            let historical = store::all(tx, "template-versions")?
-                .into_iter()
-                .find(|v| {
-                    v["templateKind"] == KIND
-                        && v["templateId"] == record_id
-                        && v["content"]["versionNumber"] == version
-                })
+            let historical = tx
+                .template_version(KIND, record_id, version)?
                 .ok_or_else(|| error(404, "邮件模板历史版本不存在。"))?;
             for key in ["name", "category", "subject", "bodyHtml"] {
                 row[key] = historical["content"][key].clone();

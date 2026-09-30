@@ -2,11 +2,17 @@ use super::error::{Result, conflict, error, unavailable};
 use crate::{contracts, paths::RuntimePaths};
 use chrono::Utc;
 pub use export_doc_storage::Connection;
-use export_doc_storage::{AuditWrite, RecordWrite};
+#[cfg(feature = "postgres")]
+use export_doc_storage::pool::PoolOptions;
+use export_doc_storage::{
+    AuditWrite, RecordWrite,
+    metrics::Metrics,
+    pool::{Lease, Pool},
+};
 use serde_json::{Value, json};
 use std::{
     fs::File,
-    sync::{Mutex, MutexGuard},
+    sync::{Mutex, MutexGuard, TryLockError},
 };
 use unicode_normalization::UnicodeNormalization;
 mod sqlite_layout;
@@ -14,7 +20,10 @@ mod sqlite_layout;
 pub struct Store {
     pub(crate) edition: export_doc_domain::permissions::ProductEdition,
     pub(crate) data_root: std::path::PathBuf,
-    connection: Mutex<Connection>,
+    connection: Pool,
+    writes: Mutex<()>,
+    write_waits: Metrics,
+    transactions: Metrics,
     #[cfg(feature = "postgres")]
     postgres_connection: Option<zeroize::Zeroizing<String>>,
     _lock: Option<File>,
@@ -39,36 +48,85 @@ impl Store {
         Ok(Self {
             edition: Default::default(),
             data_root: paths.data_root.clone(),
-            connection: Mutex::new(connection),
+            connection: Pool::single(connection),
+            writes: Mutex::new(()),
+            write_waits: Default::default(),
+            transactions: Default::default(),
             #[cfg(feature = "postgres")]
             postgres_connection: None,
             _lock: Some(lock),
         })
     }
 
-    pub fn connection(&self) -> Result<MutexGuard<'_, Connection>> {
+    pub fn connection(&self) -> Result<Lease<'_>> {
         crate::operation::check()?;
+        if self.writes.is_poisoned() {
+            return Err(unavailable("数据库写入协调状态异常。"));
+        }
         let connection = self
             .connection
-            .lock()
-            .map_err(|_| unavailable("数据库状态异常，已停止继续写入。"))?;
+            .acquire(|| crate::operation::check().is_err());
         crate::operation::check()?;
-        Ok(connection)
+        connection.map_err(Into::into)
+    }
+    pub fn metrics(&self) -> Value {
+        let mut value = self.connection.snapshot();
+        value["writeWait"] = self.write_waits.snapshot();
+        value["writeTransactions"] = self.transactions.snapshot();
+        value["writeCoordinatorFailed"] = json!(self.writes.is_poisoned());
+        value
+    }
+    pub fn health(&self) -> Result<()> {
+        if self.writes.is_poisoned() {
+            return Err(unavailable("数据库写入协调状态异常。"));
+        }
+        self.connection.health().map_err(Into::into)
+    }
+    fn write_guard(&self) -> Result<MutexGuard<'_, ()>> {
+        let observation = self.write_waits.start();
+        loop {
+            crate::operation::check()?;
+            match self.writes.try_lock() {
+                Ok(guard) => {
+                    observation.finish(true);
+                    return Ok(guard);
+                }
+                Err(TryLockError::Poisoned(_)) => {
+                    return Err(unavailable("数据库写入协调状态异常。"));
+                }
+                Err(TryLockError::WouldBlock) => {
+                    std::thread::sleep(std::time::Duration::from_millis(10))
+                }
+            }
+        }
     }
     #[cfg(feature = "postgres")]
     pub fn open_postgres(paths: &RuntimePaths, connection_string: &str) -> Result<Self> {
+        Self::open_postgres_with_pool(paths, connection_string, PoolOptions::default())
+    }
+    #[cfg(feature = "postgres")]
+    pub fn open_postgres_with_pool(
+        paths: &RuntimePaths,
+        connection_string: &str,
+        options: PoolOptions,
+    ) -> Result<Self> {
         Ok(Self {
             edition: Default::default(),
             data_root: paths.data_root.clone(),
-            connection: Mutex::new(Connection::postgres(connection_string)?),
+            connection: Pool::postgres(connection_string, options)?,
+            writes: Mutex::new(()),
+            write_waits: Default::default(),
+            transactions: Default::default(),
             postgres_connection: Some(zeroize::Zeroizing::new(connection_string.into())),
             _lock: None,
         })
     }
     pub fn transaction<T>(&self, operation: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
+        let observation = self.transactions.start();
+        let _write = self.write_guard()?;
         let connection = self.connection()?;
         connection.begin()?;
-        match operation(&connection) {
+        let result = match operation(&connection) {
             Ok(value) => {
                 if let Err(error) = crate::operation::check() {
                     connection.rollback()?;
@@ -80,6 +138,23 @@ impl Store {
             Err(error) => {
                 connection.rollback()?;
                 Err(error)
+            }
+        };
+        observation.finish(result.is_ok());
+        result
+    }
+    pub fn read<T>(&self, operation: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
+        let connection = self.connection()?;
+        connection.begin_read()?;
+        match operation(&connection) {
+            Ok(value) => {
+                crate::operation::check()?;
+                connection.commit()?;
+                Ok(value)
+            }
+            Err(cause) => {
+                connection.rollback()?;
+                Err(cause)
             }
         }
     }
@@ -107,6 +182,32 @@ impl Store {
     }
     pub fn all(&self, kind: &str) -> Result<Vec<Value>> {
         all(&*self.connection()?, kind)
+    }
+    pub fn catalog(&self, kind: &str) -> Result<Vec<Value>> {
+        self.read(|tx| {
+            let mut rows = Vec::new();
+            loop {
+                crate::operation::check()?;
+                let (total, page) = tx.query_generic(&export_doc_storage::GenericQuery {
+                    kind,
+                    scope: export_doc_storage::DataScope {
+                        all: true,
+                        ..Default::default()
+                    },
+                    filters: &[],
+                    keyword: "",
+                    search_root: None,
+                    fields: &[],
+                    offset: rows.len() as i64,
+                    limit: 200,
+                })?;
+                let empty = page.is_empty();
+                rows.extend(page);
+                if empty || rows.len() as i64 >= total {
+                    return Ok(rows);
+                }
+            }
+        })
     }
     pub fn settings(&self, name: &str) -> Result<Option<Value>> {
         Ok(self.connection()?.settings(name)?)
@@ -295,6 +396,16 @@ pub fn paged(mut items: Vec<Value>, query: &[(&str, String)]) -> Value {
     page_only(items, query)
 }
 pub fn page_only(items: Vec<Value>, query: &[(&str, String)]) -> Value {
+    let (page, size, start) = page_parameters(query);
+    let count = items.len();
+    contracts::page(
+        items.into_iter().skip(start as usize).take(size).collect(),
+        count,
+        page,
+        size,
+    )
+}
+pub fn page_parameters(query: &[(&str, String)]) -> (usize, usize, i64) {
     let query_value = |name: &str| {
         query
             .iter()
@@ -310,12 +421,6 @@ pub fn page_only(items: Vec<Value>, query: &[(&str, String)]) -> Value {
         .parse::<usize>()
         .unwrap_or(1)
         .max(1);
-    let count = items.len();
-    let start = page.saturating_sub(1).saturating_mul(size);
-    contracts::page(
-        items.into_iter().skip(start).take(size).collect(),
-        count,
-        page,
-        size,
-    )
+    let start = i64::try_from(page.saturating_sub(1).saturating_mul(size)).unwrap_or(i64::MAX);
+    (page, size, start)
 }

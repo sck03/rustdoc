@@ -46,12 +46,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let retention = export_doc_engine::engine::tasks::retention::Retention::from_lookup(|key| {
         std::env::var(key).ok()
     })?;
-    let service = NativeService::open_postgres_with_retention(
+    let service = NativeService::open_postgres_configured(
         configuration.paths.clone(),
         &configuration.connection,
         configuration.bootstrap_token,
         configuration.business_clock,
         retention,
+        configuration.pool,
     )?;
     let routes = router(service.clone(), configuration.web_root.as_deref());
     let runtime = tokio::runtime::Builder::new_multi_thread()

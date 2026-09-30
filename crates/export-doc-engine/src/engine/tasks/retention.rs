@@ -1,11 +1,10 @@
 //! Bounded history policy, injected by the host; only terminal jobs are pruned.
-use super::persistence::{KIND, active, owner, remove};
+use super::persistence::{owner, remove};
 use crate::engine::{
-    error::{Result, invalid, unavailable},
+    error::{Result, invalid},
     store::Store,
 };
 use chrono::{DateTime, Duration, Utc};
-use std::collections::HashMap;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Retention {
@@ -57,33 +56,24 @@ impl Retention {
 
 pub(super) fn prune(store: &Store, policy: Retention, now: DateTime<Utc>) -> Result<usize> {
     store.transaction(|tx| {
-        let mut terminal = vec![];
-        for job in tx.all(KIND)?.into_iter().filter(|job| !active(job)) {
-            let time = job["completedAt"]
-                .as_str()
-                .or_else(|| job["createdAt"].as_str())
-                .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
-                .ok_or_else(|| unavailable("文件任务时间损坏，已停止自动清理。"))?
-                .with_timezone(&Utc);
-            terminal.push((time, job));
-        }
-        terminal.sort_by(|(a, left), (b, right)| {
-            b.cmp(a)
-                .then_with(|| right["jobId"].as_str().cmp(&left["jobId"].as_str()))
-        });
-        let cutoff = now - Duration::days(i64::from(policy.days));
-        let mut users = HashMap::<i64, usize>::new();
-        let mut retained = 0;
+        let cutoff = (now - Duration::days(i64::from(policy.days))).to_rfc3339();
+        let fields = super::queries::metadata_fields();
         let mut removed = 0;
-        for (time, job) in terminal {
-            let actor = owner(&job)?;
-            let count = users.entry(actor.id).or_default();
-            if time < cutoff || *count >= policy.per_user_limit || retained >= policy.global_limit {
-                remove(tx, &actor, job)?;
+        loop {
+            crate::operation::check()?;
+            let mut query = super::queries::batch(None, false, &fields);
+            query.retention = Some(export_doc_storage::JobRetention {
+                cutoff: &cutoff,
+                per_user: policy.per_user_limit,
+                global: policy.global_limit,
+            });
+            let (_, jobs) = tx.query_jobs(&query)?;
+            if jobs.is_empty() {
+                break;
+            }
+            for job in jobs {
+                remove(tx, &owner(&job)?, job)?;
                 removed += 1;
-            } else {
-                *count += 1;
-                retained += 1;
             }
         }
         Ok(removed)

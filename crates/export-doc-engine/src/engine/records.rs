@@ -8,6 +8,7 @@ use crate::{contracts, generated_api::Operation, invoice};
 use export_doc_storage::{AuditWrite, Connection};
 use serde_json::{Value, json};
 use unicode_normalization::UnicodeNormalization;
+mod queries;
 
 pub fn find(operation: Operation) -> Option<&'static Resource> {
     RESOURCES.iter().find(|resource| {
@@ -123,45 +124,20 @@ pub fn list(
     ) {
         return super::office_queries::list(store, actor, resource.key, query);
     }
-    let mut records = if resource.key == "departments" {
-        super::organization::departments(store)?
-    } else {
-        store.all(resource.key)?
-    };
-    records.retain(|record| auth::visible(actor, permission, action, record));
-    for (key, value) in parameters.iter().chain(query.iter()) {
-        if [
-            "crmCustomerId",
-            "customerId",
-            "supplierId",
-            "employeeId",
-            "meetingRoomId",
-            "officeSupplyId",
-            "departmentId",
-        ]
-        .contains(key)
-            && !value.is_empty()
-        {
-            let field = if *key == "customerId" {
-                "crmCustomerId"
-            } else {
-                key
-            };
-            records.retain(|record| {
-                record.get(field).is_some_and(|actual| {
-                    actual.as_str().is_some_and(|actual| actual == value)
-                        || actual
-                            .as_i64()
-                            .is_some_and(|actual| actual.to_string() == *value)
-                })
-            });
-        }
-    }
-    if resource.key == "invoices" {
-        for record in &mut records {
-            record["customerName"] = record["customerNameEN"].clone();
-            record["exporterName"] = record["exporterNameEN"].clone();
-        }
+    let shape = contracts::resolve(contracts::response(operation.id));
+    let is_array = contracts::kind(shape) == "array";
+    let is_catalog = matches!(resource.key, "users" | "permission-templates");
+    let (mut records, total, page_number, page_size) = queries::rows(
+        store,
+        actor,
+        resource,
+        operation,
+        query,
+        parameters,
+        !is_array && !is_catalog,
+    )?;
+    if resource.key == "departments" {
+        super::organization::enrich_departments(store, &mut records)?;
     }
     if resource.key == "people" {
         records = records
@@ -178,13 +154,12 @@ pub fn list(
             })
             .collect();
     }
-    let shape = contracts::resolve(contracts::response(operation.id));
-    if contracts::kind(shape) == "array" {
+    if is_array {
         return Ok(json!(records));
     }
     let catalog_records =
         matches!(resource.key, "users" | "permission-templates").then(|| records.clone());
-    let page = store::paged(records, query);
+    let page = contracts::page(records, total, page_number, page_size);
     if shape["properties"].get("items").is_some() {
         return Ok(page);
     }
@@ -209,10 +184,10 @@ pub fn list(
                 .map(|role| role.code.clone())
                 .collect::<Vec<_>>()
         );
-        result["companies"] = json!(store.all("companies")?);
+        result["companies"] = json!(store.catalog("companies")?);
         result["departments"] = json!(super::organization::departments(store)?);
-        result["permissionTemplates"] = json!(store.all("permission-templates")?);
-        let templates = store.all("permission-templates")?;
+        let templates = store.catalog("permission-templates")?;
+        result["permissionTemplates"] = json!(templates);
         for user in result["users"].as_array_mut().into_iter().flatten() {
             let template = user["permissionTemplateId"]
                 .as_i64()

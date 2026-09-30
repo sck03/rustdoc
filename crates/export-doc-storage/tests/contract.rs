@@ -1,6 +1,16 @@
 use export_doc_storage::{BlobWrite, Connection, ErrorKind, RecordWrite};
 #[path = "support/communication_query.rs"]
 mod communication_query;
+#[cfg(feature = "postgres")]
+#[path = "support/pool_recovery.rs"]
+mod pool_recovery;
+#[cfg(feature = "postgres")]
+#[path = "support/query_plans.rs"]
+mod query_plans;
+#[path = "support/scaling_query.rs"]
+mod scaling_query;
+#[path = "support/template_query.rs"]
+mod template_query;
 use serde_json::json;
 use std::{
     fs,
@@ -52,6 +62,8 @@ fn sqlite_rejects_earlier_or_duplicate_schema_markers() {
 }
 
 fn roundtrip(connection: &Connection) {
+    scaling_query::exercise(connection);
+    template_query::exercise(connection);
     communication_query::exercise(connection);
     connection.begin().unwrap();
     connection
@@ -249,6 +261,20 @@ fn postgres_matches_the_sqlite_contract_and_holds_the_instance_lock() {
         raw.batch_execute("ALTER TABLE schema_version DROP CONSTRAINT migration_failure;")
             .unwrap();
     }
+    {
+        let mut raw = postgres::Client::connect(&maintenance, postgres::NoTls).unwrap();
+        raw.batch_execute("SET ROLE native_owner; ALTER TABLE schema_version DROP CONSTRAINT schema_version_version_check; ALTER TABLE schema_version ADD CONSTRAINT schema_version_version_check CHECK(version >= 5); UPDATE schema_version SET version=6; CREATE INDEX records_template_catalog ON records(kind);").unwrap();
+        assert!(Connection::initialize_postgres(&maintenance, "native_owner").is_err());
+        assert_eq!(
+            raw.query_one("SELECT version FROM schema_version", &[])
+                .unwrap()
+                .get::<_, i64>(0),
+            6
+        );
+        assert_eq!(raw.query_one("SELECT COUNT(*) FROM pg_indexes WHERE schemaname='public' AND indexname='records_status_page'",&[]).unwrap().get::<_,i64>(0),0);
+        raw.batch_execute("DROP INDEX records_template_catalog;")
+            .unwrap();
+    }
     Connection::initialize_postgres(&maintenance, "native_owner").unwrap();
     Connection::initialize_postgres(&maintenance, "native_owner").unwrap();
     assert!(
@@ -266,4 +292,6 @@ fn postgres_matches_the_sqlite_contract_and_holds_the_instance_lock() {
         assert_eq!(connection.provider(), "PostgreSQL");
     }
     Connection::postgres(&app).unwrap().health().unwrap();
+    pool_recovery::exercise(&app, &maintenance);
+    query_plans::exercise(&maintenance);
 }

@@ -18,6 +18,49 @@ mod invoice_preview_contract;
 mod resource_contract;
 
 #[test]
+fn template_metadata_pages_and_history_keep_content_in_detail_only() {
+    let fixture = Fixture::new();
+    let mut ids = vec![];
+    for name in ["C-目录", "A-目录", "B-目录"] {
+        let created = fixture.create(
+            CREATE_USER_REPORT_TEMPLATE,
+            json!({"reportType":"ExportDocument","name":name,"contentHtml":""}),
+        );
+        ids.push(created["id"].to_string());
+    }
+    let values = [
+        ("reportType", "ExportDocument".into()),
+        ("pageSize", "1".into()),
+        ("pageNumber", "2".into()),
+        ("keyword", "目录".into()),
+    ];
+    let page = fixture.request(LIST_USER_REPORT_TEMPLATES, &[], &values, None);
+    assert_eq!(page["totalCount"], 3);
+    assert_eq!(page["items"][0]["name"], "B-目录");
+    assert!(page["items"][0].get("contentHtml").is_none());
+    let parameters = [("id", ids[2].clone())];
+    let detail = fixture.request(GET_USER_REPORT_TEMPLATE, &parameters, &[], None);
+    assert!(!detail["contentHtml"].as_str().unwrap().is_empty());
+    fixture.request(
+        PUBLISH_USER_REPORT_TEMPLATE,
+        &parameters,
+        &[],
+        Some(json!({"expectedVersion":detail["versionNumber"]})),
+    );
+    let history = fixture.request(
+        LIST_USER_REPORT_TEMPLATE_VERSIONS,
+        &parameters,
+        &[("pageSize", "1".into()), ("pageNumber", "2".into())],
+        None,
+    );
+    assert_eq!(history["totalCount"], 2);
+    assert_eq!(history["items"][0]["versionNumber"], 1);
+    assert!(history["items"][0].get("contentHtml").is_none());
+    assert!(history["items"][0].get("content").is_none());
+    assert_eq!(history["items"][0]["canRestore"], true);
+}
+
+#[test]
 fn original_react_empty_template_requests_create_server_drafts_and_keep_empty_updates_invalid() {
     let fixture = Fixture::new();
     for kind in ["ExportDocument", "PaymentVoucher"] {

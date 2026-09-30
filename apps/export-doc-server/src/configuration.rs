@@ -14,6 +14,7 @@ pub struct Configuration {
     pub initialize_only: bool,
     pub restore_pending: bool,
     pub business_clock: export_doc_engine::clock::BusinessClock,
+    pub pool: export_doc_storage::pool::PoolOptions,
 }
 
 fn secret(key: &str) -> Result<String, String> {
@@ -106,6 +107,20 @@ impl Configuration {
             return Err("建表需要独立的 PostgreSQL 维护连接。".into());
         }
         Ok(Self {
+            pool: export_doc_storage::pool::PoolOptions {
+                size: env::var("EXPORTDOCMANAGER_POSTGRES_POOL_SIZE")
+                    .unwrap_or_else(|_| "4".into())
+                    .parse()
+                    .map_err(|_| "连接池大小必须为整数。")?,
+                acquire_timeout: std::time::Duration::from_millis(
+                    env::var("EXPORTDOCMANAGER_POSTGRES_POOL_WAIT_MS")
+                        .unwrap_or_else(|_| "5000".into())
+                        .parse()
+                        .map_err(|_| "连接池等待时间必须为整数毫秒。")?,
+                ),
+            }
+            .validate()
+            .map_err(|cause| cause.to_string())?,
             paths,
             bind,
             web_root,

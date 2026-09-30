@@ -1,5 +1,6 @@
 //! Template ownership, publication, sharing and version queries.
 mod mutations;
+pub(super) mod queries;
 pub(super) mod starter;
 use super::{
     auth,
@@ -141,59 +142,16 @@ pub fn handle(
 ) -> Result<Value> {
     let store = &service.store;
     if operation == LIST_USER_REPORT_TEMPLATES {
-        let kind = report_type(query(query_values, "reportType"))?;
-        demand_type(actor, kind)?;
-        let include_archived = query(query_values, "includeArchived") == "true";
-        let keyword = query(query_values, "keyword");
-        if keyword.chars().count() > 150 {
-            return Err(invalid("模板搜索名称不能超过 150 个字符。"));
-        }
-        let keyword = store::normalize(keyword);
-        let mut values: Vec<_> = store
-            .all(KIND)?
-            .into_iter()
-            .filter(|value| {
-                value["reportType"] == kind
-                    && (include_archived || value["status"] != "Archived")
-                    && report_assets::template_visible(actor, value)
-                    && store::normalize(&text(value, "name")).contains(&keyword)
-            })
-            .collect();
-        values.sort_by(|left, right| {
-            (right["status"] == "Published")
-                .cmp(&(left["status"] == "Published"))
-                .then_with(|| text(left, "name").cmp(&text(right, "name")))
-                .then_with(|| left["id"].as_i64().cmp(&right["id"].as_i64()))
-        });
-        return Ok(store::paged(
-            values
-                .iter()
-                .map(|value| record(actor, value, false))
-                .collect(),
-            query_values,
-        ));
+        return queries::list(service, actor, query_values);
     }
     if operation == GET_USER_REPORT_TEMPLATE || operation == LIST_USER_REPORT_TEMPLATE_VERSIONS {
         let id = super::records::id(parameters)?;
+        if operation == LIST_USER_REPORT_TEMPLATE_VERSIONS {
+            return queries::versions(service, actor, id, query_values);
+        }
         let value = store.get(KIND, id)?;
         visible(actor, &value)?;
-        if operation == GET_USER_REPORT_TEMPLATE {
-            return Ok(record(actor, &value, true));
-        }
-        let mut versions = vec![];
-        for version in store
-            .all("template-versions")?
-            .into_iter()
-            .filter(|v| v["templateKind"] == KIND && v["templateId"] == id)
-        {
-            let content = &version["content"];
-            if !content.is_object() {
-                return Err(unavailable("模板历史内容损坏。"));
-            }
-            versions.push(json!({"id":version["id"],"userReportTemplateId":id,"versionNumber":content["versionNumber"],"changeType":version["changeType"],"name":content["name"],"status":content["status"],"shareScope":content["shareScope"],"changedBy":version["changedBy"],"createdAt":version["createdAt"],"canRestore":auth::visible(actor,PERMISSION,"restore",&value)}));
-        }
-        versions.sort_by_key(|v| std::cmp::Reverse(v["versionNumber"].as_i64().unwrap_or(0)));
-        return Ok(store::paged(versions, query_values));
+        return Ok(record(actor, &value, true));
     }
     let _access = super::report_template_files::storage_lock(&service.paths)?;
     let saved = if [

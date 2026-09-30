@@ -19,13 +19,23 @@ fn unique(tx: &Connection, value: &Value) -> Result<()> {
         return Ok(());
     }
     let name = store::normalize(&text(value, "name"));
-    if tx.all(KIND)?.iter().any(|other| {
-        other["id"] != value["id"]
-            && other["ownerUserId"] == value["ownerUserId"]
-            && other["reportType"] == value["reportType"]
-            && other["status"] != "Archived"
-            && store::normalize(&text(other, "name")) == name
-    }) {
+    let (_, matches) = tx.query_report_templates(&export_doc_storage::ReportTemplateQuery {
+        audience: export_doc_storage::TemplateAudience {
+            user_id: value["ownerUserId"]
+                .as_i64()
+                .ok_or_else(|| unavailable("模板所有者无效。"))?,
+            can_view: true,
+            ..Default::default()
+        },
+        report_type: &text(value, "reportType"),
+        include_archived: false,
+        keyword: &name,
+        exact_name: true,
+        status: "",
+        offset: 0,
+        limit: 2,
+    })?;
+    if matches.iter().any(|other| other["id"] != value["id"]) {
         return Err(conflict("你已经拥有同名报表模板。"));
     }
     Ok(())
@@ -188,13 +198,7 @@ pub(super) fn lifecycle(
                 return Ok(value);
             }
             let source = tx
-                .all("template-versions")?
-                .into_iter()
-                .find(|v| {
-                    v["templateKind"] == KIND
-                        && v["templateId"] == id
-                        && v["content"]["versionNumber"] == number
-                })
+                .template_version(KIND, id, number)?
                 .ok_or_else(|| error(404, "报表模板历史版本不存在。"))?;
             value["name"] = source["content"]["name"].clone();
             value["contentHtml"] = source["content"]["contentHtml"].clone();

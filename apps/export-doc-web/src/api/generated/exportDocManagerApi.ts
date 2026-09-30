@@ -2729,6 +2729,19 @@ export interface ApiReportTemplateV3RepeatBandContract {
   source: string;
 }
 
+export interface ApiRuntimeDatabaseMetrics {
+  acquireTimeoutMilliseconds: number;
+  acquireTimeouts: number;
+  capacity: number;
+  failed: boolean;
+  leased: number;
+  operations: ApiRuntimeLatencyMetrics;
+  wait: ApiRuntimeLatencyMetrics;
+  writeCoordinatorFailed: boolean;
+  writeTransactions: ApiRuntimeLatencyMetrics;
+  writeWait: ApiRuntimeLatencyMetrics;
+}
+
 export interface ApiRuntimeDependencyInfo {
   key: string;
   label: string;
@@ -2737,6 +2750,53 @@ export interface ApiRuntimeDependencyInfo {
   requirement: string;
   resolvedPath: string;
   status: string;
+}
+
+export interface ApiRuntimeHttpMetrics {
+  admissionRejected: number;
+  availableBulkSlots: number;
+  availableRequestSlots: number;
+  bulkCapacity: number;
+  bulkRejected: number;
+  logWriteErrors: number;
+  logsDropped: number;
+  queueCapacity: number;
+  queueWait: ApiRuntimeLatencyMetrics;
+  queuedRequests: number;
+  requestCapacity: number;
+  requests: ApiRuntimeLatencyMetrics;
+  uptimeSeconds: number;
+}
+
+export interface ApiRuntimeJobMetrics {
+  active: number;
+  failed: boolean;
+  persistedCounts: Record<string, unknown>;
+  stopping: boolean;
+  workerHandles: number;
+}
+
+export interface ApiRuntimeLatencyMetrics {
+  active: number;
+  buckets: ApiRuntimeMetricBucket[];
+  completed: number;
+  failures: number;
+  maxMicroseconds: number;
+  p95UpperBoundMicroseconds: number;
+  p99UpperBoundMicroseconds: number;
+  totalMicroseconds: number;
+}
+
+export interface ApiRuntimeMetricBucket {
+  count: number;
+  upperBoundMicroseconds: number | null;
+}
+
+export interface ApiRuntimeMetricsResponse {
+  checkedAt: string;
+  http: ApiRuntimeHttpMetrics | null;
+  jobs: ApiRuntimeJobMetrics;
+  storage: ApiRuntimeDatabaseMetrics;
 }
 
 export interface ApiRuntimePathInfo {
@@ -9334,6 +9394,11 @@ export class ExportDocManagerApiClient {
   public getReportTemplateV3Contract(init?: ApiRequestInit): Promise<ApiReportTemplateV3ContractResponse> {
     const path = "/api/reports/templates/v3/contract";
     return this.request<ApiReportTemplateV3ContractResponse>("GET", path, { init });
+  }
+
+  public getRuntimeMetrics(init?: ApiRequestInit): Promise<ApiRuntimeMetricsResponse> {
+    const path = "/api/diagnostics/metrics";
+    return this.request<ApiRuntimeMetricsResponse>("GET", path, { init });
   }
 
   public getSalesOpportunity(request: GetSalesOpportunityRequest, init?: ApiRequestInit): Promise<ApiSalesOpportunityDto> {

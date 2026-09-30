@@ -7,6 +7,12 @@ use std::{
 
 struct Database(PathBuf);
 impl Database {
+    fn v6() -> Self {
+        let database = Self::v5();
+        // Apply the released v5 -> v6 schema change, not just a version label.
+        database.raw().execute_batch("BEGIN; CREATE TABLE schema_version_upgrade (version INTEGER PRIMARY KEY CHECK(version >= 5)); INSERT INTO schema_version_upgrade SELECT version FROM schema_version; DROP TABLE schema_version; ALTER TABLE schema_version_upgrade RENAME TO schema_version; UPDATE schema_version SET version=6; COMMIT;").unwrap();
+        database
+    }
     fn v5() -> Self {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../.codex-runtime/schema-migrations")
@@ -43,6 +49,52 @@ impl Drop for Database {
     fn drop(&mut self) {
         fs::remove_dir_all(self.0.parent().unwrap()).unwrap();
     }
+}
+
+#[test]
+fn version_six_query_migration_rolls_back_and_restores_without_losing_data() {
+    let database = Database::v6();
+    let original = fs::read(&database.0).unwrap();
+    let backup = database.0.with_file_name("v6-backup.db");
+    fs::write(&backup, &original).unwrap();
+    database
+        .raw()
+        .execute_batch("CREATE INDEX records_template_catalog ON records(kind);")
+        .unwrap();
+    assert!(Connection::sqlite(&database.0).is_err());
+    assert_eq!(database.version(), 6);
+    let partial: i64 = database
+        .raw()
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_schema WHERE name='records_status_page'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(partial, 0, "the earlier index must roll back too");
+    database
+        .raw()
+        .execute_batch("DROP INDEX records_template_catalog;")
+        .unwrap();
+    for _ in 0..2 {
+        let connection = Connection::sqlite(&database.0).unwrap();
+        assert_eq!(
+            connection.settings("preserved").unwrap().unwrap()["amount"],
+            "123.45"
+        );
+        assert_eq!(database.version(), SCHEMA_VERSION);
+    }
+    let snapshot = database.0.with_file_name("v6-restored.db");
+    export_doc_storage::prepare_sqlite_restore(&backup, &snapshot).unwrap();
+    assert_eq!(fs::read(&backup).unwrap(), original);
+    assert_eq!(
+        Connection::sqlite(&snapshot)
+            .unwrap()
+            .settings("preserved")
+            .unwrap()
+            .unwrap()["text"],
+        "中文业务数据"
+    );
 }
 
 #[test]

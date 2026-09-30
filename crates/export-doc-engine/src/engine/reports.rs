@@ -177,13 +177,8 @@ fn catalog(
     auth::authorize(actor, "document.report-templates", "view")?;
     let mut rows:Vec<_>=render::BUILTINS.iter().filter(|v|v.report_type()==kind).map(|v|json!({"reportType":kind,"displayName":v.label(),"templatePath":v.path(),"withSealDefault":false})).collect();
     rows.extend(super::report_template_files::catalog_entries(paths, kind)?);
-    for saved in store.all("report-templates")? {
-        if text(&saved, "reportType") == kind
-            && saved["status"] == "Published"
-            && report_assets::template_visible(actor, &saved)
-        {
-            rows.push(json!({"reportType":kind,"displayName":saved["name"],"templatePath":format!("user-template:{}",saved["id"]),"withSealDefault":false}));
-        }
+    for saved in super::report_templates::queries::published(store, actor, kind)? {
+        rows.push(json!({"reportType":kind,"displayName":saved["name"],"templatePath":format!("user-template:{}",saved["id"]),"withSealDefault":false}));
     }
     Ok(json!(rows))
 }

@@ -2,6 +2,7 @@
 //! bytes commit together in the same application database as the business data.
 mod output;
 mod persistence;
+mod queries;
 pub mod retention;
 pub(crate) mod retry;
 #[cfg(test)]
@@ -78,6 +79,24 @@ pub struct Jobs {
 }
 
 impl Jobs {
+    pub fn metrics(&self) -> Result<Value> {
+        let (active, workers, stopping, failed) = {
+            let runtime = self
+                .runtime
+                .lock()
+                .map_err(|_| unavailable("文件任务状态异常。"))?;
+            (
+                runtime.active.len(),
+                runtime.workers.len(),
+                runtime.stopping,
+                runtime.failure.is_some(),
+            )
+        };
+        Ok(
+            json!({"active":active,"workerHandles":workers,"stopping":stopping,"failed":failed,
+            "persistedCounts":self.store.connection()?.job_counts()?}),
+        )
+    }
     pub fn open(store: Arc<Store>) -> Result<Self> {
         Self::with_retention(store, Default::default())
     }

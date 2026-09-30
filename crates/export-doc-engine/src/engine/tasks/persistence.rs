@@ -27,9 +27,7 @@ fn accessible(actor: &Actor, job: &Value) -> bool {
 }
 fn lookup(connection: &Connection, id: &str) -> Result<Value> {
     connection
-        .all(KIND)?
-        .into_iter()
-        .find(|job| job["jobId"] == id)
+        .find_identity(KIND, id)?
         .ok_or_else(|| error(404, "文件任务不存在。"))
 }
 pub(super) fn checked(connection: &Connection, actor: &Actor, id: &str) -> Result<Value> {
@@ -49,16 +47,21 @@ fn snapshot(record: &Value) -> Value {
     value["retryRequestJson"] = json!("");
     value["canRetry"] = json!(
         matches!(record["status"].as_str(), Some("Failed" | "Canceled"))
-            && record["_retry"].is_object()
+            && retry_operation(record).is_some()
     );
     value
 }
-fn actor_snapshot(actor: &Actor, record: &Value) -> Value {
+fn retry_operation(record: &Value) -> Option<&str> {
+    record["_retryOperation"]
+        .as_str()
+        .or_else(|| record["_retry"]["operation"].as_str())
+}
+pub(super) fn actor_snapshot(actor: &Actor, record: &Value) -> Value {
     let mut value = snapshot(record);
     if value["canRetry"] == true {
         let operation = crate::generated_api::ALL_OPERATIONS
             .iter()
-            .find(|operation| record["_retry"]["operation"] == operation.id);
+            .find(|operation| retry_operation(record) == Some(operation.id));
         value["canRetry"] = json!(operation.is_some_and(|operation| {
             crate::engine::auth::authorize_operation(actor, *operation, &[]).is_ok()
         }));
@@ -201,20 +204,27 @@ pub fn finish(store: &Store, actor: &Actor, id: &str, result: Result<TaskOutput>
 
 pub fn recover(store: &Store) -> Result<()> {
     store.transaction(|connection| {
-        for mut job in connection.all(KIND)?.into_iter().filter(active) {
-            let actor = owner(&job)?;
-            let id = job["id"]
-                .as_i64()
-                .ok_or_else(|| unavailable("任务记录编号缺失。"))?;
-            connection.delete_blob(id, OUTPUT)?;
-            job["status"] = json!("Failed");
-            job["statusText"] = json!("任务中断");
-            job["errorMessage"] =
-                json!("上次进程在任务完成前退出，未自动重复执行。请核对结果后重新操作。");
-            job["canCancel"] = json!(false);
-            job["outputPath"] = json!("");
-            job["completedAt"] = json!(store::timestamp());
-            save(connection, &actor, job, "recover-interrupted")?;
+        loop {
+            crate::operation::check()?;
+            let (_, jobs) = connection.query_jobs(&super::queries::batch(None, true, &[]))?;
+            if jobs.is_empty() {
+                break;
+            }
+            for mut job in jobs {
+                let actor = owner(&job)?;
+                let id = job["id"]
+                    .as_i64()
+                    .ok_or_else(|| unavailable("任务记录编号缺失。"))?;
+                connection.delete_blob(id, OUTPUT)?;
+                job["status"] = json!("Failed");
+                job["statusText"] = json!("任务中断");
+                job["errorMessage"] =
+                    json!("上次进程在任务完成前退出，未自动重复执行。请核对结果后重新操作。");
+                job["canCancel"] = json!(false);
+                job["outputPath"] = json!("");
+                job["completedAt"] = json!(store::timestamp());
+                save(connection, &actor, job, "recover-interrupted")?;
+            }
         }
         Ok(())
     })
@@ -227,58 +237,7 @@ pub fn get(store: &Store, actor: &Actor, id: &str) -> Result<Value> {
     ))
 }
 pub fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
-    let parameter = |key: &str| {
-        query
-            .iter()
-            .find(|(name, _)| *name == key)
-            .map(|(_, value)| value.trim())
-            .unwrap_or("")
-    };
-    let status = parameter("status");
-    if !status.is_empty()
-        && ![
-            "Pending",
-            "Queued",
-            "Running",
-            "Canceling",
-            "Succeeded",
-            "Failed",
-            "Canceled",
-        ]
-        .iter()
-        .any(|known| known.eq_ignore_ascii_case(status))
-    {
-        return Err(invalid("文件任务状态筛选无效。"));
-    }
-    let keyword = parameter("keyword").to_lowercase();
-    let mut jobs: Vec<_> = store
-        .all(KIND)?
-        .iter()
-        .filter(|job| accessible(actor, job))
-        .filter(|job| {
-            status.is_empty()
-                || text(job, "status").eq_ignore_ascii_case(status)
-                || (status.eq_ignore_ascii_case("Canceling")
-                    && job["cancelRequested"] == true
-                    && active(job))
-        })
-        .filter(|job| {
-            keyword.is_empty()
-                || [
-                    "title",
-                    "kind",
-                    "statusText",
-                    "detailText",
-                    "requestedBy",
-                    "errorMessage",
-                ]
-                .iter()
-                .any(|key| text(job, key).to_lowercase().contains(&keyword))
-        })
-        .map(|job| actor_snapshot(actor, job))
-        .collect();
-    jobs.sort_by(|a, b| b["createdAt"].as_str().cmp(&a["createdAt"].as_str()));
-    Ok(store::page_only(jobs, query))
+    super::queries::list(store, actor, query)
 }
 pub fn download(store: &Store, actor: &Actor, id: &str) -> Result<FileOutput> {
     let connection = store.connection()?;
@@ -347,14 +306,22 @@ pub fn delete(store: &Store, actor: &Actor, id: &str) -> Result<()> {
 }
 pub fn clear_finished(store: &Store, actor: &Actor) -> Result<usize> {
     store.transaction(|connection| {
-        let jobs: Vec<_> = connection
-            .all(KIND)?
-            .into_iter()
-            .filter(|job| !active(job) && accessible(actor, job))
-            .collect();
-        let count = jobs.len();
-        for job in jobs {
-            remove(connection, actor, job)?;
+        let fields = super::queries::metadata_fields();
+        let mut count = 0;
+        loop {
+            crate::operation::check()?;
+            let (_, jobs) = connection.query_jobs(&super::queries::batch(
+                (!actor.admin).then_some(actor.id),
+                false,
+                &fields,
+            ))?;
+            if jobs.is_empty() {
+                break;
+            }
+            count += jobs.len();
+            for job in jobs {
+                remove(connection, actor, job)?;
+            }
         }
         Ok(count)
     })

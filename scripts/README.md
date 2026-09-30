@@ -53,7 +53,7 @@ Windows 批量入口默认 `-Edition All`，仅生成 Document、Sales，共用�
 
 桌面业务库统一位于 `App_Data/Database/exportdoc-native.db`，实例锁位于 `App_Data/Locks`。旧位置 `App_Data/exportdoc-native.db` 中受支持的数据库会通过 SQLite 快照自动搬入 Database，原文件保留在 `Backups/DatabaseLayout`；新旧两处同时有库则停止并提示核对。不要手工只移动正在使用的主文件：它可能还有未合并的 WAL。WebView 内部数据库保留在 `WebView` profile 中。
 
-便携包重复构建会保留已有 `App_Data`。Rust 数据库从版本 5 起逐版升级，当前为 6；只有数据库不存在才新建，已有库失败不覆盖。版本 4 及以前不做兼容：确认无需使用后，先退出程序并将原 `App_Data` 整体另存，再启动初始化。不要直接修改版本标记。初始化错误及启动期 panic 会显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；运行目录不可写时提示备用日志位置或日志写入失败。
+便携包重复构建会保留已有 `App_Data`。Rust 数据库从版本 5 起逐版升级，当前为 7；只有数据库不存在才新建，已有库失败不覆盖。版本 4 及以前不做兼容：确认无需使用后，先退出程序并将原 `App_Data` 整体另存，再启动初始化。不要直接修改版本标记。初始化错误及启动期 panic 会显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；运行目录不可写时提示备用日志位置或日志写入失败。
 
 Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便携包携带原版固定清单验证的微软离线安装器；缺少 WebView2 时显示安装／退出选择，保留取消、繁忙、超时和需重启处理。构建时核对微软签名、版本、大小和 SHA-256。Windows GNU 构建同时携带 `WebView2Loader.dll`。
 
@@ -79,9 +79,21 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 应用 schema 升级与 PostgreSQL 软件主版本升级是两件事：当前 Rust schema 为 6，从 5 开始事务升级；本次部署调整不改变 schema 或备份格式。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。升级前在界面导出备份/完整迁移包并保存在本机故障之外的位置。
 
-首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接只供初始化／升级／恢复使用。桌面 SQLite 空库仍为 admin 空密码；当前数据库版本 6，支持从 Rust 版本 5 升级，不兼容 C# v19 或版本 4 及更早试验库。
+首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接只供初始化／升级／恢复使用。桌面 SQLite 空库仍为 admin 空密码；当前数据库版本 7，支持从 Rust 版本 5 升级，不兼容 C# v19 或版本 4 及更早试验库。
 
 ## 远端入口
+
+### 连接池、运行指标与容量验证
+
+PostgreSQL 默认 4 个业务连接，另有一个独立实例锁连接；读取并行，事务写入保持统一协调、同连接事务和当前权限复核。SQLite 使用单连接。`EXPORTDOCMANAGER_POSTGRES_POOL_SIZE` 接受 1–16，`EXPORTDOCMANAGER_POSTGRES_POOL_WAIT_MS` 接受 1–30000 毫秒，默认 5000；Docker 分别通过 `NATIVE_POSTGRES_POOL_SIZE` 和 `NATIVE_POSTGRES_POOL_WAIT_MS` 传入。参数无效时拒绝启动。连接等待超时返回繁忙，取消释放等待；观察到连接/实例锁故障后停止继续办理，修复后重启，不自动重放写入。
+
+HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 5 秒；队列满或等待超时返回 429。管理员使用正常登录取得的 Bearer 令牌访问 `/api/diagnostics/metrics`，可读取连接池、写入协调、HTTP 排队和处理耗时、失败/拒绝及任务计数。服务端分位数是固定直方图的上界，负载脚本另外统计客户端实测 P95/P99；进程计数在重启后重置，任务计数来自当前保留记录。
+
+已声明的 API 响应带 `X-Request-Id`。`DataRoot/Logs/requests.jsonl` 记录对应操作名、时间、状态与耗时，约 8 MiB 轮转到 `requests.previous.jsonl`，保留两个文件；日志使用 256 条有界队列和批量写入，不记录令牌、密码、SQL 或请求正文。丢弃和写入失败可在指标中观察；这是运维日志，数据库中的事务审计继续独立保存。
+
+`test-native-postgres.ps1 -PostgresBin <PostgreSQL-18-bin>` 默认执行存储、团队业务及恢复实库契约，可用 `-Scope Storage` 或 `-Scope Engine` 定向验证。`-Scope Capacity` 是独立的 20 会话负载：使用新建的隔离数据库比较 1/4 连接，包含查询、发票保存、人员关联后的报销提交/审批及 PDF 导出。运行前需准备前端 npm 依赖和随包字体；脚本构建实际 Debug HTTP 服务，原数据库和便携数据不参与测试。输出吞吐、P95/P99、HTTP 状态、内存及指标快照到 `.codex-runtime/native-capacity`，不把 Debug 场景当成生产 SLA。
+
+存储故障演练分别终止隔离库的实例锁连接和业务连接，验证已提交数据保留、未提交写入回滚及重建连接池耗时；测试维护账号的 `pg_signal_backend` 仅在临时测试集群授予，生产部署不授予。升级失败和损坏备份保持失败与回滚边界。连接重建的恢复点与从备份恢复的时间点分别记录，生产备份频率和设备故障演练由部署环境制定。
 
 ### 备份、迁移与恢复
 

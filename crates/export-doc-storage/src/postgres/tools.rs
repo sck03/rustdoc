@@ -94,6 +94,9 @@ impl MaintenanceLease {
         let mut transaction = self.client.transaction()?;
         transaction.batch_execute(&format!("SET LOCAL ROLE \"{owner}\"; REVOKE CREATE ON SCHEMA public FROM PUBLIC; GRANT USAGE ON SCHEMA public TO \"{application}\"; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO \"{application}\"; GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{application}\"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO \"{application}\"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE,SELECT ON SEQUENCES TO \"{application}\";"))?;
         super::migrate_schema(&mut transaction)?;
+        transaction.batch_execute(&format!(
+            "GRANT EXECUTE ON FUNCTION public.exportdoc_record_text(jsonb) TO \"{application}\";"
+        ))?;
         transaction.commit()?;
         Ok(())
     }

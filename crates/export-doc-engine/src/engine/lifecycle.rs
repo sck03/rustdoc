@@ -2,6 +2,11 @@
 use super::*;
 
 impl NativeService {
+    pub fn runtime_metrics(&self) -> Result<Value> {
+        Ok(
+            json!({"checkedAt":store::timestamp(),"storage":self.store.metrics(),"jobs":self.jobs.metrics()?,"http":null}),
+        )
+    }
     pub fn open(paths: RuntimePaths) -> Result<Arc<Self>> {
         Self::open_with_retention(paths, Default::default())
     }
@@ -67,8 +72,30 @@ impl NativeService {
         clock: crate::clock::BusinessClock,
         retention: tasks::retention::Retention,
     ) -> Result<Arc<Self>> {
+        Self::open_postgres_configured(
+            paths,
+            connection_string,
+            bootstrap_token,
+            clock,
+            retention,
+            Default::default(),
+        )
+    }
+    #[cfg(feature = "postgres")]
+    pub fn open_postgres_configured(
+        paths: RuntimePaths,
+        connection_string: &str,
+        bootstrap_token: String,
+        clock: crate::clock::BusinessClock,
+        retention: tasks::retention::Retention,
+        pool: export_doc_storage::pool::PoolOptions,
+    ) -> Result<Arc<Self>> {
         super::team_backup::postgres::ensure_no_pending(&paths)?;
-        let store = Arc::new(Store::open_postgres(&paths, connection_string)?);
+        let store = Arc::new(Store::open_postgres_with_pool(
+            &paths,
+            connection_string,
+            pool,
+        )?);
         packing::seed(&store)?;
         #[cfg(feature = "mail")]
         email::recover(&store)?;
@@ -96,6 +123,6 @@ impl NativeService {
     }
     pub fn health(&self) -> Result<()> {
         self.jobs.health()?;
-        self.store.connection()?.health().map_err(Into::into)
+        self.store.health()
     }
 }

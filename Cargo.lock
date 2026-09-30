@@ -1655,11 +1655,13 @@ dependencies = [
 name = "export-doc-storage"
 version = "0.1.1"
 dependencies = [
+ "chrono",
  "native-tls",
  "postgres",
  "postgres-native-tls",
  "rusqlite",
  "serde_json",
+ "unicode-normalization",
 ]
 
 [[package]]

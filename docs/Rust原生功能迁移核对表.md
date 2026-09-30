@@ -14,7 +14,7 @@
 | 客户、供应商、商机、跟进 | 原版目录和对象详情保留 | crm、sales、related_records | 保存、并发、范围权限、导入导出 |
 | 组织、人员、通讯录、行政 | 原版页面保留 | organization、personnel、office | 组织联动、隐私权限、预约／交接 |
 | 行政与人事申请 | 新增独立 OA 页面，分为行政办公/人事管理 | domain::oa、engine::oa、存储层过滤分页 | 请假、加班、报销、出差、采购、通用申请；凭证、审批、移交/完成及交接阻断。报销不连接原付款模板或独立财务软件数据库 |
-| 模板与设计器、单据包 | 原版 V3 画布保留 | report_templates、report_assets、document_packages | 模板资源、发布、预览与输出一致 |
+| 模板与设计器、单据包 | 原版 V3 画布保留 | report_templates、report_assets、document_packages；storage 元数据分页/同名检查/定向版本读取 | 模板资源、发布、预览与输出一致；报表目录及历史避免整类正文加载，完整票面/打印仍按专门方案验收 |
 | 邮件、汇率、HS、OCR、Excel | 原版工具页保留 | 独立能力 crate 及 engine 适配 | OCR 已实测 Rust PP-OCRv6 + ONNX；文件选择、预览、识别、结果复制和缺资源提示已接通 |
 | 单一窗口、装柜 | 原版页面保留 | single_window、packing | 持卡机／回执样本、生成输出与版本 |
 | 权限、日志、设置、备份、恢复 | 原版管理页保留 | accounts、audit、settings、maintenance | 敏感字段、数据库错误、失败恢复、清理 |

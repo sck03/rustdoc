@@ -38,6 +38,9 @@ impl NativeService {
             )
     }
     pub fn supports(operation: Operation) -> bool {
+        if operation == GET_RUNTIME_METRICS {
+            return true;
+        }
         if oa::metadata(operation).is_some() || communication::metadata(operation).is_some() {
             return true;
         }

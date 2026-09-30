@@ -81,6 +81,49 @@ impl Sqlite {
         }
         Self::validate(&transaction)?;
         transaction.commit()?;
+        connection.create_scalar_function(
+            "template_normalize",
+            1,
+            rusqlite::functions::FunctionFlags::SQLITE_UTF8
+                | rusqlite::functions::FunctionFlags::SQLITE_DETERMINISTIC,
+            |context| {
+                use unicode_normalization::UnicodeNormalization;
+                Ok(context
+                    .get::<Option<String>>(0)?
+                    .unwrap_or_default()
+                    .nfc()
+                    .collect::<String>()
+                    .trim()
+                    .to_lowercase())
+            },
+        )?;
+        connection.create_scalar_function(
+            "record_json",
+            1,
+            rusqlite::functions::FunctionFlags::SQLITE_UTF8
+                | rusqlite::functions::FunctionFlags::SQLITE_DETERMINISTIC,
+            |context| {
+                let source = context
+                    .get::<Option<String>>(0)?
+                    .unwrap_or_else(|| "null".into());
+                let value: Value = serde_json::from_str(&source)
+                    .map_err(|e| rusqlite::Error::UserFunctionError(Box::new(e)))?;
+                serde_json::to_string(&value)
+                    .map_err(|e| rusqlite::Error::UserFunctionError(Box::new(e)))
+            },
+        )?;
+        connection.create_scalar_function(
+            "job_time",
+            1,
+            rusqlite::functions::FunctionFlags::SQLITE_UTF8
+                | rusqlite::functions::FunctionFlags::SQLITE_DETERMINISTIC,
+            |context| {
+                let value = context.get::<String>(0)?;
+                chrono::DateTime::parse_from_rfc3339(&value)
+                    .map(|time| time.timestamp_millis())
+                    .map_err(|e| rusqlite::Error::UserFunctionError(Box::new(e)))
+            },
+        )?;
         Ok(Self {
             connection: RefCell::new(connection),
         })
@@ -111,27 +154,22 @@ impl Sqlite {
     }
 }
 impl Adapter for Sqlite {
+    fn job_counts(&self) -> Result<Value> {
+        let connection = self.connection.borrow();
+        let mut statement=connection.prepare("SELECT json_extract(body,'$.status'),COUNT(*) FROM records WHERE kind='background-jobs' GROUP BY json_extract(body,'$.status')")?;
+        let rows = statement.query_map([], |row| {
+            Ok((row.get::<_, Option<String>>(0)?, row.get::<_, i64>(1)?))
+        })?;
+        let mut counts = serde_json::Map::new();
+        for row in rows {
+            let (status, count) = row?;
+            counts.insert(status.unwrap_or_else(|| "Unknown".into()), json!(count));
+        }
+        Ok(Value::Object(counts))
+    }
     fn query_communications(&self, q: &CommunicationQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let sql = communication::sql(q, false);
-        let connection = self.connection.borrow();
-        let params = || rusqlite::params_from_iter(sql.values.iter());
-        let count = connection.query_row(
-            &format!("SELECT COUNT(*) FROM records r WHERE {}", sql.filter),
-            params(),
-            |row| row.get(0),
-        )?;
-        let mut statement = connection.prepare(&format!(
-            "SELECT r.body FROM records r WHERE {} ORDER BY {} LIMIT {} OFFSET {}",
-            sql.filter,
-            sql.order,
-            q.limit.clamp(1, 100),
-            q.offset.max(0)
-        ))?;
-        let rows = statement
-            .query_map(params(), |row| row.get::<_, String>(0))?
-            .map(|row| serde_json::from_str(&row?).map_err(Into::into))
-            .collect::<Result<Vec<_>>>()?;
-        Ok((count, rows))
+        self.query_page(&sql, "r.body", q.offset, q.limit.clamp(1, 100))
     }
     fn provider(&self) -> &'static str {
         "SQLite"
@@ -141,6 +179,10 @@ impl Adapter for Sqlite {
     }
     fn begin(&self) -> Result<()> {
         self.connection.borrow().execute_batch("BEGIN IMMEDIATE;")?;
+        Ok(())
+    }
+    fn begin_read(&self) -> Result<()> {
+        self.connection.borrow().execute_batch("BEGIN;")?;
         Ok(())
     }
     fn commit(&self) -> Result<()> {
@@ -192,25 +234,24 @@ impl Adapter for Sqlite {
     }
     fn query_records(&self, q: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let sql = super::record_query::sql(q, false);
+        self.query_page(&sql, "r.body", q.offset, q.limit.clamp(1, 100))
+    }
+    fn query_page(
+        &self,
+        sql: &QuerySql,
+        projection: &str,
+        offset: i64,
+        limit: i64,
+    ) -> Result<(i64, Vec<Value>)> {
         let connection = self.connection.borrow();
         let params = || rusqlite::params_from_iter(sql.values.iter());
-        let count = connection.query_row(
-            &format!("SELECT COUNT(*) FROM records r WHERE {}", sql.filter),
-            params(),
-            |row| row.get(0),
-        )?;
-        let mut statement = connection.prepare(&format!(
-            "SELECT r.body FROM records r WHERE {} ORDER BY {} LIMIT {} OFFSET {}",
-            sql.filter,
-            sql.order,
-            q.limit.clamp(1, 100),
-            q.offset.max(0)
-        ))?;
-        let rows = statement
-            .query_map(params(), |row| row.get::<_, String>(0))?
-            .map(|row| serde_json::from_str(&row?).map_err(Into::into))
-            .collect::<Result<Vec<_>>>()?;
-        Ok((count, rows))
+        let query = format!("SELECT (SELECT COUNT(*) FROM records r WHERE {filter}),
+            (SELECT json_group_array(json(page.body)) FROM
+             (SELECT {projection} AS body FROM records r WHERE {filter} ORDER BY {order} LIMIT {limit} OFFSET {offset}) page)",
+            filter=sql.filter, order=sql.order, limit=limit.clamp(1,200), offset=offset.max(0));
+        let (count, rows): (i64, String) =
+            connection.query_row(&query, params(), |row| Ok((row.get(0)?, row.get(1)?)))?;
+        Ok((count, serde_json::from_str(&rows)?))
     }
     fn insert(&self, r: &RecordWrite<'_>) -> Result<i64> {
         let c = self.connection.borrow();

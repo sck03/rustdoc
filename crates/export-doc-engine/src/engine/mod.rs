@@ -303,6 +303,10 @@ impl NativeService {
             _ => {
                 let actor = self.sessions.actor(&self.store, token)?;
                 self.authorize_operation(&actor, operation, query)?;
+                if operation == GET_RUNTIME_METRICS {
+                    auth::authorize(&actor, "system.settings", "view")?;
+                    return serde_json::to_vec(&self.runtime_metrics()?).map_err(Into::into);
+                }
                 if communication::metadata(operation).is_some() {
                     return serde_json::to_vec(&communication::handle(
                         self,

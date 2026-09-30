@@ -5,12 +5,13 @@ use postgres_native_tls::MakeTlsConnector;
 use serde_json::json;
 use std::{
     cell::RefCell,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
 pub struct Postgres {
     client: RefCell<Client>,
-    lock: RefCell<(Client, Instant)>,
+    lock: Arc<Mutex<(Client, Instant)>>,
 }
 const INSTANCE_LOCK: i64 = 0x455850444F434D47;
 impl From<::postgres::Error> for Error {
@@ -34,22 +35,34 @@ impl From<::postgres::Error> for Error {
     }
 }
 impl Postgres {
+    pub(super) fn health_check(&self) -> Arc<dyn Fn() -> Result<()> + Send + Sync> {
+        let lock = self.lock.clone();
+        Arc::new(move || check_instance(&lock))
+    }
     pub fn open(connection_string: &str) -> Result<Self> {
+        Ok(Self::open_pool(connection_string, 1)?.remove(0))
+    }
+    pub(super) fn open_pool(connection_string: &str, size: usize) -> Result<Vec<Self>> {
         let mut lock = connect(connection_string)?;
         acquire_lock(&mut lock)?;
-        let mut client = connect(connection_string)?;
-        let privileges = client.query_one(
+        let lock = Arc::new(Mutex::new((lock, Instant::now())));
+        let mut connections = Vec::with_capacity(size);
+        for _ in 0..size {
+            let mut client = connect(connection_string)?;
+            let privileges = client.query_one(
             "SELECT rolsuper, rolcreatedb, rolcreaterole, has_schema_privilege(current_user, current_schema(), 'CREATE') FROM pg_roles WHERE rolname=current_user", &[])?;
-        if (0..4).any(|column| privileges.get::<_, bool>(column)) {
-            return Err(Error::unavailable(
-                "普通 API 必须使用没有管理或建表权限的业务账号。",
-            ));
+            if (0..4).any(|column| privileges.get::<_, bool>(column)) {
+                return Err(Error::unavailable(
+                    "普通 API 必须使用没有管理或建表权限的业务账号。",
+                ));
+            }
+            validate_schema(&mut client)?;
+            connections.push(Self {
+                client: RefCell::new(client),
+                lock: lock.clone(),
+            });
         }
-        validate_schema(&mut client)?;
-        Ok(Self {
-            client: RefCell::new(client),
-            lock: RefCell::new((lock, Instant::now())),
-        })
+        Ok(connections)
     }
 }
 
@@ -74,6 +87,21 @@ fn connect(connection_string: &str) -> Result<Client> {
         return Err(Error::unavailable("团队数据库必须使用 PostgreSQL 18。"));
     }
     Ok(client)
+}
+fn check_instance(lease: &Mutex<(Client, Instant)>) -> Result<()> {
+    let mut lock = lease
+        .lock()
+        .map_err(|_| Error::unavailable("PostgreSQL 实例锁状态异常。"))?;
+    if lock.0.is_closed() {
+        return Err(Error::unavailable(
+            "PostgreSQL 实例锁连接已中断，必须重新启动服务。",
+        ));
+    }
+    if lock.1.elapsed() > Duration::from_secs(2) {
+        lock.0.simple_query("SELECT 1")?;
+        lock.1 = Instant::now();
+    }
+    Ok(())
 }
 
 fn acquire_lock(client: &mut Client) -> Result<()> {
@@ -106,6 +134,12 @@ fn validate_schema(client: &mut impl ::postgres::GenericClient) -> Result<()> {
     if schema_version(client)? != SCHEMA_VERSION {
         return Err(Error::unavailable(
             "PostgreSQL 数据库需要升级，请停机后通过维护账号运行初始化/升级命令；原库已保留。",
+        ));
+    }
+    let queries_available:bool=client.query_one("SELECT COALESCE(has_function_privilege(current_user, to_regprocedure('public.exportdoc_record_text(jsonb)'), 'EXECUTE'), false)",&[])?.try_get(0)?;
+    if !queries_available {
+        return Err(Error::unavailable(
+            "受管查询函数缺失或不可执行，请通过维护流程核对数据库。",
         ));
     }
     Ok(())
@@ -160,79 +194,57 @@ pub fn initialize(connection_string: &str, owner: &str) -> Result<()> {
     validate_schema(&mut client)
 }
 impl Adapter for Postgres {
+    fn is_closed(&self) -> bool {
+        self.client.borrow().is_closed()
+    }
+    fn job_counts(&self) -> Result<Value> {
+        let mut counts = serde_json::Map::new();
+        for row in self.client.borrow_mut().query("SELECT body->>'status',COUNT(*) FROM records WHERE kind='background-jobs' GROUP BY body->>'status'",&[])? {
+            let status:Option<String>=row.try_get(0)?;
+            counts.insert(status.unwrap_or_else(||"Unknown".into()),json!(row.try_get::<_,i64>(1)?));
+        }
+        Ok(Value::Object(counts))
+    }
     fn query_communications(&self, q: &CommunicationQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let sql = communication::sql(q, true);
-        let mut client = self.client.borrow_mut();
-        let params: Vec<&(dyn ::postgres::types::ToSql + Sync)> = sql
-            .values
-            .iter()
-            .map(|v| v as &(dyn ::postgres::types::ToSql + Sync))
-            .collect();
-        let count = client
-            .query_one(
-                &format!("SELECT COUNT(*) FROM records r WHERE {}", sql.filter),
-                &params,
-            )?
-            .try_get(0)?;
-        let rows = client
-            .query(
-                &format!(
-                    "SELECT r.body::text FROM records r WHERE {} ORDER BY {} LIMIT {} OFFSET {}",
-                    sql.filter,
-                    sql.order,
-                    q.limit.clamp(1, 100),
-                    q.offset.max(0)
-                ),
-                &params,
-            )?
-            .into_iter()
-            .map(|row| serde_json::from_str(&row.try_get::<_, String>(0)?).map_err(Into::into))
-            .collect::<Result<Vec<_>>>()?;
-        Ok((count, rows))
+        self.query_page(&sql, "r.body::text", q.offset, q.limit.clamp(1, 100))
     }
     fn query_records(&self, q: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let sql = super::record_query::sql(q, true);
+        self.query_page(&sql, "r.body::text", q.offset, q.limit.clamp(1, 100))
+    }
+    fn query_page(
+        &self,
+        sql: &QuerySql,
+        projection: &str,
+        offset: i64,
+        limit: i64,
+    ) -> Result<(i64, Vec<Value>)> {
         let mut client = self.client.borrow_mut();
         let params: Vec<&(dyn ::postgres::types::ToSql + Sync)> = sql
             .values
             .iter()
             .map(|v| v as &(dyn ::postgres::types::ToSql + Sync))
             .collect();
-        let count = client
-            .query_one(
-                &format!("SELECT COUNT(*) FROM records r WHERE {}", sql.filter),
-                &params,
-            )?
-            .try_get(0)?;
-        let rows = client
-            .query(
-                &format!(
-                    "SELECT r.body::text FROM records r WHERE {} ORDER BY {} LIMIT {} OFFSET {}",
-                    sql.filter,
-                    sql.order,
-                    q.limit.clamp(1, 100),
-                    q.offset.max(0)
-                ),
-                &params,
-            )?
-            .into_iter()
-            .map(|row| serde_json::from_str(&row.try_get::<_, String>(0)?).map_err(Into::into))
-            .collect::<Result<Vec<_>>>()?;
-        Ok((count, rows))
+        let query = format!("SELECT (SELECT COUNT(*) FROM records r WHERE {filter}),
+            COALESCE((SELECT jsonb_agg(page.body::jsonb) FROM
+             (SELECT {projection} AS body FROM records r WHERE {filter} ORDER BY {order} LIMIT {limit} OFFSET {offset}) page), '[]'::jsonb)::text",
+            filter=sql.filter, order=sql.order, limit=limit.clamp(1,200), offset=offset.max(0));
+        let row = client.query_one(&query, &params)?;
+        Ok((
+            row.try_get(0)?,
+            serde_json::from_str(&row.try_get::<_, String>(1)?)?,
+        ))
     }
     fn provider(&self) -> &'static str {
         "PostgreSQL"
     }
     fn health(&self) -> Result<()> {
-        let mut lock = self.lock.borrow_mut();
-        if lock.0.is_closed() || self.client.borrow().is_closed() {
+        check_instance(&self.lock)?;
+        if self.client.borrow().is_closed() {
             return Err(Error::unavailable(
                 "PostgreSQL 实例锁连接已中断，必须重新启动服务。",
             ));
-        }
-        if lock.1.elapsed() > Duration::from_secs(2) {
-            lock.0.simple_query("SELECT 1")?;
-            lock.1 = Instant::now();
         }
         Ok(())
     }
@@ -240,6 +252,12 @@ impl Adapter for Postgres {
         self.client
             .borrow_mut()
             .batch_execute("BEGIN ISOLATION LEVEL SERIALIZABLE")?;
+        Ok(())
+    }
+    fn begin_read(&self) -> Result<()> {
+        self.client
+            .borrow_mut()
+            .batch_execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")?;
         Ok(())
     }
     fn commit(&self) -> Result<()> {

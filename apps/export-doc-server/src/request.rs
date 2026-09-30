@@ -24,16 +24,41 @@ impl Drop for Cancellation {
 }
 
 pub async fn handle(state: ServerState, operation: Operation, request: Request) -> Response<Body> {
-    match tokio::time::timeout(
+    let span = state.telemetry.start(operation.id);
+    let request_id = span.id().to_owned();
+    let mut response = match tokio::time::timeout(
         Duration::from_secs(request_seconds(operation) + 5),
-        execute(state, operation, request),
+        execute(state.clone(), operation, request),
     )
     .await
     .unwrap_or_else(|_| Err(error(504, "请求读取或处理超过时限。")))
     {
-        Ok(bytes) => response::success(operation, bytes),
+        Ok(mut reply) => {
+            if operation == GET_RUNTIME_METRICS {
+                match serde_json::from_slice::<Value>(&reply.bytes) {
+                    Ok(mut value) => {
+                        value["http"] = state.telemetry.snapshot(
+                            state.requests.available(),
+                            state.bulk_uploads.available_permits(),
+                            state.requests.queued(),
+                        );
+                        reply.bytes = value.to_string().into_bytes();
+                        response::success(operation, reply)
+                    }
+                    Err(_) => response::error(error(503, "运行指标响应无效。")),
+                }
+            } else {
+                response::success(operation, reply)
+            }
+        }
         Err(error) => response::error(error),
-    }
+    };
+    response.headers_mut().insert(
+        "x-request-id",
+        request_id.parse().expect("generated ASCII request id"),
+    );
+    span.finish(response.status().as_u16());
+    response
 }
 
 async fn execute(
@@ -61,11 +86,7 @@ async fn execute(
             }
         }
     }
-    let permit = state
-        .requests
-        .clone()
-        .try_acquire_owned()
-        .map_err(|_| error(429, "当前请求较多，请稍后重试。"))?;
+    let permit = state.requests.acquire(&state.telemetry).await?;
     let scope = OperationScope::new(Duration::from_secs(request_seconds(operation)));
     let bulk_permit = if [
         UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB,
@@ -79,7 +100,10 @@ async fn execute(
                 .bulk_uploads
                 .clone()
                 .try_acquire_owned()
-                .map_err(|_| error(429, "大文件上传正在处理，请稍后重试。"))?,
+                .map_err(|_| {
+                    state.telemetry.reject(true);
+                    error(429, "大文件上传正在处理，请稍后重试。")
+                })?,
         )
     } else {
         None
