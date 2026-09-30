@@ -10,19 +10,22 @@ export function useOaRequests(client: ExportDocManagerApiClient, user: ApiUserDt
   const selected = Number(params.get("requestId")) || 0;
   const [page, setPage] = useState(1);
   const canReceive = kind === "expense" && oaAccess(user, kind, "complete");
-  const [financeMode, setFinanceMode] = useState(canReceive && !oaAccess(user, kind, "approve"));
-  const financeOnly = canReceive && financeMode;
+  const canApprove = oaAccess(user, kind, "approve");
+  const view = params.get("view") ?? (canReceive && !canApprove ? "finance" : "requests");
+  const financeOnly = canReceive && view === "finance";
+  const approvalsOnly = canApprove && view === "approvals";
   const [mineOnly, setMine] = useState(!oaAccess(user, kind, "approve"));
-  const [status, setStatus] = useState(financeOnly ? "Approved" : "");
+  const [filter, setFilter] = useState({ view, status: financeOnly ? "Approved" : approvalsOnly ? "Pending" : "" });
+  const status = filter.view === view ? filter.status : financeOnly ? "Approved" : approvalsOnly ? "Pending" : "";
   const api = oaApi(client, kind);
   const key = ["office", "oa", kind, user.id, user.companyScope];
-  const query = useQuery({ queryKey: [...key, "list", page, mineOnly, status, financeOnly], enabled: oaAccess(user, kind, "view"),
-    queryFn: ({ signal }) => api.list({ pageNumber: page, pageSize: 20, mineOnly: financeOnly ? false : mineOnly, status: status || undefined, financeOnly: kind === "expense" ? financeOnly : undefined }, { signal }),
+  const query = useQuery({ queryKey: [...key, "list", page, mineOnly, status, financeOnly, approvalsOnly], enabled: oaAccess(user, kind, "view"),
+    queryFn: ({ signal }) => api.list({ pageNumber: page, pageSize: 20, mineOnly: financeOnly || approvalsOnly ? false : mineOnly, status: status || undefined, financeOnly: kind === "expense" ? financeOnly : undefined, approvalsOnly }, { signal }),
     refetchInterval: 30000, refetchIntervalInBackground: false });
   const detail = useQuery({ queryKey: [...key, "detail", selected], enabled: selected > 0 && oaAccess(user, kind, "view"),
     queryFn: ({ signal }) => api.get(selected, { signal }) });
-  return { query, detail, selected, page, setPage, mineOnly, status, canReceive, financeOnly,
-    changeFinance: (value: boolean) => { setFinanceMode(value); setStatus(value ? "Approved" : ""); setPage(1); },
-    select: (id: number) => setParams(id ? { requestId: String(id) } : {}),
-    changeMine: (value: boolean) => { setMine(value); setPage(1); }, changeStatus: (value: string) => { setStatus(value); setPage(1); } };
+  return { query, detail, selected, page, setPage, mineOnly, status, canReceive, financeOnly, canApprove, approvalsOnly,
+    changeView: (value: string) => { setParams({ view: value }); setPage(1); },
+    select: (id: number) => setParams((current) => { const next = new URLSearchParams(current); if (id) next.set("requestId", String(id)); else next.delete("requestId"); return next; }),
+    changeMine: (value: boolean) => { setMine(value); setPage(1); }, changeStatus: (value: string) => { setFilter({ view, status: value }); setPage(1); } };
 }

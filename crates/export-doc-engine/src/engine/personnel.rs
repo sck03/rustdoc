@@ -205,9 +205,6 @@ pub fn handle(
             })?
         }
         LIST_PERSONNEL_ACCOUNT_OPTIONS | LINK_PERSONNEL_ACCOUNT => {
-            if store.provider()? == "SQLite" {
-                return Err(invalid("单机登记模式不需要关联登录账号。"));
-            }
             if !actor.admin {
                 return Err(error(403, "只有管理员可以关联账号。"));
             }

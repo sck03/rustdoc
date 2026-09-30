@@ -344,6 +344,22 @@ pub fn authorize(actor: &Actor, resource: &str, action: &str) -> Result<()> {
         Err(error(403, "当前账号没有此操作权限。"))
     }
 }
+pub(super) fn scope_rank(actor: &Actor, resource: &str, action: &str) -> u8 {
+    if authorize(actor, resource, action).is_err() {
+        return 0;
+    }
+    if actor.admin {
+        return 4;
+    }
+    let action = permissions::service_action(resource, action);
+    actor
+        .grants
+        .iter()
+        .filter(|grant| grant["resourceKey"] == resource && grant["action"] == action)
+        .map(|grant| permissions::scope_rank(grant["dataScope"].as_str().unwrap_or("")))
+        .max()
+        .unwrap_or(0)
+}
 pub fn visible(actor: &Actor, resource: &str, action: &str, record: &Value) -> bool {
     if !actor.edition.allows(resource) {
         return false;

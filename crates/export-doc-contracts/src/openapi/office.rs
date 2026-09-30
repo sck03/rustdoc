@@ -1,3 +1,4 @@
+mod approval;
 mod schemas;
 use serde_json::{Value, json};
 
@@ -130,6 +131,7 @@ pub(super) fn extend(doc: &mut Value) {
             ("cancel", "Cancel", "cancel"),
             ("void", "Void", "approve"),
             ("complete", "Complete", "complete"),
+            ("remind", "Remind", "edit"),
         ] {
             add(
                 &format!("/{{id}}/{action}"),
@@ -175,6 +177,7 @@ pub(super) fn extend(doc: &mut Value) {
             json!({"application/octet-stream":{"schema":{"type":"string","format":"binary"}}});
         permissions(doc, kind, resource, label, group, order);
     }
+    approval::extend(doc);
 }
 
 fn permissions(doc: &mut Value, kind: &str, resource: &str, label: &str, group: &str, order: i32) {
@@ -268,6 +271,7 @@ pub(super) fn endpoint(
         }
         params.push(json!({"name":"status","in":"query","schema":{"type":"string"}}));
         params.push(json!({"name":"mineOnly","in":"query","schema":{"type":"boolean"}}));
+        params.push(json!({"name":"approvalsOnly","in":"query","schema":{"type":"boolean"}}));
     }
     if !params.is_empty() {
         op["parameters"] = json!(params);

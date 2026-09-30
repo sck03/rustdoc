@@ -16,6 +16,7 @@ mod crm_dashboard;
 mod custom_options;
 mod dashboard;
 mod diagnostics;
+mod document_formats;
 mod document_packages;
 #[cfg(feature = "mail")]
 mod email;

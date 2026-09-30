@@ -83,6 +83,20 @@ fn finance_list(
 }
 fn receive_expense(service: &NativeService, admin: &str, finance: &str, row: &Value) -> Value {
     let id = row["id"].as_i64().unwrap();
+    let inbox = call(service, finance, LIST_NOTIFICATIONS, 0, None).unwrap();
+    assert_eq!(inbox["totalCount"], 1, "one approval event reaches finance");
+    assert_eq!(inbox["items"][0]["requestId"], id);
+    assert_eq!(inbox["items"][0]["action"], "approve");
+    let notification = inbox["items"][0]["id"].as_i64().unwrap();
+    call(service, finance, READ_NOTIFICATION, notification, None).unwrap();
+    assert_eq!(
+        call(service, finance, GET_NOTIFICATION_UNREAD_COUNT, 0, None).unwrap()["unreadCount"],
+        0
+    );
+    assert_eq!(
+        call(service, finance, operation("expense", "get"), id, None).unwrap()["status"],
+        "Approved"
+    );
     assert_eq!(
         finance_list(service, finance, "Approved", true).unwrap()["items"][0]["id"],
         id
@@ -147,6 +161,16 @@ fn receive_expense(service: &NativeService, admin: &str, finance: &str, row: &Va
     .unwrap();
     let other = finance_user(service, admin, "Finance", &company, &company);
     assert_eq!(
+        call(service, &other, LIST_NOTIFICATIONS, 0, None).unwrap()["totalCount"],
+        0
+    );
+    assert_eq!(
+        call(service, &other, READ_NOTIFICATION, notification, None)
+            .unwrap_err()
+            .status,
+        Some(403)
+    );
+    assert_eq!(
         finance_list(service, &other, "Approved", true).unwrap()["totalCount"],
         0
     );
@@ -203,6 +227,55 @@ fn receive_expense(service: &NativeService, admin: &str, finance: &str, row: &Va
             .any(|e| e["action"] == "complete"
                 && e["actorName"] == "财务验收"
                 && e["note"] == "凭证已核对，接收编号 FIN-001")
+    );
+    // Removing finance access hides old notices and revokes the existing session.
+    let user = call(service, finance, GET_CURRENT_USER, 0, None).unwrap();
+    let accounts = call(service, admin, LIST_USERS, 0, None).unwrap();
+    let account = accounts["users"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["id"] == user["id"])
+        .unwrap();
+    let body = json!({"username":account["username"],"fullName":account["fullName"],"role":"OfficeEmployee","companyScope":account["companyScope"],"departmentId":account["departmentId"],"isActive":true,"expectedVersion":account["versionNumber"],"permissionTemplateId":null});
+    call(
+        service,
+        admin,
+        UPDATE_USER_ACCOUNT,
+        user["id"].as_i64().unwrap(),
+        Some(body),
+    )
+    .unwrap();
+    assert_eq!(
+        call(service, finance, LIST_NOTIFICATIONS, 0, None)
+            .unwrap_err()
+            .status,
+        Some(401)
+    );
+    let login = call(
+        service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":account["username"],"password":"Finance-Review-2026"})),
+    )
+    .unwrap();
+    let revoked = login["accessToken"].as_str().unwrap();
+    assert_eq!(
+        call(service, revoked, LIST_NOTIFICATIONS, 0, None).unwrap()["totalCount"],
+        0
+    );
+    assert_eq!(
+        call(service, revoked, READ_NOTIFICATION, notification, None)
+            .unwrap_err()
+            .status,
+        Some(403)
+    );
+    assert_eq!(
+        call(service, revoked, operation("expense", "get"), id, None)
+            .unwrap_err()
+            .status,
+        Some(403)
     );
     received
 }

@@ -42,7 +42,7 @@ fn project(tx: &Connection, actor: &Actor, meta: &Value, row: Value) -> Result<V
     if announcement(meta) {
         communication::project(tx, actor, row, true)
     } else {
-        oa::project(tx, row, true)
+        oa::project(tx, actor, row, true)
     }
 }
 fn save(

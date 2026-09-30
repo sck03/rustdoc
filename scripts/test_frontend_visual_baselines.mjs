@@ -64,20 +64,20 @@ try {
   await waitForHttp(`http://127.0.0.1:${port}/visual-baseline.html`);
   chrome = await startChrome({ browserExecutable, userDataDir: profileRoot, timeoutMs: 30000 });
   cdp = await CdpClient.connect(chrome.browserWebSocketUrl);
-  const page = await createPageSession(cdp);
-
   for (const viewport of viewports) {
-    await page.send("Emulation.setDeviceMetricsOverride", {
-      width: viewport.width,
-      height: viewport.height,
-      deviceScaleFactor: 1,
-      mobile: false,
-    });
-    await page.send("Emulation.setEmulatedMedia", {
-      media: "screen",
-      features: [{ name: "prefers-reduced-motion", value: "reduce" }],
-    });
     for (const pageName of pages) {
+      // Isolate device metrics, focus and compositor state between visual scenes.
+      const page = await createPageSession(cdp);
+      await page.send("Emulation.setDeviceMetricsOverride", {
+        width: viewport.width,
+        height: viewport.height,
+        deviceScaleFactor: 1,
+        mobile: false,
+      });
+      await page.send("Emulation.setEmulatedMedia", {
+        media: "screen",
+        features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+      });
       const url = `http://127.0.0.1:${port}/visual-baseline.html?page=${pageName}`;
       await page.send("Page.navigate", { url });
       await waitForReady(page);
@@ -449,6 +449,7 @@ try {
         && value.workspaceNavigation && value.expectedStickyControl && value.expectedDialog
         && pixelComparison.passed;
       results.push({ page: pageName, viewport, url, screenshotPath, approvedPath, pixelComparison, pixelComparisonAttempts, passed, axeViolations, ...value, ...mobileNavigationInteractionValue });
+      await cdp.send("Target.closeTarget", { targetId: page.targetId });
     }
   }
 

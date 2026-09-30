@@ -287,8 +287,16 @@ fn clearance_for(
         .collect::<Vec<_>>();
     let meeting_count = meetings.len();
     let supply_count = supplies.len();
-    let approval_count =
+    let mut approval_count =
         super::oa::references(tx, company.as_str().unwrap_or(""), employee, account, true)?;
+    if let Some(user) = account {
+        approval_count += super::oa::approval_references::assigned(
+            tx,
+            company.as_str().unwrap_or(""),
+            user,
+            true,
+        )?;
+    }
     let clear = meeting_count == 0 && supply_count == 0 && approval_count == 0;
     meetings.sort_by_key(|r| r["requestId"].as_i64());
     supplies.sort_by_key(|r| r["requestId"].as_i64());

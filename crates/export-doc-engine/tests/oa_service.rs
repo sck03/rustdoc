@@ -1,3 +1,5 @@
+#[path = "support/approval_contract.rs"]
+mod approval_contract;
 #[path = "support/native_fixture.rs"]
 #[allow(dead_code)]
 mod native_fixture;
@@ -61,6 +63,23 @@ fn sqlite_office_approvals_attachments_and_concurrency() {
     .unwrap();
     assert_eq!(record["status"], "Cancelled");
     reopened.close().unwrap();
+}
+
+#[test]
+fn configured_approval_chain_delegation_reminders_and_finance() {
+    let mut fixture = native_fixture::Fixture::new();
+    fixture.client.take();
+    let service = NativeService::open(fixture.paths.clone()).unwrap();
+    let login = oa_contract::call(
+        &service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":"admin","password":""})),
+    )
+    .unwrap();
+    approval_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    service.close().unwrap();
 }
 
 #[test]

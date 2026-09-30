@@ -78,7 +78,7 @@ fn personnel_directory_images_and_employment_events_use_the_public_contract() {
     assert_eq!(person["images"][0]["kind"], "Avatar");
     person = fixture.request(GET_PERSONNEL, Some(id), None);
     assert_eq!(person["canCorrectRegistration"], true);
-    assert_eq!(person["canLinkAccount"], false);
+    assert_eq!(person["canLinkAccount"], true);
     let image = fixture
         .client()
         .bytes(

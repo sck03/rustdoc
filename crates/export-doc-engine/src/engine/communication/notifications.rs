@@ -1,44 +1,32 @@
+use super::super::oa::approval::{authority, resource};
 use super::*;
 use export_doc_storage::NotificationScope;
-
-fn resource(kind: &str) -> Option<&'static str> {
-    match kind {
-        "oa-leave" => Some("office.leave"),
-        "oa-overtime" => Some("office.overtime"),
-        "oa-expense" => Some("office.expenses"),
-        "oa-travel" => Some("office.travel"),
-        "oa-purchase" => Some("office.purchase"),
-        "oa-general" => Some("office.general"),
-        _ => None,
-    }
-}
 fn scopes(actor: &Actor) -> Vec<NotificationScope> {
     super::super::oa::KINDS
         .iter()
-        .filter_map(|kind| {
-            let resource = resource(kind)?;
-            if auth::authorize(actor, resource, "view").is_err() {
-                return None;
-            }
-            let rank = if actor.admin {
-                4
-            } else {
-                actor
-                    .grants
-                    .iter()
-                    .filter(|g| g["resourceKey"] == resource && g["action"] == "view")
-                    .map(|g| {
-                        export_doc_domain::permissions::scope_rank(
-                            g["dataScope"].as_str().unwrap_or(""),
-                        )
-                    })
-                    .max()
-                    .unwrap_or(0)
+        .flat_map(|kind| {
+            let Some(resource) = resource(kind) else {
+                return vec![];
             };
-            Some(NotificationScope {
+            if auth::authorize(actor, resource, "view").is_err() {
+                return vec![];
+            }
+            let mut scopes = vec![NotificationScope {
                 kind: (*kind).into(),
-                rank,
-            })
+                rank: auth::scope_rank(actor, resource, "view"),
+                statuses: vec![],
+            }];
+            if *kind == "oa-expense" {
+                scopes.push(NotificationScope {
+                    kind: (*kind).into(),
+                    rank: auth::scope_rank(actor, resource, "complete"),
+                    statuses: super::super::oa::FINANCE_STATUSES
+                        .iter()
+                        .map(|s| (*s).into())
+                        .collect(),
+                });
+            }
+            scopes
         })
         .collect()
 }
@@ -50,8 +38,7 @@ fn accessible(tx: &Connection, actor: &Actor, row: &Value) -> Result<()> {
     let resource =
         resource(&kind).ok_or_else(|| super::super::error::unavailable("通知关联类型无效。"))?;
     let parent = store::get(tx, &kind, records::positive(row, "requestId", "申请")?)?;
-    auth::authorize(actor, resource, "view")?;
-    if parent["companyScope"] != actor.company || !auth::visible(actor, resource, "view", &parent) {
+    if !super::super::oa::viewable(actor, resource, &parent) {
         return Err(error(403, "您已无权访问此通知关联的申请。"));
     }
     Ok(())
@@ -139,20 +126,32 @@ pub(in crate::engine) fn on_event(
     let action = text(event, "action");
     if !matches!(
         action.as_str(),
-        "submit" | "approve" | "reject" | "complete" | "void"
+        "submit" | "approve" | "approve-step" | "remind" | "reject" | "complete" | "void"
     ) {
         return Ok(());
     }
     let mut offset = 0;
+    let finance = action == "approve" && row["status"] == "Approved" && row["kind"] == "expense";
+    let review = matches!(action.as_str(), "submit" | "approve-step" | "remind");
+    let resource = text(meta, "resource");
     loop {
         crate::operation::check()?;
-        let (_, users) = tx.query_records(&RecordQuery {
-            kind: "users",
-            company: &actor.company,
-            offset,
-            limit: 100,
-            ..Default::default()
-        })?;
+        let users = if review || finance {
+            tx.query_records(&RecordQuery {
+                kind: "users",
+                company: &actor.company,
+                offset,
+                limit: 100,
+                ..Default::default()
+            })?
+            .1
+        } else {
+            vec![store::get(
+                tx,
+                "users",
+                records::positive(row, "ownerUserId", "申请人")?,
+            )?]
+        };
         if users.is_empty() {
             break;
         }
@@ -162,23 +161,22 @@ pub(in crate::engine) fn on_event(
                 continue;
             }
             let id = records::positive(&user, "id", "接收人")?;
-            if (action == "submit" && id == actor.id)
-                || (action != "submit" && row["ownerUserId"] != id)
-            {
+            if (review && id == actor.id) || (!review && !finance && row["ownerUserId"] != id) {
                 continue;
             }
             let recipient = auth::current_actor_in(tx, id, actor.edition)?;
-            let resource = text(meta, "resource");
             if auth::authorize(&recipient, "office.notifications", "view").is_err()
-                || auth::authorize(&recipient, &resource, "view").is_err()
-                || !auth::visible(&recipient, &resource, "view", row)
+                || !super::super::oa::viewable(&recipient, &resource, row)
             {
                 continue;
             }
-            if action == "submit"
-                && (auth::authorize(&recipient, &resource, "approve").is_err()
-                    || !auth::visible(&recipient, &resource, "approve", row))
+            if finance
+                && row["ownerUserId"] != id
+                && !auth::visible(&recipient, &resource, "complete", row)
             {
+                continue;
+            }
+            if review && authority(tx, &recipient, row)?.is_none() {
                 continue;
             }
             let identity = format!("{}:{id}", event["id"]);
@@ -196,6 +194,9 @@ pub(in crate::engine) fn on_event(
                 "notify",
                 Some(&scope),
             )?;
+        }
+        if !review && !finance {
+            break;
         }
     }
     Ok(())

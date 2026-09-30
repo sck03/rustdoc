@@ -11,6 +11,7 @@ import { oaApi } from "./oaApi.ts";
 import { oaAccess, oaActions, oaActionLabel, oaStatus, type OaActionName } from "./oaModel.ts";
 import { expenseCategories } from "./OaLineEditor.tsx";
 import { generalCategories, leaveCategories } from "./OaTemporalFields.tsx";
+import { documentAccept, documentDescription } from "../../ui/documentAttachments.ts";
 
 export function OaRequestDetails({ client, user, row, onEdit }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: OaRequest; onEdit: () => void }) {
   const operation = useOfficeOperation();
@@ -27,6 +28,7 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
     </div>}
     {row.status === "HandedOff" && <InlineNotice tone="success" title="财务交接已登记">此状态仅记录资料交接，不代表已记账或已付款；办理人、时间和说明见审批与办理记录。</InlineNotice>}
     </header>
+    {row.approvalPlan && row.approvalPlan.steps.length > 0 && <section className="oa-detail-content" aria-label="审批步骤"><h3>审批步骤</h3><ol className="oa-history">{row.approvalPlan.steps.map((step, index) => <li key={step.approverUserId}><strong>第 {index + 1} 步 · {step.approverName}</strong> · {{ Waiting: "待审批", Approved: "已批准", Rejected: "已驳回" }[step.status]}{step.actedByUserId && <p>{step.delegationKey ? "代理办理：" : "办理人："}{step.actedByName} · {formatBusinessDateTime(step.actedAt, user.businessTimeZone)} · {step.note}</p>}</li>)}</ol></section>}
     <section className="oa-detail-content" aria-label="申请内容"><h3>申请内容</h3>
     <div className="oa-reason"><h4>申请说明</h4><p>{row.reason}</p></div>
     {row.leave && <p>{leaveCategories[row.leave.category]} · {row.leave.startsOn} {row.leave.startPeriod === "AM" ? "上午" : "下午"} 至 {row.leave.endsOn} {row.leave.endPeriod === "AM" ? "上午" : "下午"} · {row.durationDays} 个自然日</p>}
@@ -38,8 +40,8 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
     {row.purchaseLines && <ol className="oa-lines">{row.purchaseLines.map((line, index) => <li key={`${row.id}-${index}`} className="oa-line">{line.name} {line.specification} · {line.quantity} {line.unit} × {line.unitPrice} {row.currency}</li>)}</ol>}
     </section>
     <section className="oa-attachments" aria-label="申请附件"><h3>{row.kind === "expense" ? "报销凭证" : "申请附件"}</h3>
-      <p className="office-muted">支持 PDF、PNG、JPEG；每个 10 MiB，最多 20 个、合计 50 MiB。{row.kind === "expense" && "提交报销前至少上传一份凭证。"}</p>
-      {editable && <OfficeField label="上传附件"><input type="file" accept=".pdf,.png,.jpg,.jpeg" disabled={operation.busy} onChange={(event) => {
+      <p className="office-muted">{documentDescription}{row.kind === "expense" && "提交报销前至少上传一份凭证。"}</p>
+      {editable && <OfficeField label="上传附件"><input type="file" accept={documentAccept} disabled={operation.busy} onChange={(event) => {
         const file = event.target.files?.[0]; event.target.value = "";
         if (file) void operation.run((signal) => {
           if (file.size > 10 * 1024 * 1024) throw new Error("文件不能超过 10 MiB。");
@@ -76,7 +78,7 @@ function OaHistory({ client, user, row }: { client: ExportDocManagerApiClient; u
   const [page, setPage] = useState(1);
   const query = useQuery({ queryKey: ["office", "oa", row.kind, user.id, user.companyScope, row.id, "history", page, row.versionNumber],
     queryFn: ({ signal }) => oaApi(client, row.kind).history(row.id, page, { signal }) });
-  const labels: Record<string, string> = { create: "创建草稿", update: "修改草稿", upload: "上传附件", "delete-attachment": "移除附件", submit: "提交审批", withdraw: "撤回修改", approve: "批准", reject: "驳回", cancel: "取消", void: "作废批准", complete: "完成登记" };
+  const labels: Record<string, string> = { create: "创建草稿", update: "修改草稿", upload: "上传附件", "delete-attachment": "移除附件", submit: "提交审批", withdraw: "撤回修改", approve: "批准", "approve-step": "步骤批准", remind: "申请人催办", reject: "驳回", cancel: "取消", void: "作废批准", complete: "完成登记" };
   if (query.isError) return <InlineNotice tone="error">{readApiError(query.error)}</InlineNotice>;
   return <><ol className="oa-history">{query.data?.items.map((item) => <li key={item.id}><strong>{labels[item.action] ?? item.action}</strong> · {item.actorName} · {formatBusinessDateTime(item.occurredAt, user.businessTimeZone)}<p>{item.note || "无附加说明"}</p></li>)}</ol>
     <div className="office-card-actions"><button type="button" className="command-button secondary" disabled={page === 1 || query.isFetching} onClick={() => setPage(page - 1)}>上一页记录</button><span>第 {page} 页 · {query.data?.totalCount ?? 0} 条</span><button type="button" className="command-button secondary" disabled={query.isFetching || page * 20 >= (query.data?.totalCount ?? 0)} onClick={() => setPage(page + 1)}>下一页记录</button></div></>;

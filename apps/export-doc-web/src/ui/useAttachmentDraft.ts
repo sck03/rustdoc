@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { createRequestKey } from "./createRequestKey.ts";
 import { useUnsavedChangesGuard } from "./unsavedChangesGuard.tsx";
+import { documentExtension } from "./documentAttachments.ts";
 
 export type DraftAttachment = { key: string; kind: string; file: File };
 
@@ -15,9 +16,9 @@ export function useAttachmentDraft<R>(initial?: R) {
   function select(kind: string, selected: File[], multiple: boolean, maxBytes: number) {
     setSelectionError("");
     if (!selected.length) return;
-    const pattern = kind === "document" ? /\.(pdf|png|jpe?g)$/iu : /\.(png|jpe?g)$/iu;
+    const pattern = kind === "document" ? documentExtension : /\.(png|jpe?g)$/iu;
     if (selected.some(file => !pattern.test(file.name) || file.size === 0 || file.size > maxBytes)) {
-      setSelectionError(`请选择有效的${kind === "document" ? "PDF、PNG 或 JPEG 文件" : "PNG 或 JPEG 图片"}，每个不超过 ${maxBytes / 1024 / 1024} MiB。`);
+      setSelectionError(`请选择有效的${kind === "document" ? "PDF、PNG、JPEG、Word 或 Excel 文件" : "PNG 或 JPEG 图片"}，每个不超过 ${maxBytes / 1024 / 1024} MiB。`);
       return;
     }
     const remaining = multiple ? files : files.filter(file => file.kind !== kind);

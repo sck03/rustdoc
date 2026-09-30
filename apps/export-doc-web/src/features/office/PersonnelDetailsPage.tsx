@@ -83,7 +83,7 @@ function PersonnelFacts({ record, user }: { record: PersonnelRecord; user: ApiUs
   const employment = [
     ["用工类型", employmentTypeLabels[record.employmentType]], ["本次入职日期", record.hireDate],
     ["试用截止", record.probationEndsOn], ["合同截止", record.contractEndsOn], ["转正日期", record.confirmedOn], ["离职日期", record.departedOn],
-    ...(!user.capabilities.usesOfficeRegister ? [["关联账号", record.account ? `${record.account.username}（${record.account.isActive ? "启用" : "停用"}）` : "未关联"]] : []),
+    ["关联账号", record.account ? `${record.account.username}（${record.account.isActive ? "启用" : "停用"}）` : "未关联"],
   ];
   const contact = [["工作邮箱", record.profile.workEmail], ["工作电话", record.profile.workPhone], ["工作地点", record.profile.workLocation]];
   const personal = [

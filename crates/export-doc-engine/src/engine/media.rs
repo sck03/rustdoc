@@ -15,6 +15,17 @@ pub fn document_type(file_name: &str, bytes: &[u8]) -> Result<(String, &'static 
     if !crate::paths::valid_file_name(&name) || bytes.is_empty() || bytes.len() > DOCUMENT_LIMIT {
         return Err(invalid("文件名无效，或文件为空、超过 10 MiB。"));
     }
+    let extension = Path::new(&name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if matches!(extension.as_str(), "doc" | "docx" | "xls" | "xlsx") {
+        return Ok((
+            name,
+            super::document_formats::office_type(&extension, bytes)?,
+        ));
+    }
     let pdf = bytes.starts_with(b"%PDF-")
         && bytes[bytes.len().saturating_sub(1024)..]
             .windows(5)
@@ -24,18 +35,13 @@ pub fn document_type(file_name: &str, bytes: &[u8]) -> Result<(String, &'static 
     } else {
         image_type(bytes, DOCUMENT_LIMIT)?
     };
-    let extension = Path::new(&name)
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
     if !match media_type {
         "application/pdf" => extension == "pdf",
         "image/png" => extension == "png",
         _ => matches!(extension.as_str(), "jpg" | "jpeg"),
     } {
         return Err(invalid(
-            "附件扩展名与实际类型不一致，只支持 PDF、PNG、JPEG。",
+            "附件扩展名与实际类型不一致，只支持 PDF、PNG、JPEG、Word 和 Excel。",
         ));
     }
     Ok((name, media_type))

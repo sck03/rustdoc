@@ -51,11 +51,7 @@ pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value
     for (field, action, allowed) in [
         ("canEdit", "edit", editable),
         ("canTransition", "transition", true),
-        (
-            "canLinkAccount",
-            "assign",
-            editable && tx.provider() == "PostgreSQL" && actor.admin,
-        ),
+        ("canLinkAccount", "assign", editable && actor.admin),
         ("canDelete", "delete", true),
         ("canCorrectRegistration", "edit", editable && correct),
     ] {

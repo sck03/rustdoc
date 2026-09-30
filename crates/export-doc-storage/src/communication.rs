@@ -1,7 +1,10 @@
 //! Shared filtering before counting/pagination; both adapters bind every value.
+use super::QuerySql;
 pub struct NotificationScope {
     pub kind: String,
     pub rank: u8,
+    /// Empty accepts every parent state; otherwise filter before pagination.
+    pub statuses: Vec<String>,
 }
 pub enum CommunicationView<'a> {
     Announcements { manage: bool, now: &'a str },
@@ -15,11 +18,6 @@ pub struct CommunicationQuery<'a> {
     pub view: CommunicationView<'a>,
     pub offset: i64,
     pub limit: i64,
-}
-pub(super) struct QuerySql {
-    pub filter: String,
-    pub order: &'static str,
-    pub values: Vec<String>,
 }
 pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
     let mut values = vec![];
@@ -59,12 +57,20 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
             }
             let mut allowed = vec![];
             for scope in *scopes {
-                let condition = match scope.rank {
+                let mut condition = match scope.rank {
                     1 => format!(" AND parent.owner_id={reader}"),
                     2 => format!(" AND parent.department={}", bind(q.department.into())),
                     3..=4 => String::new(),
                     _ => continue,
                 };
+                if !scope.statuses.is_empty() {
+                    let states = scope
+                        .statuses
+                        .iter()
+                        .map(|s| bind(s.clone()))
+                        .collect::<Vec<_>>();
+                    condition += &format!(" AND parent.body->>'status' IN ({})", states.join(","));
+                }
                 let kind = bind(scope.kind.clone());
                 allowed.push(format!("(parent.kind={kind}{condition})"));
             }

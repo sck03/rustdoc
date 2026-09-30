@@ -6,6 +6,12 @@ pub use postgres::tools::{
     client_parameters as postgres_client_parameters,
 };
 mod communication;
+mod record_query;
+struct QuerySql {
+    filter: String,
+    order: &'static str,
+    values: Vec<String>,
+}
 mod migrations;
 pub use communication::{CommunicationQuery, CommunicationView, NotificationScope};
 mod sqlite;
@@ -79,6 +85,9 @@ pub struct RecordQuery<'a> {
     pub employee: Option<i64>,
     pub parent: Option<i64>,
     pub status: Option<&'a str>,
+    pub approvers: Option<&'a [i64]>,
+    pub approval_actor: Option<i64>,
+    pub exclude_owner: Option<i64>,
     pub offset: i64,
     pub limit: i64,
 }

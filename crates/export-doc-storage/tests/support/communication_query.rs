@@ -84,6 +84,7 @@ pub fn exercise(db: &Connection) {
         let scopes = [NotificationScope {
             kind: "oa-general".into(),
             rank,
+            statuses: vec![],
         }];
         let q = CommunicationQuery {
             company: "COMMS-QUERY",
@@ -96,6 +97,46 @@ pub fn exercise(db: &Connection) {
         };
         assert_eq!(db.query_communications(&q).unwrap().0, expected);
     }
+    // Finance status and department limits apply before counting and pagination.
+    for (index, status) in ["Approved", "HandedOff", "Draft", "Pending", "Cancelled"]
+        .iter()
+        .enumerate()
+    {
+        let parent = insert(
+            "oa-expense",
+            &format!("expense-{index}"),
+            json!({"ownerUserId":100,"departmentId":"A","status":status}),
+        );
+        insert(
+            "site-notification",
+            &format!("finance-{index}"),
+            json!({"ownerUserId":200,"departmentId":"A","requestId":parent,"requestKind":"oa-expense","status":"Unread"}),
+        );
+    }
+    let scopes = [NotificationScope {
+        kind: "oa-expense".into(),
+        rank: 2,
+        statuses: vec!["Approved".into(), "HandedOff".into()],
+    }];
+    let mut finance = CommunicationQuery {
+        company: "COMMS-QUERY",
+        department: "A",
+        reader: 200,
+        unread_only: true,
+        view: CommunicationView::Notifications { scopes: &scopes },
+        offset: 0,
+        limit: 1,
+    };
+    let (count, rows) = db.query_communications(&finance).unwrap();
+    assert_eq!(count, 2);
+    assert_eq!(rows.len(), 1);
+    finance.offset = 1;
+    let (count, next) = db.query_communications(&finance).unwrap();
+    assert_eq!(count, 2);
+    assert_ne!(rows[0]["id"], next[0]["id"]);
+    finance.offset = 0;
+    finance.department = "B";
+    assert_eq!(db.query_communications(&finance).unwrap().0, 0);
     // A failed/reverted business transaction cannot leave published notices or receipts.
     db.rollback().unwrap();
     q.company = "COMMS-QUERY";

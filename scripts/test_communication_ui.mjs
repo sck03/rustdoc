@@ -1,45 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-import { cargoExampleExecutable } from './lib/cargo-paths.mjs';
-import { locateChromeForTesting } from './lib/report-regression-common.mjs';
-import { spawnProcessTree, stopProcessTree } from './lib/child-process-tree.mjs';
+import { withOfficeUi } from './lib/native-office-ui.mjs';
 
-const repo = path.resolve(import.meta.dirname, '..');
-const require = createRequire(path.join(repo, 'apps/export-doc-web/package.json'));
-const { chromium } = require('playwright');
-const output = path.join(repo, 'artifacts/communication-ui', String(Date.now()));
-fs.mkdirSync(output, { recursive: true });
-const server = spawnProcessTree(cargoExampleExecutable(repo, 'office_review'), [path.join(output, 'Data')], { cwd: repo, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-let browser, financeBrowser;
-const spec = JSON.parse(fs.readFileSync(path.join(repo, 'crates/export-doc-contracts/src/openapi.json'), 'utf8'));
-const operations = new Map(Object.entries(spec.paths).flatMap(([route, methods]) => Object.entries(methods).map(([method, op]) => [op.operationId, { route, method }])));
-try {
-  const url = await new Promise((resolve, reject) => {
-    let log = '';
-    const timer = setTimeout(() => reject(new Error(`HTTP fixture startup timeout: ${log}`)), 60000);
-    const fail = error => { clearTimeout(timer); reject(error); };
-    server.once('error', fail); server.once('exit', code => fail(new Error(`HTTP fixture exited ${code}: ${log}`)));
-    server.stderr.on('data', chunk => { log += chunk; });
-    server.stdout.on('data', chunk => { log += chunk; const match = log.match(/\{"url":"([^"]+)"\}/u); if (match) { clearTimeout(timer); resolve(match[1]); } });
-  });
-  const invoke = async (id, body, parameters = {}, token = '') => {
-    const op = operations.get(id); assert(op, `Unknown operation ${id}`);
-    const route = op.route.replace(/\{([^}]+)\}/gu, (_, key) => encodeURIComponent(parameters[key]));
-    const response = await fetch(url + route, { method: op.method.toUpperCase(), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
-    assert.equal(response.status, 200, `${id}: ${await response.clone().text()}`);
-    return response.json();
-  };
-  browser = await chromium.launchPersistentContext(path.join(output, 'Chrome'), { executablePath: locateChromeForTesting(repo), headless: true, viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
-  const page = await browser.newPage();
-  page.setDefaultTimeout(30000);
-  const errors = []; page.on('pageerror', error => errors.push(error.message));
-  await page.goto(url);
-  await page.locator('input[autocomplete=username]').fill('oa-review');
-  await page.locator('input[autocomplete=current-password]').fill('Review-2026-Test');
-  await page.getByRole('button', { name: '登录', exact: true }).click();
-  await page.locator('.login-submit-button').waitFor({ state: 'hidden' });
+await withOfficeUi('communication-ui', async ({ output, require, url, operations, invoke, openPage }) => {
+  const page = await openPage('oa-review', 'Review-2026-Test');
   const navigate = async route => { await page.goto(`${url}/#${route}`); };
   await navigate('/office/announcements');
   await page.getByRole('button', { name: '新建公告', exact: true }).click();
@@ -141,14 +106,17 @@ try {
   const upload = await fetch(url + operations.get('UploadAttachmentToExpenseRequest').route.replace('{id}', expense.id), { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: form });
   assert.equal(upload.status, 200); expense = await upload.json();
   for (const op of ['SubmitExpenseRequest', 'ApproveExpenseRequest']) expense = await invoke(op, { expectedVersion: expense.versionNumber, note: '审批通过' }, { id: expense.id }, token);
-  financeBrowser = await chromium.launchPersistentContext(path.join(output, 'FinanceChrome'), { executablePath: locateChromeForTesting(repo), headless: true, viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
-  const financePage = await financeBrowser.newPage(); financePage.setDefaultTimeout(30000);
-  await financePage.goto(url);
-  await financePage.locator('input[autocomplete=username]').fill(financeName);
-  await financePage.locator('input[autocomplete=current-password]').fill('Finance-Review-2026');
-  await financePage.getByRole('button', { name: '登录', exact: true }).click();
-  await financePage.locator('.login-submit-button').waitFor({ state: 'hidden' });
-  await financePage.goto(`${url}/#/office/requests/expense`);
+  const financePage = await openPage(financeName, 'Finance-Review-2026');
+  await financePage.getByRole('link', { name: '站内通知', exact: true }).click();
+  await financePage.getByRole('heading', { name: `审批通过 · ${expenseBody.title}`, exact: true }).waitFor();
+  await financePage.getByRole('button', { name: '标记已读', exact: true }).click();
+  await financePage.getByRole('heading', { name: '站内通知 · 0 条未读', exact: true }).waitFor();
+  await financePage.getByRole('link', { name: '查看关联申请', exact: true }).click();
+  await financePage.getByRole('heading', { name: '报销凭证', exact: true }).waitFor();
+  await financePage.goto(`${url}/#/office/approvals`);
+  await financePage.getByText('待财务接收：1', { exact: true }).waitFor();
+  await financePage.screenshot({ path: path.join(output, 'finance-hub.png'), fullPage: true });
+  await financePage.getByRole('link', { name: '财务待接收', exact: true }).click();
   await financePage.locator('.office-tabs').getByRole('button', { name: '财务接收', exact: true }).waitFor();
   await financePage.getByRole('button', { name: expenseBody.title, exact: true }).waitFor();
   assert.equal(await financePage.getByRole('button', { name: privateDraft.title, exact: true }).count(), 0);
@@ -171,14 +139,6 @@ try {
   await financePage.screenshot({ path: path.join(output, 'finance-received.png'), fullPage: true });
   await financePage.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
   assert.deepEqual(await financePage.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)).map(v => v.id)), []);
-  assert.deepEqual(errors, []);
-  console.log(`Announcements and notification React/HTTP workflows passed: ${output}`);
-} catch (error) {
-  const page=browser?.pages().at(-1);
-  if (page) { await page.screenshot({path:path.join(output,'failure.png'),fullPage:true}).catch(()=>{}); fs.writeFileSync(path.join(output,'failure.txt'),await page.locator('body').innerText().catch(()=>'')); }
-  throw error;
-} finally {
-  await financeBrowser?.close();
-  await browser?.close();
-  await stopProcessTree(server);
-}
+  await financePage.goto(`${url}/#/office/approvals`);
+  await financePage.getByText('待财务接收：0', { exact: true }).waitFor();
+});

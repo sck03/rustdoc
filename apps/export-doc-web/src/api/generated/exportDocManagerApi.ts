@@ -4015,6 +4015,51 @@ export interface OaAction {
   note: string;
 }
 
+export interface OaApprovalDelegation {
+  delegateUserId: number;
+  endsAt: string;
+  isActive: boolean;
+  key: string;
+  principalUserId: number;
+  startsAt: string;
+}
+
+export interface OaApprovalPlan {
+  mode: "Single" | "DepartmentChain" | "Named";
+  policyVersion: number;
+  steps: OaApprovalStep[];
+}
+
+export interface OaApprovalRule {
+  approverUserIds: number[];
+  kind: "leave" | "overtime" | "expense" | "travel" | "purchase" | "general";
+  mode: "Single" | "DepartmentChain" | "Named";
+}
+
+export interface OaApprovalSettings {
+  delegations: OaApprovalDelegation[];
+  expectedVersion?: number;
+  rules: OaApprovalRule[];
+  versionNumber: number;
+}
+
+export interface OaApprovalSettingsSave {
+  delegations: OaApprovalDelegation[];
+  expectedVersion: number;
+  rules: OaApprovalRule[];
+}
+
+export interface OaApprovalStep {
+  actedAt: string;
+  actedByName: string;
+  actedByUserId?: number | null;
+  approverName: string;
+  approverUserId: number;
+  delegationKey: string;
+  note: string;
+  status: "Waiting" | "Approved" | "Rejected";
+}
+
 export interface OaAttachment {
   fileName: string;
   id: number;
@@ -4025,6 +4070,7 @@ export interface OaAttachment {
 export interface OaEvent {
   action: string;
   actorName: string;
+  approvalPlan?: OaApprovalPlan;
   id: number;
   note: string;
   occurredAt: string;
@@ -4068,7 +4114,9 @@ export interface OaPurchaseLine {
 }
 
 export interface OaRequest {
+  approvalPlan?: OaApprovalPlan;
   attachments: OaAttachment[];
+  canReview?: boolean;
   category?: "Seal" | "Certificate" | "IT" | "Repair" | "Other";
   createdAt: string;
   currency?: "CNY" | "USD" | "EUR" | "HKD" | "JPY" | "GBP";
@@ -4080,6 +4128,7 @@ export interface OaRequest {
   expectedVersion?: number;
   id: number;
   kind: "leave" | "expense" | "travel" | "overtime" | "purchase" | "general";
+  lastRemindedAt?: string;
   leave?: OaLeave;
   lines?: OaExpenseLine[];
   overtime?: OaOvertime;
@@ -6213,6 +6262,7 @@ export interface ListExpenseRequestRequest {
   financeOnly?: boolean;
   status?: string;
   mineOnly?: boolean;
+  approvalsOnly?: boolean;
 }
 
 export interface ListExportersRequest {
@@ -6230,6 +6280,7 @@ export interface ListGeneralRequestRequest {
   pageSize?: number;
   status?: string;
   mineOnly?: boolean;
+  approvalsOnly?: boolean;
 }
 
 export interface ListHistoryOfExpenseRequestRequest {
@@ -6311,6 +6362,7 @@ export interface ListLeaveRequestRequest {
   pageSize?: number;
   status?: string;
   mineOnly?: boolean;
+  approvalsOnly?: boolean;
 }
 
 export interface ListMeetingBookingsRequest {
@@ -6372,6 +6424,7 @@ export interface ListOvertimeRequestRequest {
   pageSize?: number;
   status?: string;
   mineOnly?: boolean;
+  approvalsOnly?: boolean;
 }
 
 export interface ListPayeesRequest {
@@ -6427,6 +6480,7 @@ export interface ListPurchaseRequestRequest {
   pageSize?: number;
   status?: string;
   mineOnly?: boolean;
+  approvalsOnly?: boolean;
 }
 
 export interface ListQueriedInvoicesRequest {
@@ -6469,6 +6523,7 @@ export interface ListTravelRequestRequest {
   pageSize?: number;
   status?: string;
   mineOnly?: boolean;
+  approvalsOnly?: boolean;
 }
 
 export interface ListUnitsRequest {
@@ -6743,6 +6798,36 @@ export interface RejectTravelRequestRequest {
   body: OaAction;
 }
 
+export interface RemindExpenseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface RemindGeneralRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface RemindLeaveRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface RemindOvertimeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface RemindPurchaseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface RemindTravelRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
 export interface RenameReportTemplateRequest {
   body: ApiReportTemplateRenameRequest;
 }
@@ -6914,6 +6999,10 @@ export interface SaveInvoiceSealImageRequest {
 export interface SaveInvoiceTransferPackageToPathRequest {
   id: number;
   body: ApiInvoiceTransferPathRequest;
+}
+
+export interface SaveOaApprovalSettingsRequest {
+  body: OaApprovalSettingsSave;
 }
 
 export interface SaveQueriedInvoicesToPathRequest {
@@ -9123,6 +9212,11 @@ export class ExportDocManagerApiClient {
     return this.request<NotificationCount>("GET", path, { init });
   }
 
+  public getOaApprovalSettings(init?: ApiRequestInit): Promise<OaApprovalSettings> {
+    const path = "/api/office/approval-settings";
+    return this.request<OaApprovalSettings>("GET", path, { init });
+  }
+
   public getOfficeStockHistory(request: GetOfficeStockHistoryRequest, init?: ApiRequestInit): Promise<PagedResultOfOfficeStockMovementRecord> {
     const path = `/api/office/supplies/${encodePath(request.id)}/movements`;
     return this.request<PagedResultOfOfficeStockMovementRecord>("GET", path, {
@@ -9636,6 +9730,7 @@ export class ExportDocManagerApiClient {
         "financeOnly": request.financeOnly,
         "status": request.status,
         "mineOnly": request.mineOnly,
+        "approvalsOnly": request.approvalsOnly,
       },
       init,
     });
@@ -9671,6 +9766,7 @@ export class ExportDocManagerApiClient {
         "pageSize": request.pageSize,
         "status": request.status,
         "mineOnly": request.mineOnly,
+        "approvalsOnly": request.approvalsOnly,
       },
       init,
     });
@@ -9819,6 +9915,7 @@ export class ExportDocManagerApiClient {
         "pageSize": request.pageSize,
         "status": request.status,
         "mineOnly": request.mineOnly,
+        "approvalsOnly": request.approvalsOnly,
       },
       init,
     });
@@ -9922,6 +10019,7 @@ export class ExportDocManagerApiClient {
         "pageSize": request.pageSize,
         "status": request.status,
         "mineOnly": request.mineOnly,
+        "approvalsOnly": request.approvalsOnly,
       },
       init,
     });
@@ -10040,6 +10138,7 @@ export class ExportDocManagerApiClient {
         "pageSize": request.pageSize,
         "status": request.status,
         "mineOnly": request.mineOnly,
+        "approvalsOnly": request.approvalsOnly,
       },
       init,
     });
@@ -10108,6 +10207,7 @@ export class ExportDocManagerApiClient {
         "pageSize": request.pageSize,
         "status": request.status,
         "mineOnly": request.mineOnly,
+        "approvalsOnly": request.approvalsOnly,
       },
       init,
     });
@@ -10622,6 +10722,54 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public remindExpenseRequest(request: RemindExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/remind`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public remindGeneralRequest(request: RemindGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/remind`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public remindLeaveRequest(request: RemindLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/remind`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public remindOvertimeRequest(request: RemindOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/remind`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public remindPurchaseRequest(request: RemindPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/remind`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public remindTravelRequest(request: RemindTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/remind`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public renameReportTemplate(request: RenameReportTemplateRequest, init?: ApiRequestInit): Promise<ApiReportTemplateContentDto> {
     const path = "/api/reports/templates/rename";
     return this.request<ApiReportTemplateContentDto>("POST", path, {
@@ -10925,6 +11073,14 @@ export class ExportDocManagerApiClient {
   public saveInvoiceTransferPackageToPath(request: SaveInvoiceTransferPackageToPathRequest, init?: ApiRequestInit): Promise<ApiInvoiceTransferExportResponse> {
     const path = `/api/invoices/${encodePath(request.id)}/transfer-package/save-to-path`;
     return this.request<ApiInvoiceTransferExportResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public saveOaApprovalSettings(request: SaveOaApprovalSettingsRequest, init?: ApiRequestInit): Promise<OaApprovalSettings> {
+    const path = "/api/office/approval-settings";
+    return this.request<OaApprovalSettings>("PUT", path, {
       body: request.body,
       init,
     });

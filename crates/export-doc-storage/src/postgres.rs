@@ -191,38 +191,29 @@ impl Adapter for Postgres {
         Ok((count, rows))
     }
     fn query_records(&self, q: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let sql = super::record_query::sql(q, true);
         let mut client = self.client.borrow_mut();
-        let filter = "kind=$1 AND company=$2 AND ($3::text IS NULL OR department=$3) AND ($4::bigint IS NULL OR owner_id=$4) AND ($5::bigint IS NULL OR (body->>'employeeId')::bigint=$5) AND ($6::text IS NULL OR body->>'status'=$6) AND ($7::bigint IS NULL OR (body->>'requestId')::bigint=$7)";
+        let params: Vec<&(dyn ::postgres::types::ToSql + Sync)> = sql
+            .values
+            .iter()
+            .map(|v| v as &(dyn ::postgres::types::ToSql + Sync))
+            .collect();
         let count = client
             .query_one(
-                &format!("SELECT COUNT(*) FROM records WHERE {filter}"),
-                &[
-                    &q.kind,
-                    &q.company,
-                    &q.department,
-                    &q.owner,
-                    &q.employee,
-                    &q.status,
-                    &q.parent,
-                ],
+                &format!("SELECT COUNT(*) FROM records r WHERE {}", sql.filter),
+                &params,
             )?
             .try_get(0)?;
         let rows = client
             .query(
                 &format!(
-                    "SELECT body::text FROM records WHERE {filter} ORDER BY id DESC LIMIT $8 OFFSET $9"
+                    "SELECT r.body::text FROM records r WHERE {} ORDER BY {} LIMIT {} OFFSET {}",
+                    sql.filter,
+                    sql.order,
+                    q.limit.clamp(1, 100),
+                    q.offset.max(0)
                 ),
-                &[
-                    &q.kind,
-                    &q.company,
-                    &q.department,
-                    &q.owner,
-                    &q.employee,
-                    &q.status,
-                    &q.parent,
-                    &q.limit.clamp(1, 100),
-                    &q.offset.max(0),
-                ],
+                &params,
             )?
             .into_iter()
             .map(|row| serde_json::from_str(&row.try_get::<_, String>(0)?).map_err(Into::into))

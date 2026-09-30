@@ -804,6 +804,7 @@ pub fn delete(
 }
 
 pub fn check_references(connection: &Connection, kind: &str, record: &Value) -> Result<()> {
+    super::oa::approval_references::check(connection, kind, record)?;
     super::communication::check_references(connection, kind, record)?;
     if matches!(kind, "users" | "people")
         && super::oa::references(

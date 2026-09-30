@@ -111,7 +111,7 @@ Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公
 
 开发时通过 `generate-api-client.ps1` 调用 `cargo run --locked -p export-doc-contracts --example generate_clients`，由 Rust 从同一 OpenAPI 文档生成 Rust 与 React 客户端；`-Check` 只校验生成文件。`crates/export-doc-contracts/src/reference_openapi.json` 是保留的官方 .NET 基线，新增能力只修改 Rust 组合器，不能覆盖生成文件或另建前端 URL/schema。`-OpenApiPath` 可指定已审阅的输入，并同时更新两端；不需要 .NET SDK。Rust 生成器回归随 workspace tests 执行，校验完整生成结果、端点策略、上传下载、请求头、默认值和类型投影；请求运行行为由现有 React/API 测试校验。
 
-OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --example office_review`，再执行 `npm --prefix apps/export-doc-web run test:oa-ui`。回环测试宿主使用独立 DataRoot，覆盖六类申请、附件、办理记录和窄屏；不代替 PostgreSQL 18 或 Tauri 验收。
+OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --example office_review`，再执行 `npm --prefix apps/export-doc-web run test:oa-ui`。回环测试宿主使用独立 DataRoot，覆盖六类申请、附件、办理记录、窄屏，以及管理员规则设置、多级审批、有效代理、手动催办和财务接收；不代替 PostgreSQL 18 或 Tauri 验收。公告通知与审批界面共用测试宿主/浏览器生命周期，正式业务仍使用同一 Rust 服务。
 
 发票印章与模板预览回归复用该隔离宿主：先构建 React 和 `office_review`，再运行 `node scripts/test_invoice_report_ui.mjs`，验证无出口商关联的上传按钮、图片保存回读及样例/真实单据的原生排版。
 

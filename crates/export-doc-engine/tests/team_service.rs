@@ -1,6 +1,8 @@
 #![cfg(feature = "postgres")]
 #[path = "support/account_scope.rs"]
 mod account_scope;
+#[path = "support/approval_contract.rs"]
+mod approval_contract;
 #[path = "support/business_contract.rs"]
 mod business_contract;
 #[path = "support/communication_contract.rs"]
@@ -247,6 +249,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
         None,
     );
     oa_contract::exercise(&service, admin_token, staff_token, None);
+    approval_contract::exercise(&service, admin_token);
     communication_contract::exercise(&service, admin_token);
     account_scope::exercise(&service, admin_token);
     personnel_contract::exercise(&service, admin_token);

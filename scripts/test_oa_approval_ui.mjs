@@ -1,0 +1,73 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { withOfficeUi } from './lib/native-office-ui.mjs';
+
+await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPage }) => {
+  const token = (await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' })).accessToken;
+  const users = [];
+  for (const [name, role] of [['first', 'OfficeManager'], ['second', 'OfficeManager'], ['proxy', 'OfficeManager'], ['finance', 'Finance']]) {
+    users.push((await invoke('createUserAccount', { username: `approval-${name}`, fullName: `审批${name}`, role, companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Approval-UI-2026' }, {}, token)).user);
+  }
+  const admin = await openPage('oa-review', 'Review-2026-Test');
+  await admin.goto(`${url}/#/office/approvals`);
+  await admin.getByRole('link', { name: '审批规则与代理', exact: true }).click();
+  const rule = admin.getByRole('region', { name: '费用报销审批规则', exact: true });
+  await rule.getByLabel('审批方式').selectOption('Named');
+  for (const [index, user] of users.slice(0, 2).entries()) {
+    await rule.getByRole('button', { name: '添加审批步骤', exact: true }).click();
+    await rule.getByLabel(`第 ${index + 1} 步审批人`).selectOption(String(user.id));
+  }
+  await admin.getByText('审批代理', { exact: true }).click();
+  await admin.getByRole('button', { name: '添加代理', exact: true }).click();
+  await admin.getByRole('combobox', { name: /^原审批人/u }).selectOption(String(users[0].id));
+  await admin.getByRole('combobox', { name: /^代理人/u }).selectOption(String(users[2].id));
+  const saved = admin.waitForResponse(response => response.url().endsWith('/api/office/approval-settings') && response.request().method() === 'PUT');
+  await admin.getByRole('button', { name: '保存审批设置', exact: true }).click();
+  assert.equal((await saved).status(), 200);
+  await admin.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
+  assert.deepEqual(await admin.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)).map(v => v.id)), []);
+  await admin.screenshot({ path: path.join(output, 'approval-settings.png'), fullPage: true });
+  await admin.goto(`${url}/#/office/requests/expense`);
+  await admin.getByRole('button', { name: '新建费用报销', exact: true }).click();
+  const form = admin.getByRole('dialog');
+  await form.getByLabel('登记人员', { exact: true }).fill('OA-001');
+  await form.getByRole('option', { name: /OA-001/u }).click();
+  await form.getByLabel('申请标题').fill('逐级审批真实界面验收');
+  await form.getByLabel('申请说明').fill('逐级审批、代理、催办和财务接收');
+  await form.getByLabel('费用说明').fill('交通票据'); await form.getByLabel('金额', { exact: true }).fill('12.35');
+  assert((await form.locator('input[type=file]').getAttribute('accept')).includes('.docx'));
+  assert((await form.locator('input[type=file]').getAttribute('accept')).includes('.xlsx'));
+  const proof = path.join(output, 'proof.pdf'); fs.writeFileSync(proof, '%PDF-1.7\n%%EOF');
+  await form.locator('input[type=file]').setInputFiles(proof);
+  await form.getByRole('button', { name: '保存草稿', exact: true }).click(); await form.waitFor({ state: 'hidden' });
+  const act = async (page, label) => { await page.getByRole('button', { name: label, exact: true }).click(); const dialog = page.getByRole('dialog'); await dialog.getByLabel('处理说明').fill(`${label}界面验收`); await dialog.getByRole('button', { name: label, exact: true }).click(); await dialog.waitFor({ state: 'hidden' }); };
+  await act(admin, '提交审批');
+  await admin.getByRole('region', { name: '审批步骤', exact: true }).waitFor();
+  await act(admin, '催办');
+  const second = await openPage('approval-second', 'Approval-UI-2026');
+  await second.goto(`${url}/#/office/requests/expense?view=approvals`);
+  await second.getByText('当前筛选下没有申请', { exact: true }).waitFor();
+  const proxy = await openPage('approval-proxy', 'Approval-UI-2026');
+  await proxy.getByRole('link', { name: '站内通知', exact: true }).click();
+  await proxy.getByRole('heading', { name: '申请人催办 · 逐级审批真实界面验收', exact: true }).waitFor();
+  await proxy.getByRole('link', { name: '查看关联申请', exact: true }).first().click();
+  await act(proxy, '登记批准结果');
+  await proxy.locator('.oa-detail-summary .office-badge').getByText('待审批', { exact: true }).waitFor();
+  await proxy.screenshot({ path: path.join(output, 'delegated-step.png'), fullPage: true });
+  await second.reload();
+  await second.getByRole('button', { name: '逐级审批真实界面验收', exact: true }).click();
+  await act(second, '登记批准结果');
+  await second.locator('.oa-detail-summary .office-badge').getByText('已批准', { exact: true }).waitFor();
+  const finance = await openPage('approval-finance', 'Approval-UI-2026');
+  await finance.goto(`${url}/#/office/approvals`);
+  await finance.getByText('待财务接收：1', { exact: true }).waitFor();
+  await finance.getByRole('link', { name: '财务待接收', exact: true }).click();
+  await finance.getByRole('button', { name: '逐级审批真实界面验收', exact: true }).click();
+  await act(finance, '财务接收');
+  await finance.getByText('财务交接已登记', { exact: true }).waitFor();
+  await finance.screenshot({ path: path.join(output, 'received.png'), fullPage: true });
+  await finance.setViewportSize({ width: 390, height: 844 });
+  assert(await finance.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+  await finance.screenshot({ path: path.join(output, 'approval-mobile.png'), fullPage: true });
+});
