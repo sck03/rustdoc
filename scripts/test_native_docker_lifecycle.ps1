@@ -27,7 +27,7 @@ function Invoke-ExportDocExternal {
         '--profile' {
             Assert-Contract (-not $script:active -and $script:databaseReady) 'Maintenance conflicts with API lock or unready database.'
             Assert-Contract ($service -eq $script:expectedMaintenance) 'Wrong maintenance operation.'
-            foreach ($flag in @('maintenance', 'run', '--rm', '--no-deps', '--no-build')) {
+            foreach ($flag in @('maintenance', 'run', '--rm', '--no-deps')) {
                 Assert-Contract ($command -contains $flag) "Missing maintenance boundary: $flag"
             }
             $script:maintained = $true

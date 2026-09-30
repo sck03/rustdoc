@@ -28,7 +28,7 @@ function Invoke-ExportDocDockerLifecycle {
     $maintenance = if ($RestorePending) { 'restore' } else { 'initialize' }
     # Always run a fresh maintenance process, even when the image has not changed.
     # Failures propagate: do not restart the API or remove pending restore markers.
-    Invoke-Compose -Command @('--profile', 'maintenance', 'run', '--rm', '--no-deps', '--no-build', $maintenance) `
+    Invoke-Compose -Command @('--profile', 'maintenance', 'run', '--rm', '--no-deps', $maintenance) `
         -Purpose "Run PostgreSQL $maintenance with maintenance credentials" -Timeout 3600
     Invoke-Compose -Command @('up', '--detach', '--no-deps', '--no-build', '--wait', '--wait-timeout', '180', 'application') `
         -Purpose 'Start API after successful database maintenance'
