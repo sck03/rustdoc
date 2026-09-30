@@ -309,6 +309,7 @@ function Get-GeneratedArtifactCleanupPlan {
             "gh-cli",
             "gh-config",
             "npm-cache",
+            "pip-cache",
             "native-runtime-packages",
             "native-ocr-crt",
             "postgresql-client",

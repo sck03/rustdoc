@@ -23,6 +23,9 @@ pub(crate) fn open_main_window(
         .min_inner_size(1024.0, 680.0)
         .build()?;
 
+    #[cfg(windows)]
+    crate::windows_prerequisites::schedule_after_startup(paths);
+
     Ok(())
 }
 

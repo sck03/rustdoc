@@ -10,6 +10,10 @@ use sha2::{Digest, Sha256};
 
 use crate::windows_runtime_installation::{InstallOutcome, InstallationGuard, install_runtime};
 
+#[path = "windows_runtime_cleanup.rs"]
+mod cleanup;
+pub(crate) use cleanup::schedule_after_startup;
+
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum StartupDecision {
     Continue,

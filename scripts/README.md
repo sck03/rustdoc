@@ -57,6 +57,8 @@ Windows 批量入口默认 `-Edition All`，仅生成 Document、Sales，共用�
 
 Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便携包携带原版固定清单验证的微软离线安装器；缺少 WebView2 时显示安装／退出选择，保留取消、繁忙、超时和需重启处理。构建时核对微软签名、版本、大小和 SHA-256。Windows GNU 构建同时携带 `WebView2Loader.dll`。
 
+便携版在系统检查、随包资源检查、后端启动和主 WebView 窗口创建成功后，后台自动移除本包 `WebView2Runtime` 内的离线安装器、校验清单及说明，最后删除空目录；当前可回收约 203 MiB。安装取消、失败、要求重启或启动检查失败时保留安装器。清理失败写入受管日志，下次成功启动重试，不阻断使用；未知文件、子目录和链接不自动删除。系统 WebView2、`WebView2Loader.dll` 和 `App_Data/WebView` 保留。开发仓库的安装器来源与原始发布压缩包保持完整；将已清理的目录拷到另一台缺少 WebView2 的电脑时，需重新解压原始完整包或安装微软 WebView2。
+
 程序随后读取本包资源清单，核对中文字体、PDFium 及已声明的 OCR 工具、ONNX 和模型。Windows OCR 只携带四个 app-local CRT DLL，不安装全局 .NET 或整个 VC 运行库。Linux 使用 WebKitGTK 4.1，macOS 使用系统 WKWebView；其它平台必须在对应 runner／设备验收。
 
 `eng/native-runtime-packages.json` 固定已校验来源及签名的原生资源归档版本和 SHA-512。NuGet 在此只是原生 DLL／so／dylib 的下载载体；不复制托管程序集，也不执行 dotnet restore。不要把 NuGet lock 的“内容哈希”直接当成签名后整个归档的哈希。PowerShell 打包器和容器资源准备都读取这份清单。

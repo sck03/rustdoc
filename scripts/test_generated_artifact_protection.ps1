@@ -40,7 +40,7 @@ try {
     if (Test-ExportDocProtectedArtifact $archiveOnly -IncludeReleaseOutputs) { throw 'Explicit release cleanup should allow a data-free archive' }
     $planRoot = Join-Path $fixture 'workspace'
     $planScripts = Join-Path $planRoot 'scripts'
-    foreach ($directory in @('scripts/lib', 'target/debug/build/example/out/permissions/resources', '.codex-runtime/native-runtime-packages', 'artifacts/releases')) {
+    foreach ($directory in @('scripts/lib', 'target/debug/build/example/out/permissions/resources', '.codex-runtime/native-runtime-packages', '.codex-runtime/pip-cache', 'artifacts/releases')) {
         New-Item -ItemType Directory -Path (Join-Path $planRoot $directory) -Force | Out-Null
     }
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'clean-generated-artifacts.ps1') -Destination $planScripts
@@ -50,12 +50,16 @@ try {
     [IO.File]::WriteAllText((Join-Path $planRoot 'target/CACHEDIR.TAG'), "Signature: 8a477f597d28d172789f06886806bc55`n")
     $cache = Join-Path $planRoot '.codex-runtime/native-runtime-packages/archive.zip'
     $release = Join-Path $planRoot 'artifacts/releases/exportdoc.zip'
+    $pipCache = Join-Path $planRoot '.codex-runtime/pip-cache/package.whl'
+    [IO.File]::WriteAllText($pipCache, 'cached Python package')
     [IO.File]::WriteAllText($cache, 'cached archive fixture')
     [IO.File]::WriteAllText($release, 'release fixture')
     & pwsh -NoProfile -File (Join-Path $planScripts 'clean-generated-artifacts.ps1') -IncludeCodexRuntimeWorkspaces | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Isolated cleanup failed' }
     if (Test-Path -LiteralPath (Join-Path $planRoot 'target')) { throw 'Verified compiler output was not removed' }
-    if (-not (Test-Path -LiteralPath $cache) -or -not (Test-Path -LiteralPath $release)) { throw 'Default cleanup removed a reusable cache or release' }
+    foreach ($preserved in @($cache, $pipCache, $release)) {
+        if (-not (Test-Path -LiteralPath $preserved)) { throw "Default cleanup removed a reusable cache or release: $preserved" }
+    }
     Write-Host "Generated artifact cleanup protection and isolated deletion passed."
 } finally {
     $resolved = [System.IO.Path]::GetFullPath($fixture)
