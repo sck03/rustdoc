@@ -38,7 +38,7 @@ export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCa
     case "Flow":
       return (
         <div className="report-designer-v3-preview-flow" aria-label={`${element.flowKind} 结构预览`}>
-          <FlowPreview block={element.block} selectedCellId={selectedGridCellId} />
+          <FlowPreview block={element.block} heightMm={hundredthMmToMm(element.heightHundredthMm)} selectedCellId={selectedGridCellId} />
         </div>
       );
   }
@@ -54,9 +54,9 @@ function lineStyle(element: Extract<ReportDesignerV3Element, { type: "Line" }>):
     : { backgroundColor: borderColor, [horizontal ? "height" : "width"]: `${width}px` };
 }
 
-function FlowPreview({ block, selectedCellId }: { block: ReportBlock; selectedCellId?: string }) {
+function FlowPreview({ block, heightMm, selectedCellId }: { block: ReportBlock; heightMm: number; selectedCellId?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const html = useMemo(() => ({ __html: renderReportDesignerBlockPreviewToHtml(block) }), [block]);
+  const html = useMemo(() => ({ __html: renderReportDesignerBlockPreviewToHtml(block, heightMm) }), [block, heightMm]);
   useLayoutEffect(() => {
     if (!selectedCellId) return;
     const cell = ref.current?.querySelector(`[data-report-grid-cell-id="${CSS.escape(selectedCellId)}"]`);

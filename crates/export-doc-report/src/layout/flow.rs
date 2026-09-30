@@ -454,11 +454,7 @@ pub(super) fn draw_border(svg: &mut String, [x, y, w, h]: [f32; 4], border: &Rep
     if border.width_px <= 0. || border.style == "None" {
         return;
     }
-    let dash = if border.style == "Dashed" {
-        " stroke-dasharray=\"2 1\""
-    } else {
-        ""
-    };
+    let dash = super::stroke_dash(&border.style);
     for (enabled, [x1, y1, x2, y2]) in [
         (border.top, [x, y, x + w, y]),
         (border.right, [x + w, y, x + w, y + h]),

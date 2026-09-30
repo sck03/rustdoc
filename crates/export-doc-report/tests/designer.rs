@@ -118,7 +118,7 @@ fn grid_merge_uses_real_column_occupancy_styles_and_vertical_text() {
         "second-row cell must skip the rowspan"
     );
     assert!(svg.contains("stroke=\"#ff0000\""));
-    assert!(svg.contains("stroke-dasharray=\"2 1\""));
+    assert!(svg.contains("stroke-dasharray=\"1.1 0.7\""));
     assert!(svg.contains("font-weight=\"700\" font-family=\"Noto Sans CJK SC\""));
     assert!(svg.contains("fill=\"#112233\""));
     assert!(svg.contains("No: GRID-IN"));

@@ -10,10 +10,10 @@ function useValidPage(total: number | undefined, page: number, change: (page: nu
   }, [total, page, change]);
 }
 
-function useFilters() {
+function useFilters(defaultManage = false) {
   const [page, setPage] = useState(1);
   const [unread, setUnread] = useState(false);
-  const [manage, setManage] = useState(false);
+  const [manage, setManage] = useState(defaultManage);
   const [params, setParams] = useSearchParams();
   const selected = Number(params.get("announcementId")) || 0;
   return { page, setPage, unread, manage, selected,
@@ -21,7 +21,7 @@ function useFilters() {
     select: (id: number) => setParams(id ? { announcementId: String(id) } : {}) };
 }
 export function useAnnouncements(client: ExportDocManagerApiClient, user: ApiUserDto) {
-  const filters = useFilters();
+  const filters = useFilters(communicationAccess(user, "announcements", "manage"));
   const { page, unread, manage, selected } = filters;
   const allowed = communicationAccess(user, "announcements");
   const key = ["office", "communication", user.id, user.companyScope, user.departmentId];

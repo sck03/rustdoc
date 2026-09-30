@@ -470,7 +470,13 @@ fn validate_detail_table(
             return Err("V3 合计行设置无效。".into());
         }
         validate_text_style(&summary.style)?;
+        if let Some(border) = &summary.border {
+            validate_border(border)?;
+        }
         for cell in &summary.cells {
+            if cell.suffix.chars().count() > 30 || cell.suffix.chars().any(char::is_control) {
+                return Err("合计行单位/后缀最多 30 字符，不能包含控制字符。".into());
+            }
             if !table
                 .columns
                 .iter()

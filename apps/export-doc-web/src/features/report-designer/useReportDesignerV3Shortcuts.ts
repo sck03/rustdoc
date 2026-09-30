@@ -10,6 +10,9 @@ export function useReportDesignerV3Shortcuts({ workspaceRef, history, editable, 
 }) {
   const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
     if (event.defaultPrevented || event.altKey || event.isComposing || isEditableTarget(event.target)) return;
+    // Native workspace listeners run before React's delegated control handlers.
+    // Interactive controls own their arrows (resize, column widths, sliders).
+    if (event.key.startsWith("Arrow") && event.target instanceof Element && event.target.closest('button,[role="slider"],[role="separator"]')) return;
     const modifier = event.ctrlKey || event.metaKey;
     const key = event.key.toLowerCase();
     if (key === "escape") { clearSelection(); return; }

@@ -41,7 +41,174 @@ fn act(service: &NativeService, token: &str, kind: &str, action: &str, row: &Val
     .unwrap()
 }
 
+fn finance_user(
+    service: &NativeService,
+    admin: &str,
+    role: &str,
+    company: &str,
+    department: &str,
+) -> String {
+    let username = format!("finance-{}", nonce().unwrap());
+    call(service, admin, CREATE_USER_ACCOUNT, 0, Some(json!({"username":username,"fullName":"财务验收","role":role,"companyScope":company,"departmentId":department,"isActive":true,"resetPassword":"Finance-Review-2026"}))).unwrap();
+    call(
+        service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":username,"password":"Finance-Review-2026"})),
+    )
+    .unwrap()["accessToken"]
+        .as_str()
+        .unwrap()
+        .into()
+}
+fn finance_list(
+    service: &NativeService,
+    token: &str,
+    status: &str,
+    finance: bool,
+) -> Result<Value, ApiError> {
+    let bytes = service.dispatch(
+        operation("expense", "list"),
+        &[],
+        &[
+            ("mineOnly", "false".into()),
+            ("financeOnly", finance.to_string()),
+            ("status", status.into()),
+        ],
+        None,
+        token,
+    )?;
+    Ok(serde_json::from_slice(&bytes).unwrap())
+}
+fn receive_expense(service: &NativeService, admin: &str, finance: &str, row: &Value) -> Value {
+    let id = row["id"].as_i64().unwrap();
+    assert_eq!(
+        finance_list(service, finance, "Approved", true).unwrap()["items"][0]["id"],
+        id
+    );
+    assert_eq!(
+        finance_list(service, finance, "", false).unwrap()["totalCount"],
+        0
+    );
+    assert_eq!(
+        finance_list(service, finance, "Pending", true)
+            .unwrap_err()
+            .status,
+        Some(400)
+    );
+    assert_eq!(
+        call(service, finance, operation("expense", "get"), id, None).unwrap()["id"],
+        id
+    );
+    let body =
+        json!({"expectedVersion":row["versionNumber"],"note":"凭证已核对，接收编号 FIN-001"});
+    assert_eq!(
+        call(
+            service,
+            finance,
+            operation("expense", "approve"),
+            id,
+            Some(body.clone())
+        )
+        .unwrap_err()
+        .status,
+        Some(403)
+    );
+    let manager = finance_user(service, admin, "OfficeManager", "DEFAULT", "GENERAL");
+    assert_eq!(
+        call(
+            service,
+            &manager,
+            operation("expense", "complete"),
+            id,
+            Some(body.clone())
+        )
+        .unwrap_err()
+        .status,
+        Some(403)
+    );
+    let company = format!("FIN-{}", &nonce().unwrap()[..8]);
+    call(
+        service,
+        admin,
+        CREATE_ORGANIZATION_COMPANY,
+        0,
+        Some(json!({"code":company,"name":"隔离财务公司","isActive":true})),
+    )
+    .unwrap();
+    call(
+        service,
+        admin,
+        CREATE_ORGANIZATION_DEPARTMENT,
+        0,
+        Some(json!({"code":company,"companyCode":company,"name":"财务部","isActive":true})),
+    )
+    .unwrap();
+    let other = finance_user(service, admin, "Finance", &company, &company);
+    assert_eq!(
+        finance_list(service, &other, "Approved", true).unwrap()["totalCount"],
+        0
+    );
+    assert_eq!(
+        call(service, &other, operation("expense", "get"), id, None)
+            .unwrap_err()
+            .status,
+        Some(403)
+    );
+    let attachment = row["attachments"][0]["id"].to_string();
+    assert!(
+        service
+            .download_file(
+                operation("expense", "download"),
+                &[("id", id.to_string()), ("attachmentId", attachment)],
+                finance
+            )
+            .is_ok()
+    );
+    let received = call(
+        service,
+        finance,
+        operation("expense", "complete"),
+        id,
+        Some(body.clone()),
+    )
+    .unwrap();
+    assert_eq!(
+        call(
+            service,
+            finance,
+            operation("expense", "complete"),
+            id,
+            Some(body)
+        )
+        .unwrap_err()
+        .status,
+        Some(409)
+    );
+    assert_eq!(
+        finance_list(service, finance, "Approved", true).unwrap()["totalCount"],
+        0
+    );
+    assert_eq!(
+        finance_list(service, finance, "HandedOff", true).unwrap()["items"][0]["id"],
+        id
+    );
+    let history = call(service, finance, operation("expense", "history"), id, None).unwrap();
+    assert!(
+        history["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["action"] == "complete"
+                && e["actorName"] == "财务验收"
+                && e["note"] == "凭证已核对，接收编号 FIN-001")
+    );
+    received
+}
+
 pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, employee: Option<i64>) {
+    let finance = finance_user(service, admin, "Finance", "DEFAULT", "GENERAL");
     let date = (chrono::Utc::now() - chrono::Duration::days(1))
         .date_naive()
         .to_string();
@@ -79,6 +246,14 @@ pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, empl
         )
         .unwrap();
         let id = row["id"].as_i64().unwrap();
+        if kind == "expense" {
+            assert_eq!(
+                call(service, &finance, operation(kind, "get"), id, None)
+                    .unwrap_err()
+                    .status,
+                Some(403)
+            );
+        }
         assert!(row.get("identity").is_none());
         assert!(row.get("submissionDigest").is_none());
         assert_eq!(
@@ -160,6 +335,14 @@ pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, empl
         }
         row = act(service, applicant, kind, "submit", &row);
         assert_eq!(row["status"], "Pending");
+        if kind == "expense" {
+            assert_eq!(
+                call(service, &finance, operation(kind, "get"), id, None)
+                    .unwrap_err()
+                    .status,
+                Some(403)
+            );
+        }
         if employee.is_none() {
             assert_eq!(
                 call(
@@ -236,7 +419,11 @@ pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, empl
             Some(409)
         );
         row = responses.into_iter().find_map(Result::ok).unwrap();
-        row = act(service, admin, kind, "complete", &row);
+        row = if kind == "expense" {
+            receive_expense(service, admin, &finance, &row)
+        } else {
+            act(service, admin, kind, "complete", &row)
+        };
         assert_eq!(
             row["status"],
             if kind == "expense" {

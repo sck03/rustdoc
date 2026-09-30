@@ -179,7 +179,7 @@ pub(super) fn extend(doc: &mut Value) {
 
 fn permissions(doc: &mut Value, kind: &str, resource: &str, label: &str, group: &str, order: i32) {
     let catalog = &mut doc["x-exportdoc-permissions"];
-    let actions: Vec<_> = [("view","查看","view"),("create","新建申请","operate"),("edit","编辑与提交","operate"),("cancel","取消草稿","operate"),("approve","审批与作废","manage"),("complete",if kind=="expense" {"移交财务"} else {"完成登记"},"manage")].into_iter().enumerate().map(|(order,(key,name,level))| json!({"key":key,"name":name,"description":name,"sortOrder":order*10,"navigationAccessLevel":level})).collect();
+    let actions: Vec<_> = [("view","查看","view"),("create","新建申请","operate"),("edit","编辑与提交","operate"),("cancel","取消草稿","operate"),("approve","审批与作废","manage"),("complete",if kind=="expense" {"财务查看与接收"} else {"完成登记"},"manage")].into_iter().enumerate().map(|(order,(key,name,level))| json!({"key":key,"name":name,"description":name,"sortOrder":order*10,"navigationAccessLevel":level})).collect();
     catalog["resources"].as_array_mut().unwrap().push(json!({"key":resource,"name":label,"group":group,"workspace":"office","moduleKey":resource,"sortOrder":order,"isTechnical":false,"supportsDataScope":true,"actions":actions}));
     catalog["modules"].as_array_mut().unwrap().push(json!({"key":resource,"name":label,"group":group,"workspace":"office","sortOrder":order,"isTechnical":false}));
     for edition in ["Full", "Administration"] {
@@ -198,10 +198,22 @@ fn permissions(doc: &mut Value, kind: &str, resource: &str, label: &str, group: 
             };
         for action in &actions {
             let key = action["key"].as_str().unwrap();
-            if matches!(key, "approve" | "complete") && !manager {
+            let receiver = kind == "expense" && matches!(code.as_str(), "Admin" | "Finance");
+            if (key == "approve" && !manager)
+                || (key == "complete"
+                    && if kind == "expense" {
+                        !receiver
+                    } else {
+                        !manager
+                    })
+            {
                 continue;
             }
-            let scope = if manager { "company" } else { "own" };
+            let scope = if manager || (key == "complete" && receiver) {
+                "company"
+            } else {
+                "own"
+            };
             role["grants"]
                 .as_array_mut()
                 .unwrap()
@@ -251,6 +263,9 @@ pub(super) fn endpoint(
         }
     }
     if action == "list" {
+        if kind == "expense" {
+            params.push(json!({"name":"financeOnly","in":"query","schema":{"type":"boolean"}}));
+        }
         params.push(json!({"name":"status","in":"query","schema":{"type":"string"}}));
         params.push(json!({"name":"mineOnly","in":"query","schema":{"type":"boolean"}}));
     }

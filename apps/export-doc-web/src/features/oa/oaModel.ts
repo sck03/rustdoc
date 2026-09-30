@@ -16,11 +16,12 @@ export const oaModules = {
 export const oaStatus: Record<OaRequest["status"], string> = { Draft: "草稿", Pending: "待审批", Approved: "已批准", Rejected: "已驳回", Cancelled: "已取消", Completed: "已完成", HandedOff: "已移交财务" };
 export const oaActionLabels = { submit: "提交审批", withdraw: "撤回修改", approve: "批准", reject: "驳回", cancel: "取消申请", void: "作废批准", complete: "完成登记" } as const;
 export type OaActionName = keyof typeof oaActionLabels;
-export function oaAccess(user: ApiUserDto, kind: OaKind, action: string, row?: OaRequest) {
+export function oaAccess(user: ApiUserDto, kind: OaKind, action: string, row?: OaRequest): boolean {
   const resource = oaModules[kind].resource;
   if (!hasPermission(user.capabilities.permissions, resource, action)) return false;
   return !row || user.capabilities.permissions.some((grant) => grant.resourceKey === resource && grant.action === action &&
-    (grant.dataScope === "all" || grant.dataScope === "company" || grant.dataScope === "department" && row.departmentId === user.departmentId || grant.dataScope === "own" && row.ownerUserId === user.id));
+    (grant.dataScope === "all" || grant.dataScope === "company" || grant.dataScope === "department" && row.departmentId === user.departmentId || grant.dataScope === "own" && row.ownerUserId === user.id))
+    || action === "view" && kind === "expense" && ["Approved", "HandedOff"].includes(row.status) && oaAccess(user, kind, "complete", row);
 }
 export function oaActions(row: OaRequest, user: ApiUserDto): OaActionName[] {
   const allows = (action: string) => oaAccess(user, row.kind, action, row);
@@ -31,7 +32,7 @@ export function oaActions(row: OaRequest, user: ApiUserDto): OaActionName[] {
   return [];
 }
 export function oaActionLabel(action: OaActionName, kind: OaKind, local: boolean) {
-  if (action === "complete") return ({ expense: "移交财务", purchase: "登记验收", leave: "销假归档", travel: "返程归档", overtime: "确认加班完成", general: "办结登记" } as const)[kind];
+  if (action === "complete") return ({ expense: "财务接收", purchase: "登记验收", leave: "销假归档", travel: "返程归档", overtime: "确认加班完成", general: "办结登记" } as const)[kind];
   if (action === "approve" && local) return "登记批准结果";
   return oaActionLabels[action];
 }

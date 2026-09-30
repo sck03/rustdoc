@@ -90,6 +90,7 @@ export function ReportDesignerDetailTableSummaryProperties({
               return (
                 <div className="new-report-summary-cell-editor" key={column.id}>
                   <strong>{column.title}</strong>
+                  {cell.contentKind === "Field" && <label><span>单位/后缀</span><input maxLength={30} value={cell.suffix ?? ""} onChange={e => updateSummaryCell(column.id, current => ({ ...current, suffix: e.target.value }))} /></label>}
                   <label>
                     <span>内容</span>
                     <select
@@ -140,6 +141,8 @@ export function ReportDesignerDetailTableSummaryProperties({
             <div className="new-report-property-wide">
               <div className="new-report-designer-muted">合计行样式</div>
               <TextStyleEditor style={block.summaryRow.style} onChange={(style) => onCommit({ ...block, summaryRow: { ...block.summaryRow!, style } })} />
+              <BorderEditor border={block.summaryRow.border ?? block.border} onChange={border => onCommit({ ...block, summaryRow: { ...block.summaryRow!, border } })} />
+              {block.summaryRow.border && <button type="button" className="command-button secondary" onClick={() => onCommit({ ...block, summaryRow: { ...block.summaryRow!, border: undefined } })}>合计行沿用表格边框</button>}
             </div>
           </div>
         ) : (

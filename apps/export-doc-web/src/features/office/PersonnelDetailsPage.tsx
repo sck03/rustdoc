@@ -61,7 +61,7 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
         {record.canDelete && record.deleteRestriction && <p className="office-muted">{record.deleteRestriction}</p>}
         <nav className="office-tabs" aria-label="人员档案内容">{[["profile", "档案信息"], ["images", "照片与证件"], ["history", "任职与操作记录"], ["clearance", "交接事项"]].map(([key, label]) =>
           <button type="button" key={key} disabled={imageOperation.busy} aria-pressed={tab === key} onClick={() => void changeTab(key)}>{label}</button>)}</nav>
-        {tab === "profile" && <PersonnelFacts record={record} user={user} />}
+        <div hidden={tab !== "profile"}><PersonnelFacts record={record} user={user} /></div>
         {tab === "images" && <PersonnelImagesPanel client={client} record={record} operation={imageOperation}
           onPendingChange={(kind, pending) => setPendingImages((current) => { const next = new Set(current); if (pending) next.add(kind); else next.delete(kind); return next; })} />}
         {tab === "history" && <PersonnelHistory client={client} user={user} id={id} />}
@@ -80,24 +80,31 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
 function PersonnelFacts({ record, user }: { record: PersonnelRecord; user: ApiUserDto }) {
   const [showIdentity, setShowIdentity] = useState(false);
   const reminders = personnelReminders(record, user.businessDate);
-  const facts = [
+  const employment = [
     ["用工类型", employmentTypeLabels[record.employmentType]], ["本次入职日期", record.hireDate],
     ["试用截止", record.probationEndsOn], ["合同截止", record.contractEndsOn], ["转正日期", record.confirmedOn], ["离职日期", record.departedOn],
-    ["工作邮箱", record.profile.workEmail], ["工作电话", record.profile.workPhone], ["工作地点", record.profile.workLocation],
+    ...(!user.capabilities.usesOfficeRegister ? [["关联账号", record.account ? `${record.account.username}（${record.account.isActive ? "启用" : "停用"}）` : "未关联"]] : []),
+  ];
+  const contact = [["工作邮箱", record.profile.workEmail], ["工作电话", record.profile.workPhone], ["工作地点", record.profile.workLocation]];
+  const personal = [
     ["个人电话", record.profile.personalPhone], ["紧急联系人", record.profile.emergencyContact], ["紧急联系电话", record.profile.emergencyPhone],
     ["签发机关", record.profile.identityAuthority], ["身份证住址", record.profile.registeredAddress],
     ["证件有效起始日", record.profile.identityValidFrom], ["证件有效截止日", record.profile.identityLongTerm ? "长期有效" : record.profile.identityValidUntil],
-    ...(!user.capabilities.usesOfficeRegister ? [["关联账号", record.account ? `${record.account.username}（${record.account.isActive ? "启用" : "停用"}）` : "未关联"]] : []),
   ];
+  const facts = (rows: (string | null | undefined)[][]) => <dl className="personnel-facts">{rows.map(([label, value]) =>
+    <div key={label}><dt>{label}</dt><dd data-empty={!value}>{value || "未登记"}</dd></div>)}</dl>;
   return <div className="personnel-detail-stack">
     {reminders.length > 0 && <InlineNotice tone="warning" title="待关注">{reminders.join("；")}</InlineNotice>}
+    <section className="personnel-fact-section"><h3>任职信息</h3>{facts(employment)}</section>
+    <section className="personnel-fact-section"><h3>工作联系</h3>{facts(contact)}</section>
+    <details className="personnel-fact-section"><summary>个人资料与证件<span>私密资料 · 按需展开</span></summary>
     <dl className="personnel-facts"><div className="personnel-wide"><dt>居民身份证号码</dt><dd>{record.profile.identityNumber ? <>
       <span>{showIdentity ? record.profile.identityNumber : `${record.profile.identityNumber.slice(0, 6)}********${record.profile.identityNumber.slice(-4)}`}</span>{" "}
       <button className="command-button secondary" type="button" aria-pressed={showIdentity} onClick={() => setShowIdentity((value) => !value)}>{showIdentity ? "隐藏号码" : "查看完整号码"}</button>
     </> : "未登记"}</dd></div>
-      {facts.map(([label, value]) => <div key={label} className={["工作邮箱", "工作地点", "关联账号", "身份证住址"].includes(label ?? "") ? "personnel-wide" : undefined}><dt>{label}</dt><dd>{value || "未登记"}</dd></div>)}
-      <div className="personnel-wide"><dt>人事备注</dt><dd>{record.profile.notes || "无"}</dd></div>
     </dl>
+    {facts(personal)}</details>
+    <details className="personnel-fact-section"><summary>人事备注</summary><p className="personnel-notes">{record.profile.notes || "暂无备注"}</p></details>
     <p className="office-muted">个人联系方式和人事记录仅对获授权的人员显示。</p>
   </div>;
 }

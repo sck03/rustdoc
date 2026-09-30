@@ -208,6 +208,50 @@ pub(super) fn handle(
         return project(tx, actor, row, true);
     }
     store::check_version(&row, store::expected(body))?;
+    if action == "delete" {
+        if row["publishVersion"] != 0
+            || !matches!(row["status"].as_str(), Some("Draft" | "Archived"))
+        {
+            return Err(conflict(
+                "发布过的公告不可删除，请归档以保留发布历史和阅读回执。",
+            ));
+        }
+        required(body, "note", "删除原因", 500)?;
+        let id = records::positive(&row, "id", "公告")?;
+        for child in ["announcement-publication", "announcement-receipt"] {
+            if children(tx, &row, child, 0, 1)?.0 > 0 {
+                return Err(conflict("公告已有发布历史或回执，不能删除。"));
+            }
+        }
+        for attachment in children(tx, &row, "announcement-attachment", 0, 20)?.1 {
+            crate::operation::check()?;
+            let file = records::positive(&attachment, "id", "附件")?;
+            tx.delete_blobs(file)?;
+            if !tx.delete(
+                "announcement-attachment",
+                file,
+                store::expected(&attachment),
+            )? {
+                return Err(conflict("附件已变化，删除已取消。"));
+            }
+        }
+        tx.append_audit_details(
+            &export_doc_storage::AuditWrite {
+                kind: "announcement",
+                record_id: id,
+                version: store::expected(&row),
+                action: "delete",
+                actor_id: actor.id,
+                occurred_at: &store::timestamp(),
+                note: &text(body, "note"),
+            },
+            &super::super::audit_values::changes(Some(&row), None),
+        )?;
+        if !tx.delete("announcement", id, store::expected(&row))? {
+            return Err(conflict("公告已变化，删除已取消。"));
+        }
+        return Ok(json!({"success":true}));
+    }
     if action == "delete-attachment" {
         return super::super::record_documents::remove(tx, actor, meta, row, parameters, body);
     }

@@ -39,7 +39,7 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerV3Validation.ts"))
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3Schema.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3Mutations.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3TemplateParser.ts"))};
-export * from ${JSON.stringify(importSpecifier("reportDesignerV3HtmlExporter.ts"))};
+export * from ${JSON.stringify(path.join(repoRoot, "scripts/lib/report-designer-v3-html-fixture.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerBlockRenderer.ts"))};
 export * from ${JSON.stringify(path.join(repoRoot, "scripts/lib/report-preview-html-fixture.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerGridMutations.ts"))};
@@ -103,7 +103,7 @@ for (const family of ["Noto Sans CJK SC", "Noto Serif CJK SC", "Arial, sans-seri
   const expected = family.startsWith("Noto ") ? family : "Noto Sans CJK SC";
   assert(result.schema.page.fontFamily === expected && result.schema.layers[0].elements[0].style.fontFamily === expected, "页面和组件应统一使用随包字体");
   draft.layers[0].elements[0].style.bold = true;
-  const html = api.exportReportDesignerV3SchemaToHtml(draft);
+  const html = api.renderReportDesignerV3HtmlFixture(draft);
   assert(/class="edm-v3-element edm-v3-element-text" style="[^"]*font-family: Noto Sans CJK SC;[^\"]*font-weight: 700/.test(html), "衬线正文加粗应选择已有 Sans Bold 字体");
 }
 
@@ -199,7 +199,7 @@ const conditionalSchema = {
 };
 const conditionalValidation = api.normalizeReportDesignerV3Schema(conditionalSchema, "ExportDocument");
 assert(!conditionalValidation.issues.some((issue) => issue.severity === "error" && issue.path.includes("conditional-export-flow")), "出口条件显示的合法字段应通过 V3 校验");
-const conditionalHtml = api.exportReportDesignerV3SchemaToHtml(conditionalSchema, "ExportDocument");
+const conditionalHtml = api.renderReportDesignerV3HtmlFixture(conditionalSchema, "ExportDocument");
 assert(conditionalHtml.includes("{{ if Invoice.SpecialTerms }}") && conditionalHtml.includes(conditionalText), "V3 条件显示导出必须生成结构化白名单条件");
 const standardConditionalPreview = api.renderReportDesignerLocalPreviewSample(JSON.stringify(conditionalSchema), "exportStandard");
 const longConditionalPreview = api.renderReportDesignerLocalPreviewSample(JSON.stringify(conditionalSchema), "exportLongItems");
@@ -227,7 +227,7 @@ const paymentConditionalSchema = {
 };
 const paymentConditionalValidation = api.normalizeReportDesignerV3Schema(paymentConditionalSchema, "PaymentVoucher");
 assert(paymentConditionalValidation.issues.some((issue) => issue.severity === "error" && issue.path.includes("condition.fieldPath")), "付款模板条件字段混用 Invoice.* 必须被业务域校验阻断");
-assert(api.validateReportDesignerV3Export(paymentConditionalSchema, "PaymentVoucher").blocked, "付款模板条件域错误必须阻断导出");
+assert(api.validateReportDesignerV3Draft(paymentConditionalSchema, "PaymentVoucher").blocked, "付款模板条件域错误必须阻断导出");
 
 const manyElementsLayer = {
   ...landscapeSchema.layers[0],
@@ -549,7 +549,7 @@ const verticalDistributed = api.distributeSelectedV3Elements(layoutState, "verti
 const verticalElements = layoutElements.map((element) => api.findV3Element(verticalDistributed.schema, element.id).element);
 assert(verticalElements[0].yHundredthMm === 1800 && verticalElements[2].yHundredthMm + verticalElements[2].heightHundredthMm <= 29700, "垂直分布必须保留外边界并限制在页面内");
 
-const exported = api.exportReportDesignerV3SchemaToHtml(landscapeSchema);
+const exported = api.renderReportDesignerV3HtmlFixture(landscapeSchema);
 assert(exported.includes("@page { size: 297mm 210mm"), "V3 导出必须输出横版 A4");
 assert(!exported.includes("http://") && !exported.includes("https://"), "V3 导出不得产生外部图片 URL");
 const parsedRoundtrip = api.parseReportDesignerV3Source(JSON.stringify(landscapeSchema), "ExportDocument");
@@ -575,7 +575,7 @@ for (const classicPath of [
   assert(parsed.issues.length === 0, `${classicPath}: ${JSON.stringify(parsed.issues)}`);
   const geometry = value => value.layers.map(layer => [layer.id, layer.role, layer.designHeightHundredthMm ?? 0, layer.elements.map(element => [element.id, element.xHundredthMm, element.yHundredthMm, element.widthHundredthMm, element.heightHundredthMm])]);
   assert(JSON.stringify(geometry(parsed.schema)) === JSON.stringify(geometry(document)), `${classicPath}: opening must not resize elements or alter design bands`);
-  assert(!api.validateReportDesignerV3Export(parsed.schema, document.reportType).blocked, `${classicPath} must remain editable`);
+  assert(!api.validateReportDesignerV3Draft(parsed.schema, document.reportType).blocked, `${classicPath} must remain editable`);
   const originalDetails = document.layers.flatMap(layer => layer.elements).filter(element => element.flowKind === "DetailTable");
   const parsedDetails = parsed.schema.layers.flatMap(layer => layer.elements).filter(element => element.flowKind === "DetailTable");
   assert(JSON.stringify(parsedDetails.map(e => e.block.columns.map(c => c.widthMm))) === JSON.stringify(originalDetails.map(e => e.block.columns.map(c => c.widthMm))), `${classicPath}: opening in the designer must preserve column geometry`);
@@ -605,8 +605,8 @@ const paymentCrossDomain = {
 };
 const paymentValidation = api.normalizeReportDesignerV3Schema(paymentCrossDomain, "PaymentVoucher");
 assert(paymentValidation.issues.some((issue) => issue.severity === "error" && issue.path.includes("fieldPath")), "付款模板混用 Invoice.* 字段必须阻断");
-assert(api.exportReportDesignerV3SchemaToHtml(paymentCrossDomain, "PaymentVoucher") === "", "有字段域阻断错误时不得导出可保存 HTML");
-assert(api.validateReportDesignerV3Export(paymentCrossDomain, "PaymentVoucher").blocked, "导出状态必须暴露字段域阻断错误");
+assert(api.renderReportDesignerV3HtmlFixture(paymentCrossDomain, "PaymentVoucher") === "", "有字段域阻断错误时不得导出可保存 HTML");
+assert(api.validateReportDesignerV3Draft(paymentCrossDomain, "PaymentVoucher").blocked, "导出状态必须暴露字段域阻断错误");
 
 const exportCrossDomain = {
   ...landscapeSchema,
@@ -626,7 +626,7 @@ const exportCrossDomain = {
 };
 const exportValidation = api.normalizeReportDesignerV3Schema(exportCrossDomain, "ExportDocument");
 assert(exportValidation.issues.some((issue) => issue.severity === "error" && issue.path.includes("fieldPath")), "出口模板混用 Payment.* 字段必须阻断");
-assert(api.validateReportDesignerV3Export(exportCrossDomain, "ExportDocument").blocked, "出口模板导出状态必须暴露字段域阻断错误");
+assert(api.validateReportDesignerV3Draft(exportCrossDomain, "ExportDocument").blocked, "出口模板导出状态必须暴露字段域阻断错误");
 assert(workspaceSource.includes("当前草稿不能保存"), "V3 工作区必须明确提示阻断草稿不能保存");
 assert(workspaceSource.includes("exportValidation.blocked") && workspaceSource.includes("isDirty: draftDirty") && workspaceSource.includes("isValid: sourceValid && !exportValidation.blocked"), "阻断导出时必须独立报告修改状态与校验状态");
 
@@ -706,7 +706,7 @@ const featureSchema = {
     { id: "feature-overlay", name: "覆盖层", role: "Overlay", print: { repeatOnEveryPage: false, keepTogether: false, pinToPageBottom: false, minHeightHundredthMm: 0 }, visible: true, locked: false, elements: [] },
   ],
 };
-const featureHtml = api.exportReportDesignerV3SchemaToHtml(featureSchema, "ExportDocument");
+const featureHtml = api.renderReportDesignerV3HtmlFixture(featureSchema, "ExportDocument");
 assert(featureHtml.includes("edm-v3-repeat-layer-header") && featureHtml.includes("edm-v3-repeat-layer-footer"), "重复页眉/页脚必须生成固定重复层");
 assert(featureHtml.includes("edm-v3-layer-keep-together"), "保持整段属性必须生成 keep-together 类");
 assert(featureHtml.includes("edm-v3-flow-item-pagebreak"), "Flow 页面断点必须保留结构化输出");
@@ -740,7 +740,7 @@ const staticHeaderFlowSchema = {
       }
     : layer),
 };
-const staticHeaderFlowHtml = api.exportReportDesignerV3SchemaToHtml(staticHeaderFlowSchema, "ExportDocument");
+const staticHeaderFlowHtml = api.renderReportDesignerV3HtmlFixture(staticHeaderFlowSchema, "ExportDocument");
 assert(staticHeaderFlowHtml.includes("edm-v3-flow-static"), "页眉/页脚/覆盖层中的固定 Flow 必须显式标记为静态图层内容");
 const invalidOverlayFlowSchema = {
   ...staticHeaderFlowSchema,
@@ -757,7 +757,7 @@ const invalidOverlayFlowSchema = {
       }
     : layer),
 };
-assert(api.validateReportDesignerV3Export(invalidOverlayFlowSchema, "ExportDocument").blocked, "覆盖层中的分页 Flow 必须阻断而不是产生歧义输出");
+assert(api.validateReportDesignerV3Draft(invalidOverlayFlowSchema, "ExportDocument").blocked, "覆盖层中的分页 Flow 必须阻断而不是产生歧义输出");
 const overlappingBodySchema = {
   ...featureSchema,
   layers: featureSchema.layers.map((layer) => layer.role === "Body"
@@ -770,7 +770,7 @@ const overlappingBodySchema = {
       }
     : layer),
 };
-assert(api.validateReportDesignerV3Export(overlappingBodySchema, "ExportDocument").issues.some((issue) => issue.message.includes("视觉区域重叠")), "主体静态元素与 Flow 重叠必须给出明确打印提示");
+assert(api.validateReportDesignerV3Draft(overlappingBodySchema, "ExportDocument").issues.some((issue) => issue.message.includes("视觉区域重叠")), "主体静态元素与 Flow 重叠必须给出明确打印提示");
 
 const controlledImageSchema = {
   ...featureSchema,
@@ -797,7 +797,7 @@ const controlledImageSchema = {
       }
     : { ...layer, elements: [] }),
 };
-const controlledImageHtml = api.exportReportDesignerV3SchemaToHtml(controlledImageSchema, "ExportDocument");
+const controlledImageHtml = api.renderReportDesignerV3HtmlFixture(controlledImageSchema, "ExportDocument");
 assert(controlledImageHtml.includes(`data-edm-v3-resource-id="img-${"a".repeat(64)}.png"`), "资源图片必须以受控 resourceId 标记输出");
 assert(!controlledImageHtml.includes("src=\"http") && !controlledImageHtml.includes("src=\"https"), "受控图片不得产生任意外部 URL");
 
@@ -810,7 +810,7 @@ for (const unsafeFieldPath of ["Invoice.LogoUrl", "Customer.Logo", "http://evil.
   };
   const unsafeFieldValidation = api.normalizeReportDesignerV3Schema(unsafeFieldSchema, "ExportDocument");
   assert(unsafeFieldValidation.issues.some((issue) => issue.severity === "error" && issue.path.includes("fieldPath")), `不受控图片字段 ${unsafeFieldPath} 必须阻断`);
-  assert(api.exportReportDesignerV3SchemaToHtml(unsafeFieldSchema, "ExportDocument") === "", `不受控图片字段 ${unsafeFieldPath} 不得导出`);
+  assert(api.renderReportDesignerV3HtmlFixture(unsafeFieldSchema, "ExportDocument") === "", `不受控图片字段 ${unsafeFieldPath} 不得导出`);
 }
 const safeFieldSchema = {
   ...controlledImageSchema,
@@ -818,7 +818,7 @@ const safeFieldSchema = {
     ? { ...layer, elements: [{ ...layer.elements[0], sourceKind: "Field", fieldPath: "doc_seal_path", resourceId: undefined }] }
     : layer),
 };
-const safeFieldHtml = api.exportReportDesignerV3SchemaToHtml(safeFieldSchema, "ExportDocument");
+const safeFieldHtml = api.renderReportDesignerV3HtmlFixture(safeFieldSchema, "ExportDocument");
 assert(safeFieldHtml.includes('src="{{ doc_seal_path }}"'), "受控 data URI 图片字段必须输出字段绑定");
 
 const unsafeImageSchema = {
@@ -827,7 +827,7 @@ const unsafeImageSchema = {
     ? { ...layer, elements: [{ ...layer.elements[0], resourceId: "https://evil.example/image.png" }] }
     : layer),
 };
-const unsafeImageHtml = api.exportReportDesignerV3SchemaToHtml(unsafeImageSchema, "ExportDocument");
+const unsafeImageHtml = api.renderReportDesignerV3HtmlFixture(unsafeImageSchema, "ExportDocument");
 assert(!unsafeImageHtml.includes("evil.example") && !unsafeImageHtml.includes("https://"), "非法资源标识必须被清理，不能进入导出 HTML");
 
 {
@@ -845,7 +845,7 @@ assert(!unsafeImageHtml.includes("evil.example") && !unsafeImageHtml.includes("h
   assert(located.layer.role === "Body" && located.element.yHundredthMm === 7700, "跨分界拖动必须同步真实归属并保持页面坐标");
   assert(moved.activeLayerId === body.id && moved.selectedIds[0] === grid.id, "跨区域后选区和活动区域必须一致");
   assert(api.findV3Element(inserted.schema, grid.id).layer.role === "Header", "区域移动必须保留原快照供撤销使用");
-  assert(api.exportReportDesignerV3SchemaToHtml(moved.schema).includes('edm-v3-flow-item-grid'), "移到主体的普通表格必须进入正式流式输出");
+  assert(api.renderReportDesignerV3HtmlFixture(moved.schema).includes('edm-v3-flow-item-grid'), "移到主体的普通表格必须进入正式流式输出");
   const coordinateMove = api.updateV3Element(moved, grid.id, { yHundredthMm: 700 });
   assert(api.findV3Element(coordinateMove.schema, grid.id).layer.role === "Header", "属性坐标与拖动必须共用区域判断");
   const incorrectOwnership = { ...inserted, schema: { ...inserted.schema, layers: inserted.schema.layers.map(layer => layer.id === header.id
@@ -887,7 +887,7 @@ assert(!unsafeImageHtml.includes("evil.example") && !unsafeImageHtml.includes("h
 }
 
 const markSchema = createShippingMarksScenario(api);
-const markHtml = api.exportReportDesignerV3SchemaToHtml(markSchema, "ExportDocument");
+const markHtml = api.renderReportDesignerV3HtmlFixture(markSchema, "ExportDocument");
 assert(markHtml.length > 0, "唛头必须可用于自由画布、普通行、表格、条件内容和明细旁栏");
 assert(!markHtml.includes("shipping_marks_image_data"), "模板只保存统一唛头绑定");
 const markImagePreview = api.renderReportDesignerLocalPreviewSample(JSON.stringify(markSchema), "exportImageMarks");

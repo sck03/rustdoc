@@ -50,6 +50,77 @@ fn horizontal_between(svg: &str, start: f32, end: f32) -> bool {
 }
 
 #[test]
+fn commercial_headers_and_packing_frame_survive_paging_and_roundtrip() {
+    for template in [Builtin::Invoice, Builtin::PackingList] {
+        let source = serde_json::to_string(&template.design().unwrap()).unwrap();
+        let design = export_doc_domain::designer::Design::from_source(&source).unwrap();
+        for count in [1, 36] {
+            let data = invoice(count);
+            let document =
+                export_doc_report::render_design(&data, &design, &AtomicBool::new(false)).unwrap();
+            for page in &document.pages {
+                for label in ["Invoice No.:", "Contract No.:", "Date:"] {
+                    let node = nodes(&page.svg, "text")
+                        .into_iter()
+                        .find(|(n, _)| n.ends_with(&format!(">{label}")))
+                        .unwrap()
+                        .0;
+                    assert!((attribute(node, "x") - 161.7).abs() < 0.02);
+                    assert!(node.contains("text-anchor=\"end\""));
+                }
+                if template == Builtin::PackingList {
+                    for x in [15., 47., 195.] {
+                        assert!(
+                            nodes(&page.svg, "line")
+                                .into_iter()
+                                .any(|(n, _)| (attribute(n, "x1") - x).abs() < 0.01
+                                    && (attribute(n, "x2") - x).abs() < 0.01
+                                    && (attribute(n, "y2") - 245.).abs() < 0.01
+                                    && attribute(n, "y1") < 80.),
+                            "packing column {x} must reach the frame bottom"
+                        );
+                    }
+                    assert!(
+                        !nodes(&page.svg, "line").into_iter().any(|(n, _)| {
+                            let x = attribute(n, "x1");
+                            x > 47.01
+                                && x < 194.99
+                                && (x - attribute(n, "x2")).abs() < 0.01
+                                && (attribute(n, "y1") - attribute(n, "y2")).abs() > 0.01
+                        }),
+                        "packing must not draw internal goods-column separators"
+                    );
+                }
+            }
+            let last = &document.pages.last().unwrap().svg;
+            if template == Builtin::PackingList {
+                for (field, unit) in [
+                    ("Invoice.TotalGrossWeight", "KGS"),
+                    ("Invoice.TotalNetWeight", "KGS"),
+                    ("Invoice.TotalVolume", "CBM"),
+                ] {
+                    let text = format!(">{}{unit}", data.text(field));
+                    assert!(
+                        nodes(last, "text")
+                            .iter()
+                            .any(|(n, _)| n.ends_with(&text) && n.contains("font-weight=\"700\"")),
+                        "packing total must include its unit: {text}"
+                    );
+                }
+            }
+            let total = text_y(last, "TOTAL:");
+            assert!(nodes(last, "line").into_iter().any(|(n, offset)| {
+                n.contains("stroke-dasharray=\"1.1 0.7\"")
+                    && (attribute(n, "x1") - 47.).abs() < 0.01
+                    && (attribute(n, "x2") - 195.).abs() < 0.01
+                    && total - attribute(n, "y1") - offset > 0.
+                    && total - attribute(n, "y1") - offset < 10.
+            }));
+        }
+    }
+}
+
+#[test]
 fn commercial_rows_have_no_dividers_and_values_share_the_lower_baseline() {
     for template in [Builtin::Invoice, Builtin::PackingList] {
         let mut data = invoice(2);

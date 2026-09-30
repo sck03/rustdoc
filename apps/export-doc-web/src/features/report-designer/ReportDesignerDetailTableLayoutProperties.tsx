@@ -60,6 +60,7 @@ export function ReportDesignerDetailTableLayoutProperties({
           </div>
         </div>
         <DesignerCheckbox checked={block.rowSeparators !== false} onChange={checked => onCommit({ ...block, rowSeparators: checked })}>商品之间显示横线</DesignerCheckbox>
+        <DesignerCheckbox checked={block.print.fillHeight === true} onChange={fillHeight => onCommit({ ...block, print: { ...block.print, fillHeight } })}>边框延伸到表格底部</DesignerCheckbox>
         <div className="new-report-property-readout">
           <span>列总宽</span>
           <strong>{detailColumnWidthTotal}mm / {block.columns.length} 列</strong>

@@ -49,9 +49,9 @@ function commercialHeader(d,title) {
     text("to","TO: M/S",15,44,85,5,8),
     field("customer","Customer.CustomerNameEN",15,49,107,6,8),
     field("customer-address","Customer.AddressEN",15,55,107,9,7),
-    text("invoice-label","Invoice No.:",133,44,29,5,7),field("invoice-no","Invoice.InvoiceNo",163,44,32,5,7,"Right"),
-    text("contract-label","Contract No.:",133,50,29,5,7),field("contract-no","Invoice.ContractNo",163,50,32,5,7,"Right"),
-    text("date-label","Date:",133,56,29,5,7),field("invoice-date","Invoice.InvoiceDate",163,56,32,5,7,"Right"),
+    text("invoice-label","Invoice No.:",143,44,19,5,7,"Right"),field("invoice-no","Invoice.InvoiceNo",163,44,32,5,7,"Right"),
+    text("contract-label","Contract No.:",143,50,19,5,7,"Right"),field("contract-no","Invoice.ContractNo",163,50,32,5,7,"Right"),
+    text("date-label","Date:",143,56,19,5,7,"Right"),field("invoice-date","Invoice.InvoiceDate",163,56,32,5,7,"Right"),
   ];
   d.layers[2].elements=[pageNumber()];
   const final={id:"final",name:"末页签章",role:"Footer",visible:true,locked:false,print:{repeatOnEveryPage:false,keepTogether:true,pinToPageBottom:false,minHeightHundredthMm:0},elements:[seal("seal","doc_seal_path",150,250,40,25)]};
@@ -119,14 +119,18 @@ function packing() {
     column("net","净重\nNet Weight","item.NWTotal",20,"Right",[F("item.NWTotal"),T("KGS")]),
     column("volume","体积\nMEAS.","item.Volume",18,"Right",[F("item.Volume"),T("CBM")]),
   ],6.5);
-  t.heightHundredthMm=mm(165);
+  t.heightHundredthMm=mm(180);
+  t.block.print.fillHeight=true;
   t.block.sideBand={title:"唛头 / Marks",widthMm:32,contentKind:"Field",text:"",fieldPath:"Invoice.ShippingMarks",style:{fontSizePt:7}};
   t.block.columns[0].omitEmptyLines=true;
   t.block.sideBand.firstPageOnly=true;
   t.block.rowSeparators=false;
+  t.block.columns.forEach((column,index)=>{column.border={...border,left:index===0,right:index===t.block.columns.length-1};});
   t.block.bodyStyle.verticalAlign="Bottom";
   summary(t,{cartons:"total_by_ctn_unit",quantity:"total_by_qty_unit",gross:"Invoice.TotalGrossWeight",net:"Invoice.TotalNetWeight",volume:"Invoice.TotalVolume"});
   t.block.summaryRow.style.marginTopMm=2.5;
+  for(const cell of t.block.summaryRow.cells) if(["gross","net","volume"].includes(cell.columnId)) cell.suffix=cell.columnId==="volume"?"CBM":"KGS";
+  t.block.summaryRow.border={...border,style:"Dashed",widthPx:0.8,right:false,bottom:false,left:false};
   d.layers[1].elements=[t]; return d;
 }
 function contract() {

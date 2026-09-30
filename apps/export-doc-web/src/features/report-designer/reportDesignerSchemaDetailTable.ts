@@ -108,6 +108,7 @@ function normalizeDetailTablePrintSettings(
 
   return {
     repeatHeaderOnPageBreak: readBoolean(value.repeatHeaderOnPageBreak, true, `${path}.repeatHeaderOnPageBreak`, issues),
+    fillHeight: readBoolean(value.fillHeight, false, `${path}.fillHeight`, issues),
     keepRowsTogether: readBoolean(value.keepRowsTogether, true, `${path}.keepRowsTogether`, issues),
     firstPageRows: readOptionalInteger(value.firstPageRows, 1, 80, `${path}.firstPageRows`, issues),
     continuationPageRows: readOptionalInteger(value.continuationPageRows, 1, 80, `${path}.continuationPageRows`, issues),
@@ -229,6 +230,7 @@ function normalizeDetailTableSummaryRow(
 
   return {
     label: readString(value.label, "TOTAL", `${path}.label`, issues),
+    border: normalizeOptionalBorderStyle(value.border, `${path}.border`, issues),
     labelColumnSpan: Math.floor(readNumber(value.labelColumnSpan, Math.max(1, columns.length - 1), 1, columns.length, `${path}.labelColumnSpan`, issues)),
     cells,
     style: normalizeTextStyle(value.style, `${path}.style`, issues),
@@ -258,6 +260,7 @@ function normalizeDetailTableSummaryCell(
     columnId,
     contentKind,
     fieldFormat: value.fieldFormat === undefined ? undefined : readEnum(value.fieldFormat, ["Currency"] as const, "Currency", `${path}.fieldFormat`, issues),
+    suffix: readOptionalString(value.suffix, `${path}.suffix`, issues),
     text: readString(value.text, "", `${path}.text`, issues),
     fieldPath: contentKind === "Field"
       ? readRequiredFieldPath(value.fieldPath, `${path}.fieldPath`, issues)

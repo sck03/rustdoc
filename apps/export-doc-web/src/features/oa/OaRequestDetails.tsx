@@ -25,7 +25,7 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
       {editable && <button type="button" className="command-button secondary" onClick={onEdit}>编辑草稿</button>}
       {oaActions(row, user).map((action) => <button type="button" className={`command-button${["cancel", "withdraw", "reject", "void"].includes(action) ? " secondary" : ""}`} key={action} disabled={operation.busy} onClick={() => setAction(action)}>{oaActionLabel(action, row.kind, user.capabilities.usesOfficeRegister)}</button>)}
     </div>}
-    {row.status === "HandedOff" && <InlineNotice tone="success" title="已移交独立财务软件">此状态仅记录资料移交，不代表已记账或已付款。</InlineNotice>}
+    {row.status === "HandedOff" && <InlineNotice tone="success" title="财务交接已登记">此状态仅记录资料交接，不代表已记账或已付款；办理人、时间和说明见审批与办理记录。</InlineNotice>}
     </header>
     <section className="oa-detail-content" aria-label="申请内容"><h3>申请内容</h3>
     <div className="oa-reason"><h4>申请说明</h4><p>{row.reason}</p></div>
@@ -65,7 +65,7 @@ function OaActionDialog({ client, user, row, action, onClose }: { client: Export
   const label = typeof action === "number" ? "移除附件" : oaActionLabel(action, row.kind, user.capabilities.usesOfficeRegister);
   return <OfficeDialog title={label} onClose={onClose} {...operation} protectChanges>
     <p>{row.title} · {row.employeeName}</p>
-    {action === "complete" && <p className="office-muted">{row.kind === "expense" ? "请记录移交对象、日期或财务软件的接收编号。此处不执行付款。" : "请如实记录办理结果；采购请注明验收情况，通用申请请注明交付内容。"}</p>}
+    {action === "complete" && <p className="office-muted">{row.kind === "expense" ? "请核对已批准的明细和凭证，填写接收说明或财务软件接收编号。系统保留办理人和时间；付款在独立财务软件中完成。" : "请如实记录办理结果；采购请注明验收情况，通用申请请注明交付内容。"}</p>}
     <form onSubmit={(event) => { event.preventDefault(); const api = oaApi(client, row.kind); const body = { expectedVersion: row.versionNumber, note };
       void operation.run((signal) => typeof action === "number" ? api.remove(row.id, action, body, { signal }) : api.action(action, row.id, body, { signal }), onClose);
     }}><OfficeField label="处理说明"><textarea required maxLength={500} rows={4} value={note} disabled={operation.busy} onChange={(event) => setNote(event.target.value)} /></OfficeField><OfficeSubmit busy={operation.busy} label={label} /></form>

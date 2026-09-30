@@ -20,6 +20,13 @@ mod flow;
 mod free_detail;
 
 const PT_MM: f32 = 25.4 / 72.0;
+fn stroke_dash(style: &str) -> &'static str {
+    if style == "Dashed" {
+        " stroke-dasharray=\"1.1 0.7\""
+    } else {
+        ""
+    }
+}
 pub fn field_value(invoice: &Value, item: Option<&Value>, path: &str) -> String {
     let (group, key) = path.split_once('.').unwrap_or(("Invoice", path));
     let target = if group.eq_ignore_ascii_case("item") {
@@ -222,11 +229,7 @@ fn element(
         } else {
             style.border_width_px * 25.4 / 96.
         };
-        let dash = if style.border_style == "Dashed" {
-            " stroke-dasharray=\"1.1 0.7\""
-        } else {
-            ""
-        };
+        let dash = stroke_dash(&style.border_style);
         if !matches!(element.kind, Kind::Line { .. } | Kind::Flow { .. }) {
             svg.push_str(&format!("<rect x=\"{x}\" y=\"{y}\" width=\"{width}\" height=\"{height}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"{border}\"{dash}/>",escape(&style.background_color),escape(&style.border_color)));
         }
@@ -499,6 +502,11 @@ fn pages_data(
     return detail::render(
         detail::DetailLayout {
             table: block,
+            minimum_height: if block.print.fill_height {
+                table.height_hundredth_mm as f32 / 100.
+            } else {
+                0.
+            },
             data,
             left,
             top,
@@ -725,9 +733,11 @@ mod tests {
                 style: ReportTextStyle::default(),
             });
             table.summary_row = Some(DetailSummaryRow {
+                border: None,
                 label: "GRAND TOTAL".into(),
                 label_column_span: 2,
                 cells: vec![DetailSummaryCell {
+                    suffix: String::new(),
                     field_format: None,
                     column_id: "col-2".into(),
                     content_kind: "Text".into(),

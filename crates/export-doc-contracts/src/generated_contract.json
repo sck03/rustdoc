@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "9f2cc673fc561d30015f5a775e8c42456175f02e3872e120c6fbe001f137705e",
+  "digest": "fa439823bc25c26c1a625893fa3bde900d9305bbed175dfb05297766f10f504f",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -2081,8 +2081,8 @@
           },
           {
             "key": "complete",
-            "name": "移交财务",
-            "description": "移交财务",
+            "name": "财务查看与接收",
+            "description": "财务查看与接收",
             "sortOrder": 50,
             "navigationAccessLevel": "manage"
           }
@@ -4989,6 +4989,11 @@
             "dataScope": "own"
           },
           {
+            "resourceKey": "office.expenses",
+            "action": "complete",
+            "dataScope": "company"
+          },
+          {
             "resourceKey": "office.travel",
             "action": "view",
             "dataScope": "own"
@@ -5410,11 +5415,6 @@
           {
             "resourceKey": "office.expenses",
             "action": "approve",
-            "dataScope": "company"
-          },
-          {
-            "resourceKey": "office.expenses",
-            "action": "complete",
             "dataScope": "company"
           },
           {
@@ -15929,6 +15929,148 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierProductLinkDto"
+      }
+    },
+    "DeleteAnnouncement": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.announcements",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OaAction"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementDeleteResult"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/OaAction"
+      },
+      "response": {
+        "$ref": "#/components/schemas/AnnouncementDeleteResult"
+      },
+      "communication": {
+        "kind": "announcement",
+        "action": "delete",
+        "resource": "office.announcements",
+        "permission": "manage"
       }
     },
     "DeleteAnnouncementAttachment": {
@@ -30087,6 +30229,13 @@
           "schema": {
             "type": "integer",
             "minimum": 1
+          }
+        },
+        {
+          "name": "financeOnly",
+          "in": "query",
+          "schema": {
+            "type": "boolean"
           }
         },
         {
@@ -54767,6 +54916,17 @@
         "createdAt",
         "updatedAt",
         "attachments"
+      ]
+    },
+    "AnnouncementDeleteResult": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "success"
       ]
     },
     "AnnouncementDepartment": {

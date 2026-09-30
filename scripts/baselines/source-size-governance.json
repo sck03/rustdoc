@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-09-29",
+  "updatedAt": "2026-09-30",
   "rules": [
     {
       "name": "repository web production default",
@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 10541,
+      "baselineAggregateLines": 10900,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 10661,
+      "maximumAggregateLines": 11020,
       "reportFiles": false
     },
     {

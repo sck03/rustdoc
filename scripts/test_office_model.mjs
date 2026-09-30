@@ -37,7 +37,7 @@ const oaUser = { ...user, capabilities: { permissions: ["view","edit","approve"]
 assert.deepEqual(oa.oaActions({ ...row, kind:"leave" }, oaUser), [], "broad read access must not expose out-of-scope approval actions");
 const oaManager = { ...oaUser, capabilities: { permissions: oaUser.capabilities.permissions.map(grant => ({ ...grant, dataScope:"company" })) } };
 assert(!oa.oaActions({ ...row, kind:"leave", ownerUserId:user.id }, oaManager).includes("approve"), "team self-approval remains unavailable");
-assert.equal(oa.oaActionLabel("complete","expense",false), "移交财务", "expense completion records handoff without implying payment");
+assert.equal(oa.oaActionLabel("complete","expense",false), "财务接收", "expense completion records handoff without implying payment");
 assert.equal(office.officeStatus({ ...row, status: "InUse" }, user.businessDate, Date.parse(row.endsAt)), "超时未归还");
 assert.equal(office.officeStatus({ status: "Issued", isReturnable: true, returnDueDate: "2026-09-06", quantity: 2, returnedQuantity: 1 }, user.businessDate), "逾期未归还");
 assert.equal(office.officeStatus({ status: "Issued", isReturnable: true, returnDueDate: "2026-09-08", quantity: 2, returnedQuantity: 1 }, user.businessDate), "部分归还");

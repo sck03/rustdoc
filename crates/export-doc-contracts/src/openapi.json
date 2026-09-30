@@ -38827,6 +38827,13 @@
             }
           },
           {
+            "name": "financeOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "status",
             "in": "query",
             "schema": {
@@ -48373,6 +48380,151 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AnnouncementSave"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Announcements and notifications"
+        ],
+        "operationId": "DeleteAnnouncement",
+        "x-exportdoc-communication": {
+          "kind": "announcement",
+          "action": "delete",
+          "resource": "office.announcements",
+          "permission": "manage"
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementDeleteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "office.announcements",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OaAction"
               }
             }
           }
@@ -72832,6 +72984,17 @@
           "attachments"
         ]
       },
+      "AnnouncementDeleteResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ]
+      },
       "AnnouncementRead": {
         "type": "object",
         "properties": {
@@ -74935,8 +75098,8 @@
           },
           {
             "key": "complete",
-            "name": "移交财务",
-            "description": "移交财务",
+            "name": "财务查看与接收",
+            "description": "财务查看与接收",
             "sortOrder": 50,
             "navigationAccessLevel": "manage"
           }
@@ -77843,6 +78006,11 @@
             "dataScope": "own"
           },
           {
+            "resourceKey": "office.expenses",
+            "action": "complete",
+            "dataScope": "company"
+          },
+          {
             "resourceKey": "office.travel",
             "action": "view",
             "dataScope": "own"
@@ -78264,11 +78432,6 @@
           {
             "resourceKey": "office.expenses",
             "action": "approve",
-            "dataScope": "company"
-          },
-          {
-            "resourceKey": "office.expenses",
-            "action": "complete",
             "dataScope": "company"
           },
           {

@@ -1,4 +1,43 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { captureScreenshot } from "./web-runtime-browser-session.mjs";
+
+export async function verifyCommercialTemplateUi({ page, url, read, waitFor, click, key, results, output }) {
+  await page.send('Page.navigate', { url: `${url}?packing=1` });
+  const element = 'window.__designerSchema.layers.flatMap(layer=>layer.elements).find(e=>e.id==="packing-items")';
+  await waitFor(page, 'document.querySelector("[data-v3-element-id=packing-items] .edm-detail-fill-row")');
+  assert.equal(await read(page, `${element}.block.summaryRow.border.style`), 'Dashed');
+  assert.deepEqual(await read(page, `${element}.block.summaryRow.cells.filter(c=>['gross','net','volume'].includes(c.columnId)).map(c=>c.suffix)`), ['KGS','KGS','CBM']);
+  assert(await read(page, `${element}.block.columns.every((c,i,a)=>c.border.left===(i===0)&&c.border.right===(i===a.length-1))`), 'packing preserves only its outer and marks borders');
+  const geometry = await read(page, `(()=>{const e=document.querySelector('[data-v3-element-id=packing-items]');const t=e.querySelector('.edm-detail-layout');return {element:e.getBoundingClientRect().height,table:t.getBoundingClientRect().height,style:getComputedStyle(e.querySelector('.edm-detail-summary-row')).borderTopStyle}})()`);
+  assert(Math.abs(geometry.element - geometry.table) < 5, JSON.stringify(geometry));
+  assert.equal(geometry.style, 'dashed');
+  await read(page, `(()=>{const e=document.querySelector('[data-v3-element-id=packing-items]');e.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerId:99}));window.dispatchEvent(new PointerEvent('pointercancel',{pointerId:99}));e.focus()})()`);
+  await waitFor(page, 'document.querySelector("button[aria-label=调整下边尺寸]")');
+  await click(page, 'button[aria-label="调整下边尺寸"]');
+  await read(page, 'document.querySelector("button[aria-label=调整下边尺寸]").focus()');
+  const before = await read(page, `${element}.heightHundredthMm`);
+  const position = await read(page, `[${element}.xHundredthMm,${element}.yHundredthMm]`);
+  await key(page, 'ArrowDown');
+  await waitFor(page, `${element}.heightHundredthMm===${before + 100}`);
+  assert.deepEqual(await read(page, `[${element}.xHundredthMm,${element}.yHundredthMm]`), position, 'resize arrows must not also move the table');
+  assert.equal(await read(page, `${element}.block.print.fillHeight`), true);
+  const saved = await read(page, 'window.__designerHtml');
+  const restored = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `window.__restoredCommercial=${JSON.stringify(saved)};` });
+  await page.send('Page.navigate', { url: `${url}?packing=1&restored=1` });
+  await waitFor(page, 'document.querySelector("[data-v3-element-id=packing-items] .edm-detail-fill-row")');
+  assert.equal(await read(page, `${element}.heightHundredthMm`), before + 100);
+  assert.deepEqual(await read(page, `[${element}.xHundredthMm,${element}.yHundredthMm]`), position);
+  assert.equal(await read(page, `${element}.block.summaryRow.border.style`), 'Dashed');
+  const labels = await read(page, 'window.__designerSchema.layers.flatMap(layer=>layer.elements).filter(e=>["invoice-label","contract-label","date-label"].includes(e.id)).map(e=>({x:e.xHundredthMm,align:e.style.align}))');
+  assert(labels.length === 3 && labels.every(e=>e.x===14300 && e.align==='Right'));
+  fs.writeFileSync(path.join(output, 'packing-designer-roundtrip.json'), await read(page, 'window.__designerHtml'));
+  await captureScreenshot(page, path.join(output, 'packing-designer.png'), { captureBeyondViewport: false });
+  await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: restored.identifier });
+  assert.deepEqual(await read(page, 'window.__designerErrors'), []);
+  results.push({ test: 'commercial header, dashed total, full-height frame and designer resize/save/reopen', passed: true });
+}
 
 export async function verifyDesignerEditingUi({ page, url, read, waitFor, click, key, modifier, results }) {
   await page.send("Page.navigate", { url: `${url}?editing=1` });

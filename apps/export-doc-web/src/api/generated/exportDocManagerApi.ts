@@ -31,6 +31,10 @@ export interface Announcement {
   versionNumber: number;
 }
 
+export interface AnnouncementDeleteResult {
+  success: boolean;
+}
+
 export interface AnnouncementDepartment {
   code: string;
   name: string;
@@ -5497,6 +5501,11 @@ export interface DeactivateSupplierProductLinkRequest {
   body: ApiSupplierLifecycleRequest;
 }
 
+export interface DeleteAnnouncementRequest {
+  id: number;
+  body: OaAction;
+}
+
 export interface DeleteAnnouncementAttachmentRequest {
   id: number;
   attachmentId: number;
@@ -6201,6 +6210,7 @@ export interface ListExchangeRatesRequest {
 export interface ListExpenseRequestRequest {
   pageNumber?: number;
   pageSize?: number;
+  financeOnly?: boolean;
   status?: string;
   mineOnly?: boolean;
 }
@@ -8366,6 +8376,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public deleteAnnouncement(request: DeleteAnnouncementRequest, init?: ApiRequestInit): Promise<AnnouncementDeleteResult> {
+    const path = `/api/office/announcements/${encodePath(request.id)}`;
+    return this.request<AnnouncementDeleteResult>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public deleteAnnouncementAttachment(request: DeleteAnnouncementAttachmentRequest, init?: ApiRequestInit): Promise<Announcement> {
     const path = `/api/office/announcements/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return this.request<Announcement>("DELETE", path, {
@@ -9615,6 +9633,7 @@ export class ExportDocManagerApiClient {
       query: {
         "pageNumber": request.pageNumber,
         "pageSize": request.pageSize,
+        "financeOnly": request.financeOnly,
         "status": request.status,
         "mineOnly": request.mineOnly,
       },

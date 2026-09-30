@@ -10,7 +10,7 @@ import { renderGridDiagonalHeader } from "./reportDesignerGridDiagonal.ts";
 import { renderDetailFixedRow } from "./reportDesignerDetailFixedRows.ts";
 import { renderDetailComposite } from "./reportDesignerDetailComposite.ts";
 
-/** Shared structured-block renderer used by the v3 exporter for flow elements. */
+/** Structured HTML for editor/reference fixtures; final document output runs in Rust. */
 export function renderReportDesignerBlockToHtml(block: ReportBlock) {
   return renderBlock(block);
 }
@@ -22,9 +22,9 @@ export function renderReportDesignerBlockToHtml(block: ReportBlock) {
  * The block AST remains the source of truth; this only expands one
  * representative set of rows for visual editing and never gets persisted.
  */
-export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock) {
+export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock, heightMm?: number) {
   // Keep one representative field value, without also showing its fallback.
-  let html = renderBlock(block, true).replace(
+  let html = renderBlock(block, true, heightMm).replace(
     /\{\{ if ([A-Za-z_][A-Za-z0-9_.]*) \}\}(\{\{ \1 \}\})\{\{ else \}\}[\s\S]*?\{\{ end \}\}/g, "$2");
   html = expandPreviewLoops(html);
   html = html.replace(/\{\{\s*(?:if|else|end|capture|assign|while|case|when)[\s\S]*?\}\}/gi, "");
@@ -47,7 +47,7 @@ function expandPreviewLoops(source: string) {
   return current;
 }
 
-function renderBlock(block: ReportBlock, preview = false) {
+function renderBlock(block: ReportBlock, preview = false, heightMm?: number) {
   switch (block.type) {
     case "Text":
       return `<div style="${renderBoxStyle(block.style, block.border)}">${escapeHtml(block.text)}</div>`;
@@ -62,7 +62,7 @@ function renderBlock(block: ReportBlock, preview = false) {
     case "Image":
       return renderImageBlock(block);
     case "DetailTable":
-      return renderDetailTable(block);
+      return renderDetailTable(block, heightMm);
     case "PageBreak":
       return `<div class="report-page-break-row"></div>`;
   }
@@ -235,7 +235,9 @@ function renderConditionalExpression(block: Extract<ReportBlock, { type: "Condit
   }
 }
 
-function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>) {
+function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>, heightMm?: number) {
+  const fillHeight = block.print.fillHeight && heightMm !== undefined && Number.isFinite(heightMm) && heightMm > 0;
+  const fillRow = fillHeight ? `<tr class="edm-detail-fill-row" style="height:100%">${block.columns.map(column => `<td style="${renderDetailCellStyle({}, { ...(column.border ?? block.border), top: false, bottom: false }, column.align)}"></td>`).join("")}</tr>` : "";
   const renderers = { style: renderDetailCellStyle, field: renderFieldExpression, text: escapeHtml };
   const summaryRow = renderDetailFixedRow(block, block.summaryRow, renderers);
   const detailPrintClasses = renderDetailPrintClassNames(block);
@@ -246,7 +248,9 @@ function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>)
     })
     .join("")}</tr>`;
   const introRow = renderDetailFixedRow(block, block.introRow, renderers);
-  const table = `<table class="edm-detail-table ${detailPrintClasses}" style="${renderBorderStyle(block.border)}">${renderProportionalColumns(block.columns.map(column => column.widthMm))}<thead>${renderDetailTableHeaderRows(block)}</thead><tbody>${introRow}${renderDetailTableRows(block, detailRow)}${summaryRow}</tbody></table>`;
+  const columns = renderProportionalColumns(block.columns.map(column => column.widthMm));
+  const header = `<thead>${renderDetailTableHeaderRows(block)}</thead>`;
+  const table = `<table class="edm-detail-table ${detailPrintClasses}" style="${renderBorderStyle(block.border)}${fillHeight ? `;height:${block.sideBand ? "100%" : `${heightMm}mm`}` : ""}">${columns}${block.sideBand ? "" : header}<tbody>${introRow}${renderDetailTableRows(block, detailRow)}${summaryRow}${fillRow}</tbody></table>`;
 
   if (!block.sideBand) {
     return table;
@@ -256,12 +260,12 @@ function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>)
     ? renderFieldExpression(block.sideBand.fieldPath)
     : escapeHtml(block.sideBand.text);
 
-  return `<table class="edm-detail-layout ${renderDetailHeaderRepeatClassName(block)}">
+  return `<table class="edm-detail-layout ${renderDetailHeaderRepeatClassName(block)}"${fillHeight ? ` style="height:${heightMm}mm"` : ""}>
   ${renderProportionalColumns([block.sideBand.widthMm, block.detailWidthMm ?? block.columns.reduce((sum, column) => sum + column.widthMm, 0)])}
   <thead>
     <tr>
       <th style="${renderDetailLayoutCellStyle(block.headerStyle, block.border)}">${escapeHtml(block.sideBand.title)}</th>
-      <th style="${renderDetailLayoutCellStyle(block.headerStyle, block.border)}">${escapeHtml(block.title || "Detail")}</th>
+      <th style="padding:0"><table class="edm-detail-table">${columns}${header}</table></th>
     </tr>
   </thead>
   <tbody>

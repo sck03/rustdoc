@@ -2,7 +2,7 @@ use super::{PT_MM, measured_wrap, text_svg, wrap};
 use crate::{ReportData, Result, error::invalid};
 use export_doc_domain::designer::{
     DetailGroupFooter, DetailGroupFooterCell, DetailSummaryCell, DetailSummaryRow, DetailTable,
-    ReportTextStyle,
+    ReportBorderStyle, ReportTextStyle,
 };
 use rust_decimal::Decimal;
 use serde_json::Value;
@@ -21,12 +21,13 @@ struct Row {
 
 enum RowKind {
     Data,
-    Group(String),
-    Fixed(ReportTextStyle),
+    Group,
+    Fixed(ReportTextStyle, Option<ReportBorderStyle>),
 }
 
 pub(super) struct DetailLayout<'a> {
     pub table: &'a DetailTable,
+    pub minimum_height: f32,
     pub data: &'a ReportData,
     pub left: f32,
     pub top: f32,
@@ -50,6 +51,7 @@ pub(super) fn render(
 ) -> Result<Vec<String>> {
     let DetailLayout {
         table,
+        minimum_height,
         data,
         left,
         top,
@@ -223,7 +225,14 @@ pub(super) fn render(
                 0.
             } + rows.iter().map(|row| row.height).sum::<f32>();
         let mut svg = canvas(page_width, height);
-        fixed(&mut svg, index, count, content_bottom)?;
+        let limit = match (index == 0, index + 1 == count) {
+            (true, true) => bottoms.single,
+            (true, false) => bottoms.first,
+            (false, true) => bottoms.last,
+            (false, false) => bottoms.continuation,
+        };
+        let frame_bottom = content_bottom.max((top + minimum_height).min(limit - 3.));
+        fixed(&mut svg, index, count, frame_bottom)?;
         if let Some(side) = &table.side_band {
             render_side_band(
                 &mut svg,
@@ -232,7 +241,7 @@ pub(super) fn render(
                 data,
                 left,
                 top,
-                content_bottom,
+                frame_bottom,
                 size,
                 if table.print.repeat_header_on_page_break || index == 0 {
                     header_height
@@ -246,11 +255,20 @@ pub(super) fn render(
         let mut y = top + if show_header { header_height } else { 0. };
         for row in rows {
             match &row.kind {
-                RowKind::Group(label) => group_row(
-                    &mut svg, table, label, &row.cells, body_left, y, row.height, size,
-                ),
-                RowKind::Fixed(style) => summary_render(
-                    &mut svg, table, &row.cells, &widths, body_left, y, row.height, size, style,
+                RowKind::Group => {
+                    group_row(&mut svg, table, &row.cells, body_left, y, row.height, size)
+                }
+                RowKind::Fixed(style, border) => summary_render(
+                    &mut svg,
+                    table,
+                    &row.cells,
+                    &widths,
+                    body_left,
+                    y,
+                    row.height,
+                    size,
+                    style,
+                    border.as_ref(),
                 ),
                 RowKind::Data => table_row(
                     &mut svg,
@@ -282,12 +300,26 @@ pub(super) fn render(
                 None,
             );
         }
-        if table.row_separators == Some(false) {
+        if table.row_separators == Some(false) && minimum_height <= 0. {
             super::flow::draw_border(
                 &mut svg,
-                [body_left, top, body_width, content_bottom - top],
+                [body_left, top, body_width, frame_bottom - top],
                 &table.border,
             );
+        }
+        if minimum_height > 0. {
+            let body_top = top + if show_header { header_height } else { 0. };
+            let mut x = body_left;
+            for (column, width) in table.columns.iter().zip(&widths) {
+                let mut border = column.border.as_ref().unwrap_or(&table.border).clone();
+                border.top = !show_header && table.border.top;
+                super::flow::draw_border(
+                    &mut svg,
+                    [x, body_top, *width, frame_bottom - body_top],
+                    &border,
+                );
+                x += width;
+            }
         }
         svg.push_str("</svg>");
         pages.push(svg);
@@ -320,7 +352,6 @@ fn detail_rows(
                     if let Some(footer) = &grouping.footer {
                         rows.push(group_footer_row(
                             table,
-                            grouping,
                             footer,
                             &previous,
                             &group_sums,
@@ -340,12 +371,7 @@ fn detail_rows(
                 } else {
                     grouping.label.clone()
                 };
-                rows.push(group_row_value(
-                    label,
-                    size,
-                    table.columns.len(),
-                    grouping.page_break_before,
-                ));
+                rows.push(group_row_value(label, size, grouping.page_break_before));
             }
         }
         let style = CellStyle::new(&table.body_style, size, false);
@@ -409,7 +435,6 @@ fn detail_rows(
             if let Some(footer) = &grouping.footer {
                 rows.push(group_footer_row(
                     table,
-                    grouping,
                     footer,
                     &previous,
                     &group_sums,
@@ -443,19 +468,18 @@ fn column_text(
     data.display(&column.field_path, Some(item))
 }
 
-fn group_row_value(label: String, size: f32, _columns: usize, page_break_before: bool) -> Row {
+fn group_row_value(label: String, size: f32, page_break_before: bool) -> Row {
     Row {
         cells: vec![vec![label]],
         composed: vec![],
         height: size * 1.35 + 4.,
-        kind: RowKind::Group(String::new()),
+        kind: RowKind::Group,
         page_break_before,
     }
 }
 
 fn group_footer_row(
     table: &DetailTable,
-    grouping: &export_doc_domain::designer::DetailGrouping,
     footer: &DetailGroupFooter,
     group: &str,
     sums: &BTreeMap<String, Decimal>,
@@ -469,7 +493,7 @@ fn group_footer_row(
             .cells
             .iter()
             .find(|cell| cell.column_id == column.id)
-            .map(|cell| footer_cell(cell, index, sums, count))
+            .map(|cell| footer_cell(cell, sums, count))
             .unwrap_or_default();
         cells.push(measured_wrap(
             &value,
@@ -482,11 +506,10 @@ fn group_footer_row(
     if let Some(first) = cells.first_mut() {
         first.insert(0, format!("{} {}", footer.label, group));
     }
-    let _ = grouping;
     Ok(Row {
         height: cells.iter().map(Vec::len).max().unwrap_or(1) as f32 * size * 1.35 + 4.,
         cells,
-        kind: RowKind::Fixed(footer.style.clone()),
+        kind: RowKind::Fixed(footer.style.clone(), None),
         composed: vec![],
         page_break_before: false,
     })
@@ -494,7 +517,6 @@ fn group_footer_row(
 
 fn footer_cell(
     cell: &DetailGroupFooterCell,
-    _index: usize,
     sums: &BTreeMap<String, Decimal>,
     count: usize,
 ) -> String {
@@ -536,7 +558,7 @@ fn summary_row(
     Ok(Row {
         height: style.height(&cells),
         cells,
-        kind: RowKind::Fixed(summary.style.clone()),
+        kind: RowKind::Fixed(summary.style.clone(), summary.border.clone()),
         composed: vec![],
         page_break_before: false,
     })
@@ -545,7 +567,14 @@ fn summary_row(
 fn summary_cell(cell: &DetailSummaryCell, data: &ReportData) -> String {
     match cell.content_kind.as_str() {
         "Text" => cell.text.clone(),
-        "Field" => data.field_text(&cell.field_path, None, cell.field_format.as_ref()),
+        "Field" => {
+            let value = data.field_text(&cell.field_path, None, cell.field_format.as_ref());
+            if value.is_empty() {
+                value
+            } else {
+                format!("{value}{}", cell.suffix)
+            }
+        }
         _ => String::new(),
     }
 }
@@ -611,7 +640,6 @@ fn render_side_band(
 fn group_row(
     svg: &mut String,
     table: &DetailTable,
-    _label: &str,
     cells: &[Vec<String>],
     left: f32,
     y: f32,
@@ -647,6 +675,7 @@ fn summary_render(
     height: f32,
     size: f32,
     text_style: &ReportTextStyle,
+    border: Option<&ReportBorderStyle>,
 ) {
     let style = CellStyle::new(text_style, size, false);
     let mut x = left;
@@ -654,11 +683,16 @@ fn summary_render(
         svg.push_str(&format!(
             "<rect x=\"{x}\" y=\"{y}\" width=\"{width}\" height=\"{height}\" fill=\"white\"/>"
         ));
-        super::flow::draw_border(
-            svg,
-            [x, y, *width, height],
-            column.border.as_ref().unwrap_or(&table.border),
-        );
+        let mut cell_border = column.border.as_ref().unwrap_or(&table.border).clone();
+        if border.is_some() {
+            cell_border.top = false;
+            cell_border.bottom = false;
+        }
+        if table.print.fill_height {
+            cell_border.left = false;
+            cell_border.right = false;
+        }
+        super::flow::draw_border(svg, [x, y, *width, height], &cell_border);
         text_svg(
             svg,
             lines,
@@ -671,6 +705,9 @@ fn summary_render(
             &column.align,
         );
         x += width;
+    }
+    if let Some(border) = border {
+        super::flow::draw_border(svg, [left, y, widths.iter().sum(), height], border);
     }
 }
 
@@ -705,6 +742,10 @@ fn table_row(
         if !header && table.row_separators == Some(false) {
             border.top = false;
             border.bottom = false;
+        }
+        if !header && table.print.fill_height {
+            border.left = false;
+            border.right = false;
         }
         super::flow::draw_border(svg, [x, y, *width, height], &border);
         if let Some(cell) = composed

@@ -9,9 +9,9 @@ import { useOfficeOperation } from "../office/useOfficeData.ts";
 import { announcementActive, announcementStatus, communicationAccess } from "./communicationModel.ts";
 import { CommunicationPager } from "./CommunicationPager.tsx";
 
-export function AnnouncementDetails({ client, user, row, onEdit }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: Announcement; onEdit: () => void }) {
+export function AnnouncementDetails({ client, user, row, onEdit, onDeleted }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: Announcement; onEdit: () => void; onDeleted: () => void }) {
   const operation = useOfficeOperation();
-  const [action, setAction] = useState<"publish" | "withdraw" | "archive" | number | null>(null);
+  const [action, setAction] = useState<"publish" | "withdraw" | "archive" | "delete" | number | null>(null);
   const [receipts, setReceipts] = useState(false);
   const editable = communicationAccess(user, "announcements", "manage") && ["Draft", "Withdrawn"].includes(row.status);
   const active = announcementActive(row) && (!row.audienceDepartment || row.audienceDepartment === user.departmentId);
@@ -20,22 +20,27 @@ export function AnnouncementDetails({ client, user, row, onEdit }: { client: Exp
       <p>可见范围：{row.audienceDepartment || "本公司全体"}</p><p>有效期：{formatBusinessDateTime(row.startsAt, user.businessTimeZone)} 至 {formatBusinessDateTime(row.expiresAt, user.businessTimeZone)}</p>
       <div className="office-card-actions">{editable && <><button type="button" className="command-button secondary" onClick={onEdit}>编辑草稿</button><button type="button" className="command-button" onClick={() => setAction("publish")}>发布公告</button></>}
         {communicationAccess(user, "announcements", "manage") && row.status !== "Archived" && <>{row.status === "Published" && <button type="button" className="command-button secondary" onClick={() => setAction("withdraw")}>撤回公告</button>}<button type="button" className="command-button secondary" onClick={() => setAction("archive")}>归档公告</button></>}
+        {communicationAccess(user, "announcements", "manage") && row.publishVersion === 0 && <button type="button" className="command-button secondary" onClick={() => setAction("delete")}>删除草稿</button>}
       </div>
+      {communicationAccess(user, "announcements", "manage") && row.publishVersion > 0 && <p className="office-muted">已发布公告保留发布历史与阅读回执；不再使用时可归档。</p>}
     </header>
     <section className="oa-detail-content" aria-label="公告正文"><p className="communication-body">{row.body}</p></section>
     <section className="oa-attachments" aria-label="公告附件"><h3>公告附件</h3>{!row.attachments.length && <p className="office-muted">无附件</p>}<ul>{row.attachments.map(file => <li key={file.id} className="office-card-actions"><span>{file.fileName}</span><button type="button" className="command-button secondary" disabled={operation.busy} onClick={() => void operation.run(signal => client.downloadAnnouncementAttachment({ id: row.id, attachmentId: file.id }, { signal }), blob => downloadBlob(blob, file.fileName))}>下载</button>{editable && <button type="button" className="command-button secondary" onClick={() => setAction(file.id)}>移除</button>}</li>)}</ul></section>
     {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
     {active && <section className="oa-detail-content" aria-label="阅读确认">{row.readAt ? <p role="status">已确认阅读 · {formatBusinessDateTime(row.readAt, user.businessTimeZone)}</p> : <button type="button" className="command-button" disabled={operation.busy} onClick={() => void operation.run(signal => client.confirmAnnouncementRead({ id: row.id, body: { publishVersion: row.publishVersion } }, { signal }), () => {})}>我已阅读并确认</button>}</section>}
     {communicationAccess(user, "announcements", "receipts") && <details className="oa-detail-history" onToggle={e => setReceipts(e.currentTarget.open)}><summary>阅读回执</summary>{receipts && <AnnouncementReceipts client={client} user={user} row={row} />}</details>}
-    {action !== null && <AnnouncementAction client={client} row={row} action={action} onClose={() => setAction(null)} />}
+    {action !== null && <AnnouncementAction client={client} row={row} action={action} onClose={() => setAction(null)} onDeleted={onDeleted} />}
   </article>;
 }
-function AnnouncementAction({ client, row, action, onClose }: { client: ExportDocManagerApiClient; row: Announcement; action: "publish" | "withdraw" | "archive" | number; onClose: () => void }) {
+function AnnouncementAction({ client, row, action, onClose, onDeleted }: { client: ExportDocManagerApiClient; row: Announcement; action: "publish" | "withdraw" | "archive" | "delete" | number; onClose: () => void; onDeleted: () => void }) {
   const operation = useOfficeOperation();
   const [note, setNote] = useState("");
-  const label = typeof action === "number" ? "移除附件" : { publish: "发布公告", withdraw: "撤回公告", archive: "归档公告" }[action];
+  const label = typeof action === "number" ? "移除附件" : { publish: "发布公告", withdraw: "撤回公告", archive: "归档公告", delete: "删除草稿" }[action];
   return <OfficeDialog title={label} onClose={onClose} {...operation} protectChanges><p>{row.title}</p>{action === "publish" && <p>发布后内容冻结，读者需要确认本次发布的内容。有效期未开始时将定时生效。</p>}
-    <form onSubmit={e => { e.preventDefault(); const input = { id: row.id, body: { expectedVersion: row.versionNumber, note } }; void operation.run(signal => typeof action === "number" ? client.deleteAnnouncementAttachment({ ...input, attachmentId: action }, { signal }) : action === "publish" ? client.publishAnnouncement(input, { signal }) : action === "withdraw" ? client.withdrawAnnouncement(input, { signal }) : client.archiveAnnouncement(input, { signal }), onClose); }}>
+    {action === "delete" && <p>此草稿从未发布。删除将同时移除正文和附件，不能恢复，操作审计仍会保留。</p>}
+    <form onSubmit={e => { e.preventDefault(); const input = { id: row.id, body: { expectedVersion: row.versionNumber, note } };
+      if (action === "delete") { void operation.run(signal => client.deleteAnnouncement(input, { signal }), onDeleted); return; }
+      void operation.run(signal => typeof action === "number" ? client.deleteAnnouncementAttachment({ ...input, attachmentId: action }, { signal }) : action === "publish" ? client.publishAnnouncement(input, { signal }) : action === "withdraw" ? client.withdrawAnnouncement(input, { signal }) : client.archiveAnnouncement(input, { signal }), onClose); }}>
       {action !== "publish" && <OfficeField label="操作原因"><textarea required rows={3} maxLength={500} value={note} disabled={operation.busy} onChange={e => setNote(e.target.value)} /></OfficeField>}<OfficeSubmit busy={operation.busy} label={label} />
     </form></OfficeDialog>;
 }

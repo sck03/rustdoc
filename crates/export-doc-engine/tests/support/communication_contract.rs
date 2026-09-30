@@ -108,6 +108,68 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
         Some(403)
     );
     let bytes = b"%PDF-1.7\n1 0 obj<</Type/Catalog>>endobj\n%%EOF\n";
+    let mut disposable = body.clone();
+    disposable["requestKey"] = json!(nonce().unwrap());
+    let disposable = create(CREATE_ANNOUNCEMENT, disposable);
+    let disposable_id = disposable["id"].as_i64().unwrap();
+    let disposable = service
+        .upload(
+            UPLOAD_ANNOUNCEMENT_ATTACHMENT,
+            &[("id", disposable_id.to_string())],
+            json!({"expectedVersion":disposable["versionNumber"]}),
+            "draft.pdf",
+            bytes,
+            admin,
+        )
+        .unwrap();
+    for (token, version, note, status) in [
+        (reader, disposable["versionNumber"].clone(), "误录", 403),
+        (other, disposable["versionNumber"].clone(), "误录", 403),
+        (manager, json!(1), "误录", 409),
+        (manager, disposable["versionNumber"].clone(), "", 400),
+    ] {
+        assert_eq!(
+            call(
+                service,
+                token,
+                DELETE_ANNOUNCEMENT,
+                disposable_id,
+                &[],
+                Some(json!({"expectedVersion":version,"note":note}))
+            )
+            .unwrap_err()
+            .status,
+            Some(status)
+        );
+    }
+    assert_eq!(
+        service
+            .download_file(
+                DOWNLOAD_ANNOUNCEMENT_ATTACHMENT,
+                &[
+                    ("id", disposable_id.to_string()),
+                    (
+                        "attachmentId",
+                        disposable["attachments"][0]["id"].to_string()
+                    )
+                ],
+                admin
+            )
+            .unwrap()
+            .content,
+        bytes
+    );
+    let disposable = action(service, manager, ARCHIVE_ANNOUNCEMENT, &disposable);
+    assert_eq!(
+        action(service, manager, DELETE_ANNOUNCEMENT, &disposable)["success"],
+        true
+    );
+    assert_eq!(
+        call(service, admin, GET_ANNOUNCEMENT, disposable_id, &[], None)
+            .unwrap_err()
+            .status,
+        Some(404)
+    );
     row = service
         .upload(
             UPLOAD_ANNOUNCEMENT_ATTACHMENT,
@@ -122,6 +184,19 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
     let path = [("id", id.to_string()), ("attachmentId", file.to_string())];
     row = action(service, admin, PUBLISH_ANNOUNCEMENT, &row);
     assert_eq!(row["publishVersion"], 1);
+    assert_eq!(
+        call(
+            service,
+            admin,
+            DELETE_ANNOUNCEMENT,
+            id,
+            &[],
+            Some(json!({"expectedVersion":row["versionNumber"],"note":"不可删除已发布"}))
+        )
+        .unwrap_err()
+        .status,
+        Some(409)
+    );
     assert_eq!(
         service
             .download_file(DOWNLOAD_ANNOUNCEMENT_ATTACHMENT, &path, reader)
@@ -198,6 +273,19 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
     );
     let old = row.clone();
     row = action(service, admin, WITHDRAW_ANNOUNCEMENT, &row);
+    assert_eq!(
+        call(
+            service,
+            admin,
+            DELETE_ANNOUNCEMENT,
+            id,
+            &[],
+            Some(json!({"expectedVersion":row["versionNumber"],"note":"不可删除已撤回"}))
+        )
+        .unwrap_err()
+        .status,
+        Some(409)
+    );
     assert_eq!(
         call(service, reader, GET_ANNOUNCEMENT, id, &[], None)
             .unwrap_err()
@@ -428,6 +516,19 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
     );
     row = action(service, admin, ARCHIVE_ANNOUNCEMENT, &row);
     assert_eq!(row["status"], "Archived");
+    assert_eq!(
+        call(
+            service,
+            admin,
+            DELETE_ANNOUNCEMENT,
+            id,
+            &[],
+            Some(json!({"expectedVersion":row["versionNumber"],"note":"不可删除发布历史"}))
+        )
+        .unwrap_err()
+        .status,
+        Some(409)
+    );
     assert_eq!(
         call(service, &revoked, GET_ANNOUNCEMENT, id, &[], None)
             .unwrap_err()

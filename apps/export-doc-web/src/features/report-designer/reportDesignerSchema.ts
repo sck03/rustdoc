@@ -197,6 +197,7 @@ export type ReportDetailTableBlock = ReportBlockBase & {
 };
 
 export type ReportDetailTablePrintSettings = {
+  fillHeight?: boolean;
   repeatHeaderOnPageBreak: boolean;
   keepRowsTogether: boolean;
   firstPageRows?: number;
@@ -262,6 +263,7 @@ export type ReportDetailTableCellContent = {
 };
 
 export type ReportDetailTableSummaryRow = {
+  border?: ReportBorderStyle;
   label: string;
   labelColumnSpan: number;
   cells: ReportDetailTableSummaryCell[];
@@ -269,6 +271,7 @@ export type ReportDetailTableSummaryRow = {
 };
 
 export type ReportDetailTableSummaryCell = {
+  suffix?: string;
   columnId: string;
   fieldFormat?: "Currency";
   contentKind: "Empty" | "Text" | "Field";

@@ -16,7 +16,6 @@ const source = name => JSON.stringify(path.join(web, "src", name).split(path.sep
 const setup = `
 import {ApiError} from ${source("api/index.ts")};
 import {parseReportDesignerV3Source} from ${source("features/report-designer/reportDesignerV3TemplateParser.ts")};
-import {exportReportDesignerV3SchemaToHtml} from ${source("features/report-designer/reportDesignerV3HtmlExporter.ts")};
 import {createV3TextElement} from ${source("features/report-designer/reportDesignerV3ElementFactories.ts")};
 const scenario=new URLSearchParams(location.search).get('scenario');
 const designContent = text => {

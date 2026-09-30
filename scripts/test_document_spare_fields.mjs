@@ -23,7 +23,7 @@ await require("esbuild").build({ stdin: { loader: "ts", resolveDir: web, content
   export * from ${source("features/report-designer/reportDesignerBlockFactories.ts")};
   export * from ${source("features/report-designer/reportDesignerV3ElementFactories.ts")};
   export * from ${source("features/report-designer/reportDesignerV3TemplateParser.ts")};
-  export * from ${source("features/report-designer/reportDesignerV3HtmlExporter.ts")};
+  export * from ${JSON.stringify(path.join(repo, "scripts/lib/report-designer-v3-html-fixture.ts"))};
 ` }, bundle: true, platform: "node", format: "esm", outfile: bundle, logLevel: "silent" });
 const api = await import(pathToFileURL(bundle).href);
 const { documentSpareKeys: keys } = api;
@@ -70,7 +70,7 @@ const detail = api.createDetailTableBlock();
 assert.equal(detail.columns[0].fieldPath, "item.StyleName", "the default product column must bind the real model");
 detail.columns = paths("item").map((field) => api.createDetailTableColumn(field, field, 12));
 body.elements.push(api.createV3FlowElement(detail, 1000, 8000));
-const html = api.exportReportDesignerV3SchemaToHtml(schema, "ExportDocument");
+const html = api.renderReportDesignerV3HtmlFixture(schema, "ExportDocument");
 assert(html, "all spare field bindings must produce valid V3 HTML");
 for (const field of [...paths("Invoice"), ...paths("item")]) assert(html.includes(field));
 const preview = api.renderReportDesignerLocalPreviewSample(JSON.stringify(schema), "exportStandard");

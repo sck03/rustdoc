@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
-import { verifyDesignerEditingUi } from "./lib/report-designer-editing-ui-scenarios.mjs";
+import { verifyDesignerEditingUi, verifyCommercialTemplateUi } from "./lib/report-designer-editing-ui-scenarios.mjs";
 import { verifyProductFieldsUi } from "./lib/report-designer-product-fields-ui.mjs";
 import { verifyShippingMarksUi } from "./lib/report-shipping-marks-ui-scenarios.mjs";
 import { verifyDetailVisibility } from "./lib/report-designer-visibility-ui.mjs";
@@ -37,7 +37,7 @@ await esbuild.build({
     import { ConfirmationProvider } from ${source("ui/ConfirmationProvider.tsx")};
     import { ReportDesignerV3Workspace } from ${source("features/report-designer/ReportDesignerV3Workspace.tsx")};
     import { parseReportDesignerV3Source } from ${source("features/report-designer/reportDesignerV3TemplateParser.ts")};
-    import { exportReportDesignerV3SchemaToHtml } from ${source("features/report-designer/reportDesignerV3HtmlExporter.ts")};
+    import { renderReportDesignerV3HtmlFixture } from ${JSON.stringify(path.join(repo, "scripts/lib/report-designer-v3-html-fixture.ts"))};
     import { createV3FlowElement, createV3TextElement, createV3FieldElement, createV3LineElement, createV3PageNumberElement, createV3ImageElement } from ${source("features/report-designer/reportDesignerV3ElementFactories.ts")};
     import { createGridBlock, createDetailTableBlock, createRowBlock, createConditionalBlock, createDetailTableSideBand } from ${source("features/report-designer/reportDesignerBlockFactories.ts")};
     import { createShippingMarksScenario } from ${JSON.stringify(path.join(repo, "scripts/lib/report-shipping-marks-fixture.mjs").replaceAll("\\", "/"))};
@@ -90,6 +90,8 @@ await esbuild.build({
     }
     if(new URLSearchParams(location.search).has('marks')) Object.assign(schema,createShippingMarksScenario({parseReportDesignerV3Source,createRowBlock,createGridBlock,createConditionalBlock,createDetailTableBlock,createDetailTableSideBand,createV3FlowElement,createV3FieldElement}));
     if(new URLSearchParams(location.search).has('invoice')) Object.assign(schema,defaultReportDesigns()[0][1]);
+    if(new URLSearchParams(location.search).has('packing')) Object.assign(schema,defaultReportDesigns()[1][1]);
+    if(window.__restoredCommercial) Object.assign(schema,parseReportDesignerV3Source(window.__restoredCommercial,reportType).schema);
     window.__designerSchema = schema;
     window.__designerUpdates = 0;
     window.__designerErrors = [];
@@ -102,7 +104,7 @@ await esbuild.build({
     fieldCatalog.fields.push({category:'单据信息',label:'发票号',value:'{{ Invoice.InvoiceNo }}',reportType:'ExportDocument'});
     if(new URLSearchParams(location.search).has('invoice')) Object.assign(fieldCatalog,${JSON.stringify(reportFields)});
     window.__designerHtml = content;
-    window.__exportDesignerHtml=()=>exportReportDesignerV3SchemaToHtml(window.__designerSchema);
+    window.__exportDesignerHtml=()=>renderReportDesignerV3HtmlFixture(window.__designerSchema);
     window.__visibilityComposite=()=>'<div class="edm-detail-omit-empty-lines">'+renderDetailComposite([{kind:'Field',fieldPath:'empty'},{kind:'LineBreak'},{kind:'Text',text:'Widget'},{kind:'LineBreak'},{kind:'Field',fieldPath:'empty'},{kind:'ColumnBreak',positionPercent:50},{kind:'Text',text:'10'}],part=>part.kind==='Text'?part.text:'')+'</div>';
     window.__renderMarksPreview=profile=>renderReportDesignerLocalPreviewSample(window.__designerHtml,profile);
     createRoot(document.getElementById('root')).render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><PermissionAccessProvider grants={[]} permissions={['view','upload','recycle'].map(action=>({resourceKey:permissionResources.reportResources,action,dataScope:'all'}))} canManageSettings={false}><ConfirmationProvider><div className="work-surface" style={{margin:'12px',padding:'8px'}}>
@@ -325,6 +327,7 @@ try {
   results.push({test:'read-only payment canvas displays authorized images',passed:true});
   await verifyShippingMarksUi({page,url,read,waitFor,click,key,results,output});
   await verifyDesignerUsability({page,url,read,waitFor,click,key,results});
+  await verifyCommercialTemplateUi({page,url,read,waitFor,click,key,results,output});
   fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify({passed:true,results},null,2));
   console.log(`Report designer UI contracts passed (${results.length} cases).`);
 } finally {

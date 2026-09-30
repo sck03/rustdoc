@@ -26,7 +26,14 @@ fn access(actor: &Actor, meta: &Value, row: &Value) -> Result<()> {
     let resource = text(meta, "resource");
     let permission = text(meta, "permission");
     auth::authorize(actor, &resource, &permission)?;
-    if row["companyScope"] != actor.company || !auth::visible(actor, &resource, &permission, row) {
+    let finance_view = permission == "view"
+        && resource == "office.expenses"
+        && matches!(row["status"].as_str(), Some("Approved" | "HandedOff"))
+        && auth::authorize(actor, &resource, "complete").is_ok()
+        && auth::visible(actor, &resource, "complete", row);
+    if row["companyScope"] != actor.company
+        || (!auth::visible(actor, &resource, &permission, row) && !finance_view)
+    {
         return Err(error(403, "没有访问此申请的权限。"));
     }
     Ok(())
@@ -145,12 +152,27 @@ fn list(tx: &Connection, actor: &Actor, meta: &Value, query: &[(&str, String)]) 
             .map(|(_, v)| v.as_str())
             .unwrap_or("")
     };
+    let finance = match get("financeOnly") {
+        "" | "false" => false,
+        "true" if meta["kind"] == "expense" => true,
+        _ => return Err(invalid("财务筛选参数无效。")),
+    };
+    let scope_permission = if finance { "complete" } else { "view" };
+    auth::authorize(actor, &resource, scope_permission)?;
     let mine = match get("mineOnly") {
-        "" | "true" => true,
+        "" => !finance,
+        "true" => true,
         "false" => false,
         _ => return Err(invalid("筛选开关无效。")),
     };
-    let status = get("status");
+    let status = if finance && get("status").is_empty() {
+        "Approved"
+    } else {
+        get("status")
+    };
+    if finance && !["Approved", "HandedOff"].contains(&status) {
+        return Err(invalid("财务接收仅查询已批准或已移交财务的报销单。"));
+    }
     if !status.is_empty()
         && ![
             "Draft",
@@ -171,13 +193,16 @@ fn list(tx: &Connection, actor: &Actor, meta: &Value, query: &[(&str, String)]) 
         actor
             .grants
             .iter()
-            .filter(|g| g["resourceKey"] == resource && g["action"] == "view")
+            .filter(|g| g["resourceKey"] == resource && g["action"] == scope_permission)
             .map(|g| {
                 export_doc_domain::permissions::scope_rank(g["dataScope"].as_str().unwrap_or(""))
             })
             .max()
             .unwrap_or(0)
     };
+    if rank == 0 {
+        return Err(error(403, "没有有效的申请数据访问范围。"));
+    }
     let (page, size) = paging(query)?;
     let (count, rows) = tx.query_records(&RecordQuery {
         kind: &kind(meta),

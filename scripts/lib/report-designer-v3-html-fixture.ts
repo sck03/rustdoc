@@ -1,46 +1,28 @@
-import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
-import type { ReportBlock } from "./reportDesignerSchema.ts";
-import { renderReportDesignerBlockToHtml } from "./reportDesignerBlockRenderer.ts";
-import { renderReportField } from "./reportDesignerFieldRendering.ts";
+// Test-only structural HTML fixture. Production document output is owned by Rust.
+import { portableReportSansFontFamily } from "../../apps/export-doc-web/src/app/typographyPolicy.ts";
+import type { ReportBlock } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerSchema.ts";
+import { renderReportDesignerBlockToHtml } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerBlockRenderer.ts";
+import { renderReportField } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerFieldRendering.ts";
 import {
   hundredthMmToMm,
   reportDesignerV3ElementBounds,
   reportDesignerV3PageSize,
   type ReportDesignerV3Element,
   type ReportDesignerV3Schema,
-} from "./reportDesignerV3Schema.ts";
-import {
-  hasBlockingReportDesignerV3SchemaIssues,
-  normalizeReportDesignerV3Schema,
-} from "./reportDesignerV3Validation.ts";
-import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
-import { isControlledReportImageFieldPath } from "./reportDesignerSchemaDomains.ts";
-import { isSafeReportDesignerCssFontFamily } from "./reportDesignerSchemaValues.ts";
+} from "../../apps/export-doc-web/src/features/report-designer/reportDesignerV3Schema.ts";
+import { validateReportDesignerV3Draft } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerV3Validation.ts";
+import type { ReportDesignerReportType } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerSchema.ts";
+import { isControlledReportImageFieldPath } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerSchemaDomains.ts";
+import { isSafeReportDesignerCssFontFamily } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerSchemaValues.ts";
 
 const colorPattern = /^#[0-9a-fA-F]{3,8}$/;
 const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
 
-/**
- * Runs the same normalization/domain gate used by the exporter without
- * producing HTML.  The workspace uses this result to keep an invalid draft
- * out of the parent form instead of treating an empty export as valid data.
- */
-export function validateReportDesignerV3Export(
+export function renderReportDesignerV3HtmlFixture(
   schema: ReportDesignerV3Schema,
   expectedReportType?: ReportDesignerReportType,
 ) {
-  const validation = normalizeReportDesignerV3Schema(schema, expectedReportType);
-  return {
-    ...validation,
-    blocked: !validation.schema || hasBlockingReportDesignerV3SchemaIssues(validation.issues),
-  };
-}
-
-export function exportReportDesignerV3SchemaToHtml(
-  schema: ReportDesignerV3Schema,
-  expectedReportType?: ReportDesignerReportType,
-) {
-  const validation = validateReportDesignerV3Export(schema, expectedReportType);
+  const validation = validateReportDesignerV3Draft(schema, expectedReportType);
   // A V3 draft with blocking schema/domain errors must never become writable
   // HTML.  Returning an empty draft keeps the original template selected in
   // the workspace and makes the save action unavailable until the user fixes

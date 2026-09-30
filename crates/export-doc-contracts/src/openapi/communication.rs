@@ -68,6 +68,15 @@ pub(super) fn extend(doc: &mut Value) {
             "publish",
         ),
         (
+            "/{id}",
+            "delete",
+            "DeleteAnnouncement",
+            "manage",
+            Some("OaAction"),
+            "AnnouncementDeleteResult",
+            "delete",
+        ),
+        (
             "/{id}/withdraw",
             "post",
             "WithdrawAnnouncement",
@@ -298,6 +307,7 @@ fn schemas(doc: &mut Value) {
         "attachments",
     ]);
     s["Announcement"] = object(p, &required);
+    s["AnnouncementDeleteResult"] = object(json!({"success":{"type":"boolean"}}), &["success"]);
     s["AnnouncementRead"] = object(json!({"publishVersion":int}), &["publishVersion"]);
     s["AnnouncementReceipt"] = object(
         json!({"id":int,"readerName":string,"publishVersion":int,"readAt":time}),

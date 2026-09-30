@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { cargoExampleExecutable } from './lib/cargo-paths.mjs';
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
@@ -23,7 +24,7 @@ async function click(text, scope = "document") {
   await run(`(() => {const button=[...${scope}.querySelectorAll('button,a')].find(e=>e.textContent.trim()===${JSON.stringify(text)} && e.getClientRects().length); if(!button) throw new Error('Missing control: '+${JSON.stringify(text)}); button.click();})()`);
 }
 async function fill(label, value) {
-  await run(`(() => {const label=[...document.querySelectorAll('label')].find(e=>e.querySelector('span')?.textContent===${JSON.stringify(label)}); const input=label?.querySelector('input,textarea,select'); if(!input) throw new Error('Missing field: '+${JSON.stringify(label)}); Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input),'value').set.call(input,${JSON.stringify(value)}); input.dispatchEvent(new Event('input',{bubbles:true})); input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await run(`(() => {const label=[...document.querySelectorAll('label')].find(e=>(e.querySelector('span')?.textContent ?? e.textContent)===${JSON.stringify(label)}); const input=label?.control ?? label?.querySelector('input,textarea,select'); if(!input) throw new Error('Missing field: '+${JSON.stringify(label)}); Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input),'value').set.call(input,${JSON.stringify(value)}); input.dispatchEvent(new Event('input',{bubbles:true})); input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
 }
 async function navigate(url) { await page.send("Page.navigate", { url }); await wait("document.readyState === 'complete'", "Page load timed out"); }
 async function chooseFiles(selector, files) {
@@ -77,6 +78,8 @@ try {
   await captureScreenshot(page, path.join(output, "personnel-before-save.png"));
   await click("登记入职");
   await wait("!document.querySelector('[role=dialog]') && document.querySelector('.personnel-facts')", "One-click personnel save failed");
+  await captureScreenshot(page, path.join(output, "personnel-profile.png"));
+  assert.equal(await run("getComputedStyle(document.querySelector('.personnel-fact-section')).backgroundColor"), "rgb(255, 255, 255)");
   await click("照片与证件");
   await wait("document.querySelector('[aria-label=档案文档]')?.innerText.includes('receipt.pdf') && document.querySelector('.personnel-image-preview img')?.naturalWidth>0", "Personnel image or document was not saved");
   await captureScreenshot(page, path.join(output, "personnel-saved-files.png"));
@@ -87,8 +90,26 @@ try {
     assert(await run(`(() => {const items=[...document.querySelectorAll('.oa-toolbar > label, .oa-toolbar > button')];const centers=items.map(e=>{const r=e.getBoundingClientRect();return r.top+r.height/2;});return centers.length>=4 && Math.max(...centers)-Math.min(...centers)<2;})()`), `${name}: toolbar controls share one baseline`);
     await captureScreenshot(page, path.join(output, `${kind}-toolbar.png`));
     await click(`新建${name}`);
-    await wait("document.querySelector('[role=dialog] .remote-select-field select option[value]:not([value=\"\"])')", "Employee options missing");
-    await run("(() => {const select=document.querySelector('[role=dialog] .remote-select-field select');select.value=[...select.options].find(o=>o.value).value;select.dispatchEvent(new Event('change',{bubbles:true}));})()");
+    await fill("登记人员", "UI-ATTACH-001");
+    await wait("document.querySelector('[role=option]')?.textContent.includes('一次保存人员') && document.querySelectorAll('[role=option]').length===1", "Employee number search failed");
+    if (kind === 'leave') {
+      const require = createRequire(path.join(repo, 'apps/export-doc-web/package.json'));
+      await page.send('Runtime.evaluate', { expression: fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8') });
+      assert.deepEqual(await run("window.axe.run(document.querySelector('[role=dialog]')).then(r=>r.violations.filter(v=>['critical','serious'].includes(v.impact)).map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})))"), [], 'Employee combobox accessibility');
+    }
+    await captureScreenshot(page, path.join(output, `${kind}-employee-search.png`));
+    await run("document.querySelector('[role=option]').click()");
+    await fill("登记人员", "不存在的员工");
+    await wait("document.querySelector('.employee-picker-status')?.textContent.includes('没有匹配')", "Empty search feedback missing");
+    assert.equal(await run("document.querySelectorAll('[role=option]').length"), 0, "Selected employee must not leak into unmatched results");
+    await fill("登记人员", "一次保存");
+    await wait("document.querySelector('[role=option]')?.textContent.includes('UI-ATTACH-001')", "Employee name search failed");
+    await run("document.querySelector('.employee-picker input').focus()");
+    for (const key of ['ArrowUp', 'Enter']) {
+      await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: key === 'Enter' ? 13 : 38 });
+      await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: key === 'Enter' ? 13 : 38 });
+    }
+    await wait("!document.querySelector('[role=listbox]') && document.querySelector('.employee-picker input').value.includes('UI-ATTACH-001')", "Keyboard employee selection failed");
     await fill("申请标题", `${name}真实界面验收`); await fill("申请说明", "验证中文输入、保存、附件和审批历史。");
     if (kind === "leave") { await fill("开始日期", yesterday); await fill("结束日期", yesterday); }
     if (kind === "overtime") { await fill("开始时间", `${yesterday}T18:00`); await fill("结束时间", `${yesterday}T20:00`); await fill("加班地点", "总部办公室"); }
@@ -143,7 +164,7 @@ try {
     await wait("document.querySelector('.oa-detail .office-badge')?.textContent==='待审批'", "Submission state missing");
     await act("登记批准结果", "同意办理");
     await wait("document.querySelector('.oa-detail .office-badge')?.textContent==='已批准'", "Approval state missing");
-    const label = { leave: "销假归档", overtime: "确认加班完成", expense: "移交财务", travel: "返程归档", purchase: "登记验收", general: "办结登记" }[kind];
+    const label = { leave: "销假归档", overtime: "确认加班完成", expense: "财务接收", travel: "返程归档", purchase: "登记验收", general: "办结登记" }[kind];
     await act(label, kind === "expense" ? "已移交独立财务软件，接收人王会计" : "已核对并完成办理");
     await run("document.querySelector('.oa-detail details').open=true");
     await wait("document.querySelector('.oa-history')?.innerText.includes('完成登记')", "Completion history missing");

@@ -261,6 +261,8 @@ pub struct DetailTable {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DetailPrint {
+    #[serde(default)]
+    pub fill_height: bool,
     pub repeat_header_on_page_break: bool,
     pub keep_rows_together: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -345,6 +347,8 @@ pub struct DetailGroupFooterCell {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DetailSummaryRow {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub border: Option<ReportBorderStyle>,
     pub label: String,
     pub label_column_span: i32,
     #[serde(default)]
@@ -355,6 +359,8 @@ pub struct DetailSummaryRow {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DetailSummaryCell {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub suffix: String,
     pub column_id: String,
     pub content_kind: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -605,6 +611,7 @@ impl Design {
                     grouping: None,
                     columns,
                     print: DetailPrint {
+                        fill_height: false,
                         repeat_header_on_page_break: true,
                         keep_rows_together: true,
                         first_page_rows: None,

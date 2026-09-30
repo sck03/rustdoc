@@ -18,7 +18,7 @@ import type {
 } from "../../api/index.ts";
 import { buildReportDesignerFieldGroups } from "./reportDesignerFields.ts";
 import { useReportDesignerV3History } from "./reportDesignerV3History.ts";
-import { validateReportDesignerV3Export } from "./reportDesignerV3HtmlExporter.ts";
+import { validateReportDesignerV3Draft } from "./reportDesignerV3Validation.ts";
 import {
   createV3FieldElement, createV3FlowElement, createV3ImageElement, createV3LineElement,
   createV3PageNumberElement, createV3RectangleElement, createV3TextElement,
@@ -103,7 +103,7 @@ export function ReportDesignerV3Workspace({
     ? gridCellSelection
     : null;
   const exportValidation = useMemo(
-    () => validateReportDesignerV3Export(history.state.schema, reportType),
+    () => validateReportDesignerV3Draft(history.state.schema, reportType),
     [history.state.schema, reportType],
   );
   const serializedContent = useMemo(() => JSON.stringify(history.state.schema), [history.state.schema]);

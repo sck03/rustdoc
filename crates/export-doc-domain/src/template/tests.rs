@@ -227,9 +227,11 @@ fn structured_detail_html_contains_groups_subtotals_summary_and_side_band() {
             style: ReportTextStyle::default(),
         });
         table.summary_row = Some(crate::designer::DetailSummaryRow {
+            border: None,
             label: "GRAND TOTAL".into(),
             label_column_span: 2,
             cells: vec![crate::designer::DetailSummaryCell {
+                suffix: String::new(),
                 field_format: None,
                 column_id: "col-2".into(),
                 content_kind: "Text".into(),
