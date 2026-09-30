@@ -21,9 +21,7 @@ services:
     networks: [database]
   initialize:
     image: '${NATIVE_IMAGE:-exportdoc-rust-native:local}'
-    build:
-      context: ../..
-      dockerfile: deploy/rust-native/Dockerfile
+    profiles: [maintenance]
     command: [--app-root, /opt/exportdoc, --data-root, /var/lib/exportdoc, --initialize-only]
     environment:
       EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION_FILE: /run/secrets/maintenance_connection
@@ -56,6 +54,9 @@ services:
     networks: [database]
   application:
     image: '${NATIVE_IMAGE:-exportdoc-rust-native:local}'
+    build:
+      context: ../..
+      dockerfile: deploy/rust-native/Dockerfile
     restart: unless-stopped
     environment:
       EXPORTDOCMANAGER_POSTGRES_CONNECTION_FILE: /run/secrets/app_connection
@@ -77,7 +78,7 @@ services:
       start_period: 15s
     stop_grace_period: 210s
     depends_on:
-      initialize: {condition: service_completed_successfully}
+      postgres: {condition: service_healthy}
     networks: [database, web]
 secrets:
   bootstrap_password:

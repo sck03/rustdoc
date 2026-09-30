@@ -63,7 +63,7 @@ $dependencyPolicyScript = Join-Path $scriptRoot "verify-dependency-policy.mjs"
 Invoke-ExportDocExternal -FilePath "node" -Arguments @($dependencyPolicyScript) -WorkingDirectory $repoRoot
 $dependencyPolicyTestScript = Join-Path $scriptRoot "test_dependency_policy.mjs"
 Invoke-ExportDocExternal -FilePath "node" -Arguments @($dependencyPolicyTestScript) -WorkingDirectory $repoRoot
-foreach ($test in @('test_generated_artifact_protection.ps1', 'test_rust_build_paths.ps1')) {
+foreach ($test in @('test_generated_artifact_protection.ps1', 'test_rust_build_paths.ps1', 'test_native_docker_lifecycle.ps1')) {
     # Negative subprocess tests must not leak their expected LASTEXITCODE into the CI host.
     Invoke-ExportDocExternal -FilePath (Resolve-ExportDocPowerShellExecutable) `
         -Arguments @('-NoProfile', '-NonInteractive', '-File', (Join-Path $scriptRoot $test)) `

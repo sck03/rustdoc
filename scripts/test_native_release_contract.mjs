@@ -158,8 +158,9 @@ async function testContainerRestartWorkflows() {
   const execute = promisify(execFile);
   for (const name of ['rust-native-validation', 'rust-native-container-release']) {
     const workflow = await readFile(path.join(root, `.github/workflows/${name}.yml`), 'utf8');
-    const block = workflow.match(/name: Restart[^\n]+\r?\n\s+shell: pwsh\r?\n\s+run: \|\r?\n([\s\S]*?)(?=      - name:)/u)?.[1];
-    assert(block, `${name} has a persistence verification step`);
+    const blocks = [...workflow.matchAll(/name: (?:Restart|Reapply|Restore with independent)[^\n]+\r?\n\s+shell: pwsh\r?\n\s+run: \|\r?\n([\s\S]*?)(?=      - name:)/gu)].map(match => match[1]);
+    assert.equal(blocks.length, 3, `${name} verifies live redeployment, maintenance restore and persistence`);
+    for (const block of blocks) {
     await write('restart.ps1', "$ErrorActionPreference = 'Stop'\n" + block.replace(/^          /gmu, ''));
     await write('scripts/run-native-docker.ps1', '# Successful PowerShell scripts need not set LASTEXITCODE.\n');
     await write('scripts/verify-native-docker.mjs', "import {writeFileSync} from 'node:fs'; writeFileSync('verified.txt', 'verified');\n");
@@ -171,6 +172,7 @@ async function testContainerRestartWorkflows() {
     await write('scripts/run-native-docker.ps1', 'exit 23\n');
     await assert.rejects(execute('pwsh', ['-NoProfile', '-File', path.join(temporary, 'restart.ps1')], { cwd: temporary, timeout: 30000 }), error => error.code === 23);
     await assert.rejects(readFile(verifyPath), error => error.code === 'ENOENT');
+    }
   }
 }
 

@@ -12,15 +12,17 @@
 
 | 形态 | 本地脚本 | 运行要求 |
 | --- | --- | --- |
-| 桌面 Full | build-native.ps1 / run-native.ps1 | Tauri、平台 WebView、Rust、SQLite；正式包默认 OCR |
+| 桌面 Document / Sales | build-native.ps1 / run-native.ps1 | Tauri、平台 WebView、Rust、SQLite；Document 默认 OCR |
 | 网页服务器 | package-native-web-server.ps1 | React + Rust HTTP、PostgreSQL 18 |
 | Docker | run-native-docker.ps1 | 同一 React、Rust HTTP、PostgreSQL 18 容器 |
 
-普通用户使用 scripts 根目录入口，详细参数见[脚本说明](../scripts/README.md)。桌面入口仅选择 Document、Sales 或 All（两版），单版默认 Document；Web/容器保持 Full 完整功能，包含行政人事与团队协作。各平台实际运行和签名更新仍须单独验收。
+普通用户使用 scripts 根目录入口，详细参数见[脚本说明](../scripts/README.md)。正式桌面选择 Document、Sales 或 All（两版），单版默认 Document；本地另支持显式 Full SQLite 测试包，不进入正式发布矩阵。Web/容器保持 Full 完整功能，包含行政人事与团队协作。各平台实际运行和签名更新仍须单独验收。
 
 ## 容器与团队模式
 
 Docker 使用 `deploy/rust-native`，本地私密运行配置位于其忽略的 runtime 目录。默认只绑定回环地址；局域网和公网绑定由部署者明确配置。首次管理员初始化需要私有 bootstrap token，日常 API 使用受限 PostgreSQL 业务账号；数据库维护角色与运行账号分离。
+
+React 静态资源与 Rust API 在同一个应用容器，PostgreSQL 在独立容器；只发布应用 HTTP 端口，数据库通过内部网络访问。`initialize`/`restore` 为一次性维护服务，由公开入口在停 API 后运行；应用镜像不包含 PostgreSQL 服务端，只包含备份恢复所需客户端。构建上下文按 Dockerfile 输入列出允许路径，排除旧部署、桌面离线安装器、文档、测试产物与本机私密配置；这减少构建传输，不代表已删除正常运行所需的 OCR/字体或减小其镜像体积。
 
 桌面 SQLite 不能代替团队 PostgreSQL。当前支持单 API、多浏览器用户，不支持把多个 API 指向同一业务库当作高可用部署。数据库、受管文件、备份与配置一起按现有恢复流程验证。
 

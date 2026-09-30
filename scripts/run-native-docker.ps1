@@ -12,6 +12,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
+. (Join-Path $PSScriptRoot 'lib/native-docker-lifecycle.ps1')
 $interactiveLaunch = Test-ExportDocPauseEnabled -NoPauseRequested $NoPause
 trap {
     Write-ExportDocScriptFailure -ErrorRecord $_
@@ -105,15 +106,8 @@ if ($PrepareOnly) {
     $docker = (Get-Command docker -ErrorAction Stop).Source
     $environment = @{ NATIVE_RUNTIME_ROOT = $runtimePath.Replace('\', '/'); NATIVE_PORT = "$Port"; NATIVE_BIND_ADDRESS = $BindAddress; NATIVE_IMAGE = $Image }
     $arguments = @('compose', '--project-name', 'exportdoc-rust-native', '--file', (Join-Path $repositoryRoot 'deploy/rust-native/compose.yml'))
-    if ($RestorePending) {
-        Invoke-ExportDocExternal -FilePath $docker -Arguments ($arguments + @('stop', 'application')) -Environment $environment -WorkingDirectory $repositoryRoot -TimeoutSeconds 240 -DisplayName 'Stop API before database maintenance'
-        Invoke-ExportDocExternal -FilePath $docker -Arguments ($arguments + @('--profile', 'maintenance', 'run', '--rm', 'restore')) -Environment $environment -WorkingDirectory $repositoryRoot -TimeoutSeconds 3600 -DisplayName 'Apply staged restore with maintenance credentials'
-        Invoke-ExportDocExternal -FilePath $docker -Arguments ($arguments + @('up', '--detach', '--wait', '--wait-timeout', '180', 'application')) -Environment $environment -WorkingDirectory $repositoryRoot -TimeoutSeconds 240 -DisplayName 'Restart restored API'
-        Wait-ExportDocInteractiveExit -Enabled $interactiveLaunch -ExitCode 0
-        return
-    }
-    $arguments += $(if ($Stop) { @('down') } else { @('up', $(if ($SkipBuild) { '--no-build' } else { '--build' }), '--detach', '--wait', '--wait-timeout', '180') })
-    Invoke-ExportDocExternal -FilePath $docker -Arguments $arguments -Environment $environment -WorkingDirectory $repositoryRoot -TimeoutSeconds 3600 -DisplayName 'Rust native Docker application'
+    Invoke-ExportDocDockerLifecycle -Docker $docker -ComposeArguments $arguments -Environment $environment `
+        -WorkingDirectory $repositoryRoot -SkipBuild:$SkipBuild -Stop:$Stop -RestorePending:$RestorePending
     if (-not $Stop) { Write-Host "Native web application: http://${BindAddress}:$Port" }
 }
 Wait-ExportDocInteractiveExit -Enabled $interactiveLaunch -ExitCode 0

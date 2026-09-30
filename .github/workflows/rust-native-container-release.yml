@@ -99,6 +99,20 @@ jobs:
         run: ./scripts/run-native-docker.ps1 -SkipBuild -NoPause -Port 5195
       - name: Verify React, API and file tasks
         run: node scripts/verify-native-docker.mjs --url http://127.0.0.1:5195 --runtime deploy/rust-native/runtime --isolated-validation
+      - name: Reapply deployment while API is running and stage database restore
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File ./scripts/run-native-docker.ps1 -SkipBuild -NoPause -Port 5195
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/verify-native-docker.mjs --url http://127.0.0.1:5195 --runtime deploy/rust-native/runtime --isolated-validation --resume --stage-restore
+          exit $LASTEXITCODE
+      - name: Restore with independent maintenance container and verify data
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File ./scripts/run-native-docker.ps1 -RestorePending -NoPause -Port 5195
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/verify-native-docker.mjs --url http://127.0.0.1:5195 --runtime deploy/rust-native/runtime --isolated-validation --resume
+          exit $LASTEXITCODE
       - name: Stop containers while retaining databases
         shell: pwsh
         run: ./scripts/run-native-docker.ps1 -Stop -NoPause

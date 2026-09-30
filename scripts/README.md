@@ -69,7 +69,15 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 ## 网页与 Docker
 
-`run-native-docker.ps1 -PrepareOnly -NoPause` 只生成私有配置；普通运行构建并启动，`-Stop -NoPause` 停止并保留数据库。默认绑定 `127.0.0.1:5188`；局域网地址须显式设置。凭据保存在忽略的 `deploy/rust-native/runtime/`，不进入 Git 或镜像。
+`run-native-docker.ps1 -PrepareOnly -NoPause` 只生成私有配置；普通运行构建并启动，`-Stop -NoPause` 停止并保留数据库。默认绑定 `127.0.0.1:5188`；局域网地址须显式设置。凭据保存在忽略的 `deploy/rust-native/runtime/`，不进入 Git 或镜像。始终使用同一 RuntimeRoot 和 Compose 项目维护已有部署，不能换一套随机凭据接管旧数据卷。
+
+常驻服务为两个容器：`application` 同源提供 React 与 Rust API，`postgres` 独立运行 PostgreSQL 18。浏览器 → HTTP/HTTPS → API → 内网 `postgres:5432`；数据库不映射宿主端口。API 使用 `database` 与 `web` 网络，PostgreSQL 只使用 `internal: true` 的 `database` 网络。TLS 代理可由服务器部署环境提供，不是必须增加的应用容器。非容器网页包使用相同 Rust 后端连接独立 PostgreSQL 服务，数据库不必容器化。
+
+### 更新程序与数据库
+
+日常启动、重复启动及更新统一经过：准备镜像 → 停 API → 等数据库就绪 → 独立维护容器初始化/逐版升级 → 启 API 并检查就绪。构建失败不打断原 API；停止、数据库或维护失败则立即报错，不继续启 API。`initialize`/`restore` 仅在 maintenance profile 显式运行，不能用裸 `docker compose up` 代替公开脚本来执行升级。`-SkipBuild` 复用已构建/已导入镜像，升级至发布镜像时使用本页的 `-Image ... -SkipBuild` 命令。
+
+应用 schema 升级与 PostgreSQL 软件主版本升级是两件事：当前 Rust schema 为 6，从 5 开始事务升级；本次部署调整不改变 schema 或备份格式。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。升级前在界面导出备份/完整迁移包并保存在本机故障之外的位置。
 
 首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接只供初始化／升级／恢复使用。桌面 SQLite 空库仍为 admin 空密码；当前数据库版本 6，支持从 Rust 版本 5 升级，不兼容 C# v19 或版本 4 及更早试验库。
 
@@ -80,10 +88,12 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 - 桌面 `.edmrecovery` 灾备包包含 SQLite 快照、Security 主密钥和 DataRoot/Templates；从本机明确选择的文件校验并暂存后，退出重开即可恢复。启动先取得实例锁，校验暂存内容，保存原文件并记录替换日志；失败停止启动，保留恢复目录。
 - PostgreSQL API 沿用“物理备份”名称，实际为 `pg_dump` custom-format `.dump`，只恢复数据库。换服务器使用另含主密钥和用户模板的 `.edmmigration` 完整包。加密包明文及下载上限为 256 MiB；超大数据库由部署管理员使用 PostgreSQL 原生离线备份工具。
 - 服务器在界面完成密码/确认及暂存后，停止正常 API，使用同一个 AppRoot/DataRoot 执行 `ExportDocManager.Server --app-root <AppRoot> --data-root <DataRoot> --restore-pending`。维护进程需提供 `EXPORTDOCMANAGER_POSTGRES_CONNECTION`、独立 `EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION` 和 NOLOGIN 所有者 `EXPORTDOCMANAGER_POSTGRES_OWNER`；两种连接须指向同一数据库，均可使用对应 `_FILE`。命令完成即退出，再以业务连接启动 API。
-- Docker 使用 `scripts/run-native-docker.ps1 -RestorePending -NoPause`：停 API、运行独立 restore 容器、成功后再启动。普通 application 容器没有维护密钥；数据库实例锁阻止 API 与恢复同时操作。
+- Docker 使用 `scripts/run-native-docker.ps1 -RestorePending -NoPause`：停 API、等待 PostgreSQL、运行独立 restore 容器、成功后再启动。必须与暂存操作使用同一个 RuntimeRoot 和镜像。普通 application 容器没有维护密钥；数据库实例锁阻止 API 与恢复同时操作。维护成功后不再隐式重复初始化；失败保留停止状态、待恢复标记和安全副本，修复原因后重试同一命令。
 - 恢复先生成安全 dump，再以 `pg_restore --single-transaction --no-owner --no-privileges --role <NOLOGIN-owner>` 执行，存储层验证 schema 并重新授予业务账号必要表/序列权限。失败保留标记和安全备份；不得删除标记冒充恢复完成。
 - 主密钥、暂存目录与恢复前副本使用共同的 Windows 私有 ACL／Unix 0700 目录边界。环境变量提供主密钥的部署明确拒绝独立密钥包操作，须由管理员安排密钥迁移。
 - 网页包随附 `Tools/PostgreSQL` 客户端和许可；版本、来源及 Windows SHA-256 在 `eng/native-runtime-packages.json`。Linux 客户端采用官方 bookworm 资源以避免在 Ubuntu 24.04 上引入更高 glibc 要求；容器使用 trixie 资源。macOS 构建机先安装 PostgreSQL 18 Homebrew formula，版本须与中央清单一致。
+
+`pg_dump`/`pg_restore` 从应用/维护容器通过数据库连接工作，不需要把数据库目录挂给 API，也不需要浏览器执行 `docker exec`。`postgres_data` 是数据库原始数据卷，`app_data` 含 Security、用户文件模板、任务输出和备份；换机不能只迁移数据库卷而漏掉应用数据和私有配置。正常停止不删除卷，禁止用 `down -v` 作为更新或恢复步骤。完整迁移包覆盖业务库、主密钥和用户模板，任务临时输出不属于完整业务迁移承诺；不能直接复制正在运行的 PostgreSQL 原始数据目录作为可靠备份。
 
 ### GitHub 构建产物
 
@@ -121,6 +131,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 
 - Rust：`cargo fmt --all --check`、`cargo test --locked --workspace`、`cargo check --locked --workspace --all-features`。
 - 实库：`test-native-postgres.ps1 -PostgresBin <PostgreSQL-18-bin>` 创建并停止隔离集群；忽略的实库测试不计通过。
+- Docker：`test_native_docker_lifecycle.ps1` 在无 daemon 环境验证停机顺序与失败中止；真实两架构 CI 另核对内部网络、端口、凭据/卷隔离、运行中重复部署、custom-format dump 恢复及重启持久化。脚本和 Compose 配置通过不等于容器实跑通过。
 - React：项目 `build`、API／登录／权限／草稿／无障碍及相应页面回归；真正的 Tauri 窗口和输出仍需实跑。
 - 依赖：`generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository`，要求 `unresolved=0 / disallowed=0`。
 - 平台：`verify-native-desktop.mjs` 验证 Tauri／SQLite，排除 Slint／egui／PostgreSQL 桌面依赖；`assert-tauri-command-permissions.ps1` 校验 command 与能力白名单。

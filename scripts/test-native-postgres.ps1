@@ -46,7 +46,6 @@ CREATE ROLE native_maintenance LOGIN NOSUPERUSER CREATEDB NOCREATEROLE PASSWORD 
 GRANT native_owner TO native_maintenance;
 CREATE DATABASE native_storage OWNER native_owner;
 CREATE DATABASE native_engine OWNER native_owner;
-CREATE DATABASE native_api OWNER native_owner;
 CREATE DATABASE native_recovery OWNER native_owner;
 "@
     [System.IO.File]::WriteAllText($sqlFile, $sql, [System.Text.UTF8Encoding]::new($false))
@@ -60,7 +59,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT SELECT, IN
 ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO native_app;
 '@
     [System.IO.File]::WriteAllText($sqlFile, $sql, [System.Text.UTF8Encoding]::new($false))
-    foreach ($database in @('native_storage', 'native_engine', 'native_api', 'native_recovery')) {
+    foreach ($database in @('native_storage', 'native_engine', 'native_recovery')) {
         Invoke-ExportDocExternal -FilePath $psql -Arguments ($common + @('-d', $database, '-f', $sqlFile)) -Environment $environment -TimeoutSeconds 30 -DisplayName "Set minimum privileges for $database"
     }
     foreach ($target in @(@('POSTGRES', 'native_storage'), @('ENGINE', 'native_engine'), @('RECOVERY', 'native_recovery'))) {
