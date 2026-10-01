@@ -99,7 +99,7 @@ export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUs
   const focused = Boolean(focus.requestId || focus.applicantUserId || focus.employeeId);
   const paging = useOfficePaging();
   const [mineOnlyFilter, setMineOnly] = useState(!access.canSeeOthers);
-  const [statusFilter, setStatus] = useState(access.allows("approve") ? "Pending" : "");
+  const [statusFilter, setStatus] = useState(search.get("status") ?? (user.capabilities.usesOfficeRegister ? "" : access.allows("approve") ? "Pending" : ""));
   const mineOnly = focused ? !access.canSeeOthers : mineOnlyFilter;
   const status = focused ? "" : statusFilter;
   const query = useQuery({

@@ -166,18 +166,18 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
                 },
                 "Approved",
                 "startsAt",
-                "待领取钥匙",
+                "待使用／交接",
             ),
             (
                 "meeting-return",
                 if local {
-                    "钥匙待归还"
+                    "会议室待结束／归还"
                 } else {
-                    "我的钥匙待归还"
+                    "我的会议室待结束／归还"
                 },
                 "InUse",
                 "endsAt",
-                "待归还钥匙",
+                "待结束使用／归还钥匙",
             ),
         ] {
             let rows = meetings
@@ -237,29 +237,22 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
             if !["Approved", "Issued"].contains(&text(r, "status").as_str()) {
                 continue;
             }
-            let supply = store::get(
-                tx,
-                "supplies",
-                r["officeSupplyId"]
-                    .as_i64()
-                    .ok_or_else(|| unavailable("领用记录缺少物品编号。"))?,
-            )?;
             let description = format!("{} · {}", text(r, "applicantName"), text(r, "purpose"));
             if r["status"] == "Approved" {
                 collection.push(item(
                     r,
-                    text(&supply, "name"),
+                    text(r, "supplyName"),
                     description,
                     Value::Null,
                     Value::Null,
                     Value::Null,
                 ));
-            } else if supply["isReturnable"] == true
+            } else if r["isReturnable"] == true
                 && r["returnedQuantity"].as_i64().unwrap_or(0) < r["quantity"].as_i64().unwrap_or(0)
             {
                 returns.push(item(
                     r,
-                    text(&supply, "name"),
+                    text(r, "supplyName"),
                     description,
                     Value::Null,
                     r["returnDueDate"].clone(),

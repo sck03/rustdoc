@@ -60,7 +60,7 @@ function OfficeActionDialog({ client, kind, row, action, label, onClose }: {
   const needsReason = action === "reject" || action === "cancel";
   const description = action === "approve" ? (kind === "rooms" ? "批准后，申请人可按预约时间到场办理交接。" : "批准后将预留相应库存，实际发放时扣减在库数量。")
     : action === "issue" ? "请核对使用人身份，确认已当面完成实物交接。"
-      : action === "return" ? "请先确认已经收到归还的钥匙或物品，再登记归还。"
+      : action === "return" ? (isMeetingBooking(row) && !row.requiresKey ? "请确认会议已结束、场地已交接，再登记结束使用。" : "请先确认已经收到归还的钥匙或物品，再登记归还。")
         : "请填写原因，申请人可在处理记录中查看。";
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

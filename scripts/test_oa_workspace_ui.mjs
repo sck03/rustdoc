@@ -7,6 +7,7 @@ import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
 import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
+import { exerciseOfficeResources } from "./lib/office-resource-ui-scenarios.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const output = path.join(repo, "artifacts/oa-native-ui", Date.now().toString());
@@ -59,6 +60,7 @@ try {
   await run(`(() => {for(const [selector,value] of [['input[autocomplete=username]','oa-review'],['input[autocomplete=current-password]','Review-2026-Test']]){const input=document.querySelector(selector);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));}})()`);
   await click("登录");
   await wait("!document.querySelector('.login-submit-button')", "Login failed");
+  await exerciseOfficeResources({ url, page, output, run, wait, click, fill, navigate, captureScreenshot });
   await navigate(`${url}/#/office/approvals`);
   await wait("document.querySelector('[aria-label=\"申请与审批中心\"]')", "Approval hub missing");
   assert(await run("document.body.innerText.includes('人事管理') && document.body.innerText.includes('行政办公')"), "Separated navigation groups are visible");

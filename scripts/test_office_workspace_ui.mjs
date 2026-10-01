@@ -26,6 +26,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   import { UnsavedChangesProvider } from ${source("ui/unsavedChangesGuard.tsx")};
   import { MeetingRoomsPage } from ${source("features/office/MeetingRoomsPage.tsx")};
   import { OfficeSuppliesPage } from ${source("features/office/OfficeSuppliesPage.tsx")};
+  import { OaApprovalHubPage } from ${source("features/oa/OaApprovalHubPage.tsx")};
   import { PersonnelPage } from ${source("features/office/PersonnelPage.tsx")};
   import { AccessControlPage } from ${source("features/access-control/AccessControlPage.tsx")};
   import { OrganizationDirectoryPage } from ${source("features/organization/OrganizationDirectoryPage.tsx")};
@@ -36,7 +37,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   const permissions=['office.rooms','office.supplies'].flatMap(resourceKey=>(admin?actions:actions.slice(0,4)).map(action=>({resourceKey,action,dataScope:admin?'company':'own'})));
   const personnelActions=['view','view-details','create','edit','delete','transition','assign'];
   permissions.push(...(admin?personnelActions:['view']).map(action=>({resourceKey:'office.people',action,dataScope:'company'})));
-  const user={id:admin?99:1,username:admin?'admin':'employee',fullName:admin?'行政管理员':'示例员工',companyScope:'DEMO',departmentId:'D1',businessDate:date,businessTimeZone:'Asia/Shanghai',capabilities:{permissions:permissions.filter(p=>!register||!['approve','assign'].includes(p.action)),usesOfficeRegister:register,canManageUsers:admin}};
+  const user={id:admin?99:1,username:admin?'admin':'employee',fullName:admin?'行政管理员':'示例员工',companyScope:'DEMO',departmentId:'D1',businessDate:date,businessTimeZone:'Asia/Shanghai',capabilities:{permissions:permissions.filter(p=>!register||p.action!=='assign'),usesOfficeRegister:register,canManageUsers:admin}};
   const room={id:1,name:'三层第一会议室',location:'办公楼三层东侧',equipment:'投影设备、白板、视频会议终端',capacity:12,maximumBookingHours:8,advanceBookingDays:90,requiresKey:true,isActive:true,inUse:false,versionNumber:1};
   const supply={id:1,name:'会议投影设备',unit:'台',location:'行政办公室',description:'会议及培训临时借用，请按期归还。',isReturnable:true,isActive:true,stockQuantity:12,reservedQuantity:2,availableQuantity:10,minimumStock:3,lowStock:false,versionNumber:2};
   const booking={id:1,meetingRoomId:1,roomName:room.name,location:room.location,requiresKey:true,ownerUserId:1,applicantName:'示例员工',departmentId:'D1',title:'项目周会与交付沟通',attendeeCount:5,startsAt:new Date(now+7200000).toISOString(),endsAt:new Date(now+10800000).toISOString(),status:'Pending',createdAt:new Date(now-600000).toISOString(),versionNumber:1};
@@ -121,7 +122,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   };
   const queries=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
   const initialPath=mode==='organization'?'/system/organization':mode==='permissions'?'/permissions':mode==='directory'||mode==='people'&&!admin?'/office/directory':mode==='people'?'/office/people':mode==='supplies'?'/office/supplies':'/office/meeting-rooms';
-  createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[initialPath]}><QueryClientProvider client={queries}><ConfirmationProvider><UnsavedChangesProvider>
+  createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[mode==='hub'?'/office/approvals':initialPath]}><QueryClientProvider client={queries}><ConfirmationProvider><UnsavedChangesProvider>
     <main className='workspace-content'><h1>公司行政工作台</h1><Routes>
       <Route path='/permissions' element={<AccessControlPage client={client} canManageUsers={true}/>}/>
       <Route path='/office/people' element={<PersonnelPage client={client} user={user}/>}/>
@@ -129,6 +130,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
       <Route path='/office/directory' element={<PersonnelPage key='directory' client={client} user={user} directoryOnly/>}/>
       <Route path='/system/organization' element={<OrganizationDirectoryPage client={client} user={user}/>}/>
       <Route path='/office/supplies' element={<OfficeSuppliesPage client={client} user={user}/>}/>
+      <Route path='/office/approvals' element={<OaApprovalHubPage client={client} user={user}/>}/>
       <Route path='/office/meeting-rooms' element={<MeetingRoomsPage client={client} user={user}/>}/>
     </Routes></main>
   </UnsavedChangesProvider></ConfirmationProvider></QueryClientProvider></MemoryRouter>);
@@ -248,6 +250,14 @@ try {
     await selectEmployee(page);await input(page,'textarea[name="purpose"]',"培训使用");
     await audit(page,`local-supply-${width}`);await clickText(page,"登记领用");await waitFor(page,"window.__officeCalls.some(c=>c.name==='createSupplyRequest')");
     assert.equal((await read(page,"window.__officeCalls.find(c=>c.name==='createSupplyRequest').input.body")).employeeId,1);results.push(`local-supply-submit-${width}`);
+    await clickText(page,"领用与归还记录");await waitFor(page,"document.querySelector('.office-request-card')");
+    assert.equal(await read(page,"document.querySelector('.office-filter select').value"),"");results.push(`local-admin-records-${width}`);
+  }
+  for(const role of ['register','employee']) {
+    await open('hub',390,role);await waitFor(page,"document.querySelectorAll('.office-resource-card li').length===2");
+    await audit(page,`resource-hub-${role}`);await captureScreenshot(page,path.join(output,`resource-hub-${role}.png`));
+    await read(page,"document.querySelector('.office-resource-card li a').click()");await waitFor(page,"document.querySelector('.office-request-card')");
+    assert(await read(page,"window.__officeCalls.some(c=>c.name==='listBookings'&&c.input.requestId===1)"));results.push(`resource-hub-navigation-${role}`);
   }
   await open("people",1024,"register");await clickText(page,"人员档案");await waitFor(page,"document.querySelector('.personnel-facts')");
   assert.equal(await read(page,"[...document.querySelectorAll('button')].some(n=>n.textContent.trim()==='关联账号')"),false);

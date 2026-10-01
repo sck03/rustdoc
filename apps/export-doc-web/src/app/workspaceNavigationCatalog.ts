@@ -64,7 +64,7 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
         isActive: path => path === "/office/notifications", workspace: "office", moduleKey: "office.notifications", requiredPermissions: [{ resourceKey: "office.notifications", action: "view" }] },
       { label: "申请与审批", description: "查看行政和人事申请进度，办理审批与归档", to: "/office/approvals", icon: ClipboardList,
         isActive: (path) => path === "/office/approvals" || path === "/office/approval-settings", workspace: "office", permissionMatch: "any",
-        requiredPermissions: oaKinds.map((kind) => ({ resourceKey: oaModules[kind].resource, action: "view" })) },
+        requiredPermissions: [...oaKinds.map((kind) => oaModules[kind].resource), "office.rooms", "office.supplies"].map(resourceKey => ({ resourceKey, action: "view" })) },
       { label: "工作概览", description: "按业务权限查看单证与销售概况", to: "/dashboard", icon: LayoutDashboard,
         isActive: (path) => isDashboardRoute(path) || path.startsWith("/crm/dashboard"), showSectionNav: true, children: [
       { label: "单证概览", description: "查看业务金额、近期单据与单证进度", keywords: "仪表盘", to: "/dashboard", icon: LayoutDashboard,

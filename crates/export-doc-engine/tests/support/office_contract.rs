@@ -126,6 +126,14 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, employee_id: Optio
         json!({"expectedVersion":issued["versionNumber"],"note":"钥匙已收回"}),
     );
     assert_eq!(completed["status"], "Completed");
+    let mut renamed = room.clone();
+    renamed["name"] = json!(format!("{name}-新名称"));
+    renamed["requiresKey"] = json!(false);
+    renamed["expectedVersion"] = room["versionNumber"].clone();
+    save(admin, UPDATE_MEETING_ROOM, Some(room_id), renamed);
+    let snapshot = page(admin, LIST_MEETING_BOOKINGS, None, &query);
+    assert_eq!(snapshot["items"][0]["roomName"], name);
+    assert_eq!(snapshot["items"][0]["requiresKey"], true);
     let history = page(
         admin,
         GET_MEETING_BOOKING_HISTORY,
@@ -189,7 +197,7 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, employee_id: Optio
         json!({"name":name,"unit":"台","location":"行政柜","description":"可借用设备","isReturnable":true,"isActive":true,"minimumStock":2}),
     );
     let supply_id = supply["id"].as_i64();
-    let stock_request = json!({"operationId":nonce().unwrap(),"quantity":10,"expectedVersion":supply["versionNumber"],"note":"采购入库"});
+    let stock_request = json!({"operationId":format!("Stock-{}", nonce().unwrap()),"quantity":10,"expectedVersion":supply["versionNumber"],"note":"采购入库"});
     let movement = save(
         admin,
         RESTOCK_OFFICE_SUPPLY,
@@ -246,6 +254,29 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, employee_id: Optio
         save(applicant, CREATE_OFFICE_SUPPLY_REQUEST, None, request)["id"],
         application["id"]
     );
+    let stock = page(
+        admin,
+        LIST_OFFICE_SUPPLIES,
+        None,
+        &[("keyword", name.clone())],
+    )["items"][0]
+        .clone();
+    assert_eq!(
+        stock["versionNumber"],
+        if employee_id.is_none() { 2 } else { 3 },
+        "pending requests must not change inventory version"
+    );
+    for (field, changed) in [("unit", json!("箱")), ("isReturnable", json!(false))] {
+        let mut update = stock.clone();
+        update["expectedVersion"] = stock["versionNumber"].clone();
+        update[field] = changed;
+        assert_eq!(
+            admin(UPDATE_OFFICE_SUPPLY, supply_id, &[], Some(update))
+                .unwrap_err()
+                .status,
+            Some(409)
+        );
+    }
     if employee_id.is_none() {
         application = save(
             admin,
@@ -303,8 +334,17 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, employee_id: Optio
     )["items"][0]
         .clone();
     supply["isActive"] = json!(false);
+    supply["name"] = json!(format!("{name}-新名称"));
     supply["expectedVersion"] = supply["versionNumber"].clone();
     save(admin, UPDATE_OFFICE_SUPPLY, supply_id, supply);
+    let snapshot = page(
+        admin,
+        LIST_OFFICE_SUPPLY_REQUESTS,
+        None,
+        &[("requestId", issued["id"].to_string())],
+    );
+    assert_eq!(snapshot["items"][0]["supplyName"], name);
+    assert_eq!(snapshot["items"][0]["isReturnable"], true);
     assert_eq!(
         page(
             admin,

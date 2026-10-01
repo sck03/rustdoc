@@ -72,7 +72,7 @@ export function officeRequestActions(row: OfficeRequestRow, user: ApiUserDto, ki
 
 export function officeStatus(row: OfficeRequestRow, businessDate: string, now = Date.now()) {
   if (isMeetingBooking(row)) {
-    if (row.status === "InUse" && Date.parse(row.endsAt) <= now) return "超时未归还";
+    if (row.status === "InUse" && Date.parse(row.endsAt) <= now) return row.requiresKey ? "超时未归还" : "超时未结束";
     if (["Pending", "Approved"].includes(row.status) && Date.parse(row.endsAt) <= now) return "已过期（未使用）";
     if (row.status === "Approved") return row.requiresKey ? "待领钥匙" : "待使用";
   } else if (row.status === "Issued" && row.isReturnable) {

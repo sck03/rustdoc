@@ -119,11 +119,9 @@ fn stock(
     } else {
         "Restock"
     };
-    if let Some(existing) = store::all(tx, "stock-movements")?
-        .into_iter()
-        .find(|row| row["operationId"] == operation_id)
-    {
-        if existing["officeSupplyId"] != id
+    if let Some(existing) = tx.find_identity("stock-movements", &store::normalize(&operation_id))? {
+        if existing["operationId"] != operation_id
+            || existing["officeSupplyId"] != id
             || existing["ownerUserId"] != actor.id
             || existing["kind"] != kind
             || existing["requestedQuantity"] != quantity
@@ -279,11 +277,13 @@ fn supply(
         }
         _ => return Err(conflict("当前领用状态不能执行此操作。")),
     }
-    supply_totals(&mut supply);
-    let identity = Some(text(&supply, "name"));
-    store::save(
-        tx, "supplies", supply_id, supply, identity, actor, operation,
-    )?;
+    if supply["stockQuantity"] != stock || supply["reservedQuantity"] != reserved {
+        supply_totals(&mut supply);
+        let identity = Some(text(&supply, "name"));
+        store::save(
+            tx, "supplies", supply_id, supply, identity, actor, operation,
+        )?;
+    }
     if delta != 0 {
         let kind = if delta > 0 { "Return" } else { "Issue" };
         store::save(

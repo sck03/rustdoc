@@ -39,6 +39,8 @@ const oaManager = { ...oaUser, capabilities: { permissions: oaUser.capabilities.
 assert(!oa.oaActions({ ...row, kind:"leave", ownerUserId:user.id }, oaManager).includes("approve"), "team self-approval remains unavailable");
 assert.equal(oa.oaActionLabel("complete","expense",false), "财务接收", "expense completion records handoff without implying payment");
 assert.equal(office.officeStatus({ ...row, status: "InUse" }, user.businessDate, Date.parse(row.endsAt)), "超时未归还");
+assert.equal(office.officeStatus({ ...row, status: "InUse", requiresKey:false }, user.businessDate, Date.parse(row.endsAt)), "超时未结束");
+assert(isRouteAccessAllowed({ pathname:"/office/approvals", user, canManageSystem:false, isDesktopRuntime:false }), "resource-only users can reach the shared request hub");
 assert.equal(office.officeStatus({ status: "Issued", isReturnable: true, returnDueDate: "2026-09-06", quantity: 2, returnedQuantity: 1 }, user.businessDate), "逾期未归还");
 assert.equal(office.officeStatus({ status: "Issued", isReturnable: true, returnDueDate: "2026-09-08", quantity: 2, returnedQuantity: 1 }, user.businessDate), "部分归还");
 assert.deepEqual(office.officeDayRange("2026-09-08", "Asia/Shanghai"), { from: "2026-09-07T16:00:00.000Z", to: "2026-09-08T16:00:00.000Z" });

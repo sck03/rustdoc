@@ -232,6 +232,17 @@ pub fn validate(
             required(value, "name", "物品名称", 120)?;
             required(value, "unit", "计量单位", 20)?;
             integer(value, "minimumStock", 0, 1_000_000, "最低库存")?;
+            if id > 0
+                && (value["unit"] != previous["unit"]
+                    || value["isReturnable"] != previous["isReturnable"])
+                && store::all(connection, "supply-requests")?
+                    .iter()
+                    .any(|request| request["officeSupplyId"] == id)
+            {
+                return Err(conflict(
+                    "已有领用记录，不能更改计量单位或归还类型，请另建物品。",
+                ));
+            }
             for key in ["stockQuantity", "reservedQuantity"] {
                 value[key] = if id == 0 {
                     json!(0)
@@ -293,17 +304,14 @@ pub fn validate(
             value["isReturnable"] = supply["isReturnable"].clone();
             value["status"] = json!(if registered { "Approved" } else { "Pending" });
             value["returnedQuantity"] = json!(0);
-            supply["reservedQuantity"] = json!(reserved + delta);
-            supply_totals(&mut supply);
-            store::save(
-                connection,
-                "supplies",
-                supply_id,
-                supply.clone(),
-                Some(text(&supply, "name")),
-                actor,
-                "reserve",
-            )?;
+            if delta != 0 {
+                supply["reservedQuantity"] = json!(reserved + delta);
+                supply_totals(&mut supply);
+                let identity = Some(text(&supply, "name"));
+                store::save(
+                    connection, "supplies", supply_id, supply, identity, actor, "reserve",
+                )?;
+            }
         }
         _ => {}
     }

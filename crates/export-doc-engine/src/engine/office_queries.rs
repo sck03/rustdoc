@@ -135,7 +135,7 @@ pub fn list(store: &Store, actor: &Actor, kind: &str, query: &[(&str, String)]) 
                     && identifiers.iter().all(|(field, id)| row[*field] == *id)
             });
             let mut filtered = vec![];
-            for mut row in rows {
+            for row in rows {
                 let (start, end) = if kind == "bookings" {
                     ("startsAt", "endsAt")
                 } else {
@@ -151,37 +151,6 @@ pub fn list(store: &Store, actor: &Actor, kind: &str, query: &[(&str, String)]) 
                     || to.zip(start).is_some_and(|(to, start)| start >= to)
                 {
                     continue;
-                }
-                let (parent_kind, parent_id, fields) = if kind == "bookings" {
-                    (
-                        "rooms",
-                        "meetingRoomId",
-                        &[
-                            ("roomName", "name"),
-                            ("location", "location"),
-                            ("requiresKey", "requiresKey"),
-                        ][..],
-                    )
-                } else {
-                    (
-                        "supplies",
-                        "officeSupplyId",
-                        &[
-                            ("supplyName", "name"),
-                            ("unit", "unit"),
-                            ("isReturnable", "isReturnable"),
-                        ][..],
-                    )
-                };
-                let parent = store::get(
-                    tx,
-                    parent_kind,
-                    row[parent_id]
-                        .as_i64()
-                        .ok_or_else(|| super::error::unavailable("行政记录关联编号损坏。"))?,
-                )?;
-                for (target, source) in fields {
-                    row[*target] = parent[*source].clone();
                 }
                 filtered.push(row);
             }
