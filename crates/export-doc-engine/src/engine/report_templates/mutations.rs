@@ -32,6 +32,7 @@ fn unique(tx: &Connection, value: &Value) -> Result<()> {
         keyword: &name,
         exact_name: true,
         status: "",
+        usable_only: false,
         offset: 0,
         limit: 2,
     })?;
@@ -58,6 +59,7 @@ fn persist(
     value: Value,
     action: &str,
 ) -> Result<Value> {
+    policy::protect_default(tx, actor, &value)?;
     unique(tx, &value)?;
     report_assets::validate_template(tx, actor, &text(&value, "contentHtml"), Some(paths))?;
     let saved = store::save(tx, KIND, id, value, None, actor, action)?;
@@ -105,7 +107,10 @@ pub(super) fn save(
     } else {
         None
     };
-    store.transaction(|tx| {
+    store.transaction_as(actor, |tx, actor| {
+        auth::authorize(actor, PERMISSION, permission)?;
+        demand_type(actor, kind)?;
+        if operation == CLONE_USER_REPORT_TEMPLATE { auth::authorize(actor, PERMISSION, "view")?; }
         let content = if operation == CLONE_USER_REPORT_TEMPLATE {
             let path = text(body, "sourceTemplatePath");
             if let Some(source_id) = path.strip_prefix("user-template:").and_then(|id| id.parse::<i64>().ok()).filter(|id| *id > 0) {
@@ -125,7 +130,8 @@ pub(super) fn save(
         validate_content(kind, &content)?;
         let mut value = if id > 0 {
             let value = store::get(tx, KIND, id)?;
-            if value["ownerUserId"] != actor.id || !auth::visible(actor, PERMISSION, "design", &value) { return Err(error(403, "只能编辑自己拥有的模板，请先复制为个人草稿。")); }
+            if !policy::can_manage(actor, &value, "design") { return Err(error(403, "只能编辑自己拥有的模板，请先复制为个人草稿。")); }
+            policy::demand_private_edit(&value)?;
             if value["reportType"] != kind { return Err(invalid("不能修改报表模板的数据域。")); }
             store::check_version(&value, store::expected(body))?;
             value
@@ -174,10 +180,10 @@ pub(super) fn lifecycle(
         _ => return Err(invalid("未知的模板生命周期操作。")),
     };
     auth::authorize(actor, PERMISSION, permission)?;
-    store.transaction(|tx| {
+    store.transaction_as(actor, |tx, actor| {
         let mut value = store::get(tx, KIND, id)?;
         demand_type(actor, &text(&value, "reportType"))?;
-        if !auth::visible(actor, PERMISSION, permission, &value) {
+        if !policy::can_manage(actor, &value, permission) {
             return Err(error(403, "没有办理此报表模板的权限。"));
         }
         let expected = if operation == ARCHIVE_USER_REPORT_TEMPLATE {
@@ -189,6 +195,7 @@ pub(super) fn lifecycle(
         };
         store::check_version(&value, expected)?;
         if operation == RESTORE_USER_REPORT_TEMPLATE_VERSION {
+            policy::demand_private_edit(&value)?;
             let number: i64 = query(parameters, "versionNumber")
                 .parse()
                 .ok()

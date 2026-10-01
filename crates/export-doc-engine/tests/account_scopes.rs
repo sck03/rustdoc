@@ -1,5 +1,7 @@
 #[path = "support/account_scope.rs"]
 mod account_scope;
+#[path = "support/template_contract.rs"]
+mod template_contract;
 use export_doc_engine::{
     engine::NativeService,
     generated_api::LOGIN,
@@ -33,6 +35,7 @@ fn sqlite_accounts_preserve_organization_and_revoke_changed_scope() {
     )
     .unwrap();
     account_scope::exercise(&service, login["accessToken"].as_str().unwrap());
+    template_contract::exercise(&service, login["accessToken"].as_str().unwrap());
     service.close().unwrap();
     drop(service);
     assert!(root.starts_with(&parent) && root != parent);

@@ -1,5 +1,6 @@
 //! Template ownership, publication, sharing and version queries.
 mod mutations;
+pub(crate) mod policy;
 pub(super) mod queries;
 pub(super) mod starter;
 use super::{
@@ -106,13 +107,14 @@ pub fn stored_content(kind: &str, content: &str) -> Result<Vec<u8>> {
         .map_err(|message| invalid(format!("模板容器编码失败:{message}")))
 }
 
-fn record(actor: &Actor, value: &Value, content: bool) -> Value {
+fn record(actor: &Actor, value: &Value, content: bool, settings: &Value) -> Value {
     let state = text(value, "status");
-    let allowed = |action| auth::visible(actor, PERMISSION, action, value);
+    let protected = policy::is_global_reference(settings, value);
+    let allowed = |action| !protected && policy::can_manage(actor, value, action);
     let mut output = json!({
         "id":value["id"],"reportType":value["reportType"],"name":value["name"],"status":value["status"],
         "shareScope":value["shareScope"],"versionNumber":value["versionNumber"],"ownerUserId":value["ownerUserId"],
-        "canEdit":state!="Archived"&&value["ownerUserId"]==actor.id&&allowed("design"),
+        "canEdit":state!="Archived"&&value["shareScope"]=="Private"&&allowed("design"),
         "canPublish":state=="Draft"&&allowed("publish"),
         "canShare":(["Published","Disabled"].contains(&state.as_str())&&allowed("share")),
         "canDisable":state=="Published"&&allowed("deactivate"),
@@ -151,7 +153,12 @@ pub fn handle(
         }
         let value = store.get(KIND, id)?;
         visible(actor, &value)?;
-        return Ok(record(actor, &value, true));
+        return Ok(record(
+            actor,
+            &value,
+            true,
+            &store.settings("settings")?.unwrap_or_default(),
+        ));
     }
     let _access = super::report_template_files::storage_lock(&service.paths)?;
     let saved = if [
@@ -165,5 +172,10 @@ pub fn handle(
     } else {
         mutations::lifecycle(service, actor, operation, parameters, query_values, body)?
     };
-    Ok(record(actor, &saved, true))
+    Ok(record(
+        actor,
+        &saved,
+        true,
+        &store.settings("settings")?.unwrap_or_default(),
+    ))
 }

@@ -35,6 +35,20 @@ mod tests {
     fn preserves_every_reference_schema_endpoint_and_security_contract() {
         let baseline: Value = serde_json::from_str(include_str!("reference_openapi.json")).unwrap();
         let mut current = document();
+        for methods in current["paths"].as_object_mut().unwrap().values_mut() {
+            for operation in methods.as_object_mut().unwrap().values_mut() {
+                if reports::MANAGED_FILES.contains(&operation["operationId"].as_str().unwrap_or(""))
+                {
+                    let requirements = operation["x-exportdoc-policy"]["requirements"]
+                        .as_array_mut()
+                        .unwrap();
+                    assert_eq!(
+                        requirements.pop().unwrap(),
+                        serde_json::json!({"resourceKey":"system.settings","action":"manage"})
+                    );
+                }
+            }
+        }
         current["components"]["schemas"]["PersonnelRecord"]["properties"]
             .as_object_mut()
             .unwrap()

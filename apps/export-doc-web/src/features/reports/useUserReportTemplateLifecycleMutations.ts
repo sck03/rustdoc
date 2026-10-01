@@ -43,6 +43,7 @@ export function useUserReportTemplateLifecycleMutations({
   async function invalidateTemplateQueries(saved?: ApiUserReportTemplateDto) {
     if (saved) queryClient.setQueryData(queryKeys.userReportTemplateContent(reportType, saved.id), saved);
     await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
     if (saved) {
       await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplateVersions(saved.id) });
     }

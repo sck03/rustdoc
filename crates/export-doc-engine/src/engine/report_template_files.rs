@@ -56,6 +56,17 @@ const FILE_POLICY: &str = "单个 .dtpl 模板文件通过用户显式路径导�
 const CHECK_POLICY: &str =
     "程序根 Templates/ 仅保存随程序发布的只读内置模板；可写性检查只创建短生命周期探针并立即删除。";
 
+fn managed_write<T>(
+    service: &NativeService,
+    actor: &Actor,
+    write: impl FnOnce(&Connection, &Actor) -> Result<T>,
+) -> Result<T> {
+    service.store.transaction_as(actor, |tx, actor| {
+        auth::authorize(actor, "system.settings", "manage")?;
+        write(tx, actor)
+    })
+}
+
 pub const OPERATIONS: &[Operation] = &[
     CHECK_REPORT_TEMPLATE_STORAGE,
     CREATE_REPORT_TEMPLATE,
@@ -144,6 +155,11 @@ pub(super) fn template_revision(content: &[u8], display: &str) -> String {
     catalog::revision(content, display)
 }
 
+pub(super) fn validate_settings_path(paths: &RuntimePaths, stored: &str) -> Result<()> {
+    let path = to_absolute(paths, stored)?;
+    validate_existing(&path)
+}
+
 pub fn handle(
     service: &NativeService,
     actor: &Actor,
@@ -152,6 +168,14 @@ pub fn handle(
     query: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
+    if ![
+        SAVE_REPORT_TEMPLATE_FILE_TO_PATH,
+        SAVE_REPORT_TEMPLATE_PACKAGE_TO_PATH,
+    ]
+    .contains(&operation)
+    {
+        auth::authorize(actor, "system.settings", "manage")?;
+    }
     match operation {
         CHECK_REPORT_TEMPLATE_STORAGE => storage_check(service, actor),
         CREATE_REPORT_TEMPLATE => {
@@ -282,7 +306,7 @@ fn create_template(
         let stored_content = report_templates::stored_content(kind, &content)?;
         files.capture(&path)?;
         files.capture(&user_root(&service.paths).join(CATALOG_FILE))?;
-        service.store.transaction(|tx| {
+        managed_write(service, actor, |tx, actor| {
             report_assets::validate_template(tx, actor, &content, Some(&service.paths))?;
             fs::create_dir_all(path.parent().unwrap_or(&path))?;
             paths::atomic_write(&path, &stored_content).map_err(unavailable)?;
@@ -320,7 +344,7 @@ pub(super) fn replace_template_content(
 ) -> Result<Value> {
     let mut files = FileTransaction::new(&service.paths)?;
     files.execute(|files| {
-        service.store.transaction(|tx| {
+        managed_write(service, actor, |tx, actor| {
             let mut resolved = resolve_editable(service, kind, stored, false)?;
             validate_revision(&resolved.path, &resolved.display, expected_revision)?;
             report_assets::validate_template(tx, actor, content, Some(&service.paths))?;
@@ -358,13 +382,13 @@ pub(super) fn replace_template_content(
 
 fn rename_template(
     service: &NativeService,
-    _actor: &Actor,
+    actor: &Actor,
     kind: &str,
     body: &Value,
 ) -> Result<Value> {
     let mut files = FileTransaction::new(&service.paths)?;
     files.execute(|files| {
-        service.store.transaction(|tx| {
+        managed_write(service, actor, |tx, _actor| {
             let current = resolve_editable(service, kind, &text(body, "templatePath"), true)?;
             validate_revision(
                 &current.path,
@@ -405,6 +429,18 @@ fn rename_template(
                         defaults[key] = json!(stored);
                     }
                 }
+                for pointer in ["/batchExport/items", "/paymentTemplates"] {
+                    for item in settings
+                        .pointer_mut(pointer)
+                        .and_then(Value::as_array_mut)
+                        .into_iter()
+                        .flatten()
+                    {
+                        if item["templatePath"].as_str() == Some(&old_stored) {
+                            item["templatePath"] = json!(stored);
+                        }
+                    }
+                }
             })?;
             let content = fs::read(&target)?;
             content_dto(kind, &stored, &current.display, current.with_seal, &content)
@@ -414,30 +450,32 @@ fn rename_template(
 
 fn update_display_name(
     service: &NativeService,
-    _actor: &Actor,
+    actor: &Actor,
     kind: &str,
     body: &Value,
 ) -> Result<Value> {
     let mut files = FileTransaction::new(&service.paths)?;
     files.execute(|files| {
-        let resolved = resolve_editable(service, kind, &text(body, "templatePath"), true)?;
-        validate_revision(
-            &resolved.path,
-            &resolved.display,
-            &text(body, "expectedRevision"),
-        )?;
-        let stored = to_stored(&service.paths, &resolved.path)?;
-        let display = display_name(&text(body, "displayName"), &resolved.path);
-        files.capture(&user_root(&service.paths).join(CATALOG_FILE))?;
-        upsert_catalog_row(&service.paths, kind, &stored, &display, resolved.with_seal)?;
-        let content = fs::read(&resolved.path)?;
-        content_dto(kind, &stored, &display, resolved.with_seal, &content)
+        managed_write(service, actor, |_tx, _actor| {
+            let resolved = resolve_editable(service, kind, &text(body, "templatePath"), true)?;
+            validate_revision(
+                &resolved.path,
+                &resolved.display,
+                &text(body, "expectedRevision"),
+            )?;
+            let stored = to_stored(&service.paths, &resolved.path)?;
+            let display = display_name(&text(body, "displayName"), &resolved.path);
+            files.capture(&user_root(&service.paths).join(CATALOG_FILE))?;
+            upsert_catalog_row(&service.paths, kind, &stored, &display, resolved.with_seal)?;
+            let content = fs::read(&resolved.path)?;
+            content_dto(kind, &stored, &display, resolved.with_seal, &content)
+        })
     })
 }
 
 fn delete_template(
     service: &NativeService,
-    _actor: &Actor,
+    actor: &Actor,
     kind: &str,
     parameters: &[(&str, String)],
     query: &[(&str, String)],
@@ -459,18 +497,22 @@ fn delete_template(
         let stored = to_stored(&service.paths, &resolved.path)?;
         files.capture(&resolved.path)?;
         files.capture(&user_root(&service.paths).join(CATALOG_FILE))?;
-        service.store.transaction(|tx| {
+        managed_write(service, actor, |tx, _actor| {
+            if let Some(settings) = tx.settings("settings")? {
+                let referenced = super::report_templates::policy::global_references(&settings)
+                    .iter()
+                    .any(|(_, path)| *path == stored);
+                if referenced {
+                    return Err(conflict(
+                        "请先在全局默认及输出默认值中移除此模板引用，再删除文件。",
+                    ));
+                }
+            }
             fs::remove_file(&resolved.path)?;
             let mut rows = catalog_rows(&service.paths)?;
             rows.retain(|row| text(row, "fileName") != stored);
             save_catalog(&service.paths, &rows)?;
-            update_settings(tx, |settings| {
-                let defaults = &mut settings["reportTemplateDefaults"];
-                let key = default_key(kind);
-                if defaults[key].as_str() == Some(&stored) {
-                    defaults[key] = json!("");
-                }
-            })
+            Ok(())
         })?;
         Ok(json!({"success":true,"message":"模板已删除。"}))
     })
@@ -483,35 +525,24 @@ fn set_default_template(
     body: &Value,
 ) -> Result<Value> {
     let _access = storage_lock(&service.paths)?;
-    let path = text(body, "templatePath");
-    let (stored, label) = if let Some(id) = path.trim().strip_prefix(USER_TEMPLATE_PREFIX) {
-        let id = id
-            .parse::<i64>()
-            .ok()
-            .filter(|id| *id > 0)
-            .ok_or_else(|| invalid("模板编号无效。"))?;
-        let template = service.store.get("report-templates", id)?;
-        if text(&template, "reportType") != kind || template["status"] != "Published" {
-            return Err(error(404, "用户报表模板不存在、已停用或无权访问。"));
-        }
-        if !report_assets::template_visible(actor, &template) {
-            return Err(error(403, "没有读取此报表模板的权限。"));
-        }
-        (
-            format!("{USER_TEMPLATE_PREFIX}{id}"),
-            text(&template, "name"),
-        )
-    } else {
-        let resolved = resolve_editable(service, kind, &path, true)?;
-        (to_stored(&service.paths, &resolved.path)?, resolved.display)
-    };
-    let key = default_key(kind);
-    service.store.transaction(|tx| {
+    managed_write(service, actor, |tx, _actor| {
+        let path = text(body, "templatePath");
+        let (stored, label) =
+            if let Some(template) = report_templates::policy::validate_default(tx, kind, &path)? {
+                (
+                    format!("{USER_TEMPLATE_PREFIX}{}", template["id"]),
+                    text(&template, "name"),
+                )
+            } else {
+                let resolved = resolve_editable(service, kind, &path, true)?;
+                (to_stored(&service.paths, &resolved.path)?, resolved.display)
+            };
+        let key = default_key(kind);
         update_settings(tx, |settings| {
             settings["reportTemplateDefaults"][key] = json!(stored);
-        })
-    })?;
-    Ok(json!({"success":true,"message":format!("已将“{label}”设为默认模板。")}))
+        })?;
+        Ok(json!({"success":true,"message":format!("已将“{label}”设为默认模板。")}))
+    })
 }
 
 fn import_template_file(

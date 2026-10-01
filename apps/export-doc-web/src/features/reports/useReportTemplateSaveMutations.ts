@@ -76,6 +76,7 @@ export function useReportTemplateSaveMutations({
       queryClient.setQueryData(queryKeys.userReportTemplateContent(reportType, saved.id), saved);
       onUserTemplateSaved(saved);
       await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplateVersions(saved.id) });
     },
     onError,

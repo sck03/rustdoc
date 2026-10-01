@@ -68,7 +68,7 @@ export function ReportTemplateUserPanel({
             <strong>创建我的模板</strong>
           </div>
           <TextField label="新模板名称" value={newTemplateName} disabled={isBusy} onChange={onNewTemplateNameChange} />
-          <small>新建和复制都会生成私有草稿；复制内容由服务端从当前模板读取，不接收客户端回传正文。</small>
+          <small>先选择公共模板并填写新名称，再复制为自己的私人模板。保存后即可自己打印、导出，无需发布或共享，不会修改原模板和全局默认。</small>
           <div className="template-management-actions">
             {allowCreateBlank ? (
               <button className="command-button secondary" type="button" disabled={!canCreateBlank} onClick={onCreateBlank}>
@@ -88,7 +88,7 @@ export function ReportTemplateUserPanel({
         {currentTemplate ? (
           <section className="template-management-section template-current-template-section" aria-label="当前用户模板">
             <div className="template-management-section-title">
-              <strong>{currentTemplate.canEdit ? "当前为我的模板" : "当前为他人共享模板"}</strong>
+              <strong>{currentTemplate.canEdit ? "当前模板可编辑" : "当前模板只读"}</strong>
             </div>
             <div className="template-status-chips" aria-label="模板状态">
               <span className={`template-status-chip ${currentTemplate.status === "Published" ? "active" : "inactive"}`}>
@@ -102,9 +102,9 @@ export function ReportTemplateUserPanel({
             <small>
               {currentTemplate.canEdit
                 ? currentTemplate.shareScope !== "Private"
-                  ? "符合共享范围的团队成员可查看和复制，只有你可以修改或删除。"
-                  : "当前内容仅你自己可见；正式输出需要先发布。"
-                : "共享模板只读；复制后可自行修改。"}
+                  ? "团队成员可按共享范围查看和复制；所有者及管理员可维护。全局默认使用中的模板须先更换默认，再修改或停用。"
+                  : "私人模板保存后即可自己打印、导出，无需发布。只有主动发布并设置共享范围，其他成员才能使用。"
+                : "共享或归档模板不可直接编辑；可复制为私人模板。共享原稿需先收回共享，归档原稿需先恢复。"}
             </small>
             {currentTemplate.canPublish || currentTemplate.canShare || currentTemplate.canDisable ||
             currentTemplate.canRestore || currentTemplate.canArchive ? (
@@ -120,7 +120,7 @@ export function ReportTemplateUserPanel({
                 ) : null}
                 {currentTemplate.canPublish ? (
                   <button className="command-button compact-button primary" type="button" disabled={isBusy} onClick={onPublish}>
-                    发布模板
+                    发布（为共享准备）
                   </button>
                 ) : null}
                 {currentTemplate.canDisable ? (
@@ -150,7 +150,7 @@ export function ReportTemplateUserPanel({
 
 function reportTemplateStatusLabel(value?: string) {
   switch (value) {
-    case "Draft": return "草稿";
+    case "Draft": return "已保存（私人）";
     case "Published": return "已发布";
     case "Disabled": return "已停用";
     case "Archived": return "已归档";

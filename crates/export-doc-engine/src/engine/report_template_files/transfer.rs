@@ -95,6 +95,7 @@ pub fn upload(
     file_name: &str,
     content: &[u8],
 ) -> Result<Value> {
+    auth::authorize(actor, "system.settings", "manage")?;
     if operation == UPLOAD_REPORT_TEMPLATE_PACKAGE {
         auth::authorize(actor, PERMISSION, "import")?;
         let package_name = upload_package_name(file_name)?;

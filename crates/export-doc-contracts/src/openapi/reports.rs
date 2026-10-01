@@ -8,7 +8,31 @@ pub(super) const FIELDS: &[(&str, &[&str])] = &[
     ("ApiPaymentReportHtmlPreviewRequest", &["content"]),
 ];
 
+pub(super) const MANAGED_FILES: &[&str] = &[
+    "CheckReportTemplateStorage",
+    "CreateReportTemplate",
+    "DeleteReportTemplate",
+    "RenameReportTemplate",
+    "UpdateReportTemplateDisplayName",
+    "SaveReportTemplateContent",
+    "SetDefaultReportTemplate",
+    "ImportReportTemplateFile",
+    "ImportReportTemplatePackage",
+    "UploadReportTemplateFile",
+    "UploadReportTemplatePackage",
+];
+
 pub(super) fn extend(document: &mut Value) {
+    for methods in document["paths"].as_object_mut().unwrap().values_mut() {
+        for operation in methods.as_object_mut().unwrap().values_mut() {
+            if MANAGED_FILES.contains(&operation["operationId"].as_str().unwrap_or("")) {
+                operation["x-exportdoc-policy"]["requirements"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({"resourceKey":"system.settings","action":"manage"}));
+            }
+        }
+    }
     for (schema, fields) in FIELDS {
         for field in *fields {
             document["components"]["schemas"][schema]["properties"][field] = if *schema

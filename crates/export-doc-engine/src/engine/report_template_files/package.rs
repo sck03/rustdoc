@@ -420,7 +420,7 @@ pub(super) fn import_template_package(
     validate_file_manifest(&manifest, &templates)?;
     let mut files = FileTransaction::new(&service.paths)?;
     files.execute(|files| {
-        service.store.transaction(|tx| {
+        managed_write(service, actor, |tx, actor| {
         for (relative, bytes) in &templates {
             crate::operation::check()?;
             let kind = kind_of_category(relative.split('/').next().unwrap_or(EXPORT_CATEGORY));

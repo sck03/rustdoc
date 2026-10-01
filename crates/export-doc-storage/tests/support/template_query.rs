@@ -97,6 +97,7 @@ pub fn exercise(c: &Connection) {
         keyword: "",
         exact_name: false,
         status: "",
+        usable_only: false,
         offset: 0,
         limit: 2,
     };
@@ -118,6 +119,20 @@ pub fn exercise(c: &Connection) {
     assert!(empty.is_empty());
     q.offset = 0;
     q.limit = 200;
+    q.usable_only = true;
+    let usable = c.query_report_templates(&q).unwrap();
+    assert_eq!(usable.0, 5);
+    assert!(usable.1.iter().any(|row| row["id"] == ids[0]));
+    assert!(
+        usable
+            .1
+            .iter()
+            .all(|row| row["id"] != ids[6] && row["id"] != ids[7] && row["id"] != ids[8])
+    );
+    q.audience.administrator = true;
+    assert_eq!(c.query_report_templates(&q).unwrap().0, 7);
+    q.audience.administrator = false;
+    q.usable_only = false;
     q.audience.shared = false;
     assert_eq!(c.query_report_templates(&q).unwrap().0, 2);
     q.include_archived = true;

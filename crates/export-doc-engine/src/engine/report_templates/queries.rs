@@ -47,11 +47,15 @@ pub(super) fn list(
                 keyword: &keyword,
                 exact_name: false,
                 status: query(values, "status"),
+                usable_only: false,
                 offset,
                 limit: size as i64,
             })?;
+    let settings = service.store.settings("settings")?.unwrap_or_default();
     Ok(crate::contracts::page(
-        rows.iter().map(|v| record(actor, v, false)).collect(),
+        rows.iter()
+            .map(|v| record(actor, v, false, &settings))
+            .collect(),
         total as usize,
         page,
         size,
@@ -83,11 +87,13 @@ pub(super) fn versions(
             .ok_or_else(|| unavailable("模板历史内容损坏。"))?
             .remove("templateId");
         row["userReportTemplateId"] = json!(id);
-        row["canRestore"] = json!(auth::visible(actor, PERMISSION, "restore", &template));
+        row["canRestore"] = json!(
+            template["shareScope"] == "Private" && policy::can_manage(actor, &template, "restore")
+        );
     }
     Ok(crate::contracts::page(rows, total as usize, page, size))
 }
-pub(crate) fn published(store: &store::Store, actor: &Actor, kind: &str) -> Result<Vec<Value>> {
+pub(crate) fn usable(store: &store::Store, actor: &Actor, kind: &str) -> Result<Vec<Value>> {
     demand_type(actor, kind)?;
     let connection = store.connection()?;
     let mut rows = Vec::new();
@@ -99,7 +105,8 @@ pub(crate) fn published(store: &store::Store, actor: &Actor, kind: &str) -> Resu
             include_archived: false,
             keyword: "",
             exact_name: false,
-            status: "Published",
+            status: "",
+            usable_only: true,
             offset: rows.len() as i64,
             limit: 200,
         })?;

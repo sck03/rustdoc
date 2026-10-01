@@ -67,7 +67,7 @@ export function ReportTemplateWorkspacePage({
   canManageSettings: boolean;
   view?: "designer" | "management";
 }) {
-  const canManageTemplates = templateAccess.publish;
+  const canManageTemplates = canManageSettings && templateAccess.publish;
   const canDesignTemplates = templateAccess.design;
   const canCloneTemplates = templateAccess.clone;
   const workspaceDeviceProfile = useWorkspaceDeviceProfile();
@@ -289,7 +289,7 @@ export function ReportTemplateWorkspacePage({
     onUserTemplateSaved: (saved) => {
       loadUser(saved, true);
       setRenameTemplateFileName(saved.name);
-      showFeedback("草稿已保存；发布和共享状态已按草稿规则重置。", "success");
+      showFeedback("私人模板已保存，可直接用于自己的打印和导出，无需发布。", "success");
     },
     onError: (error) => showFeedback(readApiError(error), "error"),
   });
@@ -313,7 +313,7 @@ export function ReportTemplateWorkspacePage({
       loadUser(created, true);
       setRenameTemplateFileName(created.name);
       setNewUserTemplateName("");
-      showFeedback("私有草稿已创建。", "success");
+      showFeedback("私人模板已创建，可继续设计，保存后直接个人使用。", "success");
     },
     onArchived: async () => {
       setSelectedUserTemplateId(0);
@@ -332,7 +332,7 @@ export function ReportTemplateWorkspacePage({
     onStatusUpdated: (saved, action) => {
       loadUser(saved, true);
       const nextMessage = action.kind === "publish"
-        ? "模板已发布，可用于正式输出。"
+        ? "模板已发布，当前仍按原共享范围可见；可另行选择共享范围。"
         : action.kind === "disable"
           ? "模板已停用，不再用于正式输出。"
           : action.kind === "restore"
@@ -499,8 +499,8 @@ export function ReportTemplateWorkspacePage({
     canManageTemplates,
     canDesignTemplates,
     canCloneTemplates,
-    canArchiveTemplates: templateAccess.archive,
-    canImportTemplates: templateAccess.import,
+    canArchiveTemplates: canManageSettings && templateAccess.archive,
+    canImportTemplates: canManageSettings && templateAccess.import,
     canExportTemplates: templateAccess.export,
     canPreviewSavedSource,
     newTemplateFileName,
@@ -707,7 +707,7 @@ export function ReportTemplateWorkspacePage({
       packagePanel={{
         desktopAvailable: packageWorkspace.desktopAvailable,
         canExportTemplates: templateAccess.export,
-        canImportTemplates: templateAccess.import,
+        canImportTemplates: canManageSettings && templateAccess.import,
         isBusy,
         importStrategy: packageWorkspace.importStrategy,
         exportPath: packageWorkspace.exportPath,
@@ -735,7 +735,7 @@ export function ReportTemplateWorkspacePage({
       filePanel={{
         desktopAvailable: fileWorkspace.desktopAvailable,
         canExportTemplates: templateAccess.export,
-        canImportTemplates: templateAccess.import,
+        canImportTemplates: canManageSettings && templateAccess.import,
         isBusy,
         exportPath: fileWorkspace.exportPath,
         importPath: fileWorkspace.importPath,

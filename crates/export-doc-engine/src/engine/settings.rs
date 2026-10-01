@@ -16,13 +16,17 @@ pub(super) fn defaults(provider: &str) -> Result<Value> {
     if !value.is_object() {
         return Err(unavailable("生成的默认设置缺失。"));
     }
+    apply_database_identity(&mut value, provider);
+    Ok(value)
+}
+
+fn apply_database_identity(value: &mut Value, provider: &str) {
     value["system"]["databaseProvider"] = json!(if provider == "SQLite" {
         "Sqlite"
     } else {
         "PostgreSQL"
     });
     value["system"]["sqliteDatabaseFileName"] = json!("exportdoc-native.db");
-    Ok(value)
 }
 fn secrets(value: &Value, allowed: bool) -> Value {
     Value::Object(
@@ -89,10 +93,16 @@ pub fn read(store: &Store, actor: &Actor) -> Result<Value> {
     )
 }
 pub fn current(store: &Store) -> Result<Value> {
-    let mut settings = defaults(store.provider()?)?;
-    if let Some(saved) = store.settings("settings")? {
+    current_in(&*store.connection()?)
+}
+pub(super) fn current_in(tx: &export_doc_storage::Connection) -> Result<Value> {
+    let mut settings = defaults(tx.provider())?;
+    if let Some(saved) = tx.settings("settings")? {
         settings = contracts::overlay(settings, &saved);
     }
+    // These read-only settings describe the already-open database, not a request
+    // to switch it. Old template writes must not override the runtime identity.
+    apply_database_identity(&mut settings, tx.provider());
     Ok(settings)
 }
 fn validate(value: &Value, paths: &RuntimePaths, provider: &str) -> Result<()> {
@@ -149,7 +159,14 @@ fn validate(value: &Value, paths: &RuntimePaths, provider: &str) -> Result<()> {
             Value::String(text) if !text.is_empty() => {
                 let key = key.to_ascii_lowercase();
                 if key.ends_with("path") || key.ends_with("directory") {
-                    if text.starts_with("native:") || text.starts_with("user-template:") {
+                    if text.starts_with("native:")
+                        || text.starts_with("user-template:")
+                        || text.starts_with("builtin:")
+                        || text.starts_with("user:")
+                    {
+                        if text.starts_with("builtin:") || text.starts_with("user:") {
+                            super::report_template_files::validate_settings_path(paths, text)?;
+                        }
                         return Ok(());
                     }
                     let path = Path::new(text);
@@ -207,7 +224,12 @@ pub fn save(
         );
     }
     validation?;
-    store.transaction(|tx|{
+    let _access = super::report_template_files::storage_lock(paths)?;
+    store.transaction_as(actor, |tx, actor|{
+        auth::authorize(actor, "system.settings", "manage")?;
+        for (kind, path) in super::report_templates::policy::global_references(&settings) {
+            super::report_templates::policy::validate_default(tx, kind, path)?;
+        }
         let previous=tx.settings("settings")?;
         let version=previous.as_ref().and_then(|value|value["revision"].as_i64()).unwrap_or(0);
         if settings["revision"].as_i64()!=Some(version){return Err(conflict("系统设置已被修改，请重新加载后核对。当前草稿已保留。"));}

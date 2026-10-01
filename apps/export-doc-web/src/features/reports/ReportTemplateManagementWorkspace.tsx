@@ -41,7 +41,7 @@ export function ReportTemplateManagementWorkspace({
       <ReportTemplateSelectionPanel {...selectionPanel} />
       <div hidden={view !== "catalog"} {...getTaskViewPanelProps("report-management", "catalog")}>
         {userPanel ? <ReportTemplateUserPanel {...userPanel} /> : null}
-        <ReportTemplateAdminPanel {...adminPanel} />
+        {adminPanel.canManageTemplates || adminPanel.isUserTemplate ? <ReportTemplateAdminPanel {...adminPanel} /> : null}
       </div>
       {reportType === "ExportDocument" && <div hidden={view !== "defaults"} {...getTaskViewPanelProps("report-management", "defaults")}><ReportExportDefaultsPanel {...exportDefaultsPanel} /></div>}
       {canTransfer && <div hidden={view !== "transfer"} {...getTaskViewPanelProps("report-management", "transfer")}>

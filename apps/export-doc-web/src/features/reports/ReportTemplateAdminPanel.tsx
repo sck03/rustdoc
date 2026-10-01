@@ -55,7 +55,7 @@ export function ReportTemplateAdminPanel({
         <small>{currentTemplateLabel}</small>
       </summary>
       <div className="template-management-content">
-        <section className="template-management-section" aria-label="新建模板">
+        {canManageTemplates ? <section className="template-management-section" aria-label="新建模板">
           <div className="template-management-section-title"><strong>管理员文件模板</strong></div>
           <TextField
             label="文件名"
@@ -73,7 +73,7 @@ export function ReportTemplateAdminPanel({
             <Plus size={17} aria-hidden="true" />
             <span>新建</span>
           </button>
-        </section>
+        </section> : null}
         <section className="template-management-section template-current-template-section" aria-label="当前模板">
           <div className="template-management-section-title"><strong>当前模板</strong></div>
           <div className="template-management-actions">

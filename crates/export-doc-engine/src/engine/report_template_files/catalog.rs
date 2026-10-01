@@ -131,6 +131,7 @@ pub(super) fn to_absolute(paths: &RuntimePaths, stored: &str) -> Result<PathBuf>
     }
     let relative = normalized.strip_prefix("Templates/").unwrap_or(&normalized);
     let user_candidate = user_root(paths).join(relative);
+    ensure_managed(&user_candidate, &user_root(paths))?;
     if user_candidate.is_file() {
         return Ok(user_candidate);
     }
@@ -301,20 +302,11 @@ pub(super) fn category_of_stored(paths: &RuntimePaths, stored: &str) -> &'static
         .unwrap_or(EXPORT_CATEGORY)
 }
 pub(super) fn settings_of(store: &Store) -> Result<Value> {
-    let mut value = contracts::contract()["configuration"]["defaults"].clone();
-    if let Some(saved) = store.settings("settings")? {
-        value = contracts::overlay(value, &saved);
-    }
-    Ok(value)
+    super::super::settings::current(store)
 }
 pub(super) fn update_settings(tx: &Connection, mutate: impl FnOnce(&mut Value)) -> Result<()> {
-    let previous = tx.settings("settings")?;
-    let version = previous
-        .as_ref()
-        .and_then(|value| value["revision"].as_i64())
-        .unwrap_or(0);
-    let mut value =
-        previous.unwrap_or_else(|| contracts::contract()["configuration"]["defaults"].clone());
+    let mut value = super::super::settings::current_in(tx)?;
+    let version = value["revision"].as_i64().unwrap_or(0);
     for key in ["reportTemplateDefaults", "batchExport"] {
         if value[key].is_null() {
             value[key] = json!({});
@@ -357,61 +349,23 @@ pub(super) struct Resolved {
     pub(super) display: String,
     pub(super) with_seal: Option<bool>,
 }
-pub(super) fn file_name_of_stored(stored: &str) -> &str {
-    stored.rsplit(['/', '\\']).next().unwrap_or("")
-}
 pub(super) fn resolve_editable(
     service: &NativeService,
     kind: &str,
     stored: &str,
     must_exist: bool,
 ) -> Result<Resolved> {
-    let absolute = to_absolute(&service.paths, stored)?;
-    validate_existing(&absolute)?;
-    let resolved_kind = kind_of_category(
-        category_of_path(&absolute).ok_or_else(|| invalid("模板路径不在受管模板分类目录下。"))?,
-    );
-    if resolved_kind != kind {
-        return Err(invalid("模板类型与请求的报表类型不匹配。"));
-    }
-    let user_root = user_root(&service.paths);
-    if !within(&absolute, &user_root) && !within(&absolute, &builtin_root(&service.paths)) {
-        return Err(error(
-            403,
-            "只能读取内置模板，或维护运行数据根 Templates/ 下的用户模板。",
-        ));
-    }
-    if must_exist && !absolute.is_file() {
-        return Err(error(404, "报表模板不存在。"));
-    }
-    let stored = to_stored(&service.paths, &absolute)?;
-    let row = catalog_rows(&service.paths)?
-        .into_iter()
-        .find(|row| {
-            text(row, "fileName") == stored
-                || file_name(&absolute) == file_name_of_stored(&text(row, "fileName"))
-        })
-        .unwrap_or_default();
-    let display = resolved_display(&service.paths, &text(&row, "name"), &absolute);
-    let with_seal = if kind == "PaymentVoucher" {
-        None
-    } else {
-        row["withSeal"].as_bool().or(Some(true))
-    };
-    if within(&absolute, &user_root) {
-        fs::create_dir_all(absolute.parent().unwrap_or(&absolute))?;
-    }
-    Ok(Resolved {
-        path: absolute,
-        display,
-        with_seal,
-    })
+    resolve(&service.paths, kind, stored, must_exist)
 }
 
 /// Resolves a managed template reference without requiring the caller to know
 /// whether it is a `builtin:`, `user:`, absolute or catalog-relative value.
 /// File maintenance and report rendering share this identity function.
 pub(super) fn resolve_template(paths: &RuntimePaths, kind: &str, stored: &str) -> Result<Resolved> {
+    resolve(paths, kind, stored, true)
+}
+
+fn resolve(paths: &RuntimePaths, kind: &str, stored: &str, must_exist: bool) -> Result<Resolved> {
     let absolute = to_absolute(paths, stored)?;
     validate_existing(&absolute)?;
     let category =
@@ -419,7 +373,7 @@ pub(super) fn resolve_template(paths: &RuntimePaths, kind: &str, stored: &str) -
     if kind_of_category(category) != kind {
         return Err(invalid("模板类型与请求的报表类型不匹配。"));
     }
-    if !absolute.is_file() {
+    if must_exist && !absolute.is_file() {
         return Err(error(404, "报表模板不存在。"));
     }
     let stored = to_stored(paths, &absolute)?;

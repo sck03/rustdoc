@@ -20,6 +20,7 @@ pub struct ReportTemplateQuery<'a> {
     pub keyword: &'a str,
     pub exact_name: bool,
     pub status: &'a str,
+    pub usable_only: bool,
     pub offset: i64,
     pub limit: i64,
 }
@@ -63,6 +64,10 @@ pub(super) fn catalog(q: &ReportTemplateQuery<'_>, postgres: bool) -> QuerySql {
         });
     }
     let a = &q.audience;
+    if q.usable_only {
+        let owner = bind(&mut values, a.user_id, postgres);
+        clauses.push(format!("((r.owner_id=CAST({owner} AS BIGINT) AND {} IN ('Draft','Published')) OR ({}='Published' AND {}<>'Private'))", f("status"), f("status"), f("shareScope")));
+    }
     if !a.administrator {
         if !a.can_view {
             clauses.push("1=0".into());

@@ -106,7 +106,7 @@ fn template(
     actor: &Actor,
     reference: &str,
     kind: &str,
-    require_published: bool,
+    for_output: bool,
 ) -> Result<Template> {
     let reference = if reference.is_empty() {
         default_path(kind)
@@ -134,8 +134,10 @@ fn template(
         if !report_assets::template_visible(actor, &saved) {
             return Err(error(403, "没有读取此模板的权限。"));
         }
-        if require_published && saved["status"] != "Published" {
-            return Err(conflict("请先发布报表模板。"));
+        if for_output && !super::report_templates::policy::usable(actor, &saved) {
+            return Err(conflict(
+                "只能使用自己已保存的个人模板或已发布的共享模板；停用和归档模板不可输出。",
+            ));
         }
         let content = text(&saved, "contentHtml");
         let design = validate_content(kind, &content)?;
@@ -165,7 +167,7 @@ fn template(
         });
     }
     Err(unsupported(
-        "此模板尚未提供原生排版。请使用内置模板、受管文件模板或已发布的 V3 模板。",
+        "此模板尚未提供原生排版。请使用内置模板、受管文件模板或已保存的个人及共享模板。",
     ))
 }
 fn catalog(
@@ -177,7 +179,7 @@ fn catalog(
     auth::authorize(actor, "document.report-templates", "view")?;
     let mut rows:Vec<_>=render::BUILTINS.iter().filter(|v|v.report_type()==kind).map(|v|json!({"reportType":kind,"displayName":v.label(),"templatePath":v.path(),"withSealDefault":false})).collect();
     rows.extend(super::report_template_files::catalog_entries(paths, kind)?);
-    for saved in super::report_templates::queries::published(store, actor, kind)? {
+    for saved in super::report_templates::queries::usable(store, actor, kind)? {
         rows.push(json!({"reportType":kind,"displayName":saved["name"],"templatePath":format!("user-template:{}",saved["id"]),"withSealDefault":false}));
     }
     Ok(json!(rows))

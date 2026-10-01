@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "deba84e851fb679dff84d8b55ad8d396ed7d8a8dfbd8ac1c66328b20f212b525",
+  "digest": "5fb506985dc8abc4933312ca99b359babb161c6831a05d82c942c68d76baae28",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -10042,6 +10042,10 @@
           {
             "resourceKey": "document.report-templates",
             "action": "publish"
+          },
+          {
+            "resourceKey": "system.settings",
+            "action": "manage"
           }
         ],
         "permissionBypass": false
@@ -14848,6 +14852,10 @@
           {
             "resourceKey": "document.report-templates",
             "action": "publish"
+          },
+          {
+            "resourceKey": "system.settings",
+            "action": "manage"
           }
         ],
         "permissionBypass": false
@@ -19449,6 +19457,10 @@
           {
             "resourceKey": "document.report-templates",
             "action": "archive"
+          },
+          {
+            "resourceKey": "system.settings",
+            "action": "manage"
           }
         ],
         "permissionBypass": false
@@ -28110,6 +28122,10 @@
           {
             "resourceKey": "document.report-templates",
             "action": "import"
+          },
+          {
+            "resourceKey": "system.settings",
+            "action": "manage"
           }
         ],
         "permissionBypass": false
@@ -28178,6 +28194,10 @@
           {
             "resourceKey": "document.report-templates",
             "action": "import"
+          },
+          {
+            "resourceKey": "system.settings",
+            "action": "manage"
           }
         ],
         "permissionBypass": false
@@ -40586,6 +40606,10 @@
           {
             "resourceKey": "document.report-templates",
             "action": "publish"
+          },
+          {
+            "resourceKey": "system.settings",
+            "action": "manage"
           }
         ],
         "permissionBypass": false
@@ -43626,6 +43650,10 @@
           {
             "resourceKey": "document.report-templates",
             "action": "publish"
+          },
+          {
+            "resourceKey": "system.settings",
+            "action": "manage"
           }
         ],
         "permissionBypass": false
@@ -44482,6 +44510,10 @@
           {
             "resourceKey": "document.report-templates",
             "action": "publish"
+          },
+          {
+            "resourceKey": "system.settings",
+            "action": "manage"
           }
         ],
         "permissionBypass": false
@@ -50733,6 +50765,10 @@
           {
             "resourceKey": "document.report-templates",
             "action": "publish"
+          },
+          {
+            "resourceKey": "system.settings",
+            "action": "manage"
           }
         ],
         "permissionBypass": false
@@ -53669,6 +53705,10 @@
           {
             "resourceKey": "document.report-templates",
             "action": "import"
+          },
+          {
+            "resourceKey": "system.settings",
+            "action": "manage"
           }
         ],
         "permissionBypass": false
@@ -53773,6 +53813,10 @@
           {
             "resourceKey": "document.report-templates",
             "action": "import"
+          },
+          {
+            "resourceKey": "system.settings",
+            "action": "manage"
           }
         ],
         "permissionBypass": false

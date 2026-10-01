@@ -77,7 +77,7 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 日常启动、重复启动及更新统一经过：准备镜像 → 停 API → 等数据库就绪 → 独立维护容器初始化/逐版升级 → 启 API 并检查就绪。构建失败不打断原 API；停止、数据库或维护失败则立即报错，不继续启 API。`initialize`/`restore` 仅在 maintenance profile 显式运行，不能用裸 `docker compose up` 代替公开脚本来执行升级。`-SkipBuild` 复用已构建/已导入镜像，升级至发布镜像时使用本页的 `-Image ... -SkipBuild` 命令。
 
-应用 schema 升级与 PostgreSQL 软件主版本升级是两件事：当前 Rust schema 为 6，从 5 开始事务升级；本次部署调整不改变 schema 或备份格式。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。升级前在界面导出备份/完整迁移包并保存在本机故障之外的位置。
+应用 schema 升级与 PostgreSQL 软件主版本升级是两件事：当前 Rust schema 为 7，从 5 开始按顺序事务升级；模板权限调整不改变 schema 或备份格式。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。升级前在界面导出备份/完整迁移包并保存在本机故障之外的位置。
 
 首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接只供初始化／升级／恢复使用。桌面 SQLite 空库仍为 admin 空密码；当前数据库版本 7，支持从 Rust 版本 5 升级，不兼容 C# v19 或版本 4 及更早试验库。
 

@@ -1,5 +1,33 @@
 use super::*;
 
+#[test]
+fn same_named_builtin_and_user_templates_keep_separate_metadata() {
+    let workspace = Workspace::new();
+    let service = open(&workspace);
+    let created = handle(&service, &admin(), CREATE_REPORT_TEMPLATE, &[], &[],
+        &json!({"reportType":"ExportDocument","templatePath":"user:Export/same.dtpl","displayName":"公共自定义名称"})).unwrap();
+    let builtin = builtin_root(&service.paths).join("Export/same.dtpl");
+    fs::create_dir_all(builtin.parent().unwrap()).unwrap();
+    fs::write(
+        &builtin,
+        report_templates::stored_content("ExportDocument", created["content"].as_str().unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let selected =
+        resolve_editable(&service, "ExportDocument", "builtin:Export/same.dtpl", true).unwrap();
+    let rendered =
+        resolve_template(&service.paths, "ExportDocument", "builtin:Export/same.dtpl").unwrap();
+    assert_eq!(selected.display, rendered.display);
+    assert_ne!(selected.display, "公共自定义名称");
+    assert_eq!(
+        resolve_editable(&service, "ExportDocument", "user:Export/same.dtpl", true)
+            .unwrap()
+            .display,
+        "公共自定义名称"
+    );
+}
+
 fn create(service: &NativeService, name: &str) -> Value {
     handle(
         service,
@@ -10,6 +38,81 @@ fn create(service: &NativeService, name: &str) -> Value {
         &json!({"reportType":"ExportDocument","displayName":name}),
     )
     .unwrap()
+}
+
+#[test]
+fn rename_updates_global_references_and_delete_requires_unlinking() {
+    let workspace = Workspace::new();
+    let service = open(&workspace);
+    let created = create(&service, "被引用模板");
+    service
+        .store
+        .transaction(|tx| {
+            update_settings(tx, |settings| {
+                settings["reportTemplateDefaults"]["exportDocumentTemplatePath"] =
+                    created["templatePath"].clone();
+                settings["batchExport"]["items"] =
+                    json!([{"templatePath":created["templatePath"]}]);
+            })
+        })
+        .unwrap();
+    let renamed = handle(&service, &admin(), RENAME_REPORT_TEMPLATE, &[], &[], &json!({"reportType":"ExportDocument","templatePath":created["templatePath"],"newTemplatePath":"user:Export/renamed.dtpl","expectedRevision":created["revision"]})).unwrap();
+    let settings = settings_of(&service.store).unwrap();
+    assert_eq!(
+        settings["reportTemplateDefaults"]["exportDocumentTemplatePath"],
+        renamed["templatePath"]
+    );
+    assert_eq!(
+        settings["batchExport"]["items"][0]["templatePath"],
+        renamed["templatePath"]
+    );
+    let query = [
+        ("reportType", "ExportDocument".into()),
+        (
+            "templatePath",
+            renamed["templatePath"].as_str().unwrap().into(),
+        ),
+        (
+            "expectedRevision",
+            renamed["revision"].as_str().unwrap().into(),
+        ),
+    ];
+    assert_eq!(
+        handle(
+            &service,
+            &admin(),
+            DELETE_REPORT_TEMPLATE,
+            &[],
+            &query,
+            &json!({})
+        )
+        .unwrap_err()
+        .status,
+        Some(409)
+    );
+    assert!(
+        to_absolute(&service.paths, renamed["templatePath"].as_str().unwrap())
+            .unwrap()
+            .is_file()
+    );
+    service
+        .store
+        .transaction(|tx| {
+            update_settings(tx, |settings| {
+                settings["reportTemplateDefaults"]["exportDocumentTemplatePath"] = json!("");
+                settings["batchExport"]["items"] = json!([]);
+            })
+        })
+        .unwrap();
+    handle(
+        &service,
+        &admin(),
+        DELETE_REPORT_TEMPLATE,
+        &[],
+        &query,
+        &json!({}),
+    )
+    .unwrap();
 }
 
 #[test]

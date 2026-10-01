@@ -210,6 +210,7 @@ export function deriveReportTemplateWorkspaceState({
     canUpdateDisplayName: selectedTemplateContentActive && designerDraftValid && canEditCurrentTemplate && Boolean(currentTemplateDisplayName.trim()) &&
       currentTemplateDisplayName.trim() !== persistedDisplayName,
     canSetDefault: Boolean(selectedTemplatePath) && canManageTemplates && !isBusy &&
+      (!isUserTemplate || (currentUserTemplate?.status === "Published" && currentUserTemplate.shareScope === "All")) &&
       !matchesTemplatePath(selectedTemplatePath, defaultTemplatePath),
   };
 }

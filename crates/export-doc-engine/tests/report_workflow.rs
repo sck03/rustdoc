@@ -14,6 +14,8 @@ use serde_json::{Value, json};
 use std::{fs, io::Cursor, path::PathBuf, sync::atomic::AtomicBool};
 #[path = "support/invoice_preview_contract.rs"]
 mod invoice_preview_contract;
+#[path = "support/private_template_output.rs"]
+mod private_template_output;
 #[path = "support/report_resource_contract.rs"]
 mod resource_contract;
 
@@ -189,6 +191,11 @@ impl Fixture {
                 {"resourceKey":"document.report-resources","action":"upload","dataScope":"own"},
                 {"resourceKey":"document.report-resources","action":"recycle","dataScope":"own"},
                 {"resourceKey":"document.invoices","action":"view","dataScope":"own"},
+                {"resourceKey":"document.invoice-output","action":"preview","dataScope":"own"},
+                {"resourceKey":"document.invoice-output","action":"export-pdf","dataScope":"own"},
+                {"resourceKey":"document.jobs","action":"view","dataScope":"own"},
+                {"resourceKey":"document.jobs","action":"operate","dataScope":"own"},
+                {"resourceKey":"document.jobs","action":"manage","dataScope":"own"},
                 {"resourceKey":"document.invoices","action":"operate","dataScope":"own"}
             ]}),
         );
@@ -392,6 +399,13 @@ fn template_publication_sharing_history_and_concurrency_are_not_generic_record_u
     assert_eq!(visible["totalCount"], 1);
     assert_eq!(visible["items"][0]["canEdit"], false);
     assert_eq!(reader.json::<Value>(SAVE_USER_REPORT_TEMPLATE_DRAFT, &parameters, &[], Some(json!({"reportType":"ExportDocument","name":"夺取草稿","contentHtml":content,"expectedVersion":3}))).unwrap_err().status, Some(403));
+    assert_eq!(fixture.client().json::<Value>(SAVE_USER_REPORT_TEMPLATE_DRAFT, &parameters, &[], Some(json!({"reportType":"ExportDocument","name":"不能隐式撤回共享","contentHtml":content,"expectedVersion":3}))).unwrap_err().status, Some(409));
+    let private = fixture.request(
+        SHARE_USER_REPORT_TEMPLATE,
+        &parameters,
+        &[],
+        Some(json!({"expectedVersion":3,"shareScope":"Private"})),
+    );
     let restored = fixture.request(
         RESTORE_USER_REPORT_TEMPLATE_VERSION,
         &[
@@ -399,9 +413,9 @@ fn template_publication_sharing_history_and_concurrency_are_not_generic_record_u
             ("versionNumber", "1".into()),
         ],
         &[],
-        Some(json!({"expectedVersion":3})),
+        Some(json!({"expectedVersion":private["versionNumber"]})),
     );
-    assert_eq!(restored["versionNumber"], 4);
+    assert_eq!(restored["versionNumber"], 5);
     assert_eq!(restored["status"], "Draft");
     assert_eq!(restored["shareScope"], "Private");
     let hidden: Value = reader
@@ -429,7 +443,7 @@ fn template_publication_sharing_history_and_concurrency_are_not_generic_record_u
     let archived = fixture.request(
         ARCHIVE_USER_REPORT_TEMPLATE,
         &parameters,
-        &[("expectedVersion", "4".into())],
+        &[("expectedVersion", restored["versionNumber"].to_string())],
         None,
     );
     assert_eq!(archived["status"], "Archived");
@@ -437,7 +451,7 @@ fn template_publication_sharing_history_and_concurrency_are_not_generic_record_u
         RESTORE_USER_REPORT_TEMPLATE,
         &parameters,
         &[],
-        Some(json!({"expectedVersion":5})),
+        Some(json!({"expectedVersion":archived["versionNumber"]})),
     );
     assert_eq!(restored["status"], "Draft");
     let fields = fixture.request(

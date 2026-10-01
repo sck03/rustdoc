@@ -69,16 +69,20 @@ export function createReportTemplatePageActions({
   };
   clearFeedback(): void;
 }) {
-  function handleCreateTemplate() {
-    if (canCreateTemplate) createTemplate();
+  async function discardForCreation() {
+    return !hasUnsavedChanges || await requestConfirmation({title: "保留还是放弃当前修改", description: "当前模板有未保存修改，继续会放弃这些修改。", details: ["复制使用服务器上已保存的模板内容。需要保留当前修改时，请取消并先保存。"], confirmLabel: "放弃修改并继续", tone: "danger"});
   }
 
-  function handleCreateBlankUserTemplate() {
-    if (canCreateBlankUserTemplate) createBlankUserTemplate();
+  async function handleCreateTemplate() {
+    if (canCreateTemplate && await discardForCreation()) createTemplate();
   }
 
-  function handleCloneUserTemplate() {
-    if (canCloneUserTemplate) cloneUserTemplate();
+  async function handleCreateBlankUserTemplate() {
+    if (canCreateBlankUserTemplate && await discardForCreation()) createBlankUserTemplate();
+  }
+
+  async function handleCloneUserTemplate() {
+    if (canCloneUserTemplate && await discardForCreation()) cloneUserTemplate();
   }
 
   async function handleUserTemplateLifecycleAction(action: UserReportTemplateLifecycleAction) {
@@ -93,8 +97,10 @@ export function createReportTemplatePageActions({
     if (await requestConfirmation({
       title: `${label}模板`,
       description: `确定${label}“${currentUserTemplate.name}”吗？`,
-      details: action.kind === "publish"
-        ? ["发布后模板才可用于正式输出；后续内容修改会重新回到私有草稿。"]
+      details: hasUnsavedChanges ? ["当前未保存修改将被放弃；本操作只处理服务器上已保存的版本。请先保存需要保留的修改。"] : action.kind === "publish"
+        ? ["个人使用无需发布。发布后仍须主动选择共享范围；共享后原稿只读，修改请先复制或收回共享。"]
+        : action.kind === "share"
+          ? [action.shareScope === "Private" ? "收回共享后，其他成员不能再使用原模板，已有个人副本不受影响。" : "所选范围内有模板权限的成员可以查看、使用及复制内容。"]
         : action.kind === "restore" && currentUserTemplate.status === "Archived"
           ? ["归档模板恢复后将回到私有草稿状态。"]
           : undefined,
@@ -130,8 +136,8 @@ export function createReportTemplatePageActions({
     if (canUpdateDisplayName) updateDisplayName();
   }
 
-  function handleSetDefaultTemplate() {
-    if (canSetDefault) setDefaultTemplate();
+  async function handleSetDefaultTemplate() {
+    if (canSetDefault && await requestConfirmation({title: "设置全局默认模板", description: "此设置会影响团队默认输出选择，确认使用当前已保存模板吗？", details: ["个人模板无需设为全局默认，可在打印或导出时自行选择。"], confirmLabel: "设为全局默认"})) setDefaultTemplate();
   }
 
   function handleExportSettingsChange(path: string[], value: unknown) {

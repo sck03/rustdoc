@@ -31,6 +31,15 @@ fn queued_writes_refresh_permissions_before_the_transaction() {
         Some(403)
     );
     let called = std::cell::Cell::new(false);
+    for operation in [CREATE_REPORT_TEMPLATE, CREATE_USER_REPORT_TEMPLATE] {
+        let body = json!({"reportType":"ExportDocument","name":"撤权后不得新建","displayName":"撤权后不得新建","contentHtml":""});
+        let result = if operation == CREATE_REPORT_TEMPLATE {
+            report_template_files::handle(&service, &stale, operation, &[], &[], &body)
+        } else {
+            report_templates::handle(&service, &stale, operation, &[], &[], &body)
+        };
+        assert_eq!(result.unwrap_err().status, Some(403));
+    }
     account["expectedVersion"] = account["versionNumber"].clone();
     account["isActive"] = json!(false);
     accounts::save(&service.store, &admin, id, account).unwrap();

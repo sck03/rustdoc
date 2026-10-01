@@ -41,9 +41,9 @@ export function ReportTemplateSelectionPanel({
   const selectedValue = selectedUserTemplateId > 0 ? `user-template:${selectedUserTemplateId}` : selectedTemplatePath;
   const selectedTemplateIsDefault = matchesTemplatePath(selectedValue, defaultTemplatePath);
   const fileTemplates = templates.filter((template) => !template.templatePath.startsWith("user-template:"));
-  const statusLabels: Record<string, string> = { Draft: "草稿", Published: "已发布", Disabled: "已停用", Archived: "已归档" };
+  const statusLabels: Record<string, string> = { Draft: "已保存", Published: "已发布", Disabled: "已停用", Archived: "已归档" };
   const entries = [
-    ...fileTemplates.map((template) => ({ value: template.templatePath, label: `${template.displayName || fileNameFromPath(template.templatePath)} · 文件模板` })),
+    ...fileTemplates.map((template) => ({ value: template.templatePath, label: `${template.displayName || fileNameFromPath(template.templatePath)} · ${template.templatePath.startsWith("builtin:") ? "内置原稿" : "公共文件模板"}` })),
     ...userTemplates.map((template) => ({ value: `user-template:${template.id}`, label: `${template.name} · ${template.shareScope === "Private" ? "个人模板" : "共享模板"} · ${statusLabels[template.status] ?? template.status}` })),
   ].map((item) => ({ ...item, label: `${matchesTemplatePath(item.value, defaultTemplatePath) ? "默认 · " : ""}${item.label}` }));
   const options = entries.filter((item) => item.value === selectedValue || item.label.normalize("NFKC").toLowerCase().includes(search.normalize("NFKC").trim().toLowerCase()));
@@ -75,9 +75,10 @@ export function ReportTemplateSelectionPanel({
           onClick={onSetDefault}
         >
           <CircleCheckBig size={16} aria-hidden="true" />
-          <span>{selectedTemplateIsDefault ? "当前默认" : "设为默认"}</span>
+          <span>{selectedTemplateIsDefault ? "当前全局默认" : "设为全局默认"}</span>
         </button>
       </div>
+      <small>内置原稿只读，公共模板和全局默认由管理员维护。需要自己的样式，请在“我的 / 共享模板”中复制；私人模板保存后即可直接使用。</small>
       {directory.totalPages > 1 ? <div className="template-management-actions" aria-label="用户模板分页">
         <button className="command-button secondary compact-button" type="button" disabled={directory.pageNumber <= 1 || directory.loading} onClick={() => directory.onPageChange(directory.pageNumber - 1)}>上一页</button>
         <small>用户模板 {directory.pageNumber} / {directory.totalPages} 页 · 共 {directory.totalCount} 个</small>

@@ -248,6 +248,11 @@ assertEqual(archiveOnlyWorkspaceState.canUploadPackage, false, "仅归档权限�
 assertEqual(archiveOnlyWorkspaceState.canDownloadPackage, false, "仅归档权限不得串权到模板包导出");
 
 const deniedSavedSourcePreviewState = deriveReportTemplateWorkspaceState(baseWorkspaceStateInput);
+for (const [status, shareScope, expected] of [["Draft", "Private", false], ["Published", "Private", false], ["Published", "Company", false], ["Published", "All", true], ["Disabled", "All", false]]) {
+  const input = { ...baseWorkspaceStateInput, canManageTemplates: true, selectedTemplatePath: "user-template:1", currentUserTemplate: {id: 1, status, shareScope} };
+  assertEqual(deriveReportTemplateWorkspaceState(input).canSetDefault, expected, `${status}/${shareScope} 全局默认选择规则`);
+  assertEqual(deriveReportTemplateWorkspaceState({...input, canManageTemplates: false}).canSetDefault, false, "普通用户不能改全局默认");
+}
 assertEqual(deniedSavedSourcePreviewState.canRenderTemplatePreview, false, "缺少对应单据预览权限时不得预览已保存业务数据");
 const deniedApiSamplePreviewState = deriveReportTemplateWorkspaceState({
   ...baseWorkspaceStateInput,

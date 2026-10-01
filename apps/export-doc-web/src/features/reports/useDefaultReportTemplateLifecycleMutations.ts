@@ -68,6 +68,7 @@ export function useDefaultReportTemplateLifecycleMutations({
       queryClient.setQueryData(queryKeys.reportTemplateContent(reportType, renamed.templatePath), renamed);
       onRenamed(renamed);
       await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
     },
     onError,
   });
@@ -101,6 +102,7 @@ export function useDefaultReportTemplateLifecycleMutations({
     onSuccess: async (result) => {
       onDefaultSet(result.message);
       await queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
     },
     onError,
   });

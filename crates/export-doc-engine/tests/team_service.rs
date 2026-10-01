@@ -13,6 +13,8 @@ mod oa_contract;
 mod office_contract;
 #[path = "support/personnel_contract.rs"]
 mod personnel_contract;
+#[path = "support/template_contract.rs"]
+mod template_contract;
 #[path = "support/tools_contract.rs"]
 mod tools_contract;
 use export_doc_engine::{
@@ -252,6 +254,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     approval_contract::exercise(&service, admin_token);
     communication_contract::exercise(&service, admin_token);
     account_scope::exercise(&service, admin_token);
+    template_contract::exercise(&service, admin_token);
     personnel_contract::exercise(&service, admin_token);
     service.close().unwrap();
     drop(Arc::clone(&service));
