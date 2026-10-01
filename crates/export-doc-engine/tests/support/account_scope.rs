@@ -71,19 +71,35 @@ pub fn exercise(service: &NativeService, admin: &str) {
         accounts.push(user);
         tokens.push(login["accessToken"].as_str().unwrap().to_owned());
     }
+    let options = call(
+        service,
+        &tokens[0],
+        LIST_CUSTOM_OPTIONS,
+        &[("optionType", "PaymentMethod".into())],
+        None,
+    )
+    .unwrap();
+    assert!(
+        options["options"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "电汇")
+    );
     let mut invoice = InvoiceDraft::demo("2026-09-16", &format!("SCOPE-{suffix}"))
         .build()
         .unwrap();
     invoice.company_scope = "DEFAULT".into();
-    let invoice = call(
+    let created = call(
         service,
         &tokens[0],
         CREATE_INVOICE,
         &[],
         Some(json!(invoice)),
     )
-    .unwrap()["invoice"]
-        .clone();
+    .unwrap();
+    assert_eq!(created["isUpdate"], false);
+    let invoice = created["invoice"].clone();
     assert_eq!(invoice["companyScope"], company);
     let parameters = [("id", invoice["id"].to_string())];
     call(service, &tokens[1], GET_INVOICE, &parameters, None).unwrap();
@@ -105,6 +121,16 @@ pub fn exercise(service: &NativeService, admin: &str) {
             .status,
         Some(403)
     );
+    let updated = call(
+        service,
+        &tokens[0],
+        UPDATE_INVOICE,
+        &parameters,
+        Some(invoice.clone()),
+    )
+    .unwrap();
+    assert_eq!(updated["isUpdate"], true);
+    assert_eq!(updated["invoice"]["id"], invoice["id"]);
     let mut changed = accounts[0].clone();
     changed["expectedVersion"] = changed["versionNumber"].clone();
     changed["companyScope"] = json!("DEFAULT");

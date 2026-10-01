@@ -77,7 +77,7 @@ function BaselineApp() {
       productEdition: "Full",
       enabledModules: baselineModules,
       moduleAccess: baselineModules.map((moduleKey) => ({ moduleKey, accessLevel: "manage" })),
-      permissions: baselineNavItems.flatMap((item) => item.requiredPermissions ?? [])
+      permissions: baselineNavItems.flatMap((item) => item.requiredPermissions ?? (item.moduleKey ? [{ resourceKey: item.moduleKey, action: "view" }] : []))
         .map((requirement) => ({ ...requirement, dataScope: "all" })),
     },
   };

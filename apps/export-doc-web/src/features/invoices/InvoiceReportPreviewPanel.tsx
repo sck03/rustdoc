@@ -41,11 +41,11 @@ export function InvoiceReportPreviewPanel({
   defaultToAddress,
   hasUnsavedDraftChanges = false,
 }: Props) {
-  const previewPermission = usePermission(permissionResources.invoiceOutput, permissionActions.preview);
-  const printPermission = usePermission(permissionResources.invoiceOutput, permissionActions.print);
-  const pdfPermission = usePermission(permissionResources.invoiceOutput, permissionActions.exportPdf);
-  const zipPermission = usePermission(permissionResources.invoiceOutput, permissionActions.exportZip);
-  const emailPermission = usePermission(permissionResources.invoiceOutput, permissionActions.sendEmail);
+  const previewPermission = usePermission(permissionResources.invoiceOutput, permissionActions.preview, invoiceId > 0 ? invoiceDraft ?? null : undefined);
+  const printPermission = usePermission(permissionResources.invoiceOutput, permissionActions.print, invoiceId > 0 ? invoiceDraft ?? null : undefined);
+  const pdfPermission = usePermission(permissionResources.invoiceOutput, permissionActions.exportPdf, invoiceId > 0 ? invoiceDraft ?? null : undefined);
+  const zipPermission = usePermission(permissionResources.invoiceOutput, permissionActions.exportZip, invoiceId > 0 ? invoiceDraft ?? null : undefined);
+  const emailPermission = usePermission(permissionResources.invoiceOutput, permissionActions.sendEmail, invoiceId > 0 ? invoiceDraft ?? null : undefined);
   const emailSendPermission = usePermission(permissionResources.emailDelivery, permissionActions.send);
   const templateViewPermission = usePermission(permissionResources.reportTemplates, permissionActions.view);
   const excelPermission = useModulePermission("document.excel");

@@ -55,6 +55,18 @@ fn queued_writes_refresh_permissions_before_the_transaction() {
         Some(403)
     );
     assert!(!called.get());
+    assert_eq!(
+        custom_options::handle(
+            &service.store,
+            &stale,
+            SAVE_CUSTOM_OPTION,
+            &[("optionType", "PaymentMethod".into())],
+            &json!({"value":"撤权后不得写入"})
+        )
+        .unwrap_err()
+        .status,
+        Some(403)
+    );
     service.close().unwrap();
     drop(service);
     std::fs::remove_dir_all(root).unwrap();

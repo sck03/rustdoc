@@ -399,6 +399,17 @@ mod tests {
                 .any(|g| g.resource_key == "sales.customers" && g.action == "edit")
         );
         assert_eq!(module_access(&grants)["sales.crm"], "operate");
+        let grants = effective(&[grant("document.payments", "view", "own")]).unwrap();
+        assert!(allows_operation(
+            &grants,
+            false,
+            crate::generated_api::LIST_CUSTOM_OPTIONS,
+            &[]
+        ));
+        assert!(!grants.contains(&grant("document.payments", "operate", "own")));
+        let grants = effective(&[grant("document.invoices", "manage", "own")]).unwrap();
+        assert!(!grants.contains(&grant("document.invoices", "view", "own")));
+        assert!(!grants.contains(&grant("document.invoices", "operate", "own")));
     }
     #[test]
     fn invalid_actions_and_scopes_are_rejected_and_empty_grants_stay_empty() {

@@ -70,7 +70,7 @@ export function getDefaultWorkspaceRoute(capabilities: WorkspaceCapabilities) {
   if (availableRoutes.has(home)) return home;
   // Full team accounts enter a useful, authorized workspace for their job.
   if (normalizeProductEdition(capabilities.productEdition) === "Full") {
-    const preferred = ["/office/approvals", "/office/announcements", "/office/directory", "/crm/dashboard", "/crm/follow-ups"];
+    const preferred = ["/office/approvals", "/office/announcements", "/office/directory", "/crm/dashboard", "/crm/follow-ups", "/invoices", "/payments", "/reports/templates/manage"];
     return preferred.find(route => availableRoutes.has(route)) ?? [...availableRoutes][0] ?? "/access-denied";
   }
   return "/access-denied";

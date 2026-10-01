@@ -7,6 +7,7 @@ import {
 import { permissionActions, permissionResources } from "./permissionCatalog.ts";
 import { settingsFeatureLinks } from "../features/settings/settingsFeatureLinks.ts";
 import { oaKinds, oaModules, type OaKind } from "../features/oa/oaModel.ts";
+import type { ApiModuleAccessDto } from "../api/index.ts";
 
 export type WorkspacePermissionRequirement = { resourceKey: string; action: string };
 export type WorkspacePermissionGrant = WorkspacePermissionRequirement & { dataScope?: string };
@@ -32,6 +33,7 @@ export type WorkspaceNavItem = {
   search?: string;
 };
 export type WorkspaceCapabilities = {
+  moduleAccess?: ApiModuleAccessDto[];
   canManageSettings?: boolean;
   canManageUsers?: boolean;
   usesOfficeRegister?: boolean;
@@ -64,11 +66,14 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
         isActive: path => path === "/office/notifications", workspace: "office", moduleKey: "office.notifications", requiredPermissions: [{ resourceKey: "office.notifications", action: "view" }] },
       { label: "申请与审批", description: "查看行政和人事申请进度，办理审批与归档", to: "/office/approvals", icon: ClipboardList,
         isActive: (path) => path === "/office/approvals" || path === "/office/approval-settings", workspace: "office", permissionMatch: "any",
-        requiredPermissions: [...oaKinds.map((kind) => oaModules[kind].resource), "office.rooms", "office.supplies"].map(resourceKey => ({ resourceKey, action: "view" })) },
+        requiredPermissions: [...oaKinds.map((kind) => oaModules[kind].resource), "office.rooms", "office.supplies"].map(resourceKey => ({ resourceKey, action: "view" })),
+        searchItems: [{ label: "审批规则与代理", description: "设置申请审批步骤和有期限的审批代理", to: "/office/approval-settings", icon: ShieldCheck,
+          isActive: path => path === "/office/approval-settings", workspace: "office", requiresAdmin: true, requiresSystemAdministration: true }] },
       { label: "工作概览", description: "按业务权限查看单证与销售概况", to: "/dashboard", icon: LayoutDashboard,
         isActive: (path) => isDashboardRoute(path) || path.startsWith("/crm/dashboard"), showSectionNav: true, children: [
       { label: "单证概览", description: "查看业务金额、近期单据与单证进度", keywords: "仪表盘", to: "/dashboard", icon: LayoutDashboard,
-        isActive: isDashboardRoute, workspace: "document", moduleKey: "document.dashboard" },
+        isActive: isDashboardRoute, workspace: "document", moduleKey: "document.dashboard",
+        requiredPermissions: [{ resourceKey: "document.dashboard", action: "view" }, { resourceKey: "document.invoices", action: "view" }] },
       { label: "销售概览", description: "查看客户、商机和近期跟进情况", to: "/crm/dashboard", icon: LayoutDashboard,
         isActive: (path) => path.startsWith("/crm/dashboard"), workspace: "sales", moduleKey: "sales.dashboard",
         requiredPermissions: [

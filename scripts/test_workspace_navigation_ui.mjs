@@ -30,7 +30,7 @@ await require("esbuild").build({ stdin: { resolveDir: web, loader: "tsx", conten
   const workspaces=edition==='Full'?['document','sales','office']:edition==='Sales'?['sales']:['document'];
   const items=getWorkspaceRouteItems().filter(item=>!item.workspace||workspaces.includes(item.workspace));
   const modules=[...new Set(items.flatMap(item=>item.moduleKey?[item.moduleKey]:[]))];
-  const permissions=items.flatMap(item=>item.requiredPermissions||[]).map(item=>({...item,dataScope:'all'}));
+  const permissions=items.flatMap(item=>item.requiredPermissions??(item.moduleKey?['view','operate','manage'].map(action=>({resourceKey:item.moduleKey,action})):[])).map(item=>({...item,dataScope:'all'}));
   permissions.push({resourceKey:'document.invoice-output',action:'export-zip',dataScope:'all'});
   const capabilities={productEdition:edition,canManageSettings:true,canManageUsers:edition==='Full',
     canUseDocumentWorkspace:workspaces.includes('document'),canUseSalesWorkspace:workspaces.includes('sales'),

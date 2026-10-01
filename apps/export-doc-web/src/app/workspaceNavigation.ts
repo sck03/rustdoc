@@ -1,4 +1,5 @@
 import { LayoutDashboard } from "lucide-react";
+import { hasWorkspaceItemAccess, hasWorkspaceItemPermission } from "./workspaceAccess.ts";
 import {
   workspaceNavGroups, type WorkspaceCapabilities, type WorkspaceContext,
   type WorkspaceNavGroupConfig, type WorkspaceNavItem, type WorkspacePermissionGrant,
@@ -14,16 +15,7 @@ export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
   const enabledModules = new Set(capabilities.enabledModules.map(normalizePermissionPart));
   function filter(items: WorkspaceNavItem[]): WorkspaceNavItem[] {
     return items.flatMap((item) => {
-      if (item.requiredFeature && !capabilities.availableFeatures?.includes(item.requiredFeature)) return [];
-      if (item.requiredFeature === "worklist" && !capabilities.canUseDocumentWorkspace && !capabilities.canUseSalesWorkspace) return [];
-      if (item.requiresAdmin && capabilities.canManageSettings !== true) return [];
-      if (item.desktopOnly && capabilities.isDesktopRuntime !== true) return [];
-      if (item.workspace === "office" && capabilities.isDesktopRuntime === true && capabilities.usesOfficeRegister !== true) return [];
-      if (item.requiresSystemAdministration && capabilities.canManageUsers !== true) return [];
-      if (item.workspace === "document" && capabilities.canUseDocumentWorkspace !== true) return [];
-      if (item.workspace === "sales" && capabilities.canUseSalesWorkspace !== true) return [];
-      if (item.moduleKey && !enabledModules.has(normalizePermissionPart(item.moduleKey))) return [];
-      if (!hasWorkspaceNavItemPermission(item, capabilities.permissions)) return [];
+      if (!hasWorkspaceItemAccess(item, capabilities)) return [];
       const children = item.children ? filter(item.children) : undefined;
       if (children && !children.length) return [];
       const searchItems = item.searchItems ? filter(item.searchItems) : undefined;
@@ -69,9 +61,11 @@ export function getWorkspaceRouteItems(groups: WorkspaceNavGroupConfig[] = works
   return groups.flatMap((group) => group.items.flatMap((item) => item.children ?? [item]));
 }
 
-function findWorkspaceNavItem(pathname: string) {
+export function findWorkspaceNavItem(pathname: string) {
   // Containers never grant access: direct routes resolve their own leaf requirement.
-  return getWorkspaceRouteItems().find((item) => item.isActive(pathname));
+  const routes = getWorkspaceRouteItems();
+  return routes.flatMap(item => item.searchItems ?? []).find(item => !item.to.includes("?") && item.isActive(pathname))
+    ?? routes.find((item) => item.isActive(pathname));
 }
 
 export function hasWorkspacePathPermission(pathname: string, permissions: WorkspacePermissionGrant[] | undefined) {
@@ -80,15 +74,7 @@ export function hasWorkspacePathPermission(pathname: string, permissions: Worksp
 }
 
 export function hasWorkspaceNavItemPermission(item: WorkspaceNavItem, permissions: WorkspacePermissionGrant[] | undefined) {
-  if (!item.requiredPermissions?.length) return true;
-  if (!Array.isArray(permissions)) return false;
-  const matches = (requirement: WorkspacePermissionGrant) => permissions.some((grant) =>
-    normalizePermissionPart(grant.resourceKey) === normalizePermissionPart(requirement.resourceKey) &&
-    normalizePermissionPart(grant.action) === normalizePermissionPart(requirement.action) &&
-    isKnownDataScope(grant.dataScope));
-  return item.permissionMatch === "any"
-    ? item.requiredPermissions.some(matches)
-    : item.requiredPermissions.every(matches);
+  return hasWorkspaceItemPermission(item, permissions);
 }
 
 export function findActiveWorkspaceNavGroupKey(pathname: string, groups: WorkspaceNavGroupConfig[] = workspaceNavGroups) {
@@ -135,10 +121,5 @@ export function getRequiredRouteAccessLevel(pathname: string): "view" | "operate
 export function isAdminOnlyRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.requiresAdmin === true; }
 export function isSystemAdministrationRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.requiresSystemAdministration === true; }
 export function isDesktopOnlyRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.desktopOnly === true; }
-export function isOfficeRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.workspace === "office"; }
-export function getRequiredFeature(pathname: string) { return findWorkspaceNavItem(pathname)?.requiredFeature ?? null; }
 
 function normalizePermissionPart(value: unknown) { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
-function isKnownDataScope(value: unknown) {
-  return ["own", "department", "company", "all"].includes(normalizePermissionPart(value));
-}

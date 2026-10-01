@@ -231,6 +231,55 @@ pub fn exercise(service: &NativeService, admin: &str) {
             .any(|m| m == "office.leave")
     );
 
+    // A suspended group keeps its configuration but exposes no effective grants.
+    let mut group = call(
+        service,
+        admin,
+        CREATE_PERMISSION_TEMPLATE,
+        0,
+        Some(json!({
+            "code":format!("suspended-{suffix}"),"name":"停用分组回归","isActive":true,
+            "grants":[read],"disabledModules":[]
+        })),
+    )
+    .unwrap();
+    accounts[2] = update(
+        service,
+        admin,
+        &accounts[2],
+        json!({"permissionTemplateId":group["id"]}),
+    );
+    let active_group_login = login(service, accounts[2]["username"].as_str().unwrap());
+    group["expectedVersion"] = group["versionNumber"].clone();
+    group["isActive"] = json!(false);
+    let inactive = call(
+        service,
+        admin,
+        UPDATE_PERMISSION_TEMPLATE,
+        group["id"].as_i64().unwrap(),
+        Some(group),
+    )
+    .unwrap();
+    assert_eq!(inactive["effectiveGrants"], json!([]));
+    assert_eq!(inactive["grants"], json!([read]));
+    assert_eq!(
+        call(
+            service,
+            token(&active_group_login),
+            GET_CURRENT_USER,
+            0,
+            None
+        )
+        .unwrap_err()
+        .status,
+        Some(401)
+    );
+    let disabled_group_login = login(service, accounts[2]["username"].as_str().unwrap());
+    assert_eq!(
+        disabled_group_login["user"]["capabilities"]["permissions"],
+        json!([])
+    );
+
     // Administrator identity cannot be partly restricted by a selected employee group.
     let promoted = update(
         service,

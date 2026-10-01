@@ -1,16 +1,6 @@
 import type { ApiUserDto } from "../api/index.ts";
-import { hasRouteModulePermission } from "./PermissionAccessContext.tsx";
-import {
-  getRequiredModule,
-  getRequiredFeature,
-  getRequiredRouteAccessLevel,
-  getRequiredWorkspace,
-  hasWorkspacePathPermission,
-  isAdminOnlyRoute,
-  isDesktopOnlyRoute,
-  isOfficeRoute,
-  isSystemAdministrationRoute,
-} from "./workspaceNavigation.ts";
+import { hasWorkspaceItemAccess } from "./workspaceAccess.ts";
+import { findWorkspaceNavItem, getRequiredRouteAccessLevel } from "./workspaceNavigation.ts";
 
 export function isRouteAccessAllowed({
   pathname,
@@ -23,35 +13,6 @@ export function isRouteAccessAllowed({
   canManageSystem: boolean;
   isDesktopRuntime: boolean;
 }) {
-  const workspaceAndModuleAllowed = isWorkspaceModuleAccessAllowed(pathname, user);
-  const adminAllowed = !isAdminOnlyRoute(pathname) || canManageSystem;
-  const runtimeAllowed = (!isDesktopOnlyRoute(pathname) || isDesktopRuntime) &&
-    (!isOfficeRoute(pathname) || !isDesktopRuntime || user.capabilities.usesOfficeRegister);
-  const editionAllowed = !isSystemAdministrationRoute(pathname) || user.capabilities.canManageUsers;
-  const requiredFeature = getRequiredFeature(pathname);
-  const featureAllowed = !requiredFeature || user.capabilities.availableFeatures?.includes(requiredFeature) === true;
-  return workspaceAndModuleAllowed && adminAllowed && runtimeAllowed && editionAllowed && featureAllowed;
-}
-
-export function isWorkspaceModuleAccessAllowed(pathname: string, user: ApiUserDto) {
-  // The root only redirects to the edition's home; it is not a document page.
-  if (pathname === "/") return true;
-  const requiredWorkspace = getRequiredWorkspace(pathname);
-  const workspaceAllowed = requiredWorkspace === "sales"
-    ? user.capabilities.canUseSalesWorkspace
-    : requiredWorkspace === "document"
-      ? user.capabilities.canUseDocumentWorkspace
-      : true;
-  const requiredModule = getRequiredModule(pathname);
-  const moduleAllowed = !requiredModule || hasRouteModulePermission(
-    user.capabilities.moduleAccess,
-    user.capabilities.enabledModules,
-    requiredModule,
-    getRequiredRouteAccessLevel(pathname),
-  );
-  const capabilityAllowed = hasWorkspacePathPermission(
-    pathname,
-    user.capabilities.permissions,
-  );
-  return workspaceAllowed && moduleAllowed && capabilityAllowed;
+  const item = pathname === "/" ? undefined : findWorkspaceNavItem(pathname);
+  return !item || hasWorkspaceItemAccess(item, { ...user.capabilities, canManageSettings: canManageSystem, isDesktopRuntime }, getRequiredRouteAccessLevel(pathname));
 }

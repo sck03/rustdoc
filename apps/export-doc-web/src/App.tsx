@@ -21,7 +21,7 @@ import { useConfirmUnsavedChanges, useHasUnsavedChanges } from "./ui/unsavedChan
 import { WorkspaceShell, type WorkspaceNotice, type WorkspaceSessionAttention } from "./app/WorkspaceShell.tsx";
 import { PermissionAccessProvider } from "./app/PermissionAccessContext.tsx";
 import { AppWorkspaceRoutes } from "./app/AppWorkspaceRoutes.tsx";
-import { isRouteAccessAllowed, isWorkspaceModuleAccessAllowed } from "./app/routeAccess.ts";
+import { isRouteAccessAllowed } from "./app/routeAccess.ts";
 import {
   clearStoredSession,
   readStoredSession,
@@ -31,7 +31,7 @@ import {
 import { isCurrentSession, openSessionChannel, shouldAcceptSessionUpdate, type SessionChannelMessage } from "./app/sessionChannel.ts";
 import { useBusinessDateSessionRefresh } from "./app/useBusinessDateSessionRefresh.ts";
 import { prefetchLandingDashboard } from "./app/loginPrefetch.ts";
-import { isDashboardRoute, isAdminOnlyRoute, isDesktopOnlyRoute, isSystemAdministrationRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
+import { isDashboardRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
 import {
   getDefaultWorkspaceRoute,
   getProductEditionPresentation,
@@ -339,18 +339,21 @@ function App() {
     setSession,
   });
 
+  const routeAccessAllowed = !session || isRouteAccessAllowed({
+    pathname: location.pathname, user: session.user, canManageSystem, isDesktopRuntime,
+  });
   useEffect(() => {
-    if (!session) return;
-    if (!isWorkspaceModuleAccessAllowed(location.pathname, session.user)) {
+    if (!session || desktopContextLoading) return;
+    if (!routeAccessAllowed) {
       setWorkspaceNotice({
         id: "permission",
         tone: "warning",
         title: "当前页面不可用",
-        message: "当前产品版本或权限模板未启用该模块，系统已返回当前账号可以使用的工作区。",
+        message: "当前账号、产品版本或运行模式不允许访问此页面，系统已返回可用的工作区。",
       });
       navigate(getDefaultWorkspaceRoute(session.user.capabilities), { replace: true });
     }
-  }, [location.pathname, navigate, session]);
+  }, [desktopContextLoading, routeAccessAllowed, location.pathname, navigate, session]);
 
   useEffect(() => {
     if (!sessionAccessToken || desktopContextLoading || isLicenseRoute(location.pathname)) {
@@ -531,38 +534,8 @@ function App() {
     navigate("/", { replace: true });
   }, [location.pathname, navigate, session]);
 
-  useEffect(() => {
-    if (!session) {
-      return;
-    }
-
-    const hasAdminAccess = !isAdminOnlyRoute(location.pathname) || canManageSystem;
-    const hasRuntimeAccess = !isDesktopOnlyRoute(location.pathname) || isDesktopRuntime;
-    const hasEditionAccess = !isSystemAdministrationRoute(location.pathname) || canManageAuditLogs;
-    if (hasAdminAccess && hasRuntimeAccess && hasEditionAccess) return;
-
-    const restriction = !hasAdminAccess
-      ? "当前账号没有系统管理权限。"
-      : !hasRuntimeAccess
-        ? "该功能仅在桌面运行模式中提供。"
-        : "当前产品版本未包含该功能。";
-    setWorkspaceNotice({
-      id: "permission",
-      tone: "warning",
-      title: "当前页面不可用",
-      message: `${restriction}系统已返回当前账号可以使用的工作区。`,
-    });
-    navigate(getDefaultWorkspaceRoute(session.user.capabilities), { replace: true });
-  }, [canManageSystem, isDesktopRuntime, canManageAuditLogs, location.pathname, navigate, session]);
-
   const isBusy = loginState === "loading" || desktopContextLoading;
   const loginProduct = getProductEditionPresentation(desktopProductEdition);
-  const routeAccessAllowed = !session || isRouteAccessAllowed({
-    pathname: location.pathname,
-    user: session.user,
-    canManageSystem,
-    isDesktopRuntime,
-  });
   const sessionAttention: WorkspaceSessionAttention | null = sessionAttentionState
     ? {
         state: sessionAttentionState,
@@ -601,6 +574,7 @@ function App() {
 
   return (
     <PermissionAccessProvider
+      subject={session.user}
       grants={session.user.capabilities.moduleAccess}
       permissions={session.user.capabilities.permissions}
       canManageSettings={session.user.capabilities.canManageSettings}

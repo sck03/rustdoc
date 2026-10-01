@@ -31,7 +31,6 @@ export function PaymentEditorPage({
   client: ExportDocManagerApiClient;
   mode: "new" | "edit";
 }) {
-  const paymentPermission = useModulePermission("document.payments");
   const masterDataPermission = useModulePermission("document.master-data");
   const requestConfirmation = useConfirmation();
   const { paymentId } = useParams();
@@ -42,6 +41,7 @@ export function PaymentEditorPage({
   const [payment, setPayment] = useState<ApiPaymentDto | null>(() =>
     mode === "new" ? createEmptyPayment(pageBusinessDate) : null,
   );
+  const paymentPermission = useModulePermission("document.payments", mode === "new" ? undefined : payment);
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(routeSuccessMessage);
   const [concurrencyMessage, setConcurrencyMessage] = useState<string | null>(null);
@@ -352,7 +352,7 @@ export function PaymentEditorPage({
       {message ? <InlineNotice tone="error" title="操作未完成">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {!paymentPermission.canOperate ? (
-        <PermissionNotice>当前模板仅允许查看付款报销，表单修改、保存和删除已禁用。</PermissionNotice>
+        <PermissionNotice>当前账号对这笔付款报销没有编辑权限；表单修改和保存已禁用，删除和输出按各自权限控制。</PermissionNotice>
       ) : null}
 
       {settingsQuery.isError && <InlineNotice tone="warning" title="字段名称未能更新" action={<button className="command-button secondary" type="button" onClick={() => void settingsQuery.refetch()}>重试</button>}>{readApiError(settingsQuery.error)}</InlineNotice>}

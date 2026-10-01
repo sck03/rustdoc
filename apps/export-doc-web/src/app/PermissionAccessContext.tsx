@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { ApiModuleAccessDto, ApiPermissionGrantDto } from "../api/index.ts";
+import { isRecordInPermissionScope, type PermissionRecord, type PermissionSubject } from "./permissionScope.ts";
 
 export type PermissionAccessLevel = "none" | "view" | "operate" | "manage";
 
@@ -7,6 +8,7 @@ type PermissionAccessValue = {
   grants: ReadonlyMap<string, PermissionAccessLevel>;
   permissions: ReadonlyMap<string, string>;
   canManageSettings: boolean;
+  subject?: PermissionSubject;
 };
 
 const PermissionAccessContext = createContext<PermissionAccessValue>({
@@ -19,11 +21,13 @@ export function PermissionAccessProvider({
   grants,
   permissions,
   canManageSettings = false,
+  subject,
   children,
 }: {
   grants?: ApiModuleAccessDto[];
   permissions?: ApiPermissionGrantDto[];
   canManageSettings?: boolean;
+  subject?: PermissionSubject;
   children: ReactNode;
 }) {
   const value = useMemo<PermissionAccessValue>(() => ({
@@ -38,19 +42,20 @@ export function PermissionAccessProvider({
         .map((grant) => [permissionKey(grant.resourceKey, grant.action), normalizeDataScope(grant.dataScope)]),
     ),
     canManageSettings,
-  }), [canManageSettings, grants, permissions]);
+    subject,
+  }), [canManageSettings, grants, permissions, subject]);
 
   return <PermissionAccessContext.Provider value={value}>{children}</PermissionAccessContext.Provider>;
 }
 
-export function usePermission(resourceKey: string, action: string) {
-  const { permissions } = useContext(PermissionAccessContext);
+export function usePermission(resourceKey: string, action: string, record?: PermissionRecord | null) {
+  const { permissions, subject, canManageSettings } = useContext(PermissionAccessContext);
   const dataScope = permissions.get(permissionKey(resourceKey, action)) ?? "";
-  return { allowed: dataScope.length > 0, dataScope };
+  return { allowed: dataScope.length > 0 && (record === undefined || isRecordInPermissionScope(dataScope, subject, record, canManageSettings)), dataScope };
 }
 
 export function hasPermission(
-  grants: ApiPermissionGrantDto[] | undefined,
+  grants: ReadonlyArray<{ resourceKey: string; action: string; dataScope?: string }> | undefined,
   resourceKey: string,
   action: string,
 ) {
@@ -63,14 +68,20 @@ export function usePermissionCapabilities() {
   return useContext(PermissionAccessContext);
 }
 
-export function useModulePermission(moduleKey: string) {
-  const { grants } = useContext(PermissionAccessContext);
+export function useModulePermission(moduleKey: string, record?: PermissionRecord | null) {
+  const { grants, permissions, subject, canManageSettings } = useContext(PermissionAccessContext);
   const accessLevel = grants.get(normalizeModuleKey(moduleKey)) ?? "none";
+  // Reports combine several resources in legacy endpoint metadata. Standard
+  // modules authorize each action independently, even when manage ranks higher.
+  const allows = (action: PermissionAccessLevel) => moduleKey === "document.reports"
+    ? permissionAccessRank(accessLevel) >= permissionAccessRank(action)
+    : Boolean(permissions.get(permissionKey(moduleKey, action))) && (record === undefined ||
+      isRecordInPermissionScope(permissions.get(permissionKey(moduleKey, action)) ?? "", subject, record, canManageSettings));
   return {
     accessLevel,
-    canView: permissionAccessRank(accessLevel) >= permissionAccessRank("view"),
-    canOperate: permissionAccessRank(accessLevel) >= permissionAccessRank("operate"),
-    canManage: permissionAccessRank(accessLevel) >= permissionAccessRank("manage"),
+    canView: allows("view"),
+    canOperate: allows("operate"),
+    canManage: allows("manage"),
   };
 }
 
@@ -91,6 +102,7 @@ export function hasRouteModulePermission(
   moduleKey: string,
   requiredAccessLevel: PermissionAccessLevel = "view",
 ) {
+  if (!enabledModules?.some((item) => normalizeModuleKey(item) === normalizeModuleKey(moduleKey))) return false;
   if (Array.isArray(moduleAccess)) {
     return hasModulePermission(moduleAccess, moduleKey, requiredAccessLevel);
   }

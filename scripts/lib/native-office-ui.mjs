@@ -30,7 +30,7 @@ export async function withOfficeUi(name, run) {
       const op = operations.get(id); assert(op, `Unknown operation ${id}`);
       const route = op.route.replace(/\{([^}]+)\}/gu, (_, key) => encodeURIComponent(parameters[key]));
       const response = await fetch(url + route, { method: op.method.toUpperCase(), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
-      assert.equal(response.status, 200, `${id}: ${await response.clone().text()}`);
+      assert(response.ok, `${id} (${response.status}): ${await response.clone().text()}`);
       return response.json();
     };
     const openPage = async (username, password) => {

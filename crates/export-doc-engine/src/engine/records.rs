@@ -382,6 +382,9 @@ pub fn handle(
         if response.get("id").is_some() {
             response["id"] = value["id"].clone();
         }
+        if response.get("isUpdate").is_some() {
+            response["isUpdate"] = json!(record_id > 0);
+        }
         response[resource.result_field] = value;
         Ok(response)
     }

@@ -142,7 +142,7 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
     }
 
     const result = await usersQuery.refetch();
-    if (selectedUserId && selectedUserId > 0) {
+    if (!result.isError && selectedUserId && selectedUserId > 0) {
       const refreshedUser = result.data?.users.find((user) => user.id === selectedUserId);
       if (refreshedUser) {
         applyUser(refreshedUser);

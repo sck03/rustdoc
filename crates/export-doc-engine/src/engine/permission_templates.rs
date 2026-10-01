@@ -10,8 +10,11 @@ pub fn project(mut value: Value) -> Result<Value> {
     let grants: Vec<Grant> = serde_json::from_value(value["grants"].clone())?;
     let disabled: Vec<String> =
         serde_json::from_value(value.get("disabledModules").cloned().unwrap_or(json!([])))?;
-    value["effectiveGrants"] =
-        json!(permissions::profile::resolve_details(&grants, &disabled).map_err(invalid)?);
+    value["effectiveGrants"] = if value["isActive"] == true {
+        json!(permissions::profile::resolve_details(&grants, &disabled).map_err(invalid)?)
+    } else {
+        json!([])
+    };
     Ok(value)
 }
 

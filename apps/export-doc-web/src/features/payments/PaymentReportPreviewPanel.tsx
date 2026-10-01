@@ -40,9 +40,9 @@ export function PaymentReportPreviewPanel({
   paymentDraft?: ApiPaymentDto;
   hasUnsavedDraftChanges?: boolean;
 }) {
-  const previewPermission = usePermission(permissionResources.paymentOutput, permissionActions.preview);
-  const printPermission = usePermission(permissionResources.paymentOutput, permissionActions.print);
-  const pdfPermission = usePermission(permissionResources.paymentOutput, permissionActions.exportPdf);
+  const previewPermission = usePermission(permissionResources.paymentOutput, permissionActions.preview, paymentId > 0 ? paymentDraft ?? null : undefined);
+  const printPermission = usePermission(permissionResources.paymentOutput, permissionActions.print, paymentId > 0 ? paymentDraft ?? null : undefined);
+  const pdfPermission = usePermission(permissionResources.paymentOutput, permissionActions.exportPdf, paymentId > 0 ? paymentDraft ?? null : undefined);
   const templateViewPermission = usePermission(permissionResources.reportTemplates, permissionActions.view);
   const { canManageSettings } = usePermissionCapabilities();
   const queryClient = useQueryClient();

@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "6c957386b97aa2ba3af404d2e37345a6f48e1a54bb8d9a4e2ffe4c624b80c1cd",
+  "digest": "91dbb82dc497e1a84c060c1e731a1eebf53978eb66186ebb4b0284eb52d24ff7",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -6665,6 +6665,76 @@
           },
           {
             "resourceKey": "document.report-resources",
+            "action": "view"
+          }
+        ]
+      },
+      {
+        "resourceKey": "document.custom-options",
+        "action": "operate",
+        "grants": [
+          {
+            "resourceKey": "document.custom-options",
+            "action": "view"
+          }
+        ]
+      },
+      {
+        "resourceKey": "document.custom-options",
+        "action": "manage",
+        "grants": [
+          {
+            "resourceKey": "document.custom-options",
+            "action": "view"
+          }
+        ]
+      },
+      {
+        "resourceKey": "document.reference-data",
+        "action": "operate",
+        "grants": [
+          {
+            "resourceKey": "document.reference-data",
+            "action": "view"
+          }
+        ]
+      },
+      {
+        "resourceKey": "document.reference-data",
+        "action": "manage",
+        "grants": [
+          {
+            "resourceKey": "document.reference-data",
+            "action": "view"
+          }
+        ]
+      },
+      {
+        "resourceKey": "common.product-reference",
+        "action": "operate",
+        "grants": [
+          {
+            "resourceKey": "common.product-reference",
+            "action": "view"
+          }
+        ]
+      },
+      {
+        "resourceKey": "common.product-reference",
+        "action": "manage",
+        "grants": [
+          {
+            "resourceKey": "common.product-reference",
+            "action": "view"
+          }
+        ]
+      },
+      {
+        "resourceKey": "system.audit",
+        "action": "manage",
+        "grants": [
+          {
+            "resourceKey": "system.audit",
             "action": "view"
           }
         ]

@@ -72,6 +72,6 @@ function Workspace(){const current=useLocation();window.__route=current.pathname
     routeAccessAllowed={isRouteAccessAllowed({pathname:current.pathname,user,canManageSystem:capabilities.canManageSettings,isDesktopRuntime:false})}/>
 </WorkspaceShell>;}
 ${setup}
-createRoot(document.getElementById('root')).render(<HashRouter><QueryClientProvider client={queries}><PermissionAccessProvider grants={capabilities.moduleAccess} permissions={permissions} canManageSettings={capabilities.canManageSettings}><ConfirmationProvider><UnsavedChangesProvider><Workspace/></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider></QueryClientProvider></HashRouter>);
+createRoot(document.getElementById('root')).render(<HashRouter><QueryClientProvider client={queries}><PermissionAccessProvider grants={capabilities.moduleAccess} permissions={permissions} subject={user} canManageSettings={capabilities.canManageSettings}><ConfirmationProvider><UnsavedChangesProvider><Workspace/></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider></QueryClientProvider></HashRouter>);
 `;
 }

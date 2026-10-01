@@ -46,6 +46,10 @@ await withOfficeUi('account-permissions-ui', async ({ output, url, invoke, openP
   await form.getByLabel('模块分类').selectOption('人事管理');
   const people = form.getByRole('region', { name: '人员档案与通讯录', exact: true });
   await people.getByLabel('人员档案与通讯录模块开放', { exact: true }).uncheck();
+  await form.getByLabel('账号权限来源').selectOption('inherit');
+  await form.getByText(/账号额外关闭的模块/u).waitFor();
+  await form.getByLabel('账号权限来源').selectOption('custom');
+  assert.equal(await people.getByLabel('人员档案与通讯录模块开放', { exact: true }).isChecked(), false, 'Switching sources preserves account restrictions');
   await form.getByRole('button', { name: '保存', exact: true }).click();
   await form.getByRole('status').filter({ hasText: '账号已保存' }).waitFor();
   login = await invoke('Login', { username: 'employee-ui', password: 'Employee-UI-2026' });

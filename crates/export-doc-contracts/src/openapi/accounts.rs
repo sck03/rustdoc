@@ -15,6 +15,28 @@ pub(super) const FIELDS: &[(&str, &[&str])] = &[
 ];
 
 pub(super) fn extend(doc: &mut Value) {
+    // Technical lookup helpers are derived, not independently assigned. A
+    // write-capable helper must also be readable by the page using it.
+    let mut dependencies = Vec::new();
+    for resource in doc["x-exportdoc-permissions"]["resources"]
+        .as_array()
+        .unwrap()
+    {
+        let actions = resource["actions"].as_array().unwrap();
+        if resource["isTechnical"] == true && actions.iter().any(|a| a["key"] == "view") {
+            for action in actions
+                .iter()
+                .filter(|a| a["key"] == "operate" || a["key"] == "manage")
+            {
+                dependencies.push(json!({"resourceKey":resource["key"],"action":action["key"],
+                    "grants":[{"resourceKey":resource["key"],"action":"view"}]}));
+            }
+        }
+    }
+    doc["x-exportdoc-permissions"]["dependencies"]
+        .as_array_mut()
+        .unwrap()
+        .extend(dependencies);
     for (schema, fields) in FIELDS {
         for field in *fields {
             doc["components"]["schemas"][schema]["properties"][field] = if *field

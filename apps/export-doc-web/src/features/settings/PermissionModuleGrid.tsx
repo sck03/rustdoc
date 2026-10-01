@@ -36,6 +36,7 @@ export function PermissionModuleGrid({
         </div>
       </div>
       <p className="permission-navigation-note">关闭模块同时隐藏入口并拒绝后台访问，保留勾选配置以便重新开放。同一页面的模块开关同步生效；各项操作独立设置数据范围，筛选不会丢失草稿。</p>
+      <p className="permission-navigation-note">查看、日常操作和管理分别授权，管理不会自动取得编辑权限。使用页面通常还需勾选“查看”，查看范围应覆盖需办理的记录；公司范围的查看不代表可以编辑同事的数据。</p>
       <div className="permission-module-grid">
         {visible.map((resource) => (
           <section className="permission-resource-card" key={resource.key} aria-label={resource.name}>
@@ -74,6 +75,9 @@ export function PermissionModuleGrid({
                 );
               })}
             </div>
+            {!disabledModules.includes(resource.moduleKey) && resource.actions.some(action => action.key === "view") &&
+              !grants[grantKey(resource.key, "view")] && resource.actions.some(action => grants[grantKey(resource.key, action.key)]) &&
+              <p className="field-help">已配置操作但未配置查看，页面或记录可能无法打开。请核对查看权限及其数据范围。</p>}
           </section>
         ))}
       </div>

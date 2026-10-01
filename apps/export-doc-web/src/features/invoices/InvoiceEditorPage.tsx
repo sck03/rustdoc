@@ -63,9 +63,7 @@ export function InvoiceEditorPage({
   mode: "new" | "edit";
   attachmentsEnabled?: boolean;
 }) {
-  const invoicePermission = useModulePermission("document.invoices");
   const masterDataPermission = useModulePermission("document.master-data");
-  const singleWindowPermission = useModulePermission("document.single-window");
   const reportDesignPermission = useModulePermission("document.reports");
   const requestConfirmation = useConfirmation();
   const { invoiceId } = useParams();
@@ -91,6 +89,8 @@ export function InvoiceEditorPage({
   const [invoice, setInvoice] = useState<ApiInvoiceDetailDto | null>(() =>
     mode === "new" ? routeInvoiceDraft ?? createEmptyInvoice(pageBusinessDate) : null,
   );
+  const invoicePermission = useModulePermission("document.invoices", mode === "new" ? undefined : invoice);
+  const singleWindowPermission = useModulePermission("document.single-window", mode === "new" ? undefined : invoice);
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(routeSuccessMessage);
   const [concurrencyMessage, setConcurrencyMessage] = useState<string | null>(null);
@@ -679,7 +679,7 @@ export function InvoiceEditorPage({
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       {!invoicePermission.canOperate ? (
         <PermissionNotice>
-          当前权限模板仅允许查看发票；表头、商品明细、状态、信用证导入和保存操作已禁用。
+          当前账号对这张发票没有编辑权限；表头、商品明细、信用证导入和保存已禁用，其它操作按各自权限开放。
         </PermissionNotice>
       ) : null}
       <WorkspaceDeviceNotice

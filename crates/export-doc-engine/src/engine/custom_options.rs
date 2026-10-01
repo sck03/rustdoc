@@ -1,5 +1,6 @@
 //! Shared candidate values. A choice never reads or rewrites another document.
 use super::{
+    auth,
     error::{Result, invalid},
     records::text,
     store::{self, Actor, Store},
@@ -56,7 +57,8 @@ pub fn handle(
         .iter()
         .find(|(kind, _, _)| kind.eq_ignore_ascii_case(requested))
         .ok_or_else(|| invalid("不支持的自定义选项类型。"))?;
-    store.transaction(|tx| {
+    store.transaction_as(actor, |tx, actor| {
+        auth::authorize(actor, "document.custom-options", if operation == SAVE_CUSTOM_OPTION { "operate" } else { "view" })?;
         let mut entries: Vec<_> = store::all(tx, "custom-options")?.into_iter().filter(|entry| entry["optionType"] == *kind).collect();
         if operation == SAVE_CUSTOM_OPTION {
             if !custom { return Err(invalid("此类型只允许使用固定内置候选值。")); }

@@ -81528,6 +81528,76 @@
             "action": "view"
           }
         ]
+      },
+      {
+        "resourceKey": "document.custom-options",
+        "action": "operate",
+        "grants": [
+          {
+            "resourceKey": "document.custom-options",
+            "action": "view"
+          }
+        ]
+      },
+      {
+        "resourceKey": "document.custom-options",
+        "action": "manage",
+        "grants": [
+          {
+            "resourceKey": "document.custom-options",
+            "action": "view"
+          }
+        ]
+      },
+      {
+        "resourceKey": "document.reference-data",
+        "action": "operate",
+        "grants": [
+          {
+            "resourceKey": "document.reference-data",
+            "action": "view"
+          }
+        ]
+      },
+      {
+        "resourceKey": "document.reference-data",
+        "action": "manage",
+        "grants": [
+          {
+            "resourceKey": "document.reference-data",
+            "action": "view"
+          }
+        ]
+      },
+      {
+        "resourceKey": "common.product-reference",
+        "action": "operate",
+        "grants": [
+          {
+            "resourceKey": "common.product-reference",
+            "action": "view"
+          }
+        ]
+      },
+      {
+        "resourceKey": "common.product-reference",
+        "action": "manage",
+        "grants": [
+          {
+            "resourceKey": "common.product-reference",
+            "action": "view"
+          }
+        ]
+      },
+      {
+        "resourceKey": "system.audit",
+        "action": "manage",
+        "grants": [
+          {
+            "resourceKey": "system.audit",
+            "action": "view"
+          }
+        ]
       }
     ],
     "editions": {
