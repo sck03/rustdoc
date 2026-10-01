@@ -20,6 +20,8 @@
 
 `scripts/verify-native-desktop.mjs` 检查真实 Cargo 运行依赖图：包含 Tauri 和 SQLite，排除 Slint／egui、PostgreSQL 服务端适配器；Domain 保持纯业务。桌面与服务端分别构建，避免 workspace feature 合并被误认为桌面交付图。
 
+Windows 桌面入口在 Debug 和 Release 均使用 GUI 子系统，Full 本地测试包也不创建常驻控制台；启动错误继续使用弹窗及受管日志。`scripts/test_native_desktop_shutdown.mjs` 在启动前检查实际 EXE 的 PE 子系统，避免自动化的隐藏窗口选项掩盖控制台构建。
+
 ## PDFium 动态库与 ABI 边界
 
 报表维持 krilla 生成 PDF、PDFium worker 处理已有 PDF。当前已采用 `pdfium-render 0.9.4`（`pdfium_7881 + image_025`），原生包为 `152.0.7961`；尚需验证完整封装/API feature/原生库组合。Windows x64/ARM64、Linux x64/ARM64、macOS ARM64 分别验收，不能将迁移前手写绑定的静态符号检查当成新封装运行通过。

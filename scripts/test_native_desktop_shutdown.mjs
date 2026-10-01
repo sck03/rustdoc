@@ -13,6 +13,19 @@ assert.equal(process.platform, "win32", "WebView2 lifecycle verification require
 const repo = path.resolve(import.meta.dirname, "..");
 const appRoot = path.resolve(process.argv[2] || path.join(repo, "artifacts/native-desktop/ExportDocManager.Tauri.Document"));
 const executable = path.resolve(process.argv[3] || path.join(appRoot, "ExportDocManager.exe"));
+// Check the actual executable: windowsHide during automation can mask a console build.
+const executableFile = fs.openSync(executable, "r");
+try {
+  const dos = Buffer.alloc(64);
+  assert.equal(fs.readSync(executableFile, dos, 0, dos.length, 0), dos.length);
+  assert.equal(dos.toString("ascii", 0, 2), "MZ");
+  const pe = Buffer.alloc(94); // PE signature + COFF header + optional header through Subsystem.
+  assert.equal(fs.readSync(executableFile, pe, 0, pe.length, dos.readUInt32LE(60)), pe.length);
+  assert.equal(pe.readUInt32LE(0), 0x00004550, "Expected a PE executable");
+  assert.equal(pe.readUInt16LE(92), 2, "Desktop EXE must use Windows GUI subsystem in Debug and Release");
+} finally {
+  fs.closeSync(executableFile);
+}
 const output = path.join(repo, "artifacts/desktop-shutdown", `${Date.now()}`);
 fs.mkdirSync(output, { recursive: true });
 const execute = promisify(execFile);
