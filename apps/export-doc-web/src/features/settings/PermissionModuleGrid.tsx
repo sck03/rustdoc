@@ -1,19 +1,19 @@
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import type { ApiPermissionResourceDefinitionDto } from "../../api/index.ts";
-import { detectPreset, grantKey, presetLabels, scopeLabels } from "./permissionSchemeModel.ts";
+import { detectPreset, grantKey, presetLabels, scopeLabels, setResourcePreset } from "./permissionSchemeModel.ts";
 import { filterPermissionResources, permissionResourceLocation } from "./permissionNavigationModel.ts";
 
 export function PermissionModuleGrid({
-  resources, grants, dataScopes, disabled, onToggle, onScopeChange, onPresetChange,
+  resources, grants, dataScopes, disabled, onChange, disabledModules, onModulesChange,
 }: {
   resources: ApiPermissionResourceDefinitionDto[];
   grants: Record<string, string>;
   dataScopes: string[];
   disabled: boolean;
-  onToggle: (resource: ApiPermissionResourceDefinitionDto, action: string, enabled: boolean) => void;
-  onScopeChange: (resourceKey: string, action: string, scope: string) => void;
-  onPresetChange: (resource: ApiPermissionResourceDefinitionDto, level: string) => void;
+  onChange: (grants: Record<string, string>) => void;
+  disabledModules: string[];
+  onModulesChange: (modules: string[]) => void;
 }) {
   const [group, setGroup] = useState("");
   const [search, setSearch] = useState("");
@@ -35,14 +35,16 @@ export function PermissionModuleGrid({
           </label>
         </div>
       </div>
-      <p className="permission-navigation-note">按主导航分组查找权限。一个页面可以包含多个独立模块，每项操作的数据范围分别生效；筛选保留全部未保存的授权。</p>
+      <p className="permission-navigation-note">关闭模块同时隐藏入口并拒绝后台访问，保留勾选配置以便重新开放。同一页面的模块开关同步生效；各项操作独立设置数据范围，筛选不会丢失草稿。</p>
       <div className="permission-module-grid">
         {visible.map((resource) => (
           <section className="permission-resource-card" key={resource.key} aria-label={resource.name}>
             <p className="permission-resource-location">{permissionResourceLocation(resource).path}</p>
+            <label className="checkbox-field"><input type="checkbox" aria-label={`${resource.name}模块开放`} checked={!disabledModules.includes(resource.moduleKey)} disabled={disabled}
+              onChange={event => onModulesChange(event.target.checked ? disabledModules.filter(key => key !== resource.moduleKey) : [...disabledModules, resource.moduleKey])} /><span>开放模块（仍需勾选操作）</span></label>
             <div className="permission-resource-header">
               <h4>{resource.name}</h4>
-              <select aria-label={`${resource.name}快捷设置`} disabled={disabled} value={detectPreset(grants, resource)} onChange={(event) => onPresetChange(resource, event.target.value)}>
+              <select aria-label={`${resource.name}快捷设置`} disabled={disabled || disabledModules.includes(resource.moduleKey)} value={detectPreset(grants, resource)} onChange={(event) => onChange(setResourcePreset(grants, resource, event.target.value))}>
                 <option value="custom" disabled>自定义</option>
                 {Object.entries(presetLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
@@ -54,12 +56,17 @@ export function PermissionModuleGrid({
                 return (
                   <div className="permission-action-row" key={action.key}>
                     <label className="checkbox-field permission-action-toggle" title={action.description}>
-                      <input type="checkbox" aria-label={`${resource.name}：${action.name}`} checked={enabled} disabled={disabled} onChange={(event) => onToggle(resource, action.key, event.target.checked)} />
+                      <input type="checkbox" aria-label={`${resource.name}：${action.name}`} checked={enabled} disabled={disabled || disabledModules.includes(resource.moduleKey)} onChange={(event) => {
+                        const next = { ...grants };
+                        if (event.target.checked) next[key] = resource.supportsDataScope ? "own" : "all";
+                        else delete next[key];
+                        onChange(next);
+                      }} />
                       <span>{action.name}</span>
                       <span className="visually-hidden">{action.description}</span>
                     </label>
                     {resource.supportsDataScope ? (
-                      <select aria-label={`${resource.name}${action.name}数据范围`} value={grants[key] ?? "own"} disabled={!enabled || disabled} onChange={(event) => onScopeChange(resource.key, action.key, event.target.value)}>
+                      <select aria-label={`${resource.name}${action.name}数据范围`} value={grants[key] ?? "own"} disabled={!enabled || disabled || disabledModules.includes(resource.moduleKey)} onChange={(event) => onChange({ ...grants, [key]: event.target.value })}>
                         {dataScopes.map((scope) => <option key={scope} value={scope}>{scopeLabels[scope] ?? scope}</option>)}
                       </select>
                     ) : <span className="permission-global-scope">全局</span>}

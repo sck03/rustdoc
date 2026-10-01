@@ -1,3 +1,5 @@
+#[path = "support/account_permissions.rs"]
+mod account_permissions;
 #[path = "support/account_scope.rs"]
 mod account_scope;
 #[path = "support/template_contract.rs"]
@@ -36,6 +38,7 @@ fn sqlite_accounts_preserve_organization_and_revoke_changed_scope() {
     .unwrap();
     account_scope::exercise(&service, login["accessToken"].as_str().unwrap());
     template_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    account_permissions::exercise(&service, login["accessToken"].as_str().unwrap());
     service.close().unwrap();
     drop(service);
     assert!(root.starts_with(&parent) && root != parent);

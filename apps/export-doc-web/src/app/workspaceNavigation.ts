@@ -15,6 +15,7 @@ export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
   function filter(items: WorkspaceNavItem[]): WorkspaceNavItem[] {
     return items.flatMap((item) => {
       if (item.requiredFeature && !capabilities.availableFeatures?.includes(item.requiredFeature)) return [];
+      if (item.requiredFeature === "worklist" && !capabilities.canUseDocumentWorkspace && !capabilities.canUseSalesWorkspace) return [];
       if (item.requiresAdmin && capabilities.canManageSettings !== true) return [];
       if (item.desktopOnly && capabilities.isDesktopRuntime !== true) return [];
       if (item.workspace === "office" && capabilities.isDesktopRuntime === true && capabilities.usesOfficeRegister !== true) return [];
@@ -29,8 +30,18 @@ export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
       return [{ ...item, children, searchItems, to: children?.[0]?.to ?? item.to }];
     });
   }
-  return workspaceNavGroups.map((group) => ({ ...group, items: filter(group.items) }))
+  const groups = workspaceNavGroups.map((group) => ({ ...group, items: filter(group.items) }))
     .filter((group) => group.items.length > 0);
+  const officeOnly = capabilities.canManageSettings !== true &&
+    !capabilities.canUseDocumentWorkspace && !capabilities.canUseSalesWorkspace &&
+    [...enabledModules].some(key => key.startsWith("office.")) &&
+    [...enabledModules].every(key => key.startsWith("office.") || key === "system.about");
+  if (!officeOnly) return groups;
+  const officeTasks = groups.find(group => group.key === "workspace")?.items.filter(item => item.workspace === "office") ?? [];
+  return groups.filter(group => group.key === "personnel" || group.key === "office")
+    .map(group => group.key === "office" ? { ...group, items: [...officeTasks, ...group.items] } : group)
+    .concat(!groups.some(group => group.key === "office") && officeTasks.length
+      ? [{ ...workspaceNavGroups.find(group => group.key === "office")!, items: officeTasks }] : []);
 }
 
 // Search only the caller's authorized navigation, including familiar feature names.
@@ -89,8 +100,8 @@ export function createInitialWorkspaceNavGroupState(pathname: string, groups: Wo
   return new Set(activeKey ? [activeKey] : []);
 }
 
-export function getWorkspaceContext(pathname: string): WorkspaceContext {
-  const group = workspaceNavGroups.find((candidate) => candidate.items.some((item) => item.isActive(pathname)));
+export function getWorkspaceContext(pathname: string, groups: WorkspaceNavGroupConfig[] = workspaceNavGroups): WorkspaceContext {
+  const group = groups.find((candidate) => candidate.items.some((item) => item.isActive(pathname)));
   const item = group?.items.find((candidate) => candidate.isActive(pathname));
   if (!group || !item) return { section: "工作台", title: "工作台", description: "选择需要办理的业务", icon: LayoutDashboard };
 

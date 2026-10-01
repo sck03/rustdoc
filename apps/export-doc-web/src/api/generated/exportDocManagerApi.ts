@@ -2351,6 +2351,7 @@ export interface ApiPermissionTemplateCatalogResponse {
 export interface ApiPermissionTemplateDto {
   code: string;
   description: string;
+  disabledModules?: string[];
   effectiveGrants: ApiEffectivePermissionGrantDto[];
   grants: ApiPermissionGrantDto[];
   id: number;
@@ -2372,6 +2373,7 @@ export interface ApiPermissionTemplateOptionDto {
 export interface ApiPermissionTemplateSaveRequest {
   code: string;
   description: string;
+  disabledModules?: string[];
   expectedVersion?: number;
   grants: ApiPermissionGrantDto[];
   id: number;
@@ -3445,9 +3447,11 @@ export interface ApiUnitDto {
 export interface ApiUserAccountDto {
   companyScope: string;
   departmentId: string;
+  disabledModules?: string[];
   fullName: string;
   id: number;
   isActive: boolean;
+  permissionGrants?: ApiPermissionGrantDto[] | null;
   permissionTemplateCode: string;
   permissionTemplateId?: number | null;
   permissionTemplateName: string;
@@ -3553,9 +3557,11 @@ export interface ApiUserReportTemplateVersionDto {
 export interface ApiUserSaveRequest {
   companyScope: string;
   departmentId: string;
+  disabledModules?: string[];
   expectedVersion?: number;
   fullName: string;
   isActive: boolean;
+  permissionGrants?: ApiPermissionGrantDto[] | null;
   permissionTemplateId: number | null;
   resetPassword: string;
   role: string;
@@ -5049,10 +5055,12 @@ export const ApiPaymentReportHtmlPreviewResponseDefaults = {
 } as const satisfies Partial<ApiPaymentReportHtmlPreviewResponse>;
 
 export const ApiPermissionTemplateDtoDefaults = {
+  disabledModules: [],
   versionNumber: 1,
 } as const satisfies Partial<ApiPermissionTemplateDto>;
 
 export const ApiPermissionTemplateSaveRequestDefaults = {
+  disabledModules: [],
   expectedVersion: 0,
 } as const satisfies Partial<ApiPermissionTemplateSaveRequest>;
 
@@ -5123,6 +5131,8 @@ export const ApiUnitDtoDefaults = {
 } as const satisfies Partial<ApiUnitDto>;
 
 export const ApiUserAccountDtoDefaults = {
+  disabledModules: [],
+  permissionGrants: null,
   versionNumber: 1,
 } as const satisfies Partial<ApiUserAccountDto>;
 
@@ -5146,7 +5156,9 @@ export const ApiUserReportTemplateDraftRequestDefaults = {
 } as const satisfies Partial<ApiUserReportTemplateDraftRequest>;
 
 export const ApiUserSaveRequestDefaults = {
+  disabledModules: [],
   expectedVersion: 0,
+  permissionGrants: null,
 } as const satisfies Partial<ApiUserSaveRequest>;
 
 export const HsCodeExampleInputDefaults = {

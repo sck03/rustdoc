@@ -208,15 +208,22 @@ assert(model.getRequiredRouteAccessLevel("/master-data/products/new") === "opera
 assert(model.getRequiredRouteAccessLevel("/single-window/coo/8") === "operate", "COO editor route requires operate");
 assert(model.getRequiredRouteAccessLevel("/single-window/acd/8") === "operate", "ACD editor route requires operate");
 assert(model.getRequiredRouteAccessLevel("/invoices/8") === "view", "invoice detail route permits view");
-assert(product.getDefaultWorkspaceRoute({ canUseDocumentWorkspace: true, enabledModules: financeModules, permissions: financePermissions }) === "/access-denied", "missing home permission must not choose an unrelated business page");
+assert(product.getDefaultWorkspaceRoute({ productEdition: "Document", canUseDocumentWorkspace: true, enabledModules: financeModules, permissions: financePermissions }) === "/access-denied", "single-user edition retains its fixed home");
 assert(product.getDefaultWorkspaceRoute({ productEdition: "Sales", canUseSalesWorkspace: true, enabledModules: ["sales.dashboard"], permissions: salesPermissions }) === "/crm/dashboard", "sales edition fixed home");
 assert(product.getDefaultWorkspaceRoute({ productEdition: "Sales", canUseSalesWorkspace: true, enabledModules: ["sales.opportunities"], permissions: [permissionGrant("sales.opportunities", "view")] }) === "/access-denied", "custom permissions do not change the fixed edition home");
 assert(product.getDefaultWorkspaceRoute({ enabledModules: [] }) === "/access-denied", "empty permission template uses access denied route");
+assert(product.getDefaultWorkspaceRoute({ enabledModules: [], availableFeatures: ["worklist"] }) === "/access-denied", "feature availability alone does not expose business navigation");
 assert(product.getProductEditionPresentation("Document").displayName === "外贸业务综合管理系统（单证版）", "document edition brand name");
 assert(product.getProductEditionPresentation("Sales").displayName === "外贸业务综合管理系统（业务员版）", "sales edition brand name");
 assert(product.getProductEditionPresentation("Full").displayName === "外贸业务综合管理系统（全功能版）", "full edition brand name");
 assert(product.getProductEditionPresentation("Administration").editionName === "行政人事版", "administration includes human resources");
 const editionPermissions = JSON.parse(fs.readFileSync(path.join(repoRoot, "crates/export-doc-contracts/src/generated_contract.json"), "utf8")).permissions;
+const employeeGrants = editionPermissions.roles.find(role => role.code === "OfficeEmployee").grants;
+const employeeCapabilities = { productEdition: "Full", availableFeatures: ["worklist"], permissions: employeeGrants,
+  enabledModules: [...new Set(employeeGrants.map(grant => editionPermissions.resources.find(resource => resource.key === grant.resourceKey).moduleKey))] };
+assert(JSON.stringify(model.filterWorkspaceNavGroups(employeeCapabilities).map(group => group.key)) === JSON.stringify(["personnel", "office"]), "ordinary employees see only personnel and administration groups");
+assert(product.getDefaultWorkspaceRoute(employeeCapabilities) === "/office/approvals", "employees land on their own office work instead of a forbidden document dashboard");
+assert(!model.getWorkspaceRouteItems(model.filterWorkspaceNavGroups(employeeCapabilities)).some(item => item.to === "/office/people"), "directory access does not expose private personnel records");
 for (const edition of ["Full", "Document", "Sales"]) {
   const resources = editionPermissions.resources.filter(resource => edition === "Full" || editionPermissions.editions[edition].includes(resource.key));
   const enabledModules = [...new Set(resources.map(resource => resource.moduleKey))];

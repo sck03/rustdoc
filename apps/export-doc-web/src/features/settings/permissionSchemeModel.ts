@@ -35,6 +35,22 @@ export function firstResourceScope(grants: Record<string, string>, resourceKey: 
   return Object.entries(grants).find(([key]) => splitGrantKey(key)[0] === resourceKey)?.[1] ?? "";
 }
 
+export function setResourcePreset(current: Record<string, string>, resource: ApiPermissionResourceDefinitionDto, level: string) {
+  const grants = Object.fromEntries(Object.entries(current).filter(([key]) => splitGrantKey(key)[0] !== resource.key));
+  const scope = firstResourceScope(current, resource.key) || (resource.supportsDataScope ? "own" : "all");
+  for (const action of resource.actions) {
+    if (level && (presetRanks[action.presetLevel] ?? 0) <= (presetRanks[level] ?? 0)) grants[grantKey(resource.key, action.key)] = scope;
+  }
+  return grants;
+}
+
+export function toPermissionGrants(grants: Record<string, string>): ApiPermissionGrantDto[] {
+  return Object.entries(grants).map(([key, dataScope]) => {
+    const [resourceKey, action] = splitGrantKey(key);
+    return { resourceKey, action, dataScope };
+  });
+}
+
 export function detectPreset(grants: Record<string, string>, resource: ApiPermissionResourceDefinitionDto) {
   const enabled = resource.actions.filter((action) => Object.prototype.hasOwnProperty.call(grants, grantKey(resource.key, action.key)));
   if (enabled.length === 0) return "";

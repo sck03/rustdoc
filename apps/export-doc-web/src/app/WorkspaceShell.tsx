@@ -24,6 +24,7 @@ import { WorkspaceNavigation } from "./WorkspaceNavigation.tsx";
 import { WorkspaceSectionNavigation } from "./WorkspaceSectionNavigation.tsx";
 import { useLocation } from "react-router-dom";
 import { getProductEditionPresentation } from "./productEdition.ts";
+import { getRolePresentation } from "./userRoles.ts";
 import { Button } from "../ui/Button.tsx";
 import { InlineNotice } from "../ui/PageState.tsx";
 import { getServiceConnectionLabel, resolveServiceConnectionState, type ServiceAvailability } from "../ui/serviceAvailabilityModel.ts";
@@ -112,7 +113,7 @@ export function WorkspaceShell({
     () => findActiveWorkspaceNavGroupKey(pathname, visibleGroups),
     [pathname, visibleGroups],
   );
-  const context = useMemo(() => getWorkspaceContext(pathname), [pathname]);
+  const context = useMemo(() => getWorkspaceContext(pathname, visibleGroups), [pathname, visibleGroups]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() =>
     createInitialWorkspaceNavGroupState(pathname, visibleGroups),
   );
@@ -477,8 +478,7 @@ function formatCacheTimestamp(timestamp: number) {
 function renderUserWorkspaceLabel(user: ApiUserDto) {
   if (user.capabilities.canManageSettings) return "管理员";
   if (user.role?.trim().toLowerCase() === "sales") return "业务员";
-  if (user.role?.trim().toLowerCase() === "finance") return "财务人员";
-  return "单证人员";
+  return getRolePresentation(user.role).label;
 }
 
 function renderProductText(user: ApiUserDto) {

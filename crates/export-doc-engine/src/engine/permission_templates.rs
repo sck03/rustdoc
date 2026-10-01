@@ -8,8 +8,10 @@ use serde_json::{Value, json};
 
 pub fn project(mut value: Value) -> Result<Value> {
     let grants: Vec<Grant> = serde_json::from_value(value["grants"].clone())?;
+    let disabled: Vec<String> =
+        serde_json::from_value(value.get("disabledModules").cloned().unwrap_or(json!([])))?;
     value["effectiveGrants"] =
-        serde_json::to_value(permissions::effective_details(&grants).map_err(invalid)?)?;
+        json!(permissions::profile::resolve_details(&grants, &disabled).map_err(invalid)?);
     Ok(value)
 }
 
@@ -39,14 +41,8 @@ pub fn validate(id: i64, previous: &Value, value: &mut Value) -> Result<()> {
     }
     let grants: Vec<Grant> = serde_json::from_value(value["grants"].clone())
         .map_err(|_| invalid("权限方案须包含资源、动作和数据范围。"))?;
-    let grants = permissions::normalize(&grants).map_err(invalid)?;
-    if grants.iter().any(|grant| {
-        permissions::resource(&grant.resource_key).is_some_and(|resource| resource.is_technical)
-    }) {
-        return Err(invalid(
-            "系统身份与技术依赖能力由服务端派生，不能通过权限方案直接授予。",
-        ));
-    }
+    let grants = permissions::profile::assignable(&grants).map_err(invalid)?;
+    super::account_permissions::validate(value)?;
     value["grants"] = serde_json::to_value(grants)?;
     // Derived permission explanations are recomputed at read time.
     value["effectiveGrants"] = json!([]);

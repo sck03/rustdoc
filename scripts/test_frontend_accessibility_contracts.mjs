@@ -76,7 +76,7 @@ inspectTypeScriptSources(files, (file, source) => {
   }
 
   if (new Set([
-    "features/settings/UserManagementPanel.tsx",
+    "features/settings/useUserManagement.ts",
     "features/settings/PermissionTemplateManagementPanel.tsx",
   ]).has(sourceRelativePath) && !sourceText.includes("useUnsavedChangesGuard")) {
     failures.push(`${sourceRelativePath}: 管理编辑页必须保护切换、刷新和浏览器导航时的未保存修改`);

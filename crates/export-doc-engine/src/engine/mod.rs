@@ -1,3 +1,4 @@
+mod account_permissions;
 mod accounts;
 #[cfg(feature = "ai")]
 mod ai;

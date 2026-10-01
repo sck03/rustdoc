@@ -106,6 +106,28 @@ for (const edition of selected) {
       while (Date.now() < pageDeadline && !await run("!!document.querySelector('[aria-label=公司公告]')")) await delay(100);
       assert(await run("!!document.querySelector('[aria-label=公司公告]')"), 'Full SQLite announcement page missing');
       await captureScreenshot(cdp, path.join(output, `${edition}-announcements.png`));
+      const account = await request('createUserAccount', login.body.accessToken, {
+        username: 'desktop-employee', fullName: '普通员工桌面验收', role: 'OfficeEmployee', permissionTemplateId: null,
+        companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Desktop-Employee-2026',
+      });
+      assert.equal(account.status, 200);
+      await run("document.querySelector('.workspace-logout-button').click(); true");
+      const staffDeadline = Date.now() + 30000;
+      while (Date.now() < staffDeadline && !await run("!!document.querySelector('input[autocomplete=username]')")) await delay(100);
+      for (const [field, value] of [['username', 'desktop-employee'], ['current-password', 'Desktop-Employee-2026']]) {
+        await run(`document.querySelector('input[autocomplete="${field}"]').focus()`);
+        await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
+        await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
+        await cdp.send('Input.insertText', { text: value });
+      }
+      await run("document.querySelector('button[type=submit]').click(); true");
+      while (Date.now() < staffDeadline && await run("!!document.querySelector('input[autocomplete=username]')")) await delay(100);
+      assert.equal(await run('location.hash'), '#/office/approvals', 'Employee opens the office workspace');
+      await delay(500);
+      const staffText = await run('document.body.innerText');
+      assert(staffText.includes('人事管理') && staffText.includes('行政办公'));
+      assert(!staffText.includes('单证概览') && !staffText.includes('账号与权限') && !staffText.includes('人员档案'));
+      await captureScreenshot(cdp, path.join(output, `${edition}-employee.png`));
     } else { assert(!text.includes('人事管理') && !text.includes('行政办公') && !text.includes('账号与权限')); }
     results.push({ edition, home: expectedHome, ocr: marker.ocr, documentResources: marker.documentResources, statuses, screenshot: `${edition}.png` });
     await run("setTimeout(() => window.__TAURI_INTERNALS__.invoke('request_app_exit'), 100); true");

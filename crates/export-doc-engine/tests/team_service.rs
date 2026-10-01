@@ -1,4 +1,6 @@
 #![cfg(feature = "postgres")]
+#[path = "support/account_permissions.rs"]
+mod account_permissions;
 #[path = "support/account_scope.rs"]
 mod account_scope;
 #[path = "support/approval_contract.rs"]
@@ -255,6 +257,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     communication_contract::exercise(&service, admin_token);
     account_scope::exercise(&service, admin_token);
     template_contract::exercise(&service, admin_token);
+    account_permissions::exercise(&service, admin_token);
     personnel_contract::exercise(&service, admin_token);
     service.close().unwrap();
     drop(Arc::clone(&service));

@@ -4,6 +4,7 @@ use crate::contracts;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, sync::OnceLock};
 mod edition;
+pub mod profile;
 pub use edition::ProductEdition;
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]

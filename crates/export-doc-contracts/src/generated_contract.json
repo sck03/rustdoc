@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "5fb506985dc8abc4933312ca99b359babb161c6831a05d82c942c68d76baae28",
+  "digest": "6c957386b97aa2ba3af404d2e37345a6f48e1a54bb8d9a4e2ffe4c624b80c1cd",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -5067,8 +5067,8 @@
       },
       {
         "code": "OfficeEmployee",
-        "name": "公司员工",
-        "description": "团队模式下预约会议室、申请领用和查看本人记录。",
+        "name": "普通员工",
+        "description": "使用人事与行政自助服务：公司通讯录、本人申请、公告和通知；不授予人事私密档案、审批或单证销售权限。",
         "grants": [
           {
             "resourceKey": "office.people",
@@ -66890,6 +66890,15 @@
           ],
           "format": "int32",
           "default": 1
+        },
+        "disabledModules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "default": [],
+          "description": "Disabled modules are removed from both effective permissions and navigation."
         }
       }
     },
@@ -66970,6 +66979,15 @@
           ],
           "format": "int32",
           "default": 0
+        },
+        "disabledModules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "default": [],
+          "description": "Disabled modules are removed from both effective permissions and navigation."
         }
       }
     },
@@ -71633,6 +71651,27 @@
           ],
           "format": "int32",
           "default": 1
+        },
+        "permissionGrants": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/components/schemas/ApiPermissionGrantDto"
+          },
+          "maxItems": 1000,
+          "default": null,
+          "description": "null inherits the selected group or role; an array replaces it, including an empty deny-all array."
+        },
+        "disabledModules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "default": [],
+          "description": "Disabled modules are removed from both effective permissions and navigation."
         }
       }
     },
@@ -72087,6 +72126,27 @@
           ],
           "format": "int32",
           "default": 0
+        },
+        "permissionGrants": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/components/schemas/ApiPermissionGrantDto"
+          },
+          "maxItems": 1000,
+          "default": null,
+          "description": "null inherits the selected group or role; an array replaces it, including an empty deny-all array."
+        },
+        "disabledModules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "default": [],
+          "description": "Disabled modules are removed from both effective permissions and navigation."
         }
       }
     },

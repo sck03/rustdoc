@@ -1,5 +1,6 @@
 //! Official contract composition. The frozen .NET export is preserved verbatim;
 //! new Rust capabilities are added here and both clients consume the same output.
+mod accounts;
 mod communication;
 mod observability;
 mod office;
@@ -15,6 +16,7 @@ pub fn document() -> Value {
     personnel::extend(&mut document);
     reports::extend(&mut document);
     observability::extend(&mut document);
+    accounts::extend(&mut document);
     document
 }
 
@@ -53,7 +55,7 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .remove("attachments");
-        for (schema, fields) in reports::FIELDS {
+        for (schema, fields) in reports::FIELDS.iter().chain(accounts::FIELDS) {
             for field in *fields {
                 current["components"]["schemas"][schema]["properties"]
                     .as_object_mut()

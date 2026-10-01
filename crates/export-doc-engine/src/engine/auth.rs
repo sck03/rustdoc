@@ -243,13 +243,9 @@ fn session_version_in(
     connection: &export_doc_storage::Connection,
     user: &Value,
 ) -> Result<(i64, i64)> {
-    let template = match user["permissionTemplateId"].as_i64().filter(|id| *id > 0) {
-        Some(id) => connection
-            .get("permission-templates", id)?
-            .and_then(|item| item["versionNumber"].as_i64())
-            .unwrap_or(0),
-        None => 0,
-    };
+    let template = super::account_permissions::template(connection, user)?
+        .and_then(|item| item["versionNumber"].as_i64())
+        .unwrap_or(0);
     Ok((user["versionNumber"].as_i64().unwrap_or(0), template))
 }
 
@@ -262,18 +258,7 @@ fn actor_from_connection(
     user: &Value,
     edition: permissions::ProductEdition,
 ) -> Result<Actor> {
-    let grants = if let Some(template) = user["permissionTemplateId"].as_i64().filter(|id| *id > 0)
-    {
-        let template = connection.get("permission-templates", template)?;
-        if let Some(template) = template.filter(|template| template["isActive"] == true) {
-            let grants: Vec<Grant> = serde_json::from_value(template["grants"].clone())?;
-            permissions::effective(&grants).map_err(unavailable)?
-        } else {
-            vec![]
-        }
-    } else {
-        permissions::role_grants(user["role"].as_str().unwrap_or("")).map_err(unavailable)?
-    };
+    let grants = super::account_permissions::grants(connection, user)?;
     Ok(Actor {
         edition,
         id: user["id"].as_i64().unwrap_or(0),

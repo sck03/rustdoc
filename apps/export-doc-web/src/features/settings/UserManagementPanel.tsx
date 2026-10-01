@@ -1,269 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ApiUserAccountDto, ApiUserListResponse, ApiUserSaveRequest, ExportDocManagerApiClient } from "../../api/index.ts";
-import { queryKeys } from "../../api/queryKeys.ts";
+import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
-import { readApiError } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { useUserManagement } from "./useUserManagement.ts";
+import { minimumPasswordLength } from "./userAccountModel.ts";
+import { getRolePresentation } from "../../app/userRoles.ts";
+import { UserPermissionEditor } from "./UserPermissionEditor.tsx";
 
-type UserDraft = {
-  id: number;
-  versionNumber: number;
-  username: string;
-  fullName: string;
-  role: string;
-  permissionTemplateId: number | null;
-  departmentId: string;
-  companyScope: string;
-  isActive: boolean;
-  resetPassword: string;
-};
-
-const rolePresentation: Record<string, { label: string; description: string }> = {
-  Admin: { label: "系统管理员", description: "管理系统设置、账号以及全部业务数据" },
-  User: { label: "单证人员", description: "处理发票、付款、单一窗口及日常单证业务" },
-  Sales: { label: "业务人员", description: "管理客户、跟进、商机、邮件模板和供应商" },
-  Finance: { label: "财务人员", description: "处理付款报销、单据查询、报表、汇率、邮件和 OCR" },
-};
-
-const minimumPasswordLength = 8;
-
-export function UserManagementPanel({
-  client,
-  canManageUsers,
-}: {
-  client: ExportDocManagerApiClient;
-  canManageUsers: boolean;
-}) {
-  const queryClient = useQueryClient();
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [draft, setDraft] = useState<UserDraft>(() => createEmptyDraft("User"));
-  const [persistedDraftSnapshot, setPersistedDraftSnapshot] = useState(() => buildUserDraftSnapshot(createEmptyDraft("User")));
-  const [message, setMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<ApiUserAccountDto | null>(null);
-
-  const usersQuery = useQuery({
-    queryKey: queryKeys.users(),
-    queryFn: ({ signal }) => client.listUsers({ signal }),
-    enabled: canManageUsers,
-  });
-
-  const roles = useMemo(() => usersQuery.data?.roles?.filter(Boolean) ?? ["Admin", "User", "Sales", "Finance"], [usersQuery.data?.roles]);
-  const users = usersQuery.data?.users ?? [];
-  const permissionTemplates = usersQuery.data?.permissionTemplates ?? [];
-  const companies = usersQuery.data?.companies ?? [];
-  const departments = usersQuery.data?.departments ?? [];
-  const availableCompanies = companies.filter((item) => item.isActive || item.code === draft.companyScope);
-  const availableDepartments = departments.filter((item) =>
-    item.companyCode === draft.companyScope && (item.isActive || item.code === draft.departmentId));
-  const selectedTemplate = permissionTemplates.find((template) => template.id === draft.permissionTemplateId);
-  const selectedRole = getRolePresentation(draft.role);
-
-  useEffect(() => {
-    if (!canManageUsers || !usersQuery.data) {
-      return;
-    }
-
-    if (selectedUserId == null && usersQuery.data.users.length > 0) {
-      applyUser(usersQuery.data.users[0]);
-    }
-  }, [canManageUsers, selectedUserId, usersQuery.data]);
-
-  useEffect(() => {
-    if (usersQuery.isError) {
-      setMessage(readApiError(usersQuery.error));
-      setSuccessMessage(null);
-    }
-  }, [usersQuery.error, usersQuery.isError]);
-
-  const saveMutation = useMutation({
-    mutationFn: (body: ApiUserSaveRequest) =>
-      draft.id > 0
-        ? client.updateUserAccount({ id: draft.id, body })
-        : client.createUserAccount({ body }),
-    onSuccess: async (response) => {
-      const savedDraft = createDraftFromUser(response.user);
-      setSelectedUserId(response.user.id);
-      setDraft(savedDraft);
-      setPersistedDraftSnapshot(buildUserDraftSnapshot(savedDraft));
-      setMessage(null);
-      setSuccessMessage(response.message || "用户已保存。");
-      queryClient.setQueryData<ApiUserListResponse | undefined>(queryKeys.users(), (current) =>
-        upsertUserList(current, response.user, roles),
-      );
-      await queryClient.invalidateQueries({ queryKey: queryKeys.users() });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (target: { id: number; expectedVersion: number }) =>
-      client.deleteUserAccount(target),
-    onSuccess: async (response) => {
-      const emptyDraft = createEmptyDraft("User");
-      setSelectedUserId(null);
-      setDraft(emptyDraft);
-      setPersistedDraftSnapshot(buildUserDraftSnapshot(emptyDraft));
-      setMessage(null);
-      setSuccessMessage(response.message || "用户已删除。");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.users() });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const currentDraftSnapshot = useMemo(() => buildUserDraftSnapshot(draft), [draft]);
-  const hasUnsavedUserChanges = Boolean(
-    canManageUsers &&
-    selectedUserId != null &&
-    currentDraftSnapshot !== persistedDraftSnapshot,
-  );
-  const { confirmDiscardChanges } = useUnsavedChangesGuard({
-    isDirty: hasUnsavedUserChanges,
-    message: "当前用户账号有未保存的修改。",
-  });
-
-  if (!canManageUsers) {
-    return null;
-  }
-
-  const isBusy = usersQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
-
-  async function beginNew() {
-    if (!await confirmDiscardChanges("新建用户")) {
-      return;
-    }
-
-    const emptyDraft = createEmptyDraft("User");
-    setSelectedUserId(0);
-    setDraft(emptyDraft);
-    setPersistedDraftSnapshot(buildUserDraftSnapshot(emptyDraft));
-    setMessage(null);
-    setSuccessMessage(null);
-  }
-
-  function applyUser(user: ApiUserAccountDto) {
-    const nextDraft = createDraftFromUser(user);
-    setSelectedUserId(user.id);
-    setDraft(nextDraft);
-    setPersistedDraftSnapshot(buildUserDraftSnapshot(nextDraft));
-    setMessage(null);
-    setSuccessMessage(null);
-  }
-
-  async function selectUser(user: ApiUserAccountDto) {
-    if (user.id === selectedUserId || !await confirmDiscardChanges(`切换到用户“${user.username}”`)) {
-      return;
-    }
-
-    applyUser(user);
-  }
-
-  async function refreshUsers() {
-    if (!await confirmDiscardChanges("刷新用户列表")) {
-      return;
-    }
-
-    const result = await usersQuery.refetch();
-    if (selectedUserId && selectedUserId > 0) {
-      const refreshedUser = result.data?.users.find((user) => user.id === selectedUserId);
-      if (refreshedUser) {
-        applyUser(refreshedUser);
-      }
-    }
-  }
-
-  function patchDraft<K extends keyof UserDraft>(key: K, value: UserDraft[K]) {
-    setDraft((current) => ({ ...current, [key]: value }));
-    setSuccessMessage(null);
-  }
-
-  function changeRole(role: string) {
-    const matchingTemplate = permissionTemplates.find((template) => template.code.toLowerCase() === role.toLowerCase());
-    setDraft((current) => ({
-      ...current,
-      role,
-      permissionTemplateId: matchingTemplate?.id ?? current.permissionTemplateId,
-    }));
-    setSuccessMessage(null);
-  }
-
-  function changeCompany(companyScope: string) {
-    setDraft((current) => {
-      const departmentStillValid = departments.some((item) =>
-        item.code === current.departmentId && item.companyCode === companyScope && item.isActive);
-      return {
-        ...current,
-        companyScope,
-        departmentId: departmentStillValid ? current.departmentId : "",
-      };
-    });
-    setSuccessMessage(null);
-  }
-
-  function saveUser() {
-    setMessage(null);
-    setSuccessMessage(null);
-
-    if (!draft.username.trim()) {
-      setMessage("用户名不能为空。");
-      return;
-    }
-
-    if (draft.id === 0 && !draft.resetPassword.trim()) {
-      setMessage("新增用户需要填写初始密码。");
-      return;
-    }
-
-    if (draft.resetPassword && draft.resetPassword.length < minimumPasswordLength) {
-      setMessage(`密码至少需要 ${minimumPasswordLength} 个字符。`);
-      return;
-    }
-
-    saveMutation.mutate({
-      username: draft.username.trim(),
-      fullName: draft.fullName.trim(),
-      role: draft.role,
-      permissionTemplateId: draft.permissionTemplateId,
-      departmentId: draft.departmentId.trim(),
-      companyScope: draft.companyScope.trim(),
-      isActive: draft.isActive,
-      resetPassword: draft.resetPassword,
-      expectedVersion: draft.id > 0 ? draft.versionNumber : 0,
-    });
-  }
-
-  async function deleteSelectedUser() {
-    if (draft.id <= 0) {
-      setMessage("请选择要删除的用户。");
-      setSuccessMessage(null);
-      return;
-    }
-
-    if (!await confirmDiscardChanges("删除当前用户")) {
-      return;
-    }
-
-    const persistedUser = users.find((user) => user.id === draft.id);
-    if (!persistedUser) {
-      setMessage("当前用户已不在服务器列表中，请刷新后重试。");
-      setSuccessMessage(null);
-      return;
-    }
-
-    setDeleteTarget(persistedUser);
-  }
-
+export function UserManagementPanel({ client, canManageUsers }: { client: ExportDocManagerApiClient; canManageUsers: boolean }) {
+  const { draft, setDraft, selectedUserId, users, search, setSearch, roles, permissionTemplates, availableCompanies, availableDepartments,
+    selectedTemplate, selectedRole, message, successMessage, deleteTarget, setDeleteTarget, deleteMutation,
+    isBusy, refreshUsers, beginNew, saveUser, deleteSelectedUser, selectUser, patchDraft, changeRole, changeCompany } = useUserManagement(client, canManageUsers);
+  if (!canManageUsers) return null;
   return (
     <section className="form-section user-management-section" aria-label="用户与权限">
       <div className="section-header">
@@ -290,6 +40,7 @@ export function UserManagementPanel({
 
       {message ? <InlineNotice tone="error" title="用户操作失败">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
+      <label><span>查找账号或分组</span><input type="search" value={search} maxLength={100} placeholder="账号、姓名、岗位、分组或部门" onChange={event => setSearch(event.target.value)} /></label>
 
       <div className="user-management-layout">
         <ResponsiveTableFrame className="user-management-table-frame" label="用户账号列表">
@@ -329,7 +80,7 @@ export function UserManagementPanel({
                     <td>
                       <span className="role-label">{getRolePresentation(user.role).label}</span>
                     </td>
-                    <td>{user.permissionTemplateName || "-"}</td>
+                    <td>{user.permissionGrants != null ? "账号单独配置" : user.permissionTemplateName || "岗位默认分组"}</td>
                     <td><span className={user.isActive ? "account-status active" : "account-status inactive"}>{user.isActive ? "启用" : "停用"}</span></td>
                   </tr>
                 ))
@@ -362,7 +113,7 @@ export function UserManagementPanel({
             <span>权限方案</span>
             <select
               value={draft.permissionTemplateId ?? ""}
-              disabled={isBusy || draft.role.toLowerCase() === "admin"}
+              disabled={isBusy || draft.role === "Admin" || draft.permissionGrants !== null}
               onChange={(event) => patchDraft("permissionTemplateId", Number(event.target.value) || null)}
             >
               <option value="">按角色默认方案</option>
@@ -375,6 +126,8 @@ export function UserManagementPanel({
             <small className="field-help">
               {draft.role.toLowerCase() === "admin"
                 ? "系统管理员固定使用内置管理员权限"
+                : draft.permissionGrants !== null
+                  ? "账号使用独立权限；分组变更不再影响此账号"
                 : selectedTemplate?.name
                   ? `当前使用：${selectedTemplate.name}`
                   : "未指定时自动使用该岗位的内置方案"}
@@ -429,6 +182,10 @@ export function UserManagementPanel({
         </div>
       </div>
 
+      {draft.role !== "Admin" ? <UserPermissionEditor client={client} template={selectedTemplate}
+        grants={draft.permissionGrants} disabledModules={draft.disabledModules} busy={isBusy}
+        onChange={(permissionGrants, disabledModules) => setDraft(current => ({ ...current, permissionGrants, disabledModules }))} /> : null}
+
       <p className="section-description">公司和部门在 <Link to="/system/organization">组织架构</Link> 中统一维护。</p>
 
       {deleteTarget ? (
@@ -456,82 +213,3 @@ export function UserManagementPanel({
 }
 
 export default UserManagementPanel;
-
-function createDraftFromUser(user: ApiUserAccountDto): UserDraft {
-  return {
-    id: user.id,
-    versionNumber: user.versionNumber ?? 1,
-    username: user.username ?? "",
-    fullName: user.fullName ?? "",
-    role: user.role || "User",
-    permissionTemplateId: user.permissionTemplateId ?? null,
-    departmentId: user.departmentId ?? "",
-    companyScope: user.companyScope ?? "",
-    isActive: user.isActive,
-    resetPassword: "",
-  };
-}
-
-function createEmptyDraft(role: string): UserDraft {
-  return {
-    id: 0,
-    versionNumber: 0,
-    username: "",
-    fullName: "",
-    role: role || "User",
-    permissionTemplateId: null,
-    departmentId: "",
-    companyScope: "",
-    isActive: true,
-    resetPassword: "",
-  };
-}
-
-function buildUserDraftSnapshot(draft: UserDraft) {
-  return JSON.stringify({
-    id: draft.id,
-    username: draft.username,
-    fullName: draft.fullName,
-    role: draft.role,
-    permissionTemplateId: draft.permissionTemplateId,
-    departmentId: draft.departmentId,
-    companyScope: draft.companyScope,
-    isActive: draft.isActive,
-    resetPassword: draft.resetPassword,
-  });
-}
-
-function getRolePresentation(role?: string) {
-  const normalized = role?.trim() || "User";
-  return rolePresentation[normalized] ?? {
-    label: normalized,
-    description: "使用管理员为该岗位配置的权限方案",
-  };
-}
-
-function upsertUserList(
-  current: ApiUserListResponse | undefined,
-  user: ApiUserAccountDto,
-  fallbackRoles: string[],
-): ApiUserListResponse {
-  const roles = current?.roles ?? fallbackRoles;
-  const users = current?.users ?? [];
-  const index = users.findIndex((item) => item.id === user.id);
-  const nextUsers = index >= 0
-    ? users.map((item) => (item.id === user.id ? user : item))
-    : [...users, user];
-
-  return {
-    roles,
-    permissionTemplates: current?.permissionTemplates ?? [],
-    companies: current?.companies ?? [],
-    departments: current?.departments ?? [],
-    users: nextUsers.sort((left, right) => {
-      if (left.isActive !== right.isActive) {
-        return left.isActive ? -1 : 1;
-      }
-
-      return left.username.localeCompare(right.username);
-    }),
-  };
-}

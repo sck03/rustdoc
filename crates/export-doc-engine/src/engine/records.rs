@@ -191,7 +191,12 @@ pub fn list(
         for user in result["users"].as_array_mut().into_iter().flatten() {
             let template = user["permissionTemplateId"]
                 .as_i64()
-                .and_then(|id| templates.iter().find(|template| template["id"] == id));
+                .map(|id| templates.iter().find(|template| template["id"] == id))
+                .unwrap_or_else(|| {
+                    templates.iter().find(|template| {
+                        template["isSystem"] == true && template["code"] == user["role"]
+                    })
+                });
             user["permissionTemplateCode"] = template
                 .map(|value| value["code"].clone())
                 .unwrap_or(json!(""));

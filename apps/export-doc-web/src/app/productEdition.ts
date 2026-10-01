@@ -67,5 +67,11 @@ export function getDefaultWorkspaceRoute(capabilities: WorkspaceCapabilities) {
     getWorkspaceRouteItems(filterWorkspaceNavGroups(capabilities)).map((item) => item.to.split("?")[0]),
   );
   const home = getProductEditionPresentation(capabilities.productEdition).defaultRoute;
-  return availableRoutes.has(home) ? home : "/access-denied";
+  if (availableRoutes.has(home)) return home;
+  // Full team accounts enter a useful, authorized workspace for their job.
+  if (normalizeProductEdition(capabilities.productEdition) === "Full") {
+    const preferred = ["/office/approvals", "/office/announcements", "/office/directory", "/crm/dashboard", "/crm/follow-ups"];
+    return preferred.find(route => availableRoutes.has(route)) ?? [...availableRoutes][0] ?? "/access-denied";
+  }
+  return "/access-denied";
 }

@@ -45,6 +45,17 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
         } else {
             None
         };
+        for key in ["permissionGrants", "disabledModules"] {
+            if !body
+                .as_object()
+                .is_some_and(|value| value.contains_key(key))
+            {
+                if let Some(value) = previous.as_ref().and_then(|user| user.get(key)) {
+                    body[key] = value.clone();
+                }
+            }
+        }
+        super::account_permissions::validate(&mut body)?;
         if let Some(previous) = &previous {
             store::check_version(previous, store::expected(&body))?;
             if previous["role"] == "Admin"
