@@ -43,7 +43,10 @@ impl References {
                 }
                 let mut ids = HashSet::new();
                 collect(kind, &record, &mut ids)?;
-                if visible {
+                if visible
+                    || (kind == "report-templates"
+                        && super::super::report_templates::policy::output_visible(actor, &record))
+                {
                     index.readable.extend(ids.iter().cloned());
                 }
                 index.all.extend(ids);

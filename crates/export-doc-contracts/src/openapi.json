@@ -16344,7 +16344,7 @@
           "requiresDesktopAccess": true,
           "requiresLicense": true,
           "permissions": {
-            "readModule": "document.reports",
+            "readModule": "common.report-catalog",
             "writeModule": null,
             "readAccessLevel": null,
             "writeAccessLevel": null,
@@ -16354,7 +16354,7 @@
           },
           "requirements": [
             {
-              "resourceKey": "document.report-templates",
+              "resourceKey": "common.report-catalog",
               "action": "view"
             }
           ],
@@ -75231,8 +75231,8 @@
       {
         "key": "document.payments",
         "name": "付款报销",
-        "group": "单证业务",
-        "workspace": "document",
+        "group": "付款报销与打印",
+        "workspace": "common",
         "moduleKey": "document.payments",
         "sortOrder": 40,
         "isTechnical": false,
@@ -75264,8 +75264,8 @@
       {
         "key": "document.jobs",
         "name": "文件任务",
-        "group": "单证业务",
-        "workspace": "document",
+        "group": "付款报销与打印",
+        "workspace": "common",
         "moduleKey": "document.jobs",
         "sortOrder": 50,
         "isTechnical": false,
@@ -76269,8 +76269,8 @@
       {
         "key": "document.report-templates",
         "name": "报表模板",
-        "group": "报表设计",
-        "workspace": "document",
+        "group": "付款报销与打印",
+        "workspace": "common",
         "moduleKey": "document.reports",
         "sortOrder": 330,
         "isTechnical": false,
@@ -76419,8 +76419,8 @@
       {
         "key": "document.report-resources",
         "name": "模板图片资源",
-        "group": "报表设计",
-        "workspace": "document",
+        "group": "付款报销与打印",
+        "workspace": "common",
         "moduleKey": "document.reports",
         "sortOrder": 340,
         "isTechnical": false,
@@ -76635,8 +76635,8 @@
       {
         "key": "document.payment-output",
         "name": "付款报销单据输出",
-        "group": "单据输出",
-        "workspace": "document",
+        "group": "付款报销与打印",
+        "workspace": "common",
         "moduleKey": "document.payment-reports",
         "sortOrder": 360,
         "isTechnical": false,
@@ -77161,6 +77161,25 @@
             "navigationAccessLevel": "view"
           }
         ]
+      },
+      {
+        "key": "common.report-catalog",
+        "name": "可用打印模板",
+        "group": "通用基础能力",
+        "workspace": "common",
+        "moduleKey": "common.report-catalog",
+        "sortOrder": 361,
+        "isTechnical": true,
+        "supportsDataScope": false,
+        "actions": [
+          {
+            "key": "view",
+            "name": "选择",
+            "description": "按单据数据域选择本人或已共享模板，不授予模板管理权限",
+            "sortOrder": 10,
+            "navigationAccessLevel": "view"
+          }
+        ]
       }
     ],
     "modules": [
@@ -77191,16 +77210,16 @@
       {
         "key": "document.payments",
         "name": "付款报销",
-        "group": "单证业务",
-        "workspace": "document",
+        "group": "付款报销与打印",
+        "workspace": "common",
         "sortOrder": 40,
         "isTechnical": false
       },
       {
         "key": "document.jobs",
         "name": "文件任务",
-        "group": "单证业务",
-        "workspace": "document",
+        "group": "付款报销与打印",
+        "workspace": "common",
         "sortOrder": 50,
         "isTechnical": false
       },
@@ -77239,8 +77258,8 @@
       {
         "key": "document.reports",
         "name": "报表模板管理",
-        "group": "单证工具",
-        "workspace": "document",
+        "group": "付款报销与打印",
+        "workspace": "common",
         "sortOrder": 80,
         "isTechnical": false
       },
@@ -77255,8 +77274,8 @@
       {
         "key": "document.payment-reports",
         "name": "付款报销单据输出",
-        "group": "单证基础能力",
-        "workspace": "document",
+        "group": "付款报销与打印",
+        "workspace": "common",
         "sortOrder": 85,
         "isTechnical": true
       },
@@ -77467,6 +77486,14 @@
         "workspace": "office",
         "sortOrder": 420,
         "isTechnical": false
+      },
+      {
+        "key": "common.report-catalog",
+        "name": "可用打印模板",
+        "group": "通用基础能力",
+        "workspace": "common",
+        "sortOrder": 86,
+        "isTechnical": true
       }
     ],
     "roles": [
@@ -79198,6 +79225,51 @@
             "resourceKey": "office.notifications",
             "action": "view",
             "dataScope": "company"
+          },
+          {
+            "resourceKey": "document.payments",
+            "action": "view",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payments",
+            "action": "operate",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "preview",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "print",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "export-pdf",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "design",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "clone",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-resources",
+            "action": "upload",
+            "dataScope": "own"
           }
         ]
       },
@@ -79645,6 +79717,51 @@
             "resourceKey": "office.notifications",
             "action": "view",
             "dataScope": "company"
+          },
+          {
+            "resourceKey": "document.payments",
+            "action": "view",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payments",
+            "action": "operate",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "preview",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "print",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "export-pdf",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "design",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "clone",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-resources",
+            "action": "upload",
+            "dataScope": "own"
           }
         ]
       },
@@ -79701,16 +79818,11 @@
           {
             "resourceKey": "document.payments",
             "action": "view",
-            "dataScope": "own"
+            "dataScope": "company"
           },
           {
             "resourceKey": "document.payments",
             "action": "operate",
-            "dataScope": "own"
-          },
-          {
-            "resourceKey": "document.query",
-            "action": "view",
             "dataScope": "own"
           },
           {
@@ -79766,17 +79878,17 @@
           {
             "resourceKey": "document.payment-output",
             "action": "preview",
-            "dataScope": "own"
+            "dataScope": "company"
           },
           {
             "resourceKey": "document.payment-output",
             "action": "print",
-            "dataScope": "own"
+            "dataScope": "company"
           },
           {
             "resourceKey": "document.payment-output",
             "action": "export-pdf",
-            "dataScope": "own"
+            "dataScope": "company"
           },
           {
             "resourceKey": "common.email-delivery",
@@ -79928,7 +80040,7 @@
       {
         "code": "OfficeEmployee",
         "name": "普通员工",
-        "description": "使用人事与行政自助服务：公司通讯录、本人申请、公告和通知；不授予人事私密档案、审批或单证销售权限。",
+        "description": "使用人事与行政自助服务、本人付款报销及个人票据模板设计打印；不授予私密人事档案、审批、发票报关或公共模板管理权限。",
         "grants": [
           {
             "resourceKey": "office.people",
@@ -80109,6 +80221,51 @@
             "resourceKey": "office.notifications",
             "action": "view",
             "dataScope": "company"
+          },
+          {
+            "resourceKey": "document.payments",
+            "action": "view",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payments",
+            "action": "operate",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "preview",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "print",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "export-pdf",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "design",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "clone",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-resources",
+            "action": "upload",
+            "dataScope": "own"
           }
         ]
       },
@@ -80386,6 +80543,51 @@
             "resourceKey": "office.notifications",
             "action": "view",
             "dataScope": "company"
+          },
+          {
+            "resourceKey": "document.payments",
+            "action": "view",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payments",
+            "action": "operate",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "preview",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "print",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "export-pdf",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "design",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "clone",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-resources",
+            "action": "upload",
+            "dataScope": "own"
           }
         ]
       },
@@ -80618,6 +80820,51 @@
             "resourceKey": "office.notifications",
             "action": "view",
             "dataScope": "company"
+          },
+          {
+            "resourceKey": "document.payments",
+            "action": "view",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payments",
+            "action": "operate",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "preview",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "print",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.payment-output",
+            "action": "export-pdf",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "design",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-templates",
+            "action": "clone",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "document.report-resources",
+            "action": "upload",
+            "dataScope": "own"
           }
         ]
       }
@@ -80713,7 +80960,7 @@
         "grants": [
           {
             "resourceKey": "document.custom-options",
-            "action": "operate"
+            "action": "view"
           },
           {
             "resourceKey": "document.reference-data",
@@ -81295,7 +81542,7 @@
           },
           {
             "resourceKey": "document.custom-options",
-            "action": "operate"
+            "action": "view"
           },
           {
             "resourceKey": "document.reference-data",
@@ -81306,7 +81553,7 @@
             "action": "view"
           },
           {
-            "resourceKey": "document.report-templates",
+            "resourceKey": "common.report-catalog",
             "action": "view"
           },
           {
@@ -81325,7 +81572,7 @@
           },
           {
             "resourceKey": "document.custom-options",
-            "action": "operate"
+            "action": "view"
           },
           {
             "resourceKey": "document.reference-data",
@@ -81336,7 +81583,7 @@
             "action": "view"
           },
           {
-            "resourceKey": "document.report-templates",
+            "resourceKey": "common.report-catalog",
             "action": "view"
           },
           {
@@ -81359,7 +81606,7 @@
           },
           {
             "resourceKey": "document.custom-options",
-            "action": "operate"
+            "action": "view"
           },
           {
             "resourceKey": "document.reference-data",
@@ -81370,12 +81617,17 @@
             "action": "view"
           },
           {
-            "resourceKey": "document.report-templates",
+            "resourceKey": "common.report-catalog",
             "action": "view"
           },
           {
             "resourceKey": "document.report-resources",
             "action": "view"
+          },
+          {
+            "resourceKey": "document.jobs",
+            "action": "view",
+            "dataScope": "own"
           }
         ]
       },
@@ -81389,7 +81641,7 @@
           },
           {
             "resourceKey": "document.custom-options",
-            "action": "operate"
+            "action": "view"
           },
           {
             "resourceKey": "document.reference-data",
@@ -81400,12 +81652,17 @@
             "action": "view"
           },
           {
-            "resourceKey": "document.report-templates",
+            "resourceKey": "common.report-catalog",
             "action": "view"
           },
           {
             "resourceKey": "document.report-resources",
             "action": "view"
+          },
+          {
+            "resourceKey": "document.jobs",
+            "action": "view",
+            "dataScope": "own"
           }
         ]
       },
@@ -81419,7 +81676,7 @@
           },
           {
             "resourceKey": "document.custom-options",
-            "action": "operate"
+            "action": "view"
           },
           {
             "resourceKey": "document.reference-data",
@@ -81438,7 +81695,7 @@
             "action": "view-delivery"
           },
           {
-            "resourceKey": "document.report-templates",
+            "resourceKey": "common.report-catalog",
             "action": "view"
           },
           {
@@ -81457,14 +81714,14 @@
           },
           {
             "resourceKey": "document.custom-options",
-            "action": "operate"
+            "action": "view"
           },
           {
             "resourceKey": "document.reference-data",
             "action": "view"
           },
           {
-            "resourceKey": "document.report-templates",
+            "resourceKey": "common.report-catalog",
             "action": "view"
           },
           {
@@ -81483,14 +81740,14 @@
           },
           {
             "resourceKey": "document.custom-options",
-            "action": "operate"
+            "action": "view"
           },
           {
             "resourceKey": "document.reference-data",
             "action": "view"
           },
           {
-            "resourceKey": "document.report-templates",
+            "resourceKey": "common.report-catalog",
             "action": "view"
           },
           {
@@ -81513,19 +81770,24 @@
           },
           {
             "resourceKey": "document.custom-options",
-            "action": "operate"
+            "action": "view"
           },
           {
             "resourceKey": "document.reference-data",
             "action": "view"
           },
           {
-            "resourceKey": "document.report-templates",
+            "resourceKey": "common.report-catalog",
             "action": "view"
           },
           {
             "resourceKey": "document.report-resources",
             "action": "view"
+          },
+          {
+            "resourceKey": "document.jobs",
+            "action": "view",
+            "dataScope": "own"
           }
         ]
       },
@@ -81598,6 +81860,16 @@
             "action": "view"
           }
         ]
+      },
+      {
+        "resourceKey": "document.report-templates",
+        "action": "view",
+        "grants": [
+          {
+            "resourceKey": "common.report-catalog",
+            "action": "view"
+          }
+        ]
       }
     ],
     "editions": {
@@ -81626,7 +81898,8 @@
         "document.invoice-output",
         "document.payment-output",
         "system.settings",
-        "system.backup"
+        "system.backup",
+        "common.report-catalog"
       ],
       "Sales": [
         "sales.dashboard",
@@ -81699,7 +81972,8 @@
         "office.purchase",
         "office.general",
         "office.announcements",
-        "office.notifications"
+        "office.notifications",
+        "common.report-catalog"
       ],
       "Administration": [
         "system.about",

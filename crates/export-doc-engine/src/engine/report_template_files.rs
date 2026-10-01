@@ -141,8 +141,7 @@ pub(super) fn resource_access(
         let kind = kind_of_category(path.split('/').next().unwrap_or(""));
         let design = report_templates::validate_bytes(kind, &bytes)
             .map_err(|_| unavailable("文件模板资源索引损坏，已停止图片操作。"))?;
-        let visible = auth::authorize(actor, PERMISSION, "view").is_ok()
-            && report_templates::demand_type(actor, kind).is_ok();
+        let visible = report_templates::policy::demand_catalog(actor, kind).is_ok();
         for resource in design.resources {
             let accessible = ids.entry(resource.id).or_insert(false);
             *accessible |= visible;

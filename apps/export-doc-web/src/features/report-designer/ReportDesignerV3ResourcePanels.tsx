@@ -70,6 +70,7 @@ function PaletteAction({ label, icon, onClick, disabled = false }: { label: stri
 }
 
 export function FieldPanel({
+  reportType,
   query,
   groups,
   productFields = false,
@@ -79,6 +80,7 @@ export function FieldPanel({
   focusRequest = 0,
   canEdit = true,
 }: {
+  reportType: ReportDesignerReportType;
   query: string;
   groups: ReportDesignerFieldGroup[];
   productFields?: boolean;
@@ -105,9 +107,9 @@ export function FieldPanel({
       </div>
       <label className="report-designer-v3-field-search">
         <span>搜索字段</span>
-        <input ref={searchRef} aria-label="搜索字段" value={query} placeholder="发票号、客户、金额..." onChange={(event) => onQueryChange(event.target.value)} />
+        <input ref={searchRef} aria-label="搜索字段" value={query} placeholder={reportType === "PaymentVoucher" ? "付款单号、收款方、金额..." : "发票号、客户、金额..."} onChange={(event) => onQueryChange(event.target.value)} />
       </label>
-      <p className="report-designer-v3-help">{productFields ? "把商品字段拖到明细行，各字段可单独移动。只设计一行，打印时按商品逐件重复。" : "把字段拖到纸上即可。发票号、唛头和合计等普通字段不随商品重复。"}</p>
+      <p className="report-designer-v3-help">{reportType === "PaymentVoucher" ? "把付款单号、收款方、费用和金额等字段拖到纸上，调整位置后保存即可打印。" : productFields ? "把商品字段拖到明细行，各字段可单独移动。只设计一行，打印时按商品逐件重复。" : "把字段拖到纸上即可。发票号、唛头和合计等普通字段不随商品重复。"}</p>
       {groups.length === 0 ? <p className="report-designer-v3-muted">暂无可用字段</p> : groups.map((group) => (
         <details key={group.category} open={Boolean(query.trim()) || groups.length <= 4}>
           <summary>{group.category}<small>{group.fields.length}</small></summary>

@@ -2,9 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, FileDown, LayoutTemplate, Printer, RefreshCw, Save } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ApiPaymentDto, ApiPaymentReportHtmlPreviewResponse, ApiReportTemplateDto, AppSettings, ExportDocManagerApiClient } from "../../api/index.ts";
-
-type SettingsLike = AppSettings | Record<string, unknown>;
+import { ApiPaymentDto, ApiPaymentReportHtmlPreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
+import { buildPaymentTemplateViews } from "./paymentReportTemplates.ts";
 import { usePermission, usePermissionCapabilities } from "../../app/PermissionAccessContext.tsx";
 import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -20,10 +19,8 @@ import { buildReportPdfDefaultFileName } from "../reports/reportFileNames.ts";
 import { printReportPreviewHtml } from "../reports/printReportPreview.ts";
 import {
   fileNameFromTemplatePath,
-  normalizeTemplatePath,
   readDefaultReportTemplatePath,
   resolveReportTemplatePath,
-  templatePathsMatch,
 } from "../reports/reportTemplateSelectionModel.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 import { createReportTemplateReturnState } from "../reports/reportTemplateReturnNavigation.ts";
@@ -44,6 +41,7 @@ export function PaymentReportPreviewPanel({
   const printPermission = usePermission(permissionResources.paymentOutput, permissionActions.print, paymentId > 0 ? paymentDraft ?? null : undefined);
   const pdfPermission = usePermission(permissionResources.paymentOutput, permissionActions.exportPdf, paymentId > 0 ? paymentDraft ?? null : undefined);
   const templateViewPermission = usePermission(permissionResources.reportTemplates, permissionActions.view);
+  const catalogPermission = usePermission(permissionResources.reportCatalog, permissionActions.view);
   const { canManageSettings } = usePermissionCapabilities();
   const queryClient = useQueryClient();
   const runAbortableOperation = useAbortableOperation();
@@ -65,7 +63,7 @@ export function PaymentReportPreviewPanel({
   const templatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates(reportType),
     queryFn: ({ signal }) => client.listReportTemplates({ reportType }, { signal }),
-    enabled: hasPreviewSource && templateViewPermission.allowed,
+    enabled: hasPreviewSource && catalogPermission.allowed,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -167,7 +165,7 @@ export function PaymentReportPreviewPanel({
   });
 
   const isBusy = templatesQuery.isFetching || settingsQuery.isFetching || previewMutation.isPending || pdfMutation.isPending || isPrinting;
-  const canPreview = previewPermission.allowed && hasPreviewSource && (templateViews.length === 0 || Boolean(selectedTemplatePath));
+  const canPreview = previewPermission.allowed && hasPreviewSource && Boolean(selectedTemplatePath) && !templatesQuery.isError;
   const canPrintPreview = printPermission.allowed && Boolean(preview?.html) && !isBusy;
   const canGeneratePdf = pdfPermission.allowed && canUseSavedPaymentOutput && Boolean(selectedTemplatePath) && (!desktopAvailable || Boolean(pdfDestinationPath.trim())) && !isBusy;
   const canQuickGeneratePdf = pdfPermission.allowed && canUseSavedPaymentOutput && Boolean(selectedTemplatePath) && !isBusy;
@@ -240,7 +238,7 @@ export function PaymentReportPreviewPanel({
 
   function buildPaymentReportPdfDefaultFileName() {
     const template = templateViews.find((item) => item.templatePath === selectedTemplatePath);
-    const paymentReference = paymentDraft?.invoiceNo?.trim() || (paymentId > 0 ? `payment-${paymentId}` : "payment-draft");
+    const paymentReference = paymentDraft?.voucherNo?.trim() || (paymentId > 0 ? `payment-${paymentId}` : "payment-draft");
     return buildReportPdfDefaultFileName({
       templatePath: selectedTemplatePath,
       displayName: template?.displayName,
@@ -285,7 +283,7 @@ export function PaymentReportPreviewPanel({
             className="icon-button"
             type="button"
             title="刷新模板" aria-label="刷新模板"
-            disabled={isBusy}
+            disabled={isBusy || !catalogPermission.allowed}
             onClick={() => void templatesQuery.refetch()}
           >
             <RefreshCw size={17} aria-hidden="true" />
@@ -351,7 +349,7 @@ export function PaymentReportPreviewPanel({
         <SelectField
           label="模板"
           value={selectedTemplatePath}
-          disabled={isBusy || !templateViewPermission.allowed || templateViews.length === 0}
+          disabled={isBusy || !catalogPermission.allowed || templateViews.length === 0}
           options={templateViews.map((template) => ({
             value: template.templatePath,
             label: template.displayName,
@@ -408,147 +406,4 @@ export function PaymentReportPreviewPanel({
       </div>
     </section>
   );
-}
-
-type PaymentTemplateSetting = {
-  name: string;
-  templatePath: string;
-  isEnabled: boolean;
-  reportType: string;
-};
-
-type PaymentTemplateView = {
-  templatePath: string;
-  displayName: string;
-};
-
-function buildPaymentTemplateViews(
-  templates: ApiReportTemplateDto[],
-  settings: SettingsLike | undefined,
-): PaymentTemplateView[] {
-  const configuredItems = readPaymentTemplateItems(settings).filter((item) => item.templatePath.length > 0);
-  const usedTemplatePaths = new Set<string>();
-  const views: PaymentTemplateView[] = [];
-
-  for (const item of configuredItems) {
-    const template = findTemplateForPaymentItem(item, templates, usedTemplatePaths);
-    if (!template) {
-      continue;
-    }
-
-    const normalizedPath = normalizeTemplatePath(template.templatePath);
-    if (usedTemplatePaths.has(normalizedPath)) {
-      continue;
-    }
-
-    usedTemplatePaths.add(normalizedPath);
-    if (!item.isEnabled) {
-      continue;
-    }
-
-    views.push({
-      templatePath: template.templatePath,
-      displayName: item.name || template.displayName || fileNameFromTemplatePath(template.templatePath),
-    });
-  }
-
-  for (const template of templates) {
-    const normalizedPath = normalizeTemplatePath(template.templatePath);
-    if (usedTemplatePaths.has(normalizedPath)) {
-      continue;
-    }
-
-    views.push({
-      templatePath: template.templatePath,
-      displayName: template.displayName || fileNameFromTemplatePath(template.templatePath),
-    });
-  }
-
-  return views;
-}
-
-function readPaymentTemplateItems(settings?: SettingsLike): PaymentTemplateSetting[] {
-  const rawItems = settings ? readRecordValue(settings, "paymentTemplates", "PaymentTemplates") : undefined;
-  if (!Array.isArray(rawItems)) {
-    return [];
-  }
-
-  const items: PaymentTemplateSetting[] = [];
-  for (const rawItem of rawItems) {
-    if (!isRecord(rawItem)) {
-      continue;
-    }
-
-    const reportType = readString(rawItem, "reportType", "ReportType") || "PaymentVoucher";
-    if (!isPaymentTemplateReportType(reportType)) {
-      continue;
-    }
-
-    items.push({
-      name: readString(rawItem, "name", "Name"),
-      templatePath: readString(rawItem, "templatePath", "TemplatePath"),
-      isEnabled: readBoolean(rawItem, true, "isEnabled", "IsEnabled"),
-      reportType,
-    });
-  }
-
-  return items;
-}
-
-function findTemplateForPaymentItem(
-  item: PaymentTemplateSetting,
-  templates: ApiReportTemplateDto[],
-  usedTemplatePaths: Set<string>,
-) {
-  const pathMatch = templates.find(
-    (template) =>
-      !usedTemplatePaths.has(normalizeTemplatePath(template.templatePath)) &&
-      templatePathsMatch(item.templatePath, template.templatePath),
-  );
-  if (pathMatch) {
-    return pathMatch;
-  }
-
-  const itemFileName = fileNameFromTemplatePath(item.templatePath);
-  if (!itemFileName) {
-    return undefined;
-  }
-
-  const fileNameMatches = templates.filter(
-    (template) =>
-      !usedTemplatePaths.has(normalizeTemplatePath(template.templatePath)) &&
-      fileNameFromTemplatePath(template.templatePath) === itemFileName,
-  );
-
-  return fileNameMatches.length === 1 ? fileNameMatches[0] : undefined;
-}
-
-function isPaymentTemplateReportType(reportType: string) {
-  return reportType.trim().toLowerCase() === "paymentvoucher";
-}
-
-
-function readRecordValue(record: SettingsLike, ...names: string[]) {
-  const source = record as unknown as Record<string, unknown>;
-  for (const name of names) {
-    if (Object.prototype.hasOwnProperty.call(source, name)) {
-      return source[name];
-    }
-  }
-
-  return undefined;
-}
-
-function readString(record: Record<string, unknown>, ...names: string[]) {
-  const value = readRecordValue(record, ...names);
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function readBoolean(record: Record<string, unknown>, fallback: boolean, ...names: string[]) {
-  const value = readRecordValue(record, ...names);
-  return typeof value === "boolean" ? value : fallback;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

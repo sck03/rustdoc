@@ -57,6 +57,8 @@ struct Dependency {
 struct Requirement {
     resource_key: String,
     action: String,
+    #[serde(default)]
+    data_scope: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -164,14 +166,19 @@ pub fn effective_details(grants: &[Grant]) -> Result<Vec<EffectiveGrant>, String
             .filter(|d| d.resource_key == source.resource_key && d.action == source.action)
         {
             for requirement in &dependency.grants {
+                let scope = requirement
+                    .data_scope
+                    .as_deref()
+                    .unwrap_or(&source.data_scope);
                 let key = (requirement.resource_key.clone(), requirement.action.clone());
-                if result.get(&key).is_none_or(|g| {
-                    scope_rank(&g.grant.data_scope) < scope_rank(&source.data_scope)
-                }) {
+                if result
+                    .get(&key)
+                    .is_none_or(|g| scope_rank(&g.grant.data_scope) < scope_rank(scope))
+                {
                     let grant = Grant {
                         resource_key: key.0.clone(),
                         action: key.1.clone(),
-                        data_scope: source.data_scope.clone(),
+                        data_scope: scope.into(),
                     };
                     result.insert(
                         key,
@@ -423,5 +430,44 @@ mod tests {
                 .iter()
                 .any(|g| g.resource_key == "system.users")
         );
+    }
+
+    #[test]
+    fn voucher_output_is_shared_without_export_or_designer_permissions() {
+        use crate::generated_api::*;
+        for role in [
+            "OfficeEmployee",
+            "Sales",
+            "SalesManager",
+            "OfficeManager",
+            "PersonnelManager",
+            "Finance",
+        ] {
+            let grants = role_grants(role).unwrap();
+            assert!(
+                allows_operation(&grants, false, CREATE_PAYMENT, &[]),
+                "{role}"
+            );
+            assert!(
+                allows_operation(&grants, false, START_PAYMENT_VOUCHER_PDF_DOWNLOAD_JOB, &[]),
+                "{role}"
+            );
+            assert!(allows_operation(&grants, false, LIST_JOBS, &[]), "{role}");
+            assert!(
+                !allows_operation(&grants, false, LIST_INVOICES, &[]),
+                "{role}"
+            );
+        }
+        let grants =
+            effective(&[grant("document.payment-output", "export-pdf", "company")]).unwrap();
+        assert!(grants.contains(&grant("document.jobs", "view", "own")));
+        assert!(
+            !grants
+                .iter()
+                .any(|g| g.resource_key == "document.report-templates")
+        );
+        assert!(!allows_operation(&grants, false, SAVE_CUSTOM_OPTION, &[]));
+        assert!(!allows_operation(&grants, false, CREATE_PAYMENT, &[]));
+        assert!(allows_operation(&grants, false, LIST_REPORT_TEMPLATES, &[]));
     }
 }

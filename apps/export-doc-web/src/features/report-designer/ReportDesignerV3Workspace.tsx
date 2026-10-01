@@ -362,7 +362,7 @@ export function ReportDesignerV3Workspace({
         {editingEnabled ? <>
         <div className="report-designer-v3-toolbar-group" role="group" aria-label="插入基础元素">
           <ToolbarButton label="文本" icon={<Pilcrow size={15} />} onClick={insertionActions.text} disabled={!editingEnabled} />
-          <ToolbarButton label="选择字段" title="普通字段：发票号、客户、唛头与合计" icon={<Braces size={15} />} onClick={() => { setProductFieldsOnly(false); openFieldPanel(); }} />
+          <ToolbarButton label="选择字段" title={reportType === "PaymentVoucher" ? "付款字段：单号、收款方、费用与金额" : "普通字段：发票号、客户、唛头与合计"} icon={<Braces size={15} />} onClick={() => { setProductFieldsOnly(false); openFieldPanel(); }} />
           {insertionActions.productFields ? <ToolbarButton label="商品字段" icon={<Columns3 size={15} />} onClick={insertionActions.productFields} /> : null}
           {insertionActions.image ? <ToolbarButton label="图片" icon={<ImageIcon size={15} />} onClick={insertionActions.image} disabled={!editingEnabled} /> : null}
           <ToolbarButton label="矩形" icon={<span className="report-designer-v3-tool-glyph">□</span>} onClick={insertionActions.rectangle} disabled={!editingEnabled} />
@@ -420,7 +420,7 @@ export function ReportDesignerV3Workspace({
           </div>
           {sidebarTab === "components" ? <ComponentPalette reportType={reportType} actions={insertionActions} canEdit={editingEnabled} /> : null}
           {sidebarTab === "fields" ? (
-            <FieldPanel query={fieldQuery} groups={visibleFieldGroups} productFields={productFieldsOnly} onProductFieldsChange={reportType === "ExportDocument" ? value => { setProductFieldsOnly(value); setFieldQuery(""); } : undefined} focusRequest={fieldFocusRequest} onQueryChange={setFieldQuery} onInsert={insertField} canEdit={editingEnabled} />
+            <FieldPanel reportType={reportType} query={fieldQuery} groups={visibleFieldGroups} productFields={productFieldsOnly} onProductFieldsChange={reportType === "ExportDocument" ? value => { setProductFieldsOnly(value); setFieldQuery(""); } : undefined} focusRequest={fieldFocusRequest} onQueryChange={setFieldQuery} onInsert={insertField} canEdit={editingEnabled} />
           ) : null}
           {sidebarTab === "layers" ? <LayerPanel state={history.state} onSelect={selectLayer} onCommit={commit} canEdit={editingEnabled} multiSelect={multiSelect} /> : null}
         </aside> : null}

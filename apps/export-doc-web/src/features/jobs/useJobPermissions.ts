@@ -7,6 +7,7 @@ export function useJobPermissions() {
   const jobPermission = useModulePermission("document.jobs");
   const reportPermission = useModulePermission("document.reports");
   const invoicePermission = useModulePermission("document.invoices");
+  const canReadReportCatalog = usePermission(permissionResources.reportCatalog, permissionActions.view).allowed;
   const retryPermissions: JobRetryPermissionSet = {
     canOperateJobs: jobPermission.canOperate,
     canOperateReports: reportPermission.canOperate,
@@ -20,6 +21,7 @@ export function useJobPermissions() {
   };
   return {
     jobPermission,
+    canReadReportCatalog,
     reportPermission,
     invoicePermission,
     canExportInvoiceZip: retryPermissions.canExportInvoiceZip,

@@ -2,6 +2,19 @@
 use super::*;
 use export_doc_storage::Connection;
 
+pub(crate) const CATALOG: &str = "common.report-catalog";
+
+pub(crate) fn demand_catalog(actor: &Actor, kind: &str) -> Result<()> {
+    auth::authorize(actor, CATALOG, "view")?;
+    demand_type(actor, kind)
+}
+
+pub(crate) fn output_visible(actor: &Actor, value: &Value) -> bool {
+    demand_catalog(actor, &text(value, "reportType")).is_ok()
+        && auth::template_visible(actor, CATALOG, value)
+        && usable(actor, value)
+}
+
 pub(crate) fn usable(actor: &Actor, value: &Value) -> bool {
     (["Draft", "Published"].contains(&text(value, "status").as_str())
         && value["ownerUserId"] == actor.id)

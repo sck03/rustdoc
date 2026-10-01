@@ -35,7 +35,7 @@ pub fn grants(connection: &Connection, user: &Value) -> Result<Vec<Grant>> {
         if group["isActive"] != true {
             return Ok(vec![]);
         }
-        serde_json::from_value(group["grants"].clone())?
+        super::permission_templates::direct_grants(group)?
     } else if user["permissionTemplateId"]
         .as_i64()
         .is_some_and(|id| id > 0)

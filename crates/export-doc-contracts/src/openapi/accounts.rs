@@ -55,7 +55,7 @@ pub(super) fn extend(doc: &mut Value) {
         if role["code"] == "OfficeEmployee" {
             role["name"] = json!("普通员工");
             role["description"] = json!(
-                "使用人事与行政自助服务：公司通讯录、本人申请、公告和通知；不授予人事私密档案、审批或单证销售权限。"
+                "使用人事与行政自助服务、本人付款报销及个人票据模板设计打印；不授予私密人事档案、审批、发票报关或公共模板管理权限。"
             );
         }
     }

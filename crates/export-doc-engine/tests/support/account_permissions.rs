@@ -2,6 +2,8 @@ use export_doc_engine::{
     api::ApiError, contracts, engine::NativeService, generated_api::*, paths::nonce,
 };
 use serde_json::{Value, json};
+#[path = "payment_printing_contract.rs"]
+mod payment_printing_contract;
 
 fn call(
     service: &NativeService,
@@ -73,15 +75,13 @@ pub fn exercise(service: &NativeService, admin: &str) {
         .map(|u| login(service, u["username"].as_str().unwrap()))
         .collect();
     for session in &sessions {
-        assert!(
-            session["user"]["capabilities"]["permissions"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .all(
-                    |g| g["resourceKey"].as_str().unwrap().starts_with("office.")
-                        || g["resourceKey"] == "system.about"
-                )
+        assert_eq!(
+            session["user"]["capabilities"]["canUseDocumentWorkspace"],
+            false
+        );
+        assert_eq!(
+            session["user"]["capabilities"]["canUseSalesWorkspace"],
+            false
         );
         assert_eq!(
             call(service, token(session), LIST_INVOICES, 0, None)
@@ -102,6 +102,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
             Some(403)
         );
     }
+    payment_printing_contract::exercise(service, admin, &sessions[0], &sessions[1]);
     let mut group = employee.clone();
     group["expectedVersion"] = employee["versionNumber"].clone();
     group["grants"] = json!([read]);

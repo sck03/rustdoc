@@ -30,7 +30,7 @@ const invoiceReportType = "ExportDocument";
 const jobListViewStateStorageKey = "export-doc-manager.job-list-view-state.v1";
 
 export function JobCenterPage({ client }: { client: ExportDocManagerApiClient }) {
-  const { jobPermission, reportPermission, invoicePermission, canExportInvoiceZip, canRetryJob } = useJobPermissions();
+  const { jobPermission, reportPermission, canReadReportCatalog, invoicePermission, canExportInvoiceZip, canRetryJob } = useJobPermissions();
   const workspaceDeviceProfile = useWorkspaceDeviceProfile();
   const workspaceDeviceMode = workspaceDeviceProfile.mode;
   const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
@@ -48,7 +48,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   const canCreateInvoiceReportZip =
     workspaceDeviceCapabilities.canImportExport
     && jobPermission.canOperate
-    && reportPermission.canView
+    && canReadReportCatalog
     && invoicePermission.canView
     && canExportInvoiceZip;
 

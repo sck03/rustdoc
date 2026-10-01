@@ -108,6 +108,7 @@ fn template(
     kind: &str,
     for_output: bool,
 ) -> Result<Template> {
+    super::report_templates::demand_type(actor, kind)?;
     let reference = if reference.is_empty() {
         default_path(kind)
     } else {
@@ -131,7 +132,12 @@ fn template(
             .filter(|id| *id > 0)
             .ok_or_else(|| invalid("模板编号无效。"))?;
         let saved = store.get("report-templates", id)?;
-        if !report_assets::template_visible(actor, &saved) {
+        let visible = if for_output {
+            auth::template_visible(actor, super::report_templates::policy::CATALOG, &saved)
+        } else {
+            report_assets::template_visible(actor, &saved)
+        };
+        if !visible {
             return Err(error(403, "没有读取此模板的权限。"));
         }
         if for_output && !super::report_templates::policy::usable(actor, &saved) {
@@ -176,7 +182,7 @@ fn catalog(
     actor: &Actor,
     kind: &str,
 ) -> Result<Value> {
-    auth::authorize(actor, "document.report-templates", "view")?;
+    super::report_templates::policy::demand_catalog(actor, kind)?;
     let mut rows:Vec<_>=render::BUILTINS.iter().filter(|v|v.report_type()==kind).map(|v|json!({"reportType":kind,"displayName":v.label(),"templatePath":v.path(),"withSealDefault":false})).collect();
     rows.extend(super::report_template_files::catalog_entries(paths, kind)?);
     for saved in super::report_templates::queries::usable(store, actor, kind)? {

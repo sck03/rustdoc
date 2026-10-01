@@ -12,6 +12,7 @@ export const permissionResources = {
   emailTemplates: "sales.email-templates",
   emailDelivery: "common.email-delivery",
   reportTemplates: "document.report-templates",
+  reportCatalog: "common.report-catalog",
   reportResources: "document.report-resources",
   invoiceOutput: "document.invoice-output",
   paymentOutput: "document.payment-output",

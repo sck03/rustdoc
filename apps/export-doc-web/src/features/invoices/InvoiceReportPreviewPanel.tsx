@@ -48,6 +48,7 @@ export function InvoiceReportPreviewPanel({
   const emailPermission = usePermission(permissionResources.invoiceOutput, permissionActions.sendEmail, invoiceId > 0 ? invoiceDraft ?? null : undefined);
   const emailSendPermission = usePermission(permissionResources.emailDelivery, permissionActions.send);
   const templateViewPermission = usePermission(permissionResources.reportTemplates, permissionActions.view);
+  const catalogPermission = usePermission(permissionResources.reportCatalog, permissionActions.view);
   const excelPermission = useModulePermission("document.excel");
   const { canManageSettings } = usePermissionCapabilities();
   const location = useLocation();
@@ -71,13 +72,13 @@ export function InvoiceReportPreviewPanel({
   const templatesQuery = useQuery({
     queryKey: queryKeys.reportTemplates("ExportDocument"),
     queryFn: ({ signal }) => client.listReportTemplates({ reportType: "ExportDocument" }, { signal }),
-    enabled: hasPreviewSource && templateViewPermission.allowed,
+    enabled: hasPreviewSource && catalogPermission.allowed,
     staleTime: 5 * 60 * 1000,
   });
   const settingsQuery = useQuery({
     queryKey: queryKeys.settings(),
     queryFn: ({ signal }) => client.getSettings({ signal }),
-    enabled: hasPreviewSource && (templateViewPermission.allowed || canManageSettings),
+    enabled: hasPreviewSource,
     staleTime: 5 * 60 * 1000,
   });
   const templates = templatesQuery.data ?? [];
@@ -255,7 +256,7 @@ export function InvoiceReportPreviewPanel({
       <InvoiceReportPreviewHeader
         canPreview={canPreview}
         canPrint={canPrintPreview}
-        canRefreshTemplates={templateViewPermission.allowed}
+        canRefreshTemplates={catalogPermission.allowed}
         errorMessage={errorMessage}
         hasSavedInvoice={hasSavedInvoice && workspaceDeviceCapabilities.canImportExport}
         hasUnsavedDraftChanges={hasUnsavedDraftChanges}
@@ -271,7 +272,7 @@ export function InvoiceReportPreviewPanel({
         <PermissionNotice>当前账号未授予发票报表预览权限；打印、PDF、ZIP 和邮件外发仍按各自动作权限独立控制。</PermissionNotice>
       ) : null}
       <InvoiceReportTemplateControls
-        canConfigureOutput={templateViewPermission.allowed}
+        canConfigureOutput={catalogPermission.allowed}
         canQuickGenerateBookingSheet={canQuickGenerateBookingSheet}
         canQuickGeneratePdf={canQuickGeneratePdf}
         desktopAvailable={desktopAvailable}

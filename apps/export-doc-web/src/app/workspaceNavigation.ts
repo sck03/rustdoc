@@ -27,9 +27,9 @@ export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
   const officeOnly = capabilities.canManageSettings !== true &&
     !capabilities.canUseDocumentWorkspace && !capabilities.canUseSalesWorkspace &&
     [...enabledModules].some(key => key.startsWith("office.")) &&
-    [...enabledModules].every(key => key.startsWith("office.") || key === "system.about");
+    groups.every(group => ["workspace", "personnel", "office", "resources", "system"].includes(group.key));
   if (!officeOnly) return groups;
-  const officeTasks = groups.find(group => group.key === "workspace")?.items.filter(item => item.workspace === "office") ?? [];
+  const officeTasks = groups.filter(group => group.key === "workspace" || group.key === "resources").flatMap(group => group.items);
   return groups.filter(group => group.key === "personnel" || group.key === "office")
     .map(group => group.key === "office" ? { ...group, items: [...officeTasks, ...group.items] } : group)
     .concat(!groups.some(group => group.key === "office") && officeTasks.length

@@ -7,7 +7,8 @@ use export_doc_domain::permissions::{self, Grant};
 use serde_json::{Value, json};
 
 pub fn project(mut value: Value) -> Result<Value> {
-    let grants: Vec<Grant> = serde_json::from_value(value["grants"].clone())?;
+    let grants = direct_grants(&value)?;
+    value["grants"] = json!(grants);
     let disabled: Vec<String> =
         serde_json::from_value(value.get("disabledModules").cloned().unwrap_or(json!([])))?;
     value["effectiveGrants"] = if value["isActive"] == true {
@@ -16,6 +17,43 @@ pub fn project(mut value: Value) -> Result<Value> {
         json!([])
     };
     Ok(value)
+}
+
+/// Version one is the untouched system seed. Saving a scheme pins the explicit
+/// choices at version two or later; independent and custom schemes never inherit.
+pub(super) fn direct_grants(value: &Value) -> Result<Vec<Grant>> {
+    if value["isSystem"] == true && value["versionNumber"] == 1 {
+        if let Some(role) = permissions::catalog()
+            .roles
+            .iter()
+            .find(|r| value["code"] == r.code)
+        {
+            return Ok(role.grants.clone());
+        }
+    }
+    serde_json::from_value(value["grants"].clone()).map_err(Into::into)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_untouched_system_defaults_follow_the_current_role() {
+        let mut seed =
+            json!({"isSystem":true,"code":"OfficeEmployee","versionNumber":1,"grants":[]});
+        assert!(
+            direct_grants(&seed)
+                .unwrap()
+                .iter()
+                .any(|g| g.resource_key == "document.payment-output")
+        );
+        seed["versionNumber"] = json!(2);
+        assert!(direct_grants(&seed).unwrap().is_empty());
+        seed["versionNumber"] = json!(1);
+        seed["isSystem"] = json!(false);
+        assert!(direct_grants(&seed).unwrap().is_empty());
+    }
 }
 
 pub fn validate(id: i64, previous: &Value, value: &mut Value) -> Result<()> {

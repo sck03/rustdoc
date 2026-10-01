@@ -126,8 +126,24 @@ for (const edition of selected) {
       await delay(500);
       const staffText = await run('document.body.innerText');
       assert(staffText.includes('人事管理') && staffText.includes('行政办公'));
+      assert(staffText.includes('付款报销') && staffText.includes('报表模板管理'));
       assert(!staffText.includes('单证概览') && !staffText.includes('账号与权限') && !staffText.includes('人员档案'));
       await captureScreenshot(cdp, path.join(output, `${edition}-employee.png`));
+      await run("location.hash='#/reports/templates/manage'; true");
+      const templateDeadline = Date.now() + 30000;
+      while (Date.now() < templateDeadline && !await run("!!document.querySelector('.template-select-field select')?.value")) await delay(100);
+      assert(!await run("!!document.querySelector('option[value=ExportDocument]')"), 'Employee designer excludes export documents');
+      const source = await run("document.querySelector('.template-select-field select').value");
+      assert(source, 'Employee payment template catalog loaded');
+      const staff = await request('Login', '', { username: 'desktop-employee', password: 'Desktop-Employee-2026' });
+      const cloned = await request('CloneUserReportTemplate', staff.body.accessToken,
+        { reportType: 'PaymentVoucher', name: '桌面私人付款模板', sourceTemplatePath: source });
+      assert.equal(cloned.status, 201); assert.equal(cloned.body.shareScope, 'Private');
+      await run(`location.hash='#/reports/templates?reportType=PaymentVoucher&userTemplateId=${cloned.body.id}'; true`);
+      const canvasDeadline = Date.now() + 30000;
+      while (Date.now() < canvasDeadline && !await run("!!document.querySelector('[data-v3-element-id]')")) await delay(100);
+      assert(await run("!!document.querySelector('[data-v3-element-id]')"), 'Employee payment designer renders inside WebView2');
+      await captureScreenshot(cdp, path.join(output, `${edition}-employee-designer.png`));
     } else { assert(!text.includes('人事管理') && !text.includes('行政办公') && !text.includes('账号与权限')); }
     results.push({ edition, home: expectedHome, ocr: marker.ocr, documentResources: marker.documentResources, statuses, screenshot: `${edition}.png` });
     await run("setTimeout(() => window.__TAURI_INTERNALS__.invoke('request_app_exit'), 100); true");

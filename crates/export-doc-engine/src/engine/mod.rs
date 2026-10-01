@@ -741,6 +741,7 @@ impl NativeService {
                     .find(|(key, _)| *key == "reportType")
                     .map(|(_, value)| value.as_str())
                     .unwrap_or("ExportDocument");
+                report_templates::demand_type(actor, kind)?;
                 serde_json::to_value(report_templates::fields(kind)?).map_err(Into::into)
             }
             GET_REPORT_TEMPLATE_V3_CONTRACT => {

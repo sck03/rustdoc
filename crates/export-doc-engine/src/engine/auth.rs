@@ -308,7 +308,13 @@ pub fn user_dto(
         .iter()
         .map(|(module, level)| json!({"moduleKey":module,"accessLevel":level}))
         .collect();
-    user["capabilities"] = json!({"canManageSettings":actor.admin,"canManageUsers":actor.admin && actor.edition.allows("system.users"),"canViewAllBusinessData":actor.admin,"canUseDocumentWorkspace":enabled.iter().any(|module|module.starts_with("document.")),"canUseSalesWorkspace":enabled.iter().any(|module|module.starts_with("sales.")),"productEdition":actor.edition.name(),"enabledModules":enabled,"moduleAccess":access,"permissions":actor.grants,"usesOfficeRegister":store.provider()? == "SQLite","availableFeatures":["worklist","business-attachments"]});
+    let workspace = |name| {
+        grants.iter().any(|grant| {
+            permissions::resource(&grant.resource_key)
+                .is_some_and(|resource| !resource.is_technical && resource.workspace == name)
+        })
+    };
+    user["capabilities"] = json!({"canManageSettings":actor.admin,"canManageUsers":actor.admin && actor.edition.allows("system.users"),"canViewAllBusinessData":actor.admin,"canUseDocumentWorkspace":workspace("document"),"canUseSalesWorkspace":workspace("sales"),"productEdition":actor.edition.name(),"enabledModules":enabled,"moduleAccess":access,"permissions":actor.grants,"usesOfficeRegister":store.provider()? == "SQLite","availableFeatures":["worklist","business-attachments"]});
     Ok(user)
 }
 
@@ -426,7 +432,10 @@ pub fn template_visible(actor: &Actor, permission: &str, template: &Value) -> bo
         || !actor.grants.iter().any(|grant| {
             grant["resourceKey"] == permission
                 && grant["action"] == "view"
-                && ["department", "company", "all"].contains(&text(grant, "dataScope").as_str())
+                && (permissions::resource(permission)
+                    .is_some_and(|resource| !resource.supports_data_scope)
+                    || ["department", "company", "all"]
+                        .contains(&text(grant, "dataScope").as_str()))
         })
     {
         return false;

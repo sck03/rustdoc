@@ -4,6 +4,7 @@ mod accounts;
 mod communication;
 mod observability;
 mod office;
+mod payment_printing;
 mod personnel;
 mod reports;
 use serde_json::Value;
@@ -17,6 +18,7 @@ pub fn document() -> Value {
     reports::extend(&mut document);
     observability::extend(&mut document);
     accounts::extend(&mut document);
+    payment_printing::extend(&mut document);
     document
 }
 
@@ -37,6 +39,14 @@ mod tests {
     fn preserves_every_reference_schema_endpoint_and_security_contract() {
         let baseline: Value = serde_json::from_str(include_str!("reference_openapi.json")).unwrap();
         let mut current = document();
+        // The catalog now serves output users as well as template designers;
+        // the use case additionally checks the requested document data domain.
+        assert_eq!(
+            current["paths"]["/api/reports/templates"]["get"]["x-exportdoc-policy"]["requirements"],
+            serde_json::json!([{"resourceKey":payment_printing::CATALOG,"action":"view"}])
+        );
+        current["paths"]["/api/reports/templates"]["get"]["x-exportdoc-policy"] =
+            baseline["paths"]["/api/reports/templates"]["get"]["x-exportdoc-policy"].clone();
         for methods in current["paths"].as_object_mut().unwrap().values_mut() {
             for operation in methods.as_object_mut().unwrap().values_mut() {
                 if reports::MANAGED_FILES.contains(&operation["operationId"].as_str().unwrap_or(""))

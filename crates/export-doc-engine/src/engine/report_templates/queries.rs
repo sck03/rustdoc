@@ -1,14 +1,15 @@
 use super::*;
 use export_doc_storage::{ReportTemplateQuery, TemplateAudience, TemplateVersionQuery};
 
-fn audience(actor: &Actor) -> TemplateAudience<'_> {
+fn audience(actor: &Actor, output: bool) -> TemplateAudience<'_> {
+    let permission = if output { policy::CATALOG } else { PERMISSION };
     TemplateAudience {
         user_id: actor.id,
         company: &actor.company,
         department: &actor.department,
         administrator: actor.admin,
-        can_view: auth::authorize(actor, PERMISSION, "view").is_ok(),
-        shared: auth::scope_rank(actor, PERMISSION, "view") >= 2,
+        can_view: auth::authorize(actor, permission, "view").is_ok(),
+        shared: output || auth::scope_rank(actor, permission, "view") >= 2,
     }
 }
 fn paging(values: &[(&str, String)]) -> (usize, usize, i64) {
@@ -41,7 +42,7 @@ pub(super) fn list(
             .store
             .connection()?
             .query_report_templates(&ReportTemplateQuery {
-                audience: audience(actor),
+                audience: audience(actor, false),
                 report_type: kind,
                 include_archived: query(values, "includeArchived") == "true",
                 keyword: &keyword,
@@ -94,13 +95,13 @@ pub(super) fn versions(
     Ok(crate::contracts::page(rows, total as usize, page, size))
 }
 pub(crate) fn usable(store: &store::Store, actor: &Actor, kind: &str) -> Result<Vec<Value>> {
-    demand_type(actor, kind)?;
+    policy::demand_catalog(actor, kind)?;
     let connection = store.connection()?;
     let mut rows = Vec::new();
     loop {
         crate::operation::check()?;
         let (total, page) = connection.query_report_templates(&ReportTemplateQuery {
-            audience: audience(actor),
+            audience: audience(actor, true),
             report_type: kind,
             include_archived: false,
             keyword: "",
