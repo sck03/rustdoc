@@ -1,9 +1,10 @@
 import { FormEvent, KeyboardEvent, useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Plus, RefreshCw, Search, X } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ApiPaymentDto, ExportDocManagerApiClient } from "../../api/index.ts";
-import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
+import { useModulePermission, usePermission } from "../../app/PermissionAccessContext.tsx";
+import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
@@ -15,6 +16,7 @@ const paymentListViewStateStorageKey = "export-doc-manager.payment-list-view-sta
 
 export function PaymentListPage({ client }: { client: ExportDocManagerApiClient }) {
   const paymentPermission = useModulePermission("document.payments");
+  const expensePermission = useModulePermission("office.expenses");
   const [initialListViewState] = useState(() => loadListViewState(paymentListViewStateStorageKey));
   const [keyword, setKeyword] = useState(initialListViewState.keyword);
   const [committedKeyword, setCommittedKeyword] = useState(initialListViewState.keyword);
@@ -36,10 +38,10 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
   });
 
   useEffect(() => {
-    if (paymentsQuery.data && paymentsQuery.data.pageNumber !== pageNumber) {
+    if (!paymentsQuery.isPlaceholderData && paymentsQuery.data && paymentsQuery.data.pageNumber !== pageNumber) {
       setPageNumber(paymentsQuery.data.pageNumber);
     }
-  }, [paymentsQuery.data, pageNumber]);
+  }, [paymentsQuery.data, paymentsQuery.isPlaceholderData, pageNumber]);
 
   useEffect(() => {
     saveListViewState(paymentListViewStateStorageKey, {
@@ -80,7 +82,7 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
             aria-label="搜索付款报销"
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="发票号、收款方、付款方、部门、项目"
+            placeholder="付款单号、参考号、收款方、付款方、部门、项目"
           />
         </form>
         <div className="toolbar-actions">
@@ -111,6 +113,9 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
         </div>
       </div>
 
+      <InlineNotice tone="info" action={expensePermission.canView ? <Link to="/office/requests/expense">报销申请与审批</Link> : undefined}>
+        填写付款单或报销打印单，保存后选择模板打印或导出 PDF。打印单不代表审批通过或已经付款。
+      </InlineNotice>
       {message ? <InlineNotice tone="error" title="付款记录加载失败">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
 
@@ -147,6 +152,7 @@ function PaymentTable({
   onOpen: (paymentId: number) => void;
 }) {
   function handleRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, paymentId: number) {
+    if (event.target !== event.currentTarget) return;
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       onOpen(paymentId);
@@ -158,7 +164,8 @@ function PaymentTable({
       <table className="payment-table">
         <thead>
           <tr>
-            <th>发票号</th>
+            <th>付款单号</th>
+            <th>发票号／业务参考号</th>
             <th>付款日期</th>
             <th>收款方</th>
             <th>付款方</th>
@@ -168,12 +175,13 @@ function PaymentTable({
             <th className="amount-cell">USD</th>
             <th className="amount-cell">CNY</th>
             <th>方式</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody>
           {data.length === 0 && !hasError ? (
             <tr>
-              <td colSpan={10} className="empty-cell">
+              <td colSpan={12} className="empty-cell">
                 {isBusy ? "加载中" : "暂无数据"}
               </td>
             </tr>
@@ -186,7 +194,8 @@ function PaymentTable({
                 onClick={() => onOpen(payment.id)}
                 onKeyDown={(event) => handleRowKeyDown(event, payment.id)}
               >
-                <td className="strong-cell">{payment.invoiceNo || "-"}</td>
+                <td className="strong-cell">{payment.voucherNo || "-"}</td>
+                <td>{payment.invoiceNo || "-"}</td>
                 <td>{formatDate(payment.paymentDate)}</td>
                 <td>{payment.payeeName || "-"}</td>
                 <td>{payment.payerName || "-"}</td>
@@ -198,6 +207,7 @@ function PaymentTable({
                 <td>
                   <span className="status-pill">{payment.paymentMethod || "-"}</span>
                 </td>
+                <td><PaymentOutputLink payment={payment} /></td>
               </tr>
             ))
           )}
@@ -205,4 +215,12 @@ function PaymentTable({
       </table>
     </ResponsiveTableFrame>
   );
+}
+
+function PaymentOutputLink({ payment }: { payment: ApiPaymentDto }) {
+  const preview = usePermission(permissionResources.paymentOutput, permissionActions.preview, payment);
+  const print = usePermission(permissionResources.paymentOutput, permissionActions.print, payment);
+  const pdf = usePermission(permissionResources.paymentOutput, permissionActions.exportPdf, payment);
+  if (!preview.allowed && !print.allowed && !pdf.allowed) return null;
+  return <Link to={`/payments/${payment.id}?section=report`} onClick={(event) => event.stopPropagation()}>打印/PDF</Link>;
 }

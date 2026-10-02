@@ -12,7 +12,6 @@ export {
 
 export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
   if (!Array.isArray(capabilities.enabledModules)) return [];
-  const enabledModules = new Set(capabilities.enabledModules.map(normalizePermissionPart));
   function filter(items: WorkspaceNavItem[]): WorkspaceNavItem[] {
     return items.flatMap((item) => {
       if (!hasWorkspaceItemAccess(item, capabilities)) return [];
@@ -22,18 +21,8 @@ export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
       return [{ ...item, children, searchItems, to: children?.[0]?.to ?? item.to }];
     });
   }
-  const groups = workspaceNavGroups.map((group) => ({ ...group, items: filter(group.items) }))
+  return workspaceNavGroups.map((group) => ({ ...group, items: filter(group.items) }))
     .filter((group) => group.items.length > 0);
-  const officeOnly = capabilities.canManageSettings !== true &&
-    !capabilities.canUseDocumentWorkspace && !capabilities.canUseSalesWorkspace &&
-    [...enabledModules].some(key => key.startsWith("office.")) &&
-    groups.every(group => ["workspace", "personnel", "office", "resources", "system"].includes(group.key));
-  if (!officeOnly) return groups;
-  const officeTasks = groups.filter(group => group.key === "workspace" || group.key === "resources").flatMap(group => group.items);
-  return groups.filter(group => group.key === "personnel" || group.key === "office")
-    .map(group => group.key === "office" ? { ...group, items: [...officeTasks, ...group.items] } : group)
-    .concat(!groups.some(group => group.key === "office") && officeTasks.length
-      ? [{ ...workspaceNavGroups.find(group => group.key === "office")!, items: officeTasks }] : []);
 }
 
 // Search only the caller's authorized navigation, including familiar feature names.
@@ -121,5 +110,3 @@ export function getRequiredRouteAccessLevel(pathname: string): "view" | "operate
 export function isAdminOnlyRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.requiresAdmin === true; }
 export function isSystemAdministrationRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.requiresSystemAdministration === true; }
 export function isDesktopOnlyRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.desktopOnly === true; }
-
-function normalizePermissionPart(value: unknown) { return typeof value === "string" ? value.trim().toLowerCase() : ""; }

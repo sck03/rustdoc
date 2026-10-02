@@ -215,22 +215,9 @@ const masterDataSmokeScene = createMasterDataSmokeScene({
   waitForRuntimeDiagnostics,
 });
 const paymentSmokeScene = createPaymentSmokeScene({
-  authorizedHeaders,
   authorizedJsonHeaders,
-  cloneJson,
-  ensureTrailingSlash,
   evaluate,
-  getApiSettings,
-  getReportTemplates,
-  includesText,
-  normalizePathForCompare,
-  redactDesktopAccessToken,
-  saveApiSettings,
-  setRecordValueKeepingExistingCase,
-  smokeFileNameFromPath,
-  waitFor,
   waitForPageExpression,
-  waitForRuntimeDiagnostics,
 });
 const reportTemplateSmokeScene = createReportTemplateSmokeScene({
   evaluate,

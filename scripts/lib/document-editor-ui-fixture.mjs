@@ -6,6 +6,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { mockIPC } from '@tauri-apps/api/mocks';
 import { PermissionAccessProvider } from ${source("app/PermissionAccessContext.tsx")};
 import { permissionResources, permissionActions } from ${source("app/permissionCatalog.ts")};
 import { ConfirmationProvider } from ${source("ui/ConfirmationProvider.tsx")};
@@ -23,6 +24,10 @@ import { setNestedValue } from ${source("features/settings/settingsValueUtils.ts
 const params=new URLSearchParams(location.search), mode=params.get('mode')||'new', readonly=params.get('role')==='reader';
 const date='2026-09-11';
 window.__calls=[]; window.__errors=[]; window.__failCustomOption=false;
+if(params.has('payment-output')) {
+  window.isTauri=true; window.__pdfDialogCount=0;
+  mockIPC(command=>{if(command!=='select_save_pdf_path')throw new Error('Unexpected fixture IPC: '+command);window.__pdfDialogCount++;return new Promise(resolve=>{window.__finishPdfDialog=resolve;});});
+}
 addEventListener('error',event=>window.__errors.push(event.message));
 addEventListener('unhandledrejection',event=>window.__errors.push(String(event.reason)));
 const provider=params.get('provider')||'Sqlite';
@@ -69,7 +74,8 @@ const client={
   },
   listUnits:()=>Promise.resolve([]),listProducts:()=>Promise.resolve(page([])),
   listCustomersPage:()=>Promise.resolve(page([])),listExportersPage:()=>Promise.resolve(page([])),listPayeesPage:()=>Promise.resolve(page([])),
-  listReportTemplates:input=>record('listReportTemplates',input,[]),
+  listReportTemplates:input=>record('listReportTemplates',input,params.has('payment-output')?[{reportType:'PaymentVoucher',templatePath:'Templates/Internal/payment_voucher_template.dtpl',displayName:'付款单',withSealDefault:false}]:[]),
+  startPaymentVoucherPdfSaveToPathJob:input=>record('startPaymentVoucherPdfSaveToPathJob',input,{jobId:'fixture-pdf'}),
   reviewInvoice:input=>record('reviewInvoice',input,{ready:true,issues:[]}),
 };
 const queries=new QueryClient({defaultOptions:{queries:{retry:false,refetchOnWindowFocus:false},mutations:{retry:false}}});

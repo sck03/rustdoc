@@ -51,6 +51,10 @@ assert.equal(api.normalizeInvoiceItemSpareColumnCount(-1), 0);
 assert.equal(api.normalizeInvoiceItemSpareColumnCount(11), 10);
 assert.equal(api.normalizeInvoiceItemSpareColumnCount(undefined), 0);
 assert.match(api.payment.validatePaymentDraft({ ...payment, spare10: "a".repeat(501) }), /备用字段10/);
+assert.equal(api.payment.calculatePaymentExpenseTotal({ ...payment, travelExpense: 0.1, officeExpense: 0.2 }), 0.3);
+assert.equal(api.payment.calculatePaymentExpenseTotal({ ...payment, travelExpense: 1e-7, officeExpense: 2e-7 }), 3e-7);
+assert.equal(api.payment.calculatePaymentExpenseTotal({ ...payment, travelExpense: 1234.56, officeExpense: 0.01, otherExpense: 9.99 }), 1244.56);
+assert.match(api.payment.validatePaymentDraft({ ...payment, cnyAmount: Infinity }), /有效金额/);
 
 const paths = (root) => keys.map((key) => `${root}.${key[0].toUpperCase()}${key.slice(1)}`);
 const catalog = { reportType: "ExportDocument", categoryOrder: ["明细备用列", "单据备用字段"], fields: [

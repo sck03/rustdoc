@@ -118,7 +118,7 @@ export function PaymentEditorPage({
       queryClient.setQueryData(queryKeys.payment(response.id), response.payment);
       await queryClient.invalidateQueries({ queryKey: queryKeys.paymentsRoot() });
       if (isNew) {
-        navigate(`/payments/${response.id}`, {
+        navigate(`/payments/${response.id}${location.search}`, {
           replace: true,
           state: { successMessage: "付款报销已创建。" },
         });
@@ -280,7 +280,7 @@ export function PaymentEditorPage({
       return;
     }
 
-    const title = payment.invoiceNo?.trim() || payment.payeeName?.trim() || `#${parsedPaymentId}`;
+    const title = payment.voucherNo?.trim() || payment.invoiceNo?.trim() || payment.payeeName?.trim() || `#${parsedPaymentId}`;
     if (!await requestConfirmation({ title: "删除付款/报销记录", description: `确定删除当前记录“${title}”吗？`, details: ["删除后无法在列表中继续查看。"], confirmLabel: "确认删除", tone: "danger" })) {
       return;
     }
@@ -328,7 +328,7 @@ export function PaymentEditorPage({
         </button>
         <div className="editor-title">
           <Edit3 size={18} aria-hidden="true" />
-          <span>{isNew ? "新建付款报销" : payment?.invoiceNo || "编辑付款报销"}</span>
+          <span>{isNew ? "新建付款报销" : payment?.voucherNo || payment?.invoiceNo || "编辑付款报销"}</span>
         </div>
         {!isNew && isPaymentIdValid && paymentPermission.canManage ? (
           <button

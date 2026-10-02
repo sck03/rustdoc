@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient, OaRequest } from "../../api/index.ts";
-import { PageState } from "../../ui/PageState.tsx";
+import { InlineNotice, PageState } from "../../ui/PageState.tsx";
+import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { OfficeQueryState } from "../office/OfficeUi.tsx";
 import { OaRequestDialog } from "./OaRequestDialog.tsx";
@@ -13,11 +14,15 @@ import "../../styles/routes/oa.css";
 
 export function OaRequestsPage({ client, user, kind }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind }) {
   const model = useOaRequests(client, user, kind);
+  const payments = useModulePermission("document.payments");
   const [editing, setEditing] = useState<OaRequest | "new" | null>(null);
   if (!oaAccess(user, kind, "view")) return <PageState tone="permission" title="没有此申请模块的查看权限" />;
   const module = oaModules[kind];
   return <section className="work-surface office-workspace oa-workspace" aria-label={module.name}>
     <header className="oa-heading"><h2>{model.selected ? "申请详情" : "申请列表"}</h2><Link to="/office/approvals">申请与审批中心</Link></header>
+    {kind === "expense" && <InlineNotice tone="info" action={payments.canView ? <Link to="/payments">填写付款或报销打印单</Link> : undefined}>
+      此处办理报销申请、审批和财务接收；付款报销打印单在工作台单独填写，打印不改变申请状态。
+    </InlineNotice>}
     {model.selected ? <>
       <button type="button" className="command-button secondary" onClick={() => model.select(0)}>返回申请列表</button>
       {model.detail.isPending ? <PageState tone="loading" title="正在读取申请" /> : model.detail.isError ? <PageState tone="error" title="申请读取失败" description={readApiError(model.detail.error)} action={<button className="command-button" type="button" onClick={() => void model.detail.refetch()}>重新读取</button>} />

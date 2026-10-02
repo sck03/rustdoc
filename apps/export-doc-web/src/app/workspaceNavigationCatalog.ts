@@ -82,10 +82,10 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
           { resourceKey: permissionResources.salesOpportunities, action: permissionActions.view },
         ] },
       ] },
+      { label: "付款报销打印", description: "填写付款单或报销打印单，保存后打印或导出 PDF；申请审批在费用报销中办理", keywords: "付款单 报销单 凭证 PDF 打印", to: "/payments", icon: CreditCard,
+        isActive: (path) => path.startsWith("/payments"), moduleKey: "document.payments" },
       { label: "文件任务", description: "查看导入、导出和报表处理进度，下载结果或重试失败任务", keywords: "任务中心 后台任务 PDF 合并 批量报表 ZIP",
         to: "/jobs", icon: ClipboardList, isActive: (path) => path.startsWith("/jobs"), moduleKey: "document.jobs" },
-      { label: "付款报销", description: "填写并打印付款、报销单，记录费用与收付款信息", to: "/payments", icon: CreditCard,
-        isActive: (path) => path.startsWith("/payments"), moduleKey: "document.payments" },
     ],
   },
   {

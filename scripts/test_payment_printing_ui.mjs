@@ -3,6 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
+import { verifyPaymentWorkflow } from './lib/payment-workflow-checks.mjs';
+import { createPaymentSmokeScene } from './lib/web-runtime-payment-scene.mjs';
+import { authorizedJsonHeaders } from './lib/web-runtime-smoke-common.mjs';
+import { evaluate } from './lib/web-runtime-browser-session.mjs';
+import { waitForPageExpression } from './lib/web-runtime-page-diagnostics.mjs';
 
 await withOfficeUi('payment-printing-ui', async ({ repo, output, url, invoke, openPage, require, operations }) => {
   const bundle = path.join(output, 'payment-model.mjs');
@@ -32,8 +37,8 @@ await withOfficeUi('payment-printing-ui', async ({ repo, output, url, invoke, op
   }
   const page = await openPage('pay-owner', password);
   await page.waitForURL('**/#/office/approvals');
-  await page.getByRole('link', { name: '报表模板管理', exact: true }).waitFor();
-  const navigation = await page.locator('#workspace-primary-navigation').innerText();
+  await page.getByRole('link', { name: '付款报销打印', exact: true }).waitFor();
+  const navigation = await page.locator('#workspace-primary-navigation').textContent();
   assert(navigation.includes('付款报销') && navigation.includes('报表模板管理'));
   assert(!navigation.includes('单证与申报') && !navigation.includes('发票管理'));
   await page.goto(`${url}/#/reports/templates/manage`);
@@ -65,11 +70,11 @@ await withOfficeUi('payment-printing-ui', async ({ repo, output, url, invoke, op
   assert.equal((await request('GetPayment', finance.accessToken, { id: payment.id })).status, 200);
   assert.equal((await request('UpdatePayment', finance.accessToken, { id: payment.id }, '', payment)).status, 403);
   await page.goto(`${url}/#/payments/${payment.id}`);
-  await page.getByRole('tab', { name: '预览与导出', exact: true }).click();
+  await page.getByRole('tab', { name: '打印与 PDF', exact: true }).click();
   const preview = page.locator('[aria-label="付款/报销单预览"]');
   await preview.getByRole('combobox', { name: '模板', exact: true }).selectOption(`user-template:${copy.id}`);
   await preview.getByRole('button', { name: '预览', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('iframe[title="付款/报销单 HTML 预览"]')?.srcdoc.includes('<svg'));
+  await page.waitForFunction(() => document.querySelector('iframe[title="付款/报销单预览"]')?.srcdoc.includes('<svg'));
   assert(await preview.getByRole('button', { name: '打印', exact: true }).isEnabled());
   const download = page.waitForEvent('download');
   await preview.getByRole('button', { name: '导出 PDF', exact: true }).click();
@@ -82,6 +87,7 @@ await withOfficeUi('payment-printing-ui', async ({ repo, output, url, invoke, op
   const expenseDownload = page.waitForEvent('download');
   await preview.getByRole('button', { name: '导出 PDF', exact: true }).click();
   await (await expenseDownload).saveAs(path.join(output, 'employee-expense.pdf'));
+  await verifyPaymentWorkflow({ page, url, invoke, operations, token: owner.accessToken, payment, output });
   // Output-only custom users do not inherit design permissions or colleagues' jobs.
   const direct = [ ['document.payments', 'view'], ['document.payment-output', 'export-pdf'] ]
     .map(([resourceKey, action]) => ({ resourceKey, action, dataScope: 'company' }));
@@ -99,4 +105,9 @@ await withOfficeUi('payment-printing-ui', async ({ repo, output, url, invoke, op
   assert.equal(views[0].displayName, '有效模板', 'A missing template must not rename or disable another file with the same name');
   assert.equal(model.buildPaymentTemplateViews([{ templatePath: 'Templates/Internal/payment.dtpl', displayName: '内置' }],
     { paymentTemplates: [{ templatePath: 'builtin:Internal/payment.dtpl', name: '已配置', isEnabled: true, reportType: 'PaymentVoucher' }] })[0].displayName, '已配置');
+  const adminPage = await openPage('oa-review', 'Review-2026-Test');
+  const session = await adminPage.context().newCDPSession(adminPage);
+  const smoke = createPaymentSmokeScene({ authorizedJsonHeaders, evaluate, waitForPageExpression });
+  const smokeResult = await smoke.run(session, { apiBaseUrl: url, webUrl: url, paymentReportCheck: true, paymentDeleteCheck: true }, admin, 'Bearer', 30000);
+  assert(smokeResult.paymentReportCheck.passed && smokeResult.paymentDeleteCheck.passed);
 });

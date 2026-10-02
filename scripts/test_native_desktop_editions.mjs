@@ -5,6 +5,7 @@ import { CdpClient, delay } from './lib/chromium-cdp.mjs';
 import { captureScreenshot, evaluate, getFreePort } from './lib/web-runtime-browser-session.mjs';
 import { spawnProcessTree, stopProcessTree } from './lib/child-process-tree.mjs';
 import { productEditionCatalog } from './lib/product-editions.mjs';
+import { verifyDesktopPayment } from './lib/native-payment-workflow.mjs';
 
 assert.equal(process.platform, 'win32', 'This gate exercises Windows WebView2 packages.');
 const repo = path.resolve(import.meta.dirname, '..');
@@ -55,10 +56,11 @@ for (const edition of selected) {
     assert(await run("!!document.querySelector('input[autocomplete=username]')"), `${edition}: login missing`);
     const context = await run("window.__TAURI_INTERNALS__.invoke('get_desktop_runtime_context')");
     assert.equal(context.productEdition, edition);
-    const request = async (id, token, body) => {
+    const request = async (id, token, body, parameters = {}) => {
       const operation = operations.get(id);
       assert(operation, `Unknown contract operation: ${id}`);
-      const response = await fetch(context.apiBaseUrl + operation.url, {
+      const route = operation.url.replace(/\{([^}]+)\}/gu, (_, key) => encodeURIComponent(parameters[key]));
+      const response = await fetch(context.apiBaseUrl + route, {
         method: operation.method, signal: AbortSignal.timeout(15000),
         headers: { 'Content-Type': 'application/json', 'X-ExportDocManager-Desktop-Token': context.desktopAccessToken,
           ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -126,7 +128,8 @@ for (const edition of selected) {
       await delay(500);
       const staffText = await run('document.body.innerText');
       assert(staffText.includes('人事管理') && staffText.includes('行政办公'));
-      assert(staffText.includes('付款报销') && staffText.includes('报表模板管理'));
+      const staffNavigation = await run("document.querySelector('#workspace-primary-navigation').textContent");
+      assert(staffNavigation.includes('工作台') && staffNavigation.includes('付款报销打印') && staffNavigation.includes('报表模板管理'));
       assert(!staffText.includes('单证概览') && !staffText.includes('账号与权限') && !staffText.includes('人员档案'));
       await captureScreenshot(cdp, path.join(output, `${edition}-employee.png`));
       await run("location.hash='#/reports/templates/manage'; true");
@@ -136,6 +139,7 @@ for (const edition of selected) {
       const source = await run("document.querySelector('.template-select-field select').value");
       assert(source, 'Employee payment template catalog loaded');
       const staff = await request('Login', '', { username: 'desktop-employee', password: 'Desktop-Employee-2026' });
+      await verifyDesktopPayment({ run, request, staff: staff.body, cdp, output });
       const cloned = await request('CloneUserReportTemplate', staff.body.accessToken,
         { reportType: 'PaymentVoucher', name: '桌面私人付款模板', sourceTemplatePath: source });
       assert.equal(cloned.status, 201); assert.equal(cloned.body.shareScope, 'Private');

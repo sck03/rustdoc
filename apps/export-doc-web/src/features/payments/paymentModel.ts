@@ -1,5 +1,6 @@
 import { ApiPaymentDto } from "../../api/index.ts";
 import { documentSpareKeys, mapDocumentSpareFields } from "../../ui/documentSpareFields.ts";
+import { sumDecimalNumbers } from "../../ui/decimalSum.ts";
 import {
   dateInputToApiDate,
   normalizeText,
@@ -20,7 +21,7 @@ export const paymentExpenseFields = [
 export const paymentAmountFields = [{ field: "usdAmount", label: "USD 金额" }, { field: "cnyAmount", label: "CNY 金额" }, ...paymentExpenseFields] as const;
 
 export function calculatePaymentExpenseTotal(payment: ApiPaymentDto) {
-  return paymentExpenseFields.reduce((sum, { field }) => sum + (Number(payment[field]) || 0), 0);
+  return sumDecimalNumbers(paymentExpenseFields.map(({ field }) => payment[field] ?? 0));
 }
 
 export function createEmptyPayment(businessDate: string): ApiPaymentDto {
@@ -136,6 +137,8 @@ export function validatePaymentDraft(payment: ApiPaymentDto) {
   const overlong = textLimits.find(([value, maximumLength]) => (value?.trim().length ?? 0) > maximumLength);
   if (overlong) return `${overlong[2]}不能超过 ${overlong[1]} 个字符。`;
 
+  const invalid = paymentAmountFields.find(({ field }) => !Number.isFinite(payment[field] ?? 0));
+  if (invalid) return `${invalid.label}必须是有效金额。`;
   const negative = paymentAmountFields.find(({ field }) => Number(payment[field] ?? 0) < 0);
   if (negative) return `${negative.label}不能小于 0。`;
   return null;

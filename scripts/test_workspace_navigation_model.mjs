@@ -224,7 +224,10 @@ const editionPermissions = JSON.parse(fs.readFileSync(path.join(repoRoot, "crate
 const employeeGrants = editionPermissions.roles.find(role => role.code === "OfficeEmployee").grants;
 const employeeCapabilities = { productEdition: "Full", availableFeatures: ["worklist"], permissions: employeeGrants,
   enabledModules: [...new Set(employeeGrants.map(grant => editionPermissions.resources.find(resource => resource.key === grant.resourceKey).moduleKey))] };
-assert(JSON.stringify(model.filterWorkspaceNavGroups(employeeCapabilities).map(group => group.key)) === JSON.stringify(["personnel", "office"]), "ordinary employees see only personnel and administration groups");
+const employeeGroups = model.filterWorkspaceNavGroups(employeeCapabilities);
+assert(employeeGroups.find(group => group.key === "workspace")?.items.some(item => item.to === "/payments"), "shared printing stays in the workbench for employees");
+assert(!employeeGroups.find(group => group.key === "office")?.items.some(item => item.to === "/payments"), "administration keeps applications separate from voucher printing");
+assert(model.searchWorkspaceNavGroups("PDF", employeeGroups).some(group => group.items.some(item => item.to === "/payments")), "employees can find payment printing by PDF");
 assert(product.getDefaultWorkspaceRoute(employeeCapabilities) === "/office/approvals", "employees land on their own office work instead of a forbidden document dashboard");
 assert(!model.getWorkspaceRouteItems(model.filterWorkspaceNavGroups(employeeCapabilities)).some(item => item.to === "/office/people"), "directory access does not expose private personnel records");
 for (const edition of ["Full", "Document", "Sales"]) {
