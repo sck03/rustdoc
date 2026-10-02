@@ -1,6 +1,6 @@
 # Rust 对照原版 C#/.NET 10 后端功能差距及修正方案
 
-> 首次盘点：2026-09-20；状态更新：2026-09-21。第 1 节提交与前端数量为首次盘点历史，现状以更新后的条目及当前事实为准。原版以相邻只读 `ExportDocManager_CS` 为准；界面、字段含义、业务规则及操作顺序按原版恢复，运行架构遵守 Tauri 2 + React + Rust 的现行约定。用户在本次盘点中进一步确认：**Rust 报表继续采用 krilla + PDFium 联动方案。**
+> 首次盘点：2026-09-20；状态更新：2026-09-21。第 1 节提交与前端数量为首次盘点历史，现状以更新后的条目及当前事实为准。原版以只读备份分支 `origin/tauri-csharp-net10-backup` 为准；界面、字段含义、业务规则及操作顺序按原版恢复，运行架构遵守 Tauri 2 + React + Rust 的现行约定。用户在本次盘点中进一步确认：**Rust 报表继续采用 krilla + PDFium 联动方案。**
 
 ## 2026-09-30 整体架构复核（2026-10-01 实施更新）
 
@@ -45,7 +45,7 @@ HS 实际采样“男裤、男T恤衫、T恤衫”：修正请求头 403、已�
 | 项目 | 本次核对基线 |
 | --- | --- |
 | Rust 仓库 | `ExportDocManager_RustNative`，提交 `106efd4a5dc2cf2f62399f7b35de0616e159eb7b` |
-| 原版仓库 | `../ExportDocManager_CS`，提交 `ba9dbdca72590b06c5f32740e4cd58d3027578da`，分支 `tauri-csharp-net10-backup` |
+| 原版仓库 | 只读备份分支，提交 `ba9dbdca72590b06c5f32740e4cd58d3027578da`，分支 `tauri-csharp-net10-backup` |
 | 原版技术基线 | C#/.NET 10；`global.json` 最低 SDK `10.0.302`，同代稳定 feature band 滚动；不是本次要求安装或运行 .NET |
 | 远端与工作树 | 开始时 Rust 工作树干净；`git fetch origin main` 后 `HEAD` 与 `origin/main` 同为上述 Rust 提交；原版工作树干净 |
 | 前端对照 | 对两仓库已跟踪的 `apps/export-doc-web/src` 做内容比较：528/528 个文件统一 CRLF/LF 后相同，无原版独有的缺失源文件；`loginPrefetch.ts` 仅字节换行有差异 |

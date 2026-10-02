@@ -1,6 +1,6 @@
 # 脚本使用说明
 
-> 2026-09-20：当前主线为 Tauri 2 + React + Rust。相邻 ExportDocManager_CS 是只读行为和脚本对照；这里的正式构建不发布 ASP.NET sidecar，不要求 .NET SDK／Runtime，不使用 NPOI。
+> 2026-09-20：当前主线为 Tauri 2 + React + Rust。原 C# 行为和脚本从只读备份分支 `origin/tauri-csharp-net10-backup` 及 Git 历史对照；这里的正式构建不发布 ASP.NET sidecar，不要求 .NET SDK／Runtime，不使用 NPOI。
 
 ## 本地入口
 

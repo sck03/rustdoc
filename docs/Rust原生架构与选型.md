@@ -16,7 +16,7 @@ Tauri 是桌面宿主；浏览器与 Docker 不运行 Tauri 窗口。Node 只用
 
 ## 原版来源与职责
 
-原版只读来源为相邻 `ExportDocManager_CS/apps/export-doc-web` 与 `apps/export-doc-tauri`。页面、导航、五页签发票、商品表格、设计器、草稿保护及操作顺序直接复用原版；保留本分支已升级 Vite／TypeScript 所需构建配置，不重写一套页面。
+原版只读来源为 `origin/tauri-csharp-net10-backup`（固定对照提交 `ba9dbdc`）中的 `apps/export-doc-web` 与 `apps/export-doc-tauri`，可通过 `git show` 读取；不再依赖本地 C# 工作树。页面、导航、五页签发票、商品表格、设计器、草稿保护及操作顺序直接复用原版；保留本分支已升级 Vite／TypeScript 所需构建配置，不重写一套页面。
 
 - `apps/export-doc-web`：唯一 React 界面；页面组合、hook 查询与变更、纯 model、平台 bridge 分层。
 - `apps/export-doc-tauri/src-tauri`：Tauri 窗口、文件对话框、WebView 预检、退出、更新、运行目录与迁移。`desktop_runtime` 仅管理共用 Rust 后端生命周期。
