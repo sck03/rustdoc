@@ -158,8 +158,30 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 
 ## 工作区清理
 
+### 目录职责
+
+| 目录 | 内容 | 清理规则 |
+| --- | --- | --- |
+| `target/` | Cargo 编译缓存、依赖构建、测试程序、Debug/Release 二进制及按版本缓存的 EXE；直接 Cargo、本地脚本和 CI 共用 | 可重建；清理后须重新编译，`-SkipBuild` 需先正常构建 |
+| `artifacts/` | 已组装的桌面/网页程序包、发布归档、验证报告和截图 | 普通验证产物可重建；程序包及包内 `App_Data` 不能整体当作缓存删除 |
+| `.codex-runtime/` | 仓库内 Cargo/npm/原生资源下载缓存、受控工具、临时工作区及本地日志 | 默认保留；`-IncludeCodexRuntimeWorkspaces` 只清理不含受保护内容的一次性目录 |
+| `apps/export-doc-web/dist/` | Vite 生成的前端静态资源，供桌面和网页打包 | 可重建，源码仍在 React 项目中 |
+
+`target` 中的 EXE 是编译结果，`artifacts/native-desktop` 中的 EXE 是附带字体、OCR、运行配置等资源的可运行包，两者存在必要的复制，并非两套源码或两套默认编译缓存。Tauri 原始安装器可能先生成在 `target/<target>/<profile>/bundle`，清理器默认保留含此目录的构建树。不要为整理目录移动已有程序包及其数据根。
+
+新增 Rust 构建继续使用 `target/`，不再新增 `artifacts/cargo-target-*` 或 `.codex-runtime/cargo-target-*`；不同 profile、目标架构和产品版本由同一构建根的子目录区分。现有 `artifacts/playwright-browsers`、`artifacts/tool-downloads` 是验证工具缓存的明确例外，保留路径以复用下载，不属于待删除报告。上述生成目录均不提交 Git；业务源码、冻结契约、模板和测试夹具仍在各自受版本控制的目录。
+
+### 执行清理
+
 只需释放 Rust 构建空间时，可在确认编译/测试进程已结束、可运行文件及验证记录已另存后，定向执行 `cargo clean --target-dir target`。旧的仓库内独立 Cargo 输出也可用 `--target-dir` 指定其已盘点路径。不要把 Cargo 下载缓存或业务目录作为目标；清理后须重新编译，但保留的 Cargo/npm 下载缓存可继续复用。
 
 先 `clean-generated-artifacts.ps1 -ListOnly` 盘点，再按根 AGENTS 中已授权的范围清理。保留业务数据、模板、模型、已需资源、交付输出和可复用依赖缓存；依赖缓存、node_modules、整个运行缓存及发布输出只有用户明确同意后才能删除。
+
+```powershell
+pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -ListOnly -IncludeCodexRuntimeWorkspaces
+pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntimeWorkspaces
+```
+
+扫描源码树时直接跳过依赖、受保护数据/资源、私有 `KEY`、链接及本地运行目录，生成目录只作为整体候选，不继续扫描其内部。任何候选含业务库、备份、私有材料或链接都保留；即使显式清理发布输出，也不放行业务数据或私有目录。
 
 带有效 `CACHEDIR.TAG` 的 Cargo 输出中，`debug/release/build/*/out` 下的生成资源可随构建目录清理；这不会放行业务数据库、备份、链接或其它位置的 `Resources/Templates`。PostgreSQL 的 `PG_VERSION`、SQLite 伴随文件同样受到保护。`-IncludeCodexRuntimeWorkspaces` 清理旧构建/一次性工作区时，仍保留原生归档、PostgreSQL 客户端、审计工具和包下载缓存；`artifacts/releases`、其它目录的 `exportdoc-desktop/web/container` 发布归档及 Cargo 安装器 `bundle` 默认按发布输出保护。清理后的下一次构建需要重新编译，但无需重复下载保留的依赖。

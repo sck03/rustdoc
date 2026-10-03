@@ -6,10 +6,11 @@ $fixture = Join-Path $fixtureRoot ("cleanup-policy-" + [Guid]::NewGuid().ToStrin
 New-Item -ItemType Directory -Path $fixture -Force | Out-Null
 try {
     if (Test-ExportDocProtectedArtifact $fixture) { throw "Empty generated directory should be cleanable" }
-    foreach ($name in @("App_Data", "Backups", "Templates", "Resources", "Database")) {
+    foreach ($name in @("App_Data", "Backups", "Templates", "Resources", "Database", "KEY")) {
         $child = Join-Path $fixture $name
         New-Item -ItemType Directory -Path $child | Out-Null
         if (-not (Test-ExportDocProtectedArtifact $fixture)) { throw "Failed to protect $name" }
+        if (-not (Test-ExportDocProtectedArtifact $child -IncludeReleaseOutputs)) { throw "Explicit release cleanup must still protect $name" }
         Remove-Item -LiteralPath $child
     }
     foreach ($name in @("business.db", "business.db-journal", "business.sqlite-wal", "backup.edmrecovery", "server.dump", "PG_VERSION")) {
@@ -54,10 +55,30 @@ try {
     [IO.File]::WriteAllText($pipCache, 'cached Python package')
     [IO.File]::WriteAllText($cache, 'cached archive fixture')
     [IO.File]::WriteAllText($release, 'release fixture')
+    $protectedFiles = @($cache, $pipCache, $release)
+    foreach ($path in @('apps/web/node_modules/package/dist/index.js', 'apps/web/App_Data/dist/user.txt', 'tools/private/KEY/target/signing-material', 'artifacts/review/KEY/private-material')) {
+        $file = Join-Path $planRoot $path
+        New-Item -ItemType Directory -Path (Split-Path $file -Parent) -Force | Out-Null
+        [IO.File]::WriteAllText($file, 'preserved fixture')
+        $protectedFiles += $file
+    }
+    $generatedPaths = @('target', 'apps/web/dist', 'crates/example/target', 'artifacts/cargo-target-native', '.codex-runtime/cargo-target-native')
+    foreach ($path in $generatedPaths | Select-Object -Skip 1) {
+        $directory = Join-Path $planRoot $path
+        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+        [IO.File]::WriteAllText((Join-Path $directory 'generated-output'), 'rebuildable')
+    }
+    & pwsh -NoProfile -File (Join-Path $planScripts 'clean-generated-artifacts.ps1') -IncludeCodexRuntimeWorkspaces -WhatIf | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Isolated cleanup preview failed' }
+    foreach ($path in $generatedPaths) {
+        if (-not (Test-Path -LiteralPath (Join-Path $planRoot $path))) { throw "Preview removed $path" }
+    }
     & pwsh -NoProfile -File (Join-Path $planScripts 'clean-generated-artifacts.ps1') -IncludeCodexRuntimeWorkspaces | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Isolated cleanup failed' }
-    if (Test-Path -LiteralPath (Join-Path $planRoot 'target')) { throw 'Verified compiler output was not removed' }
-    foreach ($preserved in @($cache, $pipCache, $release)) {
+    foreach ($path in $generatedPaths) {
+        if (Test-Path -LiteralPath (Join-Path $planRoot $path)) { throw "Verified compiler output was not removed: $path" }
+    }
+    foreach ($preserved in $protectedFiles) {
         if (-not (Test-Path -LiteralPath $preserved)) { throw "Default cleanup removed a reusable cache or release: $preserved" }
     }
     Write-Host "Generated artifact cleanup protection and isolated deletion passed."

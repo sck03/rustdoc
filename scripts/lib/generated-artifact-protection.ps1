@@ -5,7 +5,7 @@ function Test-ExportDocProtectedArtifact {
     for ($ancestor = [System.IO.Path]::GetFullPath($Path); $ancestor; $ancestor = [System.IO.Path]::GetDirectoryName($ancestor)) {
         $item = Get-Item -LiteralPath $ancestor -Force -ErrorAction Stop
         if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { return $true }
-        if ($item.Name -in @(".git", "App_Data", "Database", "Backups", "Templates", "OcrModels", "Resources", "Security")) { return $true }
+        if ($item.Name -in @(".git", "App_Data", "Database", "Backups", "Templates", "OcrModels", "Resources", "Security", "KEY")) { return $true }
     }
     $cacheTag = Join-Path $root 'CACHEDIR.TAG'
     $cargoOutput = (Test-Path -LiteralPath $cacheTag -PathType Leaf) -and
@@ -17,7 +17,7 @@ function Test-ExportDocProtectedArtifact {
     while ($pending.Count -gt 0) {
         $directory = Get-Item -LiteralPath $pending.Pop() -Force -ErrorAction Stop
         if ($directory.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { return $true }
-        if ($directory.Name -in @(".git", "App_Data", "Database", "Backups", "Security")) { return $true }
+        if ($directory.Name -in @(".git", "App_Data", "Database", "Backups", "Security", "KEY")) { return $true }
         $relative = [System.IO.Path]::GetRelativePath($root, $directory.FullName).Replace('\', '/')
         if ($cargoOutput -and -not $IncludeReleaseOutputs -and $relative -cmatch '^(?:[^/]+/)?(?:debug|release)/bundle(?:/|$)') { return $true }
         if ($directory.Name -in @('Templates', 'OcrModels', 'Resources')) {

@@ -229,24 +229,10 @@ function Add-Target {
     }
 }
 
-function Test-IsUnderPath {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Root
-    )
-
-    return Test-ExportDocPathUnderRoot -Path $Path -Root $Root -AllowRoot
-}
-
 function Get-GeneratedArtifactCleanupPlan {
     $targets = [System.Collections.Generic.List[object]]::new()
     $artifactsRoot = Join-Path $workspaceRoot "artifacts"
     $codexRuntimeRoot = Join-Path $workspaceRoot ".codex-runtime"
-    $nodeModulesPattern = [System.IO.Path]::DirectorySeparatorChar + "node_modules" + [System.IO.Path]::DirectorySeparatorChar
-    $localRuntimePattern = [System.IO.Path]::DirectorySeparatorChar + ".codex-runtime" + [System.IO.Path]::DirectorySeparatorChar
 
     # artifacts/ is reserved for generated development output. Preserve only
     # named delivery outputs and reusable download caches unless their explicit
@@ -331,33 +317,32 @@ function Get-GeneratedArtifactCleanupPlan {
         }
     }
 
-    # Restrict recursive compiler-output discovery to source trees. Runtime
-    # data, release outputs, downloaded tools, stable resources and .git are
-    # never traversed by this generic rule.
-    $sourceTreeDirectories = @()
+    # Prune dependency, data and output trees before traversal. In particular,
+    # never discover a dependency's own dist/bin directories as separate targets.
+    $pending = [System.Collections.Generic.Stack[string]]::new()
     foreach ($sourceTreeName in @("apps", "crates", "src", "tests", "tools")) {
         $sourceTreePath = Join-Path $workspaceRoot $sourceTreeName
-        if (Test-Path -LiteralPath $sourceTreePath) {
-            $sourceTreeDirectories += Get-ChildItem -LiteralPath $sourceTreePath -Recurse -Directory -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $sourceTreePath -PathType Container) {
+            $pending.Push($sourceTreePath)
         }
     }
-
-    $sourceTreeDirectories |
-        Where-Object {
-            $_.Name -in @("bin", "obj", ".vite", "dist", "target") -and
-            -not $_.FullName.Contains($localRuntimePattern) -and
-            ($IncludeNodeModules -or -not $_.FullName.Contains($nodeModulesPattern))
-        } |
-        ForEach-Object {
-            Add-Target -Targets $targets -Path $_.FullName -Reason "generated compiler or bundler output"
-        }
-
-    if ($IncludeNodeModules) {
-        $sourceTreeDirectories |
-            Where-Object { $_.Name -eq "node_modules" } |
-            ForEach-Object {
-                Add-Target -Targets $targets -Path $_.FullName -Reason "npm dependency cache"
+    while ($pending.Count -gt 0) {
+        $directory = Get-Item -LiteralPath $pending.Pop() -Force -ErrorAction Stop
+        if ($directory.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { continue }
+        if ($directory.Name -in @('.git', '.codex-runtime', 'App_Data', 'Database', 'Backups', 'Security', 'KEY', 'Templates', 'OcrModels', 'Resources')) { continue }
+        if ($directory.Name -eq 'node_modules') {
+            if ($IncludeNodeModules) {
+                Add-Target -Targets $targets -Path $directory.FullName -Reason 'explicitly requested npm dependency tree cleanup'
             }
+            continue
+        }
+        if ($directory.Name -in @('bin', 'obj', '.vite', 'dist', 'target')) {
+            Add-Target -Targets $targets -Path $directory.FullName -Reason 'generated compiler or bundler output'
+            continue
+        }
+        foreach ($child in Get-ChildItem -LiteralPath $directory.FullName -Directory -Force -ErrorAction Stop) {
+            $pending.Push($child.FullName)
+        }
     }
 
     if ($IncludePackageCaches) {
@@ -384,7 +369,7 @@ function Get-GeneratedArtifactCleanupPlan {
     foreach ($candidate in $targets | Sort-Object -Property @{ Expression = { $_.Path.Length } }, Path) {
         $coveredByParent = $false
         foreach ($existingTarget in $topLevelTargets) {
-            if (Test-IsUnderPath -Path $candidate.Path -Root $existingTarget.Path) {
+            if (Test-ExportDocPathUnderRoot -Path $candidate.Path -Root $existingTarget.Path -AllowRoot) {
                 $coveredByParent = $true
                 break
             }
