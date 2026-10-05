@@ -6,6 +6,7 @@ import { captureScreenshot, evaluate, getFreePort } from './lib/web-runtime-brow
 import { spawnProcessTree, stopProcessTree } from './lib/child-process-tree.mjs';
 import { productEditionCatalog } from './lib/product-editions.mjs';
 import { verifyDesktopPayment } from './lib/native-payment-workflow.mjs';
+import { verifyDesktopDetailDesigner } from './lib/native-detail-designer.mjs';
 
 assert.equal(process.platform, 'win32', 'This gate exercises Windows WebView2 packages.');
 const repo = path.resolve(import.meta.dirname, '..');
@@ -103,6 +104,7 @@ for (const edition of selected) {
     await captureScreenshot(cdp, path.join(output, `${edition}.png`));
     if (edition === 'Full') {
       assert(text.includes('人事管理') && text.includes('行政办公') && text.includes('公司公告') && text.includes('站内通知'));
+      await verifyDesktopDetailDesigner({ run, request, token: login.body.accessToken, cdp, output });
       await run("location.hash='#/office/announcements'; true");
       const pageDeadline = Date.now() + 15000;
       while (Date.now() < pageDeadline && !await run("!!document.querySelector('[aria-label=公司公告]')")) await delay(100);

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import { createDetailTableGroupFooter, createDetailTableGrouping } from "./reportDesignerMutations.ts";
 import type { ReportBlock, ReportDetailTableBlock, ReportDetailTableGroupFooterCell } from "./reportDesignerSchema.ts";
@@ -22,6 +23,9 @@ export function ReportDesignerDetailTableGroupingProperties({
     ? Math.min(block.columns.length, Math.max(1, Math.floor(block.grouping.footer.labelColumnSpan)))
     : 1;
   const detailItemFieldGroups = filterDetailItemFieldGroups(fieldGroups);
+  const [selectedId, setSelectedId] = useState("");
+  const footerColumns = block.columns.slice(groupFooterLabelSpan);
+  const selected = footerColumns.some(column => column.id === selectedId) ? selectedId : footerColumns[0]?.id;
 
   function updateGroupFooterCell(columnId: string, update: (cell: ReportDetailTableGroupFooterCell) => ReportDetailTableGroupFooterCell) {
     if (!block.grouping?.footer) {
@@ -64,6 +68,7 @@ export function ReportDesignerDetailTableGroupingProperties({
         {block.grouping ? (
           <div className="new-report-property-grid">
             <FieldPathInput
+              selectOnly
               className="new-report-property-wide"
               label="分组字段"
               value={block.grouping.fieldPath}
@@ -140,7 +145,10 @@ export function ReportDesignerDetailTableGroupingProperties({
                 }
               />
             </label>
-            {block.columns.slice(groupFooterLabelSpan).map((column) => {
+            {footerColumns.length > 0 && <label className="new-report-property-wide"><span>小计列</span><select value={selected} onChange={event => setSelectedId(event.target.value)}>
+              {footerColumns.map(column => <option key={column.id} value={column.id}>{column.title || "未命名列"}</option>)}
+            </select></label>}
+            {footerColumns.filter(column => column.id === selected).map((column) => {
               const cell = block.grouping!.footer!.cells.find((candidate) => candidate.columnId === column.id) ?? createEmptyGroupFooterCell(column.id);
 
               return (
@@ -169,6 +177,7 @@ export function ReportDesignerDetailTableGroupingProperties({
                   </label>
                   {cell.contentKind === "Sum" ? (
                     <FieldPathInput
+                      selectOnly
                       label="求和字段"
                       value={cell.fieldPath}
                       fieldGroups={detailItemFieldGroups}

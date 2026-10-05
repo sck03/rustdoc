@@ -390,6 +390,8 @@ export function TextStyleEditor({
       </label>
       <DesignerCheckbox checked={Boolean(style.bold)}
           onChange={(checked) => onChange({ ...style, bold: checked })}>加粗</DesignerCheckbox>
+      <details className="new-report-property-wide"><summary>文字上下间距</summary>
+      <div className="new-report-property-grid">
       <label>
         <span>上距(mm)</span>
         <input
@@ -412,6 +414,8 @@ export function TextStyleEditor({
           onChange={(event) => onChange({ ...style, marginBottomMm: normalizeNumber(event.target.value, 0) })}
         />
       </label>
+      </div>
+      </details>
     </div>
   );
 }

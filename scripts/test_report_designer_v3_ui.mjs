@@ -12,6 +12,7 @@ import { verifyProductFieldsUi } from "./lib/report-designer-product-fields-ui.m
 import { verifyShippingMarksUi } from "./lib/report-shipping-marks-ui-scenarios.mjs";
 import { verifyDetailVisibility } from "./lib/report-designer-visibility-ui.mjs";
 import { verifyDesignerUsability } from "./lib/report-designer-usability-ui.mjs";
+import { verifyDetailProperties } from "./lib/report-designer-detail-properties-ui.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -241,7 +242,7 @@ try {
   assert.equal(await read(page,'window.__designerSchema.layers.find(layer=>layer.role==="Body").elements.filter(element=>element.flowKind==="DetailTable").length'),2);
   assert(!await read(page,'document.body.innerText.includes("当前草稿不能保存")'));
   results.push({test:'detail insertion from header goes to body',passed:true});
-  await click(page,'.report-designer-v3-inspector .report-designer-property-section summary');
+	  await read(page, "[...document.querySelectorAll('.report-designer-v3-inspector summary')].find(node=>node.textContent.startsWith('位置与大小')).click()");
   await read(page, `(() => {const input=Array.from(document.querySelectorAll('.report-designer-v3-inspector label')).find(label=>label.textContent.trim()==='Y (mm)').querySelector('input');input.focus();input.select()})()`);
   await page.send('Input.insertText',{text:'0'}); await key(page,'Enter');
   assert.equal(await read(page, `Array.from(document.querySelectorAll('.report-designer-v3-inspector label')).find(label=>label.textContent.trim()==='Y (mm)').querySelector('input').value`),'60');
@@ -283,6 +284,7 @@ try {
   results.push({test:'902-element text input commits once and undoes as one operation',passed:true});
   await verifyDesignerEditingUi({page,url,read,waitFor,click,key,modifier:primaryModifier,results});
   await verifyDetailVisibility({page,url,read,waitFor,results});
+  await verifyDetailProperties({page,url,read,waitFor,click,key,results,output});
   await verifyProductFieldsUi({page,url,read,waitFor,click,results,capture:() => captureScreenshot(page,path.join(output,'invoice-fields.png'))});
   await page.send("Page.navigate",{url});
   await waitFor(page,'document.querySelector("[data-v3-element-id=review-grid]")');

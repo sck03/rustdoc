@@ -419,23 +419,14 @@
   min-width: 0;
 }
 
-.new-report-detail-column-card:not([hidden]) { display: grid; }
-
 .new-report-detail-column-card {
+  display: grid;
   gap: 8px;
   min-width: 0;
   padding: 8px;
   background: var(--edm-neutral-50);
   border: 1px solid var(--edm-neutral-250);
   border-radius: 6px;
-}
-
-.new-report-detail-column-card[draggable="true"] {
-  cursor: grab;
-}
-
-.new-report-detail-column-card[draggable="true"]:active {
-  cursor: grabbing;
 }
 
 .new-report-detail-column-title {

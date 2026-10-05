@@ -73,7 +73,7 @@
 
 .report-designer-property-section > summary {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   color: var(--edm-neutral-750);
   font-size: .75rem;

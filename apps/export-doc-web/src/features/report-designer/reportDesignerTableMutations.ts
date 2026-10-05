@@ -1,7 +1,6 @@
 import type {
   ReportDetailTableBlock,
-  ReportDetailTableGroupFooterCell,
-  ReportDetailTableSummaryCell,
+  ReportDetailTableColumn,
   ReportGridBlock,
   ReportRowColumn,
 } from "./reportDesignerSchema.ts";
@@ -144,29 +143,21 @@ export function moveDetailTableColumn(
   };
 }
 
-export function reorderDetailTableColumn(
-  block: ReportDetailTableBlock,
-  sourceColumnId: string,
-  targetColumnId: string,
-): ReportDetailTableBlock {
-  if (sourceColumnId === targetColumnId) {
-    return block;
-  }
+export function addDetailTableColumn(block: ReportDetailTableBlock): ReportDetailTableBlock {
+  return { ...block, columns: [...block.columns, createDetailTableColumn()] };
+}
 
-  const sourceIndex = block.columns.findIndex((column) => column.id === sourceColumnId);
-  const targetIndex = block.columns.findIndex((column) => column.id === targetColumnId);
-  if (sourceIndex < 0 || targetIndex < 0) {
-    return block;
-  }
-
-  const columns = [...block.columns];
-  const [movedColumn] = columns.splice(sourceIndex, 1);
-  columns.splice(targetIndex, 0, movedColumn);
-
-  return {
-    ...block,
-    columns,
-  };
+/** A content-mode change keeps the existing binding and any saved composition. */
+export function setDetailColumnContentKind(
+  column: ReportDetailTableColumn,
+  contentKind: NonNullable<ReportDetailTableColumn["contentKind"]>,
+): ReportDetailTableColumn {
+  if (column.contentKind === contentKind) return column;
+  const content = column.content?.length ? column.content : [{
+    id: createReportBlockId("detail-cell-part"), kind: "Field" as const,
+    text: "", fieldPath: column.fieldPath,
+  }];
+  return { ...column, contentKind, ...(contentKind === "Composite" ? { content } : {}) };
 }
 
 export function duplicateDetailTableColumn(
@@ -180,18 +171,10 @@ export function duplicateDetailTableColumn(
   }
 
   const duplicate = {
-    ...createDetailTableColumn(
-      `${sourceColumn.title} Copy`,
-      sourceColumn.fieldPath,
-      sourceColumn.widthMm,
-      sourceColumn.align,
-    ),
-    headerGroupTitle: sourceColumn.headerGroupTitle,
-    headerGroupSpan: sourceColumn.headerGroupSpan,
-    contentKind: sourceColumn.contentKind,
+    ...structuredClone(sourceColumn),
+    id: createReportBlockId("detail-col"),
+    title: `${sourceColumn.title} 副本`,
     content: sourceColumn.content?.map((part) => ({ ...part, id: createReportBlockId("detail-cell-part") })),
-    format: sourceColumn.format,
-    border: sourceColumn.border,
   };
   const columns = [
     ...block.columns.slice(0, currentIndex + 1),
@@ -202,27 +185,12 @@ export function duplicateDetailTableColumn(
   return {
     ...block,
     columns,
-    summaryRow: block.summaryRow
-      ? {
-          ...block.summaryRow,
-          cells: [
-            ...block.summaryRow.cells,
-            createEmptySummaryCell(duplicate.id),
-          ],
-        }
-      : undefined,
+    introRow: duplicateColumnCell(block.introRow, columnId, duplicate.id, currentIndex),
+    summaryRow: duplicateColumnCell(block.summaryRow, columnId, duplicate.id, currentIndex),
     grouping: block.grouping
       ? {
           ...block.grouping,
-          footer: block.grouping.footer
-            ? {
-                ...block.grouping.footer,
-                cells: [
-                  ...block.grouping.footer.cells,
-                  createEmptyGroupFooterCell(duplicate.id),
-                ],
-              }
-            : undefined,
+          footer: duplicateColumnCell(block.grouping.footer, columnId, duplicate.id, currentIndex),
         }
       : undefined,
   };
@@ -232,54 +200,45 @@ export function removeDetailTableColumn(
   block: ReportDetailTableBlock,
   columnId: string,
 ): ReportDetailTableBlock {
-  if (block.columns.length <= 1) {
+  if (block.columns.length <= 1 || !block.columns.some(column => column.id === columnId)) {
     return block;
   }
 
   const columns = block.columns.filter((column) => column.id !== columnId);
+  const index = block.columns.findIndex(column => column.id === columnId);
 
   return {
     ...block,
     columns,
-    introRow: block.introRow ? { ...block.introRow, labelColumnSpan: Math.min(block.introRow.labelColumnSpan, columns.length), cells: block.introRow.cells.filter(cell => cell.columnId !== columnId) } : undefined,
-    summaryRow: block.summaryRow
-      ? {
-          ...block.summaryRow,
-          labelColumnSpan: Math.min(block.summaryRow.labelColumnSpan, columns.length),
-          cells: block.summaryRow.cells.filter((cell) => columns.some((column) => column.id === cell.columnId)),
-        }
-      : undefined,
+    introRow: removeColumnCell(block.introRow, columnId, index, columns.length),
+    summaryRow: removeColumnCell(block.summaryRow, columnId, index, columns.length),
     grouping: block.grouping
       ? {
           ...block.grouping,
-          footer: block.grouping.footer
-            ? {
-                ...block.grouping.footer,
-                labelColumnSpan: Math.min(block.grouping.footer.labelColumnSpan, columns.length),
-                cells: block.grouping.footer.cells.filter((cell) => columns.some((column) => column.id === cell.columnId)),
-              }
-            : undefined,
+          footer: removeColumnCell(block.grouping.footer, columnId, index, columns.length),
         }
       : undefined,
   };
 }
 
-function createEmptySummaryCell(columnId: string): ReportDetailTableSummaryCell {
+type DetailFixedRow = { labelColumnSpan: number; cells: { columnId: string }[] };
+
+function duplicateColumnCell<T extends DetailFixedRow>(row: T | undefined, sourceId: string, targetId: string, index: number): T | undefined {
+  if (!row) return row;
+  const cell = row.cells.find(cell => cell.columnId === sourceId);
   return {
-    columnId,
-    contentKind: "Empty",
-    text: "",
-    fieldPath: "",
+    ...row,
+    labelColumnSpan: row.labelColumnSpan + (index < row.labelColumnSpan ? 1 : 0),
+    cells: cell ? [...row.cells, { ...structuredClone(cell), columnId: targetId }] : row.cells,
   };
 }
 
-function createEmptyGroupFooterCell(columnId: string): ReportDetailTableGroupFooterCell {
-  return {
-    columnId,
-    contentKind: "Empty",
-    text: "",
-    fieldPath: "",
-  };
+function removeColumnCell<T extends DetailFixedRow>(row: T | undefined, columnId: string, index: number, columnCount: number): T | undefined {
+  return row ? {
+    ...row,
+    labelColumnSpan: Math.min(columnCount, Math.max(1, row.labelColumnSpan - (index < row.labelColumnSpan ? 1 : 0))),
+    cells: row.cells.filter(cell => cell.columnId !== columnId),
+  } : row;
 }
 
 export function resizeAdjacentWidths<T extends { id: string } & Record<TKey, number>, TKey extends keyof T & string>(

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 export function verifyDesignerEditingMutations(api) {
+  verifyDetailColumnMutations(api);
   const schema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
   schema.layers.forEach(layer => { layer.elements = []; });
   const overlay = schema.layers.find(layer => layer.role === "Overlay");
@@ -91,4 +92,49 @@ export function verifyDesignerEditingMutations(api) {
   assert.equal(element(styled, flow.id), flow, "table styling belongs to its cells");
   assert.notEqual(element(styled, source.id).style, style);
   assert.equal(api.applySelectedV3ElementStyle(styled, style), styled);
+}
+
+function verifyDetailColumnMutations(api) {
+  const block = api.createDetailTableBlock();
+  const original = block.columns[0];
+  original.omitEmptyLines = true;
+  original.border = { color: "#123456", widthPx: 1, top: true };
+  const composite = api.setDetailColumnContentKind(original, "Composite");
+  assert.equal(composite.content[0].fieldPath, original.fieldPath, "switching mode must not replace the selected field with a default");
+  composite.content[0].visible = false;
+  block.columns[0] = composite;
+  assert.deepEqual(api.setDetailColumnContentKind(api.setDetailColumnContentKind(composite, "Field"), "Composite"), composite, "switching away and back retains the composition");
+  const cell = { columnId: original.id, contentKind: "Text", text: "保留说明", fieldPath: "", suffix: "KGS" };
+  block.introRow = { label: "说明", labelColumnSpan: 2, cells: [cell], style: {} };
+  block.summaryRow = { ...block.introRow, label: "TOTAL" };
+  block.grouping = { ...api.createDetailTableGrouping(), footer: { ...block.introRow, cells: [{ ...cell, contentKind: "Count" }] } };
+  const before = structuredClone(block);
+  const copied = api.duplicateDetailTableColumn(block, original.id);
+  const copy = copied.columns[1];
+  assert.notEqual(copy.id, original.id);
+  assert.equal(copy.omitEmptyLines, true);
+  assert.notEqual(copy.content[0].id, composite.content[0].id);
+  assert.equal(copy.content[0].visible, false);
+  for (const [source, target] of [[block.introRow, copied.introRow], [block.summaryRow, copied.summaryRow], [block.grouping.footer, copied.grouping.footer]]) {
+    assert.equal(target.labelColumnSpan, source.labelColumnSpan + 1, "copying within a merged label must keep its existing columns inside the label");
+    assert.deepEqual(target.cells.find(cell => cell.columnId === copy.id), { ...source.cells[0], columnId: copy.id });
+  }
+  copy.border.color = "#ffffff";
+  assert.deepEqual(block, before, "copying and editing must not mutate the source or undo history");
+  const moved = api.moveDetailTableColumn(copied, copy.id, "down");
+  assert.equal(moved.columns[2].id, copy.id);
+  const removed = api.removeDetailTableColumn(moved, copy.id);
+  assert.deepEqual(removed, before, "removal must also remove copied intro, total and subtotal cells");
+  assert.equal(api.removeDetailTableColumn(block, "missing"), block);
+  assert.equal(api.duplicateDetailTableColumn(block, "missing"), block);
+  const added = api.addDetailTableColumn(block);
+  assert.equal(added.columns.length, block.columns.length + 1);
+  assert.deepEqual(added.introRow, block.introRow);
+  const removedOutsideLabel = api.removeDetailTableColumn(block, block.columns.at(-1).id);
+  assert.equal(removedOutsideLabel.summaryRow.labelColumnSpan, 2);
+  const sparse = { ...block, introRow: { ...block.introRow, cells: [] } };
+  assert.equal(api.duplicateDetailTableColumn(sparse, original.id).introRow.labelColumnSpan, 3, "empty merged labels also follow inserted columns");
+  const doc = api.parseReportDesignerV3Source("", "ExportDocument").schema;
+  doc.layers.forEach(layer => { layer.elements = layer.role === "Body" ? [api.createV3FlowElement(removed)] : []; });
+  assert.equal(api.validateReportDesignerV3Draft(doc, "ExportDocument").blocked, false, "edited table must remain saveable");
 }
