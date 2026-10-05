@@ -2,7 +2,6 @@ import type {
   ReportDesignerReportType,
   ReportDesignerSchema,
 } from "./reportDesignerSchema.ts";
-import { getReportDesignerBlockPlacementIssue } from "./reportDesignerModel.ts";
 import {
   createIssue,
   type ReportDesignerSchemaIssue,
@@ -32,9 +31,10 @@ export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, iss
   schema.sections.forEach((section, sectionIndex) => {
     section.blocks.forEach((block, blockIndex) => {
       const blockPath = `$.sections[${sectionIndex}].blocks[${blockIndex}]`;
-      const placementIssue = getReportDesignerBlockPlacementIssue(block, section);
-      if (placementIssue) {
-        issues.push(createIssue("error", blockPath, placementIssue));
+      if (section.type !== "Body" && (block.type === "DetailTable" || block.type === "PageBreak")) {
+        issues.push(createIssue("error", blockPath, block.type === "DetailTable"
+          ? "明细表只能放在主体版区。"
+          : "分页符只能放在主体版区，不能放入重复页眉或页脚。"));
       }
 
       switch (block.type) {

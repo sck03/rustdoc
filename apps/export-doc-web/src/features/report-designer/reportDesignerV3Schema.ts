@@ -1,7 +1,6 @@
 import type {
   ReportBlock,
   ReportDesignerReportType,
-  ReportTextStyle,
 } from "./reportDesignerSchema.ts";
 import { reportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
 import { ApiReportTemplateV3LimitsContractDefaults as limits } from "../../api/generated/exportDocManagerApi.ts";
@@ -316,20 +315,4 @@ export function clampReportDesignerV3ElementToPage(
 function clampElementCenter(center: number, pageSize: number, halfExtent: number) {
   const minimum = Math.min(halfExtent, pageSize / 2);
   return Math.min(pageSize - minimum, Math.max(minimum, center));
-}
-
-export function isReportDesignerV3FlowElement(element: ReportDesignerV3Element): element is ReportDesignerV3FlowElement {
-  return element.type === "Flow";
-}
-
-export function styleFromLegacyTextStyle(style: ReportTextStyle | undefined): ReportDesignerV3ElementStyle {
-  if (!style) {
-    return {};
-  }
-
-  return {
-    fontSizePt: style.fontSizePt,
-    bold: style.bold,
-    align: style.align,
-  };
 }

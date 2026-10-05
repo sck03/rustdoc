@@ -1,4 +1,4 @@
-import type { ReportDesignerSchemaIssue } from "./reportDesignerSchemaValues.ts";
+import { getV3InsertionIssue, getV3ProductLayoutIssue } from "./reportDesignerV3Insertion.ts";
 import {
   clampReportDesignerV3ElementToPage, mmToHundredthMm,
   REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER, REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS,
@@ -82,12 +82,9 @@ export function insertV3Element(
   layerId: string,
   element: ReportDesignerV3Element,
 ): ReportDesignerV3DocumentState {
+  if (getV3InsertionIssue(state, layerId, element)) return state;
   const layer = resolveV3InsertionLayer(state.schema, layerId, element);
   if (!layer || layer.locked) return state;
-  if (layer.elements.length >= REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER ||
-      countV3Elements(state.schema) >= REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS) {
-    return state;
-  }
   const existingIds = new Set([
     ...state.schema.layers.map((candidate) => candidate.id),
     ...state.schema.layers.flatMap((candidate) => candidate.elements.map((item) => item.id)),
@@ -387,6 +384,7 @@ export function pasteV3Elements(
   preferredLayerId?: string,
 ): ReportDesignerV3DocumentState {
   if (elements.length === 0) return state;
+  if (getV3ProductLayoutIssue([...state.schema.layers.flatMap(layer => layer.elements), ...elements])) return state;
   const requestedCount = elements.length;
   if (countV3Elements(state.schema) + requestedCount > REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS) return state;
   const fallbackLayer = state.schema.layers.find((l) => l.id === preferredLayerId && l.visible && !l.locked)
@@ -633,21 +631,6 @@ function normalizeMargin(value: number, maximum: number) {
   return Math.min(Math.max(0, maximum), Math.max(0, parsed));
 }
 
-export function collectV3ValidationIssues(state: ReportDesignerV3DocumentState): ReportDesignerSchemaIssue[] {
-  const issues: ReportDesignerSchemaIssue[] = [];
-  const selected = new Set(state.selectedIds);
-  for (const id of selected) {
-    if (!findV3Element(state.schema, id)) {
-      issues.push({ severity: "warning", path: "$.selection", message: "选中的元素已不存在。" });
-    }
-  }
-  const total = countV3Elements(state.schema);
-  if (total >= REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS) {
-    issues.push({ severity: "warning", path: "$.layers", message: `已达到元素总数上限 ${REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS}。` });
-  }
-  return issues;
-}
-
 export function getV3ElementCapacityIssue(
   state: ReportDesignerV3DocumentState,
   layerId?: string,
@@ -676,6 +659,8 @@ function sameV3LayerPrint(left: ReportDesignerV3Layer["print"], right: ReportDes
   return left.repeatOnEveryPage === right.repeatOnEveryPage &&
     left.keepTogether === right.keepTogether &&
     left.pinToPageBottom === right.pinToPageBottom &&
+    (left.followBody === true) === (right.followBody === true) &&
+    (left.firstPageOnly === true) === (right.firstPageOnly === true) &&
     left.minHeightHundredthMm === right.minHeightHundredthMm;
 }
 
@@ -692,6 +677,8 @@ function normalizeLayerPrintForMutation(
     repeatOnEveryPage: role === "Body" ? false : source.repeatOnEveryPage === true,
     keepTogether: source.keepTogether === true,
     pinToPageBottom: role === "Footer" && source.pinToPageBottom === true,
+    followBody: role === "Footer" && source.pinToPageBottom !== true && source.followBody === true,
+    firstPageOnly: source.firstPageOnly === true,
     minHeightHundredthMm,
   };
 }

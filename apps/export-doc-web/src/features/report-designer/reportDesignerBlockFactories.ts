@@ -45,28 +45,6 @@ const defaultTableBorderStyle: ReportBorderStyle = {
   left: true,
 };
 
-export function createTextBlock(text = "New text"): ReportBlock {
-  return {
-    id: createReportBlockId("text"),
-    type: "Text",
-    text,
-    style: defaultTextStyle,
-    border: defaultBorderStyle,
-  };
-}
-
-export function createFieldBlock(label: string, fieldPath: string): ReportBlock {
-  return {
-    id: createReportBlockId("field"),
-    type: "Field",
-    label,
-    fieldPath: normalizeDesignerFieldPath(fieldPath),
-    fallbackText: "",
-    style: defaultTextStyle,
-    border: defaultBorderStyle,
-  };
-}
-
 export function createRowBlock(reportType: ReportDesignerReportType = "ExportDocument"): ReportBlock {
   if (reportType === "PaymentVoucher") {
     return {
@@ -161,24 +139,6 @@ export function createConditionalBlock(reportType: ReportDesignerReportType = "E
     },
     style: defaultTextStyle,
     border: defaultBorderStyle,
-  };
-}
-
-export function createImageBlock(): ReportBlock {
-  return {
-    id: createReportBlockId("image"),
-    type: "Image",
-    title: "Document seal",
-    sourceKind: "Field",
-    fieldPath: "doc_seal_path",
-    url: "",
-    altText: "Document seal",
-    widthMm: 42,
-    align: "Right",
-    marginTopMm: 4,
-    marginBottomMm: 2,
-    hideWhenSourceEmpty: true,
-    keepTogether: true,
   };
 }
 

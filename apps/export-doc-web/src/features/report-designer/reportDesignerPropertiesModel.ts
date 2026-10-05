@@ -1,10 +1,8 @@
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import type {
-  ReportBlock,
   ReportBorderStyle,
   ReportConditionalContent,
   ReportConditionalRule,
-  ReportDesignerSchema,
   ReportDetailTableCellContent,
   ReportDetailTableGroupFooterCell,
   ReportDetailTableSummaryCell,
@@ -44,14 +42,6 @@ export function filterDetailItemFieldGroups(fieldGroups: ReportDesignerFieldGrou
       fields: group.fields.filter((field) => field.value.startsWith("item.") || field.value.startsWith("Invoice.Items.")),
     }))
     .filter((group) => group.fields.length > 0);
-}
-
-export function normalizePageSize(value: string): ReportDesignerSchema["page"]["size"] {
-  if (value === "A5" || value === "Letter" || value === "Custom") {
-    return value;
-  }
-
-  return "A4";
 }
 
 export function normalizeNumber(value: string, fallback: number) {
@@ -134,14 +124,6 @@ export function normalizeConditionalOperator(value: string): ReportConditionalRu
 export function normalizeConditionalContentKind(value: string): ReportConditionalContent["kind"] {
   if (value === "Text") {
     return "Text";
-  }
-
-  return "Field";
-}
-
-export function normalizeImageSourceKind(value: string): Extract<ReportBlock, { type: "Image" }>["sourceKind"] {
-  if (value === "StaticUrl") {
-    return "StaticUrl";
   }
 
   return "Field";

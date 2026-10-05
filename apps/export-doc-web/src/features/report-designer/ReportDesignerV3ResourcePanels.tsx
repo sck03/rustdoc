@@ -42,9 +42,9 @@ export function ComponentPalette({ reportType, actions, canEdit = true }: { repo
         {base.map(([label, onClick, icon]) => <PaletteAction key={label} label={label} onClick={onClick} icon={icon} disabled={!canEdit} />)}
         {actions.image ? <PaletteAction label="图片/印章" onClick={actions.image} icon={<ImageIcon size={15} aria-hidden="true" />} disabled={!canEdit} /> : null}
       </PaletteSection>
-      <PaletteSection title="商品明细">
-        {actions.productFields ? <PaletteAction label="商品字段（逐行输出）" onClick={actions.productFields} icon={<Columns3 size={15} aria-hidden="true" />} disabled={!canEdit} /> : null}
-      </PaletteSection>
+      {actions.productFields ? <PaletteSection title="商品明细">
+        <PaletteAction label="商品字段（逐行输出）" onClick={actions.productFields} icon={<Columns3 size={15} aria-hidden="true" />} disabled={!canEdit} />
+      </PaletteSection> : null}
       <details><summary>高级排版</summary><PaletteSection title="表格与分组">
         <PaletteAction label="多列行" onClick={actions.row} icon={<Columns3 size={15} aria-hidden="true" />} disabled={!canEdit} />
         <PaletteAction label="普通表格" onClick={actions.grid} icon={<Table2 size={15} aria-hidden="true" />} disabled={!canEdit} />
@@ -103,14 +103,17 @@ export function FieldPanel({
       <div className="report-designer-v3-panel-caption">
         <Pilcrow size={15} aria-hidden="true" />
         <span>{productFields ? "商品明细字段" : "普通字段"}</span>
-        <small>{fieldCount} 个可用字段</small>
+        <small role="status">{fieldCount} 个{query.trim() ? "匹配" : "可用"}字段</small>
       </div>
       <label className="report-designer-v3-field-search">
         <span>搜索字段</span>
         <input ref={searchRef} aria-label="搜索字段" value={query} placeholder={reportType === "PaymentVoucher" ? "付款单号、收款方、金额..." : "发票号、客户、金额..."} onChange={(event) => onQueryChange(event.target.value)} />
       </label>
       <p className="report-designer-v3-help">{reportType === "PaymentVoucher" ? "把付款单号、收款方、费用和金额等字段拖到纸上，调整位置后保存即可打印。" : productFields ? "把商品字段拖到明细行，各字段可单独移动。只设计一行，打印时按商品逐件重复。" : "把字段拖到纸上即可。发票号、唛头和合计等普通字段不随商品重复。"}</p>
-      {groups.length === 0 ? <p className="report-designer-v3-muted">暂无可用字段</p> : groups.map((group) => (
+      {groups.length === 0 ? <div className="report-designer-v3-help">
+        <p>{query.trim() ? "没有找到匹配字段，请换个名称或清空搜索。" : "暂无可用字段"}</p>
+        {query.trim() ? <button type="button" onClick={() => { onQueryChange(""); searchRef.current?.focus(); }}>清空搜索</button> : null}
+      </div> : groups.map((group) => (
         <details key={group.category} open={Boolean(query.trim()) || groups.length <= 4}>
           <summary>{group.category}<small>{group.fields.length}</small></summary>
           <div className="report-designer-v3-field-list">

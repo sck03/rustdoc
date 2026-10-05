@@ -1,5 +1,6 @@
 import { createV3FieldElement, findV3Element, insertV3Element, updateV3Element, type ReportDesignerV3DocumentState } from "./reportDesignerV3Mutations.ts";
 import { resolveReportDesignerLayerBands } from "./reportDesignerLayerBands.ts";
+import { getV3InsertionIssue } from "./reportDesignerV3Insertion.ts";
 
 /** Click picks an existing column, or fills a free space in the authored product row. */
 export function insertProductField(state: ReportDesignerV3DocumentState, field: { label: string; value: string }) {
@@ -11,6 +12,8 @@ export function insertProductField(state: ReportDesignerV3DocumentState, field: 
   if (existing) return { state: { ...state, selectedIds: [existing.id], activeLayerId: body.id }, notice: null };
   const bands = resolveReportDesignerLayerBands(state.schema);
   const element = { ...createV3FieldElement(field.value), label: field.label };
+  const issue = getV3InsertionIssue(state, state.activeLayerId, element);
+  if (issue) return { state, notice: issue };
   const top = fields.length ? Math.min(...fields.map(e => e.yHundredthMm)) : Math.max(bands.headerHeight, 3000);
   const left = fields.length ? Math.min(...fields.map(e => e.xHundredthMm)) : state.schema.page.marginLeftHundredthMm;
   const right = state.schema.page.widthHundredthMm - state.schema.page.marginRightHundredthMm;

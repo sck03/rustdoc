@@ -5,6 +5,33 @@ export function verifyDesignerEditingMutations(api) {
   schema.layers.forEach(layer => { layer.elements = []; });
   const overlay = schema.layers.find(layer => layer.role === "Overlay");
   const header = schema.layers.find(layer => layer.role === "Header");
+  const footer = schema.layers.find(layer => layer.role === "Footer");
+  const empty = api.createReportDesignerV3DocumentState(schema);
+  const following = api.updateV3Layer(empty, footer.id, { print: { ...footer.print, pinToPageBottom: false, followBody: true } });
+  assert.equal(following.schema.layers.find(layer => layer.id === footer.id).print.followBody, true);
+  const renamed = api.updateV3Layer(following, footer.id, { name: "签字区" });
+  assert.equal(renamed.schema.layers.find(layer => layer.id === footer.id).print.followBody, true, "renaming must preserve footer flow");
+  const firstPage = api.updateV3Layer(renamed, header.id, { print: { ...header.print, firstPageOnly: true } });
+  assert.equal(firstPage.schema.layers.find(layer => layer.id === header.id).print.firstPageOnly, true);
+  assert.equal(api.updateV3Layer(firstPage, header.id, { visible: false }).schema.layers.find(layer => layer.id === header.id).print.firstPageOnly, true);
+  assert.equal(api.updateV3Layer(firstPage, header.id, { print: { ...header.print, firstPageOnly: true } }), firstPage, "unchanged print options must not create undo entries");
+  const pinned = api.updateV3Layer(renamed, footer.id, { print: { ...renamed.schema.layers.find(layer => layer.id === footer.id).print, pinToPageBottom: true } });
+  assert.equal(pinned.schema.layers.find(layer => layer.id === footer.id).print.followBody, false, "pin and follow are mutually exclusive");
+  const table = api.createV3FlowElement(api.createDetailTableBlock());
+  const product = api.createV3FieldElement("item.Quantity");
+  for (const [first, second] of [[table, product], [product, table]]) {
+    const original = api.insertV3Element(empty, header.id, first);
+    assert.match(api.getV3InsertionIssue(original, header.id, second), /不能混用/);
+    assert.equal(api.insertV3Element(original, header.id, second), original, "incompatible insertion must retain the complete draft");
+    assert.equal(api.pasteV3Elements(original, [second], header.id), original, "paste must obey the same product layout rule");
+  }
+  assert.equal(api.pasteV3Elements(empty, [table, product], header.id), empty, "a mixed clipboard must fail atomically");
+  const body = schema.layers.find(layer => layer.role === "Body");
+  const fullBody = { ...empty, schema: { ...schema, layers: schema.layers.map(layer => layer.id === body.id ? { ...layer, elements: Array.from({ length: api.REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER }, (_, i) => ({ ...api.createV3TextElement(), id: `full-${i}` })) } : layer) } };
+  assert.match(api.getV3InsertionIssue(fullBody, header.id, product), /该图层最多/, "capacity feedback must check the actual body destination");
+  assert.equal(api.insertV3Element(fullBody, header.id, product), fullBody);
+  const lockedBody = api.updateV3Layer(empty, body.id, { locked: true });
+  assert.match(api.getV3InsertionIssue(lockedBody, header.id, product), /锁定/);
   const text = (id, x, width, extra = {}) => ({ ...api.createV3TextElement(x, 10000), id, widthHundredthMm: width, heightHundredthMm: 1000, ...extra });
   const state = (elements, selectedIds = elements.map(element => element.id)) => ({
     schema: { ...schema, layers: schema.layers.map(layer => layer.id === overlay.id ? { ...layer, elements } : layer) },

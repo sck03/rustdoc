@@ -65,7 +65,6 @@ export function readStoredString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-
 export function formatBusinessType(value?: string) {
   return formatOptionLabel(value, businessTypeOptions);
 }
@@ -97,49 +96,6 @@ export function formatReceiptKind(value?: string) {
   ];
 
   return formatOptionLabel(value, receiptKindOptions);
-}
-
-export function formatParsedBusinessType(value?: number) {
-  const businessTypeByValue = new Map([
-    [0, "海关原产地证"],
-    [1, "报关代理委托"],
-  ]);
-
-  return typeof value === "number" ? businessTypeByValue.get(value) ?? formatPlainNumber(value) : "-";
-}
-
-export function formatPackageType(value?: number) {
-  const packageTypeByValue = new Map([
-    [0, "提交包"],
-    [1, "回执包"],
-  ]);
-
-  return typeof value === "number" ? packageTypeByValue.get(value) ?? formatPlainNumber(value) : "-";
-}
-
-export function formatParsedReceiptKind(value?: number) {
-  const receiptKindByValue = new Map([
-    [1, "海关原产地证业务回执"],
-    [2, "海关原产地证技术回执"],
-    [3, "海关原产地证附件回执"],
-    [4, "代理委托导入响应"],
-    [5, "代理委托协议回执"],
-  ]);
-
-  return typeof value === "number" ? receiptKindByValue.get(value) ?? formatPlainNumber(value) : "-";
-}
-
-export function formatParsedReceiptStatus(value?: number) {
-  const receiptStatusByValue = new Map([
-    [1, "已接收"],
-    [2, "已受理"],
-    [3, "已退回"],
-    [4, "待审核"],
-    [5, "已通过"],
-    [6, "失败"],
-  ]);
-
-  return typeof value === "number" ? receiptStatusByValue.get(value) ?? formatPlainNumber(value) : "-";
 }
 
 export function formatOptionLabel(value: string | undefined, options: Array<{ value: string; label: string }>) {
@@ -210,19 +166,6 @@ export async function invalidateSingleWindowBatchQueries(
 
 export function toSafeFileName(value: string) {
   return value.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim();
-}
-
-export function mergePathLines(value: string, additions: string[]) {
-  const seen = new Set<string>();
-  const paths: string[] = [];
-  for (const path of [...parseReceiptFilePaths(value), ...additions]) {
-    if (!seen.has(path)) {
-      paths.push(path);
-      seen.add(path);
-    }
-  }
-
-  return paths.join("\n");
 }
 
 export function parseReceiptFilePaths(value: string) {

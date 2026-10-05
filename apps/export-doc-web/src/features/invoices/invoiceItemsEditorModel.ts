@@ -535,10 +535,6 @@ export function normalizePriceCalculationMode(value?: string): InvoiceItemPriceC
     : invoiceItemPriceCalculationModes.unitPriceDriven;
 }
 
-export function normalizeOptionalInvoiceItemNumber(value?: number) {
-  return Number.isFinite(value) && Number(value) !== 0 ? Number(value) : undefined;
-}
-
 export function isMeaningfulInvoiceItem(item: ApiInvoiceItemDto) {
   const textValues = [
     item.brand,
@@ -597,12 +593,6 @@ export function roundWeight(value: number) {
 export function roundVolume(value: number) {
   return roundTo(value, invoiceItemVolumeScale);
 }
-
-export function roundMeasure(value: number) {
-  return roundVolume(value);
-}
-
-
 
 export function roundTo(value: number, digits: number) {
   return Number.isFinite(value) ? Number(value.toFixed(digits)) : 0;

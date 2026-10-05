@@ -51,6 +51,7 @@ import {
 import { ComponentPalette, FieldPanel, LayerPanel, type PaletteActions } from "./ReportDesignerV3ResourcePanels.tsx";
 import { focusDesignerNode } from "./ReportDesignerV3InspectorControls.tsx";
 import { insertProductField } from "./reportDesignerProductFields.ts";
+import { getV3InsertionIssue } from "./reportDesignerV3Insertion.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 
 type V3SidebarTab = "components" | "fields" | "layers";
@@ -153,23 +154,19 @@ export function ReportDesignerV3Workspace({
   function selectGridCell(elementId: string, cellId: string) {
     setGridCellSelection({ elementId, cellId });
   }
-  function activeLayerId() {
-    return history.state.activeLayerId;
+  function insertElement(element: ReportDesignerV3Element) {
+    if (!editingEnabled) return;
+    const layerId = history.state.activeLayerId;
+    const issue = getV3InsertionIssue(history.state, layerId, element);
+    setCapacityNotice(issue);
+    if (!issue && layerId) commit(insertV3Element(history.state, layerId, element));
   }
   function placeElement(element: ReportDesignerV3Element) {
     if (!editingEnabled) return;
     const anchor = selected?.element;
     const x = anchor ? anchor.xHundredthMm + Math.min(anchor.widthHundredthMm + 500, 1000) : element.xHundredthMm;
     const y = anchor ? anchor.yHundredthMm + Math.min(anchor.heightHundredthMm + 500, 1000) : element.yHundredthMm;
-    const layerId = activeLayerId();
-    if (!layerId) return;
-    const next = insertV3Element(history.state, layerId, { ...element, xHundredthMm: x, yHundredthMm: y });
-    if (next === history.state) {
-      setCapacityNotice(getV3ElementCapacityIssue(history.state, layerId) ?? "当前图层不可编辑。");
-      return;
-    }
-    setCapacityNotice(null);
-    commit(next);
+    insertElement({ ...element, xHundredthMm: x, yHundredthMm: y });
   }
   function insertFlow(block: ReportBlock) {
     if (block.type !== "Row" && block.type !== "Grid" && block.type !== "Conditional" && block.type !== "DetailTable" && block.type !== "PageBreak") return;
@@ -178,7 +175,6 @@ export function ReportDesignerV3Workspace({
   function insertField(field: { label: string; value: string }) {
     if (!field.value.trim()) return;
     const item = field.value.startsWith("item.");
-    if (item && history.state.schema.layers.some(layer => layer.elements.some(element => element.type === "Flow" && element.flowKind === "DetailTable"))) { setCapacityNotice("当前模板使用高级明细表。请先删除该表，再拖入自由商品字段；可随时撤销。"); return; }
     if (item) {
       const result = insertProductField(history.state, field);
       commit(result.state);
@@ -190,13 +186,9 @@ export function ReportDesignerV3Workspace({
   function dropField(path: string, x: number, y: number) {
     const field = fieldGroups.flatMap(group => group.fields).find(field => field.value === path);
     if (!field || !editingEnabled) return;
-    if (path.startsWith("item.") && history.state.schema.layers.some(layer => layer.elements.some(element => element.type === "Flow" && element.flowKind === "DetailTable"))) { setCapacityNotice("请先删除高级明细表，再拖入自由商品字段；可随时撤销。"); return; }
-    const layerId = activeLayerId();
-    if (!layerId) return;
     const grid = history.state.schema.grid;
     const snap = (value: number) => grid.snap ? Math.round(value / grid.sizeHundredthMm) * grid.sizeHundredthMm : value;
-    commit(insertV3Element(history.state, layerId, { ...createV3FieldElement(path, snap(x), snap(y)), label: field.label }));
-    setCapacityNotice(null);
+    insertElement({ ...createV3FieldElement(path, snap(x), snap(y)), label: field.label });
   }
   function openFieldPanel() {
     setSidebarTab("fields");

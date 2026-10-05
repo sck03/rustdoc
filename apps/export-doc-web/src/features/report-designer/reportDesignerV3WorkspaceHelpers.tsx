@@ -16,8 +16,12 @@ export function fitReportDesignerV3Zoom(viewportWidth: number, viewportHeight: n
 }
 
 export function flattenFields(groups: ReportDesignerFieldGroup[]) {
-  return groups.flatMap((group) => group.fields)
-    .filter((field, index, fields) => fields.findIndex((candidate) => candidate.value === field.value) === index);
+  const seen = new Set<string>();
+  return groups.flatMap(group => group.fields).filter(field => {
+    if (seen.has(field.value)) return false;
+    seen.add(field.value);
+    return true;
+  });
 }
 
 export function filterFieldGroups(groups: ReportDesignerFieldGroup[], query: string) {

@@ -1,4 +1,5 @@
 import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
+import { getV3ProductLayoutIssue } from "./reportDesignerV3Insertion.ts";
 import {
   isRecord,
   isReportDesignerCssColor,
@@ -85,8 +86,8 @@ export function normalizeReportDesignerV3Schema(
     return { schema: null, issues };
   }
   validateBodyFlowOverlaps(layers, issues);
-  const hasProductFields = layers.some(layer => layer.elements.some(element => element.type === "Field" && element.fieldPath.startsWith("item.")));
-  if (hasProductFields && layers.some(layer => layer.elements.some(element => element.type === "Flow" && element.flowKind === "DetailTable"))) issues.push({ severity: "error", path: "$.layers", message: "自由商品字段与高级明细表不能混用，请选择一种商品排版方式。" });
+  const productLayoutIssue = getV3ProductLayoutIssue(layers.flatMap(layer => layer.elements));
+  if (productLayoutIssue) issues.push({ severity: "error", path: "$.layers", message: productLayoutIssue });
 
   const resources = normalizeResources(input.resources, issues);
   if (resources === null) return { schema: null, issues };

@@ -243,10 +243,6 @@ export function buildPaymentPreviewOptions(payments: ApiPaymentDto[], selectedPa
   return ensureSelectedPreviewOption(options, selectedPaymentId, "当前打开的付款/报销单");
 }
 
-export function buildRawPreviewHtml(content: string) {
-  return `<!doctype html><html><body>${content.trim() ? "请生成模板预览。" : ""}</body></html>`;
-}
-
 function normalizeTemplatePath(path: string) {
   return path.trim().replace(/[\\/]+/g, "/");
 }
