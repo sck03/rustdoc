@@ -19,7 +19,7 @@ export function useApprovalSettingsDraft(client: ExportDocManagerApiClient, init
   const changeRule = (index: number, change: Partial<OaApprovalSettings["rules"][number]>) => setDraft(value => ({ ...value, rules: value.rules.map((rule, i) => i === index ? { ...rule, ...change } : rule) }));
   const changeDelegate = (index: number, change: Partial<OaApprovalSettings["delegations"][number]>) => setDraft(value => ({ ...value, delegations: value.delegations.map((item, i) => i === index ? { ...item, ...change } : item) }));
   const accept = (saved: OaApprovalSettings) => { setBaseline(saved); setDraft(saved); };
-  const save = () => operation.run(signal => client.saveOaApprovalSettings({ body: { expectedVersion: baseline.versionNumber, rules: draft.rules, delegations: draft.delegations } }, { signal }), accept);
+  const save = () => operation.run(signal => client.saveOaApprovalSettings({ body: { expectedVersion: baseline.versionNumber, rules: draft.rules, delegations: draft.delegations, handlingServices: draft.handlingServices ?? [] } }, { signal }), accept);
   const reload = async () => {
     if (operation.busy || !await confirmDiscardChanges("重新载入审批设置")) return;
     await operation.run(signal => client.getOaApprovalSettings({ signal }), accept);

@@ -25,6 +25,7 @@ export function OfficeSuppliesPage({ client, user }: { client: ExportDocManagerA
 
 function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {
   const access = officeAccess(user, "supplies");
+  const allowsSupply = (action: string, supply: OfficeSupplyRecord) => access.allows(action) && (!supply.handlingKey || supply.canHandle === true);
   const model = useOfficeDirectory<OfficeSupplyRecord>(user, "supplies", (input, signal) => client.listOfficeSupplies(input, { signal }));
   const { paging, query, keyword, search, lowStockOnly, includeInactive } = model;
   const [dialog, setDialog] = useState<SupplyDialog | null>(null);
@@ -43,15 +44,16 @@ function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiCl
       <div className="office-card-heading"><Package size={21} aria-hidden="true" /><h2>{supply.name}</h2><span className="office-badge" data-state={!supply.isActive ? "Cancelled" : supply.lowStock ? "Pending" : "Available"}>{!supply.isActive ? "已停用" : supply.lowStock ? "低库存" : supply.isReturnable ? "可借用" : "消耗品"}</span></div>
       <p className="office-stock-number">可用 <strong>{supply.availableQuantity}</strong> {supply.unit}</p>
       <p className="office-muted">在库 {supply.stockQuantity} · 已预留 {supply.reservedQuantity} · 最低可用 {supply.minimumStock}</p>
+      {supply.handlingName && <p>物品组：{supply.handlingName} · 保管人员：{supply.handlerNames}</p>}
       <p className="office-card-detail"><MapPin size={16} aria-hidden="true" />{supply.location || "领取位置未填写"}</p>
       <p className="office-muted office-card-description">{supply.description || (supply.isReturnable ? "借用后需要按期归还" : "按需领用，交接时确认发放")}</p>
       <footer className="office-card-actions">
         {supply.isActive && access.allows("create") && <button className="command-button" type="button" onClick={() => setDialog({ kind: "apply", supply })}>{user.capabilities.usesOfficeRegister ? "登记" : "申请"}{supply.isReturnable ? "借用" : "领用"}</button>}
-        {access.allows("restock") && <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "restock", supply })}>补充库存</button>}
-        {(access.allows("restock") || access.allows("manage")) && <details className="office-secondary-actions">
+        {allowsSupply("restock", supply) && <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "restock", supply })}>补充库存</button>}
+        {(allowsSupply("restock", supply) || allowsSupply("manage", supply)) && <details className="office-secondary-actions">
           <summary>更多操作</summary><div>
-            {access.allows("restock") && <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "history", supply })}>库存流水</button>}
-            {access.allows("manage") && <><button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "stocktake", supply })}>盘点</button>
+            {allowsSupply("restock", supply) && <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "history", supply })}>库存流水</button>}
+            {allowsSupply("manage", supply) && <><button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "stocktake", supply })}>盘点</button>
               <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "edit", supply })}>编辑</button>
               <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "delete", supply })}>删除</button></>}
           </div>
@@ -59,7 +61,7 @@ function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiCl
       </footer>
     </article>)}</div>}
     <OfficePager page={query.data} paging={paging} busy={query.isFetching} />
-    {dialog?.kind === "edit" && <OfficeSupplyEditor client={client} supply={dialog.supply} onClose={close} />}
+    {dialog?.kind === "edit" && <OfficeSupplyEditor client={client} user={user} supply={dialog.supply} onClose={close} />}
     {dialog?.kind === "apply" && <OfficeSupplyApplication client={client} supply={dialog.supply} user={user} onClose={close} />}
     {(dialog?.kind === "restock" || dialog?.kind === "stocktake") && <OfficeStockDialog client={client} supply={dialog.supply} stocktake={dialog.kind === "stocktake"} onClose={close} />}
     {dialog?.kind === "history" && <OfficeHistoryDialog client={client} user={user} kind="stock" id={dialog.supply.id} title={`${dialog.supply.name} · 库存流水`} onClose={close} />}

@@ -43,9 +43,13 @@ pub fn action(
     store.transaction_as(actor, |tx, actor| {
         auth::authorize(actor, permission, action)?;
         let mut value = store::get(tx, kind, id)?;
-        if value["companyScope"] != actor.company
-            || !auth::visible(actor, permission, action, &value)
-        {
+        let allowed = if permission == "office.supplies" {
+            super::oa::handling::supply_access(tx, actor, action, &value, kind == "supplies")?
+        } else {
+            value["companyScope"] == actor.company
+                && auth::visible(actor, permission, action, &value)
+        };
+        if !allowed {
             return Err(error(403, "没有办理此记录的权限。"));
         }
         if kind == "supplies" {

@@ -24,6 +24,10 @@ pub fn list(store: &Store, actor: &Actor, kind: &str, query: &[(&str, String)]) 
     let include_inactive = flag("includeInactive")?;
     let low_stock = flag("lowStockOnly")?;
     let mine = flag("mineOnly")?;
+    let handling = flag("handlingOnly")?;
+    if handling && kind != "supply-requests" {
+        return Err(invalid("只有物品领用支持待我办理筛选。"));
+    }
     let keyword = store::normalize(get("keyword"));
     if keyword.chars().count() > 120 {
         return Err(invalid("搜索关键词不得超过 120 字。"));
@@ -95,18 +99,38 @@ pub fn list(store: &Store, actor: &Actor, kind: &str, query: &[(&str, String)]) 
     };
     store.transaction(|tx| {
         let directory = matches!(kind, "rooms" | "supplies");
-        let mut rows: Vec<_> = store::all(tx, kind)?
-            .into_iter()
-            .filter(|row| {
-                row["companyScope"] == actor.company && auth::visible(actor, resource, "view", row)
-            })
-            .collect();
+        let keys = super::oa::handling::keys(tx, actor, true)?;
+        let mut rows = vec![];
+        for row in store::all(tx, kind)? {
+            let allowed = if directory {
+                row["companyScope"] == actor.company
+            } else if resource == "office.supplies" {
+                super::oa::handling::supply_access(tx, actor, "view", &row, directory)?
+            } else {
+                row["companyScope"] == actor.company && auth::visible(actor, resource, "view", &row)
+            };
+            if allowed
+                && (!handling
+                    || (super::oa::handling::SUPPLY_STATES
+                        .contains(&text(&row, "status").as_str())
+                        && (super::oa::handling::assigned(&keys, &row)
+                            || text(&row, "handlingKey").is_empty()
+                                && auth::visible(actor, resource, "issue", &row))
+                        && (row["status"] != "Issued" || row["isReturnable"] == true)))
+            {
+                rows.push(if resource == "office.supplies" {
+                    super::oa::handling::project_supply(tx, actor, row)?
+                } else {
+                    row
+                });
+            }
+        }
         if directory {
             rows.retain(|row| {
                 (include_inactive || row["isActive"] == true)
                     && (!low_stock || row["lowStock"] == true)
                     && (keyword.is_empty()
-                        || ["name", "location"]
+                        || ["name", "location", "handlingName", "handlerNames"]
                             .iter()
                             .any(|field| store::normalize(&text(row, field)).contains(&keyword)))
             });
@@ -258,7 +282,17 @@ fn clearance_for(
     let supply_count = supplies.len();
     let mut approval_count =
         super::oa::references(tx, company.as_str().unwrap_or(""), employee, account, true)?;
+    let mut handling_services = vec![];
     if let Some(user) = account {
+        handling_services = super::oa::handling::services(tx, company.as_str().unwrap_or(""))?
+            .iter()
+            .filter(|s| {
+                s["handlerUserIds"]
+                    .as_array()
+                    .is_some_and(|ids| ids.contains(&json!(user)))
+            })
+            .map(|s| text(s, "name"))
+            .collect();
         approval_count += super::oa::approval_references::assigned(
             tx,
             company.as_str().unwrap_or(""),
@@ -266,10 +300,13 @@ fn clearance_for(
             true,
         )?;
     }
-    let clear = meeting_count == 0 && supply_count == 0 && approval_count == 0;
+    let clear = meeting_count == 0
+        && supply_count == 0
+        && approval_count == 0
+        && handling_services.is_empty();
     meetings.sort_by_key(|r| r["requestId"].as_i64());
     supplies.sort_by_key(|r| r["requestId"].as_i64());
     Ok(
-        json!({"meetingCount":meeting_count,"supplyCount":supply_count,"approvalCount":approval_count,"items":meetings.into_iter().take(20).chain(supplies.into_iter().take(20)).collect::<Vec<_>>(),"canDepart":clear&&departments.is_empty(),"isClear":clear,"managedDepartments":departments}),
+        json!({"meetingCount":meeting_count,"supplyCount":supply_count,"approvalCount":approval_count,"handlingCount":handling_services.len(),"handlingServices":handling_services,"items":meetings.into_iter().take(20).chain(supplies.into_iter().take(20)).collect::<Vec<_>>(),"canDepart":clear&&departments.is_empty(),"isClear":clear,"managedDepartments":departments}),
     )
 }

@@ -65,6 +65,10 @@ pub(in crate::engine) fn check(tx: &Connection, kind: &str, row: &Value) -> Resu
             items
                 .iter()
                 .any(|d| d["principalUserId"] == user || d["delegateUserId"] == user)
+        }) || handling::services(tx, &company)?.iter().any(|s| {
+            s["handlerUserIds"]
+                .as_array()
+                .is_some_and(|ids| ids.contains(&json!(user)))
         }) || assigned(tx, &company, user, false)? > 0
     };
     if referenced {

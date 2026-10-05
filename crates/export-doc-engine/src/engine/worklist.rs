@@ -8,6 +8,8 @@ use crate::clock::{BusinessClock, BusinessTime};
 use chrono::{DateTime, Duration, NaiveDate};
 use export_doc_storage::Connection;
 use serde_json::{Value, json};
+#[path = "worklist_oa.rs"]
+mod oa;
 
 struct Group {
     key: &'static str,
@@ -38,15 +40,21 @@ fn rows(
     actions: &[&str],
     office: bool,
 ) -> Result<Vec<Value>> {
-    Ok(store::all(tx, kind)?
-        .into_iter()
-        .filter(|record| {
-            (!office || record["companyScope"] == actor.company)
-                && actions
-                    .iter()
-                    .all(|action| auth::visible(actor, resource, action, record))
-        })
-        .collect())
+    let mut result = vec![];
+    for record in store::all(tx, kind)? {
+        let mut visible = !office || record["companyScope"] == actor.company;
+        for action in actions {
+            visible &= if resource == "office.supplies" {
+                super::oa::handling::supply_access(tx, actor, action, &record, false)?
+            } else {
+                auth::visible(actor, resource, action, &record)
+            };
+        }
+        if visible {
+            result.push(record);
+        }
+    }
+    Ok(result)
 }
 fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
     let local = tx.provider() == "SQLite";
@@ -182,7 +190,20 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
         ] {
             let rows = meetings
                 .iter()
-                .filter(|r| mine(r) && r["status"] == status)
+                .filter(|r| {
+                    (mine(r)
+                        || auth::visible(
+                            actor,
+                            "office.rooms",
+                            if status == "Approved" {
+                                "issue"
+                            } else {
+                                "return"
+                            },
+                            r,
+                        ))
+                        && r["status"] == status
+                })
                 .map(|r| {
                     item(
                         r,
@@ -233,7 +254,10 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
         }
         let mut collection = vec![];
         let mut returns = vec![];
-        for r in requests.iter().filter(|r| mine(r)) {
+        for r in &requests {
+            if !mine(r) && !super::oa::handling::can_handle(tx, actor, r, true)? {
+                continue;
+            }
             if !["Approved", "Issued"].contains(&text(r, "status").as_str()) {
                 continue;
             }
@@ -313,6 +337,7 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
             groups.push(Group { key, name, rows });
         }
     }
+    groups.extend(oa::groups(tx, actor)?);
     Ok(groups)
 }
 fn deadline(item: &Value, now: &BusinessTime) -> Result<Option<(bool, bool, String)>> {

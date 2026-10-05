@@ -81,11 +81,20 @@ pub fn exercise(db: &Connection) {
         json!({"ownerUserId":200,"departmentId":"A","requestId":parent,"requestKind":"oa-general","status":"Unread"}),
     );
     for (rank, expected) in [(0, 0), (1, 0), (2, 1), (3, 1), (4, 1)] {
-        let scopes = [NotificationScope {
-            kind: "oa-general".into(),
-            rank,
-            statuses: vec![],
-        }];
+        let scopes = [
+            NotificationScope {
+                handling_keys: None,
+                kind: "oa-general".into(),
+                rank,
+                statuses: vec![],
+            },
+            NotificationScope {
+                kind: "oa-general".into(),
+                rank: 3,
+                statuses: vec!["Approved".into(), "Completed".into()],
+                handling_keys: Some(vec![]),
+            },
+        ];
         let q = CommunicationQuery {
             company: "COMMS-QUERY",
             department: "A",
@@ -114,6 +123,7 @@ pub fn exercise(db: &Connection) {
         );
     }
     let scopes = [NotificationScope {
+        handling_keys: None,
         kind: "oa-expense".into(),
         rank: 2,
         statuses: vec!["Approved".into(), "HandedOff".into()],

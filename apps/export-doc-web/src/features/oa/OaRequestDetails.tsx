@@ -35,6 +35,7 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
     {row.travel && <p>{row.travel.destination} · {row.travel.startsOn} 至 {row.travel.endsOn} · {row.durationDays} 天</p>}
     {row.overtime && <p>{row.overtime.location} · {formatBusinessDateTime(row.overtime.startsAt, user.businessTimeZone)} 至 {formatBusinessDateTime(row.overtime.endsAt, user.businessTimeZone)} · {row.durationHours} 小时</p>}
     {row.category && <p>申请类别：{generalCategories[row.category]}</p>}
+    {row.handlingName && <p>办理事项：{row.handlingName} · 当前办理人员：{row.handlerNames || "请联系管理员核对分工"}</p>}
     {row.totalAmount && <p><strong>{row.kind === "purchase" ? "预算合计" : "报销合计"}：{row.currency} {row.totalAmount}</strong></p>}
     {row.lines && <ol className="oa-lines">{row.lines.map((line, index) => <li key={`${row.id}-${index}`} className="oa-line">{expenseCategories[line.category]} · {line.spentOn} · {line.description} · {line.amount} {row.currency}</li>)}</ol>}
     {row.purchaseLines && <ol className="oa-lines">{row.purchaseLines.map((line, index) => <li key={`${row.id}-${index}`} className="oa-line">{line.name} {line.specification} · {line.quantity} {line.unit} × {line.unitPrice} {row.currency}</li>)}</ol>}
@@ -78,7 +79,7 @@ function OaHistory({ client, user, row }: { client: ExportDocManagerApiClient; u
   const [page, setPage] = useState(1);
   const query = useQuery({ queryKey: ["office", "oa", row.kind, user.id, user.companyScope, row.id, "history", page, row.versionNumber],
     queryFn: ({ signal }) => oaApi(client, row.kind).history(row.id, page, { signal }) });
-  const labels: Record<string, string> = { create: "创建草稿", update: "修改草稿", upload: "上传附件", "delete-attachment": "移除附件", submit: "提交审批", withdraw: "撤回修改", approve: "批准", "approve-step": "步骤批准", remind: "申请人催办", reject: "驳回", cancel: "取消", void: "作废批准", complete: "完成登记" };
+  const labels: Record<string, string> = { create: "创建草稿", update: "修改草稿", upload: "上传附件", "delete-attachment": "移除附件", submit: "提交审批", withdraw: "撤回修改", approve: "批准", "approve-step": "步骤批准", remind: "申请人催办", reject: "驳回", cancel: "取消", void: "作废批准", complete: "完成登记", reassign: "办理分工交接" };
   if (query.isError) return <InlineNotice tone="error">{readApiError(query.error)}</InlineNotice>;
   return <><ol className="oa-history">{query.data?.items.map((item) => <li key={item.id}><strong>{labels[item.action] ?? item.action}</strong> · {item.actorName} · {formatBusinessDateTime(item.occurredAt, user.businessTimeZone)}<p>{item.note || "无附加说明"}</p></li>)}</ol>
     <div className="office-card-actions"><button type="button" className="command-button secondary" disabled={page === 1 || query.isFetching} onClick={() => setPage(page - 1)}>上一页记录</button><span>第 {page} 页 · {query.data?.totalCount ?? 0} 条</span><button type="button" className="command-button secondary" disabled={query.isFetching || page * 20 >= (query.data?.totalCount ?? 0)} onClick={() => setPage(page + 1)}>下一页记录</button></div></>;

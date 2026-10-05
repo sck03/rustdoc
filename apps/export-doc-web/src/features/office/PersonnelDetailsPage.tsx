@@ -126,10 +126,10 @@ export function PersonnelClearancePanel({ client, user, record }: { client: Expo
   if (query.isError) return <PageState tone="error" title="交接核对失败" description={readApiError(query.error)} action={<button className="command-button secondary" type="button" onClick={() => void query.refetch()}>重新核对</button>} />;
   const data = query.data;
   return <div className="personnel-clearance">
-    {data.managedDepartments.length > 0 && <InlineNotice tone="warning" title="离职前需调整部门负责人">
-      {data.managedDepartments.map((department) => department.name).join("、")}仍由该人员负责。请由管理员调整负责人后再办理离职。
-      {user.capabilities.canManageUsers && <> <Link to="/system/organization">前往组织架构</Link></>}
-    </InlineNotice>}
+    {[
+      { names: data.managedDepartments.map(department => department.name), title: "离职前需调整部门负责人", href: "/system/organization", label: "前往组织架构" },
+      { names: data.handlingServices ?? [], title: "需移交印章、证明或物品保管职责", href: "/office/approval-settings", label: "前往办理分工设置" },
+    ].filter(item => item.names.length).map(item => <InlineNotice key={item.href} tone="warning" title={item.title}>{item.names.join("、")}仍由该人员负责，请管理员先指定接任人员。{user.capabilities.canManageUsers && <> <Link to={item.href}>{item.label}</Link></>}</InlineNotice>)}
     <InlineNotice tone={data.isClear ? "success" : "warning"} title={data.isClear ? "行政交接已结清" : "还有事项需要处理"}>
       {data.isClear ? "目前没有未结清的行政或人事事项。" : `预约 ${data.meetingCount} 笔，物品申请／借用 ${data.supplyCount} 笔，行政与人事申请 ${data.approvalCount ?? 0} 笔。请先完成办理或取消申请。`}
       {(data.approvalCount ?? 0) > 0 && <> <Link to="/office/approvals">前往申请与审批中心</Link></>}

@@ -1,5 +1,7 @@
 use super::{endpoint, object, reference};
 use serde_json::{Value, json};
+#[path = "handling.rs"]
+mod handling;
 
 pub(super) fn extend(doc: &mut Value) {
     let s = &mut doc["components"]["schemas"];
@@ -71,4 +73,5 @@ pub(super) fn extend(doc: &mut Value) {
             action,
         );
     }
+    handling::extend(doc);
 }

@@ -21,6 +21,6 @@ export function OaTemporalFields({ draft, setDraft, timeZone }: { draft: OaReque
       {(["startsAt", "endsAt"] as const).map((field) => <OfficeField key={field} label={field === "startsAt" ? "开始时间" : "结束时间"}><input type="datetime-local" required value={draft.overtime![field]} onChange={(event) => setDraft({ ...draft, overtime: { ...draft.overtime!, [field]: event.target.value } })} /></OfficeField>)}
       <OfficeField label="加班地点" wide><input required maxLength={200} value={draft.overtime.location} onChange={(event) => setDraft({ ...draft, overtime: { ...draft.overtime!, location: event.target.value } })} /></OfficeField>
     </>}
-    {draft.category && <OfficeField label="申请类别"><select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value as OaRequestSave["category"] })}>{Object.entries(generalCategories).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></OfficeField>}
+    {draft.category && <OfficeField label="申请类别"><select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value as OaRequestSave["category"], handlingKey: "" })}>{Object.entries(generalCategories).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></OfficeField>}
   </>;
 }

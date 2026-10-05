@@ -1,9 +1,25 @@
-use super::super::oa::approval::{authority, resource};
+use super::super::oa::{approval::authority, handling};
 use super::*;
 use export_doc_storage::NotificationScope;
-fn scopes(actor: &Actor) -> Vec<NotificationScope> {
-    super::super::oa::KINDS
+fn resource(kind: &str) -> Option<&'static str> {
+    if kind == "supply-requests" {
+        Some("office.supplies")
+    } else {
+        super::super::oa::approval::resource(kind)
+    }
+}
+fn viewable(tx: &Connection, actor: &Actor, resource: &str, row: &Value) -> Result<bool> {
+    if resource == "office.supplies" {
+        handling::supply_access(tx, actor, "view", row, false)
+    } else {
+        super::super::oa::viewable(tx, actor, resource, row)
+    }
+}
+fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
+    let mut result: Vec<_> = super::super::oa::KINDS
         .iter()
+        .copied()
+        .chain(std::iter::once("supply-requests"))
         .flat_map(|kind| {
             let Some(resource) = resource(kind) else {
                 return vec![];
@@ -12,13 +28,15 @@ fn scopes(actor: &Actor) -> Vec<NotificationScope> {
                 return vec![];
             }
             let mut scopes = vec![NotificationScope {
-                kind: (*kind).into(),
+                kind: kind.into(),
                 rank: auth::scope_rank(actor, resource, "view"),
                 statuses: vec![],
+                handling_keys: None,
             }];
-            if *kind == "oa-expense" {
+            if kind == "oa-expense" {
                 scopes.push(NotificationScope {
-                    kind: (*kind).into(),
+                    kind: kind.into(),
+                    handling_keys: None,
                     rank: auth::scope_rank(actor, resource, "complete"),
                     statuses: super::super::oa::FINANCE_STATUSES
                         .iter()
@@ -28,7 +46,19 @@ fn scopes(actor: &Actor) -> Vec<NotificationScope> {
             }
             scopes
         })
-        .collect()
+        .collect();
+    for (kind, supply, states) in [
+        ("oa-general", false, handling::GENERAL_STATES),
+        ("supply-requests", true, handling::SUPPLY_STATES),
+    ] {
+        result.push(NotificationScope {
+            kind: kind.into(),
+            rank: 3,
+            statuses: states.iter().map(|s| (*s).into()).collect(),
+            handling_keys: Some(handling::keys(tx, actor, supply)?),
+        });
+    }
+    Ok(result)
 }
 fn accessible(tx: &Connection, actor: &Actor, row: &Value) -> Result<()> {
     if row["companyScope"] != actor.company || row["ownerUserId"] != actor.id {
@@ -38,7 +68,7 @@ fn accessible(tx: &Connection, actor: &Actor, row: &Value) -> Result<()> {
     let resource =
         resource(&kind).ok_or_else(|| super::super::error::unavailable("通知关联类型无效。"))?;
     let parent = store::get(tx, &kind, records::positive(row, "requestId", "申请")?)?;
-    if !super::super::oa::viewable(actor, resource, &parent) {
+    if !viewable(tx, actor, resource, &parent)? {
         return Err(error(403, "您已无权访问此通知关联的申请。"));
     }
     Ok(())
@@ -77,7 +107,7 @@ pub(super) fn handle(
             store::get(tx, "site-notification", records::id(parameters)?)?,
         );
     }
-    let scopes = scopes(actor);
+    let scopes = scopes(tx, actor)?;
     let (number, size) = paging(query)?;
     let mut q = CommunicationQuery {
         company: &actor.company,
@@ -126,17 +156,30 @@ pub(in crate::engine) fn on_event(
     let action = text(event, "action");
     if !matches!(
         action.as_str(),
-        "submit" | "approve" | "approve-step" | "remind" | "reject" | "complete" | "void"
+        "submit"
+            | "approve"
+            | "approve-step"
+            | "remind"
+            | "reject"
+            | "complete"
+            | "void"
+            | "reassign"
     ) {
         return Ok(());
     }
     let mut offset = 0;
-    let finance = action == "approve" && row["status"] == "Approved" && row["kind"] == "expense";
+    let completion = action == "approve"
+        && row["status"] == "Approved"
+        && !matches!(row["kind"].as_str(), Some("general" | "supply"));
+    let handling = matches!(action.as_str(), "approve" | "reassign")
+        && (row["status"] == "Approved" || action == "reassign" && row["status"] == "Issued")
+        && matches!(row["kind"].as_str(), Some("general" | "supply"));
     let review = matches!(action.as_str(), "submit" | "approve-step" | "remind");
+    let distribution = review || completion || handling;
     let resource = text(meta, "resource");
     loop {
         crate::operation::check()?;
-        let users = if review || finance {
+        let users = if distribution {
             tx.query_records(&RecordQuery {
                 kind: "users",
                 company: &actor.company,
@@ -161,22 +204,28 @@ pub(in crate::engine) fn on_event(
                 continue;
             }
             let id = records::positive(&user, "id", "接收人")?;
-            if (review && id == actor.id) || (!review && !finance && row["ownerUserId"] != id) {
+            if (review && id == actor.id) || (!distribution && row["ownerUserId"] != id) {
                 continue;
             }
             let recipient = auth::current_actor_in(tx, id, actor.edition)?;
             if auth::authorize(&recipient, "office.notifications", "view").is_err()
-                || !super::super::oa::viewable(&recipient, &resource, row)
+                || !viewable(tx, &recipient, &resource, row)?
             {
                 continue;
             }
-            if finance
+            if completion
                 && row["ownerUserId"] != id
                 && !auth::visible(&recipient, &resource, "complete", row)
             {
                 continue;
             }
             if review && authority(tx, &recipient, row)?.is_none() {
+                continue;
+            }
+            if handling
+                && row["ownerUserId"] != id
+                && !handling::can_handle(tx, &recipient, row, row["kind"] == "supply")?
+            {
                 continue;
             }
             let identity = format!("{}:{id}", event["id"]);
@@ -188,14 +237,14 @@ pub(in crate::engine) fn on_event(
                 tx,
                 "site-notification",
                 0,
-                json!({"identity":identity,"eventId":event["id"],"requestId":row["id"],"requestKind":format!("oa-{}",text(row,"kind")),"title":row["title"],"action":action,"status":"Unread","readAt":""}),
+                json!({"identity":identity,"eventId":event["id"],"requestId":row["id"],"requestKind":if row["kind"] == "supply" {"supply-requests".into()} else {format!("oa-{}",text(row,"kind"))},"title":row["title"],"action":action,"status":"Unread","readAt":""}),
                 Some(identity),
                 actor,
                 "notify",
                 Some(&scope),
             )?;
         }
-        if !review && !finance {
+        if !distribution {
             break;
         }
     }

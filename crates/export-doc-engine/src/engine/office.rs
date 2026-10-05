@@ -229,6 +229,43 @@ pub fn validate(
             });
         }
         "supplies" => {
+            if id > 0
+                && value["isActive"] == false
+                && store::all(connection, "supply-requests")?.iter().any(|r| {
+                    r["officeSupplyId"] == id
+                        && ["Pending", "Approved"].contains(&text(r, "status").as_str())
+                })
+            {
+                return Err(conflict(
+                    "物品还有待审批或待发放申请，请先完成或取消后再停用。",
+                ));
+            }
+            let handling = super::oa::handling::supply_access;
+            if id > 0 && !handling(connection, actor, "edit", previous, true)? {
+                return Err(super::error::error(403, "只能维护本人负责的物品。"));
+            }
+            if id > 0
+                && text(value, "handlingKey") != text(previous, "handlingKey")
+                && store::all(connection, "supply-requests")?.iter().any(|r| {
+                    r["officeSupplyId"] == id
+                        && (["Pending", "Approved"].contains(&text(r, "status").as_str())
+                            || r["status"] == "Issued" && r["isReturnable"] == true)
+                })
+            {
+                return Err(conflict(
+                    "此物品尚有未结申请，不能更换物品组；人员交接请修改该组的办理分工。",
+                ));
+            }
+            super::oa::handling::select(connection, actor, value, "Supply", false)?;
+            if !text(value, "handlingKey").is_empty()
+                && !actor.admin
+                && !super::oa::handling::assigned(
+                    &super::oa::handling::keys(connection, actor, true)?,
+                    value,
+                )
+            {
+                return Err(super::error::error(403, "只能选择本人负责的物品组。"));
+            }
             required(value, "name", "物品名称", 120)?;
             required(value, "unit", "计量单位", 20)?;
             integer(value, "minimumStock", 0, 1_000_000, "最低库存")?;
@@ -300,6 +337,12 @@ pub fn validate(
             value["applicantUserId"] = value["ownerUserId"].clone();
             value["applicantName"] = employee["profile"]["fullName"].clone();
             value["supplyName"] = supply["name"].clone();
+            for field in ["handlingKey", "handlingName"] {
+                value[field] = json!(text(if id > 0 { previous } else { &supply }, field));
+            }
+            if id == 0 {
+                super::oa::handling::select(connection, actor, value, "Supply", false)?;
+            }
             value["unit"] = supply["unit"].clone();
             value["isReturnable"] = supply["isReturnable"].clone();
             value["status"] = json!(if registered { "Approved" } else { "Pending" });

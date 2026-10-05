@@ -1,5 +1,7 @@
 #[path = "support/approval_contract.rs"]
 mod approval_contract;
+#[path = "support/handling_contract.rs"]
+mod handling_contract;
 #[path = "support/native_fixture.rs"]
 #[allow(dead_code)]
 mod native_fixture;
@@ -79,6 +81,7 @@ fn configured_approval_chain_delegation_reminders_and_finance() {
     )
     .unwrap();
     approval_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    handling_contract::exercise(&service, login["accessToken"].as_str().unwrap());
     service.close().unwrap();
 }
 

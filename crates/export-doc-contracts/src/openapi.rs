@@ -81,6 +81,34 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .remove("approvalCount");
+        for field in ["handlingCount", "handlingServices"] {
+            assert!(
+                current["components"]["schemas"]["PersonnelClearance"]["properties"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove(field)
+                    .is_some()
+            );
+        }
+        for name in [
+            "OfficeSupplySaveRequest",
+            "OfficeSupplyRecord",
+            "OfficeSupplyRequestRecord",
+        ] {
+            let properties = current["components"]["schemas"][name]["properties"]
+                .as_object_mut()
+                .unwrap();
+            assert_eq!(properties.remove("handlingKey").unwrap()["type"], "string");
+            if name != "OfficeSupplySaveRequest" {
+                for field in ["handlingName", "handlerNames", "canHandle"] {
+                    assert!(properties.remove(field).is_some());
+                }
+            }
+        }
+        let params = current["paths"]["/api/office/supply-requests"]["get"]["parameters"]
+            .as_array_mut()
+            .unwrap();
+        assert_eq!(params.pop().unwrap()["name"], "handlingOnly");
         for (path, methods) in baseline["paths"].as_object().unwrap() {
             assert_eq!(&current["paths"][path], methods, "endpoint drift: {path}");
         }

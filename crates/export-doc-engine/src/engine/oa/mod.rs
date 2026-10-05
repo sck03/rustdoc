@@ -2,6 +2,9 @@
 //! no dependency on invoice/payment models, reports or financial software.
 pub(in crate::engine) mod approval;
 pub(in crate::engine) mod approval_references;
+pub(in crate::engine) mod handling;
+mod handling_handover;
+mod queries;
 mod settings;
 mod validation;
 use super::{
@@ -26,20 +29,30 @@ fn kind(meta: &Value) -> String {
     format!("oa-{}", text(meta, "kind"))
 }
 pub(super) const FINANCE_STATUSES: &[&str] = &["Approved", "HandedOff"];
-pub(super) fn viewable(actor: &Actor, resource: &str, row: &Value) -> bool {
-    row["companyScope"] == actor.company
+pub(super) fn viewable(
+    tx: &Connection,
+    actor: &Actor,
+    resource: &str,
+    row: &Value,
+) -> Result<bool> {
+    Ok(row["companyScope"] == actor.company
         && auth::authorize(actor, resource, "view").is_ok()
         && (auth::visible(actor, resource, "view", row)
             || (resource == "office.expenses"
                 && FINANCE_STATUSES.contains(&text(row, "status").as_str())
-                && auth::visible(actor, resource, "complete", row)))
+                && auth::visible(actor, resource, "complete", row))
+            || (resource == "office.general"
+                && handling::GENERAL_STATES.contains(&text(row, "status").as_str())
+                && handling::can_handle(tx, actor, row, false)?)))
 }
-fn access(actor: &Actor, meta: &Value, row: &Value) -> Result<()> {
+fn access(tx: &Connection, actor: &Actor, meta: &Value, row: &Value) -> Result<()> {
     let resource = text(meta, "resource");
     let permission = text(meta, "permission");
     auth::authorize(actor, &resource, &permission)?;
     let visible = if permission == "view" {
-        viewable(actor, &resource, row)
+        viewable(tx, actor, &resource, row)?
+    } else if permission == "complete" && resource == "office.general" {
+        handling::can_handle(tx, actor, row, false)?
     } else {
         row["companyScope"] == actor.company && auth::visible(actor, &resource, &permission, row)
     };
@@ -64,7 +77,7 @@ pub(super) fn current(
 ) -> Result<(Actor, Value)> {
     let actor = auth::current_actor_in(tx, actor.id, actor.edition)?;
     let row = store::get(tx, &kind(meta), id)?;
-    access(&actor, meta, &row)?;
+    access(tx, &actor, meta, &row)?;
     Ok((actor, row))
 }
 fn children(
@@ -96,6 +109,10 @@ pub(super) fn project(
     };
     if detail {
         row["canReview"] = json!(approval::authority(tx, actor, &row)?.is_some());
+    }
+    if row["kind"] == "general" {
+        row["canHandle"] = json!(handling::can_handle(tx, actor, &row, false)?);
+        row["handlerNames"] = json!(handling::names(tx, actor, &row)?);
     }
     Ok(contracts::dto(contracts::schema("OaRequest"), row))
 }
@@ -155,102 +172,6 @@ pub(super) fn paging(query: &[(&str, String)]) -> Result<(i64, i64)> {
         number("pageSize", 20, 100)?,
     ))
 }
-fn list(tx: &Connection, actor: &Actor, meta: &Value, query: &[(&str, String)]) -> Result<Value> {
-    let resource = text(meta, "resource");
-    auth::authorize(actor, &resource, "view")?;
-    let get = |name| {
-        query
-            .iter()
-            .find(|(k, _)| *k == name)
-            .map(|(_, v)| v.as_str())
-            .unwrap_or("")
-    };
-    let finance = match get("financeOnly") {
-        "" | "false" => false,
-        "true" if meta["kind"] == "expense" => true,
-        _ => return Err(invalid("财务筛选参数无效。")),
-    };
-    let approvals = match get("approvalsOnly") {
-        "" | "false" => false,
-        "true" => true,
-        _ => return Err(invalid("审批筛选参数无效。")),
-    };
-    if finance && approvals {
-        return Err(invalid("审批与财务接收不能同时筛选。"));
-    }
-    let scope_permission = if finance {
-        "complete"
-    } else if approvals {
-        "approve"
-    } else {
-        "view"
-    };
-    auth::authorize(actor, &resource, scope_permission)?;
-    let mine = match get("mineOnly") {
-        "" => !finance && !approvals,
-        "true" => true,
-        "false" => false,
-        _ => return Err(invalid("筛选开关无效。")),
-    };
-    let status = if approvals && get("status").is_empty() {
-        "Pending"
-    } else if finance && get("status").is_empty() {
-        "Approved"
-    } else {
-        get("status")
-    };
-    if approvals && status != "Pending" {
-        return Err(invalid("待我审批仅查询待审批申请。"));
-    }
-    if finance && !FINANCE_STATUSES.contains(&status) {
-        return Err(invalid("财务接收仅查询已批准或已移交财务的报销单。"));
-    }
-    if !status.is_empty()
-        && ![
-            "Draft",
-            "Pending",
-            "Approved",
-            "Rejected",
-            "Cancelled",
-            "Completed",
-            "HandedOff",
-        ]
-        .contains(&status)
-    {
-        return Err(invalid("申请状态无效。"));
-    }
-    let mut rank = auth::scope_rank(actor, &resource, scope_permission);
-    if approvals {
-        rank = rank.min(auth::scope_rank(actor, &resource, "view"));
-    }
-    if rank == 0 {
-        return Err(error(403, "没有有效的申请数据访问范围。"));
-    }
-    let (page, size) = paging(query)?;
-    let approvers = if approvals {
-        approval::queue_approvers(tx, actor, &resource)?
-    } else {
-        vec![]
-    };
-    let (count, rows) = tx.query_records(&RecordQuery {
-        kind: &kind(meta),
-        company: &actor.company,
-        department: (rank == 2).then_some(actor.department.as_str()),
-        owner: (mine || rank == 1).then_some(actor.id),
-        status: (!status.is_empty()).then_some(status),
-        approvers: approvals.then_some(approvers.as_slice()),
-        approval_actor: approvals.then_some(actor.id),
-        exclude_owner: (approvals && tx.provider() != "SQLite").then_some(actor.id),
-        offset: (page - 1) * size,
-        limit: size,
-        ..Default::default()
-    })?;
-    let rows = rows
-        .into_iter()
-        .map(|r| project(tx, actor, r, false))
-        .collect::<Result<Vec<_>>>()?;
-    Ok(json!({"items":rows,"totalCount":count,"pageNumber":page,"pageSize":size}))
-}
 
 pub(super) fn handle(
     service: &NativeService,
@@ -271,10 +192,13 @@ pub(super) fn handle(
         let actor = auth::current_actor_in(tx, actor.id, actor.edition)?;
         auth::authorize(&actor, &text(meta, "resource"), &text(meta, "permission"))?;
         if meta["kind"] == "approval-settings" {
+            if action.starts_with("handling-") {
+                return handling::directory(tx, &actor, action == "handling-supply");
+            }
             return settings::handle(tx, &actor, &action, body);
         }
         if action == "list" {
-            return list(tx, &actor, meta, query);
+            return queries::list(tx, &actor, meta, query);
         }
         if action == "create" {
             return create(tx, &actor, meta, body, today);
@@ -306,6 +230,10 @@ pub(super) fn handle(
             let values = validation::fields(meta, body, today)?;
             for (key, value) in values.as_object().unwrap() {
                 row[key] = value.clone();
+            }
+            if meta["kind"] == "general" {
+                let category = text(&row, "category");
+                handling::select(tx, &actor, &mut row, &category, false)?;
             }
             validation::employee(tx, &actor, &row, true)?;
             return save(tx, &actor, meta, row, "update", "");
@@ -349,6 +277,16 @@ pub(super) fn handle(
             validation::submission(tx, &row)?;
         }
         if action == "submit" {
+            if row["kind"] == "general" {
+                let category = text(&row, "category");
+                handling::select(
+                    tx,
+                    &actor,
+                    &mut row,
+                    &category,
+                    matches!(category.as_str(), "Seal" | "Certificate"),
+                )?;
+            }
             approval::submit(tx, &actor, &mut row)?;
         }
         if matches!(action.as_str(), "approve" | "reject") {
@@ -393,12 +331,16 @@ fn create(
     row["departmentId"] = employee["departmentId"].clone();
     row["companyScope"] = json!(actor.company);
     row["ownerUserId"] = json!(actor.id);
-    access(actor, meta, &row)?;
+    if meta["kind"] == "general" {
+        let category = text(&row, "category");
+        handling::select(tx, actor, &mut row, &category, false)?;
+    }
+    access(tx, actor, meta, &row)?;
     if let Some(existing) = tx.find_identity(&kind(meta), &identity)? {
         if existing["submissionDigest"] != submitted {
             return Err(conflict("同一请求编号不能用于不同内容。"));
         }
-        access(actor, meta, &existing)?;
+        access(tx, actor, meta, &existing)?;
         return project(tx, actor, existing, true);
     }
     row["submissionDigest"] = json!(submitted);

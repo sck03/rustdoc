@@ -11,6 +11,7 @@ import { oaDraft, oaModules, type OaKind } from "./oaModel.ts";
 import { useOfficeOperation } from "../office/useOfficeData.ts";
 import { useAttachmentDraft } from "../../ui/useAttachmentDraft.ts";
 import { AttachmentDraftFields } from "../../ui/AttachmentDraftFields.tsx";
+import { HandlingServicePicker } from "./HandlingServicePicker.tsx";
 
 export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind; record?: OaRequest; onClose: () => void; onSaved: (record: OaRequest) => void }) {
   const operation = useOfficeOperation();
@@ -46,6 +47,7 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
       <OfficeField label="申请标题" wide><input required maxLength={150} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></OfficeField>
       <OfficeField label="申请说明" wide><textarea required rows={3} maxLength={2000} value={draft.reason} onChange={(event) => setDraft({ ...draft, reason: event.target.value })} /></OfficeField>
       <OaTemporalFields draft={draft} setDraft={setDraft} timeZone={user.businessTimeZone} />
+      {draft.category && <HandlingServicePicker client={client} user={user} category={draft.category} value={draft.handlingKey ?? ""} onChange={handlingKey => setDraft({ ...draft, handlingKey })} />}
       {(kind === "expense" || kind === "purchase") && <>
         <OfficeField label="币种"><select value={draft.currency} onChange={(event) => setDraft({ ...draft, currency: event.target.value as OaRequestSave["currency"] })}>{["CNY", "USD", "EUR", "HKD", "JPY", "GBP"].map((currency) => <option key={currency}>{currency}</option>)}</select></OfficeField>
         <OaLineEditor draft={draft} setDraft={setDraft} purchase={kind === "purchase"} businessDate={user.businessDate} />

@@ -5,6 +5,7 @@ pub struct NotificationScope {
     pub rank: u8,
     /// Empty accepts every parent state; otherwise filter before pagination.
     pub statuses: Vec<String>,
+    pub handling_keys: Option<Vec<String>>,
 }
 pub enum CommunicationView<'a> {
     Announcements { manage: bool, now: &'a str },
@@ -57,6 +58,9 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
             }
             let mut allowed = vec![];
             for scope in *scopes {
+                if scope.handling_keys.as_ref().is_some_and(Vec::is_empty) {
+                    continue;
+                }
                 let mut condition = match scope.rank {
                     1 => format!(" AND parent.owner_id={reader}"),
                     2 => format!(" AND parent.department={}", bind(q.department.into())),
@@ -70,6 +74,14 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                         .map(|s| bind(s.clone()))
                         .collect::<Vec<_>>();
                     condition += &format!(" AND parent.body->>'status' IN ({})", states.join(","));
+                }
+                if let Some(keys) = &scope.handling_keys {
+                    if keys.is_empty() {
+                        continue;
+                    }
+                    let keys = keys.iter().map(|key| bind(key.clone())).collect::<Vec<_>>();
+                    condition +=
+                        &format!(" AND parent.body->>'handlingKey' IN ({})", keys.join(","));
                 }
                 let kind = bind(scope.kind.clone());
                 allowed.push(format!("(parent.kind={kind}{condition})"));

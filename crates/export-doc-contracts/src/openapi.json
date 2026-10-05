@@ -3933,6 +3933,13 @@
               ],
               "format": "int32"
             }
+          },
+          {
+            "name": "handlingOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -34454,6 +34461,13 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "handlingOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ]
       },
@@ -36822,6 +36836,13 @@
           },
           {
             "name": "approvalsOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "handlingOnly",
             "in": "query",
             "schema": {
               "type": "boolean"
@@ -41577,6 +41598,13 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "handlingOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ]
       },
@@ -43949,6 +43977,13 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "handlingOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ]
       },
@@ -46317,6 +46352,13 @@
           },
           {
             "name": "approvalsOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "handlingOnly",
             "in": "query",
             "schema": {
               "type": "boolean"
@@ -48788,6 +48830,256 @@
               }
             }
           }
+        }
+      }
+    },
+    "/api/office/general-handling-services": {
+      "get": {
+        "tags": [
+          "Office approvals"
+        ],
+        "operationId": "ListGeneralHandlingServices",
+        "x-exportdoc-office": {
+          "kind": "approval-settings",
+          "action": "handling-general",
+          "resource": "office.general",
+          "permission": "view"
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfficeHandlingDirectory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "office.general",
+              "action": "view"
+            }
+          ],
+          "permissionBypass": false
+        }
+      }
+    },
+    "/api/office/supply-handling-services": {
+      "get": {
+        "tags": [
+          "Office approvals"
+        ],
+        "operationId": "ListSupplyHandlingServices",
+        "x-exportdoc-office": {
+          "kind": "approval-settings",
+          "action": "handling-supply",
+          "resource": "office.supplies",
+          "permission": "view"
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfficeHandlingDirectory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "office.supplies",
+              "action": "view"
+            }
+          ],
+          "permissionBypass": false
         }
       }
     },
@@ -70357,6 +70649,18 @@
           },
           "lowStock": {
             "type": "boolean"
+          },
+          "handlingKey": {
+            "type": "string"
+          },
+          "handlingName": {
+            "type": "string"
+          },
+          "handlerNames": {
+            "type": "string"
+          },
+          "canHandle": {
+            "type": "boolean"
           }
         }
       },
@@ -70458,6 +70762,18 @@
               "string"
             ],
             "format": "int32"
+          },
+          "handlingKey": {
+            "type": "string"
+          },
+          "handlingName": {
+            "type": "string"
+          },
+          "handlerNames": {
+            "type": "string"
+          },
+          "canHandle": {
+            "type": "boolean"
           }
         }
       },
@@ -70507,6 +70823,9 @@
               "string"
             ],
             "format": "int32"
+          },
+          "handlingKey": {
+            "type": "string"
           }
         }
       },
@@ -71384,6 +71703,16 @@
           "approvalCount": {
             "type": "integer",
             "format": "int64"
+          },
+          "handlingCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "handlingServices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -73891,6 +74220,9 @@
               "$ref": "#/components/schemas/OaPurchaseLine"
             },
             "maxItems": 100
+          },
+          "handlingKey": {
+            "type": "string"
           }
         },
         "required": [
@@ -74110,6 +74442,18 @@
           },
           "lastRemindedAt": {
             "type": "string"
+          },
+          "handlingKey": {
+            "type": "string"
+          },
+          "handlingName": {
+            "type": "string"
+          },
+          "handlerNames": {
+            "type": "string"
+          },
+          "canHandle": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -74360,6 +74704,13 @@
               "$ref": "#/components/schemas/OaApprovalDelegation"
             },
             "maxItems": 50
+          },
+          "handlingServices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfficeHandlingService"
+            },
+            "maxItems": 100
           }
         },
         "required": [
@@ -74393,12 +74744,78 @@
           "versionNumber": {
             "type": "integer",
             "format": "int64"
+          },
+          "handlingServices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfficeHandlingService"
+            },
+            "maxItems": 100
           }
         },
         "required": [
           "versionNumber",
           "rules",
           "delegations"
+        ]
+      },
+      "OfficeHandlingService": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "Seal",
+              "Certificate",
+              "IT",
+              "Repair",
+              "Other",
+              "Supply"
+            ]
+          },
+          "handlerUserIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "handlerNames": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "category",
+          "handlerUserIds",
+          "isActive"
+        ]
+      },
+      "OfficeHandlingDirectory": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfficeHandlingService"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "items"
         ]
       },
       "AnnouncementSave": {

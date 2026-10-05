@@ -29,7 +29,9 @@ pub(super) fn plan(row: &Value) -> Result<Option<ApprovalPlan>> {
 fn reviewer(tx: &Connection, actor: &Actor, id: i64, row: &Value) -> Result<Actor> {
     let reviewer = auth::current_actor_in(tx, id, actor.edition)?;
     let resource = resource(&text(row, "kind")).ok_or_else(|| invalid("未知申请类型。"))?;
-    if !viewable(&reviewer, resource, row) || !auth::visible(&reviewer, resource, "approve", row) {
+    if !viewable(tx, &reviewer, resource, row)?
+        || !auth::visible(&reviewer, resource, "approve", row)
+    {
         return Err(error(403, "审批人缺少本申请的查看或审批范围。"));
     }
     Ok(reviewer)
@@ -157,7 +159,7 @@ pub(in crate::engine) fn authority(
         return Ok(None);
     };
     if row["status"] != "Pending"
-        || !viewable(actor, resource, row)
+        || !viewable(tx, actor, resource, row)?
         || !auth::visible(actor, resource, "approve", row)
     {
         return Ok(None);

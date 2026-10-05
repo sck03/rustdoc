@@ -97,24 +97,25 @@ export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUs
   const [search, setSearch] = useSearchParams();
   const focus = officeRequestFocus(search);
   const focused = Boolean(focus.requestId || focus.applicantUserId || focus.employeeId);
+  const handlingOnly = kind === "supplies" && search.get("handlingOnly") === "true" && !focused;
   const paging = useOfficePaging();
   const [mineOnlyFilter, setMineOnly] = useState(!access.canSeeOthers);
   const [statusFilter, setStatus] = useState(search.get("status") ?? (user.capabilities.usesOfficeRegister ? "" : access.allows("approve") ? "Pending" : ""));
-  const mineOnly = focused ? !access.canSeeOthers : mineOnlyFilter;
+  const mineOnly = focused || handlingOnly ? false : mineOnlyFilter;
   const status = focused ? "" : statusFilter;
   const query = useQuery({
-    queryKey: ["office", kind, "requests", user.id, user.companyScope, paging.pageNumber, paging.pageSize, mineOnly, status, focus],
+    queryKey: ["office", kind, "requests", user.id, user.companyScope, paging.pageNumber, paging.pageSize, mineOnly, status, focus, handlingOnly],
     queryFn: async ({ signal }): Promise<OfficePage<OfficeRequestRow>> => {
-      const input = { mineOnly, status: status || undefined, pageNumber: paging.pageNumber, pageSize: paging.pageSize, ...focus };
+      const input = { mineOnly, status: status || undefined, handlingOnly: kind === "supplies" ? handlingOnly : undefined, pageNumber: paging.pageNumber, pageSize: paging.pageSize, ...focus };
       return kind === "rooms" ? client.listMeetingBookings(input, { signal }) : client.listOfficeSupplyRequests(input, { signal });
     },
     refetchInterval: 30000,
     refetchIntervalInBackground: false,
   });
   const clearFocus = () => { setSearch({ view: "requests" }); paging.resetPage(); };
-  return { access, paging, query, mineOnly, status, focus, focused, clearFocus: () => { setStatus(""); setMineOnly(!access.canSeeOthers); clearFocus(); },
+  return { access, paging, query, mineOnly, status, focus, focused, handlingOnly, changeHandling: (value: boolean) => { setSearch(value ? {view:"requests",handlingOnly:"true"} : {view:"requests"}); setStatus(value ? "Approved" : ""); paging.resetPage(); }, clearFocus: () => { setStatus(""); setMineOnly(!access.canSeeOthers); clearFocus(); },
     changeMineOnly: (value: boolean) => { setMineOnly(value); clearFocus(); },
-    changeStatus: (value: string) => { setStatus(value); clearFocus(); } };
+    changeStatus: (value: string) => { setStatus(value); if (!handlingOnly) clearFocus(); else paging.resetPage(); } };
 }
 
 export function applyOfficeAction(client: ExportDocManagerApiClient, kind: OfficeKind, row: OfficeRequestRow,

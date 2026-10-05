@@ -4105,6 +4105,7 @@ export interface OaApprovalRule {
 export interface OaApprovalSettings {
   delegations: OaApprovalDelegation[];
   expectedVersion?: number;
+  handlingServices?: OfficeHandlingService[];
   rules: OaApprovalRule[];
   versionNumber: number;
 }
@@ -4112,6 +4113,7 @@ export interface OaApprovalSettings {
 export interface OaApprovalSettingsSave {
   delegations: OaApprovalDelegation[];
   expectedVersion: number;
+  handlingServices?: OfficeHandlingService[];
   rules: OaApprovalRule[];
 }
 
@@ -4182,6 +4184,7 @@ export interface OaPurchaseLine {
 export interface OaRequest {
   approvalPlan?: OaApprovalPlan;
   attachments: OaAttachment[];
+  canHandle?: boolean;
   canReview?: boolean;
   category?: "Seal" | "Certificate" | "IT" | "Repair" | "Other";
   createdAt: string;
@@ -4192,6 +4195,9 @@ export interface OaRequest {
   employeeId: number;
   employeeName: string;
   expectedVersion?: number;
+  handlerNames?: string;
+  handlingKey?: string;
+  handlingName?: string;
   id: number;
   kind: "leave" | "expense" | "travel" | "overtime" | "purchase" | "general";
   lastRemindedAt?: string;
@@ -4222,6 +4228,7 @@ export interface OaRequestSave {
   currency?: "CNY" | "USD" | "EUR" | "HKD" | "JPY" | "GBP";
   employeeId?: number;
   expectedVersion?: number;
+  handlingKey?: string;
   leave?: OaLeave;
   lines?: OaExpenseLine[];
   overtime?: OaOvertime;
@@ -4241,6 +4248,19 @@ export interface OaTravel {
 export interface OfficeDecisionRequest {
   expectedVersion: number;
   note?: string;
+}
+
+export interface OfficeHandlingDirectory {
+  items: OfficeHandlingService[];
+}
+
+export interface OfficeHandlingService {
+  category: "Seal" | "Certificate" | "IT" | "Repair" | "Other" | "Supply";
+  handlerNames?: string;
+  handlerUserIds: number[];
+  isActive: boolean;
+  key: string;
+  name: string;
 }
 
 export interface OfficeRequestEventRecord {
@@ -4277,7 +4297,11 @@ export interface OfficeStockRequest {
 
 export interface OfficeSupplyRecord {
   availableQuantity: number;
+  canHandle?: boolean;
   description: string;
+  handlerNames?: string;
+  handlingKey?: string;
+  handlingName?: string;
   id: number;
   isActive: boolean;
   isReturnable: boolean;
@@ -4293,8 +4317,12 @@ export interface OfficeSupplyRecord {
 
 export interface OfficeSupplyRequestRecord {
   applicantName: string;
+  canHandle?: boolean;
   createdAt: string;
   departmentId: string;
+  handlerNames?: string;
+  handlingKey?: string;
+  handlingName?: string;
   id: number;
   isReturnable: boolean;
   officeSupplyId: number;
@@ -4312,6 +4340,7 @@ export interface OfficeSupplyRequestRecord {
 export interface OfficeSupplySaveRequest {
   description: string;
   expectedVersion: number;
+  handlingKey?: string;
   isActive: boolean;
   isReturnable: boolean;
   location: string;
@@ -4479,6 +4508,8 @@ export interface PersonnelAttachment {
 export interface PersonnelClearance {
   approvalCount?: number;
   canDepart: boolean;
+  handlingCount?: number;
+  handlingServices?: string[];
   isClear: boolean;
   items: PersonnelClearanceItem[];
   managedDepartments: PersonnelManagedDepartment[];
@@ -6353,6 +6384,7 @@ export interface ListGeneralRequestRequest {
   status?: string;
   mineOnly?: boolean;
   approvalsOnly?: boolean;
+  handlingOnly?: boolean;
 }
 
 export interface ListHistoryOfExpenseRequestRequest {
@@ -6435,6 +6467,7 @@ export interface ListLeaveRequestRequest {
   status?: string;
   mineOnly?: boolean;
   approvalsOnly?: boolean;
+  handlingOnly?: boolean;
 }
 
 export interface ListMeetingBookingsRequest {
@@ -6482,6 +6515,7 @@ export interface ListOfficeSupplyRequestsRequest {
   requestId?: number;
   applicantUserId?: number;
   employeeId?: number;
+  handlingOnly?: boolean;
 }
 
 export interface ListOrganizationManagersRequest {
@@ -6497,6 +6531,7 @@ export interface ListOvertimeRequestRequest {
   status?: string;
   mineOnly?: boolean;
   approvalsOnly?: boolean;
+  handlingOnly?: boolean;
 }
 
 export interface ListPayeesRequest {
@@ -6553,6 +6588,7 @@ export interface ListPurchaseRequestRequest {
   status?: string;
   mineOnly?: boolean;
   approvalsOnly?: boolean;
+  handlingOnly?: boolean;
 }
 
 export interface ListQueriedInvoicesRequest {
@@ -6596,6 +6632,7 @@ export interface ListTravelRequestRequest {
   status?: string;
   mineOnly?: boolean;
   approvalsOnly?: boolean;
+  handlingOnly?: boolean;
 }
 
 export interface ListUnitsRequest {
@@ -9835,6 +9872,11 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listGeneralHandlingServices(init?: ApiRequestInit): Promise<OfficeHandlingDirectory> {
+    const path = "/api/office/general-handling-services";
+    return this.request<OfficeHandlingDirectory>("GET", path, { init });
+  }
+
   public listGeneralRequest(request: ListGeneralRequestRequest = {}, init?: ApiRequestInit): Promise<OaRequestPage> {
     const path = "/api/office/general-requests";
     return this.request<OaRequestPage>("GET", path, {
@@ -9844,6 +9886,7 @@ export class ExportDocManagerApiClient {
         "status": request.status,
         "mineOnly": request.mineOnly,
         "approvalsOnly": request.approvalsOnly,
+        "handlingOnly": request.handlingOnly,
       },
       init,
     });
@@ -9993,6 +10036,7 @@ export class ExportDocManagerApiClient {
         "status": request.status,
         "mineOnly": request.mineOnly,
         "approvalsOnly": request.approvalsOnly,
+        "handlingOnly": request.handlingOnly,
       },
       init,
     });
@@ -10070,6 +10114,7 @@ export class ExportDocManagerApiClient {
         "requestId": request.requestId,
         "applicantUserId": request.applicantUserId,
         "employeeId": request.employeeId,
+        "handlingOnly": request.handlingOnly,
       },
       init,
     });
@@ -10097,6 +10142,7 @@ export class ExportDocManagerApiClient {
         "status": request.status,
         "mineOnly": request.mineOnly,
         "approvalsOnly": request.approvalsOnly,
+        "handlingOnly": request.handlingOnly,
       },
       init,
     });
@@ -10216,6 +10262,7 @@ export class ExportDocManagerApiClient {
         "status": request.status,
         "mineOnly": request.mineOnly,
         "approvalsOnly": request.approvalsOnly,
+        "handlingOnly": request.handlingOnly,
       },
       init,
     });
@@ -10276,6 +10323,11 @@ export class ExportDocManagerApiClient {
     return this.request<ApiSupplierAssessmentDto[]>("GET", path, { init });
   }
 
+  public listSupplyHandlingServices(init?: ApiRequestInit): Promise<OfficeHandlingDirectory> {
+    const path = "/api/office/supply-handling-services";
+    return this.request<OfficeHandlingDirectory>("GET", path, { init });
+  }
+
   public listTravelRequest(request: ListTravelRequestRequest = {}, init?: ApiRequestInit): Promise<OaRequestPage> {
     const path = "/api/office/travel-requests";
     return this.request<OaRequestPage>("GET", path, {
@@ -10285,6 +10337,7 @@ export class ExportDocManagerApiClient {
         "status": request.status,
         "mineOnly": request.mineOnly,
         "approvalsOnly": request.approvalsOnly,
+        "handlingOnly": request.handlingOnly,
       },
       init,
     });

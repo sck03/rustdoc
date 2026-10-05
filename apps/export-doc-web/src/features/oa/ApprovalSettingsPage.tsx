@@ -7,6 +7,7 @@ import { businessDateTimeLocalInputToIso, toBusinessDateTimeLocalInput } from ".
 import { OfficeField, OfficeSubmit } from "../office/OfficeUi.tsx";
 import { useApprovalSettings, useApprovalSettingsDraft, type ApprovalAccount } from "./useApprovalSettings.ts";
 import { oaModules } from "./oaModel.ts";
+import { HandlingServicesEditor } from "./HandlingServicesEditor.tsx";
 import "../../styles/routes/office.css";
 import "../../styles/routes/oa.css";
 
@@ -39,6 +40,7 @@ function ApprovalSettingsEditor({ client, user, initial, accounts }: { client: E
           </li>)}</ol><button className="command-button secondary" type="button" disabled={rule.approverUserIds.length >= 10} onClick={() => changeRule(index, { approverUserIds: [...rule.approverUserIds, 0] })}>添加审批步骤</button></>}
         </section>)}
       </fieldset>
+      <HandlingServicesEditor services={draft.handlingServices ?? []} accounts={accounts} disabled={operation.busy} onChange={handlingServices => setDraft(value => ({ ...value, handlingServices }))} />
       <details><summary>审批代理</summary>
         <p className="office-muted">代理用于有指定审批人的步骤；只接受直接代理，同一人不能代批同一申请的多个步骤。停用或到期立即失效。</p>
         {draft.delegations.map((item, index) => <fieldset disabled={operation.busy} className="office-form-grid office-resource-card" key={item.key}><legend>代理 {index + 1}</legend>

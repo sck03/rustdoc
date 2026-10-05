@@ -34,16 +34,66 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
         bind(q.kind.into(), "TEXT"),
         bind(q.company.into(), "TEXT")
     );
-    for (field, value) in [
-        ("r.department".to_owned(), q.department),
-        (property("status", false), q.status),
-    ] {
-        if let Some(value) = value {
-            filter += &format!(" AND {field}={}", bind(value.into(), "TEXT"));
+    let mut scope = vec![];
+    if let Some(department) = q.department {
+        scope.push(format!("r.department={}", bind(department.into(), "TEXT")));
+    }
+    if let Some(owner) = q.owner {
+        scope.push(format!("r.owner_id={}", bind(owner.to_string(), "BIGINT")));
+    }
+    let ordinary = if scope.is_empty() {
+        "TRUE".into()
+    } else {
+        scope.join(" AND ")
+    };
+    let assigned = if let Some(keys) = q.handling_keys.filter(|keys| !keys.is_empty()) {
+        let keys = keys
+            .iter()
+            .map(|k| bind(k.clone(), "TEXT"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let states = q
+            .handling_states
+            .iter()
+            .map(|s| bind((*s).into(), "TEXT"))
+            .collect::<Vec<_>>()
+            .join(",");
+        format!(
+            "{} IN ({keys}) AND {} IN ({states})",
+            property("handlingKey", false),
+            property("status", false)
+        )
+    } else {
+        "FALSE".into()
+    };
+    filter += &format!(
+        " AND ({})",
+        if q.handling_only {
+            format!(
+                "({ordinary} AND COALESCE({},'')='') OR ({assigned})",
+                property("handlingKey", false)
+            )
+        } else if q.handling_keys.is_some() {
+            format!("({ordinary}) OR ({assigned})")
+        } else {
+            ordinary
         }
+    );
+    if let Some(status) = q.status {
+        filter += &format!(
+            " AND {}={}",
+            property("status", false),
+            bind(status.into(), "TEXT")
+        );
+    }
+    if let Some(key) = q.handling_key {
+        filter += &format!(
+            " AND {}={}",
+            property("handlingKey", false),
+            bind(key.into(), "TEXT")
+        );
     }
     for (field, value) in [
-        ("r.owner_id".to_owned(), q.owner),
         (property("employeeId", true), q.employee),
         (property("requestId", true), q.parent),
     ] {

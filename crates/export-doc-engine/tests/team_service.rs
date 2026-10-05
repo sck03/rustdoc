@@ -9,6 +9,8 @@ mod approval_contract;
 mod business_contract;
 #[path = "support/communication_contract.rs"]
 mod communication_contract;
+#[path = "support/handling_contract.rs"]
+mod handling_contract;
 #[path = "support/oa_contract.rs"]
 mod oa_contract;
 #[path = "support/office_contract.rs"]
@@ -254,6 +256,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     );
     oa_contract::exercise(&service, admin_token, staff_token, None);
     approval_contract::exercise(&service, admin_token);
+    handling_contract::exercise(&service, admin_token);
     communication_contract::exercise(&service, admin_token);
     account_scope::exercise(&service, admin_token);
     template_contract::exercise(&service, admin_token);

@@ -18,7 +18,7 @@ pub fn append(
     quantity: i64,
     note: &str,
 ) -> Result<()> {
-    store::save(
+    let event = store::save(
         tx,
         "office-events",
         0,
@@ -30,6 +30,32 @@ pub fn append(
         actor,
         action,
     )?;
+    if kind == "supply-requests" {
+        let action = match action {
+            "Register" | "Approve" => "approve",
+            "Issue" | "Return" => "complete",
+            "Reject" => "reject",
+            "Cancel" => "void",
+            "Reassign" => "reassign",
+            _ => "",
+        };
+        let mut request = record.clone();
+        request["kind"] = json!("supply");
+        request["title"] = json!(format!(
+            "{} · {}",
+            text(record, "supplyName"),
+            text(record, "purpose")
+        ));
+        let mut event = event;
+        event["action"] = json!(action);
+        super::communication::on_event(
+            tx,
+            actor,
+            &request,
+            &event,
+            &json!({"resource":"office.supplies"}),
+        )?;
+    }
     Ok(())
 }
 
@@ -48,9 +74,13 @@ pub fn history(
     auth::authorize(actor, permission, action)?;
     store.transaction(|tx| {
         let record = store::get(tx, kind, id)?;
-        if record["companyScope"] != actor.company
-            || !auth::visible(actor, permission, action, &record)
-        {
+        let allowed = if permission == "office.supplies" {
+            super::oa::handling::supply_access(tx, actor, action, &record, kind == "supplies")?
+        } else {
+            record["companyScope"] == actor.company
+                && auth::visible(actor, permission, action, &record)
+        };
+        if !allowed {
             return Err(error(403, "没有查看这项记录历史的权限。"));
         }
         let stock = operation == GET_OFFICE_STOCK_HISTORY;

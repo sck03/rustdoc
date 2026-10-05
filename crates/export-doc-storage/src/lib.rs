@@ -102,6 +102,11 @@ pub struct RecordQuery<'a> {
     pub approvers: Option<&'a [RecordApprover]>,
     pub approval_actor: Option<i64>,
     pub exclude_owner: Option<i64>,
+    pub handling_key: Option<&'a str>,
+    /// Additional assigned-service access, combined with the ordinary owner/department scope.
+    pub handling_keys: Option<&'a [String]>,
+    pub handling_states: &'a [&'a str],
+    pub handling_only: bool,
     pub offset: i64,
     pub limit: i64,
 }

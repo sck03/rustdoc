@@ -1,4 +1,5 @@
 import type { WorklistDueFilter, WorklistItem } from "../../api/index.ts";
+import { oaKinds } from "../oa/oaModel.ts";
 
 export const worklistDueOptions: ReadonlyArray<{ value: WorklistDueFilter; label: string }> = [
   { value: "All", label: "全部待办" }, { value: "Overdue", label: "已到期" },
@@ -6,6 +7,8 @@ export const worklistDueOptions: ReadonlyArray<{ value: WorklistDueFilter; label
 ];
 
 export function worklistTarget(item: WorklistItem) {
+  const kind = item.source.replace(/^oa-/, "");
+  if (item.source.startsWith("oa-") && oaKinds.some(value => value === kind)) return `/office/requests/${kind}?requestId=${item.recordId}`;
   switch (item.source) {
     case "invoice-review": return `/invoices/${item.recordId}`;
     case "customer-follow-up": return `/crm/follow-ups?followUpId=${item.recordId}`;

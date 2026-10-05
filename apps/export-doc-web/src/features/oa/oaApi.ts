@@ -6,7 +6,7 @@ const names = { leave: "Leave", overtime: "Overtime", expense: "Expense", travel
 export function oaApi(client: ExportDocManagerApiClient, kind: OaKind) {
   const name = names[kind];
   return {
-    list: (request: { pageNumber: number; pageSize: number; mineOnly: boolean; status?: string; financeOnly?: boolean; approvalsOnly?: boolean }, init?: ApiRequestInit) => client[`list${name}Request`](request, init),
+    list: (request: { pageNumber: number; pageSize: number; mineOnly: boolean; status?: string; financeOnly?: boolean; approvalsOnly?: boolean; handlingOnly?: boolean }, init?: ApiRequestInit) => client[`list${name}Request`](request, init),
     get: (id: number, init?: ApiRequestInit) => client[`get${name}Request`]({ id }, init),
     create: (body: OaRequestSave, init?: ApiRequestInit) => client[`create${name}Request`]({ body }, init),
     update: (id: number, body: OaRequestSave, init?: ApiRequestInit) => client[`update${name}Request`]({ id, body }, init),

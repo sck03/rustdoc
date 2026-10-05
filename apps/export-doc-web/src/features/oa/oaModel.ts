@@ -19,9 +19,10 @@ export type OaActionName = keyof typeof oaActionLabels;
 export function oaAccess(user: ApiUserDto, kind: OaKind, action: string, row?: OaRequest): boolean {
   const resource = oaModules[kind].resource;
   if (!hasPermission(user.capabilities.permissions, resource, action)) return false;
+  if (row && kind === "general" && action === "complete" && row.canHandle !== undefined) return row.canHandle;
   return !row || user.capabilities.permissions.some((grant) => grant.resourceKey === resource && grant.action === action &&
     (grant.dataScope === "all" || grant.dataScope === "company" || grant.dataScope === "department" && row.departmentId === user.departmentId || grant.dataScope === "own" && row.ownerUserId === user.id))
-    || action === "view" && kind === "expense" && ["Approved", "HandedOff"].includes(row.status) && oaAccess(user, kind, "complete", row);
+    || action === "view" && ((kind === "expense" && ["Approved", "HandedOff"].includes(row.status) && oaAccess(user, kind, "complete", row)) || kind === "general" && ["Approved", "Completed"].includes(row.status) && row.canHandle === true);
 }
 export function oaActions(row: OaRequest, user: ApiUserDto): OaActionName[] {
   const allows = (action: string) => oaAccess(user, row.kind, action, row);

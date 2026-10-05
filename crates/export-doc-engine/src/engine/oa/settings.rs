@@ -101,6 +101,27 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
         }
     }
     let mut value = contracts::dto(contracts::schema("OaApprovalSettingsSave"), body.clone());
+    let mut services = body.get("handlingServices").cloned().unwrap_or_else(|| {
+        previous
+            .get("handlingServices")
+            .cloned()
+            .unwrap_or(json!([]))
+    });
+    for service in services.as_array_mut().into_iter().flatten() {
+        use unicode_normalization::UnicodeNormalization;
+        if !service.is_object() {
+            return Err(invalid("办理分工必须为对象。"));
+        }
+        for field in ["key", "name"] {
+            service[field] = json!(text(service, field).nfc().collect::<String>());
+        }
+        service
+            .as_object_mut()
+            .ok_or_else(|| invalid("办理分工必须为对象。"))?
+            .remove("handlerNames");
+    }
+    super::handling::validate(tx, actor, &services, &previous["handlingServices"])?;
+    value["handlingServices"] = services;
     value["versionNumber"] = previous["versionNumber"].clone();
     let saved = store::save(
         tx,
@@ -111,6 +132,7 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
         actor,
         "approval-settings",
     )?;
+    super::handling_handover::notify(tx, actor, &previous, &saved)?;
     Ok(contracts::dto(
         contracts::schema("OaApprovalSettings"),
         saved,

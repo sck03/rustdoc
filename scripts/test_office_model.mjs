@@ -51,7 +51,8 @@ for (const [day, hours] of [["2026-03-08", 23], ["2026-11-01", 25]]) {
 assert.equal(office.officeDayRange("2026-02-30", "Asia/Shanghai"), null);
 assert.equal(office.shiftOfficeBookingEnd("2026-03-08T02:30", "America/New_York"), "");
 assert.equal(office.shiftOfficeBookingEnd("2026-09-07T10:30", "Asia/Shanghai"), "2026-09-07T11:30");
-assert.equal(getDefaultWorkspaceRoute(user.capabilities), "/access-denied", "missing fixed home permission must not choose an unrelated business page");
+assert.equal(getDefaultWorkspaceRoute(user.capabilities), "/office/approvals", "Full employees enter their authorized application workspace");
+assert.equal(getDefaultWorkspaceRoute({...user.capabilities,productEdition:"Document"}),"/access-denied","shipping editions retain their fixed home boundary");
 assert(navigation.filterWorkspaceNavGroups(user.capabilities).some(group => group.key === "office"));
 assert(!navigation.filterWorkspaceNavGroups({ ...user.capabilities, isDesktopRuntime: true }).some(group => group.key === "office"));
 for (const pathname of ["/office/meeting-rooms", "/office/supplies"]) {
@@ -62,7 +63,7 @@ for (const pathname of ["/office/meeting-rooms", "/office/supplies"]) {
 }
 const descriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
 const personnelUser = { ...user, capabilities: { ...user.capabilities, enabledModules: ["office.people"], permissions: [{resourceKey:"office.people",action:"view",dataScope:"company"}] } };
-assert.equal(getDefaultWorkspaceRoute(personnelUser.capabilities), "/access-denied");
+assert.equal(getDefaultWorkspaceRoute(personnelUser.capabilities), "/office/directory");
 assert(isRouteAccessAllowed({ pathname:"/office/directory",user:personnelUser,canManageSystem:false,isDesktopRuntime:false }));
 assert(!isRouteAccessAllowed({ pathname:"/office/people",user:personnelUser,canManageSystem:false,isDesktopRuntime:false }));
 assert(!isRouteAccessAllowed({ pathname:"/office/people",user:personnelUser,canManageSystem:true,isDesktopRuntime:true }));
@@ -93,12 +94,12 @@ assert.equal(deepMatch.length,32);assert.equal(deepMatch.at(-1).depth,31);assert
 assert.throws(()=>organization.departmentOptions([{code:"A",name:"A",parentCode:"B"},{code:"B",name:"B",parentCode:"A"}]),/循环/);
 assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=15&applicantUserId=7&employeeId=5")), {requestId:15,applicantUserId:7,employeeId:5});
 assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=-1&applicantUserId=2147483648&employeeId=0")), {requestId:undefined,applicantUserId:undefined,employeeId:undefined});
-const registerUser = { ...manager, capabilities: { ...manager.capabilities, productEdition:"Administration", usesOfficeRegister:true,
+const registerUser = { ...manager, capabilities: { ...manager.capabilities, productEdition:"Full", usesOfficeRegister:true,
   canManageSettings:true, canManageUsers:true, enabledModules:["office.rooms","office.supplies","office.people","system.about"],
   permissions:[...grants("all"), ...["view","view-details"].map(action=>({resourceKey:"office.people",action,dataScope:"all"}))] } };
-assert.equal(getDefaultWorkspaceRoute(registerUser.capabilities), "/office/people");
+assert.equal(getDefaultWorkspaceRoute(registerUser.capabilities), "/office/approvals");
 assert.equal(navigation.filterWorkspaceNavGroups({ ...registerUser.capabilities, isDesktopRuntime:true }).filter(group=>['office','personnel'].includes(group.key)).flatMap(group=>group.items).length,4);
-// The retained SQLite registration fixture is not a shipping desktop edition.
+// Full SQLite is the explicit local test edition; formal desktop editions remain separate.
 const fullTeamUser = { ...registerUser, capabilities: { ...registerUser.capabilities, productEdition: "Full", usesOfficeRegister:false, canUseDocumentWorkspace: true, canUseSalesWorkspace: true } };
 for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supplies"]) {
   assert(isRouteAccessAllowed({ pathname, user: fullTeamUser, canManageSystem: true, isDesktopRuntime: false }), "Full team edition permits direct administration routes");
@@ -111,6 +112,10 @@ assert(!isRouteAccessAllowed({pathname:"/system/organization",user:personnelUser
 assert(navigation.searchWorkspaceNavGroups("部门",navigation.filterWorkspaceNavGroups(registerUser.capabilities)).some(group=>group.items.some(item=>item.to==="/system/organization")));
 assert(!isRouteAccessAllowed({pathname:"/invoices",user:registerUser,canManageSystem:true,isDesktopRuntime:true}));
 assert.equal(office.officeRequestActions({...row,status:"Approved"},registerUser,"rooms").find(item=>item.action==='cancel').label,"取消登记");
+const supplyRow = {id:8,officeSupplyId:2,ownerUserId:2,status:"Approved",handlingKey:"daily",canHandle:false,isReturnable:false};
+assert(!office.officeRequestActions(supplyRow,manager,"supplies").some(entry=>entry.action==="issue"),"company permission cannot bypass an explicit custodian");
+assert(office.officeRequestActions({...supplyRow,canHandle:true},user,"supplies").some(entry=>entry.action==="issue"),"a designated custodian can issue outside ordinary own scope");
+assert(!office.officeRequestActions({...supplyRow,status:"Issued",canHandle:true},manager,"supplies").some(entry=>entry.action==="return"),"consumable issue is terminal and offers no return action");
 const crypto = globalThis.crypto;
 try {
   Object.defineProperty(globalThis, "crypto", { configurable: true, value: { getRandomValues: crypto.getRandomValues.bind(crypto) } });

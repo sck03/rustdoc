@@ -5,9 +5,11 @@ import { readOfficeSupplyForm } from "./officeModel.ts";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
 import { useOfficeOperation } from "./useOfficeData.ts";
 import { OfficeEmployeePicker } from "./OfficeEmployeePicker.tsx";
+import { HandlingServicePicker } from "../oa/HandlingServicePicker.tsx";
 
-export function OfficeSupplyEditor({ client, supply, onClose }: { client: ExportDocManagerApiClient; supply?: OfficeSupplyRecord; onClose: () => void }) {
+export function OfficeSupplyEditor({ client, user, supply, onClose }: { client: ExportDocManagerApiClient; user: ApiUserDto; supply?: OfficeSupplyRecord; onClose: () => void }) {
   const operation = useOfficeOperation();
+  const [handlingKey, setHandlingKey] = useState(supply?.handlingKey ?? "");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const body = readOfficeSupplyForm(new FormData(event.currentTarget), supply?.versionNumber ?? 0);
@@ -16,11 +18,13 @@ export function OfficeSupplyEditor({ client, supply, onClose }: { client: Export
   return <OfficeDialog title={supply ? "编辑物品" : "添加物品"} onClose={onClose} {...operation} protectChanges>
     <form onSubmit={submit}><fieldset disabled={operation.busy} className="office-form-grid">
       <OfficeField label="物品名称" wide><input name="name" required maxLength={120} defaultValue={supply?.name} /></OfficeField>
+      <HandlingServicePicker client={client} user={user} category="Supply" value={handlingKey} onChange={setHandlingKey} />
       <OfficeField label="计量单位"><input name="unit" required maxLength={20} defaultValue={supply?.unit ?? "件"} placeholder="支、本、盒、件" /></OfficeField>
       <OfficeField label="最低可用库存"><input name="minimumStock" type="number" required min={0} max={1000000} defaultValue={supply?.minimumStock ?? 0} /></OfficeField>
       <OfficeField label="存放／领取位置" wide><input name="location" maxLength={200} defaultValue={supply?.location} /></OfficeField>
       <OfficeField label="说明" wide><textarea name="description" rows={3} maxLength={500} defaultValue={supply?.description} /></OfficeField>
       <label className="checkbox-field"><input type="checkbox" name="isReturnable" defaultChecked={supply?.isReturnable ?? false} />借用后需要归还</label>
+      <p className="office-muted office-field-wide">未勾选即为消耗领用：发放后完成，无需归还。按实际用途设置，与日常用品／服装辅料等保管分组无关。</p>
       <label className="checkbox-field"><input type="checkbox" name="isActive" defaultChecked={supply?.isActive ?? true} />启用物品</label>
       <p className="office-muted office-field-wide">保存后使用“补充库存”登记入库。产生申请后，计量单位与归还类型保持固定。</p>
     </fieldset><OfficeSubmit busy={operation.busy} /></form>
@@ -45,6 +49,7 @@ export function OfficeSupplyApplication({ client, supply, user, onClose }: {
   }
   return <OfficeDialog title={`${register ? "登记" : "申请"}${supply.isReturnable ? "借用" : "领用"} · ${supply.name}`} onClose={onClose} {...operation} protectChanges>
     <p>当前可用 {supply.availableQuantity} {supply.unit} · {supply.location || "请向行政管理员确认领取位置"}</p>
+    {supply.handlingName && <p>物品组：{supply.handlingName} · 保管人员：{supply.handlerNames}</p>}
     <p className="office-muted">{register ? "登记后预留库存，实际交接时再确认发放；库存不足请先补充。" : "申请由管理员审批后发放。库存不足时，可先提交申请，待补充后审批。"}</p>
     <form onSubmit={submit}><fieldset disabled={operation.busy} className="office-form-grid">
       {register && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={setEmployee} disabled={operation.busy} />}

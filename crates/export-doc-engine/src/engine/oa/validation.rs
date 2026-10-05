@@ -92,6 +92,7 @@ pub(super) fn fields(meta: &Value, body: &Value, today: chrono::NaiveDate) -> Re
                 return Err(invalid("请选择通用申请类别。"));
             }
             row["category"] = json!(category);
+            row["handlingKey"] = json!(text(body, "handlingKey"));
         }
         _ => return Err(invalid("未知申请类型。")),
     }

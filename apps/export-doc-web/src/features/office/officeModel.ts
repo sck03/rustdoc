@@ -22,7 +22,7 @@ export const officeActionLabels = { approve: "批准", reject: "驳回", cancel:
 export const officeHistoryLabels: Record<string, string> = {
   Submit: "提交申请", Register: "登记记录", Approve: "审批通过", Reject: "驳回申请", Cancel: "取消申请",
   Issue: "发放／交接", Return: "归还登记", Restock: "补充入库", Stocktake: "盘点调整",
-  Edit: "修改记录",
+  Edit: "修改记录", Reassign: "保管职责交接",
 };
 
 export function officeAccess(user: ApiUserDto, kind: OfficeKind) {
@@ -34,6 +34,7 @@ export function officeAccess(user: ApiUserDto, kind: OfficeKind) {
       const value = scope(action);
       if (!["own", "department", "company", "all"].includes(value)) return false;
       if (!row) return true;
+      if (!isMeetingBooking(row) && row.handlingKey && ["issue", "return"].includes(action)) return row.canHandle === true;
       if (value === "own") return row.ownerUserId === user.id;
       if (value === "department") return Boolean(user.departmentId) && row.departmentId === user.departmentId;
       return true;
@@ -115,5 +116,5 @@ export function readMeetingRoomForm(form: FormData, version: number): MeetingRoo
 export function readOfficeSupplyForm(form: FormData, version: number): OfficeSupplySaveRequest {
   return { name: String(form.get("name") ?? ""), unit: String(form.get("unit") ?? ""), location: String(form.get("location") ?? ""),
     description: String(form.get("description") ?? ""), isReturnable: form.has("isReturnable"), isActive: form.has("isActive"),
-    minimumStock: Number(form.get("minimumStock")), expectedVersion: version };
+    minimumStock: Number(form.get("minimumStock")), expectedVersion: version, handlingKey: String(form.get("handlingKey") ?? "") };
 }
