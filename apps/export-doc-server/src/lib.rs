@@ -83,28 +83,9 @@ fn compose_router(
                     request::handle(state, operation, request)
                 },
             )
-            .layer(DefaultBodyLimit::max(
-                if [
-                    STAGE_SERVER_MIGRATION_RESTORE,
-                    UPLOAD_AND_RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP,
-                ]
-                .contains(&operation)
-                {
-                    257 * 1024 * 1024
-                } else if operation == UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB {
-                    129 * 1024 * 1024
-                } else if [
-                    IMPORT_HS_CODE_KNOWLEDGE,
-                    UPLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
-                    UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE,
-                ]
-                .contains(&operation)
-                {
-                    101 * 1024 * 1024
-                } else {
-                    33 * 1024 * 1024
-                },
-            )),
+            .layer(DefaultBodyLimit::max(request::body::envelope_limit(
+                operation,
+            ))),
         );
     }
     if let Some(root) = web_root {

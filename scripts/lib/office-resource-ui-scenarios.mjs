@@ -42,7 +42,9 @@ export async function exerciseOfficeResources({ url, page, output, run, wait, cl
   await finish('Partial return'); await wait("document.querySelector('.office-badge')?.textContent==='部分归还'", 'Partial return missing');
   await action('登记归还'); await wait("document.querySelector('.office-badge')?.textContent==='已归还'", 'Return not completed');
   await captureScreenshot(page, path.join(output, 'resource-supply-returned.png'));
-  await click('物品与登记'); await wait("document.querySelector('.office-stock-number')", 'Stock card missing');
+  await click('物品与登记');
+  // The directory can render cached stock while its invalidated query reloads.
+  await wait("document.querySelector('.office-stock-number') && document.querySelector('[aria-label=刷新办公物品]')?.disabled===false", 'Stock refresh did not finish');
   assert.equal(await run("document.querySelector('.office-stock-number strong').textContent"), '5');
   assert.deepEqual(await run('window.__oaErrors'), []);
 }

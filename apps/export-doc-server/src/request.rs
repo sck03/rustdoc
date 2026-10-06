@@ -1,12 +1,13 @@
 use crate::{ServerState, response};
+pub(super) mod body;
 use axum::{
-    body::{Body, to_bytes},
-    extract::{FromRequest, FromRequestParts, Multipart, Path, Request},
+    body::Body,
+    extract::{FromRequestParts, Path, Request},
     http::Response,
 };
 use export_doc_contracts::{contracts, generated_api::*};
 use export_doc_engine::{api::ApiError, operation::OperationScope};
-use serde_json::{Map, Value};
+use serde_json::Value;
 use std::{collections::HashMap, time::Duration};
 
 fn error(status: u16, message: &str) -> ApiError {
@@ -163,181 +164,17 @@ async fn execute(
     if query.len() > 64 {
         return Err(error(400, "查询参数过多。"));
     }
-    let multipart = parts
-        .headers
-        .get("content-type")
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|v| v.starts_with("multipart/form-data"));
-    let binary = contracts::contract()["operations"][operation.id]["requestBody"]["content"]
-        .get("application/octet-stream")
-        .is_some();
-    let mut upload = None;
-    let mut merge_uploads = Vec::new();
-    let mut merge_bytes = 0usize;
-    let body = if binary && !multipart {
-        let filename = query
-            .iter()
-            .find(|(key, _)| key == "fileName" || key == "sourceName")
-            .map(|(_, value)| value.clone())
-            .or_else(|| {
-                parameters
-                    .get(if operation == STAGE_SERVER_MIGRATION_RESTORE {
-                        "X-ExportDocManager-Migration-File-Name"
-                    } else {
-                        "X-ExportDocManager-PostgreSql-Backup-File-Name"
-                    })
-                    .cloned()
-            })
-            .unwrap_or_default();
-        let limit = if [
-            STAGE_SERVER_MIGRATION_RESTORE,
-            UPLOAD_AND_RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP,
-        ]
-        .contains(&operation)
-        {
-            257
-        } else if [
-            IMPORT_HS_CODE_KNOWLEDGE,
-            UPLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
-            UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE,
-        ]
-        .contains(&operation)
-        {
-            100
-        } else if operation == UPLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE {
-            32
-        } else {
-            25
-        };
-        let bytes = to_bytes(body, limit * 1024 * 1024)
-            .await
-            .map_err(|_| error(413, "上传超过该操作的容量上限。"))?;
-        upload = Some((filename, bytes.to_vec()));
-        let mut metadata = Map::new();
-        for parameter in contracts::contract()["operations"][operation.id]["parameters"]
-            .as_array()
-            .into_iter()
-            .flatten()
-        {
-            let Some(name) = parameter["name"]
-                .as_str()
-                .filter(|name| *name != "fileName")
-            else {
-                continue;
-            };
-            if parameter["in"] != "query" {
-                continue;
-            }
-            if let Some((_, value)) = query.iter().find(|(key, _)| key == name) {
-                let value = match contracts::kind(&parameter["schema"]) {
-                    "integer" => Value::from(
-                        value
-                            .parse::<i64>()
-                            .map_err(|_| error(400, "上传参数必须是整数。"))?,
-                    ),
-                    "boolean" => Value::from(
-                        value
-                            .parse::<bool>()
-                            .map_err(|_| error(400, "上传参数必须是布尔值。"))?,
-                    ),
-                    _ => Value::String(value.clone()),
-                };
-                metadata.insert(name.into(), value);
-            }
-        }
-        Some(Value::Object(metadata))
-    } else if multipart {
-        let mut form = Multipart::from_request(Request::from_parts(parts, body), &state)
-            .await
-            .map_err(|_| error(400, "上传表单无效。"))?;
-        let mut metadata = Map::new();
-        while let Some(field) = form
-            .next_field()
-            .await
-            .map_err(|_| error(400, "上传读取失败或内容超出上限。"))?
-        {
-            let name = field
-                .name()
-                .ok_or_else(|| error(400, "上传字段缺少名称。"))?
-                .to_owned();
-            if let Some(filename) = field.file_name().map(str::to_owned) {
-                if upload.is_some() && operation != UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB {
-                    return Err(error(400, "每次只能上传一个文件。"));
-                }
-                let bytes = field
-                    .bytes()
-                    .await
-                    .map_err(|_| error(400, "文件读取失败或超过容量。"))?;
-                if operation == UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB {
-                    merge_bytes = merge_bytes
-                        .checked_add(bytes.len())
-                        .filter(|n| *n <= export_doc_engine::pdf::MAX_MERGE_INPUT)
-                        .ok_or_else(|| error(413, "PDF 总大小超过 128 MiB。"))?;
-                    if merge_uploads.len() >= 100 {
-                        return Err(error(400, "每次最多合并 100 个 PDF 文件。"));
-                    }
-                    merge_uploads.push(export_doc_engine::engine::tasks::FileOutput {
-                        file_name: filename,
-                        media_type: "application/pdf".into(),
-                        content: bytes.to_vec(),
-                    });
-                    continue;
-                }
-                if bytes.len()
-                    > (if [
-                        IMPORT_HS_CODE_KNOWLEDGE,
-                        UPLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
-                        UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE,
-                    ]
-                    .contains(&operation)
-                    {
-                        100
-                    } else {
-                        16
-                    }) * 1024
-                        * 1024
-                {
-                    return Err(error(413, "文件超过该操作的容量上限。"));
-                }
-                upload = Some((filename, bytes.to_vec()));
-            } else {
-                let value = field
-                    .text()
-                    .await
-                    .map_err(|_| error(400, "上传参数编码无效。"))?;
-                if value.len() > 65536 || metadata.len() >= 32 || metadata.contains_key(&name) {
-                    return Err(error(400, "上传参数重复或超过容量。"));
-                }
-                let schema = &contracts::contract()["operations"][operation.id]["requestBody"]["content"]
-                    ["multipart/form-data"]["schema"];
-                let property = &contracts::resolve(schema)["properties"][&name];
-                let value = match contracts::kind(property) {
-                    "integer" => Value::from(
-                        value
-                            .parse::<i64>()
-                            .map_err(|_| error(400, "上传编号必须是整数。"))?,
-                    ),
-                    "boolean" => Value::from(
-                        value
-                            .parse::<bool>()
-                            .map_err(|_| error(400, "上传开关无效。"))?,
-                    ),
-                    _ => Value::String(value),
-                };
-                metadata.insert(name, value);
-            }
-        }
-        Some(Value::Object(metadata))
-    } else {
-        let bytes = to_bytes(body, 16 * 1024 * 1024)
-            .await
-            .map_err(|_| error(413, "请求超过容量上限。"))?;
-        if bytes.is_empty() {
-            None
-        } else {
-            Some(serde_json::from_slice(&bytes).map_err(|_| error(400, "请求必须是有效 JSON。"))?)
-        }
-    };
+    let body::Parsed {
+        body,
+        upload,
+        merge_uploads,
+    } = body::parse(
+        operation,
+        Request::from_parts(parts, body),
+        &parameters,
+        &query,
+    )
+    .await?;
     let worker = tokio::task::spawn_blocking(move || {
         let _permit = permit;
         scope.run(|| {
@@ -426,7 +263,6 @@ async fn execute(
                         DOWNLOAD_REPORT_TEMPLATE_FILE,
                         DOWNLOAD_REPORT_TEMPLATE_PACKAGE,
                         DOWNLOAD_SUPPORT_PACKAGE,
-                        DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
                     ]
                     .contains(&operation)
                 {
