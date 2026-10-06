@@ -166,15 +166,6 @@ export function readOptionalImageSource(value: unknown, path: string, issues: Re
   return readRequiredImageSource(value, path, issues);
 }
 
-export function readFontFamily(value: unknown, path: string, issues: ReportDesignerSchemaIssue[]) {
-  if (typeof value === "string" && value.trim() && isSafeReportDesignerCssFontFamily(value)) {
-    return value.trim();
-  }
-
-  issues.push(createIssue("warning", path, "字体不在随包字体范围内，已使用 Noto Sans CJK SC。"));
-  return portableReportSansFontFamily;
-}
-
 export function readCssColor(value: unknown, path: string, issues: ReportDesignerSchemaIssue[]) {
   if (typeof value === "string" && isReportDesignerCssColor(value)) {
     return value.trim();

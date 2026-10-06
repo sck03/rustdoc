@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { previewSourcePageSize, type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 export function useReportTemplateWorkspaceQueries({
   client,
@@ -47,11 +48,7 @@ export function useReportTemplateWorkspaceQueries({
     enabled: enabled && selectedUserTemplateId > 0,
     staleTime: 30 * 1000,
   });
-  useEffect(() => {
-    if (userTemplatesQuery.data && directory.pageNumber > Math.max(1, userTemplatesQuery.data.totalPages)) {
-      setDirectory({ ...directory, pageNumber: Math.max(1, userTemplatesQuery.data.totalPages) });
-    }
-  }, [directory, userTemplatesQuery.data]);
+  useServerPageNumber(userTemplatesQuery, directory.pageNumber, pageNumber => setDirectory({ ...directory, pageNumber }));
 
   const fieldCatalogQuery = useQuery({
     queryKey: queryKeys.reportTemplateFields(reportType),

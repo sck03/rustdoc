@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiReportTemplateImageResourceResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useAbortableOperation, isAbortError } from "../../ui/useAbortableOperation.ts";
 import { ReportResourceImage } from "./ReportResourceImage.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import type { ReportDesignerV3ImageResource } from "./reportDesignerV3Schema.ts";
 
 export function ReportImageResourceGallery({ client, editable, resources, onChoose }: {
@@ -26,9 +27,7 @@ export function ReportImageResourceGallery({ client, editable, resources, onChoo
     enabled: open,
     staleTime: 0,
   });
-  useEffect(() => {
-    if (query.data && pageNumber > Math.max(1, query.data.totalPages)) setPageNumber(Math.max(1, query.data.totalPages));
-  }, [pageNumber, query.data]);
+  useServerPageNumber(query, pageNumber, setPageNumber);
   async function recycle(id: string) {
     if (!editable || busyId || !await confirmation({ title: "回收未使用图片", description: "确定回收这张图片吗？", details: ["服务端会再次检查所有模板和历史版本的引用。", "其他上传者持有的图片仍会保留。"], confirmLabel: "确认回收", tone: "danger" })) return;
     setBusyId(id);

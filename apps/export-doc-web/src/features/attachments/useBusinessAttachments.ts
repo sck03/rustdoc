@@ -11,6 +11,7 @@ import { useBusinessAttachmentCategories } from "./useBusinessAttachmentCategori
 import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { readRouteId } from "../../ui/routeQueryState.ts";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 export function useBusinessAttachments(client: ExportDocManagerApiClient, invoiceId: number | undefined, userId: number) {
   const { keywordInput: keyword, setKeywordInput: setKeyword, keyword: search, setKeyword: setSearch, pageNumber, setPageNumber, pageSize, setPageSize } = useDirectoryLocation();
@@ -20,12 +21,12 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
   const selectedId = readRouteId(params.get("attachmentId"));
   const setSelectedId = (id: number | null) => updateRoute({ attachmentId: id }, false);
   const [uploadMode, setUploadMode] = useState<"new" | "revision" | null>(null);
-  const [preview, setPreview] = useState<{ blob: Blob; name: string } | null>(null);
+  const [preview, setPreview] = useState<{ id: number; blob: Blob; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const inFlight = useRef(false);
-  const abortable = useAbortableOperation();
+  const abortable = useAbortableOperation(selectedId);
   const queries = useQueryClient();
   const query = useQuery({
     queryKey: ["business-attachments", userId, invoiceId, search, includeArchived, pageNumber, pageSize],
@@ -41,9 +42,7 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
   const categoryInvoiceId = invoiceId ?? details.data?.attachment.invoiceId;
   const { categories, saveCategory, removeCategory } = useBusinessAttachmentCategories(client, userId, categoryInvoiceId, run, setMessage);
   useEffect(() => { setPreview(null); }, [selectedId]);
-  useEffect(() => {
-    if (query.data && pageNumber > Math.max(1, query.data.page.totalPages)) setPageNumber(Math.max(1, query.data.page.totalPages));
-  }, [query.data, pageNumber]);
+  useServerPageNumber({ ...query, data: query.data?.page }, pageNumber, setPageNumber);
   async function run<T>(operation: (signal: AbortSignal) => Promise<T>, onSuccess: (result: T) => void, write = false) {
     if (inFlight.current) return false;
     inFlight.current = true; setBusy(true); setError(""); setMessage("");
@@ -102,14 +101,14 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
       }, (saved) => { if (saved) setMessage("归档原文件已保存。"); });
     } else {
       await run((signal) => client.downloadBusinessAttachment({ id, revision: version.revision }, { signal }), (blob) => {
-        if (showPreview) setPreview({ blob, name: version.fileName });
+        if (showPreview) setPreview({ id, blob, name: version.fileName });
         else downloadBlob(blob, version.fileName);
       });
     }
   }
   const commitSearch = () => { setSearch(keyword.trim()); setPageNumber(1); };
   return { query, details, invoice, categories, saveCategory, removeCategory, editMetadata, remove, keyword, search, includeArchived, pageNumber, pageSize, selectedId, busy, error, message,
-    uploadMode, setUploadMode, preview, setPreview, upload, update, read, setSelectedId, setPageNumber, commitSearch,
+    uploadMode, setUploadMode, preview: preview?.id === selectedId ? preview : null, setPreview, upload, update, read, setSelectedId, setPageNumber, commitSearch,
     changeKeyword: (value: string) => { setKeyword(value); if (!value) { setSearch(""); setPageNumber(1); } },
     changeArchived: setIncludeArchived,
     changePageSize: (value: number) => { setPageSize(value); setPageNumber(1); },

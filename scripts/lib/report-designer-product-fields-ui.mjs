@@ -22,8 +22,10 @@ export async function verifyProductFieldsUi({ page, url, read, waitFor, click, r
   assert.equal(automatic.locked,false);
   assert.equal(automatic.yHundredthMm,11000);
   assert(automatic.xHundredthMm>=9000 && automatic.xHundredthMm+automatic.widthHundredthMm<=13000);
-  const automaticPoint=await read(page,`(()=>{const n=document.querySelector('[data-v3-element-id="${automatic.id}"]');n.scrollIntoView({block:'center'});const r=n.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+  const automaticPoint=await read(page,`(async()=>{const n=document.querySelector('[data-v3-element-id="${automatic.id}"]');n.scrollIntoView({block:'center'});await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));const r=n.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+  assert.equal(await read(page, `document.elementFromPoint(${automaticPoint.x},${automaticPoint.y})?.closest('[data-v3-element-id]')?.dataset.v3ElementId`), automatic.id, 'drag must hit the intended field after scrolling');
   assert.equal(await read(page, `document.elementFromPoint(${automaticPoint.x},${automaticPoint.y})?.closest('.report-designer-v3-handle')?.className ?? ''`), '', 'the center of a short field must remain draggable');
+  await page.send('Input.dispatchMouseEvent',{type:'mouseMoved',...automaticPoint});
   await page.send('Input.dispatchMouseEvent',{type:'mousePressed',...automaticPoint,button:'left',clickCount:1});
   await page.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:automaticPoint.x,y:automaticPoint.y+25,button:'left',buttons:1});
   await page.send('Input.dispatchMouseEvent',{type:'mouseReleased',x:automaticPoint.x,y:automaticPoint.y+25,button:'left',clickCount:1});

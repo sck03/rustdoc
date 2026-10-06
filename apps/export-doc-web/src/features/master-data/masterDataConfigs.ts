@@ -563,8 +563,3 @@ function toMasterDataPage(result: {
 export function getMasterDataConfig(key?: string): MasterDataEntityConfig | null {
   return masterDataConfigs.find((item) => item.key === key) ?? null;
 }
-
-export function getMasterDataConfigFromPath(pathname: string): MasterDataEntityConfig | null {
-  const match = pathname.match(/^\/master-data\/([^/]+)/);
-  return getMasterDataConfig(match?.[1]);
-}

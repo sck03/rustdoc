@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient, WorklistDueFilter } from "../../api/index.ts";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 export function useWorklist(client: ExportDocManagerApiClient, user: ApiUserDto) {
   const [source, setSource] = useState("");
@@ -12,10 +13,7 @@ export function useWorklist(client: ExportDocManagerApiClient, user: ApiUserDto)
     queryFn: ({ signal }) => client.getWorklist({ source: source || undefined, due, pageNumber, pageSize }, { signal }),
     refetchInterval: 30000, refetchIntervalInBackground: false, placeholderData: keepPreviousData,
   });
-  useEffect(() => {
-    if (query.data && !query.isPlaceholderData && pageNumber > Math.max(1, query.data.page.totalPages))
-      setPageNumber(Math.max(1, query.data.page.totalPages));
-  }, [query.data, query.isPlaceholderData, pageNumber]);
+  useServerPageNumber({ ...query, data: query.data?.page }, pageNumber, setPageNumber);
   return { source, due, pageNumber, pageSize, query, setPageNumber,
     changeSource: (value: string) => { setSource(value); setPageNumber(1); },
     changeDue: (value: WorklistDueFilter) => { setDue(value); setPageNumber(1); },
