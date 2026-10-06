@@ -6,17 +6,12 @@ use super::{
     error::{Result, error, invalid, unavailable},
     settings,
     store::{Actor, Store},
-    tasks::{FileOutput, TaskOutput},
+    tasks::TaskOutput,
 };
 use crate::{contracts, generated_api::*};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use serde_json::{Value, json};
-use std::{
-    fs,
-    io::{Read, Write},
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{fs, io::Read, path::Path, time::Duration};
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const TRANSFER_TIMEOUT: Duration = Duration::from_secs(600);
@@ -24,7 +19,8 @@ const PROP_FIND_LIMIT: usize = 2 * 1024 * 1024;
 const ERROR_LIMIT: usize = 64 * 1024;
 const TRANSFER_BUFFER: usize = 128 * 1024;
 const MAX_TRANSFER_BYTES: u64 = 4 * 1024 * 1024 * 1024;
-const SQLITE_MAGIC: &[u8] = b"SQLite format 3\0";
+mod download;
+use download::download_backup;
 
 struct Config {
     enabled: bool,
@@ -441,67 +437,6 @@ fn upload_file(config: &Config, path: &Path, file_name: &str) -> Result<()> {
     Ok(())
 }
 
-/// 下载远端备份到受管暂存目录,返回暂存路径与字节数。失败时清理暂存文件。
-fn download_file(config: &Config, file_name: &str, staging_root: &Path) -> Result<(PathBuf, u64)> {
-    let endpoint = parse_url(&config.url)?;
-    let (name, value) = authorization(config);
-    let remote = remote_path(&endpoint, file_name)?;
-    let temporary = staging_root.join(format!(
-        ".download-{}.tmp",
-        crate::paths::nonce().map_err(unavailable)?
-    ));
-    crate::paths::ensure_safe_absolute(&temporary).map_err(invalid)?;
-    let result = (|| {
-        let mut response = agent(TRANSFER_TIMEOUT)
-            .get(&remote)
-            .header(name.as_str(), value)
-            .call()
-            .map_err(|error| match error {
-                ureq::Error::Timeout(_) => unavailable("WebDAV 下载超时。"),
-                _ => unavailable(format!("WebDAV 下载失败:{error}")),
-            })?;
-        let status = response.status().as_u16();
-        let mut reader = response.body_mut().as_reader();
-        if !(200..300).contains(&status) {
-            let head = read_limited(&mut reader, ERROR_LIMIT, "WebDAV 错误响应超过容量上限。")?;
-            return Err(failure(status, &head));
-        }
-        let mut writer = fs::File::create(&temporary)?;
-        let mut buffer = [0u8; TRANSFER_BUFFER];
-        let mut total = 0u64;
-        loop {
-            crate::operation::check()?;
-            let length = reader
-                .read(&mut buffer)
-                .map_err(|_| unavailable("读取 WebDAV 下载流失败。"))?;
-            if length == 0 {
-                break;
-            }
-            total = total
-                .checked_add(length as u64)
-                .filter(|total| *total <= MAX_TRANSFER_BYTES)
-                .ok_or_else(|| invalid("WebDAV 备份超过 4 GiB 下载上限。"))?;
-            writer
-                .write_all(&buffer[..length])
-                .map_err(|_| unavailable("写入暂存文件失败。"))?;
-        }
-        writer
-            .sync_all()
-            .map_err(|_| unavailable("暂存文件同步失败。"))?;
-        if total == 0 {
-            return Err(unavailable("WebDAV 返回了空备份。"));
-        }
-        Ok(total)
-    })();
-    match result {
-        Ok(total) => Ok((temporary, total)),
-        Err(error) => {
-            let _ = fs::remove_file(&temporary);
-            Err(error)
-        }
-    }
-}
-
 // --- API 操作。 ---
 
 pub(super) fn status(service: &NativeService, actor: &Actor) -> Result<Value> {
@@ -619,43 +554,21 @@ pub(super) fn download(service: &NativeService, actor: &Actor, body: &Value) -> 
             auth::authorize_operation(&actor, DOWNLOAD_CLOUD_DATABASE_BACKUP, &[])?;
             let config = Config::read_parts(&store, &protector)?;
             require_enabled(&config)?;
-            let staging_root = super::cloud_staging_root(&paths)?;
-            let imported = (|| {
-                let (temporary, size) = download_file(&config, &remote_name, &staging_root)?;
-                if size == 0 {
-                    return Err(invalid("下载到的备份为空。"));
-                }
-                let bytes = fs::read(&temporary)?;
-                if !bytes.starts_with(SQLITE_MAGIC) {
-                    return Err(invalid("下载到的文件不是有效的 SQLite 备份。"));
-                }
-                if store.provider()? == "SQLite" {
-                    store.connection()?.verify_backup(&temporary)?;
-                }
-                let target =
-                    super::managed_file(&super::backup_root(&paths)?, &remote_name, "sqlite3")?;
-                super::sealed::atomic_write(&target, &bytes)?;
-                Ok((size, target))
-            })();
-            let _ = fs::remove_file(staging_root.join(format!(
-                ".download-{}.tmp",
-                crate::paths::nonce().unwrap_or_default()
-            )));
-            let (size, target) = imported?;
+            let size = download_backup(&config, &paths, &remote_name)?;
             Ok(TaskOutput {
-                file: Some(FileOutput {
-                    file_name: remote_name.clone(),
-                    media_type: "application/x-sqlite3".into(),
-                    content: Vec::new(),
-                }),
+                file: None,
                 detail: format!("{remote_name}({size} 字节)已通过校验并导入受管备份目录。"),
-                destination: Some(target),
+                destination: None,
                 directory: None,
                 managed_file: None,
             })
         },
     )
 }
+
+#[cfg(test)]
+#[path = "tests/cloud_download.rs"]
+mod download_tests;
 
 #[cfg(test)]
 mod tests {

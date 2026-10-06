@@ -1,6 +1,54 @@
 use super::*;
 
 #[test]
+fn catalog_failures_are_not_empty_successes() {
+    let workspace = Workspace::new();
+    let paths = workspace.paths();
+    assert!(catalog_rows(&paths).unwrap().is_empty());
+    assert!(
+        catalog_entries(&paths, "ExportDocument")
+            .unwrap()
+            .is_empty()
+    );
+    let root = user_root(&paths);
+    fs::create_dir_all(&root).unwrap();
+    let path = root.join(CATALOG_FILE);
+    for bytes in [
+        b"{}".as_slice(),
+        b"null",
+        b"{\"reports\":null}",
+        b"{\"reports\":{}}",
+        b"{bad json",
+    ] {
+        fs::write(&path, bytes).unwrap();
+        assert_eq!(catalog_rows(&paths).unwrap_err().status, Some(503));
+        assert!(
+            upsert_catalog_row(
+                &paths,
+                "ExportDocument",
+                "user:Export/new.dtpl",
+                "new",
+                None
+            )
+            .is_err()
+        );
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+    }
+    fs::remove_file(&path).unwrap();
+    fs::create_dir(&path).unwrap();
+    assert_eq!(catalog_rows(&paths).unwrap_err().status, Some(503));
+    fs::remove_dir(&path).unwrap();
+    fs::remove_dir(&root).unwrap();
+    fs::write(&root, b"not a directory").unwrap();
+    assert_eq!(
+        catalog_entries(&paths, "ExportDocument")
+            .unwrap_err()
+            .status,
+        Some(503)
+    );
+}
+
+#[test]
 fn same_named_builtin_and_user_templates_keep_separate_metadata() {
     let workspace = Workspace::new();
     let service = open(&workspace);

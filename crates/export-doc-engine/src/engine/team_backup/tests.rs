@@ -7,9 +7,9 @@ mod recovery;
 use crate::paths::nonce;
 use std::{fs, path::PathBuf, sync::Arc};
 
-struct Workspace(PathBuf);
+pub(super) struct Workspace(pub(super) PathBuf);
 impl Workspace {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .unwrap()
@@ -39,10 +39,10 @@ impl Drop for Workspace {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
-fn open_service(workspace: &Workspace) -> Arc<NativeService> {
+pub(super) fn open_service(workspace: &Workspace) -> Arc<NativeService> {
     NativeService::open(workspace.paths()).unwrap()
 }
-fn admin() -> Actor {
+pub(super) fn admin() -> Actor {
     Actor {
         edition: Default::default(),
         id: 1,

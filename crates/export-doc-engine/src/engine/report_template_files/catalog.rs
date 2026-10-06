@@ -252,13 +252,20 @@ pub(super) fn validate_revision(path: &Path, display: &str, expected: &str) -> R
     Ok(())
 }
 pub(super) fn catalog_rows(paths: &RuntimePaths) -> Result<Vec<Value>> {
-    let path = user_root(paths).join(CATALOG_FILE);
-    if !path.is_file() {
-        return Ok(vec![]);
+    #[derive(serde::Deserialize)]
+    struct Catalog {
+        reports: Vec<Value>,
     }
-    let value: Value = serde_json::from_slice(&fs::read(&path)?)
-        .map_err(|_| unavailable("模板目录配置已损坏。"))?;
-    Ok(value["reports"].as_array().cloned().unwrap_or_default())
+    let path = user_root(paths).join(CATALOG_FILE);
+    paths::ensure_safe_absolute(&path).map_err(unavailable)?;
+    let bytes = match fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(cause) => return Err(cause.into()),
+    };
+    let catalog: Catalog =
+        serde_json::from_slice(&bytes).map_err(|_| unavailable("模板目录配置已损坏。"))?;
+    Ok(catalog.reports)
 }
 pub(super) fn save_catalog(paths: &RuntimePaths, rows: &[Value]) -> Result<()> {
     let root = user_root(paths);
@@ -396,18 +403,23 @@ fn resolve(paths: &RuntimePaths, kind: &str, stored: &str, must_exist: bool) -> 
 /// catalog row remain visible with metadata derived from their stable path.
 pub(super) fn catalog_entries(paths: &RuntimePaths, kind: &str) -> Result<Vec<Value>> {
     let root = user_root(paths);
-    if !root.is_dir() {
-        return Ok(Vec::new());
+    ensure_managed(&root, &root)?;
+    match fs::metadata(&root) {
+        Ok(metadata) if metadata.is_dir() => {}
+        Ok(_) => return Err(unavailable("模板根路径不是目录。")),
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(cause) => return Err(cause.into()),
     }
     let metadata = catalog_rows(paths)?;
     let mut rows = Vec::new();
     let mut stack = vec![root.clone()];
     while let Some(directory) = stack.pop() {
         ensure_managed(&directory, &root)?;
-        for entry in fs::read_dir(&directory)? {
-            let path = entry?.path();
+        for entry in fs::read_dir(directory)? {
+            let entry = entry?;
+            let path = entry.path();
             ensure_managed(&path, &root)?;
-            if path.is_dir() {
+            if entry.file_type()?.is_dir() {
                 stack.push(path);
                 continue;
             }
