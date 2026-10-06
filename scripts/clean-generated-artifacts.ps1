@@ -38,7 +38,7 @@ function Assert-WorkspaceChildPath {
     return $fullPath
 }
 
-function Get-DirectorySizeBytes {
+function Get-GeneratedArtifactSizeBytes {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path
@@ -98,7 +98,7 @@ function Grant-CurrentUserGeneratedPathAccess {
     }
 }
 
-function Remove-DirectoryWithRetry {
+function Remove-GeneratedArtifactWithRetry {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path,
@@ -142,10 +142,6 @@ function Remove-DirectoryWithRetry {
                 if ($attempt -eq $RetryCount) {
                     throw
                 }
-            }
-
-            if ($attempt -eq $RetryCount) {
-                throw
             }
 
             Start-Sleep -Milliseconds (250 * $attempt)
@@ -196,7 +192,7 @@ function New-CleanupTarget {
     [PSCustomObject]@{
         Path = $fullPath
         Reason = $Reason
-        SizeBytes = Get-DirectorySizeBytes -Path $fullPath
+        SizeBytes = Get-GeneratedArtifactSizeBytes -Path $fullPath
     }
 }
 
@@ -286,6 +282,9 @@ function Get-GeneratedArtifactCleanupPlan {
         Add-Target -Targets $targets -Path $codexRuntimeRoot -Reason "local Codex/Playwright runtime cache"
     }
     elseif ($IncludeCodexRuntimeWorkspaces -and (Test-Path -LiteralPath $codexRuntimeRoot)) {
+        foreach ($log in Get-ChildItem -LiteralPath $codexRuntimeRoot -File -Filter '*.log' -Force -ErrorAction Stop) {
+            Add-Target -Targets $targets -Path $log.FullName -Reason 'explicitly requested local development and test log cleanup'
+        }
         $persistentRuntimeNames = @(
             ".dotnet",
             "cargo-audit",
@@ -329,6 +328,7 @@ function Get-GeneratedArtifactCleanupPlan {
     while ($pending.Count -gt 0) {
         $directory = Get-Item -LiteralPath $pending.Pop() -Force -ErrorAction Stop
         if ($directory.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { continue }
+        if (Test-Path -LiteralPath (Join-Path $directory.FullName '.git')) { continue }
         if ($directory.Name -in @('.git', '.codex-runtime', 'App_Data', 'Database', 'Backups', 'Security', 'KEY', 'Templates', 'OcrModels', 'Resources')) { continue }
         if ($directory.Name -eq 'node_modules') {
             if ($IncludeNodeModules) {
@@ -407,9 +407,9 @@ if ($ListOnly) {
 $cleanupFailures = [System.Collections.Generic.List[object]]::new()
 foreach ($target in $plan) {
     if ((Test-Path -LiteralPath $target.Path) -and
-        $cleanupCmdlet.ShouldProcess($target.Path, "Remove generated artifact directory")) {
+        $cleanupCmdlet.ShouldProcess($target.Path, "Remove generated artifact")) {
         try {
-            Remove-DirectoryWithRetry -Path $target.Path
+            Remove-GeneratedArtifactWithRetry -Path $target.Path
         }
         catch {
             [void]$cleanupFailures.Add([PSCustomObject]@{

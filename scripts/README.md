@@ -164,7 +164,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 | --- | --- | --- |
 | `target/` | Cargo 编译缓存、依赖构建、测试程序、Debug/Release 二进制及按版本缓存的 EXE；直接 Cargo、本地脚本和 CI 共用 | 可重建；清理后须重新编译，`-SkipBuild` 需先正常构建 |
 | `artifacts/` | 已组装的桌面/网页程序包、发布归档、验证报告和截图 | 普通验证产物可重建；程序包及包内 `App_Data` 不能整体当作缓存删除 |
-| `.codex-runtime/` | 仓库内 Cargo/npm/原生资源下载缓存、受控工具、临时工作区及本地日志 | 默认保留；`-IncludeCodexRuntimeWorkspaces` 只清理不含受保护内容的一次性目录 |
+| `.codex-runtime/` | 仓库内 Cargo/npm/原生资源下载缓存、受控工具、临时工作区及本地日志 | 默认保留；`-IncludeCodexRuntimeWorkspaces` 清理不含受保护内容的一次性目录及根部开发/测试 `.log` 文件 |
 | `apps/export-doc-web/dist/` | Vite 生成的前端静态资源，供桌面和网页打包 | 可重建，源码仍在 React 项目中 |
 
 `target` 中的 EXE 是编译结果，`artifacts/native-desktop` 中的 EXE 是附带字体、OCR、运行配置等资源的可运行包，两者存在必要的复制，并非两套源码或两套默认编译缓存。Tauri 原始安装器可能先生成在 `target/<target>/<profile>/bundle`，清理器默认保留含此目录的构建树。不要为整理目录移动已有程序包及其数据根。
@@ -182,6 +182,8 @@ pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -ListOnly -IncludeCo
 pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntimeWorkspaces
 ```
 
-扫描源码树时直接跳过依赖、受保护数据/资源、私有 `KEY`、链接及本地运行目录，生成目录只作为整体候选，不继续扫描其内部。任何候选含业务库、备份、私有材料或链接都保留；即使显式清理发布输出，也不放行业务数据或私有目录。
+扫描源码树时直接跳过依赖、受保护数据/资源、私有 `KEY`、链接、本地运行目录和嵌套 Git 仓库，生成目录只作为整体候选，不继续扫描其内部。`.git` 目录与 worktree/submodule 的 `.git` 文件都受保护，其内部构建目录不能作为独立目标绕过保护。任何候选含业务库、备份、私有材料或链接都保留；即使显式清理发布输出，也不放行业务数据、Git 工作树或私有目录。
+
+清理前结束构建、测试及写日志的进程，并把需要保留的验收结论写入进度文档。根部开发/测试日志与一次性目录使用同一盘点、路径保护和 `-WhatIf` 流程；不会顺带清除包内 `App_Data/Logs`、缓存目录内的日志或根部其它文件。Git worktree 仍须检查提交状态后通过 Git 命令单独移除。
 
 带有效 `CACHEDIR.TAG` 的 Cargo 输出中，`debug/release/build/*/out` 下的生成资源可随构建目录清理；这不会放行业务数据库、备份、链接或其它位置的 `Resources/Templates`。PostgreSQL 的 `PG_VERSION`、SQLite 伴随文件同样受到保护。`-IncludeCodexRuntimeWorkspaces` 清理旧构建/一次性工作区时，仍保留原生归档、PostgreSQL 客户端、审计工具和包下载缓存；`artifacts/releases`、其它目录的 `exportdoc-desktop/web/container` 发布归档及 Cargo 安装器 `bundle` 默认按发布输出保护。清理后的下一次构建需要重新编译，但无需重复下载保留的依赖。

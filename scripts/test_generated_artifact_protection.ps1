@@ -13,10 +13,11 @@ try {
         if (-not (Test-ExportDocProtectedArtifact $child -IncludeReleaseOutputs)) { throw "Explicit release cleanup must still protect $name" }
         Remove-Item -LiteralPath $child
     }
-    foreach ($name in @("business.db", "business.db-journal", "business.sqlite-wal", "backup.edmrecovery", "server.dump", "PG_VERSION")) {
+    foreach ($name in @(".git", "business.db", "business.db-journal", "business.sqlite-wal", "backup.edmrecovery", "server.dump", "PG_VERSION")) {
         $child = Join-Path $fixture $name
         [System.IO.File]::WriteAllText($child, "test fixture")
         if (-not (Test-ExportDocProtectedArtifact $fixture)) { throw "Failed to protect $name" }
+        if (-not (Test-ExportDocProtectedArtifact $fixture -IncludeReleaseOutputs)) { throw "Release cleanup must still protect $name" }
         Remove-Item -LiteralPath $child
     }
     $target = Join-Path $fixture 'target'
@@ -29,6 +30,13 @@ try {
     [IO.File]::WriteAllText($database, 'protected')
     if (-not (Test-ExportDocProtectedArtifact $target)) { throw 'Cargo cache tags must not bypass database protection' }
     Remove-Item -LiteralPath $database
+    foreach ($profile in @('release', 'x86_64-pc-windows-msvc/release')) {
+        $bundle = Join-Path $target "$profile/bundle"
+        New-Item -ItemType Directory -Path $bundle -Force | Out-Null
+        if (-not (Test-ExportDocProtectedArtifact $target)) { throw 'Cargo installers must be preserved' }
+        if (Test-ExportDocProtectedArtifact $target -IncludeReleaseOutputs) { throw 'Explicit release cleanup should allow a data-free bundle' }
+        Remove-Item -LiteralPath $bundle
+    }
     [IO.File]::WriteAllText($tag, 'not a cache directory tag')
     if (-not (Test-ExportDocProtectedArtifact $target)) { throw 'Unmarked resource directories must stay protected' }
     [IO.File]::WriteAllText($tag, "Signature: 8a477f597d28d172789f06886806bc55`n")
@@ -41,7 +49,7 @@ try {
     if (Test-ExportDocProtectedArtifact $archiveOnly -IncludeReleaseOutputs) { throw 'Explicit release cleanup should allow a data-free archive' }
     $planRoot = Join-Path $fixture 'workspace'
     $planScripts = Join-Path $planRoot 'scripts'
-    foreach ($directory in @('scripts/lib', 'target/debug/build/example/out/permissions/resources', '.codex-runtime/native-runtime-packages', '.codex-runtime/pip-cache', 'artifacts/releases')) {
+    foreach ($directory in @('.git', 'scripts/lib', 'target/debug/build/example/out/permissions/resources', '.codex-runtime/native-runtime-packages', '.codex-runtime/pip-cache', 'artifacts/releases')) {
         New-Item -ItemType Directory -Path (Join-Path $planRoot $directory) -Force | Out-Null
     }
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'clean-generated-artifacts.ps1') -Destination $planScripts
@@ -56,7 +64,20 @@ try {
     [IO.File]::WriteAllText($cache, 'cached archive fixture')
     [IO.File]::WriteAllText($release, 'release fixture')
     $protectedFiles = @($cache, $pipCache, $release)
-    foreach ($path in @('apps/web/node_modules/package/dist/index.js', 'apps/web/App_Data/dist/user.txt', 'tools/private/KEY/target/signing-material', 'artifacts/review/KEY/private-material')) {
+    foreach ($path in @(
+        'apps/web/node_modules/package/dist/index.js',
+        'apps/web/App_Data/dist/user.txt',
+        'tools/private/KEY/target/signing-material',
+        'artifacts/review/KEY/private-material',
+        'artifacts/worktree/.git',
+        '.codex-runtime/worktree/.git',
+        'apps/nested/.git',
+        'apps/nested/dist/source.js',
+        'crates/nested/.git/HEAD',
+        'crates/nested/target/source.rs',
+        '.codex-runtime/notes.txt',
+        '.codex-runtime/pip-cache/install.log'
+    )) {
         $file = Join-Path $planRoot $path
         New-Item -ItemType Directory -Path (Split-Path $file -Parent) -Force | Out-Null
         [IO.File]::WriteAllText($file, 'preserved fixture')
@@ -68,6 +89,8 @@ try {
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
         [IO.File]::WriteAllText((Join-Path $directory 'generated-output'), 'rebuildable')
     }
+    $generatedPaths += '.codex-runtime/completed-test.log'
+    [IO.File]::WriteAllText((Join-Path $planRoot '.codex-runtime/completed-test.log'), 'completed test log')
     & pwsh -NoProfile -File (Join-Path $planScripts 'clean-generated-artifacts.ps1') -IncludeCodexRuntimeWorkspaces -WhatIf | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Isolated cleanup preview failed' }
     foreach ($path in $generatedPaths) {
