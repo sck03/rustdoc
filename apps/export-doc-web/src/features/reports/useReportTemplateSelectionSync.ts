@@ -5,6 +5,7 @@ import {
   ApiUserReportTemplateDto,
 } from "../../api/index.ts";
 import {
+  buildUserTemplateKey,
   matchesTemplatePath,
   matchesTemplateFileName,
   readPreferredPreviewSampleProfile,
@@ -114,6 +115,7 @@ export function useReportTemplateSelectionSync({
     appliedRequest.current = requestKey;
     if (requestChanged) setSelectedUserTemplateId(requestedUserTemplateId);
     setSelectedTemplatePath((current) => {
+      if (requestChanged && requestedUserTemplateId > 0) return buildUserTemplateKey(requestedUserTemplateId);
       if (current && (!requestChanged || matchesTemplateFileName(current, requestedTemplateFileName))) return current;
       return resolveDefaultTemplatePath({
         templates,

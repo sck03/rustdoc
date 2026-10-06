@@ -66,7 +66,17 @@ await withOfficeUi('template-private-ui', async ({ output, url, invoke, openPage
   const detailCopy = await invoke('CloneUserReportTemplate', { reportType: 'ExportDocument', name: '私人明细属性验收', sourceTemplatePath: packing.templatePath }, {}, ownerSession.accessToken);
   const detailDesign = JSON.parse(detailCopy.contentHtml);
   const detail = detailDesign.layers.flatMap(layer => layer.elements).find(element => element.block?.type === 'DetailTable');
-  await page.goto(`${url}/#/reports/templates?reportType=ExportDocument&userTemplateId=${detailCopy.id}`);
+  let releaseCatalog;
+  const catalogGate = new Promise(resolve => { releaseCatalog = resolve; });
+  const catalogRoute = '**/api/reports/templates?*';
+  await page.route(catalogRoute, async route => { await catalogGate; await route.continue(); });
+  try {
+    await page.goto(`${url}/#/reports/templates?reportType=ExportDocument&userTemplateId=${detailCopy.id}`);
+    await page.reload();
+    await page.locator(`[data-v3-element-id="${detail.id}"]`).waitFor();
+    const catalogResponse = page.waitForResponse(response => response.url().includes('/api/reports/templates?'));
+    releaseCatalog(); assert.equal((await catalogResponse).status(),200);
+  } finally { releaseCatalog(); await page.unroute(catalogRoute); }
   await page.getByRole('tab', { name: '可视化设计', exact: true }).click();
   await page.locator(`[data-v3-element-id="${detail.id}"]`).click();
   const properties = page.locator('.new-report-detail-properties');
