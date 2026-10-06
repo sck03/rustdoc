@@ -156,6 +156,7 @@ assert(workspaceSource.includes("report-designer-v3-zoom-select") && workspaceSo
 assert(workspaceSource.includes("fitRequest") && workspaceSource.includes("showGuides") && workspaceSource.includes("onFitZoom={handleFitZoom}"), "V3 工作区必须把适合窗口和参考线状态传递到画布");
 assert(canvasSource.includes("scroll.clientWidth - horizontalPadding") && canvasSource.includes("scroll.clientHeight - verticalPadding"), "适合窗口必须按画布真实内容区计算可用尺寸");
 assert(api.fitReportDesignerV3Zoom(720, 560, 800, 1120) === 0.5, "适合窗口不得重复扣除画布内边距");
+assert(api.fitReportDesignerV3Zoom(720, 560, 800, 1120, true) === 0.9, "适合宽度保持可读比例，不为整页高度缩小内容");
 assert(
   /\.report-designer-v3-preview-flow-content table\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/u.test(gridCss),
   "画布内结构表格必须覆盖全站 table 最小宽度并限制在组件物理宽度内",
@@ -394,6 +395,7 @@ const hiddenHeaderState = api.updateV3Layer(bandState, "band-header", { visible:
 const hiddenHeaderBands = api.resolveReportDesignerLayerBands(hiddenHeaderState.schema);
 assert(hiddenHeaderBands.headerHeight === 0 && hiddenHeaderBands.bodyHeight > initialBands.bodyHeight, "隐藏页眉必须折叠设计带并把空间归还主体");
 const resizedHeader = api.setReportDesignerLayerRoleHeight(bandState, "Header", 4200);
+assert(api.setReportDesignerLayerRoleHeight(resizedHeader, "Header", 4200) === resizedHeader, "未改变高度不应生成新草稿或撤销步骤");
 assert(api.resolveReportDesignerLayerBands(resizedHeader.schema).headerHeight === 4200, "页眉设计带必须支持独立精确高度");
 const clampedHeader = api.setReportDesignerLayerRoleHeight(bandState, "Header", 999999);
 const clampedBands = api.resolveReportDesignerLayerBands(clampedHeader.schema);
@@ -716,7 +718,7 @@ assert(featureHtml.includes("edm-v3-line-horizontal") && featureHtml.includes("h
 assert(canvasSource.includes("data-v3-layer-name={layer.name}") && canvasElementSource.includes("report-designer-v3-preview-line-"), "V3 画布必须标识图层并使用独立细线预览");
 assert(canvasSource.includes("createV3RegionMoveConstraint") && canvasSource.includes("findReportDesignerElementNodes") && canvasSource.includes("translate3d"), "复杂模板拖动必须预计算边界、缓存元素节点并使用合成层位移");
 assert(canvasSource.includes("--v3-page-ratio") && canvasCss.includes("aspect-ratio: var(--v3-page-ratio"), "V3 画布必须按 A4 物理宽高比渲染横竖版页面");
-assert(canvasCss.includes("report-designer-v3-layer::before") && canvasCss.includes("report-designer-v3-preview-line-horizontal"), "V3 画布样式必须显示图层标识和细线方向");
+assert(bandsCss.includes("report-designer-layer-tabs") && canvasCss.includes("report-designer-v3-preview-line-horizontal"), "V3 画布必须提供独立图层导航和细线方向");
 assert(resourcePanelsSource.includes('label="普通表格"') && resourcePanelsSource.includes("商品字段（逐行输出）") && resourcePanelsSource.includes("高级排版"), "组件入口必须区分自由商品字段、普通表格和高级组合表格");
 assert(gridPropertiesSource.includes("new-report-grid-cell-picker") && gridPropertiesSource.includes("向右合并") && gridPropertiesSource.includes("向下合并") && gridPropertiesSource.includes("快速版式"), "普通表格属性栏必须提供可视化选格、预设和直接合并操作");
 assert(gridPropertiesSource.includes("修改整表样式会立即应用到全部单元格") && !gridPropertiesSource.includes("套用样式") && !gridPropertiesSource.includes("套用边框"), "整表样式和边框必须即时应用，不能依赖容易漏掉的二次套用按钮");

@@ -33,6 +33,8 @@ import {
   type ReportDesignerV3Element,
 } from "./reportDesignerV3Schema.ts";
 import { ReportDesignerV3Canvas, type ReportDesignerV3Transform } from "./ReportDesignerV3Canvas.tsx";
+import { LayerPanel } from "./ReportDesignerLayerPanel.tsx";
+import { ReportDesignerLayerNavigation } from "./ReportDesignerLayerNavigation.tsx";
 import { setReportDesignerLayerRoleHeight } from "./reportDesignerLayerBands.ts";
 import type { ReportBlock, ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { createConditionalBlock, createDetailTableBlock, createGridBlock, createPageBreakBlock, createRowBlock } from "./reportDesignerBlockFactories.ts";
@@ -48,7 +50,7 @@ import {
   MultiElementInspector,
   PageInspector,
 } from "./ReportDesignerV3Panels.tsx";
-import { ComponentPalette, FieldPanel, LayerPanel, type PaletteActions } from "./ReportDesignerV3ResourcePanels.tsx";
+import { ComponentPalette, FieldPanel, type PaletteActions } from "./ReportDesignerV3ResourcePanels.tsx";
 import { focusDesignerNode } from "./ReportDesignerV3InspectorControls.tsx";
 import { insertProductField } from "./reportDesignerProductFields.ts";
 import { getV3InsertionIssue } from "./reportDesignerV3Insertion.ts";
@@ -80,10 +82,12 @@ export function ReportDesignerV3Workspace({
   const [zoom, setZoom] = useState(0.72);
   const [fitRequest, setFitRequest] = useState(0);
   const [autoFit, setAutoFit] = useState(true);
+  const [fitWidth, setFitWidth] = useState(true);
   const [multiSelect, setMultiSelect] = useState(false);
   const [compactPanel, setCompactPanel] = useState<"resources" | "canvas" | "properties">("canvas");
   const confirmation = useConfirmation();
   const [showGuides, setShowGuides] = useState(true);
+  const [showBounds, setShowBounds] = useState(true);
   const [fieldQuery, setFieldQuery] = useState("");
   const [productFieldsOnly, setProductFieldsOnly] = useState(false);
   const [fieldFocusRequest, setFieldFocusRequest] = useState(0);
@@ -146,7 +150,7 @@ export function ReportDesignerV3Workspace({
   }
   function selectLayer(layerId: string) {
     history.select([], layerId);
-    focusDesignerNode(`[data-v3-layer-id="${CSS.escape(layerId)}"]`);
+    focusDesignerNode(`[data-v3-layer-anchor="${CSS.escape(layerId)}"]`);
   }
   function clearSelection() {
     history.select([], history.state.activeLayerId);
@@ -397,7 +401,8 @@ export function ReportDesignerV3Workspace({
           <select className="report-designer-v3-zoom-select" aria-label="选择缩放比例" value={String(zoomPercent)} onChange={(event) => setManualZoom(Number(event.target.value) / 100)}>{zoomOptions.map((value) => <option key={value} value={value}>{value}%</option>)}</select>
           <span className="report-designer-v3-zoom-readout" aria-live="polite">{zoomPercent}%</span>
           <ToolbarButton label="放大" icon={<ZoomIn size={15} />} onClick={() => setManualZoom(zoom + 0.05)} />
-          <ToolbarButton label="适合窗口" icon={<Maximize2 size={15} />} onClick={() => { setAutoFit(true); setFitRequest((value) => value + 1); }} />
+          <ToolbarButton label="适合宽度" icon={<Maximize2 size={15} />} onClick={() => { setFitWidth(true); setAutoFit(true); setFitRequest((value) => value + 1); }} />
+          <ToolbarButton label="适合窗口" icon={<Maximize2 size={15} />} onClick={() => { setFitWidth(false); setAutoFit(true); setFitRequest((value) => value + 1); }} />
         </div>
       </div>
       {editingEnabled ? <div className="report-designer-v3-compact-tabs" role="group" aria-label="设计工作区切换">
@@ -414,7 +419,7 @@ export function ReportDesignerV3Workspace({
           {sidebarTab === "fields" ? (
             <FieldPanel reportType={reportType} query={fieldQuery} groups={visibleFieldGroups} productFields={productFieldsOnly} onProductFieldsChange={reportType === "ExportDocument" ? value => { setProductFieldsOnly(value); setFieldQuery(""); } : undefined} focusRequest={fieldFocusRequest} onQueryChange={setFieldQuery} onInsert={insertField} canEdit={editingEnabled} />
           ) : null}
-          {sidebarTab === "layers" ? <LayerPanel state={history.state} onSelect={selectLayer} onCommit={commit} canEdit={editingEnabled} multiSelect={multiSelect} /> : null}
+          <LayerPanel hidden={sidebarTab !== "layers"} state={history.state} onSelect={selectLayer} onCommit={commit} canEdit={editingEnabled} multiSelect={multiSelect} />
         </aside> : null}
 
         <main className="report-designer-v3-canvas-column">
@@ -425,16 +430,20 @@ export function ReportDesignerV3Workspace({
               <label><input type="checkbox" checked={history.state.schema.grid.enabled} onChange={(event) => commit(updateV3Grid(history.state, { enabled: event.target.checked }))} /> 网格</label>
               <label><input type="checkbox" checked={history.state.schema.grid.snap} onChange={(event) => commit(updateV3Grid(history.state, { snap: event.target.checked }))} /> 吸附</label>
               <label><input type="checkbox" checked={showGuides} onChange={(event) => setShowGuides(event.target.checked)} /> 参考线</label>
+              <label><input type="checkbox" checked={showBounds} onChange={(event) => setShowBounds(event.target.checked)} /> 组件边界</label>
             </> : null}
           </div>
+          {editingEnabled ? <ReportDesignerLayerNavigation state={history.state} onSelect={selectLayer} /> : null}
           <ReportDesignerV3Canvas
             client={client}
             state={history.state}
             zoom={zoom}
             fitRequest={fitRequest}
             autoFit={autoFit}
+            fitWidth={fitWidth}
             multiSelect={multiSelect}
             showGuides={editingEnabled && showGuides}
+            showBounds={editingEnabled && showBounds}
             onFitZoom={handleFitZoom}
             disabled={!editingEnabled}
             onSelect={selectElement}

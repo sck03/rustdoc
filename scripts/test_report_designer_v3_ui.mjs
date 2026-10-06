@@ -13,6 +13,7 @@ import { verifyShippingMarksUi } from "./lib/report-shipping-marks-ui-scenarios.
 import { verifyDetailVisibility } from "./lib/report-designer-visibility-ui.mjs";
 import { verifyDesignerUsability } from "./lib/report-designer-usability-ui.mjs";
 import { verifyDetailProperties } from "./lib/report-designer-detail-properties-ui.mjs";
+import { verifyLayerClarity } from "./lib/report-designer-layer-ui.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -185,7 +186,7 @@ try {
   const panelClip=await read(page,`(()=>{const r=document.querySelector('.report-designer-v3-inspector').getBoundingClientRect();return {x:r.left,y:Math.max(0,r.top),width:r.width,height:Math.min(r.height,innerHeight-Math.max(0,r.top)),scale:1}})()`);
   const panelImage=await page.send('Page.captureScreenshot',{format:'png',clip:panelClip});
   fs.writeFileSync(path.join(output,'cell-inspector.png'),Buffer.from(panelImage.data,'base64'));
-  assert(await read(page, `Math.abs(parseFloat(getComputedStyle(document.querySelector('.report-designer-v3-layer-body'),'::before').top)-parseFloat(getComputedStyle(document.querySelector('.report-designer-v3-layer-header'),'::after').height)-4)<1`),'region labels must follow the real band boundary');
+  assert(await read(page, `Math.abs(parseFloat(getComputedStyle(document.querySelector('.report-designer-v3-layer-body'),'::after').top)-parseFloat(getComputedStyle(document.querySelector('.report-designer-v3-layer-header'),'::after').height))<1 && document.querySelectorAll('[aria-label="画布图层导航"] button').length===4`),'region boundaries must follow real heights and have readable navigation');
   await read(page, `window.__retainedCell=document.querySelectorAll('[data-v3-element-id="review-grid"] [data-report-grid-cell-id]')[1];window.__retainedCell.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerId:78}));window.dispatchEvent(new PointerEvent('pointercancel',{pointerId:78}));`);
   await delay(60);
   assert(await read(page, `window.__retainedCell === document.querySelectorAll('[data-v3-element-id="review-grid"] [data-report-grid-cell-id]')[1] && window.__retainedCell.classList.contains('is-designer-selected-cell')`),'selecting a cell must preserve the table DOM');
@@ -330,6 +331,7 @@ try {
   await verifyShippingMarksUi({page,url,read,waitFor,click,key,results,output});
   await verifyDesignerUsability({page,url,read,waitFor,click,key,results});
   await verifyCommercialTemplateUi({page,url,read,waitFor,click,key,results,output});
+  await verifyLayerClarity({page,url,read,waitFor,click,results,output});
   fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify({passed:true,results},null,2));
   console.log(`Report designer UI contracts passed (${results.length} cases).`);
 } finally {

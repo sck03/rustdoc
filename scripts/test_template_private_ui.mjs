@@ -38,8 +38,10 @@ await withOfficeUi('template-private-ui', async ({ output, url, invoke, openPage
   await page.locator('.report-designer-v3-sidebar-tabs button').filter({ hasText: '图层' }).click();
   const layerRow = role => page.getByLabel(`${design.layers.find(layer => layer.role === role).name}图层`, { exact: true });
   const header = layerRow('Header'), footer = layerRow('Footer');
+  await header.getByText('图层设置', { exact: true }).click();
   await header.getByText('打印行为', { exact: true }).click();
   await header.getByLabel('仅首页输出', { exact: true }).check();
+  await footer.getByText('图层设置', { exact: true }).click();
   await footer.getByText('打印行为', { exact: true }).click();
   await footer.getByLabel('页脚贴底', { exact: true }).uncheck();
   await footer.getByLabel('跟随正文（签字区、条款）', { exact: true }).check();

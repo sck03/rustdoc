@@ -10,9 +10,9 @@ export function clampReportDesignerV3Zoom(value: number) {
   return Math.min(REPORT_DESIGNER_V3_MAX_ZOOM, Math.max(REPORT_DESIGNER_V3_MIN_ZOOM, Math.round(safe * 100) / 100));
 }
 
-export function fitReportDesignerV3Zoom(viewportWidth: number, viewportHeight: number, pageWidth: number, pageHeight: number) {
+export function fitReportDesignerV3Zoom(viewportWidth: number, viewportHeight: number, pageWidth: number, pageHeight: number, fitWidth = false) {
   if (![viewportWidth, viewportHeight, pageWidth, pageHeight].every((value) => Number.isFinite(value) && value > 0)) return 0.72;
-  return clampReportDesignerV3Zoom(Math.min(viewportWidth / pageWidth, viewportHeight / pageHeight));
+  return clampReportDesignerV3Zoom(fitWidth ? Math.min(1, viewportWidth / pageWidth) : Math.min(viewportWidth / pageWidth, viewportHeight / pageHeight));
 }
 
 export function flattenFields(groups: ReportDesignerFieldGroup[]) {

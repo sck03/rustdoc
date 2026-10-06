@@ -44,6 +44,9 @@ export async function verifyDesignerUsability({ page, url, read, waitFor, click,
   assert.equal(await read(page, 'window.__designerDraftState.isDirty'), false, 'blocked insertion must not damage a valid template');
   results.push({ test: 'field search recovers without losing focus and incompatible insertion preserves draft', passed: true });
   await click(page, '.report-designer-v3-sidebar-tabs button:nth-child(3)');
+  assert.equal(await read(page, `document.querySelector('[aria-label="搜索已放置的内容"]').value`), '目标文本', 'layer search survives switching panels');
+  await read(page, `(() => {const input=document.querySelector('[aria-label="搜索已放置的内容"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  await waitFor(page, 'document.querySelectorAll(".report-designer-v3-layer-row").length===4');
   await read(page, `(() => {const row=[...document.querySelectorAll('.report-designer-v3-layer-row')].find(e=>e.querySelector('.report-designer-v3-layer-name').title.startsWith('页眉'));row.querySelector('.report-designer-v3-layer-print').open=true;[...row.querySelectorAll('label')].find(e=>e.textContent.includes('仅首页输出')).querySelector('input').click();})()`);
   await waitFor(page, 'window.__designerSchema.layers.find(l=>l.role==="Header").print.firstPageOnly===true');
   await click(page, 'button[aria-label="撤销"]');

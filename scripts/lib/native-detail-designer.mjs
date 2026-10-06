@@ -44,4 +44,26 @@ export async function verifyDesktopDetailDesigner({ run, request, token, cdp, ou
   await run("[...document.querySelectorAll('button')].find(node=>node.textContent.trim()==='样例预览').click(); true");
   await wait("Boolean(document.querySelector('iframe[title=模板预览]')?.srcdoc.includes('桌面货物说明'))");
   await captureScreenshot(cdp, path.join(output, 'Full-detail-native-preview.png'));
+  const invoice = catalog.body.find(item => item.templatePath.endsWith('invoice_template.dtpl'));
+  assert(invoice, 'Commercial invoice template available');
+  const invoiceCopy = await request('CloneUserReportTemplate', token, {
+    reportType: 'ExportDocument', name: '桌面发票图层验收', sourceTemplatePath: invoice.templatePath,
+  });
+  assert.equal(invoiceCopy.status, 201);
+  const invoiceDesign = JSON.parse(invoiceCopy.body.contentHtml);
+  await run(`location.hash=${JSON.stringify('#/reports/templates?reportType=ExportDocument&userTemplateId=' + invoiceCopy.body.id)}; true`);
+  await wait(`document.querySelectorAll('[aria-label="画布图层导航"] button').length===${invoiceDesign.layers.length}`);
+  await run(`[...document.querySelectorAll('[role=tab]')].find(node=>node.textContent.trim()==='可视化设计').click(); true`);
+  await wait(`document.querySelector('[aria-label="画布图层导航"]').getClientRects().length>0`);
+  await run(`document.querySelector('.report-designer-v3-sidebar-tabs button:nth-child(3)').click(); true`);
+  const total = invoiceDesign.layers.flatMap(layer => layer.elements).find(element => element.text === 'TOTAL:');
+  assert(total, 'Invoice total label remains independently editable');
+  await run(`document.querySelector('[data-v3-element-id="${total.id}"]').focus({preventScroll:true}); true`);
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', windowsVirtualKeyCode: 13 });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', windowsVirtualKeyCode: 13 });
+  await wait(`document.querySelector('.report-designer-selection-readout').textContent.includes('TOTAL:')`);
+  assert(await run(`document.querySelector('.report-designer-v3-page').classList.contains('has-element-bounds')`));
+  await wait(`document.querySelector('.report-designer-v3-canvas-column').getBoundingClientRect().width > document.querySelector('.report-designer-v3-workspace').clientWidth / 2`);
+  await run(`window.scrollTo(0,0); true`);
+  await captureScreenshot(cdp, path.join(output, 'Full-invoice-layers.png'), { captureBeyondViewport: false });
 }

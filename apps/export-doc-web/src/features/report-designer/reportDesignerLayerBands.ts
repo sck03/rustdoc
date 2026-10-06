@@ -72,7 +72,7 @@ export function setReportDesignerLayerRoleHeight(
   value: number,
 ) {
   const nextHeight = clampReportDesignerLayerHeight(state.schema, role, value);
-  const layers = state.schema.layers.map((layer) => layer.role === role && layer.visible
+  const layers = state.schema.layers.map((layer) => layer.role === role && layer.visible && reportDesignerLayerHeight(layer) !== nextHeight
     ? { ...layer, designHeightHundredthMm: nextHeight }
     : layer);
   return layers.every((layer, index) => layer === state.schema.layers[index]) ? state : { ...state, schema: { ...state.schema, layers } };

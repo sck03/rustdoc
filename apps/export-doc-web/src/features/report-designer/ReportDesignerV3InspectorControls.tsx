@@ -34,5 +34,15 @@ export function NumberField({ label, value, onCommit, min = 0, max = 1000, disab
 }
 
 export function focusDesignerNode(selector: string) {
-  requestAnimationFrame(() => document.querySelector<HTMLElement>(selector)?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" }));
+  requestAnimationFrame(() => {
+    const node = document.querySelector<HTMLElement>(selector);
+    const viewport = node?.closest<HTMLElement>(".report-designer-v3-canvas-scroll");
+    if (!node || !viewport || !node.getClientRects().length) return;
+    const rect = node.getBoundingClientRect(), bounds = viewport.getBoundingClientRect();
+    viewport.scrollTo({
+      top: viewport.scrollTop + rect.top - bounds.top - (viewport.clientHeight - rect.height) / 2,
+      left: viewport.scrollLeft + rect.left - bounds.left - (viewport.clientWidth - rect.width) / 2,
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+    });
+  });
 }

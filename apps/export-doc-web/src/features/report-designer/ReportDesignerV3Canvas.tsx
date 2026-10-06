@@ -63,8 +63,10 @@ export function ReportDesignerV3Canvas({
   zoom,
   fitRequest = 0,
   autoFit = false,
+  fitWidth = false,
   multiSelect = false,
   showGuides = true,
+  showBounds = true,
   onFitZoom,
   disabled = false,
   onSelect,
@@ -82,8 +84,10 @@ export function ReportDesignerV3Canvas({
   zoom: number;
   fitRequest?: number;
   autoFit?: boolean;
+  fitWidth?: boolean;
   multiSelect?: boolean;
   showGuides?: boolean;
+  showBounds?: boolean;
   onFitZoom?: (zoom: number) => void;
   disabled?: boolean;
   onSelect: (elementId: string, additive: boolean) => void;
@@ -133,7 +137,7 @@ export function ReportDesignerV3Canvas({
       const verticalPadding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
       const width = scroll.clientWidth - horizontalPadding;
       const height = scroll.clientHeight - verticalPadding;
-      onFitZoom(fitReportDesignerV3Zoom(width, height, canvas.offsetWidth, canvas.offsetHeight));
+      onFitZoom(fitReportDesignerV3Zoom(width, height, canvas.offsetWidth, canvas.offsetHeight, fitWidth));
     };
     const fit = () => {
       cancelAnimationFrame(frame);
@@ -143,7 +147,7 @@ export function ReportDesignerV3Canvas({
     const observer = new ResizeObserver(fit);
     observer.observe(scroll);
     return () => { observer.disconnect(); cancelAnimationFrame(frame); };
-  }, [fitRequest, onFitZoom, autoFit, page.widthMm, page.heightMm]);
+  }, [fitRequest, onFitZoom, autoFit, fitWidth, page.widthMm, page.heightMm]);
 
   function beginMove(event: ReactPointerEvent<HTMLDivElement>, element: ReportDesignerV3Element, layerId: string) {
     if (event.button !== 0) return;
@@ -436,7 +440,7 @@ export function ReportDesignerV3Canvas({
         >
           <div
             ref={canvasRef}
-            className={`report-designer-v3-page${state.schema.grid.enabled ? "" : " is-grid-hidden"}${showGuides ? "" : " is-guides-hidden"}${disabled ? " is-read-only" : ""}`}
+            className={`report-designer-v3-page${state.schema.grid.enabled ? "" : " is-grid-hidden"}${showGuides ? "" : " is-guides-hidden"}${showBounds ? " has-element-bounds" : ""}${disabled ? " is-read-only" : ""}`}
             data-v3-page-canvas="true"
             style={{
               width: `${page.widthMm}mm`,
@@ -474,6 +478,7 @@ export function ReportDesignerV3Canvas({
         >
           {state.schema.layers.filter((layer) => layer.visible).map((layer) => (
             <div className={`report-designer-v3-layer report-designer-v3-layer-${layer.role.toLowerCase()}${state.activeLayerId === layer.id ? " is-active" : ""}`} key={layer.id} data-v3-layer-id={layer.id} data-v3-layer-name={layer.name} data-v3-layer-role={layer.role} role="group" aria-label={layer.name} aria-current={state.activeLayerId === layer.id ? "true" : undefined}>
+              <span className="report-designer-layer-anchor" data-v3-layer-anchor={layer.id} aria-hidden="true" />
               {[...layer.elements]
                 .filter((element) => element.visible)
                 .sort((left, right) => left.zIndex - right.zIndex)
@@ -483,7 +488,7 @@ export function ReportDesignerV3Canvas({
                     <div
                       className={`report-designer-v3-element report-designer-v3-element-${element.type.toLowerCase()}${element.type === "Field" && element.fieldPath.startsWith("item.") ? " is-product-field" : ""}${selected ? " is-selected" : ""}${element.locked || layer.locked ? " is-locked" : ""}`}
                       key={element.id}
-                      style={reportDesignerCanvasElementStyle(element)}
+                      style={{ ...reportDesignerCanvasElementStyle(element), ...(selected ? { zIndex: 100005 } : {}) }}
                       data-v3-element-id={element.id}
                       onPointerDown={(event) => beginMove(event, element, layer.id)}
                       onDoubleClick={(event) => { event.stopPropagation(); beginTextEdit(event.target, element); }}
@@ -513,7 +518,7 @@ export function ReportDesignerV3Canvas({
                 })}
             </div>
           ))}
-          {showGuides ? <><ReportDesignerProductRows schema={state.schema} /><ReportDesignerLayerResizers schema={state.schema} disabled={disabled} onCommit={onCommitLayerBand} /></> : null}
+          {showGuides ? <><ReportDesignerProductRows schema={state.schema} /><ReportDesignerLayerResizers schema={state.schema} zoom={zoom} disabled={disabled} onCommit={onCommitLayerBand} /></> : null}
           {textEdit ? <ReportDesignerCanvasTextEditor key={`${textEdit.elementId}:${textEdit.cellId ?? ""}`} edit={textEdit} zoom={zoom} onCancel={() => finishTextEdit()} onCommit={finishTextEdit} /> : null}
           </div>
         </div>
