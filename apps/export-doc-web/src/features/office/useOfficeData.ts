@@ -73,6 +73,7 @@ export function useOfficeOperation() {
   const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const refresh = () => Promise.all(["office", "worklist"].map(key => queries.invalidateQueries({ queryKey: [key] })));
   async function run<T>(operation: (signal: AbortSignal) => Promise<T>, done: (result: T) => void) {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -80,13 +81,13 @@ export function useOfficeOperation() {
     setError("");
     try {
       const result = await abortable(operation);
-      await Promise.all([queries.invalidateQueries({ queryKey: ["office"] }), queries.invalidateQueries({ queryKey: ["worklist"] })]);
+      // Apply the result before refreshes can unmount a deleted or filtered record.
       done(result);
+      await refresh();
     } catch (failure) {
       if (!isAbortError(failure)) {
         setError(readApiError(failure));
-        void queries.invalidateQueries({ queryKey: ["office"] });
-        void queries.invalidateQueries({ queryKey: ["worklist"] });
+        void refresh();
       }
     } finally { inFlight.current = false; setBusy(false); }
   }

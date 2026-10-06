@@ -16,12 +16,11 @@ export function useAbortableOperation(scope?: unknown) {
     const controller = new AbortController();
     activeControllers.current.add(controller);
     try {
-      const result = await operation(controller.signal);
-      // A platform operation or already-resolved response may ignore cancellation.
-      controller.signal.throwIfAborted();
-      return result;
+      return await operation(controller.signal);
     } finally {
       activeControllers.current.delete(controller);
+      // Ignore both late success and late failure from operations that cannot cancel.
+      controller.signal.throwIfAborted();
     }
   }, []);
 }

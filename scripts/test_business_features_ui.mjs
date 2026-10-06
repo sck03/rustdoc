@@ -72,7 +72,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
     updateBusinessAttachment:input=>{attachment={...attachment,...input.body,versionNumber:attachment.versionNumber+1};events.unshift({action:input.body.isArchived?'Archive':'Confirm',revision:input.body.currentRevision,actorName:'示例用户',note:input.body.note,createdAt:'2026-09-08T05:00:00Z'});return record('updateAttachment',input,{...attachment});},
     editBusinessAttachmentMetadata:input=>{if(window.__metadataConflict)return Promise.reject(new Error('资料已更新，请刷新后重试。'));attachment={...attachment,...input.body,categoryName:categories.find(item=>item.id===input.body.categoryId).name,versionNumber:attachment.versionNumber+1};events.unshift({action:'Edit',revision:attachment.currentRevision,actorName:'示例用户',note:input.body.note,createdAt:'2026-09-08T05:00:00Z'});return record('editMetadata',input,{...attachment});},
     deleteBusinessAttachment:input=>{deleted=true;versions=[];events=[];return record('deleteAttachment',input,{success:true});},
-    downloadBusinessAttachment:async (input,options)=>{window.__calls.push({name:'download',input});if(window.__delayPreview)await new Promise(resolve=>{window.__resolvePreview=resolve;window.__previewSignal=options.signal;});if(mode==='pdf')return new Blob([Uint8Array.from(atob(${JSON.stringify(pdfBase64)}),letter=>letter.charCodeAt(0))],{type:'application/pdf'});const canvas=document.createElement('canvas');canvas.width=600;canvas.height=240;const ctx=canvas.getContext('2d');ctx.fillStyle='#eeeeee';ctx.fillRect(0,0,600,240);ctx.fillStyle='#334455';ctx.font='30px sans-serif';ctx.fillText('CUSTOMER DRAWING v'+input.revision,30,120);return new Promise(resolve=>canvas.toBlob(resolve,'image/png'));},
+    downloadBusinessAttachment:async (input,options)=>{window.__calls.push({name:'download',input});if(window.__delayPreview)await new Promise((resolve,reject)=>{window.__resolvePreview=resolve;window.__rejectPreview=reject;window.__previewSignal=options.signal;});if(mode==='pdf')return new Blob([Uint8Array.from(atob(${JSON.stringify(pdfBase64)}),letter=>letter.charCodeAt(0))],{type:'application/pdf'});const canvas=document.createElement('canvas');canvas.width=600;canvas.height=240;const ctx=canvas.getContext('2d');ctx.fillStyle='#eeeeee';ctx.fillRect(0,0,600,240);ctx.fillStyle='#334455';ctx.font='30px sans-serif';ctx.fillText('CUSTOMER DRAWING v'+input.revision,30,120);return new Promise(resolve=>canvas.toBlob(resolve,'image/png'));},
     reviewInvoice:input=>record('review',input,{ready:false,issues:[{field:'quantity',rowNumber:3,message:'数量必须大于 0。'}]}),
     getWorklist:input=>{
       if(mode==='failure') return Promise.reject(new Error('业务库暂时不可用'));
@@ -187,18 +187,21 @@ try {
     results.push("native-pdf-preview-one-page");
   }
   await verifyAttachmentManagementUi({page,open,read,waitFor,click,input,audit,results});
-  await open('attachments'); await click(page, '查看版本'); await waitFor(page, "document.querySelector('.attachment-detail')");
-  await read(page, 'window.__delayPreview=true'); await click(page, '预览');
-  await waitFor(page, 'window.__resolvePreview');
-  await read(page, "window.__navigate('/invoices/1/attachments')");
-  await waitFor(page, "!document.querySelector('.attachment-detail')");
-  await read(page, 'window.__resolvePreview()');
-  await waitFor(page, "[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='查看版本'&&!b.disabled)");
-  assert.equal(await read(page, "Boolean(document.querySelector('.attachment-preview'))"), false, 'late preview must not reopen after leaving the selected record');
-  assert.equal(await read(page, 'window.__previewSignal.aborted'), true, 'record navigation cancels the pending preview');
-  await click(page, '查看版本'); await waitFor(page, "document.querySelector('.attachment-detail')");
-  assert.equal(await read(page, "Boolean(document.querySelector('.attachment-preview'))"), false, 'returning to a record cannot resurrect its discarded preview');
-  results.push('late-attachment-preview-discarded');
+  for (const outcome of ['success', 'failure']) {
+    await open('attachments'); await click(page, '查看版本'); await waitFor(page, "document.querySelector('.attachment-detail')");
+    await read(page, 'window.__delayPreview=true'); await click(page, '预览');
+    await waitFor(page, 'window.__resolvePreview');
+    await read(page, "window.__navigate('/invoices/1/attachments')");
+    await waitFor(page, "!document.querySelector('.attachment-detail')");
+    await read(page, outcome === 'success' ? 'window.__resolvePreview()' : "window.__rejectPreview(new Error('旧资料预览读取失败'))");
+    await waitFor(page, "[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='查看版本'&&!b.disabled)");
+    assert.equal(await read(page, "Boolean(document.querySelector('.attachment-preview'))"), false, 'late preview must not reopen after leaving the selected record');
+    assert.equal(await read(page, 'window.__previewSignal.aborted'), true, 'record navigation cancels the pending preview');
+    assert.equal(await read(page, "document.body.innerText.includes('旧资料预览读取失败')"), false, 'late failure must not appear on a different record');
+    await click(page, '查看版本'); await waitFor(page, "document.querySelector('.attachment-detail')");
+    assert.equal(await read(page, "Boolean(document.querySelector('.attachment-preview'))"), false, 'returning to a record cannot resurrect its discarded preview');
+    results.push(`late-attachment-preview-${outcome}-discarded`);
+  }
   fs.writeFileSync(path.join(output, "summary.json"), JSON.stringify({ passed: results.length, results }, null, 2));
   process.stdout.write(`Business feature UI contracts passed (${results.length} cases).\n`);
 } finally {

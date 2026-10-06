@@ -145,6 +145,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 - 实库：`test-native-postgres.ps1 -PostgresBin <PostgreSQL-18-bin>` 创建并停止隔离集群；忽略的实库测试不计通过。
 - Docker：`test_native_docker_lifecycle.ps1` 在无 daemon 环境验证停机顺序与失败中止；真实两架构 CI 另核对内部网络、端口、凭据/卷隔离、运行中重复部署、custom-format dump 恢复及重启持久化。脚本和 Compose 配置通过不等于容器实跑通过。
 - React：项目 `build`、API／登录／权限／草稿／无障碍及相应页面回归；真正的 Tauri 窗口和输出仍需实跑。
+- 异步生命周期：`npm --prefix apps/export-doc-web run test:abortable-operations-ui` 验证资料切换、卸载后的迟到成功/失败，以及保存后刷新期间离开页面的取消边界；`test:business-features-ui` 另验证真实资料页面不会显示旧预览及旧错误。
 - 依赖：`generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository`，要求 `unresolved=0 / disallowed=0`。
 - 平台：`verify-native-desktop.mjs` 验证 Tauri／SQLite，排除 Slint／egui／PostgreSQL 桌面依赖；`assert-tauri-command-permissions.ps1` 校验 command 与能力白名单。
 - Windows 退出：`node scripts/test_native_desktop_shutdown.mjs [便携包目录] [EXE路径]` 使用隔离 DataRoot 验证真实 React/WebView2、重复退出、宿主异常终止、独立窗口不受影响及 HTTP 端口释放。调试端口仅注入测试子进程，不修改正式配置；其它 OS 需独立验收。
