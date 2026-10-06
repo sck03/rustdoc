@@ -872,7 +872,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | rolldown | 1.2.11 | MIT | web |
 | npm | scheduler | 0.28.0 | MIT | web |
 | npm | set-cookie-parser | 2.7.2 | MIT | web |
-| npm | source-map-js | 1.2.1 | BSD-3-Clause | web |
+| npm | source-map-js | 1.2.2 | BSD-3-Clause | web |
 | npm | three | 0.186.1 | MIT | web |
 | npm | tinyglobby | 0.2.17 | MIT | web |
 | npm | typescript | 7.0.2 | Apache-2.0 | web |

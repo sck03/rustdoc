@@ -133,7 +133,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | rolldown | 1.2.11 | MIT | web |
 | scheduler | 0.28.0 | MIT | web |
 | set-cookie-parser | 2.7.2 | MIT | web |
-| source-map-js | 1.2.1 | BSD-3-Clause | web |
+| source-map-js | 1.2.2 | BSD-3-Clause | web |
 | three | 0.186.1 | MIT | web |
 | tinyglobby | 0.2.17 | MIT | web |
 | typescript | 7.0.2 | Apache-2.0 | web |
