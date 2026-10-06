@@ -7,6 +7,7 @@ import { isDesktopBridgeAvailable, selectSaveExcelPath } from "../../desktop/des
 import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { readStoredJsonObject, writeStoredJson } from "../../ui/browserStorage.ts";
 import { listPageSizeOptions, normalizeListPageSize } from "../../ui/listViewState.ts";
@@ -165,11 +166,7 @@ export function AuditLogPage({
     staleTime: 5 * 60 * 1000,
   });
 
-  useEffect(() => {
-    if (logsQuery.data && logsQuery.data.pageNumber !== pageNumber) {
-      setPageNumber(logsQuery.data.pageNumber);
-    }
-  }, [logsQuery.data, pageNumber]);
+  useServerPageNumber(logsQuery, pageNumber, setPageNumber);
 
   useEffect(() => {
     saveAuditLogViewState({

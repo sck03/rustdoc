@@ -106,43 +106,6 @@ export function CooItemSelectInput({
   );
 }
 
-export function CooItemDatalistInput({
-  ariaLabel,
-  value,
-  options,
-  disabled,
-  onChange,
-}: {
-  ariaLabel: string;
-  value?: string;
-  options: ApiCustomsCooOptionDto[];
-  disabled?: boolean;
-  onChange: (value: string) => void;
-}) {
-  const listId = `coo-item-datalist-${useId().replace(/:/g, "-")}`;
-  const normalizedOptions = normalizeCooOptions(options).filter((option) => option.value);
-
-  return (
-    <>
-      <input
-        className="item-cell-input"
-        aria-label={ariaLabel}
-        list={normalizedOptions.length > 0 ? listId : undefined}
-        value={value ?? ""}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {normalizedOptions.length > 0 ? (
-        <datalist id={listId}>
-          {normalizedOptions.map((option) => (
-            <option key={`${option.value}-${option.label}`} value={option.value} label={option.label} />
-          ))}
-        </datalist>
-      ) : null}
-    </>
-  );
-}
-
 export function buildCooItemPreviousValueOptions(
   items: ApiCustomsCooItemDto[],
   rowIndex: number,

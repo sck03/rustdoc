@@ -82,12 +82,6 @@ export type ProductUnitAssistance = {
 
 export type ProductInputAssistance = Record<ProductAssistanceField, string[]>;
 
-export const emptyProductUnitAssistance: ProductUnitAssistance = {
-  chineseOptions: [],
-  englishOptions: [],
-  suggestionsByEnglish: new Map<string, string[]>(),
-};
-
 export const emptyProductInputAssistance: ProductInputAssistance = {
   brand: [],
   hsCode: [],

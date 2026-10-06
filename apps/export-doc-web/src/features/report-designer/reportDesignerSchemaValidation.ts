@@ -10,7 +10,6 @@ import type {
   ReportGridColumn,
   ReportGridRow,
   ReportImageBlock,
-  ReportPageSettings,
   ReportRowColumn,
   ReportSection,
   ReportSectionPrintSettings,
@@ -29,7 +28,6 @@ import {
   normalizeTextStyle,
   readBoolean,
   readEnum,
-  readFontFamily,
   readNumber,
   readOptionalFieldPath,
   readOptionalImageSource,
@@ -49,62 +47,12 @@ export {
 } from "./reportDesignerSchemaValues.ts";
 export type { ReportDesignerSchemaIssue } from "./reportDesignerSchemaValues.ts";
 
-export const CURRENT_REPORT_DESIGNER_SCHEMA_VERSION = 2;
-
-export type ReportDesignerSchemaValidationResult = {
-  schema: ReportDesignerSchema | null;
-  issues: ReportDesignerSchemaIssue[];
-};
-
 export type EmbeddedReportDesignerBlockValidationOptions = {
   reportType: ReportDesignerReportType;
   sectionType: ReportSection["type"];
   path: string;
   blockIds?: Set<string>;
 };
-
-export function normalizeReportDesignerSchema(input: unknown): ReportDesignerSchemaValidationResult {
-  const issues: ReportDesignerSchemaIssue[] = [];
-  if (!isRecord(input)) {
-    return {
-      schema: null,
-      issues: [createIssue("error", "$", "设计器 schema 必须是对象。")],
-    };
-  }
-
-  const current = requireCurrentReportDesignerSchemaVersion(input, issues);
-  if (!current) {
-    return { schema: null, issues };
-  }
-
-  const reportType = normalizeReportType(current.reportType, issues);
-  const page = normalizePageSettings(current.page, issues);
-  const sections = normalizeSections(current.sections, issues);
-  if (!page || !sections) {
-    return { schema: null, issues };
-  }
-
-  const schema: ReportDesignerSchema = {
-    version: CURRENT_REPORT_DESIGNER_SCHEMA_VERSION,
-    reportType,
-    page,
-    sections,
-  };
-  validateReportTypeFieldDomains(schema, issues);
-
-  return {
-    schema,
-    issues,
-  };
-}
-
-export function validateReportDesignerSchema(schema: ReportDesignerSchema) {
-  return normalizeReportDesignerSchema(schema).issues;
-}
-
-export function hasBlockingReportDesignerSchemaIssues(issues: ReportDesignerSchemaIssue[]) {
-  return issues.some((issue) => issue.severity === "error");
-}
 
 /**
  * Normalize a structured block when it is embedded in a V3 Flow element.
@@ -128,7 +76,7 @@ export function normalizeEmbeddedReportDesignerBlock(
 
   const domainIssues: ReportDesignerSchemaIssue[] = [];
   const syntheticSchema: ReportDesignerSchema = {
-    version: CURRENT_REPORT_DESIGNER_SCHEMA_VERSION,
+    version: 2,
     reportType: options.reportType,
     page: {
       size: "A4",
@@ -159,145 +107,6 @@ export function normalizeEmbeddedReportDesignerBlock(
   })));
 
   return { block, issues };
-}
-
-function requireCurrentReportDesignerSchemaVersion(
-  input: Record<string, unknown>,
-  issues: ReportDesignerSchemaIssue[],
-): Record<string, unknown> | null {
-  if (input.version === CURRENT_REPORT_DESIGNER_SCHEMA_VERSION) {
-    return input;
-  }
-
-  issues.push(createIssue("error", "$.version", `暂不支持 schema version ${String(input.version)}。`));
-  return null;
-}
-
-function normalizeReportType(value: unknown, issues: ReportDesignerSchemaIssue[]): ReportDesignerReportType {
-  if (value === "ExportDocument" || value === "PaymentVoucher") {
-    return value;
-  }
-
-  issues.push(createIssue("warning", "$.reportType", "报表类型无效，已回退为出口单据。"));
-  return "ExportDocument";
-}
-
-function normalizePageSettings(value: unknown, issues: ReportDesignerSchemaIssue[]): ReportPageSettings | null {
-  if (!isRecord(value)) {
-    issues.push(createIssue("error", "$.page", "缺少页面设置。"));
-    return null;
-  }
-
-  const size = readEnum(value.size, ["A4", "A5", "Letter", "Custom"] as const, "A4", "$.page.size", issues);
-  const orientation = readEnum(value.orientation, ["Portrait", "Landscape"] as const, "Portrait", "$.page.orientation", issues);
-  const page: ReportPageSettings = {
-    size,
-    orientation,
-    marginTopMm: readNumber(value.marginTopMm, 16, 0, 80, "$.page.marginTopMm", issues),
-    marginRightMm: readNumber(value.marginRightMm, 14, 0, 80, "$.page.marginRightMm", issues),
-    marginBottomMm: readNumber(value.marginBottomMm, 16, 0, 80, "$.page.marginBottomMm", issues),
-    marginLeftMm: readNumber(value.marginLeftMm, 14, 0, 80, "$.page.marginLeftMm", issues),
-    fontFamily: readFontFamily(value.fontFamily, "$.page.fontFamily", issues),
-    fontSizePt: readNumber(value.fontSizePt, 10, 6, 48, "$.page.fontSizePt", issues),
-  };
-
-  if (size === "Custom") {
-    page.widthMm = readNumber(value.widthMm, 210, 40, 600, "$.page.widthMm", issues);
-    page.heightMm = readNumber(value.heightMm, 297, 40, 600, "$.page.heightMm", issues);
-  }
-
-  return page;
-}
-
-function normalizeSections(value: unknown, issues: ReportDesignerSchemaIssue[]): ReportSection[] | null {
-  if (!Array.isArray(value) || value.length === 0) {
-    issues.push(createIssue("error", "$.sections", "schema 至少需要一个版区。"));
-    return null;
-  }
-
-  const sectionIds = new Set<string>();
-  const blockIds = new Set<string>();
-  const sections = value
-    .map((section, index) => normalizeSection(section, index, sectionIds, blockIds, issues))
-    .filter((section): section is ReportSection => Boolean(section));
-
-  if (sections.length === 0) {
-    issues.push(createIssue("error", "$.sections", "没有可用的版区。"));
-    return null;
-  }
-
-  return sections;
-}
-
-function normalizeSection(
-  value: unknown,
-  index: number,
-  sectionIds: Set<string>,
-  blockIds: Set<string>,
-  issues: ReportDesignerSchemaIssue[],
-): ReportSection | null {
-  const path = `$.sections[${index}]`;
-  if (!isRecord(value)) {
-    issues.push(createIssue("error", path, "版区必须是对象。"));
-    return null;
-  }
-
-  if (value.type !== "Header" && value.type !== "Body" && value.type !== "Footer") {
-    issues.push(createIssue("error", `${path}.type`, "版区类型无效。"));
-    return null;
-  }
-
-  const blocksValue = value.blocks;
-  if (!Array.isArray(blocksValue)) {
-    issues.push(createIssue("error", `${path}.blocks`, "版区组件列表必须是数组。"));
-    return null;
-  }
-
-  return {
-    id: normalizeId(value.id, `section-${value.type.toLowerCase()}`, sectionIds, `${path}.id`, issues),
-    type: value.type,
-    print: normalizeSectionPrintSettings(value.print, value.type, `${path}.print`, issues),
-    blocks: blocksValue
-      .map((block, blockIndex) => normalizeBlock(block, `${path}.blocks[${blockIndex}]`, blockIds, issues))
-      .filter((block): block is ReportBlock => Boolean(block)),
-  };
-}
-
-function normalizeSectionPrintSettings(
-  value: unknown,
-  sectionType: ReportSection["type"],
-  path: string,
-  issues: ReportDesignerSchemaIssue[],
-): ReportSectionPrintSettings {
-  const fallback = createSectionPrintDefaults(sectionType);
-  if (value === undefined || value === null) {
-    return fallback;
-  }
-
-  if (!isRecord(value)) {
-    issues.push(createIssue("warning", path, "版区打印设置无效，已使用默认设置。"));
-    return fallback;
-  }
-
-  const requestedRepeat = readBoolean(value.repeatOnEveryPage, fallback.repeatOnEveryPage, `${path}.repeatOnEveryPage`, issues);
-  if (sectionType === "Body" && requestedRepeat) {
-    issues.push(createIssue("warning", `${path}.repeatOnEveryPage`, "主体版区不支持跨页重复，已关闭该设置。"));
-  }
-
-  const minHeightMm = readOptionalNumber(value.minHeightMm, fallback.minHeightMm ?? 0, 0, 260, `${path}.minHeightMm`, issues);
-  const print: ReportSectionPrintSettings = {
-    repeatOnEveryPage: sectionType === "Body" ? false : requestedRepeat,
-    keepTogether: readBoolean(value.keepTogether, fallback.keepTogether, `${path}.keepTogether`, issues),
-    pinToPageBottom: sectionType === "Footer"
-      ? readBoolean(value.pinToPageBottom, fallback.pinToPageBottom ?? false, `${path}.pinToPageBottom`, issues)
-      : false,
-  };
-
-  if (minHeightMm !== undefined) {
-    print.minHeightMm = minHeightMm;
-  }
-
-  return print;
 }
 
 function createSectionPrintDefaults(sectionType: ReportSection["type"]): ReportSectionPrintSettings {

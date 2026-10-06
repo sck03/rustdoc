@@ -11,6 +11,7 @@ import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../..
 import { readStoredJson, writeStoredJson } from "../../ui/browserStorage.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { RemoteSelectField } from "../../ui/RemoteSelectField.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
@@ -83,11 +84,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
     placeholderData: keepPreviousData,
   });
 
-  useEffect(() => {
-    if (invoiceQuery.data && invoiceQuery.data.pageNumber !== pageNumber) {
-      setPageNumber(invoiceQuery.data.pageNumber);
-    }
-  }, [invoiceQuery.data, pageNumber]);
+  useServerPageNumber(invoiceQuery, pageNumber, setPageNumber);
 
   useEffect(() => {
     saveQueryViewState(committedFilters, pageSize);

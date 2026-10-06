@@ -85,13 +85,6 @@ export function createProductDraftFromInvoiceItem(item: ApiInvoiceItemDto, exist
   };
 }
 
-export function formatProductLibraryOption(product: ApiProductDto) {
-  const code = normalizeText(product.productCode);
-  const name = normalizeText(product.nameEN || product.nameCN);
-  const hsCode = normalizeText(product.hsCode);
-  return [code, name, hsCode].filter(Boolean).join(" / ") || `#${product.id}`;
-}
-
 export function hasSameProductCode(product: ApiProductDto, productCode: string) {
   return normalizeText(product.productCode).toUpperCase() === normalizeText(productCode).toUpperCase();
 }

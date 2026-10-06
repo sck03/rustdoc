@@ -16,6 +16,7 @@ import {
   selectExcelFile,
 } from "../../desktop/desktopBridge.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
@@ -108,11 +109,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
     canExportBookingSheet: excelPermission.canOperate,
   });
 
-  useEffect(() => {
-    if (invoicesQuery.data && invoicesQuery.data.pageNumber !== pageNumber) {
-      setPageNumber(invoicesQuery.data.pageNumber);
-    }
-  }, [invoicesQuery.data, pageNumber]);
+  useServerPageNumber(invoicesQuery, pageNumber, setPageNumber);
 
   useEffect(() => {
     saveListViewState(invoiceListViewStateStorageKey, {

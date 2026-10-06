@@ -16,10 +16,6 @@ export type ReportDesignerV3ParseResult = {
   issues: Array<{ severity: "warning" | "error"; path: string; message: string }>;
 };
 
-export function hasReportDesignerV3Schema(content: string) {
-  return parseReportDesignerV3Json(content) !== null;
-}
-
 export function hasValidReportDesignerV3Schema(content: string) {
   const source = parseReportDesignerV3Json(content);
   if (!source) return false;

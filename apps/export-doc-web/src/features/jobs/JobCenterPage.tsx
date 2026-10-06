@@ -7,6 +7,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { listPageSizeOptions, loadListViewState, normalizeListPageSize, saveListViewState } from "../../ui/listViewState.ts";
@@ -107,11 +108,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
     canStartReportZip,
   } = operations;
 
-  useEffect(() => {
-    if (jobsQuery.data && jobsQuery.data.pageNumber !== pageNumber) {
-      setPageNumber(jobsQuery.data.pageNumber);
-    }
-  }, [jobsQuery.data, pageNumber]);
+  useServerPageNumber(jobsQuery, pageNumber, setPageNumber);
 
   useEffect(() => {
     if (!focusedJobId) return;

@@ -7,6 +7,7 @@ import { useModulePermission, usePermission } from "../../app/PermissionAccessCo
 import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { formatAmount, formatDate, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
@@ -37,11 +38,7 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
     placeholderData: keepPreviousData,
   });
 
-  useEffect(() => {
-    if (!paymentsQuery.isPlaceholderData && paymentsQuery.data && paymentsQuery.data.pageNumber !== pageNumber) {
-      setPageNumber(paymentsQuery.data.pageNumber);
-    }
-  }, [paymentsQuery.data, paymentsQuery.isPlaceholderData, pageNumber]);
+  useServerPageNumber(paymentsQuery, pageNumber, setPageNumber);
 
   useEffect(() => {
     saveListViewState(paymentListViewStateStorageKey, {

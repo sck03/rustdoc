@@ -432,14 +432,3 @@ export function formatPackingPercent(value?: number) {
 
   return formatted === "-" ? formatted : `${formatted}%`;
 }
-
-export function formatPackingItemFlags(
-  isRotated: boolean,
-  isPalletized: boolean,
-) {
-  const flags = [isRotated ? "旋转" : "", isPalletized ? "托盘" : ""].filter(
-    Boolean,
-  );
-
-  return flags.length > 0 ? flags.join(" / ") : "-";
-}

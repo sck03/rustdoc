@@ -111,10 +111,6 @@ export function normalizeReportDesignerV3Schema(
   };
 }
 
-export function validateReportDesignerV3Schema(schema: ReportDesignerV3Schema) {
-  return normalizeReportDesignerV3Schema(schema).issues;
-}
-
 export function validateReportDesignerV3Draft(schema: ReportDesignerV3Schema, expectedReportType?: ReportDesignerReportType) {
   const validation = normalizeReportDesignerV3Schema(schema, expectedReportType);
   return { ...validation, blocked: !validation.schema || hasBlockingReportDesignerV3SchemaIssues(validation.issues) };

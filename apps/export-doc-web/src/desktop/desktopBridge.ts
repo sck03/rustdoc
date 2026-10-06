@@ -90,19 +90,6 @@ export async function selectDisasterRecoveryPackageFile() {
   return invokeOptionalPath("select_disaster_recovery_package_file");
 }
 
-export async function selectReceiptFile() {
-  return invokeOptionalPath("select_receipt_file");
-}
-
-export async function selectReceiptFiles() {
-  const invoke = getInvoke();
-  if (!invoke) {
-    return [];
-  }
-
-  return invoke<string[]>("select_receipt_files");
-}
-
 export async function selectPdfFiles() {
   const invoke = getInvoke();
   if (!invoke) {

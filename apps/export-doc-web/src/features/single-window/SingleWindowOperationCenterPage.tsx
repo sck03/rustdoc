@@ -8,6 +8,7 @@ import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { getDesktopRuntimeContext, isDesktopBridgeAvailable, selectSingleWindowPackageFile } from "../../desktop/desktopBridge.ts";
 import { DesktopIconButton, readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -76,11 +77,7 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
     placeholderData: keepPreviousData,
   });
 
-  useEffect(() => {
-    if (operationCenterQuery.data && operationCenterQuery.data.pageNumber !== pageNumber) {
-      setPageNumber(operationCenterQuery.data.pageNumber);
-    }
-  }, [operationCenterQuery.data, pageNumber]);
+  useServerPageNumber(operationCenterQuery, pageNumber, setPageNumber);
 
   useEffect(() => {
     saveSingleWindowOperationCenterViewState({ keyword: committedKeyword, businessType, status, pageSize });

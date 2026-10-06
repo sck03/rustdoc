@@ -707,7 +707,3 @@ export function SettingsPage({
     </section>
   );
 }
-
-export function getSettingsTitle() {
-  return "设置";
-}

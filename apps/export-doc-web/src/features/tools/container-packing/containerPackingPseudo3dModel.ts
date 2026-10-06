@@ -1,8 +1,6 @@
 import type { ApiPackedCargoItemDto } from "../../../api/index.ts";
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
-import type { ContainerPackingFormState } from "./containerPackingModel.ts";
 import {
-  readPositiveNumberInput,
   shadeHexColor,
   signedArgbToColorHex,
 } from "./containerPackingModel.ts";
@@ -23,15 +21,6 @@ type ContainerPackingPseudo3dFaceGridLines = {
   side: ContainerPackingPseudo3dLine[];
   top: ContainerPackingPseudo3dLine[];
 };
-
-export function readContainerVisualizationDimensions(
-  container: ContainerPackingFormState,
-): ContainerPackingVisualizationDimensions | null {
-  const length = readPositiveNumberInput(container.length, 0);
-  const width = readPositiveNumberInput(container.width, 0);
-  const height = readPositiveNumberInput(container.height, 0);
-  return length > 0 && width > 0 && height > 0 ? { length, width, height } : null;
-}
 
 export function buildPseudo3dProjection(
   viewBox: { width: number; height: number },

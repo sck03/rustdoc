@@ -1,7 +1,7 @@
 import { Navigate,useParams } from "react-router-dom";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
-import { getMasterDataConfig,getMasterDataConfigFromPath } from "./masterDataConfigs.ts";
+import { getMasterDataConfig } from "./masterDataConfigs.ts";
 import { MasterDataEditorPage } from "./MasterDataEditorPage.tsx";
 import { MasterDataListPage } from "./MasterDataListPage.tsx";
 
@@ -72,21 +72,4 @@ export function MasterDataEditorRoute({
       canManage={permission.canManage}
     />
   );
-}
-
-export function getMasterDataTitle(pathname: string) {
-  const config = getMasterDataConfigFromPath(pathname);
-  if (!config) {
-    return "主数据";
-  }
-
-  if (pathname.endsWith("/new")) {
-    return config.newLabel;
-  }
-
-  if (/\/master-data\/[^/]+\/[^/]+/.test(pathname)) {
-    return config.editLabel;
-  }
-
-  return config.label;
 }

@@ -12,6 +12,7 @@ readApiError,
 readRouteSuccessMessage
 } from "../../ui/formUtils.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
@@ -115,11 +116,7 @@ export function MasterDataListPage({
     });
   }, [committedKeyword, listViewStateStorageKey, pageSize]);
 
-  useEffect(() => {
-    if (masterDataQuery.data && masterDataQuery.data.pageNumber !== pageNumber) {
-      setPageNumber(masterDataQuery.data.pageNumber);
-    }
-  }, [masterDataQuery.data, pageNumber]);
+  useServerPageNumber(masterDataQuery, pageNumber, setPageNumber);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

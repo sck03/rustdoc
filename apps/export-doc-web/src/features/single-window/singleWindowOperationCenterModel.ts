@@ -167,17 +167,3 @@ export async function invalidateSingleWindowBatchQueries(
 export function toSafeFileName(value: string) {
   return value.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim();
 }
-
-export function parseReceiptFilePaths(value: string) {
-  const seen = new Set<string>();
-  const paths: string[] = [];
-  for (const line of value.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (trimmed && !seen.has(trimmed)) {
-      paths.push(trimmed);
-      seen.add(trimmed);
-    }
-  }
-
-  return paths;
-}
