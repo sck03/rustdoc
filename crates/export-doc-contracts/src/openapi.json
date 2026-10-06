@@ -1896,6 +1896,13 @@
               ],
               "format": "int32"
             }
+          },
+          {
+            "name": "handlingOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -49083,6 +49090,131 @@
         }
       }
     },
+    "/api/office/room-handling-services": {
+      "get": {
+        "tags": [
+          "Office approvals"
+        ],
+        "operationId": "ListRoomHandlingServices",
+        "x-exportdoc-office": {
+          "kind": "approval-settings",
+          "action": "handling-room",
+          "resource": "office.rooms",
+          "permission": "view"
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfficeHandlingDirectory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "office.rooms",
+              "action": "view"
+            }
+          ],
+          "permissionBypass": false
+        }
+      }
+    },
     "/api/office/announcements": {
       "get": {
         "tags": [
@@ -70168,6 +70300,18 @@
               "string"
             ],
             "format": "int32"
+          },
+          "handlingKey": {
+            "type": "string"
+          },
+          "handlingName": {
+            "type": "string"
+          },
+          "handlerNames": {
+            "type": "string"
+          },
+          "canHandle": {
+            "type": "boolean"
           }
         }
       },
@@ -70314,6 +70458,18 @@
               "string"
             ],
             "format": "int32"
+          },
+          "handlingKey": {
+            "type": "string"
+          },
+          "handlingName": {
+            "type": "string"
+          },
+          "handlerNames": {
+            "type": "string"
+          },
+          "canHandle": {
+            "type": "boolean"
           }
         }
       },
@@ -70377,6 +70533,9 @@
               "string"
             ],
             "format": "int32"
+          },
+          "handlingKey": {
+            "type": "string"
           }
         }
       },
@@ -74776,7 +74935,8 @@
               "IT",
               "Repair",
               "Other",
-              "Supply"
+              "Supply",
+              "Room"
             ]
           },
           "handlerUserIds": {

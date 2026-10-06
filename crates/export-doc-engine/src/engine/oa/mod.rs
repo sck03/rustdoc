@@ -2,14 +2,14 @@
 //! no dependency on invoice/payment models, reports or financial software.
 pub(in crate::engine) mod approval;
 pub(in crate::engine) mod approval_references;
-pub(in crate::engine) mod handling;
 mod handling_handover;
 mod queries;
-mod settings;
+pub(in crate::engine) mod settings;
 mod validation;
 use super::{
     NativeService, auth,
     error::{Result, conflict, error, invalid},
+    handling,
     records::{self, required, text},
     store::{self, Actor},
 };
@@ -43,7 +43,7 @@ pub(super) fn viewable(
                 && auth::visible(actor, resource, "complete", row))
             || (resource == "office.general"
                 && handling::GENERAL_STATES.contains(&text(row, "status").as_str())
-                && handling::can_handle(tx, actor, row, false)?)))
+                && handling::can_handle(tx, actor, row, resource)?)))
 }
 fn access(tx: &Connection, actor: &Actor, meta: &Value, row: &Value) -> Result<()> {
     let resource = text(meta, "resource");
@@ -52,7 +52,7 @@ fn access(tx: &Connection, actor: &Actor, meta: &Value, row: &Value) -> Result<(
     let visible = if permission == "view" {
         viewable(tx, actor, &resource, row)?
     } else if permission == "complete" && resource == "office.general" {
-        handling::can_handle(tx, actor, row, false)?
+        handling::can_handle(tx, actor, row, &resource)?
     } else {
         row["companyScope"] == actor.company && auth::visible(actor, &resource, &permission, row)
     };
@@ -111,7 +111,7 @@ pub(super) fn project(
         row["canReview"] = json!(approval::authority(tx, actor, &row)?.is_some());
     }
     if row["kind"] == "general" {
-        row["canHandle"] = json!(handling::can_handle(tx, actor, &row, false)?);
+        row["canHandle"] = json!(handling::can_handle(tx, actor, &row, "office.general")?);
         row["handlerNames"] = json!(handling::names(tx, actor, &row)?);
     }
     Ok(contracts::dto(contracts::schema("OaRequest"), row))
@@ -193,7 +193,7 @@ pub(super) fn handle(
         auth::authorize(&actor, &text(meta, "resource"), &text(meta, "permission"))?;
         if meta["kind"] == "approval-settings" {
             if action.starts_with("handling-") {
-                return handling::directory(tx, &actor, action == "handling-supply");
+                return handling::directory(tx, &actor, &text(meta, "resource"));
             }
             return settings::handle(tx, &actor, &action, body);
         }

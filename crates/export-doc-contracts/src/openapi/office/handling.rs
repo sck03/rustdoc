@@ -11,7 +11,7 @@ pub(super) fn extend(doc: &mut Value) {
     s["OfficeHandlingService"] = object(
         json!({
             "key":text,"name":text,
-            "category":{"type":"string","enum":["Seal","Certificate","IT","Repair","Other","Supply"]},
+            "category":{"type":"string","enum":["Seal","Certificate","IT","Repair","Other","Supply","Room"]},
             "handlerUserIds":{"type":"array","items":{"type":"integer","format":"int64"},"minItems":1,"maxItems":10},
             "handlerNames":text,"isActive":{"type":"boolean"}
         }),
@@ -29,6 +29,9 @@ pub(super) fn extend(doc: &mut Value) {
         "OfficeSupplySaveRequest",
         "OfficeSupplyRecord",
         "OfficeSupplyRequestRecord",
+        "MeetingRoomSaveRequest",
+        "MeetingRoomRecord",
+        "MeetingBookingRecord",
     ] {
         s[name]["properties"]["handlingKey"] = text.clone();
     }
@@ -36,6 +39,8 @@ pub(super) fn extend(doc: &mut Value) {
         "OaRequest",
         "OfficeSupplyRecord",
         "OfficeSupplyRequestRecord",
+        "MeetingRoomRecord",
+        "MeetingBookingRecord",
     ] {
         s[name]["properties"]["handlingName"] = text.clone();
         s[name]["properties"]["handlerNames"] = text.clone();
@@ -53,6 +58,12 @@ pub(super) fn extend(doc: &mut Value) {
             "/api/office/supply-handling-services",
             "office.supplies",
             "handling-supply",
+        ),
+        (
+            "ListRoomHandlingServices",
+            "/api/office/room-handling-services",
+            "office.rooms",
+            "handling-room",
         ),
     ] {
         endpoint(
@@ -74,8 +85,10 @@ pub(super) fn extend(doc: &mut Value) {
             .unwrap()
             .push(json!({"name":"handlingOnly","in":"query","schema":{"type":"boolean"}}));
     }
-    doc["paths"]["/api/office/supply-requests"]["get"]["parameters"]
-        .as_array_mut()
-        .unwrap()
-        .push(json!({"name":"handlingOnly","in":"query","schema":{"type":"boolean"}}));
+    for path in ["/api/office/supply-requests", "/api/office/bookings"] {
+        doc["paths"][path]["get"]["parameters"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"name":"handlingOnly","in":"query","schema":{"type":"boolean"}}));
+    }
 }

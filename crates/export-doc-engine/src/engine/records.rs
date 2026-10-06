@@ -716,11 +716,11 @@ pub fn delete(
     store.transaction_as(actor, |transaction, actor| {
         auth::authorize(actor, resource.permission, "delete")?;
         let previous = store::get(transaction, resource.key, record_id)?;
-        if resource.key == "supplies"
+        if matches!(resource.key, "rooms" | "supplies")
             && !text(&previous, "handlingKey").is_empty()
-            && !super::oa::handling::can_handle(transaction, actor, &previous, true)?
+            && !super::handling::can_handle(transaction, actor, &previous, resource.permission)?
         {
-            return Err(error(403, "只能删除本人负责且尚无业务历史的物品。"));
+            return Err(error(403, "只能删除本人负责且尚无业务历史的资源。"));
         }
         if !auth::visible(actor, resource.permission, "delete", &previous) {
             return Err(error(403, "没有删除此记录的权限。"));

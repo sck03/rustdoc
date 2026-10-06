@@ -11,13 +11,22 @@ export function useOfficeRequestHub(client: ExportDocManagerApiClient, user: Api
     label: register ? (kind === "rooms" ? "待使用／交接" : officeAccess(user, kind).canSeeOthers ? "待发放" : "我的待领用") : officeAccess(user, kind).canSeeOthers ? "可见待审批申请" : "我的待审批申请",
     href: `/office/${kind === "rooms" ? "meeting-rooms" : "supplies"}?view=requests&status=${status}`,
   }));
-  if (officeAccess(user,"supplies").allows("view") && officeAccess(user,"supplies").allows("issue")) {
-    for (const [status,title] of [["Approved","物品待发放"],["Issued","借用物品待归还"]]) queues.push({kind:"supplies",finance:false,handling:true,status,title,description:"按物品组分工办理实物交接；未全部归还的借用品继续保留。",label:title,href:`/office/supplies?view=requests&handlingOnly=true&status=${status}`});
+  for (const kind of ["rooms", "supplies"] as OfficeKind[]) {
+    const access = officeAccess(user, kind);
+    if (!access.allows("view") || !access.allows("issue")) continue;
+    const room = kind === "rooms";
+    for (const [status, title, action] of room
+      ? [["Approved", "会议室待交接", "issue"], ["InUse", "会议室待结束／归还", "return"]]
+      : [["Approved", "物品待发放", "issue"], ["Issued", "借用物品待归还", "return"]]) {
+      if (access.allows(action)) queues.push({ kind, finance: false, handling: true, status, title,
+        description: "按资源分工办理交接；任一位指定办理人执行，实际操作和归还分别留痕。", label: title,
+        href: `/office/${room ? "meeting-rooms" : "supplies"}?view=requests&handlingOnly=true&status=${status}` });
+    }
   }
   const queries = useQueries({ queries: queues.map(({ kind, handling, status }) => ({
     queryKey: ["office", kind, "hub", user.id, user.companyScope, register, handling, status],
     queryFn: async ({ signal }: { signal: AbortSignal }) => {
-      const input = { status, mineOnly: !handling && !officeAccess(user, kind).canSeeOthers, handlingOnly: kind === "supplies" ? handling : undefined, pageNumber: 1, pageSize: 5 };
+      const input = { status, mineOnly: !handling && !officeAccess(user, kind).canSeeOthers, handlingOnly: handling, pageNumber: 1, pageSize: 5 };
       const page: OfficePage<OfficeRequestRow> = await (kind === "rooms"
         ? client.listMeetingBookings(input, { signal }) : client.listOfficeSupplyRequests(input, { signal }));
       return { ...page, items: page.items.map(row => ({ id: row.id, employeeName: row.applicantName,

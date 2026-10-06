@@ -86,6 +86,7 @@ try {
   await wait("document.querySelector('[aria-label=档案文档]')?.innerText.includes('receipt.pdf') && document.querySelector('.personnel-image-preview img')?.naturalWidth>0", "Personnel image or document was not saved");
   await captureScreenshot(page, path.join(output, "personnel-saved-files.png"));
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const travelDay = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
   for (const [kind, name] of [["leave", "员工请假"], ["overtime", "加班申请"], ["expense", "费用报销"], ["travel", "出差申请"], ["purchase", "采购申请"], ["general", "通用申请"]]) {
     await navigate(`${url}/#/office/requests/${kind}`);
     await wait(`document.querySelector('.oa-workspace')?.getAttribute('aria-label')===${JSON.stringify(name)}`, `${name} page missing`);
@@ -115,7 +116,7 @@ try {
     await fill("申请标题", `${name}真实界面验收`); await fill("申请说明", "验证中文输入、保存、附件和审批历史。");
     if (kind === "leave") { await fill("开始日期", yesterday); await fill("结束日期", yesterday); }
     if (kind === "overtime") { await fill("开始时间", `${yesterday}T18:00`); await fill("结束时间", `${yesterday}T20:00`); await fill("加班地点", "总部办公室"); }
-    if (kind === "travel") { await fill("出差地点", "上海"); await fill("出发日期", yesterday); await fill("返程日期", yesterday); }
+    if (kind === "travel") { await fill("出差地点", "上海"); await fill("出发日期", travelDay); await fill("返程日期", travelDay); }
     if (kind === "expense") { await fill("费用说明", "市内交通凭证"); await fill("金额", "12.35"); }
     if (kind === "purchase") { await fill("物品名称", "办公纸"); await fill("预算单价", "18.25"); }
     await chooseFiles('[role=dialog] input[type=file]', kind === "expense" ? [receipt, supporting] : [receipt]);

@@ -12,7 +12,7 @@ export function OfficeSupplyEditor({ client, user, supply, onClose }: { client: 
   const [handlingKey, setHandlingKey] = useState(supply?.handlingKey ?? "");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const body = readOfficeSupplyForm(new FormData(event.currentTarget), supply?.versionNumber ?? 0);
+    const body = { ...readOfficeSupplyForm(new FormData(event.currentTarget), supply?.versionNumber ?? 0), handlingKey };
     void operation.run((signal) => supply ? client.updateOfficeSupply({ id: supply.id, body }, { signal }) : client.createOfficeSupply({ body }, { signal }), onClose);
   }
   return <OfficeDialog title={supply ? "编辑物品" : "添加物品"} onClose={onClose} {...operation} protectChanges>

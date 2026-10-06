@@ -146,16 +146,7 @@ pub fn validate(
             integer(value, "capacity", 1, 10_000, "容量")?;
             integer(value, "maximumBookingHours", 1, 24, "最长预约小时")?;
             integer(value, "advanceBookingDays", 1, 365, "提前预约天数")?;
-            if id > 0
-                && value["isActive"] == false
-                && store::all(connection, "bookings")?.iter().any(|booking| {
-                    booking["meetingRoomId"] == id
-                        && ["Approved", "InUse", "Pending"]
-                            .contains(&text(booking, "status").as_str())
-                })
-            {
-                return Err(conflict("会议室还有未结束预约，不能停用。"));
-            }
+            super::handling::validate_resource(connection, actor, kind, id, previous, value)?;
         }
         "bookings" => {
             required(value, "title", "会议主题", 200)?;
@@ -222,6 +213,14 @@ pub fn validate(
             value["roomName"] = room["name"].clone();
             value["location"] = room["location"].clone();
             value["requiresKey"] = room["requiresKey"].clone();
+            super::handling::snapshot(
+                connection,
+                actor,
+                value,
+                if id > 0 { previous } else { &room },
+                "Room",
+                id == 0,
+            )?;
             value["status"] = json!(if connection.provider() == "SQLite" {
                 "Approved"
             } else {
@@ -229,43 +228,7 @@ pub fn validate(
             });
         }
         "supplies" => {
-            if id > 0
-                && value["isActive"] == false
-                && store::all(connection, "supply-requests")?.iter().any(|r| {
-                    r["officeSupplyId"] == id
-                        && ["Pending", "Approved"].contains(&text(r, "status").as_str())
-                })
-            {
-                return Err(conflict(
-                    "物品还有待审批或待发放申请，请先完成或取消后再停用。",
-                ));
-            }
-            let handling = super::oa::handling::supply_access;
-            if id > 0 && !handling(connection, actor, "edit", previous, true)? {
-                return Err(super::error::error(403, "只能维护本人负责的物品。"));
-            }
-            if id > 0
-                && text(value, "handlingKey") != text(previous, "handlingKey")
-                && store::all(connection, "supply-requests")?.iter().any(|r| {
-                    r["officeSupplyId"] == id
-                        && (["Pending", "Approved"].contains(&text(r, "status").as_str())
-                            || r["status"] == "Issued" && r["isReturnable"] == true)
-                })
-            {
-                return Err(conflict(
-                    "此物品尚有未结申请，不能更换物品组；人员交接请修改该组的办理分工。",
-                ));
-            }
-            super::oa::handling::select(connection, actor, value, "Supply", false)?;
-            if !text(value, "handlingKey").is_empty()
-                && !actor.admin
-                && !super::oa::handling::assigned(
-                    &super::oa::handling::keys(connection, actor, true)?,
-                    value,
-                )
-            {
-                return Err(super::error::error(403, "只能选择本人负责的物品组。"));
-            }
+            super::handling::validate_resource(connection, actor, kind, id, previous, value)?;
             required(value, "name", "物品名称", 120)?;
             required(value, "unit", "计量单位", 20)?;
             integer(value, "minimumStock", 0, 1_000_000, "最低库存")?;
@@ -337,12 +300,14 @@ pub fn validate(
             value["applicantUserId"] = value["ownerUserId"].clone();
             value["applicantName"] = employee["profile"]["fullName"].clone();
             value["supplyName"] = supply["name"].clone();
-            for field in ["handlingKey", "handlingName"] {
-                value[field] = json!(text(if id > 0 { previous } else { &supply }, field));
-            }
-            if id == 0 {
-                super::oa::handling::select(connection, actor, value, "Supply", false)?;
-            }
+            super::handling::snapshot(
+                connection,
+                actor,
+                value,
+                if id > 0 { previous } else { &supply },
+                "Supply",
+                id == 0,
+            )?;
             value["unit"] = supply["unit"].clone();
             value["isReturnable"] = supply["isReturnable"].clone();
             value["status"] = json!(if registered { "Approved" } else { "Pending" });
@@ -485,8 +450,13 @@ pub fn action(
         store::check_version(&value, store::expected(&body))?;
         let state = text(&value, "status");
         let effective = text(&body, "effectiveDate");
-        if !valid_date(&effective) || effective < text(&value, "lastEffectiveDate") {
-            return Err(invalid("任职生效日期不能早于上一项变动。"));
+        if !valid_date(&effective)
+            || effective < text(&value, "lastEffectiveDate")
+            || effective > business_date.to_string()
+        {
+            return Err(invalid(
+                "任职生效日期不能早于上一项变动或晚于公司业务日期。",
+            ));
         }
         required(&body, "note", "任职变动说明", 500)?;
         if matches!(operation, "TransferPersonnel" | "DepartPersonnel") {

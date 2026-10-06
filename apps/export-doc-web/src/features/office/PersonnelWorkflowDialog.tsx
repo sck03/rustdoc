@@ -15,7 +15,7 @@ export function PersonnelWorkflowDialog({ client, user, record, action, departme
   const clearance = usePersonnelClearance(client, user, record.employee.id);
   const [departmentId, setDepartmentId] = useState(record.employee.departmentId);
   const changesJob = action === "transfer" || action === "rehire";
-  const needsClearance = action === "depart" || action === "rehire" || action === "transfer" && departmentId !== record.employee.departmentId;
+  const needsClearance = action === "depart" || action === "transfer";
   const blocked = needsClearance && (clearance.isFetching || clearance.isError ||
     !(action === "depart" ? clearance.data?.canDepart : clearance.data?.isClear));
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -37,7 +37,7 @@ export function PersonnelWorkflowDialog({ client, user, record, action, departme
       {clearance.isError ? "无法完成交接核对，请重新核对后提交。" : clearance.isFetching ? "正在核对…"
         : action === "depart" && (clearance.data?.managedDepartments.length ?? 0) > 0 ? "该人员仍担任部门负责人，请先由管理员在组织架构中调整负责人。"
         : clearance.data?.isClear ? "未结清事项为 0，可以办理。"
-        : `还有预约 ${clearance.data?.meetingCount ?? 0} 笔、物品申请／借用 ${clearance.data?.supplyCount ?? 0} 笔。请返回档案的“交接事项”处理。`}
+        : `还有预约 ${clearance.data?.meetingCount ?? 0} 笔、物品申请／借用 ${clearance.data?.supplyCount ?? 0} 笔、OA 申请／审批 ${clearance.data?.approvalCount ?? 0} 笔、办理分工 ${clearance.data?.handlingCount ?? 0} 项。请返回档案的“交接事项”处理。`}
     </InlineNotice>}
     <form onSubmit={submit}><fieldset className="office-form-grid" disabled={operation.busy}>
       <OfficeField label="生效日期"><input type="date" name="effectiveDate" required min={record.lastEffectiveDate} max={user.businessDate} defaultValue={user.businessDate} /></OfficeField>
@@ -67,12 +67,12 @@ export function PersonnelAccountDialog({ client, user, record, onClose }: {
       userId: selected.id, expectedAccountVersion: selected.versionNumber } }, { signal }), onClose);
   }
   return <OfficeDialog title={`关联账号 · ${record.employee.fullName}`} onClose={onClose} {...operation} protectChanges>
-    <p className="office-muted">选择本公司同部门的启用普通账号。关联后姓名和组织归属由人员档案维护，离职时同步停用账号；关联关系保留以便追溯，确认前请核对本人身份。</p>
+    <p className="office-muted">选择本公司本人的启用普通账号。关联后姓名和部门由人员档案维护，离职时同步停用账号。更换关联账号或调整账号部门前须先交接未结申请、审批及办理职责。</p>
     <form className="office-search" onSubmit={(event) => { event.preventDefault(); setSelected(null); model.search(); }}>
       <input aria-label="搜索可关联账号" placeholder="账号或姓名" value={model.keyword} onChange={(event) => model.setKeyword(event.target.value)} maxLength={100} disabled={operation.busy} />
       <button className="command-button secondary" type="submit" disabled={operation.busy}>搜索</button>
     </form>
-    <OfficeQueryState query={model.query} emptyTitle="没有可关联账号，请先在账号与权限中创建或调整同部门普通账号" />
+    <OfficeQueryState query={model.query} emptyTitle="没有可关联账号，请先在账号与权限中创建本公司普通账号" />
     <form onSubmit={submit}><fieldset className="office-form-grid" disabled={operation.busy}><legend>选择账号</legend>
       <ul className="personnel-account-list office-field-wide">{!model.query.isError && model.query.data?.items.map((item) => <li key={item.id}><label>
         <input type="radio" name="account" value={item.id} checked={selected?.id === item.id} onChange={() => setSelected(item)} />

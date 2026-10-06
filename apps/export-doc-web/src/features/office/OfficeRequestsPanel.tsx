@@ -20,7 +20,7 @@ export function OfficeRequestsPanel({ client, user, kind }: { client: ExportDocM
     {model.focused && <div className="office-toolbar"><p>正在查看{model.focus.requestId ? `申请 #${model.focus.requestId}` : "所选人员的申请记录"}</p>
       <button type="button" className="command-button secondary" onClick={model.clearFocus}>显示全部记录</button></div>}
     <div className="office-toolbar">
-      {kind === "supplies" && model.access.allows("issue") && <label className="checkbox-field"><input type="checkbox" checked={model.handlingOnly} onChange={event => model.changeHandling(event.target.checked)} />我负责的发放与归还</label>}
+      {model.access.allows("issue") && <label className="checkbox-field"><input type="checkbox" checked={model.handlingOnly} onChange={event => model.changeHandling(event.target.checked)} />我负责的交接与归还</label>}
       <label className="office-filter">{register ? "记录状态" : "申请状态"}<select value={model.status} onChange={(event) => model.changeStatus(event.target.value)}><option value="">全部状态</option>
         {statuses.filter((status) => !register || !["Pending", "Rejected"].includes(status)).map((status) => <option key={status} value={status}>{status === "Approved" && kind === "rooms" ? "待使用／领钥匙" : officeStatusLabels[status]}</option>)}</select></label>
       {!register && model.access.canSeeOthers && <label className="checkbox-field"><input type="checkbox" checked={model.mineOnly} onChange={(event) => model.changeMineOnly(event.target.checked)} />仅我的申请</label>}
@@ -32,6 +32,7 @@ export function OfficeRequestsPanel({ client, user, kind }: { client: ExportDocM
       <div className="office-card-heading"><h2>{isMeetingBooking(row) ? row.title : row.supplyName}</h2><span className="office-badge" data-state={row.status}>{officeStatus(row, user.businessDate)}</span></div>
       {isMeetingBooking(row) ? <>
         <p>{row.roomName} · {row.attendeeCount} 人</p>
+        {row.handlingName && <p>办理分工：{row.handlingName} · 办理人员：{row.handlerNames}</p>}
         <p className="office-period"><time dateTime={row.startsAt}>{formatBusinessDateTime(row.startsAt, user.businessTimeZone)}</time><span>至</span><time dateTime={row.endsAt}>{formatBusinessDateTime(row.endsAt, user.businessTimeZone)}</time></p>
         {row.issuedAt && <p className="office-muted">交接：{formatBusinessDateTime(row.issuedAt, user.businessTimeZone)}{row.returnedAt ? ` · 归还：${formatBusinessDateTime(row.returnedAt, user.businessTimeZone)}` : ""}</p>}
       </> : <>

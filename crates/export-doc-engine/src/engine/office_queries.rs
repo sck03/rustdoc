@@ -25,8 +25,8 @@ pub fn list(store: &Store, actor: &Actor, kind: &str, query: &[(&str, String)]) 
     let low_stock = flag("lowStockOnly")?;
     let mine = flag("mineOnly")?;
     let handling = flag("handlingOnly")?;
-    if handling && kind != "supply-requests" {
-        return Err(invalid("只有物品领用支持待我办理筛选。"));
+    if handling && !matches!(kind, "supply-requests" | "bookings") {
+        return Err(invalid("只有资源申请支持待我办理筛选。"));
     }
     let keyword = store::normalize(get("keyword"));
     if keyword.chars().count() > 120 {
@@ -99,30 +99,30 @@ pub fn list(store: &Store, actor: &Actor, kind: &str, query: &[(&str, String)]) 
     };
     store.transaction(|tx| {
         let directory = matches!(kind, "rooms" | "supplies");
-        let keys = super::oa::handling::keys(tx, actor, true)?;
         let mut rows = vec![];
         for row in store::all(tx, kind)? {
             let allowed = if directory {
                 row["companyScope"] == actor.company
-            } else if resource == "office.supplies" {
-                super::oa::handling::supply_access(tx, actor, "view", &row, directory)?
             } else {
-                row["companyScope"] == actor.company && auth::visible(actor, resource, "view", &row)
+                super::handling::resource_access(tx, actor, resource, "view", &row, directory)?
             };
             if allowed
                 && (!handling
-                    || (super::oa::handling::SUPPLY_STATES
-                        .contains(&text(&row, "status").as_str())
-                        && (super::oa::handling::assigned(&keys, &row)
-                            || text(&row, "handlingKey").is_empty()
-                                && auth::visible(actor, resource, "issue", &row))
-                        && (row["status"] != "Issued" || row["isReturnable"] == true)))
+                    || (super::handling::outstanding(&row)
+                        && super::handling::resource_access(
+                            tx,
+                            actor,
+                            resource,
+                            if row["status"] == "Approved" {
+                                "issue"
+                            } else {
+                                "return"
+                            },
+                            &row,
+                            false,
+                        )?))
             {
-                rows.push(if resource == "office.supplies" {
-                    super::oa::handling::project_supply(tx, actor, row)?
-                } else {
-                    row
-                });
+                rows.push(super::handling::project_resource(tx, actor, resource, row)?);
             }
         }
         if directory {
@@ -284,7 +284,7 @@ fn clearance_for(
         super::oa::references(tx, company.as_str().unwrap_or(""), employee, account, true)?;
     let mut handling_services = vec![];
     if let Some(user) = account {
-        handling_services = super::oa::handling::services(tx, company.as_str().unwrap_or(""))?
+        handling_services = super::handling::services(tx, company.as_str().unwrap_or(""))?
             .iter()
             .filter(|s| {
                 s["handlerUserIds"]

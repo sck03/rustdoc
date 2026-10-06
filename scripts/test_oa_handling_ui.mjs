@@ -12,6 +12,7 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
       ...['view', 'complete'].map(action => ({ resourceKey: 'office.general', action, dataScope: 'own' })),
       { resourceKey: 'office.supplies', action: 'view', dataScope: 'own' },
       ...['issue', 'return', 'restock'].map(action => ({ resourceKey: 'office.supplies', action, dataScope: 'own' })),
+      ...['view', 'issue', 'return'].map(action => ({ resourceKey: 'office.rooms', action, dataScope: 'own' })),
       { resourceKey: 'office.notifications', action: 'view', dataScope: 'own' },
     ] : undefined;
     users.push((await invoke('createUserAccount', { username: `handling-${name}`, fullName: `办理${name}`, role, companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: password, permissionGrants }, {}, token)).user);
@@ -24,12 +25,19 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
     await section.getByRole('button', { name: '添加审批步骤', exact: true }).click();
     await section.getByLabel(`第 ${i+1} 步审批人`).selectOption(String(user.id));
   }
-  for (const [i,[category,name,handler]] of [['Seal','公章',2],['Seal','合同章',3],['Certificate','在职证明',3],['Supply','日常用品',2],['Supply','服装辅料',3]].entries()) {
+  for (const [i,[category,name,handler]] of [['Seal','公章',2],['Seal','合同章',3],['Certificate','在职证明',3],['Supply','日常用品',2],['Supply','服装辅料',3],['Room','会议接待',2]].entries()) {
     await admin.getByRole('button', { name: '添加办理分工', exact: true }).click();
     const group = admin.getByRole('group', { name: `办理分工 ${i+1}`, exact: true });
     await group.getByLabel('分工类别').selectOption(category);
-    await group.getByLabel('事项或物品组名称').fill(name);
+    await group.getByLabel('事项或资源分工名称').fill(name);
     await group.getByRole('combobox', { name: /^办理人员 1/u }).selectOption(String(users[handler].id));
+    if (category === 'Room') {
+      await group.getByRole('button', { name: '添加办理人员', exact: true }).click();
+      const secondHandler = group.getByRole('combobox', { name: /^办理人员 2/u });
+      await secondHandler.waitFor();
+      assert(await secondHandler.locator(`option[value="${users[2].id}"]`).evaluate(option => option.disabled), 'duplicate handlers cannot be selected');
+      await secondHandler.selectOption(String(users[3].id));
+    }
   }
   const save = admin.waitForResponse(r => r.url().endsWith('/api/office/approval-settings') && r.request().method() === 'PUT');
   await admin.getByRole('button', { name: '保存审批设置', exact: true }).click();
@@ -37,6 +45,28 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
   await admin.screenshot({ path: path.join(output,'handling-settings.png'),fullPage:true });
   const policy = await invoke('GetOaApprovalSettings',undefined,{},token);
   const keys = Object.fromEntries(policy.handlingServices.map(row => [row.name,row.key]));
+  const saveDuringDirectoryLoad = async (routeName, directory, name, label, key) => {
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const pattern = `**/api/office/${directory}-handling-services`;
+    const started = admin.waitForRequest(pattern);
+    await admin.route(pattern, async route => { await gate; await route.continue(); });
+    try {
+      await admin.goto(`${url}/#/office/${routeName}`); await admin.reload();
+      const card = admin.locator('.office-resource-card').filter({ has: admin.getByRole('heading', {name,exact:true}) });
+      if (directory === 'supply') await card.getByText('更多操作', {exact:true}).click();
+      await card.getByRole('button', { name:'编辑',exact:true }).click();
+      await started;
+      const dialog = admin.getByRole('dialog');
+      assert(await dialog.getByLabel(label).isDisabled());
+      const response = admin.waitForResponse(r => r.request().method() === 'PUT' && r.url().includes('/api/office/'));
+      await dialog.getByRole('button', { name:'保存',exact:true }).click();
+      const saved = await response;
+      assert.equal(saved.status(),200);
+      assert.equal(saved.request().postDataJSON().handlingKey,key,'loading a disabled picker must preserve the saved assignment');
+      release(); await dialog.waitFor({state:'hidden'});
+    } finally { release(); await admin.unroute(pattern); }
+  };
   const leader = await openPage('handling-leader',password);
   const director = await openPage('handling-director',password);
   const seal = await openPage('handling-seal',password);
@@ -80,6 +110,7 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
     const form=admin.getByRole('dialog'); await form.getByLabel('物品名称',{exact:true}).fill(name);
     await form.getByLabel('物品组与保管分工').selectOption(keys[group]);
     await form.getByRole('button',{name:'保存',exact:true}).click(); await form.waitFor({state:'hidden'});
+    await saveDuringDirectoryLoad('supplies','supply',name,'物品组与保管分工',keys[group]);
     const card=admin.locator('.office-resource-card').filter({has:admin.getByRole('heading',{name,exact:true})});
     await card.getByRole('button',{name:'补充库存',exact:true}).click();
     await admin.getByRole('dialog').getByLabel(/^本次补充数量/u).fill('10');
@@ -96,7 +127,46 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
     await other.getByText('当前条件下没有登记记录',{exact:true}).waitFor();
     await handler.screenshot({path:path.join(output,`${group}-issued.png`),fullPage:true});
   }
-  await special.setViewportSize({width:390,height:844}); await special.goto(`${url}/#/office/approvals`);
+  await admin.goto(`${url}/#/office/meeting-rooms`);
+  await admin.getByRole('button', { name: '添加会议室', exact: true }).click();
+  let form = admin.getByRole('dialog');
+  await form.getByLabel('会议室名称', { exact: true }).fill('多位办理会议室');
+  await form.getByLabel('会议室办理分工').selectOption(keys['会议接待']);
+  await form.getByRole('button', { name: '保存', exact: true }).click(); await form.waitFor({ state: 'hidden' });
+  await saveDuringDirectoryLoad('meeting-rooms','room','多位办理会议室','会议室办理分工',keys['会议接待']);
+  const room = admin.locator('.office-resource-card').filter({ has: admin.getByRole('heading', { name: '多位办理会议室', exact: true }) });
+  await room.getByRole('button', { name: '查看日程与预约', exact: true }).click();
+  form = admin.getByRole('dialog');
+  await form.getByLabel('登记人员', { exact: true }).fill('OA-001'); await form.getByRole('option', { name: /OA-001/u }).click();
+  await form.getByLabel('会议主题').fill('部门联席中文会议');
+  await form.getByRole('button', { name: '登记预约', exact: true }).click(); await form.waitFor({ state: 'hidden' });
+  const meetingQueue = `${url}/#/office/meeting-rooms?view=requests&handlingOnly=true`;
+  for (const handler of [seal, special]) {
+    await handler.goto(meetingQueue);
+    await handler.getByRole('heading', { name: '部门联席中文会议', exact: true }).waitFor();
+    await handler.getByRole('button', { name: '发放钥匙', exact: true }).waitFor();
+  }
+  await seal.getByRole('button', { name: '发放钥匙', exact: true }).click();
+  await seal.getByRole('dialog').getByLabel('交接／处理备注').fill('第一位办理人交付钥匙');
+  await seal.getByRole('dialog').getByRole('button', { name: '发放钥匙', exact: true }).click();
+  await seal.getByRole('dialog').waitFor({ state: 'hidden' });
+  await special.reload();
+  await special.getByRole('button', { name: '归还钥匙', exact: true }).waitFor();
+  await special.setViewportSize({ width: 390, height: 844 });
+  await special.screenshot({ path: path.join(output, 'meeting-multi-handler-mobile.png'), fullPage: true });
+  await special.getByRole('button', { name: '归还钥匙', exact: true }).click();
+  await special.getByRole('dialog').getByLabel('交接／处理备注').fill('第二位办理人核收钥匙');
+  await special.getByRole('dialog').getByRole('button', { name: '归还钥匙', exact: true }).click();
+  await special.getByRole('dialog').waitFor({ state: 'hidden' });
+  await special.getByText('当前条件下没有登记记录', { exact: true }).waitFor();
+  await admin.goto(`${url}/#/office/notifications`);
+  const returned = admin.locator('article').filter({ has: admin.getByRole('heading', { name: '已登记归还 · 多位办理会议室 · 部门联席中文会议', exact: true }) });
+  await returned.getByRole('link', { name: '查看关联申请', exact: true }).click();
+  await admin.getByRole('button', { name: '处理记录', exact: true }).click();
+  await admin.getByRole('dialog').getByText('办理seal · 第一位办理人交付钥匙', { exact: true }).waitFor();
+  await admin.getByRole('dialog').getByText('办理special · 第二位办理人核收钥匙', { exact: true }).waitFor();
+  await admin.screenshot({ path: path.join(output, 'meeting-handover-history.png'), fullPage: true });
+  await special.goto(`${url}/#/office/approvals`);
   await special.getByRole('link',{name:'通用申请 · 待办理',exact:true}).waitFor();
   await special.addScriptTag({path:require.resolve('axe-core/axe.min.js')});
   assert.deepEqual(await special.evaluate(async()=> (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v=>['critical','serious'].includes(v.impact)).map(v=>v.id)),[]);

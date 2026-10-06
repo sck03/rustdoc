@@ -4004,9 +4004,13 @@ export interface MeetingBookingCreateRequest {
 export interface MeetingBookingRecord {
   applicantName: string;
   attendeeCount: number;
+  canHandle?: boolean;
   createdAt: string;
   departmentId: string;
   endsAt: string;
+  handlerNames?: string;
+  handlingKey?: string;
+  handlingName?: string;
   id: number;
   issuedAt?: string | null;
   location: string;
@@ -4039,8 +4043,12 @@ export interface MeetingBusySlot {
 
 export interface MeetingRoomRecord {
   advanceBookingDays: number;
+  canHandle?: boolean;
   capacity: number;
   equipment: string;
+  handlerNames?: string;
+  handlingKey?: string;
+  handlingName?: string;
   id: number;
   inUse: boolean;
   isActive: boolean;
@@ -4056,6 +4064,7 @@ export interface MeetingRoomSaveRequest {
   capacity: number;
   equipment: string;
   expectedVersion: number;
+  handlingKey?: string;
   isActive: boolean;
   location: string;
   maximumBookingHours: number;
@@ -4255,7 +4264,7 @@ export interface OfficeHandlingDirectory {
 }
 
 export interface OfficeHandlingService {
-  category: "Seal" | "Certificate" | "IT" | "Repair" | "Other" | "Supply";
+  category: "Seal" | "Certificate" | "IT" | "Repair" | "Other" | "Supply" | "Room";
   handlerNames?: string;
   handlerUserIds: number[];
   isActive: boolean;
@@ -6481,6 +6490,7 @@ export interface ListMeetingBookingsRequest {
   requestId?: number;
   applicantUserId?: number;
   employeeId?: number;
+  handlingOnly?: boolean;
 }
 
 export interface ListMeetingRoomsRequest {
@@ -10056,6 +10066,7 @@ export class ExportDocManagerApiClient {
         "requestId": request.requestId,
         "applicantUserId": request.applicantUserId,
         "employeeId": request.employeeId,
+        "handlingOnly": request.handlingOnly,
       },
       init,
     });
@@ -10297,6 +10308,11 @@ export class ExportDocManagerApiClient {
       },
       init,
     });
+  }
+
+  public listRoomHandlingServices(init?: ApiRequestInit): Promise<OfficeHandlingDirectory> {
+    const path = "/api/office/room-handling-services";
+    return this.request<OfficeHandlingDirectory>("GET", path, { init });
   }
 
   public listSalesOpportunityHistory(request: ListSalesOpportunityHistoryRequest, init?: ApiRequestInit): Promise<ApiSalesOpportunityHistoryDto[]> {

@@ -28,6 +28,7 @@ pub mod error;
 pub mod excel;
 #[cfg(feature = "exchange-rates")]
 mod exchange;
+mod handling;
 mod hs;
 #[cfg(feature = "excel")]
 mod hs_files;

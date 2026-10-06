@@ -73,7 +73,7 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
                 || previous["departmentId"] != body["departmentId"])
                 && super::office_queries::account_clearance(tx, previous)?["isClear"] != true
             {
-                return Err(conflict("仍有未结清的预约或领用申请，请先完成交接。"));
+                return Err(conflict("仍有未结申请、审批或办理职责，请先完成交接。"));
             }
         }
         super::organization::validate_assignment(

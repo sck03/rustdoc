@@ -254,7 +254,8 @@ try {
     assert.equal(await read(page,"document.querySelector('.office-filter select').value"),"");results.push(`local-admin-records-${width}`);
   }
   for(const role of ['register','employee']) {
-    await open('hub',390,role);await waitFor(page,"document.querySelectorAll('.office-resource-card li').length===2");
+    await open('hub',390,role);await waitFor(page,"[...document.querySelectorAll('.office-resource-card')].filter(card=>['会议室预约','物品领用'].includes(card.querySelector('h2')?.textContent.trim())).every(card=>card.querySelectorAll('li').length===1)");
+    assert.equal(await read(page,"[...document.querySelectorAll('.office-resource-card h2')].filter(title=>['会议室预约','物品领用'].includes(title.textContent.trim())).length"),2);
     await audit(page,`resource-hub-${role}`);await captureScreenshot(page,path.join(output,`resource-hub-${role}.png`));
     await read(page,"document.querySelector('.office-resource-card li a').click()");await waitFor(page,"document.querySelector('.office-request-card')");
     assert(await read(page,"window.__officeCalls.some(c=>c.name==='listBookings'&&c.input.requestId===1)"));results.push(`resource-hub-navigation-${role}`);

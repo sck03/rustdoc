@@ -80,12 +80,13 @@ export function useOfficeOperation() {
     setError("");
     try {
       const result = await abortable(operation);
-      await queries.invalidateQueries({ queryKey: ["office"] });
+      await Promise.all([queries.invalidateQueries({ queryKey: ["office"] }), queries.invalidateQueries({ queryKey: ["worklist"] })]);
       done(result);
     } catch (failure) {
       if (!isAbortError(failure)) {
         setError(readApiError(failure));
         void queries.invalidateQueries({ queryKey: ["office"] });
+        void queries.invalidateQueries({ queryKey: ["worklist"] });
       }
     } finally { inFlight.current = false; setBusy(false); }
   }
@@ -97,7 +98,7 @@ export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUs
   const [search, setSearch] = useSearchParams();
   const focus = officeRequestFocus(search);
   const focused = Boolean(focus.requestId || focus.applicantUserId || focus.employeeId);
-  const handlingOnly = kind === "supplies" && search.get("handlingOnly") === "true" && !focused;
+  const handlingOnly = search.get("handlingOnly") === "true" && !focused;
   const paging = useOfficePaging();
   const [mineOnlyFilter, setMineOnly] = useState(!access.canSeeOthers);
   const [statusFilter, setStatus] = useState(search.get("status") ?? (user.capabilities.usesOfficeRegister ? "" : access.allows("approve") ? "Pending" : ""));
@@ -106,14 +107,14 @@ export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUs
   const query = useQuery({
     queryKey: ["office", kind, "requests", user.id, user.companyScope, paging.pageNumber, paging.pageSize, mineOnly, status, focus, handlingOnly],
     queryFn: async ({ signal }): Promise<OfficePage<OfficeRequestRow>> => {
-      const input = { mineOnly, status: status || undefined, handlingOnly: kind === "supplies" ? handlingOnly : undefined, pageNumber: paging.pageNumber, pageSize: paging.pageSize, ...focus };
+      const input = { mineOnly, status: status || undefined, handlingOnly, pageNumber: paging.pageNumber, pageSize: paging.pageSize, ...focus };
       return kind === "rooms" ? client.listMeetingBookings(input, { signal }) : client.listOfficeSupplyRequests(input, { signal });
     },
     refetchInterval: 30000,
     refetchIntervalInBackground: false,
   });
   const clearFocus = () => { setSearch({ view: "requests" }); paging.resetPage(); };
-  return { access, paging, query, mineOnly, status, focus, focused, handlingOnly, changeHandling: (value: boolean) => { setSearch(value ? {view:"requests",handlingOnly:"true"} : {view:"requests"}); setStatus(value ? "Approved" : ""); paging.resetPage(); }, clearFocus: () => { setStatus(""); setMineOnly(!access.canSeeOthers); clearFocus(); },
+  return { access, paging, query, mineOnly, status, focus, focused, handlingOnly, changeHandling: (value: boolean) => { setSearch(value ? {view:"requests",handlingOnly:"true"} : {view:"requests"}); setStatus(""); paging.resetPage(); }, clearFocus: () => { setStatus(""); setMineOnly(!access.canSeeOthers); clearFocus(); },
     changeMineOnly: (value: boolean) => { setMineOnly(value); clearFocus(); },
     changeStatus: (value: string) => { setStatus(value); if (!handlingOnly) clearFocus(); else paging.resetPage(); } };
 }

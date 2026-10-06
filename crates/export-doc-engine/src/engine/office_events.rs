@@ -30,21 +30,26 @@ pub fn append(
         actor,
         action,
     )?;
-    if kind == "supply-requests" {
+    if matches!(kind, "supply-requests" | "bookings") {
         let action = match action {
             "Register" | "Approve" => "approve",
-            "Issue" | "Return" => "complete",
+            "Submit" => "submit",
+            "Edit" if record["status"] == "Pending" => "submit",
+            "Edit" => "approve",
+            "Issue" => "issue",
+            "Return" => "return",
             "Reject" => "reject",
-            "Cancel" => "void",
+            "Cancel" => "cancel",
             "Reassign" => "reassign",
             _ => "",
         };
         let mut request = record.clone();
-        request["kind"] = json!("supply");
+        let supply = kind == "supply-requests";
+        request["kind"] = json!(if supply { "supply" } else { "room" });
         request["title"] = json!(format!(
             "{} · {}",
-            text(record, "supplyName"),
-            text(record, "purpose")
+            text(record, if supply { "supplyName" } else { "roomName" }),
+            text(record, if supply { "purpose" } else { "title" })
         ));
         let mut event = event;
         event["action"] = json!(action);
@@ -53,7 +58,7 @@ pub fn append(
             actor,
             &request,
             &event,
-            &json!({"resource":"office.supplies"}),
+            &json!({"resource":if supply { "office.supplies" } else { "office.rooms" }}),
         )?;
     }
     Ok(())
@@ -74,12 +79,14 @@ pub fn history(
     auth::authorize(actor, permission, action)?;
     store.transaction(|tx| {
         let record = store::get(tx, kind, id)?;
-        let allowed = if permission == "office.supplies" {
-            super::oa::handling::supply_access(tx, actor, action, &record, kind == "supplies")?
-        } else {
-            record["companyScope"] == actor.company
-                && auth::visible(actor, permission, action, &record)
-        };
+        let allowed = super::handling::resource_access(
+            tx,
+            actor,
+            permission,
+            action,
+            &record,
+            kind == "supplies",
+        )?;
         if !allowed {
             return Err(error(403, "没有查看这项记录历史的权限。"));
         }

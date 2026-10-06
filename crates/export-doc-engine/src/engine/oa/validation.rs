@@ -112,7 +112,7 @@ pub(super) fn submission(tx: &Connection, row: &Value) -> Result<()> {
         vec!["oa-leave", "oa-travel"]
     };
     for kind in kinds {
-        for status in ["Pending", "Approved"] {
+        for status in ["Pending", "Approved", "Completed"] {
             let mut offset = 0;
             loop {
                 crate::operation::check()?;
@@ -148,7 +148,7 @@ pub(super) fn submission(tx: &Connection, row: &Value) -> Result<()> {
                     };
                     if overlap {
                         return Err(conflict(
-                            "该员工已有重叠的待审批或已批准申请，请先核对原申请。",
+                            "该员工已有重叠的待审批、已批准或已完成申请，请先核对原申请。",
                         ));
                     }
                 }

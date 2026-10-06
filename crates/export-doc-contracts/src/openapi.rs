@@ -94,21 +94,29 @@ mod tests {
             "OfficeSupplySaveRequest",
             "OfficeSupplyRecord",
             "OfficeSupplyRequestRecord",
+            "MeetingRoomSaveRequest",
+            "MeetingRoomRecord",
+            "MeetingBookingRecord",
         ] {
             let properties = current["components"]["schemas"][name]["properties"]
                 .as_object_mut()
                 .unwrap();
             assert_eq!(properties.remove("handlingKey").unwrap()["type"], "string");
-            if name != "OfficeSupplySaveRequest" {
+            if !name.ends_with("SaveRequest") {
                 for field in ["handlingName", "handlerNames", "canHandle"] {
                     assert!(properties.remove(field).is_some());
                 }
             }
         }
-        let params = current["paths"]["/api/office/supply-requests"]["get"]["parameters"]
-            .as_array_mut()
-            .unwrap();
-        assert_eq!(params.pop().unwrap()["name"], "handlingOnly");
+        for path in ["/api/office/supply-requests", "/api/office/bookings"] {
+            let params = current["paths"][path]["get"]["parameters"]
+                .as_array_mut()
+                .unwrap();
+            assert_eq!(
+                params.pop().unwrap(),
+                serde_json::json!({"name":"handlingOnly","in":"query","schema":{"type":"boolean"}})
+            );
+        }
         for (path, methods) in baseline["paths"].as_object().unwrap() {
             assert_eq!(&current["paths"][path], methods, "endpoint drift: {path}");
         }

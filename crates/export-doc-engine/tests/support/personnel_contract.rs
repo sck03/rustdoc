@@ -213,8 +213,44 @@ pub fn exercise(service: &NativeService, admin: &str) {
             .status,
         Some(404)
     );
+    person = call(service, admin, LINK_PERSONNEL_ACCOUNT, id, Some(json!({"expectedVersion":person["versionNumber"],"userId":account["id"],"expectedAccountVersion":account["versionNumber"]}))).unwrap();
+    let staff = login();
+    let staff_token = staff["accessToken"].as_str().unwrap();
+    let spare = call(service, admin, CREATE_USER_ACCOUNT, 0, Some(json!({"username":format!("spare-{suffix}"),"fullName":"候选账号","role":"OfficeEmployee","departmentId":"GENERAL","companyScope":"DEFAULT","isActive":true,"resetPassword":"Personnel-Test-2026"}))).unwrap()["user"].clone();
+    let draft = call(service, staff_token, CREATE_GENERAL_REQUEST, 0, Some(json!({"requestKey":nonce().unwrap(),"employeeId":if service.provider().unwrap() == "SQLite" {Some(id)} else {None},"title":"更换账号前的未结申请","reason":"保护申请人关联","category":"IT"}))).unwrap();
+    let link = json!({"expectedVersion":person["versionNumber"],"userId":spare["id"],"expectedAccountVersion":spare["versionNumber"]});
+    assert_eq!(
+        call(
+            service,
+            admin,
+            LINK_PERSONNEL_ACCOUNT,
+            id,
+            Some(link.clone())
+        )
+        .unwrap_err()
+        .status,
+        Some(409)
+    );
+    assert_eq!(
+        call(service, admin, GET_PERSONNEL, id, None).unwrap()["account"]["id"],
+        account["id"]
+    );
+    call(
+        service,
+        staff_token,
+        CANCEL_GENERAL_REQUEST,
+        draft["id"].as_i64().unwrap(),
+        Some(json!({"expectedVersion":draft["versionNumber"],"note":"完成交接后再关联"})),
+    )
+    .unwrap();
+    let original_account = person["account"].clone();
+    person = call(service, admin, LINK_PERSONNEL_ACCOUNT, id, Some(link)).unwrap();
+    person = call(service, admin, LINK_PERSONNEL_ACCOUNT, id, Some(json!({"expectedVersion":person["versionNumber"],"userId":account["id"],"expectedAccountVersion":original_account["versionNumber"]}))).unwrap();
+    let today = login()["user"]["businessDate"].as_str().unwrap().to_owned();
+    let future =
+        chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d").unwrap() + chrono::Duration::days(1);
+    assert_eq!(call(service, admin, TRANSFER_PERSONNEL, id, Some(json!({"expectedVersion":person["versionNumber"],"departmentId":"GENERAL","jobTitle":"新岗位","effectiveDate":future.to_string(),"note":"不允许未来日期立即调岗"}))).unwrap_err().status, Some(400));
     if service.provider().unwrap() == "PostgreSQL" {
-        person = call(service, admin, LINK_PERSONNEL_ACCOUNT, id, Some(json!({"expectedVersion":person["versionNumber"],"userId":account["id"],"expectedAccountVersion":account["versionNumber"]}))).unwrap();
         let staff = login();
         person = call(service, admin, UPDATE_PERSONNEL, id, Some(json!({"expectedVersion":person["versionNumber"],"profile":{"fullName":"账号同步姓名"},"employmentType":"FullTime"}))).unwrap();
         assert_eq!(person["account"]["fullName"], "账号同步姓名");

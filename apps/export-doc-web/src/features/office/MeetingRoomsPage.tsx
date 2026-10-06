@@ -42,12 +42,13 @@ function MeetingRoomsDirectory({ client, user }: { client: ExportDocManagerApiCl
       <p className="office-card-detail"><MapPin size={16} aria-hidden="true" />{room.location || "位置未填写"}</p>
       <p className="office-card-detail"><UsersRound size={16} aria-hidden="true" />{room.capacity} 人 · {room.requiresKey ? "需领还钥匙" : "无需钥匙"}</p>
       <p className="office-muted office-card-description">{room.equipment || "暂无设备说明"}</p>
+      {room.handlingName && <p>办理分工：{room.handlingName} · {room.handlerNames}</p>}
       <footer className="office-card-actions"><button className="command-button" type="button" onClick={() => setBooking(room)}>查看日程{access.allows("create") && room.isActive ? "与预约" : ""}</button>
-        {access.allows("manage") && <><button className="command-button secondary" type="button" onClick={() => setEditing(room)}>编辑</button>
+        {access.allows("manage") && (!room.handlingKey || room.canHandle) && <><button className="command-button secondary" type="button" onClick={() => setEditing(room)}>编辑</button>
           <button className="command-button secondary" type="button" onClick={() => setDeleting(room)}>删除</button></>}</footer>
     </article>)}</div>}
     <OfficePager page={query.data} paging={paging} busy={query.isFetching} />
-    {editing && <MeetingRoomEditor client={client} room={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} />}
+    {editing && <MeetingRoomEditor client={client} user={user} room={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} />}
     {booking && <MeetingBookingDialog client={client} user={user} room={booking} onClose={() => setBooking(null)} />}
     {deleting && <RecordDeleteDialog name={deleting.name} version={deleting.versionNumber} operation={deletion}
       description="仅可删除没有预约记录的会议室。已有历史的会议室可在编辑窗口中停用。"

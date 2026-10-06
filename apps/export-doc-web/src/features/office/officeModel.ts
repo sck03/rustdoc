@@ -34,7 +34,7 @@ export function officeAccess(user: ApiUserDto, kind: OfficeKind) {
       const value = scope(action);
       if (!["own", "department", "company", "all"].includes(value)) return false;
       if (!row) return true;
-      if (!isMeetingBooking(row) && row.handlingKey && ["issue", "return"].includes(action)) return row.canHandle === true;
+      if (row.handlingKey && ["issue", "return"].includes(action)) return row.canHandle === true;
       if (value === "own") return row.ownerUserId === user.id;
       if (value === "department") return Boolean(user.departmentId) && row.departmentId === user.departmentId;
       return true;
@@ -110,7 +110,8 @@ export function shiftOfficeBookingEnd(start: string, timeZone: string) {
 export function readMeetingRoomForm(form: FormData, version: number): MeetingRoomSaveRequest {
   return { name: String(form.get("name") ?? ""), location: String(form.get("location") ?? ""), equipment: String(form.get("equipment") ?? ""),
     capacity: Number(form.get("capacity")), maximumBookingHours: Number(form.get("maximumBookingHours")),
-    advanceBookingDays: Number(form.get("advanceBookingDays")), requiresKey: form.has("requiresKey"), isActive: form.has("isActive"), expectedVersion: version };
+    advanceBookingDays: Number(form.get("advanceBookingDays")), requiresKey: form.has("requiresKey"), isActive: form.has("isActive"), expectedVersion: version,
+    handlingKey: String(form.get("handlingKey") ?? "") };
 }
 
 export function readOfficeSupplyForm(form: FormData, version: number): OfficeSupplySaveRequest {

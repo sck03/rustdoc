@@ -1,16 +1,16 @@
-use super::super::oa::{approval::authority, handling};
+use super::super::{handling, oa::approval::authority};
 use super::*;
 use export_doc_storage::NotificationScope;
 fn resource(kind: &str) -> Option<&'static str> {
-    if kind == "supply-requests" {
-        Some("office.supplies")
-    } else {
-        super::super::oa::approval::resource(kind)
+    match kind {
+        "supply-requests" => Some("office.supplies"),
+        "bookings" => Some("office.rooms"),
+        _ => super::super::oa::approval::resource(kind),
     }
 }
 fn viewable(tx: &Connection, actor: &Actor, resource: &str, row: &Value) -> Result<bool> {
-    if resource == "office.supplies" {
-        handling::supply_access(tx, actor, "view", row, false)
+    if matches!(resource, "office.supplies" | "office.rooms") {
+        handling::resource_access(tx, actor, resource, "view", row, false)
     } else {
         super::super::oa::viewable(tx, actor, resource, row)
     }
@@ -19,7 +19,7 @@ fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
     let mut result: Vec<_> = super::super::oa::KINDS
         .iter()
         .copied()
-        .chain(std::iter::once("supply-requests"))
+        .chain(["supply-requests", "bookings"])
         .flat_map(|kind| {
             let Some(resource) = resource(kind) else {
                 return vec![];
@@ -47,15 +47,20 @@ fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
             scopes
         })
         .collect();
-    for (kind, supply, states) in [
-        ("oa-general", false, handling::GENERAL_STATES),
-        ("supply-requests", true, handling::SUPPLY_STATES),
+    for (kind, resource, states) in [
+        ("oa-general", "office.general", handling::GENERAL_STATES),
+        (
+            "supply-requests",
+            "office.supplies",
+            handling::SUPPLY_STATES,
+        ),
+        ("bookings", "office.rooms", handling::ROOM_STATES),
     ] {
         result.push(NotificationScope {
             kind: kind.into(),
             rank: 3,
             statuses: states.iter().map(|s| (*s).into()).collect(),
-            handling_keys: Some(handling::keys(tx, actor, supply)?),
+            handling_keys: Some(handling::keys(tx, actor, resource)?),
         });
     }
     Ok(result)
@@ -164,16 +169,19 @@ pub(in crate::engine) fn on_event(
             | "complete"
             | "void"
             | "reassign"
+            | "issue"
+            | "return"
+            | "cancel"
     ) {
         return Ok(());
     }
     let mut offset = 0;
-    let completion = action == "approve"
-        && row["status"] == "Approved"
-        && !matches!(row["kind"].as_str(), Some("general" | "supply"));
+    let resource_request = matches!(row["kind"].as_str(), Some("supply" | "room"));
+    let assigned_request = resource_request || row["kind"] == "general";
+    let completion = action == "approve" && row["status"] == "Approved" && !assigned_request;
     let handling = matches!(action.as_str(), "approve" | "reassign")
-        && (row["status"] == "Approved" || action == "reassign" && row["status"] == "Issued")
-        && matches!(row["kind"].as_str(), Some("general" | "supply"));
+        && handling::outstanding(row)
+        && assigned_request;
     let review = matches!(action.as_str(), "submit" | "approve-step" | "remind");
     let distribution = review || completion || handling;
     let resource = text(meta, "resource");
@@ -219,12 +227,20 @@ pub(in crate::engine) fn on_event(
             {
                 continue;
             }
-            if review && authority(tx, &recipient, row)?.is_none() {
-                continue;
+            if review {
+                let can_review = if resource_request {
+                    recipient.id != row["ownerUserId"]
+                        && auth::visible(&recipient, &resource, "approve", row)
+                } else {
+                    authority(tx, &recipient, row)?.is_some()
+                };
+                if !can_review {
+                    continue;
+                }
             }
             if handling
                 && row["ownerUserId"] != id
-                && !handling::can_handle(tx, &recipient, row, row["kind"] == "supply")?
+                && !handling::can_handle(tx, &recipient, row, &resource)?
             {
                 continue;
             }
@@ -237,7 +253,7 @@ pub(in crate::engine) fn on_event(
                 tx,
                 "site-notification",
                 0,
-                json!({"identity":identity,"eventId":event["id"],"requestId":row["id"],"requestKind":if row["kind"] == "supply" {"supply-requests".into()} else {format!("oa-{}",text(row,"kind"))},"title":row["title"],"action":action,"status":"Unread","readAt":""}),
+                json!({"identity":identity,"eventId":event["id"],"requestId":row["id"],"requestKind":match row["kind"].as_str() { Some("supply") => "supply-requests".into(), Some("room") => "bookings".into(), _ => format!("oa-{}",text(row,"kind")) },"title":row["title"],"action":action,"status":"Unread","readAt":""}),
                 Some(identity),
                 actor,
                 "notify",

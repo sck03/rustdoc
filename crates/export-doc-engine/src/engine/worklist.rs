@@ -44,8 +44,8 @@ fn rows(
     for record in store::all(tx, kind)? {
         let mut visible = !office || record["companyScope"] == actor.company;
         for action in actions {
-            visible &= if resource == "office.supplies" {
-                super::oa::handling::supply_access(tx, actor, action, &record, false)?
+            visible &= if matches!(resource, "office.supplies" | "office.rooms") {
+                super::handling::resource_access(tx, actor, resource, action, &record, false)?
             } else {
                 auth::visible(actor, resource, action, &record)
             };
@@ -188,11 +188,12 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
                 "待结束使用／归还钥匙",
             ),
         ] {
-            let rows = meetings
-                .iter()
-                .filter(|r| {
-                    (mine(r)
-                        || auth::visible(
+            let mut rows = vec![];
+            for r in &meetings {
+                if r["status"] == status
+                    && (mine(r)
+                        || super::handling::resource_access(
+                            tx,
                             actor,
                             "office.rooms",
                             if status == "Approved" {
@@ -201,20 +202,19 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
                                 "return"
                             },
                             r,
-                        ))
-                        && r["status"] == status
-                })
-                .map(|r| {
-                    item(
+                            false,
+                        )?)
+                {
+                    rows.push(item(
                         r,
                         text(r, "title"),
                         format!("{} · {description}", text(r, "applicantName")),
                         Value::Null,
                         Value::Null,
                         r[due].clone(),
-                    )
-                })
-                .collect();
+                    ));
+                }
+            }
             groups.push(Group { key, name, rows });
         }
     }
@@ -255,7 +255,21 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
         let mut collection = vec![];
         let mut returns = vec![];
         for r in &requests {
-            if !mine(r) && !super::oa::handling::can_handle(tx, actor, r, true)? {
+            let action = if r["status"] == "Approved" {
+                "issue"
+            } else {
+                "return"
+            };
+            if !mine(r)
+                && !super::handling::resource_access(
+                    tx,
+                    actor,
+                    "office.supplies",
+                    action,
+                    r,
+                    false,
+                )?
+            {
                 continue;
             }
             if !["Approved", "Issued"].contains(&text(r, "status").as_str()) {

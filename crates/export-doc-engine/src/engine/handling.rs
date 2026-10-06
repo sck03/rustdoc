@@ -1,16 +1,114 @@
 //! Company service ownership is independent of approval chains and stock transitions.
-use super::*;
+use super::{
+    auth,
+    error::{Result, conflict, invalid, unavailable},
+    records::{required, text},
+    store::{self, Actor},
+};
+use crate::contracts;
+use export_doc_storage::{Connection, RecordQuery};
+use serde_json::{Value, json};
 use std::collections::HashSet;
 
 pub(in crate::engine) const GENERAL_STATES: &[&str] = &["Approved", "Completed"];
 pub(in crate::engine) const SUPPLY_STATES: &[&str] = &["Approved", "Issued", "Returned"];
+pub(in crate::engine) const ROOM_STATES: &[&str] = &["Approved", "InUse", "Completed"];
+
+fn category_resource(category: &str) -> Result<&'static str> {
+    match category {
+        "Seal" | "Certificate" | "IT" | "Repair" | "Other" => Ok("office.general"),
+        "Supply" => Ok("office.supplies"),
+        "Room" => Ok("office.rooms"),
+        _ => Err(invalid("办理分工类别无效。")),
+    }
+}
+fn action(resource: &str) -> Result<&'static str> {
+    match resource {
+        "office.general" => Ok("complete"),
+        "office.supplies" | "office.rooms" => Ok("issue"),
+        _ => Err(invalid("不支持此模块的办理分工。")),
+    }
+}
+pub(super) fn states(resource: &str) -> Result<&'static [&'static str]> {
+    match resource {
+        "office.general" => Ok(GENERAL_STATES),
+        "office.supplies" => Ok(SUPPLY_STATES),
+        "office.rooms" => Ok(ROOM_STATES),
+        _ => Err(invalid("不支持此模块的办理分工。")),
+    }
+}
+pub(super) fn outstanding(row: &Value) -> bool {
+    row["status"] == "Approved"
+        || row["status"] == "InUse"
+        || row["status"] == "Issued" && row["isReturnable"] == true
+}
+pub(super) fn validate_resource(
+    tx: &Connection,
+    actor: &Actor,
+    kind: &str,
+    id: i64,
+    previous: &Value,
+    row: &mut Value,
+) -> Result<()> {
+    let (resource, requests, parent, category) = match kind {
+        "rooms" => ("office.rooms", "bookings", "meetingRoomId", "Room"),
+        "supplies" => (
+            "office.supplies",
+            "supply-requests",
+            "officeSupplyId",
+            "Supply",
+        ),
+        _ => return Err(invalid("未知行政资源。")),
+    };
+    let changed = text(row, "handlingKey") != text(previous, "handlingKey");
+    if id > 0 {
+        if !resource_access(tx, actor, resource, "edit", previous, true)? {
+            return Err(super::error::error(403, "只能维护本人负责的资源。"));
+        }
+        if (changed || row["isActive"] == false)
+            && store::all(tx, requests)?
+                .iter()
+                .any(|r| r[parent] == id && (r["status"] == "Pending" || outstanding(r)))
+        {
+            return Err(conflict(
+                "资源尚有未结申请，不能停用或更换分工；人员交接请修改原分工的办理人员。",
+            ));
+        }
+    }
+    if id == 0 || changed {
+        select(tx, actor, row, category, false)?;
+    } else {
+        row["handlingName"] = json!(text(previous, "handlingName"));
+    }
+    if !text(row, "handlingKey").is_empty() && !can_handle(tx, actor, row, resource)? {
+        return Err(super::error::error(403, "只能选择本人负责的资源分工。"));
+    }
+    Ok(())
+}
+
+pub(super) fn snapshot(
+    tx: &Connection,
+    actor: &Actor,
+    row: &mut Value,
+    source: &Value,
+    category: &str,
+    new: bool,
+) -> Result<()> {
+    for field in ["handlingKey", "handlingName"] {
+        row[field] = json!(text(source, field));
+    }
+    if new {
+        select(tx, actor, row, category, false)?;
+    }
+    Ok(())
+}
 
 pub(in crate::engine) fn services(tx: &Connection, company: &str) -> Result<Vec<Value>> {
-    let settings = super::settings::load(tx, company)?;
+    let settings = super::oa::settings::load(tx, company)?;
     match settings.get("handlingServices") {
         None => Ok(vec![]),
         Some(Value::Array(rows)) => Ok(rows.clone()),
-        _ => Err(super::super::error::unavailable("办理分工目录损坏。")),
+        _ => Err(unavailable("办理分工目录损坏。")),
     }
 }
 pub(in crate::engine) fn member(actor: &Actor, service: &Value) -> bool {
@@ -18,13 +116,12 @@ pub(in crate::engine) fn member(actor: &Actor, service: &Value) -> bool {
         .as_array()
         .is_some_and(|ids| ids.contains(&json!(actor.id)))
 }
-pub(in crate::engine) fn keys(tx: &Connection, actor: &Actor, supply: bool) -> Result<Vec<String>> {
-    let resource = if supply {
-        "office.supplies"
-    } else {
-        "office.general"
-    };
-    let action = if supply { "issue" } else { "complete" };
+pub(in crate::engine) fn keys(
+    tx: &Connection,
+    actor: &Actor,
+    resource: &str,
+) -> Result<Vec<String>> {
+    let action = action(resource)?;
     if auth::authorize(actor, resource, "view").is_err()
         || auth::authorize(actor, resource, action).is_err()
     {
@@ -32,7 +129,10 @@ pub(in crate::engine) fn keys(tx: &Connection, actor: &Actor, supply: bool) -> R
     }
     Ok(services(tx, &actor.company)?
         .iter()
-        .filter(|s| (s["category"] == "Supply") == supply && (actor.admin || member(actor, s)))
+        .filter(|s| {
+            category_resource(&text(s, "category")).ok() == Some(resource)
+                && (actor.admin || member(actor, s))
+        })
         .map(|s| text(s, "key"))
         .collect())
 }
@@ -43,55 +143,51 @@ pub(in crate::engine) fn can_handle(
     tx: &Connection,
     actor: &Actor,
     row: &Value,
-    supply: bool,
+    resource: &str,
 ) -> Result<bool> {
     if row["companyScope"] != actor.company {
         return Ok(false);
     }
-    let resource = if supply {
-        "office.supplies"
-    } else {
-        "office.general"
-    };
-    let action = if supply { "issue" } else { "complete" };
+    let action = action(resource)?;
     if text(row, "handlingKey").is_empty() {
         return Ok(auth::visible(actor, resource, action, row));
     }
-    Ok(assigned(&keys(tx, actor, supply)?, row))
+    Ok(assigned(&keys(tx, actor, resource)?, row))
 }
-pub(in crate::engine) fn supply_access(
+pub(in crate::engine) fn resource_access(
     tx: &Connection,
     actor: &Actor,
+    resource: &str,
     action: &str,
     row: &Value,
     directory: bool,
 ) -> Result<bool> {
-    if row["companyScope"] != actor.company
-        || auth::authorize(actor, "office.supplies", action).is_err()
-    {
+    if row["companyScope"] != actor.company || auth::authorize(actor, resource, action).is_err() {
         return Ok(false);
     }
-    let assigned = can_handle(tx, actor, row, true)?;
+    let assigned = can_handle(tx, actor, row, resource)?;
     if action == "view" {
-        return Ok(auth::visible(actor, "office.supplies", action, row)
-            || ((directory || SUPPLY_STATES.contains(&text(row, "status").as_str())) && assigned));
+        return Ok(auth::visible(actor, resource, action, row)
+            || ((directory || states(resource)?.contains(&text(row, "status").as_str()))
+                && assigned));
     }
     if !text(row, "handlingKey").is_empty()
         && matches!(action, "issue" | "return" | "restock" | "manage" | "edit")
     {
         return Ok(assigned);
     }
-    Ok(auth::visible(actor, "office.supplies", action, row))
+    Ok(auth::visible(actor, resource, action, row))
 }
-pub(in crate::engine) fn project_supply(
+pub(in crate::engine) fn project_resource(
     tx: &Connection,
     actor: &Actor,
+    resource: &str,
     mut row: Value,
 ) -> Result<Value> {
     for field in ["handlingKey", "handlingName"] {
         row[field] = json!(text(&row, field));
     }
-    row["canHandle"] = json!(can_handle(tx, actor, &row, true)?);
+    row["canHandle"] = json!(can_handle(tx, actor, &row, resource)?);
     row["handlerNames"] = json!(names(tx, actor, &row)?);
     Ok(row)
 }
@@ -105,9 +201,7 @@ pub(in crate::engine) fn select(
     let key = text(row, "handlingKey");
     if key.is_empty() {
         if required {
-            return Err(invalid(
-                "请选择已配置办理人员的具体印章、证明事项或物品组。",
-            ));
+            return Err(invalid("请选择已配置办理人员的事项或资源分工。"));
         }
         row["handlingName"] = json!("");
         return Ok(());
@@ -125,12 +219,7 @@ fn validate_handlers(tx: &Connection, actor: &Actor, service: &Value) -> Result<
         .as_array()
         .filter(|ids| !ids.is_empty() && ids.len() <= 10)
         .ok_or_else(|| invalid("每项分工须指定 1–10 位办理人员。"))?;
-    let supply = service["category"] == "Supply";
-    let resource = if supply {
-        "office.supplies"
-    } else {
-        "office.general"
-    };
+    let resource = category_resource(&text(service, "category"))?;
     let mut seen = HashSet::new();
     for id in ids {
         let id = id
@@ -140,7 +229,7 @@ fn validate_handlers(tx: &Connection, actor: &Actor, service: &Value) -> Result<
         let user = auth::current_actor_in(tx, id, actor.edition)?;
         if user.company != actor.company
             || auth::authorize(&user, resource, "view").is_err()
-            || auth::authorize(&user, resource, if supply { "issue" } else { "complete" }).is_err()
+            || auth::authorize(&user, resource, action(resource)?).is_err()
         {
             return Err(invalid(
                 "办理人员须为本公司启用账号，并具有相应查看及发放/完成登记权限；本人范围即可按分工办理。",
@@ -149,7 +238,7 @@ fn validate_handlers(tx: &Connection, actor: &Actor, service: &Value) -> Result<
     }
     Ok(())
 }
-pub(super) fn validate(
+pub(in crate::engine) fn validate(
     tx: &Connection,
     actor: &Actor,
     values: &Value,
@@ -165,7 +254,7 @@ pub(super) fn validate(
         required(row, "key", "分工编号", 100)?;
         required(row, "name", "事项或物品组名称", 100)?;
         let category = text(row, "category");
-        if !["Seal", "Certificate", "IT", "Repair", "Other", "Supply"].contains(&category.as_str())
+        if category_resource(&category).is_err()
             || !keys.insert(text(row, "key"))
             || !names.insert((category.clone(), store::normalize(&text(row, "name"))))
         {
@@ -180,7 +269,13 @@ pub(super) fn validate(
         {
             continue;
         }
-        for kind in ["oa-general", "supplies", "supply-requests"] {
+        for kind in [
+            "oa-general",
+            "supplies",
+            "supply-requests",
+            "rooms",
+            "bookings",
+        ] {
             if tx
                 .query_records(&RecordQuery {
                     kind,
@@ -211,7 +306,7 @@ pub(in crate::engine) fn names(tx: &Connection, actor: &Actor, row: &Value) -> R
                 tx,
                 "users",
                 id.as_i64()
-                    .ok_or_else(|| super::super::error::unavailable("办理人员编号损坏。"))?,
+                    .ok_or_else(|| unavailable("办理人员编号损坏。"))?,
             )?;
             names.push(format!(
                 "{}{}",
@@ -226,9 +321,14 @@ pub(in crate::engine) fn names(tx: &Connection, actor: &Actor, row: &Value) -> R
     }
     Ok(names.join("、"))
 }
-pub(super) fn directory(tx: &Connection, actor: &Actor, supply: bool) -> Result<Value> {
+pub(in crate::engine) fn directory(
+    tx: &Connection,
+    actor: &Actor,
+    resource: &str,
+) -> Result<Value> {
+    action(resource)?;
     let mut rows = services(tx, &actor.company)?;
-    rows.retain(|s| (s["category"] == "Supply") == supply);
+    rows.retain(|s| category_resource(&text(s, "category")).ok() == Some(resource));
     for row in &mut rows {
         row["handlerNames"] = json!(names(tx, actor, &json!({"handlingKey":row["key"]}))?);
     }

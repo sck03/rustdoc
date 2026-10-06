@@ -16,12 +16,13 @@ await require("esbuild").build({ stdin: { contents: `
   export * as oa from ${source("features/oa/oaModel.ts")};
   export * as personnel from ${source("features/office/personnelModel.ts")};
   export * as organization from ${source("features/organization/organizationModel.ts")};
+  export * as communication from ${source("features/communication/communicationModel.ts")};
   export * as navigation from ${source("app/workspaceNavigation.ts")};
   export { getDefaultWorkspaceRoute } from ${source("app/productEdition.ts")};
   export { isRouteAccessAllowed } from ${source("app/routeAccess.ts")};
   export { createRequestKey } from ${source("ui/createRequestKey.ts")};
 `, loader: "ts", resolveDir: web }, bundle: true, platform: "node", format: "esm", outfile: bundle, logLevel: "silent" });
-const { office, oa, personnel, organization, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey } = await import(pathToFileURL(bundle).href);
+const { office, oa, personnel, organization, communication, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey } = await import(pathToFileURL(bundle).href);
 const grants = scope => ["office.rooms", "office.supplies"].flatMap(resourceKey =>
   ["view", "create", "cancel", "approve", "issue", "return", "restock", "manage"].map(action => ({ resourceKey, action, dataScope: scope })));
 const user = { id: 1, companyScope: "C1", departmentId: "D1", businessDate: "2026-09-07",
@@ -116,6 +117,13 @@ const supplyRow = {id:8,officeSupplyId:2,ownerUserId:2,status:"Approved",handlin
 assert(!office.officeRequestActions(supplyRow,manager,"supplies").some(entry=>entry.action==="issue"),"company permission cannot bypass an explicit custodian");
 assert(office.officeRequestActions({...supplyRow,canHandle:true},user,"supplies").some(entry=>entry.action==="issue"),"a designated custodian can issue outside ordinary own scope");
 assert(!office.officeRequestActions({...supplyRow,status:"Issued",canHandle:true},manager,"supplies").some(entry=>entry.action==="return"),"consumable issue is terminal and offers no return action");
+const assignedRoom = { ...row, status: "Approved", handlingKey: "meeting", canHandle: true };
+assert.equal(communication.notificationLink({ requestKind: "bookings", requestId: 7 }), "/office/meeting-rooms?view=requests&requestId=7");
+assert(office.officeRequestActions(assignedRoom, user, "rooms").some(entry => entry.action === "issue"));
+assert(!office.officeRequestActions({ ...assignedRoom, canHandle: false }, manager, "rooms").some(entry => entry.action === "issue"));
+assert(office.officeRequestActions({ ...assignedRoom, status: "InUse" }, user, "rooms").some(entry => entry.action === "return"));
+const issueOnly = { ...user, capabilities: { ...user.capabilities, permissions: grants("own").filter(grant => grant.action !== "return") } };
+assert(!office.officeRequestActions({ ...assignedRoom, status: "InUse" }, issueOnly, "rooms").some(entry => entry.action === "return"), "being assigned does not grant unconfigured actions");
 const crypto = globalThis.crypto;
 try {
   Object.defineProperty(globalThis, "crypto", { configurable: true, value: { getRandomValues: crypto.getRandomValues.bind(crypto) } });

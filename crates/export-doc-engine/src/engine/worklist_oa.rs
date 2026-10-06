@@ -1,6 +1,9 @@
 //! One actionable queue per OA type; approval and fulfilment share their access checks.
 use super::*;
-use crate::engine::oa::{self, approval, handling};
+use crate::engine::{
+    handling,
+    oa::{self, approval},
+};
 
 pub(super) fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
     let mut groups = vec![];
@@ -24,7 +27,7 @@ pub(super) fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
             let own = row["ownerUserId"] == actor.id;
             let status = text(&row, "status");
             let complete = if kind == "oa-general" {
-                handling::can_handle(tx, actor, &row, false)?
+                handling::can_handle(tx, actor, &row, "office.general")?
             } else {
                 auth::visible(actor, resource, "complete", &row)
             };
@@ -35,6 +38,7 @@ pub(super) fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
                 "Pending" if approval::authority(tx, actor, &row)?.is_some() => "待我审批",
                 "Pending" if own => "等待审批，可催办或撤回",
                 "Approved" if complete => "待办理／验收／归档",
+                "Approved" if own => "已批准，等待办理／验收／归档",
                 _ => continue,
             };
             let date = if status == "Approved" {

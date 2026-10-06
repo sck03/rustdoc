@@ -88,7 +88,7 @@ pub(super) fn list(
         return Err(error(403, "没有有效的申请数据访问范围。"));
     }
     let (page, size) = paging(query)?;
-    let handling_keys = handling::keys(tx, actor, false)?;
+    let handling_keys = handling::keys(tx, actor, "office.general")?;
     let approvers = if approvals {
         approval::queue_approvers(tx, actor, &resource)?
     } else {

@@ -300,7 +300,12 @@ pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, empl
             "expense" => {
                 json!({"currency":"CNY","lines":[{"category":"Travel","spentOn":date,"description":"交通票据","amount":"0.10"},{"category":"Meals","spentOn":date,"description":"工作餐","amount":"0.20"}]})
             }
-            "travel" => json!({"travel":{"destination":"上海","startsOn":date,"endsOn":date}}),
+            "travel" => {
+                let travel_date = (chrono::Utc::now() - chrono::Duration::days(2))
+                    .date_naive()
+                    .to_string();
+                json!({"travel":{"destination":"上海","startsOn":travel_date,"endsOn":travel_date}})
+            }
             "purchase" => {
                 json!({"currency":"CNY","purchaseLines":[{"name":"办公纸","quantity":"2","unit":"包","unitPrice":"18.25"}]})
             }
@@ -492,6 +497,15 @@ pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, empl
             Some(409)
         );
         row = responses.into_iter().find_map(Result::ok).unwrap();
+        let waiting = call(service, applicant, GET_WORKLIST, 0, None).unwrap();
+        assert!(
+            waiting["page"]["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|item| item["recordId"] == id),
+            "approved {kind} stays visible to its applicant until actual completion"
+        );
         row = if kind == "expense" {
             receive_expense(service, admin, &finance, &row)
         } else {
@@ -505,6 +519,43 @@ pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, empl
                 "Completed"
             }
         );
+        let finished = call(service, applicant, GET_WORKLIST, 0, None).unwrap();
+        assert!(
+            !finished["page"]["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|item| item["recordId"] == id),
+            "finished {kind} leaves the applicant worklist"
+        );
+        if matches!(kind, "leave" | "travel" | "overtime") {
+            let mut duplicate = json!({"requestKey":nonce().unwrap(),"employeeId":employee,"title":"重复已完成时段","reason":"已销假或确认完成不应允许重复登记相同时段"});
+            duplicate
+                .as_object_mut()
+                .unwrap()
+                .extend(details.as_object().unwrap().clone());
+            let duplicate = call(
+                service,
+                applicant,
+                operation(kind, "create"),
+                0,
+                Some(duplicate),
+            )
+            .unwrap();
+            assert_eq!(
+                call(
+                    service,
+                    applicant,
+                    operation(kind, "submit"),
+                    duplicate["id"].as_i64().unwrap(),
+                    Some(json!({"expectedVersion":duplicate["versionNumber"]}))
+                )
+                .unwrap_err()
+                .status,
+                Some(409)
+            );
+            act(service, applicant, kind, "cancel", &duplicate);
+        }
         let events = call(service, applicant, operation(kind, "history"), id, None).unwrap();
         assert_eq!(
             events["items"]

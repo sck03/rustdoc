@@ -4,7 +4,7 @@ use export_doc_domain::approval::{ApprovalMode, delegation_window};
 use std::collections::HashSet;
 
 const STORAGE_KIND: &str = "oa-approval-settings";
-pub(super) fn load(tx: &Connection, company: &str) -> Result<Value> {
+pub(in crate::engine) fn load(tx: &Connection, company: &str) -> Result<Value> {
     Ok(tx.find_identity(STORAGE_KIND, &store::normalize(company))?.unwrap_or_else(|| {
         json!({"versionNumber":0,"rules":KINDS.iter().map(|kind| json!({"kind":kind.trim_start_matches("oa-"),"mode":"Single","approverUserIds":[]})).collect::<Vec<_>>(),"delegations":[]})
     }))
@@ -120,7 +120,7 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
             .ok_or_else(|| invalid("办理分工必须为对象。"))?
             .remove("handlerNames");
     }
-    super::handling::validate(tx, actor, &services, &previous["handlingServices"])?;
+    handling::validate(tx, actor, &services, &previous["handlingServices"])?;
     value["handlingServices"] = services;
     value["versionNumber"] = previous["versionNumber"].clone();
     let saved = store::save(

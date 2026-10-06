@@ -26,7 +26,7 @@ pub(super) fn notify(
     if changed.is_empty() {
         return Ok(());
     }
-    for kind in ["oa-general", "supply-requests"] {
+    for kind in ["oa-general", "supply-requests", "bookings"] {
         let mut offset = 0;
         loop {
             crate::operation::check()?;
@@ -38,12 +38,7 @@ pub(super) fn notify(
                 ..Default::default()
             })?;
             for row in rows {
-                if !handling::assigned(&changed, &row)
-                    || !(row["status"] == "Approved"
-                        || kind == "supply-requests"
-                            && row["status"] == "Issued"
-                            && row["isReturnable"] == true)
-                {
+                if !handling::assigned(&changed, &row) || !handling::outstanding(&row) {
                     continue;
                 }
                 let note = format!("办理分工交接至：{}", handling::names(tx, actor, &row)?);

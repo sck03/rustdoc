@@ -2,6 +2,8 @@
 use super::oa_contract::{call, operation};
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
+#[path = "handling_resources.rs"]
+mod resources;
 
 fn list(service: &NativeService, token: &str, op: Operation, query: &[(&str, String)]) -> Value {
     let result =
@@ -56,6 +58,9 @@ pub fn exercise(service: &NativeService, root: &str) {
                 {"resourceKey":"office.supplies","action":"issue","dataScope":"own"},
                 {"resourceKey":"office.supplies","action":"return","dataScope":"own"},
                 {"resourceKey":"office.supplies","action":"restock","dataScope":"own"},
+                {"resourceKey":"office.rooms","action":"view","dataScope":"own"},
+                {"resourceKey":"office.rooms","action":"issue","dataScope":"own"},
+                {"resourceKey":"office.rooms","action":"return","dataScope":"own"},
                 {"resourceKey":"office.notifications","action":"view","dataScope":"own"}
             ]);
         }
@@ -339,10 +344,28 @@ pub fn exercise(service: &NativeService, root: &str) {
         }
         assert_eq!(request["status"], "Returned");
         assert_eq!(
+            list(
+                service,
+                handler,
+                LIST_OFFICE_SUPPLY_REQUESTS,
+                &[("handlingOnly", "true".into())]
+            )["totalCount"],
+            0,
+            "completed returns must leave the unfiltered handling queue"
+        );
+        assert_eq!(
             list(service, handler, LIST_OFFICE_SUPPLY_REQUESTS, &query)["totalCount"],
             0
         );
     }
+    resources::exercise(
+        service,
+        [&admin, &applicant, &seal, &supplies, &leader],
+        &users,
+        person_id,
+        &mut policy,
+        local,
+    );
     // Referenced categories cannot disappear or silently change meaning.
     policy["handlingServices"] = json!([]);
     policy["expectedVersion"] = policy["versionNumber"].clone();
