@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ApiSupplierProductLinkDto, ApiSupplierProductOptionDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -10,6 +10,7 @@ import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { FormGuidance } from "../../ui/PageState.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 export function SupplierProductLinksPanel({
   client,
@@ -40,7 +41,7 @@ export function SupplierProductLinksPanel({
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
   const [view, setView] = useState<"directory" | "editor">("directory");
   const [draftDirty, setDraftDirty] = useState(false);
-  const productSearchController = useRef<AbortController | null>(null);
+  const runProductSearch = useAbortableOperation(supplierId, { cancelPrevious: true });
   const selected = links.find((item) => item.id === selectedId);
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: draftDirty,
@@ -67,23 +68,26 @@ export function SupplierProductLinksPanel({
     setSelectedId(preferred && rows.some((item) => item.id === preferred.id) ? preferred.id : 0);
   }
 
-  async function searchProducts(searchKeyword = keyword, signal?: AbortSignal) {
-    const result = await client.searchSupplierProductOptions(
-      { keyword: searchKeyword.trim(), pageNumber: 1, pageSize: 100 },
-      { signal },
-    );
-    if (!signal?.aborted) {
+  async function searchProducts(searchKeyword = keyword) {
+    try {
+      const result = await runProductSearch(signal => client.searchSupplierProductOptions(
+        { keyword: searchKeyword.trim(), pageNumber: 1, pageSize: 100 }, { signal },
+      ));
       setOptions(result.items);
       setProductOptionTotal(result.totalCount);
+    } catch (error) {
+      if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
     }
   }
+
+  useEffect(() => { void searchProducts(""); }, [client, supplierId]);
 
   useEffect(() => {
     setFeedback(null);
     setDraftDirty(false);
     setView("directory");
     const controller = new AbortController();
-    void Promise.all([loadLinks(undefined, controller.signal), searchProducts("", controller.signal)])
+    void loadLinks(undefined, controller.signal)
       .catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); });
     return () => controller.abort();
   }, [client, linkPageNumber, linkPageSize, supplierId]);
@@ -192,7 +196,7 @@ export function SupplierProductLinksPanel({
       <fieldset className="permission-fieldset form-field-wide" disabled={!canEdit} onChangeCapture={(event) => {
         if (!(event.target instanceof Element) || !event.target.closest("[data-draft-ignore]")) setDraftDirty(true);
       }}>
-      <label className="form-field-wide">查找产品<div className="toolbar" data-draft-ignore><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="输入产品货号或名称" /><button className="secondary-button" type="button" onClick={() => { productSearchController.current?.abort(); const controller = new AbortController(); productSearchController.current = controller; void searchProducts(keyword, controller.signal).catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); }); }}>查找</button></div>{productOptionTotal > options.length ? <small>匹配 {productOptionTotal} 项，当前显示前 {options.length} 项；请继续输入货号或名称缩小范围。</small> : null}</label>
+      <label className="form-field-wide">查找产品<div className="toolbar" data-draft-ignore><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="输入产品货号或名称" /><button className="secondary-button" type="button" onClick={() => void searchProducts()}>查找</button></div>{productOptionTotal > options.length ? <small>匹配 {productOptionTotal} 项，当前显示前 {options.length} 项；请继续输入货号或名称缩小范围。</small> : null}</label>
       <label className="form-field-wide">产品<select name="productId" required defaultValue={selected?.productId ?? ""}><option value="">请选择产品</option>{productOptions.map((item) => <option key={item.id} value={item.id}>{item.productCode || "无货号"} · {item.nameCN || item.nameEN || "未命名"}</option>)}</select></label>
       <label>供应商货号<input name="supplierProductCode" defaultValue={selected?.supplierProductCode} /></label>
       <label>参考价<input name="referencePrice" type="number" min="0" step="0.0001" defaultValue={selected?.referencePrice ?? 0} /></label>

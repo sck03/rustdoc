@@ -4,7 +4,7 @@ export function isAbortError(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && "name" in error && (error as { name?: unknown }).name === "AbortError");
 }
 
-export function useAbortableOperation(scope?: unknown) {
+export function useAbortableOperation(scope?: unknown, { cancelPrevious = false } = {}) {
   const activeControllers = useRef(new Set<AbortController>());
 
   useEffect(() => () => {
@@ -13,6 +13,7 @@ export function useAbortableOperation(scope?: unknown) {
   }, [scope]);
 
   return useCallback(async <T>(operation: (signal: AbortSignal) => Promise<T>) => {
+    if (cancelPrevious) activeControllers.current.forEach((controller) => controller.abort());
     const controller = new AbortController();
     activeControllers.current.add(controller);
     try {
@@ -22,5 +23,5 @@ export function useAbortableOperation(scope?: unknown) {
       // Ignore both late success and late failure from operations that cannot cancel.
       controller.signal.throwIfAborted();
     }
-  }, []);
+  }, [cancelPrevious]);
 }

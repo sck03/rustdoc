@@ -153,6 +153,8 @@ try {
   await open("/tools/excel"); await waitFor("document.querySelector('.job-excel-grid')");
   assert.equal(await read("window.__calls.some(c=>c.name==='invoices')"), false); assert(await read("Boolean(document.querySelector('.job-excel-grid a[href=\"#/invoices\"]'))")); await audit("excel-context-shortcut");
   await open("/invoices"); await waitFor("document.querySelector('[aria-label=\"选择发票 INV-1\"]')");
+  await input('.page-size-control select', "20");
+  await waitFor("!document.querySelector('.page-size-control select').disabled && document.querySelectorAll('tbody tr').length === 20");
   await read("document.querySelector('[aria-label=\"选择发票 INV-1\"]').click()"); await clickText("下一页"); await waitFor("document.querySelector('[aria-label=\"选择发票 INV-21\"]')");
   await read("document.querySelector('[aria-label=\"选择发票 INV-21\"]').click()"); await clickText("生成批量报表");
   await waitFor("document.querySelector('[aria-label=\"批量报表 ZIP 任务\"] button[type=submit]')?.disabled===false");

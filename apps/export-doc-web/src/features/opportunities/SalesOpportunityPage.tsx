@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { readRouteId } from "../../ui/routeQueryState.ts";
@@ -20,6 +20,7 @@ import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { formatBusinessDateTime } from "../../ui/businessTime.ts";
+import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 const stages = ["线索", "需求确认", "已报价", "谈判中", "已成交", "已失单"];
 const opportunityTabsId = "sales-opportunity-workspace";
@@ -53,8 +54,8 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
   const [history, setHistory] = useState<ApiSalesOpportunityHistoryDto[]>([]);
   const view = readOpportunityView(searchParams.get("view"));
   const [draftDirty, setDraftDirty] = useState(false);
-  const customerSearchController = useRef<AbortController | null>(null);
-  const productSearchController = useRef<AbortController | null>(null);
+  const runCustomerSearch = useAbortableOperation(client, { cancelPrevious: true });
+  const runProductSearch = useAbortableOperation(client, { cancelPrevious: true });
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: draftDirty,
     message: "当前商机有未保存的修改。",
@@ -92,42 +93,25 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
   );
   const page = pageQuery.data ?? null;
 
-  async function loadCustomerOptions(searchKeyword: string, signal?: AbortSignal) {
-    const result = await client.queryCrmCustomers({ keyword: searchKeyword.trim(), status: "", pageNumber: 1, pageSize: 100 }, { signal });
-    if (signal?.aborted) return;
-    setCustomers(result.items);
-    setCustomerOptionTotal(result.totalCount);
+  async function searchCustomers(searchKeyword = customerKeyword) {
+    try {
+      const result = await runCustomerSearch(signal => client.queryCrmCustomers({ keyword: searchKeyword.trim(), status: "", pageNumber: 1, pageSize: 100 }, { signal }));
+      setCustomers(result.items);
+      setCustomerOptionTotal(result.totalCount);
+    } catch (error) { if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error))); }
   }
 
-  async function loadProductOptions(searchKeyword: string, signal?: AbortSignal) {
-    const result = await client.listProducts({ keyword: searchKeyword.trim(), pageNumber: 1, pageSize: 100 }, { signal });
-    if (!signal?.aborted) {
+  async function searchProducts(searchKeyword = productKeyword) {
+    try {
+      const result = await runProductSearch(signal => client.listProducts({ keyword: searchKeyword.trim(), pageNumber: 1, pageSize: 100 }, { signal }));
       setProducts(result.items);
       setProductOptionTotal(result.totalCount);
-    }
-  }
-
-  async function searchCustomers() {
-    customerSearchController.current?.abort();
-    const controller = new AbortController();
-    customerSearchController.current = controller;
-    try { await loadCustomerOptions(customerKeyword, controller.signal); }
-    catch (error) { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); }
-  }
-
-  async function searchProducts() {
-    productSearchController.current?.abort();
-    const controller = new AbortController();
-    productSearchController.current = controller;
-    try { await loadProductOptions(productKeyword, controller.signal); }
-    catch (error) { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); }
+    } catch (error) { if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error))); }
   }
 
   useEffect(() => {
-    const controller = new AbortController();
-    void Promise.all([loadCustomerOptions("", controller.signal), loadProductOptions("", controller.signal)])
-      .catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); });
-    return () => controller.abort();
+    void searchCustomers("");
+    void searchProducts("");
   }, [client]);
   useEffect(() => {
     if (!selected) { setHistory([]); return; }
