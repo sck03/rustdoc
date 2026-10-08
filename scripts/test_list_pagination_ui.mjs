@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { locateChromeForTesting } from './lib/report-regression-common.mjs';
+import { locateChromeForTesting } from './lib/chromium-executable.mjs';
 
 const repo = path.resolve(import.meta.dirname, '..');
 const web = path.join(repo, 'apps/export-doc-web');

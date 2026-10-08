@@ -15,6 +15,19 @@
 
 普通用户只运行 `scripts/` 根入口；`lib/`、`prepare-*`、`verify-*`、`assert-*` 为内部组合部件。
 
+### 维护文件分工
+
+| 位置/命名 | 当前用途 |
+| --- | --- |
+| 根部 build/run/package 入口 | 用户构建、启动与打包；cmd 复用统一 PowerShell 宿主 |
+| `lib/` | 构建、受管路径、部署生命周期、浏览器会话和界面场景等共享实现，不直接运行 |
+| `github/` | 仓库初始化、公开源码检查及正式发布/镜像提升，仍被工作流引用 |
+| `baselines/` | 源码与样式规模门禁，属于版本控制输入，不是临时测试报告 |
+| `test_*`、`verify-*` | 模型、真实界面、平台与工程验证；不是安装运行依赖 |
+| `prepare-*`、`provision-*` | 从中央清单准备并校验受管资源，供构建/发布复用 |
+
+2026-10-08 移除四个旧 HTML 报表 visual/pdf/pdf-pixels/print-pixels 入口及其专用阈值和解析代码：它们将 .dtpl 当 HTML 读取，不能验证当前 Rust 输出。现用浏览器定位保留在 `lib/chromium-executable.mjs`，业务资料 PDF 查看器会话仍保留。原 HTML 对照夹具不作为运行模板。
+
 `build-native.ps1 -PreflightOnly -NoPause` 只检查 Rust、Node、curl 等构建工具。`-Configuration Debug` 用于联调，默认 Release。`-RustTarget` 明确目标架构；`-Bundles nsis`、`-Bundles deb,appimage` 或 `-Bundles app,dmg` 生成对应平台安装／应用包。安装器需要对应平台工具链。
 
 `-SkipBuild` 只整理已经构建好的相同 profile／target 二进制与资源。Document 正式包默认包含 OCR；`-WithoutOcr` 仅生成明确不提供文字识别的轻量验收包，不能用它代替完整单证版验收。网页/Docker Full 继续包含 OCR。
@@ -137,7 +150,9 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 
 发票印章与模板预览回归复用该隔离宿主：先构建 React 和 `office_review`，再运行 `node scripts/test_invoice_report_ui.mjs`，验证无出口商关联的上传按钮、图片保存回读及样例/真实单据的原生排版。
 
-文档整理后运行 `node scripts/verify-documentation-links.mjs`，检查 docs、根 README 和本页的本地文件链接；当前入口不应引用已退役的文档或工作流。
+付款模板和真实 PDF 使用 `npm --prefix apps/export-doc-web run test:payment-printing-ui`，发票使用 `test:invoice-report-ui`；两者均要求先完成 React build 和 `cargo build --locked -p export-doc-server --example office_review`。付款回归覆盖个人模板、权限、预览失效、保存/取消和下载，生成的 PDF 仍须检查真实票面。
+
+文档整理后运行 `node scripts/verify-documentation-links.mjs`，检查 docs 及各说明入口的本地文件链接；当前入口不应引用已退役的文档或工作流。
 
 按用户要求先集中完成一批页面、后端和操作，再统一联调与最终门禁。开发中只做必要编译和针对失败的回归。
 

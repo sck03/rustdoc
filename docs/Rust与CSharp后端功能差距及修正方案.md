@@ -1,308 +1,67 @@
-# Rust 对照原版 C#/.NET 10 后端功能差距及修正方案
+# Rust 后端差距与持续改进
 
-> 首次盘点：2026-09-20；状态更新：2026-09-21。第 1 节提交与前端数量为首次盘点历史，现状以更新后的条目及当前事实为准。原版以只读备份分支 `origin/tauri-csharp-net10-backup` 为准；界面、字段含义、业务规则及操作顺序按原版恢复，运行架构遵守 Tauri 2 + React + Rust 的现行约定。用户在本次盘点中进一步确认：**Rust 报表继续采用 krilla + PDFium 联动方案。**
+> 2026-10-08 按当前源码与已记录验收整理。C# 对照来源为 `origin/tauri-csharp-net10-backup`，固定对照提交 `ba9dbdc`；2026-09-20 首次盘点、候选依赖比较和旧实施顺序见 [Git 历史](https://github.com/sck03/rustdoc/blob/b44fbb6/docs/Rust与CSharp后端功能差距及修正方案.md)。当前事实只维护在[架构事实](./当前架构事实.md)，测试数字只进入带日期的[进度](./程序改进重构进度文档.md)。
 
-## 2026-09-30 整体架构复核（2026-10-01 实施更新）
+## 1. 继续维护模块化单体
 
-当前适合继续维护为**模块化单体**：React 共用界面，Tauri/HTTP 为宿主与传输边界，Domain 管纯业务规则，engine 编排用例，storage 管 SQL/事务，报表、Excel、OCR、邮件等按 crate/feature 隔离。Rust + React + PostgreSQL 18 是现代技术基础；架构成熟度取决于数据正确性、故障恢复、容量和实际交付证据，不由容器数量或微服务数量决定。目前适合单 API 的团队应用，不能宣称已完成大规模或高可用验收。
+React 共用界面；Tauri/HTTP 负责宿主与传输，Domain 负责纯规则，Engine 编排授权和用例，Storage 管理 SQL/事务，Excel、报表、HS、邮件等按 crate/feature 隔离。当前部署是单 API、多浏览器与 PostgreSQL 18，桌面使用 SQLite。
 
-| 优先级 | 源码证据与结论 | 改进与验收边界 |
+连接池不等于多 API 高可用。未经容量与可用性需求确认，不引入 Redis、消息队列、第二业务库或微服务，不直接放开实例锁。新功能优先扩展已有边界，避免复制协议、解析器或查询规则。
+
+## 2. 已有实现与继续验收的区别
+
+| 领域 | 已有实现 | 仍需独立验证 |
 | --- | --- | --- |
-| 本批修复 | 原 Compose 依赖可能在旧 API 持实例锁时启动初始化；普通启动与恢复重复编排 | 统一在 `scripts/lib/native-docker-lifecycle.ps1` 停 API、运行独立维护进程、成功后启动；SQL 仍在 storage；失败中止、实库锁与容器恢复分别验证 |
-| P1：查询规模 | 通用资源列表、模板目录/历史和任务查询已使用 storage 类型化查询；按正式响应投影字段，权限和筛选在分页前执行，计数与当前页使用同一快照 | 6→7 追加查询索引和受管函数；任务编号使用唯一身份查询，恢复只扫描活动任务，清理分批删除到期或超额记录。两端验证权限、精确数值、缺省/null、跨页和升级回滚；专门的统计、解析及业务聚合继续属于各自模块 |
-| P1：容量基线 | PostgreSQL 默认 4 个业务连接，共用独立实例锁；读取并行，事务写入保留协调和当前权限复核。HTTP 16 个执行名额加 16 个公平等待名额，等待和取消均有边界 | 用户确认按 20 会话的查询、保存、审批、PDF 混合负载比较 1/4 连接，记录吞吐、P95/P99、内存、等待与拒绝。实际数字见进度；本机匿名 Debug 负载不构成生产 SLA，也不把连接池视为多 API 高可用 |
-| P1：运维证据 | 已增加管理员指标 API、服务器生成的请求关联号、脱敏轮转日志、HTTP/数据库等待与耗时、失败/拒绝和任务计数 | 实例锁连接和业务连接分别在隔离 PostgreSQL 中终止，检查拒绝继续办理、已提交数据保留、未提交事务回滚和重建池耗时；升级失败、损坏备份及跨根恢复沿用实库回归。物理设备、真实磁盘满和生产备份频率下的 RPO/RTO 仍须部署方演练 |
-| P2：业务类型与契约 | Domain 已隔离基础设施，但 engine/storage 仍广泛使用 `serde_json::Value`；OpenAPI 保留冻结基线并生成客户端 | 按业务模块逐步让内部命令/查询使用明确类型，在边界转换 DTO；单据/OA 等 JSON 存储如需表或索引调整，追加事务迁移，保留原数据；不同时改造全部业务或新增第二套 API |
-| P2：多实例与高可用 | PostgreSQL advisory lock 明确只允许一个 API；文件任务、下载票据、敏感操作票据及本地受管目录含进程/实例状态 | 只有容量/可用性要求确认后，统一设计任务归属、共享文件、票据/会话及恢复锁。不能直接放开实例锁、增加 replicas，或只加连接池就宣称高可用 |
-| 持续验收 | Cargo feature 已分离桌面/服务端能力，共用 React 与 Rust 报表；共享业务未全部按产品从二进制剔除 | 继续按正式 Document/Sales、Full 团队和各 OS/架构做真实启动/输入/输出验收；依赖升级独立审查，避免用大规模重写代替已存在的功能验证 |
+| 通用查询 Q01 | 资源、模板目录/历史、任务的权限/过滤/排序/计数/分页下推 Storage，schema 7 保留数据迁移 | 待办汇总、部分行政和单一窗口专用列表仍有应用层过滤；按实际数据量优化，不宣称所有查询已下推 |
+| 容量与运维 | PostgreSQL 有界池、HTTP 公平等待、请求关联号、脱敏轮转日志与管理员指标；有本机混合负载和断连演练记录 | 生产容量、真实磁盘满、设备故障、备份频率下的 RPO/RTO 与多实例设计 |
+| 模板入口 | 六份 .dtpl、统一身份、文件锁/回滚、个人/共享权限、版本、图片引用与默认项 | 全部客户模板、复杂组合/长行/跨页、实体打印与其它平台 |
+| PDF | Rust 实际测量与分页、krilla 编码、pdfium-render worker | 绑定/API feature/原生资源各目标的完整实跑；SVG 预览不等于实际 PDF 页图预览 |
+| 备份恢复 | HTTPS/chunked WebDAV、流式下载与清理，SQLite 灾备及 PostgreSQL 独立维护恢复 | 真实 WebDAV 服务、断传/证书、生产备份恢复和目标设备演练 |
+| 权限与并发 | 生成 endpoint metadata、授权/许可证检查、事务内复核、会话撤销及图片/附件归属 | 各岗位×动作×数据范围的完整业务验收，不能只看菜单或路由存在 |
+| 行政/OA | 六类申请、分步/代理审批、办理分工、财务接收、通知、人员交接与 Office 附件 | 金额条件分支、自动催办、全文检索、薪酬/总账/WMS 未实现；现场流程另验 |
+| 单一窗口 | 源草稿、手工锁定、XML、schema 4.0 认证交接包、受管本机档案与回执 | 官方卡/客户端、签名、真实回执变体和企业多卡流程；详见[设计](./单一窗口对接代码级设计.md) |
 
-现阶段继续维护模块化单体，不引入 Redis、消息队列、第二业务数据库或微服务。通用查询、连接池与运维指标已按上述边界实施；其余 P2 和逐页功能按各自证据推进。部署拓扑、配置、更新/恢复与 PG 主版本边界见[脚本说明](../scripts/README.md)，实际验证统一见[进度](./程序改进重构进度文档.md)。
+已有定向测试或本机运行记录，不等于所有场景和平台全部通过。旧计划中的“替换手写 PDFium”“六份默认模板尚未转换”“WebDAV 只支持 HTTP”“通用模板分页全部未实现”均不再作为现行待办。
 
-## 2026-09-23 复核更新
+## 3. 明确的后续改进
 
-2026-09-29 多用户和附件专项复核：修正通用保存合并额外 JSON 字段、排队写入继续使用旧权限快照、人员改名/调岗/离职没有同步账号、编辑档案丢失头像标记、跨公司管理员上传业务附件时子记录归属取错公司等问题。登录不再把密码校验期间已变化的账号签发为新会话，续期不更新旧会话的授权版本。新增人员 PDF/图片文档，员工档案及六类申请支持填表选文件、一次点击保存、部分失败保留和重复请求去重。接口与客户端由同一 OpenAPI 生成，复用现有业务库，未引入新数据库或桌面形态。
-
-2026-09-30 审批现状更新：六类 OA 已提供单步、指定人员和部门负责人逐级审批、限时直接代理、手动催办、事务内通知与报销财务接收；受控附件已支持 PDF/PNG/JPEG、DOC/DOCX、XLS/XLSX。具体边界以[行政与人事](./公司行政协作设计与验收.md)为准，旧条目中的“仍为单步”“Word/Excel 未实现”不再作为当前待办。金额条件分支、后台自动催办、附件全文检索和按组织保留期限仍未实现。整体规模仍需逐步下推旧列表/历史查询，实测并发容量后再决定连接池和多实例方案。
-
-编号边界复核：现有人员工号使用 `UNIQUE(kind, identity)`，实际在整套系统内唯一；原表单“公司内唯一”说明不准确，已修正。多公司可使用公司前缀区分工号。如果需要不同公司使用相同工号，应独立追加有序的数据迁移、冲突检查和存量编号回归，不能只修改新记录的键而留下两套身份规则。
-
-2026-09-25 继续检查并修复：SQLite 灾备启动执行、包清单校验、备份任务下载与递归入库膨胀、PostgreSQL 维护连接/实例锁/事务还原/业务权限修复、迁移包主密钥和用户模板、下载票据的浏览器会话绑定，以及前后端备份参数错位。业务入口补齐生成契约的许可证门禁，修正无效授权回落试用与到期注册成功的错误；更新 IPC 增加管理员会话复核。设计器新增自由商品字段，继续保留普通表格、边框和高级组合排版。平台实跑与剩余限制以本批进度为准。
-
-本轮接续六份 `.dtpl`、可选 PO/款号和首/续/末页排版，补齐文件模板并发锁、目录回滚、模板包默认引用往返及文件图片引用保护。共享图片读取同时核对模板源业务域；资源列表按一次引用扫描计算可读/可回收状态，不再为每张图片重复解析全部模板。旧票面未使用绘图方法及高级 HTML 编辑入口已清理。测试与平台证据统一记录在[进度文档](./程序改进重构进度文档.md)。
-
-本次全项目复核仍确认 Q01（存储侧查询/分页）、大规模并发吞吐、其它 OS/架构和完整逐页操作验收需要后续推进。正式单机为 Document/Sales，网页/Docker 为 Full；2026-09-30 另增加显式构建的 Full + SQLite 本地测试包，不进入正式发布矩阵。共享代码尚未全部从二进制剔除。下方逐页台账保留明确验收边界；未重写已经存在的全部业务模块。
-
-## 2026-09-21 实施背景
-
-本批从 Rust `c2cf1ae` 开始，对照只读 C# `ba9dbdc`。用户确认默认模板逐份统一 V3、保持轻量原生并取消 HTML 兼容；六份默认模板已切换为 `.dtpl`，六份 PDF 的实际版式与迁移门槛见[统一 V3 方案](./Rust统一V3模板与原版PDF验收方案.md)。容器切换不等于逐页视觉保真。
-
-字体按同日用户补充要求统一为已有的 Noto Sans CJK SC 常规/粗体和 Noto Serif CJK SC 常规，均为 SIL OFL 1.1。保真验收保留版式与业务内容，以这三份字体重新测量和校准；不把原样本中的微软雅黑、其它字体名称或字重作为必须复制的条件。
-
-HS 实际采样“男裤、男T恤衫、T恤衫”：修正请求头 403、已有现行标准仍追历史实例、推荐分支提前结束、排序/去重优先级、名称高亮空格、详情包装层漏读等问题；解析/遍历/DTO/存储分层维护。文件模板事务、WebDAV HTTPS 和 PDFium 封装迁移在此前批次已有代码，不再列为完全缺失。
-
-## 1. 首次对照基线与历史结论
-
-| 项目 | 本次核对基线 |
-| --- | --- |
-| Rust 仓库 | `ExportDocManager_RustNative`，提交 `106efd4a5dc2cf2f62399f7b35de0616e159eb7b` |
-| 原版仓库 | 只读备份分支，提交 `ba9dbdca72590b06c5f32740e4cd58d3027578da`，分支 `tauri-csharp-net10-backup` |
-| 原版技术基线 | C#/.NET 10；`global.json` 最低 SDK `10.0.302`，同代稳定 feature band 滚动；不是本次要求安装或运行 .NET |
-| 远端与工作树 | 开始时 Rust 工作树干净；`git fetch origin main` 后 `HEAD` 与 `origin/main` 同为上述 Rust 提交；原版工作树干净 |
-| 前端对照 | 对两仓库已跟踪的 `apps/export-doc-web/src` 做内容比较：528/528 个文件统一 CRLF/LF 后相同，无原版独有的缺失源文件；`loginPrefetch.ts` 仅字节换行有差异 |
-| 当前运行形态 | 桌面 Tauri + 同一 React + 进程内 Rust HTTP + SQLite；网页/Docker 同一 React + Rust HTTP + PostgreSQL 18 |
-| 本次工作范围 | 源码盘点、上游版本查询、缺口与验收方案；没有修改业务实现、依赖、数据库或原版项目，没有重跑完整功能门禁 |
-
-当前问题的重点是：**React 已直接复用原版，但若干 Rust 接口的返回语义、模板解析和输出能力没有与原版对齐。** 生成同名 API、具备 `supports()` 分支、打开空页面，都不能替代业务等价验收。
-
-首次盘点时的优先缺口如下；HS、WebDAV、PDFium 封装与模板链路随后已有修正，不能把这份历史清单直接当作当前缺失项：
-
-1. **HS 联网结果语义错误及信息缺失**：搜索混入申报实例/作废编码，规格字段映射不同，详情信息和推荐链没有完整迁移。
-2. **报表模型和文件模板链路不完整**：普通行/表格、条件、分页符、分组汇总与高级 HTML 未实现；文件模板维护和实际渲染使用不同的解析入口。
-3. **PDFium 已使用，但原生包不是当前发布源最新版本**；尚未使用 `pdfium-render` Rust 封装。更换 PDF 库不能自动补齐报表模板语言或 HTML/CSS 排版。
-4. **WebDAV 传输能力缩水**：当前 Rust 只接受 HTTP，并明确拒绝 chunked 响应；原版使用支持 HTTPS 的 `HttpClient`。
-5. **部分查询缺少原版的存储侧分页和投影**：模板目录、历史等先加载整类正文，再在应用层筛选/分页，需补齐查询边界。
-
-其余业务已存在较多 Rust 实现和测试，不能笼统写成“全部缺失”；第 5 节逐页列出已有入口与尚未取得等价验收证据的闭环。
-
-状态约定：**缺失**＝源码没有对应能力；**差异**＝已有实现但与原版行为不同；**待验**＝已有代码，尚无本次逐项实跑证据；**方案**＝拟实施选择。优先级 P0 为首先修正的业务阻断/错误语义，P1 为主流程等价，P2 为后续交付与规模验收；这些不是测试通过等级。
-
-## 2. PDFium 的真实用途、版本与选型（状态已更新）
-
-### 2.1 当前代码实际使用什么
-
-| 环节 | 当前实现 | 结论 |
+| 优先级 | 工作 | 完成边界 |
 | --- | --- | --- |
-| 报表数据与排版 | `export-doc-domain::{designer,template}` + `export-doc-report`；先生成分页 SVG | 排版能力由本项目模型和布局器决定 |
-| 报表 PDF 编码 | `krilla = 0.8.2`、`krilla-svg = 0.8.1`、`usvg = 0.47.0` | 当前报表生成不是 PDFium |
-| 已有 PDF 预览、提取文字、OCR 页图、合并 | `export-doc-engine/src/pdf.rs`、`pdf/native.rs`、`pdf/merge.rs`；通过 `pdfium-render 0.9.4` 绑定 PDFium | 已经在 Rust 后端调用 PDFium；PDFium 本体为 C++ 原生库 |
-| 故障与取消隔离 | 当前可执行文件的受控 PDF worker 子进程 | 改换封装时应保留此边界 |
-| Rust PDFium 封装 | 已引入 `pdfium-render = 0.9.4`,显式启用 `pdfium_7881 + image_025` | 封装已迁移；实际加载及跨平台功能仍待验 |
-| 原生载荷 | `eng/native-runtime-packages.json` 中 Windows/Linux/macOS 包均为 `152.0.7961` | NuGet 仅是原生归档载体，不引入 .NET Runtime |
+| P1 | 单证主流程与报表逐页对照 | Document 的资料→制单→校验→设计/预览→Excel/PDF→备份恢复；同一匿名输入核对金额、字段、页数、印章、长内容及错误路径 |
+| P1 | HS 实际操作闭环 | 搜索→详情→候选审核→发票回填→保存；保留当前标准/历史实例区分、推荐预算、排序及源故障错误 |
+| P1 | 对专用查询测量后下推 | 保留权限、计数/页面同一快照、精确数值和非分页数组合同；需要新索引时追加迁移 |
+| P1 | 浏览器/桌面真实交互 | 中文 IME、键盘/粘贴、表格滚动、草稿、取消、原生对话框及实际打印；各 OS 分开记录 |
+| P2 | 内部强类型逐步演进 | Engine/Storage 仍广泛使用 serde_json::Value；按用例引入明确命令/查询类型，在边界转换生成 DTO，不全仓重写 |
+| P2 | 实际 PDF 页图预览 | 在明确需求下通过官方契约接入 PDFium，绑定草稿修订、权限及缓存；保留可编辑画布 |
+| P2 | 正式平台交付与升级 | MSVC、ARM64、Linux/macOS、Docker、安装与签名更新各自验收；不宣称旧 .NET 包直接升级 Rust |
 
-### 2.2 本次在线查询结果
+HS 当前采用受控静态 HTTP，没有旧浏览器取语义 DOM 的后备能力。源站依赖 JavaScript、登录或验证码时明确报不可读取/不支持；只有真实需求确认后才设计独立可选适配器，不复用桌面会话或绕过验证码。
 
-查询日期为 **2026-09-20**；实施升级时应重新核验，因为“最新”会变化。
+高级 HTML/CSS/Scriban 报表解释器已退出范围；不把它列为迁移缺口，不恢复 Chromium 报表生成。旧 HTML 夹具仅作版式对照，现用 .dtpl 和 Rust 输出才是运行链路。
 
-| 组件 | 仓库版本 | 本次发布源查询 | 判断 |
-| --- | --- | --- | --- |
-| `pdfium-render` | 已采用 0.9.4 | crates.io 最新未撤回、无预发布后缀版本 **0.9.4**，2026-09-06 发布，`MIT OR Apache-2.0` | 已替代手写 FFI；原生组合实跑另记 |
-| `bblanchon.pdfium.win32/linux/macos` | **152.0.7961** | 三个 NuGet 版本索引最新无预发布后缀版本均为 **155.0.8057** | 当前原生载荷落后于该发布源 |
-| `bblanchon/pdfium-binaries` | 对应旧构建 | GitHub 最新 release 为 **chromium/8057**，2026-09-14，`prerelease=false` | 是预编译发布项目的版本证据，不等于 Chromium 浏览器稳定通道声明 |
-| `krilla` / `krilla-svg` | **0.8.2 / 0.8.1** | crates.io 最新稳定版本同为 **0.8.2 / 0.8.1** | 当前两项已与查询结果一致 |
+## 4. 修改与验证顺序
 
-PDFium 按 Chromium 修订号持续演进，应分别固定“Rust 绑定版本、绑定 API feature、原生库构建、各 RID 归档哈希”。不能把封装 crate 的最新稳定版与底层原生库视为同一个版本，也不能仅凭两个包都叫 latest 就假定 ABI 兼容。
+先用真实输入定位差异，修通用规则，再补必要回归；页面只组合展示，草稿/查询在 hook/model/service，SQL 在 Storage，平台文件/进程在适配边界。数据库从版本 5 起有序事务升级，不能删除旧数据冒充修复。
 
-版本与能力来源：[pdfium-render 注册表](https://crates.io/api/v1/crates/pdfium-render)、[封装说明](https://github.com/ajrcarey/pdfium-render)、[Windows 包索引](https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.win32/index.json)、[Linux 包索引](https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.linux/index.json)、[macOS 包索引](https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.macos/index.json)、[8057 发布](https://github.com/bblanchon/pdfium-binaries/releases/tag/chromium/8057)、[krilla 注册表](https://crates.io/api/v1/crates/krilla)、[krilla-svg 注册表](https://crates.io/api/v1/crates/krilla-svg)。
-
-### 2.3 修正方案
-
-**已确认采用 krilla + PDFium 联动：krilla 保留原生 PDF 生成职责，PDFium 负责已有 PDF 的读取、渲染、合并和校验。** `pdfium-render` 能创建/编辑 PDF，但不是 HTML/CSS 排版器，也不解释 Scriban、V3 Grid 或分组表达式；本方案不更换 krilla 的生成职责。当前已使用 `pdfium-render`，仍需完成版本/功能验收。三平台调用约定、符号名、回调例外、集中类型宏及迁移条件见[《PDFium 跨平台绑定与验收方案》](./PDFium跨平台绑定与验收方案.md)，不把方案建议写成已完成迁移。
-
-同日补充比较 `pdfium-sys`：crates.io 最新发布仍为 `0.1.1`（2021-03-31），仅声明 Windows 测试，随包声明缺少现有文字提取/合并保存所需的 7 个入口，不作为优先替换方案。若指自建、按固定头文件生成的 sys 层，则是可行备选。绑定方案与设计器交互分层，当前 React 模板预览仍是 HTML/SVG；最终输出预览建议通过 PDFium 渲染 krilla 生成的实际 PDF，完整比较和实现边界见上述方案第 7 节。
-
-PDF 原生能力作为独立内部模块/可选 crate，由 engine 注入调用：
-
-1. 对 `pdfium-render = 0.9.4` 与拟用原生包做 API/符号、字体、文字、图片、合并和取消实验。本次发布归档的 `pdfium_latest` 实际指向 `pdfium_7881`，不能假定与 `8057` 完整兼容；选定并固定 API feature，显式绑定受管绝对路径，不使用系统回退。当前绑定已替换，不能将此前手写符号审查替代封装运行验收；不保留两套绑定。
-2. 原生包 `152.0.7961 → 155.0.8057` 作为独立依赖变更：核验来源、归档签名/哈希、架构、许可原文；同步中央清单、治理记录、notices/SBOM 与打包证据。
-3. 包清单当前记录的 `Apache-2.0` 不能代替全部原生 notices 审核。PDFium 上游 [LICENSE](https://pdfium.googlesource.com/pdfium/+/refs/heads/main/LICENSE) 包含 BSD 条款及 Apache 文本；按实际归档携带的许可证和第三方声明逐项记录，不仅检查 Rust 封装的双许可证。
-4. 保留 AppRoot 显式注入的库路径、受控 worker、输入/页数/像素/输出上限、超时和退出清理；禁止改成系统目录任意找 DLL 或请求时自动下载。
-5. Windows x64 先做真实回归，其余四个平台/架构分别编译与运行；只有本机通过不得写为全平台通过。
-
-**高级 HTML 已退出当前产品范围。** 用户明确选择统一 `.dtpl` 与 Rust 原生排版，不建设任意 HTML/CSS/Scriban 解释器。原 PDF 只用于核对字段和版式；不再将“补齐高级 HTML”列为迁移待办，也不新增浏览器 PDF 运行链路。
-
-## 3. 报表与模板确定缺口
-
-源码依据见第 8 节 E02—E06、E13。六份内置模板和 `Builtin` 已共用 `.dtpl` 资产；原硬编码票面退役。实际字段、布局与分页仍通过匿名输出和真实操作验证，不能凭文件名认定等价。
-
-| 编号/级别 | 状态与确定差距 | 受影响操作 | 修正位置与完成条件 |
-| --- | --- | --- | --- |
-| R01 / P0 | **已接通**：Row/Grid/Conditional/PageBreak 与明细前后 Flow 均进入 Rust 排版 | 普通行、表格、条件块和分页符 | 已有回归；复杂组合继续按实际票面验收 |
-| R02 / P0 | **基础闭环已接通、保真待验**:明细分组头、组尾小计、总计行和侧栏已接入原生测量与分页,字段值按小计单元格 `fieldPath` 聚合;复杂分组排序、跨页保持和原版像素结果仍待逐项对照 | 分组报表、复杂装箱明细、带汇总的用户模板 | 用原版真实模板验证分组排序、跨页位置、业务总数、精确金额和侧栏尺寸;剩余差异不得静默降级 |
-| R03 / P0 | **已接通、待完整联调**：共用解析已支持内置、数据库和受管文件身份 | 新建、默认项、预览、输出与模板包 | 已有定向回归；仍需真实 React 操作链与权限验证 |
-| R04 / P0 | **已接通、待完整联调**：目录合并内置/文件/已发布数据库模板，读取文件显示名与带章默认值 | 模板列表和输出默认项 | 核对全部身份与管理正文接口返回的 revision/默认值保持一致 |
-| R05 / P0 | **已转换**：六份默认模板为可编辑 `.dtpl`，文件/API/Builtin 使用同一模型 | 默认模板可视化与正式输出 | 不支持 HTML 明确拒绝；客户签字与目标设备打印仍单独验收 |
-| R06 / P1 | **已接通、待逐页验证**:明细 `repeatHeaderOnPageBreak` / `keepRowsTogether` / `firstPageRows` / `continuationPageRows` 已进入 SVG/PDF 分页;图层 `keepTogether` / `pinToPageBottom` / `minHeight` 已纳入页眉页脚预留与贴底 | 取消重复表头、贴底页脚、长行、分页控制 | 按勾选前后实际页数/位置验证打印策略;不能只保存布尔值 |
-| R07 / P1 | **部分已修**:无条件页码已移除,显式页码生效;Rust SVG/PDF 已按随包 Noto 字体实际测量换行 | 页码和中英长文本换行 | 浏览器画布测量、最终 PDF 与复杂字形整形仍待逐页验收,不能以已有 PDF 编码代表排版保真 |
-| R08 / P1 | **部分已修**：基本虚线已实现；本批增加网格行列跨度、占位验证、竖排、垂直对齐和边框/样式继承 | 合并、竖排、边框与打印 | 仍需复杂共享边、溢出、内嵌布局和样本截图/PDF 对照 |
-| R09 / P1 | **已补核心保护**：数据库/历史与磁盘文件引用参与读取/回收；共享图片增加源业务域校验，授权与摘要验证共用实现 | 图片、印章、共享模板与历史 | 已增加文件图片、跨域拒绝回归；其它平台与大数据量仍待验 |
-| R10 / P1 | **已有、待验**：六份内置布局、付款/报销、ZIP/合并/单据包均有实现；原版真实输出对照不足，且受 R01—R05 阻断 | 发票、装箱单、合同、报关单、付款单、费用报销，批量/邮件附件 | 每份模板用同一匿名数据生成 C# 与 Rust 样本，对照字段、金额、唛头、印章、页数、页眉尾、跨页行及打印尺寸；多模板顺序、命名、带章和 ZIP 内容一致 |
-| R11 / P0 | **已补并发与恢复保护**：文件锁覆盖版本检查、修改及回滚，快照包含目标清单；回滚失败/中断保留证据并拒绝后续操作 | 文件与目录/设置变更 | 并发改名、跨根默认包往返与失败恢复有回归；断电及人工恢复仍需部署验收 |
-| R12 / P1 | **已修**：目录/权限/I/O 读取错误保留基础设施分类，不再全部折叠为 409 | 模板修订检查 | 继续验证前端错误提示与草稿保留 |
-
-R03/R04/R11 应先于大量排版扩展修复：没有统一身份、目录与文件事务，完善后的模板仍无法从业务页稳定进入正确渲染器或安全保存。
-
-报告模板的“读取原文并保存草稿”“结构校验”“可输出能力检查”要有清晰边界。未支持内容不得被重建为 starter、删去字段或覆盖原稿；合法但未接通的渲染能力给出明确提示。空白新建 starter 已有实现，保留原行为。
-
-## 4. HS 联网查询确定差异与修正方案
-
-### 4.1 已定位的根因
-
-原版不是单纯抓取一个表格：`I5a6HsCodeProvider` 先读取静态页，必要时使用受管浏览器；`I5a6PageParser` 区分标准编码与申报实例，`HsCodeService.Remote` 补充当前编码与推荐链，最后 API 筛选返回标准编码、知识服务保存待审核实例。Rust 已引入 SearchBundle/DetailBundle；本批进一步把有界推荐遍历独立到 `export-doc-hs::lookup`，engine 保留 DTO 投影和知识候选写入。内部记录仍携带生成 DTO，不能宣称所有模型解耦已完成。
-
-| 编号/级别 | 原版行为 | Rust 当前差异 | 修正与最小验收 |
-| --- | --- | --- | --- |
-| H01 / P0 | 只返回非作废标准编码；有实例数优先、再看描述；保持来源顺序 | 本批修正 BTreeMap 排序及优先级，source 恢复 remote | 三个实际关键词快照 + DTO 顺序/优先级回归；真实 React 仍待验 |
-| H02 / P0 | Description 与 Elements 分离，保留原品名 | 前批已分离规格/要素；本批消除高亮标签造成的词中空格 | 男T恤衫实例保留名称及成分原文，不按商品名设特例 |
-| H03 / P0 | 语义表头识别标准/实例，卡片为实例 | 已有评分与卡片语义，详情根节点评分阈值本批修正 | 继续保留表头/ID/CSS 变化回归 |
-| H04 / P0 | 详情含行邮税号、CIQ、分类和实例 | 前批已建模型；本批修复标题后包装层中的表格定位 | 实际详情验证 20 条实例、CIQ、分类、行邮税号；不只是检查 HTTP 200 |
-| H05 / P0 | 已有标准直接返回；否则有界追踪全部推荐分支 | 本批独立 lookup 模块恢复短路与分支遍历、去重、12 次详情/3 层推荐预算，保留原始实例 | 男裤/T恤衫不扩展无关实例；男T恤衫保留 15 实例并找到三类当前码 |
-| H06 / P0 | 搜索只读，capture/resolve 写待审核证据，不写 Active | 已有 capture；本批补作废详情的实例捕获与替代详情补全 | 候选审核/公司隔离/幂等/发票回填仍需真实 UI 与存储联调 |
-| H07 / P1 | 静态读取含有界重试，静态无结果/失败时受管浏览器取语义 DOM；health 说明静态和浏览器可用情况 | Rust 仅静态请求，20 秒、4 MiB、禁重定向；缺少浏览器路径；交互页返回不可读取错误 | 网络源适配器保留明确超时/取消/容量/URL 限制；按需要注入可选浏览器能力，资源缺失时明确说明；正常空结果、源故障、验证码分别验证，不绕过验证码 |
-
-2026-09-21 已取得用户三个具体关键词及真实静态源页，并用 Rust 真实 HTTP 和确定性快照回归核对。原版预期来自 C# parser/service/API 源码和源页面；本批未启动 C# 应用对同一业务库联调，不把源码对照写成两程序完整操作验收。
-
-### 4.2 模块划分
-
-- `export-doc-hs`：划分 `model`、`parser/search`、`parser/detail`、`parser/recommendation` 和 `transport/i5a6`；parser 只接受 HTML 和观察时间，不访问网络、数据库或 UI。内部区分标准记录、案例、替代证据和详情，API DTO 只在边界转换。
-- engine 的 HS 用例：负责查询编排、详情预算/深度、当前有效税则解析和动作权限；`hs_remote`、`hs_learning`、`hs_search` 共享规则，不能再维护彼此不同的规格/去重定义。
-- storage：负责候选/示例/替代关系的事务与版本；普通搜索无写入，capture/resolve 的写入按原合同执行。
-- React：继续复用 `HsCodeToolsPanel`、`HsCodeKnowledgePage`、`InvoiceHsKnowledgePanel`。前端显示与筛选以正确后端结果为准，不能靠隐藏错误记录掩盖 H01。
-
-### 4.3 对照测试集
-
-使用同一份公开或匿名 HTML 快照供 C# 基线与 Rust 比对，覆盖原版已有测试中的“睡衣、男式/女式 T 恤”等场景以及通用结构变体：
-
-1. 标准表 + 实例表混排；标准条目、实例计数、同码不同规格、英文名分离。
-2. 作废码 + 纯文本/链接推荐 + 循环推荐；只有历史实例但能找到当前标准；预算耗尽可观察。
-3. 详情 20 条案例、CIQ、行邮税号、分类章节、全部税率字段；改 ID/标题/列序仍保持语义。
-4. 搜索不落库，capture/resolve 只写待审核证据；重复调用不重复建例、不覆盖人工确认、不污染其它公司。
-5. 前端搜索 → 查看详情 → 候选审核 → 本地知识检索 → 发票明细回填 → 保存发票提交反馈，逐步比较原版行为。
-6. 真实源站请求作为独立集成检查记录采样时间、关键词和结果摘要；网络变化不替代确定性的解析回归，源故障不能伪装成成功空列表。
+一批实现后集中执行 Rust fmt/tests/all-features、前端构建与相关交互、脚本/文档/依赖治理；数据库变更另用真实 PostgreSQL 18 与 SQLite 验证。测试失败、ignored、未运行平台分别报告。历史 C# 测试不计作 Rust 通过，源码和锁文件推送不等于正式安装包已经发布。
 
 ## 5. 按原版逐页补齐的实施台账
 
-下表来自原版共用的 `workspaceNavigationCatalog.ts` / `AppWorkspaceRoutes.tsx`，拆出必要的子页面和流程；不是菜单项计数。Rust 列为 `crates/export-doc-engine/src/engine/` 下模块简称，独立能力另注。**“待验”行先做定向对照，发现不符再修根因，不重新编写已经等价的页面。**
-
-| 页面/入口 | 原版 C# 用例基线 | Rust 已有落点 | 缺口/必须补齐的验收 |
-| --- | --- | --- | --- |
-| 启动、登录、退出 | 会话、许可证、运行能力、首次初始化 | `accounts`、`auth`、`licensing`、`lifecycle` + server/Tauri | 基础桌面登录已有历史实跑；待验团队初始化、过期/撤权、离线本机访问、退出任务/进程回收 |
-| 我的待办 `/worklist` | `IWorklistService` | `worklist` | 待验全部分页、按来源权限过滤、行政/人事事项、点击后正确定位，不能推断未授权财务数据 |
-| 单证概览 `/dashboard` | `IDashboardService` | `dashboard` | 待验不同权限/公司范围、业务自然日、金额/数量汇总；历史 NaN 修复不代表全指标等价 |
-| 销售概览 `/crm/dashboard` | CRM/商机汇总 | `crm_dashboard`、`supplier_overview` | 待验指标、范围、筛选及进入原对象的操作 |
-| 文件任务 `/jobs` | `IBackgroundJobService` | `tasks/*`、`jobs` | 已有持久化、输出、重试；待验重启恢复、取消、重复下载、撤权重试、输出原子发布与清理；报表任务受 R 系列影响 |
-| 客户与跟进 `/crm/follow-ups` | `ICrmService`、客户/联系人/跟进 | `crm`、`related_records`、`party_files` | 待验独立对象读取、草稿/浏览器返回、跨页搜索、动作权限、导入预览确认、并发修改 |
-| 商机与报价 `/crm/opportunities` | `ISalesOpportunityService` | `sales`、`related_records` | 待验阶段流转、报价明细、精确金额、下一步/跟进、停用及范围隔离 |
-| 供应商 `/suppliers` | 目录、联系人、供货关系、评价 | `sales`、`related_records`、`supplier_overview` | 待验同公司关联约束、评分/统计、停用、导入导出、明细权限与并发 |
-| 邮件中心 `/tools/email` | `IEmailService`、投递历史 | `email` + `export-doc-mail` | 已有 SMTP/附件策略；待验正文、收件人、任务幂等、结果分页、取消/失败、PDF 附件授权及模板输出 |
-| 邮件模板 `/crm/email-templates` | `IEmailTemplateService` | `email_templates` | 待验富文本/高级 HTML、发布/共享/停用/恢复、缺变量、历史、跨公司受众及冲突保稿 |
-| 发票列表/编辑 `/invoices` | `IInvoiceService`、核对、交换包 | `records`、`workflows`、`invoice_transfer` + domain | 基础保存已有历史实跑；待验五页签、实际/报关明细、复制、核对/撤销、删除、未保存草稿、键盘/中文 IME/粘贴；HS/PDF 分别依赖 H/R 系列 |
-| 发票信用证页签 | 文档导入、提取、合规复核 | `letter_of_credit`、`ai`、`pdf` | 待验 PDF 文字/OCR、文档上限、字段提取、人工修改与 AI 超时/取消/依赖不可用 |
-| 发票输出/高级导出 | HTML/PDF、托单、单据包、邮件 | `reports`、`document_packages`、`excel`、`email` | **R01—R10**；另验跨页选择、顺序/命名/带章/合并/ZIP、模板默认值及撤权时输出保护 |
-| 统计查询 `/query/invoices` | 查询仓储、`IQueryResultExportService` | `invoice_query`、`records` | 待验筛选、自然日、汇总、排序、导出与查看范围不同的场景；Q01 查询下推 |
-| 付款报销 `/payments` | `IPaymentService`、付款报表 | `records`、`workflows`、`reports` | 基础创建已有历史实跑；待验明细/备用字段、收款人快照、自定义方式、并发、预览不写库；付款/报销模板依赖 R 系列 |
-| 业务资料 `/business-attachments` | 附件内容、版本、确认和分类 | `attachments`、`attachment_categories` | 待验公司分类、容量/版本、内容预览、有效版本确认、永久删除审计、关联发票删除阻止、原子备份恢复 |
-| 单一窗口操作中心 `/single-window/operation-center` | 跟踪、交接、回执、持卡机桥 | `single_window/*` + 独立 crate | 已有流程/协议代码；待验真实持卡机、官方样本、重复回执、失败/重试/取消、办公室与申报站衔接；不得以本地 XML 生成宣称已对接官方 |
-| COO/ACD `/single-window/coo`、`/single-window/acd` | 原产地证、代理托单字段映射/修复 | `single_window/documents`、`review`、`imports` | 待验原表单分区、生产商/默认档案、字段锁定、局部清空/修复、草稿/版本、XML 输出与回读 |
-| 申报词典 `/single-window/reference-catalog` | 参考目录、别名、Excel 预检 | `single_window/references`、`catalog_excel` | 待验表格编辑、别名、预览/确认、跨公司目录与单据联动 |
-| HS 编码知识 `/master-data/hs-knowledge/search` | 税则、案例、反馈、联网证据 | `hs*` + `export-doc-hs` | **H01—H07**；本地年度导入/完整快照、知识包导入冲突和当前可信编码回填另验 |
-| 基础资料 `/master-data/*` | 客户、出口商、付款对象、商品、单位、港口等 | `records`、`product_options`、`custom_options`、`media` | 待验目录与详情、超过 200 条时远程选择、停用/删除引用、印章上传、通知人三态、地址银行折叠不丢草稿 |
-| 报表模板管理 `/reports/templates/manage` | 文件/个人/共享模板、默认与模板包 | `report_template_files/*`、`report_templates/*` | **R03—R05、R09、R11/R12、Q01**；导入后可使用、设默认后业务页生效、修改/删除并发及回滚 |
-| 设计器 `/reports/templates` | 完整 V3、HTML、安全校验/预览 | domain designer + report | **R01—R10**；工具栏、画布、属性、撤销/重做、中文输入、草稿冲突与实际 PDF 一起验 |
-| Excel 模板与托单 `/tools/excel` | 原 Excel 模板、识别/字段映射/导出 | `excel` + `export-doc-excel` + 现有 analyzer | 待验原模板格式/公式/合并区域、跨表补充信息、导入预览再提交、托单输出；不复制第二个识别器 |
-| 文字识别 `/tools/ocr` | 图片/PDF/OCR 服务 | `ocr`、`pdf` + Rust OCR 工具 | 中文图片已有历史实跑；待验多页/倾斜/坏图、大输入、取消、缺资源及浏览器上传/桌面文件选择的不同权限边界 |
-| 装柜模拟 `/tools/container-packing` | `IContainerPackingEngine`、方案与现场 PDF | `packing`、domain packing、report packing | 待验同输入算法约束、优先组、载重/旋转、保存回读、统计、视图与现场 PDF 的货物编号/位置一致 |
-| 今日汇率 `/tools/exchange-rates` | `IExchangeRateService` | `exchange` + `export-doc-exchange` | 待验原数据源、买入卖出/单位/日期口径、页面结构改变、超时、错误分类及金额计算 |
-| 人员档案 `/office/people` | `IPersonnelService` | `personnel`、`personnel_queries`、`office_events` | 待验入职/误录修正/转正/调岗/离职/返聘、身份证/图片隐私、账号撤销与交接阻止 |
-| 公司通讯录 `/office/directory` | 工作资料只读投影 | `personnel_queries` | 待验只展示在职工作信息、头像权限，不泄露身份证及私密档案字段 |
-| 会议室 `/office/meeting-rooms` | 申请/审批/登记、钥匙交接 | `office`、`office_queries`、`office_workflows` | 待验 SQLite 代登记与 PostgreSQL 团队申请分支、重叠/容量、修改取消、交接后限制及并发 |
-| 物品领用 `/office/supplies` | 库存/预留/审批/发放归还 | 同上 | 待验原子库存、修改释放/重新预留、独立审批、补货和人员调岗/离职阻止 |
-| 组织架构 `/system/organization` | `IOrganizationDirectoryService` | `organization` | 待验层级/负责人、停用/删除引用、跨公司限制、保存后重新定位、刷新账号/人员选项 |
-| 账号与权限 `/system/access-control` | 用户、方案、有效授权/数据范围 | `accounts`、`auth`、`permission_templates` | 已有权限代码；待验资源×动作×范围、派生依赖、空/停用模板拒绝、团队跨公司、并发、撤权及导航一致 |
-| 审计日志 `/audit-logs` | `IAuditLogService`、维护/导出 | `audit`、`audit_values` | 待验脱敏、排序分页、筛选计数、导出范围、保留/清理、独立审计与故障分类 |
-| 设置 `/settings` 的常规/业务/邮件/AI 子页 | `ISettingsService` 与各能力配置 | `settings`、`custom_options`、`diagnostics` | 待验每个设置保存后实际生效、敏感值遮掩、只改指定分组、版本冲突、诊断与真实能力一致；报表默认项依赖 R04 |
-| 设置中的备份/恢复/云同步/灾备/迁移 | `IBackupService`、共享库维护、WebDAV、灾备、迁移 | `maintenance`、`team_backup/*` | **M01—M03**；SQLite/PostgreSQL 隔离恢复、回滚、锁丢失 fail-closed、凭据/业务角色、HTTPS 云备份与大文件 |
-| 关于/授权/更新 `/system/about`、`license`、`update` | 注册、支持包、updater | `licensing`、`diagnostics` + Tauri updater | 待验产品版/离线许可/信任、支持包脱敏、签名升级/失败恢复；不宣称旧 .NET 包可直接升级 Rust |
-
-## 6. 跨页面与工程差距
-
-| 编号/级别 | 状态/证据 | 修正方案与验收 |
+| 页面/流程 | 共用 Rust 落点 | 验收重点 |
 | --- | --- | --- |
-| M01 / P0 | **已实现、实服待验**：WebDAV 已改为受控 ureq/Native TLS，支持 HTTPS/chunked 与命名空间 DAV XML | 前批定向回归已有；真实服务 PROPFIND/PUT/GET、TLS、断传及受管清理仍需集中验收 |
-| M02 / P1 | **已修**：设置读取凭据/解密失败保持基础设施错误，不再变为空密码 | 前批损坏密文回归已有，保持未配置与读取失败的区分 |
-| M03 / P1 | **已有、待验**：SQLite、PostgreSQL、灾备、迁移实现已有，不可依据旧日期文档误判为全无 | 原版工作流逐项比对恢复验证、维护锁、失败回滚、会话撤销、自动备份、临时输出清理与团队维护角色；真实 PostgreSQL 18 独立验收 |
-| Q01 / P1 | **通用资源、报表与任务查询已下推**：权限、筛选、排序、计数、分页与投影通过 storage 查询模型执行；模板同名检查、历史恢复和任务编号定向读取，任务保留按时间/用户/总量在存储侧选择候选 | SQLite/PostgreSQL 共用模型与执行边界，engine 只负责授权、用例和 DTO；追加 schema 7 查询索引和纯查询函数，保留已发布迁移及业务数据。原非分页数组契约不截断；复杂业务聚合和未列入本批的专门查询不以通用查询回归代替验收 |
-| A01 / P1 | **待验**：生成契约包含路由/schema/权限，但无法说明返回业务语义一致，H01 即为反例 | 以原 React 实际请求和 C# 同输入响应做差分；只归一化 ID/观察时间等非业务差异，不过滤缺字段、顺序、金额、状态和错误。保持官方 OpenAPI 为唯一公共契约 |
-| A02 / P1 | **方案**：部分 engine 协调器继续承担较大分发/JSON 拼装职责；已有领域/存储分层应继续保留 | 按用例拆 query/command/model/adapter，边界使用生成 DTO 或明确内部类型，避免继续扩张 `mod.rs`/`records.rs`。共享规则只实现一次，不为了每页新增一套协议 |
-| U01 / P1 | **待验**：源码一致不等于 Windows WebView、网页和其它 OS 实际交互一致 | 逐页验证原布局、页签、表格编辑/滚动、中文 IME、键盘、返回导航、错误自动展开、折叠会话状态和保稿；复用 hook/model/service，不添加通用 JSON 表单或 LocalStorage 持久化 |
-| D01 / P2 | **已有部分载荷、待验**：本地 GNU 包证据不代替正式 MSVC、其它平台/架构和真实 Docker；桌面交付收敛为 Document/Sales，多用户保持 Full | Document 单机与 Full 服务默认 OCR；按产品和 RID 检查真实依赖图、原生资源、字体、模板、notices、安装/启动/卸载/更新；桌面排除 PostgreSQL server 适配/Node/.NET，网页不引入 Tauri |
+| 启动、登录、授权、退出 | accounts/auth/licensing/lifecycle、Server/Tauri | 初始化、撤权、过期、回环令牌、任务与进程退出 |
+| 工作概览、待办、任务 | dashboard/crm_dashboard/worklist/tasks | 公司范围、日期、汇总、分页、恢复、取消/重试 |
+| 发票、明细、信用证、统计 | records/workflows/invoice_query/letter_of_credit | 五页签、精确金额、草稿、核对、HS/AI、跨页导出 |
+| 付款报销打印 | records/workflows/reports | 本人/财务权限、收款快照、费用、草稿预览、实际 PDF |
+| 客户、供应商、商机、跟进 | crm/sales/related_records/party_files | 关联、候选并发、状态流转、报价、导入导出 |
+| 邮件与模板 | email/email_templates、export-doc-mail | 收件人/附件权限、SMTP、模板变量、投递/取消/失败 |
+| 业务资料 | attachments/attachment_categories | 分类、版本、并发、预览取消、原文件、容量及删除审计 |
+| 基础资料、HS | records/custom_options/hs*、export-doc-hs | 引用保护、远程选择、年度/知识数据、联网语义与审核 |
+| 报表模板、设计器、单据包 | report_templates/report_template_files/report_assets/reports | 身份/默认值、私人/共享、保存冲突、完整票面及多模板输出 |
+| 单一窗口 | single_window、Domain 与独立协议 crate | COO/ACD 独立草稿、词典、导出审查、认证包和真实客户端 |
+| Excel、OCR、装柜、汇率 | excel/ocr/packing/exchange 与独立能力 crate | 文件/格式/公式、精度、受控资源、实际输出与失败清理 |
+| 人员、组织、会议/物品、六类 OA | personnel/organization/office/oa/handling | 私密资料、账号联动、库存、审批、办理、交接与历史 |
+| 公告、通知、账号权限 | communication/accounts/permission_templates | 受众、版本回执、关联业务授权、权限来源与会话撤销 |
+| 设置、审计、维护和交付 | settings/audit/maintenance/team_backup、Tauri | 敏感配置、备份恢复、许可证、资源/依赖、正式升级 |
 
-## 7. 实施顺序与模块边界
-
-### 7.1 批次顺序
-
-| 批次 | 实施内容 | 批次完成条件 |
-| --- | --- | --- |
-| B0：固化对照 | 固定本文件基线；按原 API/服务测试整理匿名输入、源页面 HTML、模板与输出样本；建立逐页状态记录 | 每个缺口有输入、预期、源码落点；真实客户文件/凭据不进仓库 |
-| B1：HS 与直接阻断 | H01—H06，H07 能力边界；M01/M02；PDFium 升级/封装实验单独记录 | HS 同输入字段/类型/候选写入等价；HTTPS 云备份可完成；PDF 版本变化有独立证据 |
-| B2：模板入口与 V3 | R03/R04 统一解析、R11/R12 文件事务与错误分类，然后补 R01/R02/R06—R09；Q01 先处理模板目录/历史 | 原画布结构可保存、发布、预览、输出；文件/个人/共享模板及默认项贯通 |
-| B3：原版报表保真 | 在 krilla + PDFium 上将六份默认模板逐份转为统一 V3；按样本补通用布局，联调单据包/打印/邮件附件 | 同数据原版/新版逐页对照；不删原稿、不简化、不自动改模板语言；多模板输出闭环；不能覆盖的 HTML 样本继续列为未完成 |
-| B4：业务逐页 | 按第 5 节完成单证/资料/工具 → 客户供应链/邮件 → 行政组织/权限的操作闭环 | 每页同时完成界面、用例、存储、权限、并发、失败/取消和输出；已等价部分只记录，不重写 |
-| B5：系统与交付 | 设置、维护/恢复、Q01 其它目录、D01 打包与目标环境 | 实库/跨平台/产品版/升级证据完整；未运行环境保留待验 |
-| B6：最终集中门禁 | 合并批次后统一执行完整 Rust/Web/实库/治理和所涉平台验收 | 检查无失败；忽略实库测试另跑；当前事实与本台账按真实证据更新 |
-
-开发过程中只做必要编译和真实失败的最小回归，一批完成后集中联调；已经通过且未受影响的检查不重复。B1/B2 已有上述部分实现与回归；B3 默认 V3 转换、B4 全页面闭环和最终门禁仍未完成。
-
-### 7.2 目标依赖方向
-
-```mermaid
-flowchart TD
-  React[原版 React 页面 / hook / model] --> Http[共用 Rust HTTP 适配器]
-  Tauri[Tauri 平台命令与生命周期] --> Http
-  Http --> Engine[应用用例 / 权限 / 任务编排]
-  Engine --> Domain[纯业务规则 / 完整报表模型]
-  Engine --> Storage[存储接口 / SQLite / PostgreSQL 18]
-  Engine --> Report[报表数据投影 / 测量 / 分页 / krilla 输出]
-  Engine --> Pdf[隔离 PDF worker / PDFium]
-  Engine --> Hs[HS 证据模型 / 纯解析器 / 受控数据源]
-  Engine --> Optional[可选 Excel / OCR / 邮件能力]
-  Domain --> Report
-  Report --> Pdf
-```
-
-- Domain 不引用 HTTP、GUI、数据库、路径或进程；报表布局精度与业务十进制计算分别处理。
-- 模板仓储/解析入口统一返回已授权的模板身份、版本、正文和资源；渲染器不查询数据库或猜测用户路径。
-- 外部 HTTP、浏览器、PDFium、OCR 进程放在明确适配器/worker 内；超时、取消、容量和清理是边界合同，不能散入页面与协调器。
-- 桌面与服务端由组合根启用能力。报表使用 krilla + PDFium；HS 如需浏览器获取页面，放在独立可选网络适配器中，不复用桌面界面 WebView 的会话，不把浏览器依赖拉入核心或报表生成器。
-- SQL 仅在 storage；增加分页查询接口而非在 engine 拼 SQL。拒绝旧试验库/原 C# 库，不添加猜测式迁移、双读或客户文件名特例。
-
-### 7.3 每页完成的证据要求
-
-每页记录：对照提交、页面/页签、操作步骤、测试数据、API 输入输出、持久化变化、权限身份、生成文件、截图/日志、未完成项。最低包含正常、空、错误、权限不足、并发冲突、取消/超时场景；按页面实际风险选取，不为无关页面复制无意义测试。
-
-报表比较不能只看 `%PDF-` 文件头；至少核对文字、金额/数量、图片、页数、纸张/坐标、跨页、打印和可搜索文字。HS 比较不能只看返回 200 或条数；核对每个字段、记录种类、推荐链及数据库副作用。
-
-最终 Rust 检查至少：
-
-```powershell
-cargo fmt --all --check
-cargo test --locked --workspace
-cargo check --locked --workspace --all-features
-pwsh -NoProfile -File scripts/test-native-postgres.ps1 -PostgresBin <隔离PostgreSQL18工具目录>
-npm --prefix apps/export-doc-web run build
-node scripts/generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository
-git diff --check
-```
-
-再执行受影响的 React 操作/无障碍/视觉/缩放、真实 Tauri、脚本/工作流/公开源码、资源/打包检查。治理结果须 `unresolved=0 / disallowed=0`。Firefox/WebKit 只走手动工作流；Docker、ARM64、Linux/macOS 真机及正式升级各自记录，不沿用原 .NET 的通过数字。只有修改 C# 对照实现才执行相应 .NET 门禁；Rust 交付不恢复 .NET/NPOI 运行依赖。
-
-## 8. 主要源码证据索引
-
-下列相对链接均以本文所在 `docs/` 为起点。C# 链接指向相邻只读原版；完整可移植定位为第 1 节的仓库/提交加对应仓库内路径。
-
-| 编号 | 原版 C# 基线 | Rust/共用前端落点 |
-| --- | --- | --- |
-| E01：导航/前端 | [原版导航](../apps/export-doc-web/src/app/workspaceNavigationCatalog.ts) | [导航](../apps/export-doc-web/src/app/workspaceNavigationCatalog.ts)、[路由](../apps/export-doc-web/src/app/AppWorkspaceRoutes.tsx) |
-| E02：模板模型 | [V3 合同](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Application/Services/Reporting/ReportTemplateV3ContractCatalog.cs)、[schema 校验](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Infrastructure/Services/Reporting/ReportTemplateV3SchemaValidator.cs) | [designer](../crates/export-doc-domain/src/designer.rs)、[template 校验](../crates/export-doc-domain/src/template.rs) |
-| E03：HTML/PDF | [Scriban 渲染](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Infrastructure/Services/Reporting/ScribanReportTemplateRenderer.cs)、[报表 PDF 服务](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Infrastructure/Services/Reporting/ReportPdfRenderService.cs) | [布局](../crates/export-doc-report/src/layout.rs)、[PDF 编码](../crates/export-doc-report/src/document.rs)、[Builtin](../crates/export-doc-report/src/builtin/mod.rs) |
-| E04：模板解析/目录 | [模板目录加载](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Infrastructure/Services/Reporting/ReportTemplateCatalogLoader.cs)、[路径解析](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Infrastructure/Services/Reporting/ReportTemplatePathResolver.cs) | [报表用例](../crates/export-doc-engine/src/engine/reports.rs)、[文件模板](../crates/export-doc-engine/src/engine/report_template_files.rs)、[文件目录](../crates/export-doc-engine/src/engine/report_template_files/catalog.rs) |
-| E05：模板分页 | [目录/历史查询](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Infrastructure/Services/Reporting/UserReportTemplateService.Queries.cs) | [模板用例](../crates/export-doc-engine/src/engine/report_templates.rs)、[SQLite](../crates/export-doc-storage/src/sqlite.rs)、[PostgreSQL](../crates/export-doc-storage/src/postgres.rs) |
-| E06：资源与现有测试 | [资源权限](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Infrastructure/Services/Reporting/ReportTemplateImageResourceAccessService.cs) | [资源用例](../crates/export-doc-engine/src/engine/report_assets.rs)、[现有报表闭环测试](../crates/export-doc-engine/tests/report_workflow.rs)、[现有内置测试](../crates/export-doc-report/tests/builtins.rs) |
-| E07：HS 传输/解析 | [Provider](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Infrastructure.Browser/Services/MasterData/I5a6HsCodeProvider.cs)、[Parser](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Infrastructure.Browser/Services/MasterData/I5a6PageParser.cs) | [HS 传输](../crates/export-doc-hs/src/lib.rs)、[HS parser](../crates/export-doc-hs/src/parser.rs) |
-| E08：HS API | [联网端点](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Api/Hosting/ApiMasterDataHsCodeRemoteEndpointRouteBuilderExtensions.cs)、[详情编排](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Api/Hosting/ApiMasterDataHsCodeEndpointHelpers.cs)、[DTO 映射](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Api/Hosting/ApiMasterDataHsCodeDtoFactory.cs) | [HS 联网用例](../crates/export-doc-engine/src/engine/hs_remote.rs)、[原版复用页面](../apps/export-doc-web/src/features/master-data/HsCodeToolsPanel.tsx) |
-| E09：HS 追踪/证据 | [远端服务](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Infrastructure/Services/MasterData/HsCodeService.Remote.cs)、[知识证据](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Infrastructure/Services/MasterData/HsCodeKnowledgeService.Remote.cs)、[解析回归样本](https://github.com/sck03/rustdoc/blob/291f727/tests/ExportDocManager.Infrastructure.Tests/HsCodeRemoteSearchParserTests.cs) | [知识学习](../crates/export-doc-engine/src/engine/hs_learning.rs)、[知识搜索](../crates/export-doc-engine/src/engine/hs_search.rs)、[本地工具测试](../crates/export-doc-engine/tests/tools_service.rs) |
-| E10：PDFium | [PDFium 上游](https://pdfium.googlesource.com/pdfium/) | [worker](../crates/export-doc-engine/src/pdf.rs)、[PDFium 封装](../crates/export-doc-engine/src/pdf/native.rs)、[合并](../crates/export-doc-engine/src/pdf/merge.rs)、[原生版本清单](../eng/native-runtime-packages.json) |
-| E11：WebDAV | [原版传输](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Infrastructure/Services/WebDavCloudSyncService.cs) | [Rust 云备份](../crates/export-doc-engine/src/engine/team_backup/cloud.rs)、[网络策略](../crates/export-doc-network/src/lib.rs) |
-| E12：能力/交付 | [原版应用用例目录](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Application/Services) | [能力分发](../crates/export-doc-engine/src/engine/capabilities.rs)、[server 依赖](../apps/export-doc-server/Cargo.toml)、[桌面依赖](../apps/export-doc-tauri/src-tauri/Cargo.toml)、[公开脚本说明](../scripts/README.md) |
-| E13：文件事务 | [原版协调器](https://github.com/sck03/rustdoc/blob/291f727/src/ExportDocManager.Infrastructure/Services/Reporting/ReportTemplateStorageCoordinator.cs) | [文件变更](../crates/export-doc-engine/src/engine/report_template_files.rs)、[版本检查](../crates/export-doc-engine/src/engine/report_template_files/catalog.rs)、[数据库事务](../crates/export-doc-engine/src/engine/store.rs) |
-
-当前实现总事实继续以[《当前架构事实》](./当前架构事实.md)为准；逐批完成情况写入[《程序改进重构进度文档》](./程序改进重构进度文档.md)，并同步[《Rust 原生功能迁移核对表》](./Rust原生功能迁移核对表.md)。本批通过证据单独记录于进度文档；表中“待验”不得在没有操作证据时改为“完成”。
+逐页操作范围仍与[迁移核对表](./Rust原生功能迁移核对表.md)、[导航说明](./导航与页面简化说明.md)及各专题相互对应；本表是验收入口，不是按文件存在自动打勾的完成清单。

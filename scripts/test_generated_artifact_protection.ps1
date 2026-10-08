@@ -16,9 +16,14 @@ try {
     foreach ($name in @(".git", "business.db", "business.db-journal", "business.sqlite-wal", "backup.edmrecovery", "server.dump", "PG_VERSION")) {
         $child = Join-Path $fixture $name
         [System.IO.File]::WriteAllText($child, "test fixture")
+        # Unix marks dotfiles hidden; exercise the same provider behavior on Windows.
+        if ($IsWindows -and $name -eq '.git') {
+            $item = Get-Item -LiteralPath $child -Force
+            $item.Attributes = $item.Attributes -bor [IO.FileAttributes]::Hidden
+        }
         if (-not (Test-ExportDocProtectedArtifact $fixture)) { throw "Failed to protect $name" }
         if (-not (Test-ExportDocProtectedArtifact $fixture -IncludeReleaseOutputs)) { throw "Release cleanup must still protect $name" }
-        Remove-Item -LiteralPath $child
+        Remove-Item -LiteralPath $child -Force
     }
     $target = Join-Path $fixture 'target'
     $generated = Join-Path $target 'debug/build/example/out/permissions/resources'

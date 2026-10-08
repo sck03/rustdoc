@@ -9,7 +9,7 @@ function markdownFiles(directory) {
     return entry.isDirectory() ? markdownFiles(file) : entry.name.endsWith(".md") ? [file] : [];
   });
 }
-const files = [...markdownFiles(path.join(root, "docs")), path.join(root, "README.md"), path.join(root, "scripts/README.md")];
+const files = [...markdownFiles(path.join(root, "docs")), ...["README.md", "scripts/README.md", "deploy/README.md", "tests/ReportTemplateFixtures/README.md"].map(file => path.join(root, file))];
 const failures = [];
 let links = 0;
 for (const file of files) {

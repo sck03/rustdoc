@@ -4,7 +4,7 @@ import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
-import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
+import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
 import { attachPdfViewerSession } from "./lib/pdf-viewer-page-capture.mjs";
 import { verifyAttachmentManagementUi } from "./lib/business-attachment-management-ui-scenarios.mjs";

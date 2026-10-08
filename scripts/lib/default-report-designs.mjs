@@ -206,9 +206,9 @@ function payment(expense) {
     d.layers[1].elements=[grid("payment-grid",14,34,170,[12,9,16,13,24,11,15],[
       [15,[cell("purpose","用款事项",1,{rowSpan:5,verticalText:true,style:{align:"Center",bold:true}}),cell("project-label","项目"),binding("project","Payment.Project"),cell("invoice-label","出口发票号码"),binding("invoice","Payment.InvoiceNo"),cell("shipment-label","出货日期"),binding("shipment","Payment.ShipmentDate")]],
       [15,[cell("usd-label","美元"),binding("usd","Payment.USDAmount"),cell("cny-label","人民币(大写)"),binding("cny-upper","cny_amount_upper"),cell("small","(小写)"),binding("cny","Payment.CNYAmount",1,{label:"￥",labelPosition:"Prefix"})]],
-      [10,[binding("payee","Payment.PayeeName",3,{label:"支付单位名称"}),cell("method","",3,{contentKind:"CheckboxGroup",fieldPath:"Payment.PaymentMethod",checkboxOptions:["支票","电汇","预付"].map((name,i)=>({id:`method-${i}`,label:name,value:name})),style:{align:"Center"}})]],
-      [9,[binding("bank","Payment.BankName",3,{label:"开户行"}),binding("notes","Payment.Notes",3,{rowSpan:2,label:"备注"})]],
-      [9,[binding("account","Payment.AccountNo",3,{label:"账号"})]],
+      [10,[binding("payee","Payment.PayeeName",3,{label:"支付单位名称",border:{...border,bottom:false}}),cell("method","",3,{contentKind:"CheckboxGroup",fieldPath:"Payment.PaymentMethod",checkboxOptions:["支票","电汇","预付"].map((name,i)=>({id:`method-${i}`,label:name,value:name})),style:{align:"Center"}})]],
+      [9,[binding("bank","Payment.BankName",3,{label:"开户行",border:{...border,top:false,bottom:false}}),binding("notes","Payment.Notes",3,{rowSpan:2,label:"备注"})]],
+      [9,[binding("account","Payment.AccountNo",3,{label:"账号",border:{...border,top:false}})]],
     ],8.5,serif),grid("payment-signatures",14,98,170,[35,30,35],[[7,[cell("manager","业务经理签字："),cell("approval","审批："),cell("review","复核：")]]],9,serif,false)];
     d.layers[3].elements=[text("stub","②\n付\n款\n联",189,48,8,33,10,"Center",true,serif)];
   }

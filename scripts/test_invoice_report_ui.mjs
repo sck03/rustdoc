@@ -5,7 +5,7 @@ import { cargoExampleExecutable } from './lib/cargo-paths.mjs';
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
-import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
+import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
 import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
 

@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
 import { captureScreenshot, createPageSession, evaluate, getFreePort, startChrome } from "./lib/web-runtime-browser-session.mjs";
-import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
+import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const webRoot = path.join(repositoryRoot, "apps", "export-doc-web");

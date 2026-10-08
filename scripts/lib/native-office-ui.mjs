@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { cargoExampleExecutable } from './cargo-paths.mjs';
-import { locateChromeForTesting } from './report-regression-common.mjs';
+import { locateChromeForTesting } from './chromium-executable.mjs';
 import { spawnProcessTree, stopProcessTree } from './child-process-tree.mjs';
 
 export async function withOfficeUi(name, run) {

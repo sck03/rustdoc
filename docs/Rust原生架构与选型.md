@@ -35,7 +35,7 @@ Tauri 是桌面宿主；浏览器与 Docker 不运行 Tauri 窗口。Node 只用
 
 模板字体固定使用已随包的 Noto Sans CJK SC Regular/Bold 与 Noto Serif CJK SC Regular，清单及哈希由 `Resources/Fonts/OpenSource/font-manifest.json` 管理。三文件均为 SIL OFL 1.1，允许商业使用、随包分发与 PDF 嵌入；字体替换后校准原版布局，不将参考 PDF 中的微软雅黑/其它字体作为新依赖。需要加粗时使用已有 Sans Bold。
 
-Slint 和 egui 客户端已退役。2026-09-28 按用户清理要求移除本分支重复的 C# 源码、测试、工程、生成器与旧部署；相邻只读工作树和 Git 历史仍提供对照。冻结 OpenAPI、单一窗口参考数据和共用夹具继续用于 Rust 契约验收。
+Slint 和 egui 客户端已退役。2026-09-28 按用户清理要求移除本分支重复的 C# 源码、测试、工程、生成器与旧部署；只读备份分支和 Git 历史提供对照，不再依赖相邻 C# 工作树。冻结 OpenAPI、单一窗口参考数据和有效共用夹具继续用于 Rust 契约验收。
 
 2026-09-30 清除退役客户端残留的 `reference-backend` 回环传输 feature 和未使用的 Runtime 包装；`api::ApiClient` 仅持有进程内 Rust 服务，继续供集成工作流验证。Windows 子进程 Job 对象归入 `controlled_process` 私有平台模块，实际进程树清理机制保留。
 

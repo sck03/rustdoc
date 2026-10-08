@@ -5,7 +5,7 @@ import http from "node:http";
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
-import { locateChromeForTesting } from "./lib/report-regression-common.mjs";
+import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
 import { verifyDesignerEditingUi, verifyCommercialTemplateUi } from "./lib/report-designer-editing-ui-scenarios.mjs";
 import { verifyProductFieldsUi } from "./lib/report-designer-product-fields-ui.mjs";
