@@ -852,7 +852,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | xmlwriter | 0.1.0 | MIT | native-desktop |
 | xmp-writer | 0.3.3 | MIT OR Apache-2.0 | native-desktop |
 | yoke | 0.8.3 | Unicode-3.0 | native-desktop |
-| yoke-derive | 0.8.3 | Unicode-3.0 | native-desktop |
+| yoke-derive | 0.8.4 | Unicode-3.0 | native-desktop |
 | zbus | 5.19.0 | MIT | native-desktop |
 | zbus_macros | 5.19.0 | MIT | native-desktop |
 | zbus_names | 4.3.4 | MIT | native-desktop |

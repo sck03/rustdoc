@@ -50,6 +50,8 @@ Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ub
 
 2026-10-08 复核 [run 37550212861](https://github.com/sck03/rustdoc/actions/runs/37550212861)：发布合同中的清理测试在 Ubuntu 删除测试用 .git 文件时报“隐藏/只读项”。Linux 将点文件标为 Hidden，测试释放自己创建的单个文件时需要 -Force；修正测试清理，并在 Windows 显式设置同一隐藏属性复现和回归。正式清理器的 Git/数据保护保持不变，不能为让测试通过而允许删除真实仓库。
 
+同日复核 [run 37512895890](https://github.com/sck03/rustdoc/actions/runs/37512895890) 的 rustsec-workspace.json：yoke-derive 0.8.3 被撤回，触发 --deny yanked；OCR/Excel 图没有该阻断。独立定向升级为未撤回的 0.8.4（Unicode-3.0）并同步锁文件/notices，三份锁图按原审计参数通过。GLib 既有单项例外及源码前置检查保留，不新增豁免。
+
 2026-09-29 核对 [run 36503387531](https://github.com/sck03/rustdoc/actions/runs/36503387531)：脚本套件输出 `Success: true`，但 GitHub PowerShell 包装器仍返回 1。原因是缺少构建产物的反向测试留下预期的 `$LASTEXITCODE=1`；后续检查通过未清除它。套件改为通过共用进程执行器隔离 PowerShell 回归，检查子进程真实结果，全部通过后显式返回 0。发布合同回归使用 Actions 相同的调用及退出码传播方式，验证成功和真实语法失败；不放宽文件保护、依赖、权限或发布检查。
 
 2026-09-25 核对 GitHub run 36044362655：`Audit Rust lock files` 被 glib 0.18.5 的 [RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429) 阻断，SBOM 未生成是连带结果。Tauri 2.11.6 的 GTK3 图使用该版本；修复版本 glib >=0.20 与此依赖图不兼容，0.18 分支没有发布修复。受影响 API 为 VariantStrIter/array_iter_str，当前项目及其它锁定依赖源码没有引用它们。`verify-rustsec-glib-exception.mjs` 为单项风险例外准备了保守检查：固定 Tauri/glib 版本，任何其它依赖或项目出现受影响符号即失败。源码检查不等于修复或形式化不可达证明；例外是否启用必须记录本次决定，不能全局关闭 unsound/yanked 门禁。

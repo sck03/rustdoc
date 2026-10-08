@@ -714,7 +714,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | xmlwriter | 0.1.0 | MIT | native-desktop |
 | cargo | xmp-writer | 0.3.3 | MIT OR Apache-2.0 | native-desktop |
 | cargo | yoke | 0.8.3 | Unicode-3.0 | native-desktop |
-| cargo | yoke-derive | 0.8.3 | Unicode-3.0 | native-desktop |
+| cargo | yoke-derive | 0.8.4 | Unicode-3.0 | native-desktop |
 | cargo | zbus | 5.19.0 | MIT | native-desktop |
 | cargo | zbus_macros | 5.19.0 | MIT | native-desktop |
 | cargo | zbus_names | 4.3.4 | MIT | native-desktop |
