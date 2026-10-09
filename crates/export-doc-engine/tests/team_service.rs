@@ -11,6 +11,8 @@ mod business_contract;
 mod communication_contract;
 #[path = "support/handling_contract.rs"]
 mod handling_contract;
+#[path = "support/invoice_clone_contract.rs"]
+mod invoice_clone_contract;
 #[path = "support/oa_contract.rs"]
 mod oa_contract;
 #[path = "support/office_contract.rs"]
@@ -84,6 +86,10 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     .unwrap();
     assert_eq!(admin["user"]["capabilities"]["usesOfficeRegister"], false);
     let token = admin["accessToken"].as_str().unwrap();
+    invoice_clone_contract::exercise(&|operation, parameters, query, body| {
+        let bytes = service.dispatch(operation, parameters, query, body, token)?;
+        Ok(serde_json::from_slice(&bytes).unwrap())
+    });
     business_contract::exercise(&|operation, parameters, query, body| {
         let bytes = service.dispatch(operation, parameters, query, body, token)?;
         Ok(serde_json::from_slice(&bytes).unwrap())

@@ -54,7 +54,7 @@ function commercialHeader(d,title) {
     text("date-label","Date:",143,56,19,5,7,"Right"),field("invoice-date","Invoice.InvoiceDate",163,56,32,5,7,"Right"),
   ];
   d.layers[2].elements=[pageNumber()];
-  const final={id:"final",name:"末页签章",role:"Footer",visible:true,locked:false,print:{repeatOnEveryPage:false,keepTogether:true,pinToPageBottom:false,minHeightHundredthMm:0},elements:[seal("seal","doc_seal_path",150,250,40,25)]};
+  const final={id:"final",name:"末页签章",role:"Footer",visible:true,locked:false,print:{repeatOnEveryPage:false,keepTogether:true,pinToPageBottom:false,minHeightHundredthMm:0},elements:[seal("seal","doc_seal_path",110,225,80,50)]};
   d.layers.push(final);
 }
 function invoice() {
@@ -100,7 +100,7 @@ function invoice() {
     namedField("total-quantity","总数量","total_by_qty_unit.Value",108,121,12,9,"Right",true),
     namedField("total-quantity-unit","总数量单位","total_by_qty_unit.Key",120,121,12,9,"Left",true),
     namedField("total-amount","总金额","Invoice.TotalAmount",164,121,29,9,"Right",true),
-    seal("seal","doc_seal_path",150,134,40,25),
+    seal("seal","doc_seal_path",110,134,80,50),
   ];
   for(const e of final.elements) if(e.type === "Field" || e.type === "Text") { e.yHundredthMm+=e.style.paddingHundredthMm; e.style.paddingHundredthMm=0; }
   d.layers.push(first);
@@ -119,7 +119,7 @@ function packing() {
     column("net","净重\nNet Weight","item.NWTotal",20,"Right",[F("item.NWTotal"),T("KGS")]),
     column("volume","体积\nMEAS.","item.Volume",18,"Right",[F("item.Volume"),T("CBM")]),
   ],6.5);
-  t.heightHundredthMm=mm(180);
+  t.heightHundredthMm=mm(155);
   t.block.print.fillHeight=true;
   t.block.sideBand={title:"唛头 / Marks",widthMm:32,contentKind:"Field",text:"",fieldPath:"Invoice.ShippingMarks",style:{fontSizePt:7}};
   t.block.columns[0].omitEmptyLines=true;
@@ -148,7 +148,7 @@ function contract() {
   ];
   const contractTail = d.layers[1].elements.splice(1);
   d.layers[2].elements=[pageNumber()];
-  d.layers.push({id:"seal-layer",name:"末页印章",role:"Footer",visible:true,locked:false,print:{repeatOnEveryPage:false,keepTogether:true,pinToPageBottom:false,followBody:true,minHeightHundredthMm:0},elements:[...contractTail,seal("seal","doc_seal_path",150,223,40,25)]});
+  d.layers.push({id:"seal-layer",name:"末页印章",role:"Footer",visible:true,locked:false,print:{repeatOnEveryPage:false,keepTogether:true,pinToPageBottom:false,followBody:true,minHeightHundredthMm:0},elements:[...contractTail,seal("seal","doc_seal_path",110,223,80,50)]});
   return d;
 }
 function customs() {
@@ -182,7 +182,7 @@ function customs() {
     [5,[cell("company","申报单位"),cell("company-space","",9),cell("signature","申报单位(签章)",2),cell("sign-space","",3)]],
   ],6.5,serif);
   declaration.block.rows.forEach((row,rowIndex)=>{let col=0;row.cells.forEach(c=>{c.style={bold:true,align:rowIndex===0||c.id==="signature"?"Center":"Left"};c.border={...border,top:rowIndex===0,bottom:rowIndex===0||rowIndex===2,left:col===0||(rowIndex>0&&col===12),right:col+c.colSpan===15};col+=c.colSpan;});});
-  d.layers[2].elements=[declaration,text("brand-note","境外品牌(贴牌生产)\n出口货物不能确定在最终目的国（地区）享受优惠",46,175,235,11,7,"Left",false,serif),seal("customs-seal","customs_seal_path",185,156,44,25)];
+  d.layers[2].elements=[declaration,text("brand-note","境外品牌(贴牌生产)\n出口货物不能确定在最终目的国（地区）享受优惠",46,175,235,11,7,"Left",false,serif),seal("customs-seal","customs_seal_path",141,150,88,50)];
   d.layers[2].print.followBody=true;
   d.layers[2].print.firstPageOnly=true;
   d.layers[3].elements=[pageNumber(247,18)];

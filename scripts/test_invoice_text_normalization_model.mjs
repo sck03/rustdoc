@@ -43,6 +43,17 @@ const productLibrary = globalThis.__productLibrary;
 const formUtils = globalThis.__formUtils;
 const draftEquality = globalThis.__draftEquality;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
+const totalOnly = { ...itemModel.createEmptyInvoiceItem(), styleNo: "TOTAL-ONLY", quantity: 505, cartons: 17, unitPrice: 8.22, gwTotal: 250, nwTotal: 233, volume: 1.252, purchaseTotal: 123.45 };
+const savedTotalOnly = itemModel.normalizeInvoiceItemForSave(totalOnly);
+assert(savedTotalOnly.gwTotal === 250 && savedTotalOnly.nwTotal === 233 && savedTotalOnly.volume === 1.252 && savedTotalOnly.purchaseTotal === 123.45, "saving preserves independent imported totals without pretending quantity was edited");
+assert(savedTotalOnly.totalPrice === 4151.1, "saving still normalizes the active price calculation");
+const pastedTotals = itemModel.recalculateInvoiceItem(totalOnly, ["quantity", "cartons", "gwTotal", "nwTotal", "volume"]);
+assert(pastedTotals.gwTotal === 250 && pastedTotals.nwTotal === 233 && pastedTotals.volume === 1.252, "explicit pasted totals take priority over dependent calculations");
+assert(itemModel.recalculateInvoiceItem({ ...totalOnly, gwPerCtn: 12 }, ["gwPerCtn"]).gwTotal === 204, "editing a real weight input still recalculates its total");
+const empty = model.createEmptyInvoice("2026-10-09");
+assert(empty.type === "报关数据" && empty.supervisionMode === "一般贸易" && empty.transportMode === "BY SEA", "new invoice uses customs defaults");
+assert(model.getCounterpartInvoiceType(empty.type) === "实际数据", "customs invoice generates actual data");
+assert(model.normalizeInvoiceForSave({ ...empty, type: "实际数据" }, 0).type === "实际数据", "explicit existing actual data is preserved");
 const draft = model.uppercaseInvoiceEnglishText({
   ...model.createEmptyInvoice("2026-07-29"),
   invoiceNo: "2026yh024",

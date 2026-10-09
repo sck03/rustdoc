@@ -4,6 +4,7 @@ mod archive;
 mod import;
 mod mapping;
 mod sheet;
+mod supplements;
 mod tabular;
 mod tabular_reader;
 pub use tabular_reader::read_table;

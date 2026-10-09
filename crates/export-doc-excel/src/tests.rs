@@ -61,6 +61,81 @@ fn reordered_columns_and_line_amount_driven_prices_are_preserved() {
 }
 
 #[test]
+fn supplemental_tables_join_by_po_and_style_and_ignore_empty_formula_tails() {
+    let columns = [
+        ("a", "PO number"),
+        ("b", "款号"),
+        ("c", "英文品名"),
+        ("d", "数量"),
+        ("e", "单价"),
+        ("f", "总价"),
+        ("g", "中文品名"),
+        ("h", ""),
+        ("i", ""),
+    ];
+    let mut rows = vec![
+        json!({"a":"P1","b":"SAME","c":"SHIRT A","d":0,"e":0,"f":0}),
+        json!({"a":"P2","b":"SAME","c":"SHIRT B","d":2,"e":3,"f":6,"g":"原有中文"}),
+        json!({"a":"P3","b":"OTHER","c":"SHIRT C","d":1,"e":1,"f":1}),
+    ];
+    rows.resize(148, json!({}));
+    rows[5] = json!({"a":"NOTIFY PARTY","b":"REVIEW WAREHOUSE"});
+    rows[8] = json!({"a":"日期","b":46178});
+    rows.extend([
+        json!({"a":"NAME/COMPO","d":"成分及英文名","e":"报关中文名","f":"提单HS编码","g":"品牌","h":"报关HS编码","i":"单位"}),
+        json!({"a":"P2","b":"2","c":"SAME","d":"100% COTTON SHIRT","e":"补充中文二","f":"999999","g":"BETA","h":"222222","i":"件"}),
+        json!({"a":"P1","b":"1","c":"SAME","d":"80% COTTON SHIRT","e":"补充中文一","f":"888888","g":"ALPHA","h":"111111","i":"条"}),
+        json!({"a":"P3","b":"3","c":"OTHER","d":"SILK","e":"补充中文三","g":"CONFLICT-A"}),
+        json!({"a":"P3","b":"3","c":"OTHER","d":"SILK","e":"补充中文三","g":"CONFLICT-B"}),
+    ]);
+    let bytes = table(&columns, &rows, &check).unwrap();
+    let mut package = archive::Package::open(&bytes, &check).unwrap();
+    let sheet = String::from_utf8(package.get("xl/worksheets/sheet1.xml").unwrap().to_vec())
+        .unwrap()
+        .replace(
+            "</sheetData>",
+            "<row r=\"65536\"><c r=\"J65536\"><f>D65536*E65536</f><v>0</v></c></row></sheetData>",
+        );
+    package
+        .0
+        .insert("xl/worksheets/sheet1.xml".into(), sheet.into_bytes());
+    let bytes = package.finish(&check).unwrap();
+    let result = preview(&bytes, "anonymous.xlsx", &settings(), "2026-10-09", &check).unwrap();
+    assert!(result.success, "{:?}", result.errors);
+    let invoice = result.invoice.unwrap();
+    assert_eq!(invoice.items.len(), 3);
+    assert_eq!(invoice.invoice_date, "2026-06-05");
+    assert_eq!(invoice.notify_party_mode, "Separate");
+    assert_eq!(invoice.total_amount.to_string(), "7");
+    assert_eq!(invoice.items[0].style_name_cn, "补充中文一");
+    assert_eq!(invoice.items[0].brand, "ALPHA");
+    assert_eq!(invoice.items[0].hs_code, "111111");
+    assert_eq!(invoice.items[0].unit_cn, "条");
+    assert_eq!(invoice.items[0].quantity, rust_decimal::Decimal::ZERO);
+    assert_eq!(invoice.items[1].style_name_cn, "原有中文");
+    assert_eq!(invoice.items[1].brand, "BETA");
+    assert_eq!(invoice.items[1].hs_code, "222222");
+    assert_eq!(invoice.items[2].brand, "");
+    assert_eq!(result.analysis_report.unwrap().issues.len(), 1);
+    let mut package = archive::Package::open(&bytes, &check).unwrap();
+    let workbook = String::from_utf8(package.get("xl/workbook.xml").unwrap().to_vec())
+        .unwrap()
+        .replace("<sheets>", "<workbookPr date1904=\"1\"/><sheets>");
+    package
+        .0
+        .insert("xl/workbook.xml".into(), workbook.into_bytes());
+    let result = preview(
+        &package.finish(&check).unwrap(),
+        "epoch.xlsx",
+        &settings(),
+        "2026-10-09",
+        &check,
+    )
+    .unwrap();
+    assert_eq!(result.invoice.unwrap().invoice_date, "2030-06-06");
+}
+
+#[test]
 fn extending_the_detail_area_preserves_subtotals_and_footer() {
     let mut invoice = InvoiceDraft::demo("2026-09-16", "XL-LONG").build().unwrap();
     let item = invoice.items[0].clone();
@@ -134,7 +209,10 @@ fn import_ignores_empty_tail_records_but_rejects_real_out_of_bounds_content() {
     let report = imported.analysis_report.unwrap();
     assert_eq!(report.selected_worksheet_name, "Items");
     assert_eq!(report.sheets[0].used_row_count, 11);
-    assert_eq!(report.sheets[1].used_row_count, 65536);
+    assert_eq!(
+        report.sheets[1].used_row_count, 1,
+        "zero-only formula tails are outside the effective range"
+    );
     let bytes = table(
         &[
             ("name", "英文品名"),

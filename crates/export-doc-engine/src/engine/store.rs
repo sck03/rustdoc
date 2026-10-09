@@ -356,6 +356,11 @@ pub fn save_in_scope(
         id
     };
     body["id"] = json!(record_id);
+    if kind == "invoices" {
+        for item in body["items"].as_array_mut().into_iter().flatten() {
+            item["invoiceId"] = json!(record_id);
+        }
+    }
     if kind == "people" {
         body["employee"]["id"] = json!(record_id);
     }

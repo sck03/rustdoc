@@ -366,6 +366,7 @@ pub fn handle(
             record_id,
             &request,
             business_date,
+            None,
         )
     })?;
     let value = if resource.key == "permission-templates" {
@@ -398,6 +399,7 @@ pub(super) fn save_in_transaction(
     record_id: i64,
     request: &Value,
     business_date: chrono::NaiveDate,
+    scope: Option<&Value>,
 ) -> Result<Value> {
     let current = auth::current_actor_in(transaction, actor.id, actor.edition)?;
     let actor = &current;
@@ -457,6 +459,13 @@ pub(super) fn save_in_transaction(
             json!(actor.company)
         };
     }
+    if record_id == 0 {
+        if let Some(scope) = scope {
+            for key in ["ownerUserId", "departmentId", "companyScope"] {
+                value[key] = scope[key].clone();
+            }
+        }
+    }
     normalize(&mut value, 0)?;
     validate(
         transaction,
@@ -475,7 +484,7 @@ pub(super) fn save_in_transaction(
     } else {
         Some(text(&value, resource.identity))
     };
-    let saved = store::save(
+    let saved = store::save_in_scope(
         transaction,
         resource.key,
         record_id,
@@ -483,6 +492,7 @@ pub(super) fn save_in_transaction(
         identity,
         actor,
         action,
+        scope,
     )?;
     if matches!(resource.key, "bookings" | "supply-requests") {
         let event = if record_id > 0 {

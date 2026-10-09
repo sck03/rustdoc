@@ -17,10 +17,11 @@ impl InvoiceDraft {
                 invoice_date: business_date.into(),
                 shipment_date: business_date.into(),
                 currency: "USD".into(),
-                r#type: "实际数据".into(),
+                r#type: "报关数据".into(),
                 status: "Draft".into(),
                 trade_terms: "FOB".into(),
-                transport_mode: "海运".into(),
+                transport_mode: "BY SEA".into(),
+                supervision_mode: "一般贸易".into(),
                 shipping_marks_type: "Text".into(),
                 notify_party_mode: "None".into(),
                 ..Default::default()

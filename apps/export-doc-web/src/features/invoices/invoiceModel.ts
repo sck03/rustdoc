@@ -9,8 +9,8 @@ import {
 } from "./invoiceItemsEditorModel.ts";
 
 export const invoiceTypeOptions = [
-  { value: "实际数据", label: "实际数据" },
   { value: "报关数据", label: "报关数据" },
+  { value: "实际数据", label: "实际数据" },
 ];
 
 export const invoiceStatusOptions = [
@@ -26,7 +26,7 @@ const reversibleInvoiceStatuses = new Set(["Verified", "Shipped", "Completed"]);
 
 export function normalizeInvoiceType(value?: string) {
   const normalized = value?.trim() ?? "";
-  return invoiceTypeOptions.some((option) => option.value === normalized) ? normalized : "实际数据";
+  return invoiceTypeOptions.some((option) => option.value === normalized) ? normalized : "报关数据";
 }
 
 export function getCounterpartInvoiceType(value?: string) {
@@ -125,11 +125,11 @@ export function createEmptyInvoice(businessDate: string): ApiInvoiceDetailDto {
     shippingMarks: "",
     shippingMarksImage: "",
     tradeTerms: "",
-    transportMode: "",
+    transportMode: "BY SEA",
     issuingBank: "",
     supervisionMode: "一般贸易",
     status: "Draft",
-    type: "实际数据",
+    type: "报关数据",
     totalAmount: 0,
     totalCartons: 0,
     totalQuantity: 0,

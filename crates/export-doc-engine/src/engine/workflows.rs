@@ -6,6 +6,7 @@ use super::{
 };
 use crate::{generated_api::*, invoice::InvoiceDraft};
 use serde_json::{Value, json};
+mod invoice_clone;
 
 pub const ACTIONS: &[Operation] = &[
     TRANSITION_INVOICE_STATUS,
@@ -65,6 +66,7 @@ pub fn action(
     operation: Operation,
     id: i64,
     body: Value,
+    business_date: chrono::NaiveDate,
 ) -> Result<Value> {
     let (kind, action) = match operation.id {
         "TransitionInvoiceStatus" => ("invoices", "transition"),
@@ -86,10 +88,13 @@ pub fn action(
     let resource = catalog::resource(kind).ok_or_else(|| invalid("业务资源未注册。"))?;
     let permission_action = auth::operation_action(operation, resource.permission, action)?;
     auth::authorize(actor, resource.permission, permission_action)?;
-    let mut saved=store.transaction_as(actor, |transaction, actor|{
+    store.transaction_as(actor, |transaction, actor|{
         let mut value=store::get(transaction,kind,id)?;
         if !auth::visible(actor,resource.permission,permission_action,&value){return Err(super::error::error(403,"没有办理此记录的权限。"));}
-        let cloning=matches!(operation.id,"CloneInvoice"|"CloneInvoiceAsType"|"CloneUserReportTemplate");
+        if matches!(operation.id,"CloneInvoice"|"CloneInvoiceAsType") {
+            return invoice_clone::save(transaction, actor, resource, operation, &value, body, business_date);
+        }
+        let cloning=operation.id=="CloneUserReportTemplate";
         if !cloning{store::check_version(&value,store::expected(&body))?;}
         let state=text(&value,"status");
         match operation.id {
@@ -101,10 +106,6 @@ pub fn action(
                 value["status"]=json!(next);
             },
             "UnverifyInvoice"=>{if !["Verified","Shipped","Completed"].contains(&state.as_str()){return Err(conflict("当前发票状态不能撤销核对。"));}required(&body,"note","撤销核对原因",500)?;value["status"]=json!("Draft");},
-            "CloneInvoice"|"CloneInvoiceAsType"=>{
-                value["id"]=json!(0);value["status"]=json!("Draft");value["rowVersion"]=json!("");value["invoiceNo"]=json!(format!("{}-COPY-{}",text(&value,"invoiceNo"),&crate::paths::nonce().map_err(super::error::unavailable)?[..6]));
-                if operation==CLONE_INVOICE_AS_TYPE{value["type"]=body["type"].clone();}
-            },
             "DeactivateCrmCustomer"=>{if ["暂停","已流失"].contains(&state.as_str()){return Err(conflict("客户已处于暂停或流失状态。"));}value["status"]=json!("暂停");},"RestoreCrmCustomer"=>{if !["暂停","已流失"].contains(&state.as_str()){return Err(conflict("只有暂停或流失客户可以恢复。"));}value["status"]=json!("跟进中");},
             "AdmitSupplier"=>{if state!="考察中"{return Err(conflict("仅能准入考察中的供应商。"));}value["status"]=json!("合作中");},"DeactivateSupplier"=>{if state=="停用"{return Err(conflict("供应商已经停用。"));}value["status"]=json!("停用");},"RestoreSupplier"=>{if !["暂停","停用"].contains(&state.as_str()){return Err(conflict("只有暂停或停用的供应商可以恢复考察。"));}value["status"]=json!("考察中");},
             _=>{
@@ -116,13 +117,11 @@ pub fn action(
         let identity=if resource.identity.is_empty(){None}else{Some(text(&value,resource.identity))};
         let saved=store::save(transaction,kind,if cloning{0}else{id},value,identity,actor,action)?;
         if ["report-templates","email-templates"].contains(&kind){store::save(transaction,"template-versions",0,json!({"templateKind":kind,"templateId":saved["id"],"content":saved,"note":text(&body,"note")}),None,actor,"version")?;}
+        if kind == "invoices" {
+            let dto: ApiInvoiceDetailDto = serde_json::from_value(saved)?;
+            let invoice = InvoiceDraft::from_dto(dto).build().map_err(invalid)?;
+            return Ok(json!({"success":true,"id":invoice.id,"message":"操作完成","invoice":invoice}));
+        }
         Ok(saved)
-    })?;
-    if kind == "invoices" {
-        let dto: ApiInvoiceDetailDto = serde_json::from_value(saved)?;
-        let invoice = InvoiceDraft::from_dto(dto).build().map_err(invalid)?;
-        saved = serde_json::to_value(invoice)?;
-        return Ok(json!({"success":true,"message":"操作完成","invoice":saved}));
-    }
-    Ok(saved)
+    })
 }

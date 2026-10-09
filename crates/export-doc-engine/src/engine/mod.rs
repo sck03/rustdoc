@@ -674,6 +674,7 @@ impl NativeService {
                         operation,
                         records::id(parameters)?,
                         body_value,
+                        self.clock.now().map_err(unavailable)?.today,
                     )?
                 } else if OFFICE_ACTIONS.contains(&operation) {
                     office::action(

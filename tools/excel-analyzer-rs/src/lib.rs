@@ -11,11 +11,13 @@ const MAX_CELL_CHARACTERS: usize = 4_096;
 const MAX_PROFILE_TEXT_CHARACTERS: usize = 1_000_000;
 
 mod document_fields;
+mod item_metadata;
 mod table_analysis;
 mod table_values;
 mod workbook_analysis;
 
 use document_fields::*;
+pub use item_metadata::item_metadata_fields;
 use table_analysis::*;
 use table_values::*;
 pub use workbook_analysis::analyze_workbook;

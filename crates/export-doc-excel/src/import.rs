@@ -1,5 +1,8 @@
 use crate::{Check, MAX_INPUT, Result, archive::Package, mapping};
-use calamine::{Data, DataType, Range, Reader, open_workbook_auto_from_rs};
+use calamine::{
+    Data, DataType, ExcelDateTime, ExcelDateTimeType, Range, Reader, Sheets,
+    open_workbook_auto_from_rs,
+};
 use export_doc_contracts::{contracts, generated_api::*};
 use export_doc_domain::{
     invoice::{InvoiceDraft, ItemRow, MAX_ROWS, money, parse_number},
@@ -28,7 +31,7 @@ fn text(cell: Option<&Data>) -> String {
         Some(value) => value.to_string().nfc().collect::<String>().trim().into(),
     }
 }
-fn at(range: &Range<Data>, row: usize, col: usize) -> String {
+pub(crate) fn at(range: &Range<Data>, row: usize, col: usize) -> String {
     if row == 0 || col == 0 {
         return String::new();
     }
@@ -45,6 +48,29 @@ fn score(value: f32) -> Decimal {
     Decimal::from_str(&format!("{value:.4}")).unwrap_or_default()
 }
 
+fn numeric_date(
+    range: &Range<Data>,
+    key: &str,
+    row: usize,
+    col: usize,
+    epoch: Option<bool>,
+) -> Option<String> {
+    if !matches!(key, "invoiceDate" | "shipmentDate") || row == 0 || col == 0 {
+        return None;
+    }
+    let value = match range.get_value(((row - 1) as u32, (col - 1) as u32))? {
+        Data::Float(value) => *value,
+        Data::Int(value) => *value as f64,
+        _ => return None,
+    };
+    if !(1.0..=2_958_465.0).contains(&value) {
+        return None;
+    }
+    ExcelDateTime::new(value, ExcelDateTimeType::DateTime, epoch?)
+        .as_datetime()
+        .map(|date| date.date().format("%Y-%m-%d").to_string())
+}
+
 // BIFF files can retain formatted/empty records through row 65536. Count
 // content, not formatting, and keep original coordinates for field mappings.
 fn content_range(range: Range<Data>, total: &mut usize, check: Check<'_>) -> Result<Range<Data>> {
@@ -54,6 +80,18 @@ fn content_range(range: Range<Data>, total: &mut usize, check: Check<'_>) -> Res
     let mut bounds: Option<((u32, u32), (u32, u32))> = None;
     for (row, cells) in range.rows().enumerate() {
         check()?;
+        // A row containing only empty cells and numeric zero has no item or
+        // document identity. BIFF may retain such formula caches at row 65536.
+        // Keep zeros inside every meaningful row, including zero-quantity items.
+        if !cells.iter().any(|cell| match cell {
+            Data::Empty => false,
+            Data::Float(value) => *value != 0.0,
+            Data::Int(value) => *value != 0,
+            Data::String(value) => !value.trim().is_empty(),
+            _ => true,
+        }) {
+            continue;
+        }
         for (col, cell) in cells.iter().enumerate() {
             let value = text(Some(cell));
             if value.is_empty() {
@@ -95,6 +133,12 @@ pub fn preview(
     }
     let mut workbook = open_workbook_auto_from_rs(Cursor::new(bytes))
         .map_err(|e| format!("无法读取 Excel 工作簿：{e}"))?;
+    let epoch = match &workbook {
+        Sheets::Xls(book) => Some(book.has_1904_epoch()),
+        Sheets::Xlsx(book) => Some(book.has_1904_epoch()),
+        Sheets::Xlsb(book) => Some(book.has_1904_epoch()),
+        _ => None,
+    };
     let names = workbook.sheet_names().to_vec();
     if names.len() > 64 {
         return Err("Excel 工作表超过 64 个。".into());
@@ -207,13 +251,20 @@ pub fn preview(
             .cloned();
         if let Some(key) = key {
             if header[&key].is_string() && !field.value.trim().is_empty() {
-                header[&key] = json!(field.value.trim());
+                header[&key] = json!(
+                    numeric_date(&range, &key, field.row, field.column, epoch)
+                        .unwrap_or_else(|| field.value.trim().into())
+                );
             }
         }
     }
     if configured_layout {
         for (key, setting) in mapping::HEADERS {
-            let value = configured(&range, settings, setting);
+            let value = settings[*setting]
+                .as_str()
+                .and_then(mapping::cell)
+                .and_then(|(row, col)| numeric_date(&range, key, row as usize, col as usize, epoch))
+                .unwrap_or_else(|| configured(&range, settings, setting));
             if !value.is_empty() {
                 header[*key] = json!(value);
             }
@@ -257,10 +308,12 @@ pub fn preview(
     } else if notify.eq_ignore_ascii_case("SAME AS CONSIGNEE") {
         "SameAsConsignee"
     } else {
-        "Custom"
+        "Separate"
     });
     draft.header = serde_json::from_value(header).map_err(|e| format!("发票抬头数据无效：{e}"))?;
     draft.rows.clear();
+    let supplements = crate::supplements::Tables::read(&range, detected.data_start_row, check)?;
+    let mut source_fields = vec![];
     let start = if configured_layout {
         settings["itemsStartRow"]
             .as_u64()
@@ -273,6 +326,7 @@ pub fn preview(
         .filter(|end| configured_layout && *end >= start as u64)
         .map(|end| end as usize)
         .unwrap_or(range.end().unwrap().0 as usize + 1);
+    let end = supplements.detail_end().map_or(end, |last| end.min(last));
     for row_index in start..=end {
         check()?;
         let mut row = ItemRow::blank();
@@ -339,6 +393,7 @@ pub fn preview(
             continue;
         }
         draft.rows.push(row);
+        source_fields.push(changed);
         if draft.rows.len() > MAX_ROWS {
             return Err(format!("商品明细超过 {MAX_ROWS} 行。"));
         }
@@ -346,6 +401,7 @@ pub fn preview(
     if draft.rows.is_empty() {
         errors.push("未读取到有效商品明细，请核对表头、数据行和公式缓存。".into());
     }
+    let mut issues = supplements.apply(&mut draft.rows, &source_fields, check)?;
     let invoice = draft.preview()?;
     let customer = (!invoice.customer_name_en.is_empty()).then(|| ApiImportedCustomerDto {
         customer_name_en: invoice.customer_name_en.clone(),
@@ -382,15 +438,17 @@ pub fn preview(
             ..Default::default()
         })
         .collect();
-    let issues = errors
-        .iter()
-        .map(|message| ApiExcelImportAnalysisIssueDto {
-            severity: "Error".into(),
-            code: "ImportValidation".into(),
-            message: message.clone(),
-            ..Default::default()
-        })
-        .collect();
+    issues.extend(
+        errors
+            .iter()
+            .map(|message| ApiExcelImportAnalysisIssueDto {
+                severity: "Error".into(),
+                code: "ImportValidation".into(),
+                message: message.clone(),
+                ..Default::default()
+            })
+            .collect::<Vec<_>>(),
+    );
     Ok(ApiExcelImportPreviewResponse {
         source_path: name.into(),
         success: errors.is_empty(),

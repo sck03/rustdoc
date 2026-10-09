@@ -135,9 +135,10 @@ fn dashboard_prefers_actual_data_and_keeps_previous_month_totals() {
         .unwrap()
         .checked_sub_months(chrono::Months::new(1))
         .unwrap();
-    let actual = InvoiceDraft::demo(&today.to_string(), "DASHBOARD-SAME-NUMBER")
+    let mut actual = InvoiceDraft::demo(&today.to_string(), "DASHBOARD-SAME-NUMBER")
         .build()
         .unwrap();
+    actual.r#type = "实际数据".into();
     let saved = fixture.create(CREATE_INVOICE, json!(actual));
     let mut customs = actual.clone();
     customs.r#type = "报关数据".into();

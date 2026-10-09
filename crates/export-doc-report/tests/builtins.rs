@@ -206,7 +206,7 @@ fn multipage_builtins_repeat_only_the_required_bands() {
         let result = render_builtin(template, &data, &AtomicBool::new(false)).unwrap();
         assert_eq!(
             result.pages.len(),
-            if template == Builtin::Invoice { 4 } else { 3 },
+            if template == Builtin::Invoice { 5 } else { 4 },
             "{}",
             template.label()
         );
@@ -226,6 +226,14 @@ fn multipage_builtins_repeat_only_the_required_bands() {
                 .all(|p| !p.svg.contains("TOTAL:"))
         );
         assert!(result.pages.last().unwrap().svg.contains("TOTAL:"));
+        assert!(
+            result
+                .pages
+                .last()
+                .unwrap()
+                .svg
+                .contains(">STYLE-36</text>")
+        );
         for index in 1..=36 {
             let all = result
                 .pages

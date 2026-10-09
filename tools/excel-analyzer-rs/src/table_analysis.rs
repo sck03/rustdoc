@@ -106,6 +106,7 @@ pub(super) fn detect_field_from_header_path_context(path: &[String]) -> Option<(
             "品名中文",
             "中文描述",
             "报关品名",
+            "报关中文名",
             "货物中文名称",
             "中文货物名称",
         ],
@@ -235,7 +236,9 @@ pub(super) fn disambiguate_weight_fields(mut fields: Vec<FieldCandidate>) -> Vec
     fields
 }
 
-pub(super) fn detect_field(header: &str) -> Option<(String, f32)> {
+type FieldAliases = (&'static str, f32, Vec<String>);
+
+fn field_aliases() -> Vec<FieldAliases> {
     let candidates = [
         (
             "PoNumber",
@@ -323,6 +326,7 @@ pub(super) fn detect_field(header: &str) -> Option<(String, f32)> {
                 "款式描述",
                 "中文描述",
                 "报关品名",
+                "报关中文名",
                 "货物中文名称",
                 "中文货物名称",
             ]
@@ -741,12 +745,33 @@ pub(super) fn detect_field(header: &str) -> Option<(String, f32)> {
 
     candidates
         .into_iter()
+        .map(|(field, confidence, aliases)| {
+            (
+                field,
+                confidence as f32,
+                aliases.iter().map(|alias| normalize_text(alias)).collect(),
+            )
+        })
+        .collect()
+}
+
+pub(super) fn detect_field(header: &str) -> Option<(String, f32)> {
+    if header.is_empty() {
+        return None;
+    }
+    if (header.contains("提单") || header.contains("billoflading")) && header.contains("hs") {
+        return Some(("BillOfLadingHSCode".to_string(), 0.95));
+    }
+    static CANDIDATES: std::sync::LazyLock<Vec<FieldAliases>> =
+        std::sync::LazyLock::new(field_aliases);
+    CANDIDATES
+        .iter()
         .filter_map(|(field, confidence, aliases)| {
             aliases
                 .iter()
                 .filter_map(|alias| header_alias_match_score(header, alias))
                 .max()
-                .map(|score| (field.to_string(), confidence as f32, score))
+                .map(|score| (field.to_string(), *confidence, score))
         })
         .max_by(|left, right| {
             left.2
@@ -756,8 +781,7 @@ pub(super) fn detect_field(header: &str) -> Option<(String, f32)> {
         .map(|(field, confidence, _)| (field, confidence))
 }
 
-pub(super) fn header_alias_match_score(header: &str, alias: &str) -> Option<usize> {
-    let normalized_alias = normalize_text(alias);
+fn header_alias_match_score(header: &str, normalized_alias: &str) -> Option<usize> {
     if normalized_alias.is_empty() {
         return None;
     }
@@ -771,12 +795,12 @@ pub(super) fn header_alias_match_score(header: &str, alias: &str) -> Option<usiz
         .chars()
         .filter(|character| character.is_ascii_alphanumeric())
         .count();
-    if (!contains_cjk && latin_length <= 3) || alias_requires_exact_match(&normalized_alias) {
+    if (!contains_cjk && latin_length <= 3) || alias_requires_exact_match(normalized_alias) {
         return None;
     }
 
     header
-        .contains(&normalized_alias)
+        .contains(normalized_alias)
         .then_some(normalized_alias.chars().count())
 }
 

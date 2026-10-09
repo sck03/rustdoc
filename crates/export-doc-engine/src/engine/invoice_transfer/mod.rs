@@ -172,7 +172,7 @@ fn party(
         }
     }
     Ok(
-        records::save_in_transaction(tx, actor, resource, 0, &value, date)?["id"]
+        records::save_in_transaction(tx, actor, resource, 0, &value, date, None)?["id"]
             .as_i64()
             .ok_or_else(|| invalid("往来单位缺少编号。"))?,
     )
@@ -252,7 +252,7 @@ fn import(
             invoice["letterOfCreditSourcePath"]=json!("");
         }
         invoice["id"]=json!(id);invoice["status"]=json!("Draft");
-        let saved=records::save_in_transaction(tx,actor,catalog::resource("invoices").unwrap(),id,&invoice,date)?;
+        let saved=records::save_in_transaction(tx,actor,catalog::resource("invoices").unwrap(),id,&invoice,date,None)?;
         Ok(result(saved["id"].clone(),saved["invoiceNo"].clone(),"单据导入成功。"))
     })
 }

@@ -58,7 +58,7 @@ fn commercial_headers_and_packing_frame_survive_paging_and_roundtrip() {
             let data = invoice(count);
             let document =
                 export_doc_report::render_design(&data, &design, &AtomicBool::new(false)).unwrap();
-            for page in &document.pages {
+            for (page_index, page) in document.pages.iter().enumerate() {
                 for label in ["Invoice No.:", "Contract No.:", "Date:"] {
                     let node = nodes(&page.svg, "text")
                         .into_iter()
@@ -69,13 +69,30 @@ fn commercial_headers_and_packing_frame_survive_paging_and_roundtrip() {
                     assert!(node.contains("text-anchor=\"end\""));
                 }
                 if template == Builtin::PackingList {
+                    let frame_bottom = nodes(&page.svg, "line")
+                        .iter()
+                        .filter(|(node, _)| {
+                            (attribute(node, "x1") - 15.).abs() < 0.01
+                                && (attribute(node, "x2") - 15.).abs() < 0.01
+                        })
+                        .map(|(node, _)| attribute(node, "y2"))
+                        .fold(0., f32::max);
+                    let footer_top = if page_index + 1 == document.pages.len() {
+                        225.
+                    } else {
+                        280.
+                    };
+                    assert!(
+                        frame_bottom >= 220. && frame_bottom <= footer_top,
+                        "packing frame must fill its design height and leave room for the footer"
+                    );
                     for x in [15., 47., 195.] {
                         assert!(
                             nodes(&page.svg, "line")
                                 .into_iter()
                                 .any(|(n, _)| (attribute(n, "x1") - x).abs() < 0.01
                                     && (attribute(n, "x2") - x).abs() < 0.01
-                                    && (attribute(n, "y2") - 245.).abs() < 0.01
+                                    && (attribute(n, "y2") - frame_bottom).abs() < 0.01
                                     && attribute(n, "y1") < 80.),
                             "packing column {x} must reach the frame bottom"
                         );

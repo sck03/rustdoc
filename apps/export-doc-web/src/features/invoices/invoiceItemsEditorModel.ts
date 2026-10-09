@@ -355,8 +355,6 @@ export function recalculateInvoiceItem(item: ApiInvoiceItemDto, changedFields: s
   const unitPriceChanged = hasChanged(changedFields, ["unitPrice"]);
   const quantityChanged = hasChanged(changedFields, ["quantity"]);
   const volumeChanged = hasChanged(changedFields, ["volume"]);
-  const grossWeightChanged = hasChanged(changedFields, ["gwPerCtn", "gwTotal"]);
-  const netWeightChanged = hasChanged(changedFields, ["nwPerCtn", "nwTotal"]);
 
   if (hasChanged(changedFields, ["gwPerCtn"])) {
     next.gwPerCtn = roundWeight(numberValue(next.gwPerCtn));
@@ -391,48 +389,46 @@ export function recalculateInvoiceItem(item: ApiInvoiceItemDto, changedFields: s
 
   const effectiveCartons = numberValue(next.cartons ?? cartons);
   if (quantityChanged || totalPriceChanged || unitPriceChanged) {
-    if (next.priceCalculationMode === invoiceItemPriceCalculationModes.lineAmountDriven) {
-      next.totalPrice = roundMoney(numberValue(next.totalPrice));
-      next.unitPrice = quantity > 0 ? roundUnitPrice(numberValue(next.totalPrice) / quantity) : 0;
-    } else {
-      next.unitPrice = roundUnitPrice(numberValue(next.unitPrice));
-      next.totalPrice = roundMoney(quantity * numberValue(next.unitPrice));
-    }
+    normalizeInvoiceItemPrices(next);
   }
 
   if (hasChanged(changedFields, ["quantity", "purchasePrice"])) {
     next.purchaseTotal = roundMoney(quantity * numberValue(next.purchasePrice));
   }
 
-  if (hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons", "length", "width", "height"])) {
+  if (!volumeChanged && hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons", "length", "width", "height"])) {
     next.volume =
       numberValue(next.length) > 0 && numberValue(next.width) > 0 && numberValue(next.height) > 0 && effectiveCartons > 0
         ? roundVolume((numberValue(next.length) * numberValue(next.width) * numberValue(next.height) * effectiveCartons) / 1000000)
         : 0;
   }
 
-  if (hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons", "gwPerCtn"])) {
+  if (!hasChanged(changedFields, ["gwTotal"]) && hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons", "gwPerCtn"])) {
     next.gwTotal =
       numberValue(next.gwPerCtn) > 0 && effectiveCartons > 0
         ? roundWeight(numberValue(next.gwPerCtn) * effectiveCartons)
         : 0;
   }
 
-  if (hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons", "nwPerCtn"])) {
+  if (!hasChanged(changedFields, ["nwTotal"]) && hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons", "nwPerCtn"])) {
     next.nwTotal =
       numberValue(next.nwPerCtn) > 0 && effectiveCartons > 0
         ? roundWeight(numberValue(next.nwPerCtn) * effectiveCartons)
         : 0;
   }
 
-  if (!grossWeightChanged && hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons"])) {
-    next.gwTotal = roundWeight(numberValue(next.gwTotal));
-  }
-  if (!netWeightChanged && hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons"])) {
-    next.nwTotal = roundWeight(numberValue(next.nwTotal));
-  }
-
   return next;
+}
+
+function normalizeInvoiceItemPrices(item: ApiInvoiceItemDto) {
+  const quantity = numberValue(item.quantity);
+  if (item.priceCalculationMode === invoiceItemPriceCalculationModes.lineAmountDriven) {
+    item.totalPrice = roundMoney(numberValue(item.totalPrice));
+    item.unitPrice = quantity > 0 ? roundUnitPrice(item.totalPrice / quantity) : 0;
+  } else {
+    item.unitPrice = roundUnitPrice(numberValue(item.unitPrice));
+    item.totalPrice = roundMoney(quantity * item.unitPrice);
+  }
 }
 
 export function calculateInvoiceTotals(
@@ -526,7 +522,8 @@ export function normalizeInvoiceItemForSave(item: ApiInvoiceItemDto): ApiInvoice
     width: numberValue(item.width),
   };
 
-  return recalculateInvoiceItem(normalized, ["quantity"]);
+  normalizeInvoiceItemPrices(normalized);
+  return normalized;
 }
 
 export function normalizePriceCalculationMode(value?: string): InvoiceItemPriceCalculationMode {
