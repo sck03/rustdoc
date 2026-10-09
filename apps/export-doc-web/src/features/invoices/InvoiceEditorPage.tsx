@@ -36,7 +36,6 @@ import {
   type RouteInvoiceImportAction,
   uppercaseInvoiceEnglishText,
 } from "./invoiceModel.ts";
-import { InvoiceEditorFormShell } from "./InvoiceEditorFormShell.tsx";
 import { InvoiceEditorDocumentSections } from "./InvoiceEditorDocumentSections.tsx";
 import { areInvoiceDraftsEqual } from "./invoiceDraftEquality.ts";
 import {
@@ -106,8 +105,6 @@ export function InvoiceEditorPage({
 
   const parsedInvoiceId = Number(invoiceId);
   const isNew = mode === "new";
-  const isInvoiceItemsWorkbenchMode = searchParams.get("workbench") === "items"
-    && workspaceDeviceCapabilities.canUseDenseWorkbench;
   const isInvoiceIdValid = Number.isInteger(parsedInvoiceId) && parsedInvoiceId > 0;
   const routeInvoiceImportKey =
     !isNew && routeInvoiceDraft && routeInvoiceImportAction
@@ -568,21 +565,6 @@ export function InvoiceEditorPage({
     window.requestAnimationFrame(() => document.getElementById("invoice-editor-navigation")?.scrollIntoView({ block: "start" }));
   }
 
-  function openInvoiceItemsWorkbench() {
-    const nextSearchParams = new URLSearchParams(searchParams);
-    nextSearchParams.set("section", "items");
-    nextSearchParams.set("workbench", "items");
-    setSearchParams(nextSearchParams);
-  }
-
-  function closeInvoiceItemsWorkbench() {
-    const nextSearchParams = new URLSearchParams(searchParams);
-    nextSearchParams.delete("workbench");
-    nextSearchParams.set("section", "items");
-    setSearchParams(nextSearchParams);
-    window.requestAnimationFrame(() => document.getElementById("invoice-tab-items")?.focus());
-  }
-
   const invoiceItemsPanel = invoice ? (
     <InvoiceMarksAndItemsPanel
       client={client}
@@ -594,7 +576,6 @@ export function InvoiceEditorPage({
       invoiceItemBlankRowCount={invoiceItemBlankRowCount}
       defaultSpareColumnCount={readInvoiceItemSpareColumnCount(settingsQuery.data?.settings)}
       isEditable={isInvoiceEditable && workspaceDeviceCapabilities.canUseDenseWorkbench}
-      isFocusedWorkbench={isInvoiceItemsWorkbenchMode}
       isProductLibraryBusy={isProductLibraryBusy}
       onChange={patchInvoice}
       onHsKnowledgeFeedback={handleHsKnowledgeFeedback}
@@ -606,7 +587,6 @@ export function InvoiceEditorPage({
       onFillDownItemCells={itemsWorkspace.fillDownItemCells}
       onFillDownItemField={itemsWorkspace.fillDownItemField}
       onMoveItem={itemsWorkspace.moveItem}
-      onOpenFocusedWorkbench={workspaceDeviceCapabilities.canUseDenseWorkbench ? openInvoiceItemsWorkbench : undefined}
       onPasteItemTable={itemsWorkspace.pasteItemTable}
       onRedoItemEdit={itemsWorkspace.redoItemEdit}
       onRefreshProductLibrary={itemsWorkspace.refreshProductLibrary}
@@ -684,87 +664,80 @@ export function InvoiceEditorPage({
       ) : null}
       <WorkspaceDeviceNotice
         mode={workspaceDeviceMode}
-        phone="手机端用于查看、搜索、审批和简单回填；商品明细工作台、批量录入、信用证处理和导入导出请使用桌面端。"
+        phone="手机端用于查看、搜索、审批和简单回填；商品明细编辑、批量录入、信用证处理和导入导出请使用桌面端。"
         tablet={workspaceDeviceCapabilities.canUseAdvancedTools
-          ? "可进行轻量编辑、信用证处理和导入导出；商品明细密集工作台与批量录入仍需更宽屏幕。"
+          ? "可进行轻量编辑、信用证处理和导入导出；商品明细编辑与批量录入仍需更宽屏幕。"
           : "平板端用于轻量编辑和现场确认；连接鼠标或触控板后可使用信用证处理和导入导出。"}
       />
 
       {!invoice && isBusy ? <PageState tone="loading" title="正在加载发票" description="请稍候，系统正在读取发票和商品明细。" /> : null}
 
-      {invoice && isInvoiceEditable && !isInvoiceItemsWorkbenchMode && <InvoiceReviewPanel client={client} invoice={invoice} disabled={isBusy} hasUnsavedChanges={hasUnsavedInvoiceChanges} />}
+      {invoice && isInvoiceEditable && <InvoiceReviewPanel client={client} invoice={invoice} disabled={isBusy} hasUnsavedChanges={hasUnsavedInvoiceChanges} />}
 
       {invoice ? (
-        <InvoiceEditorFormShell
-          formRef={formRef}
-          invoice={invoice}
-          isWorkbench={isInvoiceItemsWorkbenchMode}
-          isBusy={isBusy}
-          isEditable={isInvoiceEditable}
-          formClassName={isInvoiceItemsWorkbenchMode ? "invoice-form invoice-items-focus-form" : "invoice-form"}
+        <form
+          ref={formRef}
+          className="invoice-form"
           onSubmit={handleSubmit}
           onKeyDownCapture={handleEnterAsTabFormKeyDown}
-          onCloseWorkbench={closeInvoiceItemsWorkbench}
-          itemsPanel={invoiceItemsPanel}
-          documentSections={
-            <InvoiceEditorDocumentSections
-              key={isNew ? "new" : parsedInvoiceId}
-              client={client}
-              invoice={invoice}
-              invoiceId={isNew ? 0 : parsedInvoiceId}
-              activeSection={activeSection}
-              reportInvoiceId={isNew || !isInvoiceIdValid ? 0 : parsedInvoiceId}
-              invoiceDraft={currentInvoiceDraft ?? undefined}
-              selectedCustomer={selectedCustomerQuery.data}
-              selectedExporter={selectedExporterQuery.data}
-              selectedCustomerEmail={selectedCustomerEmail}
-              customOptions={invoiceCustomOptions}
-              statusHistory={statusHistoryQuery.data}
-              statusHistoryLoading={statusHistoryQuery.isFetching}
-              statusHistoryMessage={statusHistoryQuery.isError ? readApiError(statusHistoryQuery.error) : null}
-              itemsPanel={invoiceItemsPanel}
-              cloneInvoiceTypeLabel={cloneInvoiceTypeLabel}
-              isEditable={isInvoiceEditable}
-              isBusy={isBusy}
-              isSaving={saveInvoiceMutation.isPending}
-              hasUnsavedChanges={hasUnsavedInvoiceChanges}
-              canOpenSingleWindowDocuments={!isNew && isInvoiceIdValid && singleWindowPermission.canOperate}
-              canCloneInvoiceType={!isNew && isInvoiceIdValid && invoicePermission.canOperate}
-              canUnverifyInvoice={invoicePermission.canManage && canUnverifyInvoice}
-              canTransitionStatus={!isNew && isInvoiceIdValid && invoicePermission.canOperate && Boolean(getNextInvoiceStatus(invoice.status))}
-              canCancelStatus={!isNew && isInvoiceIdValid && invoicePermission.canManage && normalizeInvoiceStatus(invoice.status) !== "Cancelled"}
-              canUseAdvancedTools={workspaceDeviceCapabilities.canUseAdvancedTools}
-              canManageExporterSeals={isInvoiceEditable}
-              cloneInvoiceTypeBusy={cloneInvoiceTypeMutation.isPending}
-              unverifyInvoiceBusy={unverifyInvoiceMutation.isPending}
-              transitionStatusBusy={statusTransitionMutation.isPending}
-              partyBusy={isPartyBusy}
-              partyMessage={partyMessage}
-              sealBusy={exporterSealMutation.isPending}
-              profitAnalysisDisabled={!invoicePermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
-              letterOfCreditDisabled={!isInvoiceEditable || !workspaceDeviceCapabilities.canUseAdvancedTools || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
-              letterOfCreditReviewDisabled={!invoicePermission.canOperate || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
-              onNavigate={navigateInvoiceSection}
-              onUppercase={uppercaseInvoiceText}
-              onChange={patchInvoice}
-              onTransitionStatus={() => void handleTransitionInvoiceStatus()}
-              onCancelStatus={() => void handleTransitionInvoiceStatus("Cancelled")}
-              onCloneInvoiceType={handleCloneInvoiceType}
-              onUnverifyInvoice={handleUnverifyInvoice}
-              onOpenCustomsCoo={handleOpenCustomsCoo}
-              onOpenAgentConsignment={handleOpenAgentConsignment}
-              onCommitCustomOption={commitInvoiceCustomOption}
-              onRefreshParties={() => void refreshParties()}
-              onSealUpload={(sealType, file) => exporterSealMutation.mutate({ sealType, file })}
-              onSealError={(error) => {
-                setMessage(readApiError(error));
-                setSuccessMessage(null);
-              }}
-              onClearPageMessages={clearInvoicePageMessages}
-              onLetterOfCreditBusyChange={setIsLetterOfCreditBusy}
-            />
-          }
-        />
+        >
+          <InvoiceEditorDocumentSections
+            key={isNew ? "new" : parsedInvoiceId}
+            client={client}
+            invoice={invoice}
+            invoiceId={isNew ? 0 : parsedInvoiceId}
+            activeSection={activeSection}
+            reportInvoiceId={isNew || !isInvoiceIdValid ? 0 : parsedInvoiceId}
+            invoiceDraft={currentInvoiceDraft ?? undefined}
+            selectedCustomer={selectedCustomerQuery.data}
+            selectedExporter={selectedExporterQuery.data}
+            selectedCustomerEmail={selectedCustomerEmail}
+            customOptions={invoiceCustomOptions}
+            statusHistory={statusHistoryQuery.data}
+            statusHistoryLoading={statusHistoryQuery.isFetching}
+            statusHistoryMessage={statusHistoryQuery.isError ? readApiError(statusHistoryQuery.error) : null}
+            itemsPanel={invoiceItemsPanel}
+            cloneInvoiceTypeLabel={cloneInvoiceTypeLabel}
+            isEditable={isInvoiceEditable}
+            isBusy={isBusy}
+            isSaving={saveInvoiceMutation.isPending}
+            hasUnsavedChanges={hasUnsavedInvoiceChanges}
+            canOpenSingleWindowDocuments={!isNew && isInvoiceIdValid && singleWindowPermission.canOperate}
+            canCloneInvoiceType={!isNew && isInvoiceIdValid && invoicePermission.canOperate}
+            canUnverifyInvoice={invoicePermission.canManage && canUnverifyInvoice}
+            canTransitionStatus={!isNew && isInvoiceIdValid && invoicePermission.canOperate && Boolean(getNextInvoiceStatus(invoice.status))}
+            canCancelStatus={!isNew && isInvoiceIdValid && invoicePermission.canManage && normalizeInvoiceStatus(invoice.status) !== "Cancelled"}
+            canUseAdvancedTools={workspaceDeviceCapabilities.canUseAdvancedTools}
+            canManageExporterSeals={isInvoiceEditable}
+            cloneInvoiceTypeBusy={cloneInvoiceTypeMutation.isPending}
+            unverifyInvoiceBusy={unverifyInvoiceMutation.isPending}
+            transitionStatusBusy={statusTransitionMutation.isPending}
+            partyBusy={isPartyBusy}
+            partyMessage={partyMessage}
+            sealBusy={exporterSealMutation.isPending}
+            profitAnalysisDisabled={!invoicePermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
+            letterOfCreditDisabled={!isInvoiceEditable || !workspaceDeviceCapabilities.canUseAdvancedTools || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
+            letterOfCreditReviewDisabled={!invoicePermission.canOperate || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
+            onNavigate={navigateInvoiceSection}
+            onUppercase={uppercaseInvoiceText}
+            onChange={patchInvoice}
+            onTransitionStatus={() => void handleTransitionInvoiceStatus()}
+            onCancelStatus={() => void handleTransitionInvoiceStatus("Cancelled")}
+            onCloneInvoiceType={handleCloneInvoiceType}
+            onUnverifyInvoice={handleUnverifyInvoice}
+            onOpenCustomsCoo={handleOpenCustomsCoo}
+            onOpenAgentConsignment={handleOpenAgentConsignment}
+            onCommitCustomOption={commitInvoiceCustomOption}
+            onRefreshParties={() => void refreshParties()}
+            onSealUpload={(sealType, file) => exporterSealMutation.mutate({ sealType, file })}
+            onSealError={(error) => {
+              setMessage(readApiError(error));
+              setSuccessMessage(null);
+            }}
+            onClearPageMessages={clearInvoicePageMessages}
+            onLetterOfCreditBusyChange={setIsLetterOfCreditBusy}
+          />
+        </form>
       ) : null}
       {isCancelReasonDialogOpen ? (
         <InvoiceStatusReasonDialog

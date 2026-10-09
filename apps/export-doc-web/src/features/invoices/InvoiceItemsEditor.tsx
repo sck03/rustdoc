@@ -43,7 +43,6 @@ export function InvoiceItemsEditor({
   defaultSpareColumnCount = 0,
   currency,
   exchangeRate,
-  focusedWorkbench = false,
   isProductLibraryBusy,
   readOnly = false,
   onAddItem,
@@ -578,7 +577,7 @@ export function InvoiceItemsEditor({
   }
 
   return (
-    <div className={focusedWorkbench ? "item-editor-layout item-editor-layout-focused" : "item-editor-layout"}>
+    <div className="item-editor-layout">
       <InvoiceItemsEditorToolbar
         canApplySelectedProduct={canApplySelectedProduct} canRedoItemEdit={canRedoItemEdit} canSaveFocusedItem={canSaveFocusedItem}
         canUndoItemEdit={canUndoItemEdit} canUseHsKnowledge={!readOnly && canUseHsKnowledge && focusedRowIndex != null && focusedRowIndex < items.length}

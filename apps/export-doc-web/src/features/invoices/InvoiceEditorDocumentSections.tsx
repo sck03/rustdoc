@@ -130,7 +130,7 @@ export function InvoiceEditorDocumentSections({
 }: InvoiceEditorDocumentSectionsProps) {
   const { validationMessage, revealInvalidField, clearValidationMessage } = useDocumentEditorValidation(activeSection, onNavigate, readInvoiceEditorSection);
   return (
-    <div className="document-editor-sections" onInvalidCapture={revealInvalidField} onInputCapture={clearValidationMessage}>
+    <div className={activeSection === "items" ? "document-editor-sections invoice-editor-items-active" : "document-editor-sections"} onInvalidCapture={revealInvalidField} onInputCapture={clearValidationMessage}>
       <InvoiceEditorNavigation
         invoiceNo={invoice.invoiceNo || ""}
         isNew={invoiceId <= 0}

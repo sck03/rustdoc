@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FileText, Image as ImageIcon, Maximize2, Pencil, Plus } from "lucide-react";
+import { FileText, Image as ImageIcon, Pencil, Plus } from "lucide-react";
 import type {
   ApiInvoiceDetailDto,
   ApiInvoiceItemDto,
@@ -27,7 +27,6 @@ export function InvoiceMarksAndItemsPanel({
   invoiceItemBlankRowCount,
   defaultSpareColumnCount = 0,
   isEditable,
-  isFocusedWorkbench = false,
   isProductLibraryBusy,
   onChange,
   onAddItem,
@@ -38,7 +37,6 @@ export function InvoiceMarksAndItemsPanel({
   onFillDownItemCells,
   onFillDownItemField,
   onMoveItem,
-  onOpenFocusedWorkbench,
   onPasteItemTable,
   onRedoItemEdit,
   onRefreshProductLibrary,
@@ -68,7 +66,6 @@ export function InvoiceMarksAndItemsPanel({
   invoiceItemBlankRowCount: number;
   defaultSpareColumnCount?: number;
   isEditable: boolean;
-  isFocusedWorkbench?: boolean;
   isProductLibraryBusy: boolean;
   onChange: (next: InvoicePatch) => void;
   onAddItem: () => void;
@@ -79,7 +76,6 @@ export function InvoiceMarksAndItemsPanel({
   onFillDownItemCells: (cells: InvoiceItemCellSelection[]) => void;
   onFillDownItemField: (index: number, field: EditableInvoiceItemField) => void;
   onMoveItem: (index: number, direction: -1 | 1) => void;
-  onOpenFocusedWorkbench?: () => void;
   onPasteItemTable: (
     startRowIndex: number,
     startField: EditableInvoiceItemField,
@@ -259,7 +255,7 @@ export function InvoiceMarksAndItemsPanel({
 
   return (
     <section
-      className={isFocusedWorkbench ? "form-section invoice-items-workbench invoice-items-focus-panel information-tier-required" : "form-section invoice-items-workbench information-tier-required"}
+      className="form-section invoice-items-panel information-tier-required"
       aria-label="商品明细"
     >
       <div className="section-header">
@@ -268,12 +264,6 @@ export function InvoiceMarksAndItemsPanel({
           <span>{invoice.items?.length ?? 0} 行已录入</span>
         </div>
         <div className="toolbar-actions invoice-items-header-actions">
-          {!isFocusedWorkbench && onOpenFocusedWorkbench ? (
-            <button className="command-button secondary" type="button" onClick={onOpenFocusedWorkbench}>
-              <Maximize2 size={16} aria-hidden="true" />
-              <span>明细工作台</span>
-            </button>
-          ) : null}
           {isEditable && <button className="icon-button" type="button" title="新增商品明细" aria-label="新增商品明细" onClick={onAddItem}>
             <Plus size={17} aria-hidden="true" />
           </button>}
@@ -321,7 +311,6 @@ export function InvoiceMarksAndItemsPanel({
         productLibraryTotalPages={productLibraryTotalPages}
         onProductLibraryPageChange={onProductLibraryPageChange}
         onProductLibraryPageSizeChange={onProductLibraryPageSizeChange}
-        focusedWorkbench={isFocusedWorkbench}
         unitLookupMessage={unitLookupMessage}
         unitOptions={unitOptions}
       />

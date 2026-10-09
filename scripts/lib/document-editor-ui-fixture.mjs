@@ -35,6 +35,7 @@ let settings={revision:0,email:{smtpHost:'mail.example.test',smtpPort:587,passwo
   ?{invoice:{spare1:'船名航次'},item:{spare1:'材质规格',spare10:'客户货号'},payment:{spare1:'费用归属'}}:{invoice:{},item:{},payment:{}}}};
 let invoice={...createEmptyInvoice(date),id:7,invoiceNo:'INV-2026-091',customerNameEN:'NORTHSTAR TRADING',exporterNameEN:'BRIDGE EXPORT',exporterNameCN:'示例出口公司',currency:'USD',rowVersion:1,
   items:[{...createEmptyInvoiceItem(7),styleNo:'STYLE-091',styleName:'COTTON SHIRT',quantity:5,unitPrice:10,totalPrice:50,spare10:params.has('populated')?'保留原始备注':''}],totalAmount:50};
+if(params.has('rows')) { invoice.items=Array.from({length:Number(params.get('rows'))},(_,index)=>({...invoice.items[0],id:index+1,styleNo:'STYLE-'+(index+1)}));invoice.totalAmount=invoice.items.length*50; }
 let payment={...createEmptyPayment(date),id:9,invoiceNo:'PAY-2026-091',paymentMethod:'电汇',receiptDate:date,rowVersion:1};
 const custom={PaymentMethod:['支票','电汇','预付'],PaymentPayerName:[],Currency:['USD','CNY'],SupervisionMode:['一般贸易'],PaymentTerms:['T/T']};
 const record=(name,input,result)=>{window.__calls.push({name,input});return Promise.resolve(structuredClone(result))};

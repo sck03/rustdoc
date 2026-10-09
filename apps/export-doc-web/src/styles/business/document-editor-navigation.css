@@ -1,5 +1,6 @@
 @layer route {
   .document-editor-sections { display: grid; gap: 14px; min-width: 0; }
+  .document-editor-sections.invoice-editor-items-active { display: flex; flex-direction: column; min-height: min-content; height: calc(100dvh - 172px); }
   .document-editor-navigation { position: sticky; top: 0; z-index: 22; min-width: 0; background: var(--edm-surface); border: 1px solid var(--edm-line-strong); border-radius: 12px; }
   .document-editor-navigation .document-editor-sticky-actions { position: static; gap: 12px; margin: 0; border: 0; border-radius: 12px 12px 0 0; background: transparent; }
   .document-editor-navigation .document-editor-section-nav { position: static; gap: 8px; padding: 0 12px 8px; border: 0; border-radius: 0; background: transparent; }

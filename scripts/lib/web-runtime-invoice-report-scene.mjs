@@ -247,7 +247,7 @@ export function createInvoiceReportSmokeScene(runtime) {
         keyboardNavigationCheck: invoiceItemKeyboardNavigationCheck,
         productLibraryCheck: invoiceItemProductLibraryCheck,
         undoRedoCheck: invoiceItemUndoRedoCheck,
-        workbenchModeCheck: invoiceItemWorkbenchModeCheck,
+        tableLayoutCheck: invoiceItemTableLayoutCheck,
       } = await invoiceItemTableSmokeScene.run(page, product, timeoutMs);
 
       await evaluate(
@@ -608,7 +608,7 @@ export function createInvoiceReportSmokeScene(runtime) {
         invoiceItemShortcutGuideCheck,
         invoiceItemCellSelectionCheck,
         invoiceItemColumnVisibilityCheck,
-        invoiceItemWorkbenchModeCheck,
+        invoiceItemTableLayoutCheck,
         invoiceItemProductLibraryCheck,
         invoiceItemUndoRedoCheck,
         invoiceItemAutocompleteCheck,

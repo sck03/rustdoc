@@ -562,7 +562,7 @@ async function waitForInvoiceItemsCheck(page, options, accessToken, tokenType, t
       keyboardNavigationCheck,
       productLibraryCheck,
       undoRedoCheck,
-      workbenchModeCheck,
+      tableLayoutCheck,
     } = await invoiceItemTableSmokeScene.run(page, product, timeoutMs);
 
     result = {
@@ -571,7 +571,7 @@ async function waitForInvoiceItemsCheck(page, options, accessToken, tokenType, t
       shortcutGuideCheck,
       cellSelectionCheck,
       columnVisibilityCheck,
-      workbenchModeCheck,
+      tableLayoutCheck,
       productLibraryCheck,
       undoRedoCheck,
       autocompleteCheck,

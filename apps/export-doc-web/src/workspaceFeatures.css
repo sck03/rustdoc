@@ -35,56 +35,6 @@
   min-width: 0;
 }
 
-.invoice-items-focus-form {
-  grid-template-rows: minmax(0, 1fr);
-  min-height: 0;
-}
-
-.invoice-items-focus-shell {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
-  min-width: 0;
-  min-height: 0;
-  height: calc(100vh - 172px);
-  height: calc(100dvh - 172px);
-}
-
-.invoice-items-focus-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-width: 0;
-  padding: 10px;
-  background: var(--edm-surface);
-  border: 1px solid var(--edm-line);
-  border-radius: var(--edm-radius-md);
-}
-
-.invoice-items-focus-title {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 0;
-  color: var(--edm-neutral-700);
-  font-size: 14px;
-}
-
-.invoice-items-focus-title strong,
-.invoice-items-focus-title span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.invoice-items-focus-title strong {
-  color: var(--edm-neutral-800);
-  font-size: 16px;
-}
-
 .document-editor-section-nav {
   position: sticky;
   top: 0;

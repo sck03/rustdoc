@@ -386,116 +386,37 @@ export function createInvoiceItemTableSmokeScene(runtime) {
     };
   }
   
-  async function waitForInvoiceItemWorkbenchModeCheck(page, timeoutMs) {
-    const initial = await waitForPageExpression(
-      page,
-      `(() => {
-        const section = document.querySelector(':is([aria-label="商品明细"], [aria-label="唛头和明细"])');
-        const table = section ? section.querySelector('.item-editor-table') : null;
-        const supportDetails = section ? section.querySelector('.invoice-items-support-details') : null;
-        const buttons = section ? Array.from(section.querySelectorAll('button')) : [];
-        const workbenchButton = buttons.find((button) => (button.innerText || '').includes('明细工作台'));
-        return Boolean(section && table && supportDetails && !supportDetails.open && workbenchButton && !workbenchButton.disabled);
-      })()`,
-      timeoutMs,
-      "Timed out waiting for invoice item workbench entry.",
-    );
-  
-    await evaluate(
-      page,
-      `(() => {
-        const section = document.querySelector(':is([aria-label="商品明细"], [aria-label="唛头和明细"])');
-        const buttons = section ? Array.from(section.querySelectorAll('button')) : [];
-        const button = buttons.find((element) => (element.innerText || '').includes('明细工作台'));
-        if (!button || button.disabled) {
-          throw new Error('Invoice item workbench button is not available.');
-        }
-  
-        button.click();
-        return true;
-      })()`,
-      true,
-    );
-  
-    const focused = await waitFor(async () => {
+  async function waitForInvoiceItemTableLayoutCheck(page, timeoutMs) {
+    return waitFor(async () => {
       const state = await evaluate(
         page,
         `(() => {
-          const shell = document.querySelector('[aria-label="商品明细工作台"]');
           const section = document.querySelector('[aria-label="商品明细"]');
-          const tableFrame = section ? section.querySelector('.item-editor-frame') : null;
-          const table = section ? section.querySelector('.item-editor-table') : null;
-          const supportDetails = section ? section.querySelector('.invoice-items-support-details') : null;
+          const tableFrame = section?.querySelector('.item-editor-frame');
+          const summary = section?.querySelector('.item-summary-bar');
+          const supportDetails = section?.querySelector('.invoice-items-support-details');
           const nav = document.querySelector('[aria-label="发票编辑分区"]');
-          const returnButton = shell
-            ? Array.from(shell.querySelectorAll('button')).find((button) => (button.innerText || '').includes('返回发票'))
-            : null;
-          const rect = tableFrame ? tableFrame.getBoundingClientRect() : null;
+          const rect = tableFrame?.getBoundingClientRect();
+          const style = tableFrame && getComputedStyle(tableFrame);
           return {
-            found: Boolean(shell && section && table && supportDetails && returnButton && !returnButton.disabled),
-            href: window.location.href || '',
-            hash: window.location.hash || '',
-            navVisible: Boolean(nav),
+            found: Boolean(nav?.getClientRects().length && rect && summary && supportDetails),
             supportCollapsed: Boolean(supportDetails && !supportDetails.open),
-            tableFrameHeight: rect ? Math.round(rect.height) : 0,
-            tableFrameWidth: rect ? Math.round(rect.width) : 0,
+            tableFrameHeight: Math.round(rect?.height || 0),
+            viewportHeight: window.innerHeight,
+            scrollsInsideTable: style?.overflowX === 'auto' && style?.overflowY === 'auto',
+            summaryBelowTable: Boolean(rect && summary?.getBoundingClientRect().top >= rect.bottom),
+            obsoleteEntry: [...document.querySelectorAll('button')].some(button => /明细工作台|返回发票/.test(button.textContent)),
           };
         })()`,
         true,
-      ).catch((error) => ({ value: { found: false, error: String(error) } }));
+      );
       const value = state.value ?? {};
-      return value.found &&
-        value.hash.includes("workbench=items") &&
-        !value.navVisible &&
-        value.supportCollapsed &&
-        value.tableFrameHeight >= 260
+      return value.found && value.supportCollapsed && value.scrollsInsideTable &&
+        value.summaryBelowTable && !value.obsoleteEntry &&
+        value.tableFrameHeight >= 260 && value.tableFrameHeight <= value.viewportHeight
         ? value
         : null;
-    }, timeoutMs, () => "Timed out waiting for invoice item focused workbench mode.");
-  
-    await evaluate(
-      page,
-      `(() => {
-        const shell = document.querySelector('[aria-label="商品明细工作台"]');
-        const buttons = shell ? Array.from(shell.querySelectorAll('button')) : [];
-        const button = buttons.find((element) => (element.innerText || '').includes('返回发票'));
-        if (!button || button.disabled) {
-          throw new Error('Invoice item workbench return button is not available.');
-        }
-  
-        button.click();
-        return true;
-      })()`,
-      true,
-    );
-  
-    const restored = await waitFor(async () => {
-      const state = await evaluate(
-        page,
-        `(() => {
-          const nav = document.querySelector('[aria-label="发票编辑分区"]');
-          const section = document.querySelector(':is([aria-label="商品明细"], [aria-label="唛头和明细"])');
-          const buttons = section ? Array.from(section.querySelectorAll('button')) : [];
-          const workbenchButton = buttons.find((button) => (button.innerText || '').includes('明细工作台'));
-          return {
-            found: Boolean(nav && section && workbenchButton && !workbenchButton.disabled),
-            hash: window.location.hash || '',
-          };
-        })()`,
-        true,
-      ).catch((error) => ({ value: { found: false, error: String(error) } }));
-      const value = state.value ?? {};
-      return value.found && !value.hash.includes("workbench=items") ? value : null;
-    }, timeoutMs, () => "Timed out waiting for invoice item workbench mode to return to the invoice editor.");
-  
-    return {
-      found: true,
-      initial,
-      focusedHeight: focused.tableFrameHeight,
-      focusedWidth: focused.tableFrameWidth,
-      supportCollapsed: focused.supportCollapsed,
-      returnedToEditor: restored.found,
-    };
+    }, timeoutMs, () => "Timed out waiting for the unified invoice item table layout.");
   }
   
   async function waitForInvoiceItemProductLibraryCheck(page, product, timeoutMs) {
@@ -1364,7 +1285,7 @@ export function createInvoiceItemTableSmokeScene(runtime) {
   async function run(page, product, timeoutMs) {
     const cellSelectionCheck = await waitForInvoiceItemCellSelectionCheck(page, timeoutMs);
     const columnVisibilityCheck = await waitForInvoiceItemColumnVisibilityCheck(page, timeoutMs);
-    const workbenchModeCheck = await waitForInvoiceItemWorkbenchModeCheck(page, timeoutMs);
+    const tableLayoutCheck = await waitForInvoiceItemTableLayoutCheck(page, timeoutMs);
     const productLibraryCheck = await waitForInvoiceItemProductLibraryCheck(page, product, timeoutMs);
     const undoRedoCheck = await waitForInvoiceItemUndoRedoCheck(page, timeoutMs);
     const autocompleteCheck = await waitForInvoiceItemAutocompleteCheck(page, timeoutMs);
@@ -1377,7 +1298,7 @@ export function createInvoiceItemTableSmokeScene(runtime) {
       keyboardNavigationCheck,
       productLibraryCheck,
       undoRedoCheck,
-      workbenchModeCheck,
+      tableLayoutCheck,
     };
   }
 
