@@ -8,13 +8,14 @@ import { ApiReportTemplateV3LimitsContractDefaults as limits } from "../../api/g
 export { reportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
 export type { ReportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
 export const REPORT_DESIGNER_V3_VERSION = 3 as const;
-/** Public, descriptive contract version; the schema version remains numeric for compact persisted HTML. */
+/** Descriptive contract version; the document also keeps a numeric schema version. */
 export const REPORT_DESIGNER_V3_CONTRACT_VERSION = "3.0" as const;
 export const REPORT_DESIGNER_V3_AST_KIND = "ReportDocument" as const;
 export const REPORT_DESIGNER_V3_COORDINATE_UNIT = "hundredth-mm" as const;
 export const REPORT_DESIGNER_V3_FLOW_TYPES = ["Row", "Grid", "Conditional", "DetailTable", "PageBreak"] as const;
 export const REPORT_DESIGNER_V3_RELEASE_STATES = ["Draft", "Published", "Archived"] as const;
 export const HUNDREDTH_MM_PER_MM = 100;
+export const REPORT_DESIGNER_V3_DEFAULT_TEXT_COLOR = "#173f3b";
 export const REPORT_DESIGNER_V3_MAX_LAYER_COUNT = limits.maxLayers;
 export const REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER = limits.maxElementsPerLayer;
 export const REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS = limits.maxTotalElements;
@@ -77,9 +78,9 @@ export type ReportDesignerV3LayerPrintSettings = {
   /** Place the footer immediately after the final detail row. */
   followBody?: boolean;
   firstPageOnly?: boolean;
-  /** Repeat the band in the browser print header/footer area on every page. */
+  /** Repeat the band on every page of the native report. */
   repeatOnEveryPage: boolean;
-  /** Keep the band together when the browser lays out a page break. */
+  /** Keep the band together during native pagination. */
   keepTogether: boolean;
   /** Pin a footer band to the physical page bottom when it is not repeated. */
   pinToPageBottom: boolean;

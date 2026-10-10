@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 export function verifyDesignerEditingMutations(api) {
   verifyDetailColumnMutations(api);
+  verifyLayerMutations(api);
   const schema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
   schema.layers.forEach(layer => { layer.elements = []; });
   const overlay = schema.layers.find(layer => layer.role === "Overlay");
@@ -92,6 +93,36 @@ export function verifyDesignerEditingMutations(api) {
   assert.equal(element(styled, flow.id), flow, "table styling belongs to its cells");
   assert.notEqual(element(styled, source.id).style, style);
   assert.equal(api.applySelectedV3ElementStyle(styled, style), styled);
+}
+
+function verifyLayerMutations(api) {
+  const original = api.createReportDesignerV3DocumentState(api.parseReportDesignerV3Source("", "ExportDocument").schema);
+  let state = api.addV3Layer(original, "Footer");
+  const footer = state.schema.layers.at(-1);
+  assert.equal(state.activeLayerId, footer.id);
+  assert.deepEqual(state.selectedIds, []);
+  assert.notEqual(footer.name, original.schema.layers.find(layer => layer.role === "Footer").name);
+  state = api.updateV3Layer(state, footer.id, { name: "末页签章", print: { ...footer.print, repeatOnEveryPage: false, followBody: true } });
+  const moved = api.moveV3Layer(state, footer.id, -1);
+  assert.equal(moved.schema.layers.at(-2).id, footer.id);
+  assert.equal(moved.schema.layers.at(-2).print.followBody, true);
+  assert.equal(api.parseReportDesignerV3Source(JSON.stringify(moved.schema), "ExportDocument").issues.some(issue => issue.severity === "error"), false);
+  const removed = api.removeV3Layer(moved, footer.id);
+  assert.deepEqual(removed.schema.layers, original.schema.layers);
+  assert(removed.schema.layers.some(layer => layer.id === removed.activeLayerId));
+  for (const layer of original.schema.layers.filter(layer => ["Body", "Overlay"].includes(layer.role))) {
+    assert.equal(api.removeV3Layer(original, layer.id), original, "required regions must survive deletion");
+  }
+  const locked = api.updateV3Layer(state, footer.id, { locked: true });
+  assert.equal(api.removeV3Layer(locked, footer.id), locked);
+  assert.equal(api.moveV3Layer(locked, footer.id, -1), locked);
+  assert.equal(api.moveV3Layer(locked, locked.schema.layers.at(-2).id, 1), locked, "ordering cannot cross a locked layer");
+  const populated = api.insertV3Element(state, footer.id, api.createV3TextElement());
+  assert.equal(api.removeV3Layer(populated, footer.id), populated, "layer removal must not discard content");
+  assert.equal(api.moveV3Layer(original, original.schema.layers[0].id, -1), original);
+  while (state.schema.layers.length < api.REPORT_DESIGNER_V3_MAX_LAYER_COUNT) state = api.addV3Layer(state, "Header");
+  assert.equal(api.addV3Layer(state, "Header"), state, "the editor must honor the shared layer limit");
+  assert.equal(new Set(state.schema.layers.map(layer => layer.id)).size, state.schema.layers.length);
 }
 
 function verifyDetailColumnMutations(api) {

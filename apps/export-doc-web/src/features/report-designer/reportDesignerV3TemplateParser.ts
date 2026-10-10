@@ -20,9 +20,7 @@ export function hasValidReportDesignerV3Schema(content: string) {
   const source = parseReportDesignerV3Json(content);
   if (!source) return false;
   try {
-    const parsed = JSON.parse(source) as unknown;
-    if (!isRecordWithVersion(parsed, 3)) return false;
-    const normalized = normalizeReportDesignerV3Schema(parsed);
+    const normalized = normalizeReportDesignerV3Schema(source);
     return normalized.schema !== null &&
       !normalized.issues.some((issue) => issue.severity === "error");
   } catch {
@@ -49,27 +47,19 @@ export function parseReportDesignerV3Source(
   }
 
   try {
-    const parsed = JSON.parse(source) as unknown;
-    if (isRecordWithVersion(parsed, 3)) {
-      const normalized = normalizeReportDesignerV3Schema(parsed, reportType);
-      if (normalized.schema) {
-        return {
-          schema: normalized.schema,
-          migrated: normalized.issues.length > 0,
-          hadSchema: true,
-          sourceVersion: 3,
-          issues: normalized.issues,
-        };
-      }
-
-      return createReplacementDraft(reportType, true, [
-        ...normalized.issues,
-        { severity: "error", path: "$", message: "V3 设计结构无法读取，已生成隔离的安全草稿，原模板不会被静默覆盖。" },
-      ]);
+    const normalized = normalizeReportDesignerV3Schema(source, reportType);
+    if (normalized.schema) {
+      return {
+        schema: normalized.schema,
+        migrated: normalized.issues.length > 0,
+        hadSchema: true,
+        sourceVersion: 3,
+        issues: normalized.issues,
+      };
     }
-
     return createReplacementDraft(reportType, true, [
-      { severity: "error", path: "$.version", message: "模板必须使用 version: 3 的 .dtpl V3 结构；V2 和 HTML 不受支持。" },
+      ...normalized.issues,
+      { severity: "error", path: "$", message: "V3 设计结构无法读取，已生成隔离的安全草稿，原模板不会被静默覆盖。" },
     ]);
   } catch {
     const replacement = createReplacementDraft(reportType, true, [
@@ -85,7 +75,7 @@ function parseReportDesignerV3Json(content: string) {
   if (!trimmed.startsWith("{")) return null;
   try {
     const parsed = JSON.parse(trimmed) as unknown;
-    return isRecordWithVersion(parsed, 3) ? trimmed : null;
+    return isRecordWithVersion(parsed, 3) ? parsed : null;
   } catch {
     return null;
   }

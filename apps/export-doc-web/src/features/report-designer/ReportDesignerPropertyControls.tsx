@@ -118,6 +118,7 @@ export function CommitTextField({
   rows?: number;
 }) {
   const [draft, setDraft] = useState(value);
+  const [focused, setFocused] = useState(false);
   const cancelOnBlur = useRef(false);
   useEffect(() => setDraft(value), [value]);
   function commit() {
@@ -138,9 +139,12 @@ export function CommitTextField({
       event.currentTarget.blur();
     }
   };
-  return multiline
-    ? <textarea disabled={disabled} placeholder={placeholder} rows={rows} value={draft} onChange={onChange} onBlur={commit} onKeyDown={onKeyDown} />
-    : <input type="text" disabled={disabled} placeholder={placeholder} value={draft} onChange={onChange} onBlur={commit} onKeyDown={onKeyDown} />;
+  const input = {
+    disabled, placeholder, value: focused ? draft : value, onChange, onKeyDown,
+    onFocus: () => { setDraft(value); setFocused(true); },
+    onBlur: () => { setFocused(false); commit(); },
+  };
+  return multiline ? <textarea {...input} rows={rows} /> : <input {...input} type="text" />;
 }
 
 export function ColumnWidthStrip({
@@ -390,30 +394,19 @@ export function TextStyleEditor({
       </label>
       <DesignerCheckbox checked={Boolean(style.bold)}
           onChange={(checked) => onChange({ ...style, bold: checked })}>加粗</DesignerCheckbox>
-      <details className="new-report-property-wide"><summary>文字上下间距</summary>
+      <details className="new-report-property-wide"><summary>文字间距</summary>
       <div className="new-report-property-grid">
-      <label>
-        <span>上距(mm)</span>
+      {([['上距(mm)', 'marginTopMm'], ['右距(mm)', 'marginRightMm'], ['下距(mm)', 'marginBottomMm'], ['左距(mm)', 'marginLeftMm']] as const).map(([label, property]) => <label key={property}>
+        <span>{label}</span>
         <input
           type="number"
           min={0}
           max={30}
           step="any"
-          value={style.marginTopMm ?? 0}
-          onChange={(event) => onChange({ ...style, marginTopMm: normalizeNumber(event.target.value, 0) })}
+          value={style[property] ?? 0}
+          onChange={(event) => onChange({ ...style, [property]: normalizeNumber(event.target.value, 0) })}
         />
-      </label>
-      <label>
-        <span>下距(mm)</span>
-        <input
-          type="number"
-          min={0}
-          max={30}
-          step="any"
-          value={style.marginBottomMm ?? 0}
-          onChange={(event) => onChange({ ...style, marginBottomMm: normalizeNumber(event.target.value, 0) })}
-        />
-      </label>
+      </label>)}
       </div>
       </details>
     </div>

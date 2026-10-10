@@ -24,6 +24,7 @@ import type { ReportBlock, ReportGridBlock, ReportGridCell } from "./reportDesig
 import { DesignerCheckbox, DesignerPropertyTabs, CommitTextField, BorderEditor, ColumnWidthStrip, FieldPathInput, TextStyleEditor } from "./ReportDesignerPropertyControls.tsx";
 import { adjacentGridCell, updateGridCell } from "./reportDesignerGridMutations.ts";
 import { normalizeGridCellContentKind, normalizeNumber } from "./reportDesignerPropertiesModel.ts";
+import { NumberField, SelectField } from "./ReportDesignerV3InspectorControls.tsx";
 
 export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSelectCell, onCommit }: {
   block: ReportGridBlock;
@@ -33,6 +34,7 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
   onCommit: (block: ReportBlock) => void;
 }) {
   const [tab, setTab] = useState<"cell" | "table">("cell");
+  const [widthColumnId, setWidthColumnId] = useState(block.columns[0]?.id ?? "");
   const locations = useMemo(() => getGridCellLocations(block), [block]);
   const selected = locations.find((location) => location.cell.id === selectedCellId) ?? locations[0];
   useEffect(() => {
@@ -54,6 +56,10 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
 
   const selectedRow = selected ? block.rows[selected.rowIndex] : undefined;
   const canSplit = Boolean(selected && (selected.colSpan > 1 || selected.rowSpan > 1));
+  const widthIndex = Math.max(0, block.columns.findIndex(column => column.id === widthColumnId));
+  const widthColumn = block.columns[widthIndex];
+  const nextWidthColumn = block.columns[widthIndex + 1];
+  const adjacentWidthColumn = nextWidthColumn ?? block.columns[widthIndex - 1];
   return (
     <div className="new-report-grid-properties">
       <DesignerPropertyTabs value={tab} onChange={setTab} options={[{ value: "cell", label: "单元格" }, { value: "table", label: "整张表" }]}>
@@ -124,6 +130,11 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
 
       {tab === "table" ? <section className="new-report-detail-style-group" aria-label="整表样式"><strong>列宽、行高与整表样式</strong>
         <ColumnWidthStrip columns={block.columns.map((column, index) => ({ id: column.id, title: `列 ${index + 1}`, width: column.widthPercent }))} minWidth={1} unit="%" onResizeBoundary={(leftColumnId, delta) => onCommit(resizeAdjacentGridColumnWidths(block, leftColumnId, delta))} />
+        {widthColumn && <details className="report-designer-property-section"><summary>精确列宽</summary>
+          <SelectField label="调整列" value={widthColumn.id} options={block.columns.map((column, index) => ({ value: column.id, label: `第 ${index + 1} 列` }))} onChange={setWidthColumnId} />
+          <NumberField label="列宽 (%)" value={widthColumn.widthPercent} min={1} max={widthColumn.widthPercent + (adjacentWidthColumn?.widthPercent ?? 0) - 1} disabled={!adjacentWidthColumn} onCommit={value => onCommit(resizeAdjacentGridColumnWidths(block, nextWidthColumn ? widthColumn.id : adjacentWidthColumn.id, (value - widthColumn.widthPercent) * (nextWidthColumn ? 1 : -1)))} />
+          <small>差额由右侧相邻列承担；最后一列调整左侧相邻列，保持整表宽度。</small>
+        </details>}
         <div className="new-report-grid-structure-actions">
           <button className="command-button secondary" type="button" onClick={() => onCommit(distributeGridColumnWidths(block))}>等宽列</button>
           <button className="command-button secondary" type="button" disabled={!selectedRow} onClick={() => onCommit(setGridRowsToUniformHeight(block, selectedRow?.heightMm ?? 9))}>统一行高</button>

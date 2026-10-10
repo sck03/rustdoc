@@ -15,6 +15,7 @@ import { verifyDesignerUsability } from "./lib/report-designer-usability-ui.mjs"
 import { verifyDetailProperties } from "./lib/report-designer-detail-properties-ui.mjs";
 import { verifyLayerClarity } from "./lib/report-designer-layer-ui.mjs";
 import { verifyConditionalUi } from "./lib/report-designer-conditions-ui.mjs";
+import { verifyBlankDesigner } from "./lib/report-designer-blank-ui.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -94,6 +95,7 @@ await esbuild.build({
     if(new URLSearchParams(location.search).has('marks')) Object.assign(schema,createShippingMarksScenario({parseReportDesignerV3Source,createRowBlock,createGridBlock,createConditionalBlock,createDetailTableBlock,createDetailTableSideBand,createV3FlowElement,createV3FieldElement}));
     if(new URLSearchParams(location.search).has('invoice')) Object.assign(schema,defaultReportDesigns()[0][1]);
     if(new URLSearchParams(location.search).has('packing')) Object.assign(schema,defaultReportDesigns()[1][1]);
+    if(new URLSearchParams(location.search).has('blank')) Object.assign(schema,parseReportDesignerV3Source('',reportType).schema);
     if(window.__restoredCommercial) Object.assign(schema,parseReportDesignerV3Source(window.__restoredCommercial,reportType).schema);
     window.__designerSchema = schema;
     window.__designerUpdates = 0;
@@ -334,6 +336,7 @@ try {
   await verifyCommercialTemplateUi({page,url,read,waitFor,click,key,results,output});
   await verifyConditionalUi({page,url,read,waitFor,click,key,results,output});
   await verifyLayerClarity({page,url,read,waitFor,click,results,output});
+  await verifyBlankDesigner({page,url,read,waitFor,click,key,results,output});
   fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify({passed:true,results},null,2));
   console.log(`Report designer UI contracts passed (${results.length} cases).`);
 } finally {

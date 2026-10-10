@@ -1,6 +1,6 @@
 import type { ReportDesignerDraft } from "../report-designer/reportDesignerDraft.ts";
 import { ApiReportTemplateFieldCatalogResponse, ExportDocManagerApiClient } from "../../api/index.ts";
-import { ReportDesignerPage } from "../report-designer/ReportDesignerPage.tsx";
+import { ReportDesignerV3Workspace } from "../report-designer/ReportDesignerV3Workspace.tsx";
 import { type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
 
 export function ReportTemplateDesignWorkspace({
@@ -22,7 +22,7 @@ export function ReportTemplateDesignWorkspace({
 }) {
   return (
     <div className="report-template-new-designer">
-      <ReportDesignerPage
+      <ReportDesignerV3Workspace
         reportType={reportType}
         displayName={displayName}
         content={content}

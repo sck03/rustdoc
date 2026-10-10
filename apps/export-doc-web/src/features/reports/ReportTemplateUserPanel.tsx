@@ -68,7 +68,7 @@ export function ReportTemplateUserPanel({
             <strong>创建我的模板</strong>
           </div>
           <TextField label="新模板名称" value={newTemplateName} disabled={isBusy} onChange={onNewTemplateNameChange} />
-          <small>先选择公共模板并填写新名称，再复制为自己的私人模板。保存后即可自己打印、导出，无需发布或共享，不会修改原模板和全局默认。</small>
+          <small>填写新名称后，可新建空白模板自行设计，或复制当前模板继续修改。保存后即可自己打印、导出，无需发布或共享。</small>
           <div className="template-management-actions">
             {allowCreateBlank ? (
               <button className="command-button secondary" type="button" disabled={!canCreateBlank} onClick={onCreateBlank}>

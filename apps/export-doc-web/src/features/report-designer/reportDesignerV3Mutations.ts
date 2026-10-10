@@ -11,16 +11,14 @@ import {
   resolveV3MoveDeltaFromConstraint,
 } from "./reportDesignerGeometry.ts";
 import { createV3RegionMoveConstraint, placeV3ElementInRegion, reassignV3MovedElements, requiresV3BodyRegion, resolveV3InsertionLayer } from "./reportDesignerV3Regions.ts";
-import {
-  createV3ElementId
-  ,
-} from "./reportDesignerV3ElementFactories.ts";
+import { createV3ElementId } from "./reportDesignerV3ElementFactories.ts";
 import { resizeV3Element as resizeV3ElementLocal } from "./reportDesignerV3Resize.ts";
 export {
   createV3ElementId, createV3FieldElement, createV3FlowElement, createV3ImageElement,
   createV3LineElement, createV3PageNumberElement, createV3RectangleElement, createV3TextElement,
 } from "./reportDesignerV3ElementFactories.ts";
 export { resizeV3ElementLocal as resizeV3Element };
+export { updateV3Layer } from "./reportDesignerV3Layers.ts";
 
 export type ReportDesignerV3DocumentState = {
   schema: ReportDesignerV3Schema;
@@ -159,35 +157,6 @@ export function updateV3Page(
   return {
     ...state,
     schema: nextSchema,
-  };
-}
-
-export function updateV3Layer(
-  state: ReportDesignerV3DocumentState,
-  layerId: string,
-  update: Partial<Pick<ReportDesignerV3Layer, "name" | "visible" | "locked" | "designHeightHundredthMm" | "print">>,
-): ReportDesignerV3DocumentState {
-  const current = state.schema.layers.find((layer) => layer.id === layerId);
-  if (!current) return state;
-  const nextPrint = normalizeLayerPrintForMutation(update.print ?? current.print, current.role);
-  const next = {
-    ...current,
-    ...update,
-    name: typeof update.name === "string" ? update.name : current.name,
-    visible: typeof update.visible === "boolean" ? update.visible : current.visible,
-    locked: typeof update.locked === "boolean" ? update.locked : current.locked,
-    print: nextPrint,
-  };
-  if (next.name === current.name && next.visible === current.visible && next.locked === current.locked && next.designHeightHundredthMm === current.designHeightHundredthMm &&
-      sameV3LayerPrint(next.print, current.print)) return state;
-  return {
-    ...state,
-    schema: {
-      ...state.schema,
-      layers: state.schema.layers.map((layer) => layer.id === layerId
-        ? { ...layer, ...next, print: nextPrint }
-        : layer),
-    },
   };
 }
 
@@ -653,32 +622,4 @@ function countV3Elements(schema: ReportDesignerV3Schema) {
 
 function sameV3Page(left: ReportDesignerV3Page, right: ReportDesignerV3Page) {
   return (Object.keys(left) as Array<keyof ReportDesignerV3Page>).every((key) => Object.is(left[key], right[key]));
-}
-
-function sameV3LayerPrint(left: ReportDesignerV3Layer["print"], right: ReportDesignerV3Layer["print"]) {
-  return left.repeatOnEveryPage === right.repeatOnEveryPage &&
-    left.keepTogether === right.keepTogether &&
-    left.pinToPageBottom === right.pinToPageBottom &&
-    (left.followBody === true) === (right.followBody === true) &&
-    (left.firstPageOnly === true) === (right.firstPageOnly === true) &&
-    left.minHeightHundredthMm === right.minHeightHundredthMm;
-}
-
-function normalizeLayerPrintForMutation(
-  value: ReportDesignerV3Layer["print"] | undefined,
-  role: ReportDesignerV3Layer["role"],
-): ReportDesignerV3Layer["print"] {
-  const source = (value && typeof value === "object" ? value : {}) as Partial<ReportDesignerV3Layer["print"]>;
-  const requestedHeight = Number(source.minHeightHundredthMm);
-  const minHeightHundredthMm = Number.isFinite(requestedHeight)
-    ? Math.min(26000, Math.max(0, Math.round(requestedHeight)))
-    : 0;
-  return {
-    repeatOnEveryPage: role === "Body" ? false : source.repeatOnEveryPage === true,
-    keepTogether: source.keepTogether === true,
-    pinToPageBottom: role === "Footer" && source.pinToPageBottom === true,
-    followBody: role === "Footer" && source.pinToPageBottom !== true && source.followBody === true,
-    firstPageOnly: source.firstPageOnly === true,
-    minHeightHundredthMm,
-  };
 }

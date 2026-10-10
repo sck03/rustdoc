@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { isReportDesignerCssColor } from "./reportDesignerSchemaValues.ts";
-const palette = ["#1f2933", "#334155", "#2563eb", "#0f766e", "#15803d", "#ca8a04", "#dc2626", "#7c3aed", "#ffffff"];
+const palette = ["#000000", "#334155", "#2563eb", "#0f766e", "#15803d", "#ca8a04", "#dc2626", "#7c3aed", "#ffffff"];
 export function ReportDesignerV3ColorField({
   label,
   value,

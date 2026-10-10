@@ -39,6 +39,7 @@ fs.writeFileSync(entryPath, `
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3Validation.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3Schema.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3Mutations.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerV3Layers.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3TemplateParser.ts"))};
 export * from ${JSON.stringify(path.join(repoRoot, "scripts/lib/report-designer-v3-html-fixture.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerBlockRenderer.ts"))};
@@ -579,6 +580,16 @@ for (const classicPath of [
   const document = JSON.parse(inflateRawSync(payload.subarray(start, start + payload.readUInt32LE(18))).toString("utf8"));
   const parsed = api.parseReportDesignerV3Source(JSON.stringify(document), document.reportType);
   assert(parsed.issues.length === 0, `${classicPath}: ${JSON.stringify(parsed.issues)}`);
+  const catalogFile = document.reportType === "PaymentVoucher" ? "report-fields-payment.json" : "report-fields.json";
+  const catalog = JSON.parse(fs.readFileSync(path.join(repoRoot, "crates/export-doc-engine/resources", catalogFile), "utf8"));
+  const selectableFields = new Set(api.buildReportDesignerFieldGroups(catalog, document.reportType).flatMap(group => group.fields.map(field => field.value)));
+  const pending = [document];
+  while (pending.length) {
+    const value = pending.pop();
+    if (!value || typeof value !== "object") continue;
+    if (typeof value.fieldPath === "string" && value.fieldPath) assert(selectableFields.has(value.fieldPath), `${classicPath}: ${value.fieldPath} must be selectable when designing from blank`);
+    pending.push(...Object.values(value));
+  }
   const geometry = value => value.layers.map(layer => [layer.id, layer.role, layer.designHeightHundredthMm ?? 0, layer.elements.map(element => [element.id, element.xHundredthMm, element.yHundredthMm, element.widthHundredthMm, element.heightHundredthMm])]);
   assert(JSON.stringify(geometry(parsed.schema)) === JSON.stringify(geometry(document)), `${classicPath}: opening must not resize elements or alter design bands`);
   assert(!api.validateReportDesignerV3Draft(parsed.schema, document.reportType).blocked, `${classicPath} must remain editable`);

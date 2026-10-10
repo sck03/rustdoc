@@ -445,6 +445,8 @@ export function ReportDesignerV3Canvas({
             style={{
               width: `${page.widthMm}mm`,
               height: `${page.heightMm}mm`,
+              fontFamily: state.schema.page.fontFamily,
+              fontSize: `${state.schema.page.fontSizePt}pt`,
               "--v3-grid-size": `${hundredthMmToMm(state.schema.grid.sizeHundredthMm)}mm`,
               "--v3-page-ratio": `${page.widthMm} / ${page.heightMm}`,
               "--v3-zoom": zoom,

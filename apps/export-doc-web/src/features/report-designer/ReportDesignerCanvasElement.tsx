@@ -8,6 +8,7 @@ import { isShippingMarksField, shippingMarksPreviewText } from "./reportDesigner
 import type { ReportDesignerV3ResizeDirection } from "./reportDesignerV3Mutations.ts";
 import {
   hundredthMmToMm,
+  REPORT_DESIGNER_V3_DEFAULT_TEXT_COLOR,
   type ReportDesignerV3Element,
 } from "./reportDesignerV3Schema.ts";
 
@@ -46,8 +47,8 @@ export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCa
 
 function lineStyle(element: Extract<ReportDesignerV3Element, { type: "Line" }>): CSSProperties {
   const { borderStyle, borderColor = "#334155", borderWidthPx = 1 } = element.style;
-  if (borderStyle === "None") return { display: "none" };
-  const width = Math.max(1, Math.min(8, borderWidthPx));
+  if (borderStyle === "None" || borderWidthPx <= 0) return { display: "none" };
+  const width = Math.min(8, borderWidthPx);
   const horizontal = element.direction === "Horizontal";
   return borderStyle === "Dashed"
     ? { backgroundColor: "transparent", [horizontal ? "height" : "width"]: 0, [horizontal ? "borderTop" : "borderLeft"]: `${width}px dashed ${borderColor}` }
@@ -102,10 +103,10 @@ export function reportDesignerCanvasElementStyle(element: ReportDesignerV3Elemen
     height: `${hundredthMmToMm(element.heightHundredthMm)}mm`,
     zIndex: element.zIndex,
     transform: element.rotationDeg ? `rotate(${element.rotationDeg}deg)` : undefined,
-    fontFamily: usesOuterStyle ? (element.style.bold ? portableReportSansFontFamily : element.style.fontFamily) : undefined,
+    fontFamily: usesOuterStyle && element.style.bold ? portableReportSansFontFamily : element.style.fontFamily,
     fontSize: usesOuterStyle && element.style.fontSizePt ? `${element.style.fontSizePt}pt` : undefined,
     fontWeight: usesOuterStyle && element.style.bold ? 700 : undefined,
-    color: usesOuterStyle ? element.style.color : undefined,
+    color: element.style.color ?? REPORT_DESIGNER_V3_DEFAULT_TEXT_COLOR,
     backgroundColor: usesOuterStyle ? element.style.backgroundColor : undefined,
     textAlign: usesOuterStyle ? element.style.align?.toLowerCase() as CSSProperties["textAlign"] : undefined,
     borderColor: usesOuterStyle ? element.style.borderColor : undefined,
