@@ -1,4 +1,5 @@
-import { type ChangeEvent as ReactChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ChangeEvent as ReactChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useReportDesignerPointerGesture } from "./useReportDesignerPointerGesture.ts";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import type { ReportBorderStyle, ReportTextStyle } from "./reportDesignerSchema.ts";
 import { normalizeDesignerFieldPath } from "./reportDesignerMutations.ts";
@@ -158,10 +159,10 @@ export function ColumnWidthStrip({
   minWidth: number;
   onResizeBoundary: (leftColumnId: string, delta: number) => void;
 }) {
-  const cancelDrag = useRef<() => void>(() => undefined);
+  const pointer = useReportDesignerPointerGesture();
   const latest = useRef({ columns, onResizeBoundary });
   latest.current = { columns, onResizeBoundary };
-  useEffect(() => () => cancelDrag.current(), []);
+  useLayoutEffect(() => { pointer.cancel(); }, [columns, minWidth, unit, pointer]);
   const safeColumns = columns.filter((column) => Number.isFinite(column.width) && column.width > 0);
   if (safeColumns.length === 0) {
     return null;
@@ -178,22 +179,17 @@ export function ColumnWidthStrip({
   });
 
   function startResize(event: ReactPointerEvent<HTMLButtonElement>, leftColumnId: string) {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || pointer.isActive()) return;
     const strip = event.currentTarget.closest<HTMLElement>(".new-report-column-width-strip");
     const rect = strip?.getBoundingClientRect();
     if (!strip || !rect || rect.width <= 0 || totalWidth <= 0) return;
     event.preventDefault();
     event.stopPropagation();
-    cancelDrag.current();
     const startX = event.clientX;
     const stripWidth = rect.width;
-    const pointerId = event.pointerId;
     const handle = event.currentTarget;
     const segments = new Map(Array.from(strip.querySelectorAll<HTMLElement>("[data-column-id]")).map((node) => [node.dataset.columnId ?? "", { node, label: node.querySelector("strong") }]));
-    const baseWidths = safeColumns.map((column) => column.width).join(",");
-    let delta = 0;
-    let frame: number | null = null;
-    let settled = false;
+    const deltaAt = (x: number) => roundDesignerWidth((x - startX) * totalWidth / stripWidth);
 
     function paint(values: typeof safeColumns) {
       let offset = 0;
@@ -209,42 +205,12 @@ export function ColumnWidthStrip({
         if (column.id === leftColumnId && total > 0) handle.style.left = `${offset / total * 100}%`;
       }
     }
-    function preview() {
-      frame = null;
-      paint(resizeAdjacentWidths(safeColumns, leftColumnId, delta, minWidth, "width"));
-    }
-    function move(native: PointerEvent) {
-      if (native.pointerId !== pointerId) return;
-      delta = roundDesignerWidth((native.clientX - startX) * totalWidth / stripWidth);
-      if (frame === null) frame = requestAnimationFrame(preview);
-    }
-    function finish(commit: boolean, native?: PointerEvent) {
-      if (settled || (native && native.pointerId !== pointerId)) return;
-      settled = true;
-      if (native && commit) delta = roundDesignerWidth((native.clientX - startX) * totalWidth / stripWidth);
-      if (frame !== null) cancelAnimationFrame(frame);
-      document.removeEventListener("pointermove", move);
-      document.removeEventListener("pointerup", up);
-      document.removeEventListener("pointercancel", cancel);
-      document.removeEventListener("keydown", keyDown, true);
-      window.removeEventListener("blur", cancel);
-      cancelDrag.current = () => undefined;
-      paint(latest.current.columns);
-      if (commit && delta !== 0 && latest.current.columns.map((column) => column.width).join(",") === baseWidths) {
-        latest.current.onResizeBoundary(leftColumnId, delta);
-      }
-    }
-    const up = (native: PointerEvent) => finish(true, native);
-    const cancel = (native?: Event) => { if (!(native instanceof PointerEvent) || native.pointerId === pointerId) finish(false); };
-    const keyDown = (native: KeyboardEvent) => {
-      if (native.key === "Escape") { native.preventDefault(); native.stopPropagation(); cancel(); }
-    };
-    cancelDrag.current = cancel;
-    document.addEventListener("pointermove", move);
-    document.addEventListener("pointerup", up);
-    document.addEventListener("pointercancel", cancel);
-    document.addEventListener("keydown", keyDown, true);
-    window.addEventListener("blur", cancel);
+    pointer.start(event, {
+      surface: strip,
+      preview: ({ x }) => paint(resizeAdjacentWidths(safeColumns, leftColumnId, deltaAt(x), minWidth, "width")),
+      commit: ({ x }) => { const delta = deltaAt(x); if (delta !== 0) latest.current.onResizeBoundary(leftColumnId, delta); },
+      restore: () => paint(latest.current.columns),
+    });
   }
 
   function handleBoundaryKeyDown(

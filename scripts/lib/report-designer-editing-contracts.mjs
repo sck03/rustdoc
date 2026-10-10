@@ -17,6 +17,15 @@ export function verifyDesignerEditingMutations(api) {
   assert.equal(firstPage.schema.layers.find(layer => layer.id === header.id).print.firstPageOnly, true);
   assert.equal(api.updateV3Layer(firstPage, header.id, { visible: false }).schema.layers.find(layer => layer.id === header.id).print.firstPageOnly, true);
   assert.equal(api.updateV3Layer(firstPage, header.id, { print: { ...header.print, firstPageOnly: true } }), firstPage, "unchanged print options must not create undo entries");
+  const lockedHeader = api.updateV3Layer(firstPage, header.id, { locked: true });
+  assert.equal(api.setReportDesignerLayerHeight(lockedHeader, header.id, 4200), lockedHeader, "numeric height editing must respect layer locks");
+  assert.equal(api.setReportDesignerLayerRoleHeight(lockedHeader, "Header", 4200), lockedHeader, "canvas separators must respect layer locks");
+  const extraHeader = api.addV3Layer(lockedHeader, "Header");
+  assert.equal(api.setReportDesignerLayerRoleHeight(extraHeader, "Header", 4200), extraHeader, "a shared separator cannot partly resize a role containing a locked layer");
+  for (const value of [NaN, Infinity, -Infinity]) {
+    assert.equal(api.setReportDesignerLayerHeight(firstPage, header.id, value), firstPage);
+    assert.equal(api.setReportDesignerLayerRoleHeight(firstPage, "Header", value), firstPage);
+  }
   const pinned = api.updateV3Layer(renamed, footer.id, { print: { ...renamed.schema.layers.find(layer => layer.id === footer.id).print, pinToPageBottom: true } });
   assert.equal(pinned.schema.layers.find(layer => layer.id === footer.id).print.followBody, false, "pin and follow are mutually exclusive");
   const table = api.createV3FlowElement(api.createDetailTableBlock());

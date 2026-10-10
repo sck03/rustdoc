@@ -297,10 +297,6 @@ export function ReportDesignerV3Workspace({
     }
   }
 
-  function handleCancelTransform(baseState: ReportDesignerV3DocumentState) {
-    if (!editingEnabled) return;
-    if (history.state.schema === baseState.schema) history.select(baseState.selectedIds, baseState.activeLayerId);
-  }
   function commitCanvasText(elementId: string, cellId: string | undefined, text: string) {
     if (!editingEnabled) return;
     const current = historyRef.current.state;
@@ -450,7 +446,6 @@ export function ReportDesignerV3Workspace({
             selectedGridCell={activeGridCellSelection}
             onSelectGridCell={selectGridCell}
             onCommitTransform={handleCommitTransform}
-            onCancelTransform={handleCancelTransform}
             onCommitLayerBand={(role, height) => commit(setReportDesignerLayerRoleHeight(history.state, role, height))}
             onClearSelection={clearSelection}
             onCommitText={commitCanvasText}

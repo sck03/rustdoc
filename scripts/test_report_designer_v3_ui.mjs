@@ -16,6 +16,7 @@ import { verifyDetailProperties } from "./lib/report-designer-detail-properties-
 import { verifyLayerClarity } from "./lib/report-designer-layer-ui.mjs";
 import { verifyConditionalUi } from "./lib/report-designer-conditions-ui.mjs";
 import { verifyBlankDesigner } from "./lib/report-designer-blank-ui.mjs";
+import { verifyDesignerInteraction } from "./lib/report-designer-interaction-ui.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -80,7 +81,7 @@ await esbuild.build({
     let images=${JSON.stringify(imageFixtures)};
     window.__imageCalls=[];
     const client={
-      downloadReportTemplateV3ImageResource:async({resourceId})=>{window.__imageCalls.push({kind:'download',resourceId});const image=images.find(i=>i.id===resourceId);return new Blob([new Uint8Array(image.bytes)],{type:image.mediaType});},
+      downloadReportTemplateV3ImageResource:async({resourceId},{signal})=>{await Promise.resolve();signal.throwIfAborted();window.__imageCalls.push({kind:'download',resourceId});const image=images.find(i=>i.id===resourceId);return new Blob([new Uint8Array(image.bytes)],{type:image.mediaType});},
       queryReportTemplateV3ImageResources:async()=>{window.__imageCalls.push({kind:'list'});return {items:images.map(({bytes,...item})=>item),pageNumber:1,pageSize:12,totalCount:images.length,totalPages:1,hasPreviousPage:false,hasNextPage:false};},
       uploadReportTemplateV3ImageResource:async()=>{window.__imageCalls.push({kind:'upload'});return new Promise(resolve=>window.__finishImageUpload=()=>resolve((({bytes,...image})=>image)(images[1])));},
       recycleReportTemplateV3ImageResource:async({resourceId})=>{window.__imageCalls.push({kind:'recycle',resourceId});images=images.filter(i=>i.id!==resourceId);return {success:true,message:'图片资源已安全回收。'};}
@@ -112,12 +113,14 @@ await esbuild.build({
     window.__exportDesignerHtml=()=>renderReportDesignerV3HtmlFixture(window.__designerSchema);
     window.__visibilityComposite=()=>'<div class="edm-detail-omit-empty-lines">'+renderDetailComposite([{kind:'Field',fieldPath:'empty'},{kind:'LineBreak'},{kind:'Text',text:'Widget'},{kind:'LineBreak'},{kind:'Field',fieldPath:'empty'},{kind:'ColumnBreak',positionPercent:50},{kind:'Text',text:'10'}],part=>part.kind==='Text'?part.text:'')+'</div>';
     window.__renderMarksPreview=profile=>renderReportDesignerLocalPreviewSample(window.__designerHtml,profile);
-    createRoot(document.getElementById('root')).render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><PermissionAccessProvider grants={[]} permissions={['view','upload','recycle'].map(action=>({resourceKey:permissionResources.reportResources,action,dataScope:'all'}))} canManageSettings={false}><ConfirmationProvider><div className="work-surface" style={{margin:'12px',padding:'8px'}}>
+    const root = createRoot(document.getElementById('root'));
+    window.__unmountDesigner = () => root.unmount();
+    root.render(<React.StrictMode><QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><PermissionAccessProvider grants={[]} permissions={['view','upload','recycle'].map(action=>({resourceKey:permissionResources.reportResources,action,dataScope:'all'}))} canManageSettings={false}><ConfirmationProvider><div className="work-surface" style={{margin:'12px',padding:'8px'}}>
       <ReportDesignerV3Workspace client={imageScenario?client:undefined} reportType={reportType} displayName="表格设计交互验证" content={content} fieldCatalog={imageScenario?{reportType,fields:[],categoryOrder:[]}:fieldCatalog} editable={!new URLSearchParams(location.search).has('readonly')} onDesignerDraftChange={({content: html, isDirty, isValid}) => {
         window.__designerDraftState={isDirty,isValid};
         if(isValid) { window.__designerUpdates++; window.__designerHtml=isDirty?html:content; window.__designerSchema=parseReportDesignerV3Source(window.__designerHtml,reportType).schema; }
       }} />
-    </div></ConfirmationProvider></PermissionAccessProvider></QueryClientProvider>);
+    </div></ConfirmationProvider></PermissionAccessProvider></QueryClientProvider></React.StrictMode>);
   ` },
   outfile: path.join(output, "app.js"), bundle: true, format: "esm", platform: "browser", jsx: "automatic", nodePaths: [path.join(web, "node_modules")], logLevel: "silent",
 });
@@ -159,6 +162,7 @@ try {
   chrome = await startChrome({browserExecutable:locateChromeForTesting(repo),userDataDir:path.join(output,`profile-${Date.now()}`),timeoutMs:30000});
   cdp = await CdpClient.connect(chrome.browserWebSocketUrl);
   const page = await createPageSession(cdp);
+  await verifyDesignerInteraction({ page, url, read, waitFor, click, key, modifier: primaryModifier, results });
   for(const width of [1920,1366,1024,390]) {
     await page.send("Emulation.setDeviceMetricsOverride", {width,height:1000,deviceScaleFactor:1,mobile:width<500});
     await page.send("Page.navigate",{url});

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReportDesignerV3Schema } from "./reportDesignerV3Schema.ts";
 import type { ReportDesignerV3DocumentState } from "./reportDesignerV3Mutations.ts";
 import { createReportDesignerV3DocumentState } from "./reportDesignerV3Mutations.ts";
@@ -7,6 +7,7 @@ type HistoryState = {
   past: ReportDesignerV3DocumentState[];
   present: ReportDesignerV3DocumentState;
   future: ReportDesignerV3DocumentState[];
+  coalescedAt: number;
 };
 
 type CommitOptions = {
@@ -21,12 +22,10 @@ const stateSizeCache = new WeakMap<object, number>();
 
 export function useReportDesignerV3History(initialSchema: ReportDesignerV3Schema) {
   const initialState = useMemo(() => createReportDesignerV3DocumentState(initialSchema), [initialSchema]);
-  const [history, setHistory] = useState<HistoryState>(() => ({ past: [], present: initialState, future: [] }));
-  const lastCoalescedCommitAt = useRef(0);
+  const [history, setHistory] = useState<HistoryState>(() => ({ past: [], present: initialState, future: [], coalescedAt: 0 }));
 
   useEffect(() => {
-    lastCoalescedCommitAt.current = 0;
-    setHistory({ past: [], present: initialState, future: [] });
+    setHistory({ past: [], present: initialState, future: [], coalescedAt: 0 });
   }, [initialState]);
 
   return {
@@ -34,57 +33,51 @@ export function useReportDesignerV3History(initialSchema: ReportDesignerV3Schema
     canUndo: history.past.length > 0,
     canRedo: history.future.length > 0,
     commit(next: ReportDesignerV3DocumentState, options: CommitOptions = {}) {
+      const coalescedAt = options.coalesce ? performance.now() : 0;
       setHistory((current) => {
         if (current.present.schema === next.schema) return { ...current, present: next };
-        const now = Date.now();
-        const coalesce = options.coalesce === true && now - lastCoalescedCommitAt.current <= 450 && current.past.length > 0;
-        lastCoalescedCommitAt.current = options.coalesce === true ? now : 0;
+        // Keep grouping inside the state transition so React can replay an
+        // updater without consuming the undo boundary of the first execution.
+        const coalesce = coalescedAt > 0 && current.coalescedAt > 0 && coalescedAt - current.coalescedAt <= 450 && current.past.length > 0;
         return coalesce
-          ? { ...current, present: next, future: [] }
-          : trimHistory({ past: [...current.past, current.present], present: next, future: [] });
+          ? { ...current, present: next, future: [], coalescedAt }
+          : trimHistory({ past: [...current.past, current.present], present: next, future: [], coalescedAt });
       });
     },
     commitFrom(base: ReportDesignerV3DocumentState, next: ReportDesignerV3DocumentState) {
       if (next.schema === base.schema) return;
-      lastCoalescedCommitAt.current = 0;
       setHistory((current) => {
         // A delayed pointer-up must never append a snapshot based on a stale
         // render.  The current present is the only authoritative base; if it
         // changed during the gesture, discard that terminal commit safely.
         if (current.present.schema !== base.schema) return current;
-        return trimHistory({ past: [...current.past, base], present: next, future: [] });
+        return trimHistory({ past: [...current.past, base], present: next, future: [], coalescedAt: 0 });
       });
     },
     reset(schema: ReportDesignerV3Schema) {
-      lastCoalescedCommitAt.current = 0;
-      setHistory({ past: [], present: createReportDesignerV3DocumentState(schema), future: [] });
+      setHistory({ past: [], present: createReportDesignerV3DocumentState(schema), future: [], coalescedAt: 0 });
     },
     select(selectedIds: string[], activeLayerId?: string | null) {
-      lastCoalescedCommitAt.current = 0;
-      setHistory((current) => ({
-        ...current,
-        present: {
-          ...current.present,
-          selectedIds,
-          activeLayerId: activeLayerId === undefined ? current.present.activeLayerId : activeLayerId,
-        },
-      }));
+      setHistory((current) => {
+        const layerId = activeLayerId === undefined ? current.present.activeLayerId : activeLayerId;
+        const unchanged = layerId === current.present.activeLayerId && selectedIds.length === current.present.selectedIds.length && selectedIds.every((id, index) => id === current.present.selectedIds[index]);
+        if (unchanged && !current.coalescedAt) return current;
+        return { ...current, coalescedAt: 0, present: unchanged ? current.present : { ...current.present, selectedIds, activeLayerId: layerId } };
+      });
     },
     undo() {
-      lastCoalescedCommitAt.current = 0;
       setHistory((current) => {
         const previous = current.past.at(-1);
         return previous
-          ? trimHistory({ past: current.past.slice(0, -1), present: previous, future: [current.present, ...current.future] })
+          ? trimHistory({ past: current.past.slice(0, -1), present: previous, future: [current.present, ...current.future], coalescedAt: 0 })
           : current;
       });
     },
     redo() {
-      lastCoalescedCommitAt.current = 0;
       setHistory((current) => {
         const next = current.future[0];
         return next
-          ? trimHistory({ past: [...current.past, current.present], present: next, future: current.future.slice(1) })
+          ? trimHistory({ past: [...current.past, current.present], present: next, future: current.future.slice(1), coalescedAt: 0 })
           : current;
       });
     },

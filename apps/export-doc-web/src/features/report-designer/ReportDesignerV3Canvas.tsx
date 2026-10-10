@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { getGridCellLocations } from "./reportDesignerGridMutations.ts";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { ReportDesignerCanvasTextEditor, type ReportDesignerTextEdit } from "./ReportDesignerCanvasTextEditor.tsx";
@@ -25,6 +25,7 @@ import { fitReportDesignerV3Zoom } from "./reportDesignerV3WorkspaceHelpers.tsx"
 import { reportDesignerLayerBandStyle } from "./reportDesignerLayerBands.ts";
 import { ReportDesignerLayerResizers } from "./ReportDesignerLayerResizers.tsx";
 import { ReportDesignerProductRows } from "./ReportDesignerProductRows.tsx";
+import { useReportDesignerPointerGesture } from "./useReportDesignerPointerGesture.ts";
 import {
   ReportDesignerCanvasElementPreview,
   ReportDesignerCanvasResizeHandles,
@@ -42,19 +43,13 @@ export type ReportDesignerV3Transform =
   | { kind: "resize"; elementId: string; direction: ReportDesignerV3ResizeDirection };
 
 type Gesture = {
-  pointerId: number;
   startX: number;
   startY: number;
-  lastX: number;
-  lastY: number;
   baseState: ReportDesignerV3DocumentState;
   transform: ReportDesignerV3Transform;
-  captureTarget: HTMLElement | null;
-  pendingAnimationFrame: number | null;
   baseElements: Map<string, ReportDesignerV3Element>;
   elementNodes: Map<string, HTMLElement>;
   moveConstraint: ReportDesignerV3MoveConstraint | null;
-  coordinateScale: { x: number; y: number };
 };
 
 export function ReportDesignerV3Canvas({
@@ -73,7 +68,6 @@ export function ReportDesignerV3Canvas({
   selectedGridCell,
   onSelectGridCell,
   onCommitTransform,
-  onCancelTransform,
   onCommitLayerBand,
   onClearSelection,
   onCommitText,
@@ -94,7 +88,6 @@ export function ReportDesignerV3Canvas({
   selectedGridCell?: { elementId: string; cellId: string } | null;
   onSelectGridCell?: (elementId: string, cellId: string) => void;
   onCommitTransform: (baseState: ReportDesignerV3DocumentState, transform: ReportDesignerV3Transform, deltaX: number, deltaY: number) => void;
-  onCancelTransform: (baseState: ReportDesignerV3DocumentState) => void;
   onCommitLayerBand: (role: "Header" | "Footer", heightHundredthMm: number) => void;
   onClearSelection: () => void;
   onCommitText: (elementId: string, cellId: string | undefined, text: string) => void;
@@ -102,17 +95,17 @@ export function ReportDesignerV3Canvas({
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const gesture = useRef<Gesture | null>(null);
+  const pointer = useReportDesignerPointerGesture();
   const [textEdit, setTextEdit] = useState<ReportDesignerTextEdit | null>(null);
-  const callbacksRef = useRef({ onCommitTransform, onCancelTransform, schema: state.schema });
-  callbacksRef.current = { onCommitTransform, onCancelTransform, schema: state.schema };
+  const callbacksRef = useRef({ onCommitTransform, schema: state.schema });
+  callbacksRef.current = { onCommitTransform, schema: state.schema };
   const page = reportDesignerV3PageSize(state.schema.page);
   const displayedWidthMm = page.widthMm * zoom;
   const displayedHeightMm = page.heightMm * zoom;
   const selectedSet = new Set(state.selectedIds);
   const statusHint = useMemo(() => {
     if (state.selectedIds.length === 1) {
-      const found = state.schema.layers.flatMap((l) => l.elements).find((el) => el.id === state.selectedIds[0]);
+      const found = findV3Element(state.schema, state.selectedIds[0])?.element;
       if (found) {
         const typeLabel = reportDesignerV3ElementKindLabel(found);
         return `已选【${typeLabel}】X: ${hundredthMmToMm(found.xHundredthMm).toFixed(1)} mm, Y: ${hundredthMmToMm(found.yHundredthMm).toFixed(1)} mm, 宽: ${hundredthMmToMm(found.widthHundredthMm).toFixed(1)} mm, 高: ${hundredthMmToMm(found.heightHundredthMm).toFixed(1)} mm · 拖拽移动/角点缩放 · 方向键微移 · Ctrl+C 复制 · Del 删除`;
@@ -131,7 +124,7 @@ export function ReportDesignerV3Canvas({
     if (!scroll || !canvas) return;
     let frame = 0;
     const measure = () => {
-      if (gesture.current || !scroll.clientWidth || !canvas.offsetWidth) return;
+      if (pointer.isActive() || !scroll.clientWidth || !canvas.offsetWidth) return;
       const styles = getComputedStyle(scroll);
       const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
       const verticalPadding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
@@ -147,11 +140,11 @@ export function ReportDesignerV3Canvas({
     const observer = new ResizeObserver(fit);
     observer.observe(scroll);
     return () => { observer.disconnect(); cancelAnimationFrame(frame); };
-  }, [fitRequest, onFitZoom, autoFit, fitWidth, page.widthMm, page.heightMm]);
+  }, [fitRequest, onFitZoom, autoFit, fitWidth, page.widthMm, page.heightMm, pointer]);
 
   function beginMove(event: ReactPointerEvent<HTMLDivElement>, element: ReportDesignerV3Element, layerId: string) {
     if (event.button !== 0) return;
-    if (disabled) return;
+    if (disabled || pointer.isActive()) return;
     event.stopPropagation();
     const additive = multiSelect || event.shiftKey || event.ctrlKey || event.metaKey;
     const alreadySelected = state.selectedIds.includes(element.id);
@@ -162,7 +155,7 @@ export function ReportDesignerV3Canvas({
         : [element.id];
     const gridCellId = readReportDesignerGridCellId(event.target);
     if (gridCellId && element.type === "Flow" && element.flowKind === "Grid") onSelectGridCell?.(element.id, gridCellId);
-    onSelect(element.id, additive);
+    if (!alreadySelected || additive) onSelect(element.id, additive);
     // A modifier click on an already selected element is a selection toggle,
     // not the start of a drag.  Starting a gesture here would preview a move
     // while simultaneously removing the element from the selection.
@@ -174,27 +167,7 @@ export function ReportDesignerV3Canvas({
       selectedIds,
       activeLayerId: layerId,
     };
-    const baseElements = baseElementsFor(state.schema, selectedIds, true);
-    const coordinateScale = readCoordinateScale(canvasRef.current, state.schema);
-    if (!coordinateScale) return;
-    const elementNodes = findReportDesignerElementNodes(canvasRef.current, baseElements.keys());
-    gesture.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      lastX: event.clientX,
-      lastY: event.clientY,
-      baseState,
-      transform: { kind: "move" },
-      captureTarget: event.currentTarget,
-      pendingAnimationFrame: null,
-      baseElements,
-      elementNodes,
-      moveConstraint: createV3RegionMoveConstraint(state.schema, baseElements.values()),
-      coordinateScale,
-    };
-    prepareReportDesignerGestureNodes(elementNodes, "move");
-    capturePointer(event.currentTarget, event.pointerId);
+    beginTransform(event, baseState, { kind: "move" });
   }
 
   function beginTextEdit(target: EventTarget | null, element: ReportDesignerV3Element) {
@@ -232,9 +205,9 @@ export function ReportDesignerV3Canvas({
   }
 
   function beginResize(event: ReactPointerEvent<HTMLButtonElement>, elementId: string, direction: ReportDesignerV3ResizeDirection) {
+    if (disabled || event.button !== 0 || pointer.isActive()) return;
     event.preventDefault();
     event.stopPropagation();
-    if (disabled) return;
     const located = findV3Element(state.schema, elementId);
     if (!located || located.element.locked || located.layer.locked) return;
     const baseState: ReportDesignerV3DocumentState = {
@@ -243,30 +216,43 @@ export function ReportDesignerV3Canvas({
       activeLayerId: located.layer.id,
     };
     onSelect(elementId, false);
-    const baseElements = baseElementsFor(state.schema, [elementId]);
-    const coordinateScale = readCoordinateScale(canvasRef.current, state.schema);
-    if (!coordinateScale) return;
-    const elementNodes = findReportDesignerElementNodes(canvasRef.current, baseElements.keys());
-    gesture.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      lastX: event.clientX,
-      lastY: event.clientY,
-      baseState,
-      transform: { kind: "resize", elementId, direction },
-      captureTarget: event.currentTarget,
-      pendingAnimationFrame: null,
-      baseElements,
-      elementNodes,
-      moveConstraint: null,
-      coordinateScale,
-    };
-    prepareReportDesignerGestureNodes(elementNodes, "resize");
-    capturePointer(event.currentTarget, event.pointerId);
+    beginTransform(event, baseState, { kind: "resize", elementId, direction });
   }
 
-  function updateGesture(event: ReactPointerEvent<HTMLElement>) { updateGestureAt(event.pointerId, event.clientX, event.clientY); }
+  function beginTransform(event: ReactPointerEvent<HTMLElement>, baseState: ReportDesignerV3DocumentState, transform: ReportDesignerV3Transform) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const baseElements = baseElementsFor(state.schema, baseState.selectedIds, true);
+    const coordinateScale = readCoordinateScale(canvas, state.schema);
+    if (!coordinateScale) return;
+    const elementNodes = findReportDesignerElementNodes(canvasRef.current, baseElements.keys());
+    const current: Gesture = {
+      startX: event.clientX,
+      startY: event.clientY,
+      baseState,
+      transform,
+      baseElements,
+      elementNodes,
+      moveConstraint: transform.kind === "move" ? createV3RegionMoveConstraint(state.schema, baseElements.values()) : null,
+    };
+    pointer.start(event, {
+      surface: canvas,
+      preview: (point) => {
+        const delta = readDelta(current.startX, current.startY, point.x, point.y, coordinateScale);
+        applyTransientTransform(current, delta.x, delta.y);
+      },
+      commit: (point) => {
+        const delta = readDelta(current.startX, current.startY, point.x, point.y, coordinateScale);
+        callbacksRef.current.onCommitTransform(baseState, transform, delta.x, delta.y);
+      },
+      restore: () => {
+        restoreCommittedGeometry(current);
+        releaseReportDesignerGestureNodes(elementNodes);
+      },
+    });
+    prepareReportDesignerGestureNodes(elementNodes, transform.kind);
+  }
+
   function resizeByKeyboard(event: ReactKeyboardEvent<HTMLButtonElement>, elementId: string, direction: ReportDesignerV3ResizeDirection) {
     const step = event.shiftKey ? 1000 : 100;
     const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
@@ -276,84 +262,11 @@ export function ReportDesignerV3Canvas({
     event.stopPropagation();
     if (!disabled) callbacksRef.current.onCommitTransform(state, { kind: "resize", elementId, direction }, dx, dy);
   }
-  function finishGesture(event: ReactPointerEvent<HTMLElement>, cancelled = false) { finishGestureAt(event.pointerId, event.clientX, event.clientY, cancelled); }
-  function handleLostPointerCapture(event: ReactPointerEvent<HTMLElement>) { if (gesture.current && gesture.current.pointerId === event.pointerId) { /* keep gesture alive */ } }
-
-  function updateGestureAt(pointerId: number, clientX: number, clientY: number) {
-    const current = gesture.current;
-    if (!current || current.pointerId !== pointerId) return;
-    current.lastX = Number.isFinite(clientX) ? clientX : current.lastX;
-    current.lastY = Number.isFinite(clientY) ? clientY : current.lastY;
-    schedulePreview(current);
-  }
-
-  function finishGestureAt(pointerId: number, clientX: number, clientY: number, cancelled = false) {
-    const current = gesture.current;
-    if (!current || current.pointerId !== pointerId) return;
-    if (!cancelled) {
-      // Pointer-up can be delivered without a final pointer-move (for example
-      // when the pointer is released between browser sampling ticks).  Use the
-      // terminal event coordinates so the committed transform never lags the
-      // previewed/final pointer position.
-      const finalX = Number.isFinite(clientX) ? clientX : current.lastX;
-      const finalY = Number.isFinite(clientY) ? clientY : current.lastY;
-      current.lastX = finalX;
-      current.lastY = finalY;
-      cancelScheduledPreview(current);
-      const delta = readDelta(
-        current.startX,
-        current.startY,
-        finalX,
-        finalY,
-        current.coordinateScale,
-      );
-      applyTransientTransform(current, delta.x, delta.y);
-      callbacksRef.current.onCommitTransform(current.baseState, current.transform, delta.x, delta.y);
-      restoreCommittedGeometry(current);
-    } else {
-      cancelScheduledPreview(current);
-      restoreCommittedGeometry(current);
-      callbacksRef.current.onCancelTransform(current.baseState);
-    }
-    releaseReportDesignerGestureNodes(current.elementNodes);
-    gesture.current = null;
-    releasePointer(current.captureTarget, current.pointerId);
-  }
-
-  function cancelGesture() {
-    const current = gesture.current;
-    if (!current) return;
-    cancelScheduledPreview(current);
-    restoreCommittedGeometry(current);
-    callbacksRef.current.onCancelTransform(current.baseState);
-    releaseReportDesignerGestureNodes(current.elementNodes);
-    gesture.current = null;
-    releasePointer(current.captureTarget, current.pointerId);
-  }
-
-  function schedulePreview(current: Gesture) {
-    if (current.pendingAnimationFrame !== null) return;
-    current.pendingAnimationFrame = requestAnimationFrame(() => {
-      current.pendingAnimationFrame = null;
-      const delta = readDelta(
-        current.startX,
-        current.startY,
-        current.lastX,
-        current.lastY,
-        current.coordinateScale,
-      );
-      applyTransientTransform(current, delta.x, delta.y);
-    });
-  }
-
-  function cancelScheduledPreview(current: Gesture) {
-    if (current.pendingAnimationFrame === null) return;
-    cancelAnimationFrame(current.pendingAnimationFrame);
-    current.pendingAnimationFrame = null;
-  }
 
   function restoreCommittedGeometry(current: Gesture) {
-    const elements = baseElementsFor(callbacksRef.current.schema, [...current.baseElements.keys()]);
+    const elements = callbacksRef.current.schema === current.baseState.schema
+      ? current.baseElements
+      : baseElementsFor(callbacksRef.current.schema, [...current.baseElements.keys()]);
     for (const [id, element] of elements) {
       const node = current.elementNodes.get(id);
       if (node) paintGeometry(node, element);
@@ -382,48 +295,9 @@ export function ReportDesignerV3Canvas({
     }
   }
 
-  useEffect(() => {
-    cancelGesture();
-  }, [zoom]);
-
   useLayoutEffect(() => {
-    if (gesture.current && gesture.current.baseState.schema !== state.schema) cancelGesture();
-  }, [state.schema]);
-
-  useEffect(() => {
-    const handleWindowPointerMove = (event: PointerEvent) => {
-      const current = gesture.current;
-      if (!current || current.pointerId !== event.pointerId) return;
-      // React's page-level handler already receives captured events.  Only use
-      // the window fallback after capture has actually been lost/rejected.
-      if (current.captureTarget?.hasPointerCapture?.(event.pointerId)) return;
-      updateGestureAt(event.pointerId, event.clientX, event.clientY);
-    };
-    const handleWindowPointerUp = (event: PointerEvent) => {
-      const current = gesture.current;
-      if (!current || current.pointerId !== event.pointerId) return;
-      if (current.captureTarget?.hasPointerCapture?.(event.pointerId)) return;
-      finishGestureAt(event.pointerId, event.clientX, event.clientY);
-    };
-    const handleWindowPointerCancel = (event: PointerEvent) => {
-      const current = gesture.current;
-      if (!current || current.pointerId !== event.pointerId) return;
-      finishGestureAt(event.pointerId, event.clientX, event.clientY, true);
-    };
-    window.addEventListener("pointermove", handleWindowPointerMove);
-    window.addEventListener("pointerup", handleWindowPointerUp);
-    window.addEventListener("pointercancel", handleWindowPointerCancel);
-    window.addEventListener("blur", cancelGesture);
-    window.addEventListener("resize", cancelGesture);
-    return () => {
-      window.removeEventListener("pointermove", handleWindowPointerMove);
-      window.removeEventListener("pointerup", handleWindowPointerUp);
-      window.removeEventListener("pointercancel", handleWindowPointerCancel);
-      window.removeEventListener("blur", cancelGesture);
-      window.removeEventListener("resize", cancelGesture);
-      cancelGesture();
-    };
-  }, []);
+    pointer.cancel();
+  }, [state.schema, zoom, disabled, pointer]);
 
   return (
     <div className="report-designer-v3-canvas-shell">
@@ -458,7 +332,6 @@ export function ReportDesignerV3Canvas({
               transform: `scale(${zoom})`,
               transformOrigin: "top left",
             } as CSSProperties}
-          onPointerMove={updateGesture}
           onDragOver={event => { if (!disabled && event.dataTransfer.types.includes("application/x-exportdoc-field")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; } }}
           onDrop={event => {
             if (disabled) return;
@@ -468,9 +341,6 @@ export function ReportDesignerV3Canvas({
             event.preventDefault();
             onDropField?.(field, Math.round((event.clientX - rect.left) / rect.width * state.schema.page.widthHundredthMm), Math.round((event.clientY - rect.top) / rect.height * state.schema.page.heightHundredthMm));
           }}
-          onPointerUp={(event) => finishGesture(event)}
-          onPointerCancel={(event) => finishGesture(event, true)}
-          onLostPointerCapture={handleLostPointerCapture}
           onPointerDown={(event) => {
             if (!disabled && (event.target === event.currentTarget || (event.target instanceof HTMLElement && event.target.classList.contains("report-designer-v3-layer")))) onClearSelection();
           }}
@@ -566,23 +436,4 @@ function readDelta(
     x: Math.round((currentX - startX) * scale.x),
     y: Math.round((currentY - startY) * scale.y),
   };
-}
-
-function capturePointer(target: HTMLElement, pointerId: number) {
-  try {
-    target.setPointerCapture(pointerId);
-  } catch {
-    // Some embedded WebViews can reject capture after a synthetic pointer
-    // event.  The gesture remains cancellable and the page-level handlers
-    // still provide a best-effort fallback.
-  }
-}
-
-function releasePointer(target: HTMLElement | null, pointerId: number) {
-  if (!target) return;
-  try {
-    if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
-  } catch {
-    // The browser may have released capture already.
-  }
 }

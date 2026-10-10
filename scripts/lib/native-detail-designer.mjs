@@ -66,4 +66,24 @@ export async function verifyDesktopDetailDesigner({ run, request, token, cdp, ou
   await wait(`document.querySelector('.report-designer-v3-canvas-column').getBoundingClientRect().width > document.querySelector('.report-designer-v3-workspace').clientWidth / 2`);
   await run(`window.scrollTo(0,0); true`);
   await captureScreenshot(cdp, path.join(output, 'Full-invoice-layers.png'), { captureBeyondViewport: false });
+  const totalSelector = `[data-v3-element-id="${total.id}"]`;
+  const left = `parseFloat(document.querySelector(${JSON.stringify(totalSelector)}).style.left)`;
+  const initialLeft = await run(left);
+  await run(`document.querySelector(${JSON.stringify(totalSelector)}).focus({preventScroll:true}); true`);
+  for (const [key, modifiers, offset] of [['ArrowRight', 0, 1], ['z', 2, 0], ['y', 2, 1], ['ArrowRight', 0, 2], ['z', 2, 1], ['z', 2, 0]]) {
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key, modifiers });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, modifiers });
+    await wait(`Math.abs(${left} - ${initialLeft + offset}) < 0.001`);
+  }
+  await run(`document.querySelector('.report-designer-v3-sidebar-tabs button:nth-child(2)').click(); true`);
+  assert.equal(await run(`document.querySelectorAll('.report-designer-v3-layer-list[hidden] .report-designer-v3-layer-elements button').length`), 0, 'the packaged designer only mounts visible element lists');
+  const point = await run(`(()=>{const node=document.querySelector(${JSON.stringify(totalSelector)});node.scrollIntoView({block:'center'});node.focus({preventScroll:true});const rect=node.getBoundingClientRect();return {x:rect.left+rect.width/2,y:rect.top+rect.height/2}})()`);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x + 20, y: point.y, button: 'left', buttons: 1 });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', windowsVirtualKeyCode: 27 });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', windowsVirtualKeyCode: 27 });
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x + 20, y: point.y, button: 'left', clickCount: 1 });
+  await wait(`${left} === ${initialLeft} && document.querySelector(${JSON.stringify(totalSelector)}).style.willChange === ''`);
+  await wait(`document.querySelector('.report-designer-v3-header').textContent.includes('与已载入模板一致')`);
+  await captureScreenshot(cdp, path.join(output, 'Full-designer-drag-cancelled.png'), { captureBeyondViewport: false });
 }

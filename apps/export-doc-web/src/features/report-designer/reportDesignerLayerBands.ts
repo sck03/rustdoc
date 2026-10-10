@@ -54,7 +54,7 @@ export function clampReportDesignerLayerHeight(
 
 export function setReportDesignerLayerHeight(state: ReportDesignerV3DocumentState, layerId: string, value: number) {
   const layer = state.schema.layers.find((candidate) => candidate.id === layerId);
-  if (!layer || (layer.role !== "Header" && layer.role !== "Footer")) return state;
+  if (!layer || layer.locked || !Number.isFinite(value) || (layer.role !== "Header" && layer.role !== "Footer")) return state;
   const nextHeight = clampReportDesignerLayerHeight(state.schema, layer.role, value);
   if (reportDesignerLayerHeight(layer) === nextHeight && layer.designHeightHundredthMm !== undefined) return state;
   return {
@@ -71,11 +71,16 @@ export function setReportDesignerLayerRoleHeight(
   role: Extract<ReportDesignerV3LayerRole, "Header" | "Footer">,
   value: number,
 ) {
+  if (!Number.isFinite(value) || isReportDesignerLayerRoleLocked(state.schema, role)) return state;
   const nextHeight = clampReportDesignerLayerHeight(state.schema, role, value);
   const layers = state.schema.layers.map((layer) => layer.role === role && layer.visible && reportDesignerLayerHeight(layer) !== nextHeight
     ? { ...layer, designHeightHundredthMm: nextHeight }
     : layer);
   return layers.every((layer, index) => layer === state.schema.layers[index]) ? state : { ...state, schema: { ...state.schema, layers } };
+}
+
+export function isReportDesignerLayerRoleLocked(schema: ReportDesignerV3Schema, role: ReportDesignerV3LayerRole) {
+  return schema.layers.some(layer => layer.role === role && layer.visible && layer.locked);
 }
 
 function largestVisibleBand(layers: ReportDesignerV3Layer[], role: ReportDesignerV3LayerRole) {

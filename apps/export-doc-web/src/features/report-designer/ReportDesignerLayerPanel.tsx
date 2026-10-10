@@ -19,6 +19,7 @@ export function LayerPanel({ state, onSelect, onCommit, canEdit = true, multiSel
   const [query, setQuery] = useState("");
   const [newRole, setNewRole] = useState<ReportDesignerV3LayerRole>("Footer");
   const bands = useMemo(() => resolveReportDesignerLayerBands(state.schema), [state.schema]);
+  const selectedIds = useMemo(() => new Set(state.selectedIds), [state.selectedIds]);
   const search = query.trim().toLocaleLowerCase();
   return (
     <div className="report-designer-v3-panel-content report-designer-v3-layer-list" hidden={hidden}>
@@ -31,19 +32,22 @@ export function LayerPanel({ state, onSelect, onCommit, canEdit = true, multiSel
         <button type="button" className="command-button secondary" disabled={!canEdit || state.schema.layers.length >= REPORT_DESIGNER_V3_MAX_LAYER_COUNT} onClick={() => { setQuery(""); onCommit(addV3Layer(state, newRole)); }}>添加图层</button>
         <small>同类图层可独立设置首页、每页或末页输出，用于唛头、合计、条款与签章。</small>
       </details>
-      {state.schema.layers.map((layer, index) => <LayerRow key={layer.id} layer={layer} index={index} bodyHeight={bands.bodyHeight} state={state} onSelect={onSelect} onCommit={onCommit} canEdit={canEdit} search={search} multiSelect={multiSelect} />)}
+      {state.schema.layers.map((layer, index) => <LayerRow key={layer.id} layer={layer} index={index} bodyHeight={bands.bodyHeight} state={state} selectedIds={selectedIds} hidden={hidden} onSelect={onSelect} onCommit={onCommit} canEdit={canEdit} search={search} multiSelect={multiSelect} />)}
     </div>
   );
 }
 
-function LayerRow({ layer, index, bodyHeight, state, onSelect, onCommit, canEdit, search, multiSelect }: { layer: ReportDesignerV3Layer; index: number; bodyHeight: number; state: ReportDesignerV3DocumentState; onSelect: (id: string) => void; onCommit: (next: ReportDesignerV3DocumentState) => void; canEdit: boolean; search: string; multiSelect: boolean }) {
+function LayerRow({ layer, index, bodyHeight, state, selectedIds, hidden, onSelect, onCommit, canEdit, search, multiSelect }: { layer: ReportDesignerV3Layer; index: number; bodyHeight: number; state: ReportDesignerV3DocumentState; selectedIds: ReadonlySet<string>; hidden: boolean; onSelect: (id: string) => void; onCommit: (next: ReportDesignerV3DocumentState) => void; canEdit: boolean; search: string; multiSelect: boolean }) {
   const active = state.activeLayerId === layer.id;
   const [elementsOpen, setElementsOpen] = useState(active);
   useEffect(() => { if (active) setElementsOpen(true); }, [active]);
-  const selectedCount = layer.elements.filter((element) => state.selectedIds.includes(element.id)).length;
-  const elements = layer.elements.filter(element => !search || `${element.label ?? ""} ${reportDesignerV3ElementText(element)} ${reportDesignerV3ElementKindLabel(element)} ${element.type === "Field" ? element.fieldPath : ""}`.toLocaleLowerCase().includes(search));
+  const selectedCount = layer.elements.reduce((count, element) => count + Number(selectedIds.has(element.id)), 0);
+  const showElements = !hidden && (Boolean(search) || elementsOpen);
+  const elements = useMemo(() => showElements ? layer.elements
+    .filter(element => !search || `${element.label ?? ""} ${reportDesignerV3ElementText(element)} ${reportDesignerV3ElementKindLabel(element)} ${element.type === "Field" ? element.fieldPath : ""}`.toLocaleLowerCase().includes(search))
+    .sort((left, right) => right.zIndex - left.zIndex) : [], [layer.elements, search, showElements]);
   const removalIssue = getV3LayerRemovalIssue(state, layer.id);
-  if (search && !elements.length) return null;
+  if (!hidden && search && !elements.length) return null;
   return (
     <section className={`report-designer-v3-layer-row${state.activeLayerId === layer.id ? " is-active" : ""}${layer.visible ? "" : " is-hidden"}`} data-layer-role={layer.role} aria-label={`${layer.name}图层`}>
       <div className="report-designer-v3-layer-heading">
@@ -61,24 +65,24 @@ function LayerRow({ layer, index, bodyHeight, state, onSelect, onCommit, canEdit
       {layer.elements.length ? (
         <details className="report-designer-v3-layer-elements-disclosure" open={Boolean(search) || elementsOpen} onToggle={(event) => { if (!search) setElementsOpen(event.currentTarget.open); }}>
           <summary>元素列表 <small>{selectedCount ? `已选 ${selectedCount}` : "点击定位"}</small></summary>
-          <div className="report-designer-v3-layer-elements">
-            {[...elements].sort((left, right) => right.zIndex - left.zIndex).map((element) => (
-              <button className={state.selectedIds.includes(element.id) ? "is-selected" : ""} type="button" key={element.id} aria-pressed={state.selectedIds.includes(element.id)} onClick={(event) => {
+          {showElements ? <div className="report-designer-v3-layer-elements">
+            {elements.map((element) => (
+              <button className={selectedIds.has(element.id) ? "is-selected" : ""} type="button" key={element.id} aria-pressed={selectedIds.has(element.id)} onClick={(event) => {
                 const additive = multiSelect || event.ctrlKey || event.metaKey || event.shiftKey;
-                const selectedIds = additive ? state.selectedIds.includes(element.id) ? state.selectedIds.filter(id => id !== element.id) : [...state.selectedIds, element.id] : [element.id];
-                onCommit({ ...state, selectedIds, activeLayerId: layer.id });
+                const selection = additive ? selectedIds.has(element.id) ? state.selectedIds.filter(id => id !== element.id) : [...state.selectedIds, element.id] : [element.id];
+                onCommit({ ...state, selectedIds: selection, activeLayerId: layer.id });
                 if (!additive) focusDesignerNode(`[data-v3-element-id="${CSS.escape(element.id)}"]`);
               }}>
                 <span>{element.type !== "Flow" ? <strong>{reportDesignerV3ElementKindLabel(element)} </strong> : null}{reportDesignerV3ElementText(element) || reportDesignerV3ElementKindLabel(element)}</span>
                 <small>{!element.visible ? "已隐藏 · " : ""}{element.locked ? "已锁定" : `${hundredthMmToMm(element.xHundredthMm).toFixed(1)}, ${hundredthMmToMm(element.yHundredthMm).toFixed(1)} mm`}</small>
               </button>
             ))}
-          </div>
+          </div> : null}
         </details>
       ) : <p className="report-designer-v3-muted">空图层</p>}
       <details className="report-designer-layer-settings"><summary>图层设置</summary>
         <label><span>图层名称</span><CommitTextField value={layer.name} disabled={!canEdit || layer.locked} onCommit={name => onCommit(updateV3Layer(state, layer.id, { name }))} /></label>
-        <LayerDesignControls layer={layer} bodyHeight={bodyHeight} state={state} onCommit={onCommit} canEdit={canEdit} />
+        <LayerDesignControls layer={layer} bodyHeight={bodyHeight} state={state} onCommit={onCommit} canEdit={canEdit && !layer.locked} />
         <LayerPrintControls layer={layer} state={state} onCommit={onCommit} canEdit={canEdit} />
         <div className="report-designer-v3-element-actions">
           {([-1, 1] as const).map(direction => <button key={direction} type="button" disabled={!canEdit || layer.locked || !state.schema.layers[index + direction] || state.schema.layers[index + direction].locked} onClick={() => onCommit(moveV3Layer(state, layer.id, direction))}>{direction === -1 ? "上移图层" : "下移图层"}</button>)}

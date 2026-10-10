@@ -737,7 +737,7 @@ assert(resourcePanelsSource.includes('label="普通表格"') && resourcePanelsSo
 assert(gridPropertiesSource.includes("new-report-grid-cell-picker") && gridPropertiesSource.includes("向右合并") && gridPropertiesSource.includes("向下合并") && gridPropertiesSource.includes("快速版式"), "普通表格属性栏必须提供可视化选格、预设和直接合并操作");
 assert(gridPropertiesSource.includes("修改整表样式会立即应用到全部单元格") && !gridPropertiesSource.includes("套用样式") && !gridPropertiesSource.includes("套用边框"), "整表样式和边框必须即时应用，不能依赖容易漏掉的二次套用按钮");
 assert(gridCss.includes("data-report-grid-cell-id") && gridCss.includes("is-designer-selected-cell"), "画布样式必须支持单元格直接命中和选中反馈");
-assert(layerResizersSource.includes('role="separator"') && layerResizersSource.includes("onPointerMove") && bandsCss.includes("report-designer-v3-band-resizer"), "页眉页脚设计带必须支持可访问的画布拖拽调整");
+assert(layerResizersSource.includes('role="separator"') && bandsCss.includes("report-designer-v3-band-resizer"), "页眉页脚设计带必须提供可访问的调整入口，拖动行为由真实界面回归验证");
 assert(colorFieldSource.includes("type=\"color\"") && colorFieldSource.includes("常用颜色") && colorFieldSource.includes("高级色值"), "V3 颜色编辑必须提供色板、原生颜色选择器和可选高级色值");
 assert(colorFieldSource.includes("aria-invalid={invalid}") && colorFieldSource.includes("请输入有效的颜色值"), "非法颜色值不能写入 schema，且必须给出明确提示");
 assert(inspectorCss.includes("report-designer-v3-color-palette") && inspectorCss.includes("report-designer-v3-color-clear"), "V3 颜色控件样式必须集中在 inspector 样式模块");
