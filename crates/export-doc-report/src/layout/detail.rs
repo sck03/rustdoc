@@ -47,7 +47,7 @@ pub(super) struct PageBottoms {
 
 pub(super) fn render(
     layout: DetailLayout<'_>,
-    fixed: impl Fn(&mut String, usize, usize, f32) -> Result<()>,
+    fixed: impl Fn(&mut String, usize, usize, f32, f32) -> Result<()>,
 ) -> Result<Vec<String>> {
     let DetailLayout {
         table,
@@ -232,7 +232,7 @@ pub(super) fn render(
             (false, false) => bottoms.continuation,
         };
         let frame_bottom = content_bottom.max((top + minimum_height).min(limit - 3.));
-        fixed(&mut svg, index, count, frame_bottom)?;
+        fixed(&mut svg, index, count, content_bottom, frame_bottom)?;
         if let Some(side) = &table.side_band {
             render_side_band(
                 &mut svg,

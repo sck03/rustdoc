@@ -50,6 +50,83 @@ fn horizontal_between(svg: &str, start: f32, end: f32) -> bool {
 }
 
 #[test]
+fn packing_stamp_follows_totals_and_contract_stamp_meets_seller_signature() {
+    for rows in [1, 36] {
+        let mut data = invoice(rows);
+        data.images.insert(
+            "doc_seal_path".into(),
+            export_doc_report::RasterImage {
+                media_type: "image/png".into(),
+                bytes: include_bytes!("../../../../tests/ReportTemplateFixtures/sample-seal.png")
+                    .to_vec(),
+            },
+        );
+        for template in [Builtin::PackingList, Builtin::Contract] {
+            let document = render_builtin(template, &data, &AtomicBool::new(false)).unwrap();
+            assert!(
+                document
+                    .pages
+                    .iter()
+                    .take(document.pages.len() - 1)
+                    .all(|page| nodes(&page.svg, "image").is_empty())
+            );
+            let last = &document.pages.last().unwrap().svg;
+            let (image, offset) = nodes(last, "image")[0];
+            let top = attribute(image, "y") + offset;
+            assert_eq!(attribute(image, "height"), 35.);
+            assert!(
+                top + attribute(image, "height") <= 280.,
+                "stamp must leave room for fixed page numbering"
+            );
+            if template == Builtin::PackingList {
+                let gap = top - text_y(last, "TOTAL:");
+                assert!(
+                    gap > 0. && gap < 15.,
+                    "stamp must follow rows, not blank table fill: {gap}"
+                );
+            } else {
+                let gap = text_y(last, "卖方签字：") - top - attribute(image, "height");
+                assert!(
+                    (-4. ..=4.).contains(&gap),
+                    "stamp must meet the seller signature line: {gap}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn invoice_special_terms_follow_totals_only_on_the_last_page_when_nonblank() {
+    for rows in [1, 36] {
+        let mut data = invoice(rows);
+        for blank in [json!(null), json!(""), json!(" \t\n　")] {
+            data.root["Invoice"]["specialTerms"] = blank;
+            let document =
+                render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();
+            assert!(
+                document
+                    .pages
+                    .iter()
+                    .all(|page| !page.svg.contains("Special Terms"))
+            );
+        }
+        data.root["Invoice"]["specialTerms"] = json!("DELIVERY BY APPOINTMENT\nKEEP DRY");
+        let document = render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();
+        let last = &document.pages.last().unwrap().svg;
+        assert!(
+            document
+                .pages
+                .iter()
+                .take(document.pages.len() - 1)
+                .all(|page| !page.svg.contains("Special Terms"))
+        );
+        assert!(text_y(last, "Special Terms: DELIVERY BY APPOINTMENT") > text_y(last, "TOTAL:"));
+        assert!(text_y(last, "KEEP DRY") > text_y(last, "Special Terms: DELIVERY BY APPOINTMENT"));
+        assert!(text_y(last, "KEEP DRY") < 280.);
+    }
+}
+
+#[test]
 fn commercial_headers_and_packing_frame_survive_paging_and_roundtrip() {
     for template in [Builtin::Invoice, Builtin::PackingList] {
         let source = serde_json::to_string(&template.design().unwrap()).unwrap();
@@ -78,7 +155,7 @@ fn commercial_headers_and_packing_frame_survive_paging_and_roundtrip() {
                         .map(|(node, _)| attribute(node, "y2"))
                         .fold(0., f32::max);
                     let footer_top = if page_index + 1 == document.pages.len() {
-                        225.
+                        245.
                     } else {
                         280.
                     };

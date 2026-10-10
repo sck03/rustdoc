@@ -76,6 +76,10 @@ assert(model.findActiveWorkspaceNavGroupKey("/tools/ocr") === "resources", "tool
 assert(model.findActiveWorkspaceNavGroupKey("/master-data/hs-knowledge/search") === "documents", "classification belongs to document work");
 assert(model.findActiveWorkspaceNavGroupKey("/business-attachments") === "documents", "business files belong to document work");
 assert(model.findActiveWorkspaceNavGroupKey("/jobs") === "workspace", "file progress is distinct from business entry");
+for (const route of ["/tools/email", "/crm/email-templates"]) {
+  assert(model.findActiveWorkspaceNavGroupKey(route) === "workspace", "mail is shared work, independent of customer management");
+  assert(model.getWorkspaceContext(route).section === "工作台", "mail title follows its navigation group");
+}
 assert(model.workspaceNavGroups.length === 7, "navigation separates personnel from office services");
 assert(model.createInitialWorkspaceNavGroupState("/settings").size === 1, "only the current group starts expanded");
 assert(model.createInitialWorkspaceNavGroupState("/settings").has("system"), "active group starts expanded");
@@ -243,6 +247,8 @@ for (const edition of ["Full", "Document", "Sales"]) {
     permissions: resources.flatMap(resource => resource.actions.map(action => permissionGrant(resource.key, action.key, "all"))),
   };
   const groups = model.filterWorkspaceNavGroups(editionCapabilities);
+  assert(groups.find(group => group.key === "workspace")?.items.some(item => item.label === "邮件中心"), `${edition}: email is reachable in the shared workspace`);
+  if (edition === "Document") assert(!groups.some(group => group.key === "customers"), "Document has no empty customer group after moving email");
   assert(product.getDefaultWorkspaceRoute(editionCapabilities) === product.getProductEditionPresentation(edition).defaultRoute, `${edition}: fixed home`);
   assert(globalThis.__routeAccess.isRouteAccessAllowed({ pathname: "/", user: { capabilities: editionCapabilities }, canManageSystem: true, isDesktopRuntime: edition !== "Full" }), `${edition}: root is a neutral landing redirect`);
   const routes = model.getWorkspaceRouteItems(groups).map(item => item.to);
@@ -293,7 +299,7 @@ assert(routeQuery.patchRouteQuery("?page=3&supplierId=135", { supplierId: null }
 for (const value of ["0", "-1", "1.5", "2147483648", "1e2", ""]) assert(routeQuery.readRouteId(value) === null, "invalid route IDs are rejected: " + value);
 assert(routeQuery.readRouteId("135") === 135, "valid records outside the first page remain addressable");
 const mailResources = ["sales.email-templates", "common.email-delivery"].map((key, index) => ({ key, name: index ? "邮件发送与投递" : "邮件模板", group: "邮件", moduleKey: index ? "common.email" : "sales.email-templates", actions: [] }));
-assert(globalThis.__permissionNavigation.filterPermissionResources(mailResources, "客户与供应链", "邮件中心").length === 2, "module search follows the merged page while preserving two resource keys");
+assert(globalThis.__permissionNavigation.filterPermissionResources(mailResources, "工作台", "邮件中心").length === 2, "module search follows the merged page while preserving two resource keys");
 const routeAllowed = (pathname, capabilities) => globalThis.__routeAccess.isRouteAccessAllowed({ pathname, user: { capabilities }, canManageSystem: capabilities.canManageSettings === true, isDesktopRuntime: capabilities.isDesktopRuntime === true });
 for (const resource of editionPermissions.resources.filter(resource => !resource.isTechnical && resource.actions.some(action => action.key === "operate"))) {
   for (const actions of [[], ["view"], ["operate"], ["manage"], ["view", "manage"], ["view", "operate", "manage"]]) {

@@ -3,17 +3,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 pub mod composite;
+pub mod conditions;
 pub mod grid;
 mod report_blocks;
+pub use conditions::{ComparisonType, ConditionMatch, ConditionOperator, ConditionalRule};
 pub use report_blocks::{
-    BlockOutput, ConditionalContent, ConditionalRule, GridCell, GridCheckboxOption, GridColumn,
-    GridDiagonalHeader, GridRow, ReportBlock, ReportBlockBase, ReportBlockOutput,
-    ReportBorderStyle, ReportConditionalBlock, ReportGridBlock, ReportPageBreakBlock,
-    ReportRowBlock, ReportTextStyle, RowColumn,
+    BlockOutput, ConditionalContent, GridCell, GridCheckboxOption, GridColumn, GridDiagonalHeader,
+    GridRow, ReportBlock, ReportBlockBase, ReportBlockOutput, ReportBorderStyle,
+    ReportConditionalBlock, ReportGridBlock, ReportPageBreakBlock, ReportRowBlock, ReportTextStyle,
+    RowColumn,
 };
-
-pub const PROFILE_MARKER: &str = "<!-- EXPORTDOC_NATIVE_VALIDATION_PROFILE_1 -->";
-pub const SCHEMA_MARKER: &str = "<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

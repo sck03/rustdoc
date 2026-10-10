@@ -1,5 +1,8 @@
 use super::*;
-use crate::designer::{Element, GridCell, GridColumn, GridRow, ReportBlock, RowColumn};
+use crate::designer::{
+    ConditionOperator, ConditionalRule, Element, GridCell, GridColumn, GridRow, ReportBlock,
+    RowColumn,
+};
 use serde_json::json;
 
 fn fields() -> Vec<Field> {
@@ -53,7 +56,7 @@ fn append_flow(design: &mut Design, id: &str, kind: &str, block: ReportBlock, y:
 }
 
 #[test]
-fn original_v3_flow_blocks_round_trip_and_export() {
+fn original_v3_flow_blocks_validate_and_round_trip() {
     let mut design = Design::invoice();
     design.layers[1].elements.clear();
     append_flow(
@@ -127,9 +130,13 @@ fn original_v3_flow_blocks_round_trip_and_export() {
             output: None,
             condition: ConditionalRule {
                 field_path: "Invoice.Spare1".into(),
-                operator: "HasValue".into(),
+                operator: ConditionOperator::HasValue,
                 value: String::new(),
+                comparison_type: Default::default(),
+                ignore_case: false,
             },
+            additional_conditions: vec![],
+            match_mode: Default::default(),
             content: ConditionalContent {
                 kind: "Field".into(),
                 text: String::new(),
@@ -152,16 +159,13 @@ fn original_v3_flow_blocks_round_trip_and_export() {
         }),
         12000,
     );
-    let html = export(&design, &fields()).unwrap();
+    validate(&design, &fields()).unwrap();
     let parsed = crate::report_template_format::decode(
         &crate::report_template_format::encode(&design).unwrap(),
     )
     .unwrap();
     assert_eq!(parsed.layers[1].elements.len(), 4);
-    assert!(html.contains("edm-report-row"));
-    assert!(html.contains("edm-report-grid"));
-    assert!(html.contains("edm-conditional-block"));
-    assert!(html.contains("report-page-break-row"));
+    assert_eq!(design, parsed);
     let serialized = serde_json::to_value(&parsed).unwrap();
     assert_eq!(
         serialized["layers"][1]["elements"][0]["flowKind"],
@@ -178,29 +182,7 @@ fn original_v3_flow_blocks_round_trip_and_export() {
 }
 
 #[test]
-fn structured_detail_features_are_not_rejected_as_unrendered() {
-    let mut design = Design::invoice();
-    if let Kind::Flow {
-        block: ReportBlock::DetailTable(table),
-        ..
-    } = &mut design.layers[1].elements[0].kind
-    {
-        table.grouping = Some(crate::designer::DetailGrouping {
-            field_path: "item.StyleNo".into(),
-            label: "分组".into(),
-            show_field_value: true,
-            keep_together: true,
-            page_break_before: false,
-            footer: None,
-            style: ReportTextStyle::default(),
-        });
-    }
-    let html = export(&design, &fields()).unwrap();
-    assert!(html.contains("分组"));
-}
-
-#[test]
-fn structured_detail_html_contains_groups_subtotals_summary_and_side_band() {
+fn structured_detail_groups_subtotals_summary_and_side_band_round_trip() {
     let mut design = Design::invoice();
     if let Kind::Flow {
         block: ReportBlock::DetailTable(table),
@@ -250,16 +232,18 @@ fn structured_detail_html_contains_groups_subtotals_summary_and_side_band() {
             style: ReportTextStyle::default(),
         });
     }
-    let html = export(&design, &fields()).unwrap();
-    assert!(html.contains("GROUP"));
-    assert!(html.contains("SUBTOTAL"));
-    assert!(html.contains("GRAND TOTAL"));
-    assert!(html.contains("SIDE-BAND-VALUE"));
-    assert!(html.contains("native-detail-layout"));
+    validate(&design, &fields()).unwrap();
+    assert_eq!(
+        design,
+        crate::report_template_format::decode(
+            &crate::report_template_format::encode(&design).unwrap()
+        )
+        .unwrap()
+    );
 }
 
 #[test]
-fn grid_diagonal_header_round_trips_through_html_export() {
+fn grid_diagonal_header_round_trips_through_dtpl() {
     let mut design = Design::invoice();
     design.layers[1].elements.clear();
     append_flow(
@@ -305,7 +289,7 @@ fn grid_diagonal_header_round_trips_through_html_export() {
         }),
         6000,
     );
-    let html = export(&design, &fields()).unwrap();
+    validate(&design, &fields()).unwrap();
     let parsed = crate::report_template_format::decode(
         &crate::report_template_format::encode(&design).unwrap(),
     )
@@ -325,7 +309,6 @@ fn grid_diagonal_header_round_trips_through_html_export() {
             .upper_left_text,
         "项目"
     );
-    assert!(html.contains("edm-report-grid-diagonal"));
 }
 
 #[test]

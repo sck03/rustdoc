@@ -58,7 +58,7 @@ function renderBlock(block: ReportBlock, preview = false, heightMm?: number) {
     case "Grid":
       return renderGridBlock(block, preview);
     case "Conditional":
-      return renderConditionalBlock(block);
+      return renderConditionalBlock(block, preview);
     case "Image":
       return renderImageBlock(block);
     case "DetailTable":
@@ -206,20 +206,23 @@ function renderImageStyle(block: Extract<ReportBlock, { type: "Image" }>) {
   ].filter(Boolean).join("; ");
 }
 
-function renderConditionalBlock(block: Extract<ReportBlock, { type: "Conditional" }>) {
-  const condition = renderConditionalExpression(block);
-  if (!condition) {
-    return "";
-  }
-
+function renderConditionalBlock(block: Extract<ReportBlock, { type: "Conditional" }>, preview: boolean) {
   const content = block.content.kind === "Field"
     ? `${block.content.label ? `${escapeHtml(block.content.label)}: ` : ""}<span>${renderFieldExpression(block.content.fieldPath, block.content.fallbackText)}</span>`
     : escapeHtml(block.content.text);
 
-  return `{{ if ${condition} }}<div class="edm-conditional-block" style="${renderBoxStyle(block.style, block.border)}">${content}</div>{{ end }}`;
+  const body = `<div class="edm-conditional-block" style="${renderBoxStyle(block.style, block.border)}">${content}</div>`;
+  // The canvas always shows editable content. Actual conditions run in Rust;
+  // the legacy HTML fixture supports only its original reference scenarios.
+  if (preview) return body;
+  const condition = renderConditionalExpression(block);
+  return condition ? `{{ if ${condition} }}${body}{{ end }}` : "";
 }
 
 function renderConditionalExpression(block: Extract<ReportBlock, { type: "Conditional" }>) {
+  if (block.additionalConditions?.length || (block.condition.comparisonType ?? "Text") !== "Text" || block.condition.ignoreCase) {
+    throw new Error("组合或类型条件请使用原生预览，旧 HTML 夹具不执行这些规则。");
+  }
   const fieldPath = block.condition.fieldPath.trim();
   if (!isReportDesignerFieldPath(fieldPath)) {
     return "";
@@ -232,6 +235,8 @@ function renderConditionalExpression(block: Extract<ReportBlock, { type: "Condit
       return `${fieldPath} != ${renderScribanStringLiteral(block.condition.value)}`;
     case "HasValue":
       return fieldPath;
+    default:
+      throw new Error("扩展条件请使用原生预览，旧 HTML 夹具不执行这些规则。");
   }
 }
 

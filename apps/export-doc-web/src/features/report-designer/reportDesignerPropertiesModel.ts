@@ -2,7 +2,6 @@ import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import type {
   ReportBorderStyle,
   ReportConditionalContent,
-  ReportConditionalRule,
   ReportDetailTableCellContent,
   ReportDetailTableGroupFooterCell,
   ReportDetailTableSummaryCell,
@@ -111,14 +110,6 @@ export function normalizeBorderLineStyle(value: string): NonNullable<ReportBorde
   }
 
   return "Solid";
-}
-
-export function normalizeConditionalOperator(value: string): ReportConditionalRule["operator"] {
-  if (value === "Equals" || value === "NotEquals") {
-    return value;
-  }
-
-  return "HasValue";
 }
 
 export function normalizeConditionalContentKind(value: string): ReportConditionalContent["kind"] {

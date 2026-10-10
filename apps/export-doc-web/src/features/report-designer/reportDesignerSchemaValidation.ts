@@ -2,7 +2,6 @@ import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
 import type {
   ReportBlock,
   ReportConditionalContent,
-  ReportConditionalRule,
   ReportDesignerReportType,
   ReportDesignerSchema,
   ReportGridBlock,
@@ -17,6 +16,7 @@ import type {
 import { validateReportTypeFieldDomains } from "./reportDesignerSchemaDomains.ts";
 import { normalizeDetailTableBlock } from "./reportDesignerSchemaDetailTable.ts";
 import { normalizeBlockOutputSettings } from "./reportDesignerSchemaBlockSettings.ts";
+import { normalizeConditions } from "./reportDesignerConditions.ts";
 import { reportGridCellPlacements } from "./reportDesignerGridPlacement.ts";
 import { normalizeGridDiagonalHeader } from "./reportDesignerGridDiagonalValidation.ts";
 import {
@@ -166,7 +166,7 @@ function normalizeBlock(
         id: normalizeId(value.id, "block-conditional", blockIds, `${path}.id`, issues),
         type: "Conditional",
         output: normalizeBlockOutputSettings(value.output, `${path}.output`, issues),
-        condition: normalizeConditionalRule(value.condition, `${path}.condition`, issues),
+        ...normalizeConditions(value, path, issues),
         content: normalizeConditionalContent(value.content, `${path}.content`, issues),
         style: normalizeTextStyle(value.style, `${path}.style`, issues),
         border: normalizeOptionalBorderStyle(value.border, `${path}.border`, issues),
@@ -479,36 +479,13 @@ function normalizeGridCheckboxOptions(
     .filter((option): option is NonNullable<typeof option> => Boolean(option));
 }
 
-function normalizeConditionalRule(
-  value: unknown,
-  path: string,
-  issues: ReportDesignerSchemaIssue[],
-): ReportConditionalRule {
-  if (!isRecord(value)) {
-    issues.push(createIssue("warning", path, "条件设置无效，已使用默认条件。"));
-    return {
-      fieldPath: "Invoice.SpecialTerms",
-      operator: "HasValue",
-      value: "",
-    };
-  }
-
-  const operator = readEnum(value.operator, ["HasValue", "Equals", "NotEquals"] as const, "HasValue", `${path}.operator`, issues);
-
-  return {
-    fieldPath: readRequiredFieldPath(value.fieldPath, `${path}.fieldPath`, issues),
-    operator,
-    value: readString(value.value, "", `${path}.value`, issues),
-  };
-}
-
 function normalizeConditionalContent(
   value: unknown,
   path: string,
   issues: ReportDesignerSchemaIssue[],
 ): ReportConditionalContent {
   if (!isRecord(value)) {
-    issues.push(createIssue("warning", path, "条件内容无效，已使用固定文本。"));
+    issues.push(createIssue("warning", path, "显示内容无效，已使用固定文本。"));
     return {
       kind: "Text",
       text: "",

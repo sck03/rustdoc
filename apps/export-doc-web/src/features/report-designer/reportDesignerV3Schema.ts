@@ -207,7 +207,7 @@ export function reportDesignerV3ElementText(element: ReportDesignerV3Element) {
     case "Line":
       return element.direction === "Horizontal" ? "水平线" : "垂直线";
     case "Flow":
-      return ({ DetailTable: "明细表（自动重复）", Grid: "普通表格", Row: "多列行", Conditional: "条件块", PageBreak: "分页符" })[element.flowKind];
+      return ({ DetailTable: "明细表（自动重复）", Grid: "普通表格", Row: "多列行", Conditional: "条件显示", PageBreak: "分页符" })[element.flowKind];
   }
 }
 

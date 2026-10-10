@@ -166,36 +166,37 @@ pub(super) fn render(svg: &mut String, element: &Element, data: &ReportData) -> 
             }
         }
         ReportBlock::Conditional(block) => {
-            let field = data.value(&block.condition.field_path, None);
-            let actual = data.text(&block.condition.field_path);
-            let visible = match block.condition.operator.as_str() {
-                "Equals" => actual == block.condition.value,
-                "NotEquals" => actual != block.condition.value,
-                "HasValue" => !field.is_null() && field != false && !actual.is_empty(),
-                _ => return Err(invalid("条件操作符不受支持。")),
-            };
-            if visible {
-                let c = &block.content;
-                let value = value(
-                    data,
-                    &c.kind,
-                    &c.text,
-                    &c.field_path,
-                    &c.label,
-                    &c.fallback_text,
-                );
-                box_content(
-                    &mut content,
-                    &value,
-                    [x, y, width, height],
-                    &block.style,
-                    block.border.as_ref(),
-                    false,
-                    element,
-                    data,
-                    if c.kind == "Field" { &c.field_path } else { "" },
-                )?;
+            let visible = block
+                .matches(|rule| {
+                    rule.matches(
+                        data.value(&rule.field_path, None),
+                        &data.text(&rule.field_path),
+                    )
+                })
+                .map_err(invalid)?;
+            if !visible {
+                return Ok(());
             }
+            let c = &block.content;
+            let value = value(
+                data,
+                &c.kind,
+                &c.text,
+                &c.field_path,
+                &c.label,
+                &c.fallback_text,
+            );
+            box_content(
+                &mut content,
+                &value,
+                [x, y, width, height],
+                &block.style,
+                block.border.as_ref(),
+                false,
+                element,
+                data,
+                if c.kind == "Field" { &c.field_path } else { "" },
+            )?;
         }
         _ => return Ok(()),
     }

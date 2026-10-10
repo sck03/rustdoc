@@ -531,13 +531,15 @@ fn pages_data(
             height,
             cancelled,
         },
-        |svg, index, count, content_bottom| {
+        |svg, index, count, content_bottom, frame_bottom| {
+            // Following footers use actual rows; ordinary body blocks still
+            // start after the complete table frame, including any blank fill.
             fixed_elements(svg, design, data, index, count, false, Some(content_bottom))?;
             if index == 0 {
                 detail_mix::render_preceding(svg, data, &preceding_flows, top)?;
             }
             if index + 1 == count {
-                detail_mix::render_following(svg, data, &following_flows, content_bottom, footer)?;
+                detail_mix::render_following(svg, data, &following_flows, frame_bottom, footer)?;
             }
             Ok(())
         },

@@ -1,4 +1,4 @@
-use super::DetailTable;
+use super::{ConditionMatch, ConditionalRule, DetailTable};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -127,6 +127,10 @@ pub struct ReportConditionalBlock {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output: Option<ReportBlockOutput>,
     pub condition: ConditionalRule,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_conditions: Vec<ConditionalRule>,
+    #[serde(default, skip_serializing_if = "ConditionMatch::is_all")]
+    pub match_mode: ConditionMatch,
     pub content: ConditionalContent,
     #[serde(default)]
     pub style: ReportTextStyle,
@@ -320,14 +324,6 @@ pub struct GridDiagonalHeader {
     pub upper_left_text: String,
     #[serde(default)]
     pub lower_right_text: String,
-}
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ConditionalRule {
-    pub field_path: String,
-    pub operator: String,
-    #[serde(default)]
-    pub value: String,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

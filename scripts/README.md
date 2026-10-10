@@ -204,4 +204,6 @@ pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntime
 
 混有数据库或程序包的历史测试目录会整体保留，这不表示目录内每张截图、诊断日志和独立 Chrome 临时配置都仍有用途。用户要求进一步清理时，应单独列出这些可重建文件，核对进程占用、完整路径及链接后定向删除，并校验保留数据；不能删除父目录来绕过保护。需要记录清理过程时，将执行输出写入 `.txt`，避免根部 `.log` 清理规则选中正在写入的执行日志。
 
+用户明确授权清理过期测试程序包及隔离测试数据时，可在确认来源、用途、无运行进程和无需保留后，按已盘点的绝对路径单独回收。此授权不扩大默认清理器的保护边界；正在使用的程序及业务库、用户备份/原件、私有补丁和可复用缓存继续保留。测试目录名或较早修改时间本身不能证明其中全部内容都已无用。
+
 带有效 `CACHEDIR.TAG` 的 Cargo 输出中，`debug/release/build/*/out` 下的生成资源可随构建目录清理；这不会放行业务数据库、备份、链接或其它位置的 `Resources/Templates`。PostgreSQL 的 `PG_VERSION`、SQLite 伴随文件同样受到保护。`-IncludeCodexRuntimeWorkspaces` 清理旧构建/一次性工作区时，仍保留原生归档、PostgreSQL 客户端、审计工具和包下载缓存；`artifacts/releases`、其它目录的 `exportdoc-desktop/web/container` 发布归档及 Cargo 安装器 `bundle` 默认按发布输出保护。清理后的下一次构建需要重新编译，但无需重复下载保留的依赖。

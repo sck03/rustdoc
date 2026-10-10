@@ -1,9 +1,7 @@
 use crate::designer::{
-    ConditionalContent, ConditionalRule, Design, DetailColumn, DetailTable, Field, GridRow, Kind,
-    ReportBlock, ReportBorderStyle, ReportTextStyle, RowColumn,
+    ConditionalContent, Design, DetailColumn, DetailTable, Field, GridRow, Kind, ReportBlock,
+    ReportBorderStyle, ReportTextStyle, RowColumn,
 };
-
-mod render;
 
 pub fn escape(text: &str) -> String {
     text.replace('&', "&amp;")
@@ -13,9 +11,6 @@ pub fn escape(text: &str) -> String {
         .replace('\'', "&#39;")
         .replace('{', "&#123;")
         .replace('}', "&#125;")
-}
-fn mm(value: i32) -> String {
-    format!("{:.2}", value as f64 / 100.)
 }
 fn safe_color(value: &str) -> bool {
     value.len() == 7
@@ -93,7 +88,7 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
             }
             match &element.kind {
                 Kind::Field { field_path, .. } => {
-                    expression(field_path, fields)?;
+                    validate_field(field_path, fields)?;
                     if field_path.starts_with("item.")
                         && (layer.role != "Body"
                             || design.report_type != "ExportDocument"
@@ -258,11 +253,16 @@ fn validate_flow(
             crate::designer::grid::placements(block)?;
         }
         ReportBlock::Conditional(block) => {
-            let condition = &block.condition;
             let content = &block.content;
             let style = &block.style;
             let border = &block.border;
-            validate_condition(condition, fields)?;
+            block.validate_conditions()?;
+            for condition in block.conditions() {
+                validate_field(&condition.field_path, fields)?;
+                if condition.field_path.starts_with("item.") {
+                    return Err("条件组件使用单据字段，不能在商品循环外判断 item 字段。".into());
+                }
+            }
             validate_conditional_content(content, fields)?;
             validate_text_style(style)?;
             if let Some(border) = border {
@@ -296,7 +296,7 @@ fn validate_row_column(column: &RowColumn, fields: &[Field]) -> Result<(), Strin
     match column.content_kind.as_str() {
         "Text" if column.text.chars().count() <= 32768 => Ok(()),
         "Field" => {
-            expression(&column.field_path, fields)?;
+            validate_field(&column.field_path, fields)?;
             if column.label.chars().count() > 200 || column.fallback_text.chars().count() > 2048 {
                 Err("V3 多列行字段设置无效。".into())
             } else {
@@ -353,26 +353,16 @@ fn validate_grid_row(
         match cell.content_kind.as_str() {
             "Text" if cell.text.chars().count() <= 32768 => {}
             "Field" => {
-                expression(&cell.field_path, fields)?;
+                validate_field(&cell.field_path, fields)?;
             }
             "CheckboxGroup" => {
-                expression(&cell.field_path, fields)?;
+                validate_field(&cell.field_path, fields)?;
                 if cell.checkbox_options.len() > 100 {
                     return Err("V3 普通表格勾选项超过上限。".into());
                 }
             }
             _ => return Err("V3 普通表格单元格内容类型无效。".into()),
         }
-    }
-    Ok(())
-}
-
-fn validate_condition(condition: &ConditionalRule, fields: &[Field]) -> Result<(), String> {
-    expression(&condition.field_path, fields)?;
-    if !["HasValue", "Equals", "NotEquals"].contains(&condition.operator.as_str())
-        || condition.value.chars().count() > 2048
-    {
-        return Err("V3 条件设置无效。".into());
     }
     Ok(())
 }
@@ -384,7 +374,7 @@ fn validate_conditional_content(
     match content.kind.as_str() {
         "Text" if content.text.chars().count() <= 32768 => Ok(()),
         "Field" => {
-            expression(&content.field_path, fields)?;
+            validate_field(&content.field_path, fields)?;
             if content.label.chars().count() > 200 || content.fallback_text.chars().count() > 2048 {
                 Err("V3 条件字段设置无效。".into())
             } else {
@@ -434,7 +424,7 @@ fn validate_detail_table(
     validate_text_style(&table.body_style)?;
     validate_border(&table.border)?;
     if let Some(grouping) = &table.grouping {
-        expression(&grouping.field_path, fields)?;
+        validate_field(&grouping.field_path, fields)?;
         if grouping.label.chars().count() > 200 {
             return Err("V3 分组标题过长。".into());
         }
@@ -457,7 +447,7 @@ fn validate_detail_table(
                     return Err("V3 分组小计单元格无效。".into());
                 }
                 if cell.content_kind == "Sum" {
-                    expression(&cell.field_path, fields)?;
+                    validate_field(&cell.field_path, fields)?;
                 }
             }
         }
@@ -486,7 +476,7 @@ fn validate_detail_table(
                 return Err("V3 合计单元格无效。".into());
             }
             if cell.content_kind == "Field" {
-                expression(&cell.field_path, fields)?;
+                validate_field(&cell.field_path, fields)?;
             }
         }
     }
@@ -499,7 +489,7 @@ fn validate_detail_table(
             return Err("V3 明细侧栏无效。".into());
         }
         if side.content_kind == "Field" {
-            expression(&side.field_path, fields)?;
+            validate_field(&side.field_path, fields)?;
         }
         validate_text_style(&side.style)?;
     }
@@ -507,7 +497,7 @@ fn validate_detail_table(
 }
 
 fn validate_detail_column(column: &DetailColumn, fields: &[Field]) -> Result<(), String> {
-    expression(&column.field_path, fields)?;
+    validate_field(&column.field_path, fields)?;
     if !column.field_path.starts_with("item.")
         || !(5. ..=190.).contains(&column.width_mm)
         || !column.width_mm.is_finite()
@@ -538,7 +528,7 @@ fn validate_detail_column(column: &DetailColumn, fields: &[Field]) -> Result<(),
             position = next;
         }
         if part.kind == "Field" {
-            expression(&part.field_path, fields)?;
+            validate_field(&part.field_path, fields)?;
         }
     }
     Ok(())
@@ -587,23 +577,17 @@ fn validate_border(border: &ReportBorderStyle) -> Result<(), String> {
     Ok(())
 }
 
-fn expression(path: &str, fields: &[Field]) -> Result<String, String> {
-    let field = fields
+fn validate_field(path: &str, fields: &[Field]) -> Result<(), String> {
+    fields
         .iter()
         .find(|field| field.path == path)
         .ok_or_else(|| format!("字段 {path} 不在后端字段目录中。"))?;
-    // Shipping marks may project to a controlled image in the existing engine.
-    // This native profile is text-only; the caller checks the invoice's marks
-    // mode before using a text binding. Other image bindings are never listed.
+    // Images use controlled image bindings, never printable path strings.
     if matches!(path, "doc_seal_path" | "customs_seal_path") {
-        return Err("图片和印章组件留待下一阶段验证。".into());
+        return Err("图片和印章请使用图片组件绑定。".into());
     }
-    Ok(field.expression.clone())
+    Ok(())
 }
 
-pub fn export(design: &Design, fields: &[Field]) -> Result<String, String> {
-    validate(design, fields)?;
-    render::export(design, fields)
-}
 #[cfg(test)]
 mod tests;

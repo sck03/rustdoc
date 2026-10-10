@@ -82,6 +82,23 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
           { resourceKey: permissionResources.salesOpportunities, action: permissionActions.view },
         ] },
       ] },
+      { label: "邮件中心", description: "写邮件、查询投递结果和维护业务模板", to: "/tools/email", icon: Mail,
+        isActive: (path) => path.startsWith("/tools/email") || path.startsWith("/crm/email-templates"), showSectionNav: true, children: [
+      { label: "邮件发送", description: "发送业务邮件和附件，查询投递记录", to: "/tools/email", icon: Mail,
+        isActive: (path) => path.startsWith("/tools/email"), moduleKey: "common.email", permissionMatch: "any",
+        requiredPermissions: [
+          { resourceKey: permissionResources.emailDelivery, action: permissionActions.send },
+          { resourceKey: permissionResources.emailDelivery, action: permissionActions.viewDelivery },
+        ], searchItems: [
+          { label: "写邮件", description: "填写邮件内容、选择附件并发送", to: "/tools/email?view=compose", search: "view=compose", icon: Mail,
+            isActive: (path) => path.startsWith("/tools/email"), requiredPermissions: [{ resourceKey: permissionResources.emailDelivery, action: permissionActions.send }] },
+          { label: "投递记录", description: "按收件人、主题和状态查询邮件投递历史", to: "/tools/email?view=deliveries", search: "view=deliveries", icon: Mail,
+            isActive: (path) => path.startsWith("/tools/email"), requiredPermissions: [{ resourceKey: permissionResources.emailDelivery, action: permissionActions.viewDelivery }] },
+        ] },
+      { label: "邮件模板", description: "维护可重复使用的业务邮件内容", to: "/crm/email-templates", icon: Mail,
+        isActive: (path) => path.startsWith("/crm/email-templates"), workspace: "sales", moduleKey: "sales.email-templates",
+        requiredPermissions: [{ resourceKey: permissionResources.emailTemplates, action: permissionActions.view }] },
+      ] },
       { label: "付款报销打印", description: "填写付款单或报销打印单，保存后打印或导出 PDF；申请审批在费用报销中办理", keywords: "付款单 报销单 凭证 PDF 打印", to: "/payments", icon: CreditCard,
         isActive: (path) => path.startsWith("/payments"), moduleKey: "document.payments" },
       { label: "文件任务", description: "查看导入、导出和报表处理进度，下载结果或重试失败任务", keywords: "任务中心 后台任务 PDF 合并 批量报表 ZIP",
@@ -103,23 +120,6 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
       { label: "供应商管理", description: "维护供应商、联系人、产品和评价", to: "/suppliers", icon: Factory,
         isActive: (path) => path.startsWith("/suppliers"), workspace: "sales", moduleKey: "sales.suppliers",
         requiredPermissions: [{ resourceKey: permissionResources.suppliers, action: permissionActions.view }] },
-      { label: "邮件中心", description: "写邮件、查询投递结果和维护业务模板", to: "/tools/email", icon: Mail,
-        isActive: (path) => path.startsWith("/tools/email") || path.startsWith("/crm/email-templates"), showSectionNav: true, children: [
-      { label: "邮件发送", description: "发送业务邮件和附件，查询投递记录", to: "/tools/email", icon: Mail,
-        isActive: (path) => path.startsWith("/tools/email"), moduleKey: "common.email", permissionMatch: "any",
-        requiredPermissions: [
-          { resourceKey: permissionResources.emailDelivery, action: permissionActions.send },
-          { resourceKey: permissionResources.emailDelivery, action: permissionActions.viewDelivery },
-        ], searchItems: [
-          { label: "写邮件", description: "填写邮件内容、选择附件并发送", to: "/tools/email?view=compose", search: "view=compose", icon: Mail,
-            isActive: (path) => path.startsWith("/tools/email"), requiredPermissions: [{ resourceKey: permissionResources.emailDelivery, action: permissionActions.send }] },
-          { label: "投递记录", description: "按收件人、主题和状态查询邮件投递历史", to: "/tools/email?view=deliveries", search: "view=deliveries", icon: Mail,
-            isActive: (path) => path.startsWith("/tools/email"), requiredPermissions: [{ resourceKey: permissionResources.emailDelivery, action: permissionActions.viewDelivery }] },
-        ] },
-      { label: "邮件模板", description: "维护可重复使用的业务邮件内容", to: "/crm/email-templates", icon: Mail,
-        isActive: (path) => path.startsWith("/crm/email-templates"), workspace: "sales", moduleKey: "sales.email-templates",
-        requiredPermissions: [{ resourceKey: permissionResources.emailTemplates, action: permissionActions.view }] },
-      ] },
     ],
   },
   {

@@ -54,7 +54,7 @@ function commercialHeader(d,title) {
     text("date-label","Date:",143,56,19,5,7,"Right"),field("invoice-date","Invoice.InvoiceDate",163,56,32,5,7,"Right"),
   ];
   d.layers[2].elements=[pageNumber()];
-  const final={id:"final",name:"末页签章",role:"Footer",visible:true,locked:false,print:{repeatOnEveryPage:false,keepTogether:true,pinToPageBottom:false,minHeightHundredthMm:0},elements:[seal("seal","doc_seal_path",110,225,80,50)]};
+  const final={id:"final",name:"末页签章",role:"Footer",visible:true,locked:false,print:{repeatOnEveryPage:false,keepTogether:true,pinToPageBottom:false,minHeightHundredthMm:0},elements:[seal("seal","doc_seal_path",122,232.5,56,35)]};
   d.layers.push(final);
 }
 function invoice() {
@@ -91,7 +91,7 @@ function invoice() {
   const lines=[15,47,162,195].map((x,i)=>({...element(`invoice-rule-${i}`,"Line",x-2,86,4,159,{direction:"Vertical"}),style:{borderStyle:"Solid",borderWidthPx:0.6,borderColor:"#000000"}}));
   d.layers[3].elements=[...lines,{...rule("invoice-bottom",15,245,180),style:{borderStyle:"Solid",borderWidthPx:0.6,borderColor:"#000000"}}];
   const final=d.layers.find(layer=>layer.id==="final");
-  final.name="末页合计与签章";
+  final.name="末页合计、条款与签章";
   final.print.followBody=true;
   final.elements=[
     rule("total-rule",47,117,148),text("total-label","TOTAL:",49,121,34,9,7,"Left",true),
@@ -100,7 +100,14 @@ function invoice() {
     namedField("total-quantity","总数量","total_by_qty_unit.Value",108,121,12,9,"Right",true),
     namedField("total-quantity-unit","总数量单位","total_by_qty_unit.Key",120,121,12,9,"Left",true),
     namedField("total-amount","总金额","Invoice.TotalAmount",164,121,29,9,"Right",true),
-    seal("seal","doc_seal_path",110,134,80,50),
+    element("special-terms","Flow",49,134,67,39,{label:"特殊条款（有内容时显示）",flowKind:"Conditional",block:{
+      id:"special-terms-block",type:"Conditional",
+      condition:{fieldPath:"Invoice.SpecialTerms",operator:"HasValue",value:""},
+      content:{kind:"Field",fieldPath:"Invoice.SpecialTerms",label:"Special Terms",text:"",fallbackText:""},
+      style:{fontSizePt:7,align:"Left",marginTopMm:0,marginBottomMm:0,marginLeftMm:0,marginRightMm:0},
+      border:noBorder,
+    }},7),
+    seal("seal","doc_seal_path",122,141.5,56,35),
   ];
   for(const e of final.elements) if(e.type === "Field" || e.type === "Text") { e.yHundredthMm+=e.style.paddingHundredthMm; e.style.paddingHundredthMm=0; }
   d.layers.push(first);
@@ -131,6 +138,7 @@ function packing() {
   t.block.summaryRow.style.marginTopMm=2.5;
   for(const cell of t.block.summaryRow.cells) if(["gross","net","volume"].includes(cell.columnId)) cell.suffix=cell.columnId==="volume"?"CBM":"KGS";
   t.block.summaryRow.border={...border,style:"Dashed",widthPx:0.8,right:false,bottom:false,left:false};
+  d.layers.find(layer=>layer.id==="final").print.followBody=true;
   d.layers[1].elements=[t]; return d;
 }
 function contract() {
@@ -143,12 +151,13 @@ function contract() {
   t.block.summaryRow.cells.find(cell=>cell.columnId==="amount").fieldFormat="Currency";
   d.layers[1].elements=[t,
     grid("delivery",15,132,180,[20,25,25,30],[[10,[binding("shipment","Invoice.ShipmentDate",2,{label:"装运期限 / Time of shipment"}),cell("partial","装运港允许分批装运\nShipment quantity 5% more or less allowed",2)]],[10,[binding("loading","Invoice.PortOfLoading",2,{label:"装运港 / Port of loading"}),binding("destination","Invoice.PortOfDestination",2,{label:"目的港 / Port of destination"})]]],7,sans,false),
-    grid("clauses",15,154,180,[100],[[32,[cell("delivery-insurance","(9)交货条件：FOB/CFR/CIF 若无另外规定均按照《国际贸易术语解释通则（ TNCOTERMS）1990》办理。\nTerms of delivery: FOB/CFR/CIF shall conform to 《INCOTERMS1990》unless otherwise agreed.\n(10)保 险：由卖方按发票总值的110%投保一切险加战争险，如买方欲增加其他险别或超过上述额度保险时须事先征得卖方同意，增加的保费由买方承担。\nInsurance: To be covered by the sellers for 110% of the total value against, all risks and war risks. Should the Buyers desire to cover for other risks besides the above mentioned or for an amount exceeding the above mentioned limit. The sellers’ approval must be obtained first and all additional premium charges incurred therewith shall be for buyers’ account.")]], [9,[binding("payment","Invoice.PaymentTerms",1,{label:"(11)付款条件 / Terms of payment"})]], [12,[binding("special","Invoice.SpecialTerms")]]],7,sans,false),
-    grid("signatures",15,211,180,[50,50],[[10,[cell("buyer-sign","买方签字：\nThe buyers' signature:"),cell("seller-sign","卖方签字：\nThe sellers' signature:")]]],7,sans,false),
+    grid("clauses",15,154,180,[100],[[32,[cell("delivery-insurance","(9)交货条件：FOB/CFR/CIF 若无另外规定均按照《国际贸易术语解释通则（ TNCOTERMS）1990》办理。\nTerms of delivery: FOB/CFR/CIF shall conform to 《INCOTERMS1990》unless otherwise agreed.\n(10)保 险：由卖方按发票总值的110%投保一切险加战争险，如买方欲增加其他险别或超过上述额度保险时须事先征得卖方同意，增加的保费由买方承担。\nInsurance: To be covered by the sellers for 110% of the total value against, all risks and war risks. Should the Buyers desire to cover for other risks besides the above mentioned or for an amount exceeding the above mentioned limit. The sellers’ approval must be obtained first and all additional premium charges incurred therewith shall be for buyers’ account.")]]],7,sans,false),
+    grid("payment-special",15,188,100,[100],[[9,[binding("payment","Invoice.PaymentTerms",1,{label:"(11)付款条件 / Terms of payment"})]], [27,[binding("special","Invoice.SpecialTerms")]]],7,sans,false),
+    grid("signatures",15,227,180,[50,50],[[10,[cell("buyer-sign","买方签字：\nThe buyers' signature:"),cell("seller-sign","卖方签字：\nThe sellers' signature:")]]],7,sans,false),
   ];
   const contractTail = d.layers[1].elements.splice(1);
   d.layers[2].elements=[pageNumber()];
-  d.layers.push({id:"seal-layer",name:"末页印章",role:"Footer",visible:true,locked:false,print:{repeatOnEveryPage:false,keepTogether:true,pinToPageBottom:false,followBody:true,minHeightHundredthMm:0},elements:[...contractTail,seal("seal","doc_seal_path",110,223,80,50)]});
+  d.layers.push({id:"seal-layer",name:"末页条款与签章",role:"Footer",visible:true,locked:false,print:{repeatOnEveryPage:false,keepTogether:true,pinToPageBottom:false,followBody:true,minHeightHundredthMm:0},elements:[...contractTail,seal("seal","doc_seal_path",122,196,56,35)]});
   return d;
 }
 function customs() {
@@ -182,7 +191,7 @@ function customs() {
     [5,[cell("company","申报单位"),cell("company-space","",9),cell("signature","申报单位(签章)",2),cell("sign-space","",3)]],
   ],6.5,serif);
   declaration.block.rows.forEach((row,rowIndex)=>{let col=0;row.cells.forEach(c=>{c.style={bold:true,align:rowIndex===0||c.id==="signature"?"Center":"Left"};c.border={...border,top:rowIndex===0,bottom:rowIndex===0||rowIndex===2,left:col===0||(rowIndex>0&&col===12),right:col+c.colSpan===15};col+=c.colSpan;});});
-  d.layers[2].elements=[declaration,text("brand-note","境外品牌(贴牌生产)\n出口货物不能确定在最终目的国（地区）享受优惠",46,175,235,11,7,"Left",false,serif),seal("customs-seal","customs_seal_path",141,150,88,50)];
+  d.layers[2].elements=[declaration,text("brand-note","境外品牌(贴牌生产)\n出口货物不能确定在最终目的国（地区）享受优惠",46,175,235,11,7,"Left",false,serif),seal("customs-seal","customs_seal_path",154.2,157.5,61.6,35)];
   d.layers[2].print.followBody=true;
   d.layers[2].print.firstPageOnly=true;
   d.layers[3].elements=[pageNumber(247,18)];

@@ -1,3 +1,6 @@
+import type { ReportConditionalRule, ReportConditionMatch } from "./reportDesignerConditions.ts";
+export type { ReportConditionalRule } from "./reportDesignerConditions.ts";
+
 export type ReportDesignerReportType = "ExportDocument" | "PaymentVoucher";
 
 export type ReportDesignerSchema = {
@@ -143,15 +146,11 @@ export type ReportGridDiagonalHeader = {
 export type ReportConditionalBlock = ReportBlockBase & {
   type: "Conditional";
   condition: ReportConditionalRule;
+  additionalConditions?: ReportConditionalRule[];
+  matchMode?: ReportConditionMatch;
   content: ReportConditionalContent;
   style: ReportTextStyle;
   border?: ReportBorderStyle;
-};
-
-export type ReportConditionalRule = {
-  fieldPath: string;
-  operator: "HasValue" | "Equals" | "NotEquals";
-  value: string;
 };
 
 export type ReportConditionalContent = {

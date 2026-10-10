@@ -59,6 +59,7 @@ export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, iss
           break;
         case "Conditional":
           validateReportTypeFieldPath(schema.reportType, block.condition.fieldPath, `${blockPath}.condition.fieldPath`, issues);
+          block.additionalConditions?.forEach((rule, index) => validateReportTypeFieldPath(schema.reportType, rule.fieldPath, `${blockPath}.additionalConditions[${index}].fieldPath`, issues));
           if (block.content.kind === "Field") {
             validateReportTypeFieldPath(schema.reportType, block.content.fieldPath, `${blockPath}.content.fieldPath`, issues);
           }

@@ -14,6 +14,7 @@ import { verifyDetailVisibility } from "./lib/report-designer-visibility-ui.mjs"
 import { verifyDesignerUsability } from "./lib/report-designer-usability-ui.mjs";
 import { verifyDetailProperties } from "./lib/report-designer-detail-properties-ui.mjs";
 import { verifyLayerClarity } from "./lib/report-designer-layer-ui.mjs";
+import { verifyConditionalUi } from "./lib/report-designer-conditions-ui.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -331,6 +332,7 @@ try {
   await verifyShippingMarksUi({page,url,read,waitFor,click,key,results,output});
   await verifyDesignerUsability({page,url,read,waitFor,click,key,results});
   await verifyCommercialTemplateUi({page,url,read,waitFor,click,key,results,output});
+  await verifyConditionalUi({page,url,read,waitFor,click,key,results,output});
   await verifyLayerClarity({page,url,read,waitFor,click,results,output});
   fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify({passed:true,results},null,2));
   console.log(`Report designer UI contracts passed (${results.length} cases).`);

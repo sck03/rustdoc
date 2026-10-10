@@ -36,32 +36,34 @@ pub(super) fn footer_applies(
 }
 
 pub(super) fn footer_top_for(design: &Design, height: f32, index: usize, last: bool) -> f32 {
-    design
+    let mut fixed_top = height;
+    let mut following_height = 0_f32;
+    for layer in design
         .layers
         .iter()
         .filter(|layer| layer.role == "Footer" && layer.visible)
         .filter(|layer| footer_applies(layer, index, last))
-        .fold(height, |top, layer| {
-            let reserved = if layer.print.pin_to_page_bottom || layer.print.follow_body {
-                footer_content_height(layer)
-            } else {
-                layer
-                    .elements
-                    .iter()
-                    .filter(|element| element.visible && element.output_enabled)
-                    .map(|element| element.y_hundredth_mm as f32 / 100.)
-                    .fold(height, f32::min)
-                    .min(height)
-            };
-            top.min((height - layer.print.min_height_hundredth_mm as f32 / 100.).max(0.))
-                .min(
-                    if layer.print.pin_to_page_bottom || layer.print.follow_body {
-                        (height - reserved).max(0.)
-                    } else {
-                        reserved
-                    },
-                )
-        })
+    {
+        let minimum = layer.print.min_height_hundredth_mm as f32 / 100.;
+        if layer.print.follow_body {
+            following_height = following_height.max(footer_content_height(layer).max(minimum));
+            continue;
+        }
+        let top = if layer.print.pin_to_page_bottom {
+            height - footer_content_height(layer)
+        } else {
+            layer
+                .elements
+                .iter()
+                .filter(|element| element.visible && element.output_enabled)
+                .map(|element| element.y_hundredth_mm as f32 / 100.)
+                .fold(height, f32::min)
+        };
+        fixed_top = fixed_top.min(top).min(height - minimum);
+    }
+    // A following band must fit before fixed page footers, not occupy their
+    // reserved space. Multiple following layers share the same body anchor.
+    (fixed_top - following_height).max(0.)
 }
 
 pub(super) fn footer_content_bottom(layer: &export_doc_domain::designer::Layer) -> f32 {

@@ -167,6 +167,8 @@ pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntime
 
 绝不通过清理脚本或手工命令删除 `.git`、`App_Data`、`Templates`、`OcrModels`、`Resources`、业务数据库、用户备份、已确认仍需的浏览器资源或系统外目录。已推送且干净的临时 Git worktree 应使用精确的 `git worktree remove --force <path>`，完成后运行 `git worktree prune`；不要直接递归删除包含未提交工作的 worktree。
 
+2026-10-10 用户补充授权：可复用缓存保留；确认已过期的测试程序包和已经无用的隔离测试数据可以清理，包括包内的资源副本与测试数据库。此例外只适用于已核实来源和用途的测试输出，不能仅凭目录名或修改时间判断。须先列出精确绝对路径、检查进程占用和链接/Git 边界，并校验保留的实际程序、业务数据、用户备份与私有补丁；默认清理脚本的保护规则不变，不能用此例外扩大到真实业务目录。
+
 清理后应重新检查：
 
 ```powershell

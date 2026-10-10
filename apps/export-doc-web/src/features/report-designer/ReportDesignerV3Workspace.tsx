@@ -364,11 +364,11 @@ export function ReportDesignerV3Workspace({
           <ToolbarButton label="矩形" icon={<span className="report-designer-v3-tool-glyph">□</span>} onClick={insertionActions.rectangle} disabled={!editingEnabled} />
           <ToolbarButton label="线" icon={<span className="report-designer-v3-tool-glyph">╱</span>} onClick={insertionActions.line} disabled={!editingEnabled} />
           <ToolbarButton label="页码" icon={<Hash size={15} />} onClick={insertionActions.pageNumber} disabled={!editingEnabled} />
+          <ToolbarButton label="条件显示" icon={<ListFilter size={15} />} onClick={insertionActions.conditional} disabled={!editingEnabled} />
         </div>
         <details className="report-designer-v3-advanced-tools"><summary>高级排版</summary><div role="group" aria-label="插入结构组件">
           <ToolbarButton label="多列行" icon={<Columns3 size={15} />} onClick={insertionActions.row} disabled={!editingEnabled} />
           <ToolbarButton label="普通表格" icon={<Grid2X2 size={15} />} onClick={insertionActions.grid} disabled={!editingEnabled} />
-          <ToolbarButton label="条件块" icon={<ListFilter size={15} />} onClick={insertionActions.conditional} disabled={!editingEnabled} />
           {insertionActions.detailTable ? <ToolbarButton label="明细表" icon={<Table2 size={15} />} onClick={insertionActions.detailTable} disabled={!editingEnabled} /> : null}
           <ToolbarButton label="分页符" icon={<FilePlus2 size={15} />} onClick={insertionActions.pageBreak} disabled={!editingEnabled} />
         </div></details>

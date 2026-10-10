@@ -4,6 +4,7 @@ import path from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { verifyDesignerEditingMutations } from "./lib/report-designer-editing-contracts.mjs";
+import { verifyConditionalContracts } from "./lib/report-designer-condition-contracts.mjs";
 import { createShippingMarksScenario } from "./lib/report-shipping-marks-fixture.mjs";
 
 const require = createRequire(import.meta.url);
@@ -44,6 +45,8 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerBlockRenderer.ts")
 export * from ${JSON.stringify(path.join(repoRoot, "scripts/lib/report-preview-html-fixture.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerGridMutations.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerBlockFactories.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerConditions.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerV3ElementFactories.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3Regions.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerTableMutations.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerLayerBands.ts"))};
@@ -56,6 +59,7 @@ export { resolveDefaultTemplatePath } from ${JSON.stringify(importSpecifier("../
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 const api = await import(pathToFileURL(bundlePath).href);
 verifyDesignerEditingMutations(api);
+verifyConditionalContracts(api, repoRoot);
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 let productState = api.createReportDesignerV3DocumentState(api.parseReportDesignerV3Source("", "ExportDocument").schema);
 for (const name of ["StyleName", "Cartons", "Quantity", "UnitEN", "UnitPrice", "TotalPrice"]) {
@@ -143,7 +147,6 @@ const maliciousFlow = api.normalizeReportDesignerV3Schema({
 assert(maliciousFlow.issues.some((issue) => issue.severity === "error" && issue.path.includes("block")), "Flow 内嵌表达式必须经过统一白名单校验");
 
 assert(propertyControlsSource.includes("selectOnly?: boolean"), "字段控件必须支持条件编辑的严格下拉模式");
-assert(conditionalPropertiesSource.match(/selectOnly\s*\n/g)?.length >= 2, "条件字段和条件内容字段都必须使用下拉选项");
 assert(!conditionalPropertiesSource.includes("datalist") && !conditionalPropertiesSource.includes("表达式"), "条件编辑不得提供表达式输入，普通用户只能使用下拉字段");
 assert(panelsSource.includes("CommitTextField"), "V3 属性面板的文本编辑必须使用完成后提交控件");
 assert(propertyControlsSource.includes("当前值：") && propertyControlsSource.includes("需修正"), "V3 字段下拉必须保留非法当前值的可见修正提示");

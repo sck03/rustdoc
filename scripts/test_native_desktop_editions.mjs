@@ -8,6 +8,7 @@ import { productEditionCatalog } from './lib/product-editions.mjs';
 import { verifyDesktopPayment } from './lib/native-payment-workflow.mjs';
 import { verifyDesktopDetailDesigner } from './lib/native-detail-designer.mjs';
 import { verifyDesktopListPagination } from './lib/native-list-pagination.mjs';
+import { verifyDesktopConditionalReports } from './lib/native-conditional-reports.mjs';
 
 assert.equal(process.platform, 'win32', 'This gate exercises Windows WebView2 packages.');
 const repo = path.resolve(import.meta.dirname, '..');
@@ -107,6 +108,7 @@ for (const edition of selected) {
       assert(text.includes('人事管理') && text.includes('行政办公') && text.includes('公司公告') && text.includes('站内通知'));
       await verifyDesktopListPagination({ run, request, token: login.body.accessToken, cdp, output });
       await verifyDesktopDetailDesigner({ run, request, token: login.body.accessToken, cdp, output });
+      await verifyDesktopConditionalReports({ run, request, token: login.body.accessToken, cdp, output });
       await run("location.hash='#/office/announcements'; true");
       const pageDeadline = Date.now() + 15000;
       while (Date.now() < pageDeadline && !await run("!!document.querySelector('[aria-label=公司公告]')")) await delay(100);
@@ -159,6 +161,12 @@ for (const edition of selected) {
     while (child.exitCode === null && Date.now() < exitDeadline) await delay(100);
     assert.equal(child.exitCode, 0, `${edition}: graceful exit failed`);
     await assert.rejects(fetch(context.apiBaseUrl + '/health', { signal: AbortSignal.timeout(1000) }));
+  } catch (error) {
+    if (cdp) {
+      await captureScreenshot(cdp, path.join(output, `${edition}-failure.png`));
+      fs.writeFileSync(path.join(output, `${edition}-failure.txt`), await run('document.body.innerText'));
+    }
+    throw error;
   } finally {
     cdp?.close();
     await stopProcessTree(child);

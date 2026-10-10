@@ -32,6 +32,7 @@ await require("esbuild").build({ stdin: { resolveDir: web, loader: "tsx", conten
   const modules=[...new Set(items.flatMap(item=>item.moduleKey?[item.moduleKey]:[]))];
   const permissions=items.flatMap(item=>item.requiredPermissions??(item.moduleKey?['view','operate','manage'].map(action=>({resourceKey:item.moduleKey,action})):[])).map(item=>({...item,dataScope:'all'}));
   permissions.push({resourceKey:'document.invoice-output',action:'export-zip',dataScope:'all'});
+  permissions.push({resourceKey:'common.report-catalog',action:'view',dataScope:'all'});
   const capabilities={productEdition:edition,canManageSettings:true,canManageUsers:edition==='Full',
     canUseDocumentWorkspace:workspaces.includes('document'),canUseSalesWorkspace:workspaces.includes('sales'),
     isDesktopRuntime:desktop,
@@ -131,6 +132,11 @@ try {
   assert.equal(await read("document.querySelectorAll('.nav-item').length"), 0); results.push("specialist-search-boundary");
   await open(1366, "edition=Sales&path=/office/people"); assert(await read("document.body.innerText.includes('当前页面无权限')"));
   await open(1366, "edition=Document&path=/office/people"); assert(await read("document.body.innerText.includes('当前页面无权限')"));
+  await open(1366, "edition=Document&path=/tools/email");
+  assert.equal(await read("document.querySelector('.workspace-header h1').textContent"), "邮件中心");
+  assert.equal(await read("document.querySelector('[data-nav-group=workspace]').getAttribute('aria-expanded')"), "true");
+  assert(!await read("document.querySelector('[data-nav-group=customers]')"), "Document email does not expose a customer group");
+  await audit("document-email-workspace");
   await open(1366, "path=/office/people"); assert.equal(await read("document.querySelector('.workspace-header h1').textContent"), "人员档案");
   await open(1366, "path=/office/people&denied=1"); assert(await read("document.body.innerText.includes('当前页面无权限')")); results.push("direct-route-boundaries");
   await open(1366, "path=/jobs"); await waitFor("document.querySelector('.job-table')");

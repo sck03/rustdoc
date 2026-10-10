@@ -8,6 +8,7 @@ import { CdpClient, closeChrome, delay } from "./lib/chromium-cdp.mjs";
 import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
 import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
+import { verifyReportConditionsHttp } from "./lib/report-conditions-http.mjs";
 
 // Real React + Rust HTTP regression. Uses the existing isolated review host.
 const repo = path.resolve(import.meta.dirname, "..");
@@ -93,7 +94,7 @@ try {
   await wait("document.querySelector('[aria-label=\"客户与出口商\"]')","Source invoice missing");
   await run("[...document.querySelectorAll('details')].find(e=>e.querySelector('summary')?.textContent.includes('银行与印章')).open=true");
   const imageFile=path.join(output,"seal.png");
-  fs.copyFileSync(path.join(repo,"crates/export-doc-engine/src/engine/reports/samples-shipping-marks.png"),imageFile);
+  fs.copyFileSync(path.join(repo,"tests/ReportTemplateFixtures/sample-seal.png"),imageFile);
   for(const label of ["单证章","报关章"]){
     const selector=`button[aria-label="上传${label}图片"]`;
     await wait(`document.querySelector(${JSON.stringify(selector)}) && !document.querySelector(${JSON.stringify(selector)}).disabled`,`${label} disabled without exporter`);
@@ -107,9 +108,13 @@ try {
     await wait(`document.body.innerText.includes(${JSON.stringify(`${label}已上传`)})`,`${label} upload failed`);
   }
   await captureScreenshot(page,path.join(output,"invoice-seals.png"));
+  await run("[...document.querySelectorAll('button')].find(e=>e.textContent.trim().startsWith('商品明细')).click()");
+  await wait("document.querySelector('.invoice-special-terms-field textarea')", "Special terms editor missing");
+  await run("(()=>{document.querySelector('.invoice-items-support-details').open=true;const e=document.querySelector('.invoice-special-terms-field textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'BY APPOINTMENT\\nKEEP DRY');e.dispatchEvent(new Event('input',{bubbles:true}));})()");
   await click("保存发票");
   await wait("/发票已(保存|创建)/.test(document.body.innerText)","Invoice save failed");
   const reloaded=await api(`/api/invoices/${invoiceId}`);
+  assert.equal(reloaded.specialTerms, "BY APPOINTMENT\nKEEP DRY");
   assert.equal(reloaded.totalGrossWeight,606); assert.equal(reloaded.totalNetWeight,576); assert.equal(reloaded.totalVolume,3.06);
   for(let i=0;i<draft.items.length;i++) for(const field of ['gwTotal','nwTotal','volume']) assert.equal(reloaded.items[i][field],draft.items[i][field]);
   assert.equal(reloaded.exporterId,0);
@@ -135,11 +140,13 @@ try {
   await wait("document.querySelector('iframe[title=模板预览]')?.srcdoc.includes('UI-SEAL-001')","Saved invoice preview missing");
   const real=await run("document.querySelector('iframe[title=模板预览]').srcdoc");
   assert.match(real,/EUR11\.00/);assert.match(real,/EUR11011\.00/);
+  assert.match(real,/Special Terms: BY APPOINTMENT/);assert.match(real,/KEEP DRY/);
   assert.equal((real.match(/>EUR</g)||[]).length,0,"No detached currency heading");
   const pagePresentation = html => html.slice(0,html.indexOf('<svg')).replace(/@page report\d+\{size:210mm 297mm\}#report\d+\{page:report\d+;width:210mm\}/g,'');
   assert.equal(pagePresentation(real),pagePresentation(sample),"Sample and saved source use identical A4 presentation with independent pagination");
   fs.writeFileSync(path.join(output,"saved.html"),real);
   await captureScreenshot(page,path.join(output,"saved.png"));
+  await verifyReportConditionsHttp({ api, url, headers, invoiceId });
   console.log(`Invoice seals and native sample/saved preview passed: ${output}`);
 } catch(error) {
   if(page){await captureScreenshot(page,path.join(output,"failure.png"));fs.writeFileSync(path.join(output,"failure.txt"),await run("document.body.innerText"));}
