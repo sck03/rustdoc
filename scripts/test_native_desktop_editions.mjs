@@ -114,7 +114,9 @@ for (const edition of selected) {
     assert(await run(`document.querySelector('.about-detail-grid')?.textContent.includes(${JSON.stringify('v' + marker.version)})`));
     assert(await run(`document.querySelector('.about-detail-grid')?.textContent.includes(${JSON.stringify(health.body.informationalVersion)})`));
     await captureScreenshot(cdp, path.join(output, `${edition}-about.png`));
-    if (edition === 'Full') {
+    if (process.argv.includes('--blank-grid-only')) {
+      await verifyDesktopBlankGrid({ run, request, token: login.body.accessToken, businessDate: login.body.user.businessDate, cdp, output });
+    } else if (edition === 'Full') {
       assert(text.includes('人事管理') && text.includes('行政办公') && text.includes('公司公告') && text.includes('站内通知'));
       await verifyDesktopListPagination({ run, request, token: login.body.accessToken, cdp, output });
       await verifyDesktopDetailDesigner({ run, request, token: login.body.accessToken, cdp, output });

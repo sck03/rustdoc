@@ -7,7 +7,8 @@ import { waitFor } from './web-runtime-smoke-common.mjs';
 export async function verifyDesktopBlankGrid({ run, request, token, businessDate, cdp, output }) {
   const created = await request('CreateUserReportTemplate', token, { reportType: 'PaymentVoucher', name: '空白付款网格验收', contentHtml: '' });
   assert.equal(created.status, 201);
-  assert.equal(JSON.parse(created.body.contentHtml).layers.flatMap(layer => layer.elements).length, 0);
+  const starter = JSON.parse(created.body.contentHtml).layers.flatMap(layer => layer.elements);
+  assert.deepEqual(starter.map(element => ({ type: element.type, text: element.text })), [{ type: 'Text', text: '空白付款网格验收' }]);
   const wait = async expression => {
     try { await waitFor(() => run(expression), 30000, 'Blank desktop designer timed out'); }
     catch (error) { throw new Error(`${error.message}: ${expression}\n${await run('document.body.innerText')}`); }
@@ -29,7 +30,11 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   const fill = async (label, value, multiline = false) => {
     await run(`(()=>{const node=${control(label)};node.focus();node.select();})()`);
     await cdp.send('Input.insertText', { text: String(value) });
+    await wait(`${control(label)}.value===${JSON.stringify(String(value))}`);
+    await run('new Promise(resolve=>requestAnimationFrame(resolve))');
     await key('Enter', multiline ? 2 : 0);
+    await wait(`${control(label)}!==document.activeElement && ${control(label)}.value===${JSON.stringify(String(value))}`);
+    await run('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
   };
   const cell = async (row, column) => {
     await button('整张表');
@@ -40,6 +45,11 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   await wait("Boolean(document.querySelector('[data-v3-page-canvas]'))");
   await run("[...document.querySelectorAll('[role=tab]')].find(node=>node.textContent.trim()==='可视化设计').click(); true");
   await wait("document.querySelector('[data-v3-page-canvas]').getClientRects().length>0");
+  await run(`document.querySelector('[data-v3-element-id="${starter[0].id}"]').focus(); true`);
+  await key('Enter');
+  await run("document.querySelector('[aria-label=删除]').click(); true");
+  await wait("document.querySelectorAll('[data-v3-element-id]').length===0");
+  await run("[...document.querySelectorAll('[aria-label=画布图层导航] button')].find(node=>node.textContent.includes('主体')).click(); true");
   await run("[...document.querySelectorAll('.report-designer-v3-toolbar details')].find(node=>node.querySelector('summary').textContent.includes('高级排版')).open=true; document.querySelector('[aria-label=普通表格]').click(); true");
   await wait("Boolean(document.querySelector('.new-report-grid-properties'))");
   await button('整张表');
@@ -79,12 +89,18 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   assert.equal(grid.rows[2].cells[0].diagonalHeader.lowerRightText, '金额');
   fs.writeFileSync(path.join(output, 'desktop-blank-grid.json'), saved.body.contentHtml);
   await button('重新载入', '.report-designer-v3-header');
-  await captureScreenshot(cdp, path.join(output, 'Full-blank-grid-designer.png'));
+  await run('window.scrollTo(0,0); true');
+  await captureScreenshot(cdp, path.join(output, 'Full-blank-grid-designer.png'), { captureBeyondViewport: false });
   await run("[...document.querySelectorAll('[role=tab]')].find(node=>node.textContent.trim()==='预览').click(); true");
   await wait("Boolean([...document.querySelectorAll('button')].find(node=>node.textContent.trim()==='样例预览'&&!node.disabled))");
   await button('样例预览', 'body');
-  await wait("Boolean(document.querySelector('iframe[title=模板预览]')?.srcdoc.includes('用款事项'))");
-  await captureScreenshot(cdp, path.join(output, 'Full-blank-grid-preview.png'));
+  await wait("Boolean(document.querySelector('iframe[title=模板预览]')?.srcdoc.includes('<svg'))");
+  const preview = await run("document.querySelector('iframe[title=模板预览]').srcdoc");
+  fs.writeFileSync(path.join(output, 'desktop-blank-grid-preview.html'), preview);
+  const previewText = await run("new DOMParser().parseFromString(document.querySelector('iframe[title=模板预览]').srcdoc,'text/html').querySelector('svg').textContent.replace(/\\s+/g,'')");
+  assert(previewText.includes('用款事项') && previewText.includes('支付单位'), 'native preview preserves the vertical title and payment field label');
+  await run('window.scrollTo(0,0); true');
+  await captureScreenshot(cdp, path.join(output, 'Full-blank-grid-preview.png'), { captureBeyondViewport: false });
   const payment = await request('CreatePayment', token, { voucherNo: 'BLANK-GRID-001', payeeName: '空白设计收款方', payerName: '空白设计付款单位', paymentDate: businessDate, paymentMethod: '电汇', cnyAmount: 128.5 });
   assert.equal(payment.status, 201);
   const pdf = path.join(output, 'desktop-blank-grid.pdf');

@@ -14,6 +14,8 @@ use bands::{
     footer_applies, footer_content_bottom, footer_content_height, footer_top_for, layer_footer_top,
     layer_header_bottom,
 };
+#[cfg(test)]
+mod body_flow_tests;
 mod detail_content;
 mod detail_mix;
 mod flow;
@@ -559,8 +561,10 @@ fn render_body_flow(
     height: f32,
     cancelled: &AtomicBool,
 ) -> Result<Vec<String>> {
-    let header_bottom = layer_header_bottom(design, height);
-    let footer_top = layer_footer_top(design, height);
+    let header_bottom =
+        layer_header_bottom(design, height).max(design.page.margin_top_hundredth_mm as f32 / 100.);
+    let footer_top = layer_footer_top(design, height)
+        .min(height - design.page.margin_bottom_hundredth_mm as f32 / 100.);
     let capacity = footer_top - header_bottom;
     if capacity <= 0. {
         return Err(invalid("页眉与页脚之间没有足够的 Flow 空间。"));
@@ -610,10 +614,19 @@ fn render_body_flow(
             }
             FlowStep::Element { element, gap_mm } => {
                 let item_height = element.height_hundredth_mm as f32 / 100.;
-                let mut gap_mm = if current.is_empty() { 0. } else { gap_mm };
-                if item_height > capacity {
+                let mut gap_mm = if current.is_empty() {
+                    if pages.is_empty() {
+                        (element.y_hundredth_mm as f32 / 100. - header_bottom).max(0.)
+                    } else {
+                        0.
+                    }
+                } else {
+                    gap_mm
+                };
+                if item_height > capacity || (current.is_empty() && gap_mm + item_height > capacity)
+                {
                     return Err(invalid(format!(
-                        "报表组件“{}”高度超过当前页可用空间。",
+                        "报表组件“{}”的位置或高度超过当前页可用空间。",
                         element.label
                     )));
                 }
