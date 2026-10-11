@@ -88,6 +88,13 @@ jobs:
           key: native-cargo-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}
       - name: Provision verified shared fonts
         run: node scripts/provision-report-fonts.mjs
+      - name: Verify product version and compiler build identity
+        shell: pwsh
+        run: |
+          node scripts/sync-version.mjs --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test_build_information.mjs
+          exit $LASTEXITCODE
       - name: Format and generated contract
         shell: pwsh
         run: |

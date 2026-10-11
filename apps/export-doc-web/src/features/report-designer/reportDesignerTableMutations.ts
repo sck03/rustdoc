@@ -10,26 +10,18 @@ import {
   createRowColumn,
 } from "./reportDesignerBlockFactories.ts";
 import { createReportBlockId } from "./reportDesignerMutationUtils.ts";
+import { normalizeColumnPercentages } from "./reportDesignerColumnWidths.ts";
 
 export function normalizeRowColumnWidths(columns: ReportRowColumn[]) {
   const safeColumns = columns.length > 0 ? columns : [createRowColumn()];
-  const total = safeColumns.reduce((sum, column) => sum + Math.max(1, column.widthPercent), 0);
-  return safeColumns.map((column) => ({
-    ...column,
-    widthPercent: Math.round((Math.max(1, column.widthPercent) / total) * 1000) / 10,
-  }));
+  return normalizeColumnPercentages(safeColumns);
 }
 
 export function distributeGridColumnWidths(block: ReportGridBlock): ReportGridBlock {
   const safeColumns = block.columns.length > 0 ? block.columns : createGridColumns(1);
-  const widthPercent = Math.round((1000 / safeColumns.length)) / 10;
-
   return {
     ...block,
-    columns: safeColumns.map((column) => ({
-      ...column,
-      widthPercent,
-    })),
+    columns: normalizeColumnPercentages(safeColumns.map(column => ({ ...column, widthPercent: 1 }))),
   };
 }
 

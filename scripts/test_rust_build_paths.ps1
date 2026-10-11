@@ -55,6 +55,16 @@ try {
         if ($LASTEXITCODE -eq 0 -or $message -notmatch 'SkipBuild requires existing binaries') { throw "Document build must not be reused as $edition" }
     }
     if (Test-Path -LiteralPath $output) { throw 'Invalid edition must not create a package' }
+    $server = Join-Path $release "export-doc-server$suffix"
+    $serverReceipt = Join-Path $release 'server-build.json'
+    $productVersion = (Get-Content -LiteralPath (Join-Path $repo 'version.json') -Raw | ConvertFrom-Json).version
+    foreach ($state in @('missing', 'stale', 'changed')) {
+        if ($state -ne 'missing') { Write-ExportDocRustBuildReceipt -Binary $server -Receipt $serverReceipt -Version $(if ($state -eq 'stale') { '99.0.0' } else { $productVersion }) }
+        if ($state -eq 'changed') { [IO.File]::AppendAllText($server, 'modified') }
+        $message = & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'package-native-web-server.ps1') -SkipBuild -WithoutOcr -NoPause -OutputRoot $output 2>&1 | Out-String
+        if ($LASTEXITCODE -eq 0 -or $message -notmatch 'receipt') { throw "Web package accepted $state binary identity: $message" }
+        if (Test-Path -LiteralPath $output) { throw 'Invalid web build must not create a package' }
+    }
     $good = Join-Path $fixture 'input.txt'
     [IO.File]::WriteAllText($good, 'new')
     New-Item -ItemType Directory -Path $output | Out-Null

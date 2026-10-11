@@ -1,6 +1,6 @@
 [package]
 name = "export-doc-tauri"
-version = "0.1.1"
+version = "0.1.2"
 description = "ExportDocManager Tauri desktop with the shared Rust backend"
 authors = ["ExportDocManager"]
 edition.workspace = true

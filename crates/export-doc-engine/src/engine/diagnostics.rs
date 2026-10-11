@@ -1,5 +1,5 @@
 use super::{error::Result, store};
-use crate::{contracts, paths::RuntimePaths};
+use crate::{build_info, contracts, paths::RuntimePaths};
 use serde_json::{Value, json};
 
 pub fn health(paths: &RuntimePaths, provider: &str) -> Result<Value> {
@@ -22,8 +22,8 @@ pub fn health(paths: &RuntimePaths, provider: &str) -> Result<Value> {
     }
     value["status"] = json!("Healthy");
     value["checkedAt"] = json!(store::timestamp());
-    value["productVersion"] = json!(env!("CARGO_PKG_VERSION"));
-    value["informationalVersion"] = json!(concat!(env!("CARGO_PKG_VERSION"), " Rust"));
+    value["productVersion"] = json!(build_info::PRODUCT_VERSION);
+    value["informationalVersion"] = json!(build_info::INFORMATIONAL_VERSION);
     value["databaseProvider"] = json!(provider);
     value["databaseProviderKey"] = json!(if provider == "SQLite" {
         "sqlite"

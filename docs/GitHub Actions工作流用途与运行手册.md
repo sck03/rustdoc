@@ -23,7 +23,7 @@ Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ub
 3. 仅下载构建产物时保持发布开关关闭。运行成功后从该次 Actions 页面下载 Artifacts。
 4. 桌面/Web 选择 `publish_release`，所有所选目标成功后上传至 `v<version>` 的 GitHub Release。首次创建先使用 draft，附件上传完成后公开；预发布版本标记 prerelease。此流程不更新 latest 发布指针或自动更新通道。
 
-版本统一进入 version.json、Rust workspace、Tauri、React/npm 锁文件、独立 OCR/Excel 工具和包内标记。归档名称形如 `exportdoc-desktop-0.1.2-windows-x64-Document.zip`、`exportdoc-web-0.1.2-linux-arm64.tar.gz`，每份附 SHA-256。CI 不自动提交源码版本；本地用 `node scripts/sync-version.mjs 0.1.2` 同步。
+版本统一进入 version.json、Rust workspace、Tauri、React/npm 锁文件、独立 OCR/Excel 工具和包内标记。归档名称形如 `exportdoc-desktop-0.1.2-windows-x64-Document.zip`、`exportdoc-web-0.1.2-linux-arm64.tar.gz`，每份附 SHA-256。CI 不自动提交源码版本；本地构建入口可直接指定 `-Version`，同步修改当前工作树的版本文件，详见[构建版本参数](../scripts/README.md#构建时指定程序版本)。来源提交另写入编译期构建标识，容器工作流通过 build-arg 传入，不影响发布号与签名更新比较。
 
 同一版本的其它系统包可随后上传，但必须选择同一源码提交。已有标签指向另一提交或同名附件内容不同会明确失败，不覆盖旧包。重复上传相同字节会复用已有附件；重新构建若产生不同字节，应使用新版本。Unix 先 tar.gz 再上传，以保留执行位及 .app 链接结构。
 

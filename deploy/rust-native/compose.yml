@@ -57,6 +57,8 @@ services:
     build:
       context: ../..
       dockerfile: deploy/rust-native/Dockerfile
+      args:
+        EXPORTDOCMANAGER_BUILD_REVISION: '${EXPORTDOCMANAGER_BUILD_REVISION:-}'
     restart: unless-stopped
     environment:
       EXPORTDOCMANAGER_POSTGRES_CONNECTION_FILE: /run/secrets/app_connection

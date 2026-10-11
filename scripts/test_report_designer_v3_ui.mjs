@@ -17,6 +17,7 @@ import { verifyLayerClarity } from "./lib/report-designer-layer-ui.mjs";
 import { verifyConditionalUi } from "./lib/report-designer-conditions-ui.mjs";
 import { verifyBlankDesigner } from "./lib/report-designer-blank-ui.mjs";
 import { verifyDesignerInteraction } from "./lib/report-designer-interaction-ui.mjs";
+import { verifyGridAuthoring } from "./lib/report-designer-grid-ui.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -55,7 +56,7 @@ await esbuild.build({
     import ${source("styles/responsive.css")};
     import ${source("styles/routes/reports.css")};
     const imageScenario = new URLSearchParams(location.search).has('images');
-    const reportType = imageScenario ? 'PaymentVoucher' : 'ExportDocument';
+    const reportType = imageScenario || new URLSearchParams(location.search).has('payment') ? 'PaymentVoucher' : 'ExportDocument';
     const schema = parseReportDesignerV3Source('', reportType).schema;
     schema.layers.forEach(layer => { layer.elements = []; if (layer.role === 'Header') layer.designHeightHundredthMm = 6000; });
     const header = schema.layers.find(layer => layer.role === 'Header');
@@ -109,6 +110,7 @@ await esbuild.build({
     fieldCatalog.fields.push({category:'单据信息',label:'唛头（文字 / 图片自动）',value:'{{ Invoice.ShippingMarks }}',reportType:'ExportDocument'});
     fieldCatalog.fields.push({category:'单据信息',label:'发票号',value:'{{ Invoice.InvoiceNo }}',reportType:'ExportDocument'});
     if(new URLSearchParams(location.search).has('invoice')) Object.assign(fieldCatalog,${JSON.stringify(reportFields)});
+    if(new URLSearchParams(location.search).has('payment')) Object.assign(fieldCatalog,{reportType,categoryOrder:['付款信息'],fields:[['付款方式','Payment.PaymentMethod'],['发票号码','Payment.InvoiceNo'],['收款方','Payment.PayeeName']].map(([label,value])=>({category:'付款信息',label,value,reportType}))});
     window.__designerHtml = content;
     window.__exportDesignerHtml=()=>renderReportDesignerV3HtmlFixture(window.__designerSchema);
     window.__visibilityComposite=()=>'<div class="edm-detail-omit-empty-lines">'+renderDetailComposite([{kind:'Field',fieldPath:'empty'},{kind:'LineBreak'},{kind:'Text',text:'Widget'},{kind:'LineBreak'},{kind:'Field',fieldPath:'empty'},{kind:'ColumnBreak',positionPercent:50},{kind:'Text',text:'10'}],part=>part.kind==='Text'?part.text:'')+'</div>';
@@ -145,7 +147,7 @@ async function waitFor(page, expression) {
 async function click(page, selector) { await read(page, `document.querySelector(${JSON.stringify(selector)}).click()`); await delay(70); }
 async function key(page, key, modifiers = 0) {
   const keyCode = key === "Escape" ? 27 : key === "Enter" ? 13 : key.length === 1 ? key.toUpperCase().charCodeAt(0) : undefined;
-  await page.send("Input.dispatchKeyEvent", { type: "keyDown", key, modifiers, windowsVirtualKeyCode: keyCode });
+  await page.send("Input.dispatchKeyEvent", { type: "keyDown", key, modifiers, windowsVirtualKeyCode: keyCode, text: key === "Enter" && modifiers === 0 ? "\r" : undefined });
   await page.send("Input.dispatchKeyEvent", { type: "keyUp", key, modifiers, windowsVirtualKeyCode: keyCode });
 }
 async function drag(page, selector, dx, dy, beforeRelease) {
@@ -162,6 +164,8 @@ try {
   chrome = await startChrome({browserExecutable:locateChromeForTesting(repo),userDataDir:path.join(output,`profile-${Date.now()}`),timeoutMs:30000});
   cdp = await CdpClient.connect(chrome.browserWebSocketUrl);
   const page = await createPageSession(cdp);
+  await verifyGridAuthoring({page,url,read,waitFor,click,key,results,output});
+  if (!process.argv.includes('--grid-only')) {
   await verifyDesignerInteraction({ page, url, read, waitFor, click, key, modifier: primaryModifier, results });
   for(const width of [1920,1366,1024,390]) {
     await page.send("Emulation.setDeviceMetricsOverride", {width,height:1000,deviceScaleFactor:1,mobile:width<500});
@@ -341,6 +345,7 @@ try {
   await verifyConditionalUi({page,url,read,waitFor,click,key,results,output});
   await verifyLayerClarity({page,url,read,waitFor,click,results,output});
   await verifyBlankDesigner({page,url,read,waitFor,click,key,results,output});
+  }
   fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify({passed:true,results},null,2));
   console.log(`Report designer UI contracts passed (${results.length} cases).`);
 } finally {

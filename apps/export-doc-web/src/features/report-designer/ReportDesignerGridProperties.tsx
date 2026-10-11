@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Minus, Plus } from "lucide-react";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import {
-  appendGridColumn,
-  appendGridRow,
   applyGridBorderToCells,
   applyGridDefaultCellStyle,
   applyGridPreset,
@@ -13,8 +10,7 @@ import {
   getGridCellLocations,
   mergeGridCellDown,
   mergeGridCellRight,
-  removeLastGridColumn,
-  removeLastGridRow,
+  resizeGridStructure,
   resizeAdjacentGridColumnWidths,
   setGridRowsToUniformHeight,
   splitGridCell,
@@ -23,8 +19,9 @@ import {
 import type { ReportBlock, ReportGridBlock, ReportGridCell } from "./reportDesignerSchema.ts";
 import { DesignerCheckbox, DesignerPropertyTabs, CommitTextField, BorderEditor, ColumnWidthStrip, FieldPathInput, TextStyleEditor } from "./ReportDesignerPropertyControls.tsx";
 import { adjacentGridCell, updateGridCell } from "./reportDesignerGridMutations.ts";
-import { normalizeGridCellContentKind, normalizeNumber } from "./reportDesignerPropertiesModel.ts";
+import { normalizeGridCellContentKind } from "./reportDesignerPropertiesModel.ts";
 import { NumberField, SelectField } from "./ReportDesignerV3InspectorControls.tsx";
+import { REPORT_GRID_MAX_COLUMNS, REPORT_GRID_MAX_ROWS } from "./reportDesignerGridPlacement.ts";
 
 export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSelectCell, onCommit }: {
   block: ReportGridBlock;
@@ -48,8 +45,9 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
 
   function updateCheckboxOptions(value: string) {
     const checkboxOptions = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line, index) => {
-      const [label, optionValue] = line.split("=");
-      return { id: `grid-option-${index + 1}`, label: (label ?? "").trim(), value: (optionValue ?? label ?? "").trim() };
+      const separator = line.indexOf("=");
+      return { id: selected?.cell.checkboxOptions?.[index]?.id ?? `grid-option-${index + 1}`,
+        label: (separator < 0 ? line : line.slice(0, separator)).trim(), value: (separator < 0 ? line : line.slice(separator + 1)).trim() };
     });
     updateCell((cell) => ({ ...cell, checkboxOptions }));
   }
@@ -72,20 +70,19 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
           onSelectCell(next.rows[0].cells[0].id);
           onCommit(next);
         }}><option value="">选择...</option><option value="Blank">空白 3 × 3</option><option value="Form">标签/内容表单</option><option value="Approval">审批签字栏</option></select></label>
-        <label><span>上距 (mm)</span><input type="number" min={0} max={30} step="any" value={block.marginTopMm ?? 0} onChange={(event) => onCommit({ ...block, marginTopMm: normalizeNumber(event.target.value, block.marginTopMm ?? 0) })} /></label>
-        <label><span>下距 (mm)</span><input type="number" min={0} max={30} step="any" value={block.marginBottomMm ?? 0} onChange={(event) => onCommit({ ...block, marginBottomMm: normalizeNumber(event.target.value, block.marginBottomMm ?? 0) })} /></label>
+        <NumberField label="上距 (mm)" min={0} max={30} value={block.marginTopMm ?? 0} onCommit={marginTopMm => onCommit({ ...block, marginTopMm })} />
+        <NumberField label="下距 (mm)" min={0} max={30} value={block.marginBottomMm ?? 0} onCommit={marginBottomMm => onCommit({ ...block, marginBottomMm })} />
       </div>
 
       <section className="new-report-grid-structure" aria-label="表格结构">
         <div className="new-report-detail-column-title">
           <strong>表格结构</strong><small>{block.rows.length} 行 × {block.columns.length} 列</small>
         </div>
-        <div className="new-report-grid-structure-actions">
-          <button className="command-button secondary" type="button" onClick={() => onCommit(appendGridRow(block))}><Plus size={14} aria-hidden="true" /> 行</button>
-          <button className="command-button secondary" type="button" disabled={block.rows.length <= 1} onClick={() => onCommit(removeLastGridRow(block))}><Minus size={14} aria-hidden="true" /> 行</button>
-          <button className="command-button secondary" type="button" onClick={() => onCommit(appendGridColumn(block))}><Plus size={14} aria-hidden="true" /> 列</button>
-          <button className="command-button secondary" type="button" disabled={block.columns.length <= 1} onClick={() => onCommit(removeLastGridColumn(block))}><Minus size={14} aria-hidden="true" /> 列</button>
+        <div className="new-report-property-grid">
+          <NumberField label="行数" min={1} max={REPORT_GRID_MAX_ROWS} step={1} value={block.rows.length} onCommit={rows => onCommit(resizeGridStructure(block, rows, block.columns.length))} />
+          <NumberField label="列数" min={1} max={REPORT_GRID_MAX_COLUMNS} step={1} value={block.columns.length} onCommit={columns => onCommit(resizeGridStructure(block, block.rows.length, columns))} />
         </div>
+        <small>保留范围内的内容和合并；缩减会移除超出部分，可撤销。</small>
         <div className="new-report-grid-cell-picker" role="group" aria-label="选择要编辑的表格单元格" style={{ gridTemplateColumns: block.columns.map((column) => `minmax(0, ${Math.max(0.01, column.widthPercent)}fr)`).join(" ") }}>
           {locations.map(({ cell, rowIndex, columnIndex, rowSpan, colSpan }) => <button key={cell.id} type="button" data-grid-picker-cell={cell.id} tabIndex={selected?.cell.id === cell.id ? 0 : -1} className={selected?.cell.id === cell.id ? "is-selected" : ""} aria-pressed={selected?.cell.id === cell.id} aria-label={`第 ${rowIndex + 1} 行，第 ${columnIndex + 1} 列`} title={cellSummary(cell)} style={{ gridRow: `${rowIndex + 1} / span ${rowSpan}`, gridColumn: `${columnIndex + 1} / span ${colSpan}` }} onClick={() => onSelectCell(cell.id)} onKeyDown={(event) => {
             const direction = event.key === "ArrowLeft" ? "left" : event.key === "ArrowRight" ? "right" : event.key === "ArrowUp" ? "up" : event.key === "ArrowDown" ? "down" : null;
@@ -98,16 +95,16 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
       </section>
       </> : null}
 
-      {tab === "cell" && selected && selectedRow ? <section className="new-report-grid-cell-editor" aria-label="当前单元格">
+      {tab === "cell" && selected && selectedRow ? <section key={selected.cell.id} className="new-report-grid-cell-editor" aria-label="当前单元格">
         <div className="new-report-detail-column-title"><strong>第 {selected.rowIndex + 1} 行，第 {selected.columnIndex + 1} 列</strong><small>{selected.rowSpan} × {selected.colSpan} 格</small></div>
         <div className="new-report-grid-structure-actions">
-          <button className="command-button secondary" type="button" disabled={!canMergeGridCellRight(block, selected.cell.id)} onClick={() => onCommit(mergeGridCellRight(block, selected.cell.id))}>向右合并</button>
-          <button className="command-button secondary" type="button" disabled={!canMergeGridCellDown(block, selected.cell.id)} onClick={() => onCommit(mergeGridCellDown(block, selected.cell.id))}>向下合并</button>
+          <button className="command-button secondary" type="button" disabled={!canMergeGridCellRight(block, selected.cell.id, locations)} onClick={() => onCommit(mergeGridCellRight(block, selected.cell.id))}>向右合并</button>
+          <button className="command-button secondary" type="button" disabled={!canMergeGridCellDown(block, selected.cell.id, locations)} onClick={() => onCommit(mergeGridCellDown(block, selected.cell.id))}>向下合并</button>
           <button className="command-button secondary" type="button" disabled={!canSplit} onClick={() => onCommit(splitGridCell(block, selected.cell.id))}>拆分</button>
         </div>
         <div className="new-report-property-grid">
           <label><span>内容类型</span><select value={selected.cell.contentKind} onChange={(event) => updateCell((cell) => ({ ...cell, contentKind: normalizeGridCellContentKind(event.target.value) }))}><option value="Text">固定文本</option><option value="Field">业务字段</option><option value="CheckboxGroup">勾选组</option></select></label>
-          <label><span>本行高度 (mm)</span><input type="number" min={2} max={80} step="any" value={selectedRow.heightMm ?? 9} onChange={(event) => onCommit({ ...block, rows: block.rows.map((row) => row.id === selectedRow.id ? { ...row, heightMm: normalizeNumber(event.target.value, row.heightMm ?? 9) } : row) })} /></label>
+          <NumberField label="本行高度 (mm)" min={2} max={80} value={selectedRow.heightMm ?? 9} onCommit={heightMm => onCommit({ ...block, rows: block.rows.map(row => row.id === selectedRow.id ? { ...row, heightMm } : row) })} />
           <DesignerCheckbox checked={Boolean(selected.cell.verticalText)} onChange={(checked) => updateCell((cell) => ({ ...cell, verticalText: checked }))}>竖排文字</DesignerCheckbox>
           <DesignerCheckbox checked={Boolean(selected.cell.diagonalHeader)} onChange={(checked) => updateCell((cell) => ({
             ...cell,
@@ -116,14 +113,14 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
         </div>
         {selected.cell.diagonalHeader ? <div className="new-report-property-grid">
           <label><span>斜线方向</span><select value={selected.cell.diagonalHeader.direction ?? "Up"} onChange={(event) => updateCell(cell => ({...cell,diagonalHeader:{...cell.diagonalHeader!,direction:event.target.value === "Down" ? "Down" : "Up"}}))}><option value="Up">左下至右上</option><option value="Down">左上至右下</option></select></label>
-          <label><span>斜线上方文字</span><input value={selected.cell.diagonalHeader.upperLeftText} onChange={(event) => updateCell((cell) => ({ ...cell, diagonalHeader: { ...cell.diagonalHeader, upperLeftText: event.target.value, lowerRightText: cell.diagonalHeader?.lowerRightText ?? "" } }))} /></label>
-          <label><span>斜线下方文字</span><input value={selected.cell.diagonalHeader.lowerRightText} onChange={(event) => updateCell((cell) => ({ ...cell, diagonalHeader: { ...cell.diagonalHeader, upperLeftText: cell.diagonalHeader?.upperLeftText ?? "", lowerRightText: event.target.value } }))} /></label>
+          <label><span>斜线上方文字</span><CommitTextField value={selected.cell.diagonalHeader.upperLeftText} onCommit={upperLeftText => updateCell(cell => ({ ...cell, diagonalHeader: { ...cell.diagonalHeader!, upperLeftText } }))} /></label>
+          <label><span>斜线下方文字</span><CommitTextField value={selected.cell.diagonalHeader.lowerRightText} onCommit={lowerRightText => updateCell(cell => ({ ...cell, diagonalHeader: { ...cell.diagonalHeader!, lowerRightText } }))} /></label>
         </div> : null}
         {selected.cell.contentKind === "Text" ? <label className="new-report-property-wide"><span>文字内容</span><CommitTextField multiline rows={3} value={selected.cell.text} onCommit={(text) => updateCell((cell) => ({ ...cell, text }))} /></label> : null}
-        {selected.cell.contentKind === "Field" || selected.cell.contentKind === "CheckboxGroup" ? <FieldPathInput className="new-report-property-wide" label={selected.cell.contentKind === "CheckboxGroup" ? "判断字段" : "业务字段"} value={selected.cell.fieldPath} fieldGroups={fieldGroups} onChange={(fieldPath) => updateCell((cell) => ({ ...cell, fieldPath }))} /> : null}
-        {selected.cell.contentKind === "Field" ? <label><span>字段前标签（可选）</span><input value={selected.cell.label ?? ""} onChange={(event) => updateCell((cell) => ({ ...cell, label: event.target.value }))} /></label> : null}
+        {selected.cell.contentKind === "Field" || selected.cell.contentKind === "CheckboxGroup" ? <FieldPathInput selectOnly className="new-report-property-wide" label={selected.cell.contentKind === "CheckboxGroup" ? "判断字段" : "业务字段"} value={selected.cell.fieldPath} fieldGroups={fieldGroups} onChange={(fieldPath) => updateCell((cell) => ({ ...cell, fieldPath }))} /> : null}
+        {selected.cell.contentKind === "Field" ? <label><span>字段前标签（可选）</span><CommitTextField value={selected.cell.label ?? ""} onCommit={label => updateCell(cell => ({ ...cell, label }))} /></label> : null}
         {selected.cell.contentKind === "Field" ? <label><span>标签位置</span><select value={selected.cell.labelPosition ?? "Inline"} onChange={event => updateCell(cell => ({...cell,labelPosition:event.target.value === "Above" || event.target.value === "Prefix" ? event.target.value : "Inline"}))}><option value="Inline">与内容同一行</option><option value="Above">在内容上方</option><option value="Prefix">与内容直接连写</option></select></label> : null}
-        {selected.cell.contentKind === "CheckboxGroup" ? <label className="new-report-property-wide"><span>勾选项（每行：名称=值）</span><textarea rows={4} value={(selected.cell.checkboxOptions ?? []).map((option) => `${option.label}=${option.value}`).join("\n")} onChange={(event) => updateCheckboxOptions(event.target.value)} /></label> : null}
+        {selected.cell.contentKind === "CheckboxGroup" ? <label className="new-report-property-wide"><span>勾选项（每行：名称=值）</span><CommitTextField multiline rows={4} value={(selected.cell.checkboxOptions ?? []).map(option => `${option.label}=${option.value}`).join("\n")} onCommit={updateCheckboxOptions} /></label> : null}
         <TextStyleEditor style={selected.cell.style} onChange={(style) => updateCell((cell) => ({ ...cell, style }))} />
         <BorderEditor border={selected.cell.border ?? block.border} onChange={(border) => onCommit(updateGridCellBorder(block, selected.cell.id, border))} />
       </section> : null}

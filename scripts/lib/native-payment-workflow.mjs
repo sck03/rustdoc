@@ -40,4 +40,12 @@ export async function verifyDesktopPayment({ run, request, staff, cdp, output })
   assert.equal(job.status, 202, 'Desktop PDF job accepted');
   await waitFor(() => fs.existsSync(pdfPath), 30000, 'Actual desktop PDF save did not complete');
   assert.equal(fs.readFileSync(pdfPath).subarray(0, 5).toString(), '%PDF-');
+  const expenseTemplate = await run(`[...${panel}.querySelector('select').options].find(option=>option.value.endsWith('expense_reimbursement_template.dtpl'))?.value`);
+  assert(expenseTemplate, 'Expense template is available to the payment user');
+  const expensePath = path.join(output, 'desktop-expense.pdf');
+  const expenseJob = await request('StartPaymentVoucherPdfSaveToPathJob', staff.accessToken,
+    { templatePath: expenseTemplate, destinationPath: expensePath }, { paymentId: payment.id });
+  assert.equal(expenseJob.status, 202);
+  await waitFor(() => fs.existsSync(expensePath), 30000, 'Actual expense PDF did not complete');
+  assert.equal(fs.readFileSync(expensePath).subarray(0, 5).toString(), '%PDF-');
 }

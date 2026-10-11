@@ -1,6 +1,9 @@
 import type { ReportGridBlock } from "./reportDesignerSchema.ts";
 import type { ReportDesignerSchemaIssue } from "./reportDesignerSchemaValues.ts";
 
+export const REPORT_GRID_MAX_ROWS = 1000;
+export const REPORT_GRID_MAX_COLUMNS = 100;
+
 export type ReportGridCellPlacement = {
   cell: ReportGridBlock["rows"][number]["cells"][number];
   rowIndex: number;
@@ -22,7 +25,7 @@ export function reportGridCellPlacements(
 ): ReportGridCellPlacement[] {
   const rows = block.rows.length;
   const columns = block.columns.length;
-  if (rows === 0 || rows > 1000 || columns === 0 || columns > 100) {
+  if (rows === 0 || rows > REPORT_GRID_MAX_ROWS || columns === 0 || columns > REPORT_GRID_MAX_COLUMNS) {
     issues.push({ severity: "error", path, message: "普通表格行列数量无效。" });
     return [];
   }

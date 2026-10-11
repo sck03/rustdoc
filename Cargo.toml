@@ -23,7 +23,7 @@ exclude = ["apps/exportdoc-ocr-rs", "tools/excel-analyzer-rs", "third_party/cala
 calamine = { path = "third_party/calamine-0.36.1" }
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 rust-version = "1.98.1"
 publish = false

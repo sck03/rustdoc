@@ -34,6 +34,7 @@ COPY tools/excel-analyzer-rs/ tools/excel-analyzer-rs/
 COPY Resources/ExcelTemplates/ Resources/ExcelTemplates/
 COPY Templates/ Templates/
 COPY Resources/SingleWindow/ Resources/SingleWindow/
+ARG EXPORTDOCMANAGER_BUILD_REVISION=""
 RUN --mount=type=cache,target=/workspace/.cache/cargo/registry,sharing=locked cargo build --locked --release -p export-doc-server \
     && cargo build --locked --release --manifest-path apps/exportdoc-ocr-rs/Cargo.toml
 

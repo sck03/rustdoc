@@ -37,3 +37,20 @@ function Assert-ExportDocRustBuildOutputs {
     $missing = @($Names | ForEach-Object { Join-Path $ArtifactDirectory "$_$suffix" } | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
     if ($missing.Count) { throw "-SkipBuild requires existing binaries for this profile/target. Build without -SkipBuild first. Missing:`n$($missing -join "`n")" }
 }
+
+function Write-ExportDocRustBuildReceipt {
+    param([string]$Binary, [string]$Receipt, [string]$Version, [string]$Edition)
+    $value = @{ version = $Version; sha256 = (Get-FileHash -LiteralPath $Binary -Algorithm SHA256).Hash }
+    if ($Edition) { $value.edition = $Edition }
+    $value | ConvertTo-Json | Set-Content -LiteralPath $Receipt -Encoding utf8
+}
+
+function Assert-ExportDocRustBuildReceipt {
+    param([string]$Binary, [string]$Receipt, [string]$Version, [string]$Edition)
+    if (-not (Test-Path -LiteralPath $Receipt -PathType Leaf)) { throw 'Build receipt is missing; rebuild this product without -SkipBuild.' }
+    $value = Get-Content -LiteralPath $Receipt -Raw | ConvertFrom-Json
+    if ($value.version -ne $Version -or ($Edition -and $value.edition -ne $Edition) -or
+        $value.sha256 -ne (Get-FileHash -LiteralPath $Binary -Algorithm SHA256).Hash) {
+        throw 'Rust binary does not match its build receipt or product version; rebuild without -SkipBuild.'
+    }
+}

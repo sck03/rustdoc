@@ -2,6 +2,7 @@
 param(
     [ValidateSet('Document', 'Sales', 'Full')][string]$Edition = 'Document',
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
+    [string]$Version,
     [string]$OutputRoot,
     [string]$PdfiumPath,
     [string]$OnnxRuntimePath,
@@ -46,6 +47,8 @@ if ($PreflightOnly) {
     Wait-ExportDocInteractiveExit -Enabled $interactiveLaunch -ExitCode 0
     return
 }
+Initialize-ExportDocProductVersion -RepositoryRoot $repositoryRoot -Version $Version
+$productVersion = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'version.json') -Raw | ConvertFrom-Json).version
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $packageName = "ExportDocManager.Tauri.$Edition"
     $OutputRoot = Join-Path $repositoryRoot "artifacts/native-desktop/$packageName"
@@ -74,10 +77,7 @@ $editionBinary = Join-Path $editionDirectory "export-doc-tauri$executableSuffix"
 $editionReceipt = Join-Path $editionDirectory 'build.json'
 if ($SkipBuild) {
     Assert-ExportDocRustBuildOutputs -ArtifactDirectory $editionDirectory -Names @('export-doc-tauri')
-    if (-not (Test-Path -LiteralPath $editionReceipt -PathType Leaf)) { throw 'Edition build receipt is missing; rebuild this edition.' }
-    $receipt = Get-Content -LiteralPath $editionReceipt -Raw | ConvertFrom-Json
-    $version = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'version.json') -Raw | ConvertFrom-Json).version
-    if ($receipt.edition -ne $Edition -or $receipt.version -ne $version -or $receipt.sha256 -ne (Get-FileHash -LiteralPath $editionBinary -Algorithm SHA256).Hash) { throw 'Edition binary does not match its build receipt or product version.' }
+    Assert-ExportDocRustBuildReceipt -Binary $editionBinary -Receipt $editionReceipt -Version $productVersion -Edition $Edition
     if (-not $WithoutOcr) { Assert-ExportDocRustBuildOutputs -ArtifactDirectory $artifactDirectory -Names @('exportdoc-ocr') }
 }
 if (-not $SkipBuild) {
@@ -93,7 +93,7 @@ if (-not $SkipBuild) {
     Assert-NativePackagePath -Path $editionDirectory
     New-Item -ItemType Directory -Force -Path $editionDirectory | Out-Null
     Copy-Item -LiteralPath (Join-Path $artifactDirectory "export-doc-tauri$executableSuffix") -Destination $editionBinary -Force
-    @{ edition = $Edition; version = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'version.json') -Raw | ConvertFrom-Json).version; sha256 = (Get-FileHash -LiteralPath $editionBinary -Algorithm SHA256).Hash } | ConvertTo-Json | Set-Content -LiteralPath $editionReceipt -Encoding utf8
+    Write-ExportDocRustBuildReceipt -Binary $editionBinary -Receipt $editionReceipt -Version $productVersion -Edition $Edition
 }
 $copies = [ordered]@{}
 $copies[$editionBinary] = "ExportDocManager$executableSuffix"
@@ -115,7 +115,7 @@ Copy-ExportDocNativePackageFiles -Copies $copies -OutputRoot $outputFullPath
 @{ schemaVersion = 1; target = 'tauri-desktop'; backend = 'Rust' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputFullPath 'runtime-layout.json') -Encoding utf8
 $packageMarker = [ordered]@{
     schemaVersion = 1; purpose = 'rust-native-application'; product = 'ExportDocManager'
-    version = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'version.json') -Raw | ConvertFrom-Json).version
+    version = $productVersion
     configuration = $Configuration; backend = 'Rust'; frontend = 'Tauri'; webView = $true; ocr = (-not $WithoutOcr)
     edition = $Edition; productName = $editionMetadata.productName; documentResources = $editionMetadata.resourceProfile.documentResources
     localTest = $localTest; database = 'SQLite'

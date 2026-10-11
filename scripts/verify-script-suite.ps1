@@ -54,6 +54,7 @@ foreach ($file in $powerShellScripts) {
 if ($parseFailures.Count -gt 0) {
     throw "PowerShell syntax validation failed:`n$($parseFailures -join "`n")"
 }
+Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/sync-version.mjs', '--check') -WorkingDirectory $repoRoot
 
 foreach ($file in $moduleScripts) {
     Invoke-ExportDocExternal -FilePath "node" -Arguments @("--check", $file.FullName) -WorkingDirectory $repoRoot

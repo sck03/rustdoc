@@ -414,8 +414,8 @@ fn support_package(
 fn runtime_diagnostics(store: &Store) -> Result<Value> {
     let provider = store.provider()?;
     Ok(json!({
-        "productVersion": env!("CARGO_PKG_VERSION"),
-        "informationalVersion": concat!(env!("CARGO_PKG_VERSION"), " Rust"),
+        "productVersion": crate::build_info::PRODUCT_VERSION,
+        "informationalVersion": crate::build_info::INFORMATIONAL_VERSION,
         "databaseProvider": provider,
         "databaseProviderKey": if provider == "SQLite" { "sqlite" } else { "postgresql" },
         "operatingSystem": std::env::consts::OS,

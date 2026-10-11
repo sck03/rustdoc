@@ -238,7 +238,7 @@ pub fn write(package: &Package) -> Result<Vec<u8>> {
         .ok_or_else(|| invalid("发票结构无效。"))?
         .remove("Items")
         .unwrap_or(json!([]));
-    let mut root = json!({"SchemaVersion":"1.0","AppVersion":env!("CARGO_PKG_VERSION"),"CreatedAt":super::super::store::timestamp(),"Invoice":invoice,"Items":items,
+    let mut root = json!({"SchemaVersion":"1.0","AppVersion":crate::build_info::PRODUCT_VERSION,"CreatedAt":super::super::store::timestamp(),"Invoice":invoice,"Items":items,
         "Customer":package.customer.as_ref().map(wire),"Exporter":package.exporter.as_ref().map(wire),"Resources":{}});
     let mut entries = BTreeMap::new();
     for (field, bytes) in &package.assets {

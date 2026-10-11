@@ -17,6 +17,7 @@ import {
   createReportBlockId,
   normalizeDesignerFieldPath,
 } from "./reportDesignerMutationUtils.ts";
+import { normalizeColumnPercentages } from "./reportDesignerColumnWidths.ts";
 
 const defaultTextStyle: ReportTextStyle = {
   fontSizePt: 10,
@@ -325,11 +326,10 @@ export function createDetailTableCellContent(kind: ReportDetailTableCellContent[
 
 export function createGridColumns(count: number): ReportGridColumn[] {
   const safeCount = Math.max(1, Math.floor(count));
-  const widthPercent = Math.round((1000 / safeCount)) / 10;
-  return Array.from({ length: safeCount }, (_, index) => ({
+  return normalizeColumnPercentages(Array.from({ length: safeCount }, (_, index) => ({
     id: createReportBlockId(`grid-col-${index + 1}`),
-    widthPercent,
-  }));
+    widthPercent: 1,
+  })));
 }
 
 export function createGridRow(cells?: ReportGridCell[], heightMm = 9): ReportGridRow {

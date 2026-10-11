@@ -1461,7 +1461,7 @@ dependencies = [
 
 [[package]]
 name = "export-doc-ai"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "export-doc-network",
  "serde",
@@ -1473,7 +1473,7 @@ dependencies = [
 
 [[package]]
 name = "export-doc-contracts"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "rust_decimal",
  "serde",
@@ -1483,7 +1483,7 @@ dependencies = [
 
 [[package]]
 name = "export-doc-domain"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "export-doc-contracts",
@@ -1497,7 +1497,7 @@ dependencies = [
 
 [[package]]
 name = "export-doc-engine"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "aes-gcm",
  "base64 0.23.1",
@@ -1539,7 +1539,7 @@ dependencies = [
 
 [[package]]
 name = "export-doc-excel"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "calamine",
  "chrono",
@@ -1555,7 +1555,7 @@ dependencies = [
 
 [[package]]
 name = "export-doc-exchange"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "export-doc-contracts",
@@ -1569,7 +1569,7 @@ dependencies = [
 
 [[package]]
 name = "export-doc-hs"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "export-doc-contracts",
  "export-doc-domain",
@@ -1580,7 +1580,7 @@ dependencies = [
 
 [[package]]
 name = "export-doc-mail"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ego-tree",
  "lettre",
@@ -1593,14 +1593,14 @@ dependencies = [
 
 [[package]]
 name = "export-doc-network"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ureq",
 ]
 
 [[package]]
 name = "export-doc-report"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64 0.23.1",
  "export-doc-contracts",
@@ -1617,7 +1617,7 @@ dependencies = [
 
 [[package]]
 name = "export-doc-server"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "axum",
  "chrono",
@@ -1635,7 +1635,7 @@ dependencies = [
 
 [[package]]
 name = "export-doc-single-window"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64 0.23.1",
  "chrono",
@@ -1653,7 +1653,7 @@ dependencies = [
 
 [[package]]
 name = "export-doc-storage"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "native-tls",
@@ -1666,7 +1666,7 @@ dependencies = [
 
 [[package]]
 name = "export-doc-tauri"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64 0.23.1",
  "export-doc-engine",
@@ -1690,7 +1690,7 @@ dependencies = [
 
 [[package]]
 name = "exportdoc-excel-analyzer"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "calamine",
  "serde",

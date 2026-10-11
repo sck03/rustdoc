@@ -4,6 +4,7 @@ param(
     [ValidateRange(1024, 65535)][int]$Port = 5188,
     [string]$BindAddress = '127.0.0.1',
     [string]$Image = 'exportdoc-rust-native:local',
+    [string]$Version,
     [switch]$SkipBuild,
     [switch]$PrepareOnly,
     [switch]$Stop,
@@ -35,6 +36,10 @@ while ($currentPath) {
 $bindIp = $null
 if (-not [System.Net.IPAddress]::TryParse($BindAddress, [ref]$bindIp) -or $bindIp.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) { throw 'BindAddress must be an explicit IPv4 address.' }
 if (@($PrepareOnly, $Stop, $RestorePending).Where({ $_ }).Count -gt 1) { throw 'PrepareOnly, Stop and RestorePending cannot be combined.' }
+if ($Version.Length -gt 0) {
+    if ($SkipBuild -or $PrepareOnly -or $Stop -or $RestorePending) { throw 'Version requires a source image build; it cannot relabel an existing image.' }
+    Initialize-ExportDocProductVersion -RepositoryRoot $repositoryRoot -Version $Version
+}
 $markerPath = Join-Path $runtimePath 'native-runtime.json'
 if (Test-Path -LiteralPath $runtimePath) {
     if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf) -and @(Get-ChildItem -LiteralPath $runtimePath -Force).Count -gt 0) { throw 'Refusing to adopt an unmarked non-empty runtime directory.' }

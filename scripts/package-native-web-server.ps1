@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
+    [string]$Version,
     [string]$OutputRoot,
     [string]$RuntimeIdentifier,
     [switch]$SkipBuild,
@@ -17,6 +18,8 @@ trap {
     exit 1
 }
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
+Initialize-ExportDocProductVersion -RepositoryRoot $repositoryRoot -Version $Version
+$productVersion = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'version.json') -Raw | ConvertFrom-Json).version
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repositoryRoot 'artifacts/native-web-server'
 }
@@ -39,10 +42,14 @@ if (Test-Path -LiteralPath $outputFullPath) {
 $runtimeRoot = Join-Path $repositoryRoot '.codex-runtime'
 Initialize-ExportDocRustBuildEnvironment -RepositoryRoot $repositoryRoot
 $targetDirectory = Get-ExportDocCargoArtifactDirectory -RepositoryRoot $repositoryRoot -Configuration $Configuration -RustTarget $RuntimeIdentifier
+$suffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
+$serverSource = Join-Path $targetDirectory "export-doc-server$suffix"
+$buildReceipt = Join-Path $targetDirectory 'server-build.json'
 if ($SkipBuild) {
     $requiredBinaries = @('export-doc-server')
     if (-not $WithoutOcr) { $requiredBinaries += 'exportdoc-ocr' }
     Assert-ExportDocRustBuildOutputs -ArtifactDirectory $targetDirectory -Names $requiredBinaries
+    Assert-ExportDocRustBuildReceipt -Binary $serverSource -Receipt $buildReceipt -Version $productVersion
 }
 if (-not $SkipBuild) {
     $env:npm_config_cache = Join-Path $runtimeRoot 'npm-cache'
@@ -55,9 +62,8 @@ if (-not $SkipBuild) {
         $cargoArguments += @('--target', $RuntimeIdentifier)
     }
     Invoke-ExportDocExternal -FilePath 'cargo' -Arguments $cargoArguments -WorkingDirectory $repositoryRoot -DisplayName 'Build Rust HTTP server'
+    Write-ExportDocRustBuildReceipt -Binary $serverSource -Receipt $buildReceipt -Version $productVersion
 }
-$suffix = if ($env:OS -eq 'Windows_NT') { '.exe' } else { '' }
-$serverSource = Join-Path $targetDirectory "export-doc-server$suffix"
 if (-not (Test-Path -LiteralPath $serverSource -PathType Leaf)) {
     throw "Rust HTTP server executable was not found: $serverSource"
 }
@@ -86,7 +92,7 @@ $marker = [ordered]@{
     schemaVersion = 1
     purpose = 'rust-native-web-server-package'
     product = 'ExportDocManager'
-    version = (Get-Content -LiteralPath (Join-Path $repositoryRoot 'version.json') -Raw | ConvertFrom-Json).version
+    version = $productVersion
     frontend = 'React'
     server = 'Rust HTTP'
     database = 'PostgreSQL 18'

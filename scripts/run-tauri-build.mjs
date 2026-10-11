@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { normalizeProductEdition, productEditionCatalog as editionCatalog } from "./lib/product-editions.mjs";
+import { syncVersion } from "./sync-version.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tauriRoot = path.join(repositoryRoot, "apps", "export-doc-tauri");
@@ -14,9 +15,7 @@ const editionMetadata = editionCatalog.editions?.[productEdition];
 if (!editionMetadata) {
   throw new Error(`Product edition metadata is missing for ${productEdition}.`);
 }
-const projectVersion = String(
-  JSON.parse(readFileSync(path.join(repositoryRoot, "version.json"), "utf8")).version || "",
-).trim();
+const projectVersion = await syncVersion(repositoryRoot, undefined, { check: true });
 const requireSignedUpdater = /^(?:1|true|yes)$/iu.test(
   String(process.env.EXPORTDOCMANAGER_REQUIRE_SIGNED_UPDATER || "").trim(),
 );

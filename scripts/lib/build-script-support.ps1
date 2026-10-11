@@ -2,6 +2,13 @@
 . (Join-Path $PSScriptRoot "product-editions.ps1")
 . (Join-Path $PSScriptRoot "rust-build-paths.ps1")
 
+function Initialize-ExportDocProductVersion {
+    param([Parameter(Mandatory = $true)][string]$RepositoryRoot, [string]$Version)
+    $arguments = @('scripts/sync-version.mjs')
+    if ($Version.Length -gt 0) { $arguments += $Version } else { $arguments += '--check' }
+    Invoke-ExportDocExternal -FilePath 'node' -Arguments $arguments -WorkingDirectory $RepositoryRoot -DisplayName 'Synchronize product build version'
+}
+
 function Resolve-ExportDocExternalCommand {
     param([Parameter(Mandatory = $true)][string]$FilePath)
     if ([string]::IsNullOrWhiteSpace($FilePath)) {

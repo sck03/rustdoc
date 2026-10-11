@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Info } from "lucide-react";
-import { ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ApiHealthResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import type { ProductEditionPresentation } from "../../app/productEdition.ts";
+import { Button } from "../../ui/Button.tsx";
+import { InlineNotice } from "../../ui/PageState.tsx";
 
 export function AboutPage({
   client,
@@ -15,10 +17,11 @@ export function AboutPage({
   const healthQuery = useQuery({
     queryKey: queryKeys.health(),
     queryFn: ({ signal }) => client.getHealth({ signal }),
+    select: selectProductInfo,
   });
   const health = healthQuery.data ?? null;
   const isDesktopRuntime = isDesktopBridgeAvailable();
-  const productVersionText = formatVersion(health?.productVersion || health?.informationalVersion);
+  const unavailable = healthQuery.isPending ? "读取中…" : "未获取";
 
   return (
     <section className="work-surface about-surface" aria-label="关于">
@@ -33,15 +36,22 @@ export function AboutPage({
         <div className="section-header">
           <div>
             <h2>产品信息</h2>
-            <span>当前安装与授权版本</span>
+            <span>当前程序版本与运行方式</span>
           </div>
           <Info size={18} aria-hidden="true" />
         </div>
+        {healthQuery.isError ? <InlineNotice tone="error" title="版本信息读取失败"
+          action={<Button variant="secondary" disabled={healthQuery.isFetching} onClick={() => void healthQuery.refetch()}>
+            {healthQuery.isFetching ? "正在重试…" : "重试"}
+          </Button>}>
+          {health ? "以下版本信息为上次读取结果，请重试以核实当前程序。" : "暂时无法取得程序版本，请重试。"}
+        </InlineNotice> : null}
         <div className="detail-grid about-detail-grid">
           <DetailItem label="产品" value={product.displayName} />
-          <DetailItem label="版本" value={productVersionText} />
+          <DetailItem label="版本" value={health?.version || unavailable} />
           <DetailItem label="版本形态" value={product.editionName} />
           <DetailItem label="使用方式" value={isDesktopRuntime ? "单机工作区" : "多人协作工作区"} />
+          <DetailItem label="构建标识" value={health?.build || unavailable} wide />
           <DetailItem label="发行方" value="steven.sck 施" />
           <DetailItem label="版权" value="Copyright © 2026 steven.sck 施" wide />
         </div>
@@ -78,6 +88,11 @@ function DetailItem({ label, value, wide }: { label: string; value: string; wide
   );
 }
 
-function formatVersion(value?: string) {
-  return value?.trim() ? `v${value.trim()}` : "-";
+function selectProductInfo(health: ApiHealthResponse) {
+  const version = health.productVersion?.trim() || health.informationalVersion?.trim();
+  const build = health.informationalVersion?.trim();
+  return {
+    version: version ? `v${version.replace(/^v/iu, "")}` : "未提供",
+    build: build && build !== version ? build : "未提供",
+  };
 }

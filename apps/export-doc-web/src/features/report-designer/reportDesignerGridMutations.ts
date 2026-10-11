@@ -1,16 +1,11 @@
 import { createGridCell, createGridColumns, createGridRow } from "./reportDesignerBlockFactories.ts";
-import { distributeGridColumnWidths } from "./reportDesignerTableMutations.ts";
 import type { ReportBorderStyle, ReportGridBlock, ReportGridCell } from "./reportDesignerSchema.ts";
+import { REPORT_GRID_MAX_COLUMNS, REPORT_GRID_MAX_ROWS, reportGridCellPlacements, type ReportGridCellPlacement } from "./reportDesignerGridPlacement.ts";
+import { normalizeColumnPercentages } from "./reportDesignerColumnWidths.ts";
 
 export type ReportGridPreset = "Blank" | "Form" | "Approval";
 
-export type ReportGridCellLocation = {
-  cell: ReportGridCell;
-  rowIndex: number;
-  columnIndex: number;
-  rowSpan: number;
-  colSpan: number;
-};
+export type ReportGridCellLocation = ReportGridCellPlacement;
 
 export function updateGridCell(block: ReportGridBlock, cellId: string, update: (cell: ReportGridCell) => ReportGridCell): ReportGridBlock {
   let changed = false;
@@ -37,28 +32,7 @@ export function adjacentGridCell(block: ReportGridBlock, cellId: string, directi
 }
 
 export function getGridCellLocations(block: ReportGridBlock): ReportGridCellLocation[] {
-  const rowCount = block.rows.length;
-  const columnCount = block.columns.length;
-  const occupied = Array.from({ length: rowCount }, () => Array<boolean>(columnCount).fill(false));
-  const result: ReportGridCellLocation[] = [];
-
-  block.rows.forEach((row, rowIndex) => {
-    let columnIndex = 0;
-    row.cells.forEach((cell) => {
-      while (columnIndex < columnCount && occupied[rowIndex][columnIndex]) columnIndex += 1;
-      if (columnIndex >= columnCount) return;
-      const colSpan = Math.min(columnCount - columnIndex, Math.max(1, Math.floor(cell.colSpan ?? 1)));
-      const rowSpan = Math.min(rowCount - rowIndex, Math.max(1, Math.floor(cell.rowSpan ?? 1)));
-      result.push({ cell, rowIndex, columnIndex, rowSpan, colSpan });
-      for (let rowOffset = 0; rowOffset < rowSpan; rowOffset += 1) {
-        for (let columnOffset = 0; columnOffset < colSpan; columnOffset += 1) {
-          occupied[rowIndex + rowOffset][columnIndex + columnOffset] = true;
-        }
-      }
-      columnIndex += colSpan;
-    });
-  });
-  return result;
+  return reportGridCellPlacements(block, "grid", []);
 }
 
 export function applyGridPreset(block: ReportGridBlock, preset: ReportGridPreset): ReportGridBlock {
@@ -70,74 +44,63 @@ export function applyGridPreset(block: ReportGridBlock, preset: ReportGridPreset
   return { ...block, ...structure };
 }
 
-export function appendGridRow(block: ReportGridBlock): ReportGridBlock {
-  return {
-    ...block,
-    rows: [...block.rows, createGridRow(Array.from({ length: block.columns.length }, () => createGridCell("Text", "")))],
-  };
-}
-
-export function removeLastGridRow(block: ReportGridBlock): ReportGridBlock {
-  if (block.rows.length <= 1) return block;
-  const rowCount = block.rows.length - 1;
+export function resizeGridStructure(block: ReportGridBlock, rowCount: number, columnCount: number): ReportGridBlock {
+  if (!Number.isInteger(rowCount) || rowCount < 1 || rowCount > REPORT_GRID_MAX_ROWS ||
+      !Number.isInteger(columnCount) || columnCount < 1 || columnCount > REPORT_GRID_MAX_COLUMNS ||
+      (rowCount === block.rows.length && columnCount === block.columns.length)) return block;
+  const occupied = new Uint8Array(rowCount * columnCount);
   const locations = getGridCellLocations(block)
-    .filter((location) => location.rowIndex < rowCount)
-    .map((location) => ({
-      ...location,
-      rowSpan: Math.min(location.rowSpan, rowCount - location.rowIndex),
-      cell: { ...location.cell, rowSpan: Math.min(location.rowSpan, rowCount - location.rowIndex) },
-    }));
-  return { ...block, rows: rebuildRows(block, locations, rowCount) };
-}
-
-export function appendGridColumn(block: ReportGridBlock): ReportGridBlock {
-  return distributeGridColumnWidths({
-    ...block,
-    columns: [...block.columns, createGridColumns(1)[0]],
-    rows: block.rows.map((row) => ({ ...row, cells: [...row.cells, createGridCell("Text", "")] })),
-  });
-}
-
-export function removeLastGridColumn(block: ReportGridBlock): ReportGridBlock {
-  if (block.columns.length <= 1) return block;
-  const columnCount = block.columns.length - 1;
-  const locations = getGridCellLocations(block)
-    .filter((location) => location.columnIndex < columnCount)
-    .map((location) => ({
-      ...location,
-      colSpan: Math.min(location.colSpan, columnCount - location.columnIndex),
-      cell: { ...location.cell, colSpan: Math.min(location.colSpan, columnCount - location.columnIndex) },
-    }));
-  const rows = rebuildRows(block, locations, block.rows.length);
-  if (rows.some((row) => row.cells.length === 0)) return block;
-  return distributeGridColumnWidths({ ...block, columns: block.columns.slice(0, columnCount), rows });
+    .filter(location => location.rowIndex < rowCount && location.columnIndex < columnCount)
+    .map(location => {
+      const rowSpan = Math.min(location.rowSpan, rowCount - location.rowIndex);
+      const colSpan = Math.min(location.colSpan, columnCount - location.columnIndex);
+      for (let row = location.rowIndex; row < location.rowIndex + rowSpan; row++) {
+        const start = row * columnCount + location.columnIndex;
+        occupied.fill(1, start, start + colSpan);
+      }
+      return { ...location, rowSpan, colSpan, cell: rowSpan === location.rowSpan && colSpan === location.colSpan
+        ? location.cell : { ...location.cell, rowSpan, colSpan } };
+    });
+  for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+    for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
+      if (!occupied[rowIndex * columnCount + columnIndex]) locations.push({ rowIndex, columnIndex, rowSpan: 1, colSpan: 1,
+        cell: emptyGridCell() });
+    }
+  }
+  let columns = block.columns;
+  if (columnCount !== columns.length) {
+    columns = columns.slice(0, columnCount);
+    if (columnCount > columns.length) columns = [...columns, ...createGridColumns(columnCount - columns.length)
+      .map(column => ({ ...column, widthPercent: 100 / block.columns.length }))];
+    const weights = columns.map(column => Math.max(0, column.widthPercent - 1));
+    const total = weights.reduce((sum, value) => sum + value, 0);
+    columns = normalizeColumnPercentages(columns.map((column, index) => ({ ...column, widthPercent: 1 + (100 - columnCount) * (total ? weights[index] / total : 1 / columnCount) })));
+  }
+  return { ...block, columns, rows: rebuildRows(block, locations, rowCount) };
 }
 
 export function mergeGridCellRight(block: ReportGridBlock, cellId: string): ReportGridBlock {
-  const locations = getGridCellLocations(block);
-  const current = locations.find((location) => location.cell.id === cellId);
-  const adjacent = current && locations.find((location) =>
-    location.rowIndex === current.rowIndex &&
-    location.columnIndex === current.columnIndex + current.colSpan &&
-    location.rowSpan === current.rowSpan);
-  if (!current || !adjacent) return block;
-  return replaceGridCells(block, current.cell.id, adjacent.cell.id, {
-    ...current.cell,
-    colSpan: current.colSpan + adjacent.colSpan,
-  });
+  return mergeGridCell(block, cellId, "right");
 }
 
 export function mergeGridCellDown(block: ReportGridBlock, cellId: string): ReportGridBlock {
-  const locations = getGridCellLocations(block);
-  const current = locations.find((location) => location.cell.id === cellId);
-  const adjacent = current && locations.find((location) =>
-    location.rowIndex === current.rowIndex + current.rowSpan &&
-    location.columnIndex === current.columnIndex &&
-    location.colSpan === current.colSpan);
-  if (!current || !adjacent || block.rows[adjacent.rowIndex].cells.length <= 1) return block;
-  return replaceGridCells(block, current.cell.id, adjacent.cell.id, {
-    ...current.cell,
-    rowSpan: current.rowSpan + adjacent.rowSpan,
+  return mergeGridCell(block, cellId, "down");
+}
+
+function gridMergePair(locations: ReportGridCellLocation[], cellId: string, direction: "right" | "down") {
+  const current = locations.find(location => location.cell.id === cellId);
+  const adjacent = current && locations.find(location => direction === "right"
+    ? location.rowIndex === current.rowIndex && location.columnIndex === current.columnIndex + current.colSpan && location.rowSpan === current.rowSpan
+    : location.rowIndex === current.rowIndex + current.rowSpan && location.columnIndex === current.columnIndex && location.colSpan === current.colSpan);
+  return current && adjacent ? { current, adjacent } : null;
+}
+
+function mergeGridCell(block: ReportGridBlock, cellId: string, direction: "right" | "down") {
+  const pair = gridMergePair(getGridCellLocations(block), cellId, direction);
+  if (!pair) return block;
+  const span = direction === "right" ? "colSpan" : "rowSpan";
+  return replaceGridCells(block, cellId, pair.adjacent.cell.id, {
+    ...pair.current.cell, [span]: pair.current[span] + pair.adjacent[span],
   });
 }
 
@@ -155,7 +118,7 @@ export function splitGridCell(block: ReportGridBlock, cellId: string): ReportGri
     for (let columnOffset = 0; columnOffset < current.colSpan; columnOffset += 1) {
       if (rowOffset === 0 && columnOffset === 0) continue;
       replacements.push({
-        cell: createGridCell("Text", ""),
+        cell: { ...emptyGridCell(), style: current.cell.style, border: current.cell.border },
         rowIndex: current.rowIndex + rowOffset,
         columnIndex: current.columnIndex + columnOffset,
         rowSpan: 1,
@@ -169,12 +132,12 @@ export function splitGridCell(block: ReportGridBlock, cellId: string): ReportGri
   };
 }
 
-export function canMergeGridCellRight(block: ReportGridBlock, cellId: string) {
-  return mergeGridCellRight(block, cellId) !== block;
+export function canMergeGridCellRight(block: ReportGridBlock, cellId: string, locations = getGridCellLocations(block)) {
+  return gridMergePair(locations, cellId, "right") !== null;
 }
 
-export function canMergeGridCellDown(block: ReportGridBlock, cellId: string) {
-  return mergeGridCellDown(block, cellId) !== block;
+export function canMergeGridCellDown(block: ReportGridBlock, cellId: string, locations = getGridCellLocations(block)) {
+  return gridMergePair(locations, cellId, "down") !== null;
 }
 
 export function setGridRowsToUniformHeight(block: ReportGridBlock, heightMm: number): ReportGridBlock {
@@ -277,20 +240,25 @@ function replaceGridCells(block: ReportGridBlock, keepId: string, removeId: stri
 }
 
 function rebuildRows(block: ReportGridBlock, locations: ReportGridCellLocation[], rowCount: number) {
-  return Array.from({ length: rowCount }, (_, rowIndex) => ({
-    ...(block.rows[rowIndex] ?? createGridRow()),
-    cells: locations
-      .filter((location) => location.rowIndex === rowIndex)
-      .sort((left, right) => left.columnIndex - right.columnIndex)
-      .map((location) => location.cell),
-  }));
+  const rows = Array.from({ length: rowCount }, () => [] as ReportGridCellLocation[]);
+  for (const location of locations) rows[location.rowIndex].push(location);
+  return rows.map((locations, rowIndex) => {
+    const cells = locations.sort((left, right) => left.columnIndex - right.columnIndex).map(location => location.cell);
+    const row = block.rows[rowIndex];
+    if (!row) return createGridRow(cells, block.rows.at(-1)?.heightMm ?? 9);
+    return row.cells.length === cells.length && row.cells.every((cell, index) => cell === cells[index]) ? row : { ...row, cells };
+  });
 }
 
 function blankStructure(rowCount: number, columnCount: number) {
   return {
     columns: createGridColumns(columnCount),
-    rows: Array.from({ length: rowCount }, () => createGridRow(Array.from({ length: columnCount }, () => createGridCell("Text", "")))),
+    rows: Array.from({ length: rowCount }, () => createGridRow(Array.from({ length: columnCount }, emptyGridCell))),
   };
+}
+
+function emptyGridCell(): ReportGridCell {
+  return { ...createGridCell("Text", "", "", 1, 1, {}), border: undefined };
 }
 
 function formStructure() {

@@ -18,6 +18,7 @@ import { normalizeDetailTableBlock } from "./reportDesignerSchemaDetailTable.ts"
 import { normalizeBlockOutputSettings } from "./reportDesignerSchemaBlockSettings.ts";
 import { normalizeConditions } from "./reportDesignerConditions.ts";
 import { reportGridCellPlacements } from "./reportDesignerGridPlacement.ts";
+import { normalizeColumnPercentages } from "./reportDesignerColumnWidths.ts";
 import { normalizeGridDiagonalHeader } from "./reportDesignerGridDiagonalValidation.ts";
 import {
   createIssue,
@@ -249,7 +250,7 @@ function normalizeRowBlock(
     id: normalizeId(value.id, "block-row", blockIds, `${path}.id`, issues),
     type: "Row",
     output: normalizeBlockOutputSettings(value.output, `${path}.output`, issues),
-    columns: normalizeRowColumnWidthsForValidation(columns),
+    columns: normalizeColumnPercentages(columns),
     marginTopMm: readOptionalNumber(value.marginTopMm, 0, 0, 80, `${path}.marginTopMm`, issues),
     marginBottomMm: readOptionalNumber(value.marginBottomMm, 0, 0, 80, `${path}.marginBottomMm`, issues),
   };
@@ -281,14 +282,6 @@ function normalizeRowColumn(
     style: normalizeTextStyle(value.style, `${path}.style`, issues),
     border: normalizeOptionalBorderStyle(value.border, `${path}.border`, issues),
   };
-}
-
-function normalizeRowColumnWidthsForValidation(columns: ReportRowColumn[]) {
-  const total = columns.reduce((sum, column) => sum + Math.max(1, column.widthPercent), 0);
-  return columns.map((column) => ({
-    ...column,
-    widthPercent: Math.round((Math.max(1, column.widthPercent) / total) * 1000) / 10,
-  }));
 }
 
 function normalizeGridBlock(
@@ -333,7 +326,7 @@ function normalizeGridBlock(
     type: "Grid",
     output: normalizeBlockOutputSettings(value.output, `${path}.output`, issues),
     title: readOptionalString(value.title, `${path}.title`, issues),
-    columns: normalizeGridColumnWidths(columns),
+    columns: normalizeColumnPercentages(columns),
     rows,
     marginTopMm: readOptionalNumber(value.marginTopMm, 0, 0, 80, `${path}.marginTopMm`, issues),
     marginBottomMm: readOptionalNumber(value.marginBottomMm, 0, 0, 80, `${path}.marginBottomMm`, issues),
@@ -359,14 +352,6 @@ function normalizeGridColumn(
     id: normalizeId(value.id, "grid-col", columnIds, `${path}.id`, issues),
     widthPercent: readNumber(value.widthPercent, 10, 1, 100, `${path}.widthPercent`, issues),
   };
-}
-
-function normalizeGridColumnWidths(columns: ReportGridColumn[]) {
-  const total = columns.reduce((sum, column) => sum + Math.max(1, column.widthPercent), 0);
-  return columns.map((column) => ({
-    ...column,
-    widthPercent: Math.round((Math.max(1, column.widthPercent) / total) * 1000) / 10,
-  }));
 }
 
 function normalizeGridRow(

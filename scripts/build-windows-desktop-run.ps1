@@ -3,6 +3,7 @@
 param(
     [ValidateSet('All', 'Document', 'Sales', 'Full')][string]$Edition = 'All',
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
+    [string]$Version,
     [string]$RustTarget, [string]$OutputDir, [string]$CargoTargetDir,
     [switch]$PreflightOnly, [switch]$SkipMainBuild, [switch]$WithoutOcr, [switch]$NoPause
 )
@@ -21,6 +22,7 @@ try {
         if ($WithoutOcr) { $arguments += '-WithoutOcr' }
         if ($index -gt 0) { $arguments += '-SkipFrontendBuild' }
         if ($RustTarget) { $arguments += @('-RustTarget', $RustTarget) }
+        if ($Version.Length -gt 0) { $arguments += @('-Version', $Version) }
         if ($OutputDir) {
             $name = "ExportDocManager.Tauri.$current"
             $arguments += @('-OutputRoot', (Join-Path $OutputDir $name))

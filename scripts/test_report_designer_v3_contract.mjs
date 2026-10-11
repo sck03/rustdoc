@@ -4,6 +4,7 @@ import path from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { verifyDesignerEditingMutations } from "./lib/report-designer-editing-contracts.mjs";
+import { verifyGridAuthoringContracts } from "./lib/report-designer-grid-contracts.mjs";
 import { verifyConditionalContracts } from "./lib/report-designer-condition-contracts.mjs";
 import { createShippingMarksScenario } from "./lib/report-shipping-marks-fixture.mjs";
 
@@ -60,6 +61,7 @@ export { resolveDefaultTemplatePath } from ${JSON.stringify(importSpecifier("../
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 const api = await import(pathToFileURL(bundlePath).href);
 verifyDesignerEditingMutations(api);
+verifyGridAuthoringContracts(api);
 verifyConditionalContracts(api, repoRoot);
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 let productState = api.createReportDesignerV3DocumentState(api.parseReportDesignerV3Source("", "ExportDocument").schema);

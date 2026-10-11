@@ -62,6 +62,23 @@ Document 使用单证概览、Sales 使用销售概览作为固定首页；Full 
 
 `-SkipMainBuild`（单版入口为 `-SkipBuild`）只复用 `target/<profile>/editions/<版本>` 下已构建的该版 EXE，校验版本及 SHA-256 构建记录。不会将最后一次 Cargo 输出复制成另一版；缺少记录或校验失败须正常重建。Document 默认提供 OCR，只有显式 `-WithoutOcr` 才生成轻量检查包。
 
+### 构建时指定程序版本
+
+桌面便携包、Windows 安装器、Web 服务包和本地 Docker 源码构建均支持 `-Version`，例如：
+
+```powershell
+.\scripts\build-windows-desktop-run.cmd -Edition Document -Version 1.2.3 -NoPause
+.\scripts\build-windows-installers.cmd -Edition Sales -Version 1.2.3 -NoPause
+pwsh -NoProfile -File scripts/package-native-web-server.ps1 -Version 1.2.3 -NoPause
+.\scripts\run-native-docker.cmd -Version 1.2.3 -NoPause
+```
+
+单版/跨平台 `build-native.ps1` 同样支持此参数。接受 `1.2.3`、`v1.2.3`、`1.2.3-beta.1`；未指定时使用 `version.json` 的仓库默认值，不自动按日期或构建次数升级发布号。指定参数会在构建前同步当前工作树中的 Rust/npm/Tauri 清单及本地包锁，版本修改可随源码审阅提交；不会升级第三方依赖。`-PreflightOnly` 只检查工具，不修改版本。Docker 仅在实际源码构建时接受该参数，此操作需要本机 Node；`-SkipBuild`、停止、准备配置和恢复不能给已有镜像改版本。
+
+`node scripts/sync-version.mjs --check` 检查一致性且不写文件。桌面和 Web 的 `-SkipBuild` 还核对已构建二进制的版本及 SHA-256；Web 记录位于相同 profile/target 的 `server-build.json`。版本不符或记录缺失时必须重新构建，不能把旧 EXE 标记成新版本。
+
+“关于与支持”的版本来自正在运行的 Rust 服务，构建标识形如 `1.2.3+git.012345abcdef`。提交号在编译时获取，只表示来源提交；本地未提交修改不会产生新的提交号。源码归档可通过 `EXPORTDOCMANAGER_BUILD_REVISION` 提供提交号，Docker 对应同名 build-arg，正式容器工作流自动传入。没有来源信息时明确显示未提供；运行程序不调用 Git。发布号仍用于 Tauri 更新比较，构建标识用于核对来源，两者分别维护。
+
 ## 桌面启动检查与资源
 
 桌面业务库统一位于 `App_Data/Database/exportdoc-native.db`，实例锁位于 `App_Data/Locks`。旧位置 `App_Data/exportdoc-native.db` 中受支持的数据库会通过 SQLite 快照自动搬入 Database，原文件保留在 `Backups/DatabaseLayout`；新旧两处同时有库则停止并提示核对。不要手工只移动正在使用的主文件：它可能还有未合并的 WAL。WebView 内部数据库保留在 `WebView` profile 中。
@@ -138,7 +155,7 @@ Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公
 
 桌面和 Web 共用 `native-package-reusable.yml`，该内部工作流不提供手工运行入口。`version` 接受 `0.1.2`、`v0.1.2`、`0.1.2-beta.1`，同时进入 Rust/npm/Tauri、包内标记和归档名称。只改 CI checkout，不自动提交版本文件。已有不同源码的 GitHub Release 标签或不同内容的同名附件拒绝覆盖。完整参数及下载步骤见[工作流手册](../docs/GitHub%20Actions工作流用途与运行手册.md)。
 
-本地需要变更程序版本时先运行 `node scripts/sync-version.mjs 0.1.2`，再使用现有构建入口。该脚本同步 Rust 主工作区、独立 OCR/Excel 工具及各自锁文件，不修改保留 C# 对照的构建属性，也不升级第三方依赖。
+本地优先在构建入口传入 `-Version`；也可提前运行 `node scripts/sync-version.mjs 1.2.3`，随后使用现有入口。同步范围包含 Rust 主工作区、独立 OCR/Excel 工具及各自锁文件；版本文件只保存产品版本，不再维护已退役的 .NET 程序集版本字段。
 
 运行已发布镜像：`./scripts/run-native-docker.ps1 -Image ghcr.io/<owner>/exportdoc-rust-native:0.1.2 -SkipBuild -NoPause`。后续启动、停止和恢复均使用同一 `-Image` 参数。`-SkipBuild` 使用已有/拉取的镜像；默认本地命令仍从源码构建。
 

@@ -9,6 +9,7 @@ import { verifyDesktopPayment } from './lib/native-payment-workflow.mjs';
 import { verifyDesktopDetailDesigner } from './lib/native-detail-designer.mjs';
 import { verifyDesktopListPagination } from './lib/native-list-pagination.mjs';
 import { verifyDesktopConditionalReports } from './lib/native-conditional-reports.mjs';
+import { verifyDesktopBlankGrid } from './lib/native-blank-grid-designer.mjs';
 
 assert.equal(process.platform, 'win32', 'This gate exercises Windows WebView2 packages.');
 const repo = path.resolve(import.meta.dirname, '..');
@@ -104,11 +105,21 @@ for (const edition of selected) {
     assert(!text.includes('当前页面不可用'), `${edition}: first login must not show a permission redirect warning`);
     assert(text.includes(catalog[edition].displayName), `${edition}: wrong product title`);
     await captureScreenshot(cdp, path.join(output, `${edition}.png`));
+    const health = await request('getHealth', login.body.accessToken);
+    assert.equal(health.status, 200);
+    assert.equal(health.body.productVersion, marker.version, 'the package label must match the running Rust binary');
+    await run("location.hash='#/system/about'; true");
+    const aboutDeadline = Date.now() + 15000;
+    while (Date.now() < aboutDeadline && !await run(`document.querySelector('.about-detail-grid')?.textContent.includes(${JSON.stringify(health.body.informationalVersion)})`)) await delay(100);
+    assert(await run(`document.querySelector('.about-detail-grid')?.textContent.includes(${JSON.stringify('v' + marker.version)})`));
+    assert(await run(`document.querySelector('.about-detail-grid')?.textContent.includes(${JSON.stringify(health.body.informationalVersion)})`));
+    await captureScreenshot(cdp, path.join(output, `${edition}-about.png`));
     if (edition === 'Full') {
       assert(text.includes('人事管理') && text.includes('行政办公') && text.includes('公司公告') && text.includes('站内通知'));
       await verifyDesktopListPagination({ run, request, token: login.body.accessToken, cdp, output });
       await verifyDesktopDetailDesigner({ run, request, token: login.body.accessToken, cdp, output });
       await verifyDesktopConditionalReports({ run, request, token: login.body.accessToken, cdp, output });
+      await verifyDesktopBlankGrid({ run, request, token: login.body.accessToken, businessDate: login.body.user.businessDate, cdp, output });
       await run("location.hash='#/office/announcements'; true");
       const pageDeadline = Date.now() + 15000;
       while (Date.now() < pageDeadline && !await run("!!document.querySelector('[aria-label=公司公告]')")) await delay(100);
@@ -155,7 +166,7 @@ for (const edition of selected) {
       assert(await run("!!document.querySelector('[data-v3-element-id]')"), 'Employee payment designer renders inside WebView2');
       await captureScreenshot(cdp, path.join(output, `${edition}-employee-designer.png`));
     } else { assert(!text.includes('人事管理') && !text.includes('行政办公') && !text.includes('账号与权限')); }
-    results.push({ edition, home: expectedHome, ocr: marker.ocr, documentResources: marker.documentResources, statuses, screenshot: `${edition}.png` });
+    results.push({ edition, home: expectedHome, version: health.body.productVersion, build: health.body.informationalVersion, ocr: marker.ocr, documentResources: marker.documentResources, statuses, screenshot: `${edition}.png` });
     await run("setTimeout(() => window.__TAURI_INTERNALS__.invoke('request_app_exit'), 100); true");
     const exitDeadline = Date.now() + 50000;
     while (child.exitCode === null && Date.now() < exitDeadline) await delay(100);

@@ -3,19 +3,23 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeReleaseVersion } from "./lib/release-version.mjs";
 
-export async function syncVersion(root, requestedVersion) {
+export async function syncVersion(root, requestedVersion, { check = false } = {}) {
   const changes = new Map();
-  const read = file => readFile(path.join(root, file), "utf8");
+  const originals = new Map();
+  const read = async file => {
+    if (!originals.has(file)) originals.set(file, await readFile(path.join(root, file), "utf8"));
+    return originals.get(file);
+  };
   const updateJson = async (file, mutate) => {
     const value = JSON.parse(await read(file));
+    const before = JSON.stringify(value);
     mutate(value);
-    changes.set(file, `${JSON.stringify(value, null, 2)}\n`);
+    if (JSON.stringify(value) !== before) changes.set(file, `${JSON.stringify(value, null, 2)}\n`);
   };
   const config = JSON.parse(await read("version.json"));
-  const version = normalizeReleaseVersion(requestedVersion || config.version);
+  const version = normalizeReleaseVersion(requestedVersion ?? config.version);
   await updateJson("version.json", value => {
     value.version = version;
-    value.assemblyVersion = value.fileVersion = `${version.split("-")[0]}.0`;
   });
   for (const directory of ["apps/export-doc-web", "apps/export-doc-tauri"]) {
     for (const file of ["package.json", "package-lock.json"]) {
@@ -53,8 +57,12 @@ export async function syncVersion(root, requestedVersion) {
   }
   changes.set("Cargo.lock", updateLock(rootLock, packageNames, version));
   // Validate every input before writing; missing or stale layouts fail before mutation.
-  for (const [file, content] of changes) {
-    if (await read(file) !== content) await writeFile(path.join(root, file), content, "utf8");
+  const pending = [...changes].filter(([file, content]) => originals.get(file) !== content);
+  if (check && pending.length) {
+    throw new Error(`Product version ${version} is out of sync: ${pending.map(([file]) => file).join(", ")}. Run node scripts/sync-version.mjs.`);
+  }
+  for (const [file, content] of pending) {
+    await writeFile(path.join(root, file), content, "utf8");
   }
   return version;
 }
@@ -80,5 +88,11 @@ function updateLock(text, names, version) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  console.log(`Synced Rust/React/Tauri version ${await syncVersion(root, process.argv[2])}.`);
+  const args = process.argv.slice(2);
+  const check = args.includes("--check");
+  const versions = args.filter(argument => argument !== "--check");
+  if (versions.length > 1 || versions.some(argument => argument.startsWith("--"))) {
+    throw new Error("Usage: node scripts/sync-version.mjs [version] [--check]");
+  }
+  console.log(`${check ? "Verified" : "Synced"} Rust/React/Tauri version ${await syncVersion(root, versions[0], { check })}.`);
 }

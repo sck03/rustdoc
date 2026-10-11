@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 import { normalizeReleaseVersion } from "./lib/release-version.mjs";
 import { createReleasePlan } from "./lib/native-release-plan.mjs";
 import { normalizeProductEdition, productEditionCatalog } from "./lib/product-editions.mjs";
-import { syncVersion } from "./sync-version.mjs";
+import { verifyProductVersionContracts } from "./lib/product-version-contracts.mjs";
 import { promoteContainerRelease } from "./lib/container-release.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -57,39 +57,7 @@ try {
     assert.throws(() => createReleasePlan({ ...base, ...selection }));
   }
 
-  // Exercise version synchronization without touching the working tree or resolving dependencies.
-  await write("version.json", '{"version":"0.1.1"}\n');
-  await write("Cargo.toml", '[workspace]\nmembers = ["crates/core", "apps/export-doc-tauri/src-tauri"]\n[workspace.package]\nversion = "0.1.0"\n');
-  await write("crates/core/Cargo.toml", '[package]\nname = "core"\nversion.workspace = true\n');
-  const localPackages = [
-    ["apps/export-doc-tauri/src-tauri", "export-doc-tauri"],
-    ["apps/exportdoc-ocr-rs", "exportdoc-ocr"],
-    ["tools/excel-analyzer-rs", "exportdoc-excel-analyzer"],
-  ];
-  const block = name => `[[package]]\nname = "${name}"\nversion = "0.1.1"\n`;
-  for (const [directory, name] of localPackages) {
-    await write(`${directory}/Cargo.toml`, `[package]\nname = "${name}"\nversion = "0.1.1"\n`);
-    if (name !== "export-doc-tauri") await write(`${directory}/Cargo.lock`, block(name));
-  }
-  const registry = '[[package]]\nname = "registry-crate"\nversion = "1.0.0"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\nchecksum = "keep-me"\n';
-  await write("Cargo.lock", block("core") + block("export-doc-tauri") + block("exportdoc-excel-analyzer") + registry);
-  for (const directory of ["apps/export-doc-web", "apps/export-doc-tauri"]) {
-    await write(`${directory}/package.json`, '{"version":"0.1.1"}');
-    await write(`${directory}/package-lock.json`, '{"version":"0.1.1","packages":{"":{"version":"0.1.1"}}}');
-  }
-  await write("apps/export-doc-tauri/src-tauri/tauri.conf.json", '{"version":"0.1.1"}');
-  await write("Directory.Build.props", "C# comparison must stay unchanged");
-  assert.equal(await syncVersion(temporary, "v2.3.4-beta.1"), "2.3.4-beta.1");
-  const lock = await readFile(path.join(temporary, "Cargo.lock"), "utf8");
-  assert.ok(lock.includes(registry), "third-party versions and checksums must stay exact");
-  assert.equal(lock.match(/version = "2.3.4-beta.1"/gu).length, 3);
-  assert.equal(await readFile(path.join(temporary, "Directory.Build.props"), "utf8"), "C# comparison must stay unchanged");
-  assert.equal(JSON.parse(await readFile(path.join(temporary, "apps/export-doc-web/package-lock.json"))).packages[""].version, "2.3.4-beta.1");
-  await syncVersion(temporary);
-  assert.equal(await readFile(path.join(temporary, "Cargo.lock"), "utf8"), lock, "idempotent sync");
-  await rm(path.join(temporary, "apps/exportdoc-ocr-rs/Cargo.lock"));
-  await assert.rejects(syncVersion(temporary, "3.0.0"));
-  assert.equal(JSON.parse(await readFile(path.join(temporary, "version.json"))).version, "2.3.4-beta.1", "validate all files before writing any version");
+  await verifyProductVersionContracts(root, temporary, write);
 
   await testPublication();
   await testPackageWorkflow();
@@ -125,6 +93,7 @@ async function testPackageWorkflow() {
     await assert.rejects(execute("pwsh", ["-NoProfile", "-File", path.join(temporary, "workflow.ps1")], { cwd: temporary, env, timeout: 30000 }), error => error.code === 23);
   }
   const dockerfile = await readFile(path.join(root, "deploy/rust-native/Dockerfile"), "utf8");
+  assert.match(dockerfile, /^ARG EXPORTDOCMANAGER_BUILD_REVISION=""$/mu, 'source archives can receive the build revision explicitly');
   const rustStage = dockerfile.split(" AS rust")[1].split("FROM postgres:")[0];
   for (const resource of ["singlewindow_reference_catalogs.json", "customs_coo_issuing_authorities.json", "customs_coo_issuing_authorities.address_overrides.json"]) {
     assert.match(rustStage, /^COPY Resources\/SingleWindow\/ Resources\/SingleWindow\/$/mu, `${resource} must be available when compiling Domain`);
