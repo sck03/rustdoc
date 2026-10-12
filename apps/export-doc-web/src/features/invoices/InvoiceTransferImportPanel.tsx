@@ -13,16 +13,18 @@ export function InvoiceTransferImportPanel({ draft, isBusy, uploadMode = false, 
   const hasConflict = Boolean(preview?.invoiceExists);
   return <section className="form-section" aria-label="导入发票单据包">
     <div className="section-header"><h2>导入单据包</h2><button className="icon-button" type="button" title="关闭导入" aria-label="关闭导入" disabled={isBusy} onClick={onCancel}><X size={17} aria-hidden="true" /></button></div>
+    <p className="field-help">先检查包内发票、商品条数和重复记录，再选择处理方式并导入。检查本身不会写入数据；票面预览请打开导入后的发票，进入“预览与导出”。</p>
     <form className="settings-form" onSubmit={onSubmit}>
       <div className="field-grid">{uploadMode ? <label><span>单据包文件</span><input type="file" accept=".edpkg" disabled={isBusy} onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; onUploadFileChange?.(file); }} /></label> : <label><span>单据包路径</span><input value={draft.packagePath} disabled={isBusy} onChange={(event) => onChange({ packagePath: event.target.value, previewResponse: null })} /></label>}</div>
-      {!uploadMode ? <div className="toolbar-actions"><button className="command-button secondary" type="button" disabled={isBusy} onClick={() => onPreview(draft.packagePath)}><FileArchive size={17} aria-hidden="true" /><span>{isBusy ? "处理中" : "预览"}</span></button></div> : <div className="field-help">{uploadFile ? `已选择：${uploadFile.name}` : "选择文件后自动预览。"}</div>}
-      {draft.previewResponse ? <><InlineNotice tone={draft.previewResponse.checksumValid ? "success" : "error"}>{draft.previewResponse.checksumMessage || (draft.previewResponse.checksumValid ? "校验通过" : "校验失败")}</InlineNotice>
+      {!uploadMode ? <div className="toolbar-actions"><button className="command-button secondary" type="button" disabled={isBusy} onClick={() => onPreview(draft.packagePath)}><FileArchive size={17} aria-hidden="true" /><span>{isBusy ? "处理中" : draft.previewResponse ? "重新检查单据包" : "检查单据包"}</span></button></div> : <div className="field-help">{uploadFile ? `已选择：${uploadFile.name}` : "选择文件后自动检查单据包。"}</div>}
+      {draft.previewResponse ? <><InlineNotice title="单据包检查结果" tone={draft.previewResponse.checksumValid ? "success" : "error"}>{draft.previewResponse.checksumMessage || (draft.previewResponse.checksumValid ? "校验通过" : "校验失败")}</InlineNotice>
         {!draft.previewResponse.checksumValid ? <div className="field-help">为保护业务数据，完整性校验失败的单据包不会被导入。请向发送方重新取得可信文件。</div> : null}
         {preview ? <div className="field-grid">
           <label><span>发票号</span><input value={preview.invoiceNo || "-"} disabled /></label><label><span>类型</span><input value={preview.type || "-"} disabled /></label>
           <label><span>商品条数</span><input value={preview.itemCount} disabled /></label><label><span>客户</span><input value={preview.customerExists ? "已存在" : "将新建/匹配"} disabled /></label>
           <label><span>出口商</span><input value={preview.exporterExists ? "已存在" : "将新建/匹配"} disabled /></label><label><span>同号同类型</span><input value={preview.invoiceExists ? (preview.invoiceMatches ? "完全相同" : "存在差异") : "不存在"} disabled /></label>
         </div> : null}</> : null}
+      {hasConflict && preview?.invoiceMatches && draft.conflictAction === "Skip" ? <InlineNotice tone="info">这份发票与当前记录完全相同；按“跳过”导入时不会重复新增，可关闭此面板并打开列表中的发票。</InlineNotice> : null}
       {hasConflict ? <div className="field-grid"><label><span>冲突处理</span><select value={draft.conflictAction} disabled={isBusy} onChange={(event) => onChange({ conflictAction: event.target.value as InvoiceTransferConflictAction })}>
         <option value="NewInvoiceNo">另存新发票号</option><option value="Overwrite">覆盖同号同类型</option><option value="AppendItems">追加商品明细</option><option value="Skip">跳过</option>
       </select></label>{draft.conflictAction === "NewInvoiceNo" ? <label><span>新发票号</span><input value={draft.newInvoiceNo} disabled={isBusy} onChange={(event) => onChange({ newInvoiceNo: event.target.value })} /></label> : null}</div> : null}

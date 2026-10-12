@@ -31,7 +31,6 @@ export function MasterDataRoute({ client }: { client: ExportDocManagerApiClient 
       canOperate={config.key === "hs-codes" ? permission.canManage : permission.canOperate}
       canManage={permission.canManage}
       canViewMasterData={masterDataPermission.canView}
-      canViewHsCodes={hsKnowledgePermission.canView}
     />
   );
 }

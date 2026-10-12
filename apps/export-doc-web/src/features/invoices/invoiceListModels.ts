@@ -27,7 +27,7 @@ export function normalizeRequiredPackagePath(packagePath: string) {
 
 export function validateInvoiceTransferImportDraft(draft: InvoiceTransferImportDraft) {
   if (!draft.packagePath.trim()) return "单据包路径不能为空。";
-  if (!draft.previewResponse) return "请先预览单据包。";
+  if (!draft.previewResponse) return "请先检查单据包。";
   if (!draft.previewResponse.checksumValid) return "单据包完整性校验失败，不能导入。请重新取得可信单据包。";
   return null;
 }

@@ -38,14 +38,12 @@ export function MasterDataListPage({
   canOperate,
   canManage,
   canViewMasterData,
-  canViewHsCodes,
 }: {
   client: ExportDocManagerApiClient;
   config: MasterDataEntityConfig;
   canOperate: boolean;
   canManage: boolean;
   canViewMasterData: boolean;
-  canViewHsCodes: boolean;
 }) {
   const listViewStateStorageKey = useMemo(() => buildMasterDataListViewStateStorageKey(config.key), [config.key]);
   const [initialListViewState] = useState(() => loadListViewState(listViewStateStorageKey));
@@ -238,7 +236,7 @@ export function MasterDataListPage({
   return (
     <section className="work-surface master-data-surface" aria-label={config.listLabel}>
       {config.key === "hs-codes" ? <HsKnowledgeNavigation activeSection="catalog" canManage={canManage} />
-        : <MasterDataTabs activeKey={config.key} canViewMasterData={canViewMasterData} canViewHsCodes={canViewHsCodes} />}
+        : <MasterDataTabs activeKey={config.key} canViewMasterData={canViewMasterData} />}
       {!canOperate ? (
         <PermissionNotice>
           当前权限模板仅允许查看主数据；新建、导入、联网保存和修改已禁用，删除需要管理权限。
@@ -346,11 +344,9 @@ export function MasterDataListPage({
 function MasterDataTabs({
   activeKey,
   canViewMasterData,
-  canViewHsCodes,
 }: {
   activeKey: MasterDataEntityKey;
   canViewMasterData: boolean;
-  canViewHsCodes: boolean;
 }) {
   const visibleConfigs = masterDataConfigs.filter((item) =>
     item.key !== "hs-codes" && canViewMasterData);
@@ -365,7 +361,6 @@ function MasterDataTabs({
           {item.label}
         </Link>
       ))}
-      {canViewHsCodes && <Link className="master-data-shortcut" to="/master-data/hs-codes">HS 税则目录 ↗</Link>}
     </nav>
   );
 }

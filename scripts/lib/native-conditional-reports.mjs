@@ -89,4 +89,5 @@ export async function verifyDesktopConditionalReports({ run, request, token, cdp
   await wait("document.querySelector('.workspace-header h1')?.textContent==='邮件中心'");
   assert.equal(await run("document.querySelector('[data-nav-group=workspace]').getAttribute('aria-expanded')"), 'true');
   await captureScreenshot(cdp, path.join(output, 'Full-email-workspace.png'));
+  return { id: invoiceId, invoiceNo: draft.invoiceNo, type: draft.type };
 }

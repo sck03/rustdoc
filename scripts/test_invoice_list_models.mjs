@@ -22,7 +22,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 assert(m.buildDefaultCopyInvoiceNo(" INV-1 ") === "INV-1副本", "copy number");
 assert(m.validateInvoiceCopyDraft({ newInvoiceNo: " " }) === "新发票号不能为空。", "copy validation");
 assert(m.normalizeRequiredPackagePath(" a.edpkg ").value === "a.edpkg", "path trim");
-assert(m.validateInvoiceTransferImportDraft({ packagePath: "a", previewResponse: null }) === "请先预览单据包。", "preview validation");
+assert(m.validateInvoiceTransferImportDraft({ packagePath: "a", previewResponse: null }) === "请先检查单据包。", "preview validation");
 assert(m.formatReviewSeverity("Error") === "错误" && m.formatReviewSeverityKey("Warning") === "warning", "severity");
 assert(m.formatSingleWindowBusinessType("CustomsCoo") === "COO", "business type");
 const previewResponse = { preview: { invoiceExists: true, invoiceMatches: false, invoiceNo: " INV-2 " } };

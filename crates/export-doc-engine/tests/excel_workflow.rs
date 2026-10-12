@@ -62,6 +62,40 @@ fn excel_preview_export_backup_and_restore_keep_one_authoritative_database() {
     assert_eq!(preview["invoice"]["invoiceNo"], invoice.invoice_no);
     let invoices: Value = client.json(LIST_INVOICES, &[], &[], None).unwrap();
     assert_eq!(invoices["totalCount"], 1, "preview must not insert records");
+    let booking_path = root.join("发票托单.xlsx");
+    for id in [Value::Null, json!(0), json!(-1)] {
+        let error = client
+            .json::<Value>(
+                START_INVOICE_BOOKING_SHEET_SAVE_TO_PATH_JOB,
+                &[],
+                &[],
+                Some(json!({"invoiceId": id, "destinationPath": booking_path})),
+            )
+            .unwrap_err();
+        assert_eq!(error.status, Some(400));
+        assert!(!booking_path.exists());
+    }
+    let saved: BackgroundJobSnapshot = client
+        .json(
+            START_INVOICE_BOOKING_SHEET_SAVE_TO_PATH_JOB,
+            &[],
+            &[],
+            Some(json!({"invoiceId": invoice.id, "destinationPath": booking_path})),
+        )
+        .unwrap();
+    jobs::wait_for_completion(&client, saved, &AtomicBool::new(false)).unwrap();
+    let saved_preview = client
+        .upload(
+            PREVIEW_UPLOADED_EXCEL_IMPORT,
+            &[],
+            json!({}),
+            "发票托单.xlsx",
+            &fs::read(&booking_path).unwrap(),
+        )
+        .unwrap();
+    assert_eq!(saved_preview["invoice"], preview["invoice"]);
+    let after_preview: Value = client.json(LIST_INVOICES, &[], &[], None).unwrap();
+    assert_eq!(after_preview["totalCount"], 1);
     assert_eq!(
         client
             .upload(

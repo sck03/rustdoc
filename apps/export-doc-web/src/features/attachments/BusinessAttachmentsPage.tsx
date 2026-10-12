@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Plus, RefreshCw, Search } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
@@ -11,6 +11,7 @@ import { BusinessAttachmentUploadForm } from "./BusinessAttachmentUploadForm.tsx
 import { BusinessAttachmentDetails } from "./BusinessAttachmentDetails.tsx";
 import { BusinessAttachmentPreview } from "./BusinessAttachmentPreview.tsx";
 import { BusinessAttachmentCategoryManager } from "./BusinessAttachmentCategoryManager.tsx";
+import { InvoicePicker } from "../invoices/InvoicePicker.tsx";
 import "../../styles/routes/business-records.css";
 
 export function BusinessAttachmentsPage({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {
@@ -21,6 +22,7 @@ export function BusinessAttachmentsPage({ client, user }: { client: ExportDocMan
 }
 
 function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: ExportDocManagerApiClient; user: ApiUserDto; invoiceId?: number }) {
+  const navigate = useNavigate();
   const model = useBusinessAttachments(client, invoiceId, user.id);
   const { uploadMode, preview } = model;
   const [managingCategories, setManagingCategories] = useState(false);
@@ -34,7 +36,7 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
   const uploadInvoiceId = uploadMode === "new" ? invoiceId : uploadAttachment?.invoiceId;
   return <section className="work-surface business-records" aria-label="业务资料归档">
     <header className="business-records-heading"><div><h2>{invoiceId ? `${model.invoice.data?.invoiceNo ?? "单据"} · 业务资料` : "业务资料归档"}</h2>
-      <p>保留客户原始资料、确认文件和实际交付文件，新版本不会覆盖旧文件。</p></div>
+      <p>上传客户原始文件、确认稿和实际交付文件，并关联对应发票。历史版本完整保留。</p></div>
       <div className="business-records-actions">{invoiceId && <Link className="command-button secondary" to={`/invoices/${invoiceId}`}>返回单据</Link>}
         {catalog?.canManage && <button type="button" className="command-button secondary" disabled={model.busy || editorOpen} onClick={() => setManagingCategories(true)}>管理分类</button>}
         {data?.canUpload && <button type="button" className="command-button" disabled={model.busy || editorOpen || !catalog} onClick={() => model.setUploadMode("new")}><Plus size={16} aria-hidden="true" />上传资料</button>}</div></header>
@@ -44,9 +46,15 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
     {model.categories.isError && <InlineNotice tone="error" title="分类加载失败" action={<button className="command-button secondary" type="button" onClick={() => void model.categories.refetch()}>重新加载分类</button>}>{readApiError(model.categories.error)}</InlineNotice>}
     {managingCategories && catalog?.canManage && <BusinessAttachmentCategoryManager items={categories} busy={model.busy}
       onSave={model.saveCategory} onDelete={model.removeCategory} onClose={() => setManagingCategories(false)} />}
-    {uploadMode && data && uploadInvoiceId !== undefined && <BusinessAttachmentUploadForm key={uploadMode}
-      invoiceId={uploadInvoiceId} attachment={uploadAttachment} categories={categories} maximumBytes={data.fileBytesLimit} busy={model.busy}
-      onUpload={model.upload} onClose={() => model.setUploadMode(null)} />}
+    {uploadMode === "new" && invoiceId === undefined ? <InvoicePicker client={client} userId={user.id}
+      onSelect={id => navigate(`/invoices/${id}/attachments?upload=new`)} onClose={() => model.setUploadMode(null)} /> : uploadMode ?
+      !data || !catalog || uploadInvoiceId === undefined ? <PageState tone={model.query.isError || model.categories.isError ? "error" : "loading"}
+        title="正在准备资料上传" description="需要先取得关联发票的权限和资料分类。"
+        action={<button className="command-button secondary" type="button" onClick={() => model.setUploadMode(null)}>取消上传</button>} /> :
+        !data.canUpload ? <PageState tone="permission" title="不能上传到这张发票" description="当前账号没有本单的资料上传权限。"
+          action={<button className="command-button secondary" type="button" onClick={() => model.setUploadMode(null)}>关闭上传</button>} /> :
+          <BusinessAttachmentUploadForm key={uploadMode} invoiceId={uploadInvoiceId} attachment={uploadAttachment} categories={categories}
+            maximumBytes={data.fileBytesLimit} busy={model.busy} onUpload={model.upload} onClose={() => model.setUploadMode(null)} /> : null}
     <div className="business-records-content" hidden={model.selectedId !== null}>
     <form className="toolbar business-records-toolbar" role="search" onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
       <div className="search-form"><Search size={17} aria-hidden="true" />
@@ -59,7 +67,7 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
     </form>
     {model.query.isPending ? <PageState tone="loading" title="正在读取业务资料" /> : model.query.isError ?
       <PageState tone="error" title="资料加载失败" description={readApiError(model.query.error)} /> : <>
-        {!data?.page.items.length ? <PageState title="没有符合条件的业务资料" description={invoiceId ? "可从本单上传客户资料或实际交付文件。" : "请打开对应发票，从“业务资料”入口上传。"} /> :
+        {!data?.page.items.length ? <PageState title="没有符合条件的业务资料" description={invoiceId ? "可从本单上传客户资料或实际交付文件。" : "这里汇总已上传的附件，不会自动列出发票记录。点击“上传资料”，选择关联发票后归档文件。"} /> :
         <ul className="business-records-list">{data.page.items.map((item) => <li key={item.id} className="business-records-card">
           <div><span className="business-records-muted">{item.invoiceNo} · {item.invoiceType} · {item.categoryName}</span>
             <h3>{item.title}</h3><p>{item.customerName}{item.poNumber ? ` · PO ${item.poNumber}` : ""}{item.styleNo ? ` · 款号 ${item.styleNo}` : ""}</p>

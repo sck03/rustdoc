@@ -8,6 +8,7 @@ import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
 import { attachPdfViewerSession } from "./lib/pdf-viewer-page-capture.mjs";
 import { verifyAttachmentManagementUi } from "./lib/business-attachment-management-ui-scenarios.mjs";
+import { verifyGlobalAttachmentUploadUi } from "./lib/business-attachment-upload-ui-scenarios.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -41,6 +42,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   import ${source("styles/workspaces.css")}; import ${source("styles/responsive.css")};
   const params=new URLSearchParams(location.search), mode=params.get('mode')||'attachments';
   const readonly=params.get('role')==='reader';
+  const globalAttachments=mode==='attachments-global';
   window.__calls=[]; window.__errors=[]; window.__createdUrls=[]; window.__revokedUrls=[];
   addEventListener('error',event=>window.__errors.push(event.message));
   addEventListener('unhandledrejection',event=>window.__errors.push(String(event.reason)));
@@ -50,7 +52,8 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   const user={id:7,username:'user',fullName:'示例用户',companyScope:'C1',businessTimeZone:'Asia/Shanghai',businessDate:'2026-09-08',capabilities:{}};
   let categories=[{id:1,name:'确认资料',versionNumber:1,attachmentCount:1},{id:2,name:'产品图纸',versionNumber:1,attachmentCount:0}];
   let attachment={id:11,invoiceId:1,invoiceNo:'INV-2026-091',invoiceType:'实际数据',customerName:'SAMPLE CUSTOMER',title:'客户确认图纸',categoryId:1,categoryName:'确认资料',poNumber:'PO-2026',styleNo:'NEW-STYLE',latestRevision:2,currentRevision:1,isArchived:false,versionNumber:2,updatedAt:'2026-09-08T04:00:00Z',canEdit:!readonly,canDelete:!readonly};
-  let deleted=false; window.__metadataConflict=false;
+  let deleted=globalAttachments; window.__metadataConflict=false;
+  const invoices=[{id:1,type:'报关数据'},{id:2,type:'实际数据'}].map(item=>({...item,invoiceNo:attachment.invoiceNo,customerName:attachment.customerName,invoiceDate:'2026-09-08'}));
   let versions=[2,1].map(revision=>({revision,fileName:'客户图纸-v'+revision+'.png',contentType:'image/png',length:2048,sha256:'0'.repeat(64),uploadedBy:'示例用户',note:revision===2?'修改领口与包装要求':'客户原始确认',createdAt:'2026-09-08T04:00:00Z'}));
   if(mode==='pdf') versions[0]={...versions[0],fileName:'正式文件.pdf',contentType:'application/pdf'};
   let events=[];
@@ -61,13 +64,15 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
     createBusinessAttachmentCategory:input=>{const item={id:Math.max(...categories.map(item=>item.id))+1,name:input.body.name,versionNumber:1,attachmentCount:0};categories.push(item);return record('createCategory',input,{...item});},
     updateBusinessAttachmentCategory:input=>{const item=categories.find(item=>item.id===input.id);Object.assign(item,{name:input.body.name,versionNumber:item.versionNumber+1});if(attachment.categoryId===item.id)attachment.categoryName=item.name;return record('updateCategory',input,{...item});},
     deleteBusinessAttachmentCategory:input=>{categories=categories.filter(item=>item.id!==input.id);return record('deleteCategory',input,{success:true});},
-    getInvoice:async()=>({...createEmptyInvoice('2026-09-08'),id:1,invoiceNo:attachment.invoiceNo}),
-    listBusinessAttachments:input=>record('listAttachments',input,{page:page(!deleted&&(!attachment.isArchived||input.includeArchived)?[{...attachment}]:[],input),canUpload:!readonly,usedBytes:deleted?0:4096,fileBytesLimit:16777216,invoiceBytesLimit:268435456}),
+    getInvoice:async input=>({...createEmptyInvoice('2026-09-08'),...invoices.find(item=>item.id===input.id)}),
+    listInvoices:input=>record('listInvoices',input,page(invoices.filter(item=>!input.keyword||item.invoiceNo.includes(input.keyword)),input)),
+    listBusinessAttachments:input=>record('listAttachments',input,{page:page(!deleted&&(!input.invoiceId||input.invoiceId===attachment.invoiceId)&&(!attachment.isArchived||input.includeArchived)?[{...attachment}]:[],input),canUpload:!readonly&&!(params.get('role')==='limited'&&input.invoiceId===1),usedBytes:deleted?0:4096,fileBytesLimit:16777216,invoiceBytesLimit:268435456}),
     getBusinessAttachment:input=>record('getAttachment',input,{attachment:{...attachment},revisions:[...versions],events:[...events],eventCount:events.length}),
     uploadBusinessAttachment:async input=>{
       const fields=Object.fromEntries(input.body.entries()); window.__calls.push({name:'upload',input:{invoiceId:input.invoiceId,fields:{...fields,file:fields.file.name}}});
+      if(deleted){deleted=false;versions=[];attachment={...attachment,invoiceId:input.invoiceId,invoiceType:invoices.find(item=>item.id===input.invoiceId).type,title:fields.title,categoryId:Number(fields.categoryId),latestRevision:0,currentRevision:null,versionNumber:0};}
       attachment={...attachment,latestRevision:attachment.latestRevision+1,versionNumber:attachment.versionNumber+1};
-      versions=[{...versions[0],revision:attachment.latestRevision,fileName:fields.file.name,note:fields.note},...versions];return {...attachment};
+      versions=[{...versions[0],revision:attachment.latestRevision,fileName:fields.file.name,contentType:fields.file.type,length:fields.file.size,uploadedBy:'示例用户',createdAt:'2026-09-08T04:00:00Z',note:fields.note},...versions];return {...attachment};
     },
     updateBusinessAttachment:input=>{attachment={...attachment,...input.body,versionNumber:attachment.versionNumber+1};events.unshift({action:input.body.isArchived?'Archive':'Confirm',revision:input.body.currentRevision,actorName:'示例用户',note:input.body.note,createdAt:'2026-09-08T05:00:00Z'});return record('updateAttachment',input,{...attachment});},
     editBusinessAttachmentMetadata:input=>{if(window.__metadataConflict)return Promise.reject(new Error('资料已更新，请刷新后重试。'));attachment={...attachment,...input.body,categoryName:categories.find(item=>item.id===input.body.categoryId).name,versionNumber:attachment.versionNumber+1};events.unshift({action:'Edit',revision:attachment.currentRevision,actorName:'示例用户',note:input.body.note,createdAt:'2026-09-08T05:00:00Z'});return record('editMetadata',input,{...attachment});},
@@ -84,11 +89,12 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
     }
   };
   function Destination(){const current=useLocation();window.__destination=current.pathname+current.search;return <p>原业务处理页面</p>;}
-  function Navigation(){window.__navigate=useNavigate();return null;}
-  const entry=mode==='worklist'||mode==='failure'?'/worklist':mode==='review'?'/review':'/invoices/1/attachments';
+  function Navigation(){const current=useLocation();window.__route=current.pathname+current.search;window.__navigate=useNavigate();return null;}
+  const entry=mode==='worklist'||mode==='failure'?'/worklist':mode==='review'?'/review':globalAttachments?'/business-attachments':'/invoices/1/attachments';
   createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[entry]}><QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}})}>
     <ConfirmationProvider><UnsavedChangesProvider><Navigation/><main className='workspace-content'><h1>业务功能验收</h1><Routes>
       <Route path='/invoices/:invoiceId/attachments' element={<BusinessAttachmentsPage client={client} user={user}/>}/>
+      <Route path='/business-attachments' element={<BusinessAttachmentsPage client={client} user={user}/>}/>
       <Route path='/worklist' element={<WorklistPage client={client} user={user}/>}/>
       <Route path='/review' element={<InvoiceReviewPanel client={client} invoice={createEmptyInvoice('2026-09-08')} disabled={false} hasUnsavedChanges={true}/>}/>
       <Route path='*' element={<Destination/>}/>
@@ -187,6 +193,7 @@ try {
     results.push("native-pdf-preview-one-page");
   }
   await verifyAttachmentManagementUi({page,open,read,waitFor,click,input,audit,results});
+  await verifyGlobalAttachmentUploadUi({page,open,read,waitFor,click,input,audit,results});
   for (const outcome of ['success', 'failure']) {
     await open('attachments'); await click(page, '查看版本'); await waitFor(page, "document.querySelector('.attachment-detail')");
     await read(page, 'window.__delayPreview=true'); await click(page, '预览');

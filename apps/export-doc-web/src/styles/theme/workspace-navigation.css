@@ -84,12 +84,6 @@
   font-weight: 600;
 }
 
-.master-data-shortcut {
-  align-self: center;
-  margin-inline-start: auto;
-  padding: 10px;
-}
-
 .template-directory-search {
   display: grid;
   gap: 6px;

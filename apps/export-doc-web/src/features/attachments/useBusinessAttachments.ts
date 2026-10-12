@@ -20,7 +20,11 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
   const setIncludeArchived = (value: boolean) => updateRoute({ archived: value, page: null });
   const selectedId = readRouteId(params.get("attachmentId"));
   const setSelectedId = (id: number | null) => updateRoute({ attachmentId: id }, false);
-  const [uploadMode, setUploadMode] = useState<"new" | "revision" | null>(null);
+  const [uploadMode, setUploadModeState] = useState<"new" | "revision" | null>(() => invoiceId !== undefined && params.get("upload") === "new" ? "new" : null);
+  function setUploadMode(mode: "new" | "revision" | null) {
+    setUploadModeState(mode);
+    if (mode === null && params.has("upload")) updateRoute({ upload: null });
+  }
   const [preview, setPreview] = useState<{ id: number; blob: Blob; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

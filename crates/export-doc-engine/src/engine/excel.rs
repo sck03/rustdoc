@@ -186,7 +186,11 @@ pub fn handle(
     ]
     .contains(&operation)
     {
-        let id = super::records::id(parameters)?;
+        let id = if operation == START_INVOICE_BOOKING_SHEET_SAVE_TO_PATH_JOB {
+            super::records::positive(body, "invoiceId", "发票编号")?
+        } else {
+            super::records::id(parameters)?
+        };
         let value = service.store.get("invoices", id)?;
         if !auth::visible(actor, "document.invoices", "view", &value) {
             return Err(error(403, "没有读取发票的权限。"));
@@ -196,7 +200,7 @@ pub fn handle(
         None
     };
     let mut exporter_name = text(&settings["system"], "defaultTemplateExporterNameCn");
-    if exporter_name.trim().is_empty() {
+    if invoice.is_none() && exporter_name.trim().is_empty() {
         let mut names: Vec<_> = service
             .store
             .all("exporters")?

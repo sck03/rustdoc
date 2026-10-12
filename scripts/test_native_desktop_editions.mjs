@@ -10,6 +10,8 @@ import { verifyDesktopDetailDesigner } from './lib/native-detail-designer.mjs';
 import { verifyDesktopListPagination } from './lib/native-list-pagination.mjs';
 import { verifyDesktopConditionalReports } from './lib/native-conditional-reports.mjs';
 import { verifyDesktopBlankGrid } from './lib/native-blank-grid-designer.mjs';
+import { verifyDesktopBookingExport } from './lib/native-booking-export.mjs';
+import { verifyDesktopBusinessAttachments } from './lib/native-business-attachments.mjs';
 
 assert.equal(process.platform, 'win32', 'This gate exercises Windows WebView2 packages.');
 const repo = path.resolve(import.meta.dirname, '..');
@@ -120,7 +122,9 @@ for (const edition of selected) {
       assert(text.includes('人事管理') && text.includes('行政办公') && text.includes('公司公告') && text.includes('站内通知'));
       await verifyDesktopListPagination({ run, request, token: login.body.accessToken, cdp, output });
       await verifyDesktopDetailDesigner({ run, request, token: login.body.accessToken, cdp, output });
-      await verifyDesktopConditionalReports({ run, request, token: login.body.accessToken, cdp, output });
+      const invoice = await verifyDesktopConditionalReports({ run, request, token: login.body.accessToken, cdp, output });
+      await verifyDesktopBookingExport({ run, request, token: login.body.accessToken, invoice, cdp, output });
+      await verifyDesktopBusinessAttachments({ run, request, token: login.body.accessToken, invoice, cdp, output });
       await verifyDesktopBlankGrid({ run, request, token: login.body.accessToken, businessDate: login.body.user.businessDate, cdp, output });
       await run("location.hash='#/office/announcements'; true");
       const pageDeadline = Date.now() + 15000;
