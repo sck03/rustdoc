@@ -54,7 +54,7 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
         !data.canUpload ? <PageState tone="permission" title="不能上传到这张发票" description="当前账号没有本单的资料上传权限。"
           action={<button className="command-button secondary" type="button" onClick={() => model.setUploadMode(null)}>关闭上传</button>} /> :
           <BusinessAttachmentUploadForm key={uploadMode} invoiceId={uploadInvoiceId} attachment={uploadAttachment} categories={categories}
-            maximumBytes={data.fileBytesLimit} busy={model.busy} onUpload={model.upload} onClose={() => model.setUploadMode(null)} /> : null}
+            maximumBytes={data.fileBytesLimit} remainingBytes={Math.max(0, data.invoiceBytesLimit - (data.usedBytes ?? 0))} busy={model.busy} onUpload={model.upload} onSave={model.saveUploads} onClose={() => model.setUploadMode(null)} /> : null}
     <div className="business-records-content" hidden={model.selectedId !== null}>
     <form className="toolbar business-records-toolbar" role="search" onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
       <div className="search-form"><Search size={17} aria-hidden="true" />

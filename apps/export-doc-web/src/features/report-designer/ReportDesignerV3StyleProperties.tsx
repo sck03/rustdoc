@@ -32,7 +32,7 @@ export function ElementStyleEditor({ element, pageFontSizePt, editable, onPatch 
         onPatch({ fontFamily: face?.fontFamily, bold: face?.bold });
       }} />
       <strong>文字</strong><div className="report-designer-v3-inspector-grid">
-        <NumberField label="字号 pt" value={style.fontSizePt ?? pageFontSizePt} min={6} max={96} disabled={!editable} onCommit={(fontSizePt) => onPatch({ fontSizePt })} />
+        <NumberField label="字号 pt" value={style.fontSizePt ?? pageFontSizePt} min={5} max={48} disabled={!editable} onCommit={(fontSizePt) => onPatch({ fontSizePt })} />
         <SelectField label="对齐" value={style.align ?? "Left"} options={[{ value: "Left", label: "左" }, { value: "Center", label: "中" }, { value: "Right", label: "右" }]} disabled={!editable} onChange={(align) => onPatch({ align: align as "Left" | "Center" | "Right" })} />
         <SelectField label="垂直对齐" value={style.verticalAlign ?? "Top"} options={[{ value: "Top", label: "顶部" }, { value: "Middle", label: "居中" }, { value: "Bottom", label: "底部" }]} disabled={!editable} onChange={verticalAlign => onPatch({ verticalAlign: verticalAlign as "Top" | "Middle" | "Bottom" })} />
       </div>

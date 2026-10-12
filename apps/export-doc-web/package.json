@@ -20,6 +20,7 @@
     "test:business-features-ui": "node ../../scripts/test_business_features_ui.mjs",
     "test:payment-printing-ui": "node ../../scripts/test_payment_printing_ui.mjs",
     "test:invoice-report-ui": "node ../../scripts/test_invoice_report_ui.mjs",
+    "test:batch-file-ui": "node ../../scripts/test_batch_file_workflows_ui.mjs",
     "test:print-preview-document": "node ../../scripts/test_print_report_preview_document.mjs",
     "test:invoice-list-models": "node ../../scripts/test_invoice_list_models.mjs",
     "test:list-pagination-ui": "node ../../scripts/test_list_pagination_ui.mjs",

@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useMemo, useRef, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { memo, useLayoutEffect, useMemo, useRef, type CSSProperties } from "react";
 import type { ReportBlock } from "./reportDesignerSchema.ts";
 import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
@@ -9,8 +9,41 @@ import type { ReportDesignerV3ResizeDirection } from "./reportDesignerV3Mutation
 import {
   hundredthMmToMm,
   REPORT_DESIGNER_V3_DEFAULT_TEXT_COLOR,
+  reportDesignerV3ElementText,
   type ReportDesignerV3Element,
 } from "./reportDesignerV3Schema.ts";
+
+/** Events are delegated by the canvas; unchanged nodes can skip React work. */
+export const ReportDesignerCanvasElementNode = memo(function ReportDesignerCanvasElementNode({
+  element, client, selected, singleSelection, disabled, layerLocked, selectedGridCellId,
+}: {
+  element: ReportDesignerV3Element;
+  client?: ExportDocManagerApiClient;
+  selected: boolean;
+  singleSelection: boolean;
+  disabled: boolean;
+  layerLocked: boolean;
+  selectedGridCellId?: string;
+}) {
+  const locked = element.locked || layerLocked;
+  const text = reportDesignerV3ElementText(element);
+  return <div
+    className={`report-designer-v3-element report-designer-v3-element-${element.type.toLowerCase()}${element.type === "Field" && element.fieldPath.startsWith("item.") ? " is-product-field" : ""}${selected ? " is-selected" : ""}${locked ? " is-locked" : ""}`}
+    style={{ ...reportDesignerCanvasElementStyle(element), ...(selected ? { zIndex: 100005 } : {}) }}
+    data-v3-element-id={element.id}
+    title={`${text}${element.locked ? "（已锁定）" : ""}`}
+    role={disabled ? "img" : "group"}
+    aria-roledescription={disabled ? undefined : "可移动画布组件"}
+    tabIndex={disabled ? -1 : 0}
+    aria-current={!disabled && selected ? "true" : undefined}
+    aria-disabled={!disabled && locked || undefined}
+    aria-label={`${text}${element.locked ? "，已锁定" : ""}`}
+  >
+    <ReportDesignerCanvasElementPreview element={element} client={client} selectedGridCellId={selectedGridCellId} />
+    {!disabled && selected && singleSelection && !locked ? <ReportDesignerCanvasResizeHandles /> : null}
+    {selected && locked ? <span className="report-designer-v3-lock-badge">锁</span> : null}
+  </div>;
+});
 
 export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCanvasElementPreview({ element, selectedGridCellId, client }: {
   element: ReportDesignerV3Element;
@@ -67,15 +100,7 @@ function FlowPreview({ block, heightMm, selectedCellId }: { block: ReportBlock; 
   return <div ref={ref} className="report-designer-v3-preview-flow-content" dangerouslySetInnerHTML={html} />;
 }
 
-export function ReportDesignerCanvasResizeHandles({
-  elementId,
-  onPointerDown,
-  onKeyDown,
-}: {
-  elementId: string;
-  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>, elementId: string, direction: ReportDesignerV3ResizeDirection) => void;
-  onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>, elementId: string, direction: ReportDesignerV3ResizeDirection) => void;
-}) {
+function ReportDesignerCanvasResizeHandles() {
   const directions: ReportDesignerV3ResizeDirection[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
   return (
     <>
@@ -86,8 +111,7 @@ export function ReportDesignerCanvasResizeHandles({
           type="button"
           aria-label={`调整${({ nw: "左上角", n: "上边", ne: "右上角", e: "右边", se: "右下角", s: "下边", sw: "左下角", w: "左边" })[direction]}尺寸`}
           title="拖动调整尺寸，也可使用方向键；Shift 加大步长"
-          onPointerDown={(event) => onPointerDown(event, elementId, direction)}
-          onKeyDown={(event) => onKeyDown(event, elementId, direction)}
+          data-v3-resize-direction={direction}
         />
       ))}
     </>

@@ -39,14 +39,7 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
     if !["Noto Sans CJK SC", "Noto Serif CJK SC"].contains(&page.font_family.as_str()) {
         return Err("模板只能使用随包 Noto Sans CJK SC 或 Noto Serif CJK SC 字体。".into());
     }
-    if page.size != "A4"
-        || !matches!(
-            (page.width_hundredth_mm, page.height_hundredth_mm),
-            (21000, 29700) | (29700, 21000)
-        )
-    {
-        return Err("验证版只支持 A4 纸张。".into());
-    }
+    crate::designer::page::validate(page)?;
     let mut detail_count = 0;
     let mut ids = std::collections::BTreeSet::new();
     let mut block_ids = std::collections::BTreeSet::new();

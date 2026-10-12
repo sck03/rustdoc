@@ -1,4 +1,5 @@
 import type { ReportBlock } from "./reportDesignerSchema.ts";
+import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { isShippingMarksField } from "./reportDesignerFieldRendering.ts";
 import {
   type ReportDesignerV3Element,
@@ -60,10 +61,7 @@ export function createV3FlowElement(
 }
 
 export function createV3ElementId(prefix: string) {
-  const uuid = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID().replace(/-/g, "")
-    : `${Date.now()}${Math.random().toString(16).slice(2)}`;
-  return `v3-${prefix}-${uuid.slice(0, 20)}`;
+  return `v3-${prefix}-${createRequestKey()}`;
 }
 
 function createBase<T extends ReportDesignerV3Element["type"]>(

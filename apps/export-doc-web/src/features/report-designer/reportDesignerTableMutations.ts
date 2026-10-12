@@ -259,8 +259,9 @@ export function resizeAdjacentWidths<T extends { id: string } & Record<TKey, num
     return columns;
   }
 
-  const nextLeftWidth = roundDesignerWidth(clamp(leftWidth + delta, minWidth, pairTotal - minWidth));
-  const nextRightWidth = roundDesignerWidth(pairTotal - nextLeftWidth);
+  const requested = clamp(leftWidth + delta, minWidth, pairTotal - minWidth);
+  const nextLeftWidth = widthKey === "widthPercent" ? requested : roundDesignerWidth(requested);
+  const nextRightWidth = widthKey === "widthPercent" ? pairTotal - nextLeftWidth : roundDesignerWidth(pairTotal - nextLeftWidth);
   if (nextLeftWidth === leftColumn[widthKey] && nextRightWidth === rightColumn[widthKey]) return columns;
 
   return columns.map((column, index) => {

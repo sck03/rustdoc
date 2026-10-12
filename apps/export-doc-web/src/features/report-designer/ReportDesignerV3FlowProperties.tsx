@@ -20,18 +20,20 @@ export function ReportDesignerV3FlowProperties({
   selectedGridCellId,
   onSelectGridCell,
   onCommit,
+  widthMm,
 }: {
   block: EditableFlowBlock;
   fieldGroups: ReportDesignerFieldGroup[];
   selectedGridCellId?: string;
   onSelectGridCell: (cellId: string) => void;
   onCommit: (block: EditableFlowBlock) => void;
+  widthMm: number;
 }) {
   switch (block.type) {
     case "Row":
       return <RowBlockProperties block={block} fieldGroups={fieldGroups} onCommit={asFlowCommit(onCommit, "Row")} />;
     case "Grid":
-      return <GridBlockProperties block={block} fieldGroups={fieldGroups} selectedCellId={selectedGridCellId} onSelectCell={onSelectGridCell} onCommit={asFlowCommit(onCommit, "Grid")} />;
+      return <GridBlockProperties block={block} widthMm={widthMm} fieldGroups={fieldGroups} selectedCellId={selectedGridCellId} onSelectCell={onSelectGridCell} onCommit={asFlowCommit(onCommit, "Grid")} />;
     case "Conditional":
       return <ConditionalBlockProperties block={block} fieldGroups={fieldGroups} onCommit={asFlowCommit(onCommit, "Conditional")} />;
     case "DetailTable":

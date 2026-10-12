@@ -12,25 +12,27 @@ export function InspectorTitle({ title, subtitle }: { title: string; subtitle: s
   return <div className="report-designer-v3-inspector-title"><strong>{title}</strong><span>{subtitle}</span></div>;
 }
 
-export function NumberField({ label, value, onCommit, min = 0, max = 1000, step = 0.01, disabled = false }: { label: string; value: number; onCommit: (value: number) => void; min?: number; max?: number; step?: number; disabled?: boolean }) {
-  const [draft, setDraft] = useState(formatNumber(value));
+export function NumberField({ label, value, onCommit, min = 0, max = 1000, step = 0.01, precision = 2, disabled = false }: { label: string; value: number; onCommit: (value: number) => void; min?: number; max?: number; step?: number; precision?: number; disabled?: boolean }) {
+  const formatted = formatNumber(value, precision);
+  const [draft, setDraft] = useState(formatted);
   const [focused, setFocused] = useState(false);
   const cancelOnBlur = useRef(false);
-  useEffect(() => setDraft(formatNumber(value)), [value]);
+  useEffect(() => setDraft(formatted), [formatted]);
   function commit() {
     if (cancelOnBlur.current) {
       cancelOnBlur.current = false;
-      setDraft(formatNumber(value));
+      setDraft(formatted);
       return;
     }
-    if (!draft.trim()) return setDraft(formatNumber(value));
+    if (draft === formatted) return;
+    if (!draft.trim()) return setDraft(formatted);
     const parsed = Number(draft);
-    if (!Number.isFinite(parsed)) return setDraft(formatNumber(value));
+    if (!Number.isFinite(parsed)) return setDraft(formatted);
     const next = Math.min(max, Math.max(min, step === 1 ? Math.round(parsed) : parsed));
-    setDraft(formatNumber(next));
+    setDraft(formatNumber(next, precision));
     if (next !== value) onCommit(next);
   }
-  return <label><span>{label}</span><input type="number" inputMode={step === 1 ? "numeric" : "decimal"} step={step} min={min} max={max} disabled={disabled} value={focused ? draft : formatNumber(value)} onFocus={() => { setFocused(true); setDraft(formatNumber(value)); }} onChange={(event) => setDraft(event.target.value)} onBlur={() => { setFocused(false); commit(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelOnBlur.current = true; setDraft(formatNumber(value)); event.currentTarget.blur(); } else if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} /></label>;
+  return <label><span>{label}</span><input type="number" inputMode={step === 1 ? "numeric" : "decimal"} step={step} min={min} max={max} disabled={disabled} value={focused ? draft : formatted} onFocus={() => { setFocused(true); setDraft(formatted); }} onChange={(event) => setDraft(event.target.value)} onBlur={() => { setFocused(false); commit(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelOnBlur.current = true; setDraft(formatted); event.currentTarget.blur(); } else if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} /></label>;
 }
 
 export function focusDesignerNode(selector: string) {

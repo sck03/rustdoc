@@ -4,6 +4,8 @@ import type {
 } from "./reportDesignerSchema.ts";
 import { reportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
 import { ApiReportTemplateV3LimitsContractDefaults as limits } from "../../api/generated/exportDocManagerApi.ts";
+import { reportDesignerV3PageDimensions, type ReportPaperSize } from "./reportDesignerPage.ts";
+export { reportDesignerV3PageDimensions } from "./reportDesignerPage.ts";
 
 export { reportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
 export type { ReportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
@@ -29,8 +31,7 @@ export const REPORT_DESIGNER_V3_MAX_FIELD_PATH_LENGTH = 256;
 export const REPORT_DESIGNER_V3_MAX_FONT_FAMILY_LENGTH = 256;
 export const REPORT_DESIGNER_V3_MAX_RESOURCES = limits.maxResources;
 export const REPORT_DESIGNER_V3_MAX_RESOURCE_BYTES = limits.maxResourceBytes;
-export const A4_PORTRAIT_SIZE_HUNDREDTH_MM = Object.freeze({ width: 21000, height: 29700 });
-export const A4_LANDSCAPE_SIZE_HUNDREDTH_MM = Object.freeze({ width: 29700, height: 21000 });
+const defaultPageDimensions = reportDesignerV3PageDimensions("Portrait");
 export type ReportDesignerV3Schema = {
   version: typeof REPORT_DESIGNER_V3_VERSION;
   /** Explicit AST discriminator and coordinate unit keep persisted V3 self-describing. */
@@ -51,8 +52,7 @@ export type ReportDesignerV3Schema = {
   };
 };
 export type ReportDesignerV3Page = {
-  /** V3 deliberately has one physical page contract: A4. */
-  size: "A4";
+  size: ReportPaperSize;
   orientation: "Portrait" | "Landscape";
   widthHundredthMm: number;
   heightHundredthMm: number;
@@ -217,21 +217,13 @@ export function reportDesignerV3ElementKindLabel(element: ReportDesignerV3Elemen
   return element.type === "Flow" ? reportDesignerV3ElementText(element) : elementKindLabels[element.type];
 }
 export function reportDesignerV3PageSize(page: ReportDesignerV3Page) {
-  const size = page.orientation === "Landscape"
-    ? A4_LANDSCAPE_SIZE_HUNDREDTH_MM
-    : A4_PORTRAIT_SIZE_HUNDREDTH_MM;
   return {
-    widthMm: hundredthMmToMm(size.width),
-    heightMm: hundredthMmToMm(size.height),
+    widthMm: hundredthMmToMm(page.widthHundredthMm),
+    heightMm: hundredthMmToMm(page.heightHundredthMm),
   };
 }
-export function reportDesignerV3PageDimensions(orientation: ReportDesignerV3Page["orientation"]) {
-  return orientation === "Landscape"
-    ? A4_LANDSCAPE_SIZE_HUNDREDTH_MM
-    : A4_PORTRAIT_SIZE_HUNDREDTH_MM;
-}
 /**
- * Keep every free-canvas object inside the physical A4 page.  This helper is
+ * Keep every free-canvas object inside the physical page. This helper is
  * shared by migration and mutations so a malformed or legacy object cannot
  * escape the page depending on which path produced it.
  */
@@ -241,10 +233,10 @@ export function clampReportDesignerV3ElementToPage(
 ): ReportDesignerV3Element {
   const pageWidth = Number.isFinite(page.widthHundredthMm) && page.widthHundredthMm > 0
     ? Math.round(page.widthHundredthMm)
-    : A4_PORTRAIT_SIZE_HUNDREDTH_MM.width;
+    : defaultPageDimensions.width;
   const pageHeight = Number.isFinite(page.heightHundredthMm) && page.heightHundredthMm > 0
     ? Math.round(page.heightHundredthMm)
-    : A4_PORTRAIT_SIZE_HUNDREDTH_MM.height;
+    : defaultPageDimensions.height;
   const safeWidth = Number.isFinite(element.widthHundredthMm)
     ? Math.round(element.widthHundredthMm)
     : REPORT_DESIGNER_V3_MIN_ELEMENT_SIZE_HUNDREDTH_MM;
@@ -303,10 +295,14 @@ export function clampReportDesignerV3ElementToPage(
     pageHeight,
     fittedRotatedHeight / 2,
   );
+  const x = Math.round(Math.min(Math.max(0, pageWidth - width), Math.max(0, centerX - width / 2)));
+  const y = Math.round(Math.min(Math.max(0, pageHeight - height), Math.max(0, centerY - height / 2)));
+  if (x === element.xHundredthMm && y === element.yHundredthMm && width === element.widthHundredthMm &&
+      height === element.heightHundredthMm && rotation === element.rotationDeg) return element;
   return {
     ...element,
-    xHundredthMm: Math.round(Math.min(Math.max(0, pageWidth - width), Math.max(0, centerX - width / 2))),
-    yHundredthMm: Math.round(Math.min(Math.max(0, pageHeight - height), Math.max(0, centerY - height / 2))),
+    xHundredthMm: x,
+    yHundredthMm: y,
     widthHundredthMm: width,
     heightHundredthMm: height,
     rotationDeg: rotation,

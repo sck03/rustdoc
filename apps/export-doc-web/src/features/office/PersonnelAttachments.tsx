@@ -4,14 +4,14 @@ import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
 import { useOfficeOperation } from "./useOfficeData.ts";
+import { AttachmentUploadPanel } from "../../ui/AttachmentUploadPanel.tsx";
 
 export function PersonnelAttachments({ client, record }: { client: ExportDocManagerApiClient; record: PersonnelRecord }) {
   const operation = useOfficeOperation();
   const [removing, setRemoving] = useState<PersonnelAttachment | null>(null);
-  return <section aria-label="档案文档"><h3>档案文档</h3>
-    <p className="office-muted">编辑档案时可添加图片或 PDF 文档。文档仅对获授权的人事人员开放。</p>
+  return <section aria-label="档案文档"><h3>档案文档（{record.attachments?.length ?? 0}）</h3>
+    {record.canEdit && <AttachmentUploadPanel key={record.employee.id} record={record} operation={operation} label="上传档案文档" upload={(current, body, signal) => client.uploadPersonnelAttachment({ id: current.employee.id, body }, { signal })} />}
     {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
-    {!record.attachments?.length && <p>尚无文档附件。</p>}
     <ul>{record.attachments?.map(file => <li key={file.id} className="office-card-actions"><span>{file.fileName} · {Math.ceil(file.sizeBytes / 1024)} KiB</span>
       <button type="button" className="command-button secondary" disabled={operation.busy} onClick={() => void operation.run(signal => client.downloadPersonnelAttachment({ id: record.employee.id, attachmentId: file.id }, { signal }), blob => downloadBlob(blob, file.fileName))}>下载</button>
       {record.canEdit && <button type="button" className="command-button secondary" disabled={operation.busy} onClick={() => setRemoving(file)}>移除</button>}

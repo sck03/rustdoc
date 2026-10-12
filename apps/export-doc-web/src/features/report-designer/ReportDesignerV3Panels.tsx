@@ -33,6 +33,7 @@ import {
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import type { ReportBlock, ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { flattenFields } from "./reportDesignerV3WorkspaceHelpers.tsx";
+import { reportPaperOptions, isReportPaperSize, REPORT_PAPER_MIN_DIMENSION, REPORT_PAPER_MAX_DIMENSION } from "./reportDesignerPage.ts";
 
 type FlowBlock = Extract<ReportBlock, { type: "Row" | "Grid" | "Conditional" | "DetailTable" | "PageBreak" }>;
 type LocatedElement = NonNullable<ReturnType<typeof findV3Element>>;
@@ -46,7 +47,8 @@ export function PageInspector({ state, onCommit, canEdit = true }: { state: Repo
   ];
   return (
     <div className="report-designer-v3-inspector-content">
-      <InspectorTitle title="页面设置" subtitle="固定 A4 画布" />
+      <InspectorTitle title="页面设置" subtitle="纸张、字体与页边距" />
+      <SelectField label="纸张" value={page.size} options={reportPaperOptions} disabled={!canEdit} onChange={size => { if (isReportPaperSize(size)) onCommit(updateV3Page(state, { size })); }} />
       <div className="report-designer-v3-orientation-control">
         <span>方向</span>
         <div>
@@ -54,10 +56,13 @@ export function PageInspector({ state, onCommit, canEdit = true }: { state: Repo
           <button className={page.orientation === "Landscape" ? "is-active" : ""} type="button" disabled={!canEdit} onClick={() => onCommit(updateV3Page(state, { orientation: "Landscape" }))}>横版</button>
         </div>
       </div>
-      <div className="report-designer-v3-page-size-readout"><strong>A4</strong><span>{page.orientation === "Landscape" ? "297 × 210 mm" : "210 × 297 mm"}</span></div>
+      <div className="report-designer-v3-page-size-readout"><strong>{page.size === "Custom" ? "自定义" : page.size}</strong><span>{hundredthMmToMm(page.widthHundredthMm)} × {hundredthMmToMm(page.heightHundredthMm)} mm</span></div>
+      {page.size === "Custom" ? <div className="report-designer-v3-inspector-grid">
+        {([ ["纸张宽度 (mm)", "widthHundredthMm"], ["纸张高度 (mm)", "heightHundredthMm"] ] as const).map(([label, key]) => <NumberField key={key} label={label} value={hundredthMmToMm(page[key])} min={hundredthMmToMm(REPORT_PAPER_MIN_DIMENSION)} max={hundredthMmToMm(REPORT_PAPER_MAX_DIMENSION)} disabled={!canEdit} onCommit={value => onCommit(updateV3Page(state, { [key]: Math.round(value * 100) }))} />)}
+      </div> : null}
       <ReportDesignerFontFamilyField label="页面字体" value={page.fontFamily} disabled={!canEdit} onChange={fontFamily => onCommit(updateV3Page(state, { fontFamily }))} />
       <div className="report-designer-v3-inspector-grid">
-        <NumberField label="默认字号 pt" value={page.fontSizePt} min={6} max={96} disabled={!canEdit} onCommit={fontSizePt => onCommit(updateV3Page(state, { fontSizePt }))} />
+        <NumberField label="默认字号 pt" value={page.fontSizePt} min={6} max={48} disabled={!canEdit} onCommit={fontSizePt => onCommit(updateV3Page(state, { fontSizePt }))} />
         {margins.map(([label, key]) => <NumberField key={key} label={label} value={hundredthMmToMm(page[key])} min={0} max={hundredthMmToMm(REPORT_DESIGNER_V3_MAX_PAGE_MARGIN)} disabled={!canEdit} onCommit={(value) => onCommit(updateV3Page(state, { [key]: Math.round(value * 100) }))} />)}
         <NumberField label="网格间距" value={hundredthMmToMm(state.schema.grid.sizeHundredthMm)} min={1} max={50} disabled={!canEdit} onCommit={(value) => onCommit(updateV3Grid(state, { sizeHundredthMm: Math.max(100, Math.round(value * 100)) }))} />
       </div>
@@ -201,6 +206,7 @@ export function ElementInspector({
   ];
   const geometry = <details className="report-designer-property-section" open={element.type !== "Flow"}>
       <summary>位置与大小 <small>{hundredthMmToMm(element.widthHundredthMm)} × {hundredthMmToMm(element.heightHundredthMm)} mm</small></summary>
+      <small>输入坐标保留当前图层；跨区拖动或选择“所在区域”可切换打印区域。</small>
       <div className="report-designer-v3-inspector-grid">
         <NumberField label="X (mm)" value={hundredthMmToMm(element.xHundredthMm)} disabled={!editable} onCommit={(value) => onPatch({ xHundredthMm: Math.round(value * 100) })} />
         <NumberField label="Y (mm)" value={hundredthMmToMm(element.yHundredthMm)} disabled={!editable} onCommit={(value) => onPatch({ yHundredthMm: Math.round(value * 100) })} />
@@ -261,7 +267,7 @@ function ElementContentEditor({ element, reportType, resources, fieldGroups, edi
     case "Line":
       return <SelectField label="方向" value={element.direction} options={[{ value: "Horizontal", label: "水平" }, { value: "Vertical", label: "垂直" }]} disabled={!editable} onChange={(direction) => onPatch({ direction: direction === "Vertical" ? "Vertical" : "Horizontal" })} />;
     case "Flow":
-      return <fieldset className="report-designer-v3-flow-editor" aria-label="表格与内容属性" disabled={!editable}><ReportDesignerV3FlowProperties block={element.block} fieldGroups={fieldGroups} selectedGridCellId={selectedGridCellId} onSelectGridCell={onSelectGridCell} onCommit={onFlowCommit} /></fieldset>;
+      return <fieldset className="report-designer-v3-flow-editor" aria-label="表格与内容属性" disabled={!editable}><ReportDesignerV3FlowProperties block={element.block} widthMm={hundredthMmToMm(element.widthHundredthMm)} fieldGroups={fieldGroups} selectedGridCellId={selectedGridCellId} onSelectGridCell={onSelectGridCell} onCommit={onFlowCommit} /></fieldset>;
     case "Rectangle":
       return null;
   }

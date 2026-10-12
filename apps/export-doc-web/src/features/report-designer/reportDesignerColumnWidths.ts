@@ -1,14 +1,16 @@
-/** Round boundaries, so editable percentages always cover the whole table. */
+/** Preserve valid precision; normalize cumulative boundaries without widening the table. */
 export function normalizeColumnPercentages<T extends { widthPercent: number }>(columns: T[]): T[] {
-  const total = columns.reduce((sum, column) => sum + Math.max(1, column.widthPercent), 0);
-  const minimumUnits = Math.min(10, Math.floor(1000 / columns.length));
+  const weights = columns.map(column => Number.isFinite(column.widthPercent) ? Math.max(1, column.widthPercent) : 1);
+  const total = weights.reduce((sum, width) => sum + width, 0);
+  if (columns.every((column, index) => column.widthPercent === weights[index]) && Math.abs(total - 100) < 1e-8) return columns;
+  const minimum = Math.min(1, 100 / columns.length);
   let consumed = 0;
   let previousBoundary = 0;
   return columns.map((column, index) => {
-    consumed += Math.max(1, column.widthPercent);
-    const boundary = Math.min(1000 - (columns.length - index - 1) * minimumUnits,
-      Math.max(previousBoundary + minimumUnits, Math.round(consumed / total * 1000)));
-    const widthPercent = (boundary - previousBoundary) / 10;
+    consumed += weights[index];
+    const boundary = Math.min(100 - (columns.length - index - 1) * minimum,
+      Math.max(previousBoundary + minimum, consumed / total * 100));
+    const widthPercent = boundary - previousBoundary;
     previousBoundary = boundary;
     return widthPercent === column.widthPercent ? column : { ...column, widthPercent };
   });

@@ -38,7 +38,7 @@ import { ReportDesignerLayerNavigation } from "./ReportDesignerLayerNavigation.t
 import { setReportDesignerLayerRoleHeight } from "./reportDesignerLayerBands.ts";
 import type { ReportBlock, ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { createConditionalBlock, createDetailTableBlock, createGridBlock, createPageBreakBlock, createRowBlock } from "./reportDesignerBlockFactories.ts";
-import { updateGridCell } from "./reportDesignerGridMutations.ts";
+import { applyGridPreset, updateGridCell } from "./reportDesignerGridMutations.ts";
 import {
   countElements,
   clampReportDesignerV3Zoom,
@@ -216,7 +216,7 @@ export function ReportDesignerV3Workspace({
     pageNumber: () => placeElement(createV3PageNumberElement()),
     image: () => placeElement(createV3ImageElement()),
     row: () => insertFlow(createRowBlock(reportType)),
-    grid: () => insertFlow(createGridBlock(reportType)),
+    grid: () => insertFlow(applyGridPreset(createGridBlock(reportType), "Blank")),
     conditional: () => insertFlow(createConditionalBlock(reportType)),
     detailTable: reportType === "ExportDocument" ? () => insertFlow(createDetailTableBlock()) : undefined,
     productFields: reportType === "ExportDocument" ? () => { setFieldQuery(""); setProductFieldsOnly(true); openFieldPanel(); } : undefined,
@@ -316,10 +316,11 @@ export function ReportDesignerV3Workspace({
         <div>
             <span className="report-designer-v3-eyebrow">可视化排版</span>
           <h2>{displayName || "报表模板"}</h2>
-          <p>在现有模板上修改：双击文字编辑，拖动字段排版，再预览并保存。</p>
+          <p>从空白排版或修改现有模板：双击文字编辑，拖动字段，再预览并保存。</p>
           {!editable ? <small>只读预览：当前权限或设备不支持设计操作。</small> : null}
         </div>
         <div className="report-designer-v3-header-actions">
+          {editingEnabled ? <button className="command-button secondary" type="button" onClick={() => { clearSelection(); setCompactPanel("properties"); }}>页面设置</button> : null}
            <button className="command-button secondary" type="button" disabled={!editingEnabled || imageUploading} onClick={() => void reloadDesign()}>
             <RotateCcw size={16} aria-hidden="true" />
             <span>重新载入</span>
@@ -420,7 +421,7 @@ export function ReportDesignerV3Workspace({
 
         <main className="report-designer-v3-canvas-column">
           <div className="report-designer-v3-canvas-meta">
-            <span>页面：A4 {history.state.schema.page.orientation === "Landscape" ? "横版" : "竖版"}</span>
+            <span>页面：{history.state.schema.page.size === "Custom" ? "自定义" : history.state.schema.page.size} {history.state.schema.page.orientation === "Landscape" ? "横版" : "竖版"}</span>
             <span>{pageSize.widthMm} × {pageSize.heightMm} mm</span>
             {editingEnabled ? <>
               <label><input type="checkbox" checked={history.state.schema.grid.enabled} onChange={(event) => commit(updateV3Grid(history.state, { enabled: event.target.checked }))} /> 网格</label>

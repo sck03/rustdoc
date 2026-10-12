@@ -404,6 +404,27 @@
   min-width: 0;
 }
 
+.report-template-checklist {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--edm-neutral-350);
+  border-radius: 8px;
+}
+
+.report-template-checklist-options {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+  min-width: 0;
+}
+
+.report-template-checklist-options span { overflow-wrap: anywhere; }
+.invoice-batch-report[hidden] { display: none; }
+
 .job-excel-preview {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(90px, auto) minmax(120px, auto);

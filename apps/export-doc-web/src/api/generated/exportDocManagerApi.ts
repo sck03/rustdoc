@@ -1732,11 +1732,19 @@ export interface ApiInvoicePurgeResponse {
   success: boolean;
 }
 
+export interface ApiInvoiceReportBatchLimitsContract {
+  maxArchiveBytes?: number;
+  maxInvoices?: number;
+  maxReports?: number;
+  maxTemplates?: number;
+}
+
 export interface ApiInvoiceReportZipRequest {
   destinationPath?: string;
   invoiceIds?: number[];
   reportType?: string;
   templatePath?: string;
+  templatePaths?: string[] | null;
   withSeal?: boolean;
 }
 
@@ -2671,6 +2679,7 @@ export interface ApiReportTemplateStorageStatusResponse {
 
 export interface ApiReportTemplateV3ContractResponse {
   astKind: string;
+  batchLimits?: ApiInvoiceReportBatchLimitsContract;
   contractVersion: string;
   coordinateUnit: string;
   elementTypes: string[];
@@ -2713,8 +2722,11 @@ export interface ApiReportTemplateV3LimitsContract {
 
 export interface ApiReportTemplateV3PageContract {
   coordinateUnit: string;
+  maxDimensionHundredthMm?: number;
+  minDimensionHundredthMm?: number;
   orientations: string[];
   pageAndLayerRoles: string[];
+  presets?: { heightHundredthMm: number; size: string; widthHundredthMm: number }[];
   size: string;
 }
 
@@ -5074,6 +5086,17 @@ export const ApiHsCodeSearchResponseDefaults = {
   standardCodeCount: 0,
 } as const satisfies Partial<ApiHsCodeSearchResponse>;
 
+export const ApiInvoiceReportBatchLimitsContractDefaults = {
+  maxArchiveBytes: 67108864,
+  maxInvoices: 200,
+  maxReports: 200,
+  maxTemplates: 20,
+} as const satisfies Partial<ApiInvoiceReportBatchLimitsContract>;
+
+export const ApiInvoiceReportZipRequestDefaults = {
+  templatePaths: null,
+} as const satisfies Partial<ApiInvoiceReportZipRequest>;
+
 export const ApiOrganizationCompanySaveRequestDefaults = {
   expectedVersion: 0,
 } as const satisfies Partial<ApiOrganizationCompanySaveRequest>;
@@ -5127,6 +5150,12 @@ export const ApiReportTemplateV3LimitsContractDefaults = {
   maxTotalElements: 4000,
   minElementSizeHundredthMm: 400,
 } as const satisfies Partial<ApiReportTemplateV3LimitsContract>;
+
+export const ApiReportTemplateV3PageContractDefaults = {
+  maxDimensionHundredthMm: 60000,
+  minDimensionHundredthMm: 4000,
+  presets: [{"size":"A4","widthHundredthMm":21000,"heightHundredthMm":29700},{"size":"A3","widthHundredthMm":29700,"heightHundredthMm":42000},{"size":"A5","widthHundredthMm":14800,"heightHundredthMm":21000},{"size":"Letter","widthHundredthMm":21590,"heightHundredthMm":27940},{"size":"Legal","widthHundredthMm":21590,"heightHundredthMm":35560}],
+} as const satisfies Partial<ApiReportTemplateV3PageContract>;
 
 export const ApiSalesOpportunitySaveRequestDefaults = {
   changeNote: "",

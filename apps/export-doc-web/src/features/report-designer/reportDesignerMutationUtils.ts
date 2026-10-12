@@ -1,3 +1,5 @@
+import { createRequestKey } from "../../ui/createRequestKey.ts";
+
 export function normalizeDesignerFieldPath(value: string) {
   const trimmed = value.trim();
   const scribanMatch = trimmed.match(/^\{\{\s*([^|}]+?)(?:\s*\|[^}]*)?\s*\}\}$/);
@@ -5,5 +7,5 @@ export function normalizeDesignerFieldPath(value: string) {
 }
 
 export function createReportBlockId(prefix: string) {
-  return `block-${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  return `block-${prefix}-${createRequestKey()}`;
 }

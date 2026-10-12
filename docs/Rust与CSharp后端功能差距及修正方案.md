@@ -1,6 +1,6 @@
 # Rust 后端差距与持续改进
 
-> 2026-10-08 按当前源码与已记录验收整理。C# 对照来源为 `origin/tauri-csharp-net10-backup`，固定对照提交 `ba9dbdc`；2026-09-20 首次盘点、候选依赖比较和旧实施顺序见 [Git 历史](https://github.com/sck03/rustdoc/blob/b44fbb6/docs/Rust与CSharp后端功能差距及修正方案.md)。当前事实只维护在[架构事实](./当前架构事实.md)，测试数字只进入带日期的[进度](./程序改进重构进度文档.md)。
+> 2026-10-08 按当前源码与已记录验收整理。C# 对照来源为 `ba9dbdca72590b06c5f32740e4cd58d3027578da`，固定对照提交 `ba9dbdc`；2026-09-20 首次盘点、候选依赖比较和旧实施顺序见 [Git 历史](https://github.com/sck03/rustdoc/blob/b44fbb6/docs/Rust与CSharp后端功能差距及修正方案.md)。当前事实只维护在[架构事实](./当前架构事实.md)，测试数字只进入带日期的[进度](./程序改进重构进度文档.md)。
 
 ## 1. 继续维护模块化单体
 

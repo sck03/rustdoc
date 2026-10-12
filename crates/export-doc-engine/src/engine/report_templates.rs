@@ -67,6 +67,23 @@ pub fn fields(kind: &str) -> Result<ApiReportTemplateFieldCatalogResponse> {
     })
     .map_err(Into::into)
 }
+
+pub fn contract() -> Result<Value> {
+    let mut value: Value =
+        serde_json::from_str(include_str!("../../resources/report-v3-contract.json"))?;
+    for (key, property) in crate::contracts::schema("ApiReportTemplateV3PageContract")["properties"]
+        .as_object()
+        .unwrap()
+    {
+        if let Some(default) = property.get("default") {
+            value["page"][key] = default.clone();
+        }
+    }
+    value["batchLimits"] = crate::contracts::initial(crate::contracts::schema(
+        "ApiInvoiceReportBatchLimitsContract",
+    ));
+    Ok(value)
+}
 pub fn validate_content(kind: &str, content: &str) -> Result<Design> {
     if content.is_empty() || content.len() > 10 * 1024 * 1024 {
         return Err(invalid("报表模板内容不能为空或超过 10 MiB。"));

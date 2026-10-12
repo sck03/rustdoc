@@ -1,4 +1,4 @@
-pub use export_doc_contracts::{contracts, generated_api};
+pub use export_doc_contracts::{contracts, generated_api, report_batches};
 pub mod announcement;
 pub mod approval;
 pub mod crm;

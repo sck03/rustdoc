@@ -108,4 +108,19 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   assert.equal(job.status, 202);
   await waitFor(() => fs.existsSync(pdf), 30000, 'Blank grid PDF did not complete');
   assert.equal(fs.readFileSync(pdf).subarray(0, 5).toString(), '%PDF-');
+  await run("[...document.querySelectorAll('[role=tab]')].find(node=>node.textContent.trim()==='可视化设计').click(); true");
+  await button('页面设置', '.report-designer-v3-header');
+  await select('纸张', 'Custom');
+  await fill('纸张宽度 (mm)', 80.15); await fill('纸张高度 (mm)', 180.25);
+  await button('保存', 'body');
+  await wait("document.body.innerText.includes('私人模板已保存')");
+  const custom = await request('GetUserReportTemplate', token, undefined, { id: created.body.id });
+  const customPage = JSON.parse(custom.body.contentHtml).page;
+  assert.equal(customPage.size, 'Custom');
+  assert.equal(customPage.widthHundredthMm, 8015); assert.equal(customPage.heightHundredthMm, 18025);
+  await captureScreenshot(cdp, path.join(output, 'Full-custom-paper-designer.png'), { captureBeyondViewport: false });
+  const customPdf = path.join(output, 'desktop-custom-paper.pdf');
+  const customJob = await request('StartPaymentVoucherPdfSaveToPathJob', token, { templatePath: `user-template:${created.body.id}`, destinationPath: customPdf }, { paymentId: payment.body.payment.id });
+  assert.equal(customJob.status, 202);
+  await waitFor(() => fs.existsSync(customPdf), 30000, 'Custom paper PDF did not complete');
 }

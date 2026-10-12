@@ -7,12 +7,13 @@ use super::{
     records::text,
     report_assets,
     store::{Actor, Store},
-    tasks::TaskOutput,
 };
 use crate::{contracts, designer::Design, generated_api::*, invoice::InvoiceDraft, paths};
 use export_doc_report::{self as render, Builtin, Document, ReportData};
 use serde_json::{Value, json};
 use std::{path::PathBuf, sync::atomic::AtomicBool};
+mod jobs;
+pub(super) use jobs::invoice_document;
 mod samples;
 
 pub const OPERATIONS: &[Operation] = &[
@@ -381,165 +382,6 @@ fn prepare(
     report_assets::hydrate(store, paths, actor, &mut data, Some(template.content()))?;
     Ok((data, template))
 }
-fn destination(body: &Value, local: bool, zip: bool) -> Result<Option<PathBuf>> {
-    if !local {
-        return Ok(None);
-    }
-    let path = PathBuf::from(text(body, "destinationPath"));
-    paths::ensure_safe_absolute(&path).map_err(invalid)?;
-    if !path
-        .file_name()
-        .and_then(|v| v.to_str())
-        .is_some_and(paths::valid_file_name)
-        || !path
-            .extension()
-            .is_some_and(|v| v.eq_ignore_ascii_case(if zip { "zip" } else { "pdf" }))
-        || !path.parent().is_some_and(|p| p.is_dir())
-    {
-        return Err(invalid("请选择合法的输出文件及现有目录。"));
-    }
-    Ok(Some(path))
-}
-fn output_name(data: &ReportData, template: &Template, id: i64) -> String {
-    let number = if data.report_type == "PaymentVoucher" {
-        data.text("Payment.VoucherNo")
-    } else {
-        data.text("Invoice.InvoiceNo")
-    };
-    paths::suggested_pdf_name(&format!(
-        "{}-{}-{id}",
-        if number.is_empty() {
-            "单据".into()
-        } else {
-            number
-        },
-        template.label()
-    ))
-}
-pub(super) fn invoice_document(
-    store: &Store,
-    paths: &crate::paths::RuntimePaths,
-    fonts: &render::Fonts,
-    actor: &Actor,
-    id: i64,
-    item: &Value,
-    action: &str,
-    cancelled: &AtomicBool,
-) -> Result<(Document, String)> {
-    let (data, template) = prepare(store, paths, actor, id, item, false, action)?;
-    Ok((
-        template.render(&data, fonts, cancelled)?,
-        output_name(&data, &template, id),
-    ))
-}
-fn start(
-    service: &NativeService,
-    actor: &Actor,
-    operation: Operation,
-    parameters: &[(&str, String)],
-    body: &Value,
-) -> Result<Value> {
-    let payment = [
-        START_PAYMENT_VOUCHER_PDF_DOWNLOAD_JOB,
-        START_PAYMENT_VOUCHER_PDF_SAVE_TO_PATH_JOB,
-    ]
-    .contains(&operation);
-    let zip = [
-        START_INVOICE_REPORT_PDF_ZIP_DOWNLOAD_JOB,
-        START_INVOICE_REPORT_PDF_ZIP_SAVE_TO_PATH_JOB,
-    ]
-    .contains(&operation);
-    let ids = if zip {
-        let ids: Vec<i64> = serde_json::from_value(body["invoiceIds"].clone())
-            .map_err(|_| invalid("请选择发票。"))?;
-        if ids.is_empty()
-            || ids.len() > 100
-            || ids.iter().any(|v| *v <= 0)
-            || ids.iter().collect::<std::collections::BTreeSet<_>>().len() != ids.len()
-        {
-            return Err(invalid("每次请选择 1–100 张不同的发票。"));
-        }
-        ids
-    } else {
-        vec![super::records::id(parameters)?]
-    };
-    let target = destination(body, LOCAL_OPERATIONS.contains(&operation), zip)?;
-    if target.is_some() && service.provider()? != "SQLite" {
-        return Err(error(403, "服务器不能保存到客户端本机路径。"));
-    }
-    for id in &ids {
-        prepare(
-            &service.store,
-            &service.paths,
-            actor,
-            *id,
-            body,
-            payment,
-            "export-pdf",
-        )?;
-    }
-    let store = service.store.clone();
-    let paths = service.paths.clone();
-    let fonts = service.report_fonts.clone();
-    let body = body.clone();
-    let actor_id = actor.id;
-    let replay = super::tasks::retry::Replay::new(operation, parameters, &body);
-    service.jobs.start_replayable(
-        actor,
-        if zip {
-            "InvoiceReportPdfZip"
-        } else if payment {
-            "PaymentVoucherPdf"
-        } else {
-            "InvoiceReportPdf"
-        },
-        if zip {
-            "批量单据 PDF"
-        } else if payment {
-            "付款报销 PDF"
-        } else {
-            "单据 PDF"
-        },
-        Some(replay),
-        move |cancelled| {
-            let mut files = vec![];
-            for id in &ids {
-                crate::operation::check()?;
-                let actor = auth::current_actor(&store, actor_id)?;
-                auth::authorize_operation(&actor, operation, &[])?;
-                let (data, template) =
-                    prepare(&store, &paths, &actor, *id, &body, payment, "export-pdf")?;
-                let document = template.render(&data, &fonts, cancelled)?;
-                let pdf = render::pdf_document(&document, &fonts, cancelled)?;
-                files.push((output_name(&data, &template, *id), pdf));
-            }
-            let actor = auth::current_actor(&store, actor_id)?;
-            auth::authorize_operation(&actor, operation, &[])?;
-            for id in &ids {
-                subject(
-                    &store,
-                    &actor,
-                    if payment { "payments" } else { "invoices" },
-                    *id,
-                    "export-pdf",
-                )?;
-            }
-            let (name, media, bytes) = if zip {
-                (
-                    "单据报表.zip".into(),
-                    "application/zip",
-                    render::zip_documents(files)?,
-                )
-            } else {
-                let (name, bytes) = files.pop().ok_or_else(|| unavailable("PDF 输出缺失。"))?;
-                (name, "application/pdf", bytes)
-            };
-            let mut output = TaskOutput::file(name, media, bytes);
-            output.destination = target;
-            Ok(output)
-        },
-    )
-}
 
 pub fn handle(
     service: &NativeService,
@@ -637,6 +479,6 @@ pub fn handle(
                 .html(&service.report_fonts)?;
             Ok(json!({"reportType":kind,"withSeal":body["withSeal"],"html":html}))
         }
-        _ => start(service, actor, operation, parameters, body),
+        _ => jobs::start(service, actor, operation, parameters, body),
     }
 }

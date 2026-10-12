@@ -52,7 +52,7 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
         <OfficeField label="币种"><select value={draft.currency} onChange={(event) => setDraft({ ...draft, currency: event.target.value as OaRequestSave["currency"] })}>{["CNY", "USD", "EUR", "HKD", "JPY", "GBP"].map((currency) => <option key={currency}>{currency}</option>)}</select></OfficeField>
         <OaLineEditor draft={draft} setDraft={setDraft} purchase={kind === "purchase"} businessDate={user.businessDate} />
       </>}
-      <AttachmentDraftFields draft={attachments} busy={operation.busy} onChange={() => setDirty(true)} />
+      <AttachmentDraftFields draft={attachments} busy={operation.busy} existingFiles={attachments.saved?.attachments} onChange={() => setDirty(true)} />
     </fieldset><OfficeSubmit busy={operation.busy} label="保存草稿" disabled={user.capabilities.usesOfficeRegister && !record && !employee} /></form>
   </OfficeDialog>;
 }

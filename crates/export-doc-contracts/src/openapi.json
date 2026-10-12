@@ -60118,6 +60118,21 @@
           },
           "destinationPath": {
             "type": "string"
+          },
+          "templatePaths": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "default": null,
+            "minItems": 1,
+            "maxItems": 20,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "为每张发票生成所有选中模板。未提供或为 null 时使用原 templatePath；总 PDF 数受 batchLimits 限制。"
           }
         }
       },
@@ -64302,6 +64317,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "batchLimits": {
+            "$ref": "#/components/schemas/ApiInvoiceReportBatchLimitsContract"
           }
         }
       },
@@ -64482,6 +64500,64 @@
             "items": {
               "type": "string"
             }
+          },
+          "presets": {
+            "type": "array",
+            "description": "标准纸张竖版尺寸；横版交换宽高。Custom 使用文档自身尺寸。",
+            "items": {
+              "type": "object",
+              "required": [
+                "size",
+                "widthHundredthMm",
+                "heightHundredthMm"
+              ],
+              "properties": {
+                "size": {
+                  "type": "string"
+                },
+                "widthHundredthMm": {
+                  "type": "integer"
+                },
+                "heightHundredthMm": {
+                  "type": "integer"
+                }
+              }
+            },
+            "default": [
+              {
+                "size": "A4",
+                "widthHundredthMm": 21000,
+                "heightHundredthMm": 29700
+              },
+              {
+                "size": "A3",
+                "widthHundredthMm": 29700,
+                "heightHundredthMm": 42000
+              },
+              {
+                "size": "A5",
+                "widthHundredthMm": 14800,
+                "heightHundredthMm": 21000
+              },
+              {
+                "size": "Letter",
+                "widthHundredthMm": 21590,
+                "heightHundredthMm": 27940
+              },
+              {
+                "size": "Legal",
+                "widthHundredthMm": 21590,
+                "heightHundredthMm": 35560
+              }
+            ]
+          },
+          "minDimensionHundredthMm": {
+            "type": "integer",
+            "default": 4000
+          },
+          "maxDimensionHundredthMm": {
+            "type": "integer",
+            "default": 60000
           }
         }
       },
@@ -75356,6 +75432,27 @@
           "mediaType",
           "sizeBytes"
         ]
+      },
+      "ApiInvoiceReportBatchLimitsContract": {
+        "type": "object",
+        "properties": {
+          "maxInvoices": {
+            "type": "integer",
+            "default": 200
+          },
+          "maxTemplates": {
+            "type": "integer",
+            "default": 20
+          },
+          "maxReports": {
+            "type": "integer",
+            "default": 200
+          },
+          "maxArchiveBytes": {
+            "type": "integer",
+            "default": 67108864
+          }
+        }
       },
       "ApiInvoiceSealImageSaveRequest": {
         "type": "object",

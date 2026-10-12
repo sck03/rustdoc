@@ -41,6 +41,27 @@ export async function verifyGlobalAttachmentUploadUi({ page, open, read, waitFor
   assert(await read(page, "document.querySelector('.attachment-detail').textContent.includes('交付说明')"));
   results.push('global-upload-selects-invoice-type-and-opens-saved-details');
 
+  await open('attachments');
+  await waitFor(page, uploadReady); await click(page, '上传资料');
+  await waitFor(page, `document.querySelector('${form} input[type=file]')`);
+  assert(await read(page, `document.querySelector('${form} input[type=file]').multiple`));
+  await read(page, `(()=>{const node=document.querySelector('${form} input[type=file]'),data=new DataTransfer();for(const name of ['说明一.txt','说明二.txt','说明三.txt'])data.items.add(new File(['匿名批量附件'],name,{type:'text/plain'}));node.files=data.files;node.dispatchEvent(new Event('change',{bubbles:true}));window.__failUploadName='说明二.txt';})()`);
+  await waitFor(page, `document.querySelectorAll('${form} .attachment-draft > ul > li').length===3`);
+  await audit(page, 'attachment-multiple-selection');
+  await read(page, `document.querySelector('${form} button[type=submit]').click()`);
+  await waitFor(page, "document.body.innerText.includes('模拟附件上传失败') && !document.querySelector('form[aria-label=\"上传业务资料\"] button[type=submit]').disabled");
+  assert.equal(await read(page, `document.querySelectorAll('${form} .attachment-draft > ul > li').length`), 2);
+  assert(await read(page, "document.body.innerText.includes('本次已保存 1 个')"));
+  const failedKey = await read(page, "window.__calls.find(call=>call.name==='upload'&&call.input.fields.file==='说明二.txt').input.fields.uploadKey");
+  await read(page, `window.__failUploadName=null;document.querySelector('${form} button[type=submit]').click()`);
+  await waitFor(page, `!document.querySelector('${form}')`);
+  const uploads = await read(page, "window.__calls.filter(call=>call.name==='upload').map(call=>call.input.fields)");
+  assert.deepEqual(uploads.map(item=>item.file), ['说明一.txt','说明二.txt','说明二.txt','说明三.txt']);
+  assert.equal(uploads[2].uploadKey, failedKey, 'retry keeps the request identity when content is unchanged');
+  assert.deepEqual(uploads.map(item=>item.title), ['说明一','说明二','说明二','说明三']);
+  assert(uploads.every(item=>!item.attachmentId), 'each new file creates its own archive record');
+  results.push('multiple-attachment-partial-failure-retains-remaining-files-and-idempotency');
+
   await open('attachments-global', 390, 'limited');
   await waitFor(page, uploadReady); await click(page, '上传资料');
   await waitFor(page, `document.querySelectorAll('${picker} .business-records-card').length===2`);

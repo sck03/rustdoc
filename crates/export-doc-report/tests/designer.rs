@@ -203,6 +203,45 @@ fn detail_width_does_not_change_a4_page_viewbox() {
 }
 
 #[test]
+fn custom_and_standard_paper_keep_the_same_dimensions_on_continuation_pages() {
+    for (size, width, height) in [
+        ("A3", 29700, 42000),
+        ("A5", 14800, 21000),
+        ("Letter", 21590, 27940),
+        ("Legal", 21590, 35560),
+        ("Custom", 8015, 18025),
+    ] {
+        for landscape in [false, true] {
+            let mut design = body_flow_design(true);
+            let (width, height) = if landscape {
+                (height, width)
+            } else {
+                (width, height)
+            };
+            design.page.size = size.into();
+            design.page.orientation = if landscape { "Landscape" } else { "Portrait" }.into();
+            design.page.width_hundredth_mm = width;
+            design.page.height_hundredth_mm = height;
+            for (index, element) in design.layers[1].elements.iter_mut().enumerate() {
+                element.x_hundredth_mm = 500;
+                element.width_hundredth_mm = width - 1000;
+                element.y_hundredth_mm = 1500 + index as i32 * 2000;
+                element.height_hundredth_mm = 1000;
+            }
+            export_doc_domain::designer::page::validate(&design.page).unwrap();
+            let report = render_design(&data(), &design, &AtomicBool::new(false)).unwrap();
+            assert_eq!(report.pages.len(), 2, "{size}, landscape={landscape}");
+            for page in &report.pages {
+                assert_eq!(page.width_mm, width as f32 / 100.);
+                assert_eq!(page.height_mm, height as f32 / 100.);
+            }
+            assert!(report.pages[0].svg.contains("GRID-INVOICE"));
+            assert!(report.pages[1].svg.contains("AFTER BREAK"));
+        }
+    }
+}
+
+#[test]
 fn body_page_break_starts_a_new_physical_page() {
     let result = render_design(&data(), &body_flow_design(true), &AtomicBool::new(false)).unwrap();
     assert_eq!(result.pages.len(), 2);

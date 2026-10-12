@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { BusinessAttachmentDelete, BusinessAttachmentMetadataUpdate, BusinessAttachmentRevisionRecord, BusinessAttachmentUpdate, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { BusinessAttachmentDelete, BusinessAttachmentMetadataUpdate, BusinessAttachmentRecord, BusinessAttachmentRevisionRecord, BusinessAttachmentUpdate, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { isDesktopBridgeAvailable, selectSaveFilePath } from "../../desktop/desktopBridge.ts";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
@@ -52,8 +52,8 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
     inFlight.current = true; setBusy(true); setError(""); setMessage("");
     try {
       const result = await abortable(operation);
-      if (write) await refreshRecords();
       onSuccess(result);
+      if (write) await refreshRecords();
       return true;
     } catch (failure) {
       if (!isAbortError(failure)) {
@@ -63,17 +63,15 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
       return false;
     } finally { inFlight.current = false; setBusy(false); }
   }
-  async function refreshRecords() {
-    await Promise.all([
+  const refreshRecords = () => Promise.all([
       queries.invalidateQueries({ queryKey: ["business-attachments"] }),
       queries.invalidateQueries({ queryKey: ["business-attachment-categories"] }),
     ]);
-  }
-  function upload(request: AttachmentUploadInput) {
-    return run((signal) => client.uploadBusinessAttachment(attachmentUploadRequest(request), { signal }), (item) => {
-      setSelectedId(item.id);
-      setUploadMode(null);
-      setMessage(`v${item.latestRevision} 已归档，请核对后确认有效版本。`);
+  const upload = (request: AttachmentUploadInput, signal: AbortSignal) => client.uploadBusinessAttachment(attachmentUploadRequest(request), { signal });
+  function saveUploads(work: (signal: AbortSignal) => Promise<BusinessAttachmentRecord[]>) {
+    return run(work, records => {
+      setSelectedId(records.length === 1 ? records[0].id : null); setUploadMode(null);
+      setMessage(`已归档 ${records.length} 份资料，请核对后确认有效版本。`);
     }, true);
   }
   function update(request: BusinessAttachmentUpdate) {
@@ -112,7 +110,7 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
   }
   const commitSearch = () => { setSearch(keyword.trim()); setPageNumber(1); };
   return { query, details, invoice, categories, saveCategory, removeCategory, editMetadata, remove, keyword, search, includeArchived, pageNumber, pageSize, selectedId, busy, error, message,
-    uploadMode, setUploadMode, preview: preview?.id === selectedId ? preview : null, setPreview, upload, update, read, setSelectedId, setPageNumber, commitSearch,
+    uploadMode, setUploadMode, preview: preview?.id === selectedId ? preview : null, setPreview, upload, saveUploads, update, read, setSelectedId, setPageNumber, commitSearch,
     changeKeyword: (value: string) => { setKeyword(value); if (!value) { setSearch(""); setPageNumber(1); } },
     changeArchived: setIncludeArchived,
     changePageSize: (value: number) => { setPageSize(value); setPageNumber(1); },

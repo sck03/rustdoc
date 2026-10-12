@@ -11,7 +11,8 @@ import { oaApi } from "./oaApi.ts";
 import { oaAccess, oaActions, oaActionLabel, oaStatus, type OaActionName } from "./oaModel.ts";
 import { expenseCategories } from "./OaLineEditor.tsx";
 import { generalCategories, leaveCategories } from "./OaTemporalFields.tsx";
-import { documentAccept, documentDescription } from "../../ui/documentAttachments.ts";
+import { documentDescription } from "../../ui/documentAttachments.ts";
+import { AttachmentUploadPanel } from "../../ui/AttachmentUploadPanel.tsx";
 
 export function OaRequestDetails({ client, user, row, onEdit }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: OaRequest; onEdit: () => void }) {
   const operation = useOfficeOperation();
@@ -23,7 +24,7 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
     <div className="office-card-heading"><h2>{row.title}</h2><span className="office-badge" data-state={row.status}>{oaStatus[row.status]}</span></div>
     <dl className="oa-facts"><div><dt>申请编号</dt><dd>#{row.id}</dd></div><div><dt>申请人</dt><dd>{row.employeeName}</dd></div><div><dt>所属部门</dt><dd>{row.departmentId}</dd></div><div><dt>更新时间</dt><dd>{formatBusinessDateTime(row.updatedAt, user.businessTimeZone)}</dd></div></dl>
     {(editable || oaActions(row, user).length > 0) && <div className="office-card-actions">
-      {editable && <button type="button" className="command-button secondary" onClick={onEdit}>编辑草稿</button>}
+      {editable && <button type="button" className="command-button secondary" disabled={operation.busy} onClick={onEdit}>编辑草稿</button>}
       {oaActions(row, user).map((action) => <button type="button" className={`command-button${["cancel", "withdraw", "reject", "void"].includes(action) ? " secondary" : ""}`} key={action} disabled={operation.busy} onClick={() => setAction(action)}>{oaActionLabel(action, row.kind, user.capabilities.usesOfficeRegister)}</button>)}
     </div>}
     {row.status === "HandedOff" && <InlineNotice tone="success" title="财务交接已登记">此状态仅记录资料交接，不代表已记账或已付款；办理人、时间和说明见审批与办理记录。</InlineNotice>}
@@ -42,14 +43,7 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
     </section>
     <section className="oa-attachments" aria-label="申请附件"><h3>{row.kind === "expense" ? "报销凭证" : "申请附件"}</h3>
       <p className="office-muted">{documentDescription}{row.kind === "expense" && "提交报销前至少上传一份凭证。"}</p>
-      {editable && <OfficeField label="上传附件"><input type="file" accept={documentAccept} disabled={operation.busy} onChange={(event) => {
-        const file = event.target.files?.[0]; event.target.value = "";
-        if (file) void operation.run((signal) => {
-          if (file.size > 10 * 1024 * 1024) throw new Error("文件不能超过 10 MiB。");
-          const form = new FormData(); form.set("file", file); form.set("expectedVersion", String(row.versionNumber));
-          return api.upload(row.id, form, { signal });
-        }, () => {});
-      }} /></OfficeField>}
+      {editable && <AttachmentUploadPanel key={`${row.kind}-${row.id}`} record={row} operation={operation} upload={(current, body, signal) => api.upload(current.id, body, { signal })} />}
       {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
       {!row.attachments.length && <p className="office-muted">尚未上传附件。</p>}
       <ul>{row.attachments.map((file) => <li key={file.id} className="office-card-actions"><span>{file.fileName} · {Math.ceil(file.sizeBytes / 1024)} KiB</span>

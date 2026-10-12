@@ -1,0 +1,9 @@
+@layer components {
+  .attachment-draft { min-width: 0; }
+  .attachment-draft > label { display: grid; gap: 6px; }
+  .attachment-draft > ul { display: grid; gap: 8px; list-style: none; margin: 8px 0; padding: 0; }
+  .attachment-draft > ul > li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .attachment-draft li > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .attachment-draft li > label { display: grid; gap: 4px; flex-basis: 100%; }
+  .attachment-draft input { min-width: 0; max-width: 100%; }
+}

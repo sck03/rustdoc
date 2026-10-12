@@ -1,5 +1,6 @@
 import type {
   ReportBlock,
+  ReportGridBlock,
   ReportBorderStyle,
   ReportDesignerReportType,
   ReportDetailTableCellContent,
@@ -87,7 +88,7 @@ export function createRowBlock(reportType: ReportDesignerReportType = "ExportDoc
   };
 }
 
-export function createGridBlock(reportType: ReportDesignerReportType = "ExportDocument"): ReportBlock {
+export function createGridBlock(reportType: ReportDesignerReportType = "ExportDocument"): ReportGridBlock {
   const primaryFieldPath = reportType === "PaymentVoucher" ? "Payment.InvoiceNo" : "Invoice.InvoiceNo";
   const secondaryFieldPath = reportType === "PaymentVoucher" ? "Payment.PayeeName" : "Customer.CustomerNameEN";
 

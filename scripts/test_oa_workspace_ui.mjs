@@ -73,7 +73,7 @@ try {
   await wait("document.querySelector('.personnel-directory')", "Personnel page missing");
   await click("入职登记");
   await fill("工号（系统内唯一）", "UI-ATTACH-001"); await fill("姓名", "一次保存人员"); await fill("岗位", "业务专员");
-  await chooseFiles('[aria-label="选择档案图片或文档"] input', [receipt]);
+  await chooseFiles('[aria-label="选择档案图片或文档"] input', [receipt, supporting]);
   await run(`new Promise(resolve => {const canvas=document.createElement('canvas'); canvas.width=40;canvas.height=40;const c=canvas.getContext('2d');c.fillStyle='#147d92';c.fillRect(0,0,40,40);canvas.toBlob(blob=>{const transfer=new DataTransfer();transfer.items.add(new File([blob],'avatar.png',{type:'image/png'}));const input=document.querySelector('[aria-label="选择人员头像"] input');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));resolve(true);},'image/png');})`);
   await wait("document.querySelector('[role=dialog] img')?.naturalWidth>0", "Draft image preview missing");
   await run("document.querySelector('[aria-label=\"选择档案图片或文档\"]').scrollIntoView({block:'end'})");
@@ -85,6 +85,14 @@ try {
   await click("照片与证件");
   await wait("document.querySelector('[aria-label=档案文档]')?.innerText.includes('receipt.pdf') && document.querySelector('.personnel-image-preview img')?.naturalWidth>0", "Personnel image or document was not saved");
   await captureScreenshot(page, path.join(output, "personnel-saved-files.png"));
+  assert.equal(await run("document.querySelectorAll('[aria-label=档案文档] > ul > li').length"), 2);
+  const supplement = path.join(output, 'supplement.pdf');
+  const supplementTwo = path.join(output, 'supplement-two.pdf');
+  fs.writeFileSync(supplement, '%PDF-1.7\n3 0 obj<</Type/Catalog>>endobj\n%%EOF\n');
+  fs.writeFileSync(supplementTwo, '%PDF-1.7\n4 0 obj<</Type/Catalog>>endobj\n%%EOF\n');
+  await chooseFiles('[aria-label="上传档案文档"] input[type=file]', [supplement, supplementTwo]);
+  await click('上传所选附件（2）');
+  await wait("document.querySelectorAll('[aria-label=档案文档] > ul > li').length===4", 'Personnel batch upload from details failed');
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const travelDay = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
   for (const [kind, name] of [["leave", "员工请假"], ["overtime", "加班申请"], ["expense", "费用报销"], ["travel", "出差申请"], ["purchase", "采购申请"], ["general", "通用申请"]]) {
@@ -126,13 +134,18 @@ try {
     await click("保存草稿");
     if (kind === "expense") {
       await wait("document.querySelector('[role=dialog] [role=status]') && document.querySelector('[role=dialog] button[type=submit]')?.disabled===false", "Partial save did not retain draft");
-      assert.equal(await run("document.querySelectorAll('[role=dialog] li').length"), 1, "Only unacknowledged file remains queued");
+      assert.equal(await run("document.querySelectorAll('[role=dialog] .attachment-draft > ul > li').length"), 1, "Only unacknowledged file remains queued");
       await click("保存草稿");
     }
     await wait("!document.querySelector('[role=dialog]') && document.querySelector('.oa-detail')", `${name} save failed`);
     if (kind === "expense") assert.deepEqual(await run("window.__saveCounts"), { create: 1, upload: 3 }, "Retry does not recreate the request or resend successful files");
     assert.equal(await run("document.querySelectorAll('.oa-attachments li').length"), kind === "expense" ? 2 : 1, "Attachments are included in the first save");
     const savedId = await run("new URLSearchParams(location.hash.split('?')[1]).get('requestId')");
+    if (kind === 'general') {
+      await chooseFiles('.oa-attachments input[type=file]', [supplement, supplementTwo]);
+      await click('上传所选附件（2）');
+      await wait("document.querySelectorAll('.oa-attachments > ul > li').length===3", 'OA details batch upload must thread the updated version through both files');
+    }
     await captureScreenshot(page, path.join(output, `${kind}-draft.png`));
     await navigate(`${url}/#/office/approvals`);
     await wait("document.querySelector('[aria-label=\"申请与审批中心\"]')", "Navigation away failed");

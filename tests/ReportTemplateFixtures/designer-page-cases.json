@@ -1,0 +1,22 @@
+[
+  { "name": "A4 portrait", "page": {}, "valid": true },
+  { "name": "A4 landscape", "page": { "orientation": "Landscape", "widthHundredthMm": 29700, "heightHundredthMm": 21000 }, "valid": true },
+  { "name": "A3 portrait", "page": { "size": "A3", "widthHundredthMm": 29700, "heightHundredthMm": 42000 }, "valid": true },
+  { "name": "A5 landscape", "page": { "size": "A5", "orientation": "Landscape", "widthHundredthMm": 21000, "heightHundredthMm": 14800 }, "valid": true },
+  { "name": "Letter", "page": { "size": "Letter", "widthHundredthMm": 21590, "heightHundredthMm": 27940 }, "valid": true },
+  { "name": "Legal", "page": { "size": "Legal", "widthHundredthMm": 21590, "heightHundredthMm": 35560 }, "valid": true },
+  { "name": "custom receipt", "page": { "size": "Custom", "widthHundredthMm": 8000, "heightHundredthMm": 18000 }, "valid": true },
+  { "name": "custom square minimum", "page": { "size": "Custom", "widthHundredthMm": 4000, "heightHundredthMm": 4000 }, "valid": true },
+  { "name": "custom maximum", "page": { "size": "Custom", "widthHundredthMm": 60000, "heightHundredthMm": 60000 }, "valid": true },
+  { "name": "fractional millimetres", "page": { "size": "Custom", "widthHundredthMm": 8015, "heightHundredthMm": 18025 }, "valid": true },
+  { "name": "unknown paper", "page": { "size": "A2" }, "valid": false },
+  { "name": "wrong orientation", "page": { "orientation": "Landscape" }, "valid": false },
+  { "name": "invalid orientation", "page": { "orientation": "UpsideDown" }, "valid": false },
+  { "name": "wrong preset dimensions", "page": { "size": "A5" }, "valid": false },
+  { "name": "custom wrong orientation", "page": { "size": "Custom", "widthHundredthMm": 18000, "heightHundredthMm": 8000 }, "valid": false },
+  { "name": "too short", "page": { "size": "Custom", "widthHundredthMm": 3999 }, "valid": false },
+  { "name": "too long", "page": { "size": "Custom", "heightHundredthMm": 60001 }, "valid": false },
+  { "name": "fractional coordinate", "page": { "size": "Custom", "widthHundredthMm": 8015.5 }, "valid": false },
+  { "name": "no printable area", "page": { "size": "Custom", "widthHundredthMm": 4000, "heightHundredthMm": 8000, "marginLeftHundredthMm": 2000, "marginRightHundredthMm": 2000 }, "valid": false },
+  { "name": "unsupported page font size", "page": { "fontSizePt": 96 }, "valid": false }
+]

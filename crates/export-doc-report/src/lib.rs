@@ -10,7 +10,7 @@ mod fonts;
 mod layout;
 pub mod packing;
 
-pub use archive::zip_documents;
+pub use archive::{DocumentArchive, zip_documents};
 pub use builtin::{BUILTINS, Builtin, render_builtin};
 pub use data::{RasterImage, ReportData, chinese_money, english_money};
 pub use document::{Document, Page, pdf_document};

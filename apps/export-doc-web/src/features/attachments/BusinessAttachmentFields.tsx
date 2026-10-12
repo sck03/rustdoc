@@ -1,12 +1,13 @@
 import type { BusinessAttachmentCategoryRecord } from "../../api/index.ts";
 import type { AttachmentMetadata } from "./attachmentModel.ts";
 
-export function BusinessAttachmentFields({ value, categories, disabled, onChange }: {
+export function BusinessAttachmentFields({ value, categories, disabled, onChange, hideTitle = false }: {
   value: AttachmentMetadata; categories: BusinessAttachmentCategoryRecord[]; disabled: boolean;
   onChange: (value: AttachmentMetadata) => void;
+  hideTitle?: boolean;
 }) {
   return <fieldset disabled={disabled}>
-    <label>资料名称<input value={value.title} onChange={(event) => onChange({ ...value, title: event.target.value })} maxLength={200} required /></label>
+    {!hideTitle && <label>资料名称<input value={value.title} onChange={(event) => onChange({ ...value, title: event.target.value })} maxLength={200} required /></label>}
     <label>分类<select required value={value.categoryId || ""} onChange={(event) => onChange({ ...value, categoryId: Number(event.target.value) })}>
       <option value="" disabled>请选择分类</option>
       {categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}

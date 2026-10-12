@@ -1,5 +1,6 @@
 import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
 import { getV3ProductLayoutIssue } from "./reportDesignerV3Insertion.ts";
+import { isReportPaperSize, reportPageGeometryIssue, REPORT_PAPER_MIN_DIMENSION, REPORT_PAPER_MAX_DIMENSION } from "./reportDesignerPage.ts";
 import {
   isRecord,
   isReportDesignerCssColor,
@@ -126,14 +127,14 @@ function normalizePage(value: unknown, issues: ReportDesignerSchemaIssue[]): Rep
     return null;
   }
   const orientation = readEnum(value.orientation, ["Portrait", "Landscape"] as const, "Portrait", "$.page.orientation", issues);
-  const expectedDimensions = reportDesignerV3PageDimensions(orientation);
-  const suppliedWidth = readInteger(value.widthHundredthMm, expectedDimensions.width, 4000, 60000, "$.page.widthHundredthMm", issues);
-  const suppliedHeight = readInteger(value.heightHundredthMm, expectedDimensions.height, 4000, 60000, "$.page.heightHundredthMm", issues);
-  if (suppliedWidth !== expectedDimensions.width || suppliedHeight !== expectedDimensions.height) {
-    issues.push({ severity: "warning", path: "$.page", message: "v3 画布固定为 A4，页面尺寸已按方向恢复为标准 A4。" });
-  }
-  const width = expectedDimensions.width;
-  const height = expectedDimensions.height;
+  const size = isReportPaperSize(value.size) ? value.size : "A4";
+  const geometryIssue = reportPageGeometryIssue(value);
+  if (geometryIssue) issues.push({ severity: "error", path: "$.page", message: geometryIssue });
+  const expectedDimensions = reportDesignerV3PageDimensions(orientation, size === "Custom" ? "A4" : size);
+  const suppliedWidth = readInteger(value.widthHundredthMm, expectedDimensions.width, REPORT_PAPER_MIN_DIMENSION, REPORT_PAPER_MAX_DIMENSION, "$.page.widthHundredthMm", issues);
+  const suppliedHeight = readInteger(value.heightHundredthMm, expectedDimensions.height, REPORT_PAPER_MIN_DIMENSION, REPORT_PAPER_MAX_DIMENSION, "$.page.heightHundredthMm", issues);
+  const width = size === "Custom" ? suppliedWidth : expectedDimensions.width;
+  const height = size === "Custom" ? suppliedHeight : expectedDimensions.height;
   const margin = (name: string) => {
     const supplied = value[name];
     if (supplied !== undefined && (typeof supplied !== "number" || !Number.isInteger(supplied) || supplied < 0 || supplied > REPORT_DESIGNER_V3_MAX_PAGE_MARGIN)) {
@@ -145,14 +146,13 @@ function normalizePage(value: unknown, issues: ReportDesignerSchemaIssue[]): Rep
   const marginRight = margin("marginRightHundredthMm");
   const marginBottom = margin("marginBottomHundredthMm");
   const marginLeft = margin("marginLeftHundredthMm");
-  if (value.size !== "A4") {
-    issues.push({ severity: "warning", path: "$.page.size", message: "v3 仅支持 A4，已统一为 A4。" });
-  }
+  if (marginLeft + marginRight >= width || marginTop + marginBottom >= height) issues.push({ severity: "error", path: "$.page", message: "页边距之间必须保留可打印区域。" });
   const fontFamily = normalizeFontFamily(value.fontFamily, "$.page.fontFamily", issues);
   const fontSizePt = readNumber(value.fontSizePt, 10, 6, 48, "$.page.fontSizePt", issues);
+  if (typeof value.fontSizePt === "number" && (!Number.isFinite(value.fontSizePt) || value.fontSizePt < 6 || value.fontSizePt > 48)) issues.push({ severity: "error", path: "$.page.fontSizePt", message: "页面字号须在 6–48 pt 之间。" });
 
   return {
-    size: "A4",
+    size,
     orientation,
     widthHundredthMm: width,
     heightHundredthMm: height,
@@ -408,7 +408,7 @@ function normalizeElement(
     clampedElement.widthHundredthMm !== normalizedElement.widthHundredthMm ||
     clampedElement.heightHundredthMm !== normalizedElement.heightHundredthMm
   ) {
-    issues.push({ severity: "warning", path, message: "元素的视觉边界超出 A4 页面，已限制在画布内。" });
+    issues.push({ severity: "warning", path, message: "元素的视觉边界超出纸张，已限制在画布内。" });
   }
   return clampedElement;
 }
@@ -456,7 +456,10 @@ function normalizeStyle(value: unknown, path: string, issues: ReportDesignerSche
     const fontFamily = normalizeFontFamily(value.fontFamily, `${path}.fontFamily`, issues);
     if (fontFamily) style.fontFamily = fontFamily;
   }
-  if (value.fontSizePt !== undefined) style.fontSizePt = readNumber(value.fontSizePt, 10, 6, 96, `${path}.fontSizePt`, issues);
+  if (value.fontSizePt !== undefined) {
+    if (typeof value.fontSizePt !== "number" || !Number.isFinite(value.fontSizePt) || value.fontSizePt < 5 || value.fontSizePt > 48) issues.push({ severity: "error", path: `${path}.fontSizePt`, message: "组件字号须在 5–48 pt 之间。" });
+    style.fontSizePt = readNumber(value.fontSizePt, 10, 5, 48, `${path}.fontSizePt`, issues);
+  }
   if (typeof value.bold === "boolean") style.bold = value.bold;
   if (typeof value.color === "string" && isReportDesignerCssColor(value.color)) style.color = value.color.trim();
   if (typeof value.backgroundColor === "string" && isReportDesignerCssColor(value.backgroundColor)) style.backgroundColor = value.backgroundColor.trim();

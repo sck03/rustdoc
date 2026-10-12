@@ -43,7 +43,7 @@ await require("esbuild").build({ stdin: { resolveDir: web, loader: "tsx", conten
   window.__requests=[];window.__errors=[];window.addEventListener('error',event=>window.__errors.push(event.message));
   const paged=items=>({items,pageNumber:1,pageSize:20,totalCount:items.length,totalPages:1});
   const client={listJobs:async()=>paged([]),getSettings:async()=>({settings:{}}),
-    listReportTemplates:async()=>[{templatePath:'invoice_template.dtpl',displayName:'出口发票',withSealDefault:true}],
+    listReportTemplates:async()=>[['invoice_template.dtpl','出口发票'],['packing_list_template.dtpl','装箱单'],['customs_declaration_template.dtpl','报关单']].map(([templatePath,displayName])=>({templatePath,displayName,withSealDefault:true})),
     listInvoices:async input=>{window.__requests.push({kind:'search',keyword:input.keyword});return paged(invoices.filter(invoice=>(invoice.invoiceNo+' '+invoice.customerName).includes(input.keyword||'')).slice(0,20))},
     startInvoiceReportPdfZipDownloadJob:async input=>{window.__requests.push({kind:'zip',body:input.body});throw new Error('模拟依赖不可用，请稍后重试。')},
   };
@@ -147,8 +147,17 @@ try {
   await input('.job-invoice-selection input', "INV041"); await waitFor("document.querySelector('.job-invoice-selection option[value=\"41\"]')");
   await input(select, "41"); assert.equal(await read("document.querySelectorAll('.job-invoice-selection-list li').length"), 2);
   await click('[aria-label="移除发票 INV007"]'); await audit("batch-report-selection");
+  await click('.report-template-checklist input[value="packing_list_template.dtpl"]');
+  await click('.report-template-checklist input[value="customs_declaration_template.dtpl"]');
+  assert(await read("document.querySelector('.job-tool-submit-row').textContent.includes('1 张发票 × 3 种模板 = 3 份 PDF')"));
+  await audit("multiple-report-templates");
+  await click('.report-template-checklist button');
+  assert(await read("document.querySelector('[aria-label=\"批量报表 ZIP 任务\"] button[type=submit]').disabled"), 'empty template selection remains empty');
+  await click('.report-template-checklist input[value="invoice_template.dtpl"]');
+  await click('.report-template-checklist input[value="packing_list_template.dtpl"]');
   await click('[aria-label="批量报表 ZIP 任务"] button[type=submit]'); await waitFor("window.__requests.some(request=>request.kind==='zip')");
   assert.deepEqual(await read("window.__requests.find(request=>request.kind==='zip').body.invoiceIds"), [41]);
+  assert.deepEqual(await read("window.__requests.find(request=>request.kind==='zip').body.templatePaths"), ['invoice_template.dtpl','packing_list_template.dtpl']);
   await waitFor("document.body.innerText.includes('模拟依赖不可用')"); results.push("batch-selection-submit-and-error");
   fs.writeFileSync(path.join(output, "summary.json"), JSON.stringify({ passed: results.length, results }, null, 2));
   process.stdout.write(`Workspace navigation and report selection UI passed (${results.length} cases).\n`);

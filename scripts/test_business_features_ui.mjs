@@ -70,6 +70,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
     getBusinessAttachment:input=>record('getAttachment',input,{attachment:{...attachment},revisions:[...versions],events:[...events],eventCount:events.length}),
     uploadBusinessAttachment:async input=>{
       const fields=Object.fromEntries(input.body.entries()); window.__calls.push({name:'upload',input:{invoiceId:input.invoiceId,fields:{...fields,file:fields.file.name}}});
+      if(window.__failUploadName===fields.file.name) throw new Error('模拟附件上传失败，请重试');
       if(deleted){deleted=false;versions=[];attachment={...attachment,invoiceId:input.invoiceId,invoiceType:invoices.find(item=>item.id===input.invoiceId).type,title:fields.title,categoryId:Number(fields.categoryId),latestRevision:0,currentRevision:null,versionNumber:0};}
       attachment={...attachment,latestRevision:attachment.latestRevision+1,versionNumber:attachment.versionNumber+1};
       versions=[{...versions[0],revision:attachment.latestRevision,fileName:fields.file.name,contentType:fields.file.type,length:fields.file.size,uploadedBy:'示例用户',createdAt:'2026-09-08T04:00:00Z',note:fields.note},...versions];return {...attachment};

@@ -15,7 +15,6 @@ import { createV3RegionMoveConstraint } from "./reportDesignerV3Regions.ts";
 import { resolveV3ResizeGeometry } from "./reportDesignerV3Resize.ts";
 import {
   hundredthMmToMm,
-  reportDesignerV3ElementText,
   reportDesignerV3ElementKindLabel,
   reportDesignerV3PageSize,
   type ReportDesignerV3Element,
@@ -26,11 +25,7 @@ import { reportDesignerLayerBandStyle } from "./reportDesignerLayerBands.ts";
 import { ReportDesignerLayerResizers } from "./ReportDesignerLayerResizers.tsx";
 import { ReportDesignerProductRows } from "./ReportDesignerProductRows.tsx";
 import { useReportDesignerPointerGesture } from "./useReportDesignerPointerGesture.ts";
-import {
-  ReportDesignerCanvasElementPreview,
-  ReportDesignerCanvasResizeHandles,
-  reportDesignerCanvasElementStyle,
-} from "./ReportDesignerCanvasElement.tsx";
+import { ReportDesignerCanvasElementNode } from "./ReportDesignerCanvasElement.tsx";
 import {
   findReportDesignerElementNodes,
   prepareReportDesignerGestureNodes,
@@ -103,6 +98,9 @@ export function ReportDesignerV3Canvas({
   const displayedWidthMm = page.widthMm * zoom;
   const displayedHeightMm = page.heightMm * zoom;
   const selectedSet = new Set(state.selectedIds);
+  const visibleLayers = useMemo(() => state.schema.layers.filter(layer => layer.visible).map(layer => ({
+    layer, elements: layer.elements.filter(element => element.visible).sort((left, right) => left.zIndex - right.zIndex),
+  })), [state.schema.layers]);
   const statusHint = useMemo(() => {
     if (state.selectedIds.length === 1) {
       const found = findV3Element(state.schema, state.selectedIds[0])?.element;
@@ -170,6 +168,34 @@ export function ReportDesignerV3Canvas({
     beginTransform(event, baseState, { kind: "move" });
   }
 
+  function locateEventElement(target: EventTarget | null) {
+    if (!(target instanceof Element)) return null;
+    const node = target.closest<HTMLElement>("[data-v3-element-id]");
+    const located = node?.dataset.v3ElementId ? findV3Element(state.schema, node.dataset.v3ElementId) : null;
+    if (!located || !node) return null;
+    const direction = target.closest<HTMLElement>("[data-v3-resize-direction]")?.dataset.v3ResizeDirection as ReportDesignerV3ResizeDirection | undefined;
+    return { ...located, node, direction };
+  }
+
+  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    const located = locateEventElement(event.target);
+    if (located?.direction) beginResize(event, located.element.id, located.direction);
+    else if (located) beginMove(event, located.element, located.layer.id);
+    else if (!disabled && (event.target === event.currentTarget || event.target instanceof Element && event.target.classList.contains("report-designer-v3-layer"))) onClearSelection();
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const located = locateEventElement(event.target);
+    if (!located) return;
+    if (located.direction) return resizeByKeyboard(event, located.element.id, located.direction);
+    if (disabled || event.target !== located.node) return;
+    if (event.key === "F2") { event.preventDefault(); beginTextEdit(located.node, located.element); }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelect(located.element.id, multiSelect || event.shiftKey || event.ctrlKey || event.metaKey);
+    }
+  }
+
   function beginTextEdit(target: EventTarget | null, element: ReportDesignerV3Element) {
     const located = findV3Element(state.schema, element.id);
     const canvas = canvasRef.current;
@@ -204,7 +230,7 @@ export function ReportDesignerV3Canvas({
     });
   }
 
-  function beginResize(event: ReactPointerEvent<HTMLButtonElement>, elementId: string, direction: ReportDesignerV3ResizeDirection) {
+  function beginResize(event: ReactPointerEvent<HTMLDivElement>, elementId: string, direction: ReportDesignerV3ResizeDirection) {
     if (disabled || event.button !== 0 || pointer.isActive()) return;
     event.preventDefault();
     event.stopPropagation();
@@ -253,7 +279,7 @@ export function ReportDesignerV3Canvas({
     prepareReportDesignerGestureNodes(elementNodes, transform.kind);
   }
 
-  function resizeByKeyboard(event: ReactKeyboardEvent<HTMLButtonElement>, elementId: string, direction: ReportDesignerV3ResizeDirection) {
+  function resizeByKeyboard(event: ReactKeyboardEvent<HTMLDivElement>, elementId: string, direction: ReportDesignerV3ResizeDirection) {
     const step = event.shiftKey ? 1000 : 100;
     const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
     const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
@@ -297,6 +323,7 @@ export function ReportDesignerV3Canvas({
 
   useLayoutEffect(() => {
     pointer.cancel();
+    setTextEdit(null);
   }, [state.schema, zoom, disabled, pointer]);
 
   return (
@@ -341,53 +368,23 @@ export function ReportDesignerV3Canvas({
             event.preventDefault();
             onDropField?.(field, Math.round((event.clientX - rect.left) / rect.width * state.schema.page.widthHundredthMm), Math.round((event.clientY - rect.top) / rect.height * state.schema.page.heightHundredthMm));
           }}
-          onPointerDown={(event) => {
-            if (!disabled && (event.target === event.currentTarget || (event.target instanceof HTMLElement && event.target.classList.contains("report-designer-v3-layer")))) onClearSelection();
+          onPointerDown={handlePointerDown}
+          onKeyDown={handleKeyDown}
+          onDoubleClick={event => {
+            const located = locateEventElement(event.target);
+            if (located && !located.direction) { event.stopPropagation(); beginTextEdit(event.target, located.element); }
           }}
           aria-readonly={disabled || undefined}
           role="region"
           aria-label="v3 报表自由画布"
         >
-          {state.schema.layers.filter((layer) => layer.visible).map((layer) => (
+          {visibleLayers.map(({ layer, elements }) => (
             <div className={`report-designer-v3-layer report-designer-v3-layer-${layer.role.toLowerCase()}${state.activeLayerId === layer.id ? " is-active" : ""}`} key={layer.id} data-v3-layer-id={layer.id} data-v3-layer-name={layer.name} data-v3-layer-role={layer.role} role="group" aria-label={layer.name} aria-current={state.activeLayerId === layer.id ? "true" : undefined}>
               <span className="report-designer-layer-anchor" data-v3-layer-anchor={layer.id} aria-hidden="true" />
-              {[...layer.elements]
-                .filter((element) => element.visible)
-                .sort((left, right) => left.zIndex - right.zIndex)
-                .map((element) => {
-                  const selected = selectedSet.has(element.id);
-                  return (
-                    <div
-                      className={`report-designer-v3-element report-designer-v3-element-${element.type.toLowerCase()}${element.type === "Field" && element.fieldPath.startsWith("item.") ? " is-product-field" : ""}${selected ? " is-selected" : ""}${element.locked || layer.locked ? " is-locked" : ""}`}
-                      key={element.id}
-                      style={{ ...reportDesignerCanvasElementStyle(element), ...(selected ? { zIndex: 100005 } : {}) }}
-                      data-v3-element-id={element.id}
-                      onPointerDown={(event) => beginMove(event, element, layer.id)}
-                      onDoubleClick={(event) => { event.stopPropagation(); beginTextEdit(event.target, element); }}
-                      onKeyDown={(event) => {
-                        if (event.target !== event.currentTarget) return;
-                        if (!disabled && event.key === "F2") { event.preventDefault(); beginTextEdit(event.currentTarget, element); }
-                        if (!disabled && (event.key === "Enter" || event.key === " ")) {
-                          event.preventDefault();
-                          onSelect(element.id, multiSelect || event.shiftKey || event.ctrlKey || event.metaKey);
-                        }
-                      }}
-                      title={`${reportDesignerV3ElementText(element)}${element.locked ? "（已锁定）" : ""}`}
-                      role={disabled ? "img" : "group"}
-                      aria-roledescription={disabled ? undefined : "可移动画布组件"}
-                      tabIndex={disabled ? -1 : 0}
-                      aria-current={!disabled && selected ? "true" : undefined}
-                      aria-disabled={!disabled && (element.locked || layer.locked) || undefined}
-                      aria-label={`${reportDesignerV3ElementText(element)}${element.locked ? "，已锁定" : ""}`}
-                    >
-                      <ReportDesignerCanvasElementPreview element={element} client={client} selectedGridCellId={selectedGridCell?.elementId === element.id ? selectedGridCell.cellId : undefined} />
-                      {!disabled && selected && state.selectedIds.length === 1 && !element.locked && !layer.locked ? (
-                        <ReportDesignerCanvasResizeHandles elementId={element.id} onPointerDown={beginResize} onKeyDown={resizeByKeyboard} />
-                      ) : null}
-                      {selected && (element.locked || layer.locked) ? <span className="report-designer-v3-lock-badge">锁</span> : null}
-                    </div>
-                  );
-                })}
+              {elements.map(element => <ReportDesignerCanvasElementNode key={element.id} element={element} client={client}
+                selected={selectedSet.has(element.id)} singleSelection={selectedSet.has(element.id) && state.selectedIds.length === 1}
+                disabled={disabled} layerLocked={layer.locked}
+                selectedGridCellId={selectedGridCell?.elementId === element.id ? selectedGridCell.cellId : undefined} />)}
             </div>
           ))}
           {showGuides ? <><ReportDesignerProductRows schema={state.schema} /><ReportDesignerLayerResizers schema={state.schema} zoom={zoom} disabled={disabled} onCommit={onCommitLayerBand} /></> : null}

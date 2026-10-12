@@ -36,8 +36,8 @@ export function countElements(schema: { layers: ReportDesignerV3Layer[] }) {
   return schema.layers.reduce((count, layer) => count + layer.elements.length, 0);
 }
 
-export function formatNumber(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+export function formatNumber(value: number, precision = 2) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(precision).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 export function isEditableTarget(target: EventTarget | null) {

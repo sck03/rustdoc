@@ -23,12 +23,13 @@ import { normalizeGridCellContentKind } from "./reportDesignerPropertiesModel.ts
 import { NumberField, SelectField } from "./ReportDesignerV3InspectorControls.tsx";
 import { REPORT_GRID_MAX_COLUMNS, REPORT_GRID_MAX_ROWS } from "./reportDesignerGridPlacement.ts";
 
-export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSelectCell, onCommit }: {
+export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSelectCell, onCommit, widthMm }: {
   block: ReportGridBlock;
   fieldGroups: ReportDesignerFieldGroup[];
   selectedCellId?: string;
   onSelectCell: (cellId: string) => void;
   onCommit: (block: ReportBlock) => void;
+  widthMm: number;
 }) {
   const [tab, setTab] = useState<"cell" | "table">("cell");
   const [widthColumnId, setWidthColumnId] = useState(block.columns[0]?.id ?? "");
@@ -58,6 +59,8 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
   const widthColumn = block.columns[widthIndex];
   const nextWidthColumn = block.columns[widthIndex + 1];
   const adjacentWidthColumn = nextWidthColumn ?? block.columns[widthIndex - 1];
+  const resizeColumn = (value: number) => onCommit(resizeAdjacentGridColumnWidths(block, nextWidthColumn ? widthColumn.id : adjacentWidthColumn.id, (value - widthColumn.widthPercent) * (nextWidthColumn ? 1 : -1)));
+  const maximumPercent = widthColumn.widthPercent + (adjacentWidthColumn?.widthPercent ?? 0) - 1;
   return (
     <div className="new-report-grid-properties">
       <DesignerPropertyTabs value={tab} onChange={setTab} options={[{ value: "cell", label: "单元格" }, { value: "table", label: "整张表" }]}>
@@ -129,7 +132,8 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
         <ColumnWidthStrip columns={block.columns.map((column, index) => ({ id: column.id, title: `列 ${index + 1}`, width: column.widthPercent }))} minWidth={1} unit="%" onResizeBoundary={(leftColumnId, delta) => onCommit(resizeAdjacentGridColumnWidths(block, leftColumnId, delta))} />
         {widthColumn && <details className="report-designer-property-section"><summary>精确列宽</summary>
           <SelectField label="调整列" value={widthColumn.id} options={block.columns.map((column, index) => ({ value: column.id, label: `第 ${index + 1} 列` }))} onChange={setWidthColumnId} />
-          <NumberField label="列宽 (%)" value={widthColumn.widthPercent} min={1} max={widthColumn.widthPercent + (adjacentWidthColumn?.widthPercent ?? 0) - 1} disabled={!adjacentWidthColumn} onCommit={value => onCommit(resizeAdjacentGridColumnWidths(block, nextWidthColumn ? widthColumn.id : adjacentWidthColumn.id, (value - widthColumn.widthPercent) * (nextWidthColumn ? 1 : -1)))} />
+          <NumberField label="列宽 (mm)" value={widthColumn.widthPercent * widthMm / 100} min={widthMm / 100} max={maximumPercent * widthMm / 100} disabled={!adjacentWidthColumn} onCommit={value => resizeColumn(value / widthMm * 100)} />
+          <NumberField label="列宽 (%)" value={widthColumn.widthPercent} min={1} max={maximumPercent} step={0.000001} precision={6} disabled={!adjacentWidthColumn} onCommit={resizeColumn} />
           <small>差额由右侧相邻列承担；最后一列调整左侧相邻列，保持整表宽度。</small>
         </details>}
         <div className="new-report-grid-structure-actions">

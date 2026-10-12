@@ -2,6 +2,24 @@ import assert from 'node:assert/strict';
 import { defaultReportDesigns } from './default-report-designs.mjs';
 
 export function verifyGridAuthoringContracts(api) {
+  const document = api.parseReportDesignerV3Source('', 'ExportDocument').schema;
+  const header = document.layers.find(layer => layer.role === 'Header');
+  let copyState = api.insertV3Element(api.createReportDesignerV3DocumentState(document), header.id, api.createV3FlowElement(api.createGridBlock()));
+  copyState = api.duplicateSelectedV3Elements(copyState);
+  const copied = copyState.schema.layers.find(layer => layer.id === header.id).elements;
+  const identifiers = block => [block.id, ...block.columns.map(column => column.id), ...block.rows.flatMap(row => [row.id, ...row.cells.map(cell => cell.id)])];
+  const sourceIds = new Set(identifiers(copied[0].block));
+  assert(identifiers(copied[1].block).every(id => !sourceIds.has(id)), 'duplicating a grid must create new block, row, column and cell identities accepted by Rust');
+  for (const [, source] of defaultReportDesigns()) for (const element of source.layers.flatMap(layer => layer.elements)) {
+    if (element.type !== 'Flow') continue;
+    const copy = api.copyReportDesignerBlock(element.block);
+    assert.notEqual(copy.id, element.block.id);
+    if (copy.type === 'DetailTable') {
+      const columns = new Map(element.block.columns.map((column, index) => [column.id, copy.columns[index].id]));
+      for (const key of ['summaryRow', 'introRow']) if (copy[key]) assert.deepEqual(copy[key].cells.map(cell => cell.columnId), element.block[key].cells.map(cell => columns.get(cell.columnId)));
+      assert.deepEqual(copy.columns.map(column => column.fieldPath), element.block.columns.map(column => column.fieldPath));
+    }
+  }
   for (let count = 1; count <= 100; count++) {
     const widths = api.createGridColumns(count).map(column => column.widthPercent);
     assert(Math.abs(widths.reduce((sum, width) => sum + width, 0) - 100) < 0.001, 'rounded widths always cover the full table');

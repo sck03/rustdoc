@@ -61,7 +61,8 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
   const workspaceDeviceProfile = useWorkspaceDeviceProfile();
   const workspaceDeviceMode = workspaceDeviceProfile.mode;
   const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
-  const canBatchExport = invoicePackageExportPermission.allowed && jobPermission.canOperate && reportPermission.canView && workspaceDeviceCapabilities.canImportExport;
+  const canAuthorizeBatchExport = invoicePackageExportPermission.allowed && jobPermission.canOperate && reportPermission.canView;
+  const canBatchExport = canAuthorizeBatchExport && workspaceDeviceCapabilities.canImportExport;
   const [initialListViewState] = useState(() => loadListViewState(invoiceListViewStateStorageKey));
   const [keyword, setKeyword] = useState(initialListViewState.keyword);
   const [committedKeyword, setCommittedKeyword] = useState(initialListViewState.keyword);
@@ -643,7 +644,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
         />
       ) : null}
 
-      {canBatchExport && <InvoiceBatchReportPanel client={client} selected={batchInvoices} onChange={setBatchInvoices} />}
+      {canAuthorizeBatchExport && <InvoiceBatchReportPanel hidden={!canBatchExport} client={client} selected={batchInvoices} onChange={setBatchInvoices} />}
       <InvoiceTable
         selection={canBatchExport ? { items: batchInvoices, onChange: setBatchInvoices } : undefined}
         data={invoices?.items ?? []}

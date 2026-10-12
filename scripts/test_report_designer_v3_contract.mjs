@@ -7,6 +7,8 @@ import { verifyDesignerEditingMutations } from "./lib/report-designer-editing-co
 import { verifyGridAuthoringContracts } from "./lib/report-designer-grid-contracts.mjs";
 import { verifyConditionalContracts } from "./lib/report-designer-condition-contracts.mjs";
 import { createShippingMarksScenario } from "./lib/report-shipping-marks-fixture.mjs";
+import { defaultReportDesigns } from "./lib/default-report-designs.mjs";
+import { rebuildDesignerDocument } from "./lib/report-designer-rebuild.mjs";
 
 const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -56,6 +58,8 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerV3WorkspaceHelpers
 export * from ${JSON.stringify(importSpecifier("reportDesignerFields.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerProductFields.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3Insertion.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerPage.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerBlockCopy.ts"))};
 export { resolveDefaultTemplatePath } from ${JSON.stringify(importSpecifier("../reports/reportTemplateDesignerModel.ts"))};
 `);
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
@@ -63,6 +67,12 @@ const api = await import(pathToFileURL(bundlePath).href);
 verifyDesignerEditingMutations(api);
 verifyGridAuthoringContracts(api);
 verifyConditionalContracts(api, repoRoot);
+for (const [name, reference] of defaultReportDesigns()) {
+  const rebuilt = rebuildDesignerDocument(api, reference);
+  const directory = path.join(repoRoot, 'artifacts/report-designer-blank-rebuilds');
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(path.join(directory, path.basename(name, '.dtpl') + '.json'), JSON.stringify(rebuilt));
+}
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 let productState = api.createReportDesignerV3DocumentState(api.parseReportDesignerV3Source("", "ExportDocument").schema);
 for (const name of ["StyleName", "Cartons", "Quantity", "UnitEN", "UnitPrice", "TotalPrice"]) {
@@ -115,9 +125,28 @@ for (const family of ["Noto Sans CJK SC", "Noto Serif CJK SC", "Arial, sans-seri
   assert(/class="edm-v3-element edm-v3-element-text" style="[^"]*font-family: Noto Sans CJK SC;[^\"]*font-weight: 700/.test(html), "衬线正文加粗应选择已有 Sans Bold 字体");
 }
 
-const normalized = api.normalizeReportDesignerV3Schema({ ...landscapeSchema, page: { ...landscapeSchema.page, size: "Custom", widthHundredthMm: 99999, heightHundredthMm: 99999 } });
-assert(normalized.schema?.page.size === "A4", "v3 校验不得保留非 A4 页面");
-assert(normalized.schema?.page.widthHundredthMm === 29700 && normalized.schema?.page.heightHundredthMm === 21000, "v3 校验必须恢复标准横版 A4 尺寸");
+const pageCases = JSON.parse(fs.readFileSync(path.join(repoRoot, "tests/ReportTemplateFixtures/designer-page-cases.json"), "utf8"));
+for (const sample of pageCases) {
+  const draft = api.parseReportDesignerV3Source('', 'ExportDocument').schema;
+  Object.assign(draft.page, sample.page);
+  const result = api.validateReportDesignerV3Draft(draft);
+  assert(result.blocked !== sample.valid, `前后端纸张规则一致：${sample.name}`);
+  if (sample.valid) assert(JSON.stringify(result.schema.page) === JSON.stringify(draft.page), `纸张尺寸不得静默更改：${sample.name}`);
+}
+for (const preset of api.REPORT_PAPER_PRESETS) {
+  let paper = api.createReportDesignerV3DocumentState(api.parseReportDesignerV3Source('', 'ExportDocument').schema);
+  paper = api.updateV3Page(paper, { size: preset.size });
+  assert(paper.schema.page.widthHundredthMm === preset.widthHundredthMm && paper.schema.page.heightHundredthMm === preset.heightHundredthMm, '纸张编辑使用生成的契约尺寸');
+  paper = api.updateV3Page(paper, { orientation: 'Landscape' });
+  assert(paper.schema.page.widthHundredthMm === preset.heightHundredthMm && paper.schema.page.heightHundredthMm === preset.widthHundredthMm, '横版交换标准纸张宽高');
+}
+let customPaper = api.createReportDesignerV3DocumentState(api.parseReportDesignerV3Source('', 'ExportDocument').schema);
+customPaper = api.updateV3Page(customPaper, { size: 'Custom', widthHundredthMm: 8015, heightHundredthMm: 18025 });
+const customLandscape = api.updateV3Page(customPaper, { orientation: 'Landscape' });
+assert(customLandscape.schema.page.widthHundredthMm === 18025 && customLandscape.schema.page.heightHundredthMm === 8015, '自定义方向交换实际尺寸');
+assert(api.updateV3Page(customPaper, { size: 'Custom' }) === customPaper, '未改变纸张不增加历史');
+const changedFont = api.updateV3Page(customPaper, { fontSizePt: 12 });
+assert(changedFont.schema.layers === customPaper.schema.layers, '字体修改不克隆全部图层和组件');
 
 const marginCases = JSON.parse(fs.readFileSync(path.join(repoRoot, "tests/ReportTemplateFixtures/designer-margin-cases.json"), "utf8"));
 for (const sample of marginCases) for (const side of ["Top", "Right", "Bottom", "Left"]) for (const orientation of ["Portrait", "Landscape"]) {
@@ -866,7 +895,7 @@ assert(!unsafeImageHtml.includes("evil.example") && !unsafeImageHtml.includes("h
   assert(api.findV3Element(inserted.schema, grid.id).layer.role === "Header", "区域移动必须保留原快照供撤销使用");
   assert(api.renderReportDesignerV3HtmlFixture(moved.schema).includes('edm-v3-flow-item-grid'), "移到主体的普通表格必须进入正式流式输出");
   const coordinateMove = api.updateV3Element(moved, grid.id, { yHundredthMm: 700 });
-  assert(api.findV3Element(coordinateMove.schema, grid.id).layer.role === "Header", "属性坐标与拖动必须共用区域判断");
+  assert(api.findV3Element(coordinateMove.schema, grid.id).layer.role === "Body", "直接设置坐标必须保留当前打印图层；跨区拖动和显式图层切换另行处理");
   const incorrectOwnership = { ...inserted, schema: { ...inserted.schema, layers: inserted.schema.layers.map(layer => layer.id === header.id
     ? { ...layer, elements: [{ ...grid, yHundredthMm: 10000 }] } : layer) } };
   const repaired = api.moveV3SelectionToRegion(incorrectOwnership, body.id);

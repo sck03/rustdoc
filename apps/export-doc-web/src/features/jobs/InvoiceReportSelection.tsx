@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import type { ApiInvoiceListItemDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { RemoteSelectField } from "../../ui/RemoteSelectField.tsx";
+import { invoiceReportBatchLimits } from "./useInvoiceReportBatchOptions.ts";
 
 export function InvoiceReportSelection({ client, selected, disabled, onChange }: {
   client: ExportDocManagerApiClient;
@@ -10,10 +11,10 @@ export function InvoiceReportSelection({ client, selected, disabled, onChange }:
   onChange: (invoices: ApiInvoiceListItemDto[]) => void;
 }) {
   return <div className="job-invoice-selection">
-    <RemoteSelectField<ApiInvoiceListItemDto> label="选择发票" value="" disabled={disabled || selected.length >= 200}
+    <RemoteSelectField<ApiInvoiceListItemDto> label="选择发票" value="" disabled={disabled || selected.length >= invoiceReportBatchLimits.maxInvoices}
       queryKey={[...queryKeys.invoicesRoot(), "report-selection"]}
       searchPlaceholder="按发票号或客户搜索" emptyLabel="选择发票后加入清单"
-      description="可连续添加多张发票，单次最多 200 张；已选发票显示在下方。"
+      description={`可连续添加多张发票；发票数 × 模板数最多 ${invoiceReportBatchLimits.maxReports} 份 PDF。`}
       loadOptions={async (keyword, signal) => (await client.listInvoices({ pageNumber: 1, pageSize: 20, keyword }, { signal })).items}
       getValue={(invoice) => String(invoice.id)} getLabel={(invoice) => `${invoice.invoiceNo} · ${invoice.customerName}`}
       onChange={(invoice) => { if (invoice && !selected.some((item) => item.id === invoice.id)) onChange([...selected, invoice]); }} />

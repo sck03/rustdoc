@@ -11,7 +11,12 @@ use export_doc_engine::{
 };
 use export_doc_report::Builtin;
 use serde_json::{Value, json};
-use std::{fs, io::Cursor, path::PathBuf, sync::atomic::AtomicBool};
+use std::{
+    fs,
+    io::{Cursor, Read},
+    path::PathBuf,
+    sync::atomic::AtomicBool,
+};
 #[path = "support/invoice_preview_contract.rs"]
 mod invoice_preview_contract;
 #[path = "support/private_template_output.rs"]
@@ -300,7 +305,15 @@ fn builtins_images_pdf_jobs_and_backup_restore_share_the_business_store() {
         .unwrap();
         assert!(pdf.starts_with(b"%PDF-"));
     }
-    let job: BackgroundJobSnapshot = serde_json::from_value(fixture.request(START_INVOICE_REPORT_PDF_ZIP_DOWNLOAD_JOB, &[], &[], Some(json!({"invoiceIds":[invoice.id],"templatePath":Builtin::Invoice.path(),"withSeal":true})))).unwrap();
+    let second = fixture
+        .client()
+        .save_invoice(
+            &InvoiceDraft::demo("2026-09-16", "REPORT-JOB-002")
+                .build()
+                .unwrap(),
+        )
+        .unwrap();
+    let job: BackgroundJobSnapshot = serde_json::from_value(fixture.request(START_INVOICE_REPORT_PDF_ZIP_DOWNLOAD_JOB, &[], &[], Some(json!({"invoiceIds":[invoice.id, second.id],"templatePaths":[Builtin::Invoice.path(), Builtin::PackingList.path(), Builtin::CustomsDeclaration.path()],"withSeal":true})))).unwrap();
     let finished =
         jobs::wait_for_completion(fixture.client(), job, &AtomicBool::new(false)).unwrap();
     let parameters = [("jobId", finished.job_id)];
@@ -309,6 +322,22 @@ fn builtins_images_pdf_jobs_and_backup_restore_share_the_business_store() {
         .bytes(DOWNLOAD_JOB_RESULT, &parameters, &[], None, jobs::PDF_LIMIT)
         .unwrap();
     assert!(archive.starts_with(b"PK"));
+    let mut entries = zip::ZipArchive::new(Cursor::new(&archive)).unwrap();
+    assert_eq!(entries.len(), 6, "two invoices times three templates");
+    let mut names = std::collections::BTreeSet::new();
+    for index in 0..entries.len() {
+        let mut entry = entries.by_index(index).unwrap();
+        assert!(
+            names.insert(entry.name().to_owned()),
+            "all report names must be unique"
+        );
+        let mut signature = [0; 5];
+        entry.read_exact(&mut signature).unwrap();
+        assert_eq!(&signature, b"%PDF-");
+    }
+    for number in ["REPORT-JOB-001", "REPORT-JOB-002"] {
+        assert_eq!(names.iter().filter(|name| name.contains(number)).count(), 3);
+    }
     fixture.request(CREATE_DATABASE_BACKUP, &[], &[], None);
     let backups = fixture.request(LIST_DATABASE_BACKUPS, &[], &[], None);
     let name = backups["backups"][0]["fileName"].as_str().unwrap();

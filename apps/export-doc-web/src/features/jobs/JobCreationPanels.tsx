@@ -8,17 +8,18 @@ import {
   selectSaveZipPath,
 } from "../../desktop/desktopBridge.ts";
 import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
-import { SelectField } from "../../ui/FormFields.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { PathField, PathTextAreaField } from "../../ui/PathField.tsx";
-import { fileNameFromPath, readPathLines } from "./jobPresentation.ts";
+import { readPathLines } from "./jobPresentation.ts";
 import { InvoiceReportSelection } from "./InvoiceReportSelection.tsx";
+import { ReportTemplateChecklist } from "./ReportTemplateChecklist.tsx";
+import { invoiceReportBatchIssue } from "./useInvoiceReportBatchOptions.ts";
 
 export function InvoiceReportZipJobPanel({
   client,
   invoices,
   destinationPath,
-  templatePath,
+  templatePaths,
   withSeal,
   templates,
   templateErrorMessage,
@@ -27,7 +28,7 @@ export function InvoiceReportZipJobPanel({
   canSubmit,
   onInvoicesChange,
   onDestinationPathChange,
-  onTemplatePathChange,
+  onTemplatePathsChange,
   onWithSealChange,
   onSubmit,
   onMessage,
@@ -36,7 +37,7 @@ export function InvoiceReportZipJobPanel({
   client: ExportDocManagerApiClient;
   invoices: ApiInvoiceListItemDto[];
   destinationPath: string;
-  templatePath: string;
+  templatePaths: string[];
   withSeal: boolean;
   templates: ApiReportTemplateDto[];
   templateErrorMessage: string | null;
@@ -45,7 +46,7 @@ export function InvoiceReportZipJobPanel({
   canSubmit: boolean;
   onInvoicesChange: (value: ApiInvoiceListItemDto[]) => void;
   onDestinationPathChange: (value: string) => void;
-  onTemplatePathChange: (value: string) => void;
+  onTemplatePathsChange: (value: string[]) => void;
   onWithSealChange: (value: boolean) => void;
   onSubmit: () => void;
   onMessage: (message: string | null) => void;
@@ -53,12 +54,7 @@ export function InvoiceReportZipJobPanel({
 }) {
   const desktopAvailable = isDesktopBridgeAvailable();
 
-  function handleTemplateChange(value: string) {
-    onTemplatePathChange(value);
-    const template = templates.find((item) => item.templatePath === value);
-    if (template) onWithSealChange(template.withSealDefault ?? true);
-    onMessage(null);
-  }
+  const issue = invoiceReportBatchIssue(invoices.length, templatePaths, templates);
 
   async function pickDestination() {
     try {
@@ -75,7 +71,7 @@ export function InvoiceReportZipJobPanel({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onMessage(null);
-    onSubmit();
+    if (canSubmit && !issue) onSubmit();
   }
 
   return (
@@ -86,16 +82,7 @@ export function InvoiceReportZipJobPanel({
           onChange={(value) => { onInvoicesChange(value); onMessage(null); }} />
         <div className="job-tool-stack">
           <div className="report-zip-options">
-            <SelectField
-              label="模板"
-              value={templatePath}
-              disabled={disabled || isTemplateLoading || templates.length === 0}
-              options={templates.map((template) => ({
-                value: template.templatePath,
-                label: template.displayName || fileNameFromPath(template.templatePath),
-              }))}
-              onChange={handleTemplateChange}
-            />
+            <ReportTemplateChecklist templates={templates} selected={templatePaths} disabled={disabled || isTemplateLoading} onChange={paths => { onTemplatePathsChange(paths); onMessage(null); }} />
             <label className="checkbox-field">
               <input
                 type="checkbox"
@@ -125,12 +112,13 @@ export function InvoiceReportZipJobPanel({
         </div>
       </div>
       <div className="job-tool-submit-row">
-        <span>{invoices.length} 张发票</span>
-        <button className="solid action-button" type="submit" disabled={!canSubmit}>
+        <span>{invoices.length} 张发票 × {templatePaths.length} 种模板 = {invoices.length * templatePaths.length} 份 PDF</span>
+        <button className="solid action-button" type="submit" disabled={!canSubmit || Boolean(issue)}>
           <Play size={16} aria-hidden="true" />
           <span>{desktopAvailable ? "开始" : "生成并下载"}</span>
         </button>
       </div>
+      {issue && invoices.length > 0 && !isTemplateLoading && <InlineNotice tone="warning">{issue}</InlineNotice>}
     </form>
   );
 }

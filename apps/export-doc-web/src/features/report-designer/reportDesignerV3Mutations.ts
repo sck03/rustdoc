@@ -1,8 +1,10 @@
 import { getV3InsertionIssue, getV3ProductLayoutIssue } from "./reportDesignerV3Insertion.ts";
+import { updateReportPageGeometry } from "./reportDesignerPage.ts";
+import { copyReportDesignerBlock } from "./reportDesignerBlockCopy.ts";
 import {
   clampReportDesignerV3ElementToPage, mmToHundredthMm,
   REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER, REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS,
-  reportDesignerV3PageDimensions, type ReportDesignerV3Element,
+  REPORT_DESIGNER_V3_MAX_PAGE_MARGIN, type ReportDesignerV3Element,
   type ReportDesignerV3Layer, type ReportDesignerV3Page, type ReportDesignerV3Schema,
 } from "./reportDesignerV3Schema.ts";
 import {
@@ -113,24 +115,12 @@ export function updateV3Page(
   state: ReportDesignerV3DocumentState,
   update: Partial<ReportDesignerV3Page>,
 ): ReportDesignerV3DocumentState {
-  // Runtime callers can still pass data from an uncontrolled form or an old
-  // WebView even though TypeScript narrows the type.  Never let an invalid
-  // orientation leak into the persisted schema; keep the current valid value
-  // and derive dimensions from that canonical enum.
-  const nextOrientation = update.orientation === "Landscape" || update.orientation === "Portrait"
-    ? update.orientation
-    : state.schema.page.orientation === "Landscape"
-      ? "Landscape"
-      : "Portrait";
-  const dimensions = reportDesignerV3PageDimensions(nextOrientation);
   const nextPage: ReportDesignerV3Page = {
     ...state.schema.page,
     ...update,
-    size: "A4",
-    orientation: nextOrientation,
-    widthHundredthMm: dimensions.width,
-    heightHundredthMm: dimensions.height,
+    ...updateReportPageGeometry(state.schema.page, update),
   };
+  const dimensions = { width: nextPage.widthHundredthMm - 1, height: nextPage.heightHundredthMm - 1 };
   nextPage.marginTopHundredthMm = normalizeMargin(nextPage.marginTopHundredthMm, dimensions.height);
   nextPage.marginBottomHundredthMm = normalizeMargin(
     nextPage.marginBottomHundredthMm,
@@ -141,22 +131,15 @@ export function updateV3Page(
     nextPage.marginRightHundredthMm,
     Math.max(0, dimensions.width - nextPage.marginLeftHundredthMm),
   );
-  const nextSchema: ReportDesignerV3Schema = {
-    ...state.schema,
-    page: nextPage,
-    layers: state.schema.layers.map((layer) => ({
-      ...layer,
-      elements: layer.elements.map((element) => clampReportDesignerV3ElementToPage(element, nextPage)),
-    })),
-  };
-  if (sameV3Page(state.schema.page, nextPage) &&
-      nextSchema.layers.every((layer, index) => layer.elements.every((element, elementIndex) =>
-        areV3ElementsEqual(element, state.schema.layers[index]?.elements[elementIndex] ?? element)))) {
-    return state;
-  }
+  if (sameV3Page(state.schema.page, nextPage)) return state;
+  const geometryChanged = nextPage.widthHundredthMm !== state.schema.page.widthHundredthMm || nextPage.heightHundredthMm !== state.schema.page.heightHundredthMm;
+  const layers = geometryChanged ? state.schema.layers.map(layer => {
+    const elements = layer.elements.map(element => clampReportDesignerV3ElementToPage(element, nextPage));
+    return elements.every((element, index) => element === layer.elements[index]) ? layer : { ...layer, elements };
+  }) : state.schema.layers;
   return {
     ...state,
-    schema: nextSchema,
+    schema: { ...state.schema, page: nextPage, layers },
   };
 }
 
@@ -203,7 +186,7 @@ export function moveSelectedV3Elements(
       xHundredthMm: element.xHundredthMm + boundedDx,
       yHundredthMm: element.yHundredthMm + boundedDy,
     }, state.schema.page);
-  });
+  }, true);
 }
 
 /**
@@ -384,6 +367,7 @@ export function pasteV3Elements(
     const maxZ = targetLayer.elements.reduce((max, item) => Math.max(max, item.zIndex), -1) + (additionsByLayer.get(targetLayer.id)?.length ?? 0) + 1;
     const cloned = placeV3ElementInRegion(state.schema, targetLayer, {
       ...element,
+      ...(element.type === "Flow" ? { block: copyReportDesignerBlock(element.block) } : {}),
       id,
       xHundredthMm: element.xHundredthMm + mmToHundredthMm(5),
       yHundredthMm: element.yHundredthMm + mmToHundredthMm(5),
@@ -536,6 +520,7 @@ function updateV3Elements(
   state: ReportDesignerV3DocumentState,
   selected: Set<string>,
   update: (element: ReportDesignerV3Element, layer: ReportDesignerV3Layer) => ReportDesignerV3Element,
+  reassignMoved = false,
 ): ReportDesignerV3DocumentState {
   let changed = false;
   const moved = new Set<string>();
@@ -543,7 +528,7 @@ function updateV3Elements(
     const elements = layer.elements.map((element) => {
       if (!selected.has(element.id)) return element;
       const next = update(element, layer);
-      if (next.xHundredthMm !== element.xHundredthMm || next.yHundredthMm !== element.yHundredthMm) moved.add(element.id);
+      if (reassignMoved && (next.xHundredthMm !== element.xHundredthMm || next.yHundredthMm !== element.yHundredthMm)) moved.add(element.id);
       if (!areV3ElementsEqual(element, next)) changed = true;
       return next;
     });
@@ -597,7 +582,7 @@ function areStyleValuesEqual(
 
 function normalizeMargin(value: number, maximum: number) {
   const parsed = Number.isFinite(value) ? Math.round(value) : 0;
-  return Math.min(Math.max(0, maximum), Math.max(0, parsed));
+  return Math.min(REPORT_DESIGNER_V3_MAX_PAGE_MARGIN, Math.max(0, maximum), Math.max(0, parsed));
 }
 
 export function getV3ElementCapacityIssue(

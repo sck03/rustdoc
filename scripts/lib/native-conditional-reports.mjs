@@ -70,6 +70,16 @@ export async function verifyDesktopConditionalReports({ run, request, token, cdp
   assert.match(preview.body.html, /Special Terms: DELIVERY BY APPOINTMENT/);
   assert.match(preview.body.html, /备注：仅作模板验收/);
   fs.writeFileSync(path.join(output, 'desktop-conditional-preview.html'), preview.body.html);
+  const zipPath = path.join(output, 'desktop-multiple-reports.zip');
+  const zipJob = await request('StartInvoiceReportPdfZipSaveToPathJob', token, {
+    invoiceIds: [invoiceId], reportType: 'ExportDocument', withSeal: true, destinationPath: zipPath,
+    templatePaths: [`user-template:${cloned.body.id}`, ...['invoice_template.dtpl', 'packing_list_template.dtpl', 'contract_template.dtpl', 'customs_declaration_template.dtpl'].map(fileTemplate)],
+  });
+  assert.equal(zipJob.status, 202, JSON.stringify(zipJob.body));
+  await waitFor(() => fs.existsSync(zipPath), 90000, 'Desktop multi-template ZIP missing');
+  const archive = fs.readFileSync(zipPath), directoryEnd = archive.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  assert(directoryEnd >= 0);
+  assert.equal(archive.readUInt16LE(directoryEnd + 10), 5, 'desktop ZIP contains all five selected reports');
   for (const [name, templatePath] of [
     ['invoice', `user-template:${cloned.body.id}`], ['packing', fileTemplate('packing_list_template.dtpl')],
     ['contract', fileTemplate('contract_template.dtpl')], ['customs', fileTemplate('customs_declaration_template.dtpl')],

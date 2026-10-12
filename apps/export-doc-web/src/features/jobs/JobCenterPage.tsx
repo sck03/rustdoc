@@ -12,7 +12,7 @@ import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { listPageSizeOptions, loadListViewState, normalizeListPageSize, saveListViewState } from "../../ui/listViewState.ts";
 import { readApiError } from "../../ui/formUtils.ts";
-import { readDefaultReportTemplatePath, resolveReportTemplatePath } from "../reports/reportTemplateSelectionModel.ts";
+import { readDefaultReportTemplatePath } from "../reports/reportTemplateSelectionModel.ts";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
 import { InvoiceReportZipJobPanel, PdfMergeJobPanel } from "./JobCreationPanels.tsx";
 import { JobTable } from "./JobTable.tsx";
@@ -91,6 +91,8 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
     canCreateInvoiceReportZip,
     desktopAvailable,
     defaultExportDirectory,
+    reportTemplates: reportTemplatesQuery.data ?? [],
+    configuredReportTemplatePath,
     jobsCount: jobsQuery.data?.items?.length ?? 0,
     focusJob,
     clearFocusedJob,
@@ -101,7 +103,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
     pdfUploadFiles,
     reportInvoices,
     reportZipDestination,
-    reportTemplatePath,
+    reportTemplatePaths,
     reportWithSeal,
     reportInvoiceIdList,
     canStartPdfMerge,
@@ -123,16 +125,6 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
     saveListViewState(jobListViewStateStorageKey, { keyword: committedKeyword, pageSize });
   }, [committedKeyword, focusedJobId, pageSize]);
 
-  useEffect(() => {
-    const templates = reportTemplatesQuery.data ?? [];
-    if (!templates.length || settingsQuery.isFetching) return;
-    const nextPath = resolveReportTemplatePath({ templates, currentPath: reportTemplatePath,
-      configuredPath: configuredReportTemplatePath, fallbackFileName: "invoice_template.dtpl" });
-    if (nextPath === reportTemplatePath) return;
-    const preferredTemplate = templates.find((template) => template.templatePath === nextPath);
-    operations.setReportTemplatePath(nextPath);
-    operations.setReportWithSeal(preferredTemplate?.withSealDefault ?? true);
-  }, [configuredReportTemplatePath, operations, reportTemplatePath, reportTemplatesQuery.data, settingsQuery.isFetching]);
   function applyFilters(nextKeyword = keyword, nextStatus = status) {
     const next = commitJobCenterFilters(nextKeyword, nextStatus);
     clearFocusedJob();
@@ -198,16 +190,16 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
                 client={client}
                 invoices={reportInvoices}
                 destinationPath={reportZipDestination}
-                templatePath={reportTemplatePath}
+                templatePaths={reportTemplatePaths}
                 withSeal={reportWithSeal}
                 templates={reportTemplates}
                 templateErrorMessage={reportTemplateErrorMessage}
                 isTemplateLoading={reportTemplatesQuery.isFetching}
                 disabled={isActionBusy}
-                canSubmit={canStartReportZip && !reportTemplatesQuery.isFetching}
+                canSubmit={canStartReportZip && !reportTemplatesQuery.isFetching && !reportTemplatesQuery.isError}
                 onInvoicesChange={operations.setReportInvoices}
                 onDestinationPathChange={operations.setReportZipDestination}
-                onTemplatePathChange={operations.setReportTemplatePath}
+                onTemplatePathsChange={operations.setReportTemplatePaths}
                 onWithSealChange={operations.setReportWithSeal}
                 onSubmit={() => operations.reportZipMutation.mutate()}
                 onMessage={operations.handleChildMessage}

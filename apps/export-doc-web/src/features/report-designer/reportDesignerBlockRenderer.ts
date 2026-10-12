@@ -71,7 +71,7 @@ function renderBlock(block: ReportBlock, preview = false, heightMm?: number) {
 function renderGridBlock(block: Extract<ReportBlock, { type: "Grid" }>, preview: boolean) {
   const columnWidthTotal = block.columns.reduce((sum, column) => sum + Math.max(1, column.widthPercent), 0);
   const colgroup = `<colgroup>${block.columns.map((column) => {
-    const width = Math.round((Math.max(1, column.widthPercent) / columnWidthTotal) * 10000) / 100;
+    const width = Math.max(1, column.widthPercent) / columnWidthTotal * 100;
     return `<col style="width: ${width}%;">`;
   }).join("")}</colgroup>`;
   const rows = block.rows.map((row, rowIndex) => `<tr${row.heightMm ? ` style="height: ${row.heightMm}mm;"` : ""}>${row.cells.map((cell) => {

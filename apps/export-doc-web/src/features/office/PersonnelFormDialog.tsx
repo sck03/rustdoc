@@ -66,7 +66,7 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
           <AttachmentDraftFields draft={attachments} busy={operation.busy} kind="IdentityFront" label="选择身份证人像面（正面）" />
           <AttachmentDraftFields draft={attachments} busy={operation.busy} kind="IdentityBack" label="选择身份证国徽面（反面）" />
         </details>
-        <AttachmentDraftFields draft={attachments} busy={operation.busy} label="选择档案图片或文档" />
+        <AttachmentDraftFields draft={attachments} busy={operation.busy} label="选择档案图片或文档" existingFiles={attachments.saved?.attachments} />
       </fieldset>
       {operation.error && attachments.saved && <p role="status">档案已保存，待保存文件仍保留。再次保存会继续处理剩余文件。</p>}
       <OfficeSubmit busy={operation.busy} label={record ? "保存档案" : "登记入职"} />

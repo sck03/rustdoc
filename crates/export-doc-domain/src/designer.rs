@@ -1,10 +1,10 @@
 use crate::generated_api::ApiReportTemplateFieldCatalogResponse;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
 
 pub mod composite;
 pub mod conditions;
 pub mod grid;
+pub mod page;
 mod report_blocks;
 pub use conditions::{ComparisonType, ConditionMatch, ConditionOperator, ConditionalRule};
 pub use report_blocks::{
@@ -693,106 +693,11 @@ impl Design {
             kind,
         });
     }
-    pub fn element(&self, id: &str) -> Option<&Element> {
-        self.layers
-            .iter()
-            .flat_map(|layer| &layer.elements)
-            .find(|element| element.id == id)
-    }
     pub fn element_mut(&mut self, id: &str) -> Option<&mut Element> {
         self.layers
             .iter_mut()
             .flat_map(|layer| &mut layer.elements)
             .find(|element| element.id == id)
-    }
-    pub fn editable(&self, id: &str) -> bool {
-        self.layers.iter().any(|layer| {
-            layer.visible
-                && !layer.locked
-                && layer
-                    .elements
-                    .iter()
-                    .any(|element| element.id == id && !element.locked && element.visible)
-        })
-    }
-    pub fn add(&mut self, kind: Kind, layer_index: usize) -> Result<String, String> {
-        if self
-            .layers
-            .iter()
-            .map(|layer| layer.elements.len())
-            .sum::<usize>()
-            >= 200
-        {
-            return Err("验证版单模板最多 200 个组件。".into());
-        }
-        if self
-            .layers
-            .get(layer_index)
-            .is_none_or(|layer| layer.locked || !layer.visible || layer.role == "Body")
-        {
-            return Err("请选择可编辑的页眉或页脚图层。".into());
-        }
-        let mut index = 1;
-        while self.element(&format!("element-{index}")).is_some() {
-            index += 1;
-        }
-        let id = format!("element-{index}");
-        let y = if self.layers[layer_index].role == "Footer" {
-            27000
-        } else {
-            7000
-        };
-        self.insert(layer_index, &id, kind, [1000, y, 6000, 800], 10., false);
-        Ok(id)
-    }
-    pub fn move_selection(&mut self, selected: &BTreeSet<String>, dx: i32, dy: i32) {
-        let elements: Vec<_> = selected
-            .iter()
-            .filter(|id| self.editable(id))
-            .filter_map(|id| self.element(id))
-            .collect();
-        if elements.is_empty() {
-            return;
-        }
-        let left = elements.iter().map(|e| e.x_hundredth_mm).min().unwrap();
-        let top = elements.iter().map(|e| e.y_hundredth_mm).min().unwrap();
-        let right = elements
-            .iter()
-            .map(|e| e.x_hundredth_mm + e.width_hundredth_mm)
-            .max()
-            .unwrap();
-        let bottom = elements
-            .iter()
-            .map(|e| e.y_hundredth_mm + e.height_hundredth_mm)
-            .max()
-            .unwrap();
-        let snap = |value: i32| {
-            if self.grid.snap {
-                (value as f32 / self.grid.size_hundredth_mm as f32).round() as i32
-                    * self.grid.size_hundredth_mm
-            } else {
-                value
-            }
-        };
-        let dx = (snap(left + dx) - left).clamp(-left, self.page.width_hundredth_mm - right);
-        let dy = (snap(top + dy) - top).clamp(-top, self.page.height_hundredth_mm - bottom);
-        let ids: Vec<_> = elements.iter().map(|element| element.id.clone()).collect();
-        for id in ids {
-            let element = self.element_mut(&id).unwrap();
-            element.x_hundredth_mm += dx;
-            element.y_hundredth_mm += dy;
-        }
-    }
-    pub fn remove_selection(&mut self, selected: &BTreeSet<String>) {
-        for layer in &mut self.layers {
-            if !layer.locked {
-                layer.elements.retain(|element| {
-                    !selected.contains(&element.id)
-                        || element.locked
-                        || matches!(element.kind, Kind::Flow { .. })
-                });
-            }
-        }
     }
     pub fn from_source(source: &str) -> Result<Self, String> {
         let design: Self = serde_json::from_str(source.trim())
@@ -804,23 +709,5 @@ impl Design {
             return Err("模板版本或数据域不受支持。".into());
         }
         Ok(design)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn drag_clamps_group_and_respects_locked_elements() {
-        let mut design = Design::invoice();
-        design.grid.snap = false;
-        let ids = BTreeSet::from(["title".into(), "exporter".into()]);
-        design.move_selection(&ids, -99999, -99999);
-        assert_eq!(design.element("title").unwrap().x_hundredth_mm, 0);
-        assert_eq!(design.element("exporter").unwrap().y_hundredth_mm, 1300);
-        design.element_mut("title").unwrap().locked = true;
-        let before = design.element("title").unwrap().clone();
-        design.move_selection(&ids, 500, 500);
-        assert_eq!(*design.element("title").unwrap(), before);
     }
 }
