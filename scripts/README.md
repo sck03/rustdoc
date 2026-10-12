@@ -180,6 +180,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 - 异步生命周期：`npm --prefix apps/export-doc-web run test:abortable-operations-ui` 验证资料切换、卸载后的迟到成功/失败、保存后刷新期间离开页面，以及商机/供货产品初始加载与连续搜索的返回顺序；`test:business-features-ui` 另验证真实资料页面不会显示旧预览及旧错误。
 - 依赖：`generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository`，要求 `unresolved=0 / disallowed=0`。
 - 平台：`verify-native-desktop.mjs` 验证 Tauri／SQLite，排除 Slint／egui／PostgreSQL 桌面依赖；`assert-tauri-command-permissions.ps1` 校验 command 与能力白名单。
+- Windows 桌面：`node scripts/test_native_desktop_editions.mjs [包父目录] Full --without-ocr` 验证独立 Full 测试包的 About、设计器、托单与业务资料操作。可设置 `EXPORTDOCMANAGER_DESKTOP_VALIDATION_OUTPUT_ROOT` 指定隔离验收输出父目录；默认是仓库 `artifacts/edition-validation`，不会使用程序包的 App_Data。
 - Windows 退出：`node scripts/test_native_desktop_shutdown.mjs [便携包目录] [EXE路径]` 使用隔离 DataRoot 验证真实 React/WebView2、重复退出、宿主异常终止、独立窗口不受影响及 HTTP 端口释放。调试端口仅注入测试子进程，不修改正式配置；其它 OS 需独立验收。
 - 脚本：`verify-script-suite.ps1`、`verify-github-workflow-actions.mjs`、`test_tauri_updater_release_contract.mjs`、`github/verify-public-source.ps1`、`git diff --check`。
 

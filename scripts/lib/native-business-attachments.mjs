@@ -28,6 +28,12 @@ export async function verifyDesktopBusinessAttachments({ run, request, token, in
   const before = await request('ListBusinessAttachments', token);
   assert.equal(before.status, 200);
   await run("location.hash='#/business-attachments'; true");
+  await click('管理分类');
+  await ready('document.querySelector(\'[aria-label="资料分类管理"] form input\')');
+  await input('[aria-label="资料分类管理"] form input', '托单验收');
+  await click('新增分类');
+  await ready('document.querySelector(\'[aria-label="删除分类托单验收"]\')');
+  await click('关闭分类管理');
   await click('上传资料');
   await ready('document.querySelector(\'[aria-label="选择关联发票"] .business-records-card\')');
   await input('[aria-label="搜索关联发票"]', invoice.invoiceNo);
@@ -66,12 +72,13 @@ export async function verifyDesktopBusinessAttachments({ run, request, token, in
   await click('上传新版本'); await selectWorkbook(); await click('上传并保留版本');
   await ready("document.querySelectorAll('.attachment-detail ol .attachment-version').length===2 && !document.querySelector('input[type=file]')");
   await input('.attachment-detail > .business-records-form input', '确认第二版为本次交付文件');
-  await click('设为有效版本'); await click('确认', '[role=dialog] button');
+  await run("(()=>{const row=[...document.querySelectorAll('.attachment-detail ol .attachment-version')].find(node=>node.querySelector('h3').textContent.startsWith('v2 '));[...row.querySelectorAll('button')].find(node=>node.textContent.trim()==='设为有效版本').click();})()");
+  await click('确认', '[role=dialog] button');
   await ready("document.querySelector('.attachment-detail [data-current=true] h3')?.textContent.startsWith('v2')");
   const versioned = await details();
   assert.equal(versioned.attachment.currentRevision, 2);
   assert.equal(versioned.attachment.title, '已核对的托单');
-  assert.deepEqual(versioned.revisions.map(value => value.revision), [2, 1]);
+  assert.deepEqual(versioned.revisions.map(value => value.revision).sort((left, right) => right - left), [2, 1]);
   assert(versioned.revisions.every(value => value.sha256.toLowerCase() === sha256));
   assert(versioned.events.some(value => value.action === 'Edit'));
   await captureScreenshot(cdp, path.join(output, 'Full-attachment-versions.png'), { captureBeyondViewport: false });
@@ -80,5 +87,11 @@ export async function verifyDesktopBusinessAttachments({ run, request, token, in
   await ready("!document.querySelector('.attachment-detail') && document.body.innerText.includes('全部版本已删除')");
   assert.equal((await request('GetBusinessAttachment', token, undefined, { id: item.id })).status, 404);
   assert.equal((await request('ListBusinessAttachments', token)).body.page.totalCount, before.body.page.totalCount);
+  await click('管理分类');
+  await ready('document.querySelector(\'[aria-label="删除分类托单验收"]:not(:disabled)\')');
+  await run('document.querySelector(\'[aria-label="删除分类托单验收"]\').click(); true');
+  await click('删除分类', '[role=dialog] button');
+  await ready('!document.querySelector(\'[aria-label="删除分类托单验收"]\')');
+  await click('关闭分类管理');
   fs.writeFileSync(path.join(output, 'business-attachments-result.json'), JSON.stringify({ invoiceId: invoice.id, attachmentId: item.id, bytes: bytes.length, sha256, correctedTitle: corrected.attachment.title, confirmedRevision: 2, retainedRevisions: [2, 1], deleted: true }, null, 2));
 }

@@ -16,7 +16,7 @@ import { verifyDesktopBusinessAttachments } from './lib/native-business-attachme
 assert.equal(process.platform, 'win32', 'This gate exercises Windows WebView2 packages.');
 const repo = path.resolve(import.meta.dirname, '..');
 const packages = path.resolve(process.argv[2] || path.join(repo, 'artifacts/native-desktop'));
-const output = path.join(repo, 'artifacts/edition-validation', `desktop-${Date.now()}`);
+const output = path.resolve(process.env.EXPORTDOCMANAGER_DESKTOP_VALIDATION_OUTPUT_ROOT || path.join(repo, 'artifacts/edition-validation'), `desktop-${Date.now()}`);
 fs.mkdirSync(output, { recursive: true });
 const openapi = JSON.parse(fs.readFileSync(path.join(repo, 'crates/export-doc-contracts/src/openapi.json'), 'utf8'));
 const operations = new Map(Object.entries(openapi.paths).flatMap(([url, methods]) =>
