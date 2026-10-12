@@ -15,6 +15,23 @@ export function gridCellAt(locations: ReportGridCellLocation[], row: number, col
     column >= location.columnIndex && column < location.columnIndex + location.colSpan) ?? null;
 }
 
+export function formatGridCellAddress(rowIndex: number, columnIndex: number) {
+  let letters = "";
+  for (let column = columnIndex + 1; column > 0; column = Math.floor((column - 1) / 26)) {
+    letters = String.fromCharCode(65 + (column - 1) % 26) + letters;
+  }
+  return `${letters}${rowIndex + 1}`;
+}
+
+export function parseGridCellAddress(value: string) {
+  const address = /^([A-Z]{1,2})([1-9]\d{0,3})$/.exec(value.trim().toUpperCase());
+  const pair = /^([1-9]\d{0,3})\s*[,，]\s*([1-9]\d{0,2})$/.exec(value.trim());
+  const row = address ? Number(address[2]) : pair ? Number(pair[1]) : 0;
+  const column = address ? [...address[1]].reduce((total, letter) => total * 26 + letter.charCodeAt(0) - 64, 0) : pair ? Number(pair[2]) : 0;
+  return row >= 1 && row <= REPORT_GRID_MAX_ROWS && column >= 1 && column <= REPORT_GRID_MAX_COLUMNS
+    ? { rowIndex: row - 1, columnIndex: column - 1 } : null;
+}
+
 export function adjacentGridCell(block: ReportGridBlock, cellId: string, direction: "left" | "right" | "up" | "down", locations = getGridCellLocations(block)) {
   const current = locations.find(location => location.cell.id === cellId);
   if (!current) return null;

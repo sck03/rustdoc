@@ -103,6 +103,11 @@ export function verifyGridAuthoringContracts(api) {
     for (const index of [-1, 2, NaN, 0.5]) assert.equal(api.editGridTrack(single, axis, index, 'insert'), single);
   }
   assert.equal(api.gridCellAt(api.getGridCellLocations(merged), 1, 1).cell.id, mergedId);
+  for (let column = 0; column < 100; column++) {
+    assert.deepEqual(api.parseGridCellAddress(api.formatGridCellAddress(999, column)), { rowIndex: 999, columnIndex: column });
+  }
+  for (const address of ['d4', '4,4', ' 4，4 ']) assert.deepEqual(api.parseGridCellAddress(address), { rowIndex: 3, columnIndex: 3 });
+  for (const address of ['', 'A0', 'A1001', 'CW1', 'ZZ1', '-1,2', '1,0', '1.5,2']) assert.equal(api.parseGridCellAddress(address), null);
   assert.equal(api.setGridRowsToUniformHeight(single, single.rows[0].heightMm), single);
 
   for (const reportType of ['ExportDocument', 'PaymentVoucher']) {

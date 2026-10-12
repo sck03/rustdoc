@@ -37,8 +37,7 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
     await run('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
   };
   const cell = async (row, column) => {
-    await fill('定位列', column);
-    await fill('定位行', row);
+    await fill('单元格位置', `${String.fromCharCode(64 + column)}${row}`);
     await button('单元格');
   };
   await run(`location.hash=${JSON.stringify('#/reports/templates?reportType=PaymentVoucher&userTemplateId=' + created.body.id)}; true`);
@@ -80,7 +79,7 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   await button('整张表');
   await button('上方插入行');
   await wait(`${control('行数')}.value==='6'`);
-  await fill('定位行', 4);
+  await fill('单元格位置', 'B4');
   await button('删除当前行');
   await wait(`${control('行数')}.value==='5'`);
   await button('撤销', '.report-designer-v3-toolbar');
@@ -91,7 +90,7 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   await button('整张表');
   await button('左侧插入列');
   await wait(`${control('列数')}.value==='8'`);
-  await fill('定位列', 4);
+  await fill('单元格位置', 'D4');
   await button('删除当前列');
   await wait(`${control('列数')}.value==='7'`);
   await cell(4, 2);

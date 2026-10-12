@@ -1,7 +1,7 @@
 import { createGridCell, createGridColumns, createGridRow } from "./reportDesignerBlockFactories.ts";
 import type { ReportBorderStyle, ReportGridBlock, ReportGridCell } from "./reportDesignerSchema.ts";
 import { emptyGridCell, getGridCellLocations, type ReportGridCellLocation } from "./reportDesignerGridStructure.ts";
-export { adjacentGridCell, getGridCellLocations, gridCellAt, editGridTrack, resizeGridStructure, mergeGridCellRight, mergeGridCellDown,
+export { adjacentGridCell, getGridCellLocations, gridCellAt, formatGridCellAddress, parseGridCellAddress, editGridTrack, resizeGridStructure, mergeGridCellRight, mergeGridCellDown,
   canMergeGridCellRight, canMergeGridCellDown, splitGridCell, setGridRowsToUniformHeight, type ReportGridCellLocation } from "./reportDesignerGridStructure.ts";
 
 export type ReportGridPreset = "Blank" | "Form" | "Approval";

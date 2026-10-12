@@ -1,7 +1,8 @@
+import { useState } from "react";
 import type { ReportGridBlock } from "./reportDesignerSchema.ts";
-import { adjacentGridCell, editGridTrack, gridCellAt, type ReportGridCellLocation } from "./reportDesignerGridStructure.ts";
+import { adjacentGridCell, editGridTrack, formatGridCellAddress, gridCellAt, parseGridCellAddress, type ReportGridCellLocation } from "./reportDesignerGridStructure.ts";
 import { REPORT_GRID_MAX_COLUMNS, REPORT_GRID_MAX_ROWS } from "./reportDesignerGridPlacement.ts";
-import { NumberField } from "./ReportDesignerV3InspectorControls.tsx";
+import { CommitTextField } from "./ReportDesignerPropertyControls.tsx";
 
 export function GridCellNavigator({ block, locations, selected, onSelect }: {
   block: ReportGridBlock;
@@ -9,17 +10,18 @@ export function GridCellNavigator({ block, locations, selected, onSelect }: {
   selected?: ReportGridCellLocation;
   onSelect: (cellId: string) => void;
 }) {
+  const [error, setError] = useState("");
   if (!selected) return null;
   const index = locations.indexOf(selected);
-  const selectAt = (row: number, column: number) => {
-    const next = gridCellAt(locations, row, column);
+  const selectAt = (value: string) => {
+    const address = parseGridCellAddress(value);
+    const next = address && gridCellAt(locations, address.rowIndex, address.columnIndex);
+    setError(next ? "" : `请输入 A1 至 ${formatGridCellAddress(block.rows.length - 1, block.columns.length - 1)} 范围内的位置。`);
     if (next) onSelect(next.cell.id);
   };
-  return <section className="new-report-grid-structure" aria-label="定位表格单元格">
-    <div className="new-report-property-grid">
-      <NumberField label="定位行" value={selected.rowIndex + 1} min={1} max={block.rows.length} step={1} onCommit={row => selectAt(row - 1, selected.columnIndex)} />
-      <NumberField label="定位列" value={selected.columnIndex + 1} min={1} max={block.columns.length} step={1} onCommit={column => selectAt(selected.rowIndex, column - 1)} />
-    </div>
+  return <section className="new-report-grid-structure" aria-label="定位表格单元格" onFocusCapture={() => setError("")}>
+    <label><span>单元格位置</span><CommitTextField value={formatGridCellAddress(selected.rowIndex, selected.columnIndex)} placeholder="D4 或 4,4" onCommit={selectAt} /></label>
+    {error && <small role="alert">{error}</small>}
     <div className="new-report-grid-structure-actions" onKeyDown={event => {
       const direction = event.key === "ArrowLeft" ? "left" : event.key === "ArrowRight" ? "right" : event.key === "ArrowUp" ? "up" : event.key === "ArrowDown" ? "down" : null;
       if (!direction) return;
@@ -30,7 +32,7 @@ export function GridCellNavigator({ block, locations, selected, onSelect }: {
       <button type="button" className="command-button secondary" disabled={index <= 0} onClick={() => onSelect(locations[index - 1].cell.id)}>上一格</button>
       <button type="button" className="command-button secondary" disabled={index >= locations.length - 1} onClick={() => onSelect(locations[index + 1].cell.id)}>下一格</button>
     </div>
-    <small>也可单击画布选格；合并区域按左上角定位，方向键可跨格移动。</small>
+    <small>输入 D4 或 4,4（行,列）后按 Enter；合并格显示左上角，按钮方向键可跨格移动。</small>
   </section>;
 }
 
