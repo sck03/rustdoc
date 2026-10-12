@@ -58,14 +58,14 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   await button('单元格');
   await fill('文字内容', '用款事项', true);
   await run("[...document.querySelectorAll('.new-report-grid-cell-editor label')].find(node=>node.textContent.includes('竖排文字')).querySelector('input').click(); true");
-  for (let index = 0; index < 4; index++) await button('向下合并');
-  await cell(1, 2);
-  for (let index = 0; index < 5; index++) await button('向右合并');
+  await fill('单元格位置', 'A1:A5'); await button('合并所选区域');
+  await fill('单元格位置', 'B1:G1'); await button('合并所选区域');
   await select('内容类型', 'Field');
   await select('业务字段', 'Payment.PayeeName');
   await fill('字段前标签（可选）', '支付单位');
-  await cell(2, 2);
-  for (let index = 0; index < 5; index++) await button('向右合并');
+  await fill('单元格位置', 'A1:G5'); await button('合并所选区域');
+  await wait("document.querySelector('.new-report-grid-properties [role=alert]')?.textContent.includes('多份内容')");
+  await fill('单元格位置', 'B2:G2'); await button('合并所选区域');
   await select('内容类型', 'CheckboxGroup');
   await select('判断字段', 'Payment.PaymentMethod');
   await fill('勾选项（每行：名称=值）', '支票=支票\n电汇=电汇\n预付=预付', true);
@@ -93,8 +93,7 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   await fill('单元格位置', 'D4');
   await button('删除当前列');
   await wait(`${control('列数')}.value==='7'`);
-  await cell(4, 2);
-  for (let index = 0; index < 5; index++) await button('向右合并');
+  await fill('单元格位置', 'B4:G4'); await button('单元格'); await button('合并所选区域');
   await button('字段', '.report-designer-v3-sidebar-tabs');
   await run(`(()=>{
     const dataTransfer=new DataTransfer();
@@ -108,6 +107,11 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   })()`);
   await wait(`${control('业务字段')}.value==='Payment.InvoiceNo'`);
   await fill('字段前标签（可选）', '票据号');
+  await fill('单元格位置', 'B5:G5');
+  await select('对齐', 'Center');
+  await button('仅外框');
+  await button('撤销', '.report-designer-v3-toolbar');
+  await button('重做', '.report-designer-v3-toolbar');
   await wait("Boolean([...document.querySelectorAll('button')].find(node=>node.textContent.trim()==='保存'&&!node.disabled))");
   await button('保存', 'body');
   await wait("document.body.innerText.includes('私人模板已保存')");
@@ -121,6 +125,8 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   assert.equal(grid.rows[2].cells[0].diagonalHeader.lowerRightText, '金额');
   assert.equal(grid.rows[3].cells[0].fieldPath, 'Payment.InvoiceNo');
   assert.equal(grid.rows[3].cells[0].colSpan, 6);
+  assert(grid.rows[4].cells.every(cell => cell.style.align === 'Center'));
+  assert(grid.rows[4].cells.every((cell, index) => cell.border.left === (index === 0) && cell.border.right === (index === grid.rows[4].cells.length - 1)));
   assert.equal(design.layers.flatMap(layer => layer.elements).length, 1, 'field drops bind existing cells without adding overlays');
   fs.writeFileSync(path.join(output, 'desktop-blank-grid.json'), saved.body.contentHtml);
   await button('重新载入', '.report-designer-v3-header');

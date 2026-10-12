@@ -1,4 +1,5 @@
 import { ApiDownloadTicket, BackgroundJobSnapshot, ExportDocManagerApiClient } from "../api/index.ts";
+import { startBrowserDownload } from "./downloadBlob.ts";
 
 const terminalStatuses = new Set(["succeeded", "failed", "canceled"]);
 
@@ -120,6 +121,7 @@ export async function downloadCompletedJobResult(
 ) {
   throwIfAborted(signal);
   const ticket = await client.createJobDownloadTicket({ jobId: job.jobId }, { signal });
+  throwIfAborted(signal);
   startDownloadFromTicket(client, ticket, fileName);
 }
 
@@ -128,17 +130,7 @@ export function startDownloadFromTicket(
   ticket: ApiDownloadTicket,
   fileName?: string,
 ) {
-  const anchor = document.createElement("a");
-  anchor.href = client.resolveUrl(ticket.downloadUrl);
-  anchor.rel = "noopener";
-  anchor.referrerPolicy = "no-referrer";
-  if (fileName?.trim()) {
-    anchor.download = fileName.trim();
-  }
-  anchor.hidden = true;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
+  startBrowserDownload(client.resolveUrl(ticket.downloadUrl), fileName);
 }
 
 function delay(milliseconds: number, signal?: AbortSignal) {

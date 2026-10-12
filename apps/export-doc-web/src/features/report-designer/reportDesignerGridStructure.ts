@@ -2,6 +2,7 @@ import { createGridCell, createGridColumns, createGridRow } from "./reportDesign
 import type { ReportGridBlock, ReportGridCell } from "./reportDesignerSchema.ts";
 import { normalizeColumnPercentages } from "./reportDesignerColumnWidths.ts";
 import { REPORT_GRID_MAX_COLUMNS, REPORT_GRID_MAX_ROWS, reportGridCellPlacements, type ReportGridCellPlacement } from "./reportDesignerGridPlacement.ts";
+import { resolveGridSelection, type ReportGridCellSelection } from "./reportDesignerGridSelection.ts";
 
 export type ReportGridCellLocation = ReportGridCellPlacement;
 export type ReportGridAxis = "row" | "column";
@@ -134,33 +135,55 @@ function gridMergePair(locations: ReportGridCellLocation[], cellId: string, dire
   return current && adjacent ? { current, adjacent } : null;
 }
 
-function mergeGridCell(block: ReportGridBlock, cellId: string, direction: "right" | "down") {
+export function mergeGridCell(block: ReportGridBlock, cellId: string, direction: "right" | "down") {
   const locations = getGridCellLocations(block);
   const pair = gridMergePair(locations, cellId, direction);
-  if (!pair) return block;
-  const span = direction === "right" ? "colSpan" : "rowSpan";
-  return rebuildGrid(block, locations.filter(location => location !== pair.adjacent)
-    .map(location => location === pair.current ? { ...location, [span]: pair.current[span] + pair.adjacent[span] } : location));
+  return pair ? mergeGridSelection(block, { cellId, endCellId: pair.adjacent.cell.id }, locations) : { block, notice: null };
 }
 
-export function mergeGridCellRight(block: ReportGridBlock, cellId: string) { return mergeGridCell(block, cellId, "right"); }
-export function mergeGridCellDown(block: ReportGridBlock, cellId: string) { return mergeGridCell(block, cellId, "down"); }
+export function mergeGridCellRight(block: ReportGridBlock, cellId: string) { return mergeGridCell(block, cellId, "right").block; }
+export function mergeGridCellDown(block: ReportGridBlock, cellId: string) { return mergeGridCell(block, cellId, "down").block; }
 export function canMergeGridCellRight(block: ReportGridBlock, cellId: string, locations = getGridCellLocations(block)) { return gridMergePair(locations, cellId, "right") !== null; }
 export function canMergeGridCellDown(block: ReportGridBlock, cellId: string, locations = getGridCellLocations(block)) { return gridMergePair(locations, cellId, "down") !== null; }
 
 export function splitGridCell(block: ReportGridBlock, cellId: string): ReportGridBlock {
+  return splitGridSelection(block, { cellId });
+}
+
+export function mergeGridSelection(block: ReportGridBlock, selection: ReportGridCellSelection, locations = getGridCellLocations(block)) {
+  const selected = resolveGridSelection(locations, selection);
+  if (!selected || selected.cells.length < 2) return { block, notice: null };
+  // Include dormant field/text drafts too: changing the content kind must not
+  // make previously entered data disposable during a structural operation.
+  const populated = selected.cells.filter(({ cell }) => cell.text || cell.fieldPath || cell.label || cell.fallbackText ||
+    cell.checkboxOptions?.length || cell.diagonalHeader);
+  if (populated.length > 1) return { block, notice: "所选单元格中有多份内容，合并会丢失文字或字段。请先整理内容，再合并。" };
+  const { top, left, bottom, right } = selected.range;
+  const first = selected.cells.find(cell => cell.rowIndex === top && cell.columnIndex === left)!;
+  const source = populated[0]?.cell ?? first.cell;
+  const ids = new Set(selected.cells.map(location => location.cell.id));
+  const merged = { ...first, rowSpan: bottom - top, colSpan: right - left,
+    cell: { ...source, id: first.cell.id, rowSpan: bottom - top, colSpan: right - left } };
+  return { block: rebuildGrid(block, [...locations.filter(location => !ids.has(location.cell.id)), merged]), notice: null };
+}
+
+export function splitGridSelection(block: ReportGridBlock, selection: ReportGridCellSelection): ReportGridBlock {
   const locations = getGridCellLocations(block);
-  const current = locations.find(location => location.cell.id === cellId);
-  if (!current || (current.colSpan === 1 && current.rowSpan === 1)) return block;
+  const selected = resolveGridSelection(locations, selection);
+  const merged = selected?.cells.filter(cell => cell.colSpan > 1 || cell.rowSpan > 1) ?? [];
+  if (!merged.length) return block;
   const replacements: ReportGridCellLocation[] = [];
-  for (let row = current.rowIndex; row < current.rowIndex + current.rowSpan; row++) {
-    for (let column = current.columnIndex; column < current.columnIndex + current.colSpan; column++) {
-      replacements.push({ rowIndex: row, columnIndex: column, rowSpan: 1, colSpan: 1,
-        cell: row === current.rowIndex && column === current.columnIndex ? { ...current.cell, rowSpan: 1, colSpan: 1 }
-          : { ...emptyGridCell(), style: current.cell.style, border: current.cell.border } });
+  for (const current of merged) {
+    for (let row = current.rowIndex; row < current.rowIndex + current.rowSpan; row++) {
+      for (let column = current.columnIndex; column < current.columnIndex + current.colSpan; column++) {
+        replacements.push({ rowIndex: row, columnIndex: column, rowSpan: 1, colSpan: 1,
+          cell: row === current.rowIndex && column === current.columnIndex ? { ...current.cell, rowSpan: 1, colSpan: 1 }
+            : { ...emptyGridCell(), style: current.cell.style, border: current.cell.border } });
+      }
     }
   }
-  return rebuildGrid(block, [...locations.filter(location => location !== current), ...replacements]);
+  const ids = new Set(merged.map(location => location.cell.id));
+  return rebuildGrid(block, [...locations.filter(location => !ids.has(location.cell.id)), ...replacements]);
 }
 
 export function setGridRowsToUniformHeight(block: ReportGridBlock, heightMm: number): ReportGridBlock {

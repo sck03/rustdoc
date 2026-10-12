@@ -209,7 +209,7 @@ function payment(expense) {
       [12,[cell("amount-label","金额",1,{style:{align:"Center"}}),...fields.map((s,i)=>binding(`expense-${i}`,`Payment.${s}`,1,{style:{align:"Center"}}))]],
       [18,[cell("attachments","附件\n(张)",1,{style:{align:"Center"}}),...fields.map((_,i)=>cell(`attachment-${i}`,""))]],
       [12,[cell("notes-label","备注",1,{style:{align:"Center"}}),binding("notes","Payment.Notes",8)]],
-      [11,[binding("upper","cny_amount_upper",6,{label:"报销净额"}),binding("total","Payment.CNYAmount",3,{label:"小计: ￥",labelPosition:"Prefix"})]],
+      [11,[binding("upper","cny_amount_upper",6,{label:"报销净额",border:{...border,right:false}}),binding("total","Payment.CNYAmount",3,{label:"小计: ￥",labelPosition:"Prefix",border:{...border,left:false}})]],
     ],10,serif),grid("expense-signatures",15,111,180,[35,35,30],[[7,[cell("applicant","报销人："),cell("supervisor","主管签字："),cell("approval","审批签字：")]]],10,serif,false)];
   } else {
     d.layers[1].elements=[grid("payment-grid",14,34,170,[12,9,16,13,24,11,15],[

@@ -41,12 +41,14 @@ export function rebuildDesignerDocument(api, reference) {
 export function rebuildDesignerGrid(api, target) {
   let grid = api.resizeGridStructure(api.applyGridPreset(api.createGridBlock(), 'Blank'), target.rows.length, target.columns.length);
   const at = (row, column) => api.getGridCellLocations(grid).find(cell => cell.rowIndex === row && cell.columnIndex === column);
-  const merge = next => { assert.notEqual(next, grid, 'the requested merge must remain reachable'); grid = next; };
   for (const cell of api.getGridCellLocations(target)) {
-    for (let row = cell.rowIndex; row < cell.rowIndex + cell.rowSpan; row++) {
-      while (at(row, cell.columnIndex).colSpan < cell.colSpan) merge(api.mergeGridCellRight(grid, at(row, cell.columnIndex).cell.id));
+    if (cell.rowSpan > 1 || cell.colSpan > 1) {
+      const result = api.mergeGridSelection(grid, { cellId: at(cell.rowIndex, cell.columnIndex).cell.id,
+        endCellId: at(cell.rowIndex + cell.rowSpan - 1, cell.columnIndex + cell.colSpan - 1).cell.id });
+      assert.equal(result.notice, null);
+      assert.notEqual(result.block, grid, 'each merged rectangle must be reachable in one edit');
+      grid = result.block;
     }
-    while (at(cell.rowIndex, cell.columnIndex).rowSpan < cell.rowSpan) merge(api.mergeGridCellDown(grid, at(cell.rowIndex, cell.columnIndex).cell.id));
     const id = at(cell.rowIndex, cell.columnIndex).cell.id;
     grid = api.updateGridCell(grid, id, () => ({ ...cell.cell, id }));
   }

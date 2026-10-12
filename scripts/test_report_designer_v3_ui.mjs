@@ -147,7 +147,7 @@ async function waitFor(page, expression) {
 }
 async function click(page, selector) { await read(page, `document.querySelector(${JSON.stringify(selector)}).click()`); await delay(70); }
 async function key(page, key, modifiers = 0) {
-  const keyCode = key === "Escape" ? 27 : key === "Enter" ? 13 : key.length === 1 ? key.toUpperCase().charCodeAt(0) : undefined;
+  const keyCode = key === "Escape" ? 27 : key === "Enter" ? 13 : key === "Backspace" ? 8 : key.length === 1 ? key.toUpperCase().charCodeAt(0) : undefined;
   await page.send("Input.dispatchKeyEvent", { type: "keyDown", key, modifiers, windowsVirtualKeyCode: keyCode, text: key === "Enter" && modifiers === 0 ? "\r" : undefined });
   await page.send("Input.dispatchKeyEvent", { type: "keyUp", key, modifiers, windowsVirtualKeyCode: keyCode });
 }

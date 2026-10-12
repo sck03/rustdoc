@@ -1,16 +1,19 @@
 export function downloadBlob(blob: Blob, fileName: string) {
-  const normalizedFileName = fileName.trim() || "download";
   const objectUrl = window.URL.createObjectURL(blob);
-
   try {
-    const link = document.createElement("a");
-    link.href = objectUrl;
-    link.download = normalizedFileName;
-    link.rel = "noopener";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    startBrowserDownload(objectUrl, fileName.trim() || "download");
   } finally {
     window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000);
   }
+}
+
+export function startBrowserDownload(url: string, fileName?: string) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.rel = "noopener";
+  link.referrerPolicy = "no-referrer";
+  if (fileName?.trim()) link.download = fileName.trim();
+  link.hidden = true;
+  document.body.appendChild(link);
+  try { link.click(); } finally { link.remove(); }
 }

@@ -21,7 +21,8 @@ const modulePath = path.join(
 
 fs.rmSync(workspace, { recursive: true, force: true });
 fs.mkdirSync(workspace, { recursive: true });
-fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modulePath)}; globalThis.__model = model;`, "utf8");
+const sceneModulePath = path.join(path.dirname(modulePath), 'containerPackingSceneObjects.ts').replaceAll('\\', '/');
+fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modulePath)}; import * as scene from ${JSON.stringify(sceneModulePath)}; globalThis.__model = model; globalThis.__scene = scene;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -72,5 +73,24 @@ const palletized = mergePackedItemsForContainerRender([
   createItem({ isPalletized: true, loadCount: 12, unitsRepresented: 12 }),
 ], dimensions);
 assert(palletized.length === 1 && palletized[0].heightSegments === 1, "palletized cargo should remain a single block");
+
+const { buildContainerPackingRoot, buildContainerPackingSceneData, disposeContainerPackingScene } = globalThis.__scene;
+const analysis = { packedItems: [createItem({ loadCount: 18, unitsRepresented: 18 }), createItem({ x: 30, loadCount: 18, unitsRepresented: 18 })] };
+const sceneData = buildContainerPackingSceneData(analysis, dimensions);
+const root = buildContainerPackingRoot(sceneData, analysis, true);
+const cargo = [], gridLines = [], resources = new Set();
+root.traverse(object => {
+  if (object.isMesh && object.name === '纸箱') cargo.push(object);
+  if (object.isLineSegments && object.material.opacity === 0.62) gridLines.push(object);
+  if (object.geometry) resources.add(object.geometry);
+  for (const material of Array.isArray(object.material) ? object.material : object.material ? [object.material] : []) resources.add(material);
+});
+assert(cargo.length === 2 && cargo[0].material === cargo[1].material, 'cargo of the same color shares its materials');
+assert(new Set(cargo[0].material).size === 5, 'identical side faces reuse a material');
+assert(gridLines.length === 2 && gridLines.every(lines => lines.geometry.attributes.position.count === 17 * 8), 'all layer segments use one draw object per cargo block without losing geometry');
+const disposed = new Map();
+for (const resource of resources) resource.addEventListener('dispose', () => disposed.set(resource, (disposed.get(resource) ?? 0) + 1));
+disposeContainerPackingScene(root);
+assert(disposed.size === resources.size && [...disposed.values()].every(count => count === 1), 'shared GPU resources are disposed exactly once');
 
 process.stdout.write("container packing render-block tests passed\n");

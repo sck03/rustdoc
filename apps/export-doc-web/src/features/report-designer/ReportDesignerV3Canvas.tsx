@@ -81,8 +81,8 @@ export function ReportDesignerV3Canvas({
   onFitZoom?: (zoom: number) => void;
   disabled?: boolean;
   onSelect: (elementId: string, additive: boolean) => void;
-  selectedGridCell?: { elementId: string; cellId: string } | null;
-  onSelectGridCell?: (elementId: string, cellId: string) => void;
+  selectedGridCell?: { elementId: string; cellId: string; endCellId?: string } | null;
+  onSelectGridCell?: (elementId: string, cellId: string, extend?: boolean) => void;
   onCommitTransform: (baseState: ReportDesignerV3DocumentState, transform: ReportDesignerV3Transform, deltaX: number, deltaY: number) => void;
   onCommitLayerBand: (role: "Header" | "Footer", heightHundredthMm: number) => void;
   onClearSelection: () => void;
@@ -153,6 +153,12 @@ export function ReportDesignerV3Canvas({
         ? (alreadySelected ? state.selectedIds.filter((id) => id !== element.id) : [...state.selectedIds, element.id])
         : [element.id];
     const gridCellId = readReportDesignerGridCellId(event.target);
+    if (gridCellId && event.shiftKey && !event.ctrlKey && !event.metaKey && !multiSelect &&
+        selectedGridCell?.elementId === element.id && state.selectedIds.length === 1 && alreadySelected) {
+      event.preventDefault();
+      onSelectGridCell?.(element.id, gridCellId, true);
+      return;
+    }
     if (gridCellId && element.type === "Flow" && element.flowKind === "Grid") onSelectGridCell?.(element.id, gridCellId);
     if (!alreadySelected || additive) onSelect(element.id, additive);
     // A modifier click on an already selected element is a selection toggle,
@@ -388,7 +394,8 @@ export function ReportDesignerV3Canvas({
               {elements.map(element => <ReportDesignerCanvasElementNode key={element.id} element={element} client={client}
                 selected={selectedSet.has(element.id)} singleSelection={selectedSet.has(element.id) && state.selectedIds.length === 1}
                 disabled={disabled} layerLocked={layer.locked}
-                selectedGridCellId={selectedGridCell?.elementId === element.id ? selectedGridCell.cellId : undefined} />)}
+                selectedGridCellId={selectedGridCell?.elementId === element.id ? selectedGridCell.cellId : undefined}
+                selectedGridEndCellId={selectedGridCell?.elementId === element.id ? selectedGridCell.endCellId : undefined} />)}
             </div>
           ))}
           {showGuides ? <><ReportDesignerProductRows schema={state.schema} /><ReportDesignerLayerResizers schema={state.schema} zoom={zoom} disabled={disabled} onCommit={onCommitLayerBand} /></> : null}

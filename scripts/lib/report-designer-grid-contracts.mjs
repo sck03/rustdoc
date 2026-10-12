@@ -26,6 +26,7 @@ export function verifyGridAuthoringContracts(api) {
     assert(Math.max(...widths) - Math.min(...widths) < 0.101, 'equal columns only differ by the editable rounding unit');
   }
   const blank = () => api.applyGridPreset(api.createGridBlock(), 'Blank');
+  verifyGridRanges(api, blank);
   const roundingCase = blank();
   roundingCase.columns.forEach((column, index) => { column.widthPercent = [9.06, 1, 90.04][index]; });
   const roundTrip = api.parseReportDesignerV3Source('', 'ExportDocument').schema;
@@ -136,4 +137,54 @@ export function verifyGridAuthoringContracts(api) {
   detail.columns[0].fieldPath = 'Invoice.InvoiceNo';
   repeating.layers.find(layer => layer.role === 'Body').elements = [api.createV3FlowElement(detail)];
   assert.equal(api.validateReportDesignerV3Draft(repeating, 'ExportDocument').blocked, true, 'a repeating column rejects document-level primary bindings before native save');
+}
+
+function verifyGridRanges(api, blank) {
+  const grid = api.resizeGridStructure(blank(), 4, 4);
+  const selection = { cellId: grid.rows[0].cells[0].id, endCellId: grid.rows[1].cells[1].id };
+  const populated = api.updateGridCell(grid, selection.endCellId, cell => ({ ...cell, contentKind: 'Field', fieldPath: 'Payment.PayeeName', label: '收款人', fallbackText: '未填写' }));
+  const snapshot = structuredClone(populated);
+  const merged = api.mergeGridSelection(populated, selection);
+  assert.equal(merged.notice, null);
+  assert.equal(merged.block.rows[0].cells[0].id, selection.cellId, 'merging keeps the top-left identity');
+  assert.equal(merged.block.rows[0].cells[0].fieldPath, 'Payment.PayeeName', 'the only populated cell survives even when it is not the anchor');
+  assert.equal(merged.block.rows[0].cells[0].fallbackText, '未填写');
+  assert.deepEqual(populated, snapshot, 'merging never mutates the undo snapshot');
+  const contentConflict = api.updateGridCell(populated, selection.cellId, cell => ({ ...cell, text: '保留标题' }));
+  const refused = api.mergeGridSelection(contentConflict, selection);
+  assert.equal(refused.block, contentConflict);
+  assert.match(refused.notice, /多份内容/);
+  for (const patch of [{ fieldPath: 'Payment.TotalAmount' }, { text: '隐藏的文本' }, { fallbackText: '备用文字' }, { checkboxOptions: [{ id: 'choice', label: '是', value: '是' }] }]) {
+    const conflict = api.updateGridCell(populated, selection.cellId, cell => ({ ...cell, ...patch }));
+    assert.equal(api.mergeGridSelection(conflict, selection).block, conflict, 'inactive content and fallback text are not silently discarded');
+  }
+  const expanded = api.resolveGridSelection(api.getGridCellLocations(merged.block), {
+    cellId: merged.block.rows[0].cells[1].id, endCellId: merged.block.rows[2].cells[0].id,
+  });
+  assert.deepEqual(expanded.range, { top: 0, left: 0, bottom: 3, right: 3 }, 'touching a merged cell selects its complete rectangle');
+  const split = api.splitGridSelection(merged.block, selection);
+  assert.equal(split.rows[0].cells[0].fieldPath, 'Payment.PayeeName');
+  assert.equal(api.getGridCellLocations(split).length, 16);
+
+  const styles = api.updateGridCell(grid, selection.endCellId, cell => ({ ...cell, style: { fontSizePt: 17, align: 'Right' } }));
+  const resolved = api.resolveGridSelection(api.getGridCellLocations(styles), selection);
+  const ids = new Set(resolved.cells.map(location => location.cell.id));
+  const bold = api.patchGridCellStyles(styles, ids, { bold: true });
+  assert.equal(bold.rows[1].cells[1].style.fontSizePt, 17);
+  assert.equal(bold.rows[1].cells[1].style.align, 'Right');
+  assert(bold.rows.slice(0, 2).every(row => row.cells.slice(0, 2).every(cell => cell.style.bold)));
+  assert.equal(bold.rows[3], styles.rows[3], 'range formatting shares every unaffected row');
+  assert.equal(bold.rows[0].cells[3], styles.rows[0].cells[3], 'unselected cells retain their references');
+  assert.equal(api.patchGridCellStyles(bold, ids, { bold: true }), bold, 'repeated formatting does not create undo entries');
+  const outlined = api.setGridSelectionBorders(styles, resolved, 'outline');
+  assert.equal(outlined.rows[0].cells[0].border.top, true);
+  assert.equal(outlined.rows[0].cells[0].border.bottom, false);
+  assert.equal(outlined.rows[1].cells[1].border.top, false);
+  assert.equal(outlined.rows[1].cells[1].border.right, true);
+  assert.equal(outlined.rows[3], styles.rows[3], 'border edits share rows beyond the neighboring edges');
+  assert.equal(api.setGridSelectionBorders(outlined, api.resolveGridSelection(api.getGridCellLocations(outlined), selection), 'outline'), outlined);
+  const cleared = api.setGridSelectionBorders(outlined, api.resolveGridSelection(api.getGridCellLocations(outlined), selection), 'none');
+  assert.equal(cleared.rows[0].cells[2].border.left, false, 'clearing range edges also clears the collapsed neighboring side');
+  assert.equal(cleared.rows[2].cells[0].border.top, false);
+  assert.deepEqual(grid.rows[0].cells[0].border, undefined, 'border edits do not alter original cells');
 }

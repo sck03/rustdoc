@@ -94,7 +94,7 @@ export function ReportDesignerV3Workspace({
   const [fieldFocusRequest, setFieldFocusRequest] = useState(0);
   const [capacityNotice, setCapacityNotice] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
-  const [gridCellSelection, setGridCellSelection] = useState<{ elementId: string; cellId: string } | null>(null);
+  const [gridCellSelection, setGridCellSelection] = useState<{ elementId: string; cellId: string; endCellId?: string } | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const documentContentRef = useRef(content);
   documentContentRef.current = content;
@@ -156,8 +156,9 @@ export function ReportDesignerV3Workspace({
   function clearSelection() {
     history.select([], history.state.activeLayerId);
   }
-  function selectGridCell(elementId: string, cellId: string) {
-    setGridCellSelection({ elementId, cellId });
+  function selectGridCell(elementId: string, cellId: string, extend = false) {
+    setGridCellSelection(current => extend && current?.elementId === elementId
+      ? { ...current, endCellId: cellId } : { elementId, cellId });
   }
   function insertElement(element: ReportDesignerV3Element) {
     if (!editingEnabled) return;
@@ -366,6 +367,7 @@ export function ReportDesignerV3Workspace({
         {editingEnabled ? <>
         <div className="report-designer-v3-toolbar-group" role="group" aria-label="插入基础元素">
           <ToolbarButton label="文本" icon={<Pilcrow size={15} />} onClick={insertionActions.text} disabled={!editingEnabled} />
+          <ToolbarButton label="普通表格" icon={<Grid2X2 size={15} />} onClick={insertionActions.grid} disabled={!editingEnabled} />
           <ToolbarButton label="选择字段" title={reportType === "PaymentVoucher" ? "付款字段：单号、收款方、费用与金额" : "普通字段：发票号、客户、唛头与合计"} icon={<Braces size={15} />} onClick={() => { setProductFieldsOnly(false); openFieldPanel(); }} />
           {insertionActions.productFields ? <ToolbarButton label="商品字段" icon={<Columns3 size={15} />} onClick={insertionActions.productFields} /> : null}
           {insertionActions.image ? <ToolbarButton label="图片" icon={<ImageIcon size={15} />} onClick={insertionActions.image} disabled={!editingEnabled} /> : null}
@@ -376,7 +378,6 @@ export function ReportDesignerV3Workspace({
         </div>
         <details className="report-designer-v3-advanced-tools"><summary>高级排版</summary><div role="group" aria-label="插入结构组件">
           <ToolbarButton label="多列行" icon={<Columns3 size={15} />} onClick={insertionActions.row} disabled={!editingEnabled} />
-          <ToolbarButton label="普通表格" icon={<Grid2X2 size={15} />} onClick={insertionActions.grid} disabled={!editingEnabled} />
           {insertionActions.detailTable ? <ToolbarButton label="明细表" icon={<Table2 size={15} />} onClick={insertionActions.detailTable} disabled={!editingEnabled} /> : null}
           <ToolbarButton label="分页符" icon={<FilePlus2 size={15} />} onClick={insertionActions.pageBreak} disabled={!editingEnabled} />
         </div></details>
@@ -487,7 +488,8 @@ export function ReportDesignerV3Workspace({
               state={history.state}
               onFlowCommit={patchSelectedFlow}
               selectedGridCellId={activeGridCellSelection?.cellId}
-              onSelectGridCell={(cellId) => selectGridCell(selected.element.id, cellId)}
+              selectedGridEndCellId={activeGridCellSelection?.endCellId}
+              onSelectGridCell={(cellId, endCellId) => setGridCellSelection({ elementId: selected.element.id, cellId, endCellId })}
               client={client}
               onImageResourceUploaded={bindImageResource}
               onZIndex={(direction) => commit(setV3ElementZIndex(history.state, selected.element.id, direction))}

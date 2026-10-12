@@ -178,6 +178,8 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 - Docker：`test_native_docker_lifecycle.ps1` 在无 daemon 环境验证停机顺序与失败中止；真实两架构 CI 另核对内部网络、端口、凭据/卷隔离、运行中重复部署、custom-format dump 恢复及重启持久化。脚本和 Compose 配置通过不等于容器实跑通过。
 - React：项目 `build`、API／登录／权限／草稿／无障碍及相应页面回归；真正的 Tauri 窗口和输出仍需实跑。
 - 异步生命周期：`npm --prefix apps/export-doc-web run test:abortable-operations-ui` 验证资料切换、卸载后的迟到成功/失败、保存后刷新期间离开页面、商机/供货产品连续查询，以及附件容量刷新和部分失败重试的版本选择；`test:business-features-ui` 另验证真实资料页面不会显示旧预览及旧错误。`test:oa-ui` 的人员详情实跑满额上传、删除后释放容量及继续上传，保留真实 HTTP 版本校验。
+- 供应商评价与下载：异步回归另覆盖连续提交、切换供应商/离开页面及保存成功后刷新失败的记录保留；`test:background-job-polling` 验证取消后的迟到下载凭据不会触发下载，失败的临时链接会清理。
+- 装柜三维：`test:container-packing-model` 检查同色材质复用、层线几何与资源只释放一次；`node scripts/test_container_packing_scene_ui.mjs` 使用真实 WebGL 检查俯视/柜门方向、切换框线和父级重绘时保留视角、右键、暂停及退出清理。该浏览器回归不替代各 OS 的 GPU 驱动验收。
 - 依赖：`generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository`，要求 `unresolved=0 / disallowed=0`。
 - 平台：`verify-native-desktop.mjs` 验证 Tauri／SQLite，排除 Slint／egui／PostgreSQL 桌面依赖；`assert-tauri-command-permissions.ps1` 校验 command 与能力白名单。
 - Windows 桌面：`node scripts/test_native_desktop_editions.mjs [包父目录] Full --without-ocr` 验证独立 Full 测试包的 About、设计器、托单与业务资料操作。可设置 `EXPORTDOCMANAGER_DESKTOP_VALIDATION_OUTPUT_ROOT` 指定隔离验收输出父目录；默认是仓库 `artifacts/edition-validation`，不会使用程序包的 App_Data。

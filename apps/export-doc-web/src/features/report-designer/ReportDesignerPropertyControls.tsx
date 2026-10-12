@@ -321,8 +321,9 @@ export function TextStyleEditor({
   onChange,
 }: {
   style: ReportTextStyle;
-  onChange: (style: ReportTextStyle) => void;
+  onChange: (style: ReportTextStyle, patch: Partial<ReportTextStyle>) => void;
 }) {
+  const update = (patch: Partial<ReportTextStyle>) => onChange({ ...style, ...patch }, patch);
   return (
     <div className="new-report-property-grid new-report-style-grid">
       <label>
@@ -333,14 +334,14 @@ export function TextStyleEditor({
           max={48}
           step="any"
           value={style.fontSizePt ?? 10}
-          onChange={(event) => onChange({ ...style, fontSizePt: normalizeNumber(event.target.value, 10) })}
+          onChange={(event) => update({ fontSizePt: normalizeNumber(event.target.value, 10) })}
         />
       </label>
       <label>
         <span>对齐</span>
         <select
           value={style.align ?? "Left"}
-          onChange={(event) => onChange({ ...style, align: normalizeAlign(event.target.value) })}
+          onChange={(event) => update({ align: normalizeAlign(event.target.value) })}
         >
           <option value="Left">左</option>
           <option value="Center">中</option>
@@ -351,7 +352,7 @@ export function TextStyleEditor({
         <span>垂直对齐</span>
         <select
           value={style.verticalAlign ?? "Top"}
-          onChange={(event) => onChange({ ...style, verticalAlign: normalizeVerticalAlign(event.target.value) })}
+          onChange={(event) => update({ verticalAlign: normalizeVerticalAlign(event.target.value) })}
         >
           <option value="Top">上</option>
           <option value="Middle">中</option>
@@ -359,7 +360,7 @@ export function TextStyleEditor({
         </select>
       </label>
       <DesignerCheckbox checked={Boolean(style.bold)}
-          onChange={(checked) => onChange({ ...style, bold: checked })}>加粗</DesignerCheckbox>
+          onChange={(checked) => update({ bold: checked })}>加粗</DesignerCheckbox>
       <details className="new-report-property-wide"><summary>文字间距</summary>
       <div className="new-report-property-grid">
       {([['上距(mm)', 'marginTopMm'], ['右距(mm)', 'marginRightMm'], ['下距(mm)', 'marginBottomMm'], ['左距(mm)', 'marginLeftMm']] as const).map(([label, property]) => <label key={property}>
@@ -370,7 +371,7 @@ export function TextStyleEditor({
           max={30}
           step="any"
           value={style[property] ?? 0}
-          onChange={(event) => onChange({ ...style, [property]: normalizeNumber(event.target.value, 0) })}
+          onChange={(event) => update({ [property]: normalizeNumber(event.target.value, 0) })}
         />
       </label>)}
       </div>

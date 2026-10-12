@@ -6,6 +6,8 @@ import { ReportResourceImage } from "./ReportResourceImage.tsx";
 import { renderReportDesignerBlockPreviewToHtml } from "./reportDesignerBlockRenderer.ts";
 import { isShippingMarksField, shippingMarksPreviewText } from "./reportDesignerFieldRendering.ts";
 import type { ReportDesignerV3ResizeDirection } from "./reportDesignerV3Mutations.ts";
+import { getGridCellLocations } from "./reportDesignerGridStructure.ts";
+import { resolveGridSelection } from "./reportDesignerGridSelection.ts";
 import {
   hundredthMmToMm,
   REPORT_DESIGNER_V3_DEFAULT_TEXT_COLOR,
@@ -15,7 +17,7 @@ import {
 
 /** Events are delegated by the canvas; unchanged nodes can skip React work. */
 export const ReportDesignerCanvasElementNode = memo(function ReportDesignerCanvasElementNode({
-  element, client, selected, singleSelection, disabled, layerLocked, selectedGridCellId,
+  element, client, selected, singleSelection, disabled, layerLocked, selectedGridCellId, selectedGridEndCellId,
 }: {
   element: ReportDesignerV3Element;
   client?: ExportDocManagerApiClient;
@@ -24,6 +26,7 @@ export const ReportDesignerCanvasElementNode = memo(function ReportDesignerCanva
   disabled: boolean;
   layerLocked: boolean;
   selectedGridCellId?: string;
+  selectedGridEndCellId?: string;
 }) {
   const locked = element.locked || layerLocked;
   const text = reportDesignerV3ElementText(element);
@@ -39,16 +42,17 @@ export const ReportDesignerCanvasElementNode = memo(function ReportDesignerCanva
     aria-disabled={!disabled && locked || undefined}
     aria-label={`${text}${element.locked ? "，已锁定" : ""}`}
   >
-    <ReportDesignerCanvasElementPreview element={element} client={client} selectedGridCellId={selectedGridCellId} />
+    <ReportDesignerCanvasElementPreview element={element} client={client} selectedGridCellId={selectedGridCellId} selectedGridEndCellId={selectedGridEndCellId} />
     {!disabled && selected && singleSelection && !locked ? <ReportDesignerCanvasResizeHandles /> : null}
     {selected && locked ? <span className="report-designer-v3-lock-badge">锁</span> : null}
   </div>;
 });
 
-export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCanvasElementPreview({ element, selectedGridCellId, client }: {
+export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCanvasElementPreview({ element, selectedGridCellId, selectedGridEndCellId, client }: {
   element: ReportDesignerV3Element;
   client?: ExportDocManagerApiClient;
   selectedGridCellId?: string;
+  selectedGridEndCellId?: string;
 }) {
   switch (element.type) {
     case "Text":
@@ -72,7 +76,7 @@ export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCa
     case "Flow":
       return (
         <div className="report-designer-v3-preview-flow" aria-label={`${element.flowKind} 结构预览`}>
-          <FlowPreview block={element.block} heightMm={hundredthMmToMm(element.heightHundredthMm)} selectedCellId={selectedGridCellId} />
+          <FlowPreview block={element.block} heightMm={hundredthMmToMm(element.heightHundredthMm)} selectedCellId={selectedGridCellId} selectedEndCellId={selectedGridEndCellId} />
         </div>
       );
   }
@@ -88,15 +92,24 @@ function lineStyle(element: Extract<ReportDesignerV3Element, { type: "Line" }>):
     : { backgroundColor: borderColor, [horizontal ? "height" : "width"]: `${width}px` };
 }
 
-function FlowPreview({ block, heightMm, selectedCellId }: { block: ReportBlock; heightMm: number; selectedCellId?: string }) {
+function FlowPreview({ block, heightMm, selectedCellId, selectedEndCellId }: { block: ReportBlock; heightMm: number; selectedCellId?: string; selectedEndCellId?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const nodes = useRef(new Map<string, Element>());
   const html = useMemo(() => ({ __html: renderReportDesignerBlockPreviewToHtml(block, heightMm) }), [block, heightMm]);
+  const locations = useMemo(() => block.type === "Grid" ? getGridCellLocations(block) : [], [block]);
+  const selectedIds = useMemo(() => selectedCellId
+    ? resolveGridSelection(locations, { cellId: selectedCellId, endCellId: selectedEndCellId })?.cells.map(location => location.cell.id) ?? [] : [],
+  [locations, selectedCellId, selectedEndCellId]);
   useLayoutEffect(() => {
-    if (!selectedCellId) return;
-    const cell = ref.current?.querySelector(`[data-report-grid-cell-id="${CSS.escape(selectedCellId)}"]`);
-    cell?.classList.add("is-designer-selected-cell");
-    return () => cell?.classList.remove("is-designer-selected-cell");
-  }, [html, selectedCellId]);
+    nodes.current = new Map([...ref.current?.querySelectorAll<HTMLElement>("[data-report-grid-cell-id]") ?? []]
+      .map(node => [node.dataset.reportGridCellId!, node]));
+    return () => nodes.current.clear();
+  }, [html]);
+  useLayoutEffect(() => {
+    const selected = selectedIds.map(id => nodes.current.get(id)).filter((node): node is Element => Boolean(node));
+    selected.forEach(node => node.classList.add("is-designer-selected-cell"));
+    return () => selected.forEach(node => node.classList.remove("is-designer-selected-cell"));
+  }, [html, selectedIds]);
   return <div ref={ref} className="report-designer-v3-preview-flow-content" dangerouslySetInnerHTML={html} />;
 }
 

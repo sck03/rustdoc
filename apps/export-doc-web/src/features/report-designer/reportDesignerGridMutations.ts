@@ -1,24 +1,51 @@
 import { createGridCell, createGridColumns, createGridRow } from "./reportDesignerBlockFactories.ts";
-import type { ReportBorderStyle, ReportGridBlock, ReportGridCell } from "./reportDesignerSchema.ts";
+import type { ReportBorderStyle, ReportGridBlock, ReportGridCell, ReportTextStyle } from "./reportDesignerSchema.ts";
 import { emptyGridCell, getGridCellLocations, type ReportGridCellLocation } from "./reportDesignerGridStructure.ts";
+import type { ResolvedGridSelection } from "./reportDesignerGridSelection.ts";
 export { adjacentGridCell, getGridCellLocations, gridCellAt, formatGridCellAddress, parseGridCellAddress, editGridTrack, resizeGridStructure, mergeGridCellRight, mergeGridCellDown,
-  canMergeGridCellRight, canMergeGridCellDown, splitGridCell, setGridRowsToUniformHeight, type ReportGridCellLocation } from "./reportDesignerGridStructure.ts";
+  canMergeGridCellRight, canMergeGridCellDown, mergeGridCell, mergeGridSelection, splitGridSelection, splitGridCell, setGridRowsToUniformHeight, type ReportGridCellLocation } from "./reportDesignerGridStructure.ts";
 
 export type ReportGridPreset = "Blank" | "Form" | "Approval";
 
 export function updateGridCell(block: ReportGridBlock, cellId: string, update: (cell: ReportGridCell) => ReportGridCell): ReportGridBlock {
+  return updateGridCells(block, new Set([cellId]), update);
+}
+
+function updateGridCells(block: ReportGridBlock, ids: ReadonlySet<string>, update: (cell: ReportGridCell) => ReportGridCell): ReportGridBlock {
   let changed = false;
   const rows = block.rows.map((row) => {
-    const index = row.cells.findIndex((cell) => cell.id === cellId);
-    if (index < 0) return row;
-    const next = update(row.cells[index]);
-    if (next === row.cells[index]) return row;
+    let cells: ReportGridCell[] | undefined;
+    row.cells.forEach((cell, index) => {
+      if (!ids.has(cell.id)) return;
+      const next = update(cell);
+      if (next === cell) return;
+      cells ??= row.cells.slice();
+      cells[index] = next;
+    });
+    if (!cells) return row;
     changed = true;
-    const cells = row.cells.slice();
-    cells[index] = next;
     return { ...row, cells };
   });
   return changed ? { ...block, rows } : block;
+}
+
+export function patchGridCellStyles(block: ReportGridBlock, ids: ReadonlySet<string>, patch: Partial<ReportTextStyle>) {
+  return updateGridCells(block, ids, cell => sameProperties(cell.style, { ...cell.style, ...patch })
+    ? cell : { ...cell, style: { ...cell.style, ...patch } });
+}
+
+export function setGridSelectionBorders(block: ReportGridBlock, selected: ResolvedGridSelection, preset: "all" | "outline" | "none") {
+  const reference = selected.anchor.cell.border ?? block.border;
+  const border = { ...reference, widthPx: reference.widthPx > 0 ? reference.widthPx : 1,
+    style: reference.style === "None" ? "Solid" as const : reference.style };
+  const { top, left, bottom, right } = selected.range;
+  return applyGridCellBorders(block, new Map(selected.cells.map(location => [location.cell.id, {
+    ...border,
+    top: preset === "all" || preset === "outline" && location.rowIndex === top,
+    left: preset === "all" || preset === "outline" && location.columnIndex === left,
+    bottom: preset === "all" || preset === "outline" && location.rowIndex + location.rowSpan === bottom,
+    right: preset === "all" || preset === "outline" && location.columnIndex + location.colSpan === right,
+  }])));
 }
 
 export function applyGridPreset(block: ReportGridBlock, preset: ReportGridPreset): ReportGridBlock {
@@ -40,9 +67,13 @@ export function updateGridCellBorder(
   cellId: string,
   border: ReportBorderStyle,
 ): ReportGridBlock {
+  return applyGridCellBorders(block, new Map([[cellId, border]]));
+}
+
+function applyGridCellBorders(block: ReportGridBlock, borders: Map<string, ReportBorderStyle>): ReportGridBlock {
   const locations = getGridCellLocations(block);
-  const selected = locations.find((location) => location.cell.id === cellId);
-  if (!selected) return block;
+  const selected = locations.filter(location => borders.has(location.cell.id));
+  if (!selected.length) return block;
 
   const cellAt = Array.from({ length: block.rows.length }, () =>
     Array<ReportGridCellLocation | null>(block.columns.length).fill(null));
@@ -55,22 +86,23 @@ export function updateGridCellBorder(
   }
 
   const neighborPatches = new Map<string, Partial<ReportBorderStyle>>();
-  syncOppositeBorderSide(neighborPatches, adjacentGridCells(cellAt, selected, "top"), "bottom", "top", border);
-  syncOppositeBorderSide(neighborPatches, adjacentGridCells(cellAt, selected, "right"), "left", "right", border);
-  syncOppositeBorderSide(neighborPatches, adjacentGridCells(cellAt, selected, "bottom"), "top", "bottom", border);
-  syncOppositeBorderSide(neighborPatches, adjacentGridCells(cellAt, selected, "left"), "right", "left", border);
+  for (const location of selected) {
+    const border = borders.get(location.cell.id)!;
+    syncOppositeBorderSide(neighborPatches, adjacentGridCells(cellAt, location, "top"), "bottom", "top", border);
+    syncOppositeBorderSide(neighborPatches, adjacentGridCells(cellAt, location, "right"), "left", "right", border);
+    syncOppositeBorderSide(neighborPatches, adjacentGridCells(cellAt, location, "bottom"), "top", "bottom", border);
+    syncOppositeBorderSide(neighborPatches, adjacentGridCells(cellAt, location, "left"), "right", "left", border);
+  }
+  return updateGridCells(block, new Set([...borders.keys(), ...neighborPatches.keys()]), cell => {
+    const current = cell.border ?? block.border;
+    const next = borders.get(cell.id) ?? { ...current, ...neighborPatches.get(cell.id) };
+    return sameProperties(current, next) ? cell : { ...cell, border: next };
+  });
+}
 
-  return {
-    ...block,
-    rows: block.rows.map((row) => ({
-      ...row,
-      cells: row.cells.map((cell) => {
-        if (cell.id === cellId) return { ...cell, border };
-        const patch = neighborPatches.get(cell.id);
-        return patch ? { ...cell, border: { ...(cell.border ?? block.border), ...patch } } : cell;
-      }),
-    })),
-  };
+function sameProperties<T extends object>(left: T, right: T) {
+  return Object.keys(left).length === Object.keys(right).length &&
+    (Object.keys(right) as Array<keyof T>).every(key => Object.is(left[key], right[key]));
 }
 
 type GridBorderSide = "top" | "right" | "bottom" | "left";

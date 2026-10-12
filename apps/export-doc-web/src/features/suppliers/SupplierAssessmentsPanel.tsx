@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { ApiSupplierAssessmentDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { OperationFeedback, errorFeedback, requestErrorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
@@ -9,6 +9,7 @@ import { SupplierAssessmentAnalytics } from "./SupplierAssessmentAnalytics.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 type AssessmentView = "directory" | "analytics" | "editor";
 
@@ -28,6 +29,12 @@ export function SupplierAssessmentsPanel({ businessDate, client, supplierId, sup
   const [view, setView] = useState<AssessmentView>("directory");
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
   const [draftDirty, setDraftDirty] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const scope = useMemo(() => ({}), [client, supplierId]);
+  const abortable = useAbortableOperation(scope);
+  const activeScope = useRef<object | null>(scope);
+  const inFlight = useRef<object | null>(null);
+  const loadSequence = useRef(0);
   const selected = rows.find((item) => item.id === selectedId);
   const tabsId = `supplier-assessment-${supplierId}`;
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
@@ -36,30 +43,70 @@ export function SupplierAssessmentsPanel({ businessDate, client, supplierId, sup
   });
 
   async function load(preferredId?: number, signal?: AbortSignal) {
-    const result = await client.listSupplierAssessments({ supplierId }, { signal });
-    if (signal?.aborted) return;
+    const sequence = ++loadSequence.current;
+    let result: ApiSupplierAssessmentDto[];
+    try { result = await client.listSupplierAssessments({ supplierId }, { signal }); }
+    catch (error) { if (signal?.aborted || sequence !== loadSequence.current) return; throw error; }
+    if (signal?.aborted || sequence !== loadSequence.current) return;
     setRows(result);
     setSelectedId(preferredId && result.some((item) => item.id === preferredId) ? preferredId : result[0]?.id ?? 0);
   }
 
   useEffect(() => {
     const controller = new AbortController();
+    activeScope.current = scope;
+    inFlight.current = null;
+    setBusy(false);
+    setRows([]);
+    setSelectedId(0);
+    setFeedback(null);
     setDraftDirty(false);
     setView("directory");
     void load(undefined, controller.signal).catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); });
-    return () => controller.abort();
-  }, [client, supplierId]);
+    return () => { activeScope.current = null; controller.abort(); };
+  }, [scope]);
+
+  async function mutate(request: (signal: AbortSignal) => Promise<ApiSupplierAssessmentDto | undefined>, message: string, nextView: AssessmentView) {
+    if (inFlight.current || activeScope.current !== scope) return;
+    const operation = {};
+    inFlight.current = operation;
+    setBusy(true);
+    setFeedback(null);
+    let committed = false;
+    try {
+      await abortable(async signal => {
+        const saved = await request(signal);
+        signal.throwIfAborted();
+        committed = true;
+        setRows(current => saved ? current.some(row => row.id === saved.id)
+          ? current.map(row => row.id === saved.id ? saved : row) : [saved, ...current]
+          : current.filter(row => row.id !== selected?.id));
+        setSelectedId(saved?.id ?? 0);
+        setDraftDirty(false);
+        setView(nextView);
+        await load(saved?.id, signal);
+        signal.throwIfAborted();
+        setFeedback(successFeedback(message));
+      });
+    } catch (error) { if (!isAbortError(error)) setFeedback(committed
+      ? errorFeedback(`${message}列表刷新失败：${readApiError(error)}`) : requestErrorFeedback(error)); }
+    finally { if (inFlight.current === operation) { inFlight.current = null; setBusy(false); } }
+  }
 
   async function changeView(nextView: AssessmentView) {
+    if (busy) return false;
     if (nextView === view) return true;
     if (!await confirmDiscardChanges("切换评价工作区")) return false;
+    if (activeScope.current !== scope || inFlight.current) return false;
     setDraftDirty(false);
     setView(nextView);
     return true;
   }
 
   async function openEditor(nextSelectedId: number) {
+    if (busy) return;
     if (!await confirmDiscardChanges(nextSelectedId ? "切换评价" : "记录新评价")) return;
+    if (activeScope.current !== scope || inFlight.current) return;
     setDraftDirty(false);
     setSelectedId(nextSelectedId);
     setView("editor");
@@ -84,52 +131,30 @@ export function SupplierAssessmentsPanel({ businessDate, client, supplierId, sup
       notes: text(form, "notes"),
       expectedVersion: id > 0 ? selected?.versionNumber ?? 0 : 0,
     };
-    try {
-      const saved = id
-        ? await client.updateSupplierAssessment({ supplierId, id, body })
-        : await client.createSupplierAssessment({ supplierId, body });
-      await load(saved.id);
-      setDraftDirty(false);
-      setView("editor");
-      setFeedback(successFeedback(id ? "供应商评价已更新。" : "供应商评价已记录。"));
-    } catch (error) {
-      setFeedback(requestErrorFeedback(error));
-    }
+    await mutate(signal => id
+      ? client.updateSupplierAssessment({ supplierId, id, body }, { signal })
+      : client.createSupplierAssessment({ supplierId, body }, { signal }),
+    id ? "供应商评价已更新。" : "供应商评价已记录。", "editor");
   }
 
   async function confirmAssessment() {
-    if (!canApprove || !selected || selected.status === "Confirmed" ||
+    if (busy || !canApprove || !selected || selected.status === "Confirmed" ||
         !await requestConfirmation({
           title: "确认供应商评价",
           description: `确认 ${selected.assessmentDate} 的供应商评价吗？`,
           details: ["确认后将作为审计记录保留，不能继续修改或删除；更正请新建复评。"],
           confirmLabel: "确认评价",
         }) || !await confirmDiscardChanges("确认供应商评价")) return;
-    try {
-      const saved = await client.confirmSupplierAssessment({
+    await mutate(signal => client.confirmSupplierAssessment({
         supplierId,
         id: selected.id,
         expectedVersion: selected.versionNumber,
-      });
-      await load(saved.id);
-      setDraftDirty(false);
-      setFeedback(successFeedback("供应商评价已确认并锁定。"));
-    } catch (error) {
-      setFeedback(requestErrorFeedback(error));
-    }
+      }, { signal }), "供应商评价已确认并锁定。", view);
   }
 
   async function remove() {
-    if (!canDelete || !selected || selected.status === "Confirmed" || !await requestConfirmation({ title: "删除供应商评价", description: `确定删除 ${selected.assessmentDate} 的供应商评价草稿吗？`, confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除供应商评价")) return;
-    try {
-      await client.deleteSupplierAssessment({ supplierId, id: selected.id, expectedVersion: selected.versionNumber });
-      await load();
-      setDraftDirty(false);
-      setView("directory");
-      setFeedback(successFeedback("供应商评价已删除。"));
-    } catch (error) {
-      setFeedback(requestErrorFeedback(error));
-    }
+    if (busy || !canDelete || !selected || selected.status === "Confirmed" || !await requestConfirmation({ title: "删除供应商评价", description: `确定删除 ${selected.assessmentDate} 的供应商评价草稿吗？`, confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除供应商评价")) return;
+    await mutate(async signal => { await client.deleteSupplierAssessment({ supplierId, id: selected.id, expectedVersion: selected.versionNumber }, { signal }); return undefined; }, "供应商评价已删除。", "directory");
   }
 
   const today = dateInputToApiDate(businessDate);
@@ -171,7 +196,7 @@ export function SupplierAssessmentsPanel({ businessDate, client, supplierId, sup
       onCreate={canCreate ? () => void openEditor(0) : undefined} /></div> : <form className="form-grid" key={`${selected?.id ?? "new"}-${selected?.versionNumber ?? 0}-${supplierId}`} onSubmit={save} {...getTaskViewPanelProps(tabsId, "editor")}>
       <div className="section-heading-row"><h4>{selected ? canEdit && selected.status !== "Confirmed" ? "编辑评价" : "查看评价" : "记录新评价"}</h4><button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回评价记录</button></div>
       <div className="form-field-wide context-strip"><strong>{supplierName}</strong><span>1 分表示明显不足，5 分表示表现优秀。</span></div>
-      <fieldset className="permission-fieldset form-field-wide" disabled={selected ? !canEdit || selected.status === "Confirmed" : !canCreate} onChangeCapture={() => setDraftDirty(true)}>
+      <fieldset className="permission-fieldset form-field-wide" disabled={busy || (selected ? !canEdit || selected.status === "Confirmed" : !canCreate)} onChangeCapture={() => setDraftDirty(true)}>
       <label>评价日期<input name="assessmentDate" type="date" required max={today} defaultValue={selected?.assessmentDate ?? today} /></label>
       <label>评价类型<select name="assessmentKind" defaultValue={selected?.assessmentKind ?? "定期评价"}><option>定期评价</option><option>订单复盘</option><option>样品评估</option><option>其它</option></select></label>
       <ScoreField name="qualityScore" label="质量评分" value={selected?.qualityScore ?? 4} />
@@ -181,7 +206,7 @@ export function SupplierAssessmentsPanel({ businessDate, client, supplierId, sup
       <label>评价结论<select name="conclusion" defaultValue={selected?.conclusion ?? "合格"}><option>优先合作</option><option>合格</option><option>观察</option><option>暂停合作</option></select></label>
       <label className="form-field-wide">评价备注<textarea name="notes" maxLength={1000} defaultValue={selected?.notes} placeholder="记录事实、改进事项和下次复核重点" /></label>
       </fieldset>
-      <div className="form-actions">{(selected ? canEdit && selected.status !== "Confirmed" : canCreate) ? <button className="primary-button" type="submit">保存评价草稿</button> : null}{selected && canApprove && selected.status !== "Confirmed" ? <button className="primary-button" type="button" onClick={() => void confirmAssessment()}>确认评价</button> : null}{selected && canDelete && selected.status !== "Confirmed" ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>删除草稿</button> : null}</div>
+      <div className="form-actions">{(selected ? canEdit && selected.status !== "Confirmed" : canCreate) ? <button className="primary-button" type="submit" disabled={busy}>保存评价草稿</button> : null}{selected && canApprove && selected.status !== "Confirmed" ? <button className="primary-button" type="button" disabled={busy} onClick={() => void confirmAssessment()}>确认评价</button> : null}{selected && canDelete && selected.status !== "Confirmed" ? <button className="secondary-button danger-button" type="button" disabled={busy} onClick={() => void remove()}>删除草稿</button> : null}</div>
     </form>}
   </section>;
 }

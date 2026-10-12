@@ -25,6 +25,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { UnsavedChangesProvider } from ${source('ui/unsavedChangesGuard.tsx')};
   import { PermissionAccessProvider } from ${source('app/PermissionAccessContext.tsx')};
   import { SupplierProductLinksPanel } from ${source('features/suppliers/SupplierProductLinksPanel.tsx')};
+  import { SupplierAssessmentsPanel } from ${source('features/suppliers/SupplierAssessmentsPanel.tsx')};
   import { SalesOpportunityPage } from ${source('features/opportunities/SalesOpportunityPage.tsx')};
   window.pending = []; window.results = []; window.completed = []; window.refreshes = [];
   window.attachmentUploads = [];
@@ -32,6 +33,9 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   const delayed = signal => new Promise((resolve, reject) => window.pending.push({ signal, resolve, reject }));
   const lookup = (input, options, kind = 'primary') => new Promise((resolve, reject) => window.pending.push({ ...input, kind, signal: options.signal, resolve, reject }));
   const client = { searchSupplierProductOptions: lookup, queryCrmCustomers: lookup, listProducts: (input, options) => lookup(input, options, 'product'),
+    listSupplierAssessments: (input, options) => lookup(input, options, 'assessment-list'),
+    createSupplierAssessment: (input, options) => lookup(input, options, 'assessment-create'),
+    updateSupplierAssessment: (input, options) => lookup(input, options, 'assessment-update'),
     querySupplierProductLinks: async () => ({ items: [], totalCount: 0, totalPages: 1 }),
     querySalesOpportunities: async () => ({ items: [], totalCount: 0, totalPages: 1 }) };
   function Generic({ scope }) {
@@ -66,6 +70,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
     return <><button onClick={() => setScope(value => value + 1)}>切换资料</button>
       <button onClick={() => setOpen(false)}>离开编辑页</button>
       {open ? window.mode === 'supplier' ? <SupplierProductLinksPanel client={client} supplierId={scope + 1} supplierName='供应商' canEdit/>
+        : window.mode === 'assessment' ? <SupplierAssessmentsPanel client={client} businessDate='2026-10-12' supplierId={scope + 1} supplierName={'供应商'+(scope+1)} canCreate canEdit canApprove canDelete/>
         : window.mode.startsWith('sales') ? <SalesOpportunityPage client={client} businessTimeZone='Asia/Shanghai'/>
         : window.mode === 'office' ? <Office/> : window.mode.startsWith('attachments') ? <Attachments/> : <Generic scope={scope}/> : <p>编辑页已关闭</p>}</>;
   }
@@ -190,6 +195,38 @@ try {
     }
   }
   const attachmentFile = name => ({ name, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.7\n%%EOF') });
+  for (const boundary of ['scope', 'unmount', 'refresh-failure']) {
+    await scenario(`supplier-assessment-save-${boundary}`, 'assessment', async page => {
+      await page.waitForFunction(() => window.pending.some(item => item.kind === 'assessment-list' && !item.signal.aborted));
+      await page.evaluate(() => window.pending.filter(item => item.kind === 'assessment-list').forEach(item => item.resolve([])));
+      await page.getByRole('button', { name: '记录新评价', exact: true }).click();
+      await page.locator('form').evaluate(form => { form.requestSubmit(); form.requestSubmit(); });
+      await page.waitForFunction(() => window.pending.some(item => item.kind === 'assessment-create'));
+      assert.equal(await page.evaluate(() => window.pending.filter(item => item.kind === 'assessment-create').length), 1, 'repeated submission starts only one write');
+      assert.equal(await page.getByRole('button', { name: '保存评价草稿' }).isDisabled(), true);
+      if (boundary !== 'refresh-failure') {
+        await page.getByRole('button', { name: boundary === 'scope' ? '切换资料' : '离开编辑页', exact: true }).click();
+        await page.waitForFunction(() => window.pending.find(item => item.kind === 'assessment-create').signal.aborted);
+      }
+      const saved = { id: 10, supplierCompanyId: 1, assessmentDate: '2026-10-12', assessmentKind: '定期评价',
+        qualityScore: 4, deliveryScore: 4, serviceScore: 4, priceScore: 4, averageScore: 4,
+        conclusion: '合格', status: 'Draft', versionNumber: 1, notes: '已保存的评价' };
+      await page.evaluate(saved => window.pending.find(item => item.kind === 'assessment-create').resolve(saved), saved);
+      if (boundary === 'refresh-failure') {
+        await page.waitForFunction(() => window.pending.filter(item => item.kind === 'assessment-list').length === 3);
+        await page.evaluate(() => window.pending.filter(item => item.kind === 'assessment-list').at(-1).reject(new Error('网络中断')));
+        await page.getByText('供应商评价已记录。列表刷新失败：网络中断', { exact: true }).waitFor();
+        assert.equal(await page.locator('textarea[name=notes]').inputValue(), saved.notes, 'saved result is retained even if the refresh fails');
+        await page.getByRole('button', { name: '保存评价草稿' }).click();
+        await page.waitForFunction(() => window.pending.some(item => item.kind === 'assessment-update'));
+        assert.equal(await page.evaluate(() => window.pending.filter(item => item.kind === 'assessment-create').length), 1, 'retrying a saved result updates it instead of creating a duplicate');
+      } else {
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        assert.doesNotMatch(await page.locator('body').textContent(), /已保存的评价|供应商评价已记录/);
+        assert.equal(await page.evaluate(() => window.pending.filter(item => item.kind === 'assessment-list' && item.supplierId === 1).length), 2, 'canceled saves do not start obsolete list reloads');
+      }
+    });
+  }
   await scenario('attachment-capacity-follows-refreshed-record', 'attachments', async page => {
     const picker = page.locator('input[type=file]');
     assert.equal(await picker.isDisabled(), true);

@@ -174,7 +174,7 @@ export function ElementInspector({
   onPatchStyle,
   onCommit,
   onFlowCommit,
-  selectedGridCellId,
+  selectedGridCellId, selectedGridEndCellId,
   onSelectGridCell,
   onZIndex,
   canEdit = true,
@@ -188,8 +188,8 @@ export function ElementInspector({
   onPatchStyle: (update: Partial<ReportDesignerV3Element["style"]>) => void;
   onCommit: (next: ReportDesignerV3DocumentState) => void;
   onFlowCommit: (block: FlowBlock) => void;
-  selectedGridCellId?: string;
-  onSelectGridCell: (cellId: string) => void;
+  selectedGridCellId?: string; selectedGridEndCellId?: string;
+  onSelectGridCell: (cellId: string, endCellId?: string) => void;
   onZIndex: (direction: "front" | "back" | "forward" | "backward") => void;
   canEdit?: boolean;
   client?: ExportDocManagerApiClient;
@@ -218,7 +218,7 @@ export function ElementInspector({
         <button type="button" disabled={!editable} onClick={() => onCommit(alignSelectedV3Elements(state, "center-vertical", "page"))}>页面垂直居中</button>
       </div></details>
     </details>;
-  const content = <ElementContentEditor element={element} reportType={state.schema.reportType} resources={state.schema.resources ?? []} fieldGroups={fieldGroups} editable={editable} client={client} onPatch={onPatch} onFlowCommit={onFlowCommit} selectedGridCellId={selectedGridCellId} onSelectGridCell={onSelectGridCell} onImageResourceUploaded={onImageResourceUploaded} />;
+  const content = <ElementContentEditor element={element} reportType={state.schema.reportType} resources={state.schema.resources ?? []} fieldGroups={fieldGroups} editable={editable} client={client} onPatch={onPatch} onFlowCommit={onFlowCommit} selectedGridCellId={selectedGridCellId} selectedGridEndCellId={selectedGridEndCellId} onSelectGridCell={onSelectGridCell} onImageResourceUploaded={onImageResourceUploaded} />;
   const output = <details className="report-designer-property-section"><summary>排列与输出</summary>
       <div className="report-designer-v3-element-actions">
         {(["back", "backward", "forward", "front"] as const).map((direction) => <button key={direction} type="button" onClick={() => onZIndex(direction)} disabled={!editable}>{direction === "back" ? "置底" : direction === "backward" ? "后移" : direction === "forward" ? "前移" : "置顶"}</button>)}
@@ -244,7 +244,7 @@ export function ElementInspector({
   );
 }
 
-function ElementContentEditor({ element, reportType, resources, fieldGroups, editable, client, onPatch, onFlowCommit, selectedGridCellId, onSelectGridCell, onImageResourceUploaded }: { element: ReportDesignerV3Element; reportType: ReportDesignerReportType; resources: ReportDesignerV3ImageResource[]; fieldGroups: ReportDesignerFieldGroup[]; editable: boolean; client?: ExportDocManagerApiClient; onPatch: (update: Partial<ReportDesignerV3Element>) => void; onFlowCommit: (block: FlowBlock) => void; selectedGridCellId?: string; onSelectGridCell: (cellId: string) => void; onImageResourceUploaded: (elementId: string, resource: ApiReportTemplateImageResourceResponse) => void }) {
+function ElementContentEditor({ element, reportType, resources, fieldGroups, editable, client, onPatch, onFlowCommit, selectedGridCellId, selectedGridEndCellId, onSelectGridCell, onImageResourceUploaded }: { element: ReportDesignerV3Element; reportType: ReportDesignerReportType; resources: ReportDesignerV3ImageResource[]; fieldGroups: ReportDesignerFieldGroup[]; editable: boolean; client?: ExportDocManagerApiClient; onPatch: (update: Partial<ReportDesignerV3Element>) => void; onFlowCommit: (block: FlowBlock) => void; selectedGridCellId?: string; selectedGridEndCellId?: string; onSelectGridCell: (cellId: string, endCellId?: string) => void; onImageResourceUploaded: (elementId: string, resource: ApiReportTemplateImageResourceResponse) => void }) {
   switch (element.type) {
     case "Text":
       return <label className="report-designer-v3-wide-field"><span>文本</span><CommitTextField value={element.text} multiline disabled={!editable} onCommit={(text) => onPatch({ text })} /></label>;
@@ -267,7 +267,7 @@ function ElementContentEditor({ element, reportType, resources, fieldGroups, edi
     case "Line":
       return <SelectField label="方向" value={element.direction} options={[{ value: "Horizontal", label: "水平" }, { value: "Vertical", label: "垂直" }]} disabled={!editable} onChange={(direction) => onPatch({ direction: direction === "Vertical" ? "Vertical" : "Horizontal" })} />;
     case "Flow":
-      return <fieldset className="report-designer-v3-flow-editor" aria-label="表格与内容属性" disabled={!editable}><ReportDesignerV3FlowProperties block={element.block} widthMm={hundredthMmToMm(element.widthHundredthMm)} fieldGroups={fieldGroups} selectedGridCellId={selectedGridCellId} onSelectGridCell={onSelectGridCell} onCommit={onFlowCommit} /></fieldset>;
+      return <fieldset className="report-designer-v3-flow-editor" aria-label="表格与内容属性" disabled={!editable}><ReportDesignerV3FlowProperties block={element.block} widthMm={hundredthMmToMm(element.widthHundredthMm)} fieldGroups={fieldGroups} selectedGridCellId={selectedGridCellId} selectedGridEndCellId={selectedGridEndCellId} onSelectGridCell={onSelectGridCell} onCommit={onFlowCommit} /></fieldset>;
     case "Rectangle":
       return null;
   }

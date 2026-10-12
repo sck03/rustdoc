@@ -29,8 +29,8 @@ export async function withOfficeUi(name, run) {
     const invoke = async (id, body, parameters = {}, token = '') => {
       const op = operations.get(id); assert(op, `Unknown operation ${id}`);
       const route = op.route.replace(/\{([^}]+)\}/gu, (_, key) => encodeURIComponent(parameters[key]));
-      const response = await fetch(url + route, { method: op.method.toUpperCase(), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
-      assert(response.ok, `${id} (${response.status}): ${await response.clone().text()}`);
+      const response = await fetch(url + route, { method: op.method.toUpperCase(), signal: AbortSignal.timeout(60000), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+      if (!response.ok) throw new Error(`${id} (${response.status}): ${await response.text()}`);
       return response.json();
     };
     const openPage = async (username, password) => {

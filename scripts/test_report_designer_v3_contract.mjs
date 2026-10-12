@@ -49,6 +49,7 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerBlockRenderer.ts")
 export * from ${JSON.stringify(path.join(repoRoot, "scripts/lib/report-preview-html-fixture.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerGridMutations.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerGridFields.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerGridSelection.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerBlockFactories.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerConditions.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3ElementFactories.ts"))};
@@ -448,11 +449,13 @@ const baseGrid = {
   border: { color: "#333333", widthPx: 1, style: "Solid", top: true, right: true, bottom: true, left: true },
   defaultCellStyle: {},
 };
-const mergedRight = api.mergeGridCellRight(baseGrid, "a");
+assert(api.mergeGridCellRight(baseGrid, "a") === baseGrid && api.mergeGridCellDown(baseGrid, "a") === baseGrid, "合并必须保留有多份内容的原稿并拒绝静默丢失内容");
+const mergeableGrid = { ...baseGrid, rows: baseGrid.rows.map(row => ({ ...row, cells: row.cells.map(cell => cell.id === "a" ? cell : { ...cell, text: "" }) })) };
+const mergedRight = api.mergeGridCellRight(mergeableGrid, "a");
 assert(mergedRight.rows[0].cells.length === 1 && mergedRight.rows[0].cells[0].colSpan === 2, "普通表格必须支持向右合并并移除被覆盖单元格");
 const splitRight = api.splitGridCell(mergedRight, "a");
 assert(splitRight.rows[0].cells.length === 2 && api.getGridCellLocations(splitRight).filter((cell) => cell.rowIndex === 0).length === 2, "合并单元格必须可恢复为独立单元格");
-const mergedDown = api.mergeGridCellDown(baseGrid, "a");
+const mergedDown = api.mergeGridCellDown(mergeableGrid, "a");
 assert(mergedDown.rows[0].cells[0].rowSpan === 2 && mergedDown.rows[1].cells.length === 1, "普通表格必须支持向下合并且保持目标行有效");
 const formGrid = api.applyGridPreset(baseGrid, "Form");
 assert(formGrid.rows.length === 3 && formGrid.columns.length === 4 && formGrid.rows[2].cells[1].colSpan === 3, "标签/内容预设必须生成可编辑的 4 列合并表单");
