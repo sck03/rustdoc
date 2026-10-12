@@ -65,6 +65,8 @@ pub(super) fn render(svg: &mut String, element: &Element, data: &ReportData) -> 
                 .iter()
                 .map(|r| r.height_mm.unwrap_or(8.))
                 .collect();
+            let lefts = track_offsets(&widths);
+            let tops = track_offsets(&heights);
             let mut top = y;
             if !block.title.is_empty() {
                 let size = element.style.font_size_pt * PT_MM;
@@ -86,8 +88,8 @@ pub(super) fn render(svg: &mut String, element: &Element, data: &ReportData) -> 
             for place in grid::placements(block).map_err(invalid)? {
                 let cell = place.cell;
                 let rect = [
-                    x + widths[..place.column].iter().sum::<f32>(),
-                    top + heights[..place.row].iter().sum::<f32>(),
+                    x + lefts[place.column],
+                    top + tops[place.row],
                     widths[place.column..place.column + place.col_span]
                         .iter()
                         .sum(),
@@ -208,6 +210,18 @@ pub(super) fn render(svg: &mut String, element: &Element, data: &ReportData) -> 
         y + height / 2.
     ));
     Ok(())
+}
+
+fn track_offsets(sizes: &[f32]) -> Vec<f32> {
+    let mut offset = 0.;
+    sizes
+        .iter()
+        .map(|size| {
+            let start = offset;
+            offset += size;
+            start
+        })
+        .collect()
 }
 
 fn value(

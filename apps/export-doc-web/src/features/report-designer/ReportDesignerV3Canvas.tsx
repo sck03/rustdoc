@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { getGridCellLocations } from "./reportDesignerGridMutations.ts";
+import type { ReportDesignerGridCellTarget } from "./reportDesignerGridFields.ts";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { ReportDesignerCanvasTextEditor, type ReportDesignerTextEdit } from "./ReportDesignerCanvasTextEditor.tsx";
 import {
@@ -86,7 +87,7 @@ export function ReportDesignerV3Canvas({
   onCommitLayerBand: (role: "Header" | "Footer", heightHundredthMm: number) => void;
   onClearSelection: () => void;
   onCommitText: (elementId: string, cellId: string | undefined, text: string) => void;
-  onDropField?: (fieldPath: string, x: number, y: number) => void;
+  onDropField?: (fieldPath: string, x: number, y: number, target?: ReportDesignerGridCellTarget) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -366,7 +367,10 @@ export function ReportDesignerV3Canvas({
             const rect = event.currentTarget.getBoundingClientRect();
             if (!field || !rect.width || !rect.height) return;
             event.preventDefault();
-            onDropField?.(field, Math.round((event.clientX - rect.left) / rect.width * state.schema.page.widthHundredthMm), Math.round((event.clientY - rect.top) / rect.height * state.schema.page.heightHundredthMm));
+            const located = locateEventElement(event.target);
+            const cellId = readReportDesignerGridCellId(event.target);
+            const target = located?.element.type === "Flow" && located.element.flowKind === "Grid" && cellId ? { elementId: located.element.id, cellId } : undefined;
+            onDropField?.(field, Math.round((event.clientX - rect.left) / rect.width * state.schema.page.widthHundredthMm), Math.round((event.clientY - rect.top) / rect.height * state.schema.page.heightHundredthMm), target);
           }}
           onPointerDown={handlePointerDown}
           onKeyDown={handleKeyDown}

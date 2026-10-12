@@ -19,6 +19,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
   import { useAbortableOperation } from ${source('ui/useAbortableOperation.ts')};
   import { useOfficeOperation } from ${source('features/office/useOfficeData.ts')};
+  import { AttachmentUploadPanel } from ${source('ui/AttachmentUploadPanel.tsx')};
   import { MemoryRouter } from 'react-router-dom';
   import { ConfirmationProvider } from ${source('ui/ConfirmationProvider.tsx')};
   import { UnsavedChangesProvider } from ${source('ui/unsavedChangesGuard.tsx')};
@@ -26,6 +27,8 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { SupplierProductLinksPanel } from ${source('features/suppliers/SupplierProductLinksPanel.tsx')};
   import { SalesOpportunityPage } from ${source('features/opportunities/SalesOpportunityPage.tsx')};
   window.pending = []; window.results = []; window.completed = []; window.refreshes = [];
+  window.attachmentUploads = [];
+  window.attachmentRecord = { versionNumber: 1, attachments: Array.from({ length: window.mode === 'attachments-partial' ? 18 : 20 }, () => ({ sizeBytes: 1 })) };
   const delayed = signal => new Promise((resolve, reject) => window.pending.push({ signal, resolve, reject }));
   const lookup = (input, options, kind = 'primary') => new Promise((resolve, reject) => window.pending.push({ ...input, kind, signal: options.signal, resolve, reject }));
   const client = { searchSupplierProductOptions: lookup, queryCrmCustomers: lookup, listProducts: (input, options) => lookup(input, options, 'product'),
@@ -41,17 +44,30 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
     return <><button disabled={operation.busy} onClick={() => void operation.run(delayed,
       value => window.completed.push(value))}>保存</button><output>{operation.error}</output></>;
   }
+  function Attachments() {
+    const [record, setRecord] = useState(window.attachmentRecord);
+    const operation = useOfficeOperation();
+    return <><button onClick={() => setRecord(window.attachmentRecord)}>刷新附件记录</button>
+      <AttachmentUploadPanel record={record} operation={operation} upload={async (current, body) => {
+        window.attachmentUploads.push(current.versionNumber);
+        if (current.versionNumber !== window.attachmentRecord.versionNumber) throw new Error('过时版本');
+        if (window.mode === 'attachments-partial' && window.attachmentUploads.length === 2) throw new Error('第二个附件未完成');
+        return window.attachmentRecord = { versionNumber: current.versionNumber + 1,
+          attachments: [...current.attachments, { sizeBytes: body.get('file').size }] };
+      }}/><output>{operation.error}</output></>;
+  }
   function App() {
     const [scope, setScope] = useState(0), [open, setOpen] = useState(true);
+    const refresh = () => window.mode.startsWith('attachments') ? Promise.resolve('updated') : new Promise(resolve => window.refreshes.push(resolve));
     useQuery({ queryKey: ['office', 'test'], initialData: 'before', staleTime: Infinity,
-      queryFn: () => new Promise(resolve => window.refreshes.push(resolve)) });
+      queryFn: refresh });
     useQuery({ queryKey: ['worklist', 'test'], initialData: 'before', staleTime: Infinity,
-      queryFn: () => new Promise(resolve => window.refreshes.push(resolve)) });
+      queryFn: refresh });
     return <><button onClick={() => setScope(value => value + 1)}>切换资料</button>
       <button onClick={() => setOpen(false)}>离开编辑页</button>
       {open ? window.mode === 'supplier' ? <SupplierProductLinksPanel client={client} supplierId={scope + 1} supplierName='供应商' canEdit/>
         : window.mode.startsWith('sales') ? <SalesOpportunityPage client={client} businessTimeZone='Asia/Shanghai'/>
-        : window.mode === 'office' ? <Office/> : <Generic scope={scope}/> : <p>编辑页已关闭</p>}</>;
+        : window.mode === 'office' ? <Office/> : window.mode.startsWith('attachments') ? <Attachments/> : <Generic scope={scope}/> : <p>编辑页已关闭</p>}</>;
   }
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
   const permissions = ['sales.opportunities', 'sales.quotes'].map(resourceKey => ({ resourceKey, action: 'create', dataScope: 'all' }));
@@ -173,6 +189,30 @@ try {
       });
     }
   }
+  const attachmentFile = name => ({ name, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.7\n%%EOF') });
+  await scenario('attachment-capacity-follows-refreshed-record', 'attachments', async page => {
+    const picker = page.locator('input[type=file]');
+    assert.equal(await picker.isDisabled(), true);
+    await page.evaluate(() => { window.attachmentRecord = { versionNumber: 2, attachments: window.attachmentRecord.attachments.slice(1) }; });
+    await page.getByRole('button', { name: '刷新附件记录' }).click();
+    await page.waitForFunction(() => !document.querySelector('input[type=file]').disabled);
+    await picker.setInputFiles(attachmentFile('replacement.pdf'));
+    await page.getByRole('button', { name: '上传所选附件（1）', exact: true }).click();
+    await page.waitForFunction(() => window.attachmentRecord.attachments.length === 20);
+    assert.deepEqual(await page.evaluate(() => window.attachmentUploads), [2]);
+  });
+  await scenario('attachment-partial-upload-retains-newer-capacity-and-version', 'attachments-partial', async page => {
+    const picker = page.locator('input[type=file]');
+    await picker.setInputFiles(['first.pdf', 'second.pdf'].map(attachmentFile));
+    await page.getByRole('button', { name: '上传所选附件（2）', exact: true }).click();
+    await page.getByText('第二个附件未完成', { exact: true }).waitFor();
+    await picker.setInputFiles(attachmentFile('third.pdf'));
+    await page.getByText(/当前最多再选 1 个文档附件/).waitFor();
+    assert.equal(await page.locator('.attachment-draft > ul > li').count(), 1);
+    await page.getByRole('button', { name: '上传所选附件（1）', exact: true }).click();
+    await page.waitForFunction(() => window.attachmentRecord.attachments.length === 20);
+    assert.deepEqual(await page.evaluate(() => window.attachmentUploads), [1, 2, 2]);
+  });
   fs.writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ results, failures }, null, 2));
   assert.deepEqual(failures, []);
   process.stdout.write(`Abortable operation UI passed (${results.length} cases).\n`);

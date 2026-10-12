@@ -30,13 +30,13 @@ export function reportGridCellPlacements(
     return [];
   }
 
-  const occupied = Array.from({ length: rows }, () => Array<boolean>(columns).fill(false));
+  const occupied = new Uint8Array(rows * columns);
   const placements: ReportGridCellPlacement[] = [];
   for (const [rowIndex, row] of block.rows.entries()) {
     const rowPath = `${path}.rows[${rowIndex}]`;
     let columnIndex = 0;
     for (const [cellIndex, cell] of row.cells.entries()) {
-      while (columnIndex < columns && occupied[rowIndex][columnIndex]) {
+      while (columnIndex < columns && occupied[rowIndex * columns + columnIndex]) {
         columnIndex += 1;
       }
       const rowSpan = Math.trunc(cell.rowSpan ?? 1);
@@ -59,7 +59,7 @@ export function reportGridCellPlacements(
         for (let columnOffset = 0; columnOffset < colSpan; columnOffset += 1) {
           const targetRow = rowIndex + rowOffset;
           const targetColumn = columnIndex + columnOffset;
-          if (occupied[targetRow][targetColumn]) {
+          if (occupied[targetRow * columns + targetColumn]) {
             issues.push({
               severity: "error",
               path: `${rowPath}.cells[${cellIndex}]`,
@@ -67,7 +67,7 @@ export function reportGridCellPlacements(
             });
             return placements;
           }
-          occupied[targetRow][targetColumn] = true;
+          occupied[targetRow * columns + targetColumn] = 1;
         }
       }
 
@@ -75,7 +75,7 @@ export function reportGridCellPlacements(
       columnIndex += colSpan;
     }
 
-    if (row.cells.length === 0 && occupied[rowIndex].some((value) => !value)) {
+    if (row.cells.length === 0 && occupied.subarray(rowIndex * columns, (rowIndex + 1) * columns).includes(0)) {
       issues.push({
         severity: "error",
         path: rowPath,

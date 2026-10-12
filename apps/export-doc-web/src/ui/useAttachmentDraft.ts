@@ -34,6 +34,8 @@ export function useAttachmentDraft<R>(initial?: R) {
       setSelectionError(`当前最多再选 ${maxFiles} 个文档附件、合计 ${(maxTotalBytes / 1024 / 1024).toFixed(1)} MiB。`); return;
     }
     setFiles(next);
+    const retainedKeys = new Set(next.map(entry => entry.key));
+    for (const key of requestKeys.current.keys()) if (!retainedKeys.has(key)) requestKeys.current.delete(key);
     setFailedKey(null);
     if (!files.length) setCompleted([]);
   }
@@ -53,6 +55,7 @@ export function useAttachmentDraft<R>(initial?: R) {
       catch (error) { setFailedKey(entry.key); throw error; }
       finally { setUploadingKey(null); }
       setSaved(current.current);
+      requestKeys.current.delete(entry.key);
       setCompleted(done => [...done, { kind: entry.kind, name: entry.file.name }]);
       setFiles(remaining => remaining.filter(file => file.key !== entry.key));
     }
@@ -64,6 +67,11 @@ export function useAttachmentDraft<R>(initial?: R) {
     if (!request || request.payload !== payload) { request = { payload, key: createRequestKey() }; requestKeys.current.set(entry.key, request); }
     return request.key;
   }
+  function remove(key: string) {
+    requestKeys.current.delete(key);
+    setFiles(remaining => remaining.filter(file => file.key !== key));
+    setFailedKey(current => current === key ? null : current);
+  }
   return { files, saved, selectionError, completed, uploadingKey, failedKey, select, save, requestKey,
-    remove: (key: string) => setFiles(remaining => remaining.filter(file => file.key !== key)) };
+    remove };
 }

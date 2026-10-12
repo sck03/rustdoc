@@ -19,6 +19,7 @@ export async function verifyDetailProperties({ page, url, read, waitFor, click, 
   await read(page, 'document.querySelector("[data-v3-element-id=review-detail]").focus()');
   await key(page, "Enter");
   await waitFor(page, "document.querySelector('.new-report-detail-column-card')");
+  assert(await read(page, `[...${control("显示内容")}.options].every(option => !option.value || option.value.startsWith('item.'))`), 'a repeating column only offers bindings supported by the native renderer');
   const before = await read(page, block);
   await read(page, `${control("标题", "input")}.focus();${control("标题", "input")}.select()`);
   await page.send("Input.insertText", { text: "商品中文标题" });

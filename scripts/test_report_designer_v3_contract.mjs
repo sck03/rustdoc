@@ -48,6 +48,7 @@ export * from ${JSON.stringify(path.join(repoRoot, "scripts/lib/report-designer-
 export * from ${JSON.stringify(importSpecifier("reportDesignerBlockRenderer.ts"))};
 export * from ${JSON.stringify(path.join(repoRoot, "scripts/lib/report-preview-html-fixture.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerGridMutations.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerGridFields.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerBlockFactories.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerConditions.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3ElementFactories.ts"))};
@@ -765,7 +766,6 @@ assert(canvasSource.includes("createV3RegionMoveConstraint") && canvasSource.inc
 assert(canvasSource.includes("--v3-page-ratio") && canvasCss.includes("aspect-ratio: var(--v3-page-ratio"), "V3 画布必须按 A4 物理宽高比渲染横竖版页面");
 assert(bandsCss.includes("report-designer-layer-tabs") && canvasCss.includes("report-designer-v3-preview-line-horizontal"), "V3 画布必须提供独立图层导航和细线方向");
 assert(resourcePanelsSource.includes('label="普通表格"') && resourcePanelsSource.includes("商品字段（逐行输出）") && resourcePanelsSource.includes("高级排版"), "组件入口必须区分自由商品字段、普通表格和高级组合表格");
-assert(gridPropertiesSource.includes("new-report-grid-cell-picker") && gridPropertiesSource.includes("向右合并") && gridPropertiesSource.includes("向下合并") && gridPropertiesSource.includes("快速版式"), "普通表格属性栏必须提供可视化选格、预设和直接合并操作");
 assert(gridPropertiesSource.includes("修改整表样式会立即应用到全部单元格") && !gridPropertiesSource.includes("套用样式") && !gridPropertiesSource.includes("套用边框"), "整表样式和边框必须即时应用，不能依赖容易漏掉的二次套用按钮");
 assert(gridCss.includes("data-report-grid-cell-id") && gridCss.includes("is-designer-selected-cell"), "画布样式必须支持单元格直接命中和选中反馈");
 assert(layerResizersSource.includes('role="separator"') && bandsCss.includes("report-designer-v3-band-resizer"), "页眉页脚设计带必须提供可访问的调整入口，拖动行为由真实界面回归验证");

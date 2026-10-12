@@ -44,7 +44,7 @@ export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, iss
         case "Row":
           block.columns.forEach((column, columnIndex) => {
             if (column.contentKind === "Field") {
-              validateReportTypeFieldPath(schema.reportType, column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
+              validateFixedReportFieldPath(schema.reportType, column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
             }
           });
           break;
@@ -52,16 +52,16 @@ export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, iss
           block.rows.forEach((row, rowIndex) => {
             row.cells.forEach((cell, cellIndex) => {
               if (cell.contentKind === "Field" || cell.contentKind === "CheckboxGroup") {
-                validateReportTypeFieldPath(schema.reportType, cell.fieldPath, `${blockPath}.rows[${rowIndex}].cells[${cellIndex}].fieldPath`, issues);
+                validateFixedReportFieldPath(schema.reportType, cell.fieldPath, `${blockPath}.rows[${rowIndex}].cells[${cellIndex}].fieldPath`, issues);
               }
             });
           });
           break;
         case "Conditional":
-          validateReportTypeFieldPath(schema.reportType, block.condition.fieldPath, `${blockPath}.condition.fieldPath`, issues);
-          block.additionalConditions?.forEach((rule, index) => validateReportTypeFieldPath(schema.reportType, rule.fieldPath, `${blockPath}.additionalConditions[${index}].fieldPath`, issues));
+          validateFixedReportFieldPath(schema.reportType, block.condition.fieldPath, `${blockPath}.condition.fieldPath`, issues);
+          block.additionalConditions?.forEach((rule, index) => validateFixedReportFieldPath(schema.reportType, rule.fieldPath, `${blockPath}.additionalConditions[${index}].fieldPath`, issues));
           if (block.content.kind === "Field") {
-            validateReportTypeFieldPath(schema.reportType, block.content.fieldPath, `${blockPath}.content.fieldPath`, issues);
+            validateFixedReportFieldPath(schema.reportType, block.content.fieldPath, `${blockPath}.content.fieldPath`, issues);
           }
           break;
         case "Image":
@@ -84,6 +84,7 @@ export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, iss
           }
           block.columns.forEach((column, columnIndex) => {
             validateReportTypeFieldPath(schema.reportType, column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
+            validateDetailTableItemFieldPath(column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
             column.content?.forEach((part, partIndex) => {
               if (part.kind === "Field") {
                 validateReportTypeFieldPath(schema.reportType, part.fieldPath, `${blockPath}.columns[${columnIndex}].content[${partIndex}].fieldPath`, issues);
@@ -92,11 +93,11 @@ export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, iss
           });
           (["summaryRow", "introRow"] as const).forEach(key => block[key]?.cells.forEach((cell, cellIndex) => {
             if (cell.contentKind === "Field") {
-              validateReportTypeFieldPath(schema.reportType, cell.fieldPath, `${blockPath}.${key}.cells[${cellIndex}].fieldPath`, issues);
+              validateFixedReportFieldPath(schema.reportType, cell.fieldPath, `${blockPath}.${key}.cells[${cellIndex}].fieldPath`, issues);
             }
           }));
           if (block.sideBand?.contentKind === "Field") {
-            validateReportTypeFieldPath(schema.reportType, block.sideBand.fieldPath, `${blockPath}.sideBand.fieldPath`, issues);
+            validateFixedReportFieldPath(schema.reportType, block.sideBand.fieldPath, `${blockPath}.sideBand.fieldPath`, issues);
           }
           break;
         case "Text":
@@ -129,7 +130,7 @@ export function validateControlledReportImageFieldPath(
 /**
  * Validate one field reference against the report's data domain.
  *
- * V2 structured blocks and V3 standalone Field/Image elements must use this
+ * Structured blocks and standalone Field/Image elements must use this
  * same rule.  Keeping the function public avoids a second, weaker V3-only
  * allow-list that could drift from the tested block AST contract.
  */
@@ -182,7 +183,12 @@ function validateDetailTableItemFieldPath(
     return;
   }
 
-  issues.push(createIssue("error", path, "分组小计求和字段必须来自商品明细 item.* 或 Invoice.Items.*，不能使用发票表头字段。"));
+  issues.push(createIssue("error", path, "明细列和分组小计求和字段必须来自商品明细 item.* 或 Invoice.Items.*，不能使用发票表头字段。"));
+}
+
+export function validateFixedReportFieldPath(reportType: ReportDesignerReportType, fieldPath: string, path: string, issues: ReportDesignerSchemaIssue[]) {
+  validateReportTypeFieldPath(reportType, fieldPath, path, issues);
+  if (fieldPath.startsWith("item.")) issues.push(createIssue("error", path, "不能在商品循环外使用 item 字段；请使用独立商品字段或明细表正文。"));
 }
 
 function isTemplateSystemFieldForReportType(reportType: ReportDesignerReportType, fieldPath: string) {

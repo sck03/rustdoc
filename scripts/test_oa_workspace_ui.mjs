@@ -93,6 +93,25 @@ try {
   await chooseFiles('[aria-label="上传档案文档"] input[type=file]', [supplement, supplementTwo]);
   await click('上传所选附件（2）');
   await wait("document.querySelectorAll('[aria-label=档案文档] > ul > li').length===4", 'Personnel batch upload from details failed');
+  const capacityFiles = Array.from({ length: 16 }, (_, index) => {
+    const file = path.join(output, `capacity-${index + 1}.pdf`);
+    fs.writeFileSync(file, `%PDF-1.7\n${index + 10} 0 obj<</Type/Catalog>>endobj\n%%EOF\n`);
+    return file;
+  });
+  const attachmentPicker = '[aria-label="上传档案文档"] input[type=file]';
+  await chooseFiles(attachmentPicker, capacityFiles);
+  await click('上传所选附件（16）');
+  await wait("document.querySelectorAll('[aria-label=档案文档] > ul > li').length===20", 'Personnel attachment limit was not reached');
+  assert.equal(await run(`document.querySelector('${attachmentPicker}').disabled`), true);
+  await click('移除', "document.querySelector('[aria-label=档案文档] > ul > li')");
+  await wait("document.querySelector('[role=dialog] textarea')", 'Attachment removal dialog missing');
+  await fill('移除说明', '释放容量后继续上传'); await click('移除文档');
+  await wait("!document.querySelector('[role=dialog]') && document.querySelectorAll('[aria-label=档案文档] > ul > li').length===19", 'Attachment removal did not refresh the record');
+  await wait(`!document.querySelector('${attachmentPicker}').disabled`, 'Freed attachment capacity must be available without reloading the page');
+  await captureScreenshot(page, path.join(output, 'personnel-attachment-capacity-restored.png'));
+  await chooseFiles(attachmentPicker, [receipt]);
+  await click('上传所选附件（1）');
+  await wait("document.querySelectorAll('[aria-label=档案文档] > ul > li').length===20", 'Replacement upload did not use the refreshed version');
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const travelDay = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
   for (const [kind, name] of [["leave", "员工请假"], ["overtime", "加班申请"], ["expense", "费用报销"], ["travel", "出差申请"], ["purchase", "采购申请"], ["general", "通用申请"]]) {

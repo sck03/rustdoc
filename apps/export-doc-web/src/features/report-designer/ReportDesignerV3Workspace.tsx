@@ -39,6 +39,7 @@ import { setReportDesignerLayerRoleHeight } from "./reportDesignerLayerBands.ts"
 import type { ReportBlock, ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { createConditionalBlock, createDetailTableBlock, createGridBlock, createPageBreakBlock, createRowBlock } from "./reportDesignerBlockFactories.ts";
 import { applyGridPreset, updateGridCell } from "./reportDesignerGridMutations.ts";
+import { bindV3GridCellField, type ReportDesignerGridCellTarget } from "./reportDesignerGridFields.ts";
 import {
   countElements,
   clampReportDesignerV3Zoom,
@@ -187,9 +188,19 @@ export function ReportDesignerV3Workspace({
       if (id) focusDesignerNode(`[data-v3-element-id="${CSS.escape(id)}"]`);
     } else placeElement({ ...createV3FieldElement(field.value), label: field.label });
   }
-  function dropField(path: string, x: number, y: number) {
+  function dropField(path: string, x: number, y: number, target?: ReportDesignerGridCellTarget) {
     const field = fieldGroups.flatMap(group => group.fields).find(field => field.value === path);
     if (!field || !editingEnabled) return;
+    if (target) {
+      const result = bindV3GridCellField(history.state, target, path);
+      setCapacityNotice(result.notice);
+      if (!result.notice) {
+        commit(result.state);
+        selectElement(target.elementId, false);
+        setGridCellSelection(target);
+      }
+      return;
+    }
     const grid = history.state.schema.grid;
     const snap = (value: number) => grid.snap ? Math.round(value / grid.sizeHundredthMm) * grid.sizeHundredthMm : value;
     insertElement({ ...createV3FieldElement(path, snap(x), snap(y)), label: field.label });

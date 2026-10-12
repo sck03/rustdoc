@@ -18,7 +18,8 @@ import {
 } from "./reportDesignerMutations.ts";
 import type { ReportBlock, ReportGridBlock, ReportGridCell } from "./reportDesignerSchema.ts";
 import { DesignerCheckbox, DesignerPropertyTabs, CommitTextField, BorderEditor, ColumnWidthStrip, FieldPathInput, TextStyleEditor } from "./ReportDesignerPropertyControls.tsx";
-import { adjacentGridCell, updateGridCell } from "./reportDesignerGridMutations.ts";
+import { updateGridCell } from "./reportDesignerGridMutations.ts";
+import { GridCellNavigator, GridTrackActions } from "./ReportDesignerGridStructureControls.tsx";
 import { normalizeGridCellContentKind } from "./reportDesignerPropertiesModel.ts";
 import { NumberField, SelectField } from "./ReportDesignerV3InspectorControls.tsx";
 import { REPORT_GRID_MAX_COLUMNS, REPORT_GRID_MAX_ROWS } from "./reportDesignerGridPlacement.ts";
@@ -63,6 +64,7 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
   const maximumPercent = widthColumn.widthPercent + (adjacentWidthColumn?.widthPercent ?? 0) - 1;
   return (
     <div className="new-report-grid-properties">
+      <GridCellNavigator block={block} locations={locations} selected={selected} onSelect={onSelectCell} />
       <DesignerPropertyTabs value={tab} onChange={setTab} options={[{ value: "cell", label: "单元格" }, { value: "table", label: "整张表" }]}>
       {tab === "table" ? <>
       <div className="new-report-property-grid">
@@ -86,15 +88,7 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
           <NumberField label="列数" min={1} max={REPORT_GRID_MAX_COLUMNS} step={1} value={block.columns.length} onCommit={columns => onCommit(resizeGridStructure(block, block.rows.length, columns))} />
         </div>
         <small>保留范围内的内容和合并；缩减会移除超出部分，可撤销。</small>
-        <div className="new-report-grid-cell-picker" role="group" aria-label="选择要编辑的表格单元格" style={{ gridTemplateColumns: block.columns.map((column) => `minmax(0, ${Math.max(0.01, column.widthPercent)}fr)`).join(" ") }}>
-          {locations.map(({ cell, rowIndex, columnIndex, rowSpan, colSpan }) => <button key={cell.id} type="button" data-grid-picker-cell={cell.id} tabIndex={selected?.cell.id === cell.id ? 0 : -1} className={selected?.cell.id === cell.id ? "is-selected" : ""} aria-pressed={selected?.cell.id === cell.id} aria-label={`第 ${rowIndex + 1} 行，第 ${columnIndex + 1} 列`} title={cellSummary(cell)} style={{ gridRow: `${rowIndex + 1} / span ${rowSpan}`, gridColumn: `${columnIndex + 1} / span ${colSpan}` }} onClick={() => onSelectCell(cell.id)} onKeyDown={(event) => {
-            const direction = event.key === "ArrowLeft" ? "left" : event.key === "ArrowRight" ? "right" : event.key === "ArrowUp" ? "up" : event.key === "ArrowDown" ? "down" : null;
-            if (!direction) return;
-            event.preventDefault();
-            const next = adjacentGridCell(block, cell.id, direction);
-            if (next) { onSelectCell(next.cell.id); event.currentTarget.parentElement?.querySelector<HTMLElement>(`[data-grid-picker-cell="${CSS.escape(next.cell.id)}"]`)?.focus(); }
-          }}>{cellSummary(cell)}</button>)}
-        </div>
+        <GridTrackActions block={block} selected={selected} onCommit={onCommit} />
       </section>
       </> : null}
 
@@ -145,13 +139,7 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, onSele
         <BorderEditor border={block.border} onChange={(border) => onCommit(applyGridBorderToCells({ ...block, border }))} />
       </section> : null}
       </DesignerPropertyTabs>
-      <small className="report-designer-v3-muted">单击画布选格，双击固定文本直接编辑。</small>
+      <small className="report-designer-v3-muted">单击画布选格，双击固定文本编辑；将普通字段拖到格内可直接绑定。</small>
     </div>
   );
-}
-
-function cellSummary(cell: ReportGridCell) {
-  if (cell.contentKind === "Field") return cell.label || cell.fieldPath || "字段";
-  if (cell.contentKind === "CheckboxGroup") return "勾选组";
-  return cell.text.trim() || "空白";
 }

@@ -33,39 +33,26 @@ export function verifyGridAuthoringContracts(api) {
   const normalized = api.parseReportDesignerV3Source(JSON.stringify(roundTrip), 'ExportDocument').schema;
   assert(normalized.layers.find(layer => layer.role === 'Body').elements[0].block.columns.every(column => column.widthPercent >= 1), 'rounding must preserve the minimum editable width');
   assert.equal(api.validateReportDesignerV3Draft(normalized, 'ExportDocument').blocked, false);
-  const at = (grid, row, column) => api.getGridCellLocations(grid).find(cell => cell.rowIndex === row && cell.columnIndex === column);
   const geometry = grid => api.getGridCellLocations(grid).map(({ rowIndex, columnIndex, rowSpan, colSpan }) => [rowIndex, columnIndex, rowSpan, colSpan]);
-  // Rebuild every default grid through the same resize/merge/width operations as the UI.
+  // Editing any track must preserve merged content, identities and row metadata.
+  // Full blank reconstruction is exercised by report-designer-rebuild, not duplicated here.
   for (const [name, source] of defaultReportDesigns()) {
     const document = api.parseReportDesignerV3Source(JSON.stringify(source), source.reportType).schema;
     for (const element of document.layers.flatMap(layer => layer.elements).filter(element => element.flowKind === 'Grid')) {
       const target = element.block;
-      let grid = api.resizeGridStructure(blank(), target.rows.length, target.columns.length);
-      const targetGeometry = api.getGridCellLocations(target);
-      for (const cell of targetGeometry) {
-        for (let row = cell.rowIndex; row < cell.rowIndex + cell.rowSpan; row++) {
-          while (at(grid, row, cell.columnIndex).colSpan < cell.colSpan) {
-            const next = api.mergeGridCellRight(grid, at(grid, row, cell.columnIndex).cell.id);
-            assert.notEqual(next, grid, `${name}/${element.id}: horizontal merge remains reachable`);
-            grid = next;
-          }
-        }
-        while (at(grid, cell.rowIndex, cell.columnIndex).rowSpan < cell.rowSpan) {
-          const next = api.mergeGridCellDown(grid, at(grid, cell.rowIndex, cell.columnIndex).cell.id);
-          assert.notEqual(next, grid, `${name}/${element.id}: vertical merge remains reachable`);
-          grid = next;
-        }
-        const id = at(grid, cell.rowIndex, cell.columnIndex).cell.id;
-        grid = api.updateGridCell(grid, id, () => ({ ...cell.cell, id }));
+      const snapshot = structuredClone(target);
+      for (const axis of ['row', 'column']) for (let index = 0; index <= (axis === 'row' ? target.rows.length : target.columns.length); index++) {
+        const inserted = api.editGridTrack(target, axis, index, 'insert');
+        assert.notEqual(inserted, target);
+        const restored = api.editGridTrack(inserted, axis, index, 'delete');
+        assert.deepEqual(geometry(restored), geometry(target), `${name}/${axis}/${index}: merged geometry survives insert/delete`);
+        assert.deepEqual(restored.rows, target.rows, 'retained cell content, style and row metadata survive');
+        restored.columns.forEach((column, index) => assert(Math.abs(column.widthPercent - target.columns[index].widthPercent) < 0.00001));
+        const state = api.parseReportDesignerV3Source('', document.reportType).schema;
+        state.layers.find(layer => layer.role === 'Body').elements = [api.createV3FlowElement(inserted)];
+        assert.equal(api.validateReportDesignerV3Draft(state, document.reportType).blocked, false, `${name}/${axis}/${index}: inserted track remains printable`);
       }
-      for (let index = 0; index < target.columns.length - 1; index++) {
-        grid = api.resizeAdjacentGridColumnWidths(grid, grid.columns[index].id, target.columns[index].widthPercent - grid.columns[index].widthPercent);
-      }
-      assert.deepEqual(geometry(grid), geometry(target), `${name}/${element.id}: blank authoring reproduces all merged cells`);
-      grid.columns.forEach((column, index) => assert(Math.abs(column.widthPercent - target.columns[index].widthPercent) < 0.01, `${name}/${element.id}: column width is reachable`));
-      const state = api.parseReportDesignerV3Source('', document.reportType).schema;
-      state.layers.find(layer => layer.role === 'Body').elements = [api.createV3FlowElement(grid)];
-      assert.equal(api.validateReportDesignerV3Draft(state, document.reportType).blocked, false, `${name}/${element.id}: reconstructed grid remains printable`);
+      assert.deepEqual(target, snapshot, 'structural edits do not mutate the undo snapshot');
     }
   }
 
@@ -98,4 +85,50 @@ export function verifyGridAuthoringContracts(api) {
   for (const [rows, columns] of [[0, 3], [1001, 3], [3, 0], [3, 101], [NaN, 3], [3, Infinity], [3.5, 3]]) {
     assert.equal(api.resizeGridStructure(original, rows, columns), original, 'invalid dimensions preserve the document');
   }
+  let merged = blank();
+  const mergedId = merged.rows[0].cells[0].id;
+  merged = api.mergeGridCellRight(merged, mergedId);
+  merged = api.mergeGridCellRight(merged, merged.rows[1].cells[0].id);
+  merged = api.mergeGridCellDown(merged, mergedId);
+  merged = api.updateGridCell(merged, mergedId, cell => ({ ...cell, text: '合并内容保留' }));
+  for (const axis of ['row', 'column']) for (const index of [0, 1]) {
+    const removed = api.editGridTrack(merged, axis, index, 'delete');
+    const retained = api.getGridCellLocations(removed).find(location => location.cell.id === mergedId);
+    assert.equal(retained.cell.text, '合并内容保留', 'deleting the anchor track preserves a spanning cell');
+    assert.equal(retained[axis === 'row' ? 'rowSpan' : 'colSpan'], 1);
+  }
+  const single = api.resizeGridStructure(blank(), 1, 1);
+  for (const axis of ['row', 'column']) {
+    assert.equal(api.editGridTrack(single, axis, 0, 'delete'), single);
+    for (const index of [-1, 2, NaN, 0.5]) assert.equal(api.editGridTrack(single, axis, index, 'insert'), single);
+  }
+  assert.equal(api.gridCellAt(api.getGridCellLocations(merged), 1, 1).cell.id, mergedId);
+  assert.equal(api.setGridRowsToUniformHeight(single, single.rows[0].heightMm), single);
+
+  for (const reportType of ['ExportDocument', 'PaymentVoucher']) {
+    let state = api.createReportDesignerV3DocumentState(api.parseReportDesignerV3Source('', reportType).schema);
+    const element = api.createV3FlowElement(blank());
+    state = api.insertV3Element(state, state.activeLayerId, element);
+    const target = { elementId: element.id, cellId: element.block.rows[0].cells[0].id };
+    const field = reportType === 'ExportDocument' ? 'Invoice.InvoiceNo' : 'Payment.PayeeName';
+    const result = api.bindV3GridCellField(state, target, field);
+    assert.equal(result.notice, null);
+    assert.equal(result.state.schema.layers.flatMap(layer => layer.elements).length, 1, 'binding does not add a floating component');
+    const bound = api.findV3Element(result.state.schema, element.id).element.block;
+    assert.equal(bound.rows[0].cells[0].fieldPath, field);
+    assert.equal(bound.rows[1], element.block.rows[1], 'binding shares unchanged rows');
+    assert.equal(api.bindV3GridCellField(result.state, target, field).state, result.state, 'rebinding the same field is a no-op');
+    for (const invalid of ['item.Quantity', reportType === 'ExportDocument' ? 'Payment.PayeeName' : 'Invoice.InvoiceNo']) {
+      assert.equal(api.bindV3GridCellField(state, target, invalid).state, state, 'incompatible fields preserve the draft');
+    }
+    const locked = api.updateV3Element(state, element.id, { locked: true });
+    assert.equal(api.bindV3GridCellField(locked, target, field).state, locked);
+    const invalid = api.updateV3Element(state, element.id, { block: api.updateGridCell(element.block, target.cellId, cell => ({ ...cell, contentKind: 'Field', fieldPath: 'item.Quantity' })) });
+    assert.equal(api.validateReportDesignerV3Draft(invalid.schema, reportType).blocked, true, 'fixed cells reject a missing item context before saving');
+  }
+  const repeating = api.parseReportDesignerV3Source('', 'ExportDocument').schema;
+  const detail = api.createDetailTableBlock();
+  detail.columns[0].fieldPath = 'Invoice.InvoiceNo';
+  repeating.layers.find(layer => layer.role === 'Body').elements = [api.createV3FlowElement(detail)];
+  assert.equal(api.validateReportDesignerV3Draft(repeating, 'ExportDocument').blocked, true, 'a repeating column rejects document-level primary bindings before native save');
 }

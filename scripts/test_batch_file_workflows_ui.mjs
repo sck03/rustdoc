@@ -33,6 +33,24 @@ await withOfficeUi('batch-file-workflows-ui', async ({ repo, output, url, invoke
   draft.items = [{ ...model.createEmptyInvoiceItem(), styleNo: 'STYLE-01', styleName: 'Sample product', quantity: 20, cartons: 2, unitEN: 'PCS', ctnUnitEN: 'CTNS', unitPrice: 5, totalPrice: 100 }];
   const invoice = await invoke('CreateInvoice', draft, {}, token);
   const templates = await invoke('ListReportTemplates', undefined, {}, token);
+  const fixed = model.parseReportDesignerV3Source('', 'ExportDocument').schema;
+  const grid = model.applyGridPreset(model.createGridBlock(), 'Blank');
+  const cellId = grid.rows[0].cells[0].id;
+  const invalidGrid = model.updateGridCell(grid, cellId, cell => ({ ...cell, contentKind: 'Field', fieldPath: 'item.Quantity' }));
+  fixed.layers.find(layer => layer.role === 'Body').elements = [model.createV3FlowElement(invalidGrid)];
+  for (const operation of ['CreateUserReportTemplate', 'PreviewReportTemplateContent']) {
+    const content = JSON.stringify(fixed);
+    const response = await request(operation, operation === 'CreateUserReportTemplate'
+      ? { reportType: 'ExportDocument', name: '固定区域非法商品字段', contentHtml: content }
+      : { reportType: 'ExportDocument', content, sampleProfile: 'apiSample', withSeal: false });
+    assert.equal(response.status, 400, `${operation} must reject a missing item context instead of printing blank content`);
+    assert((await response.text()).includes('商品循环'));
+  }
+  fixed.layers.find(layer => layer.role === 'Body').elements = [model.createV3FlowElement(
+    model.updateGridCell(grid, cellId, cell => ({ ...cell, contentKind: 'Field', fieldPath: 'Invoice.InvoiceNo' })))];
+  const fixedTemplate = await invoke('CreateUserReportTemplate', { reportType: 'ExportDocument', name: '通用固定字段表格', contentHtml: JSON.stringify(fixed) }, {}, token);
+  const fixedPreview = await invoke('PreviewReportTemplateContent', { reportType: 'ExportDocument', content: fixedTemplate.contentHtml, sampleProfile: 'apiSample', withSeal: false }, {}, token);
+  assert(fixedPreview.html.includes('<svg'), 'a valid document field still previews with the native renderer');
   const rebuilt = [];
   for (const [name, reference] of defaultReportDesigns()) {
     const content = JSON.stringify(rebuildDesignerDocument(model, reference));
@@ -102,6 +120,13 @@ await withOfficeUi('batch-file-workflows-ui', async ({ repo, output, url, invoke
     fs.writeFileSync(path.join(output, name), Buffer.from(await response.arrayBuffer()));
   }
   await saveJob(await invoke('StartInvoiceReportPdfZipDownloadJob', { ...batch, templatePaths: rebuilt.filter(template => template.reportType === 'ExportDocument').map(template => template.path) }, {}, token), 'rebuilt-export-reports.zip');
+  if (!process.argv.includes('--batch-only')) {
+    const longInvoice = await invoke('CreateInvoice', { ...draft, invoiceNo: 'BATCH-LONG-001',
+      items: Array.from({ length: 72 }, (_, index) => ({ ...draft.items[0], poNumber: `PO-${index + 1}`,
+        styleNo: `STYLE-${String(index + 1).padStart(3, '0')}`, styleName: 'Sample product / 多行商品说明' })) }, {}, token);
+    await saveJob(await invoke('StartInvoiceReportPdfZipDownloadJob', { ...batch, invoiceIds: [longInvoice.id],
+      templatePaths: rebuilt.filter(template => template.reportType === 'ExportDocument').map(template => template.path) }, {}, token), 'rebuilt-long-export-reports.zip');
+  }
   const payment = await invoke('CreatePayment', { voucherNo: 'REBUILD-PAY-001', payeeName: '示例收款单位', payerName: '示例支付单位', paymentDate: session.user.businessDate, paymentMethod: '电汇', cnyAmount: 128.5, otherExpense: 128.5 }, {}, token);
   for (const template of rebuilt.filter(template => template.reportType === 'PaymentVoucher')) {
     await saveJob(await invoke('StartPaymentVoucherPdfDownloadJob', { templatePath: template.path }, { paymentId: payment.payment.id }, token), path.basename(template.name, '.dtpl') + '.pdf');

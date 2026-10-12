@@ -56,6 +56,46 @@ fn append_flow(design: &mut Design, id: &str, kind: &str, block: ReportBlock, y:
 }
 
 #[test]
+fn fixed_blocks_reject_fields_without_a_current_item() {
+    let cases = [
+        json!({"type":"Row","id":"fixed-block","columns":[{
+            "id":"column","contentKind":"Field","fieldPath":"item.Quantity","widthPercent":100
+        }]}),
+        json!({"type":"Grid","id":"fixed-block","columns":[{"id":"column","widthPercent":100}],
+            "rows":[{"id":"row","cells":[{"id":"cell","contentKind":"Field","fieldPath":"item.Quantity"}]}]}),
+        json!({"type":"Grid","id":"fixed-block","columns":[{"id":"column","widthPercent":100}],
+            "rows":[{"id":"row","cells":[{"id":"cell","contentKind":"CheckboxGroup","fieldPath":"item.Quantity"}]}]}),
+    ];
+    for value in cases {
+        let mut design = Design::invoice();
+        design.layers[1].elements.clear();
+        let kind = value["type"].as_str().unwrap();
+        append_flow(
+            &mut design,
+            "fixed-element",
+            kind,
+            serde_json::from_value(value.clone()).unwrap(),
+            6000,
+        );
+        let error = validate(&design, &fields())
+            .expect_err("a fixed block has no current item and must not print an empty value");
+        assert!(error.contains("商品循环"), "{error}");
+        let valid = value
+            .to_string()
+            .replace("item.Quantity", "Invoice.InvoiceNo");
+        design.layers[1].elements.clear();
+        append_flow(
+            &mut design,
+            "fixed-element",
+            kind,
+            serde_json::from_str(&valid).unwrap(),
+            6000,
+        );
+        validate(&design, &fields()).unwrap();
+    }
+}
+
+#[test]
 fn original_v3_flow_blocks_validate_and_round_trip() {
     let mut design = Design::invoice();
     design.layers[1].elements.clear();

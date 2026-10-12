@@ -1,4 +1,5 @@
-import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
+import { useMemo } from "react";
+import { documentReportFieldGroups, type ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import { ConditionalBlockProperties } from "./ReportDesignerConditionalProperties.tsx";
 import { DetailTableProperties } from "./ReportDesignerDetailTableProperties.tsx";
 import { GridBlockProperties } from "./ReportDesignerGridProperties.tsx";
@@ -29,13 +30,14 @@ export function ReportDesignerV3FlowProperties({
   onCommit: (block: EditableFlowBlock) => void;
   widthMm: number;
 }) {
+  const fixedFields = useMemo(() => documentReportFieldGroups(fieldGroups), [fieldGroups]);
   switch (block.type) {
     case "Row":
-      return <RowBlockProperties block={block} fieldGroups={fieldGroups} onCommit={asFlowCommit(onCommit, "Row")} />;
+      return <RowBlockProperties block={block} fieldGroups={fixedFields} onCommit={asFlowCommit(onCommit, "Row")} />;
     case "Grid":
-      return <GridBlockProperties block={block} widthMm={widthMm} fieldGroups={fieldGroups} selectedCellId={selectedGridCellId} onSelectCell={onSelectGridCell} onCommit={asFlowCommit(onCommit, "Grid")} />;
+      return <GridBlockProperties block={block} widthMm={widthMm} fieldGroups={fixedFields} selectedCellId={selectedGridCellId} onSelectCell={onSelectGridCell} onCommit={asFlowCommit(onCommit, "Grid")} />;
     case "Conditional":
-      return <ConditionalBlockProperties block={block} fieldGroups={fieldGroups} onCommit={asFlowCommit(onCommit, "Conditional")} />;
+      return <ConditionalBlockProperties block={block} fieldGroups={fixedFields} onCommit={asFlowCommit(onCommit, "Conditional")} />;
     case "DetailTable":
       return <DetailTableProperties block={block} fieldGroups={fieldGroups} onCommit={asFlowCommit(onCommit, "DetailTable")} />;
     case "PageBreak":

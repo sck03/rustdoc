@@ -8,6 +8,10 @@ export type ReportDesignerFieldGroup = {
 };
 export type ReportDesignerField = ReportDesignerFieldGroup["fields"][number] & { category: string };
 
+export function documentReportFieldGroups(groups: ReportDesignerFieldGroup[]): ReportDesignerFieldGroup[] {
+  return groups.map(group => ({ ...group, fields: group.fields.filter(field => !field.value.startsWith("item.")) })).filter(group => group.fields.length > 0);
+}
+
 const exportTemplateSystemFields: ReportDesignerField[] = [
   { category: "模板系统字段", label: "是否带章 (ShowSeal)", value: "ShowSeal" },
   { category: "模板系统字段", label: "单证章图片 (doc_seal_path)", value: "doc_seal_path" },

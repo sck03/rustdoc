@@ -251,10 +251,7 @@ fn validate_flow(
             let border = &block.border;
             block.validate_conditions()?;
             for condition in block.conditions() {
-                validate_field(&condition.field_path, fields)?;
-                if condition.field_path.starts_with("item.") {
-                    return Err("条件组件使用单据字段，不能在商品循环外判断 item 字段。".into());
-                }
+                validate_fixed_field(&condition.field_path, fields)?;
             }
             validate_conditional_content(content, fields)?;
             validate_text_style(style)?;
@@ -289,7 +286,7 @@ fn validate_row_column(column: &RowColumn, fields: &[Field]) -> Result<(), Strin
     match column.content_kind.as_str() {
         "Text" if column.text.chars().count() <= 32768 => Ok(()),
         "Field" => {
-            validate_field(&column.field_path, fields)?;
+            validate_fixed_field(&column.field_path, fields)?;
             if column.label.chars().count() > 200 || column.fallback_text.chars().count() > 2048 {
                 Err("V3 多列行字段设置无效。".into())
             } else {
@@ -346,10 +343,10 @@ fn validate_grid_row(
         match cell.content_kind.as_str() {
             "Text" if cell.text.chars().count() <= 32768 => {}
             "Field" => {
-                validate_field(&cell.field_path, fields)?;
+                validate_fixed_field(&cell.field_path, fields)?;
             }
             "CheckboxGroup" => {
-                validate_field(&cell.field_path, fields)?;
+                validate_fixed_field(&cell.field_path, fields)?;
                 if cell.checkbox_options.len() > 100 {
                     return Err("V3 普通表格勾选项超过上限。".into());
                 }
@@ -367,7 +364,7 @@ fn validate_conditional_content(
     match content.kind.as_str() {
         "Text" if content.text.chars().count() <= 32768 => Ok(()),
         "Field" => {
-            validate_field(&content.field_path, fields)?;
+            validate_fixed_field(&content.field_path, fields)?;
             if content.label.chars().count() > 200 || content.fallback_text.chars().count() > 2048 {
                 Err("V3 条件字段设置无效。".into())
             } else {
@@ -469,7 +466,7 @@ fn validate_detail_table(
                 return Err("V3 合计单元格无效。".into());
             }
             if cell.content_kind == "Field" {
-                validate_field(&cell.field_path, fields)?;
+                validate_fixed_field(&cell.field_path, fields)?;
             }
         }
     }
@@ -482,7 +479,7 @@ fn validate_detail_table(
             return Err("V3 明细侧栏无效。".into());
         }
         if side.content_kind == "Field" {
-            validate_field(&side.field_path, fields)?;
+            validate_fixed_field(&side.field_path, fields)?;
         }
         validate_text_style(&side.style)?;
     }
@@ -566,6 +563,14 @@ fn validate_border(border: &ReportBorderStyle) -> Result<(), String> {
         || !matches!(border.style.as_str(), "Solid" | "Dashed" | "None")
     {
         return Err("V3 边框样式无效。".into());
+    }
+    Ok(())
+}
+
+fn validate_fixed_field(path: &str, fields: &[Field]) -> Result<(), String> {
+    validate_field(path, fields)?;
+    if path.starts_with("item.") {
+        return Err("不能在商品循环外使用 item 字段；请使用独立商品字段或明细表正文。".into());
     }
     Ok(())
 }

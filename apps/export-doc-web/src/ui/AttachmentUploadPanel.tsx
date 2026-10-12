@@ -9,8 +9,9 @@ export function AttachmentUploadPanel<R extends { versionNumber: number; attachm
   upload: (record: R, body: FormData, signal: AbortSignal) => Promise<R>;
 }) {
   const draft = useAttachmentDraft(record);
+  const latest = draft.saved && draft.saved.versionNumber > record.versionNumber ? draft.saved : record;
   return <div>
-    <AttachmentDraftFields draft={draft} busy={operation.busy} label={label} existingFiles={draft.saved?.attachments ?? record.attachments} />
+    <AttachmentDraftFields draft={draft} busy={operation.busy} label={label} existingFiles={latest.attachments} />
     {draft.failedKey && <p role="status">已保存文件会保留，重试继续处理剩余文件。</p>}
     <button className="command-button" type="button" disabled={operation.busy || !draft.files.length} onClick={() => void operation.run(signal =>
       draft.save(String(record.versionNumber), signal, async () => record, (current, entry, signal) => {

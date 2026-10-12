@@ -37,8 +37,8 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
     await run('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
   };
   const cell = async (row, column) => {
-    await button('整张表');
-    await run(`document.querySelector('[aria-label="第 ${row} 行，第 ${column} 列"]').click(); true`);
+    await fill('定位列', column);
+    await fill('定位行', row);
     await button('单元格');
   };
   await run(`location.hash=${JSON.stringify('#/reports/templates?reportType=PaymentVoucher&userTemplateId=' + created.body.id)}; true`);
@@ -76,6 +76,39 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   await run("[...document.querySelectorAll('.new-report-grid-cell-editor label')].find(node=>node.textContent.includes('斜线表头')).querySelector('input').click(); true");
   await fill('斜线上方文字', '项目');
   await fill('斜线下方文字', '金额');
+  await cell(4, 2);
+  await button('整张表');
+  await button('上方插入行');
+  await wait(`${control('行数')}.value==='6'`);
+  await fill('定位行', 4);
+  await button('删除当前行');
+  await wait(`${control('行数')}.value==='5'`);
+  await button('撤销', '.report-designer-v3-toolbar');
+  await wait(`${control('行数')}.value==='6'`);
+  await button('重做', '.report-designer-v3-toolbar');
+  await wait(`${control('行数')}.value==='5'`);
+  await cell(4, 4);
+  await button('整张表');
+  await button('左侧插入列');
+  await wait(`${control('列数')}.value==='8'`);
+  await fill('定位列', 4);
+  await button('删除当前列');
+  await wait(`${control('列数')}.value==='7'`);
+  await cell(4, 2);
+  for (let index = 0; index < 5; index++) await button('向右合并');
+  await button('字段', '.report-designer-v3-sidebar-tabs');
+  await run(`(()=>{
+    const dataTransfer=new DataTransfer();
+    const source=[...document.querySelectorAll('.report-designer-v3-field-list button')].find(button=>{
+      button.dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer}));
+      return dataTransfer.getData('application/x-exportdoc-field')==='Payment.InvoiceNo';
+    });
+    if(!source) throw new Error('Payment invoice field is missing from the palette');
+    const cell=document.querySelector('.is-designer-selected-cell'), rect=cell.getBoundingClientRect();
+    cell.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer,clientX:rect.left+rect.width/2,clientY:rect.top+rect.height/2}));
+  })()`);
+  await wait(`${control('业务字段')}.value==='Payment.InvoiceNo'`);
+  await fill('字段前标签（可选）', '票据号');
   await wait("Boolean([...document.querySelectorAll('button')].find(node=>node.textContent.trim()==='保存'&&!node.disabled))");
   await button('保存', 'body');
   await wait("document.body.innerText.includes('私人模板已保存')");
@@ -87,6 +120,9 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   assert.equal(grid.rows[0].cells[0].rowSpan, 5); assert.equal(grid.rows[0].cells[0].verticalText, true);
   assert.deepEqual(grid.rows[1].cells[0].checkboxOptions.map(option => option.value), ['支票', '电汇', '预付']);
   assert.equal(grid.rows[2].cells[0].diagonalHeader.lowerRightText, '金额');
+  assert.equal(grid.rows[3].cells[0].fieldPath, 'Payment.InvoiceNo');
+  assert.equal(grid.rows[3].cells[0].colSpan, 6);
+  assert.equal(design.layers.flatMap(layer => layer.elements).length, 1, 'field drops bind existing cells without adding overlays');
   fs.writeFileSync(path.join(output, 'desktop-blank-grid.json'), saved.body.contentHtml);
   await button('重新载入', '.report-designer-v3-header');
   await run('window.scrollTo(0,0); true');
@@ -101,7 +137,7 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   assert(previewText.includes('用款事项') && previewText.includes('支付单位'), 'native preview preserves the vertical title and payment field label');
   await run('window.scrollTo(0,0); true');
   await captureScreenshot(cdp, path.join(output, 'Full-blank-grid-preview.png'), { captureBeyondViewport: false });
-  const payment = await request('CreatePayment', token, { voucherNo: 'BLANK-GRID-001', payeeName: '空白设计收款方', payerName: '空白设计付款单位', paymentDate: businessDate, paymentMethod: '电汇', cnyAmount: 128.5 });
+  const payment = await request('CreatePayment', token, { voucherNo: 'BLANK-GRID-001', invoiceNo: 'GRID-2026', payeeName: '空白设计收款方', payerName: '空白设计付款单位', paymentDate: businessDate, paymentMethod: '电汇', cnyAmount: 128.5 });
   assert.equal(payment.status, 201);
   const pdf = path.join(output, 'desktop-blank-grid.pdf');
   const job = await request('StartPaymentVoucherPdfSaveToPathJob', token, { templatePath: `user-template:${created.body.id}`, destinationPath: pdf }, { paymentId: payment.body.payment.id });
