@@ -18,6 +18,7 @@ import { verifyConditionalUi } from "./lib/report-designer-conditions-ui.mjs";
 import { verifyBlankDesigner } from "./lib/report-designer-blank-ui.mjs";
 import { verifyDesignerInteraction } from "./lib/report-designer-interaction-ui.mjs";
 import { verifyGridAuthoring } from "./lib/report-designer-grid-ui.mjs";
+import { verifyCanvasGeometry } from "./lib/report-designer-canvas-geometry-ui.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
 const web = path.join(repo, "apps/export-doc-web");
@@ -164,6 +165,8 @@ try {
   chrome = await startChrome({browserExecutable:locateChromeForTesting(repo),userDataDir:path.join(output,`profile-${Date.now()}`),timeoutMs:30000});
   cdp = await CdpClient.connect(chrome.browserWebSocketUrl);
   const page = await createPageSession(cdp);
+  await verifyCanvasGeometry({page,url,read,waitFor,click,key,results,output});
+  if (!process.argv.includes('--geometry-only')) {
   await verifyGridAuthoring({page,url,read,waitFor,click,key,results,output});
   if (!process.argv.includes('--grid-only')) {
   await verifyDesignerInteraction({ page, url, read, waitFor, click, key, modifier: primaryModifier, results });
@@ -345,6 +348,7 @@ try {
   await verifyConditionalUi({page,url,read,waitFor,click,key,results,output});
   await verifyLayerClarity({page,url,read,waitFor,click,results,output});
   await verifyBlankDesigner({page,url,read,waitFor,click,key,results,output});
+  }
   }
   fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify({passed:true,results},null,2));
   console.log(`Report designer UI contracts passed (${results.length} cases).`);

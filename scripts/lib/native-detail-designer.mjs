@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { captureScreenshot } from './web-runtime-browser-session.mjs';
 import { waitFor } from './web-runtime-smoke-common.mjs';
+import { verifyInvoiceCanvasAlignment } from './report-designer-canvas-geometry-ui.mjs';
 
 export async function verifyDesktopDetailDesigner({ run, request, token, cdp, output }) {
   const wait = async expression => {
@@ -55,6 +56,7 @@ export async function verifyDesktopDetailDesigner({ run, request, token, cdp, ou
   await wait(`document.querySelectorAll('[aria-label="画布图层导航"] button').length===${invoiceDesign.layers.length}`);
   await run(`[...document.querySelectorAll('[role=tab]')].find(node=>node.textContent.trim()==='可视化设计').click(); true`);
   await wait(`document.querySelector('[aria-label="画布图层导航"]').getClientRects().length>0`);
+  await verifyInvoiceCanvasAlignment(run);
   await run(`document.querySelector('.report-designer-v3-sidebar-tabs button:nth-child(3)').click(); true`);
   const total = invoiceDesign.layers.flatMap(layer => layer.elements).find(element => element.text === 'TOTAL:');
   assert(total, 'Invoice total label remains independently editable');

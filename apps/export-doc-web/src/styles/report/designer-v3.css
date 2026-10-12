@@ -588,9 +588,9 @@
   align-items: flex-start;
   justify-content: center;
   overflow: visible;
-  padding: 4px;
+  padding: 0;
   background: color-mix(in srgb, var(--edm-info-100) 58%, transparent);
-  border-style: dashed;
+  border: 0;
 }
 
 .report-designer-v3-preview-text,
