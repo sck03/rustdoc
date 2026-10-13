@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -13,6 +13,7 @@ import { MaintenanceBackgroundTaskStatusPanel } from "./MaintenanceBackgroundTas
 import { MaintenanceDatabaseBackupPanel } from "./MaintenanceDatabaseBackupPanel.tsx";
 import { MaintenanceDatabaseRecoveryPanel } from "./MaintenanceDatabaseRecoveryPanel.tsx";
 import { MaintenanceFullMigrationPanel } from "./MaintenanceFullMigrationPanel.tsx";
+import { MaintenanceOperationsGuide } from "./MaintenanceOperationsGuide.tsx";
 
 function isStrongMigrationPassword(value: string) {
   return value.length >= 12 && value.length <= 128 && /[A-Z]/.test(value) && /[a-z]/.test(value) && /\d/.test(value) && /[^A-Za-z0-9]/.test(value);
@@ -46,6 +47,8 @@ export function PostgreSqlMaintenancePanel({
   const [migrationRestoreConfirmation, setMigrationRestoreConfirmation] = useState("");
   const [databaseRestoreConfirmation, setDatabaseRestoreConfirmation] = useState("");
   const [databaseUploadFile, setDatabaseUploadFile] = useState<File | null>(null);
+  const databaseDetails = useRef<HTMLDetailsElement>(null);
+  const migrationDetails = useRef<HTMLDetailsElement>(null);
 
   const postgreSqlQuery = useQuery({
     queryKey: queryKeys.postgreSqlMaintenanceBackups(),
@@ -78,6 +81,8 @@ export function PostgreSqlMaintenancePanel({
   }, [postgreSqlQuery.error, postgreSqlQuery.isError]);
 
   const fail = (error: unknown) => { setMessage(readApiError(error)); setSuccessMessage(null); };
+  const failDatabase = (error: unknown) => { if (databaseDetails.current) databaseDetails.current.open = true; fail(error); };
+  const failMigration = (error: unknown) => { if (migrationDetails.current) migrationDetails.current.open = true; fail(error); };
   const clearFeedback = () => { setMessage(null); setSuccessMessage(null); };
 
   const createMutation = useMutation({
@@ -85,14 +90,14 @@ export function PostgreSqlMaintenancePanel({
       const job = await client.createPostgreSqlPhysicalBackup({ signal });
       return waitForJobCompletion(client, job, { timeoutMs: 60 * 60 * 1000, pollIntervalMs: 2_000, signal, timeoutMessage: "数据库备份仍在后台运行，可稍后到“文件任务”查看，完成后刷新备份列表。" });
     }),
-    onSuccess: async () => { setSuccessMessage("PostgreSQL 团队库物理备份已创建并校验完成。"); setMessage(null); await queryClient.invalidateQueries({ queryKey: queryKeys.postgreSqlMaintenanceBackups() }); },
+    onSuccess: async () => { setSuccessMessage("PostgreSQL 数据库备份已创建，请在列表下载并另存。"); setMessage(null); await queryClient.invalidateQueries({ queryKey: queryKeys.postgreSqlMaintenanceBackups() }); },
     onError: fail,
   });
 
   const restorePlanMutation = useMutation({
-    mutationFn: () => client.createPostgreSqlRestorePlan({ body: { backupFileName: selectedBackup, targetDatabase: targetDatabase.trim(), applicationRole: applicationRole.trim(), oldOwnerRoles: parseStringArray(oldOwnerRoles) } }),
+    mutationFn: () => runAbortableOperation((signal) => client.createPostgreSqlRestorePlan({ body: { backupFileName: selectedBackup, targetDatabase: targetDatabase.trim(), applicationRole: applicationRole.trim(), oldOwnerRoles: parseStringArray(oldOwnerRoles) } }, { signal })),
     onSuccess: (response) => { setLastRestorePlanPath(response.planRoot); setMessage(null); setSuccessMessage(response.message || "PostgreSQL 还原与权限改派脚本已生成。"); },
-    onError: fail,
+    onError: failDatabase,
   });
 
   const downloadMigrationMutation = useMutation({
@@ -101,7 +106,7 @@ export function PostgreSqlMaintenancePanel({
       return downloadJobResultWhenReady(client, job, `export-doc-manager-server-migration-${new Date().toISOString().slice(0, 10)}.edmmigration`, { timeoutMs: 60 * 60 * 1000, pollIntervalMs: 2_000, signal });
     }),
     onSuccess: () => { setMigrationPassword(""); setMigrationPasswordConfirmation(""); setMigrationAdminPassword(""); setMigrationCreateConfirmation(""); setMessage(null); setSuccessMessage("完整服务器迁移包已交给浏览器下载，请将密码单独保管。"); },
-    onError: (error) => { setMigrationPassword(""); setMigrationPasswordConfirmation(""); setMigrationAdminPassword(""); setMigrationCreateConfirmation(""); fail(error); },
+    onError: (error) => { setMigrationPassword(""); setMigrationPasswordConfirmation(""); setMigrationAdminPassword(""); setMigrationCreateConfirmation(""); failMigration(error); },
   });
 
   const restoreMigrationMutation = useMutation({
@@ -115,18 +120,18 @@ export function PostgreSqlMaintenancePanel({
         "X-ExportDocManager-Restore-Confirmation": migrationRestoreConfirmation.trim(),
       }, { signal });
     }),
-    onSuccess: async (response) => { setMigrationAdminPassword(""); setMigrationRestorePassword(""); setMigrationRestoreConfirmation(""); setMigrationRestoreFile(null); setMessage(null); setSuccessMessage(response.message || "服务器迁移已排队，请重启服务完成恢复。"); await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() }); },
-    onError: (error) => { setMigrationAdminPassword(""); setMigrationRestorePassword(""); setMigrationRestoreConfirmation(""); fail(error); },
+    onSuccess: async (response) => { setMigrationAdminPassword(""); setMigrationRestorePassword(""); setMigrationRestoreConfirmation(""); setMigrationRestoreFile(null); setMessage(null); setSuccessMessage(response.message || "服务器迁移已暂存，请部署管理员停止应用并执行恢复维护命令。"); await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() }); },
+    onError: (error) => { setMigrationAdminPassword(""); setMigrationRestorePassword(""); setMigrationRestoreConfirmation(""); failMigration(error); },
   });
 
   const databaseRestoreMutation = useMutation({
     mutationFn: () => runAbortableOperation((signal) => client.restorePostgreSqlPhysicalBackup({ body: { backupFileName: selectedBackup, adminPassword: databaseAdminPassword, confirmationText: databaseRestoreConfirmation.trim() } }, { signal })),
-    onSuccess: async (response) => { setDatabaseAdminPassword(""); setDatabaseRestoreConfirmation(""); setMessage(null); setSuccessMessage(response.message || "PostgreSQL 数据库恢复已排队，请重启服务完成恢复。"); await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() }); },
-    onError: (error) => { setDatabaseAdminPassword(""); setDatabaseRestoreConfirmation(""); fail(error); },
+    onSuccess: async (response) => { setDatabaseAdminPassword(""); setDatabaseRestoreConfirmation(""); setMessage(null); setSuccessMessage(response.message || "PostgreSQL 数据库恢复已暂存，请部署管理员停止应用并执行恢复维护命令。"); await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() }); },
+    onError: (error) => { setDatabaseAdminPassword(""); setDatabaseRestoreConfirmation(""); failDatabase(error); },
   });
 
   const downloadDatabaseMutation = useMutation({
-    mutationFn: () => runAbortableOperation(async (signal) => { const ticket = await client.createPostgreSqlPhysicalBackupDownloadTicket({ fileName: selectedBackup }, { signal }); startDownloadFromTicket(client, ticket, selectedBackup || "exportdoc-postgresql.dump"); }),
+    mutationFn: (fileName: string) => runAbortableOperation(async (signal) => { const ticket = await client.createPostgreSqlPhysicalBackupDownloadTicket({ fileName }, { signal }); signal.throwIfAborted(); startDownloadFromTicket(client, ticket, fileName); }),
     onSuccess: () => { setMessage(null); setSuccessMessage("PostgreSQL 备份已交给浏览器下载。"); },
     onError: fail,
   });
@@ -141,18 +146,18 @@ export function PostgreSqlMaintenancePanel({
         "X-ExportDocManager-Restore-Confirmation": databaseRestoreConfirmation.trim(),
       }, { signal });
     }),
-    onSuccess: async (response) => { setDatabaseAdminPassword(""); setDatabaseUploadFile(null); setDatabaseRestoreConfirmation(""); setMessage(null); setSuccessMessage(response.message || "上传的 PostgreSQL 数据库恢复已排队，请重启服务完成恢复。"); await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() }); },
-    onError: (error) => { setDatabaseAdminPassword(""); setDatabaseRestoreConfirmation(""); fail(error); },
+    onSuccess: async (response) => { setDatabaseAdminPassword(""); setDatabaseUploadFile(null); setDatabaseRestoreConfirmation(""); setMessage(null); setSuccessMessage(response.message || "上传的 PostgreSQL 数据库恢复已暂存，请部署管理员停止应用并执行恢复维护命令。"); await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() }); },
+    onError: (error) => { setDatabaseAdminPassword(""); setDatabaseRestoreConfirmation(""); failDatabase(error); },
   });
 
   const status = postgreSqlQuery.data?.status;
   const backups = postgreSqlQuery.data?.backups ?? [];
   const migrationStatus = migrationStatusQuery.data;
   const isBusy = postgreSqlQuery.isFetching || (!migrationStatus && migrationStatusQuery.isFetching) || createMutation.isPending || restorePlanMutation.isPending || downloadMigrationMutation.isPending || restoreMigrationMutation.isPending || databaseRestoreMutation.isPending || downloadDatabaseMutation.isPending || uploadDatabaseRestoreMutation.isPending;
-  const canCreate = canManageSettings && Boolean(status?.postgreSqlConfigured) && Boolean(status?.toolsReady) && !isBusy;
+  const canCreate = canManageSettings && Boolean(status?.postgreSqlConfigured) && Boolean(status?.toolsReady) && !migrationStatus?.pendingRestore && !isBusy;
   const canCreatePlan = canManageSettings && Boolean(status?.postgreSqlConfigured) && Boolean(status?.toolsReady) && Boolean(selectedBackup) && Boolean(targetDatabase.trim()) && Boolean(applicationRole.trim()) && !isBusy;
   const canCreateMigration = canManageSettings && Boolean(migrationStatus?.supported) && Boolean(migrationStatus?.toolsReady) && !migrationStatus?.pendingRestore && Boolean(migrationAdminPassword) && migrationCreateConfirmation.trim() === "MIGRATE" && isStrongMigrationPassword(migrationPassword) && migrationPassword === migrationPasswordConfirmation && !isBusy;
-  const canRestoreMigration = canManageSettings && Boolean(migrationStatus?.supported) && Boolean(migrationStatus?.toolsReady) && !migrationStatus?.pendingRestore && Boolean(migrationRestoreFile) && isStrongMigrationPassword(migrationRestorePassword) && Boolean(migrationAdminPassword) && migrationRestoreConfirmation.trim() === "MIGRATE" && !isBusy;
+  const canRestoreMigration = canManageSettings && Boolean(migrationStatus?.supported) && Boolean(migrationStatus?.toolsReady) && !migrationStatus?.pendingRestore && Boolean(migrationRestoreFile) && Boolean(migrationRestorePassword) && Boolean(migrationAdminPassword) && migrationRestoreConfirmation.trim() === "MIGRATE" && !isBusy;
   const canRestoreDatabase = canManageSettings && Boolean(status?.postgreSqlConfigured) && Boolean(status?.toolsReady) && !migrationStatus?.pendingRestore && Boolean(selectedBackup) && Boolean(databaseAdminPassword) && databaseRestoreConfirmation.trim() === "RESTORE DATABASE" && !isBusy;
   const canUploadDatabase = canManageSettings && Boolean(status?.postgreSqlConfigured) && Boolean(status?.toolsReady) && !migrationStatus?.pendingRestore && Boolean(databaseUploadFile) && Boolean(databaseAdminPassword) && databaseRestoreConfirmation.trim() === "RESTORE DATABASE" && !isBusy;
 
@@ -162,6 +167,7 @@ export function PostgreSqlMaintenancePanel({
       {message ? <InlineNotice tone="error" title="数据库维护失败">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       <MaintenanceBackgroundTaskStatusPanel status={migrationStatus} />
+      <MaintenanceOperationsGuide pending={Boolean(migrationStatus?.pendingRestore)} />
       <MaintenanceDatabaseBackupPanel
         canManageSettings={canManageSettings}
         busy={isBusy}
@@ -178,9 +184,12 @@ export function PostgreSqlMaintenancePanel({
           clearFeedback();
           createMutation.mutate();
         }}
+        onDownload={(fileName) => downloadDatabaseMutation.mutate(fileName)}
         onPathError={onPathError}
       />
-      <MaintenanceDatabaseRecoveryPanel
+      <details ref={databaseDetails} className="maintenance-advanced-details" aria-label="恢复数据库">
+        <summary>恢复数据库（回到某份备份）</summary>
+        <MaintenanceDatabaseRecoveryPanel
         canManageSettings={canManageSettings}
         busy={isBusy}
         backups={backups}
@@ -209,7 +218,7 @@ export function PostgreSqlMaintenancePanel({
           setDatabaseAdminPassword("");
           setDatabaseRestoreConfirmation("");
         }}
-        onDownload={() => downloadDatabaseMutation.mutate()}
+        onDownload={() => downloadDatabaseMutation.mutate(selectedBackup)}
         onRestoreSelected={() => databaseRestoreMutation.mutate()}
         onRestoreUploaded={() => uploadDatabaseRestoreMutation.mutate()}
         onCreatePlan={() => {
@@ -217,7 +226,10 @@ export function PostgreSqlMaintenancePanel({
           restorePlanMutation.mutate();
         }}
       />
-      <MaintenanceFullMigrationPanel
+      </details>
+      <details ref={migrationDetails} className="maintenance-advanced-details" aria-label="完整迁移与换机">
+        <summary>完整迁移与换机</summary>
+        <MaintenanceFullMigrationPanel
         canManageSettings={canManageSettings}
         busy={isBusy}
         status={migrationStatus}
@@ -246,6 +258,7 @@ export function PostgreSqlMaintenancePanel({
         onCreate={() => downloadMigrationMutation.mutate()}
         onRestore={() => restoreMigrationMutation.mutate()}
       />
+      </details>
       {lastRestorePlanPath ? <InlineNotice tone="info" action={renderOpenPathAction(lastRestorePlanPath, "打开还原计划目录", onPathError)}>{lastRestorePlanPath}</InlineNotice> : null}
     </section>
   );

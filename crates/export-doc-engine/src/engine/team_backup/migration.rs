@@ -21,7 +21,7 @@ pub(super) fn status(service: &NativeService, actor: &Actor) -> Result<Value> {
     let supported = service.provider()? == "PostgreSQL";
     let configured = postgres::team_configured(service)?;
     let ready = postgres::team_tools(&service.paths).ready();
-    let pending = marker_path(&service.paths)?.try_exists()?;
+    let pending = postgres::has_pending(&service.paths)?;
     let mut response = contracts::initial(contracts::schema("ApiServerMigrationStatusResponse"));
     response["supported"] = json!(supported);
     response["postgreSqlConfigured"] = json!(configured);
@@ -31,7 +31,7 @@ pub(super) fn status(service: &NativeService, actor: &Actor) -> Result<Value> {
     response["message"] = json!(if !supported {
         "单机版请使用灾备包。"
     } else if pending {
-        "迁移已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。"
+        "恢复已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。"
     } else if !ready {
         "PostgreSQL 客户端工具未就绪。"
     } else {
@@ -156,7 +156,7 @@ pub(super) fn stage_restore_upload(
 ) -> Result<Value> {
     auth::authorize(actor, "system.disaster-recovery", "manage")?;
     postgres::require_ready(service)?;
-    super::confirmation(parameters)?;
+    super::confirmation(parameters, "MIGRATE")?;
     super::sensitive_ticket(parameters, actor, super::ACTION_RESTORE_SERVER)?;
     super::managed_file(&root(&service.paths)?, file_name, "edmmigration")?;
     let password = parameters
@@ -168,7 +168,6 @@ pub(super) fn stage_restore_upload(
     let _gate = package::lock(&service.paths)?;
     postgres::ensure_no_pending(&service.paths)?;
     package::stage(
-        &service.paths,
         &marker_path(&service.paths)?,
         MAGIC,
         password,

@@ -486,8 +486,8 @@ export function SettingsPage({
     ].filter(({ path }) => settingsCategoryForPath(path) === currentCategory
       && path[1] !== "databaseProvider"
       && (path[1] !== "updaterEndpoint" || isDesktopRuntime)
-      && (path[1] !== "sqliteDatabaseFileName" || databaseProvider === "Sqlite")
-      && (!path[1]?.startsWith("postgreSql") || databaseProvider === "PostgreSQL")));
+      && (path[1] !== "sqliteDatabaseFileName" || databaseProvider === "sqlite")
+      && (!path[1]?.startsWith("postgreSql") || databaseProvider === "postgresql")));
     setSingleWindowAuthorityAutoState({ fetchPlace: "", aplAdd: "" });
     setMessage(null);
     setSuccessMessage(`已恢复“${activeCategoryConfig.label}”的默认值，请检查后保存。`);

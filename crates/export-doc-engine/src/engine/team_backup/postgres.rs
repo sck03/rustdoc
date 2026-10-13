@@ -283,6 +283,7 @@ pub(super) fn create_backup(service: &NativeService, actor: &Actor) -> Result<Va
         "创建 PostgreSQL 物理备份",
         move |_| {
             let _gate = super::package::lock(&paths)?;
+            ensure_no_pending(&paths)?;
             let actor = auth::current_actor(&store, actor_id)?;
             auth::authorize_operation(&actor, CREATE_POSTGRE_SQL_PHYSICAL_BACKUP, &[])?;
             let endpoint = Endpoint::read_parts(&store, &protector)?;
@@ -582,7 +583,7 @@ pub(super) fn upload_and_restore(
     auth::authorize(actor, "system.backup", "manage")?;
     require_ready(service)?;
     super::sensitive_ticket(parameters, actor, super::ACTION_RESTORE_DATABASE)?;
-    super::confirmation(parameters)?;
+    super::confirmation(parameters, super::CONFIRM_RESTORE_DATABASE)?;
     if content.is_empty() {
         return Err(invalid("上传的备份文件为空。"));
     }
@@ -599,4 +600,4 @@ pub(super) fn upload_and_restore(
 
 mod recovery;
 pub use recovery::apply_pending;
-pub(crate) use recovery::{dump_to, ensure_no_pending};
+pub(crate) use recovery::{dump_to, ensure_no_pending, has_pending};

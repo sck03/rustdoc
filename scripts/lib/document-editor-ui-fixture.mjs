@@ -47,7 +47,7 @@ const savePayment=(name,input)=>{
   payment={...input.body,id:9,rowVersion:(payment.rowVersion||0)+1};return record(name,input,{id:9,payment});
 };
 const client={
-  getHealth:()=>window.__failHealth?Promise.reject(new Error('运行状态暂时不可用')):record('getHealth',{}, {databaseProvider:provider==='PostgreSQL'?'当前是数据库共享模式（PostgreSQL）':'当前是单机模式（SQLite）',databaseProviderKey:provider}),
+  getHealth:()=>window.__failHealth?Promise.reject(new Error('运行状态暂时不可用')):record('getHealth',{}, {databaseProvider:provider==='PostgreSQL'?'当前是数据库共享模式（PostgreSQL）':'当前是单机模式（SQLite）',databaseProviderKey:provider==='PostgreSQL'?'postgresql':'sqlite'}),
   listDatabaseBackups:()=>record('listDatabaseBackups',{}, {backupRoot:'App_Data/Backups',backups:[]}),
   getCloudBackupStatus:()=>record('getCloudBackupStatus',{}, {enabled:false,isConfigured:false}),
   listPostgreSqlPhysicalBackups:()=>record('listPostgreSqlPhysicalBackups',{}, {status:{postgreSqlConfigured:true,toolsReady:true},backups:[]}),

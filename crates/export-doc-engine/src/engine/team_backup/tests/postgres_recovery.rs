@@ -78,9 +78,23 @@ fn postgres_migration_and_physical_restore_preserve_roles_and_reject_live_instan
     let (ticket, _) = issue_sensitive_ticket(&actor, ACTION_RESTORE_SERVER).unwrap();
     let params = [
         (TICKET_HEADER, ticket),
-        (CONFIRMATION_HEADER, "RESTORE DATABASE".into()),
+        (CONFIRMATION_HEADER, "MIGRATE".into()),
         (MIGRATION_PASSWORD_HEADER, "Migration-password-2026".into()),
     ];
+    let mut wrong_confirmation = params.clone();
+    wrong_confirmation[1].1 = "RESTORE DATABASE".into();
+    assert_eq!(
+        migration::stage_restore_upload(
+            &service,
+            &actor,
+            &wrong_confirmation,
+            &output.file_name,
+            &output.content
+        )
+        .unwrap_err()
+        .status,
+        Some(400)
+    );
     migration::stage_restore_upload(
         &service,
         &actor,
@@ -109,6 +123,10 @@ fn postgres_migration_and_physical_restore_preserve_roles_and_reject_live_instan
         .set_settings("restore-test", 2, &json!({"value":"second-change"}))
         .unwrap();
     postgres::restore(&service,&actor,&[],&json!({"backupFileName":name,"adminPassword":"Admin-2026-password","confirmationText":"RESTORE DATABASE"})).unwrap();
+    assert_eq!(
+        migration::status(&service, &actor).unwrap()["pendingRestore"],
+        true
+    );
     service.close().unwrap();
     drop(service);
     postgres::apply_pending(&paths, &maintenance, "native_owner", &app).unwrap();

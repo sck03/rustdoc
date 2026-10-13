@@ -12,4 +12,4 @@
 
 用户入口为 [scripts/run-native-docker.ps1](../scripts/run-native-docker.ps1)，启动先构建、停 API、维护数据库，再启动 API。不要用裸 compose up 跳过维护流程，也不要删除数据卷或 runtime 目录重新生成凭据接管旧卷。
 
-桌面包不使用 Docker；旧 deploy/container 已退役。详细启动、升级、备份与恢复见[脚本说明](../scripts/README.md#网页与-docker)，公开发布见[镜像说明](../docs/GitHub开源发布与Docker镜像说明.md)。
+桌面包不使用 Docker；旧 deploy/container 已退役。首次启动和升级见[Docker 用户指南](../docs/Docker容器部署与启动指南.md)，数据操作见[备份迁移与恢复指南](../docs/服务器备份迁移与恢复指南.md)，参数见[脚本说明](../scripts/README.md#网页与-docker)，公开发布见[镜像说明](../docs/GitHub开源发布与Docker镜像说明.md)。

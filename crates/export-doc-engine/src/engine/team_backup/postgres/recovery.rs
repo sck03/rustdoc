@@ -5,16 +5,22 @@ use super::super::{package, restore_files};
 use super::*;
 
 pub(crate) fn ensure_no_pending(paths: &RuntimePaths) -> Result<()> {
+    if has_pending(paths)? {
+        return Err(error(
+            409,
+            "恢复已暂存。请停止 API，运行 --restore-pending 维护命令后再启动。",
+        ));
+    }
+    Ok(())
+}
+pub(crate) fn has_pending(paths: &RuntimePaths) -> Result<bool> {
     for marker in [restart_marker(paths)?, migration::marker_path(paths)?] {
         crate::paths::ensure_safe_absolute(&marker).map_err(invalid)?;
         if marker.try_exists()? {
-            return Err(error(
-                409,
-                "恢复已暂存。请停止 API，运行 --restore-pending 维护命令后再启动。",
-            ));
+            return Ok(true);
         }
     }
-    Ok(())
+    Ok(false)
 }
 pub(crate) fn dump_to(
     store: &Store,

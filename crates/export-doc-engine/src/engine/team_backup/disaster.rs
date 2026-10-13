@@ -143,14 +143,7 @@ pub(super) fn restore_package(
             fs::File::open(path)?
                 .take(sealed::MAX_PLAINTEXT_BYTES as u64 + 1024 * 1024 + 1)
                 .read_to_end(&mut bytes)?;
-            package::stage(
-                &paths,
-                &marker(&paths)?,
-                MAGIC,
-                &password,
-                &bytes,
-                package::SQLITE,
-            )?;
+            package::stage(&marker(&paths)?, MAGIC, &password, &bytes, package::SQLITE)?;
             super::audit(
                 &store,
                 &actor,

@@ -16,6 +16,10 @@ function Invoke-ExportDocExternal {
     $service = $command[-1]
     switch ($command[0]) {
         'build' { Assert-Contract ($service -eq 'application' -and $script:active) 'Build interrupted the API.' }
+        'pull' {
+            Assert-Contract ($script:active) 'Image download interrupted the API.'
+            Assert-Contract (($command -join ' ') -in @('pull --policy missing application', 'pull --policy missing postgres')) 'Must reuse selected local/offline images.'
+        }
         'stop' {
             Assert-Contract ($service -eq 'application') 'Only stop API before maintenance.'
             $script:active = $false
@@ -50,9 +54,9 @@ function Invoke-ExportDocExternal {
 $parameters = @{ Docker = 'docker-fixture'; ComposeArguments = @('compose', '--file', 'fixture.yml');
     Environment = @{ NATIVE_IMAGE = 'example/app:fixed' }; WorkingDirectory = $PSScriptRoot }
 $scenarios = @(
-    @{ Options = @{}; Steps = 5; Maintenance = 'initialize' },
-    @{ Options = @{ SkipBuild = $true }; Steps = 4; Maintenance = 'initialize' },
-    @{ Options = @{ RestorePending = $true }; Steps = 4; Maintenance = 'restore' },
+    @{ Options = @{}; Steps = 6; Maintenance = 'initialize' },
+    @{ Options = @{ SkipBuild = $true }; Steps = 6; Maintenance = 'initialize' },
+    @{ Options = @{ RestorePending = $true }; Steps = 6; Maintenance = 'restore' },
     @{ Options = @{ Stop = $true }; Steps = 1; Maintenance = '' }
 )
 foreach ($scenario in $scenarios) {
@@ -73,6 +77,9 @@ foreach ($scenario in $scenarios) {
         Assert-Contract ($script:calls.Count -eq $(if ($failure) { $failure } else { $scenario.Steps })) 'Continued after failure or skipped a lifecycle phase.'
         if ($failure -gt 0 -and $script:calls[-1] -match '^(up|--profile)') {
             Assert-Contract (-not $script:active) 'Failure restarted the API.'
+        }
+        if ($failure -gt 0 -and $script:calls[-1] -match '^(build|pull)') {
+            Assert-Contract $script:active 'Image preparation failure stopped the existing API.'
         }
         if ($failure -eq 0 -and -not $options.Stop) {
             Assert-Contract $script:active 'API did not restart.'

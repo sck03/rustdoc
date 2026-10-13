@@ -63,7 +63,7 @@ export async function runSettingsWorkspaceCases({ open, currentPage, read, click
 
   await start("&section=database&desktop");
   assert(await read(page, "document.querySelector('[aria-label=数据库连接]').textContent.includes('SQLite 文件名')"));
-  assert.equal(await read(page, "document.querySelector('[aria-label=数据库连接]').textContent.includes('服务器')"), false);
+  assert.equal(await read(page, "[...document.querySelectorAll('[aria-label=数据库连接] label > span')].some(n=>n.textContent==='服务器')"), false);
   assert(await read(page, "Boolean(document.querySelector('[aria-label=软件更新]'))"));
   await category("备份与恢复");
   assert.equal(await read(page, "document.querySelector('.settings-section-nav').textContent.includes('团队库')"), false);
@@ -75,17 +75,29 @@ export async function runSettingsWorkspaceCases({ open, currentPage, read, click
   assert.equal(await read(page, "document.querySelector('[aria-label=软件更新]')"), null);
   assert.equal(await read(page, "document.querySelector('[aria-label=数据库连接]').textContent.includes('SQLite 文件名')"), false);
   await category("备份与恢复");
-  await field(page, "自动备份周期", "Weekly"); await field(page, "每周备份星期", "3");
+  assert(await read(page, "document.querySelector('[aria-label=备份计划与保留]').textContent.includes('尚未执行自动备份')"));
+  assert(await read(page, "[...document.querySelectorAll('[aria-label=备份计划与保留] input,[aria-label=备份计划与保留] select')].every(n=>n.matches(':disabled'))"));
   await category("单据设置"); await field(page, "明细空白行数", "9");
   await clickText(page, "恢复本分类默认"); await clickText(page, "恢复默认值", "[role=dialog] button");
   const resetSaved = await save();
   assert.equal(resetSaved.settings.system.databaseProvider, "PostgreSQL");
   assert.equal(resetSaved.settings.system.postgreSqlHost, "database.example.test");
-  assert.equal(resetSaved.settings.system.postgreSqlAutoBackupDayOfWeek, 3);
+  assert.equal(resetSaved.settings.system.postgreSqlAutoBackupSchedule, "Daily");
+  assert.equal(resetSaved.settings.system.postgreSqlAutoBackupTime, "02:00");
   assert.equal(resetSaved.settings.system.itemEntryBlankRowCount, 20);
   await category("备份与恢复"); await clickText(page, "团队库与完整迁移");
   await waitFor(page, "window.__calls.some(c=>c.name==='listPostgreSqlPhysicalBackups')");
+  await waitFor(page, "document.querySelector('.maintenance-database-recovery-panel input') && !document.querySelector('.maintenance-database-recovery-panel input').disabled");
+  await clickText(page, "恢复数据库（回到某份备份）", "summary");
+  await clickText(page, "完整迁移与换机", "summary");
+  await clickText(page, "服务器恢复与升级步骤", "summary");
   await audit(page, "settings-postgresql-backup-and-scoped-defaults");
+  for (const width of [390, 320]) {
+    await start("&section=postgresql&provider=PostgreSQL", width);
+    await waitFor(page, "document.querySelector('.maintenance-full-migration-panel')");
+    for (const title of ["恢复数据库（回到某份备份）", "完整迁移与换机", "服务器恢复与升级步骤"]) await clickText(page, title, "summary");
+    await audit(page, "settings-postgresql-maintenance-" + width);
+  }
 
   await start("&edition=Sales&desktop=1&section=documentFields");
   assert.equal(await read(page, "document.querySelector('.settings-category-nav').textContent.includes('单据设置')"), false);

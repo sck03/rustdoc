@@ -52,7 +52,7 @@ export function MaintenanceFullMigrationPanel({
   const restoreInputRef = useRef<HTMLInputElement | null>(null);
   return (
     <section className="form-section maintenance-full-migration-panel" aria-label="完整服务器迁移">
-      <div className="section-header"><div><h3>完整迁移</h3><p className="section-description">包含数据库、印章、唛头图片、用户模板、配置、主密钥和单一窗口运行数据；不包含日志、缓存、许可证或 TLS/Certbot 证书。</p></div><ShieldCheck size={22} aria-hidden="true" /></div>
+      <div className="section-header"><div><h3>完整迁移</h3><p className="section-description">包含业务数据库、凭据主密钥和用户文件模板。数据库内的账号、设置、图片和附件随库迁移；服务器连接配置、交接目录、日志、缓存及 HTTPS 证书需另行保管。</p></div><ShieldCheck size={22} aria-hidden="true" /></div>
       <div className="backup-action-grid">
         <label><span>管理员当前密码</span><input type="password" autoComplete="current-password" value={adminPassword} disabled={!canManageSettings || busy} onChange={(event) => onAdminPasswordChange(event.target.value)} /><small>创建或恢复完整迁移包前都需要重新认证。</small></label>
         <label><span>新迁移包密码</span><input type="password" autoComplete="new-password" value={packagePassword} disabled={!canManageSettings || busy} placeholder="至少12位，含大小写、数字和符号" onChange={(event) => onPackagePasswordChange(event.target.value)} /></label>
@@ -64,6 +64,7 @@ export function MaintenanceFullMigrationPanel({
         <label><span>恢复确认文本</span><input value={restoreConfirmation} disabled={!canManageSettings || busy || !restoreFile} placeholder="MIGRATE" onChange={(event) => onRestoreConfirmationChange(event.target.value)} /></label>
         <button className="command-button danger-command" type="button" disabled={!canRestore} onClick={onRestore}><RotateCcw size={17} aria-hidden="true" /><span>安排完整迁移</span></button>
       </div>
+      <p className="settings-helper-text">安排迁移只完成校验和暂存。随后须由服务器管理员停止应用、执行恢复维护命令，成功后再启动；仅刷新页面或普通重启不会完成恢复。</p>
       <p className="settings-helper-text">{status?.storagePolicy}</p>
     </section>
   );

@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$PostgresBin,
     [ValidateRange(60, 7200)][int]$TimeoutSeconds = 1800,
-    [ValidateSet('All', 'Storage', 'Engine', 'Capacity')][string]$Scope = 'All'
+    [ValidateSet('All', 'Storage', 'Engine', 'Capacity', 'Maintenance')][string]$Scope = 'All'
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
@@ -45,6 +45,10 @@ if ($Scope -in @('All', 'Engine')) {
 if ($Scope -eq 'Capacity') {
     $databaseTargets += ,@('CAPACITY_ONE', 'native_capacity_1')
     $databaseTargets += ,@('CAPACITY_FOUR', 'native_capacity_4')
+}
+if ($Scope -eq 'Maintenance') {
+    $databaseTargets += ,@('MAINTENANCE_UI', 'native_maintenance_ui')
+    $databaseTargets += ,@('MAINTENANCE_TARGET', 'native_maintenance_target')
 }
 $databaseStatements = ($databaseTargets | ForEach-Object { "CREATE DATABASE $($_[1]) OWNER native_owner;" }) -join [Environment]::NewLine
 try {
@@ -90,6 +94,11 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SEL
         $environment['EXPORTDOC_CAPACITY_ISOLATED'] = '1'
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('build', '--locked', '-p', 'export-doc-server') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Build the measured Rust HTTP service'
         Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_native_capacity.mjs') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Twenty-session query, approval and PDF capacity comparison'
+    }
+    if ($Scope -eq 'Maintenance') {
+        $environment['EXPORTDOC_MAINTENANCE_ISOLATED'] = '1'
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('build', '--locked', '-p', 'export-doc-server') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Build the Rust maintenance test service'
+        Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_postgres_maintenance_ui.mjs') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Real React and PostgreSQL backup, migration and offline recovery'
     }
     [ordered]@{ schemaVersion = 1; database = 'PostgreSQL 18'; scope = $Scope; succeeded = $true; completedAt = [DateTimeOffset]::UtcNow.ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $testRoot 'result.json') -Encoding utf8
     Write-Host "Native PostgreSQL evidence: $testRoot"

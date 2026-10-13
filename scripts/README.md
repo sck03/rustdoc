@@ -99,13 +99,15 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 ## 网页与 Docker
 
+普通用户从[Docker 部署指南](../docs/Docker容器部署与启动指南.md)或[独立网页版指南](../docs/网页版部署与启动指南.md)开始；备份、换机和故障恢复按[服务器恢复指南](../docs/服务器备份迁移与恢复指南.md)执行。这里集中维护脚本参数及开发验证，不重复完整操作步骤。
+
 `run-native-docker.ps1 -PrepareOnly -NoPause` 只生成私有配置；普通运行构建并启动，`-Stop -NoPause` 停止并保留数据库。默认绑定 `127.0.0.1:5188`；局域网地址须显式设置。凭据保存在忽略的 `deploy/rust-native/runtime/`，不进入 Git 或镜像。始终使用同一 RuntimeRoot 和 Compose 项目维护已有部署，不能换一套随机凭据接管旧数据卷。
 
 常驻服务为两个容器：`application` 同源提供 React 与 Rust API，`postgres` 独立运行 PostgreSQL 18。浏览器 → HTTP/HTTPS → API → 内网 `postgres:5432`；数据库不映射宿主端口。API 使用 `database` 与 `web` 网络，PostgreSQL 只使用 `internal: true` 的 `database` 网络。TLS 代理可由服务器部署环境提供，不是必须增加的应用容器。非容器网页包使用相同 Rust 后端连接独立 PostgreSQL 服务，数据库不必容器化。
 
 ### 更新程序与数据库
 
-日常启动、重复启动及更新统一经过：准备镜像 → 停 API → 等数据库就绪 → 独立维护容器初始化/逐版升级 → 启 API 并检查就绪。构建失败不打断原 API；停止、数据库或维护失败则立即报错，不继续启 API。`initialize`/`restore` 仅在 maintenance profile 显式运行，不能用裸 `docker compose up` 代替公开脚本来执行升级。`-SkipBuild` 复用已构建/已导入镜像，升级至发布镜像时使用本页的 `-Image ... -SkipBuild` 命令。
+日常启动、重复启动及更新统一经过：准备镜像 → 停 API → 等数据库就绪 → 独立维护容器初始化/逐版升级 → 启 API 并检查就绪。本地构建及缺失镜像取得均在停 API 前完成，失败不打断原应用；已有/离线镜像按 missing 策略复用。停止、数据库或维护失败则立即报错，不继续启 API。`initialize`/`restore` 仅在 maintenance profile 显式运行，不能用裸 `docker compose up` 代替公开脚本来执行升级。`-SkipBuild` 复用已构建/已导入镜像，升级至发布镜像时使用本页的 `-Image ... -SkipBuild` 命令。
 
 应用 schema 升级与 PostgreSQL 软件主版本升级是两件事：当前 Rust schema 为 7，从 5 开始按顺序事务升级；模板权限调整不改变 schema 或备份格式。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。升级前在界面导出备份/完整迁移包并保存在本机故障之外的位置。
 
@@ -127,6 +129,7 @@ HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 
 
 ### 备份、迁移与恢复
 
+- 当前 Rust 尚未执行自动备份及保留调度，界面历史计划只读展示。PostgreSQL 在“团队库与完整迁移”手工创建/下载；WebDAV 备份仍针对 SQLite。数据库备份确认 `RESTORE DATABASE`，完整迁移创建/恢复确认 `MIGRATE`；两类暂存状态都会阻止重复安排，普通重启不自动恢复。
 - 桌面 `.edmrecovery` 灾备包包含 SQLite 快照、Security 主密钥和 DataRoot/Templates；从本机明确选择的文件校验并暂存后，退出重开即可恢复。启动先取得实例锁，校验暂存内容，保存原文件并记录替换日志；失败停止启动，保留恢复目录。
 - PostgreSQL API 沿用“物理备份”名称，实际为 `pg_dump` custom-format `.dump`，只恢复数据库。换服务器使用另含主密钥和用户模板的 `.edmmigration` 完整包。加密包明文及下载上限为 256 MiB；超大数据库由部署管理员使用 PostgreSQL 原生离线备份工具。
 - 服务器在界面完成密码/确认及暂存后，停止正常 API，使用同一个 AppRoot/DataRoot 执行 `ExportDocManager.Server --app-root <AppRoot> --data-root <DataRoot> --restore-pending`。维护进程需提供 `EXPORTDOCMANAGER_POSTGRES_CONNECTION`、独立 `EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION` 和 NOLOGIN 所有者 `EXPORTDOCMANAGER_POSTGRES_OWNER`；两种连接须指向同一数据库，均可使用对应 `_FILE`。命令完成即退出，再以业务连接启动 API。
@@ -175,6 +178,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 
 - Rust：`cargo fmt --all --check`、`cargo test --locked --workspace`、`cargo check --locked --workspace --all-features`。
 - 实库：`test-native-postgres.ps1 -PostgresBin <PostgreSQL-18-bin>` 创建并停止隔离集群；忽略的实库测试不计通过。
+- 团队备份界面：先完成 React build，再运行同一实库脚本的 `-Scope Maintenance`。使用真实 Rust CLI、文件连接配置、浏览器首次登录、dump 下载/上传、完整迁移、错误/既有密码、停机恢复、主密钥/模板保留和重试幂等；不接受生产端点。该专项不加入普通浏览器重型门禁。
 - Docker：`test_native_docker_lifecycle.ps1` 在无 daemon 环境验证停机顺序与失败中止；真实两架构 CI 另核对内部网络、端口、凭据/卷隔离、运行中重复部署、custom-format dump 恢复及重启持久化。脚本和 Compose 配置通过不等于容器实跑通过。
 - React：项目 `build`、API／登录／权限／草稿／无障碍及相应页面回归；真正的 Tauri 窗口和输出仍需实跑。
 - 异步生命周期：`npm --prefix apps/export-doc-web run test:abortable-operations-ui` 验证资料切换、卸载后的迟到成功/失败、保存后刷新期间离开页面、商机/供货产品连续查询，以及附件容量刷新和部分失败重试的版本选择；`test:business-features-ui` 另验证真实资料页面不会显示旧预览及旧错误。`test:oa-ui` 的人员详情实跑满额上传、删除后释放容量及继续上传，保留真实 HTTP 版本校验。

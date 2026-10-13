@@ -87,8 +87,8 @@ pub(super) const ACTION_RESTORE_SERVER: &str = "restore-server";
 const MAX_PASSWORD_CHARS: usize = 1024;
 const MIN_PACKAGE_PASSWORD_CHARS: usize = 8;
 pub(super) const PG_STORAGE_POLICY: &str = "PostgreSQL 团队库物理备份默认写入运行数据根 Backups/PostgreSQL/，优先使用程序根 Tools/PostgreSQL/bin 下的 pg_dump/pg_restore/psql；custom-format .dump 包含完整业务数据但本身不加密，复制到外部介质前必须使用受控加密存储；不把 PostgreSQL 工具或备份默认放到系统 C 盘、AppData 或 ProgramData。";
-pub(super) const PLAN_STORAGE_POLICY: &str = "PostgreSQL 还原计划默认写入运行数据根 Backups/PostgreSQL/RestorePlans/，生成 pg_restore 脚本和 post_restore_ownership.sql；脚本包含 REASSIGN OWNED、ALTER OWNER、GRANT 和默认权限修复流程，执行前仍需管理员按目标服务器复核。";
-pub(super) const MIGRATION_STORAGE_POLICY: &str = "服务器迁移包默认写入运行数据根 Backups/ServerMigration/，先创建 PostgreSQL 物理备份再整体密封加密；恢复前必须再次确认目标服务器，恢复需要重启服务才能在建立数据库连接前完成切换。";
+pub(super) const PLAN_STORAGE_POLICY: &str = "PostgreSQL 还原计划写入运行数据根 Backups/PostgreSQL/RestorePlans/，仅供管理员复核后离线执行。日常恢复请使用界面暂存与 --restore-pending 维护流程，它同时校验数据库版本、实例锁和权限；生成脚本本身不会恢复数据。";
+pub(super) const MIGRATION_STORAGE_POLICY: &str = "服务器迁移包写入运行数据根 Backups/ServerMigration/，包含 PostgreSQL 数据库、凭据主密钥和用户文件模板，整体密码加密。暂存后必须停止应用并运行 --restore-pending 维护命令，成功后再启动；普通重启不会自动恢复。";
 pub(super) const DISASTER_STORAGE_POLICY: &str = "持卡机灾备包默认写入运行数据根 DisasterRecovery/，包含当前 SQLite 数据库快照与本机主密钥，使用密码派生的 AES-256-GCM 密封；包与密码必须分开保管，并至少复制一份到脱机介质。";
 pub(super) const CLOUD_STORAGE_POLICY: &str = "WebDAV 云备份只读取保存在运行数据根配置中的 WebDAV 设置，只上传运行数据根 Backups/ 中当前数据库对应的最新备份；不接受任意本地路径，不读取发票/报关业务表，也不读取付款/报销业务表。";
 pub(super) const OWNERSHIP_STORAGE_POLICY: &str = "共享库归属改派只更新发票、付款报销、客户、出口商、收款人、CRM、供应商、商机、邮件/报表模板和装柜方案的 ownerUserId、departmentId、companyScope 归属字段；关联子记录继续随所属业务聚合访问，不移动附件、不生成导出目录、不读取用户显式导出文件。";
@@ -165,11 +165,9 @@ pub(super) fn header<'a>(parameters: &'a [(&str, String)], name: &str) -> &'a st
         .unwrap_or("")
         .trim()
 }
-pub(super) fn confirmation(parameters: &[(&str, String)]) -> Result<()> {
-    if header(parameters, CONFIRMATION_HEADER) != CONFIRM_RESTORE_DATABASE {
-        return Err(invalid(format!(
-            "恢复数据库前需要输入确认文本 {CONFIRM_RESTORE_DATABASE}。"
-        )));
+pub(super) fn confirmation(parameters: &[(&str, String)], expected: &str) -> Result<()> {
+    if header(parameters, CONFIRMATION_HEADER) != expected {
+        return Err(invalid(format!("恢复前需要输入确认文本 {expected}。")));
     }
     Ok(())
 }

@@ -179,6 +179,6 @@ assert(draft.changedSettingsCategories(before, after).length === 0, "undo clears
 assert(draft.settingsCategoryForPath(["system", "defaultTemplateExporterNameCn"]) === "excel-import", "exporter default belongs to Excel");
 assert(draft.settingsCategoryForPath(["system", "postgreSqlAutoBackupTime"]) === "backup", "backup schedule ownership");
 assert(draft.settingsCategoryForPath(["system", "auditLogRetentionDays"]) === "maintenance", "audit retention ownership");
-assert(!draft.categoryHasSecrets("documents", "PostgreSQL") && !draft.categoryHasSecrets("runtime", "Sqlite"), "no unrelated secret toggle");
-assert(draft.categoryHasSecrets("runtime", "PostgreSQL") && draft.categoryHasSecrets("backup"), "relevant secret toggles");
+assert(!draft.categoryHasSecrets("documents", "postgresql") && !draft.categoryHasSecrets("runtime", "sqlite"), "no unrelated secret toggle");
+assert(draft.categoryHasSecrets("runtime", "postgresql") && draft.categoryHasSecrets("backup"), "relevant secret toggles");
 process.stdout.write("settings-model tests passed\n");

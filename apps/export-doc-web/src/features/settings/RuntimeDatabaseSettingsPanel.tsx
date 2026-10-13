@@ -28,12 +28,12 @@ export default function RuntimeDatabaseSettingsPanel({ settings, secrets, canMan
       </fieldset>
     </section>
     {databaseProvider && <section className="form-section" aria-label="数据库连接">
-      <div className="section-header"><h2>数据库连接</h2><span>当前使用 {databaseProvider === "Sqlite" ? "SQLite" : databaseProvider}</span></div>
-      <p className="form-field-description">按当前服务实际使用的数据库显示参数。修改连接配置需要重启服务；部署环境指定的参数由服务管理员维护。</p>
+      <div className="section-header"><h2>数据库连接</h2><span>当前使用 {databaseProvider === "sqlite" ? "SQLite" : "PostgreSQL"}</span></div>
+      <p className="form-field-description">当前数据库由启动配置决定。这里保存的参数不会切换正在使用的连接；服务器地址、账号和文件路径须由部署管理员在启动配置中维护。</p>
       <fieldset className="settings-fieldset" disabled={disabled}>
         <div className="field-grid">
-          {databaseProvider === "Sqlite" && <TextSetting settings={settings} path={["system", "sqliteDatabaseFileName"]} label="SQLite 文件名" onChange={onChange} />}
-          {databaseProvider === "PostgreSQL" && <>
+          {databaseProvider === "sqlite" && <TextSetting settings={settings} path={["system", "sqliteDatabaseFileName"]} label="SQLite 文件名" onChange={onChange} />}
+          {databaseProvider === "postgresql" && <>
             <TextSetting settings={settings} path={["system", "postgreSqlHost"]} label="服务器" onChange={onChange} />
             <NumberSetting settings={settings} path={["system", "postgreSqlPort"]} label="端口" onChange={onChange} />
             <TextSetting settings={settings} path={["system", "postgreSqlDatabase"]} label="数据库名" onChange={onChange} />

@@ -105,7 +105,8 @@ fn zip_payload_unpack_and_manifest_agree() {
     let working = sealed::working_directory(&workspace.paths().data_root).unwrap();
     let first = working.join("a.bin");
     let second = working.join("b.bin");
-    fs::write(&first, b"first").unwrap();
+    let first_content = vec![42; 128 * 1024 + 17];
+    fs::write(&first, &first_content).unwrap();
     fs::write(&second, b"second").unwrap();
     let entries = [
         Entry {
@@ -121,6 +122,14 @@ fn zip_payload_unpack_and_manifest_agree() {
     let extracted = working.join("extracted");
     let unpacked = unpack(&payload, &extracted).unwrap();
     assert_eq!(unpacked.len(), 2);
+    assert_eq!(
+        fs::read(extracted.join("Database/a.bin")).unwrap(),
+        first_content
+    );
+    assert_eq!(
+        fs::read(extracted.join("Security/b.bin")).unwrap(),
+        b"second"
+    );
     let manifest = [
         ManifestFile::from_path("Database/a.bin", &first).unwrap(),
         ManifestFile::from_path("Security/b.bin", &second).unwrap(),
@@ -129,15 +138,17 @@ fn zip_payload_unpack_and_manifest_agree() {
 
     // 摘要与清单不一致必须被拒绝。
     let mut wrong_digest = unpacked.clone();
-    wrong_digest[0].2 = "0".repeat(64);
+    wrong_digest[0].sha256 = "0".repeat(64);
     assert!(verify_manifest(&wrong_digest, &manifest).is_err());
 
     let mut wrong_name = unpacked.clone();
-    wrong_name[0].0 = "Database/other.bin".into();
+    wrong_name[0].name = "Database/other.bin".into();
     assert!(verify_manifest(&wrong_name, &manifest).is_err());
 
     let short = [ManifestFile::from_path("Database/a.bin", &first).unwrap()];
     assert!(verify_manifest(&unpacked, &short).is_err());
+    let duplicated = [manifest[0].clone(), manifest[0].clone()];
+    assert!(verify_manifest(&unpacked, &duplicated).is_err());
     fs::remove_dir_all(&working).unwrap();
 }
 

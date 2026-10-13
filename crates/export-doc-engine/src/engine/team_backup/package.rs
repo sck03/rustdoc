@@ -8,6 +8,7 @@ use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
+    io::Read,
     path::{Path, PathBuf},
 };
 
@@ -106,7 +107,7 @@ fn collect(root: &Path, directory: &Path, sources: &mut Vec<(String, PathBuf)>) 
         if path.is_dir() {
             collect(root, &path, sources)?;
         } else {
-            if !path.is_file() || sources.len() >= 4095 {
+            if !path.is_file() || sources.len() >= sealed::MAX_FILES - 1 {
                 return Err(invalid("模板文件数量或类型无效。"));
             }
             let name = path
@@ -125,7 +126,6 @@ fn collect(root: &Path, directory: &Path, sources: &mut Vec<(String, PathBuf)>) 
     Ok(())
 }
 pub(super) fn stage(
-    paths: &RuntimePaths,
     marker: &Path,
     magic: &[u8],
     password: &str,
@@ -146,7 +146,7 @@ pub(super) fn stage(
     let result = (|| {
         let payload = zeroize::Zeroizing::new(sealed::open(magic, password, content)?);
         let entries = sealed::unpack(&payload, &staging)?;
-        validate_entries(&entries, database)?;
+        validate_entries(&read_manifest(&staging)?, &entries, database)?;
         if database == SQLITE {
             export_doc_storage::verify_sqlite_backup(&staging.join(SQLITE))?;
         }
@@ -161,42 +161,63 @@ pub(super) fn stage(
     if result.is_err() {
         let _ = fs::remove_dir_all(&staging);
     }
-    let _ = paths;
     result
 }
-fn validate_entries(entries: &[(String, Vec<u8>, String)], database: &str) -> Result<Manifest> {
-    let manifest: Manifest = serde_json::from_slice(
-        &entries
-            .iter()
-            .find(|(name, _, _)| name == "manifest.json")
-            .ok_or_else(|| invalid("包缺少清单。"))?
-            .1,
-    )
-    .map_err(|_| invalid("恢复包清单无效。"))?;
+fn read_manifest(staging: &Path) -> Result<Manifest> {
+    let path = staging.join("manifest.json");
+    paths::ensure_safe_absolute(&path).map_err(invalid)?;
+    let mut bytes = Vec::new();
+    fs::File::open(path)?
+        .take(sealed::MAX_PLAINTEXT_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > sealed::MAX_PLAINTEXT_BYTES {
+        return Err(invalid("恢复包清单过大。"));
+    }
+    serde_json::from_slice(&bytes).map_err(|_| invalid("恢复包清单无效。"))
+}
+fn validate_manifest(manifest: &Manifest, database: &str) -> Result<()> {
     if manifest.schema_version != 1 || manifest.database != database {
         return Err(invalid("恢复包的数据库类型或版本不匹配。"));
     }
     export_doc_storage::validate_schema_version(manifest.database_schema)
         .map_err(|cause| invalid(cause.to_string()))?;
+    if manifest.files.len() >= sealed::MAX_FILES {
+        return Err(invalid("包内文件数量超过上限。"));
+    }
+    let mut total = 0_u64;
+    for file in &manifest.files {
+        if file
+            .name
+            .split('/')
+            .any(|part| !paths::valid_file_name(part))
+            || (file.name != database && file.name != KEY && !file.name.starts_with("Templates/"))
+        {
+            return Err(invalid("包包含不支持的文件或非法路径。"));
+        }
+        total = total
+            .checked_add(file.size_bytes)
+            .filter(|size| *size <= sealed::MAX_PLAINTEXT_BYTES as u64)
+            .ok_or_else(|| invalid("包内容超过容量上限。"))?;
+    }
+    Ok(())
+}
+fn validate_entries(
+    manifest: &Manifest,
+    entries: &[sealed::ManifestFile],
+    database: &str,
+) -> Result<()> {
+    validate_manifest(manifest, database)?;
     sealed::verify_manifest(entries, &manifest.files)?;
     if !entries
         .iter()
-        .any(|(name, bytes, _)| name == database && !bytes.is_empty())
+        .any(|entry| entry.name == database && entry.size_bytes > 0)
         || !entries
             .iter()
-            .any(|(name, bytes, _)| name == KEY && bytes.len() == 32)
+            .any(|entry| entry.name == KEY && entry.size_bytes == 32)
     {
         return Err(invalid("包缺少有效数据库或主密钥。"));
     }
-    if entries.iter().any(|(name, _, _)| {
-        name != database
-            && name != KEY
-            && name != "manifest.json"
-            && !name.starts_with("Templates/")
-    }) {
-        return Err(invalid("包包含不支持的文件。"));
-    }
-    Ok(manifest)
+    Ok(())
 }
 pub(super) fn staged(marker: &Path, database: &str) -> Result<Option<PathBuf>> {
     paths::ensure_safe_absolute(marker).map_err(invalid)?;
@@ -211,31 +232,20 @@ pub(super) fn staged(marker: &Path, database: &str) -> Result<Option<PathBuf>> {
         .ok_or_else(|| invalid("恢复暂存目录无效。"))?;
     let staging = marker.parent().unwrap().join(name);
     paths::ensure_safe_absolute(&staging).map_err(invalid)?;
-    let manifest: Manifest = serde_json::from_slice(&fs::read(staging.join("manifest.json"))?)
-        .map_err(|_| invalid("暂存清单无效。"))?;
-    let mut entries = vec![(
-        "manifest.json".into(),
-        serde_json::to_vec(&manifest)?,
-        String::new(),
-    )];
+    let manifest = read_manifest(&staging)?;
+    validate_manifest(&manifest, database)?;
+    let mut entries = Vec::with_capacity(manifest.files.len());
+    let mut total = 0_u64;
     for file in &manifest.files {
-        if file
-            .name
-            .split('/')
-            .any(|part| !paths::valid_file_name(part))
-        {
-            return Err(invalid("暂存文件路径无效。"));
-        }
         let path = staging.join(&file.name);
-        paths::ensure_safe_absolute(&path).map_err(invalid)?;
-        if fs::metadata(&path)?.len() > sealed::MAX_PLAINTEXT_BYTES as u64 {
+        let entry = sealed::ManifestFile::from_path(&file.name, &path)?;
+        total += entry.size_bytes;
+        if total > sealed::MAX_PLAINTEXT_BYTES as u64 {
             return Err(invalid("暂存文件过大。"));
         }
-        let bytes = fs::read(path)?;
-        let digest = super::sha256_hex(&bytes);
-        entries.push((file.name.clone(), bytes, digest));
+        entries.push(entry);
     }
-    validate_entries(&entries, database)?;
+    validate_entries(&manifest, &entries, database)?;
     Ok(Some(staging))
 }
 
@@ -254,36 +264,53 @@ mod tests {
             ] {
                 let mut entries: Vec<_> = [(database, vec![1]), (KEY, vec![2; 32])]
                     .into_iter()
-                    .map(|(name, bytes)| {
-                        (
-                            name.to_owned(),
-                            bytes.clone(),
-                            super::super::sha256_hex(&bytes),
-                        )
+                    .map(|(name, bytes)| sealed::ManifestFile {
+                        name: name.to_owned(),
+                        size_bytes: bytes.len() as u64,
+                        sha256: super::super::sha256_hex(&bytes),
                     })
                     .collect();
                 let manifest = Manifest {
                     schema_version: 1,
                     database_schema: version,
                     database: database.into(),
-                    files: entries
-                        .iter()
-                        .map(|(name, bytes, digest)| sealed::ManifestFile {
-                            name: name.clone(),
-                            size_bytes: bytes.len() as u64,
-                            sha256: digest.clone(),
-                        })
-                        .collect(),
+                    files: entries.clone(),
                 };
-                entries.push((
-                    "manifest.json".into(),
-                    serde_json::to_vec(&manifest).unwrap(),
-                    String::new(),
-                ));
-                assert_eq!(validate_entries(&entries, database).is_ok(), supported);
-                entries[0].2 = "tampered".into();
-                assert!(validate_entries(&entries, database).is_err());
+                assert_eq!(
+                    validate_entries(&manifest, &entries, database).is_ok(),
+                    supported
+                );
+                entries[0].sha256 = "tampered".into();
+                assert!(validate_entries(&manifest, &entries, database).is_err());
             }
         }
+    }
+
+    #[test]
+    fn staged_manifests_reject_aggregate_capacity_and_paths_before_reading_files() {
+        let mut manifest = Manifest {
+            schema_version: 1,
+            database_schema: export_doc_storage::SCHEMA_VERSION,
+            database: POSTGRES.into(),
+            files: vec![
+                sealed::ManifestFile {
+                    name: POSTGRES.into(),
+                    size_bytes: sealed::MAX_PLAINTEXT_BYTES as u64,
+                    sha256: String::new(),
+                },
+                sealed::ManifestFile {
+                    name: KEY.into(),
+                    size_bytes: 32,
+                    sha256: String::new(),
+                },
+            ],
+        };
+        assert!(validate_manifest(&manifest, POSTGRES).is_err());
+        manifest.files[0].size_bytes = 1;
+        assert!(validate_manifest(&manifest, POSTGRES).is_ok());
+        manifest.files[0].name = "Templates/../outside".into();
+        assert!(validate_manifest(&manifest, POSTGRES).is_err());
+        manifest.files[0].name = "Security/unsupported.bin".into();
+        assert!(validate_manifest(&manifest, POSTGRES).is_err());
     }
 }

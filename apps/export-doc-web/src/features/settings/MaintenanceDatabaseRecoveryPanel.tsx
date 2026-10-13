@@ -57,7 +57,7 @@ export function MaintenanceDatabaseRecoveryPanel({
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   return (
     <section className="form-section maintenance-database-recovery-panel" aria-label="PostgreSQL 数据库恢复">
-      <div className="section-header"><div><h3>数据库恢复</h3><p className="section-description">恢复前会保留安全备份；可恢复服务器已有备份或上传新的 custom-format .dump。</p></div><Database size={22} aria-hidden="true" /></div>
+      <div className="section-header"><div><h3>数据库恢复</h3><p className="section-description">选择服务器备份或上传 .dump 后先校验暂存；管理员须停应用并执行恢复维护命令。恢复前保留安全备份，只恢复数据库；换服务器请使用完整迁移包。</p></div><Database size={22} aria-hidden="true" /></div>
       <div className="backup-action-grid">
         <SelectField label="备份文件" value={selectedBackup} disabled={!canManageSettings || busy || backups.length === 0} options={backups.map((backup) => ({ value: backup.fileName, label: backup.fileName }))} onChange={onSelectedBackupChange} />
         <label><span>目标数据库</span><input value={targetDatabase} disabled={!canManageSettings || busy} onChange={(event) => onTargetDatabaseChange(event.target.value)} /></label>

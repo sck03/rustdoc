@@ -88,7 +88,7 @@ label select:disabled,
 label textarea:disabled,
 .remote-select-field input:disabled,
 .remote-select-field select:disabled {
-  color: var(--edm-ink-500);
+  color: var(--edm-ink-600);
   background: var(--edm-neutral-100);
   border-color: var(--edm-neutral-350);
 }

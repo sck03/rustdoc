@@ -14,7 +14,7 @@ export function MaintenanceBackgroundTaskStatusPanel({ status }: { status: ApiSe
         : "info";
   return (
     <section className="form-section maintenance-background-task-status-panel" aria-label="后台任务状态">
-      <div className="section-header"><div><h3>后台任务状态</h3><p className="section-description">备份、恢复和迁移均在后台执行；请在服务重启前确认当前阶段。</p></div></div>
+      <div className="section-header"><div><h3>后台任务状态</h3><p className="section-description">备份在后台执行。恢复暂存后，须停止应用并执行恢复维护命令；普通重启不会自动办理。</p></div></div>
       <InlineNotice tone={tone}>
         {status.message}
         {status.restorePhase ? ` 当前阶段：${formatRestorePhase(status.restorePhase)}。` : ""}
@@ -27,7 +27,7 @@ export function MaintenanceBackgroundTaskStatusPanel({ status }: { status: ApiSe
 
 function formatRestorePhase(value: string) {
   const labels: Record<string, string> = {
-    pending: "等待服务重启",
+    pending: "等待恢复维护",
     validating: "验证迁移包",
     "safety-backup": "创建安全备份",
     "applying-database": "恢复数据库",

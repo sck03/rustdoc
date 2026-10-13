@@ -32,7 +32,7 @@ export default function BackupSettingsPanel({ client, settings, secrets, databas
   const { update } = useRouteQuery();
   const section = readSection(search);
   const setSection = (next: BackupSection) => update({ section: ({ policy: "backupPolicy", webdav: "webDav", data: "backup", postgresql: "postgresql" })[next] }, false);
-  const isPostgreSql = databaseProvider === "PostgreSQL";
+  const isPostgreSql = databaseProvider === "postgresql";
   const activeSection = section === "postgresql" && !isPostgreSql ? "policy" : section;
   const sections: { key: BackupSection; label: string }[] = [
     { key: "policy", label: "计划与保留" }, { key: "webdav", label: "WebDAV 云备份" },
@@ -43,8 +43,8 @@ export default function BackupSettingsPanel({ client, settings, secrets, databas
     <SettingsSectionNav label="备份与恢复分类" sections={sections} activeSection={activeSection} onSelect={setSection} />
     {activeSection === "policy" && <section className="form-section" aria-label="备份计划与保留">
       <div className="section-header"><h2>备份计划与保留</h2></div>
-      <p className="form-field-description">数据备份保留天数为 0 时不自动清理。修改计划后，请点击“保存全部修改”。</p>
-      <fieldset className="settings-fieldset" disabled={disabled}>
+      <p className="form-field-description">当前版本尚未执行自动备份和自动清理。以下历史计划仅供核对；请定期在“{isPostgreSql ? "团队库与完整迁移" : "数据备份与还原"}”手动创建并下载备份，另存到其他设备。</p>
+      <fieldset className="settings-fieldset" disabled>
         <div className="field-grid">
           <NumberSetting settings={settings} path={["system", "backupRetentionDays"]} label="数据备份保留天数" onChange={onChange} />
           {isPostgreSql && <>

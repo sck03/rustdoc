@@ -48,7 +48,7 @@ const client={
  listInvoices:input=>call('invoices',input,page(matches(invoices,input),input)),
  getSettings:()=>call('settings',{}, {settings,secrets:{},storagePolicy:''}),
  updateSettings:input=>{Object.assign(settings,input.body.settings);settings.revision++;return call('saveSettings',input,{settings,secrets:{},message:'已保存',requiresRestart:false});},
- getHealth:()=>call('health',{}, {status:'ok',databaseProviderKey:'Sqlite'}),
+ getHealth:()=>call('health',{}, {status:'ok',databaseProviderKey:'sqlite'}),
  getCustomsCooIssuingAuthorities:()=>call('authorities',{},[]),
  listReportTemplates:input=>call('templates',input,templates),listUserReportTemplates:input=>call('userTemplates',input,page(matches(userTemplates,input).map(({contentHtml,...item})=>item),input)),
  getUserReportTemplate:input=>call('userTemplateContent',input,exact(userTemplates,input.id)),

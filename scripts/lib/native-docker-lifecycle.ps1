@@ -19,10 +19,14 @@ function Invoke-ExportDocDockerLifecycle {
         Invoke-Compose -Command @('down') -Purpose 'Stop containers and retain data volumes'
         return
     }
-    # Finish compilation before interrupting a running deployment.
+    # Finish image preparation before interrupting a running deployment. Missing
+    # published/offline images must fail while the previous API is still available.
     if (-not $SkipBuild -and -not $RestorePending) {
         Invoke-Compose -Command @('build', 'application') -Purpose 'Build Rust native application image' -Timeout 3600
+    } else {
+        Invoke-Compose -Command @('pull', '--policy', 'missing', 'application') -Purpose 'Prepare selected application image' -Timeout 3600
     }
+    Invoke-Compose -Command @('pull', '--policy', 'missing', 'postgres') -Purpose 'Prepare PostgreSQL image' -Timeout 1800
     Invoke-Compose -Command @('stop', 'application') -Purpose 'Stop API before database maintenance'
     Invoke-Compose -Command @('up', '--detach', '--wait', '--wait-timeout', '180', 'postgres') -Purpose 'Wait for PostgreSQL'
     $maintenance = if ($RestorePending) { 'restore' } else { 'initialize' }

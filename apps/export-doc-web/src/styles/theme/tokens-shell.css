@@ -112,7 +112,7 @@ html[data-interface-density="compact"] body {
 }
 
 :where(input, textarea)::placeholder {
-  color: var(--edm-ink-500);
+  color: var(--edm-ink-600);
   opacity: 1;
 }
 
