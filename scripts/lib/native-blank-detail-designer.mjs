@@ -55,12 +55,23 @@ export async function verifyDesktopBlankDetails({ run, request, token, invoice, 
   await run("[...document.querySelectorAll('label')].find(e=>e.textContent.trim()==='显示发票金额调整').querySelector('input').click(); true");
   await choose('撤销', '.report-designer-v3-toolbar button');
   await choose('重做', '.report-designer-v3-toolbar button');
+  const intro = "[...document.querySelectorAll('.new-report-detail-properties details')].find(e=>e.querySelector('summary')?.textContent==='首页说明行')";
+  await run(`${intro}.open=true; [...${intro}.querySelectorAll('button')].find(e=>e.textContent.trim()==='添加').click(); true`);
+  await wait(`${intro}.querySelector('input')`);
+  await run(`[...${intro}.querySelectorAll('label')].find(e=>e.firstElementChild?.textContent==='标签').querySelector('input').focus(); [...${intro}.querySelectorAll('label')].find(e=>e.firstElementChild?.textContent==='标签').querySelector('input').select(); true`);
+  await cdp.send('Input.dispatchKeyEvent', {type:'keyDown',key:'Backspace',windowsVirtualKeyCode:8});
+  await cdp.send('Input.dispatchKeyEvent', {type:'keyUp',key:'Backspace',windowsVirtualKeyCode:8});
+  await run(`(()=>{const e=[...${intro}.querySelectorAll('label')].find(e=>e.firstElementChild?.textContent==='设置哪一列').querySelector('select');e.value=e.options[e.options.length-1].value;e.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
+  await wait(`[...${intro}.querySelectorAll('label')].some(e=>e.firstElementChild?.textContent==='字段')`);
+  await run(`(()=>{const e=[...${intro}.querySelectorAll('label')].find(e=>e.firstElementChild?.textContent==='字段').querySelector('select');e.value='Invoice.TradeTerms';e.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
   const tableDesign = await save(tableTemplate.id);
   const table = tableDesign.layers.flatMap(layer => layer.elements).find(element => element.block?.type === 'DetailTable').block;
   assert(table.adjustments);
   assert(table.summaryRow.cells.some(cell => cell.fieldPath === 'Invoice.AdjustedTotalAmount'));
+  assert.equal(table.introRow.label, '');
+  assert(table.introRow.cells.some(cell => cell.columnId === table.columns.at(-1).id && cell.fieldPath === 'Invoice.TradeTerms'));
   const html = await previewPdf(tableTemplate.id, 'blank-detail-adjustments');
-  for (const text of ['RECEIVED DEPOSIT', '-USD10963.50', 'SAMPLE CHARGE', 'USD61161.80']) assert(html.includes(text), text);
+  for (const text of ['FOB SHANGHAI', 'RECEIVED DEPOSIT', '-USD10963.50', 'SAMPLE CHARGE', 'USD61161.80']) assert(html.includes(text), text);
   await captureScreenshot(cdp, path.join(output, 'Full-blank-adjustment-designer.png'));
 
   const freeTemplate = await create('空白独立商品字段与占位');

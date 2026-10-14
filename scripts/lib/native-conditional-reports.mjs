@@ -19,7 +19,7 @@ export async function verifyDesktopConditionalReports({ run, request, token, cdp
   const fileTemplate = name => { const selected = catalog.find(item => item.templatePath.endsWith(name)); assert(selected, name); return selected.templatePath; };
   const seal = await request('SaveInvoiceSealImage', token, { imageDataUrl: 'data:image/png;base64,' + fs.readFileSync(path.join(repo, 'tests/ReportTemplateFixtures/sample-seal.png')).toString('base64') });
   assert.equal(seal.status, 200);
-  const draft = { ...createEmptyInvoice('2026-10-10'), invoiceNo: 'CONDITION-DESKTOP-001', exporterNameEN: 'SAMPLE EXPORT COMPANY', customerNameEN: 'SAMPLE CUSTOMER', currency: 'USD', docSealPath: seal.body.imagePath, customsSealPath: seal.body.imagePath };
+  const draft = { ...createEmptyInvoice('2026-10-10'), invoiceNo: 'CONDITION-DESKTOP-001', exporterNameEN: 'SAMPLE EXPORT COMPANY', customerNameEN: 'SAMPLE CUSTOMER', currency: 'USD', tradeTerms: 'FOB SHANGHAI', portOfLoading: 'SHANGHAI', docSealPath: seal.body.imagePath, customsSealPath: seal.body.imagePath };
   draft.items = [1, 2, 3].map(n => ({ ...createEmptyInvoiceItem(), styleNo: `STYLE-${n}`, styleName: `Sample product ${n}`, quantity: 100 * n, cartons: 10 * n, unitEN: 'PCS', ctnUnitEN: 'CTNS', unitPrice: 120, totalPrice: 12000 * n }));
   const created = await request('CreateInvoice', token, draft);
   assert.equal(created.status, 201);
@@ -88,7 +88,7 @@ export async function verifyDesktopConditionalReports({ run, request, token, cdp
   assert.equal(preview.status, 200);
   assert.match(preview.body.html, /Special Terms: DELIVERY BY APPOINTMENT/);
   assert.match(preview.body.html, /备注：仅作模板验收/);
-  for (const text of ['RECEIVED DEPOSIT', '-USD10963.50', 'SAMPLE CHARGE', 'Courier included', 'USD61161.80']) assert(preview.body.html.includes(text), text);
+  for (const text of ['FOB SHANGHAI', 'RECEIVED DEPOSIT', '-USD10963.50', 'SAMPLE CHARGE', 'Courier included', 'USD61161.80']) assert(preview.body.html.includes(text), text);
   fs.writeFileSync(path.join(output, 'desktop-conditional-preview.html'), preview.body.html);
   const zipPath = path.join(output, 'desktop-multiple-reports.zip');
   const zipJob = await request('StartInvoiceReportPdfZipSaveToPathJob', token, {

@@ -19,10 +19,14 @@ fn invoice() -> export_doc_contracts::generated_api::ApiInvoiceDetailDto {
     invoice
 }
 fn text_y(svg: &str, text: &str) -> f32 {
+    text_coordinate(svg, text, "y")
+}
+
+fn text_coordinate(svg: &str, text: &str, axis: &str) -> f32 {
     svg.split("<text ")
         .find(|node| node.contains(&format!(">{text}</text>")))
         .unwrap_or_else(|| panic!("Missing {text}"))
-        .split("y=\"")
+        .split(&format!("{axis}=\""))
         .nth(1)
         .unwrap()
         .split('"')
@@ -30,6 +34,42 @@ fn text_y(svg: &str, text: &str) -> f32 {
         .unwrap()
         .parse()
         .unwrap()
+}
+
+#[test]
+fn invoice_trade_terms_use_the_first_page_amount_intro_cell() {
+    for terms in ["FOB", "FOB SHANGHAI"] {
+        let mut invoice = invoice();
+        invoice.trade_terms = terms.into();
+        invoice.port_of_loading = "SHANGHAI".into();
+        let item = invoice.items[0].clone();
+        invoice.items = (1..=36)
+            .map(|index| {
+                let mut item = item.clone();
+                item.style_name = format!("GOODS-{index:02}");
+                item
+            })
+            .collect();
+        invoice.total_amount = Decimal::from(720000);
+        let data = ReportData::invoice(&invoice, json!({}), json!({}), false).unwrap();
+        let result = render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();
+        assert!(result.pages.len() > 1);
+        let first = &result.pages[0].svg;
+        assert!(text_y(first, terms) > text_y(first, "Amount"));
+        assert!(text_y(first, terms) < text_y(first, "GOODS-01"));
+        assert!(text_coordinate(first, terms, "x") > 162.);
+        assert_eq!(
+            result
+                .pages
+                .iter()
+                .map(|page| page.svg.matches(&format!(">{terms}</text>")).count())
+                .sum::<usize>(),
+            1
+        );
+        if terms == "FOB" {
+            assert!(!first.contains(">FOB SHANGHAI</text>"));
+        }
+    }
 }
 
 #[test]
