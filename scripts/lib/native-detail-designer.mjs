@@ -58,12 +58,12 @@ export async function verifyDesktopDetailDesigner({ run, request, token, cdp, ou
   await wait(`document.querySelector('[aria-label="画布图层导航"]').getClientRects().length>0`);
   await verifyInvoiceCanvasAlignment(run);
   await run(`document.querySelector('.report-designer-v3-sidebar-tabs button:nth-child(3)').click(); true`);
-  const total = invoiceDesign.layers.flatMap(layer => layer.elements).find(element => element.text === 'TOTAL:');
-  assert(total, 'Invoice total label remains independently editable');
+  const total = invoiceDesign.layers.flatMap(layer => layer.elements).find(element => element.text === 'INVOICE');
+  assert(total, 'Invoice heading remains independently editable');
   await run(`document.querySelector('[data-v3-element-id="${total.id}"]').focus({preventScroll:true}); true`);
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', windowsVirtualKeyCode: 13 });
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', windowsVirtualKeyCode: 13 });
-  await wait(`document.querySelector('.report-designer-selection-readout').textContent.includes('TOTAL:')`);
+  await wait(`document.querySelector('.report-designer-selection-readout').textContent.includes('INVOICE')`);
   assert(await run(`document.querySelector('.report-designer-v3-page').classList.contains('has-element-bounds')`));
   await wait(`document.querySelector('.report-designer-v3-canvas-column').getBoundingClientRect().width > document.querySelector('.report-designer-v3-workspace').clientWidth / 2`);
   await run(`window.scrollTo(0,0); true`);

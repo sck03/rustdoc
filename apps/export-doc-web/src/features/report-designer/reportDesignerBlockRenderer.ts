@@ -245,6 +245,7 @@ function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>,
   const fillRow = fillHeight ? `<tr class="edm-detail-fill-row" style="height:100%">${block.columns.map(column => `<td style="${renderDetailCellStyle({}, { ...(column.border ?? block.border), top: false, bottom: false }, column.align)}"></td>`).join("")}</tr>` : "";
   const renderers = { style: renderDetailCellStyle, field: renderFieldExpression, text: escapeHtml };
   const summaryRow = renderDetailFixedRow(block, block.summaryRow, renderers);
+  const adjustmentRow = block.adjustments ? `<tr>${block.columns.map(column => `<td style="${renderDetailCellStyle(block.bodyStyle, { ...(column.border ?? block.border), top: false, bottom: false }, column.align)}">${column.id === block.adjustments!.descriptionColumnId ? "金额调整说明（有数据时显示）" : column.id === block.adjustments!.amountColumnId ? "增减金额" : ""}</td>`).join("")}</tr>` : "";
   const detailPrintClasses = renderDetailPrintClassNames(block);
   const detailRow = `<tr>${block.columns
     .map((column) => {
@@ -255,7 +256,7 @@ function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>,
   const introRow = renderDetailFixedRow(block, block.introRow, renderers);
   const columns = renderProportionalColumns(block.columns.map(column => column.widthMm));
   const header = `<thead>${renderDetailTableHeaderRows(block)}</thead>`;
-  const table = `<table class="edm-detail-table ${detailPrintClasses}" style="${renderBorderStyle(block.border)}${fillHeight ? `;height:${block.sideBand ? "100%" : `${heightMm}mm`}` : ""}">${columns}${block.sideBand ? "" : header}<tbody>${introRow}${renderDetailTableRows(block, detailRow)}${summaryRow}${fillRow}</tbody></table>`;
+  const table = `<table class="edm-detail-table ${detailPrintClasses}" style="${renderBorderStyle(block.border)}${fillHeight ? `;height:${block.sideBand ? "100%" : `${heightMm}mm`}` : ""}">${columns}${block.sideBand ? "" : header}<tbody>${introRow}${renderDetailTableRows(block, detailRow)}${adjustmentRow}${summaryRow}${fillRow}</tbody></table>`;
 
   if (!block.sideBand) {
     return table;
@@ -335,7 +336,7 @@ function renderDetailTableRowsWithGroupPageBreaks(
 function renderDetailTableHeaderRows(block: Extract<ReportBlock, { type: "DetailTable" }>) {
   const groupRow = renderDetailTableHeaderGroupRow(block);
   const columnRow = `<tr>${block.columns
-    .map((column) => `<th style="${renderDetailCellStyle(block.headerStyle, column.border ?? block.border, column.align)}">${escapeHtml(column.title)}</th>`)
+    .map((column) => `<th data-report-detail-column-id="${escapeHtmlAttribute(column.id)}" style="${renderDetailCellStyle(block.headerStyle, column.border ?? block.border, column.align)}">${escapeHtml(column.title)}</th>`)
     .join("")}</tr>`;
 
   return `${groupRow}${columnRow}`;
@@ -530,7 +531,7 @@ function renderDetailCellContent(column: Extract<ReportBlock, { type: "DetailTab
   if (column.contentKind !== "Composite" || !column.content || column.content.length === 0) {
     return renderDetailItemExpression(column.fieldPath);
   }
-  if (column.omitEmptyLines || column.content.some(part => part.kind === "ColumnBreak")) {
+  if (column.omitEmptyLines || column.content.some(part => part.kind === "ColumnBreak" || part.kind === "Spacer" || part.condition)) {
     return `<div class="${column.omitEmptyLines ? "edm-detail-omit-empty-lines" : ""}">${renderDetailComposite(column.content, part => part.kind === "Text" ? escapeHtml(part.text) : renderDetailItemExpression(part.fieldPath), verticalAlign)}</div>`;
   }
 

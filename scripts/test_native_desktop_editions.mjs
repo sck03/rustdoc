@@ -10,6 +10,7 @@ import { verifyDesktopDetailDesigner } from './lib/native-detail-designer.mjs';
 import { verifyDesktopListPagination } from './lib/native-list-pagination.mjs';
 import { verifyDesktopConditionalReports } from './lib/native-conditional-reports.mjs';
 import { verifyDesktopBlankGrid } from './lib/native-blank-grid-designer.mjs';
+import { verifyDesktopBlankDetails } from './lib/native-blank-detail-designer.mjs';
 import { verifyDesktopBookingExport } from './lib/native-booking-export.mjs';
 import { verifyDesktopBusinessAttachments } from './lib/native-business-attachments.mjs';
 
@@ -123,6 +124,7 @@ for (const edition of selected) {
       await verifyDesktopListPagination({ run, request, token: login.body.accessToken, cdp, output });
       await verifyDesktopDetailDesigner({ run, request, token: login.body.accessToken, cdp, output });
       const invoice = await verifyDesktopConditionalReports({ run, request, token: login.body.accessToken, cdp, output });
+      await verifyDesktopBlankDetails({ run, request, token: login.body.accessToken, invoice, cdp, output });
       await verifyDesktopBookingExport({ run, request, token: login.body.accessToken, invoice, cdp, output });
       await verifyDesktopBusinessAttachments({ run, request, token: login.body.accessToken, invoice, cdp, output });
       await verifyDesktopBlankGrid({ run, request, token: login.body.accessToken, businessDate: login.body.user.businessDate, cdp, output });

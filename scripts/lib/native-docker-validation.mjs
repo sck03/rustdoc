@@ -39,39 +39,55 @@ export async function verifyPostgresRestore(operation, state, stageRestore) {
 
 export function verifyComposeModel(model) {
   const { postgres, application, initialize, restore } = model.services;
+  const prepared = Boolean(model.services.setup);
   assert.equal(model.networks.database.internal, true, 'database network must be private');
   assert.deepEqual(Object.keys(postgres.networks), ['database']);
   assert.equal(postgres.ports?.length ?? 0, 0, 'PostgreSQL must not publish a host port');
-  assert.deepEqual(postgres.volumes.filter(v => v.type === 'volume').map(v => [v.source, v.target]),
+  assert.deepEqual(postgres.volumes.filter(v => v.type === 'volume' && v.source === 'postgres_data').map(v => [v.source, v.target]),
     [['postgres_data', '/var/lib/postgresql']]);
-  assert.equal(application.depends_on.postgres.condition, 'service_healthy');
-  assert.equal(application.depends_on.initialize, undefined, 'API startup must not repeat maintenance');
-  assert.deepEqual(application.secrets.map(s => s.source).sort(), ['app_connection', 'bootstrap_token']);
+  if (prepared) {
+    assert.equal(application.depends_on.initialize.condition, 'service_completed_successfully');
+    assert.equal(initialize.depends_on.postgres.condition, 'service_healthy');
+    assert.equal(postgres.depends_on.setup.condition, 'service_completed_successfully');
+    assert.equal(model.services.setup.network_mode, 'none');
+    assert.equal(application.environment.EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION_FILE, undefined);
+    const mounts = service => service.volumes.map(v => [v.type, v.target, Boolean(v.read_only)]).sort((a, b) => a[1].localeCompare(b[1]));
+    assert.deepEqual(mounts(application), [['bind', '/run/exportdoc', true], ['bind', '/var/lib/exportdoc', false]]);
+    assert.deepEqual(mounts(restore), [['bind', '/run/exportdoc', true], ['bind', '/run/exportdoc-maintenance', true], ['bind', '/var/lib/exportdoc', false]]);
+    assert.deepEqual(mounts(initialize), [['bind', '/run/exportdoc-maintenance', true]]);
+    for (const service of Object.values(model.services)) assert.equal(service.build, undefined, 'published deployment cannot require source files');
+  } else {
+    assert.equal(application.depends_on.postgres.condition, 'service_healthy');
+    assert.equal(application.depends_on.initialize, undefined, 'script deployment starts API after maintenance');
+    assert.deepEqual(application.secrets.map(s => s.source).sort(), ['app_connection', 'bootstrap_token']);
+    assert.deepEqual(restore.secrets.map(s => s.source).sort(), ['app_connection', 'maintenance_connection']);
+    assert.deepEqual(initialize.secrets.map(s => s.source), ['maintenance_connection']);
+  }
   for (const [name, service] of Object.entries({ application, initialize, restore })) {
     assert.equal(service.image, application.image, `${name} must use the same program version`);
     assert.equal(service.read_only, true);
     assert.equal(service.volumes?.some(v => v.source === 'postgres_data') ?? false, false);
     if (name !== 'application') {
-      assert.deepEqual(service.profiles, ['maintenance']);
+      if (name === 'restore' || !prepared) assert.deepEqual(service.profiles, ['maintenance']);
       assert.equal(service.ports?.length ?? 0, 0);
       assert.deepEqual(Object.keys(service.networks), ['database']);
     }
   }
-  assert.deepEqual(restore.secrets.map(s => s.source).sort(), ['app_connection', 'maintenance_connection']);
-  assert.deepEqual(initialize.secrets.map(s => s.source), ['maintenance_connection']);
   for (const service of [application, restore]) {
-    assert.deepEqual(service.volumes.filter(v => v.type === 'volume').map(v => [v.source, v.target]),
-      [['app_data', '/var/lib/exportdoc']], 'API and restore must share managed files');
+    const data = service.volumes.find(v => v.target === '/var/lib/exportdoc');
+    assert(data && !data.read_only, 'API and restore require the same writable managed directory');
+    assert.equal(data.type, prepared ? 'bind' : 'volume');
+    assert.equal(data.source, application.volumes.find(v => v.target === '/var/lib/exportdoc').source);
   }
 }
 
-export async function verifyDockerTopology(runtimeRoot) {
+export async function verifyDockerTopology(runtimeRoot, composeArguments) {
   const execute = promisify(execFile);
   const run = async args => (await execute('docker', args, {
     timeout: 30000, windowsHide: true, maxBuffer: 4 * 1024 * 1024,
     env: { ...process.env, NATIVE_RUNTIME_ROOT: runtimeRoot },
   })).stdout;
-  const compose = ['compose', '--project-name', 'exportdoc-rust-native', '--file',
+  const compose = composeArguments ?? ['compose', '--project-name', 'exportdoc-rust-native', '--file',
     fileURLToPath(new URL('../../deploy/rust-native/compose.yml', import.meta.url))];
   verifyComposeModel(JSON.parse(await run([...compose, '--profile', 'maintenance', 'config', '--format', 'json'])));
   const ids = (await run([...compose, 'ps', '--quiet', 'application', 'postgres'])).trim().split(/\s+/u);
@@ -88,6 +104,6 @@ export async function verifyDockerTopology(runtimeRoot) {
   assert.equal(network.Internal, true);
   assert(application.NetworkSettings.Networks[databaseNetwork[0]]);
   assert(!application.Mounts.some(m => /maintenance|bootstrap_password/u.test(m.Destination)));
-  const databaseVolume = postgres.Mounts.find(m => m.Type === 'volume').Name;
+  const databaseVolume = postgres.Mounts.find(m => m.Type === 'volume' && m.Destination === '/var/lib/postgresql').Name;
   assert(!application.Mounts.some(m => m.Name === databaseVolume));
 }

@@ -1,4 +1,5 @@
 import type { ReportDesignerV3DocumentState } from "./reportDesignerV3Mutations.ts";
+import { isProductElement } from "./reportDesignerV3Schema.ts";
 import { resolveV3InsertionLayer } from "./reportDesignerV3Regions.ts";
 import {
   REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER, REPORT_DESIGNER_V3_MAX_TOTAL_ELEMENTS,
@@ -8,7 +9,7 @@ import {
 export function getV3ProductLayoutIssue(elements: Iterable<ReportDesignerV3Element>) {
   let productFields = false, detailTable = false;
   for (const element of elements) {
-    productFields ||= element.type === "Field" && element.fieldPath.startsWith("item.");
+    productFields ||= isProductElement(element);
     detailTable ||= element.type === "Flow" && element.flowKind === "DetailTable";
     if (productFields && detailTable) return "自由商品字段与高级明细表不能混用，请选择一种商品排版方式。";
   }

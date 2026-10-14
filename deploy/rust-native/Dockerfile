@@ -28,6 +28,7 @@ COPY .cargo/ .cargo/
 COPY crates/ crates/
 COPY third_party/ third_party/
 COPY apps/export-doc-server/ apps/export-doc-server/
+COPY deploy/rust-native/compose.image.yml deploy/rust-native/postgres-init.sh deploy/rust-native/postgres-roles.sql deploy/rust-native/
 COPY apps/exportdoc-ocr-rs/ apps/exportdoc-ocr-rs/
 COPY apps/export-doc-tauri/src-tauri/ apps/export-doc-tauri/src-tauri/
 COPY tools/excel-analyzer-rs/ tools/excel-analyzer-rs/

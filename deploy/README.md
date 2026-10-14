@@ -6,10 +6,12 @@
 | --- | --- |
 | [Dockerfile](rust-native/Dockerfile) | 构建 React、Rust 服务及受管字体/PDFium/OCR/数据库客户端资源 |
 | [compose.yml](rust-native/compose.yml) | application/postgres 常驻服务、独立初始化与恢复服务、内部网络及持久卷 |
+| [compose.image.yml](rust-native/compose.image.yml) | 新版镜像自带的独立安装配置，自动准备凭据、初始化数据库，挂载主机 data/config |
 | [postgres-init.sh](rust-native/postgres-init.sh) | 首次数据库角色初始化，区分业务与维护身份 |
+| [postgres-roles.sql](rust-native/postgres-roles.sql) | 镜像和源码入口共用的角色及权限定义 |
 | [deployment-assets.sha256](rust-native/deployment-assets.sha256) | 发布部署文件的完整性清单，相关源变更后按现有发布流程同步 |
 | `rust-native/runtime/`（Git 忽略） | 本地部署凭据和配置；属于已有部署身份，不是可随意重建的测试缓存 |
 
-用户入口为 [scripts/run-native-docker.ps1](../scripts/run-native-docker.ps1)，启动先构建、停 API、维护数据库，再启动 API。不要用裸 compose up 跳过维护流程，也不要删除数据卷或 runtime 目录重新生成凭据接管旧卷。
+新版镜像用户通过 `docker run --rm <image> --print-compose > compose.yml` 取得配置，再执行 `docker compose up -d --wait`，无需源码或宿主脚本。旧 [scripts/run-native-docker.ps1](../scripts/run-native-docker.ps1) 保留原部署的构建、启停及维护流程；两种入口不能混用空目录接管旧卷。已有数据库卷、data/config 和 runtime 凭据必须保留。
 
 桌面包不使用 Docker；旧 deploy/container 已退役。首次启动和升级见[Docker 用户指南](../docs/Docker容器部署与启动指南.md)，数据操作见[备份迁移与恢复指南](../docs/服务器备份迁移与恢复指南.md)，参数见[脚本说明](../scripts/README.md#网页与-docker)，公开发布见[镜像说明](../docs/GitHub开源发布与Docker镜像说明.md)。

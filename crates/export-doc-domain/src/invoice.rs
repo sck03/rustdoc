@@ -77,6 +77,13 @@ impl InvoiceDraft {
             })
             .collect::<Result<Vec<_>, _>>()?;
         invoice.total_amount = money(invoice.items.iter().map(|item| item.total_price).sum());
+        invoice.amount_adjustments = Some(crate::invoice_adjustments::normalize(
+            invoice.amount_adjustments.as_deref().unwrap_or(&[]),
+        )?);
+        crate::invoice_adjustments::total(
+            invoice.total_amount,
+            invoice.amount_adjustments.as_deref().unwrap_or(&[]),
+        )?;
         invoice.total_quantity = money(invoice.items.iter().map(|item| item.quantity).sum());
         invoice.total_cartons = money(invoice.items.iter().map(|item| item.cartons).sum());
         invoice.total_gross_weight = invoice.items.iter().map(|item| item.gw_total).sum();

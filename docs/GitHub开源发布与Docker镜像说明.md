@@ -1,6 +1,6 @@
 # GitHub 开源发布与 Docker 镜像说明
 
-> 2026-09-23。当前交付为 React + Rust，桌面使用 Tauri；旧 ASP.NET/Chromium sidecar 发布入口已经退役。
+> 2026-10-14。当前交付为 React + Rust，桌面使用 Tauri；旧 ASP.NET/Chromium sidecar 发布入口已经退役。
 
 ## 公开边界
 
@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | 桌面 Document / Sales | build-native.ps1 / run-native.ps1 | Tauri、平台 WebView、Rust、SQLite；Document 默认 OCR |
 | 网页服务器 | package-native-web-server.ps1 | React + Rust HTTP、PostgreSQL 18 |
-| Docker | run-native-docker.ps1 | 同一 React、Rust HTTP、PostgreSQL 18 容器 |
+| Docker | 镜像 `--print-compose` + Docker Compose；源码构建另用 run-native-docker.ps1 | 同一 React、Rust HTTP、独立 PostgreSQL 18 容器 |
 
 普通用户使用 scripts 根目录入口，详细参数见[脚本说明](../scripts/README.md)。正式桌面选择 Document、Sales 或 All（两版），单版默认 Document；本地另支持显式 Full SQLite 测试包，不进入正式发布矩阵。Web/容器保持 Full 完整功能，包含行政人事与团队协作。各平台实际运行和签名更新仍须单独验收。
 
@@ -22,7 +22,7 @@
 
 首次操作请按[Docker 部署指南](./Docker容器部署与启动指南.md)或[独立网页版指南](./网页版部署与启动指南.md)执行。备份内容、换机和恢复分别见[服务器备份迁移指南](./服务器备份迁移与恢复指南.md)；本文只维护发布与镜像边界。
 
-Docker 使用 `deploy/rust-native`，本地私密运行配置位于其忽略的 runtime 目录。默认只绑定回环地址；局域网和公网绑定由部署者明确配置。首次管理员初始化需要私有 bootstrap token，日常 API 使用受限 PostgreSQL 业务账号；数据库维护角色与运行账号分离。
+新版镜像内置 `compose.image.yml`，在用户选择的部署目录创建私有 `config` 和可挂载的 `data`。默认发布 `0.0.0.0:5188` 供局域网使用；公网入口通过 HTTPS 代理配置。旧源码脚本继续保留其 runtime 目录及回环绑定默认值。首次管理员需要私有初始化口令，日常 API 使用受限 PostgreSQL 业务账号，维护角色独立。
 
 React 静态资源与 Rust API 在同一个应用容器，PostgreSQL 在独立容器；只发布应用 HTTP 端口，数据库通过内部网络访问。`initialize`/`restore` 为一次性维护服务，由公开入口在停 API 后运行；应用镜像不包含 PostgreSQL 服务端，只包含备份恢复所需客户端。构建上下文按 Dockerfile 输入列出允许路径，排除旧部署、桌面离线安装器、文档、测试产物与本机私密配置；这减少构建传输，不代表已删除正常运行所需的 OCR/字体或减小其镜像体积。
 
@@ -32,7 +32,7 @@ React 静态资源与 Rust API 在同一个应用容器，PostgreSQL 在独立�
 
 未选择 publish 时可下载 `docker save` 的 tar.gz，使用 `docker load -i <文件>` 导入。发布后下载的 `container-release.json` 保存版本、源码和各架构 digest。镜像首次发布的访问权限由 GitHub Packages 设置决定；需要公开拉取时在该包设置中选择 Public。工作流不改变包的可见性。
 
-使用 `scripts/run-native-docker.ps1 -Image ghcr.io/<owner>/exportdoc-rust-native:<version> -SkipBuild -NoPause` 运行已发布镜像；停止、重启和维护时保持同一个镜像引用。正式数据继续通过 Compose 卷与受管私有配置维护，不进入镜像。
+新部署使用镜像输出 Compose 后直接启动，见 [Docker 指南](./Docker容器部署与启动指南.md)。已有源码脚本部署仍可使用 `scripts/run-native-docker.ps1 -Image ghcr.io/<owner>/exportdoc-rust-native:<version> -SkipBuild -NoPause`，保留原 RuntimeRoot 和卷。容器发布工作流增加直接从镜像安装、恢复及重启验证，通过后才推送镜像；仅推送 main 不会更新 latest。
 
 ## 验收
 

@@ -14,7 +14,7 @@ import { waitForJobCompletion } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { isStrongRecoveryPassword, readDesktopError, updateBackupQuery } from "./backupManagementModel.ts";
 
-export function useBackupManagement(client: ExportDocManagerApiClient, canManageSettings: boolean) {
+export function useBackupManagement(client: ExportDocManagerApiClient, canManageSettings: boolean, sections = { database: true, cloud: false }) {
   const queryClient = useQueryClient();
   const requestConfirmation = useConfirmation();
   const desktopBridgeAvailable = isDesktopBridgeAvailable();
@@ -58,17 +58,17 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
   const backupQuery = useQuery({
     queryKey: queryKeys.backups(),
     queryFn: ({ signal }) => client.listDatabaseBackups({ signal }),
-    enabled: canManageSettings,
+    enabled: canManageSettings && sections.database,
   });
   const cloudStatusQuery = useQuery({
     queryKey: queryKeys.cloudBackupStatus(),
     queryFn: ({ signal }) => client.getCloudBackupStatus({ signal }),
-    enabled: canManageSettings,
+    enabled: canManageSettings && sections.cloud,
   });
   const cloudBackupsQuery = useQuery({
     queryKey: queryKeys.cloudBackupBackups(),
     queryFn: ({ signal }) => client.listCloudDatabaseBackups({ signal }),
-    enabled: canManageSettings && Boolean(cloudStatusQuery.data?.enabled) && Boolean(cloudStatusQuery.data?.isConfigured),
+    enabled: canManageSettings && sections.cloud && Boolean(cloudStatusQuery.data?.enabled) && Boolean(cloudStatusQuery.data?.isConfigured),
   });
   const disasterRecoveryQuery = useQuery({
     queryKey: queryKeys.disasterRecoveryStatus(),
@@ -172,7 +172,8 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     }),
     onSuccess: (job) => {
       setMessage(null);
-      setSuccessMessage("数据库还原校验任务已加入“文件任务”；任务成功后请立即重启程序完成离线还原。");
+      setSuccessMessage("数据库已恢复，请重新登录。");
+      void client.getCurrentUser().catch(() => undefined);
       setLastCreatedJobId(job.jobId);
       setRestoreConfirmation("");
     },
@@ -228,10 +229,10 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
   };
   const refreshBackups = () => {
     clearNotices();
-    void backupQuery.refetch();
-    void cloudStatusQuery.refetch();
+    if (sections.database) void backupQuery.refetch();
+    if (sections.cloud) void cloudStatusQuery.refetch();
     if (desktopBridgeAvailable) void disasterRecoveryQuery.refetch();
-    if (cloudBackupsEnabled) void cloudBackupsQuery.refetch();
+    if (sections.cloud && cloudBackupsEnabled) void cloudBackupsQuery.refetch();
   };
   const chooseNewDataRoot = async () => {
     if (!runtimeStorage?.migrationSupported || dataRootMigrationPending) return;
@@ -309,7 +310,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     canCreateRecovery: canManageSettings && Boolean(disasterRecoveryStatus?.supported) && !disasterRecoveryStatus?.pendingRestore &&
       isStrongRecoveryPassword(recoveryPassword) && recoveryPassword === recoveryPasswordConfirmation && !isBusy,
     canRestoreRecovery: canManageSettings && Boolean(disasterRecoveryStatus?.supported) && !disasterRecoveryStatus?.pendingRestore &&
-      Boolean(recoveryPackagePath) && isStrongRecoveryPassword(recoveryRestorePassword) &&
+      Boolean(recoveryPackagePath) && Boolean(recoveryRestorePassword) &&
       recoveryRestoreConfirmation.trim() === "RECOVER" && !isBusy,
     refreshBackups,
     chooseNewDataRoot,

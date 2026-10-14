@@ -39,7 +39,9 @@ $deploymentManifestPath = Join-Path $deploymentAssetRoot "deployment-assets.sha2
 $expectedDeploymentAssets = @(
     "Dockerfile",
     "compose.yml",
-    "postgres-init.sh"
+    "compose.image.yml",
+    "postgres-init.sh",
+    "postgres-roles.sql"
 )
 $deploymentManifest = @{}
 if (-not (Test-Path -LiteralPath $deploymentManifestPath -PathType Leaf)) {

@@ -20,7 +20,7 @@ export async function verifyDesktopConditionalReports({ run, request, token, cdp
   const seal = await request('SaveInvoiceSealImage', token, { imageDataUrl: 'data:image/png;base64,' + fs.readFileSync(path.join(repo, 'tests/ReportTemplateFixtures/sample-seal.png')).toString('base64') });
   assert.equal(seal.status, 200);
   const draft = { ...createEmptyInvoice('2026-10-10'), invoiceNo: 'CONDITION-DESKTOP-001', exporterNameEN: 'SAMPLE EXPORT COMPANY', customerNameEN: 'SAMPLE CUSTOMER', currency: 'USD', docSealPath: seal.body.imagePath, customsSealPath: seal.body.imagePath };
-  draft.items = [1, 2, 3].map(n => ({ ...createEmptyInvoiceItem(), styleNo: `STYLE-${n}`, styleName: `Sample product ${n}`, quantity: 100 * n, cartons: 10 * n, unitEN: 'PCS', ctnUnitEN: 'CTNS', unitPrice: 12, totalPrice: 1200 * n }));
+  draft.items = [1, 2, 3].map(n => ({ ...createEmptyInvoiceItem(), styleNo: `STYLE-${n}`, styleName: `Sample product ${n}`, quantity: 100 * n, cartons: 10 * n, unitEN: 'PCS', ctnUnitEN: 'CTNS', unitPrice: 120, totalPrice: 12000 * n }));
   const created = await request('CreateInvoice', token, draft);
   assert.equal(created.status, 201);
   const invoiceId = created.body.id;
@@ -34,6 +34,25 @@ export async function verifyDesktopConditionalReports({ run, request, token, cdp
   await wait("document.body.innerText.includes('发票已保存')");
   assert.equal((await request('GetInvoice', token, undefined, { id: invoiceId })).body.specialTerms, 'DELIVERY BY APPOINTMENT\nKEEP DRY\n备注：仅作模板验收');
   await captureScreenshot(cdp, path.join(output, 'Full-special-terms-editor.png'));
+  await run("[...document.querySelectorAll('button')].find(e=>e.textContent.trim().startsWith('运输与报关')).click(); true");
+  const adjustments = "[...document.querySelectorAll('details')].find(e=>e.querySelector('summary')?.textContent.includes('金额调整'))";
+  await wait(adjustments);
+  assert.equal(await run(`${adjustments}.open`), false, 'Optional adjustments default to collapsed');
+  await run(`${adjustments}.open=true; true`);
+  for (const [index, description, amount] of [[0, 'RECEIVED DEPOSIT', '-10963.50'], [1, 'SAMPLE CHARGE\nCourier included', '125.10'], [2, 'OTHER FEE', '0.20']]) {
+    await run(`[...${adjustments}.querySelectorAll('button')].find(e=>e.textContent==='添加金额调整').click(); true`);
+    await wait(`${adjustments}.querySelectorAll('fieldset').length===${index + 1}`);
+    for (const [selector, text] of [['textarea', description], ['input', amount]]) {
+      await run(`${adjustments}.querySelectorAll('fieldset')[${index}].querySelector('${selector}').focus(); true`);
+      await cdp.send('Input.insertText', { text });
+    }
+  }
+  await captureScreenshot(cdp, path.join(output, 'Full-invoice-adjustments.png'));
+  await run("[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='保存发票').click(); true");
+  await wait("document.body.innerText.includes('发票已保存')");
+  const adjustedInvoice = (await request('GetInvoice', token, undefined, { id: invoiceId })).body;
+  assert.equal(adjustedInvoice.totalAmount, 72000);
+  assert.deepEqual(adjustedInvoice.amountAdjustments.map(row => row.amount), ['-10963.50', '125.10', '0.20']);
   const cloned = await request('CloneUserReportTemplate', token, { reportType: 'ExportDocument', name: '桌面条件发票', sourceTemplatePath: fileTemplate('invoice_template.dtpl') });
   assert.equal(cloned.status, 201);
   await run(`location.hash='#/reports/templates?reportType=ExportDocument&userTemplateId=${cloned.body.id}&invoiceId=${invoiceId}'; true`);
@@ -69,6 +88,7 @@ export async function verifyDesktopConditionalReports({ run, request, token, cdp
   assert.equal(preview.status, 200);
   assert.match(preview.body.html, /Special Terms: DELIVERY BY APPOINTMENT/);
   assert.match(preview.body.html, /备注：仅作模板验收/);
+  for (const text of ['RECEIVED DEPOSIT', '-USD10963.50', 'SAMPLE CHARGE', 'Courier included', 'USD61161.80']) assert(preview.body.html.includes(text), text);
   fs.writeFileSync(path.join(output, 'desktop-conditional-preview.html'), preview.body.html);
   const zipPath = path.join(output, 'desktop-multiple-reports.zip');
   const zipJob = await request('StartInvoiceReportPdfZipSaveToPathJob', token, {

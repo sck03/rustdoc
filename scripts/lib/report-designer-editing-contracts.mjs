@@ -1,6 +1,19 @@
 import assert from "node:assert/strict";
 
 export function verifyDesignerEditingMutations(api) {
+  const row = api.createRowBlock();
+  for (const count of [0, 1e9, Infinity, NaN, 1.5]) assert.equal(api.resizeRowColumns(row, count), row, 'invalid column counts cannot allocate unbounded editor state');
+  const fullRow = api.resizeRowColumns(row, api.MAX_ROW_COLUMNS);
+  assert.equal(fullRow.columns.length, 100);
+  assert.equal(api.insertRowColumn(fullRow), fullRow);
+  const precise = api.setRowColumnWidth(row, row.columns[0].id, 33.333333);
+  const editedRow = api.updateRowColumn(precise, row.columns[0].id, {text:'检查项目\nInspection'});
+  assert.deepEqual(editedRow.columns.map(column=>column.widthPercent), precise.columns.map(column=>column.widthPercent));
+  assert.equal(editedRow.columns[1], precise.columns[1], 'text edits do not normalize or clone unrelated columns');
+  assert.equal(api.updateRowColumn(editedRow, row.columns[0].id, {text:'检查项目\nInspection'}), editedRow);
+  const finalWidth = api.setRowColumnWidth(editedRow, row.columns[1].id, 60);
+  assert.deepEqual(finalWidth.columns.map(column=>column.widthPercent), [40,60]);
+  assert.equal(api.setRowColumnWidth(finalWidth, row.columns[1].id, 60), finalWidth);
   verifyDetailColumnMutations(api);
   verifyLayerMutations(api);
   const schema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
@@ -29,6 +42,19 @@ export function verifyDesignerEditingMutations(api) {
   const pinned = api.updateV3Layer(renamed, footer.id, { print: { ...renamed.schema.layers.find(layer => layer.id === footer.id).print, pinToPageBottom: true } });
   assert.equal(pinned.schema.layers.find(layer => layer.id === footer.id).print.followBody, false, "pin and follow are mutually exclusive");
   const table = api.createV3FlowElement(api.createDetailTableBlock());
+  const tableState = api.insertV3Element(empty, header.id, table);
+  const textTarget = { elementId: table.id, kind: "DetailHeader", columnId: table.block.columns[0].id };
+  const titled = api.updateDesignerCanvasText(tableState, textTarget, "产品名称\nDescription");
+  const updated = api.findV3Element(titled.schema, table.id).element;
+  assert.equal(updated.block.columns[0].title, "产品名称\nDescription");
+  assert.equal(updated.block.columns[1], table.block.columns[1], "editing a header must retain other columns and field bindings");
+  assert.equal(updated.block.summaryRow, table.block.summaryRow);
+  assert.equal(api.updateDesignerCanvasText(titled, textTarget, "产品名称\nDescription"), titled);
+  assert.equal(api.updateDesignerCanvasText(titled, { ...textTarget, columnId: "removed" }, "wrong"), titled);
+  const lockedTable = api.updateV3Element(titled, table.id, { locked: true });
+  assert.equal(api.updateDesignerCanvasText(lockedTable, textTarget, "wrong"), lockedTable, "a stale inline editor cannot change a locked element");
+  assert(api.createRowBlock().columns.every(column => column.contentKind === "Text" && !column.text && !column.fieldPath));
+  assert.equal(api.createDetailTableBlock().sideBand, undefined, "new tables do not silently add a shipping-marks layout");
   const product = api.createV3FieldElement("item.Quantity");
   for (const [first, second] of [[table, product], [product, table]]) {
     const original = api.insertV3Element(empty, header.id, first);

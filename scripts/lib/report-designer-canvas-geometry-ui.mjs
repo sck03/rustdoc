@@ -7,11 +7,13 @@ export async function verifyInvoiceCanvasAlignment(run) {
   const measured = await run(`(()=>{
     const canvas=document.querySelector('[data-v3-page-canvas]').getBoundingClientRect();
     const scale=canvas.width/(210*96/25.4);
-    const table=document.querySelector('[data-v3-element-id="invoice-headings"] table');
-    const cells=[...table.rows[0].cells].map(cell=>cell.getBoundingClientRect());
-    const edges=[cells[0].left,...cells.map(cell=>cell.right)];
-    const lines=[0,1,2,3].map(index=>{const rect=document.querySelector('[data-v3-element-id="invoice-rule-'+index+'"] .report-designer-v3-preview-line').getBoundingClientRect();return rect.left+rect.width/2});
-    return {scale,errors:edges.map((edge,index)=>(edge-lines[index])/scale)};
+    const element=document.querySelector('[data-v3-element-id="invoice-items"]');
+    const header=element.querySelector('.edm-detail-layout > thead .edm-detail-table');
+    const body=element.querySelector('.edm-detail-layout > tbody .edm-detail-table');
+    const cells=[...header.rows[header.rows.length-1].cells].map(cell=>cell.getBoundingClientRect());
+    const row=[...body.rows].find(row=>row.cells.length===cells.length);
+    const bodyCells=[...row.cells].map(cell=>cell.getBoundingClientRect());
+    return {scale,errors:cells.flatMap((cell,index)=>[(cell.left-bodyCells[index].left)/scale,(cell.right-bodyCells[index].right)/scale])};
   })()`);
   assert(measured.errors.every(error => Math.abs(error) <= 1), `Header and body rules differ in canvas pixels: ${JSON.stringify(measured)}`);
   return measured;
@@ -20,7 +22,7 @@ export async function verifyInvoiceCanvasAlignment(run) {
 export async function verifyCanvasGeometry({ page, url, read, waitFor, key, results, output }) {
   await page.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await page.send('Page.navigate', { url: url + '?invoice=1' });
-  await waitFor(page, 'document.querySelector("[data-v3-element-id=invoice-headings] table")');
+  await waitFor(page, 'document.querySelector("[data-v3-element-id=invoice-items] table")');
   const original = await read(page, 'window.__designerHtml');
   const measurements = [];
   for (const percent of [50, 75, 100, 125, 150]) {
@@ -28,7 +30,7 @@ export async function verifyCanvasGeometry({ page, url, read, waitFor, key, resu
     await waitFor(page, `Math.abs(document.querySelector('[data-v3-page-canvas]').getBoundingClientRect().width/(210*96/25.4)-${percent / 100})<0.002`);
     measurements.push(await verifyInvoiceCanvasAlignment(expression => read(page, expression)));
   }
-  await read(page, "document.querySelector('[data-v3-element-id=invoice-headings]').focus()");
+  await read(page, "document.querySelector('[data-v3-element-id=invoice-items]').focus()");
   await key(page, 'Enter');
   await verifyInvoiceCanvasAlignment(expression => read(page, expression));
   await read(page, "[...document.querySelectorAll('.report-designer-v3-workspace label')].find(node=>node.textContent.trim()==='组件边界').querySelector('input').click()");

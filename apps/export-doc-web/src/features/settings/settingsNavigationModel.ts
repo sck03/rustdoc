@@ -30,6 +30,9 @@ export function readSettingsCategoryFromSearch(
     case "webDav":
     case "backup":
     case "backupPolicy":
+    case "backupReplica":
+    case "backupMigration":
+    case "backupRecovery":
     case "postgresql":
       category = "backup";
       break;
@@ -72,9 +75,14 @@ export function readSettingsPanelLabelFromSearch(search: string) {
     case "email":
       return "邮件设置";
     case "webDav":
-      return "WebDAV 云备份";
+    case "backupReplica":
+      return "异机副本";
     case "backupPolicy":
-      return "备份计划与保留";
+      return "日常灾备";
+    case "backupMigration":
+      return "完整服务器迁移";
+    case "backupRecovery":
+      return "从本地完整备份恢复";
     case "backup":
       return "数据备份与还原";
     case "singleWindow":

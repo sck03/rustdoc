@@ -14,19 +14,21 @@ use serde_json::{Value, json};
 use std::{fs, io::Read, path::Path, time::Duration};
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
-const TRANSFER_TIMEOUT: Duration = Duration::from_secs(600);
+const TRANSFER_TIMEOUT: Duration = Duration::from_secs(super::super::backup_io::TIMEOUT_SECONDS);
 const PROP_FIND_LIMIT: usize = 2 * 1024 * 1024;
 const ERROR_LIMIT: usize = 64 * 1024;
 const TRANSFER_BUFFER: usize = 128 * 1024;
-const MAX_TRANSFER_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+const MAX_TRANSFER_BYTES: u64 = super::super::backup_io::MAX_FILE_BYTES;
 mod download;
+mod recovery;
 use download::download_backup;
+pub(super) use recovery::{RecoveryTarget, validate_recovery_settings};
 
 struct Config {
     enabled: bool,
     url: String,
     user: String,
-    password: String,
+    password: zeroize::Zeroizing<String>,
 }
 
 impl Config {
@@ -38,7 +40,7 @@ impl Config {
     fn read_parts(store: &Store, protector: &crate::secrets::Protector) -> Result<Self> {
         let settings = settings::current(store)?;
         let web_dav = &settings["webDav"];
-        let password = settings::credential(store, protector, "/webDav/password")?.to_string();
+        let password = settings::credential(store, protector, "/webDav/password")?;
         Ok(Self {
             enabled: web_dav["enabled"].as_bool().unwrap_or(false),
             url: web_dav["url"].as_str().unwrap_or("").trim().to_string(),
@@ -76,6 +78,8 @@ fn parse_url(value: &str) -> Result<Endpoint> {
         || url.host_str().is_none()
         || !url.username().is_empty()
         || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
     {
         return Err(invalid(
             "WebDAV 地址必须是不含内嵌账号的 http:// 或 https:// 地址。",
@@ -154,7 +158,7 @@ fn authorization(config: &Config) -> (String, String) {
         "Authorization".into(),
         format!(
             "Basic {}",
-            BASE64_STANDARD.encode(format!("{}:{}", config.user, config.password))
+            BASE64_STANDARD.encode(format!("{}:{}", config.user, config.password.as_str()))
         ),
     )
 }
@@ -167,7 +171,7 @@ fn remote_path(endpoint: &Endpoint, file_name: &str) -> Result<String> {
 }
 
 fn agent(timeout: Duration) -> ureq::Agent {
-    export_doc_network::controlled_agent(true, timeout)
+    export_doc_network::storage_agent(timeout, crate::operation::cancellation_flag())
 }
 
 fn read_limited(reader: &mut dyn Read, limit: usize, message: &'static str) -> Result<Vec<u8>> {
@@ -415,7 +419,7 @@ fn upload_file(config: &Config, path: &Path, file_name: &str) -> Result<()> {
         return Err(invalid("要上传的本地备份文件为空或不存在。"));
     }
     if metadata.len() > MAX_TRANSFER_BYTES {
-        return Err(invalid("本地备份超过 4 GiB 上传上限。"));
+        return Err(invalid("本地备份大小超出可表示范围。"));
     }
     let remote = remote_path(&endpoint, file_name)?;
     let mut reader = std::io::BufReader::new(fs::File::open(path)?);
@@ -423,6 +427,7 @@ fn upload_file(config: &Config, path: &Path, file_name: &str) -> Result<()> {
         .put(&remote)
         .header(name.as_str(), value)
         .header("Content-Type", "application/octet-stream")
+        .header("Content-Length", metadata.len().to_string())
         .send(ureq::SendBody::from_reader(&mut reader))
         .map_err(|error| match error {
             ureq::Error::Timeout(_) => unavailable("WebDAV 上传超时。"),

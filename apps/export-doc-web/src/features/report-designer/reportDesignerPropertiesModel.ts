@@ -21,19 +21,6 @@ export function normalizeBorderForEditor(border?: ReportBorderStyle): ReportBord
   };
 }
 
-export function readDefaultRowFieldPath(fieldGroups: ReportDesignerFieldGroup[]) {
-  const field = fieldGroups
-    .flatMap((group) => group.fields)
-    .find((candidate) =>
-      candidate.value !== "ShowSeal" &&
-      candidate.value !== "doc_seal_path" &&
-      candidate.value !== "customs_seal_path" &&
-      !candidate.value.startsWith("item."),
-    );
-
-  return field?.value ?? "";
-}
-
 export function filterDetailItemFieldGroups(fieldGroups: ReportDesignerFieldGroup[]) {
   return fieldGroups
     .map((group) => ({
@@ -89,7 +76,7 @@ export function normalizeGroupFooterContentKind(value: string): ReportDetailTabl
 }
 
 export function normalizeDetailCellPartKind(value: string): ReportDetailTableCellContent["kind"] {
-  if (value === "Field" || value === "LineBreak" || value === "ColumnBreak") {
+  if (value === "Field" || value === "LineBreak" || value === "ColumnBreak" || value === "Spacer") {
     return value;
   }
 

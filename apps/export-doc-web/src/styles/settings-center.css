@@ -31,3 +31,20 @@
 .settings-command-heading .settings-save-status[data-dirty="true"] {
   color: var(--edm-warning-700);
 }
+
+.maintenance-advanced-details pre {
+  min-width: 0;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.backup-plan-toolbar {
+  flex-wrap: wrap;
+}
+
+.backup-secret-field {
+  display: grid;
+  min-width: 0;
+  gap: .5rem;
+}

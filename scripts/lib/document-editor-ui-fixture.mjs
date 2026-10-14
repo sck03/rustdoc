@@ -42,11 +42,23 @@ const record=(name,input,result)=>{window.__calls.push({name,input});return Prom
 const page=items=>({items,pageNumber:1,pageSize:50,totalCount:items.length,totalPages:1,hasNextPage:false,hasPreviousPage:false});
 const saveInvoice=(name,input)=>{invoice={...input.body,id:7,rowVersion:(invoice.rowVersion||0)+1};return record(name,input,{id:7,invoice,isUpdate:name==='updateInvoice'})};
 const conflict=()=>new ApiError(409,'Conflict',JSON.stringify({message:'数据已被其他用户更新，请重新加载最新设置后再保存。'}));
+let backupPlan={revision:0,plan:{enabled:false,frequency:'Daily',time:'02:00',weekday:1,retentionCount:14,retentionDays:0,replicaMode:'None',verifyReplica:true,s3:{endpoint:'',region:'us-east-1',bucket:'',prefix:'ExportDocManager',accessKeyId:'',pathStyle:true}},encryptionPasswordSet:false,webDavPasswordSet:false,s3SecretAccessKeySet:false,s3SessionTokenSet:false,s3Available:true,timeZone:'Asia/Shanghai',nextRunAt:null,runningJobId:null,lastRunAt:null,lastResult:'NotRun',lastError:'',archives:[]};
+const backupStatus=()=>({...backupPlan,settingsRevision:settings.revision,webDav:{enabled:settings.webDav.enabled,url:settings.webDav.url,userName:settings.webDav.userName||''}});
 const savePayment=(name,input)=>{
   if(name==='updatePayment'&&input.body.rowVersion!==payment.rowVersion)return Promise.reject(conflict());
   payment={...input.body,id:9,rowVersion:(payment.rowVersion||0)+1};return record(name,input,{id:9,payment});
 };
 const client={
+  getBackupPlan:()=>record('getBackupPlan',{},backupStatus()),
+  saveBackupPlan:input=>{
+    const body=input.body;if(body.expectedRevision!==backupPlan.revision||body.expectedSettingsRevision!==settings.revision)return Promise.reject(conflict());
+    backupPlan={...backupPlan,revision:backupPlan.revision+1,plan:structuredClone(body.plan),encryptionPasswordSet:backupPlan.encryptionPasswordSet||Boolean(body.encryptionPassword),s3SecretAccessKeySet:body.s3SecretAccessKey===null?backupPlan.s3SecretAccessKeySet:Boolean(body.s3SecretAccessKey),s3SessionTokenSet:body.s3SessionToken===null?backupPlan.s3SessionTokenSet:Boolean(body.s3SessionToken),webDavPasswordSet:body.webDavPassword===null?backupPlan.webDavPasswordSet:Boolean(body.webDavPassword)};
+    settings={...settings,revision:settings.revision+1,webDav:{...body.webDav,password:''}};
+    return record('saveBackupPlan',input,backupStatus());
+  },
+  runBackupPlan:()=>record('runBackupPlan',{}, {jobId:'backup-fixture',status:'Succeeded'}),
+  testBackupReplica:()=>record('testBackupReplica',{}, {jobId:'replica-fixture',status:'Succeeded'}),
+  getJob:input=>record('getJob',input,{jobId:input.jobId,status:'Succeeded',title:'灾备验证',detailText:'任务已完成',errorMessage:''}),
   getHealth:()=>window.__failHealth?Promise.reject(new Error('运行状态暂时不可用')):record('getHealth',{}, {databaseProvider:provider==='PostgreSQL'?'当前是数据库共享模式（PostgreSQL）':'当前是单机模式（SQLite）',databaseProviderKey:provider==='PostgreSQL'?'postgresql':'sqlite'}),
   listDatabaseBackups:()=>record('listDatabaseBackups',{}, {backupRoot:'App_Data/Backups',backups:[]}),
   getCloudBackupStatus:()=>record('getCloudBackupStatus',{}, {enabled:false,isConfigured:false}),
@@ -84,6 +96,7 @@ window.__reloadOptions=()=>queries.invalidateQueries({queryKey:['custom-options'
 window.__updateDefaultSpares=async count=>{settings.system.itemEntrySpareColumnCount=count;await queries.invalidateQueries({queryKey:['settings']});};
 window.__renameField=async(group,key,name)=>{settings.system.documentFieldLabels[group][key]=name;await queries.invalidateQueries({queryKey:['settings']});};
 window.__changeSettingOnServer=(path,value)=>{settings=structuredClone(settings);setNestedValue(settings,path,value);settings.revision++;};
+window.__changeBackupPlanOnServer=()=>{backupPlan={...backupPlan,revision:backupPlan.revision+1};};
 window.__changePaymentOnServer=patch=>{payment={...payment,...patch,rowVersion:payment.rowVersion+1};};
 function LocationProbe(){const current=useLocation();window.__route=current.pathname+current.search;return null;}
 function ExportDefaultsFixture(){

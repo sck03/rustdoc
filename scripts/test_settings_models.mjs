@@ -164,7 +164,7 @@ for (const section of ["documents", "documentDefaults", "documentFields"]) {
   assert(navigation.readSettingsCategoryFromSearch("?section=" + section) === "documents", "document settings category");
   assert(navigation.readSettingsCategoryFromSearch("?section=" + section, salesEditionCategories.map(item => item.key)) === "runtime", "document deep link is filtered");
 }
-for (const section of ["backup", "backupPolicy", "webDav", "postgresql"]) {
+for (const section of ["backup", "backupPolicy", "webDav", "postgresql", "backupReplica", "backupMigration", "backupRecovery"]) {
   assert(navigation.readSettingsCategoryFromSearch("?section=" + section) === "backup", "backup tools are consolidated");
 }
 assert(navigation.readDocumentFieldGroup("?group=payment") === "payment", "payment group deep link");
@@ -180,5 +180,5 @@ assert(draft.settingsCategoryForPath(["system", "defaultTemplateExporterNameCn"]
 assert(draft.settingsCategoryForPath(["system", "postgreSqlAutoBackupTime"]) === "backup", "backup schedule ownership");
 assert(draft.settingsCategoryForPath(["system", "auditLogRetentionDays"]) === "maintenance", "audit retention ownership");
 assert(!draft.categoryHasSecrets("documents", "postgresql") && !draft.categoryHasSecrets("runtime", "sqlite"), "no unrelated secret toggle");
-assert(draft.categoryHasSecrets("runtime", "postgresql") && draft.categoryHasSecrets("backup"), "relevant secret toggles");
+assert(draft.categoryHasSecrets("runtime", "postgresql") && !draft.categoryHasSecrets("backup"), "backup credentials have dedicated save controls");
 process.stdout.write("settings-model tests passed\n");

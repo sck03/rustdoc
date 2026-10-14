@@ -26,7 +26,7 @@ fn catalog_upload(operation: Operation) -> bool {
     .contains(&operation)
 }
 
-fn backup_upload(operation: Operation) -> bool {
+pub(super) fn backup_upload(operation: Operation) -> bool {
     [
         STAGE_SERVER_MIGRATION_RESTORE,
         UPLOAD_AND_RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP,
@@ -35,9 +35,10 @@ fn backup_upload(operation: Operation) -> bool {
 }
 
 pub(crate) fn envelope_limit(operation: Operation) -> usize {
-    (if backup_upload(operation) {
-        257
-    } else if operation == UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB {
+    if backup_upload(operation) {
+        return export_doc_engine::engine::backup_io::MAX_FILE_BYTES as usize;
+    }
+    (if operation == UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB {
         129
     } else if catalog_upload(operation) {
         101

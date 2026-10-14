@@ -67,6 +67,22 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
                 return Err(format!("{} 超出纸张范围。", element.label));
             }
             let style = &element.style;
+            if element.is_product()
+                && (layer.role != "Body"
+                    || design.report_type != "ExportDocument"
+                    || element.rotation_deg != 0)
+            {
+                return Err("商品字段和占位行须放在单证主体区域，并保持不旋转。".into());
+            }
+            if let Some(product) = &element.product {
+                if !element.is_product() {
+                    return Err("商品显隐设置仅适用于商品字段或占位行。".into());
+                }
+                if let Some(condition) = &product.condition {
+                    validate_field(&condition.field_path, fields)?;
+                    condition.validate()?;
+                }
+            }
             if !(5. ..=48.).contains(&style.font_size_pt)
                 || !(0. ..=8.).contains(&style.border_width_px)
                 || ![&style.color, &style.background_color, &style.border_color]
@@ -142,7 +158,15 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
             }
         }
     }
-    if detail_count > 0 && design.layers.iter().flat_map(|layer| &layer.elements).any(|element| matches!(&element.kind, Kind::Field { field_path, .. } if field_path.starts_with("item."))) { return Err("自由商品字段和高级明细表不能混用，请先选择一种排版方式。".into()); }
+    if detail_count > 0
+        && design
+            .layers
+            .iter()
+            .flat_map(|layer| &layer.elements)
+            .any(|element| element.is_product())
+    {
+        return Err("自由商品字段和高级明细表不能混用，请先选择一种排版方式。".into());
+    }
     if detail_count > 1 {
         return Err("当前模板只能包含一个可见的商品明细表。".into());
     }
@@ -393,6 +417,18 @@ fn validate_detail_table(
     for column in &table.columns {
         validate_detail_column(column, fields)?;
     }
+    if let Some(adjustments) = &table.adjustments {
+        if adjustments.description_column_id == adjustments.amount_column_id
+            || [
+                &adjustments.description_column_id,
+                &adjustments.amount_column_id,
+            ]
+            .iter()
+            .any(|id| !table.columns.iter().any(|column| &column.id == *id))
+        {
+            return Err("金额调整须选择不同的说明列和金额列。".into());
+        }
+    }
     if table
         .print
         .first_page_rows
@@ -496,6 +532,7 @@ fn validate_detail_column(column: &DetailColumn, fields: &[Field]) -> Result<(),
         || column.header_group_title.chars().count() > 200
         || !(1..=20).contains(&column.header_group_span)
         || !["Field", "Composite"].contains(&column.content_kind.as_str())
+        || column.content.len() > 256
     {
         return Err("明细列设置无效。".into());
     }
@@ -504,11 +541,27 @@ fn validate_detail_column(column: &DetailColumn, fields: &[Field]) -> Result<(),
     }
     let mut position = 0.;
     for part in &column.content {
-        if !["Text", "Field", "LineBreak", "ColumnBreak"].contains(&part.kind.as_str()) {
+        if !["Text", "Field", "LineBreak", "ColumnBreak", "Spacer"].contains(&part.kind.as_str())
+            || part.text.chars().count() > 32768
+        {
             return Err("明细单元格组合内容无效。".into());
         }
-        if part.kind == "LineBreak" {
+        if matches!(part.kind.as_str(), "LineBreak" | "Spacer") {
             position = 0.;
+        }
+        if part.kind == "Spacer"
+            && part
+                .height_mm
+                .is_none_or(|height| !height.is_finite() || !(0.5..=40.).contains(&height))
+        {
+            return Err("明细占位行高度必须在 0.5–40 mm 之间。".into());
+        }
+        if let Some(condition) = &part.condition {
+            if !matches!(part.kind.as_str(), "Text" | "Field" | "Spacer") {
+                return Err("换行和分栏不支持显示条件，请在内容片段上设置。".into());
+            }
+            validate_field(&condition.field_path, fields)?;
+            condition.validate()?;
         }
         if part.kind == "ColumnBreak" {
             let next = part.position_percent.ok_or("请设置分栏位置。")?;

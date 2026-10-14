@@ -2,6 +2,11 @@
 use super::*;
 
 impl NativeService {
+    fn activate(service: Self) -> Result<Arc<Self>> {
+        let service = Arc::new(service);
+        team_backup::scheduled::Scheduler::bind(&service)?;
+        Ok(service)
+    }
     pub fn runtime_metrics(&self) -> Result<Value> {
         Ok(
             json!({"checkedAt":store::timestamp(),"storage":self.store.metrics(),"jobs":self.jobs.metrics()?,"http":null}),
@@ -31,7 +36,7 @@ impl NativeService {
         #[cfg(feature = "mail")]
         email::recover(&store)?;
         let jobs = tasks::Jobs::with_retention(store.clone(), retention)?;
-        Ok(Arc::new(Self {
+        Self::activate(Self {
             maintenance: RwLock::new(()),
             protector: crate::secrets::Protector::new(&paths.data_root),
             report_fonts: Arc::new(export_doc_report::Fonts::new(&paths.font_path)),
@@ -39,6 +44,7 @@ impl NativeService {
             store,
             sessions: auth::Sessions::default(),
             jobs,
+            backup_scheduler: Default::default(),
             bootstrap_token: String::new(),
             clock: crate::clock::BusinessClock::default(),
             license_gate: Default::default(),
@@ -47,7 +53,7 @@ impl NativeService {
             ocr_gate: Default::default(),
             #[cfg(feature = "exchange-rates")]
             exchange: Default::default(),
-        }))
+        })
     }
     #[cfg(feature = "postgres")]
     pub fn open_postgres(
@@ -103,7 +109,7 @@ impl NativeService {
             return Err(invalid("空库首次启动需要至少 32 字符的一次性部署令牌。"));
         }
         let jobs = tasks::Jobs::with_retention(store.clone(), retention)?;
-        Ok(Arc::new(Self {
+        Self::activate(Self {
             maintenance: RwLock::new(()),
             protector: crate::secrets::Protector::new(&paths.data_root),
             report_fonts: Arc::new(export_doc_report::Fonts::new(&paths.font_path)),
@@ -111,6 +117,7 @@ impl NativeService {
             store,
             sessions: auth::Sessions::default(),
             jobs,
+            backup_scheduler: Default::default(),
             bootstrap_token,
             clock,
             license_gate: Default::default(),
@@ -119,7 +126,7 @@ impl NativeService {
             ocr_gate: Default::default(),
             #[cfg(feature = "exchange-rates")]
             exchange: Default::default(),
-        }))
+        })
     }
     pub fn health(&self) -> Result<()> {
         self.jobs.health()?;

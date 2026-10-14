@@ -10,15 +10,14 @@ use crate::{contracts, generated_api::*, paths::RuntimePaths};
 use serde_json::{Value, json};
 use std::{
     fs,
-    io::Read,
     path::{Path, PathBuf},
 };
 
-const MAGIC: &[u8] = b"EDM-DISASTER-RECOVERY-1";
+pub(super) const MAGIC: &[u8] = b"EDM-DISASTER-RECOVERY-1";
 fn root(paths: &RuntimePaths) -> Result<PathBuf> {
     super::disaster_root(paths)
 }
-fn marker(paths: &RuntimePaths) -> Result<PathBuf> {
+pub(super) fn marker(paths: &RuntimePaths) -> Result<PathBuf> {
     Ok(root(paths)?.join(".pending-restore.json"))
 }
 pub(super) fn status(service: &NativeService, actor: &Actor) -> Result<Value> {
@@ -33,7 +32,7 @@ pub(super) fn status(service: &NativeService, actor: &Actor) -> Result<Value> {
     result["message"] = json!(if pending {
         "恢复已暂存，请退出并重新打开桌面程序。"
     } else if supported {
-        "创建加密恢复包，包含数据库、凭据主密钥和用户模板。"
+        "加密恢复包包含数据库、凭据主密钥和用户模板；新包使用 ZIP64 和分块加密，不设固定总容量上限；请预留足够磁盘空间。"
     } else {
         "团队版请使用服务器迁移包。"
     });
@@ -57,7 +56,7 @@ pub(super) fn create_package(
         service.protector.clone(),
         actor.id,
     );
-    service.jobs.start(
+    service.jobs.start_backup(
         actor,
         "DisasterRecoveryPackage",
         "创建加密灾备包",
@@ -74,7 +73,7 @@ pub(super) fn create_package(
             let result = (|| {
                 let snapshot = working.join("snapshot.sqlite3");
                 store.connection()?.backup(&snapshot)?;
-                let bytes = package::create(
+                let package = package::create(
                     &paths,
                     &protector,
                     &snapshot,
@@ -88,17 +87,17 @@ pub(super) fn create_package(
                     crate::paths::nonce().map_err(unavailable)?
                 ));
                 crate::operation::check()?;
-                sealed::atomic_write(&target, &bytes)?;
+                fs::rename(package, &target)?;
                 super::audit(
                     &store,
                     &actor,
                     "create-disaster-recovery-package",
                     "加密灾备包已创建",
                 )?;
-                Ok(TaskOutput::managed_file(
+                TaskOutput::managed_file(
                     target,
                     "灾备包已创建。请下载到离线介质，并单独保管密码。".into(),
-                ))
+                )
             })();
             let _ = fs::remove_dir_all(&working);
             result
@@ -130,7 +129,7 @@ pub(super) fn restore_package(
         return Err(invalid("请选择 .edmrecovery 恢复包。"));
     }
     let (store, paths, id) = (service.store.clone(), service.paths.clone(), actor.id);
-    service.jobs.start(
+    service.jobs.start_backup(
         actor,
         "DisasterRecoveryRestore",
         "校验并暂存灾备恢复",
@@ -139,11 +138,13 @@ pub(super) fn restore_package(
             auth::authorize_operation(&actor, RESTORE_DISASTER_RECOVERY_PACKAGE, &[])?;
             let _gate = package::lock(&paths)?;
             crate::paths::ensure_safe_absolute(&path).map_err(invalid)?;
-            let mut bytes = Vec::new();
-            fs::File::open(path)?
-                .take(sealed::MAX_PLAINTEXT_BYTES as u64 + 1024 * 1024 + 1)
-                .read_to_end(&mut bytes)?;
-            package::stage(&marker(&paths)?, MAGIC, &password, &bytes, package::SQLITE)?;
+            package::stage(
+                &marker(&paths)?,
+                MAGIC,
+                &password,
+                fs::File::open(path)?,
+                package::SQLITE,
+            )?;
             super::audit(
                 &store,
                 &actor,

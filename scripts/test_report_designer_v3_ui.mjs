@@ -9,6 +9,7 @@ import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
 import { verifyDesignerEditingUi, verifyCommercialTemplateUi } from "./lib/report-designer-editing-ui-scenarios.mjs";
 import { verifyProductFieldsUi } from "./lib/report-designer-product-fields-ui.mjs";
+import { verifyRowAuthoring } from "./lib/report-designer-row-ui.mjs";
 import { verifyShippingMarksUi } from "./lib/report-shipping-marks-ui-scenarios.mjs";
 import { verifyDetailVisibility } from "./lib/report-designer-visibility-ui.mjs";
 import { verifyDesignerUsability } from "./lib/report-designer-usability-ui.mjs";
@@ -63,6 +64,11 @@ await esbuild.build({
     const header = schema.layers.find(layer => layer.role === 'Header');
     const body = schema.layers.find(layer => layer.role === 'Body');
     const grid = { ...createV3FlowElement(createGridBlock(), 1000, 700), id:'review-grid', zIndex:10000 };
+    if(new URLSearchParams(location.search).has('precision-grid')) {
+      grid.widthHundredthMm=18000;
+      grid.block.columns=[32/1.8,115/1.8,33/1.8].map((widthPercent,index)=>({id:'precision-'+index,widthPercent}));
+      grid.block.rows=[{id:'precision-row',heightMm:8,cells:[0,1,2].map(index=>({id:'precision-cell-'+index,colSpan:1,rowSpan:1,contentKind:'Text',text:'',label:'',fieldPath:'',fallbackText:'',checkboxOptions:[],style:{}}))}];
+    }
     header.elements.push(grid);
     body.elements.push({ ...createV3FlowElement(createDetailTableBlock(), 1000, 14500), id:'review-detail', zIndex:10000 });
     if (new URLSearchParams(location.search).has('products')) schema.layers.forEach(layer=>layer.elements=[]);
@@ -301,6 +307,7 @@ try {
   await verifyDetailVisibility({page,url,read,waitFor,results});
   await verifyDetailProperties({page,url,read,waitFor,click,key,results,output});
   await verifyProductFieldsUi({page,url,read,waitFor,click,results,capture:() => captureScreenshot(page,path.join(output,'invoice-fields.png'))});
+  await verifyRowAuthoring({page,url,read,waitFor,click,results,output});
   await page.send("Page.navigate",{url});
   await waitFor(page,'document.querySelector("[data-v3-element-id=review-grid]")');
   await read(page,"[...document.querySelectorAll('button')].find(node=>node.textContent.trim()==='字段').click()");

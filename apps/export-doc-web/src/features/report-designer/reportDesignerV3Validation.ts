@@ -1,4 +1,5 @@
 import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
+import { normalizeCondition } from "./reportDesignerConditions.ts";
 import { getV3ProductLayoutIssue } from "./reportDesignerV3Insertion.ts";
 import { isReportPaperSize, reportPageGeometryIssue, REPORT_PAPER_MIN_DIMENSION, REPORT_PAPER_MAX_DIMENSION } from "./reportDesignerPage.ts";
 import {
@@ -293,7 +294,22 @@ function normalizeElement(
     style: normalizeStyle(value.style, `${path}.style`, issues),
     outputEnabled: typeof value.outputEnabled === "boolean" ? value.outputEnabled : true,
     label: normalizeOptionalString(value.label, REPORT_DESIGNER_V3_MAX_LABEL_LENGTH, `${path}.label`, issues),
+    product: undefined as ReportDesignerV3Element["product"],
   };
+  if (value.product !== undefined) {
+    const product = value.product;
+    if (!isRecord(product) || !(value.type === "ProductSpacer" || (value.type === "Field" && typeof value.fieldPath === "string" && value.fieldPath.startsWith("item.")))) issues.push({ severity:"error", path, message:"商品显隐设置只适用于独立商品字段及商品占位行。" });
+    else {
+      for (const key of Object.keys(product)) if (!["hideWhenEmpty", "collapseEmpty", "condition"].includes(key)) issues.push({severity:"error",path,message:"商品显隐设置包含不支持的属性。"});
+      for (const key of ["hideWhenEmpty", "collapseEmpty"]) if (product[key] !== undefined && typeof product[key] !== "boolean") issues.push({severity:"error",path,message:"商品显隐开关必须为勾选值。"});
+      const condition = product.condition === undefined ? undefined : normalizeCondition(product.condition, `${path}.product.condition`, issues, true);
+      if (condition) {
+        validateReportTypeFieldPath(reportType, condition.fieldPath, `${path}.product.condition.fieldPath`, issues);
+        if (["doc_seal_path", "customs_seal_path"].includes(condition.fieldPath)) issues.push({severity:"error",path,message:"条件请使用普通文字或数字字段。"});
+      }
+      base.product = { hideWhenEmpty:product.hideWhenEmpty === true, collapseEmpty:product.collapseEmpty === true, condition };
+    }
+  }
 
   const normalizedElement: ReportDesignerV3Element | null = (() => {
     switch (value.type) {
@@ -364,6 +380,9 @@ function normalizeElement(
         };
       case "Rectangle":
         return { ...base, type: "Rectangle" };
+      case "ProductSpacer":
+        if (reportType !== "ExportDocument" || layerRole !== "Body" || base.rotationDeg !== 0) issues.push({severity:"error",path,message:"商品占位行须放在单证主体区域，并保持不旋转。"});
+        return { ...base, type:"ProductSpacer" };
       case "Line":
         return { ...base, type: "Line", direction: readEnum(value.direction, ["Horizontal", "Vertical"] as const, "Horizontal", `${path}.direction`, issues) };
       case "Flow": {

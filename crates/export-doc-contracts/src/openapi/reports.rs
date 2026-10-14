@@ -2,7 +2,10 @@
 use serde_json::{Value, json};
 
 pub(super) const FIELDS: &[(&str, &[&str])] = &[
-    ("ApiInvoiceDetailDto", &["docSealPath", "customsSealPath"]),
+    (
+        "ApiInvoiceDetailDto",
+        &["docSealPath", "customsSealPath", "amountAdjustments"],
+    ),
     ("ApiReportTemplatePreviewRequest", &["sampleProfile"]),
     ("ApiReportHtmlPreviewRequest", &["content"]),
     ("ApiPaymentReportHtmlPreviewRequest", &["content"]),
@@ -71,6 +74,11 @@ pub(super) fn extend(document: &mut Value) {
     page["maxDimensionHundredthMm"] =
         json!({"type":"integer","default":crate::report_pages::MAX_DIMENSION});
     let schemas = &mut document["components"]["schemas"];
+    schemas["ApiInvoiceAmountAdjustment"] = json!({"type":"object","additionalProperties":false,"required":["description","amount"],"properties":{
+        "description":{"type":"string","maxLength":200,"description":"报表上的调整说明，例如 RECEIVED DEPOSIT 或 SAMPLE CHARGE。"},
+        "amount":{"type":"string","maxLength":32,"pattern":"^[+-]?[0-9]+(?:\\.[0-9]{1,2})?$","description":"同发票币种的精确金额；负数扣减，正数增加。"}
+    }});
+    schemas["ApiInvoiceDetailDto"]["properties"]["amountAdjustments"] = json!({"type":"array","default":[],"maxItems":32,"items":{"$ref":"#/components/schemas/ApiInvoiceAmountAdjustment"},"description":"可选报表金额调整；原商品合计 totalAmount 不变。"});
     schemas["ApiInvoiceReportZipRequest"]["properties"]["templatePaths"] = json!({
         "type":["array","null"], "default":null, "minItems":1, "maxItems":crate::report_batches::MAX_TEMPLATES, "uniqueItems":true,
         "items":{"type":"string","minLength":1},

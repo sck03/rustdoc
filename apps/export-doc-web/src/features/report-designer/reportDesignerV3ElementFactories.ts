@@ -25,6 +25,9 @@ export function createV3FieldElement(fieldPath: string, x = 1500, y = 1500): Rep
 export function createV3RectangleElement(x = 1500, y = 1500): ReportDesignerV3Element {
   return createBase("Rectangle", x, y, 9000, 5000, { borderColor: "#334155", borderWidthPx: 1, borderStyle: "Solid" }, {});
 }
+export function createV3ProductSpacerElement(x = 1500, y = 1500, width = 18000): ReportDesignerV3Element {
+  return createBase("ProductSpacer", x, y, width, 400, { borderStyle: "None", borderWidthPx: 0 }, {});
+}
 
 export function createV3LineElement(x = 1500, y = 1500): ReportDesignerV3Element {
   return createBase("Line", x, y, 9000, 300, { borderColor: "#334155", borderWidthPx: 1, borderStyle: "Solid" }, { direction: "Horizontal" });

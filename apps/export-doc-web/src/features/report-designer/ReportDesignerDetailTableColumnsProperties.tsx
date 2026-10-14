@@ -38,11 +38,12 @@ export function ReportDesignerDetailTableColumnsProperties({ block, fieldGroups,
           <button className="icon-button compact-icon-button" type="button" title="上移列" aria-label="上移列" disabled={index === 0} onClick={() => onCommit(moveDetailTableColumn(block, column.id, "up"))}><ArrowUp size={16} aria-hidden="true" /></button>
           <button className="icon-button compact-icon-button" type="button" title="下移列" aria-label="下移列" disabled={index === block.columns.length - 1} onClick={() => onCommit(moveDetailTableColumn(block, column.id, "down"))}><ArrowDown size={16} aria-hidden="true" /></button>
           <button className="icon-button compact-icon-button" type="button" title="复制列" aria-label="复制列" onClick={() => insert(true)}><Copy size={16} aria-hidden="true" /></button>
-          <button className="icon-button compact-icon-button danger-icon" type="button" title="删除列" aria-label="删除列" disabled={block.columns.length <= 1} onClick={() => { setSelectedId(block.columns[index + 1]?.id ?? block.columns[index - 1]?.id ?? ""); onCommit(removeDetailTableColumn(block, column.id)); }}><Trash2 size={16} aria-hidden="true" /></button>
+          <button className="icon-button compact-icon-button danger-icon" type="button" title="删除列" aria-label="删除列" disabled={block.columns.length <= 1 || Boolean(block.adjustments && [block.adjustments.descriptionColumnId, block.adjustments.amountColumnId].includes(column.id))} onClick={() => { setSelectedId(block.columns[index + 1]?.id ?? block.columns[index - 1]?.id ?? ""); onCommit(removeDetailTableColumn(block, column.id)); }}><Trash2 size={16} aria-hidden="true" /></button>
         </div>
       </div>
       <div className="new-report-property-grid">
-        <label><span>标题</span><CommitTextField value={column.title} onCommit={title => updateColumn({ title })} /></label>
+        {block.adjustments && [block.adjustments.descriptionColumnId, block.adjustments.amountColumnId].includes(column.id) && <small>此列用于金额调整。删除前，请先在“分页与高级 → 定金与费用调整”更换列或关闭该功能。</small>}
+        <label className="new-report-property-wide"><span>标题</span><CommitTextField multiline rows={2} value={column.title} onCommit={title => updateColumn({ title })} /></label>
         <NumberField label="宽度(mm)" value={column.widthMm} min={8} max={180} onCommit={widthMm => updateColumn({ widthMm })} />
         {column.contentKind !== "Composite" && <FieldPathInput selectOnly className="new-report-property-wide" label="显示内容" value={column.fieldPath} fieldGroups={itemFields} onChange={fieldPath => updateColumn({ fieldPath })} />}
         <label><span>对齐方式</span><select value={column.align} onChange={event => updateColumn({ align: normalizeAlign(event.target.value) })}><option value="Left">靠左</option><option value="Center">居中</option><option value="Right">靠右</option></select></label>
@@ -59,7 +60,7 @@ export function ReportDesignerDetailTableColumnsProperties({ block, fieldGroups,
       </details>
       <details className="report-designer-property-section" onInvalidCapture={event => { event.currentTarget.open = true; }}>
         <summary>跨列表头与边框</summary>
-        <label><span>跨列表头</span><CommitTextField value={column.headerGroupTitle ?? ""} onCommit={headerGroupTitle => updateColumn({ headerGroupTitle })} /></label>
+        <label><span>跨列表头</span><CommitTextField multiline rows={2} value={column.headerGroupTitle ?? ""} onCommit={headerGroupTitle => updateColumn({ headerGroupTitle })} /></label>
         <NumberField label="跨列数" value={column.headerGroupSpan ?? 1} min={1} max={Math.min(20, block.columns.length - index)} onCommit={value => updateColumn({ headerGroupSpan: Math.floor(value) })} />
         <BorderEditor border={column.border ?? block.border} onChange={border => updateColumn({ border })} />
         {column.border && <button type="button" className="command-button secondary" onClick={() => updateColumn({ border: undefined })}>此列沿用表格边框</button>}

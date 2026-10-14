@@ -53,7 +53,7 @@ pub(super) fn create(
     working: &Path,
     magic: &[u8],
     password: &str,
-) -> Result<Vec<u8>> {
+) -> Result<PathBuf> {
     if std::env::var_os("EXPORTDOCMANAGER_MASTER_KEY").is_some() {
         return Err(invalid(
             "环境主密钥部署须由管理员单独迁移密钥，不能生成独立恢复包。",
@@ -86,14 +86,30 @@ pub(super) fn create(
             .collect::<Result<_>>()?,
     };
     let manifest_path = working.join("manifest.json");
-    sealed::atomic_write(&manifest_path, &serde_json::to_vec(&manifest)?)?;
+    let manifest_bytes = serde_json::to_vec(&manifest)?;
+    if manifest_bytes.len() > MAX_MANIFEST_BYTES {
+        return Err(invalid("恢复包清单过大。"));
+    }
+    sealed::atomic_write(&manifest_path, &manifest_bytes)?;
     sources.push(("manifest.json".into(), manifest_path));
     let entries: Vec<_> = sources
         .iter()
         .map(|(name, source)| sealed::Entry { source, name })
         .collect();
-    let payload = zeroize::Zeroizing::new(sealed::zip_payload(&entries)?);
-    sealed::seal(magic, password, &payload)
+    let payload_path = working.join("payload.zip");
+    let file = fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&payload_path)?;
+    sealed::zip_payload(&entries, file)?;
+    let target = working.join("sealed-package.bin");
+    let mut output = fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&target)?;
+    sealed::seal_to(magic, password, fs::File::open(&payload_path)?, &mut output)?;
+    output.sync_all()?;
+    Ok(target)
 }
 fn collect(root: &Path, directory: &Path, sources: &mut Vec<(String, PathBuf)>) -> Result<()> {
     paths::ensure_safe_absolute(directory).map_err(invalid)?;
@@ -129,7 +145,7 @@ pub(super) fn stage(
     marker: &Path,
     magic: &[u8],
     password: &str,
-    content: &[u8],
+    content: impl Read,
     database: &str,
 ) -> Result<()> {
     if std::env::var_os("EXPORTDOCMANAGER_MASTER_KEY").is_some() {
@@ -144,8 +160,16 @@ pub(super) fn stage(
     let staging = root.join(format!("pending-{}", paths::nonce().map_err(unavailable)?));
     private_directory(&staging)?;
     let result = (|| {
-        let payload = zeroize::Zeroizing::new(sealed::open(magic, password, content)?);
-        let entries = sealed::unpack(&payload, &staging)?;
+        let archive_path = staging.join(".payload.zip");
+        let mut archive = fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&archive_path)?;
+        sealed::open_to(magic, password, content, &mut archive)?;
+        archive.sync_all()?;
+        drop(archive);
+        let entries = sealed::unpack(fs::File::open(&archive_path)?, &staging)?;
+        fs::remove_file(archive_path)?;
         validate_entries(&read_manifest(&staging)?, &entries, database)?;
         if database == SQLITE {
             export_doc_storage::verify_sqlite_backup(&staging.join(SQLITE))?;
@@ -163,14 +187,15 @@ pub(super) fn stage(
     }
     result
 }
+const MAX_MANIFEST_BYTES: usize = 4 * 1024 * 1024;
 fn read_manifest(staging: &Path) -> Result<Manifest> {
     let path = staging.join("manifest.json");
     paths::ensure_safe_absolute(&path).map_err(invalid)?;
     let mut bytes = Vec::new();
     fs::File::open(path)?
-        .take(sealed::MAX_PLAINTEXT_BYTES as u64 + 1)
+        .take(MAX_MANIFEST_BYTES as u64 + 1)
         .read_to_end(&mut bytes)?;
-    if bytes.len() > sealed::MAX_PLAINTEXT_BYTES {
+    if bytes.len() > MAX_MANIFEST_BYTES {
         return Err(invalid("恢复包清单过大。"));
     }
     serde_json::from_slice(&bytes).map_err(|_| invalid("恢复包清单无效。"))
@@ -196,7 +221,7 @@ fn validate_manifest(manifest: &Manifest, database: &str) -> Result<()> {
         }
         total = total
             .checked_add(file.size_bytes)
-            .filter(|size| *size <= sealed::MAX_PLAINTEXT_BYTES as u64)
+            .filter(|size| *size <= sealed::MAX_EXPANDED_BYTES as u64)
             .ok_or_else(|| invalid("包内容超过容量上限。"))?;
     }
     Ok(())
@@ -239,10 +264,9 @@ pub(super) fn staged(marker: &Path, database: &str) -> Result<Option<PathBuf>> {
     for file in &manifest.files {
         let path = staging.join(&file.name);
         let entry = sealed::ManifestFile::from_path(&file.name, &path)?;
-        total += entry.size_bytes;
-        if total > sealed::MAX_PLAINTEXT_BYTES as u64 {
-            return Err(invalid("暂存文件过大。"));
-        }
+        total = total
+            .checked_add(entry.size_bytes)
+            .ok_or_else(|| invalid("暂存文件大小超出可表示范围。"))?;
         entries.push(entry);
     }
     validate_entries(&manifest, &entries, database)?;
@@ -295,7 +319,7 @@ mod tests {
             files: vec![
                 sealed::ManifestFile {
                     name: POSTGRES.into(),
-                    size_bytes: sealed::MAX_PLAINTEXT_BYTES as u64,
+                    size_bytes: sealed::MAX_EXPANDED_BYTES as u64,
                     sha256: String::new(),
                 },
                 sealed::ManifestFile {

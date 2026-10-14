@@ -68,6 +68,7 @@ pub(crate) fn create(kind: &str, title: &str) -> Result<String> {
         visible: true,
         locked: false,
         output_enabled: true,
+        product: None,
         style: Style {
             font_size_pt: 16.,
             bold: true,

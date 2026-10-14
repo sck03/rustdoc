@@ -4,6 +4,7 @@ use super::*;
 #[cfg(feature = "postgres")]
 mod postgres_recovery;
 mod recovery;
+mod replica_protocol;
 use crate::paths::nonce;
 use std::{fs, path::PathBuf, sync::Arc};
 
@@ -83,20 +84,41 @@ fn sha256_hex_matches_known_vector() {
 
 #[test]
 fn sealed_package_roundtrip_keeps_payload_secret() {
-    let sealed = seal(b"EDM-TEST", "password-123", b"business data").unwrap();
+    let mut sealed = Vec::new();
+    seal(
+        b"EDM-TEST",
+        "password-123",
+        b"business data".to_vec(),
+        &mut sealed,
+    )
+    .unwrap();
     assert_ne!(&sealed[..], b"business data");
     assert_eq!(
-        open(b"EDM-TEST", "password-123", &sealed).unwrap(),
+        &**open(b"EDM-TEST", "password-123", sealed.as_slice()).unwrap(),
         b"business data"
     );
 }
 
 #[test]
 fn sealed_package_rejects_wrong_password_and_magic() {
-    let sealed = seal(b"EDM-TEST", "password-123", b"business data").unwrap();
-    assert!(open(b"EDM-TEST", "wrong-password", &sealed).is_err());
-    assert!(open(b"EDM-OTHER", "password-123", &sealed).is_err());
-    assert!(open(b"EDM-TEST", "password-123", b"not a sealed package").is_err());
+    let mut sealed = Vec::new();
+    seal(
+        b"EDM-TEST",
+        "password-123",
+        b"business data".to_vec(),
+        &mut sealed,
+    )
+    .unwrap();
+    assert!(open(b"EDM-TEST", "wrong-password", sealed.as_slice()).is_err());
+    assert!(open(b"EDM-OTHER", "password-123", sealed.as_slice()).is_err());
+    assert!(
+        open(
+            b"EDM-TEST",
+            "password-123",
+            b"not a sealed package".as_slice()
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -118,9 +140,11 @@ fn zip_payload_unpack_and_manifest_agree() {
             name: "Security/b.bin",
         },
     ];
-    let payload = zip_payload(&entries).unwrap();
+    let mut payload = std::io::Cursor::new(Vec::new());
+    zip_payload(&entries, &mut payload).unwrap();
+    let payload = payload.into_inner();
     let extracted = working.join("extracted");
-    let unpacked = unpack(&payload, &extracted).unwrap();
+    let unpacked = unpack(std::io::Cursor::new(&payload), &extracted).unwrap();
     assert_eq!(unpacked.len(), 2);
     assert_eq!(
         fs::read(extracted.join("Database/a.bin")).unwrap(),

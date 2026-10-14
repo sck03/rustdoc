@@ -33,11 +33,19 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | atoi_simd | 0.18.1 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
 | cargo | atomic-waker | 1.1.2 | Apache-2.0 OR MIT | native-desktop |
 | cargo | autocfg | 1.5.1 | Apache-2.0 OR MIT | native-desktop, ocr |
+| cargo | aws-credential-types | 1.3.0 | Apache-2.0 | native-desktop |
+| cargo | aws-sigv4 | 1.6.0 | Apache-2.0 | native-desktop |
+| cargo | aws-smithy-async | 1.3.0 | Apache-2.0 | native-desktop |
+| cargo | aws-smithy-http | 0.64.1 | Apache-2.0 | native-desktop |
+| cargo | aws-smithy-runtime-api | 1.19.0 | Apache-2.0 | native-desktop |
+| cargo | aws-smithy-runtime-api-macros | 1.1.0 | Apache-2.0 | native-desktop |
+| cargo | aws-smithy-types | 1.8.1 | Apache-2.0 | native-desktop |
 | cargo | axum | 0.8.9 | MIT | native-desktop |
 | cargo | axum-core | 0.5.6 | MIT | native-desktop |
 | cargo | base64 | 0.21.7 | MIT OR Apache-2.0 | native-desktop |
 | cargo | base64 | 0.22.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | base64 | 0.23.1 | MIT OR Apache-2.0 | native-desktop |
+| cargo | base64-simd | 0.8.0 | MIT | native-desktop |
 | cargo | base64ct | 1.8.3 | Apache-2.0 OR MIT | native-desktop |
 | cargo | bit-set | 0.8.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | bit-vec | 0.8.0 | Apache-2.0 OR MIT | native-desktop |
@@ -59,6 +67,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | byteorder | 1.5.0 | Unlicense OR MIT | excel-analyzer, native-desktop |
 | cargo | byteorder-lite | 0.1.0 | Unlicense OR MIT | native-desktop, ocr |
 | cargo | bytes | 1.12.1 | MIT | native-desktop |
+| cargo | bytes-utils | 0.1.4 | Apache-2.0 OR MIT | native-desktop |
 | cargo | cairo-rs | 0.18.5 | MIT | native-desktop |
 | cargo | cairo-sys-rs | 0.18.2 | MIT | native-desktop |
 | cargo | calamine | 0.36.1 | MIT | excel-analyzer, native-desktop |
@@ -329,6 +338,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | num-complex | 0.4.6 | MIT OR Apache-2.0 | ocr |
 | cargo | num-conv | 0.2.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | num-integer | 0.1.46 | MIT OR Apache-2.0 | ocr |
+| cargo | num-integer | 0.1.47 | MIT OR Apache-2.0 | native-desktop |
 | cargo | num-traits | 0.2.19 | MIT OR Apache-2.0 | native-desktop, ocr |
 | cargo | objc2 | 0.6.4 | MIT | native-desktop |
 | cargo | objc2-app-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT | native-desktop |
@@ -359,6 +369,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | ort | 2.0.0-rc.12 | MIT OR Apache-2.0 | ocr |
 | cargo | ort-sys | 2.0.0-rc.12 | MIT OR Apache-2.0 | ocr |
 | cargo | osakit | 0.3.1 | MIT OR Apache-2.0 | native-desktop |
+| cargo | outref | 0.5.2 | MIT | native-desktop |
 | cargo | pango | 0.18.3 | MIT | native-desktop |
 | cargo | pango-sys | 0.18.0 | MIT | native-desktop |
 | cargo | parking | 2.2.1 | Apache-2.0 OR MIT | native-desktop |
@@ -378,6 +389,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | phf_shared | 0.13.1 | MIT | native-desktop |
 | cargo | pico-args | 0.5.0 | MIT | native-desktop |
 | cargo | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT | native-desktop, ocr |
+| cargo | pin-utils | 0.1.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | piper | 0.2.5 | MIT OR Apache-2.0 | native-desktop |
 | cargo | piston-float | 1.0.1 | MIT | native-desktop |
 | cargo | pkg-config | 0.3.34 | MIT OR Apache-2.0 | native-desktop |
@@ -618,6 +630,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | vecmath | 1.0.0 | MIT | native-desktop |
 | cargo | version_check | 0.9.5 | MIT OR Apache-2.0 | native-desktop |
 | cargo | version-compare | 0.2.1 | MIT | native-desktop |
+| cargo | vsimd | 0.8.0 | MIT | native-desktop |
 | cargo | vswhom | 0.1.0 | MIT | native-desktop |
 | cargo | vswhom-sys | 0.1.3 | MIT | native-desktop |
 | cargo | walkdir | 2.5.0 | Unlicense OR MIT | native-desktop |

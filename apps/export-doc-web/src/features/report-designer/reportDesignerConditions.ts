@@ -34,9 +34,9 @@ export function conditionOperatorOptions(type: ReportComparisonType = "Text") {
 export function conditionRules(block: { condition: ReportConditionalRule; additionalConditions?: ReportConditionalRule[] }) {
   return [block.condition, ...(block.additionalConditions ?? [])];
 }
-export function conditionRuleIssue(rule: ReportConditionalRule): string | undefined {
+export function conditionRuleIssue(rule: ReportConditionalRule, itemContext = false): string | undefined {
   const type = rule.comparisonType ?? "Text";
-  if (rule.fieldPath.startsWith("item.")) return "条件组件使用单据字段，不能在商品循环外判断 item 字段。";
+  if (!itemContext && rule.fieldPath.startsWith("item.")) return "条件组件使用单据字段，不能在商品循环外判断 item 字段。";
   if ([...rule.value].length > 2048) return "比较值不能超过 2048 个字符。";
   if (rule.ignoreCase && type !== "Text") return "只有文本条件支持忽略大小写。";
   if (!conditionNeedsValue(rule)) return;
@@ -57,7 +57,7 @@ function strictEnum<T extends string>(value: unknown, allowed: readonly T[], fal
   return fallback;
 }
 
-function normalizeCondition(value: unknown, path: string, issues: ReportDesignerSchemaIssue[]): ReportConditionalRule {
+export function normalizeCondition(value: unknown, path: string, issues: ReportDesignerSchemaIssue[], itemContext = false): ReportConditionalRule {
   if (!isRecord(value)) {
     issues.push(createIssue("error", path, "条件规则无效。"));
     return { fieldPath: "", operator: "HasValue", value: "" };
@@ -74,7 +74,7 @@ function normalizeCondition(value: unknown, path: string, issues: ReportDesigner
     comparisonType: strictEnum(value.comparisonType, comparisonTypes, "Text", `${path}.comparisonType`, issues, true),
     ignoreCase: value.ignoreCase === true,
   };
-  const message = conditionRuleIssue(rule);
+  const message = conditionRuleIssue(rule, itemContext);
   if (message) issues.push(createIssue("error", path, message));
   return rule;
 }

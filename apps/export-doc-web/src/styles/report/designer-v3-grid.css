@@ -24,6 +24,11 @@
   cursor: cell;
 }
 
+.report-designer-v3-preview-flow-content th[data-report-detail-column-id] {
+  pointer-events: auto;
+  cursor: text;
+}
+
 .report-designer-v3-preview-flow-content .edm-report-grid td[data-report-grid-cell-id] > * {
   pointer-events: none;
 }

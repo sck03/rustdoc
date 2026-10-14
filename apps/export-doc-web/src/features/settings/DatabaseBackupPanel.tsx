@@ -1,104 +1,27 @@
-import { Archive, CloudDownload, CloudUpload, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
-import type { ApiCloudBackupStatusResponse } from "../../api/index.ts";
+import { Archive, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { NumberField, SelectField } from "../../ui/FormFields.tsx";
-import { formatBytes, formatManagedPath } from "./settingsFormatters.ts";
+import { formatManagedPath } from "./settingsFormatters.ts";
 import type { BackupManagementController } from "./useBackupManagement.ts";
 
-export function DatabaseBackupPanel({
-  controller,
-  onPathError,
-}: {
-  controller: BackupManagementController;
-  onPathError: (message: string) => void;
-}) {
-  return (
-    <>
-      <div className="section-header">
-        <h2>数据备份与还原</h2>
-        <div className="toolbar-actions">
-          <button className="icon-button" type="button" title="刷新备份" aria-label="刷新备份" disabled={!controller.canManageSettings || controller.isBusy} onClick={controller.refreshBackups}>
-            <RefreshCw size={18} aria-hidden="true" />
-          </button>
-          <button className="command-button" type="button" disabled={!controller.canManageSettings || controller.isBusy} onClick={controller.createBackup}>
-            <Archive size={17} aria-hidden="true" />
-            <span>创建备份</span>
-          </button>
-          <button className="command-button secondary" type="button" disabled={!controller.canUploadCloud} onClick={controller.uploadLatestBackup}>
-            <CloudUpload size={17} aria-hidden="true" />
-            <span>上传最新备份</span>
-          </button>
-          <button className="command-button secondary" type="button" disabled={!controller.canDownloadCloud} onClick={controller.downloadCloudBackup}>
-            <CloudDownload size={17} aria-hidden="true" />
-            <span>下载云备份</span>
-          </button>
-        </div>
-      </div>
-      <div className="detail-grid runtime-detail-grid">
-        <div className="detail-item detail-item-wide">
-          <span>备份目录</span>
-          <div className="detail-value-row">
-            <strong title={formatManagedPath(controller.backupRoot)}>{formatManagedPath(controller.backupRoot)}</strong>
-            <div className="detail-item-actions">{renderOpenPathAction(controller.backupRoot, "打开备份目录", onPathError)}</div>
-          </div>
-        </div>
-        <CloudBackupStatusDetail status={controller.cloudStatus} />
+export function DatabaseBackupPanel({ controller: c, onPathError }: { controller: BackupManagementController; onPathError: (message: string) => void }) {
+  return <>
+    <div className="section-header"><h3>数据库快照</h3><div className="toolbar-actions">
+      <button className="command-button secondary" type="button" disabled={!c.canManageSettings || c.isBusy} onClick={c.refreshBackups}><RefreshCw size={17} aria-hidden="true" /><span>刷新备份</span></button>
+      <button className="command-button" type="button" disabled={!c.canManageSettings || c.isBusy} onClick={c.createBackup}><Archive size={17} aria-hidden="true" /><span>创建数据库快照</span></button>
+    </div></div>
+    <p className="settings-helper-text">用于当前安装内的数据回退。更换机器请使用完整加密包，以便同时迁移主密钥和用户文件模板。</p>
+    <div className="detail-value-row"><span>备份目录</span><strong title={formatManagedPath(c.backupRoot)}>{formatManagedPath(c.backupRoot)}</strong>{renderOpenPathAction(c.backupRoot, "打开备份目录", onPathError)}</div>
+    <details className="maintenance-advanced-details"><summary>恢复数据库或清理旧快照</summary>
+      <div className="backup-action-grid">
+        <SelectField label="还原备份" value={c.restoreFileName} disabled={!c.canManageSettings || c.isBusy || !c.backups.length} options={c.backups.map((backup) => ({ value: backup.fileName, label: backup.fileName }))} onChange={(value) => { c.setRestoreFileName(value); c.setRestoreConfirmation(""); }} />
+        <label><span>确认文本</span><input value={c.restoreConfirmation} disabled={!c.canManageSettings || c.isBusy} placeholder="RESTORE" onChange={(event) => c.setRestoreConfirmation(event.target.value)} /></label>
+        <button className="command-button danger-command" type="button" disabled={!c.canRestore} onClick={c.restoreBackup}><RotateCcw size={17} aria-hidden="true" /><span>还原数据库</span></button>
       </div>
       <div className="backup-action-grid">
-        <NumberField label="保留天数" value={controller.cleanupDays} disabled={!controller.canManageSettings || controller.isBusy} step="1" onChange={controller.setCleanupDays} />
-        <button className="command-button secondary" type="button" disabled={!controller.canManageSettings || controller.isBusy} onClick={controller.cleanupBackups}>
-          <Trash2 size={17} aria-hidden="true" />
-          <span>清理旧备份</span>
-        </button>
-        <SelectField
-          label="云端备份"
-          value={controller.cloudDownloadFileName}
-          disabled={!controller.cloudBackupsEnabled || controller.isBusy || controller.cloudBackups.length === 0}
-          options={controller.cloudBackups.map((backup) => ({ value: backup.fileName, label: `${backup.fileName} (${formatBytes(backup.sizeBytes)})` }))}
-          onChange={controller.setCloudDownloadFileName}
-        />
-        <SelectField
-          label="还原备份"
-          value={controller.restoreFileName}
-          disabled={!controller.canManageSettings || controller.isBusy || controller.backups.length === 0}
-          options={controller.backups.map((backup) => ({ value: backup.fileName, label: backup.fileName }))}
-          onChange={(value) => {
-            controller.setRestoreFileName(value);
-            controller.setRestoreConfirmation("");
-          }}
-        />
-        <label>
-          <span>确认文本</span>
-          <input
-            value={controller.restoreConfirmation}
-            disabled={!controller.canManageSettings || controller.isBusy || controller.backups.length === 0}
-            placeholder="RESTORE"
-            onChange={(event) => controller.setRestoreConfirmation(event.target.value)}
-          />
-        </label>
-        <button className="command-button danger-command" type="button" disabled={!controller.canRestore} onClick={controller.restoreBackup}>
-          <RotateCcw size={17} aria-hidden="true" />
-          <span>还原数据库</span>
-        </button>
+        <NumberField label="快照保留天数" value={c.cleanupDays} disabled={!c.canManageSettings || c.isBusy} step="1" onChange={c.setCleanupDays} />
+        <button className="command-button secondary" type="button" disabled={!c.canManageSettings || c.isBusy} onClick={c.cleanupBackups}><Trash2 size={17} aria-hidden="true" /><span>清理旧快照</span></button>
       </div>
-    </>
-  );
-}
-
-function CloudBackupStatusDetail({ status }: { status: ApiCloudBackupStatusResponse | null }) {
-  const stateText = status ? `${status.enabled ? "已启用" : "未启用"} · ${status.isConfigured ? "已配置" : "未配置"}` : "加载中";
-  const latestText = status?.latestBackupFileName ? `${status.latestBackupFileName} (${formatBytes(status.latestBackupSizeBytes)})` : "暂无本地备份";
-
-  return (
-    <>
-      <div className="detail-item">
-        <span>WebDAV 云备份</span>
-        <strong title={status?.url || stateText}>{stateText}</strong>
-      </div>
-      <div className="detail-item detail-item-wide">
-        <span>最新本地备份</span>
-        <strong title={latestText}>{latestText}</strong>
-      </div>
-    </>
-  );
+    </details>
+  </>;
 }

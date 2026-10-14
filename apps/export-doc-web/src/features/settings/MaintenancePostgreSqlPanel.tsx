@@ -23,10 +23,12 @@ export function PostgreSqlMaintenancePanel({
   client,
   canManageSettings,
   onPathError,
+  view = "all",
 }: {
   client: ExportDocManagerApiClient;
   canManageSettings: boolean;
   onPathError: (message: string) => void;
+  view?: "migration" | "recovery" | "all";
 }) {
   const runAbortableOperation = useAbortableOperation();
   const queryClient = useQueryClient();
@@ -118,14 +120,14 @@ export function PostgreSqlMaintenancePanel({
         "X-ExportDocManager-Migration-Password": encodeHeaderText(migrationRestorePassword),
         "X-ExportDocManager-Migration-File-Name": encodeHeaderText(migrationRestoreFile?.name ?? "migration.edmmigration"),
         "X-ExportDocManager-Restore-Confirmation": migrationRestoreConfirmation.trim(),
-      }, { signal });
+      }, { signal, timeoutMs: 24 * 60 * 60 * 1000 });
     }),
     onSuccess: async (response) => { setMigrationAdminPassword(""); setMigrationRestorePassword(""); setMigrationRestoreConfirmation(""); setMigrationRestoreFile(null); setMessage(null); setSuccessMessage(response.message || "服务器迁移已暂存，请部署管理员停止应用并执行恢复维护命令。"); await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() }); },
     onError: (error) => { setMigrationAdminPassword(""); setMigrationRestorePassword(""); setMigrationRestoreConfirmation(""); failMigration(error); },
   });
 
   const databaseRestoreMutation = useMutation({
-    mutationFn: () => runAbortableOperation((signal) => client.restorePostgreSqlPhysicalBackup({ body: { backupFileName: selectedBackup, adminPassword: databaseAdminPassword, confirmationText: databaseRestoreConfirmation.trim() } }, { signal })),
+    mutationFn: () => runAbortableOperation((signal) => client.restorePostgreSqlPhysicalBackup({ body: { backupFileName: selectedBackup, adminPassword: databaseAdminPassword, confirmationText: databaseRestoreConfirmation.trim() } }, { signal, timeoutMs: 24 * 60 * 60 * 1000 })),
     onSuccess: async (response) => { setDatabaseAdminPassword(""); setDatabaseRestoreConfirmation(""); setMessage(null); setSuccessMessage(response.message || "PostgreSQL 数据库恢复已暂存，请部署管理员停止应用并执行恢复维护命令。"); await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() }); },
     onError: (error) => { setDatabaseAdminPassword(""); setDatabaseRestoreConfirmation(""); failDatabase(error); },
   });
@@ -144,7 +146,7 @@ export function PostgreSqlMaintenancePanel({
         "X-ExportDocManager-Sensitive-Operation-Ticket": authorization.ticket,
         "X-ExportDocManager-PostgreSql-Backup-File-Name": encodeHeaderText(databaseUploadFile?.name ?? "database.dump"),
         "X-ExportDocManager-Restore-Confirmation": databaseRestoreConfirmation.trim(),
-      }, { signal });
+      }, { signal, timeoutMs: 24 * 60 * 60 * 1000 });
     }),
     onSuccess: async (response) => { setDatabaseAdminPassword(""); setDatabaseUploadFile(null); setDatabaseRestoreConfirmation(""); setMessage(null); setSuccessMessage(response.message || "上传的 PostgreSQL 数据库恢复已暂存，请部署管理员停止应用并执行恢复维护命令。"); await queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() }); },
     onError: (error) => { setDatabaseAdminPassword(""); setDatabaseRestoreConfirmation(""); failDatabase(error); },
@@ -163,12 +165,12 @@ export function PostgreSqlMaintenancePanel({
 
   return (
     <section className="form-section backup-management-section" aria-label="PostgreSQL 团队库维护">
-      <div className="section-header"><div><h2>PostgreSQL 团队库维护</h2><p className="section-description">按“备份、恢复、完整迁移、任务状态”分区，低频危险操作不会挤在同一张表单中。</p></div></div>
+      <div className="section-header"><h2>{view === "migration" ? "整机迁移" : "数据库备份与外部文件恢复"}</h2></div>
       {message ? <InlineNotice tone="error" title="数据库维护失败">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
       <MaintenanceBackgroundTaskStatusPanel status={migrationStatus} />
       <MaintenanceOperationsGuide pending={Boolean(migrationStatus?.pendingRestore)} />
-      <MaintenanceDatabaseBackupPanel
+      {view !== "migration" && <MaintenanceDatabaseBackupPanel
         canManageSettings={canManageSettings}
         busy={isBusy}
         status={status}
@@ -186,8 +188,8 @@ export function PostgreSqlMaintenancePanel({
         }}
         onDownload={(fileName) => downloadDatabaseMutation.mutate(fileName)}
         onPathError={onPathError}
-      />
-      <details ref={databaseDetails} className="maintenance-advanced-details" aria-label="恢复数据库">
+      />}
+      {view !== "migration" && <details ref={databaseDetails} className="maintenance-advanced-details" aria-label="恢复数据库">
         <summary>恢复数据库（回到某份备份）</summary>
         <MaintenanceDatabaseRecoveryPanel
         canManageSettings={canManageSettings}
@@ -226,10 +228,11 @@ export function PostgreSqlMaintenancePanel({
           restorePlanMutation.mutate();
         }}
       />
-      </details>
-      <details ref={migrationDetails} className="maintenance-advanced-details" aria-label="完整迁移与换机">
-        <summary>完整迁移与换机</summary>
+      </details>}
+      <details ref={migrationDetails} open={view === "migration" || undefined} className="maintenance-advanced-details" aria-label="完整迁移与换机">
+        <summary>{view === "recovery" ? "从外部完整包恢复" : "完整迁移与换机"}</summary>
         <MaintenanceFullMigrationPanel
+        view={view}
         canManageSettings={canManageSettings}
         busy={isBusy}
         status={migrationStatus}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 type PointerPoint = { x: number; y: number };
-type PointerStart = Pick<PointerEvent, "button" | "pointerId" | "clientX" | "clientY"> & { currentTarget: HTMLElement };
+type PointerStart = Pick<PointerEvent, "button" | "pointerId" | "clientX" | "clientY" | "target"> & { currentTarget: HTMLElement };
 type GestureCallbacks = {
   surface: Element;
   preview: (point: PointerPoint) => void;
@@ -15,7 +15,10 @@ export function useReportDesignerPointerGesture() {
   const cancel = useCallback(() => active.current?.cancel(), []);
   const start = useCallback((event: PointerStart, callbacks: GestureCallbacks) => {
     if (event.button !== 0 || active.current) return false;
-    const { currentTarget: target, pointerId } = event;
+    const { pointerId } = event;
+    // Capturing the delegated canvas retargets click/double-click away from text
+    // and table cells. Keep capture on the original hit target.
+    const target = event.target instanceof HTMLElement ? event.target : event.currentTarget;
     const origin = callbacks.surface.getBoundingClientRect();
     let point = { x: event.clientX, y: event.clientY };
     let frame: number | null = null;

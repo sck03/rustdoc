@@ -232,7 +232,10 @@ fn element(
             style.border_width_px * 25.4 / 96.
         };
         let dash = stroke_dash(&style.border_style);
-        if !matches!(element.kind, Kind::Line { .. } | Kind::Flow { .. }) {
+        if !matches!(
+            element.kind,
+            Kind::Line { .. } | Kind::Flow { .. } | Kind::ProductSpacer
+        ) {
             svg.push_str(&format!("<rect x=\"{x}\" y=\"{y}\" width=\"{width}\" height=\"{height}\" fill=\"{}\" stroke=\"{}\" stroke-width=\"{border}\"{dash}/>",escape(&style.background_color),escape(&style.border_color)));
         }
         let text = match &element.kind {
@@ -248,7 +251,9 @@ fn element(
                 svg.push_str(&format!("<line x1=\"{x1}\" y1=\"{y1}\" x2=\"{x2}\" y2=\"{y2}\" stroke=\"{}\" stroke-width=\"{}\"{dash}/>",escape(&style.border_color),border.max(0.2)));
                 return Ok(());
             }
-            Kind::Rectangle | Kind::Flow { .. } | Kind::Image { .. } => return Ok(()),
+            Kind::Rectangle | Kind::ProductSpacer | Kind::Flow { .. } | Kind::Image { .. } => {
+                return Ok(());
+            }
             Kind::Text { text } => text.clone(),
             Kind::Field {
                 field_path,

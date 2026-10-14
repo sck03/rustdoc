@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "9347d064cf7fd5279e8ab68782b526d78b5939e5af04024d7ddbbdc56149639c",
+  "digest": "2f886c67f9c2c54dc13c38262bdb7810e606765ab99ff5c116cf9562e8a003df",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -15178,6 +15178,74 @@
         "$ref": "#/components/schemas/OaRequest"
       }
     },
+    "CreateRecoveryArchiveDownloadTicket": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": false,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "system.backup",
+            "action": "manage"
+          },
+          {
+            "resourceKey": "system.disaster-recovery",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "Success",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiDownloadTicket"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Invalid configuration"
+        },
+        "401": {
+          "description": "Authentication required"
+        },
+        "403": {
+          "description": "Administrator required"
+        },
+        "404": {
+          "description": "Archive missing"
+        },
+        "409": {
+          "description": "Configuration changed"
+        },
+        "429": {
+          "description": "Backup already running"
+        },
+        "503": {
+          "description": "Storage or replica unavailable"
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/ApiDownloadTicket"
+      }
+    },
     "CreateReportTemplate": {
       "policy": {
         "requiresAuthentication": true,
@@ -22588,6 +22656,57 @@
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
       }
     },
+    "DownloadRecoveryArchiveWithTicket": {
+      "policy": {
+        "requiresAuthentication": false,
+        "requiresDesktopAccess": true,
+        "requiresLicense": false,
+        "permissions": {
+          "readModule": "document.jobs",
+          "writeModule": null,
+          "readAccessLevel": null,
+          "writeAccessLevel": null,
+          "selector": 0,
+          "disabled": false,
+          "overridesParent": false
+        },
+        "requirements": [],
+        "permissionBypass": true
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "token",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "byte"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found"
+        },
+        "426": {
+          "description": "Upgrade Required"
+        }
+      },
+      "request": null,
+      "response": null
+    },
     "DownloadReportTemplateFile": {
       "policy": {
         "requiresAuthentication": true,
@@ -23428,6 +23547,65 @@
         "action": "get",
         "resource": "office.announcements",
         "permission": "view"
+      }
+    },
+    "GetBackupPlan": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": false,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "system.backup",
+            "action": "manage"
+          },
+          {
+            "resourceKey": "system.disaster-recovery",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "Success",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiBackupPlanStatus"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Invalid configuration"
+        },
+        "401": {
+          "description": "Authentication required"
+        },
+        "403": {
+          "description": "Administrator required"
+        },
+        "404": {
+          "description": "Archive missing"
+        },
+        "409": {
+          "description": "Configuration changed"
+        },
+        "429": {
+          "description": "Backup already running"
+        },
+        "503": {
+          "description": "Storage or replica unavailable"
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/ApiBackupPlanStatus"
       }
     },
     "GetBusinessAttachment": {
@@ -43205,6 +43383,65 @@
         "$ref": "#/components/schemas/ApiLetterOfCreditReviewResponse"
       }
     },
+    "RunBackupPlan": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": false,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "system.backup",
+            "action": "manage"
+          },
+          {
+            "resourceKey": "system.disaster-recovery",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "Success",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackgroundJobSnapshot"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Invalid configuration"
+        },
+        "401": {
+          "description": "Authentication required"
+        },
+        "403": {
+          "description": "Administrator required"
+        },
+        "404": {
+          "description": "Archive missing"
+        },
+        "409": {
+          "description": "Configuration changed"
+        },
+        "429": {
+          "description": "Backup already running"
+        },
+        "503": {
+          "description": "Storage or replica unavailable"
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/BackgroundJobSnapshot"
+      }
+    },
     "RunShutdownMaintenance": {
       "policy": {
         "requiresAuthentication": false,
@@ -43444,6 +43681,76 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiAuditLogCommandResponse"
+      }
+    },
+    "SaveBackupPlan": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": false,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "system.backup",
+            "action": "manage"
+          },
+          {
+            "resourceKey": "system.disaster-recovery",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiBackupPlanSaveRequest"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Success",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiBackupPlanStatus"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Invalid configuration"
+        },
+        "401": {
+          "description": "Authentication required"
+        },
+        "403": {
+          "description": "Administrator required"
+        },
+        "404": {
+          "description": "Archive missing"
+        },
+        "409": {
+          "description": "Configuration changed"
+        },
+        "429": {
+          "description": "Backup already running"
+        },
+        "503": {
+          "description": "Storage or replica unavailable"
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/ApiBackupPlanSaveRequest"
+      },
+      "response": {
+        "$ref": "#/components/schemas/ApiBackupPlanStatus"
       }
     },
     "SaveBusinessAttachmentToPath": {
@@ -45679,6 +45986,85 @@
         "$ref": "#/components/schemas/ApiUserReportTemplateDto"
       }
     },
+    "StageRecoveryArchiveRestore": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": false,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "system.backup",
+            "action": "manage"
+          },
+          {
+            "resourceKey": "system.disaster-recovery",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiRecoveryArchiveRestoreRequest"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Success",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackgroundJobSnapshot"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Invalid configuration"
+        },
+        "401": {
+          "description": "Authentication required"
+        },
+        "403": {
+          "description": "Administrator required"
+        },
+        "404": {
+          "description": "Archive missing"
+        },
+        "409": {
+          "description": "Configuration changed"
+        },
+        "429": {
+          "description": "Backup already running"
+        },
+        "503": {
+          "description": "Storage or replica unavailable"
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/ApiRecoveryArchiveRestoreRequest"
+      },
+      "response": {
+        "$ref": "#/components/schemas/BackgroundJobSnapshot"
+      }
+    },
     "StageServerMigrationRestore": {
       "policy": {
         "requiresAuthentication": true,
@@ -47850,6 +48236,65 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiEmailServerSuggestionResponse"
+      }
+    },
+    "TestBackupReplica": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": false,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "system.backup",
+            "action": "manage"
+          },
+          {
+            "resourceKey": "system.disaster-recovery",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "Success",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackgroundJobSnapshot"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Invalid configuration"
+        },
+        "401": {
+          "description": "Authentication required"
+        },
+        "403": {
+          "description": "Administrator required"
+        },
+        "404": {
+          "description": "Archive missing"
+        },
+        "409": {
+          "description": "Configuration changed"
+        },
+        "429": {
+          "description": "Backup already running"
+        },
+        "503": {
+          "description": "Storage or replica unavailable"
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/BackgroundJobSnapshot"
       }
     },
     "TestCloudBackupConnection": {
@@ -57737,6 +58182,220 @@
         }
       }
     },
+    "ApiBackupPlan": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "frequency": {
+          "type": "string",
+          "enum": [
+            "Daily",
+            "Weekly"
+          ],
+          "default": "Daily"
+        },
+        "time": {
+          "type": "string",
+          "default": "02:00",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        },
+        "weekday": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6,
+          "default": 1
+        },
+        "retentionCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365,
+          "default": 14
+        },
+        "retentionDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3650,
+          "default": 0
+        },
+        "replicaMode": {
+          "type": "string",
+          "enum": [
+            "None",
+            "WebDav",
+            "S3"
+          ],
+          "default": "None"
+        },
+        "verifyReplica": {
+          "type": "boolean",
+          "default": true
+        },
+        "s3": {
+          "$ref": "#/components/schemas/ApiBackupS3Settings"
+        }
+      },
+      "required": [
+        "enabled",
+        "frequency",
+        "time",
+        "weekday",
+        "retentionCount",
+        "retentionDays",
+        "replicaMode",
+        "verifyReplica",
+        "s3"
+      ],
+      "additionalProperties": false
+    },
+    "ApiBackupPlanSaveRequest": {
+      "type": "object",
+      "properties": {
+        "expectedRevision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
+        "expectedSettingsRevision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
+        "plan": {
+          "$ref": "#/components/schemas/ApiBackupPlan"
+        },
+        "webDav": {
+          "$ref": "#/components/schemas/ApiBackupWebDavSettings"
+        },
+        "webDavPassword": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4096
+        },
+        "s3SecretAccessKey": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4096
+        },
+        "s3SessionToken": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 16384
+        },
+        "encryptionPassword": {
+          "type": "string",
+          "maxLength": 1024,
+          "description": "空字符串保留已保存密码；密码仅加密存储，不回传。"
+        }
+      },
+      "required": [
+        "expectedRevision",
+        "expectedSettingsRevision",
+        "plan",
+        "webDav",
+        "webDavPassword",
+        "s3SecretAccessKey",
+        "s3SessionToken",
+        "encryptionPassword"
+      ],
+      "additionalProperties": false
+    },
+    "ApiBackupPlanStatus": {
+      "type": "object",
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "plan": {
+          "$ref": "#/components/schemas/ApiBackupPlan"
+        },
+        "encryptionPasswordSet": {
+          "type": "boolean"
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "nextRunAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "runningJobId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lastRunAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "lastResult": {
+          "type": "string"
+        },
+        "lastError": {
+          "type": "string"
+        },
+        "archives": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ApiRecoveryArchive"
+          }
+        },
+        "settingsRevision": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "webDav": {
+          "$ref": "#/components/schemas/ApiBackupWebDavSettings"
+        },
+        "webDavPasswordSet": {
+          "type": "boolean"
+        },
+        "s3SecretAccessKeySet": {
+          "type": "boolean"
+        },
+        "s3SessionTokenSet": {
+          "type": "boolean"
+        },
+        "s3Available": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "revision",
+        "plan",
+        "encryptionPasswordSet",
+        "timeZone",
+        "nextRunAt",
+        "runningJobId",
+        "lastRunAt",
+        "lastResult",
+        "lastError",
+        "archives",
+        "settingsRevision",
+        "webDav",
+        "webDavPasswordSet",
+        "s3SecretAccessKeySet",
+        "s3SessionTokenSet",
+        "s3Available"
+      ],
+      "additionalProperties": false
+    },
     "ApiBackupRestoreRequest": {
       "required": [
         "backupFileName",
@@ -57751,6 +58410,68 @@
           "type": "string"
         }
       }
+    },
+    "ApiBackupS3Settings": {
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "region": {
+          "type": "string",
+          "maxLength": 64,
+          "default": "us-east-1"
+        },
+        "bucket": {
+          "type": "string",
+          "maxLength": 63
+        },
+        "prefix": {
+          "type": "string",
+          "maxLength": 512,
+          "default": "ExportDocManager"
+        },
+        "accessKeyId": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "pathStyle": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "required": [
+        "endpoint",
+        "region",
+        "bucket",
+        "prefix",
+        "accessKeyId",
+        "pathStyle"
+      ],
+      "additionalProperties": false
+    },
+    "ApiBackupWebDavSettings": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "userName": {
+          "type": "string",
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "enabled",
+        "url",
+        "userName"
+      ],
+      "additionalProperties": false
     },
     "ApiCloudBackupCommandResponse": {
       "required": [
@@ -63458,6 +64179,27 @@
         }
       }
     },
+    "ApiInvoiceAmountAdjustment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "amount"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "报表上的调整说明，例如 RECEIVED DEPOSIT 或 SAMPLE CHARGE。"
+        },
+        "amount": {
+          "type": "string",
+          "maxLength": 32,
+          "pattern": "^[+-]?[0-9]+(?:\\.[0-9]{1,2})?$",
+          "description": "同发票币种的精确金额；负数扣减，正数增加。"
+        }
+      }
+    },
     "ApiInvoiceBookingSheetRequest": {
       "type": "object",
       "properties": {
@@ -63981,6 +64723,15 @@
             "string"
           ],
           "description": "受控发票印章；null 继承出口商档案，空字符串不盖章。"
+        },
+        "amountAdjustments": {
+          "type": "array",
+          "default": [],
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/components/schemas/ApiInvoiceAmountAdjustment"
+          },
+          "description": "可选报表金额调整；原商品合计 totalAmount 不变。"
         }
       }
     },
@@ -68361,6 +69112,66 @@
           "type": "string"
         }
       }
+    },
+    "ApiRecoveryArchive": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "replicaStatus": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "fileName",
+        "createdAt",
+        "sizeBytes",
+        "replicaStatus",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "ApiRecoveryArchiveRestoreRequest": {
+      "type": "object",
+      "properties": {
+        "password": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "adminPassword": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "confirmationText": {
+          "type": "string",
+          "enum": [
+            "MIGRATE",
+            "RECOVER"
+          ]
+        }
+      },
+      "required": [
+        "password",
+        "adminPassword",
+        "confirmationText"
+      ],
+      "additionalProperties": false
     },
     "ApiReportHtmlPreviewRequest": {
       "type": "object",

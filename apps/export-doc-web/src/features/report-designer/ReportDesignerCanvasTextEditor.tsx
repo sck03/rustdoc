@@ -1,8 +1,7 @@
 import { useEffect, useRef } from "react";
+import type { ReportDesignerTextTarget } from "./reportDesignerCanvasText.ts";
 
-export type ReportDesignerTextEdit = {
-  elementId: string;
-  cellId?: string;
+export type ReportDesignerTextEdit = ReportDesignerTextTarget & {
   text: string;
   left: number;
   top: number;
@@ -26,7 +25,7 @@ export function ReportDesignerCanvasTextEditor({ edit, zoom, onCommit, onCancel 
     else onCommit(value);
   }
   return <div className="report-designer-canvas-text-editor" style={{ left: edit.left, top: edit.top, width: edit.width, height: edit.height }} onPointerDown={(event) => event.stopPropagation()}>
-    <textarea ref={ref} aria-label={edit.cellId ? "在画布编辑单元格文字" : "在画布编辑文字"} title="Ctrl+Enter 确认，Esc 取消；点击画布其他位置也可确认" defaultValue={edit.text} style={{ fontSize: `${12 / zoom}px` }} onBlur={(event) => finish(event.currentTarget.value)} onKeyDown={(event) => {
+    <textarea ref={ref} aria-label={edit.kind === "GridCell" ? "在画布编辑单元格文字" : edit.kind === "DetailHeader" ? "在画布编辑表头文字" : "在画布编辑文字"} title="Ctrl+Enter 确认，Esc 取消；点击画布其他位置也可确认" defaultValue={edit.text} style={{ fontSize: `${12 / zoom}px` }} onBlur={(event) => finish(event.currentTarget.value)} onKeyDown={(event) => {
       if (event.nativeEvent.isComposing) return;
       event.stopPropagation();
       if (event.key === "Escape") { event.preventDefault(); finish(event.currentTarget.value, true); }

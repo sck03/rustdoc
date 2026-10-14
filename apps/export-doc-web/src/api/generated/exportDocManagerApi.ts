@@ -239,9 +239,66 @@ export interface ApiBackupListResponse {
   storagePolicy: string;
 }
 
+export interface ApiBackupPlan {
+  enabled: boolean;
+  frequency: "Daily" | "Weekly";
+  replicaMode: "None" | "WebDav" | "S3";
+  retentionCount: number;
+  retentionDays: number;
+  s3: ApiBackupS3Settings;
+  time: string;
+  verifyReplica: boolean;
+  weekday: number;
+}
+
+export interface ApiBackupPlanSaveRequest {
+  encryptionPassword: string;
+  expectedRevision: number;
+  expectedSettingsRevision: number;
+  plan: ApiBackupPlan;
+  s3SecretAccessKey: string | null;
+  s3SessionToken: string | null;
+  webDav: ApiBackupWebDavSettings;
+  webDavPassword: string | null;
+}
+
+export interface ApiBackupPlanStatus {
+  archives: ApiRecoveryArchive[];
+  encryptionPasswordSet: boolean;
+  lastError: string;
+  lastResult: string;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  plan: ApiBackupPlan;
+  revision: number;
+  runningJobId: string | null;
+  s3Available: boolean;
+  s3SecretAccessKeySet: boolean;
+  s3SessionTokenSet: boolean;
+  settingsRevision: number;
+  timeZone: string;
+  webDav: ApiBackupWebDavSettings;
+  webDavPasswordSet: boolean;
+}
+
 export interface ApiBackupRestoreRequest {
   backupFileName: string;
   confirmationText: string;
+}
+
+export interface ApiBackupS3Settings {
+  accessKeyId: string;
+  bucket: string;
+  endpoint: string;
+  pathStyle: boolean;
+  prefix: string;
+  region: string;
+}
+
+export interface ApiBackupWebDavSettings {
+  enabled: boolean;
+  url: string;
+  userName: string;
 }
 
 export interface ApiCloudBackupCommandResponse {
@@ -1471,6 +1528,11 @@ export interface ApiImportedExporterDto {
   swiftCode: string;
 }
 
+export interface ApiInvoiceAmountAdjustment {
+  amount: string;
+  description: string;
+}
+
 export interface ApiInvoiceBookingSheetRequest {
   destinationPath?: string;
   invoiceId?: number;
@@ -1514,6 +1576,7 @@ export interface ApiInvoiceDataMaintenancePreviewResponse {
 }
 
 export interface ApiInvoiceDetailDto {
+  amountAdjustments?: ApiInvoiceAmountAdjustment[];
   bankAccount: string;
   bankName: string;
   companyScope: string;
@@ -2520,6 +2583,21 @@ export interface ApiQueryInvoiceRowDto {
   tradeTerms: string;
   transportMode: string;
   type: string;
+}
+
+export interface ApiRecoveryArchive {
+  createdAt: string;
+  fileName: string;
+  id: string;
+  message: string;
+  replicaStatus: string;
+  sizeBytes: number;
+}
+
+export interface ApiRecoveryArchiveRestoreRequest {
+  adminPassword: string;
+  confirmationText: "MIGRATE" | "RECOVER";
+  password: string;
 }
 
 export interface ApiReportHtmlPreviewRequest {
@@ -5040,6 +5118,23 @@ export interface WorklistSourceCount {
   name: string;
 }
 
+export const ApiBackupPlanDefaults = {
+  enabled: false,
+  frequency: "Daily",
+  replicaMode: "None",
+  retentionCount: 14,
+  retentionDays: 0,
+  time: "02:00",
+  verifyReplica: true,
+  weekday: 1,
+} as const satisfies Partial<ApiBackupPlan>;
+
+export const ApiBackupS3SettingsDefaults = {
+  pathStyle: true,
+  prefix: "ExportDocManager",
+  region: "us-east-1",
+} as const satisfies Partial<ApiBackupS3Settings>;
+
 export const ApiCrmContactSaveRequestDefaults = {
   expectedVersion: 0,
 } as const satisfies Partial<ApiCrmContactSaveRequest>;
@@ -5085,6 +5180,10 @@ export const ApiHsCodeSearchResponseDefaults = {
   declarationExampleCount: 0,
   standardCodeCount: 0,
 } as const satisfies Partial<ApiHsCodeSearchResponse>;
+
+export const ApiInvoiceDetailDtoDefaults = {
+  amountAdjustments: [],
+} as const satisfies Partial<ApiInvoiceDetailDto>;
 
 export const ApiInvoiceReportBatchLimitsContractDefaults = {
   maxArchiveBytes: 67108864,
@@ -5632,6 +5731,10 @@ export interface CreatePurchaseRequestRequest {
   body: OaRequestSave;
 }
 
+export interface CreateRecoveryArchiveDownloadTicketRequest {
+  id: string;
+}
+
 export interface CreateReportTemplateRequest {
   body: ApiReportTemplateCreateRequest;
 }
@@ -6015,6 +6118,10 @@ export interface DownloadPostgreSqlPhysicalBackupWithTicketRequest {
 
 export interface DownloadQueriedInvoicesRequest {
   body: ApiQueryInvoiceFilterRequest;
+}
+
+export interface DownloadRecoveryArchiveWithTicketRequest {
+  token: string;
 }
 
 export interface DownloadReportTemplateFileRequest {
@@ -7098,6 +7205,10 @@ export interface SaveAuditLogsToPathRequest {
   body: ApiAuditLogPathExportRequest;
 }
 
+export interface SaveBackupPlanRequest {
+  body: ApiBackupPlanSaveRequest;
+}
+
 export interface SaveBusinessAttachmentToPathRequest {
   id: number;
   revision: number;
@@ -7239,6 +7350,11 @@ export interface ShareEmailTemplateRequest {
 export interface ShareUserReportTemplateRequest {
   id: number;
   body: ApiUserReportTemplateShareRequest;
+}
+
+export interface StageRecoveryArchiveRestoreRequest {
+  id: string;
+  body: ApiRecoveryArchiveRestoreRequest;
 }
 
 export interface StageServerMigrationRestoreRequest {
@@ -8509,6 +8625,11 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public createRecoveryArchiveDownloadTicket(request: CreateRecoveryArchiveDownloadTicketRequest, init?: ApiRequestInit): Promise<ApiDownloadTicket> {
+    const path = `/api/disaster-recovery/archives/${encodePath(request.id)}/download-ticket`;
+    return this.request<ApiDownloadTicket>("POST", path, { init });
+  }
+
   public createReportTemplate(request: CreateReportTemplateRequest, init?: ApiRequestInit): Promise<ApiReportTemplateContentDto> {
     const path = "/api/reports/templates";
     return this.request<ApiReportTemplateContentDto>("POST", path, {
@@ -9106,6 +9227,11 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public downloadRecoveryArchiveWithTicket(request: DownloadRecoveryArchiveWithTicketRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/disaster-recovery/archives/downloads/${encodePath(request.token)}`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
   public downloadReportTemplateFile(request: DownloadReportTemplateFileRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = "/api/reports/templates/file/download";
     return this.request<Blob>("POST", path, {
@@ -9201,6 +9327,11 @@ export class ExportDocManagerApiClient {
   public getAnnouncement(request: GetAnnouncementRequest, init?: ApiRequestInit): Promise<Announcement> {
     const path = `/api/office/announcements/${encodePath(request.id)}`;
     return this.request<Announcement>("GET", path, { init });
+  }
+
+  public getBackupPlan(init?: ApiRequestInit): Promise<ApiBackupPlanStatus> {
+    const path = "/api/disaster-recovery/plan";
+    return this.request<ApiBackupPlanStatus>("GET", path, { init });
   }
 
   public getBusinessAttachment(request: GetBusinessAttachmentRequest, init?: ApiRequestInit): Promise<BusinessAttachmentDetails> {
@@ -11136,6 +11267,11 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public runBackupPlan(init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
+    const path = "/api/disaster-recovery/plan/run";
+    return this.request<BackgroundJobSnapshot>("POST", path, { init });
+  }
+
   public runShutdownMaintenance(init?: ApiRequestInit): Promise<ApiShutdownMaintenanceResponse> {
     const path = "/api/system/shutdown-maintenance";
     return this.request<ApiShutdownMaintenanceResponse>("POST", path, { init });
@@ -11160,6 +11296,14 @@ export class ExportDocManagerApiClient {
   public saveAuditLogsToPath(request: SaveAuditLogsToPathRequest, init?: ApiRequestInit): Promise<ApiAuditLogCommandResponse> {
     const path = "/api/audit-logs/save-to-path";
     return this.request<ApiAuditLogCommandResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public saveBackupPlan(request: SaveBackupPlanRequest, init?: ApiRequestInit): Promise<ApiBackupPlanStatus> {
+    const path = "/api/disaster-recovery/plan";
+    return this.request<ApiBackupPlanStatus>("PUT", path, {
       body: request.body,
       init,
     });
@@ -11430,6 +11574,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public stageRecoveryArchiveRestore(request: StageRecoveryArchiveRestoreRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
+    const path = `/api/disaster-recovery/archives/${encodePath(request.id)}/restore`;
+    return this.request<BackgroundJobSnapshot>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public stageServerMigrationRestore(request: StageServerMigrationRestoreRequest, init?: ApiRequestInit): Promise<ApiServerMigrationRestoreResponse> {
     const path = "/api/server-migration/restore";
     return this.request<ApiServerMigrationRestoreResponse>("POST", path, {
@@ -11635,6 +11787,11 @@ export class ExportDocManagerApiClient {
       body: request.body,
       init,
     });
+  }
+
+  public testBackupReplica(init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
+    const path = "/api/disaster-recovery/plan/test-replica";
+    return this.request<BackgroundJobSnapshot>("POST", path, { init });
   }
 
   public testCloudBackupConnection(init?: ApiRequestInit): Promise<ApiCloudBackupCommandResponse> {
@@ -12502,8 +12659,9 @@ export class ExportDocManagerApiClient {
 }
 
 function normalizeTimeout(value: number): number {
-  if (!Number.isFinite(value) || value < 0 || value > 60 * 60 * 1000) {
-    throw new RangeError("API request timeout must be between 0 and 3600000 milliseconds.");
+  const maximum = 24 * 60 * 60 * 1000;
+  if (!Number.isFinite(value) || value < 0 || value > maximum) {
+    throw new RangeError(`API request timeout must be between 0 and ${maximum} milliseconds.`);
   }
   return Math.trunc(value);
 }

@@ -65,41 +65,31 @@ function invoice() {
     text("terms-label","Payment Terms:",15,71,21,5,7),field("terms","Invoice.PaymentTerms",36,71,69,5,7),rule("terms-rule",36,76,69),
     text("issuer-label","Issued by:",105,71,15,5,7),text("issuer","",120,71,75,5,7),rule("issuer-rule",120,76,75),
   );
-  // One editable product row. Document fields, rules and totals have their own layers.
-  const namedField=(id,label,path,x,y,w,h=4,align="Left",bold=false)=>({...field(id,path,x,y,w,h,7,align,bold),label});
-  d.detailRowHeightHundredthMm=mm(12);
-  d.layers[0].elements.push(
-    grid("invoice-headings",15,78,180,[32/1.8,115/1.8,33/1.8],[[8,[cell("marks-heading","唛头 / Marks",1,{style:{bold:true}}),cell("goods-heading","货品名称 / Quantities and Descriptions",1,{style:{bold:true}}),cell("amount-heading","金额 / Amount",1,{style:{bold:true}})]]],7,sans),
-  );
-  d.layers[1].elements=[
-    namedField("item-name","货品名称","item.StyleName",49,100,34),
-    namedField("item-po","客户 PO","item.PoNumber",49,104,34),
-    namedField("item-style","款号","item.StyleNo",49,108,34),
-    namedField("item-cartons","箱数","item.Cartons",85,108,10,4,"Right"),
-    namedField("item-carton-unit","箱数单位","item.CtnUnitEN",95,108,12),
-    namedField("item-quantity","数量","item.Quantity",108,108,12,4,"Right"),
-    namedField("item-quantity-unit","数量单位","item.UnitEN",120,108,12),
-    namedField("item-price","单价","item.UnitPrice",134,108,26,4,"Right"),
-    namedField("item-amount","金额","item.TotalPrice",164,108,29,4,"Right"),
-  ];
-  for(const e of d.layers[1].elements) if(e.yHundredthMm===mm(108)) { e.style.verticalAlign="Bottom"; e.style.paddingHundredthMm=0; }
-  for(const e of d.layers[1].elements) if(["item-price","item-amount"].includes(e.id)) e.fieldFormat="Currency";
-  const first={...d.layers[0],id:"invoice-first",name:"首页单据信息",print:{...d.layers[0].print,firstPageOnly:true},elements:[
-    namedField("shipping-marks","唛头","Invoice.ShippingMarks",16,100,30,100),
-    namedField("trade-terms","价格条款","Invoice.TradeTerms",164,87,29,5,"Right"),
-  ]};
-  const lines=[15,47,162,195].map((x,i)=>({...element(`invoice-rule-${i}`,"Line",x-2,86,4,159,{direction:"Vertical"}),style:{borderStyle:"Solid",borderWidthPx:0.6,borderColor:"#000000"}}));
-  d.layers[3].elements=[...lines,{...rule("invoice-bottom",15,245,180),style:{borderStyle:"Solid",borderWidthPx:0.6,borderColor:"#000000"}}];
+  const t=table("invoice-items",15,78,180,[
+    column("description","货品名称 / Description","item.StyleName",36,"Left",[F("item.StyleName"),NL(),F("item.PoNumber"),NL(),F("item.StyleNo")]),
+    column("cartons","箱数\nCartons","item.Cartons",22,"Right",[F("item.Cartons"),F("item.CtnUnitEN")]),
+    column("quantity","数量\nQuantity","item.Quantity",26,"Right",[F("item.Quantity"),F("item.UnitEN")]),
+    column("price","单价\nUnit Price","item.UnitPrice",31,"Right",[F("Invoice.Currency"),F("item.UnitPrice")]),
+    column("amount","金额\nAmount","item.TotalPrice",33,"Right",[F("Invoice.Currency"),F("item.TotalPrice")]),
+  ],7);
+  t.heightHundredthMm=mm(142);
+  t.block.print.fillHeight=true;
+  t.block.sideBand={title:"唛头 / Marks",widthMm:32,contentKind:"Field",text:"",fieldPath:"Invoice.ShippingMarks",firstPageOnly:true,style:{fontSizePt:7}};
+  t.block.columns[0].omitEmptyLines=true;
+  t.block.rowSeparators=false;
+  t.block.bodyStyle.verticalAlign="Bottom";
+  t.block.columns.forEach((column,index)=>{column.border={...border,left:index===0||index===4,right:index===4};});
+  summary(t,{cartons:"total_by_ctn_unit",quantity:"total_by_qty_unit",amount:"Invoice.AdjustedTotalAmount"});
+  t.block.adjustments={descriptionColumnId:"description",amountColumnId:"amount"};
+  t.block.summaryRow.cells.find(cell=>cell.columnId==="amount").fieldFormat="Currency";
+  t.block.summaryRow.style.marginTopMm=2.5;
+  t.block.summaryRow.border={...border,style:"Dashed",widthPx:0.8,right:false,bottom:false,left:false};
+  t.block.introRow={label:"",labelColumnSpan:4,style:{fontSizePt:7},cells:[{columnId:"amount",contentKind:"Field",fieldPath:"Invoice.TradeTerms",text:""}]};
+  d.layers[1].elements=[t];
   const final=d.layers.find(layer=>layer.id==="final");
   final.name="末页合计、条款与签章";
   final.print.followBody=true;
   final.elements=[
-    rule("total-rule",47,117,148),text("total-label","TOTAL:",49,121,34,9,7,"Left",true),
-    namedField("total-cartons","总箱数","total_by_ctn_unit.Value",85,121,10,9,"Right",true),
-    namedField("total-carton-unit","总箱数单位","total_by_ctn_unit.Key",95,121,12,9,"Left",true),
-    namedField("total-quantity","总数量","total_by_qty_unit.Value",108,121,12,9,"Right",true),
-    namedField("total-quantity-unit","总数量单位","total_by_qty_unit.Key",120,121,12,9,"Left",true),
-    namedField("total-amount","总金额","Invoice.TotalAmount",164,121,29,9,"Right",true),
     element("special-terms","Flow",49,134,67,39,{label:"特殊条款（有内容时显示）",flowKind:"Conditional",block:{
       id:"special-terms-block",type:"Conditional",
       condition:{fieldPath:"Invoice.SpecialTerms",operator:"HasValue",value:""},
@@ -109,9 +99,6 @@ function invoice() {
     }},7),
     seal("seal","doc_seal_path",122,141.5,56,35),
   ];
-  for(const e of final.elements) if(e.type === "Field" || e.type === "Text") { e.yHundredthMm+=e.style.paddingHundredthMm; e.style.paddingHundredthMm=0; }
-  d.layers.push(first);
-  final.elements.find(e=>e.id==="total-amount").fieldFormat="Currency";
   const labels={company:"公司名称", "company-address":"公司地址",customer:"客户名称","customer-address":"客户地址","invoice-no":"发票号码","contract-no":"合同号码","invoice-date":"发票日期",loading:"起运港",destination:"目的港",terms:"付款条件"};
   for(const layer of d.layers) for(const e of layer.elements) if(labels[e.id]) e.label=labels[e.id];
   return d;
@@ -152,7 +139,7 @@ function contract() {
   d.layers[1].elements=[t,
     grid("delivery",15,132,180,[20,25,25,30],[[10,[binding("shipment","Invoice.ShipmentDate",2,{label:"装运期限 / Time of shipment"}),cell("partial","装运港允许分批装运\nShipment quantity 5% more or less allowed",2)]],[10,[binding("loading","Invoice.PortOfLoading",2,{label:"装运港 / Port of loading"}),binding("destination","Invoice.PortOfDestination",2,{label:"目的港 / Port of destination"})]]],7,sans,false),
     grid("clauses",15,154,180,[100],[[32,[cell("delivery-insurance","(9)交货条件：FOB/CFR/CIF 若无另外规定均按照《国际贸易术语解释通则（ TNCOTERMS）1990》办理。\nTerms of delivery: FOB/CFR/CIF shall conform to 《INCOTERMS1990》unless otherwise agreed.\n(10)保 险：由卖方按发票总值的110%投保一切险加战争险，如买方欲增加其他险别或超过上述额度保险时须事先征得卖方同意，增加的保费由买方承担。\nInsurance: To be covered by the sellers for 110% of the total value against, all risks and war risks. Should the Buyers desire to cover for other risks besides the above mentioned or for an amount exceeding the above mentioned limit. The sellers’ approval must be obtained first and all additional premium charges incurred therewith shall be for buyers’ account.")]]],7,sans,false),
-    grid("payment-special",15,188,100,[100],[[9,[binding("payment","Invoice.PaymentTerms",1,{label:"(11)付款条件 / Terms of payment"})]], [27,[binding("special","Invoice.SpecialTerms")]]],7,sans,false),
+    grid("payment-terms",15,188,100,[100],[[9,[binding("payment","Invoice.PaymentTerms",1,{label:"(11)付款条件 / Terms of payment"})]]],7,sans,false),
     grid("signatures",15,227,180,[50,50],[[10,[cell("buyer-sign","买方签字：\nThe buyers' signature:"),cell("seller-sign","卖方签字：\nThe sellers' signature:")]]],7,sans,false),
   ];
   const contractTail = d.layers[1].elements.splice(1);

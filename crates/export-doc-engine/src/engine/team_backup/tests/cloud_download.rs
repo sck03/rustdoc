@@ -58,11 +58,13 @@ fn cloud_download_preserves_backups_and_reclaims_staging() {
             }
             ready.send(()).unwrap();
             proceed.recv_timeout(Duration::from_secs(5)).unwrap();
-            write!(
+            let header_sent = write!(
                 stream,
                 "HTTP/1.1 {status} Test\r\nContent-Length: {length}\r\nConnection: close\r\n\r\n"
-            )
-            .unwrap();
+            );
+            if mode != "cancel" {
+                header_sent.unwrap();
+            }
             let sent = stream.write_all(&body);
             if mode != "cancel" {
                 sent.unwrap();

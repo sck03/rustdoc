@@ -13,6 +13,7 @@ pub struct Reply {
     pub bytes: Vec<u8>,
     pub file: Option<(String, String)>,
     pub cookie: Option<String>,
+    pub stream: Option<(std::fs::File, u64)>,
 }
 impl Reply {
     pub fn bytes(bytes: Vec<u8>) -> Self {
@@ -20,6 +21,7 @@ impl Reply {
             bytes,
             file: None,
             cookie: None,
+            stream: None,
         }
     }
     pub fn file(file: FileOutput) -> Self {
@@ -27,6 +29,23 @@ impl Reply {
             bytes: file.content,
             file: Some((file.file_name, file.media_type)),
             cookie: None,
+            stream: None,
+        }
+    }
+    pub fn download(download: export_doc_engine::engine::backup_io::Download) -> Self {
+        match download {
+            export_doc_engine::engine::backup_io::Download::Memory(file) => Self::file(file),
+            export_doc_engine::engine::backup_io::Download::File {
+                file_name,
+                media_type,
+                file,
+                size,
+            } => Self {
+                bytes: vec![],
+                file: Some((file_name, media_type)),
+                cookie: None,
+                stream: Some((file, size)),
+            },
         }
     }
 }
@@ -64,7 +83,20 @@ pub fn success(operation: Operation, reply: Reply) -> Response<Body> {
         .and_then(|m| m.keys().next())
         .map(String::as_str)
         .unwrap_or("application/json");
-    let mut response = Response::new(Body::from(reply.bytes));
+    let mut response = if let Some((file, size)) = reply.stream {
+        use tokio::io::AsyncReadExt;
+        let stream = tokio_util::io::ReaderStream::with_capacity(
+            tokio::fs::File::from_std(file).take(size),
+            64 * 1024,
+        );
+        let mut response = Response::new(Body::from_stream(stream));
+        response
+            .headers_mut()
+            .insert(header::CONTENT_LENGTH, size.into());
+        response
+    } else {
+        Response::new(Body::from(reply.bytes))
+    };
     if let Some((status, _)) = success {
         if let Ok(status) = status.parse::<u16>() {
             *response.status_mut() = StatusCode::from_u16(status).unwrap_or(StatusCode::OK);

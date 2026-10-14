@@ -1,6 +1,7 @@
 import { ImageSourceEditor } from "./ReportDesignerV3ImageProperties.tsx";
 import { ElementStyleEditor, FlowStyleEditor, ReportDesignerFontFamilyField } from "./ReportDesignerV3StyleProperties.tsx";
-import { alignProductSummary } from "./reportDesignerProductFields.ts";
+import { alignProductSummary, insertProductSpacer } from "./reportDesignerProductFields.ts";
+import { ReportDesignerProductVisibility } from "./ReportDesignerProductVisibility.tsx";
 import { isShippingMarksField } from "./reportDesignerFieldRendering.ts";
 import { NumberField, SelectField, InspectorTitle, focusDesignerNode } from "./ReportDesignerV3InspectorControls.tsx";
 import { useState } from "react";
@@ -231,6 +232,7 @@ export function ElementInspector({
     <div className="report-designer-v3-inspector-content">
       <InspectorTitle title={element.type === "Field" ? element.fieldPath.startsWith("item.") ? "商品明细字段" : "普通字段" : element.type === "Flow" ? reportDesignerV3ElementText(element) : reportDesignerV3ElementKindLabel(element)} subtitle={`${element.label || v3RegionNames[layer.role]}${element.locked || layer.locked ? " · 已锁定" : ""}`} />
       {element.type === "Field" ? <small>{productField ? "每件商品重复一次，直接拖动字段排好这一行。" : "普通字段独立显示，不随商品重复。"}</small> : null}
+      {(productField || element.type === "ProductSpacer") && <ReportDesignerProductVisibility element={element} fieldGroups={fieldGroups} editable={editable} onPatch={onPatch} onAddSpacer={() => onCommit(insertProductSpacer(state))} />}
       {alignedSummary !== state ? <button type="button" className="command-button secondary" disabled={!editable} onClick={() => onCommit(alignedSummary)}>合计与明细同列对齐</button> : null}
       {element.type === "Field" ? <>{content}<ElementStyleEditor element={element} pageFontSizePt={state.schema.page.fontSizePt} editable={editable} onPatch={onPatchStyle} />{geometry}
         {productField ? <details className="report-designer-property-section"><summary>商品行距</summary><NumberField label="商品行距 (mm)" value={(state.schema.detailRowHeightHundredthMm ?? 1200) / 100} min={4} max={100} disabled={!editable} onCommit={value => onCommit({ ...state, schema: { ...state.schema, detailRowHeightHundredthMm: Math.round(value * 100) } })} /><small>所有商品列共用最小行距，长文字自动撑高。</small></details> : null}
@@ -270,6 +272,8 @@ function ElementContentEditor({ element, reportType, resources, fieldGroups, edi
       return <fieldset className="report-designer-v3-flow-editor" aria-label="表格与内容属性" disabled={!editable}><ReportDesignerV3FlowProperties block={element.block} widthMm={hundredthMmToMm(element.widthHundredthMm)} fieldGroups={fieldGroups} selectedGridCellId={selectedGridCellId} selectedGridEndCellId={selectedGridEndCellId} onSelectGridCell={onSelectGridCell} onCommit={onFlowCommit} /></fieldset>;
     case "Rectangle":
       return null;
+    case "ProductSpacer":
+      return <p>保留空白高度，在“布局”中设置位置和大小；不输出文字或边框。</p>;
   }
 }
 

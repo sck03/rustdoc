@@ -154,6 +154,15 @@ try {
   );
   assert.equal(requests.length, 3, "caller cancellation during token resolution must not start a fetch request");
 
+  const transferController = new AbortController();
+  const transferStarted = new Promise(resolve => { notifyRequestStarted = resolve; });
+  const transfer = client.getHealth({ signal: transferController.signal, timeoutMs: 24 * 60 * 60 * 1000 });
+  await transferStarted;
+  notifyRequestStarted = undefined;
+  transferController.abort();
+  await assert.rejects(transfer, { name: "AbortError" }, "long backup transfers must remain cancelable");
+  await assert.rejects(client.getHealth({ timeoutMs: 24 * 60 * 60 * 1000 + 1 }), RangeError, "timeouts remain explicitly bounded");
+
   console.log("API client timeout and cancellation contracts passed.");
 } finally {
   fs.rmSync(workspace, { recursive: true, force: true });

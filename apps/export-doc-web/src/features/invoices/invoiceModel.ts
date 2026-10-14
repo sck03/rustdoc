@@ -131,6 +131,7 @@ export function createEmptyInvoice(businessDate: string): ApiInvoiceDetailDto {
     status: "Draft",
     type: "报关数据",
     totalAmount: 0,
+    amountAdjustments: [],
     totalCartons: 0,
     totalQuantity: 0,
     totalGrossWeight: 0,
@@ -211,6 +212,7 @@ export function uppercaseInvoiceEnglishText(invoice: ApiInvoiceDetailDto): ApiIn
     swiftCode: uppercaseAsciiText(invoice.swiftCode),
     shippingMarks: uppercaseAsciiText(invoice.shippingMarks),
     specialTerms: uppercaseAsciiText(invoice.specialTerms),
+    amountAdjustments: (invoice.amountAdjustments ?? []).map(row => ({ ...row, description: uppercaseAsciiText(row.description) })),
     letterOfCreditNo: uppercaseAsciiText(invoice.letterOfCreditNo),
     ...mapDocumentSpareFields(invoice, uppercaseAsciiText),
     items: (invoice.items ?? []).map((item) => ({
@@ -301,6 +303,7 @@ export function normalizeInvoiceForSave(
     exchangeRate: readNumber(String(invoice.exchangeRate)),
     ...normalizeInvoiceShippingMarks(invoice),
     specialTerms: invoice.specialTerms ?? "",
+    amountAdjustments: (invoice.amountAdjustments ?? []).filter(row => row.description.trim() || row.amount.trim()).map(row => ({ description: row.description.trim(), amount: row.amount.trim() })),
     letterOfCreditNo: invoice.letterOfCreditNo?.trim() ?? "",
     letterOfCreditSourcePath: invoice.letterOfCreditSourcePath?.trim() ?? "",
     letterOfCreditContent: invoice.letterOfCreditContent ?? "",

@@ -39,7 +39,7 @@ export function resizeAdjacentRowColumnWidths(
   leftColumnId: string,
   deltaPercent: number,
 ): ReportRowColumn[] {
-  return normalizeRowColumnWidths(resizeAdjacentWidths(columns, leftColumnId, deltaPercent, 1, "widthPercent"));
+  return resizeAdjacentWidths(columns, leftColumnId, deltaPercent, 1, "widthPercent");
 }
 
 export function resizeAdjacentDetailTableColumnWidths(
@@ -192,7 +192,7 @@ export function removeDetailTableColumn(
   block: ReportDetailTableBlock,
   columnId: string,
 ): ReportDetailTableBlock {
-  if (block.columns.length <= 1 || !block.columns.some(column => column.id === columnId)) {
+  if (block.columns.length <= 1 || !block.columns.some(column => column.id === columnId) || (block.adjustments && [block.adjustments.descriptionColumnId, block.adjustments.amountColumnId].includes(columnId))) {
     return block;
   }
 

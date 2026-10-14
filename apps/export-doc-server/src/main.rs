@@ -2,6 +2,7 @@ use export_doc_engine::{engine::NativeService, paths::atomic_write};
 use export_doc_server::{configuration::Configuration, router};
 use export_doc_storage::Connection;
 use std::{sync::Arc, time::Duration};
+mod deployment;
 
 fn main() {
     if let Err(error) = run() {
@@ -12,6 +13,9 @@ fn main() {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
+    if let Some(result) = deployment::command(&args) {
+        return result;
+    }
     if args.first().is_some_and(|arg| arg == "--health-check") {
         if args.len() != 2 {
             return Err("健康检查须指定一个监听地址。".into());
@@ -25,6 +29,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return result.map_err(Into::into);
     }
     let configuration = Configuration::load()?;
+    if let Some(package) = &configuration.migration_package {
+        export_doc_engine::engine::stage_postgres_migration_file(
+            &configuration.paths,
+            &configuration.maintenance_connection,
+            &configuration.owner,
+            package,
+            &configuration.migration_password,
+        )?;
+    }
     if configuration.restore_pending {
         export_doc_engine::engine::apply_pending_postgres_restore(
             &configuration.paths,

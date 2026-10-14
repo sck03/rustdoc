@@ -93,13 +93,14 @@ export function ConditionalBlockProperties({
   );
 }
 
-function ConditionRuleProperties({ rule, fieldGroups, onChange }: {
+export function ConditionRuleProperties({ rule, fieldGroups, onChange, itemContext = false }: {
   rule: ReportConditionalRule;
   fieldGroups: ReportDesignerFieldGroup[];
   onChange: (patch: Partial<ReportConditionalRule>) => void;
+  itemContext?: boolean;
 }) {
   const type = rule.comparisonType ?? "Text";
-  const issue = conditionRuleIssue(rule);
+  const issue = conditionRuleIssue(rule, itemContext);
   function changeType(comparisonType: ReportComparisonType) {
     const operator = conditionOperatorOptions(comparisonType).some(option => option.value === rule.operator) ? rule.operator : "Equals";
     onChange({ comparisonType, operator, ignoreCase: comparisonType === "Text" && rule.ignoreCase === true });

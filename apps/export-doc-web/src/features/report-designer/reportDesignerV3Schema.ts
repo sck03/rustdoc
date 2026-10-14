@@ -118,6 +118,7 @@ export type ReportDesignerV3ElementBase = {
   style: ReportDesignerV3ElementStyle;
   outputEnabled: boolean;
   label?: string;
+  product?: { hideWhenEmpty?: boolean; collapseEmpty?: boolean; condition?: import("./reportDesignerConditions.ts").ReportConditionalRule };
 };
 export type ReportDesignerV3TextElement = ReportDesignerV3ElementBase & {
   type: "Text";
@@ -148,6 +149,7 @@ export type ReportDesignerV3PageNumberElement = ReportDesignerV3ElementBase & {
 export type ReportDesignerV3RectangleElement = ReportDesignerV3ElementBase & {
   type: "Rectangle";
 };
+export type ReportDesignerV3ProductSpacerElement = ReportDesignerV3ElementBase & { type: "ProductSpacer" };
 export type ReportDesignerV3LineElement = ReportDesignerV3ElementBase & {
   type: "Line";
   direction: "Horizontal" | "Vertical";
@@ -171,6 +173,7 @@ export type ReportDesignerV3Element =
   | ReportDesignerV3ImageElement
   | ReportDesignerV3PageNumberElement
   | ReportDesignerV3RectangleElement
+  | ReportDesignerV3ProductSpacerElement
   | ReportDesignerV3LineElement
   | ReportDesignerV3FlowElement;
 
@@ -205,6 +208,8 @@ export function reportDesignerV3ElementText(element: ReportDesignerV3Element) {
       return element.format === "CurrentOfTotal" ? "页码/总页数" : "当前页码";
     case "Rectangle":
       return "矩形";
+    case "ProductSpacer":
+      return "商品占位行";
     case "Line":
       return element.direction === "Horizontal" ? "水平线" : "垂直线";
     case "Flow":
@@ -212,7 +217,10 @@ export function reportDesignerV3ElementText(element: ReportDesignerV3Element) {
   }
 }
 
-const elementKindLabels = { Text: "文本", Field: "字段", Image: "图片", PageNumber: "页码", Rectangle: "矩形", Line: "线条" };
+const elementKindLabels = { Text: "文本", Field: "字段", Image: "图片", PageNumber: "页码", Rectangle: "矩形", Line: "线条", ProductSpacer: "商品占位行" };
+export function isProductElement(element: ReportDesignerV3Element) {
+  return element.type === "ProductSpacer" || (element.type === "Field" && element.fieldPath.startsWith("item."));
+}
 export function reportDesignerV3ElementKindLabel(element: ReportDesignerV3Element) {
   return element.type === "Flow" ? reportDesignerV3ElementText(element) : elementKindLabels[element.type];
 }

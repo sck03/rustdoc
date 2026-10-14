@@ -138,6 +138,8 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify installation directly from the image
+        run: node scripts/test_native_docker_image.mjs
       - name: Export validated image for download
         if: ${{ !inputs.publish }}
         run: |

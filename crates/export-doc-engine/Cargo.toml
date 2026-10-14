@@ -17,6 +17,7 @@ mail = ["dep:export-doc-mail"]
 ocr = []
 ai = ["dep:export-doc-ai"]
 single-window = ["dep:export-doc-single-window"]
+s3-backup = ["dep:aws-sigv4", "dep:aws-credential-types"]
 
 [dependencies]
 export-doc-single-window = { path = "../export-doc-single-window", optional = true }
@@ -40,6 +41,8 @@ image.workspace = true
 pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881", "image_025"] }
 chrono.workspace = true
 base64.workspace = true
+aws-sigv4 = { workspace = true, optional = true }
+aws-credential-types = { workspace = true, optional = true }
 aes-gcm = { version = "=0.11.1", default-features = false, features = ["aes", "alloc", "zeroize"] }
 zeroize = "=1.9.0"
 chrono-tz = { version = "=0.10.4", default-features = false, features = ["std"] }

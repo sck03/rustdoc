@@ -188,14 +188,16 @@ export function createSettingsBackupSmokeScene(runtime) {
 
     const backupUrl = buildSettingsSectionUrl(options.webUrl, "backup", "smokeBackupSettings");
     await page.send("Page.navigate", { url: backupUrl });
+    await waitForPageExpression(page, `Boolean(document.querySelector('[aria-label="数据备份与还原"] details'))`, timeoutMs, "Backup tools did not load.");
+    await evaluate(page, `document.querySelector('[aria-label="数据备份与还原"] details').open=true`, false);
     const backupExpectedText = [
       "备份与恢复",
-      "数据备份与还原",
+      "恢复与校验",
       "备份目录",
       "Backups",
-      "创建备份",
+      "创建数据库快照",
       "保留天数",
-      "清理旧备份",
+      "清理旧快照",
       "还原备份",
       "确认文本",
       "还原数据库",
@@ -214,8 +216,8 @@ export function createSettingsBackupSmokeScene(runtime) {
           panel.querySelector('.backup-table') &&
           panel.querySelector('input[placeholder="RESTORE"]') &&
           (panel.innerText || '').includes('Backups') &&
-          buttons.some((button) => (button.innerText || '').includes('创建备份')) &&
-          buttons.some((button) => (button.innerText || '').includes('清理旧备份')) &&
+          buttons.some((button) => (button.innerText || '').includes('创建数据库快照')) &&
+          buttons.some((button) => (button.innerText || '').includes('清理旧快照')) &&
           buttons.some((button) => (button.innerText || '').includes('还原数据库')));
       })()`,
       timeoutMs,
@@ -504,7 +506,7 @@ export function createSettingsBackupSmokeScene(runtime) {
       page,
       `Boolean(document.querySelector('[aria-label="数据备份与还原"] .backup-table') &&
         Array.from(document.querySelectorAll('[aria-label="数据备份与还原"] button'))
-          .some((button) => (button.innerText || '').includes('创建备份') && !button.disabled))`,
+          .some((button) => (button.innerText || '').includes('创建数据库快照') && !button.disabled))`,
       timeoutMs,
       "Timed out waiting for the backup create button.",
     );
@@ -567,7 +569,7 @@ export function createSettingsBackupSmokeScene(runtime) {
       page,
       `Boolean(document.querySelector('[aria-label="数据备份与还原"] .backup-table') &&
         Array.from(document.querySelectorAll('[aria-label="数据备份与还原"] button'))
-          .some((button) => (button.innerText || '').includes('创建备份') && !button.disabled))`,
+          .some((button) => (button.innerText || '').includes('创建数据库快照') && !button.disabled))`,
       timeoutMs,
       "Timed out waiting for the backup restore smoke panel.",
     );
@@ -819,12 +821,14 @@ export function createSettingsBackupSmokeScene(runtime) {
         };
 
         if (payload.action === "create") {
-          const button = await waitForButton((item) => (item.innerText || item.textContent || "").includes("创建备份"), "创建备份");
+          const button = await waitForButton((item) => (item.innerText || item.textContent || "").includes("创建数据库快照"), "创建数据库快照");
           button.click();
           return { action: payload.action, submitted: true };
         }
 
         if (payload.action === "restore") {
+          const advanced = Array.from(section.querySelectorAll('details')).find(node=>node.querySelector('summary')?.textContent.includes('恢复数据库或清理旧快照'));
+          if (advanced) advanced.open = true;
           setNativeValue(fieldByLabel("还原备份"), payload.backupFileName);
           setNativeValue(fieldByLabel("确认文本"), payload.confirmationText);
           const button = await waitForButton((item) => (item.innerText || item.textContent || "").includes("还原数据库"), "还原数据库");

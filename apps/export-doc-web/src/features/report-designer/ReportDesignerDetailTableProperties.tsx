@@ -7,6 +7,7 @@ import { ReportDesignerDetailTableLayoutProperties } from "./ReportDesignerDetai
 import { ReportDesignerDetailTableSummaryProperties } from "./ReportDesignerDetailTableSummaryProperties.tsx";
 import { ReportDesignerDetailTablePrintProperties } from "./ReportDesignerDetailTablePrintProperties.tsx";
 import { DesignerPropertyTabs } from "./ReportDesignerPropertyControls.tsx";
+import { ReportDesignerDetailAdjustmentsProperties } from "./ReportDesignerDetailAdjustmentsProperties.tsx";
 
 export function DetailTableProperties({
   block,
@@ -29,6 +30,7 @@ export function DetailTableProperties({
           <ReportDesignerDetailTablePrintProperties block={block} fieldGroups={fixedFields} onCommit={onCommit} />
           <details><summary>分组与小计</summary><ReportDesignerDetailTableGroupingProperties block={block} fieldGroups={fieldGroups} onCommit={onCommit} /></details>
           <details><summary>末页合计</summary><ReportDesignerDetailTableSummaryProperties block={block} fieldGroups={fixedFields} onCommit={onCommit} /></details>
+          <details><summary>定金与费用调整</summary><ReportDesignerDetailAdjustmentsProperties block={block} onCommit={onCommit} /></details>
           <details><summary>首页说明行</summary><ReportDesignerDetailTableSummaryProperties title="明细前说明行（仅首页）" block={{...block, summaryRow:block.introRow}} fieldGroups={fixedFields} onCommit={next => { if(next.type === "DetailTable") onCommit({...block,introRow:next.summaryRow}); }} /></details>
         </div>
       </DesignerPropertyTabs>

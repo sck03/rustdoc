@@ -145,8 +145,9 @@ export class ExportDocManagerApiClient {
 }
 
 function normalizeTimeout(value: number): number {
-  if (!Number.isFinite(value) || value < 0 || value > 60 * 60 * 1000) {
-    throw new RangeError("API request timeout must be between 0 and 3600000 milliseconds.");
+  const maximum = 24 * 60 * 60 * 1000;
+  if (!Number.isFinite(value) || value < 0 || value > maximum) {
+    throw new RangeError(`API request timeout must be between 0 and ${maximum} milliseconds.`);
   }
   return Math.trunc(value);
 }

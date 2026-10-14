@@ -1,15 +1,16 @@
 //! 密封包格式：zip 负载 + AES-256-GCM 密封，密钥由包密码经 PBKDF2-HMAC-SHA256 派生。
 //! 灾备包与服务器迁移包共用同一格式，仅幻数与清单结构不同。
 use super::error::{Result, invalid, unavailable};
+use crate::engine::backup_io::{copy_and_hash, copy_chunks};
 use aes_gcm::{
-    Aes256Gcm, Nonce,
-    aead::{Aead, KeyInit, Payload},
+    Aes256Gcm, Nonce, Tag,
+    aead::{AeadInOut, KeyInit},
 };
 use pbkdf2::pbkdf2_hmac_array;
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use std::{
     fs,
-    io::{Read, Write},
+    io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
@@ -17,34 +18,14 @@ use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 const PBKDF2_ITERATIONS: u32 = 200_000;
 const SALT_LENGTH: usize = 32;
 const NONCE_LENGTH: usize = 12;
-pub(super) const MAX_PLAINTEXT_BYTES: usize = 256 * 1024 * 1024;
+pub(super) const MAX_EXPANDED_BYTES: u64 = crate::engine::backup_io::MAX_FILE_BYTES;
+pub(super) const MAX_PACKAGE_BYTES: u64 = MAX_EXPANDED_BYTES;
+const LEGACY_MAX_BYTES: usize = 256 * 1024 * 1024;
+#[cfg(test)]
+const MAX_ARCHIVE_BYTES: usize = LEGACY_MAX_BYTES - 128;
+mod stream;
+pub(super) use stream::{open as open_to, seal as seal_to};
 pub(super) const MAX_FILES: usize = 4096;
-
-/// Copy with a fixed buffer, observing cancellation and the actual byte count.
-/// The digest describes exactly the bytes written, including when a file changes.
-fn copy_and_hash(
-    input: &mut impl Read,
-    output: &mut impl Write,
-    maximum: u64,
-) -> Result<(u64, String)> {
-    let mut buffer = [0_u8; 64 * 1024];
-    let mut size = 0_u64;
-    let mut digest = Sha256::new();
-    loop {
-        crate::operation::check()?;
-        let count = (maximum - size).saturating_add(1).min(buffer.len() as u64) as usize;
-        let read = input.read(&mut buffer[..count])?;
-        if read == 0 {
-            return Ok((size, super::hex(&digest.finalize())));
-        }
-        if read as u64 > maximum - size {
-            return Err(invalid("包内容超过容量上限。"));
-        }
-        output.write_all(&buffer[..read])?;
-        digest.update(&buffer[..read]);
-        size += read as u64;
-    }
-}
 
 /// 一个待密封的文件条目：磁盘路径 + 包内相对路径。
 pub(super) struct Entry<'a> {
@@ -53,35 +34,48 @@ pub(super) struct Entry<'a> {
 }
 
 /// 生成 zip 负载。条目顺序与清单顺序一致，调用方负责写清单。
-pub(super) fn zip_payload(entries: &[Entry<'_>]) -> Result<Vec<u8>> {
-    let mut writer = ZipWriter::new(std::io::Cursor::new(Vec::new()));
+pub(super) fn zip_payload(entries: &[Entry<'_>], output: impl Write + Seek) -> Result<()> {
+    let mut writer = ZipWriter::new(output);
     let mut total = 0_u64;
     for entry in entries {
         crate::operation::check()?;
         crate::paths::ensure_safe_absolute(entry.source).map_err(invalid)?;
         let mut input = fs::File::open(entry.source)?;
-        let remaining = MAX_PLAINTEXT_BYTES as u64 - total;
+        let remaining = MAX_EXPANDED_BYTES as u64 - total;
         if input.metadata()?.len() > remaining {
-            return Err(invalid("包内容超过 256 MiB 明文上限。"));
+            return Err(invalid("包展开内容超过可表示的文件大小。"));
         }
         writer
             .start_file(
                 entry.name,
-                SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
+                SimpleFileOptions::default()
+                    .large_file(true)
+                    .compression_method(CompressionMethod::Deflated),
             )
             .map_err(|cause| unavailable(cause.to_string()))?;
-        total += copy_and_hash(&mut input, &mut writer, remaining)?.0;
+        total += copy_chunks(&mut input, &mut writer, remaining, |_| {})?;
     }
-    let cursor = writer
+    let mut output = writer
         .finish()
         .map_err(|cause| unavailable(cause.to_string()))?;
-    Ok(cursor.into_inner())
+    if output.seek(SeekFrom::End(0))? > MAX_PACKAGE_BYTES {
+        return Err(invalid("压缩后的迁移/灾备包超过可表示的文件大小。"));
+    }
+    output.flush()?;
+    Ok(())
 }
 
 /// 派生密钥并密封负载。返回magic || salt || nonce || ciphertext。
-pub(super) fn seal(magic: &[u8], password: &str, payload: &[u8]) -> Result<Vec<u8>> {
-    if payload.len() > MAX_PLAINTEXT_BYTES {
-        return Err(invalid("包内容超过 256 MiB 明文上限。"));
+#[cfg(test)]
+pub(super) fn seal(
+    magic: &[u8],
+    password: &str,
+    payload: Vec<u8>,
+    output: &mut impl Write,
+) -> Result<()> {
+    let mut payload = zeroize::Zeroizing::new(payload);
+    if magic.len() > 64 || payload.len() > MAX_ARCHIVE_BYTES {
+        return Err(invalid("压缩后的迁移/灾备包超过 256 MiB 传输上限。"));
     }
     let mut salt = vec![0u8; SALT_LENGTH];
     getrandom::fill(&mut salt).map_err(|_| unavailable("无法生成包随机盐。"))?;
@@ -94,40 +88,60 @@ pub(super) fn seal(magic: &[u8], password: &str, payload: &[u8]) -> Result<Vec<u
         Aes256Gcm::new_from_slice(key.as_ref()).map_err(|_| unavailable("包密钥长度无效。"))?;
     let mut nonce = [0u8; NONCE_LENGTH];
     getrandom::fill(&mut nonce).map_err(|_| unavailable("无法生成包随机数。"))?;
-    let encrypted = cipher
-        .encrypt(
-            &Nonce::from(nonce),
-            Payload {
-                msg: payload,
-                aad: magic,
-            },
-        )
+    crate::operation::check()?;
+    let tag = cipher
+        .encrypt_inout_detached(&Nonce::from(nonce), magic, payload.as_mut_slice().into())
         .map_err(|_| unavailable("密封加密失败。"))?;
-    let mut output = Vec::with_capacity(magic.len() + salt.len() + nonce.len() + encrypted.len());
-    output.extend_from_slice(magic);
-    output.extend_from_slice(&salt);
-    output.extend_from_slice(&nonce);
-    output.extend_from_slice(&encrypted);
-    Ok(output)
+    crate::operation::check()?;
+    output.write_all(magic)?;
+    output.write_all(&salt)?;
+    output.write_all(&nonce)?;
+    output.write_all(&payload)?;
+    output.write_all(&tag)?;
+    Ok(())
 }
 
 /// 打开密封包。校验幻数、大小上限与认证标签。
-pub(super) fn open(magic: &[u8], password: &str, sealed: &[u8]) -> Result<Vec<u8>> {
-    if sealed.len() < magic.len() + SALT_LENGTH + NONCE_LENGTH + 16 {
-        return Err(invalid("包文件不完整或格式无效。"));
+pub(super) fn open(
+    magic: &[u8],
+    password: &str,
+    mut input: impl Read,
+) -> Result<zeroize::Zeroizing<Vec<u8>>> {
+    if magic.len() > 64 {
+        return Err(invalid("包格式标记无效。"));
     }
-    if &sealed[..magic.len()] != magic {
+    let mut header = vec![0_u8; magic.len() + SALT_LENGTH + NONCE_LENGTH];
+    input
+        .read_exact(&mut header)
+        .map_err(|_| invalid("包文件不完整或格式无效。"))?;
+    if &header[..magic.len()] != magic {
         return Err(invalid("包幻数不匹配，不是当前类型的密封包。"));
     }
-    if sealed.len() > MAX_PLAINTEXT_BYTES + 1024 * 1024 {
+    let mut payload = zeroize::Zeroizing::new(Vec::new());
+    // The original format allowed a 256 MiB ZIP plus its authentication tag.
+    copy_chunks(
+        &mut input,
+        &mut *payload,
+        LEGACY_MAX_BYTES as u64 + 16,
+        |_| {},
+    )?;
+    if payload.len() < 16 {
+        return Err(invalid("包文件不完整或格式无效。"));
+    }
+    if payload.len() > LEGACY_MAX_BYTES + 16 {
         return Err(invalid("包文件超过容量上限。"));
     }
-    let salt = &sealed[magic.len()..magic.len() + SALT_LENGTH];
-    let nonce: [u8; NONCE_LENGTH] = sealed
+    let salt = &header[magic.len()..magic.len() + SALT_LENGTH];
+    let nonce: [u8; NONCE_LENGTH] = header
         [magic.len() + SALT_LENGTH..magic.len() + SALT_LENGTH + NONCE_LENGTH]
         .try_into()
         .expect("validated nonce length");
-    let ciphertext = &sealed[magic.len() + SALT_LENGTH + NONCE_LENGTH..];
+    let tag_bytes: [u8; 16] = payload[payload.len() - 16..]
+        .try_into()
+        .expect("validated tag length");
+    let tag = Tag::from(tag_bytes);
+    let size = payload.len() - 16;
+    payload.truncate(size);
     let key = zeroize::Zeroizing::new(pbkdf2_hmac_array::<Sha256, 32>(
         password.as_bytes(),
         salt,
@@ -135,26 +149,41 @@ pub(super) fn open(magic: &[u8], password: &str, sealed: &[u8]) -> Result<Vec<u8
     ));
     let cipher =
         Aes256Gcm::new_from_slice(key.as_ref()).map_err(|_| unavailable("包密钥长度无效。"))?;
+    crate::operation::check()?;
     cipher
-        .decrypt(
+        .decrypt_inout_detached(
             &Nonce::from(nonce),
-            Payload {
-                msg: ciphertext,
-                aad: magic,
-            },
+            magic,
+            payload.as_mut_slice().into(),
+            &tag,
         )
-        .map_err(|_| invalid("包密码错误、包已损坏或本机密钥状态不匹配。"))
+        .map_err(|_| invalid("包密码错误、包已损坏或本机密钥状态不匹配。"))?;
+    crate::operation::check()?;
+    Ok(payload)
 }
 
 /// 把字节数组解包到目标目录，返回解出的文件名清单。解包前必须已通过密封校验。
-pub(super) fn unpack(payload: &[u8], destination: &Path) -> Result<Vec<ManifestFile>> {
+pub(super) fn unpack(payload: impl Read + Seek, destination: &Path) -> Result<Vec<ManifestFile>> {
     crate::paths::ensure_safe_absolute(destination).map_err(invalid)?;
     fs::create_dir_all(destination)?;
-    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(payload))
+    let mut archive = zip::ZipArchive::new(payload)
         .map_err(|cause| invalid(format!("包内容不是有效 zip：{cause}")))?;
     let mut entries = Vec::new();
     if archive.len() > MAX_FILES {
         return Err(invalid("包内文件数量超过上限。"));
+    }
+    let expanded = (0..archive.len()).try_fold(0_u64, |total, index| {
+        let entry = archive
+            .by_index(index)
+            .map_err(|cause| invalid(cause.to_string()))?;
+        total
+            .checked_add(entry.size())
+            .ok_or_else(|| invalid("包展开大小超出可表示范围。"))
+    })?;
+    if expanded > fs2::available_space(destination)? {
+        return Err(unavailable(
+            "恢复暂存目录剩余空间不足以展开此备份，请释放空间或改用容量足够的受管数据目录。",
+        ));
     }
     let mut names = std::collections::BTreeSet::new();
     let mut total = 0_u64;
@@ -169,14 +198,18 @@ pub(super) fn unpack(payload: &[u8], destination: &Path) -> Result<Vec<ManifestF
             .split('/')
             .any(|part| !crate::paths::valid_file_name(part))
             || name.contains('\\')
-            || !names.insert(name.to_lowercase())
+            || !names.insert(if cfg!(windows) {
+                name.to_lowercase()
+            } else {
+                name.clone()
+            })
             || file
                 .unix_mode()
                 .is_some_and(|mode| mode & 0o170000 == 0o120000)
         {
             return Err(invalid("包内含非法路径条目。"));
         }
-        let remaining = MAX_PLAINTEXT_BYTES as u64 - total;
+        let remaining = MAX_EXPANDED_BYTES as u64 - total;
         if file.size() > remaining {
             return Err(invalid("包解压容量超过上限。"));
         }
@@ -221,11 +254,11 @@ impl ManifestFile {
         crate::paths::ensure_safe_absolute(path).map_err(invalid)?;
         let mut input = fs::File::open(path)?;
         let metadata = input.metadata()?;
-        if !metadata.is_file() || metadata.len() > MAX_PLAINTEXT_BYTES as u64 {
-            return Err(invalid("包内容超过 256 MiB 上限。"));
+        if !metadata.is_file() || metadata.len() > MAX_EXPANDED_BYTES as u64 {
+            return Err(invalid("包展开内容超过可表示的文件大小。"));
         }
         let (size_bytes, sha256) =
-            copy_and_hash(&mut input, &mut std::io::sink(), MAX_PLAINTEXT_BYTES as u64)?;
+            copy_and_hash(&mut input, &mut std::io::sink(), MAX_EXPANDED_BYTES as u64)?;
         Ok(Self {
             name: name.into(),
             size_bytes,

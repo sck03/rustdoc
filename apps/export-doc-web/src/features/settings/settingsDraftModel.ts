@@ -43,6 +43,6 @@ export function changedSettingsCategories(baseline: SettingsRecord | null, draft
 }
 
 export function categoryHasSecrets(category: SettingsCategoryKey, databaseProvider?: string | null) {
-  return category === "communication" || category === "backup" || category === "ai"
+  return category === "communication" || category === "ai"
     || (category === "runtime" && databaseProvider === "postgresql");
 }

@@ -24,15 +24,46 @@ pub(super) fn compose(
     omit_empty_lines: bool,
     vertical_factor: f32,
 ) -> crate::Result<Option<ComposedCell>> {
-    if !omit_empty_lines && !parts.iter().any(|part| part.kind == "ColumnBreak") {
+    if !omit_empty_lines
+        && !parts.iter().any(|part| {
+            matches!(part.kind.as_str(), "ColumnBreak" | "Spacer") || part.condition.is_some()
+        })
+    {
         return Ok(None);
     }
-    let rows = export_doc_domain::designer::composite::rows(parts);
+    let visible = parts
+        .iter()
+        .filter_map(|part| {
+            if part.visible == Some(false) {
+                return None;
+            }
+            let matched = part.condition.as_ref().map_or(Ok(true), |rule| {
+                rule.matches(
+                    data.value(&rule.field_path, Some(item)),
+                    &data.display(&rule.field_path, Some(item)),
+                )
+                .map_err(crate::error::invalid)
+            });
+            match matched {
+                Ok(true) => Some(Ok(part)),
+                Ok(false) => None,
+                Err(error) => Some(Err(error)),
+            }
+        })
+        .collect::<crate::Result<Vec<_>>>()?;
+    let rows = export_doc_domain::designer::composite::rows(visible);
     let mut result = ComposedCell {
         fragments: vec![],
         height: 0.,
     };
     for row in rows {
+        let row = match row {
+            export_doc_domain::designer::composite::Row::Spacer(height) => {
+                result.height += height;
+                continue;
+            }
+            export_doc_domain::designer::composite::Row::Content(row) => row,
+        };
         if omit_empty_lines
             && row.iter().all(|slot| {
                 slot.parts.iter().all(|part| {

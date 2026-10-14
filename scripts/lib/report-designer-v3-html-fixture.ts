@@ -9,6 +9,7 @@ import {
   reportDesignerV3PageSize,
   type ReportDesignerV3Element,
   type ReportDesignerV3Schema,
+  isProductElement,
 } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerV3Schema.ts";
 import { validateReportDesignerV3Draft } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerV3Validation.ts";
 import type { ReportDesignerReportType } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerSchema.ts";
@@ -128,7 +129,7 @@ ${repeatedLayers}
 </html>`;
 }
 
-function isProductField(element: ReportDesignerV3Element) { return element.visible && element.outputEnabled && element.type === "Field" && element.fieldPath.startsWith("item."); }
+function isProductField(element: ReportDesignerV3Element) { return element.visible && element.outputEnabled && isProductElement(element); }
 
 function renderStaticLayer(
   layer: ReportDesignerV3Schema["layers"][number],
@@ -277,6 +278,8 @@ function renderElementContent(element: ReportDesignerV3Element) {
         return renderPageNumber(element);
       case "Rectangle":
         return `<div class="edm-v3-rectangle"></div>`;
+      case "ProductSpacer":
+        return "";
       case "Line":
         return `<div class="edm-v3-line edm-v3-line-${element.direction.toLowerCase()}" style="${renderLineStyle(element)}"></div>`;
       case "Flow":

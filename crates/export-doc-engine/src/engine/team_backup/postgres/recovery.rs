@@ -143,7 +143,7 @@ pub fn apply_pending(
                 .as_str()
                 .ok_or_else(|| invalid("恢复文件名缺失。"))?;
             let source = super::super::managed_file(&postgres_root(paths)?, name, "dump")?;
-            let hash = super::super::sha256_hex(&fs::read(&source)?);
+            let (_, hash) = crate::engine::backup_io::digest_file(&source)?;
             if value["sha256"] != hash {
                 return Err(invalid("备份文件已变化，恢复已拒绝。"));
             }

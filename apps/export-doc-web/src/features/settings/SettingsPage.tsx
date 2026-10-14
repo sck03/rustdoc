@@ -1,4 +1,4 @@
-import { FormEvent, lazy, Suspense, useEffect, useState } from "react";
+import { FormEvent, lazy, Suspense, useCallback, useEffect, useState } from "react";
 import "../../styles/runtime-diagnostics.css";
 import "../../styles/settings-center.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,6 +12,7 @@ import { useLocation } from "react-router-dom";
 import {
   ApiSettingsResponse,
   ApiSettingsValidationResponse,
+  ApiBackupPlanStatus,
   AppSettings,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
@@ -105,6 +106,7 @@ export function SettingsPage({
   const [settings, setSettings] = useState<SettingsRecord | null>(null);
   const [updateSecrets, setUpdateSecrets] = useState(false);
   const [baselineSettings, setBaselineSettings] = useState<SettingsRecord | null>(null);
+  const [backupDirty, setBackupDirty] = useState(false);
   const changedCategories = changedSettingsCategories(baselineSettings, settings);
   const hasUnsavedChanges = changedCategories.length > 0;
   const [message, setMessage] = useState<string | null>(null);
@@ -116,7 +118,12 @@ export function SettingsPage({
   });
   const { update: updateRoute } = useRouteQuery();
   const activeCategory = readSettingsCategoryFromSearch(location.search, availableSettingsCategoryKeys);
-  const setActiveCategory = (key: SettingsCategoryKey) => updateRoute({ section: availableSettingsCategories.find((item) => item.key === key)?.section, group: null }, false);
+  const setActiveCategory = async (key: SettingsCategoryKey) => {
+    if (activeCategory === "backup" && key !== "backup" && backupDirty && !await requestConfirmation({
+      title: "放弃未保存的灾备设置？", description: "灾备计划或异机存储有未保存的修改。", confirmLabel: "放弃修改", tone: "warning",
+    })) return;
+    updateRoute({ section: availableSettingsCategories.find((item) => item.key === key)?.section, group: null, archive: null }, false);
+  };
   const queryClient = useQueryClient();
   const [concurrencyMessage, setConcurrencyMessage] = useState<string | null>(null);
 
@@ -233,18 +240,14 @@ export function SettingsPage({
     },
   });
 
-  const testWebDavMutation = useMutation({
-    mutationFn: () => client.testCloudBackupConnection(),
-    onSuccess: async (response) => {
-      setMessage(null);
-      setSuccessMessage(response.message || "WebDAV 连接测试成功。");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.cloudBackupStatus() });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
+  const handleBackupSettingsSaved = useCallback((response: ApiBackupPlanStatus, previousRevision: number) => {
+    // Advance only the acknowledged shared connection fields; preserve drafts in other categories.
+    const merge = (current: SettingsRecord | null) => current && current.revision === previousRevision
+      ? { ...current, revision: response.settingsRevision, webDav: { ...current.webDav as SettingsRecord, ...response.webDav, password: "" } }
+      : current;
+    setSettings(merge);
+    setBaselineSettings(merge);
+  }, []);
 
   const inferEmailServerMutation = useMutation({
     mutationFn: (request: EmailServerSuggestionDraft) =>
@@ -295,7 +298,6 @@ export function SettingsPage({
     saveMutation.isPending ||
     validateSettingsMutation.isPending ||
     testEmailMutation.isPending ||
-    testWebDavMutation.isPending ||
     inferEmailServerMutation.isPending ||
     cleanupSystemLogsMutation.isPending ||
     refreshExchangeCurrenciesMutation.isPending;
@@ -411,22 +413,6 @@ export function SettingsPage({
     setMessage(null);
     setSuccessMessage(null);
     testEmailMutation.mutate();
-  }
-
-  function handleTestWebDavConnection() {
-    if (!canManageSettings || isBusy) {
-      return;
-    }
-
-    if (hasUnsavedChanges) {
-      setMessage("请先保存当前 WebDAV 设置，再测试已保存的连接配置。");
-      setSuccessMessage(null);
-      return;
-    }
-
-    setMessage(null);
-    setSuccessMessage(null);
-    testWebDavMutation.mutate();
   }
 
   function handleInferEmailServerConfig() {
@@ -555,6 +541,7 @@ export function SettingsPage({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (currentCategory === "backup") return;
     if (!settings || !canManageSettings || isBusy) {
       return;
     }
@@ -578,9 +565,9 @@ export function SettingsPage({
               <div className="settings-command-heading-row">
                 <h2>{activeCategoryConfig.label}</h2>
               </div>
-              <span className="settings-save-status" data-dirty={hasUnsavedChanges} role="status">{hasUnsavedChanges ? `未保存：${changedCategories.map((category) => category.label).join("、")}` : "所有修改已保存"}</span>
+              <span className="settings-save-status" data-dirty={hasUnsavedChanges || backupDirty} role="status">{backupDirty ? "灾备设置有未保存修改" : hasUnsavedChanges ? `未保存：${changedCategories.map((category) => category.label).join("、")}` : "所有修改已保存"}</span>
             </div>
-            <div className="toolbar-actions settings-command-actions">
+            {currentCategory !== "backup" && <div className="toolbar-actions settings-command-actions">
               {categoryHasSecrets(currentCategory, databaseProvider) && <SecretToggle checked={updateSecrets} disabled={isBusy || !canManageSettings} onChange={setUpdateSecrets} />}
               <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void handleReloadSettings()}>
                 <RefreshCw size={18} aria-hidden="true" />
@@ -597,13 +584,13 @@ export function SettingsPage({
                 <Save size={17} aria-hidden="true" />
                 <span>保存全部修改</span>
               </button>
-            </div>
+            </div>}
           </div>
           <div className="settings-center-layout">
             <SettingsCategoryNav
               categories={availableSettingsCategories}
               activeCategory={currentCategory}
-              changedCategories={changedCategories.map((category) => category.key)}
+              changedCategories={[...new Set([...changedCategories.map((category) => category.key), ...(backupDirty ? ["backup" as const] : [])])]}
               onSelect={setActiveCategory}
             />
             <div className="settings-category-panel">
@@ -632,9 +619,9 @@ export function SettingsPage({
                   canManageSettings={canManageSettings && !isBusy} onChange={patchSetting} onOrgCodeChange={handleSingleWindowOrgCodeChange}
                   onFetchPlaceChange={handleSingleWindowFetchPlaceChange} onAplAddChange={handleSingleWindowAplAddChange} />} />}
               {currentCategory === "backup" && <LazyBackupSettingsPanel
-                client={client} settings={settings} secrets={secrets} databaseProvider={databaseProvider}
-                disabled={isBusy || !canManageSettings} canManageSettings={canManageSettings} updateSecrets={updateSecrets}
-                search={location.search} onChange={patchSetting} onTestWebDavConnection={handleTestWebDavConnection} onPathError={setMessage} />}
+                client={client} databaseProvider={databaseProvider}
+                disabled={isBusy || !canManageSettings} canManageSettings={canManageSettings}
+                search={location.search} onPathError={setMessage} onSettingsSaved={handleBackupSettingsSaved} onDirtyChange={setBackupDirty} />}
               {currentCategory === "excel-import" ? (
                 <LazyExcelImportSettingsPanel
                   settings={settings}

@@ -106,6 +106,8 @@ pub struct Element {
     pub visible: bool,
     pub locked: bool,
     pub output_enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product: Option<ProductSettings>,
     pub style: Style,
     #[serde(flatten)]
     pub kind: Kind,
@@ -153,6 +155,7 @@ pub enum Kind {
         direction: String,
     },
     Rectangle,
+    ProductSpacer,
     Flow {
         #[serde(rename = "flowKind")]
         flow_kind: String,
@@ -170,6 +173,7 @@ impl Kind {
             Self::Field { .. } => "字段",
             Self::Line { .. } => "线条",
             Self::Rectangle => "矩形",
+            Self::ProductSpacer => "商品占位行",
             Self::Flow { block, .. } => match block.kind() {
                 "Row" => "多列行",
                 "Grid" => "普通表格",
@@ -187,6 +191,22 @@ impl Kind {
             }
             Self::PageNumber { .. } => "页码",
         }
+    }
+}
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProductSettings {
+    #[serde(default)]
+    pub hide_when_empty: bool,
+    #[serde(default)]
+    pub collapse_empty: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub condition: Option<ConditionalRule>,
+}
+impl Element {
+    pub fn is_product(&self) -> bool {
+        matches!(self.kind, Kind::ProductSpacer)
+            || matches!(&self.kind, Kind::Field { field_path, .. } if field_path.starts_with("item."))
     }
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -250,12 +270,20 @@ pub struct DetailTable {
     pub summary_row: Option<DetailSummaryRow>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub intro_row: Option<DetailSummaryRow>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adjustments: Option<DetailAdjustments>,
     #[serde(default)]
     pub header_style: ReportTextStyle,
     #[serde(default)]
     pub body_style: ReportTextStyle,
     #[serde(default)]
     pub border: ReportBorderStyle,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DetailAdjustments {
+    pub description_column_id: String,
+    pub amount_column_id: String,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -382,6 +410,10 @@ pub struct DetailCellContent {
     pub position_percent: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub visible: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub condition: Option<ConditionalRule>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height_mm: Option<f32>,
 }
 fn one() -> i32 {
     1
@@ -618,6 +650,7 @@ impl Design {
                     },
                     summary_row: None,
                     intro_row: None,
+                    adjustments: None,
                     header_style: ReportTextStyle::default(),
                     body_style: ReportTextStyle::default(),
                     border: ReportBorderStyle {
@@ -685,6 +718,7 @@ impl Design {
             visible: true,
             locked: false,
             output_enabled: true,
+            product: None,
             style: Style {
                 font_size_pt: size,
                 bold,

@@ -41,7 +41,18 @@ impl ReportData {
         exporter: Value,
         with_seal: bool,
     ) -> Result<Self> {
-        let value = serde_json::to_value(invoice)?;
+        let mut value = serde_json::to_value(invoice)?;
+        let adjustments = invoice.amount_adjustments.as_deref().unwrap_or(&[]);
+        let adjusted =
+            export_doc_domain::invoice_adjustments::total(invoice.total_amount, adjustments)
+                .map_err(invalid)?;
+        value["adjustedTotalAmount"] = json!(adjusted);
+        value["adjustmentTotalAmount"] = json!(
+            export_doc_domain::invoice_adjustments::total(Decimal::ZERO, adjustments)
+                .map_err(invalid)?
+        );
+        value["amountAdjustments"] =
+            json!(export_doc_domain::invoice_adjustments::normalize(adjustments).map_err(invalid)?);
         let mut data = Self {
             report_type: "ExportDocument",
             root: json!({"Invoice":value,"Customer":customer,"Exporter":exporter,"ShowSeal":with_seal,"withSeal":with_seal}),
@@ -192,7 +203,7 @@ impl ReportData {
         if format.is_some() && !value.is_empty() {
             let currency = self.text("Invoice.Currency");
             if !currency.trim().is_empty() {
-                return format!("{}{value}", currency.trim());
+                return currency_text(&value, currency.trim());
             }
         }
         value
@@ -225,9 +236,17 @@ impl ReportData {
                         _ => String::new(),
                     })
                     .collect::<Vec<_>>()
-                    .join(if member.is_empty() { "; " } else { "\n" })
+                    .join("\n")
             })
             .unwrap_or_default()
+    }
+}
+
+pub(crate) fn currency_text(value: &str, currency: &str) -> String {
+    if let Some(amount) = value.strip_prefix('-') {
+        format!("-{currency}{amount}")
+    } else {
+        format!("{currency}{value}")
     }
 }
 

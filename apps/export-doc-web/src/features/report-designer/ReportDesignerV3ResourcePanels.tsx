@@ -30,6 +30,10 @@ export function ComponentPalette({ reportType, actions, canEdit = true }: { repo
         {base.map(([label, onClick, icon]) => <PaletteAction key={label} label={label} onClick={onClick} icon={icon} disabled={!canEdit} />)}
         {actions.image ? <PaletteAction label="图片/印章" onClick={actions.image} icon={<ImageIcon size={15} aria-hidden="true" />} disabled={!canEdit} /> : null}
       </PaletteSection>
+      <PaletteSection title="表格">
+        <PaletteAction label="普通表格" onClick={actions.grid} icon={<Table2 size={15} aria-hidden="true" />} disabled={!canEdit} />
+        {actions.detailTable ? <PaletteAction label="商品明细表" onClick={actions.detailTable} icon={<Table2 size={15} aria-hidden="true" />} disabled={!canEdit} /> : null}
+      </PaletteSection>
       {actions.productFields ? <PaletteSection title="商品明细">
         <PaletteAction label="商品字段（逐行输出）" onClick={actions.productFields} icon={<Columns3 size={15} aria-hidden="true" />} disabled={!canEdit} />
       </PaletteSection> : null}
@@ -38,9 +42,7 @@ export function ComponentPalette({ reportType, actions, canEdit = true }: { repo
       </PaletteSection>
       <details><summary>高级排版</summary><PaletteSection title="表格与分组">
         <PaletteAction label="多列行" onClick={actions.row} icon={<Columns3 size={15} aria-hidden="true" />} disabled={!canEdit} />
-        <PaletteAction label="普通表格" onClick={actions.grid} icon={<Table2 size={15} aria-hidden="true" />} disabled={!canEdit} />
       </PaletteSection>
-      {actions.detailTable ? <PaletteAction label="明细表（分组与组合排版）" onClick={actions.detailTable} icon={<Table2 size={15} aria-hidden="true" />} disabled={!canEdit} /> : null}
       <PaletteSection title="打印">
         <PaletteAction label="分页符" onClick={actions.pageBreak} icon={<FilePlus2 size={15} aria-hidden="true" />} disabled={!canEdit} />
       </PaletteSection>

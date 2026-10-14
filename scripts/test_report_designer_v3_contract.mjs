@@ -62,6 +62,8 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerProductFields.ts")
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3Insertion.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerPage.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerBlockCopy.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerCanvasText.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerRowMutations.ts"))};
 export { resolveDefaultTemplatePath } from ${JSON.stringify(importSpecifier("../reports/reportTemplateDesignerModel.ts"))};
 `);
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, format: "esm", platform: "node", logLevel: "silent" });

@@ -170,8 +170,8 @@ fn invoice_terms_and_packing_header_follow_their_separate_templates() {
             .parse::<f32>()
             .unwrap()
     };
-    assert!(position("1000") - position("20") > 15.);
-    assert!(position("USD4.50") - position("1000") > 15.);
+    assert!(position("1000PCS") - position("20CTNS") > 15.);
+    assert!(position("USD4.50") - position("1000PCS") > 15.);
     let packing =
         render_builtin(Builtin::PackingList, &invoice(3), &AtomicBool::new(false)).unwrap();
     for label in ["From:", "Payment Terms:", "Issued by:"] {

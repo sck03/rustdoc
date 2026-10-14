@@ -20,8 +20,8 @@ export function rebuildDesignerDocument(api, reference) {
     while (state.schema.layers.findIndex(layer => layer.id === id) > index) state = api.moveV3Layer(state, id, -1);
   });
   const factories = { Text: api.createV3TextElement, Field: element => api.createV3FieldElement(element.fieldPath),
-    Image: api.createV3ImageElement, Line: api.createV3LineElement, Rectangle: api.createV3RectangleElement, PageNumber: api.createV3PageNumberElement,
-    Flow: element => api.createV3FlowElement(element.flowKind === 'Grid' ? rebuildDesignerGrid(api, element.block) : api.copyReportDesignerBlock(element.block)) };
+    Image: api.createV3ImageElement, Line: api.createV3LineElement, Rectangle: api.createV3RectangleElement, ProductSpacer: api.createV3ProductSpacerElement, PageNumber: api.createV3PageNumberElement,
+    Flow: element => api.createV3FlowElement(rebuildBlock(api, element.block, expected.reportType)) };
   expected.layers.forEach((layer, index) => {
     for (const element of layer.elements) {
       const base = element.type === 'Field' || element.type === 'Flow' ? factories[element.type](element) : factories[element.type]();
@@ -36,6 +36,35 @@ export function rebuildDesignerDocument(api, reference) {
   assert.equal(api.validateReportDesignerV3Draft(actual).blocked, false);
   assert.deepEqual(printableStructure(actual), printableStructure(expected), 'blank reconstruction must preserve all printable properties and stacking order');
   return actual;
+}
+
+function rebuildBlock(api, target, reportType) {
+  if (target.type === 'Grid') return rebuildDesignerGrid(api, target);
+  if (target.type === 'DetailTable') return rebuildDetailTable(api, target);
+  const factory = { Conditional: () => api.createConditionalBlock(reportType), Row: api.createRowBlock, PageBreak: api.createPageBreakBlock }[target.type];
+  assert(factory, `${target.type}: the blank editor needs a supported insertion operation`);
+  const block = factory();
+  const { id, ...properties } = target;
+  return api.copyReportDesignerBlock({ ...block, ...properties });
+}
+
+function rebuildDetailTable(api, target) {
+  let block = api.createDetailTableBlock();
+  while (block.columns.length < target.columns.length) block = api.addDetailTableColumn(block);
+  while (block.columns.length > target.columns.length) block = api.removeDetailTableColumn(block, block.columns.at(-1).id);
+  const ids = new Map(target.columns.map((column, index) => [column.id, block.columns[index].id]));
+  const columns = target.columns.map((column, index) => {
+    const fresh = api.setDetailColumnContentKind(block.columns[index], column.contentKind ?? 'Field');
+    return { ...fresh, ...column, id: fresh.id,
+      content: column.content?.map(part => ({ ...part, id: api.createDetailTableCellContent(part.kind).id })) };
+  });
+  const row = targetRow => targetRow && { ...api.createDetailTableSummaryRow(columns), ...targetRow,
+    cells: targetRow.cells.map(cell => ({ ...cell, columnId: ids.get(cell.columnId) })) };
+  const { id, columns: unusedColumns, ...properties } = target;
+  return { id: block.id, ...properties, columns,
+    summaryRow: row(target.summaryRow), introRow: row(target.introRow),
+    grouping: target.grouping && { ...target.grouping, footer: row(target.grouping.footer) },
+    adjustments: target.adjustments && { descriptionColumnId: ids.get(target.adjustments.descriptionColumnId), amountColumnId: ids.get(target.adjustments.amountColumnId) } };
 }
 
 export function rebuildDesignerGrid(api, target) {
@@ -68,5 +97,5 @@ function printableStructure(document) {
     Object.keys(value).sort().forEach(key => collect(value[key]));
   }
   collect(value);
-  return JSON.parse(JSON.stringify(value, (key, value) => key === 'zIndex' ? undefined : key === 'widthPercent' ? Math.fround(value) : ['id', 'columnId'].includes(key) ? ids.get(value) ?? value : value));
+  return JSON.parse(JSON.stringify(value, (key, value) => key === 'zIndex' ? undefined : key === 'widthPercent' ? Math.fround(value) : ['id', 'columnId', 'descriptionColumnId', 'amountColumnId'].includes(key) ? ids.get(value) ?? value : value));
 }

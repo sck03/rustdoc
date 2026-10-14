@@ -56,6 +56,10 @@ pub(super) fn save(
     invoice.row_version.clear();
     invoice.pending_hs_feedback.clear();
     invoice.extra.clear();
+    if options.clear_amounts.unwrap_or(false) || !as_type {
+        // A received deposit belongs to the original invoice, never a new invoice number.
+        invoice.amount_adjustments = None;
+    }
     if let Some(target_type) = target_type {
         invoice.r#type = target_type;
     }

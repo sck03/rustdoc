@@ -9,7 +9,7 @@ export async function runSettingsWorkspaceCases({ open, currentPage, read, click
     await waitFor(page, "!document.querySelector('[aria-busy=true]')");
   };
   const textField = async (label, value) => {
-    const selector = await read(page, `(()=>{const node=[...document.querySelectorAll('label')].find(n=>n.querySelector(':scope>span')?.textContent===${JSON.stringify(label)})?.querySelector('input');if(!node)throw new Error('Missing '+${JSON.stringify(label)});node.dataset.settingsField='current';return '[data-settings-field=current]'})()`);
+    const selector = await read(page, `(()=>{const node=[...document.querySelectorAll('label')].find(n=>n.querySelector(':scope>span')?.textContent===${JSON.stringify(label)})?.querySelector('input,select');if(!node)throw new Error('Missing '+${JSON.stringify(label)});node.dataset.settingsField='current';return '[data-settings-field=current]'})()`);
     await input(page, selector, value);
     await read(page, "document.querySelector('[data-settings-field=current]').removeAttribute('data-settings-field')");
   };
@@ -33,13 +33,17 @@ export async function runSettingsWorkspaceCases({ open, currentPage, read, click
   await category("邮件设置"); await textField("SMTP 服务器", "smtp.example.test");
   await click(page, '.settings-command-actions input[type="checkbox"]');
   await textField("邮箱密码", "fixture-password");
-  await category("备份与恢复"); await clickText(page, "WebDAV 云备份", ".settings-section-nav button");
+  await category("备份与恢复"); await clickText(page, "异机副本", ".settings-section-nav button");
+  await textField("副本存储", "WebDav");
   await textField("WebDAV 地址", "https://backup.example.test/dav");
+  await textField("WebDAV 用户名", "test-user");
+  await clickText(page, "保存灾备设置");
+  await waitFor(page, "window.__calls.some(c=>c.name==='saveBackupPlan') && !document.querySelector('.backup-plan-toolbar').textContent.includes('有未保存')");
   await category("维护工具"); await waitFor(page, "document.querySelector('[aria-label=日志管理]')");
   await field(page, "日志保留天数", "60");
   assert(await read(page, "[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='清理旧日志').disabled"));
   assert.equal(await read(page, "window.__calls.filter(c=>c.name==='cleanupSystemLogs').length"), 0);
-  assert(await read(page, "['单据设置','邮件设置','备份与恢复','维护工具'].every(label=>document.querySelector('.settings-command-heading').textContent.includes(label))"));
+  assert(await read(page, "['单据设置','邮件设置','维护工具'].every(label=>document.querySelector('.settings-command-heading').textContent.includes(label))"));
   await category("单据设置"); await fields("invoice");
   assert.equal(await read(page, "document.querySelector('[aria-label=单据字段名称] input').value"), "invoice名称");
   assert.equal(await read(page, "document.querySelector('.settings-command-actions input[type=checkbox]')"), null);
@@ -67,7 +71,7 @@ export async function runSettingsWorkspaceCases({ open, currentPage, read, click
   assert(await read(page, "Boolean(document.querySelector('[aria-label=软件更新]'))"));
   await category("备份与恢复");
   assert.equal(await read(page, "document.querySelector('.settings-section-nav').textContent.includes('团队库')"), false);
-  await clickText(page, "数据备份与还原", ".settings-section-nav button");
+  await clickText(page, "恢复与校验", ".settings-section-nav button");
   await waitFor(page, "window.__calls.some(c=>c.name==='listDatabaseBackups')");
   await audit(page, "settings-sqlite-backup-tools");
 
@@ -75,8 +79,8 @@ export async function runSettingsWorkspaceCases({ open, currentPage, read, click
   assert.equal(await read(page, "document.querySelector('[aria-label=软件更新]')"), null);
   assert.equal(await read(page, "document.querySelector('[aria-label=数据库连接]').textContent.includes('SQLite 文件名')"), false);
   await category("备份与恢复");
-  assert(await read(page, "document.querySelector('[aria-label=备份计划与保留]').textContent.includes('尚未执行自动备份')"));
-  assert(await read(page, "[...document.querySelectorAll('[aria-label=备份计划与保留] input,[aria-label=备份计划与保留] select')].every(n=>n.matches(':disabled'))"));
+  assert(await read(page, "!document.querySelector('[aria-label=日常灾备] input[type=checkbox]').checked"));
+  assert.equal(await read(page, "window.__calls.some(c=>['runBackupPlan','getCloudBackupStatus'].includes(c.name))"), false);
   await category("单据设置"); await field(page, "明细空白行数", "9");
   await clickText(page, "恢复本分类默认"); await clickText(page, "恢复默认值", "[role=dialog] button");
   const resetSaved = await save();
@@ -85,19 +89,49 @@ export async function runSettingsWorkspaceCases({ open, currentPage, read, click
   assert.equal(resetSaved.settings.system.postgreSqlAutoBackupSchedule, "Daily");
   assert.equal(resetSaved.settings.system.postgreSqlAutoBackupTime, "02:00");
   assert.equal(resetSaved.settings.system.itemEntryBlankRowCount, 20);
-  await category("备份与恢复"); await clickText(page, "团队库与完整迁移");
+  await category("备份与恢复"); await clickText(page, "恢复与校验");
   await waitFor(page, "window.__calls.some(c=>c.name==='listPostgreSqlPhysicalBackups')");
   await waitFor(page, "document.querySelector('.maintenance-database-recovery-panel input') && !document.querySelector('.maintenance-database-recovery-panel input').disabled");
   await clickText(page, "恢复数据库（回到某份备份）", "summary");
-  await clickText(page, "完整迁移与换机", "summary");
+  await clickText(page, "从外部完整包恢复", "summary");
   await clickText(page, "服务器恢复与升级步骤", "summary");
   await audit(page, "settings-postgresql-backup-and-scoped-defaults");
   for (const width of [390, 320]) {
     await start("&section=postgresql&provider=PostgreSQL", width);
     await waitFor(page, "document.querySelector('.maintenance-full-migration-panel')");
-    for (const title of ["恢复数据库（回到某份备份）", "完整迁移与换机", "服务器恢复与升级步骤"]) await clickText(page, title, "summary");
+    for (const title of ["恢复数据库（回到某份备份）", "从外部完整包恢复", "服务器恢复与升级步骤"]) await clickText(page, title, "summary");
     await audit(page, "settings-postgresql-maintenance-" + width);
   }
+
+  await start("&section=backupPolicy&provider=PostgreSQL", 390);
+  await waitFor(page, "document.querySelector('[aria-label=日常灾备] input')");
+  await click(page, '[aria-label="日常灾备"] input[type=checkbox]');
+  await textField("备份包密码", "backup-password-2026");
+  await textField("再次输入新密码", "backup-password-2026");
+  await clickText(page, "异机副本", ".settings-section-nav button");
+  await textField("副本存储", "S3");
+  await textField("S3 端点", "https://objects.example.test");
+  await textField("存储桶", "backup-bucket");
+  await textField("Access Key ID", "test-access");
+  await clickText(page, "修改Secret Access Key（未设置）", "label");
+  await textField("Secret Access Key", "fixture-secret");
+  await audit(page, "settings-s3-replica-390");
+  await clickText(page, "保存灾备设置");
+  await waitFor(page, "window.__calls.some(c=>c.name==='saveBackupPlan') && !document.querySelector('.backup-plan-toolbar').textContent.includes('有未保存')");
+  const planSaved = await read(page, "window.__calls.filter(c=>c.name==='saveBackupPlan').at(-1).input.body");
+  assert.equal(planSaved.plan.enabled, true); assert.equal(planSaved.plan.replicaMode, "S3");
+  assert.equal(planSaved.s3SecretAccessKey, "fixture-secret"); assert.equal(planSaved.plan.s3.bucket, "backup-bucket");
+  await clickText(page, "测试已保存的副本存储");
+  await waitFor(page, "window.__calls.some(c=>c.name==='testBackupReplica')");
+  await textField("对象前缀", "pending-edit");
+  await read(page, "window.__changeBackupPlanOnServer()");
+  await clickText(page, "保存灾备设置");
+  await waitFor(page, "document.body.innerText.includes('数据已被其他用户更新')");
+  assert.equal(await read(page, "[...document.querySelectorAll('label')].find(n=>n.querySelector(':scope>span')?.textContent==='对象前缀').querySelector('input').value"), "pending-edit");
+  await category("维护工具"); await clickText(page, "取消", "[role=dialog] button");
+  assert(await read(page, "window.__route.includes('backupReplica')"));
+  await captureScreenshot(page, path.join(output, "settings-s3-conflict-and-draft.png"));
+  results.push("settings-backup-opt-in-s3-save-test-conflict-and-draft-protection");
 
   await start("&edition=Sales&desktop=1&section=documentFields");
   assert.equal(await read(page, "document.querySelector('.settings-category-nav').textContent.includes('单据设置')"), false);

@@ -250,7 +250,7 @@ fn commercial_rows_have_no_dividers_and_values_share_the_lower_baseline() {
         }
         let baseline = text_y(svg, "LOWER-1");
         for value in if template == Builtin::Invoice {
-            vec!["20", "CTNS", "1000", "PCS", "USD4.50", "USD4500.00"]
+            vec!["20CTNS", "1000PCS", "USD4.50", "USD4500.00"]
         } else {
             vec!["20CTNS", "1000PCS", "250KGS", "230KGS", "1.2CBM"]
         } {
@@ -303,16 +303,21 @@ fn invoice_amount_header_rule_is_not_covered_by_document_fields() {
         let document = render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();
         for page in &document.pages {
             let svg = &page.svg;
-            let (rule, _) = nodes(svg, "line")
+            let header_bottom = text_y(svg, "Amount");
+            let first_amount = text_y(svg, "USD4500.00");
+            let (rule, offset) = nodes(svg, "line")
                 .into_iter()
                 .find(|(node, offset)| {
                     (attribute(node, "x1") - 162.).abs() < 0.01
                         && (attribute(node, "x2") - 195.).abs() < 0.01
-                        && (attribute(node, "y1") + offset - 86.).abs() < 0.01
-                        && (attribute(node, "y2") + offset - 86.).abs() < 0.01
+                        && (attribute(node, "y1") - attribute(node, "y2")).abs() < 0.01
+                        && attribute(node, "y1") + offset > header_bottom
+                        && attribute(node, "y1") + offset < first_amount
                 })
                 .expect("amount header must have a complete bottom rule");
-            let rule_position = svg.find(rule).unwrap();
+            // Header and first row can redraw the same shared edge. Check its final paint.
+            let rule_position = svg.rfind(rule).unwrap();
+            let rule_y = attribute(rule, "y1") + offset;
             for (rect, offset) in nodes(svg, "rect") {
                 if svg.find(rect).unwrap() < rule_position {
                     continue;
@@ -321,11 +326,11 @@ fn invoice_amount_header_rule_is_not_covered_by_document_fields() {
                 let y = attribute(rect, "y") + offset;
                 let covers = x < 195.
                     && x + attribute(rect, "width") > 162.
-                    && y < 86.1
-                    && y + attribute(rect, "height") > 85.9;
+                    && y < rule_y + 0.1
+                    && y + attribute(rect, "height") > rule_y - 0.1;
                 assert!(
                     !covers,
-                    "a later field background obscures the amount header rule"
+                    "a later field background obscures the amount header rule at {rule_y}: {rect} (offset {offset})"
                 );
             }
         }
@@ -349,7 +354,7 @@ fn invoice_amount_stays_with_price_when_po_is_empty_or_style_wraps() {
 }
 
 #[test]
-fn independent_invoice_fields_and_totals_share_columns_and_total_baseline() {
+fn invoice_detail_component_and_totals_share_columns_and_baseline() {
     let data = invoice(2);
     let document = render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();
     let svg = &document.pages[0].svg;
@@ -363,53 +368,36 @@ fn independent_invoice_fields_and_totals_share_columns_and_total_baseline() {
             "x",
         )
     };
-    for (detail, unit, total, anchor) in [("20", "CTNS", "40", 95.), ("1000", "PCS", "2000", 120.)]
-    {
-        assert!(
-            (x(unit) - x(detail)).abs() < 0.01,
-            "numbers and units must be joined without a gap"
-        );
+    for (detail, total, anchor) in [("20CTNS", "40CTNS", 103.5), ("1000PCS", "2000PCS", 129.5)] {
         assert!((x(total) - anchor).abs() < 0.01);
         assert!((x(total) - x(detail)).abs() < 0.01);
         assert!((text_y(svg, "TOTAL:") - text_y(svg, total)).abs() < 0.01);
     }
     assert!((x("USD4500.00") - x("USD9000.00")).abs() < 0.01);
     assert!((text_y(svg, "TOTAL:") - text_y(svg, "USD9000.00")).abs() < 0.01);
-    assert!(
-        !nodes(svg, "text")
-            .iter()
-            .any(|(node, _)| node.ends_with(">USD"))
-    );
     let design = Builtin::Invoice.design().unwrap();
-    assert!(
+    assert_eq!(
         design
             .layers
             .iter()
             .flat_map(|layer| &layer.elements)
-            .all(|e| !matches!(
-                &e.kind,
+            .filter(|element| matches!(
+                &element.kind,
                 Kind::Flow {
                     block: ReportBlock::DetailTable(_),
                     ..
                 }
             ))
+            .count(),
+        1
     );
-    for path in [
-        "item.StyleName",
-        "item.Cartons",
-        "item.Quantity",
-        "item.UnitPrice",
-        "item.TotalPrice",
-    ] {
-        assert!(
-            design
-                .layers
-                .iter()
-                .flat_map(|layer| &layer.elements)
-                .any(|e| !e.locked
-                    && matches!(&e.kind, Kind::Field {field_path,..} if field_path == path))
-        );
-    }
+    assert!(
+        !design
+            .layers
+            .iter()
+            .flat_map(|layer| &layer.elements)
+            .any(|element| element.is_product())
+    );
 }
 
 #[test]
@@ -430,26 +418,16 @@ fn invoice_grouped_totals_keep_each_number_and_unit_on_the_same_line() {
         .into_iter()
         .filter(|(node, _)| node.contains("font-weight=\"700\""))
         .collect();
-    for (number, unit, anchor) in [
-        ("12", "BOXES", 95.),
-        ("28", "CTNS", 95.),
-        ("1400", "PCS", 120.),
-        ("600", "SETS", 120.),
+    for (value, anchor) in [
+        ("12BOXES", 103.5),
+        ("28CTNS", 103.5),
+        ("1400PCS", 129.5),
+        ("600SETS", 129.5),
     ] {
-        let (number_node, number_offset) = totals
+        let (node, _) = totals
             .iter()
-            .find(|(node, _)| node.ends_with(&format!(">{number}")))
+            .find(|(node, _)| node.ends_with(&format!(">{value}")))
             .unwrap();
-        let (unit_node, unit_offset) = totals
-            .iter()
-            .find(|(node, _)| node.ends_with(&format!(">{unit}")))
-            .unwrap();
-        assert!((attribute(number_node, "x") - anchor).abs() < 0.01);
-        assert!((attribute(unit_node, "x") - anchor).abs() < 0.01);
-        assert!(
-            (attribute(number_node, "y") + number_offset - attribute(unit_node, "y") - unit_offset)
-                .abs()
-                < 0.01
-        );
+        assert!((attribute(node, "x") - anchor).abs() < 0.01);
     }
 }

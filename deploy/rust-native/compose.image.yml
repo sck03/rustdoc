@@ -1,0 +1,99 @@
+# Self-contained deployment for the published image. No source checkout or host scripts.
+name: exportdoc
+x-image: &image '${EXPORTDOC_IMAGE:-ghcr.io/sck03/exportdoc-rust-native:latest}'
+x-restricted: &restricted
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+services:
+  setup:
+    <<: *restricted
+    image: *image
+    user: '0:0'
+    cap_add: [CHOWN, FOWNER]
+    command: [--prepare-docker, /deployment, /var/lib/exportdoc]
+    network_mode: none
+    volumes:
+      - ./config:/deployment
+      - ./data:/var/lib/exportdoc
+  postgres:
+    image: postgres:18.6-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: exportdoc_native
+      POSTGRES_USER: exportdoc_bootstrap
+      POSTGRES_PASSWORD_FILE: /docker-entrypoint-initdb.d/credentials/bootstrap_password
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale-provider=builtin --builtin-locale=PG_UNICODE_FAST
+      EXPORTDOCMANAGER_SECRETS_ROOT: /docker-entrypoint-initdb.d/credentials
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./config/postgres:/docker-entrypoint-initdb.d:ro
+    depends_on:
+      setup: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U exportdoc_bootstrap -d exportdoc_native']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    stop_grace_period: 45s
+    networks: [database]
+  initialize:
+    <<: *restricted
+    image: *image
+    command: [--app-root, /opt/exportdoc, --data-root, /var/lib/exportdoc, --initialize-only]
+    environment:
+      EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION_FILE: /run/exportdoc-maintenance/maintenance-connection.txt
+      EXPORTDOCMANAGER_POSTGRES_OWNER: exportdoc_owner
+    volumes:
+      - ./config/maintenance:/run/exportdoc-maintenance:ro
+    tmpfs:
+      - /var/lib/exportdoc:uid=10001,gid=10001,mode=0700,size=16m
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [database]
+  application:
+    <<: *restricted
+    image: *image
+    restart: unless-stopped
+    environment:
+      EXPORTDOCMANAGER_POSTGRES_CONNECTION_FILE: /run/exportdoc/app-connection.txt
+      EXPORTDOCMANAGER_BOOTSTRAP_TOKEN_FILE: /run/exportdoc/bootstrap-token.txt
+      EXPORTDOCMANAGER_BUSINESS_TIME_ZONE: Asia/Shanghai
+      EXPORTDOCMANAGER_POSTGRES_POOL_SIZE: '${NATIVE_POSTGRES_POOL_SIZE:-4}'
+      EXPORTDOCMANAGER_POSTGRES_POOL_WAIT_MS: '${NATIVE_POSTGRES_POOL_WAIT_MS:-5000}'
+    volumes:
+      - ./data:/var/lib/exportdoc
+      - ./config/application:/run/exportdoc:ro
+    ports:
+      - '${NATIVE_BIND_ADDRESS:-0.0.0.0}:${NATIVE_PORT:-5188}:5188'
+    depends_on:
+      initialize: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, /opt/exportdoc/ExportDocManager.Server, --health-check, '127.0.0.1:5188']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    stop_grace_period: 210s
+    networks: [database, web]
+  restore:
+    <<: *restricted
+    image: *image
+    profiles: [maintenance]
+    command: [--app-root, /opt/exportdoc, --data-root, /var/lib/exportdoc, --restore-pending]
+    environment:
+      EXPORTDOCMANAGER_POSTGRES_CONNECTION_FILE: /run/exportdoc/app-connection.txt
+      EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION_FILE: /run/exportdoc-maintenance/maintenance-connection.txt
+      EXPORTDOCMANAGER_POSTGRES_OWNER: exportdoc_owner
+    volumes:
+      - ./data:/var/lib/exportdoc
+      - ./config/application:/run/exportdoc:ro
+      - ./config/maintenance:/run/exportdoc-maintenance:ro
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [database]
+volumes:
+  postgres_data:
+networks:
+  database: {internal: true}
+  web:

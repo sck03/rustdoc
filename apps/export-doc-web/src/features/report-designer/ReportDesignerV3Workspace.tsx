@@ -38,7 +38,8 @@ import { ReportDesignerLayerNavigation } from "./ReportDesignerLayerNavigation.t
 import { setReportDesignerLayerRoleHeight } from "./reportDesignerLayerBands.ts";
 import type { ReportBlock, ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { createConditionalBlock, createDetailTableBlock, createGridBlock, createPageBreakBlock, createRowBlock } from "./reportDesignerBlockFactories.ts";
-import { applyGridPreset, updateGridCell } from "./reportDesignerGridMutations.ts";
+import { applyGridPreset } from "./reportDesignerGridMutations.ts";
+import { updateDesignerCanvasText, type ReportDesignerTextTarget } from "./reportDesignerCanvasText.ts";
 import { bindV3GridCellField, type ReportDesignerGridCellTarget } from "./reportDesignerGridFields.ts";
 import {
   countElements,
@@ -227,7 +228,7 @@ export function ReportDesignerV3Workspace({
     line: () => placeElement(createV3LineElement()),
     pageNumber: () => placeElement(createV3PageNumberElement()),
     image: () => placeElement(createV3ImageElement()),
-    row: () => insertFlow(createRowBlock(reportType)),
+    row: () => insertFlow(createRowBlock()),
     grid: () => insertFlow(applyGridPreset(createGridBlock(reportType), "Blank")),
     conditional: () => insertFlow(createConditionalBlock(reportType)),
     detailTable: reportType === "ExportDocument" ? () => insertFlow(createDetailTableBlock()) : undefined,
@@ -309,15 +310,9 @@ export function ReportDesignerV3Workspace({
     }
   }
 
-  function commitCanvasText(elementId: string, cellId: string | undefined, text: string) {
+  function commitCanvasText(target: ReportDesignerTextTarget, text: string) {
     if (!editingEnabled) return;
-    const current = historyRef.current.state;
-    const element = findV3Element(current.schema, elementId)?.element;
-    if (element?.type === "Text") commit(updateV3Element(current, elementId, { text }));
-    if (element?.type === "Flow" && element.block.type === "Grid" && cellId) {
-      const block = updateGridCell(element.block, cellId, (cell) => cell.contentKind === "Text" ? { ...cell, text } : cell);
-      commit(updateV3Element(current, elementId, { block }));
-    }
+    commit(updateDesignerCanvasText(historyRef.current.state, target, text));
   }
   historyRef.current = history;
   useReportDesignerV3Shortcuts({ workspaceRef, history, editable: editingEnabled, commit, copySelection, pasteClipboard, duplicateSelection, clearSelection });
@@ -368,6 +363,7 @@ export function ReportDesignerV3Workspace({
         <div className="report-designer-v3-toolbar-group" role="group" aria-label="插入基础元素">
           <ToolbarButton label="文本" icon={<Pilcrow size={15} />} onClick={insertionActions.text} disabled={!editingEnabled} />
           <ToolbarButton label="普通表格" icon={<Grid2X2 size={15} />} onClick={insertionActions.grid} disabled={!editingEnabled} />
+          {insertionActions.detailTable ? <ToolbarButton label="明细表" title="按商品逐行输出，可设置列、分组、小计与金额调整" icon={<Table2 size={15} />} onClick={insertionActions.detailTable} disabled={!editingEnabled} /> : null}
           <ToolbarButton label="选择字段" title={reportType === "PaymentVoucher" ? "付款字段：单号、收款方、费用与金额" : "普通字段：发票号、客户、唛头与合计"} icon={<Braces size={15} />} onClick={() => { setProductFieldsOnly(false); openFieldPanel(); }} />
           {insertionActions.productFields ? <ToolbarButton label="商品字段" icon={<Columns3 size={15} />} onClick={insertionActions.productFields} /> : null}
           {insertionActions.image ? <ToolbarButton label="图片" icon={<ImageIcon size={15} />} onClick={insertionActions.image} disabled={!editingEnabled} /> : null}
@@ -378,7 +374,6 @@ export function ReportDesignerV3Workspace({
         </div>
         <details className="report-designer-v3-advanced-tools"><summary>高级排版</summary><div role="group" aria-label="插入结构组件">
           <ToolbarButton label="多列行" icon={<Columns3 size={15} />} onClick={insertionActions.row} disabled={!editingEnabled} />
-          {insertionActions.detailTable ? <ToolbarButton label="明细表" icon={<Table2 size={15} />} onClick={insertionActions.detailTable} disabled={!editingEnabled} /> : null}
           <ToolbarButton label="分页符" icon={<FilePlus2 size={15} />} onClick={insertionActions.pageBreak} disabled={!editingEnabled} />
         </div></details>
         <div className="report-designer-v3-toolbar-group" role="group" aria-label="编辑">

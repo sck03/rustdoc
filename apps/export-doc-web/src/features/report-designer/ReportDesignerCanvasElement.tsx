@@ -71,6 +71,8 @@ export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCa
       return <span className="report-designer-v3-preview-page-number">{element.prefix ?? ""}1{element.format === "CurrentOfTotal" ? " / 1" : ""}{element.suffix ?? ""}</span>;
     case "Rectangle":
       return null;
+    case "ProductSpacer":
+      return <span className="report-designer-v3-preview-field">商品占位行（不打印文字）</span>;
     case "Line":
       return <span className={`report-designer-v3-preview-line report-designer-v3-preview-line-${element.direction.toLowerCase()}`} style={lineStyle(element)} aria-hidden="true" />;
     case "Flow":

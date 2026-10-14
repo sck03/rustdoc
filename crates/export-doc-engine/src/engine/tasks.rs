@@ -29,25 +29,31 @@ pub struct FileOutput {
 
 mod managed_output;
 pub struct TaskOutput {
-    pub managed_file: Option<std::path::PathBuf>,
+    pub managed_file: Option<ManagedOutput>,
     pub file: Option<FileOutput>,
     pub detail: String,
     pub destination: Option<std::path::PathBuf>,
     pub directory: Option<DirectoryOutput>,
+}
+pub struct ManagedOutput {
+    pub path: std::path::PathBuf,
+    pub size: u64,
+    pub digest: String,
 }
 pub struct DirectoryOutput {
     pub path: std::path::PathBuf,
     pub files: Vec<FileOutput>,
 }
 impl TaskOutput {
-    pub fn managed_file(path: std::path::PathBuf, detail: String) -> Self {
-        Self {
+    pub fn managed_file(path: std::path::PathBuf, detail: String) -> Result<Self> {
+        let (size, digest) = super::backup_io::digest_file(&path)?;
+        Ok(Self {
             file: None,
             detail,
             destination: None,
             directory: None,
-            managed_file: Some(path),
-        }
+            managed_file: Some(ManagedOutput { path, size, digest }),
+        })
     }
     pub fn file(file_name: String, media_type: &str, content: Vec<u8>) -> Self {
         Self {
@@ -139,6 +145,33 @@ impl Jobs {
         replay: Option<retry::Replay>,
         work: impl FnOnce(&AtomicBool) -> Result<TaskOutput> + Send + 'static,
     ) -> Result<Value> {
+        self.start_task(actor, kind, title, replay, Duration::from_secs(180), work)
+    }
+    pub(crate) fn start_backup(
+        &self,
+        actor: &Actor,
+        kind: &str,
+        title: &str,
+        work: impl FnOnce(&AtomicBool) -> Result<TaskOutput> + Send + 'static,
+    ) -> Result<Value> {
+        self.start_task(
+            actor,
+            kind,
+            title,
+            None,
+            Duration::from_secs(super::backup_io::TIMEOUT_SECONDS),
+            work,
+        )
+    }
+    fn start_task(
+        &self,
+        actor: &Actor,
+        kind: &str,
+        title: &str,
+        replay: Option<retry::Replay>,
+        timeout: Duration,
+        work: impl FnOnce(&AtomicBool) -> Result<TaskOutput> + Send + 'static,
+    ) -> Result<Value> {
         self.health()?;
         let mut runtime = self
             .runtime
@@ -164,7 +197,7 @@ impl Jobs {
             .as_str()
             .ok_or_else(|| unavailable("任务编号缺失。"))?
             .to_owned();
-        let scope = OperationScope::new(Duration::from_secs(180));
+        let scope = OperationScope::new(timeout);
         runtime.active.insert(job_id.clone(), scope.clone());
         let store = self.store.clone();
         let state = self.runtime.clone();
@@ -246,6 +279,9 @@ impl Jobs {
     }
 
     pub fn download(&self, actor: &Actor, id: &str) -> Result<FileOutput> {
+        self.prepare_download(actor, id)?.into_memory()
+    }
+    pub fn prepare_download(&self, actor: &Actor, id: &str) -> Result<super::backup_io::Download> {
         self.health()?;
         persistence::download(&self.store, actor, id)
     }

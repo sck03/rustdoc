@@ -74,6 +74,7 @@ export function normalizeDetailTableBlock(
     columns,
     summaryRow: normalizeDetailTableSummaryRow(value.summaryRow, columns, `${path}.summaryRow`, issues),
     introRow: normalizeDetailTableSummaryRow(value.introRow, columns, `${path}.introRow`, issues),
+    adjustments: normalizeAdjustments(value.adjustments, columns, `${path}.adjustments`, issues),
     headerStyle: normalizeTextStyle(value.headerStyle, `${path}.headerStyle`, issues),
     bodyStyle: normalizeTextStyle(value.bodyStyle, `${path}.bodyStyle`, issues),
     border: normalizeBorderStyle(value.border, `${path}.border`, issues),
@@ -84,6 +85,16 @@ export function normalizeDetailTableBlock(
   }
 
   return block;
+}
+
+function normalizeAdjustments(value: unknown, columns: ReportDetailTableColumn[], path: string, issues: ReportDesignerSchemaIssue[]): ReportDetailTableBlock["adjustments"] {
+  if (value === undefined) return;
+  if (!isRecord(value) || typeof value.descriptionColumnId !== "string" || typeof value.amountColumnId !== "string") {
+    issues.push(createIssue("error", path, "金额调整列设置无效。")); return;
+  }
+  const { descriptionColumnId, amountColumnId } = value;
+  if (descriptionColumnId === amountColumnId || ![descriptionColumnId, amountColumnId].every(id => columns.some(column => column.id === id))) issues.push(createIssue("error", path, "金额调整须选择不同的说明列和金额列。"));
+  return { descriptionColumnId, amountColumnId };
 }
 
 function normalizeDetailTablePrintSettings(

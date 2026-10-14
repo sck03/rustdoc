@@ -21,7 +21,9 @@ use crate::{
 use export_doc_storage::AuditWrite;
 use pbkdf2::pbkdf2_hmac_array;
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
+#[cfg(test)]
+use sha2::Digest;
+use sha2::Sha256;
 use std::{
     collections::HashMap,
     fs,
@@ -38,11 +40,23 @@ pub mod ownership;
 mod package;
 pub mod postgres;
 mod restore_files;
+#[cfg(feature = "s3-backup")]
+mod s3;
+pub(in crate::engine) mod scheduled;
 mod sealed;
+mod transfer;
+pub use transfer::UploadAuthorization;
 #[cfg(test)]
 mod tests;
 
 pub const OPERATIONS: &[Operation] = &[
+    GET_BACKUP_PLAN,
+    SAVE_BACKUP_PLAN,
+    RUN_BACKUP_PLAN,
+    TEST_BACKUP_REPLICA,
+    CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET,
+    STAGE_RECOVERY_ARCHIVE_RESTORE,
+    DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET,
     CREATE_POSTGRE_SQL_PHYSICAL_BACKUP,
     CREATE_POSTGRE_SQL_PHYSICAL_BACKUP_DOWNLOAD_TICKET,
     DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
@@ -323,12 +337,13 @@ pub(super) fn audit(store: &Store, actor: &Actor, action: &str, note: &str) -> R
         Ok(())
     })
 }
+#[cfg(test)]
 pub(super) fn sha256_hex(bytes: &[u8]) -> String {
     let mut digest = Sha256::new();
     digest.update(bytes);
     hex(&digest.finalize())
 }
-fn hex(bytes: &[u8]) -> String {
+pub(super) fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 /// 受管目录中最新的本地 SQLite 备份（云备份上传与状态接口使用）。
@@ -370,6 +385,16 @@ pub fn handle(
     body: &Value,
 ) -> Result<Value> {
     match operation {
+        GET_BACKUP_PLAN => scheduled::status(service, actor),
+        SAVE_BACKUP_PLAN => scheduled::save(service, actor, body),
+        RUN_BACKUP_PLAN => scheduled::run_now(service, actor),
+        TEST_BACKUP_REPLICA => scheduled::test_replica(service, actor),
+        CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET => {
+            scheduled::ticket(service, actor, header(parameters, "id"))
+        }
+        STAGE_RECOVERY_ARCHIVE_RESTORE => {
+            scheduled::stage_restore(service, actor, header(parameters, "id"), body)
+        }
         GET_CLOUD_BACKUP_STATUS => cloud::status(service, actor),
         TEST_CLOUD_BACKUP_CONNECTION => cloud::test_connection(service, actor),
         UPLOAD_LATEST_DATABASE_BACKUP_TO_CLOUD => cloud::upload_latest(service, actor),
@@ -426,16 +451,6 @@ pub fn upload(
     file_name: &str,
     content: &[u8],
 ) -> Result<Value> {
-    match operation {
-        UPLOAD_AND_RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP => {
-            postgres::upload_and_restore(service, actor, parameters, file_name, content)
-        }
-        STAGE_SERVER_MIGRATION_RESTORE => {
-            migration::stage_restore_upload(service, actor, parameters, file_name, content)
-        }
-        _ => Err(unsupported(format!(
-            "此项上传尚未完成原生迁移：{}。",
-            operation.id
-        ))),
-    }
+    let authorization = transfer::begin(service, actor, operation, parameters, file_name)?;
+    transfer::finish(service, actor, authorization, content)
 }

@@ -55,4 +55,4 @@ Tauri 使用 MIT／Apache-2.0 双许可路径，具体传递组件以生成 noti
 
 按原版逐页核对界面、后端、权限及操作闭环，积累一批后集中联调，最后统一运行完整门禁。开发中只做必要编译与针对真实失败的回归，不逐模块重复全量构建或测试。功能核对表见《Rust原生功能迁移核对表》，平台验收见《Rust桌面平台适配与验收》。路由存在、编译通过和旧 Slint 截图均不表示当前 Tauri 页面已验收。
 
-公开入口沿用 `scripts/build-native.ps1`／`run-native.ps1`，含义已切换为 Tauri + React + Rust。网页和 Docker 保持 `package-native-web-server.ps1`／`run-native-docker.ps1`。构建、运行和测试的实际结果只记录在当前批次进度中。
+桌面构建／运行入口为 `scripts/build-native.ps1`／`run-native.ps1`。网页发布包可通过 `--setup-web` 准备配置并自动识别相邻 Web 目录；新版 Docker 镜像通过 `--print-compose` 输出独立部署配置，无需克隆源码。`package-native-web-server.ps1` 与 `run-native-docker.ps1` 继续用于构建、已有部署及开发验证。实际结果按平台记录在当前批次进度中。

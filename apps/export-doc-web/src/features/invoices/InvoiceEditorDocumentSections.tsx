@@ -16,6 +16,7 @@ import { InvoiceShippingTermsPanel } from "./InvoiceShippingTermsPanel.tsx";
 import { InvoiceEditorNavigation } from "./InvoiceEditorNavigation.tsx";
 import { InvoiceLetterOfCreditPanel } from "./InvoiceLetterOfCreditPanel.tsx";
 import { InvoiceProfitAnalysisPanel } from "./InvoiceProfitAnalysisPanel.tsx";
+import { InvoiceAmountAdjustmentsPanel } from "./InvoiceAmountAdjustmentsPanel.tsx";
 import { InvoiceReportPreviewPanel } from "./InvoiceReportPreviewPanel.tsx";
 import { InvoiceEditorSection } from "./InvoiceEditorSection.tsx";
 import { readInvoiceEditorSection, type InvoiceEditorSectionId } from "./invoiceEditorSections.ts";
@@ -199,6 +200,7 @@ export function InvoiceEditorDocumentSections({
           onChange={onChange}
           onCommitCustomOption={onCommitCustomOption}
         />
+        <InvoiceAmountAdjustmentsPanel invoice={invoice} editable={isEditable && !isBusy} onChange={onChange} />
 
         <details className="invoice-new-optional-section information-tier-advanced">
           <summary>

@@ -12,6 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./postgres-init.sh:/docker-entrypoint-initdb.d/10-native-roles.sh:ro
+      - ./postgres-roles.sql:/docker-entrypoint-initdb.d/sql/postgres-roles.sql:ro
     healthcheck:
       test: [CMD-SHELL, 'pg_isready -U exportdoc_bootstrap -d exportdoc_native']
       interval: 5s

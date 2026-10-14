@@ -13,10 +13,10 @@ export async function verifyLayerClarity({ page, url, read, waitFor, click, resu
   assert.equal(await read(page, 'window.scrollY'), pageScroll, 'layer navigation scrolls the canvas without moving the toolbar');
   await click(page, '.report-designer-v3-sidebar-tabs button:nth-child(3)');
   assert.equal(await read(page, 'document.querySelectorAll(".report-designer-layer-settings[open]").length'), 0);
-  await read(page, `document.querySelector('[data-v3-element-id="total-label"]').focus()`);
+  await read(page, `document.querySelector('[data-v3-element-id="title"]').focus()`);
   await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', windowsVirtualKeyCode: 13 });
   await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', windowsVirtualKeyCode: 13 });
-  await waitFor(page, 'document.querySelector(".report-designer-selection-readout").textContent.includes("TOTAL")');
+  await waitFor(page, 'document.querySelector(".report-designer-selection-readout").textContent.includes("INVOICE")');
   for (const zoom of ['50', '100']) {
     await read(page, `(()=>{const input=document.querySelector('[aria-label="选择缩放比例"]');input.value='${zoom}';input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
     await waitFor(page, `document.querySelector('.report-designer-v3-zoom-readout').textContent==='${zoom}%'`);

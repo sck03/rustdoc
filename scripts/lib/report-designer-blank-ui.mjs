@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { captureScreenshot } from './web-runtime-browser-session.mjs';
+import { doubleClickDesignerNode } from './report-designer-pointer-ui.mjs';
 
 export async function verifyBlankDesigner({ page, url, read, waitFor, click, key, results, output }) {
   const inspector = '.report-designer-v3-inspector';
@@ -46,7 +47,7 @@ export async function verifyBlankDesigner({ page, url, read, waitFor, click, key
   await click(page, '.report-designer-v3-sidebar-tabs button:nth-child(3)');
   await click(page, `${side} [data-layer-role="Header"] .report-designer-v3-layer-name`);
   await click(page, '[aria-label="文本"]');
-  await read(page, 'document.querySelector(".report-designer-v3-element-text").dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))');
+  await doubleClickDesignerNode(page, '.report-designer-v3-element-text', read);
   await waitFor(page, 'document.querySelector(".report-designer-canvas-text-editor textarea")');
   await page.send('Input.insertText', { text: '自定义检查记录' });
   await key(page, 'Enter', process.platform === 'darwin' ? 4 : 2);
@@ -65,7 +66,7 @@ export async function verifyBlankDesigner({ page, url, read, waitFor, click, key
   await fill('X (mm)', 5);
   await fill('Y (mm)', 35);
   const firstGrid = await read(page, `${elements}.find(element=>element.flowKind==='Grid').id`);
-  await read(page, `document.querySelector('[data-v3-element-id="${firstGrid}"] [data-report-grid-cell-id]').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`);
+  await doubleClickDesignerNode(page, `[data-v3-element-id="${firstGrid}"] [data-report-grid-cell-id]`, read);
   await waitFor(page, 'document.querySelector(".report-designer-canvas-text-editor textarea")');
   await page.send('Input.insertText', { text: '检查项目' });
   await key(page, 'Enter', process.platform === 'darwin' ? 4 : 2);
@@ -93,7 +94,7 @@ export async function verifyBlankDesigner({ page, url, read, waitFor, click, key
   }
   results.push({ test: 'generic custom paper report authors text and reusable blank tables and reopens intact', passed: true });
 
-  await page.send('Page.navigate', { url: `${url}?invoice=1` });
+  await page.send('Page.navigate', { url: `${url}?precision-grid=1` });
   await waitFor(page, 'window.__designerDraftState && document.querySelector("[data-v3-page-canvas]")');
   const heading = await read(page, `${elements}.find(element=>element.flowKind==='Grid').id`);
   await read(page, `document.querySelector('[data-v3-element-id="${heading}"]').focus()`);

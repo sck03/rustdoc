@@ -21,10 +21,10 @@ export async function verifyDetailProperties({ page, url, read, waitFor, click, 
   await waitFor(page, "document.querySelector('.new-report-detail-column-card')");
   assert(await read(page, `[...${control("显示内容")}.options].every(option => !option.value || option.value.startsWith('item.'))`), 'a repeating column only offers bindings supported by the native renderer');
   const before = await read(page, block);
-  await read(page, `${control("标题", "input")}.focus();${control("标题", "input")}.select()`);
-  await page.send("Input.insertText", { text: "商品中文标题" });
-  await key(page, "Enter");
-  await waitFor(page, `${block}.columns[0].title==="商品中文标题"`);
+  await read(page, `${control("标题", "textarea")}.focus();${control("标题", "textarea")}.select()`);
+  await page.send("Input.insertText", { text: "商品中文标题\nDescription" });
+  await key(page, "Enter", process.platform === "darwin" ? 4 : 2);
+  await waitFor(page, `${block}.columns[0].title===${JSON.stringify("商品中文标题\nDescription")}`);
   await click(page, 'button[aria-label="撤销"]');
   assert.deepEqual(await read(page, block), before, "one undo restores the whole title");
   await open("组合排版");

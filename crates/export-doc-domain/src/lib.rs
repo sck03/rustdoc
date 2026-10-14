@@ -1,12 +1,14 @@
 pub use export_doc_contracts::{contracts, generated_api, report_batches};
 pub mod announcement;
 pub mod approval;
+pub mod backup_plan;
 pub mod crm;
 pub mod designer;
 pub mod history;
 pub mod hs;
 pub mod hs_import;
 pub mod invoice;
+pub mod invoice_adjustments;
 pub mod invoice_calculation;
 pub mod invoice_columns;
 pub mod invoice_grid;

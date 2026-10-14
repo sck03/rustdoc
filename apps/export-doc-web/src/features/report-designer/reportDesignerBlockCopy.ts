@@ -21,6 +21,7 @@ export function copyReportDesignerBlock<T extends ReportBlock>(source: T): T {
     });
     return {
       ...block, columns, summaryRow: references(block.summaryRow), introRow: references(block.introRow),
+      adjustments: block.adjustments && { descriptionColumnId: ids.get(block.adjustments.descriptionColumnId)!, amountColumnId: ids.get(block.adjustments.amountColumnId)! },
       grouping: block.grouping && { ...block.grouping, footer: references(block.grouping.footer) },
     };
   }

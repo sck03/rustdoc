@@ -120,7 +120,7 @@ async function login(first = false) {
   access = (await (await operation('Login', { body: { username: 'admin', password } })).json()).accessToken;
   assert(access);
   await page.goto(origin + '/#/settings?section=postgresql');
-  await page.getByRole('heading', { name: 'PostgreSQL 团队库维护', exact: true }).waitFor();
+  await page.getByRole('heading', { name: '数据库备份与外部文件恢复', exact: true }).waitFor();
 }
 async function createUnit(name) {
   return (await operation('CreateUnit', { body: { id: 0, nameEN: name, nameCN: '隔离恢复验证', code: 'RV', rowVersion: '' } })).json();
@@ -159,6 +159,45 @@ try {
   page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   page.setDefaultTimeout(30000);
   await login(true);
+  // Exercise the new plan through the real React client and PostgreSQL service.
+  await page.getByRole('button', { name: '日常灾备', exact: true }).click();
+  const schedule = page.locator('[aria-label="日常灾备"]');
+  await schedule.getByLabel('启用日常灾备', { exact: true }).waitFor();
+  assert.equal(await schedule.getByLabel('启用日常灾备', { exact: true }).isChecked(), false);
+  await schedule.getByLabel('备份包密码', { exact: true }).fill('Scheduled-password-2026');
+  await schedule.getByLabel('再次输入新密码', { exact: true }).fill('Scheduled-password-2026');
+  await page.getByRole('button', { name: '保存灾备设置', exact: true }).click();
+  await page.getByText('灾备设置已保存。', { exact: true }).waitFor();
+  const started = page.waitForResponse(response => response.url().endsWith('/api/disaster-recovery/plan/run') && response.request().method() === 'POST');
+  await schedule.getByRole('button', { name: '立即备份一次' }).click();
+  const scheduledJob = await (await started).json();
+  await waitForJob(operation, scheduledJob.jobId);
+  const scheduledStatus = await (await operation('GetBackupPlan')).json();
+  assert.equal(scheduledStatus.plan.enabled, false);
+  assert.equal(scheduledStatus.lastResult, 'Succeeded');
+  assert.equal(scheduledStatus.s3Available, true);
+  assert.equal(scheduledStatus.archives.length, 1);
+  const archive = scheduledStatus.archives[0];
+  const issued = await operation('CreateRecoveryArchiveDownloadTicket', { parameters: { id: archive.id } });
+  const archiveCookie = issued.headers.get('set-cookie')?.split(';')[0];
+  const archiveTicket = await issued.json();
+  assert.equal((await fetch(new URL(archiveTicket.downloadUrl, origin))).status, 404);
+  const archiveDownload = await fetch(new URL(archiveTicket.downloadUrl, origin), { headers: { cookie: archiveCookie } });
+  assert(archiveDownload.ok);
+  assert(Buffer.from(await archiveDownload.arrayBuffer()).subarray(0, 22).toString().startsWith('EDM-SERVER-MIGRATION-2'));
+  await createUnit('After scheduled archive');
+  await page.getByRole('button', { name: '重新加载灾备设置', exact: true }).click();
+  await page.locator('[aria-label="完整备份列表"]').getByRole('button', { name: '用于恢复' }).first().click();
+  const archiveRestore = page.locator('[aria-label="从本地完整备份恢复"]');
+  await archiveRestore.getByLabel('所选备份的密码').fill('Scheduled-password-2026');
+  await archiveRestore.getByLabel('管理员当前密码').fill(password);
+  await archiveRestore.getByLabel('恢复确认文本').fill('MIGRATE');
+  const stagedArchive = page.waitForResponse(response => response.url().endsWith(`/api/disaster-recovery/archives/${archive.id}/restore`) && response.request().method() === 'POST');
+  await archiveRestore.getByRole('button', { name: '校验并安排完整恢复' }).click();
+  await waitForJob(operation, (await (await stagedArchive).json()).jobId);
+  await page.screenshot({ path: path.join(root, 'scheduled-archive-restore.png'), fullPage: true });
+  await restoreOffline();
+  await assertUnitAbsent('After scheduled archive');
   const backup = page.locator('.maintenance-database-backup-panel');
   const recovery = page.locator('.maintenance-database-recovery-panel');
   await backup.getByRole('button', { name: '创建备份', exact: true }).click();
@@ -176,7 +215,7 @@ try {
   await recovery.getByRole('button', { name: '恢复上传文件', exact: true }).click();
   await page.getByText('恢复已暂存。停止服务后运行 --restore-pending 维护命令，再启动服务。', { exact: true }).waitFor();
   assert(await page.locator('details[aria-label="服务器维护步骤"]').evaluate(element => element.open));
-  await page.getByText('./scripts/run-native-docker.ps1 @run -RestorePending', { exact: true }).waitFor();
+  await page.getByText(/docker compose run --rm --no-deps restore/u).waitFor();
   assert(await backup.getByRole('button', { name: '创建备份', exact: true }).isDisabled());
   await page.screenshot({ path: path.join(root, 'database-restore-pending.png'), fullPage: true });
   await restoreOffline();
@@ -187,7 +226,7 @@ try {
   const originalTemplate = fs.readFileSync(path.join(repo, 'Templates/Export/invoice_template.dtpl'));
   fs.writeFileSync(template, originalTemplate);
   const migration = page.locator('.maintenance-full-migration-panel');
-  await page.locator('details[aria-label="完整迁移与换机"] > summary').click();
+  await page.getByRole('button', { name: '整机迁移', exact: true }).click();
   await migration.getByLabel('管理员当前密码').fill(password);
   await migration.getByLabel('新迁移包密码', { exact: true }).fill('Migration-password-2026');
   await migration.getByLabel('再次输入密码', { exact: true }).fill('Migration-password-2026');
@@ -235,7 +274,7 @@ try {
     await migration.getByLabel('迁移包密码', { exact: true }).fill(candidate);
     await migration.getByLabel('恢复确认文本', { exact: true }).fill('MIGRATE');
     const response = page.waitForResponse(r => new URL(r.url()).pathname === operations.get('StageServerMigrationRestore').route && r.request().method() === 'POST');
-    await migration.getByRole('button', { name: '安排完整迁移', exact: true }).click();
+    await migration.getByRole('button', { name: '安排完整恢复', exact: true }).click();
     assert.equal((await response).status(), candidate === legacyPassword ? 200 : 400);
     if (candidate !== legacyPassword) {
       await page.getByText(/包密码错误/u).waitFor();
@@ -253,7 +292,7 @@ try {
   await page.screenshot({ path: path.join(root, 'restored-maintenance.png'), fullPage: true });
   fs.writeFileSync(path.join(root, 'result.json'), JSON.stringify({
     succeeded: true, database: 'PostgreSQL 18', platform: process.platform,
-    checks: ['secret-file startup', 'browser bootstrap', 'dump create/download/upload', 'both pending states',
+    checks: ['secret-file startup', 'browser bootstrap', 'opt-in scheduled plan', 'real complete archive', 'archive cookie binding', 'server-side archive restore', 'dump create/download/upload', 'both pending states',
       'live-instance rejection', 'fail-closed startup', 'offline restore and idempotency', 'browser migration creation',
       'wrong password rejection', 'valid existing password', 'MIGRATE confirmation', 'cross-database and DataRoot migration',
       'original administrator restored', 'database/key/template recovery'],

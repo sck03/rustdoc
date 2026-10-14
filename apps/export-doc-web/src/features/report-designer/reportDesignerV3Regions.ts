@@ -1,4 +1,5 @@
 import { createV3MoveConstraint, getElementBounds, reportDesignerV3ElementBounds } from "./reportDesignerGeometry.ts";
+import { isProductElement } from "./reportDesignerV3Schema.ts";
 import { resolveReportDesignerLayerBands } from "./reportDesignerLayerBands.ts";
 import type { ReportDesignerV3DocumentState } from "./reportDesignerV3Mutations.ts";
 import { clampReportDesignerV3ElementToPage, REPORT_DESIGNER_V3_MAX_ELEMENTS_PER_LAYER, type ReportDesignerV3Element, type ReportDesignerV3Layer, type ReportDesignerV3LayerRole, type ReportDesignerV3Schema } from "./reportDesignerV3Schema.ts";
@@ -6,7 +7,7 @@ import { clampReportDesignerV3ElementToPage, REPORT_DESIGNER_V3_MAX_ELEMENTS_PER
 export const v3RegionNames: Record<ReportDesignerV3LayerRole, string> = { Header: "页眉", Body: "主体", Footer: "页脚", Overlay: "覆盖层" };
 
 export function requiresV3BodyRegion(element: ReportDesignerV3Element) {
-  return (element.type === "Field" && element.fieldPath.startsWith("item.")) || (element.type === "Flow" && (element.flowKind === "DetailTable" || element.flowKind === "PageBreak"));
+  return isProductElement(element) || (element.type === "Flow" && (element.flowKind === "DetailTable" || element.flowKind === "PageBreak"));
 }
 
 export function resolveV3InsertionLayer(schema: ReportDesignerV3Schema, layerId: string, element: ReportDesignerV3Element) {

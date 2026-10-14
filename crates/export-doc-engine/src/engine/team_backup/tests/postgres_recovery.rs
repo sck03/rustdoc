@@ -84,10 +84,12 @@ fn postgres_migration_and_physical_restore_preserve_roles_and_reject_live_instan
     let mut wrong_confirmation = params.clone();
     wrong_confirmation[1].1 = "RESTORE DATABASE".into();
     assert_eq!(
-        migration::stage_restore_upload(
+        super::super::upload(
             &service,
             &actor,
+            STAGE_SERVER_MIGRATION_RESTORE,
             &wrong_confirmation,
+            &Value::Null,
             &output.file_name,
             &output.content
         )
@@ -95,10 +97,12 @@ fn postgres_migration_and_physical_restore_preserve_roles_and_reject_live_instan
         .status,
         Some(400)
     );
-    migration::stage_restore_upload(
+    super::super::upload(
         &service,
         &actor,
+        STAGE_SERVER_MIGRATION_RESTORE,
         &params,
+        &Value::Null,
         &output.file_name,
         &output.content,
     )

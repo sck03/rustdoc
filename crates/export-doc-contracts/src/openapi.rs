@@ -1,6 +1,7 @@
 //! Official contract composition. The frozen .NET export is preserved verbatim;
 //! new Rust capabilities are added here and both clients consume the same output.
 mod accounts;
+mod backup_plan;
 mod communication;
 mod observability;
 mod office;
@@ -19,6 +20,7 @@ pub fn document() -> Value {
     observability::extend(&mut document);
     accounts::extend(&mut document);
     payment_printing::extend(&mut document);
+    backup_plan::extend(&mut document);
     document
 }
 

@@ -1,8 +1,8 @@
-import type { ReportDesignerV3Schema } from "./reportDesignerV3Schema.ts";
+import { isProductElement, type ReportDesignerV3Schema } from "./reportDesignerV3Schema.ts";
 
 /** Edit one product row, as in a banded report designer; printing repeats it. */
 export function ReportDesignerProductRows({ schema }: { schema: ReportDesignerV3Schema }) {
-  const fields = schema.layers.filter(layer => layer.visible && layer.role === "Body").flatMap(layer => layer.elements).filter(element => element.visible && element.type === "Field" && element.fieldPath.startsWith("item."));
+  const fields = schema.layers.filter(layer => layer.visible && layer.role === "Body").flatMap(layer => layer.elements).filter(element => element.visible && isProductElement(element));
   if (!fields.length) return null;
   const top = Math.min(...fields.map(field => field.yHundredthMm));
   const bottom = Math.max(...fields.map(field => field.yHundredthMm + field.heightHundredthMm));

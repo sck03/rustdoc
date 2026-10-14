@@ -16,6 +16,18 @@
     {
       "reportType": "ExportDocument",
       "category": "单据信息",
+      "label": "调整后应付金额 (Adjusted Total)",
+      "value": "{{ Invoice.AdjustedTotalAmount }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
+      "label": "金额调整合计 (Adjustments)",
+      "value": "{{ Invoice.AdjustmentTotalAmount }}"
+    },
+    {
+      "reportType": "ExportDocument",
+      "category": "单据信息",
       "label": "发票号码 (Invoice No)",
       "value": "{{ Invoice.InvoiceNo }}"
     },

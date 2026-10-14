@@ -140,7 +140,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | undici-types | 8.9.0 | MIT | web |
 | vite | 8.3.1 | MIT | web |
 
-## cargo (736)
+## cargo (749)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -171,11 +171,19 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | atoi_simd | 0.18.1 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
 | atomic-waker | 1.1.2 | Apache-2.0 OR MIT | native-desktop |
 | autocfg | 1.5.1 | Apache-2.0 OR MIT | native-desktop, ocr |
+| aws-credential-types | 1.3.0 | Apache-2.0 | native-desktop |
+| aws-sigv4 | 1.6.0 | Apache-2.0 | native-desktop |
+| aws-smithy-async | 1.3.0 | Apache-2.0 | native-desktop |
+| aws-smithy-http | 0.64.1 | Apache-2.0 | native-desktop |
+| aws-smithy-runtime-api | 1.19.0 | Apache-2.0 | native-desktop |
+| aws-smithy-runtime-api-macros | 1.1.0 | Apache-2.0 | native-desktop |
+| aws-smithy-types | 1.8.1 | Apache-2.0 | native-desktop |
 | axum | 0.8.9 | MIT | native-desktop |
 | axum-core | 0.5.6 | MIT | native-desktop |
 | base64 | 0.21.7 | MIT OR Apache-2.0 | native-desktop |
 | base64 | 0.22.1 | MIT OR Apache-2.0 | native-desktop |
 | base64 | 0.23.1 | MIT OR Apache-2.0 | native-desktop |
+| base64-simd | 0.8.0 | MIT | native-desktop |
 | base64ct | 1.8.3 | Apache-2.0 OR MIT | native-desktop |
 | bit-set | 0.8.0 | Apache-2.0 OR MIT | native-desktop |
 | bit-vec | 0.8.0 | Apache-2.0 OR MIT | native-desktop |
@@ -197,6 +205,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | byteorder | 1.5.0 | Unlicense OR MIT | excel-analyzer, native-desktop |
 | byteorder-lite | 0.1.0 | Unlicense OR MIT | native-desktop, ocr |
 | bytes | 1.12.1 | MIT | native-desktop |
+| bytes-utils | 0.1.4 | Apache-2.0 OR MIT | native-desktop |
 | cairo-rs | 0.18.5 | MIT | native-desktop |
 | cairo-sys-rs | 0.18.2 | MIT | native-desktop |
 | calamine | 0.36.1 | MIT | excel-analyzer, native-desktop |
@@ -467,6 +476,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | num-complex | 0.4.6 | MIT OR Apache-2.0 | ocr |
 | num-conv | 0.2.2 | MIT OR Apache-2.0 | native-desktop |
 | num-integer | 0.1.46 | MIT OR Apache-2.0 | ocr |
+| num-integer | 0.1.47 | MIT OR Apache-2.0 | native-desktop |
 | num-traits | 0.2.19 | MIT OR Apache-2.0 | native-desktop, ocr |
 | objc2 | 0.6.4 | MIT | native-desktop |
 | objc2-app-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT | native-desktop |
@@ -497,6 +507,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | ort | 2.0.0-rc.12 | MIT OR Apache-2.0 | ocr |
 | ort-sys | 2.0.0-rc.12 | MIT OR Apache-2.0 | ocr |
 | osakit | 0.3.1 | MIT OR Apache-2.0 | native-desktop |
+| outref | 0.5.2 | MIT | native-desktop |
 | pango | 0.18.3 | MIT | native-desktop |
 | pango-sys | 0.18.0 | MIT | native-desktop |
 | parking | 2.2.1 | Apache-2.0 OR MIT | native-desktop |
@@ -516,6 +527,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | phf_shared | 0.13.1 | MIT | native-desktop |
 | pico-args | 0.5.0 | MIT | native-desktop |
 | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT | native-desktop, ocr |
+| pin-utils | 0.1.1 | MIT OR Apache-2.0 | native-desktop |
 | piper | 0.2.5 | MIT OR Apache-2.0 | native-desktop |
 | piston-float | 1.0.1 | MIT | native-desktop |
 | pkg-config | 0.3.34 | MIT OR Apache-2.0 | native-desktop |
@@ -756,6 +768,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | vecmath | 1.0.0 | MIT | native-desktop |
 | version_check | 0.9.5 | MIT OR Apache-2.0 | native-desktop |
 | version-compare | 0.2.1 | MIT | native-desktop |
+| vsimd | 0.8.0 | MIT | native-desktop |
 | vswhom | 0.1.0 | MIT | native-desktop |
 | vswhom-sys | 0.1.3 | MIT | native-desktop |
 | walkdir | 2.5.0 | Unlicense OR MIT | native-desktop |

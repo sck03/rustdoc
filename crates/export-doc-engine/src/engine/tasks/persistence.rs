@@ -239,7 +239,11 @@ pub fn get(store: &Store, actor: &Actor, id: &str) -> Result<Value> {
 pub fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
     super::queries::list(store, actor, query)
 }
-pub fn download(store: &Store, actor: &Actor, id: &str) -> Result<FileOutput> {
+pub fn download(
+    store: &Store,
+    actor: &Actor,
+    id: &str,
+) -> Result<super::super::backup_io::Download> {
     let connection = store.connection()?;
     let job = checked(&connection, actor, id)?;
     if job["status"] != "Succeeded" || text(&job, "outputPath").is_empty() {
@@ -247,7 +251,7 @@ pub fn download(store: &Store, actor: &Actor, id: &str) -> Result<FileOutput> {
     }
     if job["_managedOutput"].is_object() {
         drop(connection);
-        return super::managed_output::read(store, actor, &job["_managedOutput"]);
+        return super::managed_output::open(store, actor, &job["_managedOutput"]);
     }
     let record_id = job["id"]
         .as_i64()
@@ -258,11 +262,11 @@ pub fn download(store: &Store, actor: &Actor, id: &str) -> Result<FileOutput> {
     if digest(&blob.content) != blob.digest {
         return Err(unavailable("任务输出完整性校验失败。"));
     }
-    Ok(FileOutput {
+    Ok(super::super::backup_io::Download::Memory(FileOutput {
         file_name: blob.file_name,
         media_type: blob.media_type,
         content: blob.content,
-    })
+    }))
 }
 pub fn cancel(store: &Store, actor: &Actor, id: &str) -> Result<()> {
     store.transaction(|connection| {

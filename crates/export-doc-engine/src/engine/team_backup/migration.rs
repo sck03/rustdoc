@@ -9,7 +9,35 @@ use super::{
 use crate::{contracts, generated_api::*, paths::RuntimePaths};
 use serde_json::{Value, json};
 use std::{fs, path::PathBuf};
-const MAGIC: &[u8] = b"EDM-SERVER-MIGRATION-1";
+pub(super) const MAGIC: &[u8] = b"EDM-SERVER-MIGRATION-1";
+/// Offline administrator import. A database maintenance lease proves the API has stopped.
+#[cfg(feature = "postgres")]
+pub fn stage_file(
+    paths: &RuntimePaths,
+    maintenance: &str,
+    owner: &str,
+    source: &std::path::Path,
+    password: &str,
+) -> Result<()> {
+    super::validate_package_password(password)?;
+    crate::paths::ensure_safe_absolute(source).map_err(invalid)?;
+    if source
+        .extension()
+        .is_none_or(|value| value != "edmmigration")
+    {
+        return Err(invalid("请选择 .edmmigration 文件。"));
+    }
+    let _gate = package::lock(paths)?;
+    postgres::ensure_no_pending(paths)?;
+    let _lease = export_doc_storage::PostgresMaintenanceLease::acquire(maintenance, owner)?;
+    package::stage(
+        &marker_path(paths)?,
+        MAGIC,
+        password,
+        fs::File::open(source)?,
+        package::POSTGRES,
+    )
+}
 pub(super) fn root(paths: &RuntimePaths) -> Result<PathBuf> {
     super::migration_root(paths)
 }
@@ -35,7 +63,7 @@ pub(super) fn status(service: &NativeService, actor: &Actor) -> Result<Value> {
     } else if !ready {
         "PostgreSQL 客户端工具未就绪。"
     } else {
-        "迁移包包含数据库、凭据主密钥和用户模板。"
+        "迁移包包含数据库、凭据主密钥和用户模板；新包使用 ZIP64 和分块加密，不设固定总容量上限；请预留足够磁盘空间。"
     });
     response["storagePolicy"] = json!(MIGRATION_STORAGE_POLICY);
     Ok(response)
@@ -94,7 +122,7 @@ pub(super) fn create_package(
         service.protector.clone(),
         actor.id,
     );
-    service.jobs.start(
+    service.jobs.start_backup(
         actor,
         "ServerMigrationPackage",
         "创建服务器迁移包",
@@ -109,7 +137,7 @@ pub(super) fn create_package(
             let result = (|| {
                 let dump = working.join("database.dump");
                 postgres::dump_to(&store, &protector, &tools.pg_dump, &dump)?;
-                let bytes = package::create(
+                let package = package::create(
                     &paths,
                     &protector,
                     &dump,
@@ -123,17 +151,14 @@ pub(super) fn create_package(
                     crate::paths::nonce().map_err(unavailable)?
                 ));
                 crate::operation::check()?;
-                sealed::atomic_write(&target, &bytes)?;
+                fs::rename(package, &target)?;
                 super::audit(
                     &store,
                     &actor,
                     "create-server-migration-package",
                     "加密迁移包已创建",
                 )?;
-                Ok(TaskOutput::managed_file(
-                    target,
-                    "迁移包已创建，可下载。请单独保管密码。".into(),
-                ))
+                TaskOutput::managed_file(target, "迁移包已创建，可下载。请单独保管密码。".into())
             })();
             let _ = fs::remove_dir_all(&working);
             result
@@ -152,12 +177,11 @@ pub(super) fn stage_restore_upload(
     actor: &Actor,
     parameters: &[(&str, String)],
     file_name: &str,
-    content: &[u8],
+    content: impl std::io::Read,
 ) -> Result<Value> {
     auth::authorize(actor, "system.disaster-recovery", "manage")?;
     postgres::require_ready(service)?;
     super::confirmation(parameters, "MIGRATE")?;
-    super::sensitive_ticket(parameters, actor, super::ACTION_RESTORE_SERVER)?;
     super::managed_file(&root(&service.paths)?, file_name, "edmmigration")?;
     let password = parameters
         .iter()

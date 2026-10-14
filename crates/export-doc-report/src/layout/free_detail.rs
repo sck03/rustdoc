@@ -1,7 +1,7 @@
 //! Free-positioned fields form one repeated product row; fixed document objects stay independent.
 use super::*;
 pub(super) fn is_item(element: &Element) -> bool {
-    matches!(&element.kind, Kind::Field { field_path, .. } if field_path.starts_with("item."))
+    element.is_product()
 }
 pub(super) fn render(
     design: &Design,
@@ -72,76 +72,7 @@ pub(super) fn render(
         if cancelled.load(std::sync::atomic::Ordering::Relaxed) {
             return Err(invalid("报表生成已取消。"));
         }
-        let mut row: Vec<Element> = Vec::new();
-        let mut row_height = pitch;
-        for (index, source) in fields.iter().enumerate() {
-            let Kind::Field {
-                field_path,
-                fallback_text,
-                field_format,
-            } = &source.kind
-            else {
-                unreachable!()
-            };
-            let value = data.field_text(field_path, Some(item), field_format.as_ref());
-            let text = if value.is_empty() {
-                fallback_text.clone()
-            } else {
-                value
-            };
-            let mut field = (*source).clone();
-            let size = field.style.font_size_pt * PT_MM;
-            let available =
-                (field.width_hundredth_mm - field.style.padding_hundredth_mm * 2) as f32 / 100.;
-            let lines = measured_wrap(
-                &text,
-                available,
-                &field.style.font_family,
-                field.style.bold,
-                size,
-            );
-            field.height_hundredth_mm = field.height_hundredth_mm.max(
-                (lines.len() as f32 * size * 1.35 * 100.).ceil() as i32
-                    + field.style.padding_hundredth_mm * 2,
-            );
-            field.y_hundredth_mm -= top;
-            // Wrapped text pushes fields below it in the same column, preserving authored gaps.
-            for (previous, placed) in fields[..index].iter().zip(&row) {
-                if previous.x_hundredth_mm < source.x_hundredth_mm + source.width_hundredth_mm
-                    && previous.x_hundredth_mm + previous.width_hundredth_mm > source.x_hundredth_mm
-                    && previous.y_hundredth_mm + previous.height_hundredth_mm
-                        <= source.y_hundredth_mm
-                {
-                    let gap = source.y_hundredth_mm
-                        - previous.y_hundredth_mm
-                        - previous.height_hundredth_mm;
-                    field.y_hundredth_mm = field
-                        .y_hundredth_mm
-                        .max(placed.y_hundredth_mm + placed.height_hundredth_mm + gap);
-                }
-            }
-            row_height = row_height.max(field.y_hundredth_mm + field.height_hundredth_mm + 100);
-            field.kind = Kind::Text { text };
-            row.push(field);
-        }
-        let content_bottom = row
-            .iter()
-            .map(|field| field.y_hundredth_mm + field.height_hundredth_mm)
-            .max()
-            .unwrap();
-        let authored_bottom = fields
-            .iter()
-            .map(|field| field.y_hundredth_mm + field.height_hundredth_mm - top)
-            .max()
-            .unwrap();
-        for (source, field) in fields.iter().zip(&mut row) {
-            if field.style.vertical_align == "Bottom" {
-                field.y_hundredth_mm = source.y_hundredth_mm + source.height_hundredth_mm - top
-                    + content_bottom
-                    - authored_bottom
-                    - field.height_hundredth_mm;
-            }
-        }
+        let (row, row_height) = product_row(&fields, data, item, top, pitch)?;
         if (top + row_height) as f32 > bottom * 100. {
             return Err(invalid("单件商品内容超过一页，请调宽字段或缩小字号。"));
         }
@@ -181,4 +112,188 @@ pub(super) fn render(
             Ok(canvas.finish().svg)
         })
         .collect()
+}
+
+fn overlaps(left: &Element, right: &Element) -> bool {
+    left.x_hundredth_mm < right.x_hundredth_mm + right.width_hundredth_mm
+        && left.x_hundredth_mm + left.width_hundredth_mm > right.x_hundredth_mm
+}
+struct Placed {
+    element: Element,
+    print: bool,
+    collapsed: bool,
+    anchor: bool,
+}
+/// Empty horizontal bands contract as a unit; bottom-aligned numeric fields follow them.
+/// Authored blank gaps and explicit spacers remain, and wrapping expands the same columns.
+fn product_row(
+    fields: &[&Element],
+    data: &crate::ReportData,
+    item: &Value,
+    top: i32,
+    pitch: i32,
+) -> Result<(Vec<Element>, i32)> {
+    let mut row = Vec::with_capacity(fields.len());
+    for source in fields {
+        let spacer = matches!(source.kind, Kind::ProductSpacer);
+        let text = match &source.kind {
+            Kind::Field {
+                field_path,
+                fallback_text,
+                field_format,
+            } => {
+                let value = data.field_text(field_path, Some(item), field_format.as_ref());
+                if value.is_empty() {
+                    fallback_text.clone()
+                } else {
+                    value
+                }
+            }
+            Kind::ProductSpacer => String::new(),
+            _ => unreachable!(),
+        };
+        let condition = source
+            .product
+            .as_ref()
+            .and_then(|settings| settings.condition.as_ref());
+        let matched = condition
+            .map_or(Ok(true), |rule| {
+                rule.matches(
+                    data.value(&rule.field_path, Some(item)),
+                    &data.display(&rule.field_path, Some(item)),
+                )
+            })
+            .map_err(invalid)?;
+        let hidden = !matched
+            || (!spacer
+                && source
+                    .product
+                    .as_ref()
+                    .is_some_and(|settings| settings.hide_when_empty)
+                && text.trim().is_empty());
+        let collapsed = hidden
+            && source
+                .product
+                .as_ref()
+                .is_some_and(|settings| settings.collapse_empty);
+        let mut field = (*source).clone();
+        if collapsed {
+            field.height_hundredth_mm = 0;
+        } else if !spacer && !hidden {
+            let size = field.style.font_size_pt * PT_MM;
+            let available =
+                (field.width_hundredth_mm - field.style.padding_hundredth_mm * 2) as f32 / 100.;
+            let lines = measured_wrap(
+                &text,
+                available,
+                &field.style.font_family,
+                field.style.bold,
+                size,
+            );
+            field.height_hundredth_mm = field.height_hundredth_mm.max(
+                (lines.len() as f32 * size * 1.35 * 100.).ceil() as i32
+                    + field.style.padding_hundredth_mm * 2,
+            );
+        }
+        let anchor = !spacer
+            && field.style.vertical_align == "Bottom"
+            && !fields.iter().any(|previous| {
+                overlaps(previous, source)
+                    && previous.y_hundredth_mm + previous.height_hundredth_mm
+                        <= source.y_hundredth_mm
+            });
+        field.kind = Kind::Text { text };
+        field.product = None;
+        row.push(Placed {
+            element: field,
+            print: !hidden && !spacer,
+            collapsed,
+            anchor,
+        });
+    }
+    let mut points: Vec<_> = fields
+        .iter()
+        .flat_map(|field| {
+            [
+                field.y_hundredth_mm,
+                field.y_hundredth_mm + field.height_hundredth_mm,
+            ]
+        })
+        .collect();
+    points.sort_unstable();
+    points.dedup();
+    let collapsed: Vec<_> = points
+        .windows(2)
+        .filter_map(|band| {
+            let covering: Vec<_> = fields
+                .iter()
+                .zip(&row)
+                .filter(|(field, placed)| {
+                    !placed.anchor
+                        && field.y_hundredth_mm <= band[0]
+                        && field.y_hundredth_mm + field.height_hundredth_mm >= band[1]
+                })
+                .collect();
+            (!covering.is_empty() && covering.iter().all(|(_, placed)| placed.collapsed))
+                .then_some((band[0], band[1]))
+        })
+        .collect();
+    let removed = |from: i32, to: i32| {
+        collapsed
+            .iter()
+            .map(|(start, end)| (to.min(*end) - from.max(*start)).max(0))
+            .sum::<i32>()
+    };
+    let authored_bottom = fields
+        .iter()
+        .map(|field| field.y_hundredth_mm + field.height_hundredth_mm)
+        .max()
+        .unwrap();
+    let removed_height = removed(top, authored_bottom);
+    for (index, source) in fields.iter().enumerate() {
+        let until = source.y_hundredth_mm
+            + if row[index].anchor {
+                source.height_hundredth_mm
+            } else {
+                0
+            };
+        let mut y = source.y_hundredth_mm - top - removed(top, until);
+        if !row[index].anchor {
+            for (previous, placed) in fields[..index].iter().zip(&row[..index]) {
+                let end = previous.y_hundredth_mm + previous.height_hundredth_mm;
+                if !placed.anchor && overlaps(previous, source) && end <= source.y_hundredth_mm {
+                    let gap = source.y_hundredth_mm - end - removed(end, source.y_hundredth_mm);
+                    y = y.max(
+                        placed.element.y_hundredth_mm + placed.element.height_hundredth_mm + gap,
+                    );
+                }
+            }
+        }
+        row[index].element.y_hundredth_mm = y.max(0);
+    }
+    let bottom = row
+        .iter()
+        .map(|placed| placed.element.y_hundredth_mm + placed.element.height_hundredth_mm)
+        .max()
+        .unwrap_or(0);
+    for (source, placed) in fields.iter().zip(&mut row) {
+        if placed.element.style.vertical_align == "Bottom" && !placed.collapsed {
+            let end = source.y_hundredth_mm + source.height_hundredth_mm;
+            placed.element.y_hundredth_mm = end - top - removed(top, end) + bottom
+                - (authored_bottom - top - removed_height)
+                - placed.element.height_hundredth_mm;
+        }
+    }
+    let height = if row.iter().all(|placed| placed.collapsed) {
+        0
+    } else {
+        (pitch - removed_height).max(bottom + 100)
+    };
+    Ok((
+        row.into_iter()
+            .filter(|placed| placed.print)
+            .map(|placed| placed.element)
+            .collect(),
+        height,
+    ))
 }

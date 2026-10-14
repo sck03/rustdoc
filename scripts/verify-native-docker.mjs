@@ -10,7 +10,7 @@ const origin=new URL(option("--url")??"http://127.0.0.1:5195");
 if(!["127.0.0.1","localhost","[::1]"].includes(origin.hostname))throw new Error("Validation must target a loopback container port.");
 const root=path.resolve(option("--runtime")??"deploy/rust-native/runtime");
 const marker=JSON.parse(readFileSync(path.join(root,"native-runtime.json"),"utf8").replace(/^\uFEFF/u,""));
-if(marker.purpose!=="exportdoc-rust-native-docker")throw new Error("Not a prepared native Docker validation directory.");
+if(!["exportdoc-rust-native-docker", "exportdoc-image-deployment"].includes(marker.purpose))throw new Error("Not a prepared native Docker validation directory.");
 const statePath=path.join(root,"validation-session.json");
 const resume=args.includes("--resume");
 const stageRestore=args.includes("--stage-restore");
@@ -18,7 +18,8 @@ if(stageRestore&&!resume)throw new Error('Restore validation requires an existin
 if(resume!==existsSync(statePath))throw new Error("Validation session state does not match the requested phase.");
 const state=resume?JSON.parse(readFileSync(statePath,"utf8")):{password:`Native-${randomBytes(24).toString("hex")}`};
 let access="";
-await verifyDockerTopology(root);
+const composeArguments=option('--compose')?['compose','--project-name',option('--project')??'exportdoc-image-check','--file',path.resolve(option('--compose'))]:undefined;
+await verifyDockerTopology(root,composeArguments);
 async function request(route,options={},label="HTTP request"){
   const target=new URL(route,origin);
   if(target.origin!==origin.origin)throw new Error("Native validation refused an external response URL.");

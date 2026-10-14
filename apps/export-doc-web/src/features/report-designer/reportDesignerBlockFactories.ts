@@ -47,41 +47,13 @@ const defaultTableBorderStyle: ReportBorderStyle = {
   left: true,
 };
 
-export function createRowBlock(reportType: ReportDesignerReportType = "ExportDocument"): ReportBlock {
-  if (reportType === "PaymentVoucher") {
-    return {
-      id: createReportBlockId("row"),
-      type: "Row",
-      columns: [
-        createRowColumn("Field", "", "Payment.Project", 50, {
-          ...defaultTextStyle,
-          bold: true,
-          align: "Left",
-        }, "项目/业务号"),
-        createRowColumn("Field", "", "Payment.PaymentDate", 50, {
-          ...defaultTextStyle,
-          align: "Right",
-        }, "申请日期"),
-      ],
-      marginTopMm: 1.5,
-      marginBottomMm: 1.5,
-    };
-  }
-
+export function createRowBlock(): ReportBlock {
   return {
     id: createReportBlockId("row"),
     type: "Row",
     columns: [
-      createRowColumn("Text", "TO:M/S\nCustomer name and address", "", 58, {
-        ...defaultTextStyle,
-        bold: true,
-        align: "Left",
-      }),
-      createRowColumn("Field", "", "Invoice.InvoiceNo", 42, {
-        ...defaultTextStyle,
-        bold: true,
-        align: "Right",
-      }, "Invoice No."),
+      createRowColumn("Text", "", "", 50, defaultTextStyle),
+      createRowColumn("Text", "", "", 50, defaultTextStyle),
     ],
     marginTopMm: 1.5,
     marginBottomMm: 1.5,
@@ -162,13 +134,7 @@ export function createDetailTableBlock(): ReportBlock {
   return {
     id: createReportBlockId("detail-table"),
     type: "DetailTable",
-    title: "Quantities and Descriptions",
-    detailWidthMm: 132,
-    // Export documents commonly keep shipping marks in a non-repeating
-    // left band while the item rows repeat on the right.  Make that layout
-    // the friendly default; advanced users can remove or edit it in the
-    // layout properties panel.
-    sideBand: createDetailTableSideBand(),
+    title: "",
     sourcePath: "Invoice.Items",
     repeatMode: "ScribanFor",
     print: createDetailTablePrintSettings(),
@@ -322,6 +288,7 @@ export function createDetailTableCellContent(kind: ReportDetailTableCellContent[
     text: kind === "Text" ? "Text" : "",
     fieldPath: kind === "Field" ? "item.StyleName" : "",
     ...(kind === "ColumnBreak" ? { positionPercent: 50 } : {}),
+    ...(kind === "Spacer" ? { heightMm: 3 } : {}),
   };
 }
 

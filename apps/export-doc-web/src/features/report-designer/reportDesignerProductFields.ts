@@ -1,6 +1,18 @@
 import { createV3FieldElement, findV3Element, insertV3Element, updateV3Element, type ReportDesignerV3DocumentState } from "./reportDesignerV3Mutations.ts";
 import { resolveReportDesignerLayerBands } from "./reportDesignerLayerBands.ts";
 import { getV3InsertionIssue } from "./reportDesignerV3Insertion.ts";
+import { isProductElement } from "./reportDesignerV3Schema.ts";
+import { createV3ProductSpacerElement } from "./reportDesignerV3ElementFactories.ts";
+
+export function insertProductSpacer(state: ReportDesignerV3DocumentState) {
+  const layer = state.schema.layers.find(layer => layer.id === state.activeLayerId && layer.role === "Body" && layer.visible && !layer.locked);
+  const fields = layer?.elements.filter(element => element.visible && isProductElement(element)) ?? [];
+  if (!layer || !fields.length) return state;
+  const left = Math.min(...fields.map(field => field.xHundredthMm));
+  const right = Math.max(...fields.map(field => field.xHundredthMm + field.widthHundredthMm));
+  const bottom = Math.max(...fields.map(field => field.yHundredthMm + field.heightHundredthMm));
+  return insertV3Element(state, layer.id, createV3ProductSpacerElement(left, bottom, right - left));
+}
 
 /** Click picks an existing column, or fills a free space in the authored product row. */
 export function insertProductField(state: ReportDesignerV3DocumentState, field: { label: string; value: string }) {

@@ -190,6 +190,7 @@ export type ReportDetailTableBlock = ReportBlockBase & {
   columns: ReportDetailTableColumn[];
   summaryRow?: ReportDetailTableSummaryRow;
   introRow?: ReportDetailTableSummaryRow;
+  adjustments?: { descriptionColumnId: string; amountColumnId: string };
   headerStyle: ReportTextStyle;
   bodyStyle: ReportTextStyle;
   border: ReportBorderStyle;
@@ -254,9 +255,11 @@ export type ReportDetailTableColumn = {
 
 export type ReportDetailTableCellContent = {
   id: string;
-  kind: "Text" | "Field" | "LineBreak" | "ColumnBreak";
+  kind: "Text" | "Field" | "LineBreak" | "ColumnBreak" | "Spacer";
   positionPercent?: number;
   visible?: boolean;
+  condition?: ReportConditionalRule;
+  heightMm?: number;
   text: string;
   fieldPath: string;
 };

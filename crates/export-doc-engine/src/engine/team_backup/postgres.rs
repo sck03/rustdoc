@@ -17,6 +17,7 @@ use crate::{
 use serde_json::{Value, json};
 use std::{
     fs,
+    io::{Read, Write},
     path::{Path, PathBuf},
     process::Command,
     time::Duration,
@@ -27,9 +28,9 @@ const PG_RESTORE: &str = "pg_restore";
 const BACKUP_SUFFIX: &str = ".dump";
 const SAFETY_PREFIX: &str = ".";
 const RESTART_MARKER: &str = ".pending-restore.json";
-const BACKUP_TIMEOUT: Duration = Duration::from_secs(1800);
+const BACKUP_TIMEOUT: Duration = Duration::from_secs(crate::engine::backup_io::TIMEOUT_SECONDS);
 #[cfg(feature = "postgres")]
-const RESTORE_TIMEOUT: Duration = Duration::from_secs(1800);
+const RESTORE_TIMEOUT: Duration = Duration::from_secs(crate::engine::backup_io::TIMEOUT_SECONDS);
 const OUTPUT_LIMIT: usize = 64 * 1024 * 1024;
 const MAX_IDENTIFIER_BYTES: usize = 63;
 const MAX_OLD_OWNER_ROLES: usize = 100;
@@ -277,7 +278,7 @@ pub(super) fn create_backup(service: &NativeService, actor: &Actor) -> Result<Va
     let paths = service.paths.clone();
     let actor_id = actor.id;
     let pg_dump = tools.pg_dump;
-    service.jobs.start(
+    service.jobs.start_backup(
         actor,
         "PostgreSqlPhysicalBackup",
         "创建 PostgreSQL 物理备份",
@@ -471,29 +472,28 @@ pub(super) fn download_with_ticket(
     service: &NativeService,
     parameters: &[(&str, String)],
 ) -> Result<tasks::FileOutput> {
+    prepare_download(service, parameters)?.into_memory()
+}
+pub(in crate::engine) fn prepare_download(
+    service: &NativeService,
+    parameters: &[(&str, String)],
+) -> Result<crate::engine::backup_io::Download> {
     let token = super::header(parameters, "token");
     let file_name = super::consume_download_ticket(token)?;
     let path = super::managed_file(&postgres_root(&service.paths)?, &file_name, "dump")?;
-    let content = fs::read(&path)?;
-    Ok(tasks::FileOutput {
-        file_name,
-        media_type: "application/octet-stream".into(),
-        content,
-    })
+    crate::engine::backup_io::Download::open(&path, None)
 }
 
 /// 写入暂存恢复标记（物理备份与服务器迁移共用）。
 pub(super) fn stage_restore_marker(service: &NativeService, file_name: &str) -> Result<()> {
     ensure_no_pending(&service.paths)?;
     let path = super::managed_file(&postgres_root(&service.paths)?, file_name, "dump")?;
-    let content = fs::read(&path)?;
-    if !content.starts_with(b"PGDMP") {
-        return Err(invalid("请选择 PostgreSQL custom-format 备份。"));
-    }
+    verify_dump(&path)?;
+    let (_, digest) = crate::engine::backup_io::digest_file(&path)?;
     let marker = json!({
         "restoreId": crate::paths::nonce().map_err(unavailable)?,
         "sourceFileName": file_name,
-        "sha256": super::sha256_hex(&content),
+        "sha256": digest,
         "scheduledAtUtc": chrono::Utc::now().to_rfc3339(),
     });
     managed_write(
@@ -578,24 +578,44 @@ pub(super) fn upload_and_restore(
     actor: &Actor,
     parameters: &[(&str, String)],
     file_name: &str,
-    content: &[u8],
+    mut content: impl Read,
 ) -> Result<Value> {
     auth::authorize(actor, "system.backup", "manage")?;
     require_ready(service)?;
-    super::sensitive_ticket(parameters, actor, super::ACTION_RESTORE_DATABASE)?;
     super::confirmation(parameters, super::CONFIRM_RESTORE_DATABASE)?;
-    if content.is_empty() {
-        return Err(invalid("上传的备份文件为空。"));
-    }
     let _gate = super::package::lock(&service.paths)?;
     ensure_no_pending(&service.paths)?;
     super::managed_file(&postgres_root(&service.paths)?, file_name, "dump")?;
-    if !content.starts_with(b"PGDMP") {
+    let staged = postgres_root(&service.paths)?.join(backup_name("uploaded")?);
+    let result = (|| {
+        let mut file = fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&staged)?;
+        crate::engine::backup_io::copy_and_hash(
+            &mut content,
+            &mut file,
+            crate::engine::backup_io::MAX_FILE_BYTES,
+        )?;
+        file.flush()?;
+        file.sync_all()?;
+        drop(file);
+        verify_dump(&staged)?;
+        schedule_restore(service, actor, &staged)
+    })();
+    if result.is_err() && !restart_marker(&service.paths)?.try_exists()? {
+        let _ = fs::remove_file(&staged);
+    }
+    result
+}
+
+fn verify_dump(path: &Path) -> Result<()> {
+    let mut header = [0; 5];
+    let mut file = fs::File::open(path)?;
+    if file.read(&mut header)? != 5 || &header != b"PGDMP" {
         return Err(invalid("请选择 PostgreSQL custom-format 备份。"));
     }
-    let staged = postgres_root(&service.paths)?.join(backup_name("uploaded")?);
-    managed_write(&staged, content)?;
-    schedule_restore(service, actor, &staged)
+    Ok(())
 }
 
 mod recovery;

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { getGridCellLocations } from "./reportDesignerGridMutations.ts";
+import { readDesignerCanvasText, type ReportDesignerTextTarget } from "./reportDesignerCanvasText.ts";
 import type { ReportDesignerGridCellTarget } from "./reportDesignerGridFields.ts";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { ReportDesignerCanvasTextEditor, type ReportDesignerTextEdit } from "./ReportDesignerCanvasTextEditor.tsx";
@@ -86,7 +86,7 @@ export function ReportDesignerV3Canvas({
   onCommitTransform: (baseState: ReportDesignerV3DocumentState, transform: ReportDesignerV3Transform, deltaX: number, deltaY: number) => void;
   onCommitLayerBand: (role: "Header" | "Footer", heightHundredthMm: number) => void;
   onClearSelection: () => void;
-  onCommitText: (elementId: string, cellId: string | undefined, text: string) => void;
+  onCommitText: (target: ReportDesignerTextTarget, text: string) => void;
   onDropField?: (fieldPath: string, x: number, y: number, target?: ReportDesignerGridCellTarget) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -209,19 +209,22 @@ export function ReportDesignerV3Canvas({
     if (disabled || !canvas || !located || element.locked || located.layer.locked) return;
     const cellId = readReportDesignerGridCellId(target) ??
       (selectedGridCell?.elementId === element.id ? selectedGridCell.cellId : undefined);
-    const cell = element.type === "Flow" && element.block.type === "Grid" && cellId
-      ? getGridCellLocations(element.block).find((location) => location.cell.id === cellId)?.cell : undefined;
-    const text = element.type === "Text" ? element.text : cell?.contentKind === "Text" ? cell.text : undefined;
-    if (text === undefined || !(target instanceof Element)) return;
+    if (!(target instanceof Element)) return;
+    const columnId = target.closest<HTMLElement>("[data-report-detail-column-id]")?.dataset.reportDetailColumnId;
+    const editTarget: ReportDesignerTextTarget = columnId ? { kind: "DetailHeader", elementId: element.id, columnId }
+      : cellId ? { kind: "GridCell", elementId: element.id, cellId } : { kind: "Text", elementId: element.id };
+    const text = readDesignerCanvasText(element, editTarget);
+    if (text === undefined) return;
     const elementNode = target.closest("[data-v3-element-id]");
-    const node = cellId ? elementNode?.querySelector(`[data-report-grid-cell-id="${CSS.escape(cellId)}"]`) : elementNode;
+    const node = columnId ? elementNode?.querySelector(`[data-report-detail-column-id="${CSS.escape(columnId)}"]`)
+      : cellId ? elementNode?.querySelector(`[data-report-grid-cell-id="${CSS.escape(cellId)}"]`) : elementNode;
     if (!node) return;
     const rect = node.getBoundingClientRect();
     const pageRect = canvas.getBoundingClientRect();
     const scale = pageRect.width / canvas.offsetWidth;
     const width = Math.min(canvas.offsetWidth, Math.max(rect.width / scale, 140 / zoom));
     const height = Math.min(canvas.offsetHeight, Math.max(rect.height / scale, 44 / zoom));
-    setTextEdit({ elementId: element.id, cellId, text, width, height,
+    setTextEdit({ ...editTarget, text, width, height,
       left: Math.max(0, Math.min((rect.left - pageRect.left) / scale, canvas.offsetWidth - width)),
       top: Math.max(0, Math.min((rect.top - pageRect.top) / scale, canvas.offsetHeight - height)),
     });
@@ -231,7 +234,7 @@ export function ReportDesignerV3Canvas({
     if (!textEdit) return;
     const edit = textEdit;
     setTextEdit(null);
-    if (text !== undefined && text !== edit.text) onCommitText(edit.elementId, edit.cellId, text);
+    if (text !== undefined && text !== edit.text) onCommitText(edit, text);
     requestAnimationFrame(() => {
       findReportDesignerElementNodes(canvasRef.current, [edit.elementId]).get(edit.elementId)?.focus({ preventScroll: true });
     });
@@ -399,7 +402,7 @@ export function ReportDesignerV3Canvas({
             </div>
           ))}
           {showGuides ? <><ReportDesignerProductRows schema={state.schema} /><ReportDesignerLayerResizers schema={state.schema} zoom={zoom} disabled={disabled} onCommit={onCommitLayerBand} /></> : null}
-          {textEdit ? <ReportDesignerCanvasTextEditor key={`${textEdit.elementId}:${textEdit.cellId ?? ""}`} edit={textEdit} zoom={zoom} onCancel={() => finishTextEdit()} onCommit={finishTextEdit} /> : null}
+          {textEdit ? <ReportDesignerCanvasTextEditor key={`${textEdit.elementId}:${textEdit.kind}:${textEdit.kind === "GridCell" ? textEdit.cellId : textEdit.kind === "DetailHeader" ? textEdit.columnId : ""}`} edit={textEdit} zoom={zoom} onCancel={() => finishTextEdit()} onCommit={finishTextEdit} /> : null}
           </div>
         </div>
       </div>

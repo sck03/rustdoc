@@ -47,6 +47,7 @@ fn append_flow(design: &mut Design, id: &str, kind: &str, block: ReportBlock, y:
         visible: true,
         locked: false,
         output_enabled: true,
+        product: None,
         style: crate::designer::Style::default(),
         kind: Kind::Flow {
             flow_kind: kind.into(),

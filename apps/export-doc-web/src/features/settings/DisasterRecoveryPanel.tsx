@@ -7,17 +7,19 @@ import type { BackupManagementController } from "./useBackupManagement.ts";
 export function DisasterRecoveryPanel({
   controller,
   onPathError,
+  view,
 }: {
   controller: BackupManagementController;
   onPathError: (message: string) => void;
+  view: "migration" | "recovery";
 }) {
   const status = controller.disasterRecoveryStatus;
   return (
     <section className="backup-recovery-card" aria-label="持卡机灾难恢复">
       <div className="section-header">
         <div>
-          <h3>持卡机灾难恢复</h3>
-          <p className="section-description">独立加密包用于整机损坏或更换持卡机，不等同于普通数据库 ZIP 备份。</p>
+          <h3>{view === "migration" ? "桌面完整迁移" : "从外部完整包恢复"}</h3>
+          <p className="section-description">独立加密包包含数据库、主密钥和用户模板，适合换机或整机恢复。</p>
         </div>
         <ShieldCheck size={22} aria-hidden="true" />
       </div>
@@ -35,7 +37,7 @@ export function DisasterRecoveryPanel({
           </div>
         </div>
       </div>
-      <div className="backup-action-grid">
+      {view === "migration" && <div className="backup-action-grid">
         <label>
           <span>新恢复包密码</span>
           <input type="password" autoComplete="new-password" value={controller.recoveryPassword} disabled={!controller.canManageSettings || controller.isBusy || !status?.supported} placeholder="至少 12 位，含大小写、数字和符号" onChange={(event) => controller.setRecoveryPassword(event.target.value)} />
@@ -48,8 +50,8 @@ export function DisasterRecoveryPanel({
           <ShieldCheck size={17} aria-hidden="true" />
           <span>创建加密恢复包</span>
         </button>
-      </div>
-      <div className="backup-action-grid">
+      </div>}
+      {view === "recovery" && <div className="backup-action-grid">
         <label>
           <span>待恢复文件</span>
           <input value={controller.recoveryPackagePath} readOnly placeholder="请选择 .edmrecovery 文件" />
@@ -69,7 +71,7 @@ export function DisasterRecoveryPanel({
           <RotateCcw size={17} aria-hidden="true" />
           <span>安排灾难恢复</span>
         </button>
-      </div>
+      </div>}
     </section>
   );
 }

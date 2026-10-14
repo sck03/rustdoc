@@ -86,6 +86,10 @@ export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, iss
             validateReportTypeFieldPath(schema.reportType, column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
             validateDetailTableItemFieldPath(column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
             column.content?.forEach((part, partIndex) => {
+              if (part.condition) {
+                validateReportTypeFieldPath(schema.reportType, part.condition.fieldPath, `${blockPath}.columns[${columnIndex}].content[${partIndex}].condition.fieldPath`, issues);
+                if (isControlledReportImageFieldPath(part.condition.fieldPath)) issues.push(createIssue("error", blockPath, "条件字段请使用普通文字或数字字段。"));
+              }
               if (part.kind === "Field") {
                 validateReportTypeFieldPath(schema.reportType, part.fieldPath, `${blockPath}.columns[${columnIndex}].content[${partIndex}].fieldPath`, issues);
               }

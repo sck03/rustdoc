@@ -21,6 +21,7 @@ struct Row {
 
 enum RowKind {
     Data,
+    Adjustment,
     Group,
     Fixed(ReportTextStyle, Option<ReportBorderStyle>),
 }
@@ -121,6 +122,39 @@ pub(super) fn render(
     if let Some(intro) = &table.intro_row {
         rows.insert(0, summary_row(table, intro, data, &widths, size)?);
     }
+    if let Some(adjustments) = &table.adjustments {
+        for entry in data.root["Invoice"]["amountAdjustments"]
+            .as_array()
+            .into_iter()
+            .flatten()
+        {
+            let cells: Vec<_> = table
+                .columns
+                .iter()
+                .zip(&widths)
+                .map(|(column, width)| {
+                    let value = if column.id == adjustments.description_column_id {
+                        entry["description"].as_str().unwrap_or("").to_owned()
+                    } else if column.id == adjustments.amount_column_id {
+                        crate::data::currency_text(
+                            entry["amount"].as_str().unwrap_or(""),
+                            &data.text("Invoice.Currency"),
+                        )
+                    } else {
+                        String::new()
+                    };
+                    body_style.wrap(&value, *width)
+                })
+                .collect();
+            rows.push(Row {
+                height: body_style.height(&cells),
+                cells,
+                composed: vec![],
+                kind: RowKind::Adjustment,
+                page_break_before: false,
+            });
+        }
+    }
     if let Some(summary) = &table.summary_row {
         rows.push(summary_row(table, summary, data, &widths, size)?);
     }
@@ -179,6 +213,7 @@ pub(super) fn render(
             }
     };
     let last_index = chunks.len() - 1;
+    let is_entry = |row: &Row| matches!(row.kind, RowKind::Data | RowKind::Adjustment);
     if chunks[last_index].iter().map(|row| row.height).sum::<f32>() > final_capacity(last_index) {
         let capacity = final_capacity(last_index + 1);
         let last = chunks.last_mut().unwrap();
@@ -199,17 +234,35 @@ pub(super) fn render(
             used += last[start].height;
             detail_count += usize::from(is_detail);
         }
-        if start == last.len()
-            || !last[start..]
-                .iter()
-                .any(|row| matches!(row.kind, RowKind::Data))
-        {
+        if start == last.len() || !last[start..].iter().any(is_entry) {
             return Err(invalid(
                 "末页条款与合计没有足够空间容纳明细，请缩短条款或减小字号。",
             ));
         }
         let tail = last.split_off(start);
         chunks.push(tail);
+    }
+    // A summary that overflowed during the initial pagination still needs a preceding entry.
+    if chunks.len() > 1 && !chunks.last().unwrap().iter().any(is_entry) {
+        let last = chunks.len() - 1;
+        let previous = chunks[last - 1]
+            .iter()
+            .rposition(is_entry)
+            .ok_or_else(|| invalid("合计前没有可衔接的明细。"))?;
+        let tail = chunks[last - 1].split_off(previous);
+        if tail
+            .iter()
+            .chain(chunks[last].iter())
+            .map(|row| row.height)
+            .sum::<f32>()
+            > final_capacity(last)
+        {
+            return Err(invalid("末页调整与合计空间不足，请调整字号或页脚。"));
+        }
+        chunks[last].splice(0..0, tail);
+        if chunks[last - 1].is_empty() {
+            chunks.remove(last - 1);
+        }
     }
     let count = chunks.len();
     if count > 500 {
@@ -270,7 +323,7 @@ pub(super) fn render(
                     style,
                     border.as_ref(),
                 ),
-                RowKind::Data => table_row(
+                RowKind::Data | RowKind::Adjustment => table_row(
                     &mut svg,
                     table,
                     &row.cells,
@@ -337,6 +390,7 @@ fn detail_rows(
     let mut current_group = None::<String>;
     let mut group_sums = empty_group_sums(table);
     let mut group_count = 0usize;
+    let style = CellStyle::new(&table.body_style, size, false);
     for item in data.items() {
         let group = table
             .grouping
@@ -374,13 +428,12 @@ fn detail_rows(
                 rows.push(group_row_value(label, size, grouping.page_break_before));
             }
         }
-        let style = CellStyle::new(&table.body_style, size, false);
         let composed: Vec<_> = table
             .columns
             .iter()
             .zip(widths)
             .map(|(column, width)| {
-                if column.content_kind == "Composite" {
+                if column.content_kind == "Composite" && !column.content.is_empty() {
                     super::detail_content::compose(
                         &column.content,
                         data,
@@ -406,7 +459,7 @@ fn detail_rows(
                     return vec![String::new()];
                 }
                 let text = column_text(column, data, item);
-                CellStyle::new(&table.body_style, size, false).wrap(&text, *width)
+                style.wrap(&text, *width)
             })
             .collect();
         for cell in group_sum_cells(table) {
@@ -762,7 +815,7 @@ fn table_row(
                     style.size,
                     style.bold,
                     "#000000",
-                    "Left",
+                    &column.align,
                 );
             }
         } else {

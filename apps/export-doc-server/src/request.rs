@@ -1,4 +1,5 @@
 use crate::{ServerState, response};
+mod backup;
 pub(super) mod body;
 use axum::{
     body::Body,
@@ -164,17 +165,82 @@ async fn execute(
     if query.len() > 64 {
         return Err(error(400, "查询参数过多。"));
     }
+    let mut backup_upload = None;
+    let parsed = if body::backup_upload(operation) {
+        if parts
+            .headers
+            .get("content-type")
+            .and_then(|value| value.to_str().ok())
+            .is_none_or(|value| !value.starts_with("application/octet-stream"))
+        {
+            return Err(error(400, "备份上传须使用二进制文件请求。"));
+        }
+        if parts
+            .headers
+            .get("content-length")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.parse::<u64>().ok())
+            .is_some_and(|size| size > export_doc_engine::engine::backup_io::MAX_FILE_BYTES)
+        {
+            return Err(error(413, "备份文件大小无效或超出可表示范围。"));
+        }
+        let name = parameters
+            .get(if operation == STAGE_SERVER_MIGRATION_RESTORE {
+                "X-ExportDocManager-Migration-File-Name"
+            } else {
+                "X-ExportDocManager-PostgreSql-Backup-File-Name"
+            })
+            .cloned()
+            .or_else(|| {
+                query
+                    .iter()
+                    .find(|(key, _)| key == "fileName")
+                    .map(|(_, value)| value.clone())
+            })
+            .unwrap_or_default();
+        let service = state.service.clone();
+        let token = token.clone();
+        let parameters: Vec<_> = parameters
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect();
+        let upload_scope = scope.clone();
+        let authorization = tokio::task::spawn_blocking(move || {
+            upload_scope.run(|| {
+                service.begin_backup_upload(
+                    operation,
+                    &parameters
+                        .iter()
+                        .map(|(key, value)| (key.as_str(), value.clone()))
+                        .collect::<Vec<_>>(),
+                    &name,
+                    &token,
+                )
+            })
+        })
+        .await
+        .map_err(|_| error(503, "上传授权任务中断。"))??;
+        let file = backup::receive(body, &state.service.paths.cache_root).await?;
+        backup_upload = Some((authorization, file));
+        body::Parsed {
+            body: None,
+            upload: None,
+            merge_uploads: vec![],
+        }
+    } else {
+        body::parse(
+            operation,
+            Request::from_parts(parts, body),
+            &parameters,
+            &query,
+        )
+        .await?
+    };
     let body::Parsed {
         body,
         upload,
         merge_uploads,
-    } = body::parse(
-        operation,
-        Request::from_parts(parts, body),
-        &parameters,
-        &query,
-    )
-    .await?;
+    } = parsed;
     let worker = tokio::task::spawn_blocking(move || {
         let _permit = permit;
         scope.run(|| {
@@ -198,10 +264,15 @@ async fn execute(
                 let (id, session) = state.tickets.resolve(ticket, &cookie_binding)?;
                 return state
                     .service
-                    .download_job(&id, &session)
-                    .map(response::Reply::file);
+                    .prepare_job_download(&id, &session)
+                    .map(response::Reply::download);
             }
-            if operation == DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET {
+            if [
+                DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
+                DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET,
+            ]
+            .contains(&operation)
+            {
                 let ticket = parameters
                     .iter()
                     .find(|(name, _)| *name == "token")
@@ -213,8 +284,8 @@ async fn execute(
                         .resolve_for(operation, ticket, &cookie_binding)?;
                 return state
                     .service
-                    .download_file(operation, &[("token", token)], &session)
-                    .map(response::Reply::file);
+                    .prepare_backup_download(operation, &[("token", token)], &session)
+                    .map(response::Reply::download);
             }
             if [DOWNLOAD_JOB_RESULT, CREATE_JOB_DOWNLOAD_TICKET].contains(&operation) {
                 let id = parameters
@@ -222,10 +293,13 @@ async fn execute(
                     .find(|(name, _)| *name == "jobId")
                     .map(|(_, value)| value.as_str())
                     .unwrap_or("");
-                let file = state.service.download_job(id, &token)?;
                 if operation == DOWNLOAD_JOB_RESULT {
-                    return Ok(response::Reply::file(file));
+                    return state
+                        .service
+                        .prepare_job_download(id, &token)
+                        .map(response::Reply::download);
                 }
+                state.service.authorize_job_download(id, &token)?;
                 let (ticket, cookie) =
                     state
                         .tickets
@@ -235,9 +309,19 @@ async fn execute(
                         .map_err(|_| error(503, "下载票据编码失败。"))?,
                     file: None,
                     cookie: Some(cookie),
+                    stream: None,
                 });
             }
             let _bulk_permit = bulk_permit;
+            if let Some((authorization, file)) = backup_upload {
+                return serde_json::to_vec(&state.service.finish_backup_upload(
+                    authorization,
+                    file,
+                    &token,
+                )?)
+                .map(response::Reply::bytes)
+                .map_err(|_| error(503, "上传结果编码失败。"));
+            }
             if operation == UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB {
                 return serde_json::to_vec(&state.service.upload_pdf_merge(merge_uploads, &token)?)
                     .map(response::Reply::bytes)
@@ -285,14 +369,23 @@ async fn execute(
                     &token,
                     &bootstrap,
                 )?;
-                if operation == CREATE_POSTGRE_SQL_PHYSICAL_BACKUP_DOWNLOAD_TICKET {
+                if [
+                    CREATE_POSTGRE_SQL_PHYSICAL_BACKUP_DOWNLOAD_TICKET,
+                    CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET,
+                ]
+                .contains(&operation)
+                {
                     let original: Value = serde_json::from_slice(&result)
                         .map_err(|_| error(503, "备份下载票据无效。"))?;
                     let id = original["token"]
                         .as_str()
                         .ok_or_else(|| error(503, "备份下载票据缺失。"))?;
                     let (ticket, cookie) = state.tickets.issue_for(
-                        DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
+                        if operation == CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET {
+                            DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET
+                        } else {
+                            DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET
+                        },
                         id,
                         &token,
                         &cookie_binding,
@@ -303,6 +396,7 @@ async fn execute(
                             .map_err(|_| error(503, "票据编码失败。"))?,
                         file: None,
                         cookie: Some(cookie),
+                        stream: None,
                     });
                 }
                 if operation == LOGOUT {
@@ -431,6 +525,18 @@ mod header_tests {
 }
 
 fn request_seconds(operation: Operation) -> u64 {
+    if body::backup_upload(operation)
+        || [
+            DOWNLOAD_JOB_RESULT,
+            DOWNLOAD_JOB_RESULT_WITH_TICKET,
+            DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
+            DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET,
+            RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP,
+        ]
+        .contains(&operation)
+    {
+        return export_doc_engine::engine::backup_io::TIMEOUT_SECONDS;
+    }
     if [
         UPLOAD_LETTER_OF_CREDIT_DOCUMENT,
         IMPORT_LETTER_OF_CREDIT_DOCUMENT,

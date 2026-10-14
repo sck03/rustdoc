@@ -25,6 +25,7 @@ export function MaintenanceFullMigrationPanel({
   onRestoreConfirmationChange,
   onCreate,
   onRestore,
+  view = "all",
 }: {
   canManageSettings: boolean;
   busy: boolean;
@@ -48,6 +49,7 @@ export function MaintenanceFullMigrationPanel({
   onRestoreConfirmationChange: (value: string) => void;
   onCreate: () => void;
   onRestore: () => void;
+  view?: "migration" | "recovery" | "all";
 }) {
   const restoreInputRef = useRef<HTMLInputElement | null>(null);
   return (
@@ -55,16 +57,17 @@ export function MaintenanceFullMigrationPanel({
       <div className="section-header"><div><h3>完整迁移</h3><p className="section-description">包含业务数据库、凭据主密钥和用户文件模板。数据库内的账号、设置、图片和附件随库迁移；服务器连接配置、交接目录、日志、缓存及 HTTPS 证书需另行保管。</p></div><ShieldCheck size={22} aria-hidden="true" /></div>
       <div className="backup-action-grid">
         <label><span>管理员当前密码</span><input type="password" autoComplete="current-password" value={adminPassword} disabled={!canManageSettings || busy} onChange={(event) => onAdminPasswordChange(event.target.value)} /><small>创建或恢复完整迁移包前都需要重新认证。</small></label>
-        <label><span>新迁移包密码</span><input type="password" autoComplete="new-password" value={packagePassword} disabled={!canManageSettings || busy} placeholder="至少12位，含大小写、数字和符号" onChange={(event) => onPackagePasswordChange(event.target.value)} /></label>
+        {view !== "recovery" && <><label><span>新迁移包密码</span><input type="password" autoComplete="new-password" value={packagePassword} disabled={!canManageSettings || busy} placeholder="至少12位，含大小写、数字和符号" onChange={(event) => onPackagePasswordChange(event.target.value)} /></label>
         <label><span>再次输入密码</span><input type="password" autoComplete="new-password" value={packagePasswordConfirmation} disabled={!canManageSettings || busy} onChange={(event) => onPackagePasswordConfirmationChange(event.target.value)} /></label>
         <label><span>创建确认文本</span><input value={createConfirmation} disabled={!canManageSettings || busy} placeholder="MIGRATE" onChange={(event) => onCreateConfirmationChange(event.target.value)} /></label>
-        <button className="command-button" type="button" disabled={!canCreate} onClick={onCreate}><Download size={17} aria-hidden="true" /><span>{createPending ? "正在创建迁移包" : "创建并下载迁移包"}</span></button>
-        <label><span>待恢复迁移包</span><input ref={restoreInputRef} hidden type="file" accept=".edmmigration" onChange={(event) => { onRestoreFileChange(event.currentTarget.files?.[0] ?? null); event.currentTarget.value = ""; }} /><button className="command-button secondary" type="button" disabled={!canManageSettings || busy} onClick={() => restoreInputRef.current?.click()}><Upload size={17} aria-hidden="true" /><span>{restoreFile?.name || "选择 .edmmigration 文件"}</span></button></label>
+        <button className="command-button" type="button" disabled={!canCreate} onClick={onCreate}><Download size={17} aria-hidden="true" /><span>{createPending ? "正在创建迁移包" : "创建并下载迁移包"}</span></button></>}
+        {view !== "migration" && <><label><span>待恢复迁移包</span><input ref={restoreInputRef} hidden type="file" accept=".edmmigration" onChange={(event) => { onRestoreFileChange(event.currentTarget.files?.[0] ?? null); event.currentTarget.value = ""; }} /><button className="command-button secondary" type="button" disabled={!canManageSettings || busy} onClick={() => restoreInputRef.current?.click()}><Upload size={17} aria-hidden="true" /><span>{restoreFile?.name || "选择 .edmmigration 文件"}</span></button></label>
         <label><span>迁移包密码</span><input type="password" autoComplete="current-password" value={restorePassword} disabled={!canManageSettings || busy || !restoreFile} onChange={(event) => onRestorePasswordChange(event.target.value)} /></label>
         <label><span>恢复确认文本</span><input value={restoreConfirmation} disabled={!canManageSettings || busy || !restoreFile} placeholder="MIGRATE" onChange={(event) => onRestoreConfirmationChange(event.target.value)} /></label>
-        <button className="command-button danger-command" type="button" disabled={!canRestore} onClick={onRestore}><RotateCcw size={17} aria-hidden="true" /><span>安排完整迁移</span></button>
+        <button className="command-button danger-command" type="button" disabled={!canRestore} onClick={onRestore}><RotateCcw size={17} aria-hidden="true" /><span>安排完整恢复</span></button></>}
       </div>
       <p className="settings-helper-text">安排迁移只完成校验和暂存。随后须由服务器管理员停止应用、执行恢复维护命令，成功后再启动；仅刷新页面或普通重启不会完成恢复。</p>
+      <p className="settings-helper-text">{status?.message} 大包可由管理员直接从服务器目录导入；创建与恢复前请预留备份及恢复副本所需的磁盘空间。</p>
       <p className="settings-helper-text">{status?.storagePolicy}</p>
     </section>
   );
