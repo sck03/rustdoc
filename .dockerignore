@@ -8,6 +8,11 @@
 !crates/**
 !third_party/
 !third_party/**
+!deploy/
+!deploy/rust-native/
+!deploy/rust-native/compose.image.yml
+!deploy/rust-native/postgres-init.sh
+!deploy/rust-native/postgres-roles.sql
 !apps/
 !apps/export-doc-web/
 !apps/export-doc-web/**
