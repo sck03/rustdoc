@@ -84,7 +84,7 @@ function invoice() {
   t.block.summaryRow.cells.find(cell=>cell.columnId==="amount").fieldFormat="Currency";
   t.block.summaryRow.style.marginTopMm=2.5;
   t.block.summaryRow.border={...border,style:"Dashed",widthPx:0.8,right:false,bottom:false,left:false};
-  t.block.introRow={label:"",labelColumnSpan:4,style:{fontSizePt:7,align:"Right"},cells:[{columnId:"amount",contentKind:"Field",fieldPath:"Invoice.TradeTerms",text:""}]};
+  t.block.introRow={label:"",labelColumnSpan:4,style:{fontSizePt:7,align:"Right"},border:{...border,bottom:false},cells:[{columnId:"amount",contentKind:"Field",fieldPath:"Invoice.TradeTerms",text:""}]};
   d.layers[1].elements=[t];
   const final=d.layers.find(layer=>layer.id==="final");
   final.name="末页合计、条款与签章";

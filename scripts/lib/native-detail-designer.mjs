@@ -3,6 +3,7 @@ import path from 'node:path';
 import { captureScreenshot } from './web-runtime-browser-session.mjs';
 import { waitFor } from './web-runtime-smoke-common.mjs';
 import { verifyInvoiceCanvasAlignment } from './report-designer-canvas-geometry-ui.mjs';
+import { doubleClickDesignerNode } from './report-designer-pointer-ui.mjs';
 
 export async function verifyDesktopDetailDesigner({ run, request, token, cdp, output }) {
   const wait = async expression => {
@@ -25,9 +26,10 @@ export async function verifyDesktopDetailDesigner({ run, request, token, cdp, ou
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', windowsVirtualKeyCode: 13 });
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', windowsVirtualKeyCode: 13 });
   await wait("Boolean(document.querySelector('.new-report-detail-column-card'))");
-  await run("(()=>{const input=[...document.querySelectorAll('.new-report-detail-properties label')].find(node=>node.firstElementChild?.textContent==='标题').querySelector('input');input.focus();input.select()})()");
-  await cdp.send('Input.insertText', { text: '桌面货物说明' });
-  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', windowsVirtualKeyCode: 13 });
+  await doubleClickDesignerNode(cdp, `${selector} [data-report-detail-column-id="${table.block.columns[0].id}"]`, (_page, expression) => run(expression));
+  await wait("Boolean(document.querySelector('[aria-label=在画布编辑表头文字]'))");
+  await cdp.send('Input.insertText', { text: '桌面货物说明\nDescription' });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', windowsVirtualKeyCode: 13, modifiers: 2 });
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', windowsVirtualKeyCode: 13 });
   await run("[...document.querySelectorAll('.new-report-detail-properties [role=tab]')].find(node=>node.textContent==='表格样式').click(); true");
   await wait("Boolean([...document.querySelectorAll('.new-report-detail-properties label')].find(node=>node.firstElementChild?.textContent==='设置文字样式')?.getClientRects().length)");
@@ -38,7 +40,7 @@ export async function verifyDesktopDetailDesigner({ run, request, token, cdp, ou
   const saved = await request('GetUserReportTemplate', token, undefined, { id: clone.body.id });
   assert.equal(saved.status, 200);
   const savedTable = JSON.parse(saved.body.contentHtml).layers.flatMap(layer => layer.elements).find(element => element.id === table.id).block;
-  assert.equal(savedTable.columns[0].title, '桌面货物说明');
+  assert.equal(savedTable.columns[0].title, '桌面货物说明\nDescription');
   assert.deepEqual(savedTable.summaryRow, table.block.summaryRow);
   await run("[...document.querySelectorAll('[role=tab]')].find(node=>node.textContent.trim()==='预览').click(); true");
   await wait("Boolean([...document.querySelectorAll('button')].find(node=>node.textContent.trim()==='样例预览'&&!node.disabled))");

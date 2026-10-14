@@ -75,9 +75,16 @@ export async function verifyDesktopBlankDetails({ run, request, token, invoice, 
   await captureScreenshot(cdp, path.join(output, 'Full-blank-adjustment-designer.png'));
 
   const freeTemplate = await create('空白独立商品字段与占位');
-  await run("document.querySelector('button[aria-label=商品字段]').click(); for(const e of document.querySelectorAll('.report-designer-v3-sidebar details'))e.open=true; true");
-  await wait("document.querySelector('button[aria-label=\"插入字段 款号\"]')");
-  await run("document.querySelector('button[aria-label=\"插入字段 款号\"]').click(); true");
+  const catalog = await request('GetReportTemplateFieldCatalog', token);
+  assert.equal(catalog.status, 200);
+  const styleNo = catalog.body.fields.find(field => field.value.replaceAll('{', '').replaceAll('}', '').trim() === 'item.StyleNo');
+  assert(styleNo, 'The authorized field catalog includes item.StyleNo');
+  const fieldSelector = `button[aria-label=${JSON.stringify('插入字段 ' + styleNo.label)}]`;
+  await run("document.querySelector('button[aria-label=商品字段]').click(); true");
+  await wait("document.querySelector('.report-designer-field-scope')");
+  await run("for(const e of document.querySelectorAll('.report-designer-v3-sidebar details'))e.open=true; true");
+  await wait(`document.querySelector(${JSON.stringify(fieldSelector)})?.getClientRects().length`);
+  await run(`document.querySelector(${JSON.stringify(fieldSelector)}).click(); true`);
   await choose('显隐与空行', '.report-designer-v3-inspector summary');
   for (const label of ['空内容时隐藏字段', '按条件显示', '隐藏时收起空内容行']) {
     await run(`[...document.querySelectorAll('.report-designer-v3-inspector label')].find(e=>e.textContent.trim()===${JSON.stringify(label)}).querySelector('input').click(); true`);
