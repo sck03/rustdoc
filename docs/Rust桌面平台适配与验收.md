@@ -26,6 +26,8 @@ Windows 桌面入口在 Debug 和 Release 均使用 GUI 子系统，Full 本地�
 
 OCR 同样按目标 OS/架构组装 Rust worker、ONNX 和模型。2026-10-15 补齐 Windows ARM64 app-local CRT，与 x64 共用显式初始化和受控管道；各目标打包后新增实际模型回归。签名/摘要和源码检查不代替各设备运行，详见 [OCR 跨平台评估](./OCR跨平台与RapidOCR评估.md)。
 
+2026-10-15 在[原生交付工作流](https://github.com/sck03/rustdoc/actions/runs/38694473894)完成上表全部五种 target 的独立桌面构建、运行依赖检查、Document 包组装及七份真实 OCR 模型夹具。Windows ARM64 实际加载 ARM64 ONNX 和三个 ARM64 CRT；x64 MSVC 与本机 GNU 分别记录。Linux/macOS runner 未在本批执行完整窗口、系统输入法及打印操作。本机最新 Full SQLite / 含 OCR 测试包另通过 Tauri 页面、空白设计、保存回读、十份 PDF、员工权限及退出清理，构建与路径见本日进度。
+
 报表维持 krilla 生成 PDF、PDFium worker 处理已有 PDF。当前已采用 `pdfium-render 0.9.4`（`pdfium_7881 + image_025`），原生包为 `152.0.7961`；尚需验证完整封装/API feature/原生库组合。Windows x64/ARM64、Linux x64/ARM64、macOS ARM64 分别验收，不能将迁移前手写绑定的静态符号检查当成新封装运行通过。
 
 2026-09-20 本地 Windows x64 DLL 与 Linux x64 ELF 静态导出检查均包含当前 19/19 个所需符号；本轮没有执行 Linux/macOS/ARM64 加载或功能调用，不据此宣称跨平台运行通过。详细平台矩阵、符号/加载/回调/资源限制检查见[《PDFium 跨平台绑定与验收方案》](./PDFium跨平台绑定与验收方案.md)。

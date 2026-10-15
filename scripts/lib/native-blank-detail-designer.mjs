@@ -64,8 +64,9 @@ export async function verifyDesktopBlankDetails({ run, request, token, invoice, 
   await cdp.send('Input.dispatchKeyEvent', {type:'keyDown',key:'Backspace',windowsVirtualKeyCode:8});
   await cdp.send('Input.dispatchKeyEvent', {type:'keyUp',key:'Backspace',windowsVirtualKeyCode:8});
   await run(`(()=>{const e=[...${intro}.querySelectorAll('label')].find(e=>e.firstElementChild?.textContent==='设置哪一列').querySelector('select');e.value=e.options[e.options.length-1].value;e.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
-  await wait(`[...${intro}.querySelectorAll('label')].some(e=>e.firstElementChild?.textContent==='字段')`);
+  await wait(`${intro}.querySelector('.new-report-summary-cell-editor strong')?.textContent==='Amount'`);
   await run(`(()=>{const e=[...${intro}.querySelectorAll('label')].find(e=>e.firstElementChild?.textContent==='字段').querySelector('select');e.value='Invoice.TradeTerms';e.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
+  await wait("[...document.querySelectorAll('[data-v3-element-id]')].some(element=>element.textContent.includes('Invoice.TradeTerms'))");
   const tableDesign = await save(tableTemplate.id);
   const table = tableDesign.layers.flatMap(layer => layer.elements).find(element => element.block?.type === 'DetailTable').block;
   assert(table.adjustments);

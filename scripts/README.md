@@ -219,6 +219,8 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 
 只需释放 Rust 构建空间时，可在确认编译/测试进程已结束、可运行文件及验证记录已另存后，定向执行 `cargo clean --target-dir target`。旧的仓库内独立 Cargo 输出也可用 `--target-dir` 指定其已盘点路径。不要把 Cargo 下载缓存或业务目录作为目标；清理后须重新编译，但保留的 Cargo/npm 下载缓存可继续复用。
 
+需要保留当前编译缓存时，先按 Cargo `test-*` 指纹识别已完成的测试可执行文件，核对旧可执行文件的当前替代品，再为旧增量目录生成精确路径清单。测试程序不一定以 `export_doc` 开头；依赖库、当前可执行文件及仍需的增量版本应保留。2026-10-15 的定向清理、保留校验和空间实测见[实施进度](../docs/程序改进重构进度文档.md)，没有改变默认清理器的保护范围。
+
 先 `clean-generated-artifacts.ps1 -ListOnly` 盘点，再按根 AGENTS 中已授权的范围清理。保留业务数据、模板、模型、已需资源、交付输出和可复用依赖缓存；依赖缓存、node_modules、整个运行缓存及发布输出只有用户明确同意后才能删除。
 
 ```powershell

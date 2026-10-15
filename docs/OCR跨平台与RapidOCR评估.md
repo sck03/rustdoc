@@ -22,16 +22,23 @@ Windows x64、ONNX Runtime 1.29.0、同一份 PP-OCRv6 Small 模型及字典、�
 
 匿名样本包含中英发票、7° 倾斜、90° 旋转、低对比度、16 行密集文字和空白页，见 [OCR 夹具](../tests/OcrFixtures/README.md)。原实现在倾斜图上严重漏字，且将单引号变成两个单引号；本次修复这些问题。最终耗时、内存与通过范围见本日[实施进度](./程序改进重构进度文档.md)。合成样本不能当作真实业务识别率保证；手写、严重透视、复杂竖排和混合方向仍须独立验收。
 
+| 样本 | 原 Rust / ms | 重构 Rust / ms | RapidOCR / ms | 原 Rust / 重构 Rust / RapidOCR 峰值 MiB |
+| --- | ---: | ---: | ---: | --- |
+| 中英发票 | 1691.06 | 773.66 | 5618.71 | 159.9 / 146.4 / 200.3 |
+| 16 行密集文字 | 4668.63 | 2055.63 | 5236.22 | 221.3 / 204.9 / 324.6 |
+
+六份比较样本中，重构 Rust 的去空白文本与预期一致。上述比较使用同版本 ONNX Python wheel 的原生库，以控制后端差异；正式包来自受管 NuGet 原生归档，同为 1.29.0，但不是同一字节文件。正式包另外执行七份实际模型夹具，包含后来补入的 EXIF JPEG；没有把比较环境当作交付依赖。
+
 ## 产品与平台
 
 | 入口/目标 | 执行位置与要求 | 证据边界 |
 | --- | --- | --- |
-| Windows x64 Document、Full SQLite 测试版 | 本地 worker、x64 ONNX、x64 CRT | 本机实际识别与 Tauri；GNU 不替代 MSVC 发布 |
-| Windows ARM64 桌面 | ARM64 worker、ONNX、三个 ARM64 CRT | 已补齐打包与初始化；签名/摘要不等于设备运行 |
-| Linux x64/ARM64 桌面 | 对应 GNU worker、libonnxruntime.so | 对应 runner/设备，另需 WebKitGTK |
-| macOS ARM64 桌面 | ARM64 worker、libonnxruntime.dylib | 对应 runner/设备，使用 WKWebView |
-| 网页/移动浏览器 | 上传到 Rust HTTP 服务，由服务器识别 | 客户端不加载 ONNX；文件选择可用于非 HTTPS 局域网，粘贴权限依浏览器而定 |
-| Docker amd64/arm64 | 容器内对应 Linux worker 和 ONNX | 与 PostgreSQL 分工不变，需对应架构真实镜像验收 |
+| Windows x64 Document、Full SQLite 测试版 | 本地 worker、x64 ONNX、x64 CRT | 本机 GNU Tauri 实际识别；MSVC runner 的 Document 包及七份夹具通过 |
+| Windows ARM64 桌面 | ARM64 worker、ONNX、三个 ARM64 CRT | ARM64 MSVC runner 的 Document 包及七份实际模型夹具通过 |
+| Linux x64/ARM64 桌面 | 对应 GNU worker、libonnxruntime.so | 两种 runner 的 Document 包及七份实际模型夹具通过；图形界面另需 WebKitGTK 验收 |
+| macOS ARM64 桌面 | ARM64 worker、libonnxruntime.dylib | ARM64 runner 的 Document 包及七份实际模型夹具通过；WKWebView 交互另验 |
+| 网页/移动浏览器 | 上传到 Rust HTTP 服务，由服务器识别 | Windows x64、Linux x64/ARM64、macOS ARM64 服务包与 OCR 夹具通过；浏览器文件选择、换图取消和 EXIF 坐标另在本机验证 |
+| Docker amd64/arm64 | 容器内对应 Linux worker 和 ONNX | 两种实际镜像的认证上传、识别、坏图 400、生命周期及持久重启通过 |
 | Sales 或显式 WithoutOcr 包 | 不附 OCR | 明确显示不可用 |
 
 运行库从 AppRoot 绝对路径加载，不依赖工作目录或系统 ONNX。Windows 两种架构从同一已核验微软归档提取目标架构所需的 CRT 文件，缓存隔离，许可和哈希随包，见 [CRT 说明](../VisualCppRuntime/README.md)。
@@ -41,3 +48,5 @@ Windows x64、ONNX Runtime 1.29.0、同一份 PP-OCRv6 Small 模型及字典、�
 ## 持续验证
 
 OCR 是独立 Cargo 工程，根 `cargo test --workspace` 不包含它。本次增加独立 fmt/test、真实模型回归和打包后的 `scripts/test_native_ocr.mjs`。`rust-native-validation.yml` 在各目标 runner 执行，并增加 OCR/模型/CRT 变更触发路径。只有实际工作流成功才计入该平台证据；检查或打包成功不代表所有 OS、架构和浏览器均已实测。
+
+2026-10-15 的[交付验证](https://github.com/sck03/rustdoc/actions/runs/38694473894)在 `17248d5` 完成 11/11 个任务：五种桌面目标、四种网页服务目标和两种 Docker 架构。后续 `aaafbc8` 的合计标签对齐修正不改变 OCR，另经本机报表与 Tauri 验收。此处证明所列运行目标的 OCR 和服务打包路径；系统中文输入法、实体打印、Firefox/WebKit 及完整桌面交互仍按对应设备记录。
