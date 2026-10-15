@@ -576,11 +576,7 @@ fn summary_render(
                     widths[column_index]
                 },
                 border: cell_border,
-                align: text_style.align.as_deref().unwrap_or(if index == 0 {
-                    "Right"
-                } else {
-                    &column.align
-                }),
+                align: text_style.align.as_deref().unwrap_or(&column.align),
             }
         }),
         border,

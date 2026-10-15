@@ -354,6 +354,23 @@ fn invoice_amount_stays_with_price_when_po_is_empty_or_style_wraps() {
 }
 
 #[test]
+fn commercial_total_labels_keep_the_first_column_alignment() {
+    for (template, left) in [
+        (Builtin::Invoice, 48.5),
+        (Builtin::PackingList, 48.5),
+        (Builtin::Contract, 16.5),
+    ] {
+        let document = render_builtin(template, &invoice(2), &AtomicBool::new(false)).unwrap();
+        let label = nodes(&document.pages.last().unwrap().svg, "text")
+            .into_iter()
+            .find(|(node, _)| node.ends_with(">TOTAL:"))
+            .unwrap()
+            .0;
+        assert!((attribute(label, "x") - left).abs() < 0.01, "{template:?}");
+    }
+}
+
+#[test]
 fn invoice_detail_component_and_totals_share_columns_and_baseline() {
     let data = invoice(2);
     let document = render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();

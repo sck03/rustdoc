@@ -1,4 +1,6 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
+$script:invokeActualExternal = (Get-Command Invoke-ExportDocExternal).ScriptBlock
 . (Join-Path $PSScriptRoot 'lib/postgresql-macos-client.ps1')
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $fixture = Join-Path $repository ('.codex-runtime/postgresql-macos-client-tests/' + [Guid]::NewGuid().ToString('N'))
@@ -13,9 +15,7 @@ function Invoke-ExportDocExternal {
     param($FilePath, $Arguments, [switch]$CaptureOutput, $TimeoutSeconds)
     if ($FilePath -eq 'brew') { return [pscustomobject]@{ Output = $script:alias } }
     if ($FilePath -eq 'node') {
-        $value = & node @Arguments
-        if ($LASTEXITCODE -ne 0) { throw 'Canonical path resolution failed.' }
-        return [pscustomobject]@{ Output = "$value" }
+        return & $script:invokeActualExternal -FilePath $FilePath -Arguments $Arguments -CaptureOutput -TimeoutSeconds 30
     }
     if ($FilePath -eq 'otool') {
         $source = $Arguments[1]

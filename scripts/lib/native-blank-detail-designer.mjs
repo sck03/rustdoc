@@ -56,7 +56,9 @@ export async function verifyDesktopBlankDetails({ run, request, token, invoice, 
   await choose('撤销', '.report-designer-v3-toolbar button');
   await choose('重做', '.report-designer-v3-toolbar button');
   const intro = "[...document.querySelectorAll('.new-report-detail-properties details')].find(e=>e.querySelector('summary')?.textContent==='首页说明行')";
-  await run(`${intro}.open=true; [...${intro}.querySelectorAll('button')].find(e=>e.textContent.trim()==='添加').click(); true`);
+  await choose('首页说明行', '.new-report-detail-properties summary');
+  await wait(`${intro}.querySelector('button')`);
+  await run(`[...${intro}.querySelectorAll('button')].find(e=>e.textContent.trim()==='添加').click(); true`);
   await wait(`${intro}.querySelector('input')`);
   await run(`[...${intro}.querySelectorAll('label')].find(e=>e.firstElementChild?.textContent==='标签').querySelector('input').focus(); [...${intro}.querySelectorAll('label')].find(e=>e.firstElementChild?.textContent==='标签').querySelector('input').select(); true`);
   await cdp.send('Input.dispatchKeyEvent', {type:'keyDown',key:'Backspace',windowsVirtualKeyCode:8});
