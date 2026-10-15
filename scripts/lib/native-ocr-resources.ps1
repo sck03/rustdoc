@@ -38,9 +38,9 @@ function Add-ExportDocNativeOcrResources {
     foreach ($name in @('det/inference.onnx', 'det/inference.yml', 'rec/inference.onnx', 'rec/inference.yml', 'MODEL_INFO.txt', 'THIRD_PARTY_NOTICES.md')) {
         $Copies[(Join-Path $RepositoryRoot "OcrModels/PaddleOCR/V6/$name")] = "OcrModels/PaddleOCR/V6/$name"
     }
-    if ($platform -eq 'win' -and $architecture -eq 'x64') {
-        $crtRoot = Join-Path $RepositoryRoot '.codex-runtime/native-ocr-crt'
-        Invoke-ExportDocExternal -FilePath 'pwsh' -Arguments @('-NoProfile', '-File', (Join-Path $RepositoryRoot 'scripts/provision-visual-cpp-runtime.ps1'), '-DestinationDirectory', $crtRoot) -WorkingDirectory $RepositoryRoot -DisplayName 'Prepare governed app-local OCR runtime'
+    if ($platform -eq 'win') {
+        $crtRoot = Join-Path $RepositoryRoot ".codex-runtime/native-ocr-crt/$architecture"
+        Invoke-ExportDocExternal -FilePath 'pwsh' -Arguments @('-NoProfile', '-File', (Join-Path $RepositoryRoot 'scripts/provision-visual-cpp-runtime.ps1'), '-DestinationDirectory', $crtRoot, '-Architecture', $architecture) -WorkingDirectory $RepositoryRoot -DisplayName 'Prepare governed app-local OCR runtime'
         $crt = Get-Content -LiteralPath (Join-Path $crtRoot 'msvc-runtime.json') -Raw | ConvertFrom-Json
         foreach ($name in (@($crt.files | ForEach-Object { $_.name }) + @('msvc-runtime.json', 'MSVC_RUNTIME_NOTICES.md'))) {
             $Copies[(Join-Path $crtRoot $name)] = "sidecar/ocr/$name"

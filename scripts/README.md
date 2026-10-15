@@ -89,7 +89,7 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 便携版在系统检查、随包资源检查、后端启动和主 WebView 窗口创建成功后，后台自动移除本包 `WebView2Runtime` 内的离线安装器、校验清单及说明，最后删除空目录；当前可回收约 203 MiB。安装取消、失败、要求重启或启动检查失败时保留安装器。清理失败写入受管日志，下次成功启动重试，不阻断使用；未知文件、子目录和链接不自动删除。系统 WebView2、`WebView2Loader.dll` 和 `App_Data/WebView` 保留。开发仓库的安装器来源与原始发布压缩包保持完整；将已清理的目录拷到另一台缺少 WebView2 的电脑时，需重新解压原始完整包或安装微软 WebView2。
 
-程序随后读取本包资源清单，核对中文字体、PDFium 及已声明的 OCR 工具、ONNX 和模型。Windows OCR 只携带四个 app-local CRT DLL，不安装全局 .NET 或整个 VC 运行库。Linux 使用 WebKitGTK 4.1，macOS 使用系统 WKWebView；其它平台必须在对应 runner／设备验收。
+程序随后读取本包资源清单，核对中文字体、PDFium 及已声明的 OCR 工具、ONNX 和模型。Windows x64/ARM64 OCR 分别携带对应架构的四个 app-local CRT DLL，不安装全局 .NET 或整个 VC 运行库。Linux 使用 WebKitGTK 4.1，macOS 使用系统 WKWebView；其它平台必须在对应 runner／设备验收。OCR 选型、网页上传和各目标边界见 [OCR 评估](../docs/OCR跨平台与RapidOCR评估.md)。
 
 `eng/native-runtime-packages.json` 固定已校验来源及签名的原生资源归档版本和 SHA-512。NuGet 在此只是原生 DLL／so／dylib 的下载载体；不复制托管程序集，也不执行 dotnet restore。不要把 NuGet lock 的“内容哈希”直接当成签名后整个归档的哈希。PowerShell 打包器和容器资源准备都读取这份清单。
 
@@ -180,6 +180,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 按用户要求先集中完成一批页面、后端和操作，再统一联调与最终门禁。开发中只做必要编译和针对失败的回归。
 
 - Rust：`cargo fmt --all --check`、`cargo test --locked --workspace`、`cargo check --locked --workspace --all-features`。
+- OCR 独立工程：`cargo fmt --manifest-path apps/exportdoc-ocr-rs/Cargo.toml --check`、`cargo test --locked --manifest-path apps/exportdoc-ocr-rs/Cargo.toml`；组装资源后运行 `node scripts/test_native_ocr.mjs <AppRoot>`，验证真实模型、倾斜/旋转/手机方向和输入边界。根 workspace 不包含此工程；网页切图、上传、取消及内存回收使用 `test:smart-ocr-ui`。
 - 实库：`test-native-postgres.ps1 -PostgresBin <PostgreSQL-18-bin>` 创建并停止隔离集群；忽略的实库测试不计通过。
 - 团队备份界面：先完成 React build，再运行同一实库脚本的 `-Scope Maintenance`。使用真实 Rust CLI、文件连接配置、浏览器首次登录、dump 下载/上传、完整迁移、错误/既有密码、停机恢复、主密钥/模板保留和重试幂等；不接受生产端点。该专项不加入普通浏览器重型门禁。
 - Docker：`test_native_docker_lifecycle.ps1` 在无 daemon 环境验证停机顺序与失败中止；真实两架构 CI 另核对内部网络、端口、凭据/卷隔离、运行中重复部署、custom-format dump 恢复及重启持久化。脚本和 Compose 配置通过不等于容器实跑通过。

@@ -19,6 +19,7 @@ import { verifyConditionalUi } from "./lib/report-designer-conditions-ui.mjs";
 import { verifyBlankDesigner } from "./lib/report-designer-blank-ui.mjs";
 import { verifyDesignerInteraction } from "./lib/report-designer-interaction-ui.mjs";
 import { verifyGridAuthoring } from "./lib/report-designer-grid-ui.mjs";
+import { verifyGridTextUi } from "./lib/report-designer-grid-text-ui.mjs";
 import { verifyCanvasGeometry } from "./lib/report-designer-canvas-geometry-ui.mjs";
 
 const repo = path.resolve(import.meta.dirname, "..");
@@ -174,6 +175,7 @@ try {
   await verifyCanvasGeometry({page,url,read,waitFor,click,key,results,output});
   if (!process.argv.includes('--geometry-only')) {
   await verifyGridAuthoring({page,url,read,waitFor,click,key,results,output});
+  await verifyGridTextUi({page,url,read,waitFor,click,results});
   if (!process.argv.includes('--grid-only')) {
   await verifyDesignerInteraction({ page, url, read, waitFor, click, key, modifier: primaryModifier, results });
   for(const width of [1920,1366,1024,390]) {

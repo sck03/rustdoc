@@ -1,28 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from "react";
 import { ClipboardPaste, Copy, FileImage, Play, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
-import { type ApiOcrRecognizeImageResponse, ExportDocManagerApiClient } from "../../api/index.ts";
-import { queryKeys } from "../../api/queryKeys.ts";
+import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
-import { isDesktopBridgeAvailable, selectOcrImageFile } from "../../desktop/desktopBridge.ts";
-import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
+import { DesktopIconButton, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { PathField } from "../../ui/PathField.tsx";
-import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
-import { getClipboardPasteInstruction, writeClipboardText } from "../../ui/clipboard.ts";
-import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
-
-type OcrImageSource =
-  | {
-      kind: "path";
-      filePath: string;
-    }
-  | {
-      kind: "content";
-      blob: Blob;
-      sourceName: string;
-      sourceMimeType: string;
-    };
+import { OCR_IMAGE_ACCEPT, useSmartOcr } from "./useSmartOcr.ts";
 
 type ImageSize = {
   width: number;
@@ -39,241 +22,27 @@ type PreviewDragState = {
 
 const MinZoom = 0.1;
 const MaxZoom = 10;
-const MaxOcrImageBytes = 25 * 1024 * 1024;
-
 export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) {
   const ocrPermission = useModulePermission("document.ocr");
-  const desktopAvailable = isDesktopBridgeAvailable();
-  const runAbortableOperation = useAbortableOperation();
-  const healthQuery = useQuery({
-    queryKey: queryKeys.health(),
-    queryFn: ({ signal }) => client.getHealth({ signal }),
-  });
-  const ocrRuntime = healthQuery.data?.runtimeDependencies.find((item) => item.key === "ocr-runtime") ?? null;
-  const ocrRuntimeReady = healthQuery.isSuccess && ocrRuntime?.status === "ready" && ocrRuntime.ready;
-  const ocrRuntimeUnavailable = healthQuery.isSuccess && !ocrRuntimeReady;
-  const canUseOcr = ocrPermission.canOperate && ocrRuntimeReady;
+  const { desktopAvailable, healthQuery, ocrRuntime, canUseOcr, imageSource, imagePath, imagePreviewUrl, result,
+    isBusy, message, messageType, recognizedText, canRecognize, canCopy, sourceLabel,
+    pickImage, usePathImage, loadImageBlob, pasteImageFromClipboard, recognizeCurrentImage, copyText, showError } = useSmartOcr(client, ocrPermission.canOperate);
+  const ocrRuntimeUnavailable = healthQuery.isSuccess && !canUseOcr;
+  const fileInput = useRef<HTMLInputElement | null>(null);
   const previewViewportRef = useRef<HTMLDivElement | null>(null);
   const previewDragRef = useRef<PreviewDragState | null>(null);
-  const previewObjectUrlRef = useRef<string | null>(null);
-  const [imagePath, setImagePath] = useState("");
-  const [imageSource, setImageSource] = useState<OcrImageSource | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [previewSize, setPreviewSize] = useState<ImageSize | null>(null);
   const [zoom, setZoom] = useState(1);
   const [isDraggingPreview, setIsDraggingPreview] = useState(false);
-  const [result, setResult] = useState<ApiOcrRecognizeImageResponse | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [messageType, setMessageType] = useState<"success" | "error">("success");
-
-  const recognizeMutation = useMutation({
-    mutationFn: () => runAbortableOperation((signal) => {
-      if (imageSource?.kind === "content") {
-        return client.uploadOcrImage({
-          body: imageSource.blob,
-          sourceName: imageSource.sourceName,
-          sourceMimeType: imageSource.sourceMimeType,
-        }, { signal });
-      }
-
-      const filePath = (imageSource?.kind === "path" ? imageSource.filePath : imagePath).trim();
-      return client.recognizeOcrImage({
-        body: {
-          filePath,
-        },
-      }, { signal });
-    }),
-    onSuccess: (response) => {
-      setResult(response);
-      setMessage("OCR 识别完成。");
-      setMessageType("success");
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setMessageType("error");
-    },
-  });
-
-  const recognizedText = useMemo(() => {
-    if (!result) {
-      return "";
-    }
-
-    const fullText = result.fullText?.trim();
-    if (fullText) {
-      return fullText;
-    }
-
-    return [...(result.lines ?? [])]
-      .sort((left, right) => left.y - right.y || left.x - right.x)
-      .map((line) => line.text)
-      .filter(Boolean)
-      .join("\n");
-  }, [result]);
-
-  useEffect(() => {
-    function handlePaste(event: ClipboardEvent) {
-      if (!canUseOcr) return;
-      const items = Array.from(event.clipboardData?.items ?? []);
-      const imageItem = items.find((item) => item.type.startsWith("image/"));
-      const file = imageItem?.getAsFile();
-      if (!file) {
-        return;
-      }
-
-      event.preventDefault();
-      void loadImageBlob(file, "剪贴板图片（内存）");
-    }
-
-    window.addEventListener("paste", handlePaste);
-    return () => window.removeEventListener("paste", handlePaste);
-  }, [canUseOcr]);
-
-  useEffect(() => () => {
-    if (previewObjectUrlRef.current) {
-      window.URL.revokeObjectURL(previewObjectUrlRef.current);
-    }
-  }, []);
-
-  const isBusy = recognizeMutation.isPending;
-  const canRecognize = canUseOcr && Boolean(imageSource?.kind === "content" || imagePath.trim()) && !isBusy;
-  const canCopy = Boolean(recognizedText.trim());
-  const lines = result?.lines ?? [];
-  const pathSource = imageSource?.kind === "path" ? imageSource.filePath : "";
-  const sourceLabel =
-    imageSource?.kind === "content"
-      ? imageSource.sourceName
-      : result?.sourcePath || pathSource || imagePath || "未选择图片";
   const zoomLabel = `${Math.round(zoom * 100)}%`;
-
-  async function pickImage() {
-    try {
-      const selected = await selectOcrImageFile();
-      if (selected) {
-        await usePathImage(selected, true);
-      }
-    } catch (error) {
-      showError(readDesktopError(error));
-    }
-  }
-
-  async function usePathImage(path: string, loadPreview: boolean) {
-    const trimmed = path.trim();
-    setImagePath(trimmed);
-    setImageSource(trimmed ? { kind: "path", filePath: trimmed } : null);
-    setResult(null);
-    setMessage(null);
-    replacePreview(null);
-
-    if (!trimmed || !loadPreview || !desktopAvailable) {
-      return;
-    }
-
-    try {
-      replacePreview(await client.previewOcrImage({ filePath: trimmed }));
-    } catch (error) {
-      showError(`图片已选择，但预览加载失败：${readDesktopError(error)}`);
-    }
-  }
-
-  async function pasteImageFromClipboard() {
-    if (!window.isSecureContext || !navigator.clipboard?.read) {
-      showError(getClipboardPasteInstruction("页面"));
-      return;
-    }
-
-    try {
-      const items = await navigator.clipboard.read();
-      for (const item of items) {
-        const imageType = item.types.find((type) => type.startsWith("image/"));
-        if (!imageType) {
-          continue;
-        }
-
-        const blob = await item.getType(imageType);
-        await loadImageBlob(blob, "剪贴板图片（内存）");
-        return;
-      }
-
-      showError("剪贴板中没有图片。");
-    } catch (error) {
-      showError(`${error instanceof Error ? error.message : "读取剪贴板图片失败。"} ${getClipboardPasteInstruction("页面")}`);
-    }
-  }
-
-  async function loadImageBlob(blob: Blob, sourceName: string) {
-    if (!blob.type.startsWith("image/")) {
-      showError("OCR 只支持图片内容。");
-      return;
-    }
-    if (blob.size > MaxOcrImageBytes) {
-      showError(`图片不能超过 ${Math.floor(MaxOcrImageBytes / 1024 / 1024)} MB。`);
-      return;
-    }
-
-    try {
-      setImagePath(sourceName);
-      setImageSource({
-        kind: "content",
-        blob,
-        sourceName,
-        sourceMimeType: blob.type,
-      });
-      setResult(null);
-      replacePreview(blob);
-      setMessage("图片已载入。");
-      setMessageType("success");
-    } catch (error) {
-      showError(error instanceof Error ? error.message : "图片载入失败。");
-    }
-  }
-
-  async function recognizeCurrentImage() {
-    if (!canRecognize) {
-      return;
-    }
-
-    if (imageSource?.kind === "path" && desktopAvailable && !imagePreviewUrl) {
-      try {
-        replacePreview(await client.previewOcrImage({ filePath: imageSource.filePath }));
-      } catch {
-        // Preview is helpful but not required for path-based OCR recognition.
-      }
-    }
-
-    recognizeMutation.mutate();
-  }
-
-  async function copyText() {
-    if (!canCopy) {
-      return;
-    }
-
-    if (await writeClipboardText(recognizedText)) {
-      setMessage("识别文本已复制。");
-      setMessageType("success");
-    } else {
-      showError("复制失败，请手动选中文本复制。");
-    }
-  }
-
-  function replacePreview(blob: Blob | null) {
-    if (previewObjectUrlRef.current) {
-      window.URL.revokeObjectURL(previewObjectUrlRef.current);
-    }
-    const objectUrl = blob ? window.URL.createObjectURL(blob) : null;
-    previewObjectUrlRef.current = objectUrl;
-    setImagePreviewUrl(objectUrl);
-    setPreviewSize(null);
-    setZoom(1);
-    window.requestAnimationFrame(() => {
-      const viewport = previewViewportRef.current;
-      if (viewport) {
-        viewport.scrollLeft = 0;
-        viewport.scrollTop = 0;
-      }
+  const lines = result?.lines ?? [];
+  useEffect(() => {
+    setPreviewSize(null); setZoom(1); setIsDraggingPreview(false); previewDragRef.current = null;
+    const frame = requestAnimationFrame(() => {
+      if (previewViewportRef.current) { previewViewportRef.current.scrollLeft = 0; previewViewportRef.current.scrollTop = 0; }
     });
-  }
+    return () => cancelAnimationFrame(frame);
+  }, [imagePreviewUrl]);
 
   function adjustZoom(multiplier: number) {
     setZoom((current) => clampZoom(current * multiplier));
@@ -301,7 +70,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
 
   function beginPreviewDrag(event: PointerEvent<HTMLDivElement>) {
     const viewport = previewViewportRef.current;
-    if (!viewport || !imagePreviewUrl || event.button !== 0) {
+    if (!viewport || !imagePreviewUrl || event.button !== 0 || previewDragRef.current) {
       return;
     }
 
@@ -331,34 +100,33 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
   function endPreviewDrag(event: PointerEvent<HTMLDivElement>) {
     const drag = previewDragRef.current;
     if (drag?.pointerId === event.pointerId) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
       previewDragRef.current = null;
       setIsDraggingPreview(false);
     }
-  }
-
-  function showError(value: string) {
-    setMessage(value);
-    setMessageType("error");
   }
 
   return (
     <section className="work-surface smart-ocr-surface" aria-label="智能 OCR">
       <div className="toolbar smart-ocr-toolbar">
         <PathField
-          label="图片路径"
+          label={desktopAvailable ? "图片路径" : "图片文件"}
           value={imagePath}
+          readOnly={!desktopAvailable}
           disabled={isBusy || !canUseOcr}
           onChange={(value) => {
             void usePathImage(value, false);
           }}
           actions={
             <>
-              {desktopAvailable ? (
-                <DesktopIconButton title="选择 OCR 图片" disabled={isBusy || !canUseOcr} onClick={pickImage}>
+              <input ref={fileInput} type="file" hidden accept={OCR_IMAGE_ACCEPT} aria-label="上传 OCR 图片" onChange={event => {
+                const file = event.currentTarget.files?.[0];
+                if (file) loadImageBlob(file, file.name);
+                event.currentTarget.value = "";
+              }} />
+                <DesktopIconButton title="选择 OCR 图片" disabled={isBusy || !canUseOcr} onClick={() => desktopAvailable ? void pickImage() : fileInput.current?.click()}>
                   <FileImage size={15} aria-hidden="true" />
                 </DesktopIconButton>
-              ) : null}
               {renderOpenPathAction(imageSource?.kind === "path" ? imageSource.filePath : "", "打开图片位置", showError)}
             </>
           }
@@ -378,7 +146,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
 
       {!ocrPermission.canOperate ? <PermissionNotice>当前模板仅允许进入 OCR 模块，图片载入和识别操作已禁用。</PermissionNotice> : null}
       {ocrPermission.canOperate && healthQuery.isPending ? (
-        <InlineNotice tone="info" title="正在检查智能识别组件">确认本机 OCR 运行组件状态后才能开始识别。</InlineNotice>
+        <InlineNotice tone="info" title="正在检查智能识别组件">确认 OCR 运行组件状态后才能开始识别。</InlineNotice>
       ) : null}
       {ocrPermission.canOperate && healthQuery.isError ? (
         <InlineNotice tone="error" title="无法确认智能识别组件状态">暂不能安全启用 OCR，请恢复业务服务后重试。</InlineNotice>
@@ -418,6 +186,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
             onPointerMove={movePreviewDrag}
             onPointerUp={endPreviewDrag}
             onPointerCancel={endPreviewDrag}
+            onLostPointerCapture={() => { previewDragRef.current = null; setIsDraggingPreview(false); }}
             aria-label="OCR 图片预览画布"
           >
             {imagePreviewUrl ? (
@@ -436,6 +205,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
                   src={imagePreviewUrl}
                   alt=""
                   draggable={false}
+                  onError={() => showError("图片无法预览，仍可尝试识别或改用 PNG/JPEG 图片。")}
                   onLoad={(event) => {
                     setPreviewSize({
                       width: event.currentTarget.naturalWidth,
@@ -475,7 +245,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
                 <span>{result ? `${result.lines?.length ?? 0} 行` : "等待识别"}</span>
               </div>
             </div>
-            <textarea value={recognizedText || (isBusy ? "正在识别中，请稍候..." : "")} readOnly />
+            <textarea aria-label="识别文本" value={recognizedText || (isBusy ? "正在识别中，请稍候..." : "")} readOnly />
           </section>
         </div>
       </div>

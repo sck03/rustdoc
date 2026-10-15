@@ -11,7 +11,7 @@ export function updateGridCell(block: ReportGridBlock, cellId: string, update: (
   return updateGridCells(block, new Set([cellId]), update);
 }
 
-function updateGridCells(block: ReportGridBlock, ids: ReadonlySet<string>, update: (cell: ReportGridCell) => ReportGridCell): ReportGridBlock {
+export function updateGridCells(block: ReportGridBlock, ids: ReadonlySet<string>, update: (cell: ReportGridCell) => ReportGridCell): ReportGridBlock {
   let changed = false;
   const rows = block.rows.map((row) => {
     let cells: ReportGridCell[] | undefined;

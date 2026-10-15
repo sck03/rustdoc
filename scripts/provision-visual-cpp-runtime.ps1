@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param([Parameter(Mandatory = $true)][string]$DestinationDirectory)
+param(
+    [Parameter(Mandatory = $true)][string]$DestinationDirectory,
+    [ValidateSet('x64', 'arm64')][string]$Architecture = 'x64'
+)
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "lib/build-script-support.ps1")
@@ -23,7 +26,7 @@ function Assert-WorkspacePath {
 }
 
 $manifestPath = Join-Path $repositoryRoot "VisualCppRuntime/visual-cpp-runtime.json"
-$release = Read-ExportDocVisualCppRelease -ManifestPath $manifestPath
+$release = Read-ExportDocVisualCppRelease -ManifestPath $manifestPath -Architecture $Architecture
 $destination = Assert-WorkspacePath $DestinationDirectory
 $cacheRoot = Assert-WorkspacePath (Join-Path $repositoryRoot "artifacts/tool-downloads/visual-cpp")
 New-Item -ItemType Directory -Path $destination, $cacheRoot -Force | Out-Null
@@ -69,7 +72,7 @@ foreach ($file in $release.files) {
     $targetPath = Assert-WorkspacePath (Join-Path $destination $file.name)
     Copy-Item -LiteralPath (Join-Path $staging $file.sourceName) -Destination $targetPath -Force
 }
-Copy-Item -LiteralPath $manifestPath -Destination (Assert-WorkspacePath (Join-Path $destination "msvc-runtime.json")) -Force
+$release | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Assert-WorkspacePath (Join-Path $destination 'msvc-runtime.json')) -Encoding utf8
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "VisualCppRuntime/README.md") -Destination (Assert-WorkspacePath (Join-Path $destination "MSVC_RUNTIME_NOTICES.md")) -Force
 Assert-ExportDocVisualCppFiles -Directory $destination -Release $release
 Write-Host "Minimal Visual C++ runtime: 4 DLLs, $(($release.files | Measure-Object -Property bytes -Sum).Sum) bytes; no installer shipped."

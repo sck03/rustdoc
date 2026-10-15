@@ -127,7 +127,10 @@ pub(crate) fn select_ocr_image_file() -> Result<Option<String>, String> {
     Ok(pick_file(
         "选择 OCR 图片",
         &[
-            ("图片文件", &["png", "jpg", "jpeg", "bmp", "tif", "tiff"]),
+            (
+                "图片文件",
+                &["png", "jpg", "jpeg", "bmp", "webp", "tif", "tiff"],
+            ),
             ("全部文件", &["*"]),
         ],
     ))

@@ -5,15 +5,20 @@ export function isAbortError(error: unknown): boolean {
 }
 
 export function useAbortableOperation(scope?: unknown, { cancelPrevious = false } = {}) {
+  return useAbortableOperationController(scope, { cancelPrevious }).run;
+}
+
+export function useAbortableOperationController(scope?: unknown, { cancelPrevious = false } = {}) {
   const activeControllers = useRef(new Set<AbortController>());
 
-  useEffect(() => () => {
+  const cancel = useCallback(() => {
     activeControllers.current.forEach((controller) => controller.abort());
     activeControllers.current.clear();
-  }, [scope]);
+  }, []);
+  useEffect(() => cancel, [scope, cancel]);
 
-  return useCallback(async <T>(operation: (signal: AbortSignal) => Promise<T>) => {
-    if (cancelPrevious) activeControllers.current.forEach((controller) => controller.abort());
+  const run = useCallback(async <T>(operation: (signal: AbortSignal) => Promise<T>) => {
+    if (cancelPrevious) cancel();
     const controller = new AbortController();
     activeControllers.current.add(controller);
     try {
@@ -23,5 +28,6 @@ export function useAbortableOperation(scope?: unknown, { cancelPrevious = false 
       // Ignore both late success and late failure from operations that cannot cancel.
       controller.signal.throwIfAborted();
     }
-  }, [cancelPrevious]);
+  }, [cancelPrevious, cancel]);
+  return { run, cancel };
 }

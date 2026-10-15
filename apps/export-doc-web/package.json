@@ -34,6 +34,7 @@
     "test:business-status-model": "node ../../scripts/test_business_status_model.mjs",
     "test:concurrency-feedback": "node ../../scripts/test_frontend_concurrency_feedback.mjs",
     "test:abortable-operations-ui": "node ../../scripts/test_abortable_operations_ui.mjs",
+    "test:smart-ocr-ui": "node ../../scripts/test_smart_ocr_ui.mjs",
     "test:query-retry-policy": "node ../../scripts/test_query_retry_policy.mjs",
     "test:query-network-mode": "node ../../scripts/test_query_network_mode.mjs",
     "test:background-job-polling": "node ../../scripts/test_background_job_polling_contract.mjs",

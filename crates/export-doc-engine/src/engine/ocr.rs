@@ -68,8 +68,6 @@ impl Resources {
         command
             .arg("--model-root")
             .arg(&self.models)
-            .arg("--allowed-root")
-            .arg(&paths.app_root)
             .current_dir(&paths.cache_root)
             .env("ORT_DYLIB_PATH", &self.library)
             .env("TEMP", &paths.cache_root)
@@ -116,7 +114,7 @@ fn preview(query: &[(&str, String)]) -> Result<tasks::FileOutput> {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
         "bmp" => "image/bmp",
-        "gif" => "image/gif",
+        "tif" | "tiff" => "image/tiff",
         "webp" => "image/webp",
         _ => return Err(invalid("OCR 预览只支持图片文件。")),
     };
@@ -159,15 +157,22 @@ pub fn recognize(service: &NativeService, bytes: &[u8], source: &str) -> Result<
             output.stderr.trim()
         )));
     }
-    let result: Value = serde_json::from_slice(&output.stdout)
-        .map_err(|_| unavailable("OCR 工具返回了无效结果。"))?;
+    decode_response(&output.stdout, source)
+}
+
+fn decode_response(bytes: &[u8], source: &str) -> Result<Value> {
+    let result: Value =
+        serde_json::from_slice(bytes).map_err(|_| unavailable("OCR 工具返回了无效结果。"))?;
     if result["id"] != "stdin" {
         return Err(unavailable("OCR 响应标识不匹配。"));
     }
     if result["success"] != true {
-        return Err(invalid(
-            result["error"].as_str().unwrap_or("图片无法识别。"),
-        ));
+        let message = result["error"].as_str().unwrap_or("OCR 工具未能完成识别。");
+        return Err(if result["errorKind"] == "invalid_input" {
+            invalid(message)
+        } else {
+            unavailable(message)
+        });
     }
     let full_text = result["fullText"]
         .as_str()
@@ -178,6 +183,9 @@ pub fn recognize(service: &NativeService, bytes: &[u8], source: &str) -> Result<
         .ok_or_else(|| unavailable("OCR 识别行数超出范围。"))?;
     for row in lines {
         if row["text"].as_str().is_none_or(|s| s.len() > 64 * 1024)
+            || row["confidence"]
+                .as_f64()
+                .is_none_or(|score| !score.is_finite() || !(0.0..=1.0).contains(&score))
             || ["x", "y", "width", "height"]
                 .iter()
                 .any(|key| row[*key].as_u64().is_none_or(|n| n > 16384))
@@ -189,4 +197,46 @@ pub fn recognize(service: &NativeService, bytes: &[u8], source: &str) -> Result<
         contracts::schema("ApiOcrRecognizeImageResponse"),
         json!({"sourcePath":source,"fullText":full_text,"lines":lines,"storagePolicy":"只在内存和受控 Rust 进程管道中处理图片；识别结果不写入数据库，不生成默认输出文件。"}),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn worker_failures_preserve_input_and_dependency_error_categories() {
+        for (kind, expected) in [
+            ("invalid_input", 400),
+            ("unavailable", 503),
+            ("unknown", 503),
+        ] {
+            let payload = json!({"id":"stdin","success":false,"error":"failure","errorKind":kind});
+            assert_eq!(
+                decode_response(&serde_json::to_vec(&payload).unwrap(), "sample.png")
+                    .unwrap_err()
+                    .status,
+                Some(expected)
+            );
+        }
+        assert_eq!(
+            decode_response(b"{}", "sample.png").unwrap_err().status,
+            Some(503)
+        );
+    }
+
+    #[test]
+    fn worker_confidence_and_coordinates_are_validated_before_projection() {
+        let mut payload = json!({"id":"stdin","success":true,"fullText":"OCR","lines":[{"text":"OCR","confidence":0.9,"x":1,"y":2,"width":40,"height":10}]});
+        assert!(decode_response(&serde_json::to_vec(&payload).unwrap(), "sample.png").is_ok());
+        payload["lines"][0]["confidence"] = json!(1.1);
+        assert_eq!(
+            decode_response(&serde_json::to_vec(&payload).unwrap(), "sample.png")
+                .unwrap_err()
+                .status,
+            Some(503)
+        );
+        payload["lines"][0]["confidence"] = json!(0.9);
+        payload["lines"][0]["x"] = json!(20000);
+        assert!(decode_response(&serde_json::to_vec(&payload).unwrap(), "sample.png").is_err());
+    }
 }

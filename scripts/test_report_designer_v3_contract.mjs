@@ -5,6 +5,7 @@ import { inflateRawSync } from "node:zlib";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { verifyDesignerEditingMutations } from "./lib/report-designer-editing-contracts.mjs";
 import { verifyGridAuthoringContracts } from "./lib/report-designer-grid-contracts.mjs";
+import { verifyGridTextImport } from "./lib/report-designer-grid-text-contracts.mjs";
 import { verifyConditionalContracts } from "./lib/report-designer-condition-contracts.mjs";
 import { createShippingMarksScenario } from "./lib/report-shipping-marks-fixture.mjs";
 import { defaultReportDesigns } from "./lib/default-report-designs.mjs";
@@ -50,6 +51,7 @@ export * from ${JSON.stringify(path.join(repoRoot, "scripts/lib/report-preview-h
 export * from ${JSON.stringify(importSpecifier("reportDesignerGridMutations.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerGridFields.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerGridSelection.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerGridTextImport.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerBlockFactories.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerConditions.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3ElementFactories.ts"))};
@@ -70,6 +72,7 @@ await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: tru
 const api = await import(pathToFileURL(bundlePath).href);
 verifyDesignerEditingMutations(api);
 verifyGridAuthoringContracts(api);
+verifyGridTextImport(api);
 verifyConditionalContracts(api, repoRoot);
 for (const [name, reference] of defaultReportDesigns()) {
   const rebuilt = rebuildDesignerDocument(api, reference);

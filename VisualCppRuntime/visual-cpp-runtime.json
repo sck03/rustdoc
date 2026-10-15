@@ -9,11 +9,19 @@
   "originalFileName": "VC_redist.x64.exe",
   "source": "Microsoft official Visual C++ v14 Redistributable x64",
   "sourceUrl": "https://download.visualstudio.microsoft.com/download/pr/ebdab8e5-1d7b-4d9f-a11b-cbb1720c3b12/843068991DAAA1F73AD9F6239BCE4D0F6A07A51F18C37EA2A867E9BECA71295C/VC_redist.x64.exe",
-  "cabinet": { "offset": 630000, "bytes": 18091661, "payload": "a4" },
-  "files": [
+  "cabinet": { "offset": 630000, "bytes": 18091661 },
+  "runtimes": {
+    "x64": { "payload": "a4", "files": [
     { "name": "vcruntime140.dll", "sourceName": "vcruntime140.dll_amd64", "bytes": 178616, "sha256": "d1f4225df2cd877dbf130d5668a021dce3f94118455ff5ec952061c30afc9ce7" },
     { "name": "vcruntime140_1.dll", "sourceName": "vcruntime140_1.dll_amd64", "bytes": 50112, "sha256": "a7146c08f89fe5b04541ab507cdb59ff7b44534d4ba3c668a426c6450a03434e" },
     { "name": "msvcp140.dll", "sourceName": "msvcp140.dll_amd64", "bytes": 643512, "sha256": "7c26614e1d733892c2deac7e245ce115504b1d80592dd0a01b08e3e5a55f89ca" },
     { "name": "msvcp140_1.dll", "sourceName": "msvcp140_1.dll_amd64", "bytes": 35768, "sha256": "206c931bf90fdad8816de3b5e2ef80b2bcaa9406c89ecc05fe6fddffe251e982" }
-  ]
+    ] },
+    "arm64": { "payload": "a3", "files": [
+      { "name": "vcruntime140.dll", "sourceName": "vcruntime140.dll_arm64", "bytes": 246112, "sha256": "3c56f4167e2b3d8e6338497731e6aae8cd7ec46bd6789f9423a8d9cf9a630310" },
+      { "name": "vcruntime140_1.dll", "sourceName": "vcruntime140_1.dll_arm64", "bytes": 53600, "sha256": "60c70e34e2e156f8bd214b92c2125c252e17d86ac8a25799ea1a4ecabde1d97c" },
+      { "name": "msvcp140.dll", "sourceName": "msvcp140.dll_arm64", "bytes": 1588064, "sha256": "167ceac85c2d726c4cd9e39b8881fafdc6de1520c0e67c4f6b271235f9d2a6c5" },
+      { "name": "msvcp140_1.dll", "sourceName": "msvcp140_1.dll_arm64", "bytes": 50528, "sha256": "c7713c2061b29d24de4874923522ada0815cfca80d09265c181e81d16c7c42d6" }
+    ] }
+  }
 }

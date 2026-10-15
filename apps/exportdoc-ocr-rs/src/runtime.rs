@@ -1,4 +1,3 @@
-#[cfg(all(windows, target_arch = "x86_64"))]
 pub(crate) fn initialize() -> anyhow::Result<()> {
     use anyhow::{bail, Context};
     use std::{env, path::PathBuf};
@@ -8,9 +7,11 @@ pub(crate) fn initialize() -> anyhow::Result<()> {
     if !library.is_absolute() {
         bail!("ORT_DYLIB_PATH must be an absolute application resource path");
     }
+    #[cfg(windows)]
     let root = library
         .parent()
         .context("ONNX Runtime directory is missing")?;
+    #[cfg(windows)]
     if root.join("msvc-runtime.json").try_exists()? {
         // ONNX is loaded from its explicit resource path. Pin its CRT dependencies to
         // the same package before ort loads it; no system installation is needed.
@@ -25,10 +26,5 @@ pub(crate) fn initialize() -> anyhow::Result<()> {
         }
     }
     ort::init_from(&library)?.commit();
-    Ok(())
-}
-
-#[cfg(not(all(windows, target_arch = "x86_64")))]
-pub(crate) fn initialize() -> anyhow::Result<()> {
     Ok(())
 }

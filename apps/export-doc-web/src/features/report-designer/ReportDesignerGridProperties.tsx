@@ -24,6 +24,7 @@ import { REPORT_GRID_MAX_COLUMNS, REPORT_GRID_MAX_ROWS } from "./reportDesignerG
 import { resolveGridSelection } from "./reportDesignerGridSelection.ts";
 import { mergeGridCell } from "./reportDesignerGridStructure.ts";
 import { GridRangeProperties } from "./ReportDesignerGridRangeProperties.tsx";
+import { GridTextImport } from "./ReportDesignerGridTextImport.tsx";
 
 export function GridBlockProperties({ block, fieldGroups, selectedCellId, selectedEndCellId, onSelectCell, onCommit, widthMm }: {
   block: ReportGridBlock;
@@ -79,6 +80,7 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, select
   return (
     <div className="new-report-grid-properties">
       <GridCellNavigator block={block} locations={locations} selected={selected} selection={selection} onSelect={onSelectCell} />
+      <GridTextImport block={block} selected={selected} onCommit={onCommit} />
       {mergeNotice && <small role="alert">{mergeNotice}</small>}
       <DesignerPropertyTabs value={tab} onChange={setTab} options={[{ value: "cell", label: "单元格" }, { value: "table", label: "整张表" }]}>
       {tab === "table" ? <>

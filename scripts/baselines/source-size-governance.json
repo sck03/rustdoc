@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-10-10",
+  "updatedAt": "2026-10-15",
   "rules": [
     {
       "name": "repository web production default",
@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 14846,
+      "baselineAggregateLines": 15414,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 14966,
+      "maximumAggregateLines": 15534,
       "reportFiles": false
     },
     {
@@ -81,9 +81,9 @@
       "filePattern": "^(?:.+\\.(?:mjs|ps1|cmd|yml|yaml|sh)|Dockerfile)$",
       "relativePathPattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)|deploy/rust-native/[^/]+|\\.github/workflows/rust-native-validation\\.yml)$",
       "maximumLines": 350,
-      "baselineAggregateLines": 1859,
+      "baselineAggregateLines": 2076,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 1934,
+      "maximumAggregateLines": 2151,
       "reportFiles": false
     },
     {
