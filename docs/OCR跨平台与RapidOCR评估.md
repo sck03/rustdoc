@@ -27,14 +27,14 @@ Windows x64、ONNX Runtime 1.29.0、同一份 PP-OCRv6 Small 模型及字典、�
 | 入口/目标 | 执行位置与要求 | 证据边界 |
 | --- | --- | --- |
 | Windows x64 Document、Full SQLite 测试版 | 本地 worker、x64 ONNX、x64 CRT | 本机实际识别与 Tauri；GNU 不替代 MSVC 发布 |
-| Windows ARM64 桌面 | ARM64 worker、ONNX、四个 ARM64 CRT | 已补齐打包与初始化；签名/摘要不等于设备运行 |
+| Windows ARM64 桌面 | ARM64 worker、ONNX、三个 ARM64 CRT | 已补齐打包与初始化；签名/摘要不等于设备运行 |
 | Linux x64/ARM64 桌面 | 对应 GNU worker、libonnxruntime.so | 对应 runner/设备，另需 WebKitGTK |
 | macOS ARM64 桌面 | ARM64 worker、libonnxruntime.dylib | 对应 runner/设备，使用 WKWebView |
 | 网页/移动浏览器 | 上传到 Rust HTTP 服务，由服务器识别 | 客户端不加载 ONNX；文件选择可用于非 HTTPS 局域网，粘贴权限依浏览器而定 |
 | Docker amd64/arm64 | 容器内对应 Linux worker 和 ONNX | 与 PostgreSQL 分工不变，需对应架构真实镜像验收 |
 | Sales 或显式 WithoutOcr 包 | 不附 OCR | 明确显示不可用 |
 
-运行库从 AppRoot 绝对路径加载，不依赖工作目录或系统 ONNX。Windows 两种架构从同一已核验微软归档提取目标架构的四个 CRT 文件，缓存隔离，许可和哈希随包，见 [CRT 说明](../VisualCppRuntime/README.md)。
+运行库从 AppRoot 绝对路径加载，不依赖工作目录或系统 ONNX。Windows 两种架构从同一已核验微软归档提取目标架构所需的 CRT 文件，缓存隔离，许可和哈希随包，见 [CRT 说明](../VisualCppRuntime/README.md)。
 
 网页增加文件选择，桌面保留原生对话框。PNG/JPEG/BMP/WebP/TIFF 共用后端；部分浏览器不能预览 TIFF，但可以上传识别。手机照片按 EXIF 纠正方向，与浏览器预览一致，返回坐标以显示方向为准；新增对应 JPEG 回归。换图立即取消旧预览和识别，迟到结果不覆盖当前图；Blob URL 在替换或离开后释放。图片和结果不自动写入业务库，信用证应用保留原确认与权限边界。
 

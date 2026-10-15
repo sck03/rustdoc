@@ -915,7 +915,6 @@ Microsoft Visual C++ 14.51.36247.0; Microsoft redistribution terms apply. Full i
 | x64 | msvcp140.dll | 643512 | 7c26614e1d733892c2deac7e245ce115504b1d80592dd0a01b08e3e5a55f89ca |
 | x64 | msvcp140_1.dll | 35768 | 206c931bf90fdad8816de3b5e2ef80b2bcaa9406c89ecc05fe6fddffe251e982 |
 | arm64 | vcruntime140.dll | 246112 | 3c56f4167e2b3d8e6338497731e6aae8cd7ec46bd6789f9423a8d9cf9a630310 |
-| arm64 | vcruntime140_1.dll | 53600 | 60c70e34e2e156f8bd214b92c2125c252e17d86ac8a25799ea1a4ecabde1d97c |
 | arm64 | msvcp140.dll | 1588064 | 167ceac85c2d726c4cd9e39b8881fafdc6de1520c0e67c4f6b271235f9d2a6c5 |
 | arm64 | msvcp140_1.dll | 50528 | c7713c2061b29d24de4874923522ada0815cfca80d09265c181e81d16c7c42d6 |
 

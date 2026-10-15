@@ -19,7 +19,6 @@
     ] },
     "arm64": { "payload": "a3", "files": [
       { "name": "vcruntime140.dll", "sourceName": "vcruntime140.dll_arm64", "bytes": 246112, "sha256": "3c56f4167e2b3d8e6338497731e6aae8cd7ec46bd6789f9423a8d9cf9a630310" },
-      { "name": "vcruntime140_1.dll", "sourceName": "vcruntime140_1.dll_arm64", "bytes": 53600, "sha256": "60c70e34e2e156f8bd214b92c2125c252e17d86ac8a25799ea1a4ecabde1d97c" },
       { "name": "msvcp140.dll", "sourceName": "msvcp140.dll_arm64", "bytes": 1588064, "sha256": "167ceac85c2d726c4cd9e39b8881fafdc6de1520c0e67c4f6b271235f9d2a6c5" },
       { "name": "msvcp140_1.dll", "sourceName": "msvcp140_1.dll_arm64", "bytes": 50528, "sha256": "c7713c2061b29d24de4874923522ada0815cfca80d09265c181e81d16c7c42d6" }
     ] }

@@ -9,8 +9,11 @@ function Read-ExportDocVisualCppRelease {
     $runtime = $release.runtimes.$Architecture
     $files = @($runtime.files)
     $names = @($files | ForEach-Object { [string]$_.name })
+    $expectedNames = @('vcruntime140.dll', 'msvcp140.dll', 'msvcp140_1.dll')
+    if ($Architecture -eq 'x64') { $expectedNames += 'vcruntime140_1.dll' }
     if ($release.deployment -ne "app-local" -or $release.fileName -ne "VC_redist.x64.exe" -or
-        $files.Count -ne 4 -or @($names | Select-Object -Unique).Count -ne 4 -or
+        $files.Count -ne $expectedNames.Count -or @($names | Select-Object -Unique).Count -ne $expectedNames.Count -or
+        @($names | Where-Object { $_ -cnotin $expectedNames }).Count -ne 0 -or
         [long]$release.cabinet.offset -le 0 -or [long]$release.cabinet.bytes -le 0 -or
         ([long]$release.cabinet.offset + [long]$release.cabinet.bytes) -gt [long]$release.bytes -or
         [string]$runtime.payload -notmatch '\Aa[0-9]+\z' -or
@@ -47,5 +50,11 @@ function Assert-ExportDocVisualCppFiles {
             originalFileName = $file.name
         }
         Assert-ExportDocMicrosoftRuntimeFile -Path (Join-Path $Directory $name) -Release $expected | Out-Null
+        $image = [IO.File]::ReadAllBytes((Join-Path $Directory $name))
+        if ($image.Length -lt 64 -or $image[0] -ne 0x4d -or $image[1] -ne 0x5a) { throw "Invalid CRT PE image: $name" }
+        $peOffset = [BitConverter]::ToUInt32($image, 0x3c)
+        $machine = if ($Release.runtimeArchitecture -eq 'arm64') { 0xaa64 } else { 0x8664 }
+        if ($peOffset -gt $image.Length - 6 -or [BitConverter]::ToUInt32($image, $peOffset) -ne 0x4550 -or
+            [BitConverter]::ToUInt16($image, $peOffset + 4) -ne $machine) { throw "CRT architecture mismatch: $name" }
     }
 }

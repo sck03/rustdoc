@@ -12,19 +12,55 @@ pub(crate) fn initialize() -> anyhow::Result<()> {
         .parent()
         .context("ONNX Runtime directory is missing")?;
     #[cfg(windows)]
-    if root.join("msvc-runtime.json").try_exists()? {
-        // ONNX is loaded from its explicit resource path. Pin its CRT dependencies to
-        // the same package before ort loads it; no system installation is needed.
-        for name in [
-            "vcruntime140.dll",
-            "vcruntime140_1.dll",
-            "msvcp140.dll",
-            "msvcp140_1.dll",
-        ] {
-            ort::util::preload_dylib(root.join(name))
-                .with_context(|| format!("cannot load packaged {name}"))?;
-        }
-    }
+    preload_crt(root)?;
     ort::init_from(&library)?.commit();
+    Ok(())
+}
+
+#[cfg(windows)]
+fn preload_crt(root: &std::path::Path) -> anyhow::Result<()> {
+    use anyhow::{bail, Context};
+    use serde::Deserialize;
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Manifest {
+        runtime_architecture: String,
+        files: Vec<Library>,
+    }
+    #[derive(Deserialize)]
+    struct Library {
+        name: String,
+    }
+
+    let path = root.join("msvc-runtime.json");
+    if !path.try_exists()? {
+        return Ok(());
+    }
+    let manifest: Manifest = serde_json::from_reader(std::fs::File::open(path)?)?;
+    let architecture = if cfg!(target_arch = "aarch64") {
+        "arm64"
+    } else {
+        "x64"
+    };
+    if manifest.runtime_architecture != architecture
+        || manifest.files.is_empty()
+        || manifest.files.len() > 8
+    {
+        bail!("packaged CRT manifest does not match the worker architecture");
+    }
+    // The governed list is ordered by dependencies. ARM64 needs three libraries;
+    // the archive's vcruntime140_1.dll_arm64 is actually x64 and must not be loaded.
+    for library in manifest.files {
+        let name = library.name;
+        if !name.ends_with(".dll")
+            || !name
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'.')
+        {
+            bail!("invalid packaged CRT library name");
+        }
+        ort::util::preload_dylib(root.join(&name))
+            .with_context(|| format!("cannot load packaged {name}"))?;
+    }
     Ok(())
 }

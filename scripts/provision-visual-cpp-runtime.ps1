@@ -75,4 +75,4 @@ foreach ($file in $release.files) {
 $release | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Assert-WorkspacePath (Join-Path $destination 'msvc-runtime.json')) -Encoding utf8
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "VisualCppRuntime/README.md") -Destination (Assert-WorkspacePath (Join-Path $destination "MSVC_RUNTIME_NOTICES.md")) -Force
 Assert-ExportDocVisualCppFiles -Directory $destination -Release $release
-Write-Host "Minimal Visual C++ runtime: 4 DLLs, $(($release.files | Measure-Object -Property bytes -Sum).Sum) bytes; no installer shipped."
+Write-Host "Minimal Visual C++ runtime ($Architecture): $($release.files.Count) DLLs, $(($release.files | Measure-Object -Property bytes -Sum).Sum) bytes; no installer shipped."

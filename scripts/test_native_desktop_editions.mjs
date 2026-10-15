@@ -13,6 +13,7 @@ import { verifyDesktopBlankGrid } from './lib/native-blank-grid-designer.mjs';
 import { verifyDesktopBlankDetails } from './lib/native-blank-detail-designer.mjs';
 import { verifyDesktopBookingExport } from './lib/native-booking-export.mjs';
 import { verifyDesktopBusinessAttachments } from './lib/native-business-attachments.mjs';
+import { verifyDesktopOcr } from './lib/native-ocr-ui.mjs';
 
 assert.equal(process.platform, 'win32', 'This gate exercises Windows WebView2 packages.');
 const repo = path.resolve(import.meta.dirname, '..');
@@ -117,6 +118,7 @@ for (const edition of selected) {
     assert(await run(`document.querySelector('.about-detail-grid')?.textContent.includes(${JSON.stringify('v' + marker.version)})`));
     assert(await run(`document.querySelector('.about-detail-grid')?.textContent.includes(${JSON.stringify(health.body.informationalVersion)})`));
     await captureScreenshot(cdp, path.join(output, `${edition}-about.png`));
+    if (marker.ocr && !process.argv.includes('--blank-grid-only')) await verifyDesktopOcr({ run, cdp, repo, output, context, token: login.body.accessToken, operations });
     if (process.argv.includes('--blank-grid-only')) {
       await verifyDesktopBlankGrid({ run, request, token: login.body.accessToken, businessDate: login.body.user.businessDate, cdp, output });
     } else if (edition === 'Full') {
