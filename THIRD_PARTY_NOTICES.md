@@ -458,7 +458,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | rustc_version | 0.4.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | rustc-hash | 2.1.3 | Apache-2.0 OR MIT | native-desktop |
 | cargo | rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | native-desktop |
-| cargo | rustls | 0.23.45 | Apache-2.0 OR ISC OR MIT | native-desktop |
+| cargo | rustls | 0.23.46 | Apache-2.0 OR ISC OR MIT | native-desktop |
 | cargo | rustls-native-certs | 0.8.4 | Apache-2.0 OR ISC OR MIT | native-desktop |
 | cargo | rustls-pki-types | 1.15.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | rustls-platform-verifier | 0.7.0 | MIT OR Apache-2.0 | native-desktop |

@@ -596,7 +596,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 | native-desktop |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT | native-desktop |
 | rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | native-desktop |
-| rustls | 0.23.45 | Apache-2.0 OR ISC OR MIT | native-desktop |
+| rustls | 0.23.46 | Apache-2.0 OR ISC OR MIT | native-desktop |
 | rustls-native-certs | 0.8.4 | Apache-2.0 OR ISC OR MIT | native-desktop |
 | rustls-pki-types | 1.15.1 | MIT OR Apache-2.0 | native-desktop |
 | rustls-platform-verifier | 0.7.0 | MIT OR Apache-2.0 | native-desktop |
