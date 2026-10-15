@@ -1,4 +1,4 @@
-import { type ChangeEvent as ReactChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { type ChangeEvent as ReactChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useReportDesignerPointerGesture } from "./useReportDesignerPointerGesture.ts";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import type { ReportBorderStyle, ReportTextStyle } from "./reportDesignerSchema.ts";
@@ -60,8 +60,13 @@ export function FieldPathInput({
   onChange: (fieldPath: string) => void;
 }) {
   const listId = useId();
-  const fields = fieldGroups.flatMap((group) => group.fields.map((field) => ({ ...field, category: group.category })));
-  const hasKnownValue = fields.some((field) => field.value === value);
+  const fieldValues = useMemo(() => new Set(fieldGroups.flatMap(group => group.fields.map(field => field.value))), [fieldGroups]);
+  const options = useMemo(() => selectOnly
+    ? fieldGroups.map(group => <optgroup key={group.category} label={group.category}>{group.fields.map(field =>
+      <option key={`${group.category}-${field.value}`} value={field.value}>{field.label}</option>)}</optgroup>)
+    : fieldGroups.flatMap(group => group.fields.map(field =>
+      <option key={`${group.category}-${field.value}`} value={field.value}>{group.category} / {field.label}</option>)), [fieldGroups, selectOnly]);
+  const hasKnownValue = fieldValues.has(value);
 
   return (
     <label className={className}>
@@ -74,13 +79,7 @@ export function FieldPathInput({
         >
           <option value="">请选择字段</option>
           {value && !hasKnownValue ? <option value={value}>当前值：{value}（需修正）</option> : null}
-          {fieldGroups.map((group) => (
-            <optgroup key={group.category} label={group.category}>
-              {group.fields.map((field) => (
-                <option key={`${group.category}-${field.value}`} value={field.value}>{field.label}</option>
-              ))}
-            </optgroup>
-          ))}
+          {options}
         </select>
       ) : (
         <>
@@ -90,11 +89,7 @@ export function FieldPathInput({
             onChange={(event) => onChange(normalizeDesignerFieldPath(event.target.value))}
           />
           <datalist id={listId}>
-            {fields.map((field) => (
-              <option key={`${field.category}-${field.value}`} value={field.value}>
-                {field.category} / {field.label}
-              </option>
-            ))}
+            {options}
           </datalist>
         </>
       )}

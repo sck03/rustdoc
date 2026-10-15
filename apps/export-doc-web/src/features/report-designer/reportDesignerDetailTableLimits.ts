@@ -1,0 +1,1 @@
+export const REPORT_DETAIL_MAX_COLUMNS = 100;

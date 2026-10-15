@@ -12,8 +12,14 @@ export function InspectorTitle({ title, subtitle }: { title: string; subtitle: s
   return <div className="report-designer-v3-inspector-title"><strong>{title}</strong><span>{subtitle}</span></div>;
 }
 
-export function NumberField({ label, value, onCommit, min = 0, max = 1000, step = 0.01, precision = 2, disabled = false }: { label: string; value: number; onCommit: (value: number) => void; min?: number; max?: number; step?: number; precision?: number; disabled?: boolean }) {
-  const formatted = formatNumber(value, precision);
+type NumberFieldProps = { label: string; min?: number; max?: number; step?: number; precision?: number; disabled?: boolean } & (
+  { value: number; onCommit: (value: number) => void; optional?: false } |
+  { value: number | undefined; onCommit: (value: number | undefined) => void; optional: true }
+);
+
+export function NumberField(props: NumberFieldProps) {
+  const { label, value, onCommit, min = 0, max = 1000, step = 0.01, precision = 2, disabled = false } = props;
+  const formatted = value === undefined ? "" : formatNumber(value, precision);
   const [draft, setDraft] = useState(formatted);
   const [focused, setFocused] = useState(false);
   const cancelOnBlur = useRef(false);
@@ -25,14 +31,18 @@ export function NumberField({ label, value, onCommit, min = 0, max = 1000, step 
       return;
     }
     if (draft === formatted) return;
-    if (!draft.trim()) return setDraft(formatted);
+    if (!draft.trim()) {
+      if (props.optional) { setDraft(""); props.onCommit(undefined); }
+      else setDraft(formatted);
+      return;
+    }
     const parsed = Number(draft);
     if (!Number.isFinite(parsed)) return setDraft(formatted);
     const next = Math.min(max, Math.max(min, step === 1 ? Math.round(parsed) : parsed));
     setDraft(formatNumber(next, precision));
     if (next !== value) onCommit(next);
   }
-  return <label><span>{label}</span><input type="number" inputMode={step === 1 ? "numeric" : "decimal"} step={step} min={min} max={max} disabled={disabled} value={focused ? draft : formatted} onFocus={() => { setFocused(true); setDraft(formatted); }} onChange={(event) => setDraft(event.target.value)} onBlur={() => { setFocused(false); commit(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelOnBlur.current = true; setDraft(formatted); event.currentTarget.blur(); } else if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} /></label>;
+  return <label><span>{label}</span><input type="number" inputMode={step === 1 ? "numeric" : "decimal"} placeholder={props.optional ? "自动" : undefined} step={step} min={min} max={max} disabled={disabled} value={focused ? draft : formatted} onFocus={() => { setFocused(true); setDraft(formatted); }} onChange={(event) => setDraft(event.target.value)} onBlur={() => { setFocused(false); commit(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelOnBlur.current = true; setDraft(formatted); event.currentTarget.blur(); } else if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} /></label>;
 }
 
 export function focusDesignerNode(selector: string) {

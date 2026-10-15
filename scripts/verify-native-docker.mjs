@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { randomBytes, createHash } from "node:crypto";
 import path from "node:path";
-import { verifyDockerTopology, verifyPostgresRestore, waitForJob } from './lib/native-docker-validation.mjs';
+import { verifyContainerOcr, verifyDockerTopology, verifyPostgresRestore, waitForJob } from './lib/native-docker-validation.mjs';
 
 const args=process.argv.slice(2);
 const option=name=>{const index=args.indexOf(name);return index<0?undefined:args[index+1];};
@@ -41,6 +41,7 @@ const login=await (await operation("Login",{body:{username:"admin",password:stat
 access=login.accessToken;
 if(!access)throw new Error("Native login returned no session.");
 if(!resume){
+  await verifyContainerOcr(request,routes.get('UploadOcrImage'));
   const job=await (await operation("StartExcelTemplateDownloadJob")).json();
   state.jobId=job.jobId;
 }

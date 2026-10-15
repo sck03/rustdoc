@@ -1,8 +1,8 @@
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import { createDetailTableSideBand } from "./reportDesignerBlockFactories.ts";
 import type { ReportBlock, ReportDetailTableBlock } from "./reportDesignerSchema.ts";
-import { normalizeNumber } from "./reportDesignerPropertiesModel.ts";
-import { DesignerCheckbox, FieldPathInput, TextStyleEditor } from "./ReportDesignerPropertyControls.tsx";
+import { CommitTextField, DesignerCheckbox, FieldPathInput, TextStyleEditor } from "./ReportDesignerPropertyControls.tsx";
+import { NumberField } from "./ReportDesignerV3InspectorControls.tsx";
 
 export function ReportDesignerDetailTablePrintProperties({ block, fieldGroups, onCommit }: {
   block: ReportDetailTableBlock;
@@ -12,7 +12,7 @@ export function ReportDesignerDetailTablePrintProperties({ block, fieldGroups, o
   return <>
       <details className="new-report-detail-style-group" open>
         <summary>打印分页</summary>
-        <label><span>明细标题</span><input value={block.title ?? ""} onChange={event => onCommit({ ...block, title: event.target.value })} /></label>
+        <label><span>明细标题</span><CommitTextField value={block.title ?? ""} onCommit={title => onCommit({ ...block, title })} /></label>
         <div className="new-report-property-grid">
           <DesignerCheckbox checked={block.print.repeatHeaderOnPageBreak}
               onChange={(checked) =>
@@ -24,57 +24,10 @@ export function ReportDesignerDetailTablePrintProperties({ block, fieldGroups, o
                   },
                 })
               }>跨页重复表头</DesignerCheckbox>
-          <DesignerCheckbox checked={block.print.keepRowsTogether}
-              onChange={(checked) =>
-                onCommit({
-                  ...block,
-                  print: {
-                    ...block.print,
-                    keepRowsTogether: checked,
-                  },
-                })
-              }>明细行避免截断</DesignerCheckbox>
-          <label>
-            <span>首页明细行数</span>
-            <input
-              type="number"
-              min={1}
-              max={80}
-              step={1}
-              value={block.print.firstPageRows ?? ""}
-              placeholder="自动"
-              onChange={(event) =>
-                onCommit({
-                  ...block,
-                  print: {
-                    ...block.print,
-                    firstPageRows: optionalRowLimit(event.target.value),
-                  },
-                })
-              }
-            />
-          </label>
-          <label>
-            <span>续页明细行数</span>
-            <input
-              type="number"
-              min={1}
-              max={80}
-              step={1}
-              value={block.print.continuationPageRows ?? ""}
-              placeholder="自动"
-              onChange={(event) =>
-                onCommit({
-                  ...block,
-                  print: {
-                    ...block.print,
-                    continuationPageRows: optionalRowLimit(event.target.value),
-                  },
-                })
-              }
-            />
-          </label>
+          <NumberField label="首页明细行数" optional value={block.print.firstPageRows} min={1} max={80} step={1} precision={0} onCommit={firstPageRows => onCommit({ ...block, print: { ...block.print, firstPageRows } })} />
+          <NumberField label="续页明细行数" optional value={block.print.continuationPageRows} min={1} max={80} step={1} precision={0} onCommit={continuationPageRows => onCommit({ ...block, print: { ...block.print, continuationPageRows } })} />
           <div className="new-report-designer-muted">留空时按页面高度自动分页;填写后每页最多显示该行数。</div>
+          <small>明细按整行分页；单行内容超过一页时，请调整列宽或字号。</small>
         </div>
       </details>
       <details className="new-report-detail-style-group">
@@ -93,31 +46,16 @@ export function ReportDesignerDetailTablePrintProperties({ block, fieldGroups, o
         </div>
         {block.sideBand ? (
           <div className="new-report-property-grid">
-            <label><span>明细区参考宽度(mm)</span><input type="number" min={40} max={240} step="any" value={block.detailWidthMm ?? 132} onChange={event => onCommit({ ...block, detailWidthMm: normalizeNumber(event.target.value, block.detailWidthMm ?? 132) })} /></label>
+            <NumberField label="明细区参考宽度(mm)" min={40} max={240} value={block.detailWidthMm ?? 132} onCommit={detailWidthMm => onCommit({ ...block, detailWidthMm })} />
             <DesignerCheckbox checked={block.sideBand.firstPageOnly === true} onChange={checked => onCommit({...block,sideBand:{...block.sideBand!,firstPageOnly:checked}})}>唛头内容仅首页显示</DesignerCheckbox>
             <label>
               <span>侧栏标题</span>
-              <input
+              <CommitTextField
                 value={block.sideBand.title}
-                onChange={(event) => onCommit({ ...block, sideBand: { ...block.sideBand!, title: event.target.value } })}
+                onCommit={title => onCommit({ ...block, sideBand: { ...block.sideBand!, title } })}
               />
             </label>
-            <label>
-              <span>宽度(mm)</span>
-              <input
-                type="number"
-                min={16}
-                max={120}
-                step="any"
-                value={block.sideBand.widthMm}
-                onChange={(event) =>
-                  onCommit({
-                    ...block,
-                    sideBand: { ...block.sideBand!, widthMm: normalizeNumber(event.target.value, block.sideBand!.widthMm) },
-                  })
-                }
-              />
-            </label>
+            <NumberField label="宽度(mm)" min={16} max={120} value={block.sideBand.widthMm} onCommit={widthMm => onCommit({ ...block, sideBand: { ...block.sideBand!, widthMm } })} />
             <label>
               <span>内容类型</span>
               <select
@@ -149,10 +87,10 @@ export function ReportDesignerDetailTablePrintProperties({ block, fieldGroups, o
             ) : (
               <label className="new-report-property-wide">
                 <span>固定内容</span>
-                <textarea
+                <CommitTextField multiline
                   rows={5}
                   value={block.sideBand.text}
-                  onChange={(event) => onCommit({ ...block, sideBand: { ...block.sideBand!, text: event.target.value } })}
+                  onCommit={text => onCommit({ ...block, sideBand: { ...block.sideBand!, text } })}
                 />
               </label>
             )}
@@ -166,11 +104,4 @@ export function ReportDesignerDetailTablePrintProperties({ block, fieldGroups, o
         )}
       </details>
   </>;
-}
-function optionalRowLimit(value: string) {
-  if (value.trim() === "") {
-    return undefined;
-  }
-  const parsed = Number.parseInt(value, 10);
-  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 80 ? parsed : undefined;
 }

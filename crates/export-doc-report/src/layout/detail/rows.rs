@@ -1,11 +1,8 @@
 use super::{CellStyle, Row, RowKind};
-use crate::{
-    ReportData, Result,
-    error::invalid,
-    layout::{detail_content, measured_wrap},
-};
+use crate::{ReportData, Result, error::invalid, layout::detail_content};
 use export_doc_domain::designer::{
     DetailGroupFooter, DetailGroupFooterCell, DetailSummaryCell, DetailSummaryRow, DetailTable,
+    ReportBorderStyle, ReportTextStyle,
 };
 use rust_decimal::Decimal;
 use serde_json::Value;
@@ -20,6 +17,7 @@ pub(super) fn detail_rows(
     let mut rows = Vec::new();
     let mut current_group = None::<String>;
     let mut group_sums = empty_group_sums(table);
+    let sum_cells: Vec<_> = group_sum_cells(table).collect();
     let mut group_count = 0usize;
     let style = CellStyle::new(&table.body_style, size, false);
     for item in data.items() {
@@ -28,10 +26,7 @@ pub(super) fn detail_rows(
             .as_ref()
             .map(|grouping| data.item_text(item, field_name(&grouping.field_path)))
             .unwrap_or_default();
-        if table.grouping.is_some()
-            && current_group.as_deref() != Some(group.as_str())
-            && !group.is_empty()
-        {
+        if table.grouping.is_some() && current_group.as_deref() != Some(group.as_str()) {
             if let Some(previous) = current_group.take() {
                 if let Some(grouping) = &table.grouping {
                     if let Some(footer) = &grouping.footer {
@@ -48,15 +43,21 @@ pub(super) fn detail_rows(
                 }
             }
             current_group = Some(group.clone());
-            group_sums = empty_group_sums(table);
+            group_sums.values_mut().for_each(|sum| *sum = Decimal::ZERO);
             group_count = 0;
             if let Some(grouping) = &table.grouping {
-                let label = if grouping.show_field_value {
+                let label = if grouping.show_field_value && !group.is_empty() {
                     format!("{} {}", grouping.label, group)
                 } else {
                     grouping.label.clone()
                 };
-                rows.push(group_row_value(label, size, grouping.page_break_before));
+                rows.push(group_row_value(
+                    label,
+                    &grouping.style,
+                    widths.iter().sum(),
+                    size,
+                    grouping.page_break_before,
+                ));
             }
         }
         let composed: Vec<_> = table
@@ -93,7 +94,7 @@ pub(super) fn detail_rows(
                 style.wrap(&text, *width)
             })
             .collect();
-        for cell in group_sum_cells(table) {
+        for cell in &sum_cells {
             if let Some(total) = group_sums.get_mut(&cell.column_id) {
                 add_sum(total, data.value(&cell.field_path, Some(item)))?;
             }
@@ -150,12 +151,20 @@ fn column_text(
     data.display(&column.field_path, Some(item))
 }
 
-fn group_row_value(label: String, size: f32, page_break_before: bool) -> Row {
+fn group_row_value(
+    label: String,
+    text_style: &ReportTextStyle,
+    width: f32,
+    size: f32,
+    page_break_before: bool,
+) -> Row {
+    let style = CellStyle::new(text_style, size, true);
+    let cells = vec![style.wrap(&label, width)];
     Row {
-        cells: vec![vec![label]],
+        height: style.height(&cells),
+        cells,
         composed: vec![],
-        height: size * 1.35 + 4.,
-        kind: RowKind::Group,
+        kind: RowKind::Group(text_style.clone()),
         page_break_before,
     }
 }
@@ -169,32 +178,35 @@ fn group_footer_row(
     widths: &[f32],
     size: f32,
 ) -> Result<Row> {
-    let mut cells = Vec::with_capacity(table.columns.len());
-    for (index, column) in table.columns.iter().enumerate() {
-        let value = footer
-            .cells
-            .iter()
-            .find(|cell| cell.column_id == column.id)
-            .map(|cell| footer_cell(cell, sums, count))
-            .unwrap_or_default();
-        cells.push(measured_wrap(
-            &value,
-            (widths[index] - 3.).max(size),
-            "Noto Sans CJK SC",
-            false,
-            size,
-        ));
-    }
-    if let Some(first) = cells.first_mut() {
-        first.insert(0, format!("{} {}", footer.label, group));
-    }
-    Ok(Row {
-        height: cells.iter().map(Vec::len).max().unwrap_or(1) as f32 * size * 1.35 + 4.,
-        cells,
-        kind: RowKind::Fixed(footer.style.clone(), None),
-        composed: vec![],
-        page_break_before: false,
-    })
+    let cells: BTreeMap<_, _> = footer
+        .cells
+        .iter()
+        .map(|cell| (cell.column_id.as_str(), cell))
+        .collect();
+    let values = table
+        .columns
+        .iter()
+        .map(|column| {
+            cells
+                .get(column.id.as_str())
+                .map(|cell| footer_cell(cell, sums, count))
+                .unwrap_or_default()
+        })
+        .collect();
+    let label = if group.is_empty() {
+        footer.label.clone()
+    } else {
+        format!("{} {group}", footer.label)
+    };
+    Ok(fixed_row(
+        values,
+        label,
+        footer.label_column_span,
+        &footer.style,
+        None,
+        widths,
+        size,
+    ))
 }
 
 fn footer_cell(
@@ -220,30 +232,63 @@ pub(super) fn summary_row(
     widths: &[f32],
     size: f32,
 ) -> Result<Row> {
-    let style = CellStyle::new(&summary.style, size, false);
-    let mut cells = Vec::with_capacity(table.columns.len());
-    for (index, column) in table.columns.iter().enumerate() {
-        let cell = summary
-            .cells
+    let cells: BTreeMap<_, _> = summary
+        .cells
+        .iter()
+        .map(|cell| (cell.column_id.as_str(), cell))
+        .collect();
+    let values = table
+        .columns
+        .iter()
+        .map(|column| {
+            cells
+                .get(column.id.as_str())
+                .map(|cell| summary_cell(cell, data))
+                .unwrap_or_default()
+        })
+        .collect();
+    Ok(fixed_row(
+        values,
+        summary.label.clone(),
+        summary.label_column_span,
+        &summary.style,
+        summary.border.as_ref(),
+        widths,
+        size,
+    ))
+}
+
+fn fixed_row(
+    mut values: Vec<String>,
+    label: String,
+    span: i32,
+    text_style: &ReportTextStyle,
+    border: Option<&ReportBorderStyle>,
+    widths: &[f32],
+    size: f32,
+) -> Row {
+    let span = (span.max(1) as usize).min(widths.len());
+    let style = CellStyle::new(text_style, size, false);
+    let label = std::iter::once(label)
+        .chain(values.drain(..span))
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut cells = Vec::with_capacity(widths.len() - span + 1);
+    cells.push(style.wrap(&label, widths[..span].iter().sum()));
+    cells.extend(
+        values
             .iter()
-            .find(|cell| cell.column_id == column.id);
-        let value = cell
-            .map(|cell| summary_cell(cell, data))
-            .unwrap_or_default();
-        cells.push(style.wrap(&value, widths[index]));
-    }
-    if let Some(first) = cells.first_mut() {
-        if !summary.label.is_empty() {
-            first.insert(0, summary.label.clone());
-        }
-    }
-    Ok(Row {
+            .zip(&widths[span..])
+            .map(|(value, width)| style.wrap(value, *width)),
+    );
+    Row {
         height: style.height(&cells),
         cells,
-        kind: RowKind::Fixed(summary.style.clone(), summary.border.clone()),
+        kind: RowKind::Fixed(text_style.clone(), border.cloned(), span),
         composed: vec![],
         page_break_before: false,
-    })
+    }
 }
 
 fn summary_cell(cell: &DetailSummaryCell, data: &ReportData) -> String {

@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Copy, Trash2 } from "lucide-react";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
-import { addDetailTableColumn, duplicateDetailTableColumn, moveDetailTableColumn, removeDetailTableColumn, setDetailColumnContentKind } from "./reportDesignerTableMutations.ts";
+import { addDetailTableColumn, duplicateDetailTableColumn, moveDetailTableColumn, removeDetailTableColumn, setDetailColumnContentKind, REPORT_DETAIL_MAX_COLUMNS } from "./reportDesignerTableMutations.ts";
 import type { ReportBlock, ReportDetailTableBlock, ReportDetailTableColumn } from "./reportDesignerSchema.ts";
 import { filterDetailItemFieldGroups, normalizeAlign } from "./reportDesignerPropertiesModel.ts";
 import { BorderEditor, CommitTextField, FieldPathInput, DesignerCheckbox } from "./ReportDesignerPropertyControls.tsx";
 import { NumberField } from "./ReportDesignerV3InspectorControls.tsx";
 import { ReportDesignerDetailCompositeProperties } from "./ReportDesignerDetailCompositeProperties.tsx";
+import { DeferredPropertySection } from "./ReportDesignerDeferredProperties.tsx";
 
 export function ReportDesignerDetailTableColumnsProperties({ block, fieldGroups, onCommit }: {
   block: ReportDetailTableBlock;
@@ -23,6 +24,7 @@ export function ReportDesignerDetailTableColumnsProperties({ block, fieldGroups,
   }
   function insert(copy: boolean) {
     const next = copy ? duplicateDetailTableColumn(block, column.id) : addDetailTableColumn(block);
+    if (next === block) return;
     setSelectedId(next.columns[copy ? index + 1 : next.columns.length - 1].id);
     onCommit(next);
   }
@@ -37,7 +39,7 @@ export function ReportDesignerDetailTableColumnsProperties({ block, fieldGroups,
         <div className="new-report-detail-column-actions" aria-label={`列 ${index + 1} 操作`}>
           <button className="icon-button compact-icon-button" type="button" title="上移列" aria-label="上移列" disabled={index === 0} onClick={() => onCommit(moveDetailTableColumn(block, column.id, "up"))}><ArrowUp size={16} aria-hidden="true" /></button>
           <button className="icon-button compact-icon-button" type="button" title="下移列" aria-label="下移列" disabled={index === block.columns.length - 1} onClick={() => onCommit(moveDetailTableColumn(block, column.id, "down"))}><ArrowDown size={16} aria-hidden="true" /></button>
-          <button className="icon-button compact-icon-button" type="button" title="复制列" aria-label="复制列" onClick={() => insert(true)}><Copy size={16} aria-hidden="true" /></button>
+          <button className="icon-button compact-icon-button" type="button" title="复制列" aria-label="复制列" disabled={block.columns.length >= REPORT_DETAIL_MAX_COLUMNS} onClick={() => insert(true)}><Copy size={16} aria-hidden="true" /></button>
           <button className="icon-button compact-icon-button danger-icon" type="button" title="删除列" aria-label="删除列" disabled={block.columns.length <= 1 || Boolean(block.adjustments && [block.adjustments.descriptionColumnId, block.adjustments.amountColumnId].includes(column.id))} onClick={() => { setSelectedId(block.columns[index + 1]?.id ?? block.columns[index - 1]?.id ?? ""); onCommit(removeDetailTableColumn(block, column.id)); }}><Trash2 size={16} aria-hidden="true" /></button>
         </div>
       </div>
@@ -51,21 +53,19 @@ export function ReportDesignerDetailTableColumnsProperties({ block, fieldGroups,
       {column.contentKind === "Composite" && <fieldset className="new-report-detail-style-group"><legend>显示哪些商品信息</legend>
         {(column.content ?? []).filter(part => part.kind === "Field").map(part => <DesignerCheckbox key={part.id} checked={part.visible !== false} onChange={visible => updateColumn({ content: column.content?.map(current => current.id === part.id ? { ...current, visible } : current) })}>{fields.get(part.fieldPath) ?? "未识别的商品信息（请在组合排版中修正）"}</DesignerCheckbox>)}
       </fieldset>}
-      <details className="report-designer-property-section" onInvalidCapture={event => { event.currentTarget.open = true; }}>
-        <summary>组合排版</summary>
+      <DeferredPropertySection title="组合排版">
         <label><span>内容</span><select value={column.contentKind ?? "Field"} onChange={event => updateColumn(setDetailColumnContentKind(column, event.target.value === "Composite" ? "Composite" : "Field"))}>
           <option value="Field">一项商品信息</option><option value="Composite">多项信息组合排版</option>
         </select></label>
         {column.contentKind === "Composite" && <ReportDesignerDetailCompositeProperties column={column} fieldGroups={fieldGroups} onChange={updateColumn} />}
-      </details>
-      <details className="report-designer-property-section" onInvalidCapture={event => { event.currentTarget.open = true; }}>
-        <summary>跨列表头与边框</summary>
+      </DeferredPropertySection>
+      <DeferredPropertySection title="跨列表头与边框">
         <label><span>跨列表头</span><CommitTextField multiline rows={2} value={column.headerGroupTitle ?? ""} onCommit={headerGroupTitle => updateColumn({ headerGroupTitle })} /></label>
         <NumberField label="跨列数" value={column.headerGroupSpan ?? 1} min={1} max={Math.min(20, block.columns.length - index)} onCommit={value => updateColumn({ headerGroupSpan: Math.floor(value) })} />
         <BorderEditor border={column.border ?? block.border} onChange={border => updateColumn({ border })} />
         {column.border && <button type="button" className="command-button secondary" onClick={() => updateColumn({ border: undefined })}>此列沿用表格边框</button>}
-      </details>
+      </DeferredPropertySection>
     </div>
-    <button className="command-button secondary" type="button" onClick={() => insert(false)}>新增列</button>
+    <button className="command-button secondary" type="button" disabled={block.columns.length >= REPORT_DETAIL_MAX_COLUMNS} onClick={() => insert(false)}>新增列</button>
   </>;
 }

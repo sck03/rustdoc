@@ -11,6 +11,7 @@ import type {
 } from "./reportDesignerSchema.ts";
 import { normalizeBlockOutputSettings } from "./reportDesignerSchemaBlockSettings.ts";
 import { normalizeDetailTableCellContentList } from "./reportDesignerDetailComposite.ts";
+import { REPORT_DETAIL_MAX_COLUMNS } from "./reportDesignerDetailTableLimits.ts";
 import {
   createIssue,
   isRecord,
@@ -37,8 +38,8 @@ export function normalizeDetailTableBlock(
   blockIds: Set<string>,
   issues: ReportDesignerSchemaIssue[],
 ): ReportDetailTableBlock | null {
-  if (!Array.isArray(value.columns) || value.columns.length === 0) {
-    issues.push(createIssue("error", `${path}.columns`, "明细表至少需要一列。"));
+  if (!Array.isArray(value.columns) || value.columns.length === 0 || value.columns.length > REPORT_DETAIL_MAX_COLUMNS) {
+    issues.push(createIssue("error", `${path}.columns`, `明细表应包含 1–${REPORT_DETAIL_MAX_COLUMNS} 列。`));
     return null;
   }
 

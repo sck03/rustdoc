@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { verifyDesignerEditingMutations } from "./lib/report-designer-editing-contracts.mjs";
 import { verifyGridAuthoringContracts } from "./lib/report-designer-grid-contracts.mjs";
 import { verifyGridTextImport } from "./lib/report-designer-grid-text-contracts.mjs";
+import { verifyDetailTableContracts } from "./lib/report-designer-detail-contracts.mjs";
 import { verifyConditionalContracts } from "./lib/report-designer-condition-contracts.mjs";
 import { createShippingMarksScenario } from "./lib/report-shipping-marks-fixture.mjs";
 import { defaultReportDesigns } from "./lib/default-report-designs.mjs";
@@ -73,6 +74,7 @@ const api = await import(pathToFileURL(bundlePath).href);
 verifyDesignerEditingMutations(api);
 verifyGridAuthoringContracts(api);
 verifyGridTextImport(api);
+verifyDetailTableContracts(api);
 verifyConditionalContracts(api, repoRoot);
 for (const [name, reference] of defaultReportDesigns()) {
   const rebuilt = rebuildDesignerDocument(api, reference);

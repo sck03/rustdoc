@@ -2,6 +2,19 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+
+export async function verifyContainerOcr(request, endpoint) {
+  assert(endpoint, 'The OCR upload contract must be present');
+  const query = new URLSearchParams({ sourceName: 'skew_7deg.png', sourceMimeType: 'image/png' });
+  const response = await request(`${endpoint.route}?${query}`, {
+    method: endpoint.method, headers: { 'content-type': 'image/png' },
+    body: readFileSync(new URL('../../tests/OcrFixtures/skew_7deg.png', import.meta.url)),
+  }, 'Real container OCR inference');
+  const result = await response.json();
+  assert(result.fullText.includes('COMMERCIAL INVOICE') && result.fullText.includes('客户名称：示例贸易有限公司'));
+  assert.equal(result.lines.length, 5);
+}
 
 export async function waitForJob(operation, jobId) {
   const deadline = Date.now() + 120000;

@@ -1,4 +1,8 @@
+mod cells;
+mod headers;
 mod rows;
+#[cfg(test)]
+mod tests;
 use super::{PT_MM, measured_wrap, text_svg, wrap};
 use crate::{ReportData, Result, error::invalid};
 use export_doc_domain::designer::{DetailTable, ReportBorderStyle, ReportTextStyle};
@@ -16,8 +20,8 @@ struct Row {
 enum RowKind {
     Data,
     Adjustment,
-    Group,
-    Fixed(ReportTextStyle, Option<ReportBorderStyle>),
+    Group(ReportTextStyle),
+    Fixed(ReportTextStyle, Option<ReportBorderStyle>, usize),
 }
 
 pub(super) struct DetailLayout<'a> {
@@ -84,13 +88,15 @@ pub(super) fn render(
         .zip(&widths)
         .map(|(column, width)| header_style.wrap(&column.title, *width))
         .collect();
+    let (header_groups, group_header_height) = headers::prepare(table, &widths, &header_style);
     let header_height = table
         .side_band
         .as_ref()
         .map_or(0., |side| {
             header_style.height(&[header_style.wrap(&side.title, side.width_mm)])
         })
-        .max(header_style.height(&header_lines));
+        .max(header_style.height(&header_lines))
+        + group_header_height;
     let page_capacity = |index: usize| {
         (if index == 0 {
             bottoms.first
@@ -156,7 +162,8 @@ pub(super) fn render(
     let mut used = 0.;
     let mut page_index = 0usize;
     let mut data_rows_on_page = 0usize;
-    for row in rows {
+    let mut pending = rows.into_iter().peekable();
+    while let Some(row) = pending.next() {
         if cancelled.load(Ordering::Relaxed) {
             return Err(crate::Error {
                 kind: crate::ErrorKind::Cancelled,
@@ -173,9 +180,25 @@ pub(super) fn render(
         };
         let row_limit_reached = row_limit
             .is_some_and(|limit| matches!(row.kind, RowKind::Data) && data_rows_on_page >= limit);
+        let keep_with_next = matches!(row.kind, RowKind::Group(_))
+            && table
+                .grouping
+                .as_ref()
+                .is_some_and(|group| group.keep_together);
+        let keep_height = if keep_with_next {
+            row.height + pending.peek().map_or(0., |next| next.height)
+        } else {
+            row.height
+        };
+        let group_needs_page = keep_with_next
+            && !chunks.last().is_some_and(Vec::is_empty)
+            && (row_limit.is_some_and(|limit| data_rows_on_page >= limit)
+                || keep_height <= page_capacity(page_index + 1)
+                    && used + keep_height > page_capacity(page_index));
         if (row.page_break_before && !chunks.last().is_some_and(Vec::is_empty))
             || used + row.height > page_capacity(page_index)
             || (row_limit_reached && !chunks.last().is_some_and(Vec::is_empty))
+            || group_needs_page
         {
             chunks.push(Vec::new());
             used = 0.;
@@ -233,16 +256,39 @@ pub(super) fn render(
                 "末页条款与合计没有足够空间容纳明细，请缩短条款或减小字号。",
             ));
         }
+        if start > 0
+            && matches!(last[start - 1].kind, RowKind::Group(_))
+            && table
+                .grouping
+                .as_ref()
+                .is_some_and(|group| group.keep_together)
+        {
+            if used + last[start - 1].height > capacity {
+                return Err(invalid(
+                    "末页无法同时容纳分组标题及首条明细，请调整字号或页脚。",
+                ));
+            }
+            start -= 1;
+        }
         let tail = last.split_off(start);
         chunks.push(tail);
     }
     // A summary that overflowed during the initial pagination still needs a preceding entry.
     if chunks.len() > 1 && !chunks.last().unwrap().iter().any(is_entry) {
         let last = chunks.len() - 1;
-        let previous = chunks[last - 1]
+        let mut previous = chunks[last - 1]
             .iter()
             .rposition(is_entry)
             .ok_or_else(|| invalid("合计前没有可衔接的明细。"))?;
+        if previous > 0
+            && matches!(chunks[last - 1][previous - 1].kind, RowKind::Group(_))
+            && table
+                .grouping
+                .as_ref()
+                .is_some_and(|group| group.keep_together)
+        {
+            previous -= 1;
+        }
         let tail = chunks[last - 1].split_off(previous);
         if tail
             .iter()
@@ -302,10 +348,15 @@ pub(super) fn render(
         let mut y = top + if show_header { header_height } else { 0. };
         for row in rows {
             match &row.kind {
-                RowKind::Group => {
-                    group_row(&mut svg, table, &row.cells, body_left, y, row.height, size)
-                }
-                RowKind::Fixed(style, border) => summary_render(
+                RowKind::Group(style) => group_row(
+                    &mut svg,
+                    table,
+                    &row.cells,
+                    [body_left, y, body_width, row.height],
+                    size,
+                    style,
+                ),
+                RowKind::Fixed(style, border, span) => summary_render(
                     &mut svg,
                     table,
                     &row.cells,
@@ -316,6 +367,7 @@ pub(super) fn render(
                     size,
                     style,
                     border.as_ref(),
+                    *span,
                 ),
                 RowKind::Data | RowKind::Adjustment => table_row(
                     &mut svg,
@@ -340,12 +392,21 @@ pub(super) fn render(
                 &header_lines,
                 &widths,
                 body_left,
-                top,
-                header_height,
+                top + group_header_height,
+                header_height - group_header_height,
                 size,
                 true,
                 None,
             );
+            if !header_groups.is_empty() {
+                headers::draw(
+                    &mut svg,
+                    table,
+                    &header_groups,
+                    [body_left, top, group_header_height],
+                    &header_style,
+                );
+            }
         }
         if table.row_separators == Some(false) && minimum_height <= 0. {
             super::flow::draw_border(
@@ -357,12 +418,30 @@ pub(super) fn render(
         if minimum_height > 0. {
             let body_top = top + if show_header { header_height } else { 0. };
             let mut x = body_left;
-            for (column, width) in table.columns.iter().zip(&widths) {
+            for (index, (column, width)) in table.columns.iter().zip(&widths).enumerate() {
                 let mut border = column.border.as_ref().unwrap_or(&table.border).clone();
-                border.top = !show_header && table.border.top;
+                if index == 0 || index + 1 == table.columns.len() {
+                    let mut outer = border.clone();
+                    outer.top = false;
+                    outer.bottom = false;
+                    outer.left = index == 0 && border.left;
+                    outer.right = index + 1 == table.columns.len() && border.right;
+                    super::flow::draw_border(
+                        &mut svg,
+                        [x, body_top, *width, frame_bottom - body_top],
+                        &outer,
+                    );
+                    if index == 0 {
+                        border.left = false;
+                    }
+                    if index + 1 == table.columns.len() {
+                        border.right = false;
+                    }
+                }
+                border.top = false;
                 super::flow::draw_border(
                     &mut svg,
-                    [x, body_top, *width, frame_bottom - body_top],
+                    [x, content_bottom, *width, frame_bottom - content_bottom],
                     &border,
                 );
                 x += width;
@@ -436,27 +515,25 @@ fn group_row(
     svg: &mut String,
     table: &DetailTable,
     cells: &[Vec<String>],
-    left: f32,
-    y: f32,
-    height: f32,
+    [left, y, width, height]: [f32; 4],
     size: f32,
+    text_style: &ReportTextStyle,
 ) {
-    let text = cells
-        .first()
-        .and_then(|lines| lines.first())
-        .cloned()
-        .unwrap_or_default();
-    svg.push_str(&format!("<rect x=\"{left}\" y=\"{y}\" width=\"{}\" height=\"{height}\" fill=\"#f2f2f2\" stroke=\"#000000\" stroke-width=\"0.2\"/>", table.columns.iter().map(|column| column.width_mm).sum::<f32>()));
+    let style = CellStyle::new(text_style, size, true);
+    svg.push_str(&format!(
+        "<rect x=\"{left}\" y=\"{y}\" width=\"{width}\" height=\"{height}\" fill=\"#f2f2f2\"/>"
+    ));
+    super::flow::draw_border(svg, [left, y, width, height], &table.border);
     text_svg(
         svg,
-        &wrap(&text, 100., size),
-        left + 1.5,
-        y + 1.5,
-        100.,
-        size,
-        true,
+        cells.first().map_or(&[], Vec::as_slice),
+        left + style.left,
+        y + style.top,
+        width - style.left - style.right,
+        style.size,
+        style.bold,
         "#000000",
-        "Left",
+        text_style.align.as_deref().unwrap_or("Left"),
     );
 }
 
@@ -471,39 +548,43 @@ fn summary_render(
     size: f32,
     text_style: &ReportTextStyle,
     border: Option<&ReportBorderStyle>,
+    span: usize,
 ) {
     let style = CellStyle::new(text_style, size, false);
-    let mut x = left;
-    for ((column, lines), width) in table.columns.iter().zip(cells).zip(widths) {
-        svg.push_str(&format!(
-            "<rect x=\"{x}\" y=\"{y}\" width=\"{width}\" height=\"{height}\" fill=\"white\"/>"
-        ));
-        let mut cell_border = column.border.as_ref().unwrap_or(&table.border).clone();
-        if border.is_some() {
-            cell_border.top = false;
-            cell_border.bottom = false;
-        }
-        if table.print.fill_height {
-            cell_border.left = false;
-            cell_border.right = false;
-        }
-        super::flow::draw_border(svg, [x, y, *width, height], &cell_border);
-        text_svg(
-            svg,
-            lines,
-            x + style.left,
-            y + style.top,
-            width - style.left - style.right,
-            style.size,
-            style.bold,
-            "#000000",
-            &column.align,
-        );
-        x += width;
-    }
-    if let Some(border) = border {
-        super::flow::draw_border(svg, [left, y, widths.iter().sum(), height], border);
-    }
+    cells::draw(
+        svg,
+        [left, y, height],
+        &style,
+        cells.iter().enumerate().map(|(index, lines)| {
+            let column_index = if index == 0 { 0 } else { index + span - 1 };
+            let column = &table.columns[column_index];
+            let cell_span = if index == 0 { span } else { 1 };
+            let mut cell_border = cells::span_border(table, column_index, cell_span);
+            if table.print.fill_height {
+                if index == 0 {
+                    cell_border.left = false;
+                }
+                if column_index + cell_span == table.columns.len() {
+                    cell_border.right = false;
+                }
+            }
+            cells::SpanCell {
+                lines,
+                width: if index == 0 {
+                    widths[..span].iter().sum()
+                } else {
+                    widths[column_index]
+                },
+                border: cell_border,
+                align: text_style.align.as_deref().unwrap_or(if index == 0 {
+                    "Right"
+                } else {
+                    &column.align
+                }),
+            }
+        }),
+        border,
+    );
 }
 
 fn table_row(
@@ -539,8 +620,12 @@ fn table_row(
             border.bottom = false;
         }
         if !header && table.print.fill_height {
-            border.left = false;
-            border.right = false;
+            if index == 0 {
+                border.left = false;
+            }
+            if index + 1 == table.columns.len() {
+                border.right = false;
+            }
         }
         super::flow::draw_border(svg, [x, y, *width, height], &border);
         if let Some(cell) = composed

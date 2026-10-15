@@ -13,12 +13,16 @@ export async function verifyDetailProperties({ page, url, read, waitFor, click, 
   };
   const open = async label => {
     await read(page, `[...document.querySelectorAll('.new-report-detail-properties summary')].find(n=>n.textContent===${JSON.stringify(label)}).parentElement.open=true`);
+    await waitFor(page, `(()=>{const section=[...document.querySelectorAll('.new-report-detail-properties summary')].find(n=>n.textContent===${JSON.stringify(label)}).parentElement;return section.open && section.children.length>1;})()`);
   };
   await page.send("Page.navigate", { url });
   await waitFor(page, 'document.querySelector("[data-v3-element-id=review-detail]")');
   await read(page, 'document.querySelector("[data-v3-element-id=review-detail]").focus()');
   await key(page, "Enter");
   await waitFor(page, "document.querySelector('.new-report-detail-column-card')");
+  const initialOptions = await read(page, "document.querySelectorAll('.new-report-detail-properties option').length");
+  assert(initialOptions < 250, 'unvisited detail panels must not construct their field option trees');
+  assert.equal(await read(page, "document.querySelectorAll('.new-report-summary-cell-editor').length"), 0);
   assert(await read(page, `[...${control("显示内容")}.options].every(option => !option.value || option.value.startsWith('item.'))`), 'a repeating column only offers bindings supported by the native renderer');
   const before = await read(page, block);
   await read(page, `${control("标题", "textarea")}.focus();${control("标题", "textarea")}.select()`);
@@ -43,6 +47,7 @@ export async function verifyDetailProperties({ page, url, read, waitFor, click, 
   await click(page, 'button[aria-label="撤销"]');
   await waitFor(page, `${block}.columns.length===${before.columns.length + 1}`);
   assert.equal(await read(page, `${block}.columns[1].omitEmptyLines`), true);
+  await choose("选择要修改的列", copy.id);
   results.push({ test: "detail title commits once; mode switch and copied columns preserve configuration through undo", passed: true });
   await tab("表格样式");
   await choose("设置文字样式", "headerStyle");
@@ -52,11 +57,24 @@ export async function verifyDetailProperties({ page, url, read, waitFor, click, 
   await page.send("Input.insertText", { text: "14" }); await key(page, "Tab");
   await waitFor(page, `${block}.headerStyle.fontSizePt===14`);
   assert.equal(await read(page, `${block}.bodyStyle.fontSizePt`), sizes.body);
-  await tab("分页与高级"); await open("末页合计");
+  await tab("分页与高级");
+  const rowUpdates = await read(page, 'window.__designerUpdates');
+  await read(page, `${control("首页明细行数", "input")}.focus();${control("首页明细行数", "input")}.select()`);
+  await page.send("Input.insertText", { text: "12" });
+  assert.equal(await read(page, 'window.__designerUpdates'), rowUpdates, 'typing a row limit keeps a local draft');
+  await key(page, "Tab");
+  await waitFor(page, `${block}.print.firstPageRows===12`);
+  await read(page, `(()=>{const node=${control("首页明细行数", "input")};node.focus();Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(node,'');node.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  await key(page, "Tab");
+  await waitFor(page, `${block}.print.firstPageRows===undefined`);
+  await open("末页合计");
   assert.equal(await read(page, "[...document.querySelectorAll('.new-report-summary-cell-editor')].filter(n=>n.getClientRects().length).length"), 1);
   await tab("表格样式");
   await waitFor(page, `${control("设置文字样式")}.value==="headerStyle"`);
   results.push({ test: "header and body styles are independent; totals edit one column and tabs preserve selection", passed: true });
+  await tab("商品列");
+  await waitFor(page, `${control("选择要修改的列")}.value===${JSON.stringify(copy.id)}`);
+  results.push({ test: "unvisited detail editors load on demand and retain the selected column after visiting other tabs", initialOptions, passed: true });
   for (const width of [1366, 390]) {
     await page.send("Emulation.setDeviceMetricsOverride", { width, height: 1000, deviceScaleFactor: 1, mobile: width < 500 });
     if (width < 500) await click(page, ".report-designer-v3-compact-tabs button:nth-child(3)");

@@ -18,8 +18,14 @@ export function renderDetailFixedRow(block: ReportDetailTableBlock, row: ReportD
   };
   const values = block.columns.slice(span).map(column => {
     const content = cellContent(column.id);
-    return `<td style="${render.style(row.style, cellBorder(column.border ?? block.border), column.align)}">${content}</td>`;
+    return `<td style="${render.style(row.style, cellBorder(column.border ?? block.border), row.style.align ?? column.align)}">${content}</td>`;
   }).join("");
   const label = [render.text(row.label), ...block.columns.slice(0, span).map(column => cellContent(column.id))].filter(Boolean).join("<br>");
-  return `<tr class="edm-detail-summary-row"${row.border ? ` style="${render.style({}, row.border, "Left")}"` : ""}><td colspan="${span}" style="${render.style(row.style, cellBorder(block.border), "Right")}">${label}</td>${values}</tr>`;
+  return `<tr class="edm-detail-summary-row"${row.border ? ` style="${render.style({}, row.border, "Left")}"` : ""}><td colspan="${span}" style="${render.style(row.style, cellBorder(detailSpanBorder(block, 0, span)), row.style.align ?? "Right")}">${label}</td>${values}</tr>`;
+}
+
+export function detailSpanBorder(block: ReportDetailTableBlock, start: number, span: number): ReportBorderStyle {
+  const first = block.columns[start]?.border ?? block.border;
+  const last = block.columns[start + span - 1]?.border ?? block.border;
+  return { ...first, right: last.right };
 }

@@ -484,7 +484,12 @@ fn meeting_bookings_reject_overlaps_but_allow_adjacent_times() {
     let fixture = Fixture::new();
     let person = fixture.employee();
     let room=fixture.create(CREATE_MEETING_ROOM,json!({"name":"会议室一","capacity":12,"maximumBookingHours":8,"advanceBookingDays":90,"isActive":true,"requiresKey":true}));
-    let day = (chrono::Local::now().date_naive() + chrono::Duration::days(1)).to_string();
+    let day = (export_doc_engine::clock::BusinessClock::default()
+        .now()
+        .unwrap()
+        .today
+        + chrono::Duration::days(1))
+    .to_string();
     let request = json!({"requestKey":nonce().unwrap(),"meetingRoomId":room["id"],"employeeId":person["id"],"title":"业务会议","attendeeCount":5,"startsAt":format!("{day}T10:00:00+08:00"),"endsAt":format!("{day}T11:00:00+08:00")});
     let booking = fixture.create(CREATE_MEETING_BOOKING, request.clone());
     assert_eq!(booking["status"], "Approved");

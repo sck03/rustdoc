@@ -12,6 +12,9 @@ import {
 import { createReportBlockId } from "./reportDesignerMutationUtils.ts";
 import { normalizeColumnPercentages } from "./reportDesignerColumnWidths.ts";
 
+import { REPORT_DETAIL_MAX_COLUMNS } from "./reportDesignerDetailTableLimits.ts";
+export { REPORT_DETAIL_MAX_COLUMNS } from "./reportDesignerDetailTableLimits.ts";
+
 export function normalizeRowColumnWidths(columns: ReportRowColumn[]) {
   const safeColumns = columns.length > 0 ? columns : [createRowColumn()];
   return normalizeColumnPercentages(safeColumns);
@@ -83,7 +86,8 @@ export function distributeDetailTableColumnWidths(block: ReportDetailTableBlock)
   }
 
   const totalWidthMm = block.columns.reduce((sum, column) => sum + Math.max(8, column.widthMm), 0);
-  const widthMm = Math.round((totalWidthMm / block.columns.length) * 10) / 10;
+  const widthMm = totalWidthMm / block.columns.length;
+  if (block.columns.every(column => column.widthMm === widthMm)) return block;
 
   return {
     ...block,
@@ -136,7 +140,7 @@ export function moveDetailTableColumn(
 }
 
 export function addDetailTableColumn(block: ReportDetailTableBlock): ReportDetailTableBlock {
-  return { ...block, columns: [...block.columns, createDetailTableColumn()] };
+  return block.columns.length >= REPORT_DETAIL_MAX_COLUMNS ? block : { ...block, columns: [...block.columns, createDetailTableColumn()] };
 }
 
 /** A content-mode change keeps the existing binding and any saved composition. */
@@ -158,16 +162,14 @@ export function duplicateDetailTableColumn(
 ): ReportDetailTableBlock {
   const currentIndex = block.columns.findIndex((column) => column.id === columnId);
   const sourceColumn = block.columns[currentIndex];
-  if (!sourceColumn) {
+  if (!sourceColumn || block.columns.length >= REPORT_DETAIL_MAX_COLUMNS) {
     return block;
   }
 
-  const duplicate = {
-    ...structuredClone(sourceColumn),
-    id: createReportBlockId("detail-col"),
-    title: `${sourceColumn.title} 副本`,
-    content: sourceColumn.content?.map((part) => ({ ...part, id: createReportBlockId("detail-cell-part") })),
-  };
+  const duplicate = structuredClone(sourceColumn);
+  duplicate.id = createReportBlockId("detail-col");
+  duplicate.title = `${sourceColumn.title} 副本`;
+  duplicate.content?.forEach(part => { part.id = createReportBlockId("detail-cell-part"); });
   const columns = [
     ...block.columns.slice(0, currentIndex + 1),
     duplicate,

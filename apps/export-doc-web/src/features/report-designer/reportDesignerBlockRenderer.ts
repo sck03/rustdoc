@@ -7,7 +7,7 @@ import {
   isReportDesignerImageSource,
 } from "./reportDesignerSchemaValidation.ts";
 import { renderGridDiagonalHeader } from "./reportDesignerGridDiagonal.ts";
-import { renderDetailFixedRow } from "./reportDesignerDetailFixedRows.ts";
+import { detailSpanBorder, renderDetailFixedRow } from "./reportDesignerDetailFixedRows.ts";
 import { renderDetailComposite } from "./reportDesignerDetailComposite.ts";
 
 /** Structured HTML for editor/reference fixtures; final document output runs in Rust. */
@@ -354,7 +354,7 @@ function renderDetailTableHeaderGroupRow(block: Extract<ReportBlock, { type: "De
     const requestedSpan = column.headerGroupTitle ? Math.max(1, Math.floor(column.headerGroupSpan ?? 1)) : 1;
     const columnSpan = Math.min(requestedSpan, block.columns.length - index);
     const title = column.headerGroupTitle ?? "";
-    cells.push(`<th colspan="${columnSpan}" style="${renderDetailCellStyle(block.headerStyle, column.border ?? block.border, column.align)}">${escapeHtml(title)}</th>`);
+    cells.push(`<th colspan="${columnSpan}" style="${renderDetailCellStyle(block.headerStyle, detailSpanBorder(block, index, columnSpan), column.align)}">${escapeHtml(title)}</th>`);
     index += columnSpan;
   }
 
@@ -488,10 +488,13 @@ function renderDetailTableGroupFooterRow(block: Extract<ReportBlock, { type: "De
     const cell = cellsByColumnId.get(column.id);
     const content = cell ? renderGroupFooterCellContent(block, cell) : "";
 
-    return `<td style="${renderDetailCellStyle(footer.style, block.border, column.align)}">${content}</td>`;
+    return `<td style="${renderDetailCellStyle(footer.style, column.border ?? block.border, footer.style.align ?? column.align)}">${content}</td>`;
   }).join("");
 
-  return `<tr class="edm-detail-group-footer-row"><td colspan="${labelColumnSpan}" style="${renderDetailCellStyle(footer.style, block.border, "Right")}">${escapeHtml(footer.label)}</td>${valueCells}</tr>`;
+  const label = [escapeHtml(footer.label), ...block.columns.slice(0, labelColumnSpan).map(column => {
+    const cell = cellsByColumnId.get(column.id); return cell ? renderGroupFooterCellContent(block, cell) : "";
+  })].filter(Boolean).join("<br>");
+  return `<tr class="edm-detail-group-footer-row"><td colspan="${labelColumnSpan}" style="${renderDetailCellStyle(footer.style, detailSpanBorder(block, 0, labelColumnSpan), footer.style.align ?? "Right")}">${label}</td>${valueCells}</tr>`;
 }
 
 function renderGroupFooterCellContent(
