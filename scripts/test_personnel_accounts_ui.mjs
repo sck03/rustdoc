@@ -7,7 +7,7 @@ await withOfficeUi('personnel-accounts-ui', async ({ output, url, invoke, openPa
   const person = await invoke('CreatePersonnel', { requestKey: 'identity-ui-person', employeeNumber: 'IDENTITY-UI',
     departmentId: 'GENERAL', jobTitle: '外贸业务主管', employmentType: 'FullTime', hireDate: '2026-09-01',
     onProbation: false, profile: { fullName: '关联员工验收' } }, {}, token);
-  const account = (await invoke('CreateUserAccount', { username: 'identity-ui', fullName: '待同步姓名', role: 'OfficeEmployee',
+  const account = (await invoke('createUserAccount', { username: 'identity-ui', fullName: '待同步姓名', role: 'OfficeEmployee',
     companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Identity-UI-2026' }, {}, token)).user;
   const admin = await openPage('oa-review', 'Review-2026-Test');
   await admin.goto(`${url}/#/system/access-control?userId=${account.id}`);

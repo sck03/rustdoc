@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiUserAccountDto, ApiUserListResponse, ApiUserSaveRequest, ExportDocManagerApiClient } from "../../api/index.ts";
-import { queryKeys } from "../../api/queryKeys.ts";
+import { identityQueryRoots, queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { type UserDraft, createEmptyDraft, createDraftFromUser, buildUserDraftSnapshot, upsertUserList, minimumPasswordLength } from "./userAccountModel.ts";
 import { getRolePresentation } from "../../app/userRoles.ts";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { readRouteId } from "../../ui/routeQueryState.ts";
-import { identityQueryRoots } from "../../api/queryKeys.ts";
 
 export function useUserManagement(client: ExportDocManagerApiClient, canManageUsers: boolean) {
   const queryClient = useQueryClient();
@@ -41,16 +40,21 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
   const selectedTemplate = permissionTemplates.find((template) => draft.permissionTemplateId != null
     ? template.id === draft.permissionTemplateId : template.isSystem && template.code === draft.role);
   const selectedRole = getRolePresentation(draft.role);
+  const currentDraftSnapshot = useMemo(() => buildUserDraftSnapshot(draft), [draft]);
+  const hasUnsavedUserChanges = Boolean(
+    canManageUsers &&
+    selectedUserId != null &&
+    currentDraftSnapshot !== persistedDraftSnapshot,
+  );
 
   useEffect(() => {
-    if (!canManageUsers || !usersQuery.data) {
-      return;
+    if (!canManageUsers || !usersQuery.data) return;
+    const matching = usersQuery.data.users.find(user => user.id === (selectedUserId ?? requestedUserId));
+    const next = matching ?? (selectedUserId == null ? usersQuery.data.users[0] : undefined);
+    if (next && (selectedUserId == null || (!hasUnsavedUserChanges && next.versionNumber > draft.versionNumber))) {
+      applyUser(next);
     }
-
-    if (selectedUserId == null && usersQuery.data.users.length > 0) {
-      applyUser(usersQuery.data.users.find(user => user.id === requestedUserId) ?? usersQuery.data.users[0]);
-    }
-  }, [canManageUsers, selectedUserId, usersQuery.data, requestedUserId]);
+  }, [canManageUsers, selectedUserId, usersQuery.data, requestedUserId, hasUnsavedUserChanges, draft.versionNumber]);
 
   useEffect(() => {
     if (usersQuery.isError) {
@@ -100,12 +104,6 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
     },
   });
 
-  const currentDraftSnapshot = useMemo(() => buildUserDraftSnapshot(draft), [draft]);
-  const hasUnsavedUserChanges = Boolean(
-    canManageUsers &&
-    selectedUserId != null &&
-    currentDraftSnapshot !== persistedDraftSnapshot,
-  );
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: hasUnsavedUserChanges,
     message: "当前用户账号有未保存的修改。",

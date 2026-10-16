@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { useUserManagement } from "./useUserManagement.ts";
 import { minimumPasswordLength } from "./userAccountModel.ts";
@@ -77,7 +78,7 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
                     }}
                   >
                     <td className="strong-cell">{user.username}</td>
-                    <td>{user.fullName || "-"}{user.employee && <small className="field-help">{user.employee.employeeNumber}</small>}</td>
+                    <td><TablePrimaryText value={user.fullName} secondary={user.employee?.employeeNumber} /></td>
                     <td>
                       <span className="role-label">{getRolePresentation(user.role).label}</span>
                     </td>

@@ -3,8 +3,7 @@ import type { ApiUserDto, ExportDocManagerApiClient, PersonnelAccountRecord, Per
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { OfficeDialog, OfficeField, OfficePager, OfficeQueryState, OfficeSubmit } from "./OfficeUi.tsx";
 import { personnelActionLabels, type PersonnelWorkflow } from "./personnelModel.ts";
-import { applyPersonnelWorkflow, usePersonnelAccountOptions, usePersonnelClearance } from "./usePersonnelData.ts";
-import { usePersonnelOperation } from "./usePersonnelData.ts";
+import { applyPersonnelWorkflow, usePersonnelAccountOptions, usePersonnelClearance, usePersonnelOperation } from "./usePersonnelData.ts";
 import { departmentOptions } from "../organization/organizationModel.ts";
 
 export function PersonnelWorkflowDialog({ client, user, record, action, departments, onClose }: {

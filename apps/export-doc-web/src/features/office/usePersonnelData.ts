@@ -7,9 +7,7 @@ import type { PersonnelWorkflow } from "./personnelModel.ts";
 import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 
-export function usePersonnelOperation() {
-  return useOfficeOperation(identityQueryRoots);
-}
+export const usePersonnelOperation = () => useOfficeOperation(identityQueryRoots);
 
 export function usePersonnelDirectory(client: ExportDocManagerApiClient, user: ApiUserDto, directoryOnly = false, enabled = true) {
   const list = useDirectoryLocation("people", 24);
@@ -65,11 +63,6 @@ export function usePersonnelAccountOptions(client: ExportDocManagerApiClient, us
 
 export function applyPersonnelWorkflow(client: ExportDocManagerApiClient, id: number, action: PersonnelWorkflow,
   body: PersonnelTransitionRequest, signal: AbortSignal) {
-  const request = { id, body };
-  switch (action) {
-    case "confirm": return client.confirmPersonnel(request, { signal });
-    case "transfer": return client.transferPersonnel(request, { signal });
-    case "depart": return client.departPersonnel(request, { signal });
-    case "rehire": return client.rehirePersonnel(request, { signal });
-  }
+  const operations = { confirm: "confirmPersonnel", transfer: "transferPersonnel", depart: "departPersonnel", rehire: "rehirePersonnel" } as const;
+  return client[operations[action]]({ id, body }, { signal });
 }

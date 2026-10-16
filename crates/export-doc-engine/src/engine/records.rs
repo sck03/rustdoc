@@ -160,11 +160,8 @@ pub fn list(
     if is_array {
         return Ok(json!(records));
     }
-    let catalog_records =
-        matches!(resource.key, "users" | "permission-templates").then(|| records.clone());
-    let page = contracts::page(records, total, page_number, page_size);
     if shape["properties"].get("items").is_some() {
-        return Ok(page);
+        return Ok(contracts::page(records, total, page_number, page_size));
     }
     let mut result = contracts::object(operation.id, false);
     let field = if resource.key == "users" {
@@ -176,9 +173,7 @@ pub fn list(
     } else {
         "items"
     };
-    result[field] = catalog_records
-        .map(Value::Array)
-        .unwrap_or_else(|| page["items"].clone());
+    result[field] = Value::Array(records);
     if resource.key == "users" {
         result["roles"] = json!(
             export_doc_domain::permissions::catalog()

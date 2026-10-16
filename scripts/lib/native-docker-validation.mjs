@@ -4,6 +4,21 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 
+export async function cleanupCompletedSetup(docker, compose, project) {
+  for (const service of ['setup', 'initialize']) {
+    const id = (await docker([...compose, 'ps', '--all', '--quiet', service])).trim();
+    const [container] = JSON.parse(await docker(['inspect', id]));
+    assert.equal(container.Name, `/${project}-${service}`);
+    assert.equal(container.State.Status, 'exited');
+    assert.equal(container.State.ExitCode, 0);
+  }
+  await docker([...compose, 'rm', '--force', 'setup', 'initialize']);
+  const ids = (await docker([...compose, 'ps', '--all', '--quiet'])).trim().split(/\s+/u);
+  const containers = JSON.parse(await docker(['inspect', ...ids]));
+  assert.deepEqual(containers.map(item => item.Name).sort(), [`/${project}-application`, `/${project}-postgres`]);
+  assert(containers.every(item => item.State.Health.Status === 'healthy'));
+}
+
 export async function verifyContainerOcr(request, endpoint) {
   assert(endpoint, 'The OCR upload contract must be present');
   const query = new URLSearchParams({ sourceName: 'skew_7deg.png', sourceMimeType: 'image/png' });

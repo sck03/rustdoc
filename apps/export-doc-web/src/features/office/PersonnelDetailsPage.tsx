@@ -10,11 +10,10 @@ import { readRouteChoice } from "../../ui/routeQueryState.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { officeAccess, officeStatusLabels } from "./officeModel.ts";
 import { employmentStatusLabels, employmentTypeLabels, personnelActionLabels, personnelHistoryLabels, personnelReminders, personnelWorkflows, type PersonnelWorkflow } from "./personnelModel.ts";
-import { usePersonnelClearance, usePersonnelHistory, usePersonnelRecord } from "./usePersonnelData.ts";
+import { usePersonnelClearance, usePersonnelHistory, usePersonnelOperation, usePersonnelRecord } from "./usePersonnelData.ts";
 import { PersonnelFormDialog } from "./PersonnelFormDialog.tsx";
 import { PersonnelAccountDialog, PersonnelWorkflowDialog } from "./PersonnelWorkflowDialog.tsx";
 import { PersonnelImagesPanel } from "./PersonnelImagesPanel.tsx";
-import { usePersonnelOperation } from "./usePersonnelData.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { RecordDeleteDialog } from "./RecordDeleteDialog.tsx";
 
