@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { requestPersonLabel } from "../office/requestIdentity.ts";
 import { Link } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient, OaRequest } from "../../api/index.ts";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
@@ -39,7 +40,7 @@ export function OaRequestsPage({ client, user, kind }: { client: ExportDocManage
         {!model.financeOnly && oaAccess(user, kind, "create") && <button type="button" className="command-button" onClick={() => setEditing("new")}>新建{module.name}</button>}
       </div>
       <OfficeQueryState query={model.query} emptyTitle="当前筛选下没有申请" />
-      <div className="office-resource-grid">{model.query.data?.items.map((row) => <article key={row.id} className="office-resource-card"><div className="office-card-heading"><h2><button className="oa-title-button" type="button" onClick={() => model.select(row.id)}>{row.title}</button></h2><span className="office-badge" data-state={row.status}>{oaStatus[row.status]}</span></div><p>{row.employeeName} · {row.departmentId}</p><p className="office-muted">#{row.id} {row.totalAmount && ` · ${row.currency} ${row.totalAmount}`}{row.durationDays && ` · ${row.durationDays} 天`}{row.durationHours && ` · ${row.durationHours} 小时`}</p></article>)}</div>
+      <div className="office-resource-grid">{model.query.data?.items.map((row) => <article key={row.id} className="office-resource-card"><div className="office-card-heading"><h2><button className="oa-title-button" type="button" onClick={() => model.select(row.id)}>{row.title}</button></h2><span className="office-badge" data-state={row.status}>{oaStatus[row.status]}</span></div><p>{requestPersonLabel(row.employeeName, row)} · {row.departmentId}</p><p className="office-muted">#{row.id} {row.totalAmount && ` · ${row.currency} ${row.totalAmount}`}{row.durationDays && ` · ${row.durationDays} 天`}{row.durationHours && ` · ${row.durationHours} 小时`}</p></article>)}</div>
       <div className="office-card-actions"><button className="command-button secondary" type="button" disabled={model.page <= 1 || model.query.isFetching} onClick={() => model.setPage(model.page - 1)}>上一页</button><span>第 {model.page} 页 · 共 {model.query.data?.totalCount ?? 0} 条</span><button className="command-button secondary" type="button" disabled={model.query.isFetching || model.page * 20 >= (model.query.data?.totalCount ?? 0)} onClick={() => model.setPage(model.page + 1)}>下一页</button></div>
     </>}
     {editing && <OaRequestDialog client={client} user={user} kind={kind} record={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} onSaved={(row) => { setEditing(null); model.select(row.id); }} />}

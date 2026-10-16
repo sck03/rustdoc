@@ -14,9 +14,8 @@ pub(super) fn employee(
         if body["employeeId"].as_i64().is_some_and(|id| id > 0) {
             return Err(invalid("团队申请由本人发起，不能代选其他员工。"));
         }
-        store::all(tx, "people")?
-            .into_iter()
-            .find(|p| p["account"]["id"] == actor.id && p["companyScope"] == actor.company)
+        super::super::personnel_accounts::person_for_account(tx, actor.id)?
+            .filter(|person| person["companyScope"] == actor.company)
             .ok_or_else(|| invalid("请先由人事将账号关联到本公司在职人员。"))?
     };
     if person["companyScope"] != actor.company {

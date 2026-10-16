@@ -1,3 +1,5 @@
+#[path = "support/identity_contract.rs"]
+mod identity_contract;
 #[path = "support/native_fixture.rs"]
 #[allow(dead_code)]
 mod native_fixture;
@@ -24,5 +26,6 @@ fn personnel_registration_files_and_private_fields_follow_the_contract() {
     )
     .unwrap();
     personnel_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    identity_contract::exercise(&service, login["accessToken"].as_str().unwrap());
     service.close().unwrap();
 }

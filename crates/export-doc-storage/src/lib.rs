@@ -8,7 +8,9 @@ pub use postgres::tools::{
 mod communication;
 mod generic_query;
 mod job_query;
+mod personnel_query;
 pub use job_query::{JobQuery, JobRetention};
+pub use personnel_query::PersonnelQuery;
 mod record_query;
 mod sql;
 mod template_query;
@@ -166,6 +168,10 @@ trait Adapter: Send {
     fn job_counts(&self) -> Result<Value>;
     fn query_generic(&self, query: &GenericQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let (sql, projection) = generic_query::build(query, self.provider() == "PostgreSQL")?;
+        self.query_page(&sql, &projection, query.offset, query.limit)
+    }
+    fn query_personnel(&self, query: &PersonnelQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let (sql, projection) = personnel_query::build(query, self.provider() == "PostgreSQL")?;
         self.query_page(&sql, &projection, query.offset, query.limit)
     }
     fn provider(&self) -> &'static str;
@@ -395,6 +401,7 @@ delegate! {
     query_jobs(query:&JobQuery<'_>)->(i64,Vec<Value>);
     job_counts()->Value;
     query_generic(query:&GenericQuery<'_>)->(i64, Vec<Value>);
+    query_personnel(query:&PersonnelQuery<'_>)->(i64, Vec<Value>);
     query_report_templates(query: &ReportTemplateQuery<'_>)->(i64, Vec<Value>);
     report_template_metadata(id:i64)->Option<Value>;
     query_template_versions(query: &TemplateVersionQuery<'_>)->(i64, Vec<Value>);

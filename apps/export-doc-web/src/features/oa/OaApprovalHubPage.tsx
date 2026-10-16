@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { requestPersonLabel } from "../office/requestIdentity.ts";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { PageState } from "../../ui/PageState.tsx";
 import { useOaApprovalHub } from "./useOaApprovalHub.ts";
@@ -15,7 +16,7 @@ export function OaApprovalHubPage({ client, user }: { client: ExportDocManagerAp
     <div className="office-resource-grid">{queues.map(({ title, description, label, href, query }) => <article className="office-resource-card" key={href}>
       <h2><Link to={href}>{title}</Link></h2><p className="office-muted">{description}</p>
       <p>{query.isPending ? "正在读取申请…" : query.isError ? "读取失败，请进入模块重试" : `${label}：${query.data?.totalCount ?? 0}`}</p>
-      <ul>{query.data?.items.map((row) => <li key={row.id}><Link to={`${href}${href.includes("?") ? "&" : "?"}requestId=${row.id}`}>{row.employeeName} · {row.title}</Link></li>)}</ul>
+      <ul>{query.data?.items.map((row) => <li key={row.id}><Link to={`${href}${href.includes("?") ? "&" : "?"}requestId=${row.id}`}>{requestPersonLabel(row.employeeName, row)} · {row.title}</Link></li>)}</ul>
     </article>)}</div>
   </section>;
 }

@@ -1,5 +1,4 @@
-//! Organization ancestry is shared by validation and native tree presentation.
-use crate::generated_api::ApiOrganizationDepartmentDto;
+//! Pure organization ancestry and identifier normalization.
 use std::collections::{BTreeMap, BTreeSet};
 use unicode_normalization::UnicodeNormalization;
 
@@ -7,13 +6,6 @@ pub fn search_key(value: &str) -> String {
     value.trim().nfc().collect::<String>().to_lowercase()
 }
 
-#[derive(Clone)]
-pub struct DepartmentPath {
-    pub department: ApiOrganizationDepartmentDto,
-    pub ancestors: Vec<String>,
-    pub label: String,
-    pub child_count: usize,
-}
 #[derive(Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DepartmentLink {
@@ -59,122 +51,36 @@ pub fn ancestry(departments: &[DepartmentLink]) -> Result<BTreeMap<String, Vec<S
     }
     Ok(result)
 }
-pub fn paths(departments: &[ApiOrganizationDepartmentDto]) -> Result<Vec<DepartmentPath>, String> {
-    let directory: BTreeMap<_, _> = departments
-        .iter()
-        .map(|department| (department.code.as_str(), department))
-        .collect();
-    let links: Vec<_> = departments
-        .iter()
-        .map(|department| DepartmentLink {
-            code: department.code.clone(),
-            company_code: department.company_code.clone(),
-            parent_code: department.parent_code.clone(),
-        })
-        .collect();
-    let lineages = ancestry(&links)?;
-    let mut children = BTreeMap::new();
-    for department in departments {
-        if let Some(parent) = department
-            .parent_code
-            .as_deref()
-            .filter(|value| !value.is_empty())
-        {
-            *children.entry(parent).or_insert(0) += 1;
-        }
-    }
-    let mut output = Vec::with_capacity(departments.len());
-    for department in departments {
-        let ancestors = lineages
-            .get(&department.code)
-            .ok_or("部门层级不完整。")?
-            .clone();
-        let names: Vec<_> = ancestors
-            .iter()
-            .map(|code| {
-                directory
-                    .get(code.as_str())
-                    .map(|node| node.name.as_str())
-                    .ok_or("上级部门不存在。")
-            })
-            .chain(std::iter::once(Ok(department.name.as_str())))
-            .collect::<Result<_, _>>()?;
-        output.push(DepartmentPath {
-            department: department.clone(),
-            ancestors,
-            label: names.join(" / "),
-            child_count: *children.get(department.code.as_str()).unwrap_or(&0),
-        });
-    }
-    let mut siblings: BTreeMap<String, Vec<DepartmentPath>> = BTreeMap::new();
-    for entry in output {
-        siblings
-            .entry(entry.department.parent_code.clone().unwrap_or_default())
-            .or_default()
-            .push(entry);
-    }
-    for children in siblings.values_mut() {
-        children.sort_by(|a, b| {
-            a.department
-                .name
-                .cmp(&b.department.name)
-                .then_with(|| a.department.code.cmp(&b.department.code))
-        });
-    }
-    let mut pending = siblings.remove("").unwrap_or_default();
-    pending.reverse();
-    let mut ordered = Vec::with_capacity(departments.len());
-    while let Some(entry) = pending.pop() {
-        if let Some(children) = siblings.remove(&entry.department.code) {
-            pending.extend(children.into_iter().rev());
-        }
-        ordered.push(entry);
-    }
-    Ok(ordered)
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn department(code: &str, parent: Option<&str>, name: &str) -> ApiOrganizationDepartmentDto {
-        ApiOrganizationDepartmentDto {
+    fn department(code: &str, parent: Option<&str>) -> DepartmentLink {
+        DepartmentLink {
             code: code.into(),
             parent_code: parent.map(str::to_owned),
-            name: name.into(),
             company_code: "COMPANY".into(),
-            is_active: true,
-            ..Default::default()
         }
     }
     #[test]
-    fn equal_names_remain_under_their_own_parent() {
-        let tree = paths(&[
-            department("B", None, "同名"),
-            department("A", None, "同名"),
-            department("A1", Some("A"), "子部门"),
-            department("B1", Some("B"), "子部门"),
+    fn ancestry_uses_codes_and_preserves_each_branch() {
+        let tree = ancestry(&[
+            department("B", None),
+            department("A", None),
+            department("A1", Some("A")),
+            department("B1", Some("B")),
         ])
         .unwrap();
-        assert_eq!(
-            tree.iter()
-                .map(|entry| entry.department.code.as_str())
-                .collect::<Vec<_>>(),
-            ["A", "A1", "B", "B1"]
-        );
-        assert_eq!(tree[1].ancestors, ["A"]);
+        assert_eq!(tree["A1"], ["A"]);
+        assert_eq!(tree["B1"], ["B"]);
+        assert!(ancestry(&[department("A", None), department("A", None)]).is_err());
     }
     #[test]
     fn hierarchy_rejects_missing_parents_cycles_and_cross_company_links() {
-        assert!(paths(&[department("A", Some("missing"), "部门")]).is_err());
-        assert!(
-            paths(&[
-                department("A", Some("B"), "部门"),
-                department("B", Some("A"), "部门")
-            ])
-            .is_err()
-        );
-        let mut child = department("B", Some("A"), "子部门");
+        assert!(ancestry(&[department("A", Some("missing"))]).is_err());
+        assert!(ancestry(&[department("A", Some("B")), department("B", Some("A"))]).is_err());
+        let mut child = department("B", Some("A"));
         child.company_code = "OTHER".into();
-        assert!(paths(&[department("A", None, "部门"), child]).is_err());
+        assert!(ancestry(&[department("A", None), child]).is_err());
     }
 }

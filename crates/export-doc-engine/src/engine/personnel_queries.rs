@@ -1,39 +1,38 @@
 //! Personnel directory and detail projections never expose a stored permission snapshot.
 use super::{
     auth,
-    error::{Result, error, invalid, unavailable},
+    error::{Result, invalid, unavailable},
     office,
     records::text,
     store::{self, Actor, Store},
 };
 use crate::{clock::BusinessClock, contracts};
 use chrono::{Duration, NaiveDate};
-use export_doc_storage::Connection;
+use export_doc_storage::{Connection, DataScope, GenericQuery, PersonnelQuery};
 use serde_json::{Value, json};
 
 pub fn employee(tx: &Connection, actor: &Actor, record: &Value) -> Result<Value> {
-    Ok(directory_entry(
-        actor,
-        record,
-        &store::all(tx, "departments")?,
-    ))
+    directory_entry(tx, actor, record, &mut Default::default())
 }
-fn directory_entry(actor: &Actor, record: &Value, departments: &[Value]) -> Value {
+fn directory_entry(
+    tx: &Connection,
+    actor: &Actor,
+    record: &Value,
+    departments: &mut super::organization::DepartmentNames,
+) -> Result<Value> {
     let mut employee = record["employee"].clone();
-    let department = departments.iter().find(|department| {
-        department["code"] == record["departmentId"]
-            && department["companyCode"] == record["companyScope"]
-    });
-    employee["departmentName"] = department
-        .map(|department| department["name"].clone())
-        .unwrap_or_else(|| record["departmentId"].clone());
+    employee["departmentName"] = json!(departments.get(
+        tx,
+        &text(record, "companyScope"),
+        &text(record, "departmentId")
+    )?);
     employee["canViewDetails"] = json!(auth::visible(
         actor,
         "office.people",
         "view-details",
         record
     ));
-    employee
+    Ok(employee)
 }
 
 pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value> {
@@ -67,12 +66,8 @@ pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value
 }
 
 pub fn read(store: &Store, actor: &Actor, id: i64) -> Result<Value> {
-    auth::authorize(actor, "office.people", "view-details")?;
-    store.transaction(|tx| {
-        let record = store::get(tx, "people", id)?;
-        if !auth::visible(actor, "office.people", "view-details", &record) {
-            return Err(error(403, "没有查看此人员档案的权限。"));
-        }
+    store.read(|tx| {
+        let record = super::personnel::person(tx, actor, id, "view-details")?;
         detail(tx, actor, record)
     })
 }
@@ -92,6 +87,20 @@ pub fn options(store: &Store, actor: &Actor) -> Result<Value> {
     )
 }
 
+const DIRECTORY_FIELDS: &[(&str, &str)] = &[
+    ("employee", "employee"),
+    ("companyScope", "companyScope"),
+    ("departmentId", "departmentId"),
+    ("ownerUserId", "ownerUserId"),
+    ("status", "status"),
+];
+const ATTENTION_FIELDS: &[(&str, &str)] = &[
+    ("probationEndsOn", "probationEndsOn"),
+    ("contractEndsOn", "contractEndsOn"),
+    ("identityLongTerm", "profile.identityLongTerm"),
+    ("identityValidUntil", "profile.identityValidUntil"),
+];
+
 pub fn directory(
     store: &Store,
     actor: &Actor,
@@ -110,70 +119,86 @@ pub fn directory(
     if !["", "Probation", "Active", "Departed"].contains(&status) {
         return Err(invalid("任职状态无效。"));
     }
-    let attention = argument("attentionOnly") == "true";
+    let attention = match argument("attentionOnly") {
+        "" | "false" => false,
+        "true" => true,
+        _ => return Err(invalid("到期筛选须为 true 或 false。")),
+    };
+    let mut scopes = vec![auth::data_scope(actor, "office.people", "view")];
     if attention || status == "Departed" {
         auth::authorize(actor, "office.people", "view-details")?;
+        scopes.push(auth::data_scope(actor, "office.people", "view-details"));
     }
-    let today = clock.now().map_err(unavailable)?.today;
-    let through = today
-        .checked_add_signed(Duration::days(30))
-        .ok_or_else(|| unavailable("业务日期超出范围。"))?;
     let keyword = super::organization::search_key(argument("keyword"));
-    store.transaction(|tx| {
-        let mut items = vec![];
-        let departments = store::all(tx, "departments")?;
-        for record in store::all(tx, "people")? {
+    if keyword.chars().count() > 100 {
+        return Err(invalid("搜索词不能超过 100 字。"));
+    }
+    let through = if attention {
+        Some(
+            clock
+                .now()
+                .map_err(unavailable)?
+                .today
+                .checked_add_signed(Duration::days(30))
+                .ok_or_else(|| unavailable("业务日期超出范围。"))?,
+        )
+    } else {
+        None
+    };
+    let (page, size, start) = store::page_parameters(query);
+    let mut fields = DIRECTORY_FIELDS.to_vec();
+    if attention {
+        fields.extend_from_slice(ATTENTION_FIELDS);
+    }
+    store.read(|tx| {
+        let mut listing = PersonnelQuery {
+            company: &actor.company,
+            department: argument("departmentId"),
+            status,
+            keyword: &keyword,
+            search_fields: &[
+                "employee.fullName",
+                "employee.employeeNumber",
+                "employee.jobTitle",
+                "employee.workEmail",
+                "employee.workPhone",
+                "employee.workLocation",
+            ],
+            scopes: &scopes,
+            fields: &fields,
+            offset: if attention { 0 } else { start },
+            limit: if attention { 200 } else { size as i64 },
+        };
+        let mut items = Vec::new();
+        let mut count = 0;
+        let mut departments = super::organization::DepartmentNames::default();
+        loop {
             crate::operation::check()?;
-            if record["companyScope"] != actor.company
-                || !auth::visible(actor, "office.people", "view", &record)
-            {
-                continue;
+            let (total, rows) = tx.query_personnel(&listing)?;
+            listing.offset += rows.len() as i64;
+            let empty = rows.is_empty();
+            for record in rows {
+                // Validate dates even outside the requested page; malformed private
+                // metadata must not become a successful, misleading attention count.
+                if let Some(through) = through {
+                    if !needs_attention(&record, through)? {
+                        continue;
+                    }
+                }
+                if !attention || (count >= start && items.len() < size) {
+                    items.push(directory_entry(tx, actor, &record, &mut departments)?);
+                }
+                count += 1;
             }
-            if (!status.is_empty() && record["status"] != status)
-                || (status.is_empty() && record["status"] == "Departed")
-            {
-                continue;
+            if !attention {
+                count = total;
+                break;
             }
-            if !argument("departmentId").is_empty()
-                && record["departmentId"] != argument("departmentId")
-            {
-                continue;
+            if empty || listing.offset >= total {
+                break;
             }
-            if attention
-                && (!auth::visible(actor, "office.people", "view-details", &record)
-                    || !needs_attention(&record, through)?)
-            {
-                continue;
-            }
-            let row = directory_entry(actor, &record, &departments);
-            let searchable = [
-                "fullName",
-                "employeeNumber",
-                "jobTitle",
-                "workEmail",
-                "workPhone",
-                "workLocation",
-            ]
-            .into_iter()
-            .map(|field| text(&row, field))
-            .collect::<Vec<_>>()
-            .join(" ");
-            if !super::organization::search_key(&searchable).contains(&keyword) {
-                continue;
-            }
-            items.push(row);
         }
-        items.sort_by(|a, b| {
-            store::normalize(&text(a, "employeeNumber"))
-                .cmp(&store::normalize(&text(b, "employeeNumber")))
-                .then_with(|| a["id"].as_i64().cmp(&b["id"].as_i64()))
-        });
-        let paging: Vec<_> = query
-            .iter()
-            .filter(|(key, _)| ["pageNumber", "pageSize"].contains(key))
-            .cloned()
-            .collect();
-        Ok(store::paged(items, &paging))
+        Ok(contracts::page(items, count as usize, page, size))
     })
 }
 
@@ -184,10 +209,7 @@ fn needs_attention(record: &Value, through: NaiveDate) -> Result<bool> {
     for (enabled, field) in [
         (record["status"] == "Probation", "probationEndsOn"),
         (true, "contractEndsOn"),
-        (
-            record["profile"]["identityLongTerm"] != true,
-            "profile.identityValidUntil",
-        ),
+        (record["identityLongTerm"] != true, "identityValidUntil"),
     ] {
         let value = text(record, field);
         if !enabled || value.is_empty() {
@@ -203,12 +225,22 @@ fn needs_attention(record: &Value, through: NaiveDate) -> Result<bool> {
 }
 
 pub fn history(store: &Store, actor: &Actor, id: i64, query: &[(&str, String)]) -> Result<Value> {
-    read(store, actor, id)?;
-    let mut events: Vec<_> = store
-        .all("personnel-events")?
-        .into_iter()
-        .filter(|event| event["employeeId"] == id)
-        .collect();
-    events.sort_by_key(|event| std::cmp::Reverse(event["id"].as_i64()));
-    Ok(store::paged(events, query))
+    let (page, size, offset) = store::page_parameters(query);
+    store.read(|tx| {
+        super::personnel::person(tx, actor, id, "view-details")?;
+        let (total, events) = tx.query_generic(&GenericQuery {
+            kind: "personnel-events",
+            scope: DataScope {
+                all: true,
+                ..Default::default()
+            },
+            filters: &[("employeeId", id.to_string())],
+            keyword: "",
+            search_root: None,
+            fields: &[],
+            offset,
+            limit: size as i64,
+        })?;
+        Ok(contracts::page(events, total as usize, page, size))
+    })
 }

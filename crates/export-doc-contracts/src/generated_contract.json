@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "2c67db3b76c1feee7fae94a950d46bf40f23c4001a0d9f731fc758e440b9e905",
+  "digest": "70eff3a85d225d8ed2fd3aeff56cdc975cd5b79666443106740978825be0e7bb",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -66222,6 +66222,11 @@
         "managerName": {
           "type": "string",
           "default": ""
+        },
+        "managerEmployeeNumber": {
+          "type": "string",
+          "readOnly": true,
+          "description": "Employee number for disambiguation; relationships and authorization use the stable employee ID. Request records retain the number captured when created."
         }
       }
     },
@@ -76140,6 +76145,17 @@
         },
         "canHandle": {
           "type": "boolean"
+        },
+        "employeeId": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true,
+          "description": "Stable employee reference, independent of the applicant name."
+        },
+        "employeeNumber": {
+          "type": "string",
+          "readOnly": true,
+          "description": "Employee number for disambiguation; relationships and authorization use the stable employee ID. Request records retain the number captured when created."
         }
       }
     },
@@ -77016,6 +77032,11 @@
         },
         "canHandle": {
           "type": "boolean"
+        },
+        "employeeNumber": {
+          "type": "string",
+          "readOnly": true,
+          "description": "Employee number for disambiguation; relationships and authorization use the stable employee ID. Request records retain the number captured when created."
         }
       },
       "required": [
@@ -77609,6 +77630,17 @@
         },
         "canHandle": {
           "type": "boolean"
+        },
+        "employeeId": {
+          "type": "integer",
+          "format": "int64",
+          "readOnly": true,
+          "description": "Stable employee reference, independent of the applicant name."
+        },
+        "employeeNumber": {
+          "type": "string",
+          "readOnly": true,
+          "description": "Employee number for disambiguation; relationships and authorization use the stable employee ID. Request records retain the number captured when created."
         }
       }
     },

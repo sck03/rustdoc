@@ -10,6 +10,15 @@ use serde_json::{Value, json};
 use sha2::Sha256;
 use std::{collections::HashMap, sync::Mutex, time::Instant};
 use subtle::ConstantTimeEq;
+use unicode_normalization::UnicodeNormalization;
+
+pub(super) fn username_key(username: &str) -> Result<String> {
+    let username = username.trim().nfc().collect::<String>();
+    if username.is_empty() || username.encode_utf16().count() > 80 {
+        return Err(invalid("账号须为 1–80 个字符。"));
+    }
+    Ok(store::normalize(&username))
+}
 
 pub(super) const ITERATIONS: u32 = 600_000;
 pub struct Sessions {
@@ -32,8 +41,27 @@ pub fn seed(store: &Store) -> Result<()> {
     seed_admin(store, "")
 }
 
+fn has_users(connection: &store::Connection) -> Result<bool> {
+    Ok(connection
+        .query_generic(&export_doc_storage::GenericQuery {
+            kind: "users",
+            scope: export_doc_storage::DataScope {
+                all: true,
+                ..Default::default()
+            },
+            filters: &[],
+            keyword: "",
+            search_root: None,
+            fields: &[("id", "id")],
+            offset: 0,
+            limit: 1,
+        })?
+        .0
+        > 0)
+}
+
 fn seed_admin(store: &Store, password: &str) -> Result<()> {
-    if !store.all("users")?.is_empty() {
+    if has_users(&*store.connection()?)? {
         return Ok(());
     }
     let admin = Actor {
@@ -47,7 +75,7 @@ fn seed_admin(store: &Store, password: &str) -> Result<()> {
     };
     let (salt, hash) = password_hash(password)?;
     store.transaction(|transaction| {
-        if !store::all(transaction, "users")?.is_empty() {
+        if has_users(transaction)? {
             return Ok(());
         }
         let body = contracts::overlay(contracts::initial(contracts::schema("ApiUserAccountDto")), &json!({"username":"admin","fullName":"系统管理员","role":"Admin","isActive":true,"companyScope":"DEFAULT","departmentId":"GENERAL"}));
@@ -72,7 +100,7 @@ pub fn bootstrap(
     expected: &str,
     submitted: &str,
 ) -> Result<()> {
-    if store.provider()? == "SQLite" || !store.all("users")?.is_empty() {
+    if store.provider()? == "SQLite" || has_users(&*store.connection()?)? {
         return Ok(());
     }
     if expected.len() < 32 || expected.as_bytes().ct_eq(submitted.as_bytes()).unwrap_u8() != 1 {
@@ -107,8 +135,8 @@ impl Sessions {
         username: &str,
         password: &str,
     ) -> Result<Value> {
-        let key = store::normalize(username);
-        if key.is_empty() || key.len() > 160 || password.len() > 512 {
+        let key = username_key(username)?;
+        if password.chars().count() > 128 {
             return Err(invalid("账号或密码长度无效。"));
         }
         {
@@ -124,10 +152,7 @@ impl Sessions {
                 return Err(error(429, "登录请求过多，请稍后重试。"));
             }
         }
-        let record = store
-            .all("users")?
-            .into_iter()
-            .find(|user| store::normalize(user["username"].as_str().unwrap_or("")) == key);
+        let record = store.connection()?.find_identity("users", &key)?;
         let credentials = if let Some(record) = &record {
             store
                 .connection()?
@@ -350,6 +375,37 @@ pub(super) fn scope_rank(actor: &Actor, resource: &str, action: &str) -> u8 {
         .map(|grant| permissions::scope_rank(grant["dataScope"].as_str().unwrap_or("")))
         .max()
         .unwrap_or(0)
+}
+pub(super) fn data_scope<'a>(
+    actor: &'a Actor,
+    resource: &str,
+    action: &str,
+) -> export_doc_storage::DataScope<'a> {
+    let mut scope = export_doc_storage::DataScope {
+        company: &actor.company,
+        department: &actor.department,
+        user_id: actor.id,
+        ..Default::default()
+    };
+    if !actor.edition.allows(resource) {
+        return scope;
+    }
+    scope.all = actor.admin;
+    let action = permissions::service_action(resource, action);
+    for grant in actor
+        .grants
+        .iter()
+        .filter(|grant| grant["resourceKey"] == resource && grant["action"] == action)
+    {
+        match grant["dataScope"].as_str() {
+            Some("all") => scope.all = true,
+            Some("company") => scope.company_wide = true,
+            Some("department") => scope.department_wide = true,
+            Some("own") => scope.own = true,
+            _ => {}
+        }
+    }
+    scope
 }
 pub fn visible(actor: &Actor, resource: &str, action: &str, record: &Value) -> bool {
     if !actor.edition.allows(resource) {

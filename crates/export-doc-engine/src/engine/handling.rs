@@ -309,8 +309,9 @@ pub(in crate::engine) fn names(tx: &Connection, actor: &Actor, row: &Value) -> R
                     .ok_or_else(|| unavailable("办理人员编号损坏。"))?,
             )?;
             names.push(format!(
-                "{}{}",
+                "{}（{}）{}",
                 text(&user, "fullName"),
+                text(&user, "username"),
                 if user["isActive"] == true {
                     ""
                 } else {

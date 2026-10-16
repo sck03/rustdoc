@@ -510,6 +510,9 @@ pub(super) fn save_in_transaction(
             "",
         )?;
     }
+    if resource.key == "departments" {
+        return super::organization::project(transaction, saved);
+    }
     Ok(saved)
 }
 

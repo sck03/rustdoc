@@ -61318,6 +61318,11 @@
           "managerName": {
             "type": "string",
             "default": ""
+          },
+          "managerEmployeeNumber": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Employee number for disambiguation; relationships and authorization use the stable employee ID. Request records retain the number captured when created."
           }
         }
       },
@@ -70890,6 +70895,17 @@
           },
           "canHandle": {
             "type": "boolean"
+          },
+          "employeeId": {
+            "type": "integer",
+            "format": "int64",
+            "readOnly": true,
+            "description": "Stable employee reference, independent of the applicant name."
+          },
+          "employeeNumber": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Employee number for disambiguation; relationships and authorization use the stable employee ID. Request records retain the number captured when created."
           }
         }
       },
@@ -71511,6 +71527,17 @@
           },
           "canHandle": {
             "type": "boolean"
+          },
+          "employeeId": {
+            "type": "integer",
+            "format": "int64",
+            "readOnly": true,
+            "description": "Stable employee reference, independent of the applicant name."
+          },
+          "employeeNumber": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Employee number for disambiguation; relationships and authorization use the stable employee ID. Request records retain the number captured when created."
           }
         }
       },
@@ -75191,6 +75218,11 @@
           },
           "canHandle": {
             "type": "boolean"
+          },
+          "employeeNumber": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Employee number for disambiguation; relationships and authorization use the stable employee ID. Request records retain the number captured when created."
           }
         },
         "required": [

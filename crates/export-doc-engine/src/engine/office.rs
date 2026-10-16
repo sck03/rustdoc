@@ -32,11 +32,8 @@ fn person(connection: &Connection, actor: &Actor, value: &Value) -> Result<Value
             .as_i64()
             .filter(|id| *id > 0)
             .unwrap_or(actor.id);
-        store::all(connection, "people")?
-            .into_iter()
-            .find(|person| {
-                person["account"]["id"] == owner && person["companyScope"] == actor.company
-            })
+        super::personnel_accounts::person_for_account(connection, owner)?
+            .filter(|person| person["companyScope"] == actor.company)
             .ok_or_else(|| invalid("团队申请需要关联本公司的在职人员档案。"))?
     };
     if employee["companyScope"] != actor.company {
@@ -210,6 +207,7 @@ pub fn validate(
             value["departmentId"] = employee["departmentId"].clone();
             value["applicantUserId"] = value["ownerUserId"].clone();
             value["applicantName"] = employee["profile"]["fullName"].clone();
+            value["employeeNumber"] = employee["employeeNumber"].clone();
             value["roomName"] = room["name"].clone();
             value["location"] = room["location"].clone();
             value["requiresKey"] = room["requiresKey"].clone();
@@ -299,6 +297,7 @@ pub fn validate(
             value["departmentId"] = employee["departmentId"].clone();
             value["applicantUserId"] = value["ownerUserId"].clone();
             value["applicantName"] = employee["profile"]["fullName"].clone();
+            value["employeeNumber"] = employee["employeeNumber"].clone();
             value["supplyName"] = supply["name"].clone();
             super::handling::snapshot(
                 connection,

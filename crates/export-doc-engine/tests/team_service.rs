@@ -11,6 +11,8 @@ mod business_contract;
 mod communication_contract;
 #[path = "support/handling_contract.rs"]
 mod handling_contract;
+#[path = "support/identity_contract.rs"]
+mod identity_contract;
 #[path = "support/invoice_clone_contract.rs"]
 mod invoice_clone_contract;
 #[path = "support/oa_contract.rs"]
@@ -268,6 +270,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     template_contract::exercise(&service, admin_token);
     account_permissions::exercise(&service, admin_token);
     personnel_contract::exercise(&service, admin_token);
+    identity_contract::exercise(&service, admin_token);
     service.close().unwrap();
     drop(Arc::clone(&service));
     drop(service);

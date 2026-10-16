@@ -63,11 +63,11 @@ mod tests {
                 }
             }
         }
-        current["components"]["schemas"]["PersonnelRecord"]["properties"]
-            .as_object_mut()
-            .unwrap()
-            .remove("attachments");
-        for (schema, fields) in reports::FIELDS.iter().chain(accounts::FIELDS) {
+        for (schema, fields) in reports::FIELDS
+            .iter()
+            .chain(accounts::FIELDS)
+            .chain(personnel::FIELDS)
+        {
             for field in *fields {
                 current["components"]["schemas"][schema]["properties"]
                     .as_object_mut()

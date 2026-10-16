@@ -1,32 +1,7 @@
 //! Common list queries: permissions and filters precede SQL pagination;
 //! the generated response schema determines the transferred fields.
 use super::*;
-use export_doc_storage::{DataScope, GenericQuery};
-
-fn scope<'a>(actor: &'a Actor, permission: &str) -> DataScope<'a> {
-    let action = export_doc_domain::permissions::service_action(permission, "view");
-    let mut scope = DataScope {
-        all: actor.admin,
-        company: &actor.company,
-        department: &actor.department,
-        user_id: actor.id,
-        ..Default::default()
-    };
-    for grant in actor
-        .grants
-        .iter()
-        .filter(|g| g["resourceKey"] == permission && g["action"] == action)
-    {
-        match grant["dataScope"].as_str() {
-            Some("all") => scope.all = true,
-            Some("company") => scope.company_wide = true,
-            Some("department") => scope.department_wide = true,
-            Some("own") => scope.own = true,
-            _ => {}
-        }
-    }
-    scope
-}
+use export_doc_storage::GenericQuery;
 
 pub(super) fn rows(
     store: &Store,
@@ -133,7 +108,7 @@ pub(super) fn rows(
             crate::operation::check()?;
             let (total, rows) = tx.query_generic(&GenericQuery {
                 kind: resource.key,
-                scope: scope(actor, read_permission(resource)),
+                scope: auth::data_scope(actor, read_permission(resource), "view"),
                 filters: &filters,
                 keyword: &keyword,
                 search_root: (resource.key == "people").then_some("employee"),

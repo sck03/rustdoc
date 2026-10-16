@@ -1,6 +1,8 @@
 use export_doc_storage::{BlobWrite, Connection, ErrorKind, RecordWrite};
 #[path = "support/communication_query.rs"]
 mod communication_query;
+#[path = "support/personnel_query.rs"]
+mod personnel_query;
 #[cfg(feature = "postgres")]
 #[path = "support/pool_recovery.rs"]
 mod pool_recovery;
@@ -62,6 +64,7 @@ fn sqlite_rejects_earlier_or_duplicate_schema_markers() {
 }
 
 fn roundtrip(connection: &Connection) {
+    personnel_query::exercise(connection);
     scaling_query::exercise(connection);
     template_query::exercise(connection);
     communication_query::exercise(connection);

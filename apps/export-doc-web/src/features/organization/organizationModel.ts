@@ -1,4 +1,9 @@
 export type DepartmentNode = { code: string; name: string; parentCode?: string | null; isActive: boolean };
+type DepartmentManager = { managerName: string; managerEmployeeNumber?: string };
+
+export function departmentManagerLabel(manager: DepartmentManager) {
+  return [manager.managerName, manager.managerEmployeeNumber].filter(Boolean).join(" · ");
+}
 
 export function departmentOptions<T extends DepartmentNode>(departments: T[]) {
   const directory = new Map(departments.map((item) => [item.code, item]));
@@ -24,12 +29,12 @@ export function parentDepartmentOptions<T extends DepartmentNode>(departments: T
   return departmentOptions(departments).filter((item) => item.code !== code && (!code || !item.ancestors.includes(code)));
 }
 
-export function filterDepartmentTree<T extends DepartmentNode & { managerName: string }>(departments: T[], keyword: string) {
+export function filterDepartmentTree<T extends DepartmentNode & DepartmentManager>(departments: T[], keyword: string, entries?: Array<T & { ancestors: string[] }>) {
   const search = keyword.trim().normalize("NFC").toLocaleLowerCase();
   if (!search) return departments;
   const keep = new Set<string>();
-  for (const item of departmentOptions(departments)) {
-    if (`${item.code} ${item.name} ${item.managerName}`.normalize("NFC").toLocaleLowerCase().includes(search)) {
+  for (const item of entries ?? departmentOptions(departments)) {
+    if (`${item.code} ${item.name} ${departmentManagerLabel(item)}`.normalize("NFC").toLocaleLowerCase().includes(search)) {
       keep.add(item.code);
       item.ancestors.forEach((code) => keep.add(code));
     }
@@ -37,9 +42,9 @@ export function filterDepartmentTree<T extends DepartmentNode & { managerName: s
   return departments.filter((item) => keep.has(item.code));
 }
 
-export function buildDepartmentTreeRows<T extends DepartmentNode & { managerName: string }>(departments: T[], keyword: string, expandedDepth: number, overrides: Readonly<Record<string, boolean>>) {
+export function buildDepartmentTreeRows<T extends DepartmentNode & DepartmentManager>(departments: T[], keyword: string, expandedDepth: number, overrides: Readonly<Record<string, boolean>>) {
   const entries = departmentOptions(departments);
-  const visible = new Set(filterDepartmentTree(departments, keyword).map((item) => item.code));
+  const visible = new Set(filterDepartmentTree(departments, keyword, entries).map((item) => item.code));
   const groups = new Map<string, typeof entries>();
   for (const entry of entries) {
     const parent = entry.parentCode ?? "";

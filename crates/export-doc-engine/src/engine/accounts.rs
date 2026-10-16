@@ -16,12 +16,10 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
         body[key] = json!(text(&body, key).nfc().collect::<String>());
     }
     let username = text(&body, "username");
+    auth::username_key(&username)?;
     let password = body["resetPassword"].as_str().unwrap_or("");
-    if username.is_empty()
-        || username.encode_utf16().count() > 80
-        || text(&body, "fullName").encode_utf16().count() > 100
-    {
-        return Err(invalid("账号须为 1–80 个字符，姓名不能超过 100 个字符。"));
+    if text(&body, "fullName").encode_utf16().count() > 100 {
+        return Err(invalid("姓名不能超过 100 个字符。"));
     }
     if !permissions::catalog()
         .roles

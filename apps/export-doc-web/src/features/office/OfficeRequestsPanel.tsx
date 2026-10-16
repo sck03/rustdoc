@@ -8,6 +8,7 @@ import { applyOfficeAction, useOfficeOperation, useOfficeRequests } from "./useO
 import { OfficeDialog, OfficeField, OfficePager, OfficeQueryState, OfficeSubmit } from "./OfficeUi.tsx";
 import { OfficeHistoryDialog } from "./OfficeHistoryDialog.tsx";
 import { OfficeRequestEditor } from "./OfficeRequestEditor.tsx";
+import { requestPersonLabel } from "./requestIdentity.ts";
 
 export function OfficeRequestsPanel({ client, user, kind }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OfficeKind }) {
   const model = useOfficeRequests(client, user, kind);
@@ -40,7 +41,7 @@ export function OfficeRequestsPanel({ client, user, kind }: { client: ExportDocM
         <p>{row.purpose}</p>{row.returnDueDate && <p className="office-muted">预计归还：{row.returnDueDate}</p>}
         {row.handlingName && <p>物品组：{row.handlingName} · 保管人员：{row.handlerNames}</p>}
       </>}
-      <p className="office-muted">{register ? "登记人员" : "申请人"}：{row.applicantName} · {register ? "登记于" : "提交于"} {formatBusinessDateTime(row.createdAt, user.businessTimeZone)}</p>
+      <p className="office-muted">{register ? "登记人员" : "申请人"}：{requestPersonLabel(row.applicantName, row)} · {register ? "登记于" : "提交于"} {formatBusinessDateTime(row.createdAt, user.businessTimeZone)}</p>
       <footer className="office-card-actions">{officeRequestActions(row, user, kind).map((entry) =>
         <button key={entry.action} type="button" className={entry.action === "approve" ? "command-button" : "command-button secondary"}
           onClick={() => setSelected({ row, ...entry })}>{entry.label}</button>)}
@@ -72,7 +73,7 @@ function OfficeActionDialog({ client, kind, row, action, label, onClose }: {
       partialReturn ? Number(form.get("quantity")) : 0, signal), onClose);
   }
   return <OfficeDialog title={label || officeActionLabels[action]} onClose={onClose} {...operation} protectChanges>
-    <p><strong>{row.applicantName}</strong> · {isMeetingBooking(row) ? `${row.roomName} · ${row.title}` : `${row.supplyName} · ${row.quantity} ${row.unit}`}</p>
+    <p><strong>{requestPersonLabel(row.applicantName, row)}</strong> · {isMeetingBooking(row) ? `${row.roomName} · ${row.title}` : `${row.supplyName} · ${row.quantity} ${row.unit}`}</p>
     <p className="office-muted">{description}</p>
     <form onSubmit={submit}><fieldset className="office-form-grid" disabled={operation.busy}>
       {partialReturn && !isMeetingBooking(row) && <OfficeField label={`本次归还数量（尚欠 ${row.quantity - row.returnedQuantity} ${row.unit}）`} wide>

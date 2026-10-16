@@ -2015,6 +2015,7 @@ export interface ApiOrganizationDepartmentDto {
   companyCode: string;
   isActive: boolean;
   managerEmployeeId?: number | null;
+  managerEmployeeNumber?: string;
   managerName: string;
   name: string;
   parentCode?: string | null;
@@ -4106,6 +4107,8 @@ export interface MeetingBookingRecord {
   canHandle?: boolean;
   createdAt: string;
   departmentId: string;
+  employeeId?: number;
+  employeeNumber?: string;
   endsAt: string;
   handlerNames?: string;
   handlingKey?: string;
@@ -4302,6 +4305,7 @@ export interface OaRequest {
   durationHours: string;
   employeeId: number;
   employeeName: string;
+  employeeNumber?: string;
   expectedVersion?: number;
   handlerNames?: string;
   handlingKey?: string;
@@ -4428,6 +4432,8 @@ export interface OfficeSupplyRequestRecord {
   canHandle?: boolean;
   createdAt: string;
   departmentId: string;
+  employeeId?: number;
+  employeeNumber?: string;
   handlerNames?: string;
   handlingKey?: string;
   handlingName?: string;

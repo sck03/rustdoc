@@ -1,6 +1,34 @@
 use serde_json::{Value, json};
 
+#[cfg(test)]
+pub(super) const FIELDS: &[(&str, &[&str])] = &[
+    ("PersonnelRecord", &["attachments"]),
+    ("ApiOrganizationDepartmentDto", &["managerEmployeeNumber"]),
+    (
+        "OfficeSupplyRequestRecord",
+        &["employeeNumber", "employeeId"],
+    ),
+    ("MeetingBookingRecord", &["employeeNumber", "employeeId"]),
+];
+
 pub(super) fn extend(doc: &mut Value) {
+    for schema in ["OfficeSupplyRequestRecord", "MeetingBookingRecord"] {
+        doc["components"]["schemas"][schema]["properties"]["employeeId"] = json!({
+            "type":"integer", "format":"int64", "readOnly":true,
+            "description":"Stable employee reference, independent of the applicant name."
+        });
+    }
+    for (schema, field) in [
+        ("ApiOrganizationDepartmentDto", "managerEmployeeNumber"),
+        ("OfficeSupplyRequestRecord", "employeeNumber"),
+        ("MeetingBookingRecord", "employeeNumber"),
+        ("OaRequest", "employeeNumber"),
+    ] {
+        doc["components"]["schemas"][schema]["properties"][field] = json!({
+            "type":"string", "readOnly":true,
+            "description":"Employee number for disambiguation; relationships and authorization use the stable employee ID. Request records retain the number captured when created."
+        });
+    }
     let mut attachment = doc["components"]["schemas"]["OaAttachment"].clone();
     attachment["properties"]["id"] = json!({"type":"string"});
     doc["components"]["schemas"]["PersonnelAttachment"] = attachment;

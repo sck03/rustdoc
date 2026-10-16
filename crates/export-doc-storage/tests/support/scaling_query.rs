@@ -75,6 +75,17 @@ pub fn exercise(c: &Connection) {
     q.filters = &filters;
     assert_eq!(c.query_generic(&q).unwrap().0, 0);
     q.filters = &[];
+    let enabled = [("nested.enabled", "true".into())];
+    q.filters = &enabled;
+    assert_eq!(
+        c.query_generic(&q).unwrap().0,
+        2,
+        "boolean filters share SQLite/PostgreSQL semantics"
+    );
+    let disabled = [("nested.enabled", "false".into())];
+    q.filters = &disabled;
+    assert_eq!(c.query_generic(&q).unwrap().0, 0);
+    q.filters = &[];
     let names: Vec<_> = (0..70).map(|n| format!("field{n}")).collect();
     let wide: Vec<_> = names.iter().map(|name| (name.as_str(), "id")).collect();
     q.fields = &wide;

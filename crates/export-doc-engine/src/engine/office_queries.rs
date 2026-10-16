@@ -235,10 +235,8 @@ pub fn account_clearance(tx: &Connection, account: &Value) -> Result<Value> {
     let id = account["id"]
         .as_i64()
         .ok_or_else(|| invalid("账号编号无效。"))?;
-    let employee = store::all(tx, "people")?
-        .iter()
-        .find(|person| person["account"]["id"] == id)
-        .and_then(|person| person["id"].as_i64());
+    let employee =
+        super::personnel_accounts::linked_person(tx, id)?.and_then(|person| person["id"].as_i64());
     clearance_for(tx, employee, Some(id), &account["companyScope"])
 }
 fn clearance_for(

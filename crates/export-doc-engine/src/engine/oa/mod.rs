@@ -328,6 +328,7 @@ fn create(
     submitted_fields.sort_all_objects();
     let submitted = super::media::digest(&serde_json::to_vec(&submitted_fields)?);
     row["employeeName"] = employee["fullName"].clone();
+    row["employeeNumber"] = employee["employeeNumber"].clone();
     row["departmentId"] = employee["departmentId"].clone();
     row["companyScope"] = json!(actor.company);
     row["ownerUserId"] = json!(actor.id);

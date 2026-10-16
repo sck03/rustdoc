@@ -4,6 +4,7 @@ import { toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
 import { isMeetingBooking, readMeetingBookingUpdate, readSupplyRequestUpdate, type OfficeRequestRow } from "./officeModel.ts";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
 import { useOfficeOperation } from "./useOfficeData.ts";
+import { requestPersonLabel } from "./requestIdentity.ts";
 
 export function OfficeRequestEditor({ client, user, row, onClose }: {
   client: ExportDocManagerApiClient; user: ApiUserDto; row: OfficeRequestRow; onClose: () => void;
@@ -17,7 +18,7 @@ export function OfficeRequestEditor({ client, user, row, onClose }: {
       : client.updateOfficeSupplyRequest({ id: row.id, body: readSupplyRequestUpdate(form, row.versionNumber) }, { signal }), onClose);
   }
   return <OfficeDialog title={isMeetingBooking(row) ? "修改预约" : "修改领用"} onClose={onClose} {...operation} protectChanges>
-    <p>{row.applicantName} · {isMeetingBooking(row) ? row.roomName : row.supplyName}</p>
+    <p>{requestPersonLabel(row.applicantName, row)} · {isMeetingBooking(row) ? row.roomName : row.supplyName}</p>
     <p className="office-muted">{user.capabilities.usesOfficeRegister ? "保存后将按新内容调整时段或预留库存。" : "修改已审批的内容后须重新审批。"}已交接的记录不能修改。</p>
     <form onSubmit={submit}><fieldset className="office-form-grid" disabled={operation.busy}>
       {isMeetingBooking(row) ? <>

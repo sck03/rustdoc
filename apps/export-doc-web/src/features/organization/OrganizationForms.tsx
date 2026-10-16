@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import type { ApiOrganizationCompanyDto, ApiOrganizationDepartmentDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "../office/OfficeUi.tsx";
 import { useOrganizationOperation } from "./useOrganizationDirectory.ts";
-import { parentDepartmentOptions } from "./organizationModel.ts";
+import { departmentManagerLabel, parentDepartmentOptions } from "./organizationModel.ts";
 import { OrganizationManagerPicker } from "./OrganizationManagerPicker.tsx";
 
 export function OrganizationCompanyForm({ client, record, onClose, onSaved }: {
@@ -32,7 +32,7 @@ export function OrganizationDepartmentForm({ client, company, departments, recor
   record?: ApiOrganizationDepartmentDto; parentCode?: string; onClose: () => void; onSaved: (department: ApiOrganizationDepartmentDto) => void;
 }) {
   const operation = useOrganizationOperation();
-  const [manager, setManager] = useState<{ id: number; name: string } | null>(record?.managerEmployeeId ? { id: record.managerEmployeeId, name: record.managerName } : null);
+  const [manager, setManager] = useState<{ id: number; name: string } | null>(record?.managerEmployeeId ? { id: record.managerEmployeeId, name: departmentManagerLabel(record) } : null);
   const [choosingManager, setChoosingManager] = useState(false);
   const [active, setActive] = useState(record?.isActive ?? true);
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -58,10 +58,10 @@ export function OrganizationDepartmentForm({ client, company, departments, recor
           <button type="button" className="command-button secondary" disabled={!active} onClick={() => setChoosingManager(true)}>选择负责人</button>
           {manager && <button type="button" className="command-button secondary" onClick={() => setManager(null)}>取消负责人</button>}</div></div>
         <label className="checkbox-field"><input type="checkbox" name="isActive" checked={active} onChange={(event) => setActive(event.target.checked)} />启用部门</label>
-        <p className="office-field-wide office-muted">调整上级部门会改变组织展示层级，现有人员归属和授权范围按原部门保留。停用前须调整子部门、负责人及在职人员。</p>
+        <p className="office-field-wide office-muted">调整上级部门会改变组织展示层级，现有人员归属和授权范围按原部门保留。停用前须调整子部门、负责人、在职人员及启用账号。</p>
       </fieldset><OfficeSubmit busy={operation.busy} label="保存部门" /></form>
     </OfficeDialog>
     {choosingManager && <OrganizationManagerPicker client={client} companyCode={company.code} onClose={() => setChoosingManager(false)}
-      onSelect={(person) => { setManager({ id: person.id, name: person.fullName }); setChoosingManager(false); }} />}
+      onSelect={(person) => { setManager({ id: person.id, name: departmentManagerLabel({ managerName: person.fullName, managerEmployeeNumber: person.employeeNumber }) }); setChoosingManager(false); }} />}
   </>;
 }

@@ -26,7 +26,7 @@ export function useSmartOcr(client: ExportDocManagerApiClient, permitted: boolea
   const [result, setResult] = useState<ApiOcrRecognizeImageResponse | null>(null);
   const [isBusy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [messageType, setMessageType] = useState<"success" | "error">("success");
+  const [messageType, setMessageType] = useState<"success" | "error" | "info">("success");
   const { run: runRecognition, cancel: cancelRecognition } = useAbortableOperationController(undefined, { cancelPrevious: true });
   const { run: runPreview, cancel: cancelPreview } = useAbortableOperationController(undefined, { cancelPrevious: true });
   const runInput = useAbortableOperation(undefined, { cancelPrevious: true });
@@ -73,7 +73,7 @@ export function useSmartOcr(client: ExportDocManagerApiClient, permitted: boolea
       if (!canUseOcr) return;
       const file = Array.from(event.clipboardData?.items ?? []).find(item => item.type.startsWith("image/"))?.getAsFile();
       if (!file) return;
-      event.preventDefault(); loadImageBlob(file, "剪贴板图片（内存）");
+      event.preventDefault(); loadImageBlob(file, "剪贴板图片");
     };
     window.addEventListener("paste", paste);
     return () => window.removeEventListener("paste", paste);
@@ -87,8 +87,14 @@ export function useSmartOcr(client: ExportDocManagerApiClient, permitted: boolea
     } catch (error) { if (!isAbortError(error) && sequence === inputSequence.current) showError(readApiError(error)); }
   }
 
-  async function pasteImageFromClipboard() {
-    if (!window.isSecureContext || !navigator.clipboard?.read) { showError(getClipboardPasteInstruction("页面")); return; }
+  function manualPaste(reason: string) {
+    setMessage(`${reason} ${getClipboardPasteInstruction("图片预览区")}`); setMessageType("info");
+    return "manual" as const;
+  }
+  async function pasteImageFromClipboard(): Promise<"manual" | undefined> {
+    if (!canUseOcr) return;
+    if (!window.isSecureContext) return manualPaste("当前 HTTP 连接不能一键读取剪贴板；使用 HTTPS 可启用此功能。");
+    if (!navigator.clipboard?.read) return manualPaste("当前浏览器不支持一键读取剪贴板图片。");
     const sequence = ++inputSequence.current;
     try {
       const blob = await runInput(async signal => {
@@ -98,10 +104,13 @@ export function useSmartOcr(client: ExportDocManagerApiClient, permitted: boolea
           const type = item.types.find(type => type.startsWith("image/"));
           if (type) return item.getType(type);
         }
-        throw new Error("剪贴板中没有图片。");
+        return null;
       });
-      if (sequence === inputSequence.current) loadImageBlob(blob, "剪贴板图片（内存）");
-    } catch (error) { if (!isAbortError(error) && sequence === inputSequence.current) showError(`${readApiError(error)} ${getClipboardPasteInstruction("页面")}`); }
+      if (sequence === inputSequence.current) {
+        if (blob) loadImageBlob(blob, "剪贴板图片");
+        else showError("剪贴板中没有图片，请先截图或复制图片。");
+      }
+    } catch (error) { if (!isAbortError(error) && sequence === inputSequence.current) return manualPaste("浏览器未允许直接读取剪贴板图片。"); }
   }
 
   async function recognizeCurrentImage() {

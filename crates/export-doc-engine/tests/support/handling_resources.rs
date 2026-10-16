@@ -204,7 +204,11 @@ pub(super) fn exercise(
         current["handlingName"], "会议接待",
         "request snapshot stays unchanged during handover"
     );
-    assert_eq!(current["handlerNames"], "supplies");
+    let handler = call(service, second, GET_CURRENT_USER, 0, None).unwrap();
+    assert_eq!(
+        current["handlerNames"],
+        format!("supplies（{}）", handler["username"].as_str().unwrap())
+    );
     assert!(notice(second).iter().any(|n| n["action"] == "reassign"));
     let mut fresh = body.clone();
     fresh["requestKey"] = json!(nonce().unwrap());

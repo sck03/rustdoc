@@ -44,6 +44,10 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
     return () => cancelAnimationFrame(frame);
   }, [imagePreviewUrl]);
 
+  async function pasteImage() {
+    if (await pasteImageFromClipboard() === "manual") previewViewportRef.current?.focus({ preventScroll: true });
+  }
+
   function adjustZoom(multiplier: number) {
     setZoom((current) => clampZoom(current * multiplier));
   }
@@ -132,7 +136,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
           }
         />
         <div className="toolbar-actions smart-ocr-action-bar">
-          <button className="icon-button" type="button" title="粘贴图片" aria-label="粘贴图片" disabled={isBusy || !canUseOcr} onClick={() => void pasteImageFromClipboard()}>
+          <button className="icon-button" type="button" title="粘贴图片" aria-label="粘贴图片" disabled={isBusy || !canUseOcr} onClick={() => void pasteImage()}>
             <ClipboardPaste size={18} aria-hidden="true" />
           </button>
           <button className="icon-button" type="button" title="复制文本" aria-label="复制文本" disabled={!canCopy} onClick={() => void copyText()}>
@@ -156,7 +160,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
           {readOcrRuntimeUnavailableMessage(ocrRuntime?.status)}
         </InlineNotice>
       ) : null}
-      {message ? <InlineNotice tone={messageType === "error" ? "error" : "success"}>{message}</InlineNotice> : null}
+      {message ? <InlineNotice tone={messageType}>{message}</InlineNotice> : null}
 
       <div className="smart-ocr-layout">
         <section className="form-section smart-ocr-preview-panel" aria-label="图片预览">
@@ -180,6 +184,8 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
           </div>
           <div
             ref={previewViewportRef}
+            tabIndex={0}
+            role="region"
             className={isDraggingPreview ? "smart-ocr-preview-viewport smart-ocr-preview-viewport-dragging" : "smart-ocr-preview-viewport"}
             onWheel={handlePreviewWheel}
             onPointerDown={beginPreviewDrag}

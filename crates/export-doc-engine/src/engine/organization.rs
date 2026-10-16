@@ -4,8 +4,9 @@ use super::{
     store::{self, Actor, Store},
 };
 pub use export_doc_domain::organization::search_key;
-use export_doc_storage::Connection;
-use serde_json::Value;
+use export_doc_storage::{Connection, DataScope, GenericQuery, PersonnelQuery};
+use serde_json::{Value, json};
+use std::collections::{HashMap, hash_map::Entry};
 
 pub fn validate_assignment(connection: &Connection, company: &str, department: &str) -> Result<()> {
     if company.is_empty() && department.is_empty() {
@@ -14,16 +15,20 @@ pub fn validate_assignment(connection: &Connection, company: &str, department: &
     if company.is_empty() {
         return Err(invalid("选择部门前必须先选择所属公司。"));
     }
-    if !store::all(connection, "companies")?
-        .iter()
-        .any(|item| item["code"] == company && item["isActive"] == true)
+    if !connection
+        .find_identity("companies", &store::normalize(company))?
+        .is_some_and(|item| item["code"] == company && item["isActive"] == true)
     {
         return Err(invalid("选择的公司不存在或已停用。"));
     }
     if !department.is_empty()
-        && !store::all(connection, "departments")?.iter().any(|item| {
-            item["code"] == department && item["companyCode"] == company && item["isActive"] == true
-        })
+        && !connection
+            .find_identity("departments", &store::normalize(department))?
+            .is_some_and(|item| {
+                item["code"] == department
+                    && item["companyCode"] == company
+                    && item["isActive"] == true
+            })
     {
         return Err(invalid("选择的部门不存在、已停用或不属于所选公司。"));
     }
@@ -35,21 +40,27 @@ pub fn departments(store: &Store) -> Result<Vec<Value>> {
     enrich_departments(store, &mut rows)?;
     Ok(rows)
 }
+pub(super) fn project(tx: &Connection, row: Value) -> Result<Value> {
+    let mut department = crate::contracts::overlay(
+        crate::contracts::initial(crate::contracts::schema("ApiOrganizationDepartmentDto")),
+        &row,
+    );
+    department["managerName"] = json!("");
+    department["managerEmployeeNumber"] = json!("");
+    if let Some(id) = row["managerEmployeeId"].as_i64() {
+        let person = tx
+            .get("people", id)?
+            .filter(|person| person["companyScope"] == row["companyCode"])
+            .ok_or_else(|| super::error::unavailable("部门负责人引用无效。"))?;
+        department["managerName"] = person["profile"]["fullName"].clone();
+        department["managerEmployeeNumber"] = person["employeeNumber"].clone();
+    }
+    Ok(department)
+}
 pub(super) fn enrich_departments(store: &Store, rows: &mut [Value]) -> Result<()> {
     let tx = store.connection()?;
     for row in rows {
-        let mut department = crate::contracts::overlay(
-            crate::contracts::initial(crate::contracts::schema("ApiOrganizationDepartmentDto")),
-            row,
-        );
-        if let Some(id) = row["managerEmployeeId"].as_i64() {
-            let person = tx
-                .get("people", id)?
-                .filter(|person| person["companyScope"] == row["companyCode"])
-                .ok_or_else(|| super::error::unavailable("部门负责人引用无效。"))?;
-            department["managerName"] = person["profile"]["fullName"].clone();
-        }
-        *row = department;
+        *row = project(&tx, std::mem::take(row))?;
     }
     Ok(())
 }
@@ -69,20 +80,95 @@ pub fn managers(store: &Store, query: &[(&str, String)]) -> Result<Value> {
     if keyword.chars().count() > 100 {
         return Err(invalid("搜索词不能超过 100 字。"));
     }
-    let keyword = export_doc_domain::organization::search_key(keyword);
-    store.transaction(|tx| {
-        let departments = store::all(tx, "departments")?;
-        let mut people: Vec<_> = store::all(tx, "people")?.into_iter()
-            .filter(|person| person["companyScope"] == company && person["status"] != "Departed")
-            .filter(|person| export_doc_domain::organization::search_key(&format!("{} {}", text(person, "employeeNumber"), text(person, "profile.fullName"))).contains(&keyword))
-            .map(|person| {
-                let department = departments.iter().find(|department| department["code"] == person["departmentId"]);
-                serde_json::json!({"id":person["id"],"fullName":person["profile"]["fullName"],"employeeNumber":person["employeeNumber"],"departmentName":department.map(|department| department["name"].clone()).unwrap_or_else(|| person["departmentId"].clone())})
-            }).collect();
-        people.sort_by(|a,b| store::normalize(&text(a,"employeeNumber")).cmp(&store::normalize(&text(b,"employeeNumber"))).then_with(|| a["id"].as_i64().cmp(&b["id"].as_i64())));
-        let paging: Vec<_> = query.iter().filter(|(key, _)| *key != "keyword").cloned().collect();
-        Ok(store::paged(people, &paging))
+    let keyword = search_key(keyword);
+    let (page, size, offset) = store::page_parameters(query);
+    store.read(|tx| {
+        let (total, mut people) = tx.query_personnel(&PersonnelQuery {
+            company,
+            department: "",
+            status: "",
+            keyword: &keyword,
+            search_fields: &["employeeNumber", "profile.fullName"],
+            scopes: &[],
+            fields: &[
+                ("id", "id"),
+                ("fullName", "profile.fullName"),
+                ("employeeNumber", "employeeNumber"),
+                ("departmentId", "departmentId"),
+            ],
+            offset,
+            limit: size as i64,
+        })?;
+        let mut departments = DepartmentNames::default();
+        for person in &mut people {
+            person["departmentName"] =
+                json!(departments.get(tx, company, &text(person, "departmentId"))?);
+        }
+        Ok(crate::contracts::page(people, total as usize, page, size))
     })
+}
+
+#[derive(Default)]
+pub(super) struct DepartmentNames(HashMap<(String, String), String>);
+impl DepartmentNames {
+    pub fn get(&mut self, tx: &Connection, company: &str, code: &str) -> Result<String> {
+        match self.0.entry((company.to_owned(), code.to_owned())) {
+            Entry::Occupied(entry) => Ok(entry.get().clone()),
+            Entry::Vacant(entry) => {
+                let name = tx
+                    .find_identity("departments", &store::normalize(code))?
+                    .filter(|department| department["companyCode"] == company)
+                    .map(|department| text(&department, "name"))
+                    .unwrap_or_else(|| code.to_owned());
+                Ok(entry.insert(name).clone())
+            }
+        }
+    }
+}
+
+fn exists(tx: &Connection, kind: &str, filters: &[(&str, String)]) -> Result<bool> {
+    Ok(tx
+        .query_generic(&GenericQuery {
+            kind,
+            scope: DataScope {
+                all: true,
+                ..Default::default()
+            },
+            filters,
+            keyword: "",
+            search_root: None,
+            fields: &[("id", "id")],
+            offset: 0,
+            limit: 1,
+        })?
+        .0
+        > 0)
+}
+fn has_active_members(tx: &Connection, company: &str, department: &str) -> Result<bool> {
+    let mut filters = vec![
+        ("companyScope", company.to_owned()),
+        ("isActive", "true".into()),
+    ];
+    if !department.is_empty() {
+        filters.push(("departmentId", department.to_owned()));
+    }
+    if exists(tx, "users", &filters)? {
+        return Ok(true);
+    }
+    Ok(tx
+        .query_personnel(&PersonnelQuery {
+            company,
+            department,
+            status: "",
+            keyword: "",
+            search_fields: &[],
+            scopes: &[],
+            fields: &[("id", "id")],
+            offset: 0,
+            limit: 1,
+        })?
+        .0
+        > 0)
 }
 
 pub fn validate(
@@ -104,16 +190,12 @@ pub fn validate(
     }
     if kind == "companies" {
         if value["isActive"] == false {
-            let active_departments = store::all(connection, "departments")?
-                .iter()
-                .any(|item| item["companyCode"] == code && item["isActive"] == true);
-            let active_users = store::all(connection, "users")?
-                .iter()
-                .any(|item| item["companyScope"] == code && item["isActive"] == true);
-            let active_people = store::all(connection, "people")?
-                .iter()
-                .any(|item| item["companyScope"] == code && item["status"] != "Departed");
-            if active_departments || active_users || active_people {
+            if exists(
+                connection,
+                "departments",
+                &[("companyCode", code.clone()), ("isActive", "true".into())],
+            )? || has_active_members(connection, &code, "")?
+            {
                 return Err(conflict(
                     "公司仍有启用部门、账号或在职人员，请先处理后再停用公司。",
                 ));
@@ -125,9 +207,9 @@ pub fn validate(
     if id > 0 && previous["companyCode"] != company {
         return Err(invalid("已有部门不能修改所属公司。"));
     }
-    if !store::all(connection, "companies")?
-        .iter()
-        .any(|item| item["code"] == company && item["isActive"] == true)
+    if !connection
+        .find_identity("companies", &store::normalize(&company))?
+        .is_some_and(|item| item["code"] == company && item["isActive"] == true)
     {
         return Err(invalid("请选择启用的公司。"));
     }
@@ -151,11 +233,20 @@ pub fn validate(
     {
         return Err(conflict("存在启用的下级部门，不能停用上级。"));
     }
-    if let Some(manager) = value["managerEmployeeId"].as_i64().filter(|id| *id > 0) {
+    if !value["managerEmployeeId"].is_null() {
+        let manager = super::records::positive(value, "managerEmployeeId", "部门负责人")?;
         let person = store::get(connection, "people", manager)?;
         if person["companyScope"] != company || person["status"] == "Departed" {
             return Err(invalid("负责人必须是本公司在职人员。"));
         }
+    }
+    if value["isActive"] == false
+        && (!value["managerEmployeeId"].is_null()
+            || has_active_members(connection, &company, &code)?)
+    {
+        return Err(conflict(
+            "部门仍有负责人、启用账号或在职人员，请先交接、调岗后再停用部门。",
+        ));
     }
     let mut tree = departments
         .into_iter()

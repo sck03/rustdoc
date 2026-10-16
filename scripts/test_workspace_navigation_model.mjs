@@ -288,7 +288,7 @@ assert(model.isSystemAdministrationRoute("/audit-logs"), "audit route requires s
 assert(model.isSystemAdministrationRoute("/system/access-control"), "access control route requires system administration capability");
 assert(model.isDesktopOnlyRoute("/system/update"), "updater route requires desktop runtime");
 const routes = model.searchWorkspaceNavGroups("WebDAV", adminGroups).flatMap(group => group.items);
-assert(routes.some(item => item.to === "/settings?section=webDav" && item.locationLabel.includes("系统管理 / 系统设置")), "search resolves settings subfeatures and displays their location");
+assert(routes.some(item => item.to === "/settings?section=backupReplica" && item.locationLabel.includes("系统管理 / 系统设置") && item.label === "异机副本"), "search resolves the current replica settings and displays their location");
 assert(model.searchWorkspaceNavGroups("WebDAV", salesGroups).length === 0, "feature search preserves administrative boundaries");
 const dictionaryOnly = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: true, enabledModules: ["document.declaration-dictionary"], permissions: [permissionGrant("document.declaration-dictionary", "view")] });
 assert(dictionaryOnly[0].items[0].label === "单一窗口" && dictionaryOnly[0].items[0].to === "/single-window/reference-catalog", "a merged area opens its first authorized destination");

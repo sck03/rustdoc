@@ -70,7 +70,7 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
     {editing && <PersonnelFormDialog client={client} user={user} departments={departments} record={editing} onClose={() => setEditing(null)} onSaved={() => setEditing(null)} />}
     {workflow && <PersonnelWorkflowDialog client={client} user={user} departments={departments} {...workflow} onClose={() => setWorkflow(null)} />}
     {linking && <PersonnelAccountDialog client={client} user={user} record={linking} onClose={() => setLinking(null)} />}
-    {deleting && <RecordDeleteDialog name={deleting.employee.fullName} version={deleting.versionNumber} operation={deleteOperation}
+    {deleting && <RecordDeleteDialog name={`${deleting.employee.fullName} · ${deleting.employee.employeeNumber}`} version={deleting.versionNumber} operation={deleteOperation}
       description="仅可删除没有账号、业务及正式任职变动引用的误录档案。档案和所附照片会一起删除，删除审计保留。"
       onDelete={(body, signal) => client.deletePersonnel({ id, body }, { signal })} onClose={() => setDeleting(null)} onDeleted={onClose} />}
   </>;

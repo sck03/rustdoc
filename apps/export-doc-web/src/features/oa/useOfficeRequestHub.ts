@@ -29,7 +29,7 @@ export function useOfficeRequestHub(client: ExportDocManagerApiClient, user: Api
       const input = { status, mineOnly: !handling && !officeAccess(user, kind).canSeeOthers, handlingOnly: handling, pageNumber: 1, pageSize: 5 };
       const page: OfficePage<OfficeRequestRow> = await (kind === "rooms"
         ? client.listMeetingBookings(input, { signal }) : client.listOfficeSupplyRequests(input, { signal }));
-      return { ...page, items: page.items.map(row => ({ id: row.id, employeeName: row.applicantName,
+      return { ...page, items: page.items.map(row => ({ id: row.id, employeeName: row.applicantName, employeeId: row.employeeId, employeeNumber: row.employeeNumber,
         title: isMeetingBooking(row) ? row.title : `${row.supplyName} · ${row.quantity} ${row.unit}` })) };
     },
     refetchInterval: 30000, refetchIntervalInBackground: false,

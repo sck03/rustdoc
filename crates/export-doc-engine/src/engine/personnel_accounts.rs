@@ -48,6 +48,18 @@ pub fn linked_person(tx: &Connection, user_id: i64) -> Result<Option<Value>> {
     Ok(rows.pop())
 }
 
+pub fn person_for_account(tx: &Connection, user_id: i64) -> Result<Option<Value>> {
+    linked_person(tx, user_id)?
+        .map(|person| {
+            let id = person["id"]
+                .as_i64()
+                .ok_or_else(|| unavailable("人员编号损坏。"))?;
+            tx.get("people", id)?
+                .ok_or_else(|| unavailable("人员账号关联已失效。"))
+        })
+        .transpose()
+}
+
 pub fn links(tx: &Connection) -> Result<HashMap<i64, Value>> {
     let mut links = HashMap::new();
     let mut offset = 0;

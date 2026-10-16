@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { requestPersonLabel } from "../office/requestIdentity.ts";
 import { useQuery } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient, OaRequest } from "../../api/index.ts";
 import { formatBusinessDateTime } from "../../ui/businessTime.ts";
@@ -22,14 +23,14 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
   return <article className="oa-detail">
     <header className="oa-detail-summary">
     <div className="office-card-heading"><h2>{row.title}</h2><span className="office-badge" data-state={row.status}>{oaStatus[row.status]}</span></div>
-    <dl className="oa-facts"><div><dt>申请编号</dt><dd>#{row.id}</dd></div><div><dt>申请人</dt><dd>{row.employeeName}</dd></div><div><dt>所属部门</dt><dd>{row.departmentId}</dd></div><div><dt>更新时间</dt><dd>{formatBusinessDateTime(row.updatedAt, user.businessTimeZone)}</dd></div></dl>
+    <dl className="oa-facts"><div><dt>申请编号</dt><dd>#{row.id}</dd></div><div><dt>申请人</dt><dd>{requestPersonLabel(row.employeeName, row)}</dd></div><div><dt>所属部门</dt><dd>{row.departmentId}</dd></div><div><dt>更新时间</dt><dd>{formatBusinessDateTime(row.updatedAt, user.businessTimeZone)}</dd></div></dl>
     {(editable || oaActions(row, user).length > 0) && <div className="office-card-actions">
       {editable && <button type="button" className="command-button secondary" disabled={operation.busy} onClick={onEdit}>编辑草稿</button>}
       {oaActions(row, user).map((action) => <button type="button" className={`command-button${["cancel", "withdraw", "reject", "void"].includes(action) ? " secondary" : ""}`} key={action} disabled={operation.busy} onClick={() => setAction(action)}>{oaActionLabel(action, row.kind, user.capabilities.usesOfficeRegister)}</button>)}
     </div>}
     {row.status === "HandedOff" && <InlineNotice tone="success" title="财务交接已登记">此状态仅记录资料交接，不代表已记账或已付款；办理人、时间和说明见审批与办理记录。</InlineNotice>}
     </header>
-    {row.approvalPlan && row.approvalPlan.steps.length > 0 && <section className="oa-detail-content" aria-label="审批步骤"><h3>审批步骤</h3><ol className="oa-history">{row.approvalPlan.steps.map((step, index) => <li key={step.approverUserId}><strong>第 {index + 1} 步 · {step.approverName}</strong> · {{ Waiting: "待审批", Approved: "已批准", Rejected: "已驳回" }[step.status]}{step.actedByUserId && <p>{step.delegationKey ? "代理办理：" : "办理人："}{step.actedByName} · {formatBusinessDateTime(step.actedAt, user.businessTimeZone)} · {step.note}</p>}</li>)}</ol></section>}
+    {row.approvalPlan && row.approvalPlan.steps.length > 0 && <section className="oa-detail-content" aria-label="审批步骤"><h3>审批步骤</h3><ol className="oa-history">{row.approvalPlan.steps.map((step, index) => <li key={step.approverUserId}><strong>第 {index + 1} 步 · {step.approverName}（账号 #{step.approverUserId}）</strong> · {{ Waiting: "待审批", Approved: "已批准", Rejected: "已驳回" }[step.status]}{step.actedByUserId && <p>{step.delegationKey ? "代理办理：" : "办理人："}{step.actedByName}（账号 #{step.actedByUserId}） · {formatBusinessDateTime(step.actedAt, user.businessTimeZone)} · {step.note}</p>}</li>)}</ol></section>}
     <section className="oa-detail-content" aria-label="申请内容"><h3>申请内容</h3>
     <div className="oa-reason"><h4>申请说明</h4><p>{row.reason}</p></div>
     {row.leave && <p>{leaveCategories[row.leave.category]} · {row.leave.startsOn} {row.leave.startPeriod === "AM" ? "上午" : "下午"} 至 {row.leave.endsOn} {row.leave.endPeriod === "AM" ? "上午" : "下午"} · {row.durationDays} 个自然日</p>}
@@ -61,7 +62,7 @@ function OaActionDialog({ client, user, row, action, onClose }: { client: Export
   const [note, setNote] = useState("");
   const label = typeof action === "number" ? "移除附件" : oaActionLabel(action, row.kind, user.capabilities.usesOfficeRegister);
   return <OfficeDialog title={label} onClose={onClose} {...operation} protectChanges>
-    <p>{row.title} · {row.employeeName}</p>
+    <p>{row.title} · {requestPersonLabel(row.employeeName, row)}</p>
     {action === "complete" && <p className="office-muted">{row.kind === "expense" ? "请核对已批准的明细和凭证，填写接收说明或财务软件接收编号。系统保留办理人和时间；付款在独立财务软件中完成。" : "请如实记录办理结果；采购请注明验收情况，通用申请请注明交付内容。"}</p>}
     <form onSubmit={(event) => { event.preventDefault(); const api = oaApi(client, row.kind); const body = { expectedVersion: row.versionNumber, note };
       void operation.run((signal) => typeof action === "number" ? api.remove(row.id, action, body, { signal }) : api.action(action, row.id, body, { signal }), onClose);

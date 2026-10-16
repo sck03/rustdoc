@@ -53,7 +53,12 @@ try {
     const page=await context.newPage();page.setDefaultTimeout(10_000);
     const errors=[];page.on('pageerror',error=>errors.push(error.message));
     try {
-      await page.setContent('<!doctype html><html lang="zh-CN"><title>OCR verification</title><div id="root"></div></html>');
+      const html = '<!doctype html><html lang="zh-CN"><title>OCR verification</title><div id="root"></div></html>';
+      if (mode === 'http' || mode === 'clipboard') {
+        const origin = mode === 'http' ? 'http://ocr-http.test/' : 'https://ocr-clipboard.test/';
+        await page.route(origin, route => route.fulfill({ contentType: 'text/html', body: html }));
+        await page.goto(origin);
+      } else await page.setContent(html);
       await page.evaluate(mode=>{window.mode=mode;if(mode==='desktop'){window.isTauri=true;window.__TAURI_INTERNALS__={invoke:async()=>null};}},mode);
       await page.addScriptTag({path:bundle});
       await page.addStyleTag({path:path.join(output,'app.css')});
@@ -61,6 +66,58 @@ try {
     } finally {await page.close();}
   }
   const settle=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  const clipboardPng = fs.readFileSync(path.join(repo, 'tests/OcrFixtures/invoice.png')).toString('base64');
+  await scenario('HTTP button focuses the paste receiver and accepts a screenshot paste event', 'http', async page => {
+    assert.equal(await page.evaluate(() => isSecureContext), false);
+    await page.getByRole('button', { name: '粘贴图片', exact: true }).click();
+    await page.getByText(/HTTP 连接不能一键读取剪贴板/u).waitFor();
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'OCR 图片预览画布');
+    await page.evaluate(encoded => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([Uint8Array.from(atob(encoded), c => c.charCodeAt(0))], 'screenshot.png', { type: 'image/png' }));
+      document.activeElement.dispatchEvent(new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }));
+    }, clipboardPng);
+    await page.getByText('图片已载入。', { exact: true }).waitFor();
+    await page.getByRole('button', { name: '开始识别', exact: true }).click();
+    await page.waitForFunction(() => window.pending.length === 1);
+    assert.equal(await page.evaluate(() => window.pending[0].input.sourceName), '剪贴板图片');
+    await page.screenshot({ path: path.join(output, 'http-paste.png'), fullPage: true });
+  });
+  await scenario('secure clipboard image remains a single-click operation', 'clipboard', async page => {
+    assert.equal(await page.evaluate(() => isSecureContext), true);
+    await page.evaluate(encoded => {
+      const blob = new Blob([Uint8Array.from(atob(encoded), c => c.charCodeAt(0))], { type: 'image/png' });
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { read: async () => [{ types: ['image/png'], getType: async () => blob }] } });
+    }, clipboardPng);
+    await page.getByRole('button', { name: '粘贴图片', exact: true }).click();
+    await page.getByText('图片已载入。', { exact: true }).waitFor();
+    assert(await page.getByRole('button', { name: '开始识别', exact: true }).isEnabled());
+  });
+  await scenario('denied clipboard access offers keyboard paste without clearing an image', 'clipboard', async page => {
+    await page.getByLabel('上传 OCR 图片').setInputFiles(path.join(repo, 'tests/OcrFixtures/invoice.png'));
+    await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { read: async () => { throw new DOMException('Denied', 'NotAllowedError'); } } }));
+    await page.getByRole('button', { name: '粘贴图片', exact: true }).click();
+    await page.getByText(/浏览器未允许直接读取剪贴板图片/u).waitFor();
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'OCR 图片预览画布');
+    assert(await page.getByRole('button', { name: '开始识别', exact: true }).isEnabled());
+  });
+  await scenario('empty clipboard reports the actual problem', 'clipboard', async page => {
+    await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { read: async () => [] } }));
+    await page.getByRole('button', { name: '粘贴图片', exact: true }).click();
+    await page.getByText('剪贴板中没有图片，请先截图或复制图片。', { exact: true }).waitFor();
+    assert(await page.getByRole('button', { name: '开始识别', exact: true }).isDisabled());
+  });
+  await scenario('late clipboard denial cannot replace current feedback or steal focus', 'clipboard', async page => {
+    await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { read: () => new Promise((_, reject) => { window.clipboardReject = reject; }) } }));
+    await page.getByRole('button', { name: '粘贴图片', exact: true }).click();
+    await page.waitForFunction(() => Boolean(window.clipboardReject));
+    await page.getByLabel('上传 OCR 图片').setInputFiles(path.join(repo, 'tests/OcrFixtures/invoice.png'));
+    await page.getByLabel('识别文本').focus();
+    await page.evaluate(() => window.clipboardReject(new DOMException('Late denial', 'NotAllowedError')));
+    await settle(page);
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), '识别文本');
+    await page.getByText('图片已载入。', { exact: true }).waitFor();
+  });
   await scenario('browser file upload, one submission, source cancellation and Blob cleanup','browser',async page=>{
     await page.getByRole('button',{name:'选择 OCR 图片'}).waitFor({state:'visible'});
     assert.equal(await page.getByLabel('图片文件').getAttribute('readonly'),'');

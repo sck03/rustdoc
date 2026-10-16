@@ -15,6 +15,35 @@ pub struct DataScope<'a> {
     pub department: &'a str,
     pub user_id: i64,
 }
+impl DataScope<'_> {
+    pub(crate) fn filter(&self, values: &mut Vec<String>, pg: bool) -> String {
+        if self.all {
+            return "1=1".into();
+        }
+        let company = bind(values, self.company, pg);
+        let mut alternatives = Vec::new();
+        if self.company_wide {
+            alternatives.push(format!("r.company={company}"));
+        }
+        if self.department_wide {
+            let department = bind(values, self.department, pg);
+            alternatives.push(format!(
+                "(r.company={company} AND r.department={department})"
+            ));
+        }
+        if self.own {
+            let owner = bind(values, self.user_id, pg);
+            alternatives.push(format!(
+                "(r.company={company} AND r.owner_id=CAST({owner} AS BIGINT))"
+            ));
+        }
+        if alternatives.is_empty() {
+            format!("({company} IS NOT NULL AND 1=0)")
+        } else {
+            format!("({})", alternatives.join(" OR "))
+        }
+    }
+}
 pub struct GenericQuery<'a> {
     pub kind: &'a str,
     pub scope: DataScope<'a>,
@@ -28,36 +57,16 @@ pub struct GenericQuery<'a> {
 pub(crate) fn build(q: &GenericQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
     let mut values = Vec::new();
     let mut clauses = vec![format!("r.kind={}", bind(&mut values, q.kind, pg))];
-    let scope = &q.scope;
-    if !scope.all {
-        let company = bind(&mut values, scope.company, pg);
-        let mut alternatives = Vec::new();
-        if scope.company_wide {
-            alternatives.push(format!("r.company={company}"));
-        }
-        if scope.department_wide {
-            let department = bind(&mut values, scope.department, pg);
-            alternatives.push(format!(
-                "(r.company={company} AND r.department={department})"
-            ));
-        }
-        if scope.own {
-            let owner = bind(&mut values, scope.user_id, pg);
-            alternatives.push(format!(
-                "(r.company={company} AND r.owner_id=CAST({owner} AS BIGINT))"
-            ));
-        }
-        if alternatives.is_empty() {
-            clauses.push(format!("({company} IS NOT NULL AND 1=0)"));
-        } else {
-            clauses.push(format!("({})", alternatives.join(" OR ")));
-        }
-    }
+    clauses.push(q.scope.filter(&mut values, pg));
     for (name, value) in q.filters {
         sql::valid_path(name)?;
         let expression = field(name, pg);
         let expression = if pg {
             expression
+        } else if matches!(value.as_str(), "true" | "false") {
+            format!(
+                "CASE json_type(r.body,'$.{name}') WHEN 'true' THEN 'true' WHEN 'false' THEN 'false' ELSE CAST({expression} AS TEXT) END"
+            )
         } else {
             format!("CAST({expression} AS TEXT)")
         };

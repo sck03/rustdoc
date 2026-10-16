@@ -3,7 +3,8 @@ import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 import type { ApiOrganizationDepartmentDto } from "../../api/index.ts";
 import { IconButton } from "../../ui/Button.tsx";
 import { PageState } from "../../ui/PageState.tsx";
-import { buildDepartmentTreeRows, departmentOptions } from "./organizationModel.ts";
+import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
+import { buildDepartmentTreeRows, departmentManagerLabel, departmentOptions } from "./organizationModel.ts";
 
 type Props = {
   departments: ApiOrganizationDepartmentDto[];
@@ -73,7 +74,7 @@ export function OrganizationTree({ departments, keyword, companyName, canAdd, on
                 {department.childCount > 0 && <small className="organization-child-count" title="直属下级部门数">{department.childCount} 下级</small>}
               </div>
             </td>
-            <td className="organization-manager-cell" title={department.managerName || "未设置"}>{department.managerName || <span className="office-muted">未设置</span>}</td>
+            <td className="organization-manager-cell"><TablePrimaryText value={department.managerName || "未设置"} secondary={department.managerEmployeeNumber} /></td>
             <td><span className="organization-state" data-active={department.isActive}>{department.isActive ? "启用" : "停用"}</span></td>
             <td><div className="organization-row-actions">
               <IconButton label={"编辑" + department.name} onClick={() => onEdit(department)}><Pencil size={15} aria-hidden="true" /></IconButton>
@@ -84,7 +85,7 @@ export function OrganizationTree({ departments, keyword, companyName, canAdd, on
         </table>
       </div>
       <div className="organization-selection-path" role="status">
-        {selected ? <><strong>{companyName} / {selected.label}</strong><span>部门代码：{selected.code} · 负责人：{selected.managerName || "未设置"} · {selected.isActive ? "启用" : "停用"}</span></>
+        {selected ? <><strong>{companyName} / {selected.label}</strong><span>部门代码：{selected.code} · 负责人：{departmentManagerLabel(selected) || "未设置"} · {selected.isActive ? "启用" : "停用"}</span></>
           : <span>点击部门名称查看完整路径与负责人；行末可编辑、新增下级或删除。</span>}
       </div>
     </> : <PageState title={searching ? "没有符合条件的部门" : "该公司尚未设置部门"}

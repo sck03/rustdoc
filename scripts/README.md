@@ -171,6 +171,8 @@ Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公
 
 OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --example office_review`，再执行 `npm --prefix apps/export-doc-web run test:oa-ui`。回环测试宿主使用独立 DataRoot，覆盖六类申请、附件、办理记录、窄屏，以及管理员规则设置、多级审批、有效代理、手动催办和财务接收；不代替 PostgreSQL 18 或 Tauri 验收。公告通知与审批界面共用测试宿主/浏览器生命周期，正式业务仍使用同一 Rust 服务。
 
+同一宿主构建后，`node scripts/test_personnel_accounts_ui.mjs` 验证人员与账号双向入口、启停和改名同步、同名负责人的工号选择与保存、按工号检索、申请人工号及窄屏显示。Rust 人员和存储契约同时在 SQLite 与 `test-native-postgres.ps1 -Scope All` 的真实 PostgreSQL 18 中验证重名隔离、中文账号、组织停用、权限范围和分页。
+
 发票印章与模板预览回归复用该隔离宿主：先构建 React 和 `office_review`，再运行 `node scripts/test_invoice_report_ui.mjs`，验证无出口商关联的上传按钮、图片保存回读及样例/真实单据的原生排版。
 
 付款模板和真实 PDF 使用 `npm --prefix apps/export-doc-web run test:payment-printing-ui`，发票使用 `test:invoice-report-ui`，多模板 ZIP 和多附件使用 `test:batch-file-ui`；均要求先完成 React build 和 `cargo build --locked -p export-doc-server --example office_review`。批量回归包含六份模板的空白组件重建、原生样例/长明细输出对照、同一发票选择超过三种模板、逐模板权限与附件字节回读。付款回归覆盖个人模板、权限、预览失效、保存/取消和下载，生成的 PDF 仍须检查真实票面。
