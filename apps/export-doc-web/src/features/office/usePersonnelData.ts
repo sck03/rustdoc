@@ -1,10 +1,15 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient, PersonnelTransitionRequest } from "../../api/index.ts";
-import { useOfficePaging } from "./useOfficeData.ts";
+import { useOfficeOperation, useOfficePaging } from "./useOfficeData.ts";
+import { identityQueryRoots } from "../../api/queryKeys.ts";
 import type { PersonnelWorkflow } from "./personnelModel.ts";
 import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
+
+export function usePersonnelOperation() {
+  return useOfficeOperation(identityQueryRoots);
+}
 
 export function usePersonnelDirectory(client: ExportDocManagerApiClient, user: ApiUserDto, directoryOnly = false, enabled = true) {
   const list = useDirectoryLocation("people", 24);

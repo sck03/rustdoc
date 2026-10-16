@@ -8,10 +8,11 @@ import { useUserManagement } from "./useUserManagement.ts";
 import { minimumPasswordLength } from "./userAccountModel.ts";
 import { getRolePresentation } from "../../app/userRoles.ts";
 import { UserPermissionEditor } from "./UserPermissionEditor.tsx";
+import { employmentStatusLabels } from "../office/personnelModel.ts";
 
 export function UserManagementPanel({ client, canManageUsers }: { client: ExportDocManagerApiClient; canManageUsers: boolean }) {
   const { draft, setDraft, selectedUserId, users, search, setSearch, roles, permissionTemplates, availableCompanies, availableDepartments,
-    selectedTemplate, selectedRole, message, successMessage, deleteTarget, setDeleteTarget, deleteMutation,
+    employee, selectedTemplate, selectedRole, message, successMessage, deleteTarget, setDeleteTarget, deleteMutation,
     isBusy, refreshUsers, beginNew, saveUser, deleteSelectedUser, selectUser, patchDraft, changeRole, changeCompany } = useUserManagement(client, canManageUsers);
   if (!canManageUsers) return null;
   return (
@@ -19,7 +20,7 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
       <div className="section-header">
         <div>
           <h2>账号管理</h2>
-          <p className="section-description">创建和维护登录账号，并通过岗位与权限方案控制界面导航和业务操作。</p>
+          <p className="section-description">账号管理登录与操作权限；员工档案管理任职，公司与部门统一在组织架构维护。权限角色与实际岗位分别设置。</p>
         </div>
         <div className="toolbar-actions">
           <button className="icon-button" type="button" title="刷新用户" aria-label="刷新用户" disabled={isBusy} onClick={() => void refreshUsers()}>
@@ -40,7 +41,7 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
 
       {message ? <InlineNotice tone="error" title="用户操作失败">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
-      <label><span>查找账号或分组</span><input type="search" value={search} maxLength={100} placeholder="账号、姓名、岗位、分组或部门" onChange={event => setSearch(event.target.value)} /></label>
+      <label><span>查找账号或分组</span><input type="search" value={search} maxLength={100} placeholder="账号、姓名、工号、角色、分组或部门" onChange={event => setSearch(event.target.value)} /></label>
 
       <div className="user-management-layout">
         <ResponsiveTableFrame className="user-management-table-frame" label="用户账号列表">
@@ -76,11 +77,11 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
                     }}
                   >
                     <td className="strong-cell">{user.username}</td>
-                    <td>{user.fullName || "-"}</td>
+                    <td>{user.fullName || "-"}{user.employee && <small className="field-help">{user.employee.employeeNumber}</small>}</td>
                     <td>
                       <span className="role-label">{getRolePresentation(user.role).label}</span>
                     </td>
-                    <td>{user.permissionGrants != null ? "账号单独配置" : user.permissionTemplateName || "岗位默认分组"}</td>
+                    <td>{user.permissionGrants != null ? "账号单独配置" : user.permissionTemplateName || "角色默认方案"}</td>
                     <td><span className={user.isActive ? "account-status active" : "account-status inactive"}>{user.isActive ? "启用" : "停用"}</span></td>
                   </tr>
                 ))
@@ -90,24 +91,31 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
         </ResponsiveTableFrame>
 
         <div className="field-grid user-management-form-grid">
+          <div className="user-personnel-summary" aria-label="关联员工档案">
+            {employee ? <><strong>已关联：{employee.employeeNumber} · {employee.fullName}（{employmentStatusLabels[employee.status]}）</strong>
+              <p className="field-help">实际职位：{employee.jobTitle}。姓名、部门及任职变动请在员工档案维护。离职会停用登录，返聘后需重新审核启用。</p>
+              <Link to={`/office/people/${employee.id}`}>打开员工档案</Link></>
+              : <><p className="field-help">{draft.role === "Admin" ? "管理员账号用于系统管理，不关联员工档案。" : "尚未关联员工。先保存本公司普通账号，再打开员工档案，点击“关联账号”。每个账号和员工档案一一对应。"}</p>
+                {draft.role !== "Admin" && <Link to="/office/people">选择或登记员工档案</Link>}</>}
+          </div>
           <label>
             <span>账号</span>
             <input value={draft.username} disabled={isBusy} onChange={(event) => patchDraft("username", event.target.value)} />
           </label>
           <label>
             <span>姓名</span>
-            <input value={draft.fullName} disabled={isBusy} onChange={(event) => patchDraft("fullName", event.target.value)} />
+            <input value={draft.fullName} disabled={isBusy} readOnly={Boolean(employee)} onChange={(event) => patchDraft("fullName", event.target.value)} />
           </label>
           <label>
             <span>角色</span>
             <select value={draft.role} disabled={isBusy} onChange={(event) => changeRole(event.target.value)}>
               {roles.map((role) => (
-                <option key={role} value={role}>
+                <option key={role} value={role} disabled={Boolean(employee) && role === "Admin"}>
                   {getRolePresentation(role).label}
                 </option>
               ))}
             </select>
-            <small className="field-help">{selectedRole.description}</small>
+            <small className="field-help">{selectedRole.description} 权限角色提供默认授权，修改员工职位不会自动改变权限。</small>
           </label>
           <label>
             <span>权限方案</span>
@@ -130,12 +138,12 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
                   ? "账号使用独立权限；分组变更不再影响此账号"
                 : selectedTemplate?.name
                   ? `当前使用：${selectedTemplate.name}`
-                  : "未指定时自动使用该岗位的内置方案"}
+                  : "未指定时自动使用该角色的内置方案"}
             </small>
           </label>
           <label>
             <span>所属公司</span>
-            <select value={draft.companyScope} disabled={isBusy} onChange={(event) => changeCompany(event.target.value)}>
+            <select value={draft.companyScope} disabled={isBusy || Boolean(employee)} onChange={(event) => changeCompany(event.target.value)}>
               <option value="">未分配公司</option>
               {availableCompanies.map((company) => (
                 <option key={company.code} value={company.code}>
@@ -149,7 +157,7 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
             <span>所属部门</span>
             <select
               value={draft.departmentId}
-              disabled={isBusy || !draft.companyScope}
+              disabled={isBusy || !draft.companyScope || Boolean(employee)}
               onChange={(event) => patchDraft("departmentId", event.target.value)}
             >
               <option value="">未分配部门</option>
@@ -176,7 +184,7 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
             </small>
           </label>
           <label className="settings-check">
-            <input type="checkbox" checked={draft.isActive} disabled={isBusy} onChange={(event) => patchDraft("isActive", event.target.checked)} />
+            <input type="checkbox" checked={draft.isActive} disabled={isBusy || employee?.status === "Departed"} onChange={(event) => patchDraft("isActive", event.target.checked)} />
             <span>启用账号</span>
           </label>
         </div>

@@ -14,7 +14,7 @@ import { usePersonnelClearance, usePersonnelHistory, usePersonnelRecord } from "
 import { PersonnelFormDialog } from "./PersonnelFormDialog.tsx";
 import { PersonnelAccountDialog, PersonnelWorkflowDialog } from "./PersonnelWorkflowDialog.tsx";
 import { PersonnelImagesPanel } from "./PersonnelImagesPanel.tsx";
-import { useOfficeOperation } from "./useOfficeData.ts";
+import { usePersonnelOperation } from "./usePersonnelData.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { RecordDeleteDialog } from "./RecordDeleteDialog.tsx";
 
@@ -27,8 +27,8 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
   useEffect(() => { title.current?.focus(); }, [id]);
   const [pendingImages, setPendingImages] = useState(new Set<PersonnelImageKind>());
   useEffect(() => setPendingImages(new Set()), [tab]);
-  const imageOperation = useOfficeOperation();
-  const deleteOperation = useOfficeOperation();
+  const imageOperation = usePersonnelOperation();
+  const deleteOperation = usePersonnelOperation();
   const [deleting, setDeleting] = useState<PersonnelRecord | null>(null);
   const requestConfirmation = useConfirmation();
   const { confirmDiscardChanges } = useUnsavedChangesGuard({ isDirty: pendingImages.size > 0, message: "人员档案有尚未上传的图片。" });
@@ -96,6 +96,9 @@ function PersonnelFacts({ record, user }: { record: PersonnelRecord; user: ApiUs
   return <div className="personnel-detail-stack">
     {reminders.length > 0 && <InlineNotice tone="warning" title="待关注">{reminders.join("；")}</InlineNotice>}
     <section className="personnel-fact-section"><h3>任职信息</h3>{facts(employment)}</section>
+    {user.capabilities.canManageUsers && <p className="office-muted">{record.account
+      ? <Link to={`/system/access-control?userId=${record.account.id}`}>管理关联账号与权限</Link>
+      : <>员工档案不会自动创建登录账号。请在 <Link to="/system/access-control">账号与权限</Link> 保存本公司普通账号，再点击本页“关联账号”。</>}</p>}
     <section className="personnel-fact-section"><h3>工作联系</h3>{facts(contact)}</section>
     <details className="personnel-fact-section"><summary>个人资料与证件<span>私密资料 · 按需展开</span></summary>
     <dl className="personnel-facts"><div className="personnel-wide"><dt>居民身份证号码</dt><dd>{record.profile.identityNumber ? <>

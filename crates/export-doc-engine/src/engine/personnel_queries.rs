@@ -37,6 +37,7 @@ fn directory_entry(actor: &Actor, record: &Value, departments: &[Value]) -> Valu
 }
 
 pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value> {
+    record["account"] = super::personnel_accounts::current_account(tx, &record)?;
     if record.get("attachments").is_none() {
         record["attachments"] = json!([]);
     }

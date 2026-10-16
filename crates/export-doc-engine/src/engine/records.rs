@@ -139,6 +139,9 @@ pub fn list(
     if resource.key == "departments" {
         super::organization::enrich_departments(store, &mut records)?;
     }
+    if resource.key == "users" {
+        super::personnel_accounts::enrich_users(store, &mut records)?;
+    }
     if resource.key == "people" {
         records = records
             .into_iter()

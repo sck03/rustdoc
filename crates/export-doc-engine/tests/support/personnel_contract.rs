@@ -214,6 +214,73 @@ pub fn exercise(service: &NativeService, admin: &str) {
         Some(404)
     );
     person = call(service, admin, LINK_PERSONNEL_ACCOUNT, id, Some(json!({"expectedVersion":person["versionNumber"],"userId":account["id"],"expectedAccountVersion":account["versionNumber"]}))).unwrap();
+    let users = call(service, admin, LIST_USERS, 0, None).unwrap();
+    let linked = users["users"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["id"] == account["id"])
+        .unwrap();
+    assert_eq!(linked["employee"]["id"], id);
+    assert_eq!(linked["employee"]["jobTitle"], "业务员");
+    assert_eq!(
+        linked["employee"].as_object().unwrap().len(),
+        5,
+        "Account summary excludes private HR data"
+    );
+    for active in [false, true] {
+        let saved = call(service, admin, UPDATE_USER_ACCOUNT, account["id"].as_i64().unwrap(), Some(json!({
+            "username":account["username"], "fullName":person["profile"]["fullName"], "role":"OfficeEmployee",
+            "departmentId":"GENERAL", "companyScope":"DEFAULT", "isActive":active, "resetPassword":"",
+            "expectedVersion":person["account"]["versionNumber"], "employee":{"id":999999}
+        }))).unwrap()["user"].clone();
+        assert_eq!(
+            saved["employee"]["id"], id,
+            "Account writes cannot change the personnel link"
+        );
+        person = call(service, admin, GET_PERSONNEL, id, None).unwrap();
+        assert_eq!(
+            person["account"]["isActive"], active,
+            "Personnel detail reads current login status"
+        );
+        assert_eq!(person["account"]["versionNumber"], saved["versionNumber"]);
+    }
+    let other_person = call(service, admin, CREATE_PERSONNEL, 0, Some(json!({
+        "requestKey":nonce().unwrap(),"employeeNumber":format!("SECOND-{}", &suffix[..8]),
+        "departmentId":"GENERAL","jobTitle":"助理","employmentType":"FullTime","hireDate":"2026-09-01",
+        "onProbation":false,"profile":{"fullName":"另一员工"}
+    }))).unwrap();
+    let other_id = other_person["employee"]["id"].as_i64().unwrap();
+    assert_eq!(
+        call(
+            service,
+            admin,
+            LINK_PERSONNEL_ACCOUNT,
+            other_id,
+            Some(json!({
+                "expectedVersion":other_person["versionNumber"],"userId":account["id"],
+                "expectedAccountVersion":person["account"]["versionNumber"]
+            }))
+        )
+        .unwrap_err()
+        .status,
+        Some(409)
+    );
+    let options = call(
+        service,
+        admin,
+        LIST_PERSONNEL_ACCOUNT_OPTIONS,
+        other_id,
+        None,
+    )
+    .unwrap();
+    assert!(
+        options["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|u| u["id"] != account["id"])
+    );
     let staff = login();
     let staff_token = staff["accessToken"].as_str().unwrap();
     let spare = call(service, admin, CREATE_USER_ACCOUNT, 0, Some(json!({"username":format!("spare-{suffix}"),"fullName":"候选账号","role":"OfficeEmployee","departmentId":"GENERAL","companyScope":"DEFAULT","isActive":true,"resetPassword":"Personnel-Test-2026"}))).unwrap()["user"].clone();
@@ -271,6 +338,11 @@ pub fn exercise(service: &NativeService, admin: &str) {
         call(service, admin, CREATE_ORGANIZATION_DEPARTMENT, 0, Some(json!({"code":department,"companyCode":"DEFAULT","name":"调岗部门","isActive":true}))).unwrap();
         person = call(service, admin, TRANSFER_PERSONNEL, id, Some(json!({"expectedVersion":person["versionNumber"],"departmentId":department,"jobTitle":"新岗位","effectiveDate":"2026-09-02","note":"部门调整"}))).unwrap();
         assert_eq!(login()["user"]["departmentId"], department);
+        assert_eq!(
+            login()["user"]["role"],
+            "OfficeEmployee",
+            "Job changes do not assign permissions"
+        );
         let staff = login();
         person = call(service, admin, DEPART_PERSONNEL, id, Some(json!({"expectedVersion":person["versionNumber"],"effectiveDate":"2026-09-03","note":"完成交接离职"}))).unwrap();
         assert_eq!(person["account"]["isActive"], false);

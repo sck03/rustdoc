@@ -209,26 +209,27 @@ pub fn handle(
                 return Err(error(403, "只有管理员可以关联账号。"));
             }
             if operation == LIST_PERSONNEL_ACCOUNT_OPTIONS {
-                let people = store.all("people")?;
-                let accounts = store
-                    .all("users")?
-                    .into_iter()
-                    .filter(|user| {
-                        user["companyScope"] == current["companyScope"]
-                            && user["isActive"] == true
-                            && user["role"] != "Admin"
-                            && !people
-                                .iter()
-                                .any(|p| p["id"] != id && p["account"]["id"] == user["id"])
-                    })
-                    .map(|user| {
-                        contracts::overlay(
-                            contracts::initial(contracts::schema("PersonnelAccountRecord")),
-                            &user,
-                        )
-                    })
-                    .collect();
-                store::paged(accounts, query)
+                store.read(|tx| {
+                    let people = super::personnel_accounts::links(tx)?;
+                    let accounts = store::all(tx, "users")?
+                        .into_iter()
+                        .filter(|user| {
+                            user["companyScope"] == current["companyScope"]
+                                && user["isActive"] == true
+                                && user["role"] != "Admin"
+                                && user["id"].as_i64().is_some_and(|user_id| {
+                                    people.get(&user_id).is_none_or(|person| person["id"] == id)
+                                })
+                        })
+                        .map(|user| {
+                            contracts::overlay(
+                                contracts::initial(contracts::schema("PersonnelAccountRecord")),
+                                &user,
+                            )
+                        })
+                        .collect();
+                    Ok(store::paged(accounts, query))
+                })?
             } else {
                 store.transaction_as(actor, |tx, actor| {
                     let mut person = person(tx, actor, id, "assign")?;
@@ -254,9 +255,8 @@ pub fn handle(
                     {
                         return Err(invalid("请选择本公司启用的普通账号。"));
                     }
-                    if store::all(tx, "people")?
-                        .iter()
-                        .any(|p| p["id"] != id && p["account"]["id"] == user_id)
+                    if super::personnel_accounts::linked_person(tx, user_id)?
+                        .is_some_and(|person| person["id"] != id)
                     {
                         return Err(conflict("账号已经关联其他人员。"));
                     }

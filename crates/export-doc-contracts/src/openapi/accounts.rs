@@ -8,13 +8,22 @@ pub(super) const FIELDS: &[(&str, &[&str])] = &[
     ),
     (
         "ApiUserAccountDto",
-        &["permissionGrants", "disabledModules"],
+        &["permissionGrants", "disabledModules", "employee"],
     ),
     ("ApiPermissionTemplateDto", &["disabledModules"]),
     ("ApiPermissionTemplateSaveRequest", &["disabledModules"]),
 ];
 
 pub(super) fn extend(doc: &mut Value) {
+    doc["components"]["schemas"]["AccountPersonnelRecord"] = json!({
+        "type":"object", "required":["id","employeeNumber","fullName","jobTitle","status"],
+        "properties": {
+            "id":{"type":"integer","format":"int64"},
+            "employeeNumber":{"type":"string"}, "fullName":{"type":"string"},
+            "jobTitle":{"type":"string"},
+            "status":{"type":"string","enum":["Probation","Active","Departed"]}
+        }
+    });
     // Technical lookup helpers are derived, not independently assigned. A
     // write-capable helper must also be readable by the page using it.
     let mut dependencies = Vec::new();
@@ -43,6 +52,8 @@ pub(super) fn extend(doc: &mut Value) {
                 == "permissionGrants"
             {
                 json!({"type":["array","null"],"items":{"$ref":"#/components/schemas/ApiPermissionGrantDto"},"maxItems":1000,"default":null,"description":"null inherits the selected group or role; an array replaces it, including an empty deny-all array."})
+            } else if *field == "employee" {
+                json!({"anyOf":[{"$ref":"#/components/schemas/AccountPersonnelRecord"},{"type":"null"}],"default":null,"readOnly":true,"description":"Current personnel link; maintained through personnel workflows, never account save input."})
             } else {
                 json!({"type":"array","items":{"type":"string"},"maxItems":100,"default":[],"description":"Disabled modules are removed from both effective permissions and navigation."})
             };

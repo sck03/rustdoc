@@ -100,3 +100,5 @@ export const queryKeys = {
   singleWindowReferenceCatalog: () => ["single-window", "reference-catalog"] as const,
   singleWindowOperationCenterRoot: () => ["single-window", "operation-center"] as const,
 };
+
+export const identityQueryRoots = [queryKeys.users(), queryKeys.organizationDirectory(), ["organization-managers"]] as const;

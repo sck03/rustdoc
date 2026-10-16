@@ -6,9 +6,16 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { type UserDraft, createEmptyDraft, createDraftFromUser, buildUserDraftSnapshot, upsertUserList, minimumPasswordLength } from "./userAccountModel.ts";
 import { getRolePresentation } from "../../app/userRoles.ts";
+import { useRouteQuery } from "../../ui/useRouteQuery.ts";
+import { readRouteId } from "../../ui/routeQueryState.ts";
+import { identityQueryRoots } from "../../api/queryKeys.ts";
 
 export function useUserManagement(client: ExportDocManagerApiClient, canManageUsers: boolean) {
   const queryClient = useQueryClient();
+  const { params } = useRouteQuery();
+  const requestedUserId = readRouteId(params.get("userId"));
+  const refreshIdentity = () => Promise.all([...identityQueryRoots, ["office"], ["worklist"]]
+    .map(queryKey => queryClient.invalidateQueries({ queryKey })));
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<UserDraft>(() => createEmptyDraft("OfficeEmployee"));
@@ -41,9 +48,9 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
     }
 
     if (selectedUserId == null && usersQuery.data.users.length > 0) {
-      applyUser(usersQuery.data.users[0]);
+      applyUser(usersQuery.data.users.find(user => user.id === requestedUserId) ?? usersQuery.data.users[0]);
     }
-  }, [canManageUsers, selectedUserId, usersQuery.data]);
+  }, [canManageUsers, selectedUserId, usersQuery.data, requestedUserId]);
 
   useEffect(() => {
     if (usersQuery.isError) {
@@ -67,7 +74,7 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
       queryClient.setQueryData<ApiUserListResponse | undefined>(queryKeys.users(), (current) =>
         upsertUserList(current, response.user, roles),
       );
-      await queryClient.invalidateQueries({ queryKey: queryKeys.users() });
+      await refreshIdentity();
     },
     onError: (error) => {
       setMessage(readApiError(error));
@@ -85,7 +92,7 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
       setPersistedDraftSnapshot(buildUserDraftSnapshot(emptyDraft));
       setMessage(null);
       setSuccessMessage(response.message || "用户已删除。");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.users() });
+      await refreshIdentity();
     },
     onError: (error) => {
       setMessage(readApiError(error));
@@ -230,8 +237,9 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
 
   const searchText = search.normalize("NFKC").trim().toLowerCase();
   const filteredUsers = users.filter(user => [user.username, user.fullName, getRolePresentation(user.role).label,
-    user.permissionTemplateName, user.companyScope, user.departmentId].join(" ").normalize("NFKC").toLowerCase().includes(searchText));
+    user.permissionTemplateName, user.companyScope, user.departmentId, user.employee?.employeeNumber].join(" ").normalize("NFKC").toLowerCase().includes(searchText));
+  const employee = users.find(user => user.id === draft.id)?.employee;
   return { draft, setDraft, selectedUserId, users: filteredUsers, search, setSearch, roles, permissionTemplates, availableCompanies, availableDepartments,
-    selectedTemplate, selectedRole, message, successMessage, deleteTarget, setDeleteTarget, deleteMutation,
+    employee, selectedTemplate, selectedRole, message, successMessage, deleteTarget, setDeleteTarget, deleteMutation,
     isBusy, refreshUsers, beginNew, saveUser, deleteSelectedUser, selectUser, patchDraft, changeRole, changeCompany };
 }

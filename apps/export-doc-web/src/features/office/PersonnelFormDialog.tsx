@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import type { ApiUserDto, ExportDocManagerApiClient, PersonnelDepartmentRecord, PersonnelProfile, PersonnelRecord } from "../../api/index.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
-import { useOfficeOperation } from "./useOfficeData.ts";
+import { usePersonnelOperation } from "./usePersonnelData.ts";
 import { employmentTypeLabels, readPersonnelCreate, readPersonnelUpdate } from "./personnelModel.ts";
 import { PersonnelIdentityFields } from "./PersonnelIdentityFields.tsx";
 import { departmentOptions } from "../organization/organizationModel.ts";
@@ -13,7 +13,7 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
   client: ExportDocManagerApiClient; user: ApiUserDto; departments: PersonnelDepartmentRecord[]; record?: PersonnelRecord;
   onClose: () => void; onSaved: (record: PersonnelRecord) => void;
 }) {
-  const operation = useOfficeOperation();
+  const operation = usePersonnelOperation();
   const attachments = useAttachmentDraft(record);
   const [requestKey] = useState(createRequestKey);
   const [hireDate, setHireDate] = useState(record?.hireDate ?? user.businessDate);

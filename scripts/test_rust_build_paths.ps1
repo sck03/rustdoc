@@ -86,5 +86,5 @@ try {
     $env:CARGO_TARGET_DIR = $previousTarget
     $resolved = [IO.Path]::GetFullPath($fixture)
     if ([IO.Path]::GetDirectoryName($resolved) -ne (Join-Path $repo '.codex-runtime')) { throw 'Unsafe fixture cleanup path' }
-    Remove-Item -LiteralPath $resolved -Recurse -Force
+    Remove-ExportDocDirectoryWithRetry -Path $resolved -MaximumAttempts 4
 }

@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "2f886c67f9c2c54dc13c38262bdb7810e606765ab99ff5c116cf9562e8a003df",
+  "digest": "2c67db3b76c1feee7fae94a950d46bf40f23c4001a0d9f731fc758e440b9e905",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -57240,6 +57240,39 @@
         }
       }
     },
+    "AccountPersonnelRecord": {
+      "type": "object",
+      "required": [
+        "id",
+        "employeeNumber",
+        "fullName",
+        "jobTitle",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "employeeNumber": {
+          "type": "string"
+        },
+        "fullName": {
+          "type": "string"
+        },
+        "jobTitle": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Probation",
+            "Active",
+            "Departed"
+          ]
+        }
+      }
+    },
     "Announcement": {
       "type": "object",
       "properties": {
@@ -73330,6 +73363,19 @@
           "maxItems": 100,
           "default": [],
           "description": "Disabled modules are removed from both effective permissions and navigation."
+        },
+        "employee": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/AccountPersonnelRecord"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "readOnly": true,
+          "description": "Current personnel link; maintained through personnel workflows, never account save input."
         }
       }
     },

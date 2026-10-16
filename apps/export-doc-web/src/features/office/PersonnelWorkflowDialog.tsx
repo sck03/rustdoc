@@ -4,14 +4,14 @@ import { InlineNotice } from "../../ui/PageState.tsx";
 import { OfficeDialog, OfficeField, OfficePager, OfficeQueryState, OfficeSubmit } from "./OfficeUi.tsx";
 import { personnelActionLabels, type PersonnelWorkflow } from "./personnelModel.ts";
 import { applyPersonnelWorkflow, usePersonnelAccountOptions, usePersonnelClearance } from "./usePersonnelData.ts";
-import { useOfficeOperation } from "./useOfficeData.ts";
+import { usePersonnelOperation } from "./usePersonnelData.ts";
 import { departmentOptions } from "../organization/organizationModel.ts";
 
 export function PersonnelWorkflowDialog({ client, user, record, action, departments, onClose }: {
   client: ExportDocManagerApiClient; user: ApiUserDto; record: PersonnelRecord; action: PersonnelWorkflow;
   departments: PersonnelDepartmentRecord[]; onClose: () => void;
 }) {
-  const operation = useOfficeOperation();
+  const operation = usePersonnelOperation();
   const clearance = usePersonnelClearance(client, user, record.employee.id);
   const [departmentId, setDepartmentId] = useState(record.employee.departmentId);
   const changesJob = action === "transfer" || action === "rehire";
@@ -57,7 +57,7 @@ export function PersonnelWorkflowDialog({ client, user, record, action, departme
 export function PersonnelAccountDialog({ client, user, record, onClose }: {
   client: ExportDocManagerApiClient; user: ApiUserDto; record: PersonnelRecord; onClose: () => void;
 }) {
-  const operation = useOfficeOperation();
+  const operation = usePersonnelOperation();
   const model = usePersonnelAccountOptions(client, user, record.employee.id);
   const [selected, setSelected] = useState<PersonnelAccountRecord | null>(null);
   function submit(event: FormEvent<HTMLFormElement>) {

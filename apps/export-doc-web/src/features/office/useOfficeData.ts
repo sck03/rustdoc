@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient, ListOfficeSuppliesRequest, OfficeRequestEventRecord, OfficeStockMovementRecord } from "../../api/index.ts";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
@@ -67,13 +67,13 @@ export function useOfficeHistory(client: ExportDocManagerApiClient, user: ApiUse
   return { paging, query };
 }
 
-export function useOfficeOperation() {
+export function useOfficeOperation(relatedKeys: readonly QueryKey[] = []) {
   const queries = useQueryClient();
   const abortable = useAbortableOperation();
   const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const refresh = () => Promise.all(["office", "worklist"].map(key => queries.invalidateQueries({ queryKey: [key] })));
+  const refresh = () => Promise.all([["office"], ["worklist"], ...relatedKeys].map(queryKey => queries.invalidateQueries({ queryKey })));
   async function run<T>(operation: (signal: AbortSignal) => Promise<T>, done: (result: T) => void) {
     if (inFlight.current) return;
     inFlight.current = true;

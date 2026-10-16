@@ -3,11 +3,11 @@ import type { ExportDocManagerApiClient, PersonnelAttachment, PersonnelRecord } 
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
-import { useOfficeOperation } from "./useOfficeData.ts";
+import { usePersonnelOperation } from "./usePersonnelData.ts";
 import { AttachmentUploadPanel } from "../../ui/AttachmentUploadPanel.tsx";
 
 export function PersonnelAttachments({ client, record }: { client: ExportDocManagerApiClient; record: PersonnelRecord }) {
-  const operation = useOfficeOperation();
+  const operation = usePersonnelOperation();
   const [removing, setRemoving] = useState<PersonnelAttachment | null>(null);
   return <section aria-label="档案文档"><h3>档案文档（{record.attachments?.length ?? 0}）</h3>
     {record.canEdit && <AttachmentUploadPanel key={record.employee.id} record={record} operation={operation} label="上传档案文档" upload={(current, body, signal) => client.uploadPersonnelAttachment({ id: current.employee.id, body }, { signal })} />}

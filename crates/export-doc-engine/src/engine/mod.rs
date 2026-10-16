@@ -66,6 +66,7 @@ mod party_files;
 mod pdf_merge;
 mod permission_templates;
 mod personnel;
+mod personnel_accounts;
 mod personnel_files;
 mod personnel_queries;
 mod product_options;

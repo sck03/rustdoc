@@ -29,8 +29,9 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
   const company = companies.find((item) => item.code === companyCode) ?? companies.find((item) => item.isActive) ?? companies[0];
   const departments = (query.data?.departments ?? []).filter((item) => item.companyCode === company?.code);
   return <section className="work-surface office-workspace organization-workspace" aria-label="组织架构管理">
-    <div className="organization-heading"><div><h2>公司与部门</h2><p className="office-muted">统一维护组织层级、部门负责人和人员归属。</p></div>
+    <div className="organization-heading"><div><h2>公司与部门</h2><p className="office-muted">公司与部门确定数据归属；负责人用于部门逐级审批，操作权限在账号与权限配置。员工调岗从人员档案办理。</p></div>
       <div className="organization-actions"><Link className="command-button secondary" to="/office/people">人员档案</Link>
+        <Link className="command-button secondary" to="/system/access-control">账号与权限</Link>
         <button type="button" className="command-button secondary" onClick={() => setCompanyEditor({})}><Plus size={16} aria-hidden="true" />新增公司</button></div></div>
     {query.isPending ? <PageState tone="loading" title="正在加载组织架构" /> : query.isError ? <PageState tone="error" title="组织架构加载失败" description={readApiError(query.error)}
       action={<button className="command-button secondary" type="button" onClick={() => void query.refetch()}>重新加载</button>} /> : !company ? <PageState title="尚未设置公司" description="先新增公司，再在公司下建立部门。" /> : <>

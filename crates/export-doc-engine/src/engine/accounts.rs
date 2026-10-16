@@ -96,26 +96,26 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
                 return Err(invalid("不能新分配已停用的权限方案。"));
             }
         }
-        if id > 0 {
-            if let Some(person) = store::all(tx, "people")?
-                .iter()
-                .find(|person| person["account"]["id"] == id)
+        let person = if id > 0 {
+            super::personnel_accounts::linked_person(tx, id)?
+        } else {
+            None
+        };
+        if let Some(person) = &person {
+            if body["role"] == "Admin"
+                || body["fullName"] != person["fullName"]
+                || body["departmentId"] != person["departmentId"]
+                || body["companyScope"] != person["companyScope"]
             {
-                if body["role"] == "Admin"
-                    || body["fullName"] != person["profile"]["fullName"]
-                    || body["departmentId"] != person["departmentId"]
-                    || body["companyScope"] != person["companyScope"]
-                {
-                    return Err(conflict(
-                        "已关联人员的姓名和组织须从人员档案维护，不能改为管理员账号。",
-                    ));
-                }
-                if person["status"] == "Departed" && body["isActive"] == true {
-                    return Err(conflict("离职人员须先办理返聘，才能重新启用账号。"));
-                }
+                return Err(conflict(
+                    "已关联人员的姓名和组织须从人员档案维护，不能改为管理员账号。",
+                ));
+            }
+            if person["status"] == "Departed" && body["isActive"] == true {
+                return Err(conflict("离职人员须先办理返聘，才能重新启用账号。"));
             }
         }
-        let saved = store::save(
+        let mut saved = store::save(
             tx,
             "users",
             id,
@@ -135,6 +135,9 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
                 auth::ITERATIONS,
             )?;
         }
+        saved["employee"] = person
+            .map(super::personnel_accounts::summary)
+            .unwrap_or(Value::Null);
         Ok(json!({"success":true,"message":"账号已保存","user":saved}))
     })
 }

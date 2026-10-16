@@ -7,6 +7,7 @@ x-restricted: &restricted
   security_opt: [no-new-privileges:true]
 services:
   setup:
+    container_name: '${COMPOSE_PROJECT_NAME}-setup'
     <<: *restricted
     image: *image
     user: '0:0'
@@ -17,6 +18,7 @@ services:
       - ./config:/deployment
       - ./data:/var/lib/exportdoc
   postgres:
+    container_name: '${COMPOSE_PROJECT_NAME}-postgres'
     image: postgres:18.6-trixie
     restart: unless-stopped
     environment:
@@ -38,6 +40,7 @@ services:
     stop_grace_period: 45s
     networks: [database]
   initialize:
+    container_name: '${COMPOSE_PROJECT_NAME}-initialize'
     <<: *restricted
     image: *image
     command: [--app-root, /opt/exportdoc, --data-root, /var/lib/exportdoc, --initialize-only]
@@ -52,6 +55,7 @@ services:
       postgres: {condition: service_healthy}
     networks: [database]
   application:
+    container_name: '${COMPOSE_PROJECT_NAME}-application'
     <<: *restricted
     image: *image
     restart: unless-stopped

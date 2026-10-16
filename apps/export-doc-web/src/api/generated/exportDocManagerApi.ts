@@ -10,6 +10,14 @@ export interface AISettings {
   systemPrompt: string;
 }
 
+export interface AccountPersonnelRecord {
+  employeeNumber: string;
+  fullName: string;
+  id: number;
+  jobTitle: string;
+  status: "Probation" | "Active" | "Departed";
+}
+
 export interface Announcement {
   attachments: OaAttachment[];
   audienceDepartment: string;
@@ -3538,6 +3546,7 @@ export interface ApiUserAccountDto {
   companyScope: string;
   departmentId: string;
   disabledModules?: string[];
+  employee?: AccountPersonnelRecord | null;
   fullName: string;
   id: number;
   isActive: boolean;
@@ -5300,6 +5309,7 @@ export const ApiUnitDtoDefaults = {
 
 export const ApiUserAccountDtoDefaults = {
   disabledModules: [],
+  employee: null,
   permissionGrants: null,
   versionNumber: 1,
 } as const satisfies Partial<ApiUserAccountDto>;
