@@ -15,6 +15,42 @@ pub fn code(value: &str) -> Result<String, String> {
     }
     Ok(code)
 }
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    use chrono::{DateTime, Duration, Utc};
+    #[test]
+    fn annual_evidence_and_full_year_retention_are_independent() {
+        let mut row = ApiHsCodeDto {
+            code: "6109100000".into(),
+            name: "棉制针织T恤衫".into(),
+            status: "Active".into(),
+            source_name: "年度税则".into(),
+            effective_year: Some(2025),
+            last_verified_at: Some("2025-01-01T00:00:00+08:00".into()),
+            update_time: Some("2024-02-29T23:30:00+08:00".into()),
+            ..Default::default()
+        };
+        assert!(current(&row, 2025));
+        assert!(!current(&row, 2026));
+        let anniversary = DateTime::parse_from_rfc3339("2025-02-28T23:30:00+08:00")
+            .unwrap()
+            .with_timezone(&Utc);
+        let before = anniversary - Duration::seconds(1);
+        for status in ["Active", "ReferenceOnly", "SuspectedObsolete"] {
+            row.status = status.into();
+            assert!(!cleanup_eligible(&row, anniversary));
+        }
+        row.status = "Obsolete".into();
+        assert!(!cleanup_eligible(&row, before));
+        assert!(cleanup_eligible(&row, anniversary));
+        row.update_time = Some("unknown".into());
+        assert!(!cleanup_eligible(&row, anniversary));
+        row.update_time = None;
+        assert!(!cleanup_eligible(&row, anniversary));
+    }
+}
 pub fn trusted(row: &ApiHsCodeDto) -> bool {
     row.status.eq_ignore_ascii_case("Active")
         && !row.source_name.trim().is_empty()
@@ -25,6 +61,21 @@ pub fn trusted(row: &ApiHsCodeDto) -> bool {
             .last_verified_at
             .as_deref()
             .is_some_and(|date| !date.is_empty())
+}
+pub fn current(row: &ApiHsCodeDto, year: i32) -> bool {
+    trusted(row) && row.effective_year == Some(i64::from(year))
+}
+
+/// Only confirmed obsolete records are eligible. A full calendar year after
+/// their last change is a conservative transition period; unknown dates stay.
+pub fn cleanup_eligible(row: &ApiHsCodeDto, now: chrono::DateTime<chrono::Utc>) -> bool {
+    row.status == "Obsolete"
+        && row
+            .update_time
+            .as_deref()
+            .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+            .and_then(|date| date.checked_add_months(chrono::Months::new(12)))
+            .is_some_and(|anniversary| anniversary <= now)
 }
 pub fn normalize(row: &mut ApiHsCodeDto) -> Result<(), String> {
     row.code = code(&row.code)?;

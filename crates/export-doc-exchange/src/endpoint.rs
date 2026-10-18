@@ -11,7 +11,7 @@ pub fn normalize(value: &str) -> Result<Url> {
     let invalid = || {
         Error::new(
             ErrorKind::Invalid,
-            "汇率源必须使用公开 HTTPS 地址，不能包含账号、查询参数、片段或内网地址。",
+            "汇率源必须使用公开 HTTPS 地址，不能包含账号、片段或内网地址；请勿在网址中放置密钥。",
         )
     };
     let url = Url::parse(value).map_err(|_| invalid())?;
@@ -20,7 +20,6 @@ pub fn normalize(value: &str) -> Result<Url> {
         || url.host_str().is_none()
         || !url.username().is_empty()
         || url.password().is_some()
-        || url.query().is_some()
         || url.fragment().is_some()
         || url.host_str().is_some_and(|host| {
             host.eq_ignore_ascii_case("localhost")

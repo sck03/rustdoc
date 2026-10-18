@@ -118,9 +118,9 @@ export function createSettingsBackupSmokeScene(runtime) {
       "设置",
       "汇率与币制",
       "汇率源网址",
-      "缓存分钟",
+      "获取间隔",
       "常用货币",
-      "更新货币列表",
+      "刷新报价与币种",
     ];
     const exchangeRatePageText = await waitForRuntimeDiagnostics(page, exchangeRateExpectedText, timeoutMs);
     const exchangeRateSettingsCheck = await waitForPageExpression(
@@ -132,9 +132,9 @@ export function createSettingsBackupSmokeScene(runtime) {
         return Boolean(panel &&
           panel.querySelector('.exchange-currency-settings-panel') &&
           text.includes('汇率源网址') &&
-          text.includes('缓存分钟') &&
+          text.includes('获取间隔') &&
           text.includes('常用货币') &&
-          buttons.some((button) => (button.innerText || '').includes('更新货币列表')));
+          buttons.some((button) => (button.innerText || '').includes('刷新报价与币种')));
       })()`,
       timeoutMs,
       "Timed out waiting for the exchange rate and currency settings panel.",

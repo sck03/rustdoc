@@ -48,8 +48,10 @@ pub fn upload(
     let year = metadata["effectiveYear"]
         .as_i64()
         .unwrap_or(service.clock.now().map_err(unavailable)?.today.year() as i64);
-    if !(2000..=2100).contains(&year) {
-        return Err(invalid("税则年度須为 2000 至 2100。"));
+    if !(2000..=i64::from(service.clock.now().map_err(unavailable)?.today.year())).contains(&year) {
+        return Err(invalid(
+            "税则年度须为 2000 至本年度；未来年度请在生效后导入。",
+        ));
     }
     let source =
         export_doc_domain::crm::text(&text(metadata, "sourceName"), "税则来源", 200, false)
@@ -82,7 +84,8 @@ pub fn upload(
                     seen.insert(code.clone(),item.clone());
                     if let Some(old)=existing.get(&code){let old=serde_json::to_value(old)?;item["id"]=old["id"].clone();item["rowVersion"]=old["rowVersion"].clone();
                         changed=comparable(&item).as_object().unwrap().iter().filter(|(key,value)|old[*key]!=**value).map(|(key,_)|key.clone()).collect();
-                        if change!="Unchanged"{change=if changed.is_empty(){"Unchanged"}else{"Update"};}
+                        if old["effectiveYear"].as_i64().is_some_and(|previous|previous>year){change="Conflict";message="已有较新年度资料，不能用旧年度覆盖。".into();}
+                        else if change!="Unchanged"{change=if changed.is_empty(){"Unchanged"}else{"Update"};}
                     }
                 }
             }
@@ -91,7 +94,8 @@ pub fn upload(
         if items.is_empty(){return Err(invalid("税则文件没有可读取的明细。"));}
         for item in &mut items{if conflicts.contains(&text(&item["item"],"code")){item["changeType"]=json!("Conflict");item["message"]=json!("同一编码在文件中存在不同内容，不会写入。" );}}
         if mode=="CompleteSnapshot"{
-            for (code,old) in &existing{if seen.contains_key(code){continue;}operation::check()?;
+            if items.iter().any(|row|row["changeType"]=="Invalid"||row["changeType"]=="Conflict"){return Err(invalid("完整年度库包含无效或冲突行，请修正后重新预检，避免误判缺失编码。"));}
+            for (code,old) in &existing{if seen.contains_key(code)||old.status!="Active"||old.effective_year.is_none_or(|old_year|old_year>year){continue;}operation::check()?;
                 let replacements:Vec<_>=seen.iter().filter(|(_,item)|rules::text(&text(item,"name"))==rules::text(&old.name)).map(|(code,_)|code.clone()).take(20).collect();
                 items.push(json!({"changeType":"SuspectedObsolete","rowNumber":0,"item":old,"changedFields":["status"],"replacementCandidates":replacements,"message":"完整年度文件未出现，确认后标记为疑似作废，保留原编码。"}));
             }

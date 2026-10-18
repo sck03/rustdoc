@@ -40,7 +40,6 @@ mod hs_package;
 #[cfg(feature = "hs-remote")]
 mod hs_remote;
 mod hs_search;
-#[cfg(feature = "excel")]
 mod import_previews;
 mod invoice_maintenance;
 mod invoice_query;
@@ -117,6 +116,8 @@ pub struct NativeService {
     ocr_gate: std::sync::Mutex<()>,
     #[cfg(feature = "exchange-rates")]
     exchange: export_doc_exchange::ExchangeRates,
+    #[cfg(feature = "exchange-rates")]
+    exchange_scheduler: exchange::Scheduler,
 }
 impl NativeService {
     pub(crate) fn authorize_operation(
@@ -240,11 +241,6 @@ impl NativeService {
             )?;
         }
         self.dispatch(operation, parameters, query, body, token)
-    }
-    pub fn close(&self) -> Result<()> {
-        self.backup_scheduler.stop()?;
-        self.jobs.close()?;
-        self.store.close()
     }
     pub fn dispatch(
         &self,
@@ -767,6 +763,8 @@ impl NativeService {
                 self.sessions.clear()?;
                 self.jobs.recover()?;
                 self.backup_scheduler.refresh(self)?;
+                #[cfg(feature = "exchange-rates")]
+                self.exchange_scheduler.refresh(self)?;
                 let job = self.jobs.completed(
                     actor,
                     "DatabaseRestore",
@@ -843,14 +841,19 @@ impl NativeService {
                 Ok(json!(store::history(&*self.store.connection()?, kind, id)?))
             }
             GET_SETTINGS => settings::read(&self.store, actor),
-            UPDATE_SETTINGS | VALIDATE_SETTINGS => settings::save(
-                &self.store,
-                &self.paths,
-                &self.protector,
-                actor,
-                operation,
-                &body_value,
-            ),
+            UPDATE_SETTINGS | VALIDATE_SETTINGS => {
+                let response = settings::save(
+                    &self.store,
+                    &self.paths,
+                    &self.protector,
+                    actor,
+                    operation,
+                    &body_value,
+                )?;
+                #[cfg(feature = "exchange-rates")]
+                let response = exchange::settings_saved(self, operation, response);
+                Ok(response)
+            }
             LIST_CUSTOM_OPTIONS | SAVE_CUSTOM_OPTION => {
                 custom_options::handle(&self.store, actor, operation, parameters, &body_value)
             }

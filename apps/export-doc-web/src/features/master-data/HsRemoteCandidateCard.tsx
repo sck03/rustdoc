@@ -64,7 +64,7 @@ function RemoteCandidatePicker({ client, candidate, draft, disabled, onDraft, on
     queryFn:({signal})=>client.listHsCodes({pageNumber:1,pageSize:30,keyword:debouncedDraft},{signal}),
     enabled:debouncedDraft.length>=4,
   });
-  const activeItems=(lookup.data?.items??[]).filter(item=>item.status==="Active"&&item.sourceName&&item.effectiveYear&&item.lastVerifiedAt);
+  const activeItems=(lookup.data?.items??[]).filter(item=>item.status==="Active"&&!item.requiresAnnualReview&&item.sourceName&&item.effectiveYear&&item.lastVerifiedAt);
   const selected=activeItems.find(item=>(item.code||item.normalizedCode).replace(/[^0-9A-Za-z]/g,"")===draft.replace(/[^0-9A-Za-z]/g,""));
   return <div className="remote-candidate-picker" aria-busy={lookup.isFetching}><input aria-label="选择当前有效HS编码" list={`active-hs-codes-${candidate.id}`} value={draft} onChange={event=>onDraft(event.target.value)} placeholder="输入有效编码检索"/><datalist id={`active-hs-codes-${candidate.id}`}>{activeItems.map(item=><option key={item.normalizedCode} value={item.code||item.normalizedCode}>{item.name} · {item.effectiveYear}年</option>)}</datalist><Button variant="primary" disabled={disabled||!selected} onClick={()=>selected&&onConfirm(selected.code||selected.normalizedCode)}>{lookup.isFetching?"检索中":selected?"确认加入":"选择有效编码"}</Button>{lookup.isError?<small className="remote-candidate-picker-error">有效编码检索失败，请稍后重试。</small>:null}</div>;
 }

@@ -1,32 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, Pause, Play, RotateCcw, Square } from "lucide-react";
-import { DirectionalLight, Fog, Group, HemisphereLight, PerspectiveCamera, Scene, WebGLRenderer } from "three";
+import { Box, Pause, Play, RotateCcw, Square, ZoomIn, ZoomOut } from "lucide-react";
+import { DirectionalLight, Fog, Group, HemisphereLight, OrthographicCamera, Scene, WebGLRenderer } from "three";
 import type { ApiContainerPackingAnalysisDto } from "../../../api/index.ts";
 import { buildContainerPackingRoot, buildContainerPackingSceneData, disposeContainerPackingScene } from "./containerPackingSceneObjects.ts";
 import type { ContainerPackingVisualizationDimensions } from "./containerPackingVisualizationModel.ts";
 import type { ContainerPackingRenderModeValue } from "./containerPackingModel.ts";
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
-
-type ContainerPackingViewPreset = "isometric" | "top" | "door";
+import { containerPackingViewAngles, type ContainerPackingViewPreset } from "./containerPackingViewModel.ts";
+import { buildContainerPackingLegend } from "./ContainerPackingProjectionModel.tsx";
 
 type ContainerPackingSceneControlApi = {
   resetView: () => void;
   setViewPreset: (preset: ContainerPackingViewPreset) => void;
   setAutoRotate: (enabled: boolean) => void;
+  zoomBy: (factor: number) => void;
 };
 
 const initialViewPreset: ContainerPackingViewPreset = "isometric";
 const containerPackingViewPresets: Array<{ value: ContainerPackingViewPreset; label: string }> = [
-  { value: "isometric", label: "等轴" },
+  { value: "isometric", label: "总览" },
   { value: "top", label: "俯视" },
+  { value: "side", label: "侧视" },
   { value: "door", label: "柜门" },
 ];
-
-const containerPackingViewAngles: Record<ContainerPackingViewPreset, { x: number; y: number }> = {
-  isometric: { x: 0.22, y: 0.58 },
-  top: { x: 1.18, y: 0 },
-  door: { x: 0.12, y: -Math.PI / 2 },
-};
 
 export function ContainerPackingScene3d({
   analysis,
@@ -39,7 +35,8 @@ export function ContainerPackingScene3d({
 }) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const controlApiRef = useRef<ContainerPackingSceneControlApi | null>(null);
-  const [autoRotate, setAutoRotate] = useState(true);
+  const [autoRotate, setAutoRotate] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   const [viewPreset, setViewPreset] = useState<ContainerPackingViewPreset>(initialViewPreset);
   const autoRotateRef = useRef(autoRotate);
   const viewPresetRef = useRef(viewPreset);
@@ -47,20 +44,25 @@ export function ContainerPackingScene3d({
   viewPresetRef.current = viewPreset;
   const sceneData = useMemo(() => buildContainerPackingSceneData(analysis, dimensions), [analysis, dimensions.length, dimensions.width, dimensions.height]);
   const viewRef = useRef({ ...containerPackingViewAngles[initialViewPreset] });
+  const zoomRef = useRef(1);
 
   useEffect(() => {
     const mount = mountRef.current;
-    if (!mount) {
+    if (!mount || failure) {
       return;
     }
 
     mount.innerHTML = "";
-    const renderer = new WebGLRenderer({
+    let renderer: WebGLRenderer;
+    try { renderer = new WebGLRenderer({
       antialias: true,
       alpha: false,
       // Retaining every frame increases GPU memory use on low-power devices.
       preserveDrawingBuffer: false,
-    });
+    }); } catch {
+      setFailure("三维视图暂不可用，可切回装柜图继续查看和导出。");
+      return;
+    }
     renderer.setClearColor(0xf7fafc, 1);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.domElement.className = "container-packing-3d-canvas";
@@ -73,7 +75,8 @@ export function ContainerPackingScene3d({
     const scene = new Scene();
     const fog = new Fog(0xf7fafc, 1, 100);
     scene.fog = fog;
-    const camera = new PerspectiveCamera(36, 1, 0.1, 100);
+    const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+    camera.zoom = zoomRef.current;
 
     const content = buildContainerPackingRoot(sceneData, analysis, renderMode === "FullGrid");
     content.position.y = -sceneData.container.height / 2;
@@ -92,6 +95,7 @@ export function ContainerPackingScene3d({
     scene.add(fillLight);
 
     const view = viewRef.current;
+    let viewportAspect = 1;
     let isDragging = false;
     let activePointerId: number | null = null;
     let lastPointerX = 0;
@@ -105,6 +109,7 @@ export function ContainerPackingScene3d({
     const renderScene = () => {
       root.rotation.x = view.x;
       root.rotation.y = view.y;
+      fitView();
       renderer.render(scene, camera);
       renderer.domElement.dataset.autoRotate = String(autoRotateRef.current);
       renderer.domElement.dataset.viewPreset = viewPresetRef.current;
@@ -141,6 +146,18 @@ export function ContainerPackingScene3d({
       }
     };
 
+    const fitView = () => {
+      const { length, width, height } = sceneData.container;
+      const halfWidth = (Math.abs(Math.cos(view.y)) * length + Math.abs(Math.sin(view.y)) * width) / 2;
+      const halfHeight = (Math.abs(Math.sin(view.x) * Math.sin(view.y)) * length + Math.abs(Math.cos(view.x)) * height + Math.abs(Math.sin(view.x) * Math.cos(view.y)) * width) / 2;
+      const extent = Math.max(halfHeight + 0.25, halfWidth / viewportAspect) * 1.12;
+      camera.left = -extent * viewportAspect;
+      camera.right = extent * viewportAspect;
+      camera.top = extent;
+      camera.bottom = -extent;
+      camera.updateProjectionMatrix();
+    };
+
     const applyViewPreset = (preset: ContainerPackingViewPreset) => {
       const angles = containerPackingViewAngles[preset];
       view.x = angles.x;
@@ -161,9 +178,18 @@ export function ContainerPackingScene3d({
     };
 
     controlApiRef.current = {
-      resetView: () => applyViewPreset(initialViewPreset),
+      resetView: () => {
+        camera.zoom = zoomRef.current = 1;
+        camera.updateProjectionMatrix();
+        applyViewPreset(initialViewPreset);
+      },
       setViewPreset: applyViewPreset,
       setAutoRotate,
+      zoomBy: (factor) => {
+        camera.zoom = zoomRef.current = Math.min(3, Math.max(0.75, camera.zoom * factor));
+        camera.updateProjectionMatrix();
+        scheduleAnimation();
+      },
     };
 
     const resize = () => {
@@ -171,16 +197,14 @@ export function ContainerPackingScene3d({
       const width = Math.max(Math.floor(rect.width), 320);
       const height = Math.max(Math.floor(rect.height), 260);
       renderer.setSize(width, height, false);
-      camera.aspect = width / height;
-      const halfFov = Math.atan(Math.tan(camera.fov * Math.PI / 360) * Math.min(1, camera.aspect));
+      viewportAspect = width / height;
       const radius = Math.hypot(sceneData.container.length, sceneData.container.width, sceneData.container.height) / 2;
-      const distance = radius / Math.sin(halfFov) * 1.1;
-      camera.position.set(0, sceneData.container.height * 0.95, distance);
+      const distance = radius * 4;
+      camera.position.set(0, sceneData.container.height / 2, distance);
       camera.lookAt(0, sceneData.container.height / 2, 0);
       camera.far = distance * 4;
       fog.near = distance * 1.2;
       fog.far = distance * 2.4;
-      camera.updateProjectionMatrix();
       scheduleAnimation();
     };
 
@@ -208,7 +232,7 @@ export function ContainerPackingScene3d({
       lastPointerX = event.clientX;
       lastPointerY = event.clientY;
       view.y += deltaX * 0.008;
-      view.x = Math.min(1.45, Math.max(-0.08, view.x + deltaY * 0.005));
+      view.x = Math.min(Math.PI / 2, Math.max(0, view.x + deltaY * 0.005));
       scheduleAnimation();
     };
 
@@ -225,6 +249,12 @@ export function ContainerPackingScene3d({
       scheduleAnimation();
     };
     const handleBlur = () => handlePointerUp();
+    const handleContextLost = (event: Event) => {
+      event.preventDefault();
+      cancelAnimation();
+      setAutoRotate(false);
+      setFailure("三维显示已中断，装柜方案仍保留。可以重试或切回装柜图。");
+    };
 
     const handleVisibilityChange = () => {
       isPageVisible = document.visibilityState === "visible";
@@ -248,6 +278,7 @@ export function ContainerPackingScene3d({
         }, { threshold: 0.01 });
 
     renderer.domElement.addEventListener("pointerdown", handlePointerDown);
+    renderer.domElement.addEventListener("webglcontextlost", handleContextLost);
     renderer.domElement.addEventListener("pointermove", handlePointerMove);
     renderer.domElement.addEventListener("pointerup", handlePointerUp);
     renderer.domElement.addEventListener("pointercancel", handlePointerUp);
@@ -267,6 +298,7 @@ export function ContainerPackingScene3d({
       intersectionObserver?.disconnect();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
+      renderer.domElement.removeEventListener("webglcontextlost", handleContextLost);
       renderer.domElement.removeEventListener("pointermove", handlePointerMove);
       renderer.domElement.removeEventListener("pointerup", handlePointerUp);
       renderer.domElement.removeEventListener("pointercancel", handlePointerUp);
@@ -275,9 +307,10 @@ export function ContainerPackingScene3d({
       controlApiRef.current = null;
       disposeContainerPackingScene(scene);
       renderer.dispose();
+      renderer.forceContextLoss();
       mount.innerHTML = "";
     };
-  }, [analysis, renderMode, sceneData]);
+  }, [analysis, renderMode, sceneData, failure]);
 
   function switchViewPreset(nextPreset: ContainerPackingViewPreset) {
     setAutoRotate(false);
@@ -287,6 +320,8 @@ export function ContainerPackingScene3d({
   }
 
   function resetView() {
+    setAutoRotate(false);
+    controlApiRef.current?.setAutoRotate(false);
     setViewPreset(initialViewPreset);
     controlApiRef.current?.resetView();
   }
@@ -322,6 +357,8 @@ export function ContainerPackingScene3d({
               </button>
             ))}
           </div>
+          <button className="icon-button" type="button" aria-label="缩小三维图" onClick={() => controlApiRef.current?.zoomBy(1 / 1.2)}><ZoomOut size={16} aria-hidden="true" /></button>
+          <button className="icon-button" type="button" aria-label="放大三维图" onClick={() => controlApiRef.current?.zoomBy(1.2)}><ZoomIn size={16} aria-hidden="true" /></button>
           <button
             className="icon-button"
             type="button"
@@ -341,7 +378,9 @@ export function ContainerPackingScene3d({
         <span>{sceneData.boxes.length} 个装载块</span>
         <span>{autoRotate ? "自动旋转" : "手动视角"}</span>
         <span>拖拽旋转</span>
+        <span>橙色框为柜门 · 从柜头向柜门装入</span>
       </div>
+      {failure && <div role="alert" className="warning-note">{failure} <button type="button" className="command-button secondary" onClick={() => setFailure(null)}>重试三维视图</button></div>}
       <div
         ref={mountRef}
         className="container-packing-3d-stage"
@@ -350,6 +389,9 @@ export function ContainerPackingScene3d({
         data-container-width={dimensions.width}
         data-container-height={dimensions.height}
       />
+      <div className="container-packing-legend" aria-label="装柜颜色图例">
+        {buildContainerPackingLegend(analysis.packedItems).map(item => <span key={item.key} className="container-packing-legend-item"><span className="container-packing-legend-swatch" style={{ backgroundColor: item.color }} aria-hidden="true" />{item.name}</span>)}
+      </div>
     </section>
   );
 }

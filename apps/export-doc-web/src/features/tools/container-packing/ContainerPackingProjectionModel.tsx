@@ -78,7 +78,7 @@ export function projectPackedCargoItem(
             height: item.occupiedHeight,
           }
         : {
-            x: item.y,
+            x: dimensions.width - item.y - footprint.width,
 
             y: dimensions.height - item.topHeight,
 
@@ -93,14 +93,8 @@ export function projectPackedCargoItem(
     projection.worldHeight,
   );
 
-  const screenX =
-    viewKind === "top" || viewKind === "side"
-      ? projection.originX +
-        (projection.worldWidth - rect.x - rect.width) * projection.scale
-      : projection.originX + rect.x * projection.scale;
-
   return {
-    x: screenX,
+    x: projection.originX + rect.x * projection.scale,
 
     y: projection.originY + rect.y * projection.scale,
 
@@ -117,17 +111,11 @@ export function renderContainerPackingItemGrid(
 
   rect: { x: number; y: number; width: number; height: number },
 ) {
-  if (item.isPalletized || rect.width < 12 || rect.height < 12) {
+  if (viewKind === "top" || item.isPalletized || rect.width < 12 || rect.height < 12) {
     return null;
   }
 
-  const segments = estimateContainerPackingGridSegments(item, viewKind, rect);
-
-  const lines = [
-    ...buildContainerPackingGridLines("x", rect, segments.xSegments),
-
-    ...buildContainerPackingGridLines("y", rect, segments.ySegments),
-  ];
+  const lines = buildContainerPackingGridLines("y", rect, clampContainerPackingGridSegments(item.loadCount));
 
   if (lines.length === 0) {
     return null;
@@ -153,48 +141,6 @@ export function renderContainerPackingItemGrid(
       ))}
     </g>
   );
-}
-
-function estimateContainerPackingGridSegments(
-  item: ApiPackedCargoItemDto,
-
-  viewKind: ContainerPackingViewKind,
-
-  rect: { width: number; height: number },
-) {
-  const loadCount = Math.max(
-    Math.trunc(item.loadCount || item.unitsRepresented || 1),
-    1,
-  );
-
-  const boundedCount = Math.min(
-    loadCount,
-    maxContainerPackingGridSegments * maxContainerPackingGridSegments,
-  );
-
-  const aspect = Math.max(rect.width / Math.max(rect.height, 1), 0.25);
-
-  const footprintXSegments = clampContainerPackingGridSegments(
-    Math.ceil(Math.sqrt(boundedCount * aspect)),
-  );
-
-  const footprintYSegments = clampContainerPackingGridSegments(
-    Math.ceil(boundedCount / footprintXSegments),
-  );
-
-  if (viewKind === "top") {
-    return {
-      xSegments: footprintXSegments,
-
-      ySegments: footprintYSegments,
-    };
-  }
-
-  return {
-    xSegments: viewKind === "side" ? footprintXSegments : footprintYSegments,
-
-    ySegments: clampContainerPackingGridSegments(loadCount),
-  };
 }
 
 function buildContainerPackingGridLines(
@@ -310,7 +256,7 @@ export function renderContainerPackingGuides(
         x={projection.originX + 4}
         y={projection.originY - 7}
       >
-        柜门
+        柜头
       </text>
 
       <text
@@ -322,7 +268,7 @@ export function renderContainerPackingGuides(
 
         textAnchor="end"
       >
-        柜头
+        柜门
       </text>
     </>
   );
@@ -344,8 +290,7 @@ export function renderContainerPackingCenterOfGravity(
 
   const x =
     projection.originX +
-    (dimensions.length -
-      clampNumber(analysis.centerOfGravityX, 0, dimensions.length)) *
+    clampNumber(analysis.centerOfGravityX, 0, dimensions.length) *
       projection.scale;
 
   const y =

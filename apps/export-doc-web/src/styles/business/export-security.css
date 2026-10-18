@@ -36,7 +36,7 @@
 
 .exchange-currency-select {
   width: 100%;
-  min-height: 240px;
+  min-height: 180px;
   padding: 8px;
   color: var(--edm-neutral-800);
   background: var(--edm-white);

@@ -83,7 +83,7 @@ function buildSceneBox(
     x: (x + footprintLength / 2) * scale - (dimensions.length * scale) / 2,
     y: (baseHeight + occupiedHeight / 2) * scale,
     z: (y + footprintWidth / 2) * scale - (dimensions.width * scale) / 2,
-    loadCount: item.unitsRepresented || item.loadCount || 1,
+    loadCount: item.isPalletized ? 1 : item.loadCount || 1,
   };
 }
 
@@ -126,7 +126,7 @@ function buildContainerShell(container: { length: number; width: number; height:
   const shell = new LineSegments(
     edges,
     new LineBasicMaterial({
-      color: 0x334155,
+      color: 0x849792,
       linewidth: 1,
     }),
   );
@@ -137,7 +137,7 @@ function buildContainerShell(container: { length: number; width: number; height:
 
 function buildContainerDoorFrame(container: { length: number; width: number; height: number }) {
   const group = new Group();
-  const doorMaterial = new LineBasicMaterial({ color: 0x0f766e });
+  const doorMaterial = new LineBasicMaterial({ color: 0xb76223, depthTest: false });
   const doorGeometry = new BufferGeometry().setFromPoints([
     new Vector3(container.length / 2, 0, -container.width / 2),
     new Vector3(container.length / 2, container.height, -container.width / 2),
@@ -145,6 +145,7 @@ function buildContainerDoorFrame(container: { length: number; width: number; hei
     new Vector3(container.length / 2, 0, container.width / 2),
   ]);
   const door = new Line(doorGeometry, doorMaterial);
+  door.renderOrder = 4;
   group.add(door);
   return group;
 }
@@ -155,7 +156,7 @@ function buildContainerAxisMarkers(container: { length: number; width: number; h
   headMarker.position.set(-container.length / 2, container.height * 0.02, 0);
   group.add(headMarker);
 
-  const doorMarker = buildMarkerPlane(0x0f766e, container.width, 0.07);
+  const doorMarker = buildMarkerPlane(0xb76223, container.width, 0.07);
   doorMarker.position.set(container.length / 2, container.height * 0.025, 0);
   group.add(doorMarker);
   return group;

@@ -26,6 +26,7 @@
     "test:list-pagination-ui": "node ../../scripts/test_list_pagination_ui.mjs",
     "test:invoice-text-normalization": "node ../../scripts/test_invoice_text_normalization_model.mjs",
     "test:settings-models": "node ../../scripts/test_settings_models.mjs",
+    "test:exchange-rate-ui": "node ../../scripts/test_exchange_rate_ui.mjs",
     "test:about-ui": "node ../../scripts/test_about_page_ui.mjs",
     "test:workspace-navigation": "node ../../scripts/test_workspace_navigation_model.mjs",
     "test:workspace-ui": "node ../../scripts/test_workspace_navigation_ui.mjs",

@@ -52965,6 +52965,130 @@
           "permissionBypass": true
         }
       }
+    },
+    "/api/master-data/hs-codes/cleanup/preview": {
+      "post": {
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "PreviewHsCodeCleanup",
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": {
+            "readModule": "document.hs-knowledge",
+            "writeModule": null,
+            "readAccessLevel": null,
+            "writeAccessLevel": "manage",
+            "selector": 0,
+            "disabled": false,
+            "overridesParent": false
+          },
+          "requirements": [],
+          "permissionBypass": false
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiHsCodeCleanupPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ]
+      }
+    },
+    "/api/master-data/hs-codes/cleanup/commit": {
+      "post": {
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "CommitHsCodeCleanup",
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": {
+            "readModule": "document.hs-knowledge",
+            "writeModule": null,
+            "readAccessLevel": null,
+            "writeAccessLevel": "manage",
+            "selector": 0,
+            "disabled": false,
+            "overridesParent": false
+          },
+          "requirements": [],
+          "permissionBypass": false
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiHsCodeImportCommitRequest"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -58155,6 +58279,14 @@
           },
           "storagePolicy": {
             "type": "string"
+          },
+          "isStale": {
+            "type": "boolean",
+            "default": false
+          },
+          "lastError": {
+            "type": "string",
+            "default": ""
           }
         }
       },
@@ -58262,6 +58394,60 @@
           },
           "storagePolicy": {
             "type": "string"
+          },
+          "autoRefreshEnabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "sourceFormat": {
+            "type": "string",
+            "enum": [
+              "BankOfChinaHtml",
+              "Icbc",
+              "Cmb",
+              "Json",
+              "Auto"
+            ],
+            "default": "BankOfChinaHtml",
+            "description": "BankOfChinaHtml reads BOC HTML; Icbc and Cmb read the official public quotation endpoints. Json requires baseCurrency CNY, unit 100 and rates using ApiExchangeRateDto."
+          },
+          "isStale": {
+            "type": "boolean",
+            "default": false
+          },
+          "lastError": {
+            "type": "string",
+            "default": ""
+          },
+          "availableCurrencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "missingCurrencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "lastAttemptAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "default": null
+          },
+          "nextRefreshAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "default": null
           }
         }
       },
@@ -58652,6 +58838,12 @@
           "rowVersion": {
             "type": "string",
             "default": ""
+          },
+          "requiresAnnualReview": {
+            "type": "boolean",
+            "default": false,
+            "readOnly": true,
+            "description": "Active evidence belongs to another business year; it cannot be used as a current tariff."
           }
         }
       },
@@ -69911,6 +70103,22 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "autoRefreshEnabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "sourceFormat": {
+            "type": "string",
+            "enum": [
+              "BankOfChinaHtml",
+              "Icbc",
+              "Cmb",
+              "Json",
+              "Auto"
+            ],
+            "default": "BankOfChinaHtml",
+            "description": "BankOfChinaHtml reads BOC HTML; Icbc and Cmb read the official public quotation endpoints. Json requires baseCurrency CNY, unit 100 and rates using ApiExchangeRateDto."
           }
         }
       },
@@ -76703,6 +76911,39 @@
           "s3Available"
         ],
         "additionalProperties": false
+      },
+      "ApiHsCodeCleanupPreview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "token",
+          "items",
+          "eligibleCount",
+          "retainedCount",
+          "policy"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiHsCodeDto"
+            }
+          },
+          "eligibleCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retainedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "policy": {
+            "type": "string"
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -83720,7 +83961,9 @@
           "澳门元",
           "林吉特"
         ],
-        "lastCurrencyListUpdateTime": null
+        "lastCurrencyListUpdateTime": null,
+        "autoRefreshEnabled": false,
+        "sourceFormat": "BankOfChinaHtml"
       },
       "email": {
         "smtpHost": "",

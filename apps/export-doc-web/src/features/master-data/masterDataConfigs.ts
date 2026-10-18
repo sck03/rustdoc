@@ -450,7 +450,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       { name: "rebateRate", label: "退税率" },
       { name: "supervisionConditions", label: "监管条件" },
       { name: "inspectionCategory", label: "检验检疫类别" },
-      { name: "status", label: "状态", format: (value) => value === "SuspectedObsolete" ? "疑似作废" : value === "Obsolete" ? "已作废" : value === "ReferenceOnly" ? "仅供参考" : "有效" },
+      { name: "status", label: "状态", format: (value, record) => record.requiresAnnualReview ? "待年度复核" : value === "SuspectedObsolete" ? "疑似作废" : value === "Obsolete" ? "已作废" : value === "ReferenceOnly" ? "仅供参考" : "有效" },
       { name: "updateTime", label: "更新", format: (value) => typeof value === "string" ? formatDate(value) : "-" },
     ],
     sections: [

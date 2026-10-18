@@ -82,7 +82,7 @@ pub fn feedback(tx: &Connection, actor: &Actor, body: &Value, year: i32) -> Resu
     let accepted = body["accepted"]
         .as_bool()
         .ok_or_else(|| invalid("缺少反馈结果。"))?;
-    if accepted && !hs::codes(tx)?.get(&code).is_some_and(rules::trusted) {
+    if accepted && !hs::is_current(tx, &code, year)? {
         return Err(invalid(
             "确认适用前必须选择已验证年度税则中的当前有效编码。",
         ));
@@ -137,7 +137,12 @@ pub fn feedback(tx: &Connection, actor: &Actor, body: &Value, year: i32) -> Resu
     }
     Ok(())
 }
-pub fn history(tx: &Connection, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
+pub fn history(
+    tx: &Connection,
+    actor: &Actor,
+    query: &[(&str, String)],
+    year: i32,
+) -> Result<Value> {
     let keyword = read(query, "keyword");
     if keyword.chars().count() > 200 {
         return Err(invalid("历史资料检索不能超过 200 字。"));
@@ -230,7 +235,7 @@ pub fn history(tx: &Connection, actor: &Actor, query: &[(&str, String)]) -> Resu
         .iter()
         .map(|r| text(r, "fingerprint"))
         .collect();
-    let codes = hs::codes(tx)?;
+    let codes = hs::codes_for_year(tx, year)?;
     let relations = store::all(tx, hs::REPLACEMENTS)?;
     let mut groups: BTreeMap<String, Value> = BTreeMap::new();
     for (raw, name, spec, source, variant) in sources {
@@ -267,6 +272,7 @@ pub fn remote_review(
     operation: Operation,
     query: &[(&str, String)],
     body: &Value,
+    year: i32,
 ) -> Result<Value> {
     if operation == LIST_HS_CODE_REMOTE_CANDIDATES {
         let status = if read(query, "status").is_empty() {
@@ -359,7 +365,7 @@ pub fn remote_review(
     if inputs.len() > 200 {
         return Err(invalid("一次最多审核 200 条候选。"));
     }
-    let codes = hs::codes(tx)?;
+    let codes = hs::codes_for_year(tx, year)?;
     let mut count = 0;
     for input in inputs {
         operation::check()?;

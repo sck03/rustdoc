@@ -191,6 +191,7 @@ export function SettingsPage({
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.settings() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.exchangeRatesRoot() }),
         ...["ExportDocument", "PaymentVoucher"].map((type) => queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplateFields(type) })),
       ]);
     },
@@ -289,9 +290,8 @@ export function SettingsPage({
     },
   });
 
-  const maintenanceActions = useSettingsMaintenanceActions({ client, patchSettings, refetchHealth: healthQuery.refetch, setMessage, setSuccessMessage });
+  const maintenanceActions = useSettingsMaintenanceActions({ client, refetchHealth: healthQuery.refetch, setMessage, setSuccessMessage });
   const cleanupSystemLogsMutation = maintenanceActions.cleanupMutation;
-  const refreshExchangeCurrenciesMutation = maintenanceActions.refreshCurrenciesMutation;
 
   const isBusy =
     settingsQuery.isFetching ||
@@ -299,8 +299,7 @@ export function SettingsPage({
     validateSettingsMutation.isPending ||
     testEmailMutation.isPending ||
     inferEmailServerMutation.isPending ||
-    cleanupSystemLogsMutation.isPending ||
-    refreshExchangeCurrenciesMutation.isPending;
+    cleanupSystemLogsMutation.isPending;
   const secrets = settingsQuery.data?.secrets ?? null;
   const databaseProvider = healthQuery.isError ? null : healthQuery.data?.databaseProviderKey ?? null;
   const issuingAuthorityOptions = issuingAuthoritiesQuery.data?.options ?? [];
@@ -529,16 +528,6 @@ export function SettingsPage({
     setValidationResult(null);
   }
 
-  function handleRefreshExchangeCurrencies() {
-    if (!canManageSettings || isBusy) {
-      return;
-    }
-
-    setMessage(null);
-    setSuccessMessage(null);
-    refreshExchangeCurrenciesMutation.mutate();
-  }
-
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (currentCategory === "backup") return;
@@ -633,6 +622,7 @@ export function SettingsPage({
 
               {currentCategory === "exchange-rate" ? (
                 <LazyExchangeRateSettingsPanel
+                  client={client}
                   settings={settings}
                   canManageSettings={canManageSettings}
                   isBusy={isBusy}
@@ -642,7 +632,6 @@ export function SettingsPage({
                     setMessage(text);
                     setSuccessMessage(null);
                   }}
-                  onRefreshCurrencies={handleRefreshExchangeCurrencies}
                 />
               ) : null}
               {currentCategory === "communication" ? (

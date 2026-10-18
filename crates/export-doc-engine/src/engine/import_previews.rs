@@ -9,7 +9,13 @@ use chrono::{DateTime, Duration};
 use export_doc_storage::{BlobWrite, Connection, RecordWrite};
 use serde_json::{Value, json};
 const KIND: &str = "import-previews";
-const MAX_PAYLOAD: usize = 16 * 1024 * 1024;
+fn limits(kind: &str) -> (usize, usize) {
+    if kind == "hs-tariffs" {
+        (50_000, 64 * 1024 * 1024)
+    } else {
+        (5_000, 16 * 1024 * 1024)
+    }
+}
 
 pub fn save(
     tx: &Connection,
@@ -19,8 +25,12 @@ pub fn save(
     rows: &[Value],
 ) -> Result<String> {
     let bytes = serde_json::to_vec(rows)?;
-    if bytes.len() > MAX_PAYLOAD {
-        return Err(invalid("导入预检内容超过 16 MiB，请拆分文件。"));
+    let (max_rows, max_payload) = limits(kind);
+    if rows.len() > max_rows || bytes.len() > max_payload {
+        return Err(invalid(format!(
+            "预检内容超过 {max_rows} 行或 {} MiB，请缩小范围。",
+            max_payload / 1024 / 1024
+        )));
     }
     let now = clock.now().map_err(unavailable)?.utc_now;
     let mut removed = 0;
@@ -97,14 +107,14 @@ pub fn consume(
         .blob(id, KIND)?
         .ok_or_else(|| unavailable("导入预检内容缺失。"))?;
     if payload.content.is_empty()
-        || payload.content.len() > MAX_PAYLOAD
+        || payload.content.len() > limits(kind).1
         || preview["payloadSha256"] != digest(&payload.content)
     {
         return Err(unavailable("导入预检完整性校验失败。"));
     }
     let rows: Vec<Value> = serde_json::from_slice(&payload.content)
         .map_err(|cause| unavailable(format!("导入预检内容无效：{cause}")))?;
-    if rows.len() > 5000 || preview["rowCount"] != json!(rows.len()) {
+    if rows.len() > limits(kind).0 || preview["rowCount"] != json!(rows.len()) {
         return Err(unavailable("导入预检行数无效。"));
     }
     preview["consumed"] = json!(true);

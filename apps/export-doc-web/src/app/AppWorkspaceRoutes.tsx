@@ -177,7 +177,7 @@ export function AppWorkspaceRoutes({
         <Route path="/tools/excel" element={<ExcelToolsPage client={client} />} />
         <Route path="/tools/ocr" element={<SmartOcrPage client={client} />} />
         <Route path="/tools/container-packing" element={<ContainerPackingPage client={client} />} />
-        <Route path="/tools/exchange-rates" element={<ExchangeRatePage client={client} />} />
+        <Route path="/tools/exchange-rates" element={<ExchangeRatePage client={client} canManageSettings={user.capabilities.canManageSettings === true} />} />
         <Route path="/tools/email" element={<EmailPage client={client} businessTimeZone={user.businessTimeZone} />} />
         <Route path="/system/update" element={<UpdateCenterPage client={client} sessionToken={sessionToken} />} />
         <Route path="/system/license" element={<LicensePage client={client} />} />

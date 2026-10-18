@@ -193,6 +193,13 @@ fn validate(value: &Value, paths: &RuntimePaths, provider: &str) -> Result<()> {
         export_doc_mail::recipient::normalize_rules(value["email"][key].as_str().unwrap_or(""))
             .map_err(invalid)?;
     }
+    #[cfg(feature = "exchange-rates")]
+    export_doc_exchange::Configuration::read(&value["exchangeRate"])
+        .map_err(super::exchange::map_error)?;
+    #[cfg(not(feature = "exchange-rates"))]
+    if value["exchangeRate"]["autoRefreshEnabled"] == true {
+        return Err(invalid("当前程序未启用汇率能力，无法开启自动获取。"));
+    }
     visit(value, "", paths)
 }
 pub fn save(

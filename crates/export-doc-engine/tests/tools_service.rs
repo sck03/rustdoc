@@ -29,64 +29,30 @@ fn tariff_preview_is_single_use_detects_stale_changes_and_roundtrips_knowledge()
             )
             .unwrap()
     };
+    let commit = |token: &Value| {
+        let body = Some(json!({"token":token}));
+        client.json::<Value>(COMMIT_HS_CODES_IMPORT, &[], &[], body)
+    };
     let first = preview();
     assert_eq!(first["addCount"], 2);
     export_doc_contracts::validation::response(PREVIEW_HS_CODES_IMPORT_UPLOAD.id, &first).unwrap();
     let before: Value = client.json(LIST_HS_CODES, &[], &[], None).unwrap();
     assert_eq!(before["totalCount"], 0);
-    let committed: Value = client
-        .json(
-            COMMIT_HS_CODES_IMPORT,
-            &[],
-            &[],
-            Some(json!({"token":first["token"]})),
-        )
-        .unwrap();
-    assert_eq!(committed["addedCount"], 2);
-    assert!(
-        client
-            .json::<Value>(
-                COMMIT_HS_CODES_IMPORT,
-                &[],
-                &[],
-                Some(json!({"token":first["token"]}))
-            )
-            .is_err()
-    );
+    assert_eq!(commit(&first["token"]).unwrap()["addedCount"], 2);
+    assert!(commit(&first["token"]).is_err());
     let stale = preview();
-    let mut current: Value = client
-        .json(GET_HS_CODE, &[("code", "6109100000".into())], &[], None)
-        .unwrap();
+    let code = [("code", "6109100000".into())];
+    let mut current: Value = client.json(GET_HS_CODE, &code, &[], None).unwrap();
     assert_eq!(current["status"], "Active");
     assert_eq!(current["unit"], "件");
     current["notes"] = json!("年度复核");
     client
-        .json::<Value>(
-            UPDATE_HS_CODE,
-            &[("code", "6109100000".into())],
-            &[],
-            Some(current),
-        )
+        .json::<Value>(UPDATE_HS_CODE, &code, &[], Some(current))
         .unwrap();
-    assert_eq!(
-        client
-            .json::<Value>(
-                COMMIT_HS_CODES_IMPORT,
-                &[],
-                &[],
-                Some(json!({"token":stale["token"]}))
-            )
-            .unwrap_err()
-            .status,
-        Some(409)
-    );
+    assert_eq!(commit(&stale["token"]).unwrap_err().status, Some(409));
+    let query = [("query", "610910".into())];
     let response: Value = client
-        .json(
-            SEARCH_HS_CODE_KNOWLEDGE,
-            &[],
-            &[("query", "610910".into())],
-            None,
-        )
+        .json(SEARCH_HS_CODE_KNOWLEDGE, &[], &query, None)
         .unwrap();
     assert_eq!(response["items"][0]["canUse"], true);
     for _ in 0..3 {
@@ -100,39 +66,19 @@ fn tariff_preview_is_single_use_detects_stale_changes_and_roundtrips_knowledge()
         .bytes(EXPORT_HS_CODE_KNOWLEDGE, &[], &[], None, 1024 * 1024)
         .unwrap();
     let second = native_fixture::Fixture::new();
-    second
-        .client()
-        .upload(
-            IMPORT_HS_CODE_KNOWLEDGE,
-            &[],
-            json!({}),
-            "知识.zip",
-            &archive,
-        )
-        .unwrap();
+    let import = |bytes: &[u8]| {
+        second
+            .client()
+            .upload(IMPORT_HS_CODE_KNOWLEDGE, &[], json!({}), "知识.zip", bytes)
+    };
+    import(&archive).unwrap();
     let imported: Value = second
         .client()
-        .json(
-            SEARCH_HS_CODE_KNOWLEDGE,
-            &[],
-            &[("query", "610910".into())],
-            None,
-        )
+        .json(SEARCH_HS_CODE_KNOWLEDGE, &[], &query, None)
         .unwrap();
     assert_eq!(imported["items"][0]["canUse"], true);
     assert_eq!(imported["items"][0]["exampleCount"], 1);
-    assert!(
-        second
-            .client()
-            .upload(
-                IMPORT_HS_CODE_KNOWLEDGE,
-                &[],
-                json!({}),
-                "损坏.zip",
-                &archive[..archive.len() / 2]
-            )
-            .is_err()
-    );
+    assert!(import(&archive[..archive.len() / 2]).is_err());
     let after: Value = second.client().json(LIST_HS_CODES, &[], &[], None).unwrap();
     assert_eq!(after["totalCount"], 2);
 }

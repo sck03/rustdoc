@@ -12,6 +12,7 @@ use export_doc_domain::hs;
 use export_doc_storage::{AuditWrite, Connection};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
+mod lifecycle;
 
 pub const CODES: &str = "hs-codes";
 pub const EXAMPLES: &str = "hs-examples";
@@ -27,6 +28,8 @@ pub const OPERATIONS: &[Operation] = &[
     DELETE_HS_CODE,
     DELETE_HS_CODES_BATCH,
     CLEAR_ALL_HS_CODES,
+    PREVIEW_HS_CODE_CLEANUP,
+    COMMIT_HS_CODE_CLEANUP,
     SEARCH_HS_CODE_KNOWLEDGE,
     SEARCH_INVOICE_HS_CODE_KNOWLEDGE,
     LIST_HS_CODE_KNOWLEDGE_EXAMPLES,
@@ -58,6 +61,20 @@ pub fn codes(tx: &Connection) -> Result<BTreeMap<String, ApiHsCodeDto>> {
         })
         .collect()
 }
+pub fn codes_for_year(tx: &Connection, year: i32) -> Result<BTreeMap<String, ApiHsCodeDto>> {
+    let mut values = codes(tx)?;
+    values.retain(|_, row| hs::current(row, year));
+    Ok(values)
+}
+pub fn is_current(tx: &Connection, code: &str, year: i32) -> Result<bool> {
+    tx.find_identity(CODES, code)?
+        .map(|row| {
+            let dto =
+                serde_json::from_value(contracts::project(contracts::schema("ApiHsCodeDto"), row))?;
+            Ok(hs::current(&dto, year))
+        })
+        .unwrap_or(Ok(false))
+}
 pub fn handle(
     service: &NativeService,
     actor: &Actor,
@@ -66,12 +83,19 @@ pub fn handle(
     query: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
+    let today = service
+        .clock
+        .now()
+        .map_err(super::error::unavailable)?
+        .today;
+    let year = today.year();
     let value=service.store.transaction(|tx|match operation {
+        PREVIEW_HS_CODE_CLEANUP|COMMIT_HS_CODE_CLEANUP=>lifecycle::handle(service,tx,actor,operation,body),
         LIST_HS_CODES=>{
             let filter=hs::text(read(query,"keyword"));
             if filter.chars().count()>500{return Err(invalid("检索条件不能超过 500 字。"));}
             let mut rows=store::all(tx,CODES)?;rows.retain(|r|filter.is_empty()||["code","name","elements","description"].iter().any(|key|hs::text(&text(r,key)).contains(&filter)));
-            rows.sort_by_key(|r|text(r,"code"));Ok(store::page_only(rows,query))
+            rows.sort_by_key(|r|text(r,"code"));for row in &mut rows {annotate_year(row,year);}Ok(store::page_only(rows,query))
         }
         GET_HS_CODE|GET_INVOICE_HS_CODE=>{
             let code=hs::code(read(parameters,"code")).map_err(invalid)?;
@@ -95,26 +119,45 @@ pub fn handle(
             }else{ids(body)?};
             let count=delete(tx,actor,CODES,&ids)?;Ok(json!({"success":true,"message":format!("已删除 {count} 个编码。"),"deletedCount":count}))
         }
-        SEARCH_HS_CODE_KNOWLEDGE|SEARCH_INVOICE_HS_CODE_KNOWLEDGE=>hs_search::search(tx,query),
+        SEARCH_HS_CODE_KNOWLEDGE|SEARCH_INVOICE_HS_CODE_KNOWLEDGE=>hs_search::search(tx,query,year),
         LIST_HS_CODE_KNOWLEDGE_EXAMPLES=>{
             let filter=hs::text(read(query,"keyword"));let mut rows=store::all(tx,EXAMPLES)?;
             rows.retain(|r|filter.is_empty()||["rawReportedHsCode","resolvedCurrentHsCode","productName","specification"].iter().any(|key|hs::text(&text(r,key)).contains(&filter)));
             rows.sort_by(|a,b|(a["isManuallyVerified"]!=true).cmp(&(b["isManuallyVerified"]!=true)).then_with(||b["updatedAt"].as_str().cmp(&a["updatedAt"].as_str())));
             Ok(store::page_only(rows,query))
         }
-        SAVE_HS_CODE_KNOWLEDGE_EXAMPLE=>hs_learning::save_example(tx,actor,body),
+        SAVE_HS_CODE_KNOWLEDGE_EXAMPLE=>{
+            let current=text(body,"resolvedCurrentHsCode");
+            if !current.is_empty() && !is_current(tx,&hs::code(&current).map_err(invalid)?,year)? {return Err(invalid("请选择本年度已验证的有效编码。"));}
+            hs_learning::save_example(tx,actor,body)
+        },
         DELETE_HS_CODE_KNOWLEDGE_EXAMPLE|DELETE_HS_CODE_KNOWLEDGE_EXAMPLES_BATCH=>{
             let ids=if operation==DELETE_HS_CODE_KNOWLEDGE_EXAMPLE{BTreeSet::from([id(parameters)?])}else{ids(body)?};
             let count=delete(tx,actor,EXAMPLES,&ids)?;Ok(json!({"success":true,"message":format!("已删除 {count} 条案例。"),"deletedCount":count}))
         }
         RECORD_HS_CODE_KNOWLEDGE_FEEDBACK|RECORD_INVOICE_HS_CODE_KNOWLEDGE_FEEDBACK=>{
-            hs_learning::feedback(tx,actor,body,service.clock.now().map_err(super::error::unavailable)?.today.year())?;
+            hs_learning::feedback(tx,actor,body,year)?;
             Ok(json!({"success":true,"message":"反馈已记录。"}))
         }
-        DISCOVER_HS_CODE_HISTORY_CANDIDATES=>hs_learning::history(tx,actor,query),
-        _=>hs_learning::remote_review(tx,actor,operation,query,body),
+        DISCOVER_HS_CODE_HISTORY_CANDIDATES=>hs_learning::history(tx,actor,query,year),
+        _=>hs_learning::remote_review(tx,actor,operation,query,body,year),
     })?;
+    let mut value = value;
+    if [
+        GET_HS_CODE,
+        GET_INVOICE_HS_CODE,
+        CREATE_HS_CODE,
+        UPDATE_HS_CODE,
+    ]
+    .contains(&operation)
+    {
+        annotate_year(&mut value, year);
+    }
     Ok(contracts::project(contracts::response(operation.id), value))
+}
+fn annotate_year(row: &mut Value, year: i32) {
+    row["requiresAnnualReview"] =
+        json!(row["status"] == "Active" && row["effectiveYear"].as_i64() != Some(i64::from(year)));
 }
 pub fn save_code(tx: &Connection, actor: &Actor, body: &Value, managed: bool) -> Result<Value> {
     let mut dto: ApiHsCodeDto = serde_json::from_value(contracts::project(
@@ -131,6 +174,18 @@ pub fn save_code(tx: &Connection, actor: &Actor, body: &Value, managed: bool) ->
             .map_err(|_| invalid("HS 验证时间须为包含时区的有效时间。"))?;
     }
     let previous = tx.find_identity(CODES, &dto.code)?;
+    if !managed
+        && dto.status == "Active"
+        && previous.as_ref().is_some_and(|row| {
+            row["effectiveYear"].as_i64() != dto.effective_year
+                || text(row, "sourceName") != dto.source_name
+                || row["lastVerifiedAt"].as_str() != dto.last_verified_at.as_deref()
+        })
+    {
+        return Err(invalid(
+            "有效税则的来源、年度和验证时间只能通过年度导入更新。",
+        ));
+    }
     if !managed
         && dto.status == "Active"
         && previous

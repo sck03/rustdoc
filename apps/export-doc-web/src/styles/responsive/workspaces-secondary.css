@@ -62,7 +62,6 @@
   }
 
   .exchange-rate-detail-grid,
-  .exchange-rate-layout,
   .update-center-detail-grid,
   .update-center-layout,
   .update-package-detail-grid,
@@ -81,8 +80,6 @@
     justify-self: start;
   }
 
-  .exchange-rate-table-frame,
-  .currency-chip-list,
   .update-release-notes,
   .email-attachment-table-frame {
     min-height: 280px;

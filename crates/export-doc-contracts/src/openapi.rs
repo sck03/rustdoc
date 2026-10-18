@@ -3,6 +3,8 @@
 mod accounts;
 mod backup_plan;
 mod communication;
+mod exchange;
+mod hs_lifecycle;
 mod observability;
 mod office;
 mod payment_printing;
@@ -21,6 +23,8 @@ pub fn document() -> Value {
     accounts::extend(&mut document);
     payment_printing::extend(&mut document);
     backup_plan::extend(&mut document);
+    exchange::extend(&mut document);
+    hs_lifecycle::extend(&mut document);
     document
 }
 
@@ -67,6 +71,8 @@ mod tests {
             .iter()
             .chain(accounts::FIELDS)
             .chain(personnel::FIELDS)
+            .chain(exchange::FIELDS)
+            .chain(hs_lifecycle::FIELDS)
         {
             for field in *fields {
                 current["components"]["schemas"][schema]["properties"]
@@ -132,6 +138,15 @@ mod tests {
             current["components"]["securitySchemes"],
             baseline["components"]["securitySchemes"]
         );
+        for field in ["autoRefreshEnabled", "sourceFormat"] {
+            assert!(
+                current["x-exportdoc-configuration"]["defaults"]["exchangeRate"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove(field)
+                    .is_some()
+            );
+        }
         assert_eq!(
             current["x-exportdoc-configuration"],
             baseline["x-exportdoc-configuration"]

@@ -1,6 +1,6 @@
 use super::{
     error::{Result, invalid},
-    hs::{self, codes, read},
+    hs::{self, codes_for_year, read},
     records::text,
     store,
 };
@@ -83,7 +83,7 @@ pub fn resolve(
         false,
     )
 }
-pub fn search(tx: &Connection, query: &[(&str, String)]) -> Result<Value> {
+pub fn search(tx: &Connection, query: &[(&str, String)], year: i32) -> Result<Value> {
     let raw = read(query, "query").trim();
     if raw.chars().count() > 500 {
         return Err(invalid("查询条件不能超过 500 字。"));
@@ -98,7 +98,7 @@ pub fn search(tx: &Connection, query: &[(&str, String)]) -> Result<Value> {
         .parse::<usize>()
         .unwrap_or(20)
         .clamp(1, 50);
-    let codes = codes(tx)?;
+    let codes = codes_for_year(tx, year)?;
     let relations = store::all(tx, hs::REPLACEMENTS)?;
     let feedback = store::all(tx, hs::FEEDBACK)?;
     let mut examples = store::all(tx, hs::EXAMPLES)?;

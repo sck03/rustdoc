@@ -24,7 +24,7 @@ await require('esbuild').build({
       return <><button onClick={()=>setGrid(value=>!value)}>切换框线</button>
         <button onClick={()=>setTick(value=>value+1)}>父级刷新 {tick}</button>
         <button onClick={()=>setOpen(false)}>离开三维</button>
-        {open && <ContainerPackingScene3d analysis={analysis} dimensions={{length:120,width:80,height:80}} renderMode={grid?'FullGrid':'OutlineOnly'}/>}</>;
+        {open && <ContainerPackingScene3d analysis={analysis} dimensions={{length:1203,width:235,height:269}} renderMode={grid?'FullGrid':'OutlineOnly'}/>}</>;
     }
     createRoot(document.getElementById('root')).render(<App/>);
   ` }, outfile: bundle, bundle: true, jsx: 'automatic', format: 'iife', platform: 'browser', logLevel: 'silent',
@@ -40,7 +40,7 @@ await require('esbuild').build({
           metrics.created++;
           const render = this.render.bind(this), dispose = this.dispose.bind(this);
           this.render = (scene, camera) => {
-            metrics.renders++; metrics.angles={x:scene.children[0].rotation.x,y:scene.children[0].rotation.y};
+            metrics.renders++; metrics.angles={x:scene.children[0].rotation.x,y:scene.children[0].rotation.y}; metrics.zoom=camera.zoom;
             render(scene, camera); metrics.drawCalls=this.info.render.calls;
             const bounds = { minX:Infinity, maxX:-Infinity, minY:Infinity, maxY:-Infinity };
             scene.children[0].traverse(object => {
@@ -75,11 +75,11 @@ try {
   const frames = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.getByRole('button', { name: '柜门', exact: true }).click();
   await frames();
-  assert.deepEqual(await page.evaluate(() => window.sceneMetrics.angles), { x: 0.12, y: -Math.PI / 2 }, 'door view faces the positive-X door opening');
+  assert.deepEqual(await page.evaluate(() => window.sceneMetrics.angles), { x: 0, y: -Math.PI / 2 }, 'door view faces the positive-X door opening');
   await page.getByRole('button', { name: '俯视', exact: true }).click();
   await frames();
   const top = await page.evaluate(() => window.sceneMetrics.angles);
-  assert.deepEqual(top, { x: 1.18, y: 0 }, 'top view shows cargo above the floor');
+  assert.deepEqual(top, { x: Math.PI / 2, y: 0 }, 'top view shows cargo above the floor');
   const projected = await page.evaluate(() => window.sceneMetrics.bounds);
   await page.screenshot({ path: path.join(output, 'packing-top-fit.png') });
   assert(Object.values(projected).every(value => Math.abs(value) < 1), `rotation around the container center keeps the complete model in view: ${JSON.stringify(projected)}`);
@@ -91,12 +91,22 @@ try {
   assert.equal(await page.evaluate(() => window.sceneMetrics.created), 2, 'equal dimensions do not recreate a WebGL context');
   const canvas = page.locator('canvas');
   const rect = await canvas.boundingBox();
+  await page.getByRole('button', { name: '柜门', exact: true }).click();
   await page.mouse.move(rect.x + 120, rect.y + 100);
   await page.mouse.down();
-  await page.mouse.move(rect.x + 120, rect.y + 101);
+  await page.mouse.move(rect.x + 320, rect.y + 100);
   await page.mouse.up();
   await frames();
-  assert(Math.abs((await page.evaluate(() => window.sceneMetrics.angles.x)) - 1.185) < 0.001, 'dragging from top view does not snap to a different angle');
+  const rotated = await page.evaluate(() => window.sceneMetrics.bounds);
+  assert(Object.values(rotated).every(value => Math.abs(value) < 1), `rotating a long container out of the door view keeps the entire model visible: ${JSON.stringify(rotated)}`);
+  await page.getByRole('button', { name: '俯视', exact: true }).click();
+  await frames();
+  await page.mouse.move(rect.x + 120, rect.y + 100);
+  await page.mouse.down();
+  await page.mouse.move(rect.x + 120, rect.y + 99);
+  await page.mouse.up();
+  await frames();
+  assert(Math.abs((await page.evaluate(() => window.sceneMetrics.angles.x)) - (Math.PI / 2 - 0.005)) < 0.001, 'dragging from top view does not snap to a different angle');
   const beforeRight = await page.evaluate(() => window.sceneMetrics.angles);
   await page.mouse.down({ button: 'right' });
   await page.mouse.move(rect.x + 180, rect.y + 160);
@@ -127,6 +137,18 @@ try {
   await frames();
   assert.equal(await page.evaluate(() => window.sceneMetrics.renders), paused, 'a paused static scene does not schedule continuous renders');
   await page.screenshot({ path: path.join(output, 'packing-top-full-grid.png') });
+  await canvas.evaluate(node => node.dispatchEvent(new Event('webglcontextlost', { cancelable:true })));
+  await page.getByRole('button', { name:'重试三维视图' }).waitFor();
+  assert.equal(await page.locator('canvas').count(), 0, 'a lost context is released');
+  await page.getByRole('button', { name:'重试三维视图' }).click();
+  await page.waitForSelector('canvas[data-scene-ready=true]');
+  assert.equal(await page.evaluate(() => window.sceneMetrics.created), 3, 'retry creates a fresh renderer');
+  await page.getByRole('button', { name:'放大三维图', exact:true }).click();
+  await frames();
+  assert.equal(await page.evaluate(() => window.sceneMetrics.zoom), 1.2);
+  await page.getByRole('button', { name:'重置三维视角', exact:true }).click();
+  await frames();
+  assert.equal(await page.evaluate(() => window.sceneMetrics.zoom), 1);
   await page.getByRole('button', { name: '离开三维' }).click();
   await frames();
   const metrics = await page.evaluate(() => window.sceneMetrics);

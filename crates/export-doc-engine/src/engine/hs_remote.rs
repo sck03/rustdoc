@@ -6,6 +6,7 @@ use super::{
     store::{self, Actor},
 };
 use crate::{generated_api::*, operation};
+use chrono::Datelike;
 use export_doc_domain::hs as rules;
 use export_doc_hs::parser::{RemoteRecord, RemoteRecordKind, SearchBundle};
 use serde_json::{Value, json};
@@ -248,7 +249,7 @@ fn capture(
     bundle: &SearchBundle,
 ) -> Result<()> {
     service.store.transaction(|tx| {
-        let codes = hs::codes(tx)?;
+        let codes = hs::codes_for_year(tx, service.clock.now().map_err(unavailable)?.today.year())?;
         let relations = store::all(tx, hs::REPLACEMENTS)?;
         for record in bundle
             .records

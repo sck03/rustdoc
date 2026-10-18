@@ -22,7 +22,7 @@ const modulePath = path.join(
 fs.rmSync(workspace, { recursive: true, force: true });
 fs.mkdirSync(workspace, { recursive: true });
 const sceneModulePath = path.join(path.dirname(modulePath), 'containerPackingSceneObjects.ts').replaceAll('\\', '/');
-fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modulePath)}; import * as scene from ${JSON.stringify(sceneModulePath)}; globalThis.__model = model; globalThis.__scene = scene;`, "utf8");
+fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modulePath)}; import * as scene from ${JSON.stringify(sceneModulePath)}; import * as projection from ${JSON.stringify(path.join(path.dirname(modulePath), 'ContainerPackingProjectionModel.tsx'))}; import * as pseudo from ${JSON.stringify(path.join(path.dirname(modulePath), 'containerPackingPseudo3dModel.ts'))}; Object.assign(globalThis, {__model:model,__scene:scene,__projection:projection,__pseudo:pseudo});`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -49,6 +49,15 @@ const createItem = (overrides = {}) => ({
   ...overrides,
 });
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
+const overview = globalThis.__pseudo.buildPseudo3dProjection({width:960,height:500}, dimensions);
+assert(overview.headLabel.x < overview.doorLabel.x, 'overview has the head on the left and door on the right');
+const {buildContainerPackingProjection, projectPackedCargoItem, renderContainerPackingItemGrid} = globalThis.__projection;
+for (const view of ['top', 'side']) {
+  const plane = buildContainerPackingProjection(view, dimensions);
+  assert(projectPackedCargoItem(createItem(), view, dimensions, plane).x < projectPackedCargoItem(createItem({x:80}), view, dimensions, plane).x, `${view} preserves the same head-to-door direction`);
+}
+assert(renderContainerPackingItemGrid(createItem({loadCount:6}), 'top', {x:0,y:0,width:100,height:100}) === null, 'stacked cartons do not invent extra floor positions in the top view');
+assert(globalThis.__scene.buildContainerPackingSceneData({packedItems:[createItem({isPalletized:true,unitsRepresented:100,loadCount:1})]},dimensions).boxes[0].loadCount === 1, 'cartons on a pallet are not drawn as stacked pallets');
 
 const merged = mergePackedItemsForContainerRender([
   createItem(),

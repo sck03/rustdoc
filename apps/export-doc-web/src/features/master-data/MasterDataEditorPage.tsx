@@ -430,7 +430,7 @@ export function MasterDataEditorPage({
           { pageNumber: 1, pageSize: 20, keyword: normalizedValue },
           { signal },
         ));
-        hsCode = result.items.find(item => normalizeHsCodeKey(item.code || item.normalizedCode) === normalizedValue && item.status === "Active");
+        hsCode = result.items.find(item => normalizeHsCodeKey(item.code || item.normalizedCode) === normalizedValue && item.status === "Active" && !item.requiresAnnualReview);
       } catch (error) {
         if (isAbortError(error)) return;
         setProductUnitMessage(readApiError(error));

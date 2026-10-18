@@ -554,11 +554,11 @@ export function createSystemToolsSmokeScene(runtime) {
     await page.send("Page.navigate", { url: checkUrl });
     const expectedText = [
       "今日汇率",
-      "汇率列表",
-      "可用货币",
-      "汇率源",
-      "缓存分钟",
-      "暂无汇率数据",
+      "常用货币报价",
+      "来源说明与可用货币",
+      "每 100 外币",
+      "自动获取",
+      "最近获取",
     ];
 
     const pageText = await waitForRuntimeDiagnostics(page, expectedText, timeoutMs);
@@ -568,10 +568,9 @@ export function createSystemToolsSmokeScene(runtime) {
         const page = document.querySelector('[aria-label="今日汇率"]');
         return Boolean(page &&
           page.querySelector('.exchange-rate-table') &&
-          page.querySelector('[aria-label="可用货币"]') &&
-          Array.from(page.querySelectorAll('button')).some((button) => (button.title || '').includes('刷新汇率')) &&
-          Array.from(page.querySelectorAll('button')).some((button) => (button.title || '').includes('强制刷新汇率')) &&
-          Array.from(page.querySelectorAll('button')).some((button) => (button.title || '').includes('读取可用货币')));
+          page.querySelector('[aria-label="汇率状态"]') &&
+          page.querySelector('details') &&
+          Array.from(page.querySelectorAll('button')).some((button) => /刷新汇率|正在读取/.test(button.textContent || '')));
       })()`,
       timeoutMs,
       "Timed out waiting for the exchange-rate page.",

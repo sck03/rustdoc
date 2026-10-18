@@ -176,7 +176,7 @@ export function readProductUnitFieldOptions(name: string, assistance: ProductUni
 }
 
 export function buildProductInputAssistance(products: ApiProductDto[], hsCodes: ApiHsCodeDto[] = []): ProductInputAssistance {
-  const activeHsCodes = (hsCodes ?? []).filter((hsCode) => !hsCode.status || hsCode.status === "Active");
+  const activeHsCodes = (hsCodes ?? []).filter((hsCode) => !hsCode.requiresAnnualReview && (!hsCode.status || hsCode.status === "Active"));
   return {
     brand: buildUniqueTextSuggestions((products ?? []).map((product) => product.brand)),
     hsCode: buildUniqueTextSuggestions([
@@ -194,7 +194,7 @@ export function buildProductInputAssistance(products: ApiProductDto[], hsCodes: 
 export function buildProductHsCodeLookup(hsCodes: ApiHsCodeDto[]) {
   const lookup = new Map<string, ApiHsCodeDto>();
   for (const hsCode of hsCodes ?? []) {
-    if (hsCode.status && hsCode.status !== "Active") {
+    if (hsCode.requiresAnnualReview || hsCode.status && hsCode.status !== "Active") {
       continue;
     }
     const key = normalizeHsCodeKey(hsCode.code || hsCode.normalizedCode);

@@ -2,5 +2,4 @@ export const singleWindowCustomsCooOrgCodePath = ["singleWindow", "customsCooDef
 export const singleWindowCustomsCooFetchPlacePath = ["singleWindow", "customsCooDefaults", "fetchPlace"];
 export const singleWindowCustomsCooAplAddPath = ["singleWindow", "customsCooDefaults", "aplAdd"];
 export const exchangeRateAllSupportedCurrenciesPath = ["exchangeRate", "allSupportedCurrencies"];
-export const exchangeRateLastCurrencyListUpdateTimePath = ["exchangeRate", "lastCurrencyListUpdateTime"];
 export const systemUpdaterEndpointPath = ["system", "updaterEndpoint"];

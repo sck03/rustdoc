@@ -13,7 +13,7 @@ export function formatBytes(value: number) {
   return `${index === 0 ? value : (value / 1024 ** index).toFixed(1)} ${units[index]}`;
 }
 
-export function formatSettingDateTime(value: string) {
+export function formatSettingDateTime(value?: string | null) {
   if (!value) return "-";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();

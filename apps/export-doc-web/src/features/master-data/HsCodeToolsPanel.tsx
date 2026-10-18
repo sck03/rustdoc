@@ -24,6 +24,7 @@ replaceHsCodeResult,
 shouldFetchRemoteHsCodeDetail
 } from "./masterDataModel.ts";
 import { hsCodeClearAllConfirmationText } from "./masterDataTypes.ts";
+import { HsCodeCleanupPanel } from "./HsCodeCleanupPanel.tsx";
 
 
 export function HsCodeToolsPanel({
@@ -352,6 +353,7 @@ export function HsCodeToolsPanel({
       </div>
 
       {message ? <InlineNotice tone={messageType === "error" ? "error" : "success"}>{message}</InlineNotice> : null}
+      {mode !== "remote" && <HsCodeCleanupPanel client={client} disabled={isBusy} onChanged={onLocalDataChanged} />}
 
       {mode === "hub" ? <div className="hs-code-action-hub">
         <button className="hs-code-action-card" type="button" disabled={isBusy} onClick={openImportWorkspace}>

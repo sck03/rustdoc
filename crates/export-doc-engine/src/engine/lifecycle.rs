@@ -2,9 +2,18 @@
 use super::*;
 
 impl NativeService {
+    pub fn close(&self) -> Result<()> {
+        #[cfg(feature = "exchange-rates")]
+        self.exchange_scheduler.stop()?;
+        self.backup_scheduler.stop()?;
+        self.jobs.close()?;
+        self.store.close()
+    }
     fn activate(service: Self) -> Result<Arc<Self>> {
         let service = Arc::new(service);
         team_backup::scheduled::Scheduler::bind(&service)?;
+        #[cfg(feature = "exchange-rates")]
+        exchange::Scheduler::bind(&service)?;
         Ok(service)
     }
     pub fn runtime_metrics(&self) -> Result<Value> {
@@ -53,6 +62,8 @@ impl NativeService {
             ocr_gate: Default::default(),
             #[cfg(feature = "exchange-rates")]
             exchange: Default::default(),
+            #[cfg(feature = "exchange-rates")]
+            exchange_scheduler: Default::default(),
         })
     }
     #[cfg(feature = "postgres")]
@@ -126,9 +137,13 @@ impl NativeService {
             ocr_gate: Default::default(),
             #[cfg(feature = "exchange-rates")]
             exchange: Default::default(),
+            #[cfg(feature = "exchange-rates")]
+            exchange_scheduler: Default::default(),
         })
     }
     pub fn health(&self) -> Result<()> {
+        #[cfg(feature = "exchange-rates")]
+        self.exchange_scheduler.health()?;
         self.jobs.health()?;
         self.store.health()
     }

@@ -93,7 +93,7 @@ export function ContainerPackingPanel({
   } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [renderMode, setRenderMode] =
-    useState<ContainerPackingRenderModeValue>("OutlineOnly");
+    useState<ContainerPackingRenderModeValue>("FullGrid");
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
   const [autoRefreshState, setAutoRefreshState] = useState<
     "idle" | "queued" | "running" | "complete" | "error" | "disabled"
@@ -582,13 +582,13 @@ export function ContainerPackingPanel({
       defaultPalletLength: String(project.rules.defaultPalletLength || 120),
       defaultPalletWidth: String(project.rules.defaultPalletWidth || 100),
       defaultPalletHeight: String(project.rules.defaultPalletHeight ?? 15),
-      defaultPalletWeight: formatFormNumber(project.rules.defaultPalletWeight),
+      defaultPalletWeight: formatFormNumber(project.rules.defaultPalletWeight ?? 25),
       enforceCenterOfGravity: project.rules.enforceCenterOfGravity ?? false,
       centerOfGravityTolerancePercent: formatFormNumber(
-        project.rules.centerOfGravityTolerancePercent,
+        project.rules.centerOfGravityTolerancePercent ?? 20,
       ),
       minimumSupportAreaPercent: formatFormNumber(
-        project.rules.minimumSupportAreaPercent,
+        project.rules.minimumSupportAreaPercent ?? 100,
       ),
       requireSameFootprintStacking: project.rules.requireSameFootprintStacking ?? false,
     });

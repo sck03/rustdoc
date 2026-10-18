@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import type { ApiContainerPackingAnalysisDto } from "../../../api/index.ts";
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
 import type { ContainerPackingRenderModeValue } from "./containerPackingModel.ts";
@@ -26,6 +26,8 @@ export function ContainerPackingVisualization({
   renderMode: ContainerPackingRenderModeValue;
 }) {
   const legendItems = buildContainerPackingLegend(analysis.packedItems);
+  const [view, setView] = useState<"overview" | ContainerPackingViewKind>("overview");
+  const views = [{ value: "overview", label: "总览" }, { value: "top", label: "俯视图" }, { value: "side", label: "侧视图" }, { value: "door", label: "柜门视图" }] as const;
 
   return (
     <section
@@ -54,43 +56,21 @@ export function ContainerPackingVisualization({
         </div>
       </div>
 
-      <ContainerPackingPseudo3dView
+      <div className="packing-view-switch" role="group" aria-label="装柜图方向">
+        {views.map(item => <button key={item.value} type="button" className="command-button secondary" aria-pressed={view === item.value} onClick={() => setView(item.value)}>{item.label}</button>)}
+      </div>
+      {view === "overview" ? <ContainerPackingPseudo3dView
         dimensions={dimensions}
         analysis={analysis}
         renderMode={renderMode}
-      />
-
-      <div
-        className="container-packing-visual-grid"
-        aria-label="装柜正投影视图"
-      >
-        <ContainerPackingProjectionView
-          title="俯视图"
-          subtitle="柜门 / 柜头"
-          viewKind="top"
+      /> : <ContainerPackingProjectionView
+          title={views.find(item => item.value === view)!.label}
+          subtitle={view === "door" ? "从柜门向内看 · 宽向 / 高向" : "柜头在左 → 柜门在右"}
+          viewKind={view}
           dimensions={dimensions}
           analysis={analysis}
           renderMode={renderMode}
-        />
-
-        <ContainerPackingProjectionView
-          title="侧视图"
-          subtitle="长向 / 高向"
-          viewKind="side"
-          dimensions={dimensions}
-          analysis={analysis}
-          renderMode={renderMode}
-        />
-
-        <ContainerPackingProjectionView
-          title="柜门视图"
-          subtitle="宽向 / 高向"
-          viewKind="door"
-          dimensions={dimensions}
-          analysis={analysis}
-          renderMode={renderMode}
-        />
-      </div>
+        />}
 
       {legendItems.length > 0 ? (
         <div className="container-packing-legend" aria-label="装柜颜色图例">
@@ -140,7 +120,7 @@ function ContainerPackingPseudo3dView({
 }) {
   const clipIdPrefix = `container-packing-pseudo3d-${useId().replace(/:/g, "")}`;
 
-  const viewBox = { width: 980, height: 360 };
+  const viewBox = { width: 960, height: 500 };
 
   const shell = buildPseudo3dProjection(viewBox, dimensions);
 
@@ -315,6 +295,7 @@ function ContainerPackingPseudo3dView({
           </g>
         );
       })}
+      <polygon className="container-packing-door-frame" points={pointsToString(shell.door)} fill="none" />
     </svg>
   );
 }
@@ -413,7 +394,7 @@ function ContainerPackingProjectionView({
 
         {renderContainerPackingGuides(viewKind, projection)}
 
-        {analysis.packedItems.map((item, index) => {
+        {[...analysis.packedItems].sort((a, b) => viewKind === "top" ? a.topHeight - b.topHeight : viewKind === "side" ? a.y - b.y : a.x - b.x).map((item, index) => {
           const rect = projectPackedCargoItem(
             item,
             viewKind,
@@ -423,7 +404,7 @@ function ContainerPackingProjectionView({
 
           const color = signedArgbToColorHex(item.colorArgb);
 
-          const label = item.loadCount > 1 ? String(item.loadCount) : "";
+          const label = item.loadCount > 1 ? `${item.loadCount}层` : "";
 
           return (
             <g key={`${viewKind}-${item.name}-${index}`}>

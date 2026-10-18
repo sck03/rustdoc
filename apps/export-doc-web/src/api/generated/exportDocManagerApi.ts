@@ -1274,6 +1274,8 @@ export interface ApiExcelOutputRequest {
 export interface ApiExchangeRateAvailableCurrenciesResponse {
   currencies: string[];
   fetchedAt: string;
+  isStale?: boolean;
+  lastError?: string;
   sourceUrl: string;
   storagePolicy: string;
 }
@@ -1289,10 +1291,18 @@ export interface ApiExchangeRateDto {
 }
 
 export interface ApiExchangeRateListResponse {
+  autoRefreshEnabled?: boolean;
+  availableCurrencies?: string[];
   cacheDurationMinutes: number;
   fetchedAt: string;
+  isStale?: boolean;
+  lastAttemptAt?: string | null;
+  lastError?: string;
+  missingCurrencies?: string[];
+  nextRefreshAt?: string | null;
   rates: ApiExchangeRateDto[];
   selectedCurrencies: string[];
+  sourceFormat?: "BankOfChinaHtml" | "Icbc" | "Cmb" | "Json" | "Auto";
   sourceUrl: string;
   statusText: string;
   storagePolicy: string;
@@ -1341,6 +1351,14 @@ export interface ApiHsCodeBatchDeleteRequest {
   ids: number[];
 }
 
+export interface ApiHsCodeCleanupPreview {
+  eligibleCount: number;
+  items: ApiHsCodeDto[];
+  policy: string;
+  retainedCount: number;
+  token: string;
+}
+
 export interface ApiHsCodeClearAllRequest {
   confirmation: string;
 }
@@ -1372,6 +1390,7 @@ export interface ApiHsCodeDto {
   recommendedKeywords?: string[] | null;
   remoteRecordKind: string;
   replacedByCodes: string;
+  requiresAnnualReview?: boolean;
   rowVersion: string;
   sourceName: string;
   status: string;
@@ -3919,9 +3938,11 @@ export interface ExcelImportSettings {
 
 export interface ExchangeRateSettings {
   allSupportedCurrencies: string[];
+  autoRefreshEnabled?: boolean;
   cacheDurationMinutes: number;
   lastCurrencyListUpdateTime?: string | null;
   selectedCurrencies: string[];
+  sourceFormat?: "BankOfChinaHtml" | "Icbc" | "Cmb" | "Json" | "Auto";
   url: string;
 }
 
@@ -5173,6 +5194,22 @@ export const ApiEmailTemplateDraftRequestDefaults = {
   subject: "",
 } as const satisfies Partial<ApiEmailTemplateDraftRequest>;
 
+export const ApiExchangeRateAvailableCurrenciesResponseDefaults = {
+  isStale: false,
+  lastError: "",
+} as const satisfies Partial<ApiExchangeRateAvailableCurrenciesResponse>;
+
+export const ApiExchangeRateListResponseDefaults = {
+  autoRefreshEnabled: false,
+  availableCurrencies: [],
+  isStale: false,
+  lastAttemptAt: null,
+  lastError: "",
+  missingCurrencies: [],
+  nextRefreshAt: null,
+  sourceFormat: "BankOfChinaHtml",
+} as const satisfies Partial<ApiExchangeRateListResponse>;
+
 export const ApiHsCodeDtoDefaults = {
   consumptionTaxRate: "",
   declarationExampleCount: 0,
@@ -5184,6 +5221,7 @@ export const ApiHsCodeDtoDefaults = {
   preferentialTariffRate: "",
   remoteRecordKind: "StandardCode",
   replacedByCodes: "",
+  requiresAnnualReview: false,
   rowVersion: "",
   sourceName: "",
   status: "ReferenceOnly",
@@ -5344,6 +5382,11 @@ export const ApiUserSaveRequestDefaults = {
   expectedVersion: 0,
   permissionGrants: null,
 } as const satisfies Partial<ApiUserSaveRequest>;
+
+export const ExchangeRateSettingsDefaults = {
+  autoRefreshEnabled: false,
+  sourceFormat: "BankOfChinaHtml",
+} as const satisfies Partial<ExchangeRateSettings>;
 
 export const HsCodeExampleInputDefaults = {
   isManuallyVerified: true,
@@ -5561,6 +5604,10 @@ export interface CloneUserReportTemplateRequest {
 
 export interface CollectSingleWindowClientReceiptsRequest {
   body: ApiSingleWindowReceiptCollectionRequest;
+}
+
+export interface CommitHsCodeCleanupRequest {
+  body: ApiHsCodeImportCommitRequest;
 }
 
 export interface CommitHsCodesImportRequest {
@@ -8286,6 +8333,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public commitHsCodeCleanup(request: CommitHsCodeCleanupRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
+    const path = "/api/master-data/hs-codes/cleanup/commit";
+    return this.request<ApiCommandResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public commitHsCodesImport(request: CommitHsCodesImportRequest, init?: ApiRequestInit): Promise<ApiHsCodeImportCommitResponse> {
     const path = "/api/master-data/hs-codes/import-commit";
     return this.request<ApiHsCodeImportCommitResponse>("POST", path, {
@@ -10641,6 +10696,11 @@ export class ExportDocManagerApiClient {
       body: request.body,
       init,
     });
+  }
+
+  public previewHsCodeCleanup(init?: ApiRequestInit): Promise<ApiHsCodeCleanupPreview> {
+    const path = "/api/master-data/hs-codes/cleanup/preview";
+    return this.request<ApiHsCodeCleanupPreview>("POST", path, { init });
   }
 
   public previewHsCodesImportFromPath(request: PreviewHsCodesImportFromPathRequest, init?: ApiRequestInit): Promise<ApiHsCodeImportPreviewResponse> {

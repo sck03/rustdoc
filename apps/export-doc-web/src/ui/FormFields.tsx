@@ -104,7 +104,7 @@ export function SelectField({
   return (
     <FieldShell label={label} disabled={disabled} className={className} description={description}>
       {(descriptionId) => (
-      <select value={value} disabled={disabled} aria-describedby={descriptionId} onChange={(event) => onChange(event.target.value)}>
+      <select value={value} disabled={disabled} aria-label={label} aria-describedby={descriptionId} onChange={(event) => onChange(event.target.value)}>
         {includeEmptyOption ? <option value="">未选择</option> : null}
         {options.map((option) => (
           <option key={option.value} value={option.value}>

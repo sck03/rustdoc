@@ -5,6 +5,7 @@ import {
   signedArgbToColorHex,
 } from "./containerPackingModel.ts";
 import { mergePackedItemsForContainerRender } from "./containerPackingRenderBlocks.ts";
+import { containerPackingViewAngles } from "./containerPackingViewModel.ts";
 import {
   clampContainerPackingGridSegments,
   clampNumber,
@@ -26,20 +27,22 @@ export function buildPseudo3dProjection(
   viewBox: { width: number; height: number },
   dimensions: ContainerPackingVisualizationDimensions,
 ) {
-  const origin = { x: viewBox.width - 210, y: viewBox.height - 132 };
-  const xAxis = { x: -(viewBox.width - 430), y: 50 };
-  const yAxis = { x: 150, y: 42 };
-  const zAxis = { x: 0, y: -166 };
-  const project = (x: number, y: number, z: number): ContainerPackingPseudo3dPoint => ({
-    x: origin.x
-      + (x / dimensions.length) * xAxis.x
-      + (y / dimensions.width) * yAxis.x
-      + (z / dimensions.height) * zAxis.x,
-    y: origin.y
-      + (x / dimensions.length) * xAxis.y
-      + (y / dimensions.width) * yAxis.y
-      + (z / dimensions.height) * zAxis.y,
+  const { x: elevation, y: rotation } = containerPackingViewAngles.isometric;
+  const yaw = -rotation;
+  const raw = (x: number, y: number, z: number) => ({
+    x: x * Math.cos(yaw) - y * Math.sin(yaw),
+    y: (x * Math.sin(yaw) + y * Math.cos(yaw)) * Math.sin(elevation) - z * Math.cos(elevation),
   });
+  const corners = [0, dimensions.length].flatMap(x => [0, dimensions.width].flatMap(y =>
+    [0, dimensions.height].map(z => raw(x, y, z))));
+  const minX = Math.min(...corners.map(p => p.x)), maxX = Math.max(...corners.map(p => p.x));
+  const minY = Math.min(...corners.map(p => p.y)), maxY = Math.max(...corners.map(p => p.y));
+  const scale = Math.min((viewBox.width - 80) / (maxX - minX), (viewBox.height - 80) / (maxY - minY));
+  const project = (x: number, y: number, z: number): ContainerPackingPseudo3dPoint => {
+    const point = raw(x, y, z);
+    return { x: viewBox.width / 2 + (point.x - (minX + maxX) / 2) * scale,
+      y: (viewBox.height - 20) / 2 + (point.y - (minY + maxY) / 2) * scale };
+  };
 
   const p000 = project(0, 0, 0);
   const p100 = project(dimensions.length, 0, 0);
@@ -53,14 +56,15 @@ export function buildPseudo3dProjection(
   return {
     project,
     floor: [p000, p100, p110, p010],
-    backWall: [p010, p110, p111, p011],
+    door: [p100, p110, p111, p101],
+    backWall: [p000, p100, p101, p001],
     shellEdges: [
       [p000, p100], [p100, p110], [p110, p010], [p010, p000],
       [p001, p101], [p101, p111], [p111, p011], [p011, p001],
       [p000, p001], [p100, p101], [p110, p111], [p010, p011],
     ] as const,
-    doorLabel: { x: p100.x - 18, y: p100.y + 24 },
-    headLabel: { x: p000.x + 18, y: p000.y + 24 },
+    doorLabel: { x: p110.x, y: p110.y + 24 },
+    headLabel: { x: p010.x, y: p010.y + 24 },
   };
 }
 
@@ -70,8 +74,13 @@ export function buildPseudo3dPackedItems(
   shell: ReturnType<typeof buildPseudo3dProjection>,
 ) {
   return mergePackedItemsForContainerRender(items, dimensions)
-    .sort((left, right) =>
-      left.x + left.y + left.baseHeight - (right.x + right.y + right.baseHeight))
+    .sort((left, right) => {
+      const { x: elevation, y: rotation } = containerPackingViewAngles.isometric;
+      const depth = (item: ContainerPackingRenderBlockSource) =>
+        ((item.x + item.length / 2) * Math.sin(-rotation) + (item.y + item.width / 2) * Math.cos(rotation)) * Math.cos(elevation)
+        + (item.baseHeight + item.occupiedHeight / 2) * Math.sin(elevation);
+      return depth(left) - depth(right);
+    })
     .map((item, index) => buildPseudo3dPackedItem(item, index, dimensions, shell));
 }
 
@@ -116,7 +125,7 @@ function buildPseudo3dPackedItem(
     edgeLines: buildPseudo3dBoxEdgeLines(p000, p100, p010, p110, p001, p101, p011, p111),
     gridLines: buildPseudo3dBlockGridLines(item, [p010, p110, p111, p011], side, top),
     stackSegments: item.isPalletized ? 1 : clampContainerPackingGridSegments(item.heightSegments),
-    label: item.unitsRepresented || item.loadCount ? String(item.unitsRepresented || item.loadCount) : "",
+    label: item.unitsRepresented || item.loadCount ? `${item.unitsRepresented || item.loadCount}件` : "",
     labelPoint: {
       x: (p001.x + p101.x + p111.x + p011.x) / 4,
       y: (p001.y + p101.y + p111.y + p011.y) / 4,

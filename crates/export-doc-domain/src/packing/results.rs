@@ -134,7 +134,45 @@ fn can_merge(p: &ApiPackedCargoItemDto, layer: &Layer) -> bool {
         && close(p.y, layer.y)
         && close(p.width, layer.length)
         && close(p.height, layer.width)
+        && p.occupied_height == layer.height * D::from(p.load_count)
         && close(p.top_height, layer.z)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::generated_api::*;
+    #[test]
+    fn different_carton_heights_keep_their_actual_layer_boundaries() {
+        let mut carton = ApiContainerPackingCargoInputDto {
+            name: Some("同名纸箱".into()),
+            length: Some(20.into()),
+            width: Some(20.into()),
+            height: Some(20.into()),
+            quantity: Some(1),
+            ..Default::default()
+        };
+        let mut cargo = vec![carton.clone()];
+        carton.height = Some(10.into());
+        cargo.push(carton);
+        let request = Request::new(&ApiContainerPackingAnalyzeRequest {
+            container: Some(ApiContainerDimensionsDto {
+                length: Some(20),
+                width: Some(20),
+                height: Some(30),
+                max_weight: Some(100.into()),
+                ..Default::default()
+            }),
+            cargo_items: Some(cargo),
+            ..Default::default()
+        })
+        .unwrap();
+        let result = super::super::analyze(&request, || Ok::<_, ()>(())).unwrap();
+        assert_eq!(result.packed_packages, 2);
+        assert_eq!(result.packed_items.len(), 2);
+        assert!(result.packed_items.iter().all(|item| item.load_count == 1));
+        assert_eq!(result.packed_items[1].base_height, 20.into());
+    }
 }
 fn display(p: &mut ApiPackedCargoItemDto) {
     p.display_text = format!(

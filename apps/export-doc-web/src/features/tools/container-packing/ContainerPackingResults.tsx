@@ -1,4 +1,4 @@
-import { lazy, Suspense, type MutableRefObject } from "react";
+import { lazy, Suspense, useState, type MutableRefObject } from "react";
 import type { ApiContainerPackingAnalysisDto } from "../../../api/index.ts";
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
 import { PageState } from "../../../ui/PageState.tsx";
@@ -32,12 +32,13 @@ export function ContainerPackingResults({
   visualizationDimensions,
   onAnalyze,
 }: Props) {
+  const [view, setView] = useState<"plan" | "3d">("plan");
   if (!analysis) {
     return (
       <section className="container-packing-preview-placeholder" aria-label="装柜效果图状态">
         <PageState
-          title="3D 与伪 3D 效果图等待分析"
-          description="货物或柜型修改后，点击“立即刷新”或“分析”生成装载方案；生成后会同时显示可旋转 3D、俯视、侧视和柜门图。"
+          title="准备装柜方案"
+          description="填写柜型与货物后分析，即可查看装柜图并导出现场作业单。"
           action={(
             <button className="command-button" type="button" disabled={!canAnalyze || isAnalyzing} onClick={onAnalyze}>
               {isAnalyzing ? "正在分析…" : "立即生成效果图"}
@@ -56,18 +57,22 @@ export function ContainerPackingResults({
       <PackingSummary analysis={analysis} />
       {visualizationDimensions ? (
         <>
-          <Suspense fallback={<SceneLoadingState />}>
+          <div className="packing-view-switch" role="group" aria-label="装柜视图类型">
+            <button type="button" className="command-button secondary" aria-pressed={view === "plan"} onClick={() => setView("plan")}>装柜图</button>
+            <button type="button" className="command-button secondary" aria-pressed={view === "3d"} onClick={() => setView("3d")}>可旋转 3D</button>
+            <span>从柜头向柜门装入；下层先装，上层后装</span>
+          </div>
+          {view === "3d" ? <Suspense fallback={<SceneLoadingState />}>
             <ContainerPackingScene3d
               analysis={analysis}
               dimensions={visualizationDimensions}
               renderMode={renderMode}
             />
-          </Suspense>
-          <ContainerPackingVisualization
+          </Suspense> : <ContainerPackingVisualization
             analysis={analysis}
             dimensions={visualizationDimensions}
             renderMode={renderMode}
-          />
+          />}
         </>
       ) : null}
     </div>
