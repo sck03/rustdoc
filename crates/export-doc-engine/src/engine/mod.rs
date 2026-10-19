@@ -2,6 +2,7 @@ mod account_permissions;
 mod accounts;
 #[cfg(feature = "ai")]
 mod ai;
+mod archive;
 mod attachment_categories;
 mod attachments;
 pub mod audit;
@@ -722,7 +723,7 @@ impl NativeService {
                 auth::authorize(actor, "system.users", "manage")?;
                 organization::managers(&self.store, query)
             }
-            GET_PERSONNEL_OPTIONS => personnel_queries::options(&self.store, actor),
+            GET_PERSONNEL_OPTIONS => personnel_queries::options(&self.store, actor, query),
             LIST_PERSONNEL => personnel_queries::directory(&self.store, actor, &self.clock, query),
             GET_PERSONNEL => personnel_queries::read(&self.store, actor, records::id(parameters)?),
             GET_PERSONNEL_HISTORY => {

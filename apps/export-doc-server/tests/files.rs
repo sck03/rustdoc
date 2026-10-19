@@ -125,6 +125,66 @@ async fn directory_upload_preview_commit_and_xlsx_download_use_the_existing_brow
         .await
         .unwrap();
     assert!(workbook.starts_with(b"PK"));
+    // The generated client posts a JSON body; query parameters must not replace it.
+    for (body, authenticated, expected) in [
+        (
+            json!({"reportType":"ExportDocument","templatePath":"builtin:Export/invoice_template.dtpl"}),
+            true,
+            StatusCode::OK,
+        ),
+        (
+            json!({"reportType":"ExportDocument"}),
+            true,
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"reportType":"ExportDocument","templatePath":17}),
+            true,
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"reportType":"ExportDocument","templatePath":"builtin:Export/invoice_template.dtpl"}),
+            false,
+            StatusCode::UNAUTHORIZED,
+        ),
+    ] {
+        let mut request = Request::builder()
+            .method("POST")
+            .uri("/api/reports/templates/file/download?templatePath=ignored.dtpl")
+            .header("content-type", "application/json");
+        if authenticated {
+            request = request.header("authorization", format!("Bearer {token}"));
+        }
+        let response = app
+            .clone()
+            .oneshot(request.body(Body::from(body.to_string())).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), expected);
+        if expected == StatusCode::OK {
+            assert_eq!(
+                response.headers()["content-type"],
+                "application/vnd.exportdoc.dtpl"
+            );
+            let encoded = response.headers()["content-disposition"]
+                .to_str()
+                .unwrap()
+                .split("filename*=UTF-8''")
+                .nth(1)
+                .unwrap();
+            let (filename, _) = url::form_urlencoded::parse(encoded.as_bytes())
+                .next()
+                .unwrap();
+            assert_eq!(filename, "invoice_template.dtpl");
+            let bytes = to_bytes(response.into_body(), 16 * 1024 * 1024)
+                .await
+                .unwrap();
+            assert_eq!(
+                bytes.as_ref(),
+                std::fs::read(workspace.join("Templates/Export/invoice_template.dtpl")).unwrap()
+            );
+        }
+    }
     drop(app);
     service.close().unwrap();
     drop(service);

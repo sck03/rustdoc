@@ -3600,6 +3600,7 @@ export interface ApiUserDto {
   capabilities: ApiUserCapabilitiesDto;
   companyScope: string;
   departmentId: string;
+  employee?: AccountPersonnelRecord | null;
   fullName: string;
   id: number;
   isActive: boolean;
@@ -4230,7 +4231,7 @@ export interface OaApprovalPlan {
 
 export interface OaApprovalRule {
   approverUserIds: number[];
-  kind: "leave" | "overtime" | "expense" | "travel" | "purchase" | "general";
+  kind: "leave" | "overtime" | "expense" | "travel" | "purchase" | "general" | "personnel";
   mode: "Single" | "DepartmentChain" | "Named";
 }
 
@@ -4238,6 +4239,7 @@ export interface OaApprovalSettings {
   delegations: OaApprovalDelegation[];
   expectedVersion?: number;
   handlingServices?: OfficeHandlingService[];
+  personnelApprovalActions?: ("Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire")[];
   rules: OaApprovalRule[];
   versionNumber: number;
 }
@@ -4246,6 +4248,7 @@ export interface OaApprovalSettingsSave {
   delegations: OaApprovalDelegation[];
   expectedVersion: number;
   handlingServices?: OfficeHandlingService[];
+  personnelApprovalActions?: ("Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire")[];
   rules: OaApprovalRule[];
 }
 
@@ -4305,6 +4308,16 @@ export interface OaOvertime {
   startsAt: string;
 }
 
+export interface OaPersonnelChange {
+  action: "Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire";
+  departmentId?: string;
+  effectiveDate?: string;
+  expectedPersonnelVersion?: number;
+  jobTitle?: string;
+  onProbation?: boolean;
+  registration?: PersonnelCreateRequest;
+}
+
 export interface OaPurchaseLine {
   name: string;
   quantity: string;
@@ -4332,12 +4345,13 @@ export interface OaRequest {
   handlingKey?: string;
   handlingName?: string;
   id: number;
-  kind: "leave" | "expense" | "travel" | "overtime" | "purchase" | "general";
+  kind: "leave" | "expense" | "travel" | "overtime" | "purchase" | "general" | "personnel";
   lastRemindedAt?: string;
   leave?: OaLeave;
   lines?: OaExpenseLine[];
   overtime?: OaOvertime;
   ownerUserId: number;
+  personnelChange?: OaPersonnelChange;
   purchaseLines?: OaPurchaseLine[];
   reason: string;
   requestKey: string;
@@ -4365,6 +4379,7 @@ export interface OaRequestSave {
   leave?: OaLeave;
   lines?: OaExpenseLine[];
   overtime?: OaOvertime;
+  personnelChange?: OaPersonnelChange;
   purchaseLines?: OaPurchaseLine[];
   reason: string;
   requestKey: string;
@@ -4720,6 +4735,7 @@ export interface PersonnelManagedDepartment {
 }
 
 export interface PersonnelOptions {
+  approvalRequiredActions?: ("Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire")[];
   canCreate: boolean;
   departments: PersonnelDepartmentRecord[];
 }
@@ -4743,6 +4759,7 @@ export interface PersonnelProfile {
 
 export interface PersonnelRecord {
   account?: null | PersonnelAccountRecord;
+  approvalRequiredActions?: ("Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire")[];
   attachments?: PersonnelAttachment[];
   canCorrectRegistration: boolean;
   canDelete: boolean;
@@ -4782,6 +4799,7 @@ export interface PersonnelTransitionRequest {
 
 export interface PersonnelUpdateRequest {
   contractEndsOn: string | null;
+  correctionNote?: string;
   employmentType: EmploymentType;
   expectedVersion: number;
   probationEndsOn: string | null;
@@ -5358,6 +5376,10 @@ export const ApiUserAccountDtoDefaults = {
   versionNumber: 1,
 } as const satisfies Partial<ApiUserAccountDto>;
 
+export const ApiUserDtoDefaults = {
+  employee: null,
+} as const satisfies Partial<ApiUserDto>;
+
 export const ApiUserReportTemplateCloneRequestDefaults = {
   name: "",
   reportType: "",
@@ -5478,6 +5500,11 @@ export interface ApproveOvertimeRequestRequest {
   body: OaAction;
 }
 
+export interface ApprovePersonnelChangeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
 export interface ApprovePurchaseRequestRequest {
   id: number;
   body: OaAction;
@@ -5558,6 +5585,11 @@ export interface CancelOfficeSupplyRequestRequest {
 }
 
 export interface CancelOvertimeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface CancelPersonnelChangeRequestRequest {
   id: number;
   body: OaAction;
 }
@@ -5774,6 +5806,10 @@ export interface CreatePersonnelRequest {
   body: PersonnelCreateRequest;
 }
 
+export interface CreatePersonnelChangeRequestRequest {
+  body: OaRequestSave;
+}
+
 export interface CreatePortRequest {
   body: ApiPortDto;
 }
@@ -5887,6 +5923,12 @@ export interface DeleteAttachmentOfLeaveRequestRequest {
 }
 
 export interface DeleteAttachmentOfOvertimeRequestRequest {
+  id: number;
+  attachmentId: number;
+  body: OaAction;
+}
+
+export interface DeleteAttachmentOfPersonnelChangeRequestRequest {
   id: number;
   attachmentId: number;
   body: OaAction;
@@ -6126,6 +6168,11 @@ export interface DownloadAttachmentOfOvertimeRequestRequest {
   attachmentId: number;
 }
 
+export interface DownloadAttachmentOfPersonnelChangeRequestRequest {
+  id: number;
+  attachmentId: number;
+}
+
 export interface DownloadAttachmentOfPurchaseRequestRequest {
   id: number;
   attachmentId: number;
@@ -6350,6 +6397,10 @@ export interface GetPersonnelAvatarRequest {
   id: number;
 }
 
+export interface GetPersonnelChangeRequestRequest {
+  id: number;
+}
+
 export interface GetPersonnelClearanceRequest {
   id: number;
 }
@@ -6363,6 +6414,10 @@ export interface GetPersonnelHistoryRequest {
 export interface GetPersonnelImageRequest {
   id: number;
   kind: PersonnelImageKind;
+}
+
+export interface GetPersonnelOptionsRequest {
+  employeeId?: number;
 }
 
 export interface GetPortRequest {
@@ -6619,6 +6674,12 @@ export interface ListHistoryOfOvertimeRequestRequest {
   pageSize?: number;
 }
 
+export interface ListHistoryOfPersonnelChangeRequestRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 export interface ListHistoryOfPurchaseRequestRequest {
   id: number;
   pageNumber?: number;
@@ -6773,6 +6834,14 @@ export interface ListPersonnelAccountOptionsRequest {
   keyword?: string;
   pageNumber?: number;
   pageSize?: number;
+}
+
+export interface ListPersonnelChangeRequestRequest {
+  pageNumber?: number;
+  pageSize?: number;
+  status?: string;
+  mineOnly?: boolean;
+  approvalsOnly?: boolean;
 }
 
 export interface ListPortsRequest {
@@ -7106,6 +7175,11 @@ export interface RejectOvertimeRequestRequest {
   body: OaAction;
 }
 
+export interface RejectPersonnelChangeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
 export interface RejectPurchaseRequestRequest {
   id: number;
   body: OaAction;
@@ -7132,6 +7206,11 @@ export interface RemindLeaveRequestRequest {
 }
 
 export interface RemindOvertimeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface RemindPersonnelChangeRequestRequest {
   id: number;
   body: OaAction;
 }
@@ -7520,6 +7599,11 @@ export interface SubmitOvertimeRequestRequest {
   body: OaAction;
 }
 
+export interface SubmitPersonnelChangeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
 export interface SubmitPurchaseRequestRequest {
   id: number;
   body: OaAction;
@@ -7703,6 +7787,11 @@ export interface UpdatePersonnelRequest {
   body: PersonnelUpdateRequest;
 }
 
+export interface UpdatePersonnelChangeRequestRequest {
+  id: number;
+  body: OaRequestSave;
+}
+
 export interface UpdatePortRequest {
   id: number;
   body: ApiPortDto;
@@ -7805,6 +7894,11 @@ export interface UploadAttachmentToLeaveRequestRequest {
 }
 
 export interface UploadAttachmentToOvertimeRequestRequest {
+  id: number;
+  body: FormData;
+}
+
+export interface UploadAttachmentToPersonnelChangeRequestRequest {
   id: number;
   body: FormData;
 }
@@ -7947,6 +8041,11 @@ export interface WithdrawLeaveRequestRequest {
 }
 
 export interface WithdrawOvertimeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface WithdrawPersonnelChangeRequestRequest {
   id: number;
   body: OaAction;
 }
@@ -8105,6 +8204,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public approvePersonnelChangeRequest(request: ApprovePersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/approve`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public approvePurchaseRequest(request: ApprovePurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/purchase-requests/${encodePath(request.id)}/approve`;
     return this.request<OaRequest>("POST", path, {
@@ -8232,6 +8339,14 @@ export class ExportDocManagerApiClient {
 
   public cancelOvertimeRequest(request: CancelOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/cancel`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public cancelPersonnelChangeRequest(request: CancelPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/cancel`;
     return this.request<OaRequest>("POST", path, {
       body: request.body,
       init,
@@ -8649,6 +8764,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public createPersonnelChangeRequest(request: CreatePersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = "/api/office/personnel-requests";
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public createPort(request: CreatePortRequest, init?: ApiRequestInit): Promise<ApiPortDto> {
     const path = "/api/master-data/ports";
     return this.request<ApiPortDto>("POST", path, {
@@ -8847,6 +8970,14 @@ export class ExportDocManagerApiClient {
 
   public deleteAttachmentOfOvertimeRequest(request: DeleteAttachmentOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<OaRequest>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deleteAttachmentOfPersonnelChangeRequest(request: DeleteAttachmentOfPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return this.request<OaRequest>("DELETE", path, {
       body: request.body,
       init,
@@ -9215,6 +9346,11 @@ export class ExportDocManagerApiClient {
 
   public downloadAttachmentOfOvertimeRequest(request: DownloadAttachmentOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
+  public downloadAttachmentOfPersonnelChangeRequest(request: DownloadAttachmentOfPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return this.request<Blob>("GET", path, { init });
   }
 
@@ -9619,6 +9755,11 @@ export class ExportDocManagerApiClient {
     return this.request<Blob>("GET", path, { init });
   }
 
+  public getPersonnelChangeRequest(request: GetPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("GET", path, { init });
+  }
+
   public getPersonnelClearance(request: GetPersonnelClearanceRequest, init?: ApiRequestInit): Promise<PersonnelClearance> {
     const path = `/api/office/people/${encodePath(request.id)}/clearance`;
     return this.request<PersonnelClearance>("GET", path, { init });
@@ -9640,9 +9781,14 @@ export class ExportDocManagerApiClient {
     return this.request<Blob>("GET", path, { init });
   }
 
-  public getPersonnelOptions(init?: ApiRequestInit): Promise<PersonnelOptions> {
+  public getPersonnelOptions(request: GetPersonnelOptionsRequest = {}, init?: ApiRequestInit): Promise<PersonnelOptions> {
     const path = "/api/office/people/options";
-    return this.request<PersonnelOptions>("GET", path, { init });
+    return this.request<PersonnelOptions>("GET", path, {
+      query: {
+        "employeeId": request.employeeId,
+      },
+      init,
+    });
   }
 
   public getPort(request: GetPortRequest, init?: ApiRequestInit): Promise<ApiPortDto> {
@@ -10177,6 +10323,17 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listHistoryOfPersonnelChangeRequest(request: ListHistoryOfPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaEventPage> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/history`;
+    return this.request<OaEventPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
   public listHistoryOfPurchaseRequest(request: ListHistoryOfPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaEventPage> {
     const path = `/api/office/purchase-requests/${encodePath(request.id)}/history`;
     return this.request<OaEventPage>("GET", path, {
@@ -10451,6 +10608,20 @@ export class ExportDocManagerApiClient {
         "keyword": request.keyword,
         "pageNumber": request.pageNumber,
         "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listPersonnelChangeRequest(request: ListPersonnelChangeRequestRequest = {}, init?: ApiRequestInit): Promise<OaRequestPage> {
+    const path = "/api/office/personnel-requests";
+    return this.request<OaRequestPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "status": request.status,
+        "mineOnly": request.mineOnly,
+        "approvalsOnly": request.approvalsOnly,
       },
       init,
     });
@@ -11088,6 +11259,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public rejectPersonnelChangeRequest(request: RejectPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/reject`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public rejectPurchaseRequest(request: RejectPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/purchase-requests/${encodePath(request.id)}/reject`;
     return this.request<OaRequest>("POST", path, {
@@ -11130,6 +11309,14 @@ export class ExportDocManagerApiClient {
 
   public remindOvertimeRequest(request: RemindOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/remind`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public remindPersonnelChangeRequest(request: RemindPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/remind`;
     return this.request<OaRequest>("POST", path, {
       body: request.body,
       init,
@@ -11841,6 +12028,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public submitPersonnelChangeRequest(request: SubmitPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/submit`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public submitPurchaseRequest(request: SubmitPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/purchase-requests/${encodePath(request.id)}/submit`;
     return this.request<OaRequest>("POST", path, {
@@ -12152,6 +12347,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public updatePersonnelChangeRequest(request: UpdatePersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}`;
+    return this.request<OaRequest>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public updatePort(request: UpdatePortRequest, init?: ApiRequestInit): Promise<ApiPortDto> {
     const path = `/api/master-data/ports/${encodePath(request.id)}`;
     return this.request<ApiPortDto>("PUT", path, {
@@ -12324,6 +12527,14 @@ export class ExportDocManagerApiClient {
 
   public uploadAttachmentToOvertimeRequest(request: UploadAttachmentToOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/attachments`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadAttachmentToPersonnelChangeRequest(request: UploadAttachmentToPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/attachments`;
     return this.request<OaRequest>("POST", path, {
       body: request.body,
       init,
@@ -12574,6 +12785,14 @@ export class ExportDocManagerApiClient {
 
   public withdrawOvertimeRequest(request: WithdrawOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/withdraw`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public withdrawPersonnelChangeRequest(request: WithdrawPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/withdraw`;
     return this.request<OaRequest>("POST", path, {
       body: request.body,
       init,

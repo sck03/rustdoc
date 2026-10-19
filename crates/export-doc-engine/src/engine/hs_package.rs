@@ -11,7 +11,7 @@ use export_doc_domain::hs as rules;
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    io::{Cursor, Read, Write},
+    io::{Cursor, Write},
 };
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 const MAX_PACKAGE: u64 = 100 * 1024 * 1024;
@@ -146,14 +146,7 @@ fn read(bytes: &[u8]) -> Result<BTreeMap<String, Vec<Value>>> {
         if entry.size() > maximum || total > MAX_EXPANDED {
             return Err(invalid("知识包解压容量超过上限。"));
         }
-        let mut data = Vec::new();
-        (&mut entry)
-            .take(maximum + 1)
-            .read_to_end(&mut data)
-            .map_err(|e| invalid(e.to_string()))?;
-        if data.len() as u64 > maximum {
-            return Err(invalid("知识文件超过上限。"));
-        }
+        let data = super::archive::read_entry(&mut entry, maximum)?;
         entries.insert(name, data);
     }
     let manifest: Value = serde_json::from_slice(

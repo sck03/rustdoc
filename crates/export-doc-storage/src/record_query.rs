@@ -132,6 +132,13 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
     if let Some(owner) = q.exclude_owner {
         filter += &format!(" AND r.owner_id<>{}", bind(owner.to_string(), "BIGINT"));
     }
+    if let Some(applicant) = q.exclude_applicant {
+        filter += &format!(
+            " AND COALESCE({},0)<>{}",
+            property("applicantAccountId", true),
+            bind(applicant.to_string(), "BIGINT")
+        );
+    }
     QuerySql {
         filter,
         order: "r.id DESC",

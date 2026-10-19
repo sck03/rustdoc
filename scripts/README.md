@@ -45,7 +45,7 @@ Windows 批量入口默认 `-Edition All`，仅生成 Document、Sales，共用�
 .\scripts\run-native.cmd -Edition Full -NoPause
 ```
 
-输出 `artifacts/native-desktop/ExportDocManager.Tauri.Full/ExportDocManager.exe`；可直接双击运行，无需安装 PostgreSQL。数据库位于该目录的 `App_Data/Database/exportdoc-native.db`，重新构建保留已有数据。此版采用独立 `com.exportdocmanager.desktop.fulltest` 身份，显示完整单证、销售、行政人事、公告通知及账号权限页面，用于本地界面和流程测试。SQLite 的 OA 使用选择人员、登记批准结果的单机语义，团队本人申请/禁止自批和并发仍须 PostgreSQL 实测。
+输出 `artifacts/native-desktop/ExportDocManager.Tauri.Full/ExportDocManager.exe`；可直接双击运行，无需安装 PostgreSQL。数据库位于该目录的 `App_Data/Database/exportdoc-native.db`，重新构建保留已有数据。此版采用独立 `com.exportdocmanager.desktop.fulltest` 身份，显示完整单证、销售、行政人事、公告通知及账号权限页面，用于本地界面和流程测试。SQLite 的六类日常 OA 保留选择人员、登记批准结果的单机语义；人员变动审批在 SQLite 也禁止申请人和被变动人员自批。团队本人申请、权限和并发仍须 PostgreSQL 实测。
 
 默认 Release 并包含 OCR 资源；仅检查布局时可加 `-Configuration Debug -WithoutOcr` 生成不含 OCR 的轻量测试包。Full 只通过显式参数生成，不进入 All、正式安装器、GitHub 桌面发布矩阵或自动更新频道。跨平台本地构建可使用 `build-native.ps1 -Edition Full`，每个平台仍需单独验收。
 
@@ -171,7 +171,7 @@ Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公
 
 OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --example office_review`，再执行 `npm --prefix apps/export-doc-web run test:oa-ui`。回环测试宿主使用独立 DataRoot，覆盖六类申请、附件、办理记录、窄屏，以及管理员规则设置、多级审批、有效代理、手动催办和财务接收；不代替 PostgreSQL 18 或 Tauri 验收。公告通知与审批界面共用测试宿主/浏览器生命周期，正式业务仍使用同一 Rust 服务。
 
-同一宿主构建后，`node scripts/test_personnel_accounts_ui.mjs` 验证人员与账号双向入口、启停和改名同步、同名负责人的工号选择与保存、按工号检索、申请人工号及窄屏显示。Rust 人员和存储契约同时在 SQLite 与 `test-native-postgres.ps1 -Scope All` 的真实 PostgreSQL 18 中验证重名隔离、中文账号、组织停用、权限范围和分页。
+同一宿主构建后，`node scripts/test_personnel_accounts_ui.mjs` 验证人员与账号双向入口、启停和改名同步、同名工号选择、窄屏、继承权限时模块开闭，以及人事直接办理、管理员启用离职审批、人事提交和批准后停用账号。Rust 人员契约在 SQLite 与 `test-native-postgres.ps1 -Scope All` 的真实 PostgreSQL 18 中共用审批策略、版本回滚、交接、身份隔离和权限测试。
 
 发票印章与模板预览回归复用该隔离宿主：先构建 React 和 `office_review`，再运行 `node scripts/test_invoice_report_ui.mjs`，验证无出口商关联的上传按钮、图片保存回读及样例/真实单据的原生排版。
 
@@ -189,6 +189,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 - React：项目 `build`、API／登录／权限／草稿／无障碍及相应页面回归；真正的 Tauri 窗口和输出仍需实跑。
 - 异步生命周期：`npm --prefix apps/export-doc-web run test:abortable-operations-ui` 验证资料切换、卸载后的迟到成功/失败、保存后刷新期间离开页面、商机/供货产品连续查询，以及附件容量刷新和部分失败重试的版本选择；`test:business-features-ui` 另验证真实资料页面不会显示旧预览及旧错误。`test:oa-ui` 的人员详情实跑满额上传、删除后释放容量及继续上传，保留真实 HTTP 版本校验。
 - 供应商评价与下载：异步回归另覆盖连续提交、切换供应商/离开页面及保存成功后刷新失败的记录保留；`test:background-job-polling` 验证取消后的迟到下载凭据不会触发下载，失败的临时链接会清理。
+- 模板／压缩包导入：domain 的 `template_container` 与 engine 的 `archive`、`report_template_files` 回归覆盖伪造展开长度、容量、CRC、逐块取消、冲突路径及正常包回读；`test:api-client-contracts` 核对原始 File 的二进制上传。Office 附件不缓存无需解析的图片条目，模板包上传不额外落盘再读回。
 - 装柜三维：`test:container-packing-model` 检查同色材质复用、层线几何与资源只释放一次；`node scripts/test_container_packing_scene_ui.mjs` 使用真实 WebGL 检查俯视/柜门方向、切换框线和父级重绘时保留视角、右键、暂停及退出清理。该浏览器回归不替代各 OS 的 GPU 驱动验收。
 - 依赖：`generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository`，要求 `unresolved=0 / disallowed=0`。
 - 平台：`verify-native-desktop.mjs` 验证 Tauri／SQLite，排除 Slint／egui／PostgreSQL 桌面依赖；`assert-tauri-command-permissions.ps1` 校验 command 与能力白名单。

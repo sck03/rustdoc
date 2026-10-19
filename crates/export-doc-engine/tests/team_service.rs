@@ -21,6 +21,8 @@ mod oa_contract;
 mod office_contract;
 #[path = "support/personnel_contract.rs"]
 mod personnel_contract;
+#[path = "support/personnel_policy_contract.rs"]
+mod personnel_policy_contract;
 #[path = "support/template_contract.rs"]
 mod template_contract;
 #[path = "support/tools_contract.rs"]
@@ -271,6 +273,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     account_permissions::exercise(&service, admin_token);
     personnel_contract::exercise(&service, admin_token);
     identity_contract::exercise(&service, admin_token);
+    personnel_policy_contract::exercise(&service, admin_token);
     service.close().unwrap();
     drop(Arc::clone(&service));
     drop(service);

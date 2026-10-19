@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react";
-import type { ApiUserDto, ExportDocManagerApiClient, PersonnelAccountRecord, PersonnelDepartmentRecord, PersonnelRecord } from "../../api/index.ts";
+import type { ApiUserDto, ExportDocManagerApiClient, PersonnelDepartmentRecord, PersonnelRecord } from "../../api/index.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { OfficeDialog, OfficeField, OfficePager, OfficeQueryState, OfficeSubmit } from "./OfficeUi.tsx";
-import { personnelActionLabels, type PersonnelWorkflow } from "./personnelModel.ts";
-import { applyPersonnelWorkflow, usePersonnelAccountOptions, usePersonnelClearance, usePersonnelOperation } from "./usePersonnelData.ts";
+import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
+import { type PersonnelWorkflow } from "./personnelModel.ts";
+import { applyPersonnelWorkflow, usePersonnelClearance, usePersonnelOperation } from "./usePersonnelData.ts";
+import { personnelChangeLabels } from "../oa/oaModel.ts";
 import { departmentOptions } from "../organization/organizationModel.ts";
 
 export function PersonnelWorkflowDialog({ client, user, record, action, departments, onClose }: {
@@ -13,10 +14,10 @@ export function PersonnelWorkflowDialog({ client, user, record, action, departme
   const operation = usePersonnelOperation();
   const clearance = usePersonnelClearance(client, user, record.employee.id);
   const [departmentId, setDepartmentId] = useState(record.employee.departmentId);
-  const changesJob = action === "transfer" || action === "rehire";
-  const needsClearance = action === "depart" || action === "transfer";
+  const changesJob = action === "Transfer" || action === "Rehire";
+  const needsClearance = action === "Depart" || action === "Transfer";
   const blocked = needsClearance && (clearance.isFetching || clearance.isError ||
-    !(action === "depart" ? clearance.data?.canDepart : clearance.data?.isClear));
+    !(action === "Depart" ? clearance.data?.canDepart : clearance.data?.isClear));
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (blocked) return;
@@ -26,15 +27,15 @@ export function PersonnelWorkflowDialog({ client, user, record, action, departme
       departmentId: changesJob ? departmentId : null, jobTitle: changesJob ? String(form.get("jobTitle") ?? "") : null, onProbation: form.has("onProbation"),
     }, signal), onClose);
   }
-  return <OfficeDialog title={`${personnelActionLabels[action]} · ${record.employee.fullName}`} onClose={onClose} {...operation} protectChanges>
+  return <OfficeDialog title={`办理${personnelChangeLabels[action]} · ${record.employee.fullName}`} onClose={onClose} {...operation} protectChanges>
     <p>{record.employee.employeeNumber} · {record.employee.departmentName} · {record.employee.jobTitle}</p>
-    <p className="office-muted">{action === "depart" ? `完成交接后归档人员，保留全部历史记录。${record.account ? "关联账号将停用并撤销会话。" : ""}`
-      : action === "rehire" ? `登记新一轮任职，试用与合同日期可在档案中重新设置。${record.account ? "关联账号由系统管理员复核权限后启用。" : ""}`
-        : action === "transfer" ? `登记部门或岗位调整，原业务记录保留原归属。${record.account ? "关联账号将同步部门范围并要求重新登录。" : ""}` : "将试用人员转为正式在职，并记录生效日期与办理说明。"}</p>
+    <p className="office-muted">{action === "Depart" ? `完成交接后归档人员，保留全部历史记录。${record.account ? "关联账号将停用并撤销会话。" : ""}`
+      : action === "Rehire" ? `登记新一轮任职，清除上一轮试用及合同截止日期，再按新合同补充。${record.account ? "关联账号由系统管理员复核权限后启用。" : ""}`
+        : action === "Transfer" ? `登记部门或岗位调整，原业务记录保留原归属。${record.account ? "关联账号将同步部门范围并要求重新登录。" : ""}` : "将试用人员转为正式在职，并记录生效日期与办理说明。"}</p>
     {needsClearance && <InlineNotice tone={!blocked ? "success" : "warning"} title="行政交接核对"
       action={<button className="command-button secondary" type="button" disabled={clearance.isFetching} onClick={() => void clearance.refetch()}>重新核对</button>}>
       {clearance.isError ? "无法完成交接核对，请重新核对后提交。" : clearance.isFetching ? "正在核对…"
-        : action === "depart" && (clearance.data?.managedDepartments.length ?? 0) > 0 ? "该人员仍担任部门负责人，请先由管理员在组织架构中调整负责人。"
+        : action === "Depart" && (clearance.data?.managedDepartments.length ?? 0) > 0 ? "该人员仍担任部门负责人，请先由管理员在组织架构中调整负责人。"
         : clearance.data?.isClear ? "未结清事项为 0，可以办理。"
         : `还有预约 ${clearance.data?.meetingCount ?? 0} 笔、物品申请／借用 ${clearance.data?.supplyCount ?? 0} 笔、OA 申请／审批 ${clearance.data?.approvalCount ?? 0} 笔、办理分工 ${clearance.data?.handlingCount ?? 0} 项。请返回档案的“交接事项”处理。`}
     </InlineNotice>}
@@ -45,42 +46,10 @@ export function PersonnelWorkflowDialog({ client, user, record, action, departme
           {departmentOptions(departments).filter((item) => item.isActive).map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></OfficeField>
         <OfficeField label="新岗位"><input name="jobTitle" required maxLength={120} defaultValue={record.employee.jobTitle} /></OfficeField>
       </>}
-      {action === "rehire" && <label className="checkbox-field"><input type="checkbox" name="onProbation" defaultChecked />返聘后先进入试用期</label>}
+      {action === "Rehire" && <label className="checkbox-field"><input type="checkbox" name="onProbation" defaultChecked />返聘后先进入试用期</label>}
       <OfficeField label="办理说明（必填）" wide><textarea name="note" required maxLength={500} rows={3} /></OfficeField>
     </fieldset><p className="office-muted">提交后立即生效。日期用于记录实际发生时间，不会安排未来自动执行。</p>
-      <OfficeSubmit busy={operation.busy} disabled={blocked} label={personnelActionLabels[action]} />
+      <OfficeSubmit busy={operation.busy} disabled={blocked} label={`办理${personnelChangeLabels[action]}`} />
     </form>
-  </OfficeDialog>;
-}
-
-export function PersonnelAccountDialog({ client, user, record, onClose }: {
-  client: ExportDocManagerApiClient; user: ApiUserDto; record: PersonnelRecord; onClose: () => void;
-}) {
-  const operation = usePersonnelOperation();
-  const model = usePersonnelAccountOptions(client, user, record.employee.id);
-  const [selected, setSelected] = useState<PersonnelAccountRecord | null>(null);
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selected) return;
-    void operation.run((signal) => client.linkPersonnelAccount({ id: record.employee.id, body: { expectedVersion: record.versionNumber,
-      userId: selected.id, expectedAccountVersion: selected.versionNumber } }, { signal }), onClose);
-  }
-  return <OfficeDialog title={`关联账号 · ${record.employee.fullName}`} onClose={onClose} {...operation} protectChanges>
-    <p className="office-muted">选择本公司本人的启用普通账号。关联后姓名和部门由人员档案维护，离职时同步停用账号。更换关联账号或调整账号部门前须先交接未结申请、审批及办理职责。</p>
-    <form className="office-search" onSubmit={(event) => { event.preventDefault(); setSelected(null); model.search(); }}>
-      <input aria-label="搜索可关联账号" placeholder="账号或姓名" value={model.keyword} onChange={(event) => model.setKeyword(event.target.value)} maxLength={100} disabled={operation.busy} />
-      <button className="command-button secondary" type="submit" disabled={operation.busy}>搜索</button>
-    </form>
-    <OfficeQueryState query={model.query} emptyTitle="没有可关联账号，请先在账号与权限中创建本公司普通账号" />
-    <form onSubmit={submit}><fieldset className="office-form-grid" disabled={operation.busy}><legend>选择账号</legend>
-      <ul className="personnel-account-list office-field-wide">{!model.query.isError && model.query.data?.items.map((item) => <li key={item.id}><label>
-        <input type="radio" name="account" value={item.id} checked={selected?.id === item.id} onChange={() => setSelected(item)} />
-        <span>{item.username} · {item.fullName || "未填写姓名"}</span>
-      </label></li>)}</ul>
-    </fieldset>
-      {selected && <p>已选：{selected.username}。将关联到 {record.employee.employeeNumber} / {record.employee.fullName}。</p>}
-      <OfficeSubmit busy={operation.busy} disabled={!selected || model.query.isError} label="确认关联" />
-    </form>
-    <OfficePager page={model.query.data} paging={model.paging} busy={model.query.isFetching || operation.busy} />
   </OfficeDialog>;
 }

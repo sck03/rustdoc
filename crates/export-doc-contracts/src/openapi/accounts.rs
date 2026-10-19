@@ -10,6 +10,7 @@ pub(super) const FIELDS: &[(&str, &[&str])] = &[
         "ApiUserAccountDto",
         &["permissionGrants", "disabledModules", "employee"],
     ),
+    ("ApiUserDto", &["employee"]),
     ("ApiPermissionTemplateDto", &["disabledModules"]),
     ("ApiPermissionTemplateSaveRequest", &["disabledModules"]),
 ];

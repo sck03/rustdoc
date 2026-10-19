@@ -340,15 +340,28 @@ async fn execute(
                     .map(response::Reply::bytes)
                     .map_err(|_| error(503, "上传结果编码失败。"))
             } else {
+                if operation == DOWNLOAD_REPORT_TEMPLATE_FILE {
+                    let request: DownloadReportTemplateFileBody = serde_json::from_value(
+                        body.ok_or_else(|| error(400, "缺少模板下载请求。"))?,
+                    )
+                    .map_err(|_| error(400, "模板下载请求格式无效。"))?;
+                    return state
+                        .service
+                        .download_file(
+                            operation,
+                            &[
+                                ("reportType", request.report_type.unwrap_or_default()),
+                                ("templatePath", request.template_path.unwrap_or_default()),
+                            ],
+                            &token,
+                        )
+                        .map(response::Reply::file);
+                }
                 if operation == DOWNLOAD_PERSONNEL_ATTACHMENT
                     || export_doc_engine::engine::oa::is_download(operation)
                     || export_doc_engine::engine::communication::is_download(operation)
-                    || [
-                        DOWNLOAD_REPORT_TEMPLATE_FILE,
-                        DOWNLOAD_REPORT_TEMPLATE_PACKAGE,
-                        DOWNLOAD_SUPPORT_PACKAGE,
-                    ]
-                    .contains(&operation)
+                    || [DOWNLOAD_REPORT_TEMPLATE_PACKAGE, DOWNLOAD_SUPPORT_PACKAGE]
+                        .contains(&operation)
                 {
                     return state
                         .service

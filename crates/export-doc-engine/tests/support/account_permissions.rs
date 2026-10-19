@@ -75,6 +75,10 @@ pub fn exercise(service: &NativeService, admin: &str) {
         .map(|u| login(service, u["username"].as_str().unwrap()))
         .collect();
     for session in &sessions {
+        assert!(
+            session["user"]["employee"].is_null(),
+            "unlinked accounts have no employee identity"
+        );
         assert_eq!(
             session["user"]["capabilities"]["canUseDocumentWorkspace"],
             false

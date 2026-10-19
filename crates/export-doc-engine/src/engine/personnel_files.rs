@@ -23,9 +23,9 @@ fn documents(row: &Value) -> Result<Vec<Value>> {
         _ => Err(unavailable("人员附件记录损坏。")),
     }
 }
-fn mutable(row: &Value) -> Result<()> {
-    if row["status"] == "Departed" {
-        return Err(conflict("离职档案的附件不能修改。"));
+fn mutable(row: &Value, actor: &Actor) -> Result<()> {
+    if row["status"] == "Departed" && !actor.admin {
+        return Err(conflict("离职档案的附件须由管理员修正。"));
     }
     Ok(())
 }
@@ -53,7 +53,7 @@ pub fn upload(
     let id = records::id(parameters)?;
     store.transaction_as(actor, |tx, actor| {
         let mut row = personnel::person(tx, actor, id, "edit")?;
-        mutable(&row)?;
+        mutable(&row, actor)?;
         let mut files = documents(&row)?;
         if let Some(existing) = files.iter().find(|file| file["digest"] == digest) {
             if existing["fileName"] == name { return personnel_queries::detail(tx, actor, row); }
@@ -81,7 +81,7 @@ pub fn remove(
     records::required(body, "note", "移除说明", 500)?;
     store.transaction_as(actor, |tx, actor| {
         let mut row = personnel::person(tx, actor, id, "edit")?;
-        mutable(&row)?;
+        mutable(&row, actor)?;
         store::check_version(&row, store::expected(body))?;
         let file = attachment(&row, parameters)?;
         let files: Vec<_> = documents(&row)?

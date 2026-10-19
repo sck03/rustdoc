@@ -12,6 +12,9 @@ export async function runAdministrationMaintenanceUi({page,open,read,waitFor,cli
   }
   await open("people",1024,"register");await clickText(page,"人员档案");
   await waitFor(page,"document.querySelector('.personnel-facts')");await clickText(page,"编辑档案");
+  assert.equal(await read(page,"Boolean(document.querySelector('input[name=employeeNumber]'))"),false);
+  await clickText(page,"纠正登记信息（须说明原因）","label");
+  await input(page,'textarea[name="correctionNote"]',"核对入职登记后纠正");
   await input(page,'input[name="employeeNumber"]',"CORRECTED-001");await input(page,'input[name="jobTitle"]',"业务主管");
   await clickText(page,"保存档案");await waitFor(page,"window.__officeCalls.some(item=>item.name==='updatePerson') && !document.querySelector('input[name=employeeNumber]')");
   const correction=await read(page,"window.__officeCalls.find(item=>item.name==='updatePerson').input.body.registration");

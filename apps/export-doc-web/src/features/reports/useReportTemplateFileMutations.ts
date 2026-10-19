@@ -73,13 +73,12 @@ export function useReportTemplateFileMutations({
   });
 
   const uploadFileMutation = useMutation({
-    mutationFn: async (file: File) => client.uploadReportTemplateFile({
+    mutationFn: (file: File) => client.uploadReportTemplateFile({
       reportType,
       templatePath: selectedTemplatePath,
       expectedRevision,
       fileName: file.name,
-      // The raw HTML endpoint must not be JSON encoded by the generated client.
-      body: new Blob([await file.arrayBuffer()], { type: "text/html" }),
+      body: file,
     }),
     onSuccess: async (response) => {
       onImported(response, "upload");

@@ -177,7 +177,6 @@ export type ReportDesignerV3Element =
   | ReportDesignerV3LineElement
   | ReportDesignerV3FlowElement;
 
-export type ReportDesignerV3ElementType = ReportDesignerV3Element["type"];
 export type ReportDesignerV3ImageResource = {
   id: string;
   mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";

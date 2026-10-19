@@ -14,7 +14,7 @@ export function useOaApprovalHub(client: ExportDocManagerApiClient, user: ApiUse
       description: "核对已批准的报销明细、凭证和审批记录，并登记接收。",
       label: "待财务接收", href: "/office/requests/expense?view=finance" });
   }
-  for (const kind of oaKinds.filter(kind => kind !== "expense" && oaAccess(user,kind,"view") && oaAccess(user,kind,"complete"))) {
+  for (const kind of oaKinds.filter(kind => kind !== "expense" && kind !== "personnel" && oaAccess(user,kind,"view") && oaAccess(user,kind,"complete"))) {
     queues.push({kind,finance:false,handling:true,title:`${oaModules[kind].name} · 待办理`,description:oaModules[kind].description,label:"待我办理",href:`/office/requests/${kind}?view=handling`});
   }
   const queries = useQueries({ queries: queues.map(({ kind, finance, handling }) => ({

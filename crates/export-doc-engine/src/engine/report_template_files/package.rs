@@ -21,7 +21,7 @@ pub(super) fn save_template_package_to_path(
 
 pub(super) fn template_files(paths: &RuntimePaths) -> Result<Vec<(String, Vec<u8>)>> {
     let root = user_root(paths);
-    if !root.is_dir() {
+    if !template_directory_exists(&root)? {
         return Ok(vec![]);
     }
     let mut files = vec![];
@@ -133,7 +133,7 @@ pub(super) fn package_bytes(service: &NativeService, actor: &Actor) -> Result<(V
     let defaults = settings["reportTemplateDefaults"].clone();
     let manifest = json!({
         "PackageVersion": PACKAGE_SCHEMA_VERSION,
-        "Templates": templates.clone(),
+        "Templates": templates,
         "TemplateDefaults": {
             "ExportDocumentTemplatePath": normalize_default(&service.paths, &text(&defaults, "exportDocumentTemplatePath"), "ExportDocument")?,
             "PaymentVoucherTemplatePath": normalize_default(&service.paths, &text(&defaults, "paymentVoucherTemplatePath"), "PaymentVoucher")?,
@@ -150,6 +150,14 @@ pub(super) fn package_bytes(service: &NativeService, actor: &Actor) -> Result<(V
         "FilesDigest": files_digest(&files)
     });
     let mut buffer = Vec::new();
+    let config = serde_json::to_vec(&manifest)?;
+    if files.len() >= MAX_PACKAGE_ENTRIES
+        || config.len() > MAX_TEMPLATE_BYTES
+        || config.len() + files.iter().map(|(_, bytes)| bytes.len()).sum::<usize>()
+            > MAX_PACKAGE_BYTES
+    {
+        return Err(invalid("模板包清单或解压总容量超过上限。"));
+    }
     {
         let mut archive = ZipWriter::new(Cursor::new(&mut buffer));
         let options = SimpleFileOptions::default();
@@ -157,7 +165,7 @@ pub(super) fn package_bytes(service: &NativeService, actor: &Actor) -> Result<(V
             .start_file("config.json", options)
             .map_err(|_| unavailable("模板包写入失败。"))?;
         archive
-            .write_all(&serde_json::to_vec(&manifest)?)
+            .write_all(&config)
             .map_err(|_| unavailable("模板包写入失败。"))?;
         for (relative, bytes) in &files {
             crate::operation::check()?;
@@ -172,7 +180,13 @@ pub(super) fn package_bytes(service: &NativeService, actor: &Actor) -> Result<(V
             .finish()
             .map_err(|_| unavailable("模板包写入失败。"))?;
     }
-    Ok((buffer, templates.len() as i64))
+    if buffer.len() > MAX_PACKAGE_BYTES {
+        return Err(invalid("模板包超过 50 MiB。"));
+    }
+    Ok((
+        buffer,
+        manifest["Templates"].as_array().map_or(0, Vec::len) as i64,
+    ))
 }
 
 pub(super) fn normalize_default(paths: &RuntimePaths, stored: &str, kind: &str) -> Result<String> {
@@ -191,29 +205,49 @@ pub(super) fn normalize_default(paths: &RuntimePaths, stored: &str, kind: &str) 
 }
 
 pub(super) fn extract_package(bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
+    if bytes.is_empty() || bytes.len() > MAX_PACKAGE_BYTES {
+        return Err(invalid("模板包为空或超过 50 MiB。"));
+    }
     let mut archive =
         ZipArchive::new(Cursor::new(bytes)).map_err(|_| invalid("模板包不是有效的 zip 归档。"))?;
     if archive.len() > MAX_PACKAGE_ENTRIES {
         return Err(invalid("模板包条目超过 2000。"));
     }
     let mut entries = BTreeMap::new();
+    let mut names = std::collections::BTreeSet::new();
+    let mut total = 0u64;
     for index in 0..archive.len() {
         crate::operation::check()?;
         let mut entry = archive
             .by_index(index)
             .map_err(|_| invalid("模板包条目无法读取。"))?;
-        let raw = entry
-            .enclosed_name()
-            .ok_or_else(|| invalid("模板包包含不安全的条目路径。"))?;
-        // Windows 上 zip 会把条目名中的 / 转成 \，导入时统一成正斜杠再校验。
-        let name = raw.to_string_lossy().replace('\\', "/");
-        if name.is_empty() || name.ends_with('/') || name.contains("..") || name.starts_with('/') {
+        let name = entry.name().trim_end_matches('/').to_owned();
+        if entry.enclosed_name().is_none()
+            || name.split('/').any(|part| !paths::valid_file_name(part))
+            || !names.insert(store::normalize(&name))
+            || entry
+                .unix_mode()
+                .is_some_and(|mode| !matches!(mode & 0o170000, 0 | 0o100000 | 0o040000))
+        {
+            return Err(invalid("模板包包含不安全路径、重复条目或链接。"));
+        }
+        if entry.is_dir() {
+            if entry.size() != 0 || (name != "Templates" && !name.starts_with("Templates/")) {
+                return Err(invalid("模板包目录条目无效。"));
+            }
+            super::super::archive::verify_entry(&mut entry, 0)?;
             continue;
         }
-        let mut buffer = Vec::new();
-        entry
-            .read_to_end(&mut buffer)
-            .map_err(|_| invalid("模板包条目读取失败。"))?;
+        if name != "config.json" && !(name.starts_with("Templates/") && name.ends_with(EXTENSION)) {
+            return Err(invalid(
+                "模板包只能包含配置清单及 Templates 下的 .dtpl 文件。",
+            ));
+        }
+        total = total
+            .checked_add(entry.size())
+            .filter(|total| *total <= MAX_PACKAGE_BYTES as u64)
+            .ok_or_else(|| invalid("模板包解压容量超限。"))?;
+        let buffer = super::super::archive::read_entry(&mut entry, MAX_TEMPLATE_BYTES as u64)?;
         entries.insert(name, buffer);
     }
     Ok(entries)
@@ -276,13 +310,18 @@ pub(super) fn validate_file_manifest(
         if path.is_empty() {
             return Err(invalid("模板包文件摘要包含无效条目。"));
         }
-        expected.insert(
-            path,
-            (
-                file["SizeBytes"].as_i64().unwrap_or(0),
-                text(file, "Sha256").to_string(),
-            ),
-        );
+        if expected
+            .insert(
+                path,
+                (
+                    file["SizeBytes"].as_i64().unwrap_or(0),
+                    text(file, "Sha256").to_string(),
+                ),
+            )
+            .is_some()
+        {
+            return Err(invalid("模板包文件摘要包含重复条目。"));
+        }
     }
     let mut actual = BTreeMap::new();
     for (relative, bytes) in templates {
@@ -403,7 +442,6 @@ pub(super) fn import_template_package(
     validate_manifest(&manifest)?;
     let root = user_root(&service.paths);
     let mut templates = vec![];
-    let mut total = 0usize;
     for (relative, bytes) in entries {
         let Some(relative) = relative.strip_prefix("Templates/") else {
             return Err(invalid("模板包只能包含 Templates 目录下的模板文件。"));
@@ -411,10 +449,6 @@ pub(super) fn import_template_package(
         if relative.is_empty() {
             continue;
         }
-        total = total
-            .checked_add(bytes.len())
-            .filter(|total| *total <= MAX_PACKAGE_BYTES)
-            .ok_or_else(|| invalid("模板包解压容量超限。"))?;
         templates.push((relative.to_owned(), bytes));
     }
     validate_file_manifest(&manifest, &templates)?;

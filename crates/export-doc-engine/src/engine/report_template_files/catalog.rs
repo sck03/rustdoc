@@ -231,9 +231,10 @@ fn resolved_display(paths: &RuntimePaths, raw: &str, absolute: &Path) -> String 
     display_name(raw, absolute)
 }
 pub(super) fn revision(content: &[u8], display: &str) -> String {
-    let mut payload = content.to_vec();
-    payload.extend_from_slice(display.as_bytes());
-    Sha256::digest(&payload)
+    Sha256::new()
+        .chain_update(content)
+        .chain_update(display.as_bytes())
+        .finalize()
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
@@ -399,16 +400,22 @@ fn resolve(paths: &RuntimePaths, kind: &str, stored: &str, must_exist: bool) -> 
     })
 }
 
+pub(super) fn template_directory_exists(root: &Path) -> Result<bool> {
+    ensure_managed(root, root)?;
+    match fs::metadata(root) {
+        Ok(metadata) if metadata.is_dir() => Ok(true),
+        Ok(_) => Err(unavailable("模板根路径不是目录。")),
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(cause) => Err(cause.into()),
+    }
+}
+
 /// Enumerates managed file templates for a report domain. Files without a
 /// catalog row remain visible with metadata derived from their stable path.
 pub(super) fn catalog_entries(paths: &RuntimePaths, kind: &str) -> Result<Vec<Value>> {
     let root = user_root(paths);
-    ensure_managed(&root, &root)?;
-    match fs::metadata(&root) {
-        Ok(metadata) if metadata.is_dir() => {}
-        Ok(_) => return Err(unavailable("模板根路径不是目录。")),
-        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(cause) => return Err(cause.into()),
+    if !template_directory_exists(&root)? {
+        return Ok(Vec::new());
     }
     let metadata = catalog_rows(paths)?;
     let mut rows = Vec::new();

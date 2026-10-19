@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { requestPersonLabel } from "../office/requestIdentity.ts";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient, OaRequest } from "../../api/index.ts";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
@@ -16,7 +16,9 @@ import "../../styles/routes/oa.css";
 export function OaRequestsPage({ client, user, kind }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind }) {
   const model = useOaRequests(client, user, kind);
   const payments = useModulePermission("document.payments");
-  const [editing, setEditing] = useState<OaRequest | "new" | null>(null);
+  const [params, setParams] = useSearchParams();
+  const [editing, setEditing] = useState<OaRequest | "new" | null>(() => kind === "personnel" && params.has("change") && oaAccess(user, kind, "create") ? "new" : null);
+  function closeEditor() { setEditing(null); setParams(current => { const next = new URLSearchParams(current); next.delete("change"); next.delete("employeeId"); return next; }); }
   if (!oaAccess(user, kind, "view")) return <PageState tone="permission" title="没有此申请模块的查看权限" />;
   const module = oaModules[kind];
   return <section className="work-surface office-workspace oa-workspace" aria-label={module.name}>
@@ -43,6 +45,6 @@ export function OaRequestsPage({ client, user, kind }: { client: ExportDocManage
       <div className="office-resource-grid">{model.query.data?.items.map((row) => <article key={row.id} className="office-resource-card"><div className="office-card-heading"><h2><button className="oa-title-button" type="button" onClick={() => model.select(row.id)}>{row.title}</button></h2><span className="office-badge" data-state={row.status}>{oaStatus[row.status]}</span></div><p>{requestPersonLabel(row.employeeName, row)} · {row.departmentId}</p><p className="office-muted">#{row.id} {row.totalAmount && ` · ${row.currency} ${row.totalAmount}`}{row.durationDays && ` · ${row.durationDays} 天`}{row.durationHours && ` · ${row.durationHours} 小时`}</p></article>)}</div>
       <div className="office-card-actions"><button className="command-button secondary" type="button" disabled={model.page <= 1 || model.query.isFetching} onClick={() => model.setPage(model.page - 1)}>上一页</button><span>第 {model.page} 页 · 共 {model.query.data?.totalCount ?? 0} 条</span><button className="command-button secondary" type="button" disabled={model.query.isFetching || model.page * 20 >= (model.query.data?.totalCount ?? 0)} onClick={() => model.setPage(model.page + 1)}>下一页</button></div>
     </>}
-    {editing && <OaRequestDialog client={client} user={user} kind={kind} record={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} onSaved={(row) => { setEditing(null); model.select(row.id); }} />}
+    {editing && <OaRequestDialog client={client} user={user} kind={kind} record={editing === "new" ? undefined : editing} onClose={closeEditor} onSaved={(row) => { setEditing(null); model.select(row.id); }} />}
   </section>;
 }

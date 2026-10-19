@@ -9,10 +9,12 @@ import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { readRouteChoice } from "../../ui/routeQueryState.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { officeAccess, officeStatusLabels } from "./officeModel.ts";
-import { employmentStatusLabels, employmentTypeLabels, personnelActionLabels, personnelHistoryLabels, personnelReminders, personnelWorkflows, type PersonnelWorkflow } from "./personnelModel.ts";
+import { employmentStatusLabels, employmentTypeLabels, personnelHistoryLabels, personnelReminders, personnelWorkflows, type PersonnelWorkflow } from "./personnelModel.ts";
+import { oaAccess, personnelChangeLabels } from "../oa/oaModel.ts";
 import { usePersonnelClearance, usePersonnelHistory, usePersonnelOperation, usePersonnelRecord } from "./usePersonnelData.ts";
 import { PersonnelFormDialog } from "./PersonnelFormDialog.tsx";
-import { PersonnelAccountDialog, PersonnelWorkflowDialog } from "./PersonnelWorkflowDialog.tsx";
+import { PersonnelAccountDialog } from "./PersonnelAccountDialog.tsx";
+import { PersonnelWorkflowDialog } from "./PersonnelWorkflowDialog.tsx";
 import { PersonnelImagesPanel } from "./PersonnelImagesPanel.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { RecordDeleteDialog } from "./RecordDeleteDialog.tsx";
@@ -52,12 +54,15 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
           <span className="office-badge" data-state={record.employee.status}>{employmentStatusLabels[record.employee.status]}</span></div>
         <div className="office-card-actions">
           {record.canEdit && <button type="button" className="command-button" disabled={imageOperation.busy} onClick={() => setEditing(record)}>编辑档案</button>}
-          {personnelWorkflows(record).map((action) => <button type="button" className="command-button secondary" disabled={imageOperation.busy} key={action} onClick={() => setWorkflow({ record, action })}>{personnelActionLabels[action]}</button>)}
+          {personnelWorkflows(record).map((action) => record.approvalRequiredActions?.includes(action)
+            ? oaAccess(user, "personnel", "create") && <Link className="command-button secondary" key={action} to={`/office/requests/personnel?change=${action}&employeeId=${id}`}>申请{personnelChangeLabels[action]}</Link>
+            : <button type="button" className="command-button secondary" disabled={imageOperation.busy} key={action} onClick={() => setWorkflow({ record, action })}>办理{personnelChangeLabels[action]}</button>)}
           {record.canLinkAccount && <button type="button" className="command-button secondary" disabled={imageOperation.busy} onClick={() => setLinking(record)}>关联账号</button>}
           {record.canDelete && <button type="button" className="command-button secondary" disabled={imageOperation.busy || Boolean(record.deleteRestriction)}
             onClick={() => setDeleting(record)}>删除误录档案</button>}
         </div>
         {record.canDelete && record.deleteRestriction && <p className="office-muted">{record.deleteRestriction}</p>}
+        {record.canTransition && Boolean(record.approvalRequiredActions?.length) && !oaAccess(user, "personnel", "create") && <InlineNotice tone="warning">部分人员变动需要审批，但当前账号没有人员变动申请权限，请管理员检查权限方案与模块开关。</InlineNotice>}
         <nav className="office-tabs" aria-label="人员档案内容">{[["profile", "档案信息"], ["images", "照片与证件"], ["history", "任职与操作记录"], ["clearance", "交接事项"]].map(([key, label]) =>
           <button type="button" key={key} disabled={imageOperation.busy} aria-pressed={tab === key} onClick={() => void changeTab(key)}>{label}</button>)}</nav>
         <div hidden={tab !== "profile"}><PersonnelFacts record={record} user={user} /></div>

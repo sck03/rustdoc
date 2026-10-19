@@ -7,7 +7,7 @@ use crate::contracts;
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    io::{Cursor, Read, Write},
+    io::{Cursor, Write},
 };
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
@@ -149,11 +149,7 @@ pub fn read(bytes: &[u8]) -> Result<Package> {
         {
             return Err(invalid("单据包文件重复、类型错误或超过容量。"));
         }
-        let mut content = vec![];
-        (&mut entry)
-            .take(limit as u64 + 1)
-            .read_to_end(&mut content)
-            .map_err(|_| invalid("单据包文件损坏。"))?;
+        let content = crate::engine::archive::read_entry(&mut entry, limit as u64)?;
         total += content.len();
         if content.len() > limit || total > 48 * 1024 * 1024 {
             return Err(invalid("单据包解压容量超限。"));

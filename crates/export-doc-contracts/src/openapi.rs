@@ -125,6 +125,20 @@ mod tests {
                 serde_json::json!({"name":"handlingOnly","in":"query","schema":{"type":"boolean"}})
             );
         }
+        let parameters = current["paths"]["/api/office/people/options"]["get"]
+            .as_object_mut()
+            .unwrap()
+            .remove("parameters")
+            .unwrap();
+        assert_eq!(parameters.as_array().unwrap().len(), 1);
+        let employee = &parameters[0];
+        assert_eq!(employee["name"], "employeeId");
+        assert_eq!(employee["in"], "query");
+        assert_eq!(employee["required"], false);
+        assert_eq!(
+            employee["schema"],
+            serde_json::json!({"type":"integer","format":"int64","minimum":1})
+        );
         for (path, methods) in baseline["paths"].as_object().unwrap() {
             assert_eq!(&current["paths"][path], methods, "endpoint drift: {path}");
         }

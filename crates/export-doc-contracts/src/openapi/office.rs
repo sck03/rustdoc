@@ -25,6 +25,14 @@ pub(super) fn extend(doc: &mut Value) {
     }
     for (kind, name, resource, label, group, order) in [
         (
+            "personnel",
+            "PersonnelChange",
+            "office.personnel-changes",
+            "人员变动审批",
+            "人事管理",
+            345,
+        ),
+        (
             "leave",
             "Leave",
             "office.leave",
@@ -133,6 +141,9 @@ pub(super) fn extend(doc: &mut Value) {
             ("complete", "Complete", "complete"),
             ("remind", "Remind", "edit"),
         ] {
+            if kind == "personnel" && matches!(action, "void" | "complete") {
+                continue;
+            }
             add(
                 &format!("/{{id}}/{action}"),
                 "post",
@@ -182,7 +193,7 @@ pub(super) fn extend(doc: &mut Value) {
 
 fn permissions(doc: &mut Value, kind: &str, resource: &str, label: &str, group: &str, order: i32) {
     let catalog = &mut doc["x-exportdoc-permissions"];
-    let actions: Vec<_> = [("view","查看","view"),("create","新建申请","operate"),("edit","编辑与提交","operate"),("cancel","取消草稿","operate"),("approve","审批与作废","manage"),("complete",if kind=="expense" {"财务查看与接收"} else {"完成登记"},"manage")].into_iter().enumerate().map(|(order,(key,name,level))| json!({"key":key,"name":name,"description":name,"sortOrder":order*10,"navigationAccessLevel":level})).collect();
+    let actions: Vec<_> = [("view","查看","view"),("create","新建申请","operate"),("edit","编辑与提交","operate"),("cancel","取消草稿","operate"),("approve",if kind=="personnel" {"审批人员变动"} else {"审批与作废"},"manage"),("complete",if kind=="expense" {"财务查看与接收"} else {"完成登记"},"manage")].into_iter().filter(|(key,_,_)| kind != "personnel" || *key != "complete").enumerate().map(|(order,(key,name,level))| json!({"key":key,"name":name,"description":name,"sortOrder":order*10,"navigationAccessLevel":level})).collect();
     catalog["resources"].as_array_mut().unwrap().push(json!({"key":resource,"name":label,"group":group,"workspace":"office","moduleKey":resource,"sortOrder":order,"isTechnical":false,"supportsDataScope":true,"actions":actions}));
     catalog["modules"].as_array_mut().unwrap().push(json!({"key":resource,"name":label,"group":group,"workspace":"office","sortOrder":order,"isTechnical":false}));
     for edition in ["Full", "Administration"] {
@@ -193,8 +204,11 @@ fn permissions(doc: &mut Value, kind: &str, resource: &str, label: &str, group: 
     }
     for role in catalog["roles"].as_array_mut().unwrap() {
         let code = role["code"].as_str().unwrap().to_owned();
+        if kind == "personnel" && !matches!(code.as_str(), "Admin" | "PersonnelManager") {
+            continue;
+        }
         let manager = code == "Admin"
-            || if matches!(kind, "leave" | "overtime") {
+            || if matches!(kind, "leave" | "overtime" | "personnel") {
                 code == "PersonnelManager"
             } else {
                 code == "OfficeManager"

@@ -11,7 +11,7 @@ export function useOaRequests(client: ExportDocManagerApiClient, user: ApiUserDt
   const [page, setPage] = useState(1);
   const canReceive = kind === "expense" && oaAccess(user, kind, "complete");
   const canApprove = oaAccess(user, kind, "approve");
-  const canHandle = kind !== "expense" && oaAccess(user,kind,"complete");
+  const canHandle = kind !== "expense" && kind !== "personnel" && oaAccess(user,kind,"complete");
   const view = params.get("view") ?? (canReceive && !canApprove ? "finance" : "requests");
   const financeOnly = canReceive && view === "finance";
   const approvalsOnly = canApprove && view === "approvals";
@@ -29,6 +29,6 @@ export function useOaRequests(client: ExportDocManagerApiClient, user: ApiUserDt
     queryFn: ({ signal }) => api.get(selected, { signal }) });
   return { query, detail, selected, page, setPage, mineOnly, status, canReceive, financeOnly, canApprove, approvalsOnly,canHandle,handlingOnly,
     changeView: (value: string) => { setParams({ view: value }); setPage(1); },
-    select: (id: number) => setParams((current) => { const next = new URLSearchParams(current); if (id) next.set("requestId", String(id)); else next.delete("requestId"); return next; }),
+    select: (id: number) => setParams((current) => { const next = new URLSearchParams(current); next.delete("change"); next.delete("employeeId"); if (id) next.set("requestId", String(id)); else next.delete("requestId"); return next; }),
     changeMine: (value: boolean) => { setMine(value); setPage(1); }, changeStatus: (value: string) => { setFilter({ view, status: value }); setPage(1); } };
 }

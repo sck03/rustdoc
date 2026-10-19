@@ -7,6 +7,15 @@ pub(super) fn extend(doc: &mut Value) {
     let money = json!({"type":"string","pattern":"^[0-9]+(\\.[0-9]{1,2})?$"});
     let date = json!({"type":"string","format":"date"});
     let schemas = &mut doc["components"]["schemas"];
+    schemas["OaPersonnelChange"] = object(
+        json!({
+            "action":{"type":"string","enum":["Hire","Confirm","Transfer","Depart","Rehire"]},
+            "expectedPersonnelVersion":integer,
+            "effectiveDate":date,"departmentId":string,"jobTitle":string,"onProbation":{"type":"boolean"},
+            "registration":reference("PersonnelCreateRequest")
+        }),
+        &["action"],
+    );
     schemas["PersonnelClearance"]["properties"]["approvalCount"] = integer.clone();
     schemas["OaLeave"] = object(
         json!({
@@ -38,6 +47,7 @@ pub(super) fn extend(doc: &mut Value) {
     schemas["OaRequestSave"] = object(
         json!({
             "requestKey":string,"expectedVersion":integer,"employeeId":integer,"title":string,"reason":string,
+            "personnelChange":reference("OaPersonnelChange"),
             "leave":reference("OaLeave"),"travel":reference("OaTravel"),"overtime":reference("OaOvertime"),
             "category":{"type":"string","enum":["Seal","Certificate","IT","Repair","Other"]},
             "currency":{"type":"string","enum":["CNY","USD","EUR","HKD","JPY","GBP"]},
@@ -68,7 +78,7 @@ pub(super) fn extend(doc: &mut Value) {
     let mut record = schemas["OaRequestSave"]["properties"].clone();
     for (key,value) in json!({"id":integer,"versionNumber":integer,"employeeName":string,"departmentId":string,"ownerUserId":integer,
         "status":{"type":"string","enum":["Draft","Pending","Approved","Rejected","Cancelled","Completed","HandedOff"]},
-        "kind":{"type":"string","enum":["leave","expense","travel","overtime","purchase","general"]},"totalAmount":string,"durationDays":string,"durationHours":string,
+        "kind":{"type":"string","enum":["leave","expense","travel","overtime","purchase","general","personnel"]},"totalAmount":string,"durationDays":string,"durationHours":string,
         "createdAt":string,"updatedAt":string,"attachments":{"type":"array","items":reference("OaAttachment")}
     }).as_object().unwrap() { record[key] = value.clone(); }
     schemas["OaRequest"] = object(

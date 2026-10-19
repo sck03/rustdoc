@@ -29,7 +29,7 @@ pub(super) fn extend(doc: &mut Value) {
     s["OaRequest"]["properties"]["lastRemindedAt"] = text.clone();
     s["OaEvent"]["properties"]["approvalPlan"] = reference("OaApprovalPlan");
     s["OaApprovalRule"] = object(
-        json!({"kind":{"type":"string","enum":["leave","overtime","expense","travel","purchase","general"]},"mode":mode,"approverUserIds":{"type":"array","items":int,"maxItems":10}}),
+        json!({"kind":{"type":"string","enum":["leave","overtime","expense","travel","purchase","general","personnel"]},"mode":mode,"approverUserIds":{"type":"array","items":int,"maxItems":10}}),
         &["kind", "mode", "approverUserIds"],
     );
     s["OaApprovalDelegation"] = object(
@@ -43,7 +43,7 @@ pub(super) fn extend(doc: &mut Value) {
             "isActive",
         ],
     );
-    let properties = json!({"expectedVersion":int,"rules":{"type":"array","items":reference("OaApprovalRule"),"minItems":6,"maxItems":6},"delegations":{"type":"array","items":reference("OaApprovalDelegation"),"maxItems":50}});
+    let properties = json!({"expectedVersion":int,"personnelApprovalActions":{"type":"array","items":{"type":"string","enum":["Hire","Confirm","Transfer","Depart","Rehire"]},"maxItems":5,"uniqueItems":true},"rules":{"type":"array","items":reference("OaApprovalRule"),"minItems":7,"maxItems":7},"delegations":{"type":"array","items":reference("OaApprovalDelegation"),"maxItems":50}});
     s["OaApprovalSettingsSave"] = object(
         properties.clone(),
         &["expectedVersion", "rules", "delegations"],

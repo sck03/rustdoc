@@ -102,7 +102,9 @@ pub(super) fn list(
         status: (!status.is_empty()).then_some(status),
         approvers: approvals.then_some(approvers.as_slice()),
         approval_actor: approvals.then_some(actor.id),
-        exclude_owner: (approvals && tx.provider() != "SQLite").then_some(actor.id),
+        exclude_owner: (approvals && (tx.provider() != "SQLite" || meta["kind"] == "personnel"))
+            .then_some(actor.id),
+        exclude_applicant: (approvals && meta["kind"] == "personnel").then_some(actor.id),
         handling_keys: (meta["kind"] == "general" && !approvals && !mine)
             .then_some(handling_keys.as_slice()),
         handling_states: handling::GENERAL_STATES,

@@ -71,7 +71,7 @@ assert(!isRouteAccessAllowed({ pathname:"/office/people",user:personnelUser,canM
 assert(!personnel.canViewPersonnelDetails(personnelUser));
 assert(personnel.canViewPersonnelDetails({ ...personnelUser, capabilities:{permissions:[{resourceKey:"office.people",action:"view-details",dataScope:"department"}]} }));
 assert.deepEqual(personnel.personnelWorkflows({ canTransition:false,employee:{status:"Active"} }), []);
-assert.deepEqual(personnel.personnelWorkflows({ canTransition:true,employee:{status:"Departed"} }), ["rehire"]);
+assert.deepEqual(personnel.personnelWorkflows({ canTransition:true,employee:{status:"Departed"} }), ["Rehire"]);
 assert.deepEqual(personnel.personnelReminders({ employee:{status:"Probation"},profile:{identityLongTerm:false,identityValidUntil:null},probationEndsOn:"2026-09-07",contractEndsOn:"2026-10-08" },"2026-09-07"), ["试用期即将到期：2026-09-07"]);
 assert.deepEqual(personnel.personnelReminders({employee:{status:"Active"},profile:{identityLongTerm:false,identityValidUntil:"2026-09-08"}},"2026-09-07"),["身份证即将到期：2026-09-08"]);
 const identityForm = new FormData();

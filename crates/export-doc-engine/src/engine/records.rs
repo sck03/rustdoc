@@ -423,27 +423,11 @@ pub(super) fn save_in_transaction(
     }
     let mut value = contracts::overlay(previous.clone(), &request);
     if resource.key == "people" && record_id == 0 {
-        required(request, "requestKey", "请求编号", 100)?;
-        let mut submitted = request.clone();
-        submitted.sort_all_objects();
-        let digest = super::media::digest(&serde_json::to_vec(&submitted)?);
-        if let Some(existing) = store::all(transaction, "people")?
-            .into_iter()
-            .find(|person| {
-                person["companyScope"] == actor.company
-                    && person["ownerUserId"] == actor.id
-                    && person["requestKey"] == request["requestKey"]
-            })
+        if let Some(existing) =
+            super::personnel::registration(transaction, actor, request, &mut value)?
         {
-            if existing["registrationDigest"] != digest {
-                return Err(conflict("同一请求编号不能用于不同入职资料。"));
-            }
-            if !auth::visible(actor, "office.people", "create", &existing) {
-                return Err(error(403, "档案已不在当前登记范围内。"));
-            }
-            return super::personnel_queries::detail(transaction, actor, existing);
+            return Ok(existing);
         }
-        value["registrationDigest"] = json!(digest);
     }
     if !matches!(resource.key, "users" | "people") {
         value["ownerUserId"] = if record_id > 0 {
@@ -475,7 +459,21 @@ pub(super) fn save_in_transaction(
         business_date,
     )?;
     if resource.key == "people" {
-        return super::personnel::save(transaction, actor, record_id, value, action, "");
+        if !auth::visible(actor, "office.people", action, &value) {
+            return Err(error(403, "人员档案不在当前账号的操作范围内。"));
+        }
+        if let Some(object) = value.as_object_mut() {
+            object.remove("registration");
+            object.remove("correctionNote");
+        }
+        return super::personnel::save(
+            transaction,
+            actor,
+            record_id,
+            value,
+            action,
+            &text(request, "correctionNote"),
+        );
     }
     let identity = if resource.identity.is_empty() {
         None
@@ -516,7 +514,7 @@ pub(super) fn save_in_transaction(
     Ok(saved)
 }
 
-fn normalize(value: &mut Value, depth: usize) -> Result<()> {
+pub(super) fn normalize(value: &mut Value, depth: usize) -> Result<()> {
     if depth > 20 {
         return Err(invalid("内容嵌套过深。"));
     }

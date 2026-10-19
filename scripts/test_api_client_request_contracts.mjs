@@ -163,7 +163,15 @@ try {
   await assert.rejects(transfer, { name: "AbortError" }, "long backup transfers must remain cancelable");
   await assert.rejects(client.getHealth({ timeoutMs: 24 * 60 * 60 * 1000 + 1 }), RangeError, "timeouts remain explicitly bounded");
 
-  console.log("API client timeout and cancellation contracts passed.");
+  const template = new File([Uint8Array.from([0, 127, 255])], "模板.dtpl");
+  const uploadClient = createExportDocManagerApiClient({ baseUrl: "https://api.example.test", fetch: async (_url, init) => {
+    assert.equal(init.body, template, "template uploads pass the original binary File without copying or HTML conversion");
+    assert.equal(new Headers(init.headers).get("Content-Type"), "application/octet-stream");
+    return new Response("{}", { headers: { "content-type": "application/json" } });
+  } });
+  await uploadClient.uploadReportTemplateFile({ fileName: template.name, body: template });
+
+  console.log("API client timeout, cancellation and binary upload contracts passed.");
 } finally {
   fs.rmSync(workspace, { recursive: true, force: true });
 }

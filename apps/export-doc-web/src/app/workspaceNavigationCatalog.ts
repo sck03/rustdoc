@@ -152,7 +152,7 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
       { label: "公司通讯录", description: "查找同事的工作电话、邮箱和办公地点", keywords: "联系 同事 部门", to: "/office/directory", icon: ContactRound,
         isActive: (path) => path.startsWith("/office/directory"), workspace: "office", moduleKey: "office.people",
         requiredPermissions: [{ resourceKey: permissionResources.officePeople, action: permissionActions.view }] },
-      ...(["leave", "overtime"] as const).map(oaNavigation),
+      ...(["personnel", "leave", "overtime"] as const).map(oaNavigation),
     ],
   },
   {

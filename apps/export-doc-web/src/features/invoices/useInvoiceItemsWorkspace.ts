@@ -440,5 +440,3 @@ export function useInvoiceItemsWorkspace({
     redoItemEdit,
   };
 }
-
-export type InvoiceItemsWorkspace = ReturnType<typeof useInvoiceItemsWorkspace>;

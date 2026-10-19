@@ -73,6 +73,24 @@ pub fn exercise(service: &NativeService, admin: &str) {
         .unwrap();
         assert_eq!(login["user"]["id"], account["id"]);
         assert_eq!(login["user"]["fullName"], name);
+        assert_eq!(login["user"]["employee"]["id"], person["employee"]["id"]);
+        assert_eq!(
+            login["user"]["employee"]["employeeNumber"],
+            person["employee"]["employeeNumber"]
+        );
+        assert!(!login["user"].to_string().contains("private-"));
+        assert_eq!(
+            request(
+                service,
+                login["accessToken"].as_str().unwrap(),
+                GET_CURRENT_USER,
+                &[],
+                &[],
+                None
+            )
+            .unwrap()["employee"],
+            login["user"]["employee"]
+        );
         tokens.push(login["accessToken"].as_str().unwrap().to_owned());
         account["versionNumber"] = linked["account"]["versionNumber"].clone();
         accounts.push(account);

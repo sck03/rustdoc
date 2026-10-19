@@ -372,21 +372,19 @@ pub fn exercise(service: &NativeService, admin: &str) {
             .status,
             Some(401)
         );
-        assert_eq!(
-            service
-                .upload(
-                    UPLOAD_PERSONNEL_ATTACHMENT,
-                    &path,
-                    json!({"expectedVersion":person["versionNumber"]}),
-                    "离职后.pdf",
-                    pdf,
-                    admin
-                )
-                .err()
-                .expect("request must be denied")
-                .status,
-            Some(409)
-        );
+        let corrected = service
+            .upload(
+                UPLOAD_PERSONNEL_ATTACHMENT,
+                &path,
+                json!({"expectedVersion":person["versionNumber"]}),
+                "离职后.pdf",
+                b"%PDF-1.7\n% Separation document\n1 0 obj<</Type/Catalog>>endobj\n%%EOF\n",
+                admin,
+            )
+            .unwrap();
+        assert_eq!(corrected["attachments"].as_array().unwrap().len(), 2);
+        assert_eq!(corrected["employee"]["status"], "Departed");
+        assert_eq!(corrected["account"]["isActive"], false);
     } else {
         let removed: Value = serde_json::from_slice(
             &service

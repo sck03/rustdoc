@@ -41,7 +41,8 @@ pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value
         record["attachments"] = json!([]);
     }
     record["employee"] = employee(tx, actor, &record)?;
-    let editable = record["status"] != "Departed";
+    let editable = actor.admin || record["status"] != "Departed";
+    let required_actions = super::oa::personnel_changes::required_actions(tx, actor)?;
     let correct = office::can_correct(
         tx,
         record["id"]
@@ -53,7 +54,13 @@ pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value
         ("canTransition", "transition", true),
         ("canLinkAccount", "assign", editable && actor.admin),
         ("canDelete", "delete", true),
-        ("canCorrectRegistration", "edit", editable && correct),
+        (
+            "canCorrectRegistration",
+            "edit",
+            editable
+                && (actor.admin
+                    || (correct && required_actions.as_array().is_some_and(Vec::is_empty))),
+        ),
     ] {
         record[field] = json!(allowed && auth::visible(actor, "office.people", action, &record));
     }
@@ -62,6 +69,7 @@ pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value
     } else {
         "已有账号、业务记录、负责人职责或正式任职变动，请通过调岗、离职流程处理。"
     });
+    record["approvalRequiredActions"] = required_actions;
     Ok(record)
 }
 
@@ -72,19 +80,28 @@ pub fn read(store: &Store, actor: &Actor, id: i64) -> Result<Value> {
     })
 }
 
-pub fn options(store: &Store, actor: &Actor) -> Result<Value> {
+pub fn options(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
     auth::authorize(actor, "office.people", "view")?;
-    let departments: Vec<_> = store
-        .all("departments")?
+    store.read(|tx| {
+    let company = if let Some((_, id)) = query.iter().find(|(key, _)| *key == "employeeId") {
+        let id = id.parse::<i64>().ok().filter(|id| *id > 0)
+            .ok_or_else(|| invalid("人员编号无效。"))?;
+        text(&super::personnel::person(tx, actor, id, "view-details")?, "companyScope")
+    } else {
+        actor.company.clone()
+    };
+    let departments: Vec<_> = store::all(tx, "departments")?
         .into_iter()
-        .filter(|department| department["companyCode"] == actor.company)
+        .filter(|department| department["companyCode"] == company)
         .map(|department| {
             contracts::project(contracts::schema("PersonnelDepartmentRecord"), department)
         })
         .collect();
+    let actions = super::oa::personnel_changes::required_actions(tx, actor)?;
     Ok(
-        json!({"departments":departments,"canCreate":auth::authorize(actor,"office.people","create").is_ok()}),
+        json!({"departments":departments,"canCreate":auth::authorize(actor,"office.people","create").is_ok(),"approvalRequiredActions":actions}),
     )
+    })
 }
 
 const DIRECTORY_FIELDS: &[(&str, &str)] = &[

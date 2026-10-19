@@ -1,10 +1,69 @@
 use super::*;
 
 #[test]
+fn package_rejects_ambiguous_paths_and_capacity_before_import() {
+    fn zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+        for (name, bytes) in entries {
+            writer
+                .start_file(
+                    *name,
+                    SimpleFileOptions::default()
+                        .compression_method(zip::CompressionMethod::Deflated),
+                )
+                .unwrap();
+            writer.write_all(bytes).unwrap();
+        }
+        writer.finish().unwrap().into_inner()
+    }
+    for entries in [
+        vec![
+            ("config.json", b"{}".as_slice()),
+            ("Templates/Export/a.dtpl", b"a"),
+            ("Templates/Export/A.dtpl", b"b"),
+        ],
+        vec![("Templates/../a.dtpl", b"a".as_slice())],
+        vec![("Templates/Export/./a.dtpl", b"a".as_slice())],
+        vec![("ignored.txt", b"a".as_slice())],
+    ] {
+        assert_eq!(
+            extract_package(&zip(&entries)).unwrap_err().status,
+            Some(400)
+        );
+    }
+    let large = vec![b'x'; MAX_TEMPLATE_BYTES + 1];
+    assert!(extract_package(&zip(&[("config.json", &large)])).is_err());
+    let entries: Vec<_> = ["a", "b", "c", "d", "e", "f"]
+        .iter()
+        .map(|s| {
+            (
+                format!("Templates/Export/{s}.dtpl"),
+                &large[..MAX_TEMPLATE_BYTES],
+            )
+        })
+        .collect();
+    assert!(
+        extract_package(&zip(&entries
+            .iter()
+            .map(|(n, b)| (n.as_str(), *b))
+            .collect::<Vec<_>>()))
+        .is_err()
+    );
+    let mut truncated = zip(&[("config.json", b"{}")]);
+    let central = truncated
+        .windows(4)
+        .position(|s| s == b"PK\x01\x02")
+        .unwrap();
+    truncated[central + 24..central + 28].copy_from_slice(&1u32.to_le_bytes());
+    assert!(extract_package(&truncated).is_err());
+}
+
+#[test]
 fn catalog_failures_are_not_empty_successes() {
     let workspace = Workspace::new();
     let paths = workspace.paths();
     assert!(catalog_rows(&paths).unwrap().is_empty());
+    assert!(template_files(&paths).unwrap().is_empty());
     assert!(
         catalog_entries(&paths, "ExportDocument")
             .unwrap()
@@ -40,6 +99,10 @@ fn catalog_failures_are_not_empty_successes() {
     fs::remove_dir(&path).unwrap();
     fs::remove_dir(&root).unwrap();
     fs::write(&root, b"not a directory").unwrap();
+    assert_eq!(
+        resource_access(&paths, &admin()).unwrap_err().status,
+        Some(503)
+    );
     assert_eq!(
         catalog_entries(&paths, "ExportDocument")
             .unwrap_err()

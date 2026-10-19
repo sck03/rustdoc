@@ -92,7 +92,7 @@ fn personnel_directory_images_and_employment_events_use_the_public_contract() {
     assert_eq!(image, image_bytes.into_inner());
     person=fixture.request(CONFIRM_PERSONNEL,Some(id),Some(json!({"expectedVersion":person["versionNumber"],"effectiveDate":"2026-09-17","note":"已完成试用考核"})));
     assert_eq!(person["employee"]["status"], "Active");
-    assert_eq!(person["canCorrectRegistration"], false);
+    assert_eq!(person["canCorrectRegistration"], true);
     let history = fixture
         .client()
         .json::<Value>(
@@ -286,6 +286,11 @@ fn attachment_versions_require_confirmation_and_keep_auditable_reasons() {
 #[test]
 fn implemented_parameterless_reads_match_the_generated_response_structure() {
     let fixture = Fixture::new();
+    assert!(fixture.client().supports(CLONE_USER_REPORT_TEMPLATE));
+    if fixture.client().supports(GET_DISASTER_RECOVERY_STATUS) {
+        assert!(fixture.client().supports(CREATE_DISASTER_RECOVERY_PACKAGE));
+        assert!(fixture.client().supports(RESTORE_DISASTER_RECOVERY_PACKAGE));
+    }
     let mut failures = vec![];
     for operation in ALL_OPERATIONS
         .iter()

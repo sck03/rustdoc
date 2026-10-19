@@ -2,7 +2,12 @@ use serde_json::{Value, json};
 
 #[cfg(test)]
 pub(super) const FIELDS: &[(&str, &[&str])] = &[
-    ("PersonnelRecord", &["attachments"]),
+    (
+        "PersonnelRecord",
+        &["attachments", "approvalRequiredActions"],
+    ),
+    ("PersonnelOptions", &["approvalRequiredActions"]),
+    ("PersonnelUpdateRequest", &["correctionNote"]),
     ("ApiOrganizationDepartmentDto", &["managerEmployeeNumber"]),
     (
         "OfficeSupplyRequestRecord",
@@ -12,6 +17,18 @@ pub(super) const FIELDS: &[(&str, &[&str])] = &[
 ];
 
 pub(super) fn extend(doc: &mut Value) {
+    doc["paths"]["/api/office/people/options"]["get"]["parameters"] = json!([{
+        "name":"employeeId", "in":"query", "required":false,
+        "schema":{"type":"integer","format":"int64","minimum":1},
+        "description":"Read departments for an authorized employee; omitted for registration in the current company."
+    }]);
+    let actions = json!({"type":"array","readOnly":true,"items":doc["components"]["schemas"]["OaPersonnelChange"]["properties"]["action"]});
+    for schema in ["PersonnelRecord", "PersonnelOptions"] {
+        doc["components"]["schemas"][schema]["properties"]["approvalRequiredActions"] =
+            actions.clone();
+    }
+    doc["components"]["schemas"]["PersonnelUpdateRequest"]["properties"]["correctionNote"] =
+        json!({"type":"string","maxLength":500});
     for schema in ["OfficeSupplyRequestRecord", "MeetingBookingRecord"] {
         doc["components"]["schemas"][schema]["properties"]["employeeId"] = json!({
             "type":"integer", "format":"int64", "readOnly":true,

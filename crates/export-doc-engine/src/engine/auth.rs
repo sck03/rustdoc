@@ -322,6 +322,14 @@ pub fn user_dto(
 ) -> Result<Value> {
     let actor = actor_from(store, record)?;
     let mut user = contracts::overlay(contracts::initial(contracts::schema("ApiUserDto")), record);
+    user["employee"] = if !actor.admin && actor.edition.allows("office.people") {
+        store
+            .read(|tx| super::personnel_accounts::linked_person(tx, actor.id))?
+            .map(super::personnel_accounts::summary)
+            .unwrap_or(Value::Null)
+    } else {
+        Value::Null
+    };
     let now = clock.now().map_err(unavailable)?;
     user["businessDate"] = json!(now.today.to_string());
     user["businessTimeZone"] = json!(now.time_zone);

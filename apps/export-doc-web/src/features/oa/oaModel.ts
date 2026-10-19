@@ -1,11 +1,14 @@
-import type { ApiUserDto, OaRequest, OaRequestSave } from "../../api/index.ts";
+import type { ApiUserDto, OaPersonnelChange, OaRequest, OaRequestSave } from "../../api/index.ts";
 import { hasPermission } from "../../app/PermissionAccessContext.tsx";
 import { officeBookingDefaults } from "../office/officeModel.ts";
+import { readPersonnelProfile } from "../office/personnelModel.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 
 export type OaKind = OaRequest["kind"];
-export const oaKinds: OaKind[] = ["leave", "overtime", "expense", "travel", "purchase", "general"];
+export const personnelChangeLabels: Record<OaPersonnelChange["action"], string> = { Hire: "入职", Confirm: "转正", Transfer: "调岗", Depart: "离职", Rehire: "返聘" };
+export const oaKinds: OaKind[] = ["personnel", "leave", "overtime", "expense", "travel", "purchase", "general"];
 export const oaModules = {
+  personnel: { name: "人员变动审批", resource: "office.personnel-changes", description: "提交入职、转正、调岗、离职或返聘申请，最终批准后更新档案与关联账号。" },
   leave: { name: "员工请假", resource: "office.leave", description: "按半天申请，审批后销假归档；自然日时长不自动扣减年假余额。" },
   overtime: { name: "加班申请", resource: "office.overtime", description: "记录加班事由和时段，审批后确认实际完成。" },
   expense: { name: "费用报销", resource: "office.expenses", description: "提交费用明细和凭证，审批通过后移交独立财务软件。" },
@@ -26,7 +29,7 @@ export function oaAccess(user: ApiUserDto, kind: OaKind, action: string, row?: O
 }
 export function oaActions(row: OaRequest, user: ApiUserDto): OaActionName[] {
   const allows = (action: string) => oaAccess(user, row.kind, action, row);
-  const reviewer = user.capabilities.usesOfficeRegister || row.ownerUserId !== user.id;
+  const reviewer = (row.kind !== "personnel" && user.capabilities.usesOfficeRegister) || row.ownerUserId !== user.id;
   const applicant = allows("edit") && row.ownerUserId === user.id;
   if (row.status === "Draft" || row.status === "Rejected") return [...(applicant ? ["submit" as const] : []), ...(allows("cancel") ? ["cancel" as const] : [])];
   if (row.status === "Pending") return [...(applicant ? ["withdraw" as const, "remind" as const] : []), ...((row.canReview ?? (allows("approve") && reviewer)) ? ["approve" as const, "reject" as const] : [])];
@@ -34,13 +37,15 @@ export function oaActions(row: OaRequest, user: ApiUserDto): OaActionName[] {
   return [];
 }
 export function oaActionLabel(action: OaActionName, kind: OaKind, local: boolean) {
-  if (action === "complete") return ({ expense: "财务接收", purchase: "登记验收", leave: "销假归档", travel: "返程归档", overtime: "确认加班完成", general: "办结登记" } as const)[kind];
+  if (action === "complete") return ({ expense: "财务接收", purchase: "登记验收", leave: "销假归档", travel: "返程归档", overtime: "确认加班完成", general: "办结登记", personnel: "变动已生效" } as const)[kind];
+  if (action === "approve" && kind === "personnel") return "批准人员变动";
   if (action === "approve" && local) return "登记批准结果";
   return oaActionLabels[action];
 }
 export function oaDraft(kind: OaKind, user: ApiUserDto): OaRequestSave {
   const { start, end } = officeBookingDefaults(user.businessTimeZone);
   return { requestKey: createRequestKey(), title: "", reason: "", currency: "CNY",
+    ...(kind === "personnel" ? { personnelChange: { action: "Hire" as const, registration: { requestKey: "", employeeNumber: "", departmentId: user.departmentId, jobTitle: "", employmentType: "FullTime" as const, hireDate: user.businessDate, onProbation: true, probationEndsOn: null, contractEndsOn: null, profile: readPersonnelProfile(new FormData()) } } } : {}),
     ...(kind === "leave" ? { leave: { category: "Annual", startsOn: user.businessDate, endsOn: user.businessDate, startPeriod: "AM", endPeriod: "PM" } } : {}),
     ...(kind === "expense" ? { lines: [{ category: "Travel", spentOn: user.businessDate, description: "", amount: "" }] } : {}),
     ...(kind === "purchase" ? { purchaseLines: [{ name: "", specification: "", quantity: "1", unit: "件", unitPrice: "" }] } : {}),

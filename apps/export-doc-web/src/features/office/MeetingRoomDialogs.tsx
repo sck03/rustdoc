@@ -8,6 +8,7 @@ import { officeAccess, officeBookingDefaults, readMeetingRoomForm, shiftOfficeBo
 import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
 import { useMeetingAvailability, useOfficeOperation } from "./useOfficeData.ts";
 import { OfficeEmployeePicker } from "./OfficeEmployeePicker.tsx";
+import { OfficeApplicantIdentity, canIdentifyOfficeApplicant } from "./OfficeApplicantIdentity.tsx";
 import { HandlingServicePicker } from "../oa/HandlingServicePicker.tsx";
 
 export function MeetingRoomEditor({ client, user, room, onClose }: { client: ExportDocManagerApiClient; user: ApiUserDto; room?: MeetingRoomRecord; onClose: () => void }) {
@@ -45,6 +46,7 @@ export function MeetingBookingDialog({ client, room, user, onClose }: {
   const access = officeAccess(user, "rooms");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canIdentifyOfficeApplicant(user)) return;
     const form = new FormData(event.currentTarget);
     void operation.run((signal) => {
       const startsAt = businessDateTimeLocalInputToIso(times.start, user.businessTimeZone);
@@ -74,12 +76,13 @@ export function MeetingBookingDialog({ client, room, user, onClose }: {
       </div>
       {access.allows("create") && room.isActive && <>
         {register && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={setEmployee} disabled={operation.busy} />}
+        <OfficeApplicantIdentity user={user} />
         <OfficeField label="会议主题" wide><input name="title" required maxLength={200} placeholder="例如：项目周会" /></OfficeField>
         <OfficeField label="参会人数"><input name="attendeeCount" type="number" required min={1} max={room.capacity} defaultValue={1} /></OfficeField>
         <p className="office-field-wide office-muted">{register ? "登记后占用该时段，请在实际交接时登记使用和归还。" :
           `提交后等待审批。${room.requiresKey ? "审批通过后，于开始前 30 分钟内联系办理人领钥匙，结束后归还。" : "审批通过后，请由办理人登记使用和结束。"}`}</p>
       </>}
     </fieldset>{access.allows("create") && room.isActive && <OfficeSubmit label={register ? "登记预约" : "提交预约"} busy={operation.busy}
-      disabled={!range || availability.isPending || availability.isError || register && !employee} />}</form>
+      disabled={!range || availability.isPending || availability.isError || !canIdentifyOfficeApplicant(user) || register && !employee} />}</form>
   </OfficeDialog>;
 }

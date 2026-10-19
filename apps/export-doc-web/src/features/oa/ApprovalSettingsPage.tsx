@@ -6,7 +6,7 @@ import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { businessDateTimeLocalInputToIso, toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
 import { OfficeField, OfficeSubmit } from "../office/OfficeUi.tsx";
 import { useApprovalSettings, useApprovalSettingsDraft, type ApprovalAccount } from "./useApprovalSettings.ts";
-import { oaModules } from "./oaModel.ts";
+import { oaModules, personnelChangeLabels } from "./oaModel.ts";
 import { HandlingServicesEditor } from "./HandlingServicesEditor.tsx";
 import "../../styles/routes/office.css";
 import "../../styles/routes/oa.css";
@@ -27,7 +27,13 @@ function ApprovalSettingsEditor({ client, user, initial, accounts }: { client: E
     {changedElsewhere && <InlineNotice tone="warning">审批设置已被其他管理员修改。当前草稿已保留，请记录需要保留的内容后重新载入最新设置。</InlineNotice>}
     <form ref={formRef} onInvalidCapture={event => { const section = (event.target as HTMLElement).closest("details"); if (section) section.open = true; }} onSubmit={event => { event.preventDefault(); void save(); }}>
       <fieldset disabled={operation.busy} className="office-form-grid">
-        <legend>六类申请审批规则</legend>
+        <legend>申请审批规则</legend>
+        <section className="office-resource-card office-field-wide" aria-label="人员变动审批开关"><h3>需要审批的人员变动</h3>
+          <p className="office-muted">默认由获授权的人事直接办理。勾选后，人事须提交审批；管理员仍可直接办理并留下操作记录。在途申请继续按原审批步骤办理。</p>
+          {(Object.keys(personnelChangeLabels) as (keyof typeof personnelChangeLabels)[]).map(action => <label key={action} className="checkbox-field">
+            <input type="checkbox" checked={draft.personnelApprovalActions?.includes(action) ?? false} onChange={event => setDraft(current => ({ ...current,
+              personnelApprovalActions: event.target.checked ? [...(current.personnelApprovalActions ?? []), action] : current.personnelApprovalActions?.filter(value => value !== action) ?? [] }))} />{personnelChangeLabels[action]}须审批</label>)}
+        </section>
         {draft.rules.map((rule, index) => <section className="office-resource-card office-field-wide" key={rule.kind} aria-label={`${oaModules[rule.kind].name}审批规则`}>
           <h3>{oaModules[rule.kind].name}</h3><OfficeField label="审批方式"><select value={rule.mode} onChange={event => changeRule(index, { mode: event.target.value as typeof rule.mode, approverUserIds: [] })}>
             <option value="Single">单步审批（按岗位权限）</option><option value="DepartmentChain">部门负责人逐级审批</option><option value="Named">指定审批人（按顺序，可单人）</option>

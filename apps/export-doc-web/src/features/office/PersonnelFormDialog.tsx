@@ -30,11 +30,14 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
           : client.uploadPersonnelImage({ id: current.employee.id, kind: entry.kind as "Avatar" | "IdentityFront" | "IdentityBack", body }, { signal });
       }), onSaved);
   }
-  const canCorrectRegistration = !record || record.canCorrectRegistration;
+  const [correcting, setCorrecting] = useState(false);
+  const canCorrectRegistration = !record || (record.canCorrectRegistration && correcting);
   return <OfficeDialog title={record ? `编辑档案 · ${record.employee.fullName}` : "入职登记"} onClose={onClose} {...operation} protectChanges>
     <form className="personnel-form" onSubmit={submit} autoComplete="off">
       <fieldset className="office-form-grid" disabled={operation.busy}>
         <legend>基本信息</legend>
+        {record?.canCorrectRegistration && <label className="checkbox-field office-field-wide"><input type="checkbox" checked={correcting} onChange={event => setCorrecting(event.target.checked)} />纠正登记信息（须说明原因）</label>}
+        {record && correcting && <OfficeField label="登记纠错原因" wide><textarea name="correctionNote" required maxLength={500} rows={2} /></OfficeField>}
         {canCorrectRegistration && <OfficeField label="工号（系统内唯一）"><input name="employeeNumber" required maxLength={40} defaultValue={record?.employee.employeeNumber} autoFocus={!record} /></OfficeField>}
         <OfficeField label="姓名"><input name="fullName" required maxLength={100} defaultValue={record?.profile.fullName ?? ""} autoFocus={Boolean(record)} /></OfficeField>
         {canCorrectRegistration && <>
@@ -45,7 +48,7 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
           <OfficeField label="入职日期"><input type="date" name="hireDate" required min="1900-01-01" max={user.businessDate} value={hireDate} onChange={(event) => setHireDate(event.target.value)} /></OfficeField>
           <label className="checkbox-field"><input name="onProbation" type="checkbox" defaultChecked={!record || record.employee.status === "Probation"} />入职时处于试用期</label>
         </>}
-        {record && <p className="office-field-wide office-muted">{canCorrectRegistration ? "该档案尚未用于业务，可修正工号、入职日期及初始任职信息，保存后留下修正记录。" : `${record.employee.employeeNumber} · ${record.employee.departmentName} · ${record.employee.jobTitle}。部门与岗位通过调岗流程变更。`}</p>}
+        {record && <p className="office-field-wide office-muted">{canCorrectRegistration ? "用于纠正登记错误，保存后保留原值与纠错原因；日常任职变动请使用转正、调岗等办理入口。" : `${record.employee.employeeNumber} · ${record.employee.departmentName} · ${record.employee.jobTitle}。部门与职位通过相应人员变动入口办理。`}</p>}
         <OfficeField label="用工类型"><select name="employmentType" defaultValue={record?.employmentType ?? "FullTime"}>
           {Object.entries(employmentTypeLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
         </select></OfficeField>

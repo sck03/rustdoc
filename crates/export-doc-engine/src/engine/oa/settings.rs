@@ -4,10 +4,38 @@ use export_doc_domain::approval::{ApprovalMode, delegation_window};
 use std::collections::HashSet;
 
 const STORAGE_KIND: &str = "oa-approval-settings";
+fn personnel_actions(value: &Value) -> std::result::Result<(), &'static str> {
+    let actions = value
+        .as_array()
+        .filter(|a| a.len() <= 5)
+        .ok_or("人员审批开关无效。")?;
+    let mut seen = HashSet::new();
+    for action in actions {
+        let action = action.as_str().ok_or("人员变动类型无效。")?;
+        if !["Hire", "Confirm", "Transfer", "Depart", "Rehire"].contains(&action)
+            || !seen.insert(action)
+        {
+            return Err("人员审批类型无效或重复。");
+        }
+    }
+    Ok(())
+}
 pub(in crate::engine) fn load(tx: &Connection, company: &str) -> Result<Value> {
-    Ok(tx.find_identity(STORAGE_KIND, &store::normalize(company))?.unwrap_or_else(|| {
+    let mut value = tx.find_identity(STORAGE_KIND, &store::normalize(company))?.unwrap_or_else(|| {
         json!({"versionNumber":0,"rules":KINDS.iter().map(|kind| json!({"kind":kind.trim_start_matches("oa-"),"mode":"Single","approverUserIds":[]})).collect::<Vec<_>>(),"delegations":[]})
-    }))
+    });
+    let rules = value["rules"]
+        .as_array_mut()
+        .ok_or_else(|| super::super::error::unavailable("审批规则损坏。"))?;
+    if !rules.iter().any(|rule| rule["kind"] == "personnel") {
+        rules.push(json!({"kind":"personnel","mode":"Single","approverUserIds":[]}));
+    }
+    if value.get("personnelApprovalActions").is_none() {
+        value["personnelApprovalActions"] = json!([]);
+    }
+    personnel_actions(&value["personnelApprovalActions"])
+        .map_err(super::super::error::unavailable)?;
+    Ok(value)
 }
 fn account(tx: &Connection, actor: &Actor, id: i64) -> Result<Actor> {
     let user = auth::current_actor_in(tx, id, actor.edition)?;
@@ -36,8 +64,8 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
     }
     let rules = body["rules"]
         .as_array()
-        .filter(|r| r.len() == 6)
-        .ok_or_else(|| invalid("须配置六类申请的审批规则。"))?;
+        .filter(|r| r.len() == KINDS.len())
+        .ok_or_else(|| invalid("须配置全部申请类型的审批规则。"))?;
     let mut kinds = HashSet::new();
     for rule in rules {
         let kind = text(rule, "kind");
@@ -101,6 +129,12 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
         }
     }
     let mut value = contracts::dto(contracts::schema("OaApprovalSettingsSave"), body.clone());
+    let actions = body
+        .get("personnelApprovalActions")
+        .cloned()
+        .unwrap_or_else(|| previous["personnelApprovalActions"].clone());
+    personnel_actions(&actions).map_err(invalid)?;
+    value["personnelApprovalActions"] = json!(actions);
     let mut services = body.get("handlingServices").cloned().unwrap_or_else(|| {
         previous
             .get("handlingServices")

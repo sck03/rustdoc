@@ -58,7 +58,10 @@ pub fn validate(
             required(value, "profile.fullName", "姓名", 100)?;
             if id == 0 {
                 required(value, "employeeNumber", "工号", 50)?;
-                if !valid_date(&text(value, "hireDate")) {
+                required(value, "jobTitle", "职位", 120)?;
+                if !valid_date(&text(value, "hireDate"))
+                    || text(value, "hireDate") > business_date.to_string()
+                {
                     return Err(invalid("入职日期无效。"));
                 }
                 value["status"] = json!(if value["onProbation"] == true {
@@ -68,7 +71,7 @@ pub fn validate(
                 });
                 value["lastEffectiveDate"] = value["hireDate"].clone();
             } else {
-                if previous["status"] == "Departed" {
+                if previous["status"] == "Departed" && !actor.admin {
                     return Err(conflict("离职档案不能直接修改，请办理重新入职。"));
                 }
                 value["status"] = previous["status"].clone();
@@ -80,33 +83,67 @@ pub fn validate(
                     .filter(|registration| registration.is_object())
                     .cloned()
                 {
-                    if !can_correct(connection, id)? {
-                        return Err(conflict("已有任职变动或业务引用，不能修正初始登记。"));
+                    let unused = can_correct(connection, id)?;
+                    if !actor.admin
+                        && (!unused
+                            || !super::oa::personnel_changes::required_actions(connection, actor)?
+                                .as_array()
+                                .is_some_and(Vec::is_empty))
+                    {
+                        return Err(conflict(
+                            "已有任职记录或启用了审批，请通过人员变动办理；登记错误可由管理员纠正。",
+                        ));
                     }
-                    for field in [
-                        "employeeNumber",
-                        "departmentId",
-                        "jobTitle",
-                        "hireDate",
-                        "onProbation",
-                    ] {
-                        if let Some(corrected) = registration.get(field) {
-                            value[field] = corrected.clone();
-                        }
+                    required(value, "correctionNote", "登记纠错原因", 500)?;
+                    let changing_job = registration["departmentId"] != previous["departmentId"]
+                        || registration["jobTitle"] != previous["jobTitle"];
+                    if changing_job
+                        && super::office_queries::clearance(connection, previous)?["isClear"]
+                            != true
+                    {
+                        return Err(conflict(
+                            "仍有未结申请或办理职责，请完成交接后再纠正任职信息。",
+                        ));
+                    }
+                    for field in ["employeeNumber", "departmentId", "jobTitle", "hireDate"] {
+                        value[field] = registration[field].clone();
                     }
                     required(value, "employeeNumber", "工号", 50)?;
-                    if !valid_date(&text(value, "hireDate")) {
-                        return Err(invalid("入职日期无效。"));
+                    required(value, "jobTitle", "职位", 120)?;
+                    let hire = text(value, "hireDate");
+                    if !valid_date(&hire)
+                        || hire > business_date.to_string()
+                        || (!unused && hire > text(previous, "lastEffectiveDate"))
+                        || ["confirmedOn", "departedOn"].iter().any(|key| {
+                            previous[*key]
+                                .as_str()
+                                .is_some_and(|date| hire.as_str() > date)
+                        })
+                    {
+                        return Err(invalid(
+                            "入职日期须有效且不能晚于已有任职变动或公司业务日期。",
+                        ));
                     }
-                    value["status"] = json!(if value["onProbation"] == true {
-                        "Probation"
-                    } else {
-                        "Active"
-                    });
-                    value["lastEffectiveDate"] = value["hireDate"].clone();
+                    if unused {
+                        value["lastEffectiveDate"] = json!(hire);
+                    }
+                    if previous["status"] != "Departed" {
+                        value["status"] = json!(if registration["onProbation"] == true {
+                            "Probation"
+                        } else {
+                            "Active"
+                        });
+                        if value["status"] != previous["status"] {
+                            value["confirmedOn"] = Value::Null;
+                        }
+                    }
                 }
             }
-            validate_department(connection, actor, &text(value, "departmentId"))?;
+            validate_department(
+                connection,
+                &text(value, "companyScope"),
+                &text(value, "departmentId"),
+            )?;
             if !["FullTime", "PartTime", "Intern", "Contractor"]
                 .contains(&text(value, "employmentType").as_str())
             {
@@ -330,13 +367,13 @@ pub(super) fn supply_totals(supply: &mut Value) {
     supply["availableQuantity"] = json!(available);
     supply["lowStock"] = json!(available < supply["minimumStock"].as_i64().unwrap_or(0));
 }
-fn validate_department(connection: &Connection, actor: &Actor, code: &str) -> Result<()> {
+fn validate_department(connection: &Connection, company: &str, code: &str) -> Result<()> {
     if store::all(connection, "departments")?
         .iter()
         .any(|department| {
             department["code"] == code
                 && department["isActive"] == true
-                && (actor.admin || department["companyCode"] == actor.company)
+                && department["companyCode"] == company
         })
     {
         Ok(())
@@ -441,66 +478,7 @@ pub fn action(
     }
     auth::authorize(actor, "office.people", "transition")?;
     store.transaction_as(actor, |tx, actor| {
-        auth::authorize(actor, "office.people", "transition")?;
-        let mut value = store::get(tx, "people", id)?;
-        if !auth::visible(actor, "office.people", "transition", &value) {
-            return Err(super::error::error(403, "没有办理此人员档案的权限。"));
-        }
-        store::check_version(&value, store::expected(&body))?;
-        let state = text(&value, "status");
-        let effective = text(&body, "effectiveDate");
-        if !valid_date(&effective)
-            || effective < text(&value, "lastEffectiveDate")
-            || effective > business_date.to_string()
-        {
-            return Err(invalid(
-                "任职生效日期不能早于上一项变动或晚于公司业务日期。",
-            ));
-        }
-        required(&body, "note", "任职变动说明", 500)?;
-        if matches!(operation, "TransferPersonnel" | "DepartPersonnel") {
-            let clearance = super::office_queries::clearance(tx, &value)?;
-            if clearance["isClear"] != true {
-                return Err(conflict("仍有未结清的行政或人事申请，请先完成交接。"));
-            }
-            if operation == "DepartPersonnel" && clearance["canDepart"] != true {
-                return Err(conflict("请先移交部门负责人职责。"));
-            }
-        }
-        match operation {
-            "ConfirmPersonnel" if state == "Probation" => {
-                value["status"] = json!("Active");
-                value["confirmedOn"] = json!(effective);
-            }
-            "TransferPersonnel" if state != "Departed" => {
-                validate_department(tx, actor, &text(&body, "departmentId"))?;
-                value["departmentId"] = body["departmentId"].clone();
-                value["jobTitle"] = body["jobTitle"].clone();
-            }
-            "DepartPersonnel" if state != "Departed" => {
-                value["status"] = json!("Departed");
-                value["departedOn"] = json!(effective);
-            }
-            "RehirePersonnel" if state == "Departed" => {
-                validate_department(tx, actor, &text(&body, "departmentId"))?;
-                value["departmentId"] = body["departmentId"].clone();
-                value["jobTitle"] = body["jobTitle"].clone();
-                value["status"] = json!(if body["onProbation"] == true {
-                    "Probation"
-                } else {
-                    "Active"
-                });
-                value["hireDate"] = json!(effective);
-                value["confirmedOn"] = Value::Null;
-                value["departedOn"] = Value::Null;
-            }
-            _ => return Err(conflict("当前任职状态不能办理此项变动。")),
-        }
-        value["lastEffectiveDate"] = json!(effective);
-        value["employee"]["status"] = value["status"].clone();
-        value["employee"]["departmentId"] = value["departmentId"].clone();
-        value["employee"]["jobTitle"] = value["jobTitle"].clone();
-        super::personnel::save(tx, actor, id, value, operation, &text(&body, "note"))
+        super::oa::personnel_changes::direct(tx, actor, id, operation, &body, business_date)
     })
 }
 

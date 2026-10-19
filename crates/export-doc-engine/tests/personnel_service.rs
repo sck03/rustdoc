@@ -5,6 +5,8 @@ mod identity_contract;
 mod native_fixture;
 #[path = "support/personnel_contract.rs"]
 mod personnel_contract;
+#[path = "support/personnel_policy_contract.rs"]
+mod personnel_policy_contract;
 use export_doc_engine::{engine::NativeService, generated_api::LOGIN};
 use serde_json::{Value, json};
 
@@ -27,5 +29,6 @@ fn personnel_registration_files_and_private_fields_follow_the_contract() {
     .unwrap();
     personnel_contract::exercise(&service, login["accessToken"].as_str().unwrap());
     identity_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    personnel_policy_contract::exercise(&service, login["accessToken"].as_str().unwrap());
     service.close().unwrap();
 }

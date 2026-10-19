@@ -5,6 +5,7 @@ use std::collections::HashSet;
 
 pub(in crate::engine) fn resource(kind: &str) -> Option<&'static str> {
     match kind.trim_start_matches("oa-") {
+        "personnel" => Some("office.personnel-changes"),
         "leave" => Some("office.leave"),
         "overtime" => Some("office.overtime"),
         "expense" => Some("office.expenses"),
@@ -71,11 +72,15 @@ pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<
         .and_then(|r| r.iter().find(|r| r["kind"] == row["kind"]))
         .ok_or_else(|| super::super::error::unavailable("缺少申请审批规则。"))?;
     let mode: ApprovalMode = serde_json::from_value(rule["mode"].clone())?;
-    let employee = store::get(
-        tx,
-        "people",
-        records::positive(row, "employeeId", "申请人员")?,
-    )?;
+    let employee = if row["kind"] == "personnel" && row["personnelChange"]["action"] == "Hire" {
+        Value::Null
+    } else {
+        store::get(
+            tx,
+            "people",
+            records::positive(row, "employeeId", "申请人员")?,
+        )?
+    };
     let employee_user = employee["account"]["id"].as_i64();
     row["applicantAccountId"] = json!(employee_user);
     let mut ids = vec![];
@@ -165,6 +170,11 @@ pub(in crate::engine) fn authority(
         return Ok(None);
     }
     let plan = plan(row)?;
+    if row["kind"] == "personnel"
+        && (row["ownerUserId"] == actor.id || row["applicantAccountId"] == actor.id)
+    {
+        return Ok(None);
+    }
     if plan.as_ref().is_none_or(|p| p.mode == ApprovalMode::Single) {
         return Ok(
             (tx.provider() == "SQLite" || row["ownerUserId"] != actor.id)

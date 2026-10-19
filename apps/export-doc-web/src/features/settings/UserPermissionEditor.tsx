@@ -20,7 +20,9 @@ export function UserPermissionEditor({ client, template, grants, disabledModules
   const resources = catalog.data?.resources ?? [];
   const source = catalog.data?.templates.find(item => item.id === template?.id);
   const resourceByKey = useMemo(() => new Map(resources.map(resource => [resource.key, resource])), [resources]);
-  const editable = getEditableSchemeGrants(grants ?? [], resourceByKey);
+  const inheritedModules = grants === null ? source?.disabledModules ?? [] : [];
+  const effectiveModules = [...new Set([...disabledModules, ...inheritedModules])];
+  const editable = getEditableSchemeGrants(grants ?? (source?.isActive ? source.grants : []), resourceByKey);
   return <details className="permission-effective-details" open={expanded} onToggle={event => setExpanded(event.currentTarget.open)}>
     <summary>账号单独配置与模块权限{grants === null ? "（继承分组）" : "（独立配置）"}</summary>
     <p>日常建议共享权限分组。单独配置会复制当前分组的可授权操作，此后不随分组更新；没有可复制的分组时从空权限开始。空权限表示不开放业务，恢复继承后重新使用岗位或所选分组。</p>
@@ -30,10 +32,11 @@ export function UserPermissionEditor({ client, template, grants, disabledModules
         source?.isActive === false ? [] : toPermissionGrants(getEditableSchemeGrants(source?.grants ?? [], resourceByKey)), [...new Set([...disabledModules, ...(source?.disabledModules ?? [])])])}>
       <option value="inherit">继承岗位或共享分组</option><option value="custom">账号单独配置</option>
     </select></label>
-    {grants !== null ? <PermissionModuleGrid resources={resources.filter(resource => !resource.isTechnical)} grants={editable}
+    {grants === null && <p>当前来源：{template?.name ?? "角色默认权限"}。操作和数据范围随分组更新；可在下方为本账号单独关闭模块，重新开放仍受分组限制。{source?.isActive === false && "当前分组已停用，全部业务权限已关闭。"}</p>}
+    <PermissionModuleGrid resources={resources.filter(resource => !resource.isTechnical)} grants={editable}
       dataScopes={catalog.data?.dataScopes ?? []} disabled={busy || !catalog.data}
-      onChange={next => onChange(toPermissionGrants(next), disabledModules)} disabledModules={disabledModules}
-      onModulesChange={modules => onChange(grants, modules)} /> : <p>当前来源：{template?.name ?? "岗位默认权限"}。在“权限方案”中维护共享分组，再将账号分配到该分组。</p>}
-    {grants === null && disabledModules.length > 0 && <p>账号额外关闭的模块：{disabledModules.map(key => resources.find(resource => resource.moduleKey === key)?.name ?? key).join("、")}。切换权限来源仍保留这些限制，可在独立配置中调整。</p>}
+      onChange={next => onChange(toPermissionGrants(next), disabledModules)} disabledModules={effectiveModules}
+      inheritedModules={inheritedModules} readOnlyActions={grants === null}
+      onModulesChange={modules => onChange(grants, [...new Set([...modules.filter(key => !inheritedModules.includes(key)), ...disabledModules.filter(key => inheritedModules.includes(key))])])} />
   </details>;
 }

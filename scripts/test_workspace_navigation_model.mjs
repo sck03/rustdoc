@@ -85,7 +85,7 @@ assert(model.createInitialWorkspaceNavGroupState("/settings").size === 1, "only 
 assert(model.createInitialWorkspaceNavGroupState("/settings").has("system"), "active group starts expanded");
 const navigationItems = model.workspaceNavGroups.flatMap((group) => group.items);
 const routeItems = model.getWorkspaceRouteItems();
-assert(navigationItems.length === 37, "primary navigation includes six request modules, approval center, announcements and notifications");
+assert(navigationItems.length === 38, "primary navigation includes personnel changes, daily requests, approval center, announcements and notifications");
 const allModules = [...new Set(routeItems.flatMap((item) => item.moduleKey ? [item.moduleKey] : []))];
 const allPermissions = routeItems.flatMap((item) => item.requiredPermissions ?? (item.moduleKey ? [{ resourceKey: item.moduleKey, action: "view" }] : []))
   .map((requirement) => permissionGrant(requirement.resourceKey, requirement.action));
@@ -102,7 +102,7 @@ const browserAdminGroups = model.filterWorkspaceNavGroups({ productEdition: "Ful
 const fullTeamCapabilities = { productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, isDesktopRuntime: false, ...fullNavigationGrants };
 const adminGroups = model.filterWorkspaceNavGroups(fullTeamCapabilities);
 assert(adminGroups.find((group) => group.key === "office")?.items.length === 6, "Full team edition includes office resources and four administrative request modules");
-assert(adminGroups.find((group) => group.key === "personnel")?.items.length === 4, "Full team edition separates directory, personnel, leave and overtime");
+assert(adminGroups.find((group) => group.key === "personnel")?.items.length === 5, "Full team edition separates directory, personnel, personnel changes, leave and overtime");
 assert(product.getDefaultWorkspaceRoute(fullTeamCapabilities) === "/dashboard", "Full team edition retains its business home");
 for (const item of navigationItems) {
   assert(navigationItems.filter((candidate) => candidate.isActive(item.to)).length === 1, `each route has one navigation owner: ${item.to}`);

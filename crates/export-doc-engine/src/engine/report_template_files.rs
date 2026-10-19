@@ -26,7 +26,7 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
     fs,
-    io::{Cursor, Read, Write},
+    io::{Cursor, Write},
     path::{Path, PathBuf},
 };
 pub(super) use transaction::FileTransaction;

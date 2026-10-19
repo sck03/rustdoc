@@ -54,7 +54,7 @@ export function ReportTemplateFilePanel({
     <details className="template-management-panel template-file-panel" aria-label="单个模板文件">
       <summary>
         <span>单个模板文件</span>
-        <small>HTML 导入 / 导出</small>
+        <small>.dtpl 导入 / 导出</small>
       </summary>
       <div className="template-management-content template-package-content">
         <p className="template-management-note">适合备份或交换当前选中的一个 .dtpl 模板；导入会覆盖当前模板内容。</p>
@@ -63,7 +63,7 @@ export function ReportTemplateFilePanel({
           <button
             className="command-button secondary"
             type="button"
-            disabled={desktopAvailable ? !canExport : !canExport}
+            disabled={!canExport}
             onClick={onExport}
           >
             <Download size={17} aria-hidden="true" />

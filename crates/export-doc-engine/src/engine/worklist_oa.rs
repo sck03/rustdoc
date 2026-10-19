@@ -8,6 +8,7 @@ use crate::engine::{
 pub(super) fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
     let mut groups = vec![];
     for (kind, name) in [
+        ("oa-personnel", "人员变动审批"),
         ("oa-leave", "请假审批与销假"),
         ("oa-overtime", "加班审批与确认"),
         ("oa-expense", "报销审批与财务接收"),

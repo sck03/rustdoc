@@ -54,14 +54,11 @@ fn ooxml(bytes: &[u8], part: &str, root: &str, content_type: &str) -> Result<()>
             .checked_add(entry.size())
             .filter(|n| *n <= 50 * 1024 * 1024)
             .ok_or_else(|| invalid("Office 文档展开内容不能超过 50 MiB。"))?;
-        let mut content = Vec::new();
-        (&mut entry)
-            .take(50 * 1024 * 1024 + 1)
-            .read_to_end(&mut content)
-            .map_err(|_| invalid("Office 文档内容或校验码损坏。"))?;
-        if content.len() as u64 != entry.size() {
-            return Err(invalid("Office 文档内部长度不符。"));
+        if name != "[Content_Types].xml" && name != part {
+            super::archive::verify_entry(&mut entry, 50 * 1024 * 1024)?;
+            continue;
         }
+        let content = super::archive::read_entry(&mut entry, 50 * 1024 * 1024)?;
         if name == "[Content_Types].xml" {
             let mut reader = quick_xml::Reader::from_reader(content.as_slice());
             loop {

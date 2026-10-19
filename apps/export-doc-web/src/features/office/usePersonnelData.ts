@@ -1,15 +1,20 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient, PersonnelTransitionRequest } from "../../api/index.ts";
+import type { PersonnelWorkflow } from "./personnelModel.ts";
 import { useOfficeOperation, useOfficePaging } from "./useOfficeData.ts";
 import { identityQueryRoots } from "../../api/queryKeys.ts";
-import type { PersonnelWorkflow } from "./personnelModel.ts";
 import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 
 export const usePersonnelOperation = () => useOfficeOperation(identityQueryRoots);
 
-export function usePersonnelDirectory(client: ExportDocManagerApiClient, user: ApiUserDto, directoryOnly = false, enabled = true) {
+export function applyPersonnelWorkflow(client: ExportDocManagerApiClient, id: number, action: PersonnelWorkflow, body: PersonnelTransitionRequest, signal: AbortSignal) {
+  const operations = { Confirm: "confirmPersonnel", Transfer: "transferPersonnel", Depart: "departPersonnel", Rehire: "rehirePersonnel" } as const;
+  return client[operations[action]]({ id, body }, { signal });
+}
+
+export function usePersonnelDirectory(client: ExportDocManagerApiClient, user: ApiUserDto, directoryOnly = false, enabled = true, employeeId?: number) {
   const list = useDirectoryLocation("people", 24);
   const { params, update } = useRouteQuery();
   const paging = { pageNumber: list.pageNumber, pageSize: list.pageSize, setPageNumber: list.setPageNumber, resetPage: () => list.setPageNumber(1), changePageSize: list.setPageSize };
@@ -17,8 +22,8 @@ export function usePersonnelDirectory(client: ExportDocManagerApiClient, user: A
   const departmentId = params.get("departmentId") ?? "";
   const status = directoryOnly ? "" : list.status;
   const attentionOnly = !directoryOnly && params.get("attention") === "true";
-  const options = useQuery({ queryKey: ["office", "people", "options", user.id, user.companyScope],
-    queryFn: ({ signal }) => client.getPersonnelOptions({ signal }) });
+  const options = useQuery({ queryKey: ["office", "people", "options", user.id, user.companyScope, employeeId],
+    queryFn: ({ signal }) => client.getPersonnelOptions({ employeeId }, { signal }) });
   const query = useQuery({
     queryKey: ["office", "people", "directory", user.id, user.companyScope, search, departmentId, status, attentionOnly, paging.pageNumber, paging.pageSize],
     queryFn: ({ signal }) => client.listPersonnel({ keyword: search || undefined, departmentId: departmentId || undefined,
@@ -59,10 +64,4 @@ export function usePersonnelAccountOptions(client: ExportDocManagerApiClient, us
   const query = useQuery({ queryKey: ["office", "people", "accounts", user.id, user.companyScope, id, search, paging.pageNumber, paging.pageSize],
     queryFn: ({ signal }) => client.listPersonnelAccountOptions({ id, keyword: search || undefined, pageNumber: paging.pageNumber, pageSize: paging.pageSize }, { signal }) });
   return { paging, query, keyword, setKeyword, search: () => { setSearch(keyword.trim()); paging.resetPage(); } };
-}
-
-export function applyPersonnelWorkflow(client: ExportDocManagerApiClient, id: number, action: PersonnelWorkflow,
-  body: PersonnelTransitionRequest, signal: AbortSignal) {
-  const operations = { confirm: "confirmPersonnel", transfer: "transferPersonnel", depart: "departPersonnel", rehire: "rehirePersonnel" } as const;
-  return client[operations[action]]({ id, body }, { signal });
 }

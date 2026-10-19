@@ -38,6 +38,12 @@ pub(super) fn fields(meta: &Value, body: &Value, today: chrono::NaiveDate) -> Re
     required(body, "reason", "申请说明", 2000)?;
     let mut row = json!({"title":text(body,"title"),"reason":text(body,"reason"),"totalAmount":"","durationDays":"","durationHours":""});
     match text(meta, "kind").as_str() {
+        "personnel" => {
+            row["personnelChange"] = contracts::dto(
+                contracts::schema("OaPersonnelChange"),
+                body["personnelChange"].clone(),
+            );
+        }
         "leave" => {
             let (start, end) = rules::leave_span(&body["leave"]).map_err(invalid)?;
             row["leave"] = body["leave"].clone();

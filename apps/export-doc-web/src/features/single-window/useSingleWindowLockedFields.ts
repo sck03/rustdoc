@@ -113,5 +113,3 @@ export function useSingleWindowLockedFields<TDocument>({
     unlockSelected,
   };
 }
-
-export type SingleWindowLockedFieldsWorkspace = ReturnType<typeof useSingleWindowLockedFields>;

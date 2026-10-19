@@ -3,6 +3,7 @@
 pub(in crate::engine) mod approval;
 pub(in crate::engine) mod approval_references;
 mod handling_handover;
+pub(in crate::engine) mod personnel_changes;
 mod queries;
 pub(in crate::engine) mod settings;
 mod validation;
@@ -224,8 +225,10 @@ pub(super) fn handle(
             mutable(&row)?;
             if row["requestKey"] != body["requestKey"]
                 || (body["employeeId"].is_number() && row["employeeId"] != body["employeeId"])
+                || (meta["kind"] == "personnel"
+                    && row["personnelChange"]["action"] != body["personnelChange"]["action"])
             {
-                return Err(invalid("申请编号和人员不能更换。"));
+                return Err(invalid("申请编号、变动类型和人员不能更换。"));
             }
             let values = validation::fields(meta, body, today)?;
             for (key, value) in values.as_object().unwrap() {
@@ -235,7 +238,17 @@ pub(super) fn handle(
                 let category = text(&row, "category");
                 handling::select(tx, &actor, &mut row, &category, false)?;
             }
-            validation::employee(tx, &actor, &row, true)?;
+            if meta["kind"] == "personnel" {
+                personnel_changes::validate(tx, &actor, &row, today)?;
+                let employee = personnel_changes::identity(tx, &actor, &row, today)?;
+                if row["departmentId"] != employee["departmentId"] {
+                    return Err(conflict("申请所属部门已改变，请取消后重新发起。"));
+                }
+                row["employeeName"] = employee["fullName"].clone();
+                row["employeeNumber"] = employee["employeeNumber"].clone();
+            } else {
+                validation::employee(tx, &actor, &row, true)?;
+            }
             return save(tx, &actor, meta, row, "update", "");
         }
         let note = text(body, "note");
@@ -263,7 +276,7 @@ pub(super) fn handle(
         )
         .ok_or_else(|| conflict("当前状态不能执行此操作，请刷新后核对。"))?;
         if matches!(action.as_str(), "approve" | "reject" | "void")
-            && tx.provider() != "SQLite"
+            && (tx.provider() != "SQLite" || row["kind"] == "personnel")
             && row["ownerUserId"] == actor.id
         {
             return Err(error(
@@ -272,7 +285,11 @@ pub(super) fn handle(
             ));
         }
         if matches!(action.as_str(), "submit" | "approve") {
-            validation::employee(tx, &actor, &row, true)?;
+            if meta["kind"] == "personnel" {
+                personnel_changes::validate(tx, &actor, &row, today)?;
+            } else {
+                validation::employee(tx, &actor, &row, true)?;
+            }
             validation::fields(meta, &row, today)?;
             validation::submission(tx, &row)?;
         }
@@ -294,6 +311,20 @@ pub(super) fn handle(
         }
         if action == "complete" {
             validation::completion(&row, today)?;
+        }
+        if row["kind"] == "personnel" && next == "Approved" {
+            row["status"] = json!("Completed");
+            row["currentApproverId"] = json!(0);
+            if row["personnelChange"]["action"] == "Hire" {
+                let id = personnel_changes::apply(tx, &actor, &row, today)?;
+                row["employeeId"] = json!(id);
+                return save(tx, &actor, meta, row, "approve", &note);
+            }
+            // Mark this proposal complete inside the same transaction so its
+            // own clearance reference does not prevent the approved change.
+            let saved = save(tx, &actor, meta, row.clone(), "approve", &note)?;
+            personnel_changes::apply(tx, &actor, &row, today)?;
+            return Ok(saved);
         }
         row["status"] = json!(next);
         if next != "Pending" {
@@ -322,11 +353,35 @@ fn create(
         text(body, "requestKey")
     ]))?);
     let mut row = validation::fields(meta, body, today)?;
-    let employee = validation::employee(tx, actor, body, false)?;
-    row["employeeId"] = employee["id"].clone();
+    let employee = if meta["kind"] == "personnel" {
+        None
+    } else {
+        Some(validation::employee(tx, actor, body, false)?)
+    };
+    row["employeeId"] = employee
+        .as_ref()
+        .map(|e| e["id"].clone())
+        .unwrap_or_else(|| {
+            if body["personnelChange"]["action"] == "Hire" {
+                json!(0)
+            } else {
+                body["employeeId"].clone()
+            }
+        });
     let mut submitted_fields = row.clone();
     submitted_fields.sort_all_objects();
     let submitted = super::media::digest(&serde_json::to_vec(&submitted_fields)?);
+    if let Some(existing) = tx.find_identity(&kind(meta), &identity)? {
+        access(tx, actor, meta, &existing)?;
+        if existing["submissionDigest"] != submitted {
+            return Err(conflict("同一请求编号不能用于不同内容。"));
+        }
+        return project(tx, actor, existing, true);
+    }
+    let employee = match employee {
+        Some(employee) => employee,
+        None => personnel_changes::identity(tx, actor, body, today)?,
+    };
     row["employeeName"] = employee["fullName"].clone();
     row["employeeNumber"] = employee["employeeNumber"].clone();
     row["departmentId"] = employee["departmentId"].clone();
@@ -337,13 +392,6 @@ fn create(
         handling::select(tx, actor, &mut row, &category, false)?;
     }
     access(tx, actor, meta, &row)?;
-    if let Some(existing) = tx.find_identity(&kind(meta), &identity)? {
-        if existing["submissionDigest"] != submitted {
-            return Err(conflict("同一请求编号不能用于不同内容。"));
-        }
-        access(tx, actor, meta, &existing)?;
-        return project(tx, actor, existing, true);
-    }
     row["submissionDigest"] = json!(submitted);
     row["identity"] = json!(identity);
     row["requestKey"] = body["requestKey"].clone();
@@ -353,6 +401,7 @@ fn create(
 }
 
 pub(super) const KINDS: &[&str] = &[
+    "oa-personnel",
     "oa-leave",
     "oa-overtime",
     "oa-expense",

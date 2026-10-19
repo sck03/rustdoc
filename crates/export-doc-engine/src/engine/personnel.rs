@@ -8,6 +8,40 @@ use crate::{contracts, generated_api::*};
 use export_doc_storage::BlobWrite;
 use serde_json::{Value, json};
 
+/// Initialize a direct hire and resolve retries without duplicating personnel records.
+pub(super) fn registration(
+    transaction: &export_doc_storage::Connection,
+    actor: &Actor,
+    request: &Value,
+    value: &mut Value,
+) -> Result<Option<Value>> {
+    super::oa::personnel_changes::authorize_direct(transaction, actor, "Hire")?;
+    records::required(request, "requestKey", "请求编号", 100)?;
+    value["companyScope"] = json!(actor.company);
+    value["ownerUserId"] = json!(actor.id);
+    let mut submitted = request.clone();
+    submitted.sort_all_objects();
+    let digest = media::digest(&serde_json::to_vec(&submitted)?);
+    if let Some(existing) = store::all(transaction, "people")?
+        .into_iter()
+        .find(|person| {
+            person["companyScope"] == actor.company
+                && person["ownerUserId"] == actor.id
+                && person["requestKey"] == request["requestKey"]
+        })
+    {
+        if existing["registrationDigest"] != digest {
+            return Err(conflict("同一请求编号不能用于不同入职资料。"));
+        }
+        if !auth::visible(actor, "office.people", "create", &existing) {
+            return Err(error(403, "档案已不在当前登记范围内。"));
+        }
+        return super::personnel_queries::detail(transaction, actor, existing).map(Some);
+    }
+    value["registrationDigest"] = json!(digest);
+    Ok(None)
+}
+
 pub fn save(
     tx: &export_doc_storage::Connection,
     actor: &Actor,
@@ -62,8 +96,18 @@ pub fn save(
         value["account"] = contracts::dto(contracts::schema("PersonnelAccountRecord"), user);
     }
     let identity = records::text(&value, "employeeNumber");
-    let saved = store::save(tx, "people", id, value, Some(identity), actor, audit_action)?;
-    store::save(
+    let scope = (id == 0 && value["approvalRequestId"].is_number()).then(|| value.clone());
+    let saved = store::save_in_scope(
+        tx,
+        "people",
+        id,
+        value,
+        Some(identity),
+        actor,
+        audit_action,
+        scope.as_ref(),
+    )?;
+    store::save_in_scope(
         tx,
         "personnel-events",
         0,
@@ -76,6 +120,7 @@ pub fn save(
         None,
         actor,
         event_action,
+        Some(&saved),
     )?;
     super::personnel_queries::detail(tx, actor, saved)
 }
@@ -129,7 +174,7 @@ pub fn upload(
     let hash = media::digest(bytes);
     store.transaction_as(actor, |tx, actor| {
         let mut person = person(tx, actor, id, "edit")?;
-        if person["status"] == "Departed" { return Err(conflict("离职人员的图片不能修改。")); }
+        if person["status"] == "Departed" && !actor.admin { return Err(conflict("离职人员的图片须由管理员修正。")); }
         if person["images"].as_array().is_some_and(|images| images.iter().any(|image| image["kind"] == kind && image["contentHash"] == hash)) {
             return super::personnel_queries::detail(tx, actor, person);
         }
@@ -190,7 +235,7 @@ pub fn handle(
             store.transaction_as(actor, |tx, actor| {
                 let mut person = person(tx, actor, id, "edit")?;
                 store::check_version(&person, expected)?;
-                if person["status"] == "Departed" {
+                if person["status"] == "Departed" && !actor.admin {
                     return Err(conflict("离职档案不能修改。"));
                 }
                 person["images"]
@@ -215,7 +260,7 @@ pub fn handle(
                         .into_iter()
                         .filter(|user| {
                             user["companyScope"] == current["companyScope"]
-                                && user["isActive"] == true
+                                && (current["status"] == "Departed" || user["isActive"] == true)
                                 && user["role"] != "Admin"
                                 && user["id"].as_i64().is_some_and(|user_id| {
                                     people.get(&user_id).is_none_or(|person| person["id"] == id)
@@ -237,9 +282,6 @@ pub fn handle(
                         return Err(error(403, "只有管理员可以关联账号。"));
                     }
                     store::check_version(&person, store::expected(body))?;
-                    if person["status"] == "Departed" {
-                        return Err(conflict("离职档案不能关联账号。"));
-                    }
                     let user_id = body["userId"]
                         .as_i64()
                         .filter(|id| *id > 0)
@@ -251,7 +293,7 @@ pub fn handle(
                     )?;
                     if user["companyScope"] != person["companyScope"]
                         || user["role"] == "Admin"
-                        || user["isActive"] != true
+                        || (person["status"] != "Departed" && user["isActive"] != true)
                     {
                         return Err(invalid("请选择本公司启用的普通账号。"));
                     }

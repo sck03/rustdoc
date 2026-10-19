@@ -80,13 +80,19 @@ pub fn decode(bytes: &[u8]) -> Result<Design, String> {
         return Err("报表模板容器结构无效。".into());
     }
     let mut entry = archive.by_index(0).map_err(|_| "报表模板容器缺少正文。")?;
-    if entry.name() != DOCUMENT_NAME || entry.size() as usize > MAX_DOCUMENT_BYTES {
+    let size = entry.size();
+    if entry.name() != DOCUMENT_NAME || size > MAX_DOCUMENT_BYTES as u64 {
         return Err("报表模板正文结构无效。".into());
     }
-    let mut document = Vec::with_capacity(entry.size() as usize);
+    let mut document = Vec::new();
     entry
+        .by_ref()
+        .take(size + 1)
         .read_to_end(&mut document)
         .map_err(|_| "报表模板正文读取失败。")?;
+    if document.len() as u64 != size {
+        return Err("报表模板正文长度与目录不一致。".into());
+    }
     let source = std::str::from_utf8(&document).map_err(|_| "报表模板正文编码无效。")?;
     Design::from_source(source)
 }

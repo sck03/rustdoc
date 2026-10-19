@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Mail, MapPin, Phone, Plus, RefreshCw, Search } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient, PersonnelDirectoryRecord } from "../../api/index.ts";
@@ -8,8 +7,9 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { OfficePager, OfficeQueryState } from "./OfficeUi.tsx";
 import { canViewPersonnelDetails, employmentStatusLabels } from "./personnelModel.ts";
 import { usePersonnelDirectory } from "./usePersonnelData.ts";
-import { PersonnelFormDialog } from "./PersonnelFormDialog.tsx";
+import { oaAccess } from "../oa/oaModel.ts";
 import { PersonnelDetailsPage } from "./PersonnelDetailsPage.tsx";
+import { PersonnelFormDialog } from "./PersonnelFormDialog.tsx";
 import { PersonnelAvatar } from "./PersonnelAvatar.tsx";
 import { departmentOptions } from "../organization/organizationModel.ts";
 import "../../styles/routes/office.css";
@@ -19,9 +19,9 @@ export function PersonnelPage({ client, user, directoryOnly = false }: { client:
   const route = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const model = usePersonnelDirectory(client, user, directoryOnly, !route.employeeId);
   const [creating, setCreating] = useState(false);
   const selectedId = readRouteId(route.employeeId ?? null);
+  const model = usePersonnelDirectory(client, user, directoryOnly, !route.employeeId, selectedId ?? undefined);
   const openPerson = (id: number) => navigate({ pathname: `/office/people/${id}`, search: location.search });
   const canViewDetails = !directoryOnly && canViewPersonnelDetails(user);
   if (route.employeeId) return selectedId && canViewDetails ? <PersonnelDetailsPage key={selectedId} client={client} user={user} id={selectedId}
@@ -33,7 +33,10 @@ export function PersonnelPage({ client, user, directoryOnly = false }: { client:
       <div className="office-card-actions">{!directoryOnly && <Link className="command-button secondary" to="/office/directory">公司通讯录</Link>}
         {directoryOnly && canViewPersonnelDetails(user) && <Link className="command-button secondary" to="/office/people">人员档案</Link>}
         {!directoryOnly && user.capabilities.canManageUsers && <Link className="command-button secondary" to="/system/organization">组织架构</Link>}
-        {!directoryOnly && model.options.data?.canCreate && <button type="button" className="command-button" onClick={() => setCreating(true)}><Plus size={17} aria-hidden="true" />入职登记</button>}</div>
+        {!directoryOnly && oaAccess(user, "personnel", "view") && <Link className="command-button secondary" to="/office/requests/personnel">人员变动审批</Link>}
+        {!directoryOnly && model.options.data?.canCreate && (model.options.data.approvalRequiredActions?.includes("Hire")
+          ? oaAccess(user, "personnel", "create") && <Link className="command-button" to="/office/requests/personnel?change=Hire"><Plus size={17} aria-hidden="true" />入职申请</Link>
+          : <button type="button" className="command-button" onClick={() => setCreating(true)}><Plus size={17} aria-hidden="true" />入职登记</button>)}</div>
     </div>
     <div className="office-toolbar">
       <form className="office-search" onSubmit={(event) => { event.preventDefault(); model.search(); }}>
@@ -51,12 +54,12 @@ export function PersonnelPage({ client, user, directoryOnly = false }: { client:
     </div>
     {canViewDetails && <label className="checkbox-field personnel-attention"><input type="checkbox" checked={model.attentionOnly} onChange={(event) => model.changeAttention(event.target.checked)} />仅看试用／合同／身份证已到期或 30 天内到期的人员</label>}
     {model.options.isError && <InlineNotice tone="error" title="部门目录加载失败" action={<button className="command-button secondary" type="button" onClick={() => void model.options.refetch()}>重新加载</button>}>{readApiError(model.options.error)}</InlineNotice>}
+    {!directoryOnly && model.options.data?.canCreate && model.options.data.approvalRequiredActions?.includes("Hire") && !oaAccess(user, "personnel", "create") && <InlineNotice tone="warning">入职需要审批，但当前账号没有人员变动申请权限，请管理员检查权限方案与模块开关。</InlineNotice>}
     <OfficeQueryState query={model.query} emptyTitle={model.keyword || model.departmentId || model.status || model.attentionOnly ? "没有符合条件的人员" : "尚未登记人员档案"} />
     {!model.query.isError && <div className="personnel-directory">{model.query.data?.items.map((employee) =>
       <PersonnelCard key={employee.id} client={client} employee={employee} showDetails={!directoryOnly} onOpen={() => openPerson(employee.id)} />)}</div>}
     <OfficePager page={model.query.data} paging={model.paging} busy={model.query.isFetching} />
-    {creating && <PersonnelFormDialog client={client} user={user} departments={model.options.data?.departments ?? []} onClose={() => setCreating(false)}
-      onSaved={(record) => { setCreating(false); openPerson(record.employee.id); }} />}
+    {creating && <PersonnelFormDialog client={client} user={user} departments={model.options.data?.departments ?? []} onClose={() => setCreating(false)} onSaved={record => { setCreating(false); openPerson(record.employee.id); }} />}
   </section>;
 }
 
@@ -73,3 +76,4 @@ function PersonnelCard({ client, employee, showDetails, onOpen }: { client: Expo
     {showDetails && employee.canViewDetails && <button type="button" className="command-button secondary" onClick={onOpen} aria-label={`查看${employee.fullName}的人员档案`}>人员档案</button>}
   </article>;
 }
+import { useState } from "react";
