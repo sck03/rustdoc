@@ -29,7 +29,10 @@ impl Package {
             if total > 128 * 1024 * 1024 {
                 return Err("Excel 解压容量超过 128 MiB。".into());
             }
-            let name = entry.name().to_owned();
+            let name = entry
+                .name()
+                .map_err(|_| "Excel 文件条目名称编码无效。")?
+                .into_owned();
             if entry.enclosed_name().is_none()
                 || name.contains('\\')
                 || name.split('/').any(|p| p == "..")

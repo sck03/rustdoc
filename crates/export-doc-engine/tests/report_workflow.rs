@@ -328,7 +328,7 @@ fn builtins_images_pdf_jobs_and_backup_restore_share_the_business_store() {
     for index in 0..entries.len() {
         let mut entry = entries.by_index(index).unwrap();
         assert!(
-            names.insert(entry.name().to_owned()),
+            names.insert(entry.name().unwrap().into_owned()),
             "all report names must be unique"
         );
         let mut signature = [0; 5];

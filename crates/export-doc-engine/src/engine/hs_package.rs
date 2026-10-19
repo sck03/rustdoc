@@ -125,7 +125,10 @@ fn read(bytes: &[u8]) -> Result<BTreeMap<String, Vec<Value>>> {
         let mut entry = archive
             .by_index(index)
             .map_err(|e| invalid(e.to_string()))?;
-        let name = entry.name().to_owned();
+        let name = entry
+            .name()
+            .map_err(|cause| invalid(cause.to_string()))?
+            .into_owned();
         if !(name == "manifest.json" || CONTENTS.iter().any(|(key, _)| *key == name))
             || entries.contains_key(&name)
             || entry.is_dir()

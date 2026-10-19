@@ -284,7 +284,14 @@ fn support_package_carries_diagnostics_without_secrets() {
     let mut archive = ZipArchive::new(std::io::Cursor::new(output.content)).unwrap();
     let mut names = vec![];
     for index in 0..archive.len() {
-        names.push(archive.by_index(index).unwrap().name().to_string());
+        names.push(
+            archive
+                .by_index(index)
+                .unwrap()
+                .name()
+                .unwrap()
+                .into_owned(),
+        );
     }
     assert_eq!(
         names

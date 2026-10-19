@@ -274,7 +274,7 @@ function buildNotices(items) {
   }
 
   lines.push("", "## Reviewed source patch", "",
-    "calamine 0.36.1 includes a two-line BIFF8 row-index overflow correction. The application and standalone analyzer use the same source; archive checksum and patch provenance are recorded in third_party/README.md.",
+    "calamine 0.36.1 includes the BIFF8 row-index overflow correction and ZIP 9.0.5 filename-decoding API adaptation. The application and standalone analyzer use the same source; archive checksum and patch provenance are recorded in third_party/README.md.",
     "", readRequiredText("third_party/calamine-0.36.1/LICENSE-MIT.md"));
   const usedExtractedLicenses = resolveUsedExtractedLicenses(items);
   if (usedExtractedLicenses.length > 0) {

@@ -43,7 +43,10 @@ fn ooxml(bytes: &[u8], part: &str, root: &str, content_type: &str) -> Result<()>
         let mut entry = archive
             .by_index(index)
             .map_err(|_| invalid("Office 文档损坏或已加密。"))?;
-        let name = entry.name().to_owned();
+        let name = entry
+            .name()
+            .map_err(|cause| invalid(cause.to_string()))?
+            .into_owned();
         if entry.enclosed_name().is_none()
             || !names.insert(name.clone())
             || name.to_ascii_lowercase().ends_with("vbaproject.bin")

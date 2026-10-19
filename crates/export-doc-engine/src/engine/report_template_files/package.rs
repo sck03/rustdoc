@@ -221,7 +221,11 @@ pub(super) fn extract_package(bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>>
         let mut entry = archive
             .by_index(index)
             .map_err(|_| invalid("模板包条目无法读取。"))?;
-        let name = entry.name().trim_end_matches('/').to_owned();
+        let name = entry
+            .name()
+            .map_err(|cause| invalid(cause.to_string()))?
+            .trim_end_matches('/')
+            .to_owned();
         if entry.enclosed_name().is_none()
             || name.split('/').any(|part| !paths::valid_file_name(part))
             || !names.insert(store::normalize(&name))

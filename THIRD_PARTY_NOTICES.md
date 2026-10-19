@@ -15,7 +15,6 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | alloc-stdlib | 0.2.4 | BSD-3-Clause | native-desktop |
 | cargo | android_system_properties | 0.1.6 | MIT OR Apache-2.0 | native-desktop |
 | cargo | anyhow | 1.0.104 | MIT OR Apache-2.0 | native-desktop, ocr |
-| cargo | arbitrary | 1.4.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | arrayref | 0.3.9 | BSD-2-Clause | native-desktop |
 | cargo | arrayvec | 0.7.8 | MIT OR Apache-2.0 | native-desktop |
 | cargo | async-broadcast | 0.7.2 | MIT OR Apache-2.0 | native-desktop |
@@ -51,7 +50,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | bit-vec | 0.8.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | bitflags | 1.3.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | bitflags | 2.13.1 | MIT OR Apache-2.0 | ocr |
-| cargo | bitflags | 2.13.2 | MIT OR Apache-2.0 | native-desktop |
+| cargo | bitflags | 2.13.2 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
 | cargo | block-buffer | 0.10.4 | MIT OR Apache-2.0 | native-desktop |
 | cargo | block-buffer | 0.12.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | block2 | 0.6.2 | MIT | native-desktop |
@@ -78,7 +77,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | cc | 1.4.6 | MIT OR Apache-2.0 | native-desktop |
 | cargo | cesu8 | 1.1.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | cfb | 0.7.3 | MIT | native-desktop |
-| cargo | cfg_aliases | 0.2.2 | MIT | native-desktop |
+| cargo | cfg_aliases | 0.2.2 | MIT | excel-analyzer, native-desktop |
 | cargo | cfg-expr | 0.15.8 | MIT OR Apache-2.0 | native-desktop |
 | cargo | cfg-if | 1.0.4 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | cargo | chacha20 | 0.10.2 | MIT OR Apache-2.0 | native-desktop |
@@ -131,7 +130,6 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | defmt-parser | 1.0.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | der | 0.8.2 | Apache-2.0 OR MIT | native-desktop |
 | cargo | deranged | 0.5.8 | MIT OR Apache-2.0 | native-desktop |
-| cargo | derive_arbitrary | 1.4.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | derive_more | 2.1.1 | MIT | native-desktop |
 | cargo | derive_more-impl | 2.1.1 | MIT | native-desktop |
 | cargo | digest | 0.10.7 | MIT OR Apache-2.0 | native-desktop |
@@ -293,6 +291,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | libappindicator | 0.9.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | libappindicator-sys | 0.9.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | libc | 0.2.189 | MIT OR Apache-2.0 | native-desktop |
+| cargo | libc | 0.2.191 | MIT OR Apache-2.0 | excel-analyzer |
 | cargo | libdbus-sys | 0.2.7 | Apache-2.0 OR MIT | native-desktop |
 | cargo | libloading | 0.7.4 | ISC | native-desktop |
 | cargo | libloading | 0.9.0 | ISC | native-desktop, ocr |
@@ -332,6 +331,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | ndk | 0.9.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | ndk-sys | 0.6.0+11769913 | MIT OR Apache-2.0 | native-desktop |
 | cargo | new_debug_unreachable | 1.0.6 | MIT | native-desktop |
+| cargo | nix | 0.31.3 | MIT | excel-analyzer, native-desktop |
 | cargo | nom | 8.0.0 | MIT | native-desktop |
 | cargo | num_enum | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 | native-desktop |
 | cargo | num_enum_derive | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 | native-desktop |
@@ -742,8 +742,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | zerotrie | 0.2.5 | Unicode-3.0 | native-desktop |
 | cargo | zerovec | 0.11.8 | Unicode-3.0 | native-desktop |
 | cargo | zerovec-derive | 0.11.6 | Unicode-3.0 | native-desktop |
-| cargo | zip | 4.6.1 | MIT | native-desktop |
-| cargo | zip | 8.6.0 | MIT | excel-analyzer, native-desktop |
+| cargo | zip | 9.0.5 | MIT | excel-analyzer, native-desktop |
 | cargo | zlib-rs | 0.6.4 | Zlib | excel-analyzer |
 | cargo | zlib-rs | 0.6.8 | Zlib | native-desktop |
 | cargo | zmij | 1.0.21 | MIT | excel-analyzer |
@@ -894,7 +893,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 
 ## Reviewed source patch
 
-calamine 0.36.1 includes a two-line BIFF8 row-index overflow correction. The application and standalone analyzer use the same source; archive checksum and patch provenance are recorded in third_party/README.md.
+calamine 0.36.1 includes the BIFF8 row-index overflow correction and ZIP 9.0.5 filename-decoding API adaptation. The application and standalone analyzer use the same source; archive checksum and patch provenance are recorded in third_party/README.md.
 
 The MIT License (MIT)
 

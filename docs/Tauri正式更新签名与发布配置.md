@@ -6,6 +6,8 @@
 
 当前 Rust 桌面配置默认没有更新端点或正式公钥，默认身份为 Document。三个操作系统的手工工作流按 edition 选择 Document、Sales 单版或 All 两版构建 Artifact，`publish_release` 可上传归档到对应版本的 GitHub Release，供人工下载安装。两版保留各自身份和更新频道，不再构建或发布 Full/Administration 桌面通道，也不把旧 Full 安装自动转为 Document。此开关不启用 Tauri 自动更新或发布 latest-*.json。正式更新须在配置受信公钥、保管私钥及完成真实升级验收后启用；不宣称旧 .NET 安装包可直接升级为 Rust。
 
+2026-10-19 为移除有漏洞的 ZIP 4 依赖，`tauri-plugin-updater` 2.12.0 关闭默认 `zip` feature，保留 `rustls-tls` 与 `system-proxy`。Windows 更新使用 Tauri 2 直接签名的 EXE/MSI，Linux 使用直接签名的 AppImage；旧 `.exe.zip`、`.msi.zip` 和 `.AppImage.tar.gz` 兼容入口停用，macOS 原有 tar 更新路径保留。手工下载的便携归档不受影响。该依赖裁剪不等于各平台真实自动升级已经验收，启用前仍执行下列签名、安装及数据保留检查。
+
 ## 信任边界
 
 检查、下载、取消和安装更新的 Tauri IPC 均接收当前会话，并由共用 Rust 应用服务验证管理员身份；安装前再次核验会话和账号/权限版本。React 隐藏按钮不是授权边界。会话只通过 IPC 参数传递，不放到 URL 或日志中。

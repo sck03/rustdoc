@@ -140,7 +140,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | undici-types | 8.9.0 | MIT | web |
 | vite | 8.3.1 | MIT | web |
 
-## cargo (749)
+## cargo (748)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -153,7 +153,6 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | alloc-stdlib | 0.2.4 | BSD-3-Clause | native-desktop |
 | android_system_properties | 0.1.6 | MIT OR Apache-2.0 | native-desktop |
 | anyhow | 1.0.104 | MIT OR Apache-2.0 | native-desktop, ocr |
-| arbitrary | 1.4.2 | MIT OR Apache-2.0 | native-desktop |
 | arrayref | 0.3.9 | BSD-2-Clause | native-desktop |
 | arrayvec | 0.7.8 | MIT OR Apache-2.0 | native-desktop |
 | async-broadcast | 0.7.2 | MIT OR Apache-2.0 | native-desktop |
@@ -189,7 +188,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | bit-vec | 0.8.0 | Apache-2.0 OR MIT | native-desktop |
 | bitflags | 1.3.2 | MIT OR Apache-2.0 | native-desktop |
 | bitflags | 2.13.1 | MIT OR Apache-2.0 | ocr |
-| bitflags | 2.13.2 | MIT OR Apache-2.0 | native-desktop |
+| bitflags | 2.13.2 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
 | block-buffer | 0.10.4 | MIT OR Apache-2.0 | native-desktop |
 | block-buffer | 0.12.1 | MIT OR Apache-2.0 | native-desktop |
 | block2 | 0.6.2 | MIT | native-desktop |
@@ -216,7 +215,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | cc | 1.4.6 | MIT OR Apache-2.0 | native-desktop |
 | cesu8 | 1.1.0 | Apache-2.0 OR MIT | native-desktop |
 | cfb | 0.7.3 | MIT | native-desktop |
-| cfg_aliases | 0.2.2 | MIT | native-desktop |
+| cfg_aliases | 0.2.2 | MIT | excel-analyzer, native-desktop |
 | cfg-expr | 0.15.8 | MIT OR Apache-2.0 | native-desktop |
 | cfg-if | 1.0.4 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | chacha20 | 0.10.2 | MIT OR Apache-2.0 | native-desktop |
@@ -269,7 +268,6 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | defmt-parser | 1.0.0 | MIT OR Apache-2.0 | native-desktop |
 | der | 0.8.2 | Apache-2.0 OR MIT | native-desktop |
 | deranged | 0.5.8 | MIT OR Apache-2.0 | native-desktop |
-| derive_arbitrary | 1.4.2 | MIT OR Apache-2.0 | native-desktop |
 | derive_more | 2.1.1 | MIT | native-desktop |
 | derive_more-impl | 2.1.1 | MIT | native-desktop |
 | digest | 0.10.7 | MIT OR Apache-2.0 | native-desktop |
@@ -431,6 +429,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | libappindicator | 0.9.0 | Apache-2.0 OR MIT | native-desktop |
 | libappindicator-sys | 0.9.0 | Apache-2.0 OR MIT | native-desktop |
 | libc | 0.2.189 | MIT OR Apache-2.0 | native-desktop |
+| libc | 0.2.191 | MIT OR Apache-2.0 | excel-analyzer |
 | libdbus-sys | 0.2.7 | Apache-2.0 OR MIT | native-desktop |
 | libloading | 0.7.4 | ISC | native-desktop |
 | libloading | 0.9.0 | ISC | native-desktop, ocr |
@@ -470,6 +469,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | ndk | 0.9.0 | MIT OR Apache-2.0 | native-desktop |
 | ndk-sys | 0.6.0+11769913 | MIT OR Apache-2.0 | native-desktop |
 | new_debug_unreachable | 1.0.6 | MIT | native-desktop |
+| nix | 0.31.3 | MIT | excel-analyzer, native-desktop |
 | nom | 8.0.0 | MIT | native-desktop |
 | num_enum | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 | native-desktop |
 | num_enum_derive | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 | native-desktop |
@@ -880,8 +880,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | zerotrie | 0.2.5 | Unicode-3.0 | native-desktop |
 | zerovec | 0.11.8 | Unicode-3.0 | native-desktop |
 | zerovec-derive | 0.11.6 | Unicode-3.0 | native-desktop |
-| zip | 4.6.1 | MIT | native-desktop |
-| zip | 8.6.0 | MIT | excel-analyzer, native-desktop |
+| zip | 9.0.5 | MIT | excel-analyzer, native-desktop |
 | zlib-rs | 0.6.4 | Zlib | excel-analyzer |
 | zlib-rs | 0.6.8 | Zlib | native-desktop |
 | zmij | 1.0.21 | MIT | excel-analyzer |

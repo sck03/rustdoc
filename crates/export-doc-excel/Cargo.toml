@@ -12,7 +12,7 @@ export-doc-domain = { path = "../export-doc-domain" }
 exportdoc-excel-analyzer = { path = "../../tools/excel-analyzer-rs" }
 calamine = { version = "=0.36.1", features = ["dates"] }
 quick-xml = "=0.42.0"
-zip = { version = "=8.6.0", default-features = false, features = ["deflate"] }
+zip.workspace = true
 serde_json.workspace = true
 rust_decimal.workspace = true
 chrono.workspace = true

@@ -81,7 +81,9 @@ pub fn decode(bytes: &[u8]) -> Result<Design, String> {
     }
     let mut entry = archive.by_index(0).map_err(|_| "报表模板容器缺少正文。")?;
     let size = entry.size();
-    if entry.name() != DOCUMENT_NAME || size > MAX_DOCUMENT_BYTES as u64 {
+    if entry.name().map_err(|_| "报表模板条目名称编码无效。")? != DOCUMENT_NAME
+        || size > MAX_DOCUMENT_BYTES as u64
+    {
         return Err("报表模板正文结构无效。".into());
     }
     let mut document = Vec::new();

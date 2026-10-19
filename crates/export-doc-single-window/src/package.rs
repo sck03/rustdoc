@@ -133,7 +133,11 @@ impl Package {
         for index in 0..zip.len() {
             check()?;
             let mut entry = zip.by_index(index).map_err(|e| e.to_string())?;
-            let name = entry.name().trim_end_matches('/').to_owned();
+            let name = entry
+                .name()
+                .map_err(|_| "报文包条目名称编码无效。")?
+                .trim_end_matches('/')
+                .to_owned();
             if !safe_path(&name)
                 || !names.insert(name.to_uppercase())
                 || entry

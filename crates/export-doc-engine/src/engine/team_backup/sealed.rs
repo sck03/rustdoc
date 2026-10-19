@@ -193,7 +193,10 @@ pub(super) fn unpack(payload: impl Read + Seek, destination: &Path) -> Result<Ve
             .by_index(index)
             .map_err(|cause| unavailable(cause.to_string()))?;
         // Portable package paths use forward slashes and reject ambiguous names.
-        let name = file.name().to_string();
+        let name = file
+            .name()
+            .map_err(|cause| invalid(cause.to_string()))?
+            .into_owned();
         if name
             .split('/')
             .any(|part| !crate::paths::valid_file_name(part))

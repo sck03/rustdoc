@@ -29,7 +29,8 @@ serde_json.workspace = true
 sha2.workspace = true
 tauri = { version = "=2.11.6", features = [] }
 tauri-plugin-single-instance = "=2.4.5"
-tauri-plugin-updater = "=2.12.0"
+# Tauri 2 uses signed installers directly; exclude legacy Windows ZIP extraction.
+tauri-plugin-updater = { version = "=2.12.0", default-features = false, features = ["rustls-tls", "system-proxy"] }
 url = "=2.5.8"
 
 [target.'cfg(unix)'.dependencies]

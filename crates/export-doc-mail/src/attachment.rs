@@ -31,13 +31,16 @@ pub fn inspect(name: &str, bytes: &[u8]) -> Result<&'static str, String> {
         "zip" | "docx" | "xlsx" => {
             let archive = zip::ZipArchive::new(Cursor::new(bytes))
                 .map_err(|_| "邮件附件不是有效的 ZIP/Office 文件。")?;
+            let mut content_types = false;
+            let mut office_part = false;
+            for name in archive.file_names() {
+                let name = name.map_err(|_| "邮件附件条目名称编码无效。")?;
+                content_types |= name == "[Content_Types].xml";
+                office_part |= name.starts_with(if ext == "docx" { "word/" } else { "xl/" });
+            }
             let valid = archive.len() > 0
                 && archive.len() <= 10000
-                && (ext == "zip"
-                    || (archive.file_names().any(|n| n == "[Content_Types].xml")
-                        && archive
-                            .file_names()
-                            .any(|n| n.starts_with(if ext == "docx" { "word/" } else { "xl/" }))));
+                && (ext == "zip" || (content_types && office_part));
             (
                 match ext.as_str() {
                     "docx" => {

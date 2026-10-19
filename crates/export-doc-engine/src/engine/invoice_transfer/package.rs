@@ -130,7 +130,10 @@ pub fn read(bytes: &[u8]) -> Result<Package> {
         let mut entry = archive
             .by_index(index)
             .map_err(|_| invalid("单据包目录损坏。"))?;
-        let name = entry.name().to_owned();
+        let name = entry
+            .name()
+            .map_err(|cause| invalid(cause.to_string()))?
+            .into_owned();
         let limit = match name.as_str() {
             "data.json" => MAX_DATA,
             "meta.json" => 256 * 1024,

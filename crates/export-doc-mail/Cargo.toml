@@ -12,7 +12,7 @@ tokio = { version = "=1.53.1", features = ["rt", "time", "net", "macros"] }
 scraper = { version = "=0.27.0", default-features = false }
 ego-tree = "=0.11.0"
 url = "=2.5.8"
-zip = { version = "=8.6.0", default-features = false, features = ["deflate"] }
+zip.workspace = true
 zeroize = "=1.9.0"
 
 [lints]
