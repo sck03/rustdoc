@@ -42,6 +42,7 @@ impl ReportData {
         with_seal: bool,
     ) -> Result<Self> {
         let mut value = serde_json::to_value(invoice)?;
+        export_doc_domain::invoice_print_rows::validate(&invoice.items).map_err(invalid)?;
         let adjustments = invoice.amount_adjustments.as_deref().unwrap_or(&[]);
         let adjusted =
             export_doc_domain::invoice_adjustments::total(invoice.total_amount, adjustments)
@@ -101,6 +102,9 @@ impl ReportData {
         data.root["items"] = value_at(&data.root["Invoice"], "Items").clone();
         if let Some(items) = data.root["items"].as_array_mut() {
             for (index, item) in items.iter_mut().enumerate() {
+                item["printRows"] = serde_json::to_value(
+                    export_doc_domain::invoice_print_rows::rows(&invoice.items[index]),
+                )?;
                 item["RowNumber"] = json!(index + 1);
                 if value_at(item, "styleNameCN")
                     .as_str()

@@ -748,10 +748,10 @@ pub fn delete(
             return Err(conflict("交接记录必须通过取消流程处理。"));
         }
         check_references(transaction, resource.key, &previous)?;
-        if resource.key == "people" && !super::office::can_correct(transaction, record_id)? {
-            return Err(conflict(
-                "档案已有账号、业务或任职历史，请通过离职流程处理。",
-            ));
+        if resource.key == "people" {
+            if let Some(reason) = super::office::deletion_restriction(transaction, record_id)? {
+                return Err(conflict(reason));
+            }
         }
         if ["rooms", "supplies"].contains(&resource.key)
             && store::history(transaction, resource.key, record_id)?

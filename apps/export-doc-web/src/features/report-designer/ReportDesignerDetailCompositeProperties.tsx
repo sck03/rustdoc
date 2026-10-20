@@ -24,15 +24,23 @@ export function ReportDesignerDetailCompositeProperties({ column, fieldGroups, o
   function update(patch: Partial<ReportDetailTableCellContent>) {
     onChange({ content: content.map(current => current.id === part?.id ? { ...current, ...patch } : current) });
   }
-  function add(kind: ReportDetailTableCellContent["kind"]) {
+  function add(kind: ReportDetailTableCellContent["kind"], copy = false) {
     if (content.length >= MAX_DETAIL_PARTS) return;
-    const next = createDetailTableCellContent(kind);
+    const created = createDetailTableCellContent(kind);
+    const next = copy && part ? { ...structuredClone(part), id: created.id } : created;
     setSelectedId(next.id);
-    onChange({ content: [...content, next] });
+    const updated = [...content];
+    updated.splice(part ? index + 1 : updated.length, 0, next);
+    onChange({ content: updated });
   }
   return <div className="new-report-detail-style-group">
     <DesignerCheckbox checked={column.omitEmptyLines === true} onChange={omitEmptyLines => onChange({ omitEmptyLines })}>不显示空内容行</DesignerCheckbox>
-    <p className="report-designer-v3-help">款号等字段为空或条件不满足时，可收起所在空行；占位行始终保留设置的高度。每项商品都会重复此排版。</p>
+    <p className="report-designer-v3-help">以下片段从左到右组合，换行后另起一行。点击片段修改；新片段插在所选片段后。占位行保留高度。</p>
+    <div className="new-report-detail-parts" aria-label="列内容排列">
+      {content.map((item, i) => <button key={item.id} type="button" aria-pressed={item.id === part?.id} className={`new-report-detail-part${item.visible === false ? " is-hidden" : ""}`} onClick={() => setSelectedId(item.id)}>
+        <span>{i + 1}. {item.kind === "Field" ? fields.get(item.fieldPath) ?? "字段" : item.kind === "Text" ? item.text || "空文本" : partNames[item.kind]}</span>{item.visible === false && <small>隐藏</small>}
+      </button>)}
+    </div>
     <div className="new-report-detail-column-actions">
       {Object.entries(partNames).map(([kind, title]) => <button key={kind} type="button" className="command-button secondary" disabled={content.length >= MAX_DETAIL_PARTS} onClick={() => add(kind as ReportDetailTableCellContent["kind"])}>添加{title}</button>)}
     </div>
@@ -47,7 +55,7 @@ export function ReportDesignerDetailCompositeProperties({ column, fieldGroups, o
       }}>
         {Object.entries(partNames).map(([kind, title]) => <option key={kind} value={kind}>{title}</option>)}
       </select></label>
-      {part.kind === "Text" && <label><span>文本</span><CommitTextField value={part.text} onCommit={text => update({ text })} /></label>}
+      {part.kind === "Text" && <label><span>文本</span><CommitTextField multiline rows={3} value={part.text} onCommit={text => update({ text })} /></label>}
       {part.kind === "Field" && <FieldPathInput selectOnly label="字段" value={part.fieldPath} fieldGroups={fieldGroups} onChange={fieldPath => update({ fieldPath })} />}
       {part.kind === "ColumnBreak" && <NumberField label="距单元格左侧 (%)" value={part.positionPercent ?? 50} min={1} max={99} onCommit={positionPercent => update({ positionPercent })} />}
       {part.kind === "Spacer" && <NumberField label="占位行高度 (mm)" value={part.heightMm ?? 3} min={0.5} max={40} onCommit={heightMm => update({ heightMm })} />}
@@ -56,6 +64,7 @@ export function ReportDesignerDetailCompositeProperties({ column, fieldGroups, o
         {part.condition && <ConditionRuleProperties rule={part.condition} itemContext fieldGroups={conditionFields} onChange={patch => update({ condition: { ...part.condition!, ...patch } })} />}
       </>}
       <div className="new-report-detail-column-actions">
+        <button type="button" className="command-button secondary" disabled={content.length >= MAX_DETAIL_PARTS} onClick={() => add(part.kind, true)}>复制片段</button>
         <button type="button" className="command-button secondary" disabled={index <= 0} onClick={() => onChange({ content: moveDetailCellPart(content, part.id, -1) })}>上移片段</button>
         <button type="button" className="command-button secondary" disabled={index >= content.length - 1} onClick={() => onChange({ content: moveDetailCellPart(content, part.id, 1) })}>下移片段</button>
       <button type="button" className="command-button secondary" onClick={() => onChange({ content: content.filter(current => current.id !== part.id) })}>删除片段</button>

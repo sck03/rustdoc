@@ -66,11 +66,11 @@ function invoice() {
     text("issuer-label","Issued by:",105,71,15,5,7),text("issuer","",120,71,75,5,7),rule("issuer-rule",120,76,75),
   );
   const t=table("invoice-items",15,78,180,[
-    column("description","货品名称 / Description","item.StyleName",36,"Left",[F("item.StyleName"),NL(),F("item.PoNumber"),NL(),F("item.StyleNo")]),
-    column("cartons","箱数\nCartons","item.Cartons",22,"Right",[F("item.Cartons"),F("item.CtnUnitEN")]),
-    column("quantity","数量\nQuantity","item.Quantity",26,"Right",[F("item.Quantity"),F("item.UnitEN")]),
-    column("price","单价\nUnit Price","item.UnitPrice",31,"Right",[F("Invoice.Currency"),F("item.UnitPrice")]),
-    column("amount","金额\nAmount","item.TotalPrice",33,"Right",[F("Invoice.Currency"),F("item.TotalPrice")]),
+    column("description","货品名称 / Description","item.StyleName",68,"Left",[F("item.StyleName"),NL(),F("item.PoNumber"),NL(),F("item.StyleNo")]),
+    column("cartons","箱数\nCartons","item.Cartons",18,"Right",[F("item.Cartons"),F("item.CtnUnitEN")]),
+    column("quantity","数量\nQuantity","item.Quantity",19,"Right",[F("item.Quantity"),F("item.UnitEN")]),
+    column("price","单价\nUnit Price","item.UnitPrice",20,"Right",[F("Invoice.Currency"),F("item.UnitPrice")]),
+    column("amount","金额\nAmount","item.TotalPrice",23,"Right",[F("Invoice.Currency"),F("item.TotalPrice")]),
   ],7);
   t.heightHundredthMm=mm(142);
   t.block.print.fillHeight=true;
@@ -81,6 +81,7 @@ function invoice() {
   t.block.columns.forEach((column,index)=>{column.border={...border,left:index===0||index===4,right:index===4};});
   summary(t,{cartons:"total_by_ctn_unit",quantity:"total_by_qty_unit",amount:"Invoice.AdjustedTotalAmount"});
   t.block.adjustments={descriptionColumnId:"description",amountColumnId:"amount"};
+  t.block.entryDescriptionColumnId="description";
   t.block.summaryRow.cells.find(cell=>cell.columnId==="amount").fieldFormat="Currency";
   t.block.summaryRow.style.marginTopMm=2.5;
   t.block.summaryRow.border={...border,style:"Dashed",widthPx:0.8,right:false,bottom:false,left:false};
@@ -118,6 +119,7 @@ function packing() {
   t.block.sideBand={title:"唛头 / Marks",widthMm:32,contentKind:"Field",text:"",fieldPath:"Invoice.ShippingMarks",style:{fontSizePt:7}};
   t.block.columns[0].omitEmptyLines=true;
   t.block.sideBand.firstPageOnly=true;
+  t.block.entryDescriptionColumnId="description";
   t.block.rowSeparators=false;
   t.block.columns.forEach((column,index)=>{column.border={...border,left:index===0,right:index===t.block.columns.length-1};});
   t.block.bodyStyle.verticalAlign="Bottom";
@@ -132,7 +134,7 @@ function contract() {
   const d=document("ExportDocument");
   d.layers[0].print.repeatOnEveryPage=false;
   d.layers[0].elements=[field("company","Exporter.ExporterNameEN",15,16,180,7,12,"Center",true),text("title","售货合同",15,25,180,7,11,"Center",true),text("buyer-label","买方 / Buyer:",15,35,90,5,8),field("buyer","Customer.CustomerNameEN",15,41,95,6,8),field("buyer-address","Customer.AddressEN",15,48,95,10,7),text("seller-label","卖方 / Seller:",15,60,95,5,8),field("seller","Exporter.ExporterNameEN",15,65,180,6,8),text("contract-label","合同号码 (Contract No.):",116,41,39,6,8),field("contract-no","Invoice.ContractNo",155,41,40,6,8,"Right"),text("date-label","日期 (Date):",116,57,35,5,8),field("date","Invoice.InvoiceDate",151,57,44,5,8,"Right"),text("agreement","双方同意按本合同所列条款由卖方出售，买方购进下列货物：\nThe sellers agree to sell and the Buyers agree to buy the under-mentioned commodities on the terms and conditions stated below:",15,76,180,10,7)];
-  const t=table("contract-items",15,88,180,[column("goods","Name of Commodity, Specification, Packing and Shipping Marks","item.StyleNo",110,"Left",[F("item.StyleNo"),T(" "),F("item.StyleName")]),column("quantity","Quantity","item.Quantity",23,"Right",[F("item.Quantity"),F("item.UnitEN")]),column("price","Unit Price","item.UnitPrice",23,"Right",[F("Invoice.Currency"),F("item.UnitPrice")]),column("amount","Total Amount","item.TotalPrice",24,"Right",[F("Invoice.Currency"),F("item.TotalPrice")])],7,20,20);
+  const t=table("contract-items",15,88,180,[column("goods","Name of Commodity","item.StyleName",110),column("quantity","Quantity","item.Quantity",23,"Right",[F("item.Quantity"),F("item.UnitEN")]),column("price","Unit Price","item.UnitPrice",23,"Right",[F("Invoice.Currency"),F("item.UnitPrice")]),column("amount","Total Amount","item.TotalPrice",24,"Right",[F("Invoice.Currency"),F("item.TotalPrice")])],7,20,20);
   t.block.print.firstPageRows=24; t.block.print.continuationPageRows=40;
   t.heightHundredthMm=mm(40); summary(t,{quantity:"total_by_qty_unit",amount:"Invoice.TotalAmount"});
   t.block.summaryRow.cells.find(cell=>cell.columnId==="amount").fieldFormat="Currency";

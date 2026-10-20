@@ -49,6 +49,34 @@ fn horizontal_between(svg: &str, start: f32, end: f32) -> bool {
     })
 }
 
+fn invoice_column_bounds(id: &str) -> (f32, f32) {
+    let design = Builtin::Invoice.design().unwrap();
+    let (element, table) = design
+        .layers
+        .iter()
+        .flat_map(|layer| &layer.elements)
+        .find_map(|element| match &element.kind {
+            Kind::Flow {
+                block: ReportBlock::DetailTable(table),
+                ..
+            } => Some((element, table)),
+            _ => None,
+        })
+        .unwrap();
+    let side = table.side_band.as_ref().map_or(0., |band| band.width_mm);
+    let available = element.width_hundredth_mm as f32 / 100. - side;
+    let total: f32 = table.columns.iter().map(|column| column.width_mm).sum();
+    let mut left = element.x_hundredth_mm as f32 / 100. + side;
+    for column in &table.columns {
+        let right = left + available * column.width_mm / total;
+        if column.id == id {
+            return (left, right);
+        }
+        left = right;
+    }
+    panic!("Missing invoice column: {id}");
+}
+
 #[test]
 fn packing_stamp_follows_totals_and_contract_stamp_meets_seller_signature() {
     for rows in [1, 36] {
@@ -297,6 +325,7 @@ fn commercial_rows_have_no_dividers_and_values_share_the_lower_baseline() {
 
 #[test]
 fn invoice_amount_header_rule_is_not_covered_by_document_fields() {
+    let (left, right) = invoice_column_bounds("amount");
     for count in [1, 36] {
         let mut data = invoice(count);
         data.root["Invoice"]["tradeTerms"] = json!("FOB");
@@ -308,8 +337,8 @@ fn invoice_amount_header_rule_is_not_covered_by_document_fields() {
             let (rule, offset) = nodes(svg, "line")
                 .into_iter()
                 .find(|(node, offset)| {
-                    (attribute(node, "x1") - 162.).abs() < 0.01
-                        && (attribute(node, "x2") - 195.).abs() < 0.01
+                    (attribute(node, "x1") - left).abs() < 0.01
+                        && (attribute(node, "x2") - right).abs() < 0.01
                         && (attribute(node, "y1") - attribute(node, "y2")).abs() < 0.01
                         && attribute(node, "y1") + offset > header_bottom
                         && attribute(node, "y1") + offset < first_amount
@@ -324,8 +353,8 @@ fn invoice_amount_header_rule_is_not_covered_by_document_fields() {
                 }
                 let x = attribute(rect, "x");
                 let y = attribute(rect, "y") + offset;
-                let covers = x < 195.
-                    && x + attribute(rect, "width") > 162.
+                let covers = x < right
+                    && x + attribute(rect, "width") > left
                     && y < rule_y + 0.1
                     && y + attribute(rect, "height") > rule_y - 0.1;
                 assert!(
@@ -385,7 +414,11 @@ fn invoice_detail_component_and_totals_share_columns_and_baseline() {
             "x",
         )
     };
-    for (detail, total, anchor) in [("20CTNS", "40CTNS", 103.5), ("1000PCS", "2000PCS", 129.5)] {
+    for (detail, total, column) in [
+        ("20CTNS", "40CTNS", "cartons"),
+        ("1000PCS", "2000PCS", "quantity"),
+    ] {
+        let anchor = invoice_column_bounds(column).1 - 1.5;
         assert!((x(total) - anchor).abs() < 0.01);
         assert!((x(total) - x(detail)).abs() < 0.01);
         assert!((text_y(svg, "TOTAL:") - text_y(svg, total)).abs() < 0.01);
@@ -435,12 +468,13 @@ fn invoice_grouped_totals_keep_each_number_and_unit_on_the_same_line() {
         .into_iter()
         .filter(|(node, _)| node.contains("font-weight=\"700\""))
         .collect();
-    for (value, anchor) in [
-        ("12BOXES", 103.5),
-        ("28CTNS", 103.5),
-        ("1400PCS", 129.5),
-        ("600SETS", 129.5),
+    for (value, column) in [
+        ("12BOXES", "cartons"),
+        ("28CTNS", "cartons"),
+        ("1400PCS", "quantity"),
+        ("600SETS", "quantity"),
     ] {
+        let anchor = invoice_column_bounds(column).1 - 1.5;
         let (node, _) = totals
             .iter()
             .find(|(node, _)| node.ends_with(&format!(">{value}")))

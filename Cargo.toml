@@ -49,6 +49,11 @@ lto = "thin"
 codegen-units = 1
 strip = true
 
+[profile.test]
+# Keep source locations in test backtraces without embedding full type/variable
+# debug information into every integration-test executable.
+debug = "line-tables-only"
+
 [profile.dev.package.sha2]
 opt-level = 3
 [profile.dev.package.pbkdf2]

@@ -14,12 +14,16 @@ pub(super) fn detail_rows(
     widths: &[f32],
     size: f32,
 ) -> Result<Vec<Row>> {
+    if data.root["Invoice"]["useEntryPrintRows"] == true
+        && table.entry_description_column_id.is_some()
+    {
+        return super::entry_rows::prepare(table, data, widths, size);
+    }
     let mut rows = Vec::new();
     let mut current_group = None::<String>;
     let mut group_sums = empty_group_sums(table);
     let sum_cells: Vec<_> = group_sum_cells(table).collect();
     let mut group_count = 0usize;
-    let style = CellStyle::new(&table.body_style, size, false);
     for item in data.items() {
         let group = table
             .grouping
@@ -60,58 +64,14 @@ pub(super) fn detail_rows(
                 ));
             }
         }
-        let composed: Vec<_> = table
-            .columns
-            .iter()
-            .zip(widths)
-            .map(|(column, width)| {
-                if column.content_kind == "Composite" && !column.content.is_empty() {
-                    detail_content::compose(
-                        &column.content,
-                        data,
-                        item,
-                        width - style.left - style.right,
-                        size,
-                        style.bold,
-                        column.omit_empty_lines,
-                        style.vertical_factor,
-                    )
-                } else {
-                    Ok(None)
-                }
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let cells: Vec<Vec<String>> = table
-            .columns
-            .iter()
-            .zip(widths)
-            .zip(&composed)
-            .map(|((column, width), composed)| {
-                if composed.is_some() {
-                    return vec![String::new()];
-                }
-                let text = column_text(column, data, item);
-                style.wrap(&text, *width)
-            })
-            .collect();
+        let row = item_row(table, data, item, widths, size, None)?;
         for cell in &sum_cells {
             if let Some(total) = group_sums.get_mut(&cell.column_id) {
                 add_sum(total, data.value(&cell.field_path, Some(item)))?;
             }
         }
         group_count += 1;
-        let height = composed
-            .iter()
-            .flatten()
-            .map(|cell| cell.height + style.top + style.bottom)
-            .fold(style.height(&cells), f32::max);
-        rows.push(Row {
-            cells,
-            composed,
-            height,
-            kind: RowKind::Data,
-            page_break_before: false,
-        });
+        rows.push(row);
     }
     if let Some(previous) = current_group {
         if let Some(grouping) = &table.grouping {
@@ -129,6 +89,73 @@ pub(super) fn detail_rows(
         }
     }
     Ok(rows)
+}
+
+pub(super) fn item_row(
+    table: &DetailTable,
+    data: &ReportData,
+    item: &Value,
+    widths: &[f32],
+    size: f32,
+    description: Option<(usize, &str)>,
+) -> Result<Row> {
+    let style = CellStyle::new(&table.body_style, size, false);
+    let composed: Vec<_> = table
+        .columns
+        .iter()
+        .zip(widths)
+        .enumerate()
+        .map(|(index, (column, width))| {
+            if description.is_none_or(|(selected, _)| selected != index)
+                && column.content_kind == "Composite"
+                && !column.content.is_empty()
+            {
+                detail_content::compose(
+                    &column.content,
+                    data,
+                    item,
+                    width - style.left - style.right,
+                    size,
+                    style.bold,
+                    column.omit_empty_lines,
+                    style.vertical_factor,
+                )
+            } else {
+                Ok(None)
+            }
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let cells: Vec<Vec<String>> = table
+        .columns
+        .iter()
+        .zip(widths)
+        .zip(&composed)
+        .enumerate()
+        .map(|(index, ((column, width), composed))| {
+            if let Some((selected, text)) = description {
+                if selected == index {
+                    return style.wrap(text, *width);
+                }
+            }
+            if composed.is_some() {
+                return vec![String::new()];
+            }
+            let text = column_text(column, data, item);
+            style.wrap(&text, *width)
+        })
+        .collect();
+    let height = composed
+        .iter()
+        .flatten()
+        .map(|cell| cell.height + style.top + style.bottom)
+        .fold(style.height(&cells), f32::max);
+    Ok(Row {
+        cells,
+        composed,
+        height,
+        kind: RowKind::Data,
+        page_break_before: false,
+    })
 }
 
 fn column_text(

@@ -1,4 +1,5 @@
 mod cells;
+mod entry_rows;
 mod headers;
 mod rows;
 #[cfg(test)]

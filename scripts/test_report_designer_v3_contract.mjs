@@ -58,6 +58,7 @@ export * from ${JSON.stringify(importSpecifier("reportDesignerConditions.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3ElementFactories.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3Regions.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerTableMutations.ts"))};
+export * from ${JSON.stringify(importSpecifier("reportDesignerDetailWidths.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerLayerBands.ts"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerV3WorkspaceHelpers.tsx"))};
 export * from ${JSON.stringify(importSpecifier("reportDesignerFields.ts"))};

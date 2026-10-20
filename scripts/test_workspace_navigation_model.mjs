@@ -39,6 +39,7 @@ const permission = globalThis.__permission;
 const device = globalThis.__device;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const permissionGrant = (resourceKey, action, dataScope = "own") => ({ resourceKey, action, dataScope });
+const moduleGrants = enabledModules => ({ enabledModules, moduleAccess: enabledModules.map(moduleKey => ({ moduleKey, accessLevel: "manage" })) });
 const scheme = globalThis.__scheme;
 const savedGrants = [permissionGrant("sales.customers", "view", "department"), permissionGrant("common.product-reference", "view", "all")];
 const originalGrants = JSON.stringify(savedGrants);
@@ -89,12 +90,12 @@ assert(navigationItems.length === 38, "primary navigation includes personnel cha
 const allModules = [...new Set(routeItems.flatMap((item) => item.moduleKey ? [item.moduleKey] : []))];
 const allPermissions = routeItems.flatMap((item) => item.requiredPermissions ?? (item.moduleKey ? [{ resourceKey: item.moduleKey, action: "view" }] : []))
   .map((requirement) => permissionGrant(requirement.resourceKey, requirement.action));
-const fullNavigationGrants = { enabledModules: allModules, permissions: allPermissions };
+const fullNavigationGrants = { ...moduleGrants(allModules), permissions: allPermissions };
 const userGroups = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: true, ...fullNavigationGrants });
 const salesGroups = model.filterWorkspaceNavGroups({
   productEdition: "Full",
   canUseSalesWorkspace: true,
-  enabledModules: ["sales.dashboard", "sales.crm", "sales.opportunities", "sales.email-templates", "sales.suppliers", "system.about"],
+  ...moduleGrants(["sales.dashboard", "sales.crm", "sales.opportunities", "sales.email-templates", "sales.suppliers", "system.about"]),
   permissions: salesPermissions,
 });
 const salesEditionAdminGroups = model.filterWorkspaceNavGroups({ productEdition: "Sales", canManageSettings: true, canUseSalesWorkspace: true, isDesktopRuntime: true, ...fullNavigationGrants });
@@ -134,34 +135,34 @@ const financePermissions = [
 ];
 const financeGroups = model.filterWorkspaceNavGroups({
   canUseDocumentWorkspace: true,
-  enabledModules: financeModules,
+  ...moduleGrants(financeModules),
   permissions: financePermissions,
 });
 const documentClerkRoutes = model.filterWorkspaceNavGroups({
   canUseDocumentWorkspace: true,
-  enabledModules: ["document.invoices", "document.hs-knowledge", "document.master-data", "system.about"],
+  ...moduleGrants(["document.invoices", "document.hs-knowledge", "document.master-data", "system.about"]),
   permissions: ["document.invoices", "document.hs-knowledge", "document.master-data", "system.about"].map(key => permissionGrant(key, "view")),
 }).flatMap((group) => group.items.flatMap((item) => item.children ?? [item])).map((item) => item.to);
-const noPermissionGroups = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: false, canUseSalesWorkspace: false, enabledModules: [] });
+const noPermissionGroups = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: false, canUseSalesWorkspace: false, ...moduleGrants([]) });
 const unresolvedPermissionGroups = model.filterWorkspaceNavGroups({
   canManageSettings: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, productEdition: "Full",
 });
 assert(unresolvedPermissionGroups.length === 0, "missing module grants must not expose navigation even with broad workspace flags");
 const partialCrmGroups = model.filterWorkspaceNavGroups({
   canUseSalesWorkspace: true,
-  enabledModules: ["sales.crm"],
+  ...moduleGrants(["sales.crm"]),
   permissions: [permissionGrant("sales.customers", "view")],
 });
 const sendOnlyEmailRoutes = model.filterWorkspaceNavGroups({
-  enabledModules: ["common.email"],
+  ...moduleGrants(["common.email"]),
   permissions: [permissionGrant("common.email-delivery", "send")],
 }).flatMap((group) => group.items.flatMap((item) => item.children ?? [item])).map((item) => item.to);
 const deliveryOnlyEmailRoutes = model.filterWorkspaceNavGroups({
-  enabledModules: ["common.email"],
+  ...moduleGrants(["common.email"]),
   permissions: [permissionGrant("common.email-delivery", "view-delivery")],
 }).flatMap((group) => group.items.flatMap((item) => item.children ?? [item])).map((item) => item.to);
 const noEmailCapabilityRoutes = model.filterWorkspaceNavGroups({
-  enabledModules: ["common.email"],
+  ...moduleGrants(["common.email"]),
   permissions: [],
 }).flatMap((group) => group.items.flatMap((item) => item.children ?? [item])).map((item) => item.to);
 const financeRoutes = financeGroups.flatMap((group) => group.items.flatMap((item) => item.children ?? [item])).map((item) => item.to);
@@ -215,11 +216,11 @@ assert(model.getRequiredRouteAccessLevel("/master-data/products/new") === "opera
 assert(model.getRequiredRouteAccessLevel("/single-window/coo/8") === "operate", "COO editor route requires operate");
 assert(model.getRequiredRouteAccessLevel("/single-window/acd/8") === "operate", "ACD editor route requires operate");
 assert(model.getRequiredRouteAccessLevel("/invoices/8") === "view", "invoice detail route permits view");
-assert(product.getDefaultWorkspaceRoute({ productEdition: "Document", canUseDocumentWorkspace: true, enabledModules: financeModules, permissions: financePermissions }) === "/access-denied", "single-user edition retains its fixed home");
-assert(product.getDefaultWorkspaceRoute({ productEdition: "Sales", canUseSalesWorkspace: true, enabledModules: ["sales.dashboard"], permissions: salesPermissions }) === "/crm/dashboard", "sales edition fixed home");
-assert(product.getDefaultWorkspaceRoute({ productEdition: "Sales", canUseSalesWorkspace: true, enabledModules: ["sales.opportunities"], permissions: [permissionGrant("sales.opportunities", "view")] }) === "/access-denied", "custom permissions do not change the fixed edition home");
-assert(product.getDefaultWorkspaceRoute({ enabledModules: [] }) === "/access-denied", "empty permission template uses access denied route");
-assert(product.getDefaultWorkspaceRoute({ enabledModules: [], availableFeatures: ["worklist"] }) === "/access-denied", "feature availability alone does not expose business navigation");
+assert(product.getDefaultWorkspaceRoute({ productEdition: "Document", canUseDocumentWorkspace: true, ...moduleGrants(financeModules), permissions: financePermissions }) === "/access-denied", "single-user edition retains its fixed home");
+assert(product.getDefaultWorkspaceRoute({ productEdition: "Sales", canUseSalesWorkspace: true, ...moduleGrants(["sales.dashboard"]), permissions: salesPermissions }) === "/crm/dashboard", "sales edition fixed home");
+assert(product.getDefaultWorkspaceRoute({ productEdition: "Sales", canUseSalesWorkspace: true, ...moduleGrants(["sales.opportunities"]), permissions: [permissionGrant("sales.opportunities", "view")] }) === "/access-denied", "custom permissions do not change the fixed edition home");
+assert(product.getDefaultWorkspaceRoute({ ...moduleGrants([]) }) === "/access-denied", "empty permission template uses access denied route");
+assert(product.getDefaultWorkspaceRoute({ ...moduleGrants([]), availableFeatures: ["worklist"] }) === "/access-denied", "feature availability alone does not expose business navigation");
 assert(product.getProductEditionPresentation("Document").displayName === "外贸业务综合管理系统（单证版）", "document edition brand name");
 assert(product.getProductEditionPresentation("Sales").displayName === "外贸业务综合管理系统（业务员版）", "sales edition brand name");
 assert(product.getProductEditionPresentation("Full").displayName === "外贸业务综合管理系统（全功能版）", "full edition brand name");
@@ -227,7 +228,7 @@ assert(product.getProductEditionPresentation("Administration").editionName === "
 const editionPermissions = JSON.parse(fs.readFileSync(path.join(repoRoot, "crates/export-doc-contracts/src/generated_contract.json"), "utf8")).permissions;
 const employeeGrants = editionPermissions.roles.find(role => role.code === "OfficeEmployee").grants;
 const employeeCapabilities = { productEdition: "Full", availableFeatures: ["worklist"], permissions: employeeGrants,
-  enabledModules: [...new Set(employeeGrants.map(grant => editionPermissions.resources.find(resource => resource.key === grant.resourceKey).moduleKey))] };
+  ...moduleGrants([...new Set(employeeGrants.map(grant => editionPermissions.resources.find(resource => resource.key === grant.resourceKey).moduleKey))]) };
 const employeeGroups = model.filterWorkspaceNavGroups(employeeCapabilities);
 assert(employeeGroups.find(group => group.key === "workspace")?.items.some(item => item.to === "/payments"), "shared printing stays in the workbench for employees");
 assert(!employeeGroups.find(group => group.key === "office")?.items.some(item => item.to === "/payments"), "administration keeps applications separate from voucher printing");
@@ -239,7 +240,7 @@ for (const edition of ["Full", "Document", "Sales"]) {
   const enabledModules = [...new Set(resources.map(resource => resource.moduleKey))];
   const editionCapabilities = {
     productEdition: edition,
-    enabledModules, isDesktopRuntime: edition !== "Full", canManageSettings: true,
+    ...moduleGrants(enabledModules), isDesktopRuntime: edition !== "Full", canManageSettings: true,
     canManageUsers: resources.some(resource => resource.key === "system.users"),
     canUseDocumentWorkspace: edition === "Full" || edition === "Document",
     canUseSalesWorkspace: edition === "Full" || edition === "Sales",
@@ -280,7 +281,10 @@ assert(!permission.hasModulePermission([{ moduleKey: "document.payments", access
 assert(permission.hasModulePermission([{ moduleKey: "document.reports", accessLevel: "manage" }], "document.reports", "manage"), "manage grant permits report design");
 assert(!permission.hasRouteModulePermission([], [], "system.about", "view"), "explicit empty grants deny route module");
 assert(!permission.hasRouteModulePermission(undefined, undefined, "system.about", "view"), "missing grants fail closed");
-assert(!permission.hasRouteModulePermission(undefined, ["document.payments"], "document.payments", "operate"), "legacy enabled module list cannot imply operate access");
+for (const level of ["view", "operate", "manage"]) {
+  assert(!permission.hasRouteModulePermission(undefined, ["document.payments"], "document.payments", level), "enabled modules alone cannot grant " + level);
+  assert(!permission.hasRouteModulePermission([], ["document.payments"], "document.payments", level), "empty module grants cannot grant " + level);
+}
 assert(model.isAdminOnlyRoute("/settings"), "settings route requires administrator");
 assert(model.isAdminOnlyRoute("/system/access-control"), "access control route requires administrator");
 assert(model.isAdminOnlyRoute("/system/license"), "license registration route requires administrator");
@@ -290,7 +294,7 @@ assert(model.isDesktopOnlyRoute("/system/update"), "updater route requires deskt
 const routes = model.searchWorkspaceNavGroups("WebDAV", adminGroups).flatMap(group => group.items);
 assert(routes.some(item => item.to === "/settings?section=backupReplica" && item.locationLabel.includes("系统管理 / 系统设置") && item.label === "异机副本"), "search resolves the current replica settings and displays their location");
 assert(model.searchWorkspaceNavGroups("WebDAV", salesGroups).length === 0, "feature search preserves administrative boundaries");
-const dictionaryOnly = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: true, enabledModules: ["document.declaration-dictionary"], permissions: [permissionGrant("document.declaration-dictionary", "view")] });
+const dictionaryOnly = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: true, ...moduleGrants(["document.declaration-dictionary"]), permissions: [permissionGrant("document.declaration-dictionary", "view")] });
 assert(dictionaryOnly[0].items[0].label === "单一窗口" && dictionaryOnly[0].items[0].to === "/single-window/reference-catalog", "a merged area opens its first authorized destination");
 assert(model.getRequiredModule("/single-window/reference-catalog") === "document.declaration-dictionary", "merging navigation never merges dictionary permissions");
 const routeQuery = globalThis.__routeQuery;
@@ -303,7 +307,7 @@ assert(globalThis.__permissionNavigation.filterPermissionResources(mailResources
 const routeAllowed = (pathname, capabilities) => globalThis.__routeAccess.isRouteAccessAllowed({ pathname, user: { capabilities }, canManageSystem: capabilities.canManageSettings === true, isDesktopRuntime: capabilities.isDesktopRuntime === true });
 for (const resource of editionPermissions.resources.filter(resource => !resource.isTechnical && resource.actions.some(action => action.key === "operate"))) {
   for (const actions of [[], ["view"], ["operate"], ["manage"], ["view", "manage"], ["view", "operate", "manage"]]) {
-    const capabilities = { productEdition: "Full", canUseDocumentWorkspace: true, enabledModules: [resource.moduleKey],
+    const capabilities = { productEdition: "Full", canUseDocumentWorkspace: true, ...moduleGrants([resource.moduleKey]),
       moduleAccess: [{ moduleKey: resource.moduleKey, accessLevel: actions.includes("manage") ? "manage" : actions.includes("operate") ? "operate" : actions.includes("view") ? "view" : "none" }],
       permissions: actions.map(action => permissionGrant(resource.key, action)) };
     for (const item of routeItems.filter(item => item.moduleKey === resource.moduleKey)) {
@@ -312,12 +316,12 @@ for (const resource of editionPermissions.resources.filter(resource => !resource
     }
     if (resource.key === "document.invoices") {
       assert(routeAllowed("/invoices/new", capabilities) === (actions.includes("view") && actions.includes("operate")), "new invoice requires explicit view and operate; manage alone never enables edit");
-      assert(!routeAllowed("/invoices", { ...capabilities, enabledModules: [] }), "disabled module wins over stale module access");
+      assert(!routeAllowed("/invoices", { ...capabilities, ...moduleGrants([]) }), "disabled module wins over stale module access");
     }
   }
 }
 assert(!routeAllowed("/office/approval-settings", employeeCapabilities), "employees cannot open administrator approval settings directly");
 assert(routeAllowed("/office/approval-settings", fullTeamCapabilities), "Full administrators can configure approvals");
-assert(!routeAllowed("/worklist", { enabledModules: [], availableFeatures: ["worklist"] }), "empty grants also deny the direct worklist route");
+assert(!routeAllowed("/worklist", { ...moduleGrants([]), availableFeatures: ["worklist"] }), "empty grants also deny the direct worklist route");
 assert(model.searchWorkspaceNavGroups("审批规则", model.filterWorkspaceNavGroups(employeeCapabilities)).length === 0, "settings search respects administrator rights");
 process.stdout.write("workspace-navigation-model tests passed\n");

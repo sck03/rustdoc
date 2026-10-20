@@ -103,16 +103,7 @@ export function hasRouteModulePermission(
   requiredAccessLevel: PermissionAccessLevel = "view",
 ) {
   if (!enabledModules?.some((item) => normalizeModuleKey(item) === normalizeModuleKey(moduleKey))) return false;
-  if (Array.isArray(moduleAccess)) {
-    return hasModulePermission(moduleAccess, moduleKey, requiredAccessLevel);
-  }
-  if (Array.isArray(enabledModules)) {
-    return permissionAccessRank(requiredAccessLevel) <= permissionAccessRank("view") &&
-      enabledModules.some((item) => normalizeModuleKey(item) === normalizeModuleKey(moduleKey));
-  }
-  // Capabilities are deny-by-default while the session is loading.  A route
-  // may become visible only after the server has supplied an explicit grant.
-  return false;
+  return hasModulePermission(moduleAccess, moduleKey, requiredAccessLevel);
 }
 
 export function normalizePermissionAccessLevel(value: unknown): PermissionAccessLevel {

@@ -5,7 +5,7 @@ export type PersonnelWorkflow = Exclude<OaPersonnelChange["action"], "Hire">;
 export const employmentStatusLabels: Record<EmploymentStatus, string> = { Probation: "试用期", Active: "正式在职", Departed: "已离职" };
 export const employmentTypeLabels: Record<EmploymentType, string> = { FullTime: "全职", PartTime: "兼职", Intern: "实习", Contractor: "合同用工" };
 export const personnelHistoryLabels: Record<string, string> = {
-  Hire: "入职登记", Edit: "档案更新", Image: "照片与证件更新", LinkAccount: "关联账号", Confirm: "转正", Transfer: "调岗", Depart: "离职归档", Rehire: "返聘入职",
+  Hire: "入职登记", Edit: "档案更新", Image: "照片与证件更新", LinkAccount: "关联账号", UnlinkAccount: "解除账号绑定", Confirm: "转正", Transfer: "调岗", Depart: "离职归档", Rehire: "返聘入职",
 };
 
 export function canViewPersonnelDetails(user: ApiUserDto) {

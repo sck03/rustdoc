@@ -1674,6 +1674,7 @@ export interface ApiInvoiceDetailDto {
   tradeTerms: string;
   transportMode: string;
   type: string;
+  useEntryPrintRows?: boolean;
 }
 
 export interface ApiInvoiceDocumentEmailRequest {
@@ -1743,6 +1744,7 @@ export interface ApiInvoiceItemDto {
   pcsPerCtn: number;
   poNumber: string;
   priceCalculationMode: string;
+  printRows?: ApiInvoicePrintRow[];
   purchasePrice: number;
   purchaseTotal: number;
   quantity: number;
@@ -1783,6 +1785,11 @@ export interface ApiInvoiceListItemDto {
   status: string;
   totalAmount: number;
   type: string;
+}
+
+export interface ApiInvoicePrintRow {
+  kind: "Item" | "Text" | "Blank";
+  text: string;
 }
 
 export interface ApiInvoiceProfitAnalysisRequest {
@@ -4797,6 +4804,13 @@ export interface PersonnelTransitionRequest {
   onProbation?: boolean;
 }
 
+export interface PersonnelUnlinkAccountRequest {
+  expectedAccountVersion: number;
+  expectedVersion: number;
+  reason: string;
+  userId: number;
+}
+
 export interface PersonnelUpdateRequest {
   contractEndsOn: string | null;
   correctionNote?: string;
@@ -5254,7 +5268,12 @@ export const ApiHsCodeSearchResponseDefaults = {
 
 export const ApiInvoiceDetailDtoDefaults = {
   amountAdjustments: [],
+  useEntryPrintRows: false,
 } as const satisfies Partial<ApiInvoiceDetailDto>;
+
+export const ApiInvoiceItemDtoDefaults = {
+  printRows: [],
+} as const satisfies Partial<ApiInvoiceItemDto>;
 
 export const ApiInvoiceReportBatchLimitsContractDefaults = {
   maxArchiveBytes: 67108864,
@@ -7640,6 +7659,11 @@ export interface TransitionInvoiceStatusRequest {
 export interface TransitionSalesOpportunityRequest {
   id: number;
   body: ApiSalesOpportunityTransitionRequest;
+}
+
+export interface UnlinkPersonnelAccountRequest {
+  id: number;
+  body: PersonnelUnlinkAccountRequest;
 }
 
 export interface UnlockAgentConsignmentFieldsRequest {
@@ -12110,6 +12134,14 @@ export class ExportDocManagerApiClient {
   public transitionSalesOpportunity(request: TransitionSalesOpportunityRequest, init?: ApiRequestInit): Promise<ApiSalesOpportunityDto> {
     const path = `/api/crm/opportunities/${encodePath(request.id)}/transition`;
     return this.request<ApiSalesOpportunityDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public unlinkPersonnelAccount(request: UnlinkPersonnelAccountRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}/account/unlink`;
+    return this.request<PersonnelRecord>("POST", path, {
       body: request.body,
       init,
     });

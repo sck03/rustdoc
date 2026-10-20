@@ -42,7 +42,31 @@ const itemModel = globalThis.__itemModel;
 const productLibrary = globalThis.__productLibrary;
 const formUtils = globalThis.__formUtils;
 const draftEquality = globalThis.__draftEquality;
+const printRowsBundle = path.join(workspace, 'print-rows.mjs');
+await esbuild.build({ entryPoints: [path.join(repoRoot, 'apps/export-doc-web/src/features/invoices/invoicePrintRows.ts')], outfile: printRowsBundle, bundle: true, format: 'esm', platform: 'node', logLevel: 'silent' });
+const printRowModel = await import(pathToFileURL(printRowsBundle).href);
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
+const entryItems = [
+  { ...itemModel.createEmptyInvoiceItem(), quantity: 10, printRows: [{ kind: 'Item', text: '' }, { kind: 'Text', text: '自由说明' }] },
+  { ...itemModel.createEmptyInvoiceItem(), quantity: 20, printRows: [{ kind: 'Item', text: '第二件' }] },
+];
+const moved = printRowModel.movePrintRow(entryItems, { item: 0, row: 1 }, 1);
+assert(JSON.stringify(printRowModel.flattenPrintRows(moved.items).map(entry => entry.row.text)) === JSON.stringify(['', '第二件', '自由说明']), 'moving a note across items changes its actual print order');
+assert(moved.selection.item === 1 && moved.selection.row === 1, 'selection follows moved note');
+assert(moved.items[0].quantity === 10 && moved.items[1].quantity === 20 && entryItems[0].printRows.length === 2, 'moving text preserves amounts and immutable undo snapshots');
+const back = printRowModel.movePrintRow(moved.items, moved.selection, -1);
+const beforePrevious = printRowModel.movePrintRow(back.items, back.selection, -1);
+assert(printRowModel.flattenPrintRows(beforePrevious.items)[0].row.text === '自由说明', 'notes can also cross upwards past the previous business row');
+assert(!printRowModel.canMovePrintRow(entryItems, { item: 1, row: 0 }, -1), 'business rows cannot lose their item by crossing a boundary');
+const notes = printRowModel.insertPrintNotes(entryItems[0].printRows, 0, '  KEEP CASE  \r\n\r\n任意内容\n');
+assert(notes.length === 6 && notes[0].text === '  KEEP CASE  ' && notes[1].kind === 'Blank' && notes[3].kind === 'Blank', 'batch notes preserve whitespace, case and trailing blank rows');
+assert(printRowModel.changePrintRow(entryItems[0].printRows, 0, 'duplicate') === entryItems[0].printRows, 'duplicating a note cannot duplicate business totals');
+const full = Array.from({ length: 63 }, () => ({ kind: 'Blank', text: '' }));
+full.unshift({ kind: 'Item', text: '' });
+assert(printRowModel.changePrintRow(full, 1, 'duplicate') === full, 'row limit is checked before mutation');
+let rejected = false;
+try { printRowModel.insertPrintNotes(full, 1, 'one more'); } catch { rejected = true; }
+assert(rejected && full.length === 64, 'oversized batch leaves original rows untouched');
 const totalOnly = { ...itemModel.createEmptyInvoiceItem(), styleNo: "TOTAL-ONLY", quantity: 505, cartons: 17, unitPrice: 8.22, gwTotal: 250, nwTotal: 233, volume: 1.252, purchaseTotal: 123.45 };
 const savedTotalOnly = itemModel.normalizeInvoiceItemForSave(totalOnly);
 assert(savedTotalOnly.gwTotal === 250 && savedTotalOnly.nwTotal === 233 && savedTotalOnly.volume === 1.252 && savedTotalOnly.purchaseTotal === 123.45, "saving preserves independent imported totals without pretending quantity was edited");
@@ -51,6 +75,10 @@ const pastedTotals = itemModel.recalculateInvoiceItem(totalOnly, ["quantity", "c
 assert(pastedTotals.gwTotal === 250 && pastedTotals.nwTotal === 233 && pastedTotals.volume === 1.252, "explicit pasted totals take priority over dependent calculations");
 assert(itemModel.recalculateInvoiceItem({ ...totalOnly, gwPerCtn: 12 }, ["gwPerCtn"]).gwTotal === 204, "editing a real weight input still recalculates its total");
 const empty = model.createEmptyInvoice("2026-10-09");
+const printRows = [{ kind: "Text", text: "FREE TEXT\n任意说明" }, { kind: "Item", text: "" }, { kind: "Blank", text: "" }];
+const entryDraft = model.normalizeInvoiceForSave({ ...empty, useEntryPrintRows: true, items: [{ ...totalOnly, printRows }] }, 0);
+assert(entryDraft.useEntryPrintRows && JSON.stringify(entryDraft.items[0].printRows) === JSON.stringify(printRows), "normalization preserves entry order, blank descriptions and multiline notes");
+assert(model.normalizeInvoiceForSave({ ...empty, items: [{ ...itemModel.createEmptyInvoiceItem(), printRows }] }, 0).items.length === 1, "a layout on an otherwise blank item must reach backend validation instead of silently disappearing");
 assert(empty.type === "报关数据" && empty.supervisionMode === "一般贸易" && empty.transportMode === "BY SEA", "new invoice uses customs defaults");
 assert(model.getCounterpartInvoiceType(empty.type) === "实际数据", "customs invoice generates actual data");
 assert(model.normalizeInvoiceForSave({ ...empty, type: "实际数据" }, 0).type === "实际数据", "explicit existing actual data is preserved");

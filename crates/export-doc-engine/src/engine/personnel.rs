@@ -56,6 +56,7 @@ pub fn save(
         "image-upload" | "image-delete" => "Image",
         "attachment-upload" | "attachment-delete" => "Edit",
         "account-link" => "LinkAccount",
+        "account-unlink" => "UnlinkAccount",
         "ConfirmPersonnel" => "Confirm",
         "TransferPersonnel" => "Transfer",
         "DepartPersonnel" => "Depart",
@@ -128,6 +129,7 @@ pub fn save(
 pub const OPERATIONS: &[Operation] = &[
     GET_PERSONNEL_CLEARANCE,
     LINK_PERSONNEL_ACCOUNT,
+    UNLINK_PERSONNEL_ACCOUNT,
     LIST_PERSONNEL_ACCOUNT_OPTIONS,
     UPLOAD_PERSONNEL_IMAGE,
     DELETE_PERSONNEL_IMAGE,
@@ -207,6 +209,7 @@ pub fn handle(
     };
     let current = person(&*store.connection()?, actor, id, action)?;
     let result = match operation {
+        UNLINK_PERSONNEL_ACCOUNT => super::personnel_accounts::unlink(store, actor, id, body)?,
         GET_PERSONNEL_CLEARANCE => {
             store.transaction(|tx| super::office_queries::clearance(tx, &current))?
         }

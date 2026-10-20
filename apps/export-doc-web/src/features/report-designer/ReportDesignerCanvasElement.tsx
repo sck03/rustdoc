@@ -4,6 +4,7 @@ import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { ReportResourceImage } from "./ReportResourceImage.tsx";
 import { renderReportDesignerBlockPreviewToHtml } from "./reportDesignerBlockRenderer.ts";
+import { useReportDesignerPreview } from "./ReportDesignerPreviewContext.tsx";
 import { isShippingMarksField, shippingMarksPreviewText } from "./reportDesignerFieldRendering.ts";
 import type { ReportDesignerV3ResizeDirection } from "./reportDesignerV3Mutations.ts";
 import { getGridCellLocations } from "./reportDesignerGridStructure.ts";
@@ -78,7 +79,7 @@ export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCa
     case "Flow":
       return (
         <div className="report-designer-v3-preview-flow" aria-label={`${element.flowKind} 结构预览`}>
-          <FlowPreview block={element.block} heightMm={hundredthMmToMm(element.heightHundredthMm)} selectedCellId={selectedGridCellId} selectedEndCellId={selectedGridEndCellId} />
+          <FlowPreview block={element.block} widthMm={hundredthMmToMm(element.widthHundredthMm)} heightMm={hundredthMmToMm(element.heightHundredthMm)} selectedCellId={selectedGridCellId} selectedEndCellId={selectedGridEndCellId} />
         </div>
       );
   }
@@ -94,10 +95,18 @@ function lineStyle(element: Extract<ReportDesignerV3Element, { type: "Line" }>):
     : { backgroundColor: borderColor, [horizontal ? "height" : "width"]: `${width}px` };
 }
 
-function FlowPreview({ block, heightMm, selectedCellId, selectedEndCellId }: { block: ReportBlock; heightMm: number; selectedCellId?: string; selectedEndCellId?: string }) {
+function FlowPreview({ block, heightMm, widthMm, selectedCellId, selectedEndCellId }: { block: ReportBlock; heightMm: number; widthMm: number; selectedCellId?: string; selectedEndCellId?: string }) {
+  const preview = useReportDesignerPreview();
   const ref = useRef<HTMLDivElement>(null);
   const nodes = useRef(new Map<string, Element>());
-  const html = useMemo(() => ({ __html: renderReportDesignerBlockPreviewToHtml(block, heightMm) }), [block, heightMm]);
+  const mode = block.type === "DetailTable" ? preview.mode : "products";
+  const html = useMemo(() => ({ __html: renderReportDesignerBlockPreviewToHtml(block, heightMm, widthMm, mode, preview.labels) }), [block, heightMm, widthMm, mode, preview.labels]);
+  useLayoutEffect(() => {
+    if (block.type !== "DetailTable" || preview.column?.blockId !== block.id) return;
+    const selected = [...ref.current?.querySelectorAll<HTMLElement>("[data-report-detail-column-id]") ?? []].filter(node => node.dataset.reportDetailColumnId === preview.column?.columnId);
+    selected.forEach(node => node.classList.add("is-designer-selected-column"));
+    return () => selected.forEach(node => node.classList.remove("is-designer-selected-column"));
+  }, [html, block.id, block.type, preview.column]);
   const locations = useMemo(() => block.type === "Grid" ? getGridCellLocations(block) : [], [block]);
   const selectedIds = useMemo(() => selectedCellId
     ? resolveGridSelection(locations, { cellId: selectedCellId, endCellId: selectedEndCellId })?.cells.map(location => location.cell.id) ?? [] : [],
@@ -112,7 +121,10 @@ function FlowPreview({ block, heightMm, selectedCellId, selectedEndCellId }: { b
     selected.forEach(node => node.classList.add("is-designer-selected-cell"));
     return () => selected.forEach(node => node.classList.remove("is-designer-selected-cell"));
   }, [html, selectedIds]);
-  return <div ref={ref} className="report-designer-v3-preview-flow-content" dangerouslySetInnerHTML={html} />;
+  return <div ref={ref} className="report-designer-v3-preview-flow-content" onClick={event => {
+    const columnId = (event.target as Element).closest<HTMLElement>("[data-report-detail-column-id]")?.dataset.reportDetailColumnId;
+    if (block.type === "DetailTable" && columnId) preview.selectColumn(block.id, columnId);
+  }} dangerouslySetInnerHTML={html} />;
 }
 
 function ReportDesignerCanvasResizeHandles() {

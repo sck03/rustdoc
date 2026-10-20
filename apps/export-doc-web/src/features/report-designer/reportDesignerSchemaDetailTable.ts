@@ -66,7 +66,6 @@ export function normalizeDetailTableBlock(
     rowSeparators: readBoolean(value.rowSeparators, true, `${path}.rowSeparators`, issues),
     output: normalizeBlockOutputSettings(value.output, `${path}.output`, issues),
     title: readOptionalString(value.title, `${path}.title`, issues),
-    detailWidthMm: readOptionalNumber(value.detailWidthMm, 132, 40, 240, `${path}.detailWidthMm`, issues),
     sourcePath: "Invoice.Items",
     repeatMode: "ScribanFor",
     print: normalizeDetailTablePrintSettings(value.print, `${path}.print`, issues),
@@ -76,13 +75,16 @@ export function normalizeDetailTableBlock(
     summaryRow: normalizeDetailTableSummaryRow(value.summaryRow, columns, `${path}.summaryRow`, issues),
     introRow: normalizeDetailTableSummaryRow(value.introRow, columns, `${path}.introRow`, issues),
     adjustments: normalizeAdjustments(value.adjustments, columns, `${path}.adjustments`, issues),
+    entryDescriptionColumnId: typeof value.entryDescriptionColumnId === "string" ? value.entryDescriptionColumnId : undefined,
     headerStyle: normalizeTextStyle(value.headerStyle, `${path}.headerStyle`, issues),
     bodyStyle: normalizeTextStyle(value.bodyStyle, `${path}.bodyStyle`, issues),
     border: normalizeBorderStyle(value.border, `${path}.border`, issues),
   };
 
+  if (value.entryDescriptionColumnId !== undefined && !columns.some(column => column.id === value.entryDescriptionColumnId)) {
+    issues.push(createIssue("error", `${path}.entryDescriptionColumnId`, "按录入行打印的说明列不存在。"));
+  }
   if (!block.sideBand) {
-    delete block.detailWidthMm;
   }
 
   return block;

@@ -181,7 +181,6 @@ export type ReportDetailTableBlock = ReportBlockBase & {
   type: "DetailTable";
   rowSeparators?: boolean;
   title?: string;
-  detailWidthMm?: number;
   sourcePath: "Invoice.Items";
   repeatMode: "ScribanFor";
   print: ReportDetailTablePrintSettings;
@@ -191,6 +190,7 @@ export type ReportDetailTableBlock = ReportBlockBase & {
   summaryRow?: ReportDetailTableSummaryRow;
   introRow?: ReportDetailTableSummaryRow;
   adjustments?: { descriptionColumnId: string; amountColumnId: string };
+  entryDescriptionColumnId?: string;
   headerStyle: ReportTextStyle;
   bodyStyle: ReportTextStyle;
   border: ReportBorderStyle;

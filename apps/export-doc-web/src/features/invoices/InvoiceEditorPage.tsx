@@ -567,6 +567,7 @@ export function InvoiceEditorPage({
 
   const invoiceItemsPanel = invoice ? (
     <InvoiceMarksAndItemsPanel
+      key={invoice.id}
       client={client}
       invoice={invoice}
       canSaveToProductLibrary={masterDataPermission.canOperate}
@@ -582,6 +583,7 @@ export function InvoiceEditorPage({
       onAddItem={itemsWorkspace.addItem}
       onApplyProductLibraryItem={itemsWorkspace.applyProductLibraryItem}
       onChangeItem={itemsWorkspace.patchItem}
+      onEditItems={itemsWorkspace.editItems}
       onClearItemCells={itemsWorkspace.clearItemCells}
       onDuplicateItem={itemsWorkspace.duplicateItem}
       onFillDownItemCells={itemsWorkspace.fillDownItemCells}

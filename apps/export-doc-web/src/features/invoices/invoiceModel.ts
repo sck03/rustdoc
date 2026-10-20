@@ -250,7 +250,7 @@ export function normalizeInvoiceForSave(
   id: number,
   pendingHsFeedback: HsCodeKnowledgeFeedbackInput[] = [],
 ): ApiInvoiceDetailDto {
-  const items = (invoice.items ?? []).map(normalizeInvoiceItemForSave).filter(isMeaningfulInvoiceItem);
+  const items = (invoice.items ?? []).map(normalizeInvoiceItemForSave).filter(item => isMeaningfulInvoiceItem(item) || Boolean(item.printRows?.length));
   const calculatedTotals = calculateInvoiceTotals(
     items,
     invoice.exchangeRate,

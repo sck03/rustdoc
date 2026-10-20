@@ -75,6 +75,7 @@ export async function verifyProductFieldsUi({ page, url, read, waitFor, click, r
   await click(page,'button[aria-label="撤销"]');
   await waitFor(page, table + '.columns[0].title===' + JSON.stringify(originalTitles[0]));
   results.push({test:'multiline detail headers can be authored in properties and directly on canvas without changing data or totals',passed:true});
+  await read(page,"(()=>{const select=[...document.querySelectorAll('label')].find(n=>n.firstElementChild?.textContent==='选择要修改的列').querySelector('select');select.value='description';select.dispatchEvent(new Event('change',{bubbles:true}));})()");
   await read(page,"(()=>{const select=[...document.querySelectorAll('label')].find(n=>n.firstElementChild?.textContent==='编辑组合内容').querySelector('select');select.value="+table+".columns[0].content.find(p=>p.fieldPath==='item.StyleNo').id;select.dispatchEvent(new Event('change',{bubbles:true}));})()");
   await read(page,"[...document.querySelectorAll('label')].find(n=>n.textContent.includes('按条件显示此片段')).querySelector('input').click()");
   await waitFor(page,table+".columns[0].content.some(p=>p.condition?.fieldPath==='item.StyleNo')");
@@ -94,7 +95,7 @@ export async function verifyProductFieldsUi({ page, url, read, waitFor, click, r
   assert.equal(await read(page,table+".summaryRow.cells.find(c=>c.columnId==='amount').fieldFormat"),'Currency');
   assert(await read(page,"document.querySelector('[data-v3-element-id=invoice-items] .edm-detail-spacer').getBoundingClientRect().height>0"));
   if(capture) await capture();
-  await read(page,"[...document.querySelectorAll('.new-report-detail-properties [role=tab]')].find(n=>n.textContent==='分页与高级').click()");
+  await read(page,"[...document.querySelectorAll('.new-report-detail-properties [role=tab]')].find(n=>n.textContent==='录入行与合计').click()");
   await read(page,"[...document.querySelectorAll('.new-report-detail-properties details')].find(n=>n.querySelector('summary')?.textContent==='定金与费用调整').open=true");
   await read(page,"[...document.querySelectorAll('.new-report-detail-properties label')].find(n=>n.textContent.trim()==='显示发票金额调整').querySelector('input').click()");
   await waitFor(page,table+".adjustments===undefined");

@@ -17,6 +17,18 @@ pub(super) const FIELDS: &[(&str, &[&str])] = &[
 ];
 
 pub(super) fn extend(doc: &mut Value) {
+    let mut unlink = doc["paths"]["/api/office/people/{id}/account"]["post"].clone();
+    unlink["operationId"] = json!("UnlinkPersonnelAccount");
+    unlink["requestBody"]["content"]["application/json"]["schema"] =
+        json!({"$ref":"#/components/schemas/PersonnelUnlinkAccountRequest"});
+    doc["paths"]["/api/office/people/{id}/account/unlink"] = json!({"post":unlink});
+    let mut request = doc["components"]["schemas"]["PersonnelAccountRequest"].clone();
+    request["properties"]["reason"] = json!({"type":"string","minLength":1,"maxLength":500});
+    request["required"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!("reason"));
+    doc["components"]["schemas"]["PersonnelUnlinkAccountRequest"] = request;
     doc["paths"]["/api/office/people/options"]["get"]["parameters"] = json!([{
         "name":"employeeId", "in":"query", "required":false,
         "schema":{"type":"integer","format":"int64","minimum":1},
@@ -87,5 +99,32 @@ pub(super) fn extend(doc: &mut Value) {
             doc["paths"][&target] = json!({});
         }
         doc["paths"][&target][method] = op;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unlink_retains_account_assignment_security_and_errors() {
+        let doc = crate::openapi::document();
+        let link = &doc["paths"]["/api/office/people/{id}/account"]["post"];
+        let unlink = &doc["paths"]["/api/office/people/{id}/account/unlink"]["post"];
+        for field in ["security", "x-exportdoc-policy", "responses", "parameters"] {
+            assert_eq!(unlink[field], link[field]);
+        }
+        assert_eq!(unlink["operationId"], "UnlinkPersonnelAccount");
+        let body = &doc["components"]["schemas"]["PersonnelUnlinkAccountRequest"];
+        assert_eq!(
+            body["required"],
+            json!([
+                "expectedVersion",
+                "userId",
+                "expectedAccountVersion",
+                "reason"
+            ])
+        );
+        assert_eq!(body["properties"]["reason"]["maxLength"], 500);
     }
 }

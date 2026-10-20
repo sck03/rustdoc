@@ -14,6 +14,7 @@ import { verifyShippingMarksUi } from "./lib/report-shipping-marks-ui-scenarios.
 import { verifyDetailVisibility } from "./lib/report-designer-visibility-ui.mjs";
 import { verifyDesignerUsability } from "./lib/report-designer-usability-ui.mjs";
 import { verifyDetailProperties } from "./lib/report-designer-detail-properties-ui.mjs";
+import { verifyEntryDesignUi } from "./lib/report-designer-entry-design-ui.mjs";
 import { verifyLayerClarity } from "./lib/report-designer-layer-ui.mjs";
 import { verifyConditionalUi } from "./lib/report-designer-conditions-ui.mjs";
 import { verifyBlankDesigner } from "./lib/report-designer-blank-ui.mjs";
@@ -308,6 +309,7 @@ try {
   await verifyDesignerEditingUi({page,url,read,waitFor,click,key,modifier:primaryModifier,results});
   await verifyDetailVisibility({page,url,read,waitFor,results});
   await verifyDetailProperties({page,url,read,waitFor,click,key,results,output});
+  await verifyEntryDesignUi({page,url,read,waitFor,click,key,results,output});
   await verifyProductFieldsUi({page,url,read,waitFor,click,results,capture:() => captureScreenshot(page,path.join(output,'invoice-fields.png'))});
   await verifyRowAuthoring({page,url,read,waitFor,click,results,output});
   await page.send("Page.navigate",{url});

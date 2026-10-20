@@ -1,12 +1,10 @@
 import type { ClipboardEvent, KeyboardEvent, MouseEvent, Ref, UIEvent } from "react";
 import { ArrowDown, ArrowUp, Copy, Trash2 } from "lucide-react";
 import type { ApiInvoiceDetailDto, ApiInvoiceItemDto } from "../../api/index.ts";
-import { formatAmount, formatPlainNumber } from "../../ui/formUtils.ts";
 import { InvoiceItemCellInput } from "./InvoiceItemCellInput.tsx";
+import { InvoiceItemsSummary } from "./InvoiceItemsSummary.tsx";
 import {
   createCellKey,
-  invoiceItemVolumeDisplayValue,
-  invoiceItemWeightDisplayValue,
   type InvoiceItemCellSelection,
 } from "./invoiceItemsEditorModel.ts";
 import { firstEditableInvoiceItemField, type InvoiceItemColumnDefinition } from "./invoiceItemTableModel.ts";
@@ -162,14 +160,7 @@ export function InvoiceItemsTable(props:Props){
           </tbody>
         </table>
       </div>
-      <div className="item-summary-bar">
-        <span>{meaningfulItemCount} 行</span>
-        <span>数量 {formatPlainNumber(totals.totalQuantity ?? 0)}</span>
-        <span>箱数 {formatPlainNumber(totals.totalCartons ?? 0)}</span>
-        <span>毛重 {invoiceItemWeightDisplayValue(totals.totalGrossWeight ?? 0)}</span>
-        <span>体积 {invoiceItemVolumeDisplayValue(totals.totalVolume ?? 0)}</span>
-        <span>金额合计 {formatAmount(totals.totalAmount ?? 0, currency)}</span>
-      </div>
+      <InvoiceItemsSummary count={meaningfulItemCount} totals={totals} currency={currency} />
 
  </>;
 }

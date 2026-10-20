@@ -426,6 +426,7 @@ export function useInvoiceItemsWorkspace({
     setProductLibraryPageNumber,
     changeProductLibraryPageSize,
     addItem,
+    editItems: setInvoiceItems,
     applyProductLibraryItem,
     saveItemToProductLibrary,
     duplicateItem,

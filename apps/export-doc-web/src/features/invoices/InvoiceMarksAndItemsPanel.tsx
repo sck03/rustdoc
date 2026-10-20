@@ -14,6 +14,9 @@ import { type InvoiceItemCellSelection, InvoiceItemsEditor } from "./InvoiceItem
 import type { EditableInvoiceItemField } from "./invoiceItemTableModel.ts";
 import { ShippingMarkEditorDialog } from "./ShippingMarkEditorDialog.tsx";
 import { normalizeInvoiceShippingMarks } from "./invoiceModel.ts";
+import { InvoicePrintRowsEditor, type EditInvoiceItems } from "./InvoicePrintRowsEditor.tsx";
+import { InvoiceItemsSummary } from "./InvoiceItemsSummary.tsx";
+import { isMeaningfulInvoiceItem } from "./invoiceItemsEditorModel.ts";
 
 type InvoicePatch = Partial<ApiInvoiceDetailDto>;
 
@@ -32,6 +35,7 @@ export function InvoiceMarksAndItemsPanel({
   onAddItem,
   onApplyProductLibraryItem,
   onChangeItem,
+  onEditItems,
   onClearItemCells,
   onDuplicateItem,
   onFillDownItemCells,
@@ -71,6 +75,7 @@ export function InvoiceMarksAndItemsPanel({
   onAddItem: () => void;
   onApplyProductLibraryItem: (product: ApiProductDto, insertAfterIndex: number | null) => void;
   onChangeItem: (index: number, next: Partial<ApiInvoiceItemDto>) => void;
+  onEditItems: EditInvoiceItems;
   onClearItemCells: (cells: InvoiceItemCellSelection[]) => void;
   onDuplicateItem: (index: number) => void;
   onFillDownItemCells: (cells: InvoiceItemCellSelection[]) => void;
@@ -102,6 +107,12 @@ export function InvoiceMarksAndItemsPanel({
   unitOptions: ApiUnitDto[];
 }) {
   const [isShippingMarkEditorOpen, setIsShippingMarkEditorOpen] = useState(false);
+  const [showPrintRows, setShowPrintRows] = useState(Boolean(invoice.useEntryPrintRows));
+  const [visitedEditors, setVisitedEditors] = useState({ data: !invoice.useEntryPrintRows, print: Boolean(invoice.useEntryPrintRows) });
+  function showEditor(print: boolean) {
+    setShowPrintRows(print);
+    setVisitedEditors(current => ({ ...current, [print ? "print" : "data"]: true }));
+  }
   const [isShippingMarkSaving, setIsShippingMarkSaving] = useState(false);
   const [isShippingMarkPreviewBusy, setIsShippingMarkPreviewBusy] = useState(false);
   const [shippingMarkPreviewDataUrl, setShippingMarkPreviewDataUrl] = useState<string | null>(null);
@@ -273,7 +284,19 @@ export function InvoiceMarksAndItemsPanel({
         <summary>唛头与特殊条款</summary>
         <div className="invoice-items-support-details-body">{supportFields}</div>
       </details>
-      <InvoiceItemsEditor
+      <div className="toolbar-actions invoice-items-view-controls">
+        <div className="segmented-control" role="group" aria-label="商品明细视图">
+          <button type="button" className={!showPrintRows ? "segmented-active" : ""} aria-pressed={!showPrintRows} onClick={() => showEditor(false)}>商品资料</button>
+          <button type="button" className={showPrintRows ? "segmented-active" : ""} aria-pressed={showPrintRows} onClick={() => showEditor(true)}>打印排版</button>
+        </div>
+        <label className="checkbox-field"><input type="checkbox" checked={Boolean(invoice.useEntryPrintRows)} disabled={!isEditable} onChange={event => { onChange({ useEntryPrintRows: event.target.checked }); showEditor(event.target.checked); }} />按录入行打印</label>
+      </div>
+      <div className="invoice-items-print" hidden={!showPrintRows}>{visitedEditors.print && <>
+        {!invoice.useEntryPrintRows && <p className="office-muted">当前未启用按录入行打印，勾选后随单据保存生效。</p>}
+        <InvoicePrintRowsEditor items={invoice.items} readOnly={!isEditable} onChangeItem={onChangeItem} onEditItems={onEditItems} onAddItem={onAddItem} onDuplicateItem={onDuplicateItem} onRemoveItem={onRemoveItem} onMoveItem={onMoveItem} onUndo={onUndoItemEdit} onRedo={onRedoItemEdit} canUndo={canUndoItemEdit} canRedo={canRedoItemEdit} />
+        <InvoiceItemsSummary count={invoice.items.filter(isMeaningfulInvoiceItem).length} totals={invoice} currency={invoice.currency} /></>}
+      </div>
+      <div className="invoice-items-source" hidden={showPrintRows}>{visitedEditors.data && <InvoiceItemsEditor
         client={client}
         items={invoice.items}
         canRedoItemEdit={canRedoItemEdit}
@@ -313,7 +336,7 @@ export function InvoiceMarksAndItemsPanel({
         onProductLibraryPageSizeChange={onProductLibraryPageSizeChange}
         unitLookupMessage={unitLookupMessage}
         unitOptions={unitOptions}
-      />
+      />}</div>
       {isShippingMarkEditorOpen ? (
         <ShippingMarkEditorDialog
           initialImageDataUrl={shippingMarkPreviewDataUrl}

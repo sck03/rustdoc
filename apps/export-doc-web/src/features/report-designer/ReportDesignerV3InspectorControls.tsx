@@ -42,7 +42,10 @@ export function NumberField(props: NumberFieldProps) {
     setDraft(formatNumber(next, precision));
     if (next !== value) onCommit(next);
   }
-  return <label><span>{label}</span><input type="number" inputMode={step === 1 ? "numeric" : "decimal"} placeholder={props.optional ? "自动" : undefined} step={step} min={min} max={max} disabled={disabled} value={focused ? draft : formatted} onFocus={() => { setFocused(true); setDraft(formatted); }} onChange={(event) => setDraft(event.target.value)} onBlur={() => { setFocused(false); commit(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelOnBlur.current = true; setDraft(formatted); event.currentTarget.blur(); } else if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} /></label>;
+  // Native validation sees the displayed precision; the model retains exact bounds.
+  const displayMin = Number(formatNumber(min, precision));
+  const displayMax = Number(formatNumber(max, precision));
+  return <label><span>{label}</span><input type="number" inputMode={step === 1 ? "numeric" : "decimal"} placeholder={props.optional ? "自动" : undefined} step={step === 1 ? 1 : "any"} min={displayMin} max={displayMax} disabled={disabled} value={focused ? draft : formatted} onFocus={() => { setFocused(true); setDraft(formatted); }} onChange={(event) => setDraft(event.target.value)} onBlur={() => { setFocused(false); commit(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelOnBlur.current = true; setDraft(formatted); event.currentTarget.blur(); } else if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} /></label>;
 }
 
 export function focusDesignerNode(selector: string) {

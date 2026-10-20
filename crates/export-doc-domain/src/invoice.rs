@@ -62,9 +62,23 @@ impl InvoiceDraft {
     /// header fields. Persistence still goes through build and full validation.
     pub fn preview(&self) -> Result<ApiInvoiceDetailDto, String> {
         let mut invoice = self.header.clone();
+        crate::invoice_print_rows::validate(self.rows.iter().map(|row| &row.original))?;
         invoice.invoice_no = normalize(&invoice.invoice_no);
         if self.rows.len() > MAX_ROWS {
             return Err(format!("商品明细最多 {MAX_ROWS} 行。"));
+        }
+        if let Some(index) = self.rows.iter().position(|row| {
+            row.is_blank()
+                && row
+                    .original
+                    .print_rows
+                    .as_ref()
+                    .is_some_and(|rows| !rows.is_empty())
+        }) {
+            return Err(format!(
+                "第 {} 项已有打印行，请填写该货项的商品资料或数量，或先删除其打印排版。",
+                index + 1
+            ));
         }
         invoice.items = self
             .rows

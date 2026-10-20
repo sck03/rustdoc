@@ -272,6 +272,8 @@ pub struct DetailTable {
     pub intro_row: Option<DetailSummaryRow>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub adjustments: Option<DetailAdjustments>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry_description_column_id: Option<String>,
     #[serde(default)]
     pub header_style: ReportTextStyle,
     #[serde(default)]
@@ -651,6 +653,7 @@ impl Design {
                     summary_row: None,
                     intro_row: None,
                     adjustments: None,
+                    entry_description_column_id: None,
                     header_style: ReportTextStyle::default(),
                     body_style: ReportTextStyle::default(),
                     border: ReportBorderStyle {

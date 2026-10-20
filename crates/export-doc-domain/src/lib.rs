@@ -12,6 +12,7 @@ pub mod invoice_adjustments;
 pub mod invoice_calculation;
 pub mod invoice_columns;
 pub mod invoice_grid;
+pub mod invoice_print_rows;
 pub mod invoice_query;
 pub mod oa;
 pub mod organization;

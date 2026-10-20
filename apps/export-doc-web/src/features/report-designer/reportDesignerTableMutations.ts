@@ -45,15 +45,6 @@ export function resizeAdjacentRowColumnWidths(
   return resizeAdjacentWidths(columns, leftColumnId, deltaPercent, 1, "widthPercent");
 }
 
-export function resizeAdjacentDetailTableColumnWidths(
-  block: ReportDetailTableBlock,
-  leftColumnId: string,
-  deltaMm: number,
-): ReportDetailTableBlock {
-  const columns = resizeAdjacentWidths(block.columns, leftColumnId, deltaMm, 8, "widthMm");
-  return columns === block.columns ? block : { ...block, columns };
-}
-
 export function applyGridDefaultCellStyle(block: ReportGridBlock): ReportGridBlock {
   return {
     ...block,
@@ -139,8 +130,17 @@ export function moveDetailTableColumn(
   };
 }
 
-export function addDetailTableColumn(block: ReportDetailTableBlock): ReportDetailTableBlock {
-  return block.columns.length >= REPORT_DETAIL_MAX_COLUMNS ? block : { ...block, columns: [...block.columns, createDetailTableColumn()] };
+export function addDetailTableColumn(block: ReportDetailTableBlock, anchorId?: string, position: "before" | "after" = "after"): ReportDetailTableBlock {
+  if (block.columns.length >= REPORT_DETAIL_MAX_COLUMNS) return block;
+  const index = block.columns.findIndex(column => column.id === anchorId);
+  const columns = [...block.columns];
+  const insertion = index < 0 ? columns.length : index + (position === "after" ? 1 : 0);
+  columns.splice(insertion, 0, createDetailTableColumn());
+  return { ...block, columns,
+    introRow: insertColumnCell(block.introRow, insertion),
+    summaryRow: insertColumnCell(block.summaryRow, insertion),
+    grouping: block.grouping ? { ...block.grouping, footer: insertColumnCell(block.grouping.footer, insertion) } : undefined,
+  };
 }
 
 /** A content-mode change keeps the existing binding and any saved composition. */
@@ -194,7 +194,7 @@ export function removeDetailTableColumn(
   block: ReportDetailTableBlock,
   columnId: string,
 ): ReportDetailTableBlock {
-  if (block.columns.length <= 1 || !block.columns.some(column => column.id === columnId) || (block.adjustments && [block.adjustments.descriptionColumnId, block.adjustments.amountColumnId].includes(columnId))) {
+  if (block.columns.length <= 1 || block.entryDescriptionColumnId === columnId || !block.columns.some(column => column.id === columnId) || (block.adjustments && [block.adjustments.descriptionColumnId, block.adjustments.amountColumnId].includes(columnId))) {
     return block;
   }
 
@@ -216,6 +216,10 @@ export function removeDetailTableColumn(
 }
 
 type DetailFixedRow = { labelColumnSpan: number; cells: { columnId: string }[] };
+
+function insertColumnCell<T extends DetailFixedRow>(row: T | undefined, index: number): T | undefined {
+  return row && index < row.labelColumnSpan ? { ...row, labelColumnSpan: row.labelColumnSpan + 1 } : row;
+}
 
 function duplicateColumnCell<T extends DetailFixedRow>(row: T | undefined, sourceId: string, targetId: string, index: number): T | undefined {
   if (!row) return row;

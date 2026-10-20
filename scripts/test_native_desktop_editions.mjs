@@ -14,6 +14,8 @@ import { verifyDesktopBlankDetails } from './lib/native-blank-detail-designer.mj
 import { verifyDesktopBookingExport } from './lib/native-booking-export.mjs';
 import { verifyDesktopBusinessAttachments } from './lib/native-business-attachments.mjs';
 import { verifyDesktopOcr } from './lib/native-ocr-ui.mjs';
+import { verifyDesktopEntryRows } from './lib/native-entry-print-rows.mjs';
+import { verifyDesktopPersonnelDeletion } from './lib/native-personnel-deletion.mjs';
 
 assert.equal(process.platform, 'win32', 'This gate exercises Windows WebView2 packages.');
 const repo = path.resolve(import.meta.dirname, '..');
@@ -118,14 +120,19 @@ for (const edition of selected) {
     assert(await run(`document.querySelector('.about-detail-grid')?.textContent.includes(${JSON.stringify('v' + marker.version)})`));
     assert(await run(`document.querySelector('.about-detail-grid')?.textContent.includes(${JSON.stringify(health.body.informationalVersion)})`));
     await captureScreenshot(cdp, path.join(output, `${edition}-about.png`));
-    if (marker.ocr && !process.argv.includes('--blank-grid-only')) await verifyDesktopOcr({ run, cdp, repo, output, context, token: login.body.accessToken, operations });
-    if (process.argv.includes('--blank-grid-only')) {
+    if (marker.ocr && !process.argv.includes('--blank-grid-only') && !process.argv.includes('--entry-rows-only')) await verifyDesktopOcr({ run, cdp, repo, output, context, token: login.body.accessToken, operations });
+    if (process.argv.includes('--entry-rows-only')) {
+      await verifyDesktopEntryRows({ run, request, token: login.body.accessToken, cdp, output });
+      if (edition === 'Full') await verifyDesktopPersonnelDeletion({ run, request, token: login.body.accessToken, cdp, output });
+    } else if (process.argv.includes('--blank-grid-only')) {
       await verifyDesktopBlankGrid({ run, request, token: login.body.accessToken, businessDate: login.body.user.businessDate, cdp, output });
     } else if (edition === 'Full') {
       assert(text.includes('人事管理') && text.includes('行政办公') && text.includes('公司公告') && text.includes('站内通知'));
       await verifyDesktopListPagination({ run, request, token: login.body.accessToken, cdp, output });
       await verifyDesktopDetailDesigner({ run, request, token: login.body.accessToken, cdp, output });
       const invoice = await verifyDesktopConditionalReports({ run, request, token: login.body.accessToken, cdp, output });
+      await verifyDesktopEntryRows({ run, request, token: login.body.accessToken, cdp, output });
+      await verifyDesktopPersonnelDeletion({ run, request, token: login.body.accessToken, cdp, output });
       await verifyDesktopBlankDetails({ run, request, token: login.body.accessToken, invoice, cdp, output });
       await verifyDesktopBookingExport({ run, request, token: login.body.accessToken, invoice, cdp, output });
       await verifyDesktopBusinessAttachments({ run, request, token: login.body.accessToken, invoice, cdp, output });

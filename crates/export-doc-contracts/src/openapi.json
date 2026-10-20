@@ -54026,6 +54026,128 @@
         ]
       }
     },
+    "/api/office/people/{id}/account/unlink": {
+      "post": {
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "UnlinkPersonnelAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonnelUnlinkAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonnelRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "office.people",
+              "action": "assign"
+            }
+          ],
+          "permissionBypass": false
+        }
+      }
+    },
     "/api/office/people/{id}/attachments": {
       "post": {
         "tags": [
@@ -62205,6 +62327,11 @@
               "$ref": "#/components/schemas/ApiInvoiceAmountAdjustment"
             },
             "description": "可选报表金额调整；原商品合计 totalAmount 不变。"
+          },
+          "useEntryPrintRows": {
+            "type": "boolean",
+            "default": false,
+            "description": "明细表按货项内录入的打印行顺序输出；模板须指定录入说明列。"
           }
         }
       },
@@ -62628,6 +62755,15 @@
           },
           "customFieldsJson": {
             "type": "string"
+          },
+          "printRows": {
+            "type": "array",
+            "default": [],
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/components/schemas/ApiInvoicePrintRow"
+            },
+            "description": "此货项的打印行，非空时必须且只能有一行 Item 承载本货项数量金额；Text 与 Blank 不参与合计。"
           }
         }
       },
@@ -78363,6 +78499,46 @@
           "pageSize"
         ]
       },
+      "PersonnelUnlinkAccountRequest": {
+        "required": [
+          "expectedVersion",
+          "userId",
+          "expectedAccountVersion",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "userId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "expectedAccountVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
       "PersonnelAttachment": {
         "type": "object",
         "properties": {
@@ -78386,6 +78562,29 @@
           "mediaType",
           "sizeBytes"
         ]
+      },
+      "ApiInvoicePrintRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "text"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "Item",
+              "Text",
+              "Blank"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "本行打印原文；空字符串保留空白，不回填品名。"
+          }
+        }
       },
       "ApiInvoiceAmountAdjustment": {
         "type": "object",

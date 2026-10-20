@@ -43,12 +43,13 @@ pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value
     record["employee"] = employee(tx, actor, &record)?;
     let editable = actor.admin || record["status"] != "Departed";
     let required_actions = super::oa::personnel_changes::required_actions(tx, actor)?;
-    let correct = office::can_correct(
+    let restriction = office::deletion_restriction(
         tx,
         record["id"]
             .as_i64()
             .ok_or_else(|| unavailable("人员编号损坏。"))?,
     )?;
+    let correct = restriction.is_none();
     for (field, action, allowed) in [
         ("canEdit", "edit", editable),
         ("canTransition", "transition", true),
@@ -64,11 +65,7 @@ pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value
     ] {
         record[field] = json!(allowed && auth::visible(actor, "office.people", action, &record));
     }
-    record["deleteRestriction"] = json!(if correct {
-        ""
-    } else {
-        "已有账号、业务记录、负责人职责或正式任职变动，请通过调岗、离职流程处理。"
-    });
+    record["deleteRestriction"] = json!(restriction.unwrap_or_default());
     record["approvalRequiredActions"] = required_actions;
     Ok(record)
 }

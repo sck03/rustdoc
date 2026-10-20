@@ -39,7 +39,7 @@ export function ReportDesignerV3FlowProperties({
     case "Conditional":
       return <ConditionalBlockProperties block={block} fieldGroups={fixedFields} onCommit={asFlowCommit(onCommit, "Conditional")} />;
     case "DetailTable":
-      return <DetailTableProperties block={block} fieldGroups={fieldGroups} onCommit={asFlowCommit(onCommit, "DetailTable")} />;
+      return <DetailTableProperties block={block} widthMm={widthMm} fieldGroups={fieldGroups} onCommit={asFlowCommit(onCommit, "DetailTable")} />;
     case "PageBreak":
       return <div className="report-designer-v3-flow-properties-note">分页符会在打印时开始新页；可在画布中移动其位置。</div>;
   }

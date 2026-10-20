@@ -46,7 +46,6 @@ export function ReportDesignerDetailTablePrintProperties({ block, fieldGroups, o
         </div>
         {block.sideBand ? (
           <div className="new-report-property-grid">
-            <NumberField label="明细区参考宽度(mm)" min={40} max={240} value={block.detailWidthMm ?? 132} onCommit={detailWidthMm => onCommit({ ...block, detailWidthMm })} />
             <DesignerCheckbox checked={block.sideBand.firstPageOnly === true} onChange={checked => onCommit({...block,sideBand:{...block.sideBand!,firstPageOnly:checked}})}>唛头内容仅首页显示</DesignerCheckbox>
             <label>
               <span>侧栏标题</span>

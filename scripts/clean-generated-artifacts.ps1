@@ -5,6 +5,7 @@ param(
     [switch]$IncludeCodexRuntimeWorkspaces,
     [switch]$IncludeCodexRuntime,
     [switch]$IncludeReleaseOutputs,
+    [switch]$RustTestOutputsOnly,
     [switch]$ListOnly
 )
 
@@ -16,6 +17,12 @@ $workspaceRoot = (Resolve-Path (Join-Path $scriptRoot "..")).Path
 $workspaceRootFullPath = [System.IO.Path]::GetFullPath($workspaceRoot)
 . (Join-Path $scriptRoot "lib/platform-path-safety.ps1")
 . (Join-Path $scriptRoot "lib/generated-artifact-protection.ps1")
+. (Join-Path $scriptRoot "lib/rust-test-artifacts.ps1")
+
+if ($RustTestOutputsOnly -and ($IncludeNodeModules -or $IncludePackageCaches -or
+    $IncludeCodexRuntimeWorkspaces -or $IncludeCodexRuntime -or $IncludeReleaseOutputs)) {
+    throw '-RustTestOutputsOnly cannot be combined with broader cleanup switches.'
+}
 
 function Assert-WorkspaceChildPath {
     param(
@@ -227,6 +234,12 @@ function Add-Target {
 
 function Get-GeneratedArtifactCleanupPlan {
     $targets = [System.Collections.Generic.List[object]]::new()
+    if ($RustTestOutputsOnly) {
+        foreach ($path in Get-ExportDocRustTestArtifactPaths -TargetRoot (Join-Path $workspaceRoot 'target')) {
+            Add-Target -Targets $targets -Path $path -Reason 'completed Cargo test executable or its debug/dependency metadata'
+        }
+        return $targets | Sort-Object -Property SizeBytes -Descending
+    }
     $artifactsRoot = Join-Path $workspaceRoot "artifacts"
     $codexRuntimeRoot = Join-Path $workspaceRoot ".codex-runtime"
 
@@ -403,6 +416,9 @@ if ($ListOnly) {
     return
 }
 
+if ($RustTestOutputsOnly) {
+    Assert-ExportDocRustTestsIdle -TargetRoot (Join-Path $workspaceRoot 'target')
+}
 
 $cleanupFailures = [System.Collections.Generic.List[object]]::new()
 foreach ($target in $plan) {

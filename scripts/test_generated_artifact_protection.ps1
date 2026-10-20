@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "lib/build-script-support.ps1")
 . (Join-Path $PSScriptRoot "lib/generated-artifact-protection.ps1")
+. (Join-Path $PSScriptRoot "lib/rust-test-artifacts.ps1")
 $fixtureRoot = Join-Path (Split-Path $PSScriptRoot -Parent) ".codex-runtime"
 $fixture = Join-Path $fixtureRoot ("cleanup-policy-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $fixture -Force | Out-Null
@@ -58,10 +59,25 @@ try {
         New-Item -ItemType Directory -Path (Join-Path $planRoot $directory) -Force | Out-Null
     }
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'clean-generated-artifacts.ps1') -Destination $planScripts
-    foreach ($name in @('platform-path-safety.ps1', 'generated-artifact-protection.ps1')) {
+    foreach ($name in @('platform-path-safety.ps1', 'generated-artifact-protection.ps1', 'rust-test-artifacts.ps1')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "lib/$name") -Destination (Join-Path $planScripts 'lib')
     }
     [IO.File]::WriteAllText((Join-Path $planRoot 'target/CACHEDIR.TAG'), "Signature: 8a477f597d28d172789f06886806bc55`n")
+    $testTarget = Join-Path $planRoot 'target'
+    $testOutputs = @('debug/deps/sample_test-0123456789abcdef.exe', 'debug/deps/sample_test-0123456789abcdef.d', 'debug/deps/sample_test-0123456789abcdef.pdb')
+    foreach ($relative in @('debug/.fingerprint/sample-0123456789abcdef/test-integration-test-sample_test.json', 'debug/.fingerprint/sample-fedcba9876543210/bin-sample.json', 'debug/deps/sample-fedcba9876543210.exe') + $testOutputs) {
+        $file = Join-Path $testTarget $relative
+        New-Item -ItemType Directory -Path (Split-Path $file -Parent) -Force | Out-Null
+        [IO.File]::WriteAllText($file, '{}')
+    }
+    $testPlan = @(Get-ExportDocRustTestArtifactPaths -TargetRoot $testTarget)
+    if ($testPlan.Count -ne 3) { throw 'Only fingerprint-proven test outputs should be selected' }
+    foreach ($relative in $testOutputs) {
+        if ((Join-Path $testTarget $relative) -notin $testPlan) { throw "Missing test output: $relative" }
+    }
+    [IO.File]::WriteAllText((Join-Path $testTarget 'CACHEDIR.TAG'), 'untrusted')
+    if (@(Get-ExportDocRustTestArtifactPaths -TargetRoot $testTarget).Count) { throw 'Missing Cargo identity must fail closed' }
+    [IO.File]::WriteAllText((Join-Path $testTarget 'CACHEDIR.TAG'), "Signature: 8a477f597d28d172789f06886806bc55`n")
     $cache = Join-Path $planRoot '.codex-runtime/native-runtime-packages/archive.zip'
     $release = Join-Path $planRoot 'artifacts/releases/exportdoc.zip'
     $pipCache = Join-Path $planRoot '.codex-runtime/pip-cache/package.whl'

@@ -1,6 +1,7 @@
 import { EMPTY_REPORT_DESIGNER_DRAFT, type ReportDesignerDraft } from "./reportDesignerDraft.ts";
 import { useReportDesignerV3Clipboard } from "./useReportDesignerV3Clipboard.ts";
 import { ReportDesignerUploadState } from "./reportDesignerUploadState.ts";
+import { ReportDesignerPreviewProvider } from "./ReportDesignerPreviewContext.tsx";
 import { useReportDesignerV3Shortcuts } from "./useReportDesignerV3Shortcuts.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -318,6 +319,7 @@ export function ReportDesignerV3Workspace({
   useReportDesignerV3Shortcuts({ workspaceRef, history, editable: editingEnabled, commit, copySelection, pasteClipboard, duplicateSelection, clearSelection });
   return (
     <ReportDesignerUploadState.Provider value={setImageUploading}>
+    <ReportDesignerPreviewProvider fieldGroups={fieldGroups}>
     <section ref={workspaceRef} className="report-designer-v3-workspace" data-compact-panel={compactPanel} aria-label="报表模板可视化设计器">
       <header className="report-designer-v3-header">
         <div>
@@ -497,6 +499,7 @@ export function ReportDesignerV3Workspace({
       </div>
       </div>
     </section>
+    </ReportDesignerPreviewProvider>
     </ReportDesignerUploadState.Provider>
   );
 }

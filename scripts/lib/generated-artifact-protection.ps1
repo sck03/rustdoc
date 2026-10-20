@@ -1,4 +1,13 @@
 # Never traverse junctions/symlinks or remove business data with generated output.
+function Test-ExportDocCargoOutputDirectory {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $cacheTag = Join-Path $Path 'CACHEDIR.TAG'
+    return (Test-Path -LiteralPath $cacheTag -PathType Leaf) -and
+        -not ((Get-Item -LiteralPath $cacheTag -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint) -and
+        ((Get-Item -LiteralPath $cacheTag).Length -le 4096) -and
+        ([System.IO.File]::ReadAllText($cacheTag).StartsWith('Signature: 8a477f597d28d172789f06886806bc55'))
+}
+
 function Test-ExportDocProtectedArtifact {
     param([Parameter(Mandatory = $true)][string]$Path, [switch]$IncludeReleaseOutputs)
     $root = [System.IO.Path]::GetFullPath($Path)
@@ -11,11 +20,7 @@ function Test-ExportDocProtectedArtifact {
         if ([System.IO.Path]::GetRelativePath($workspace, $ancestor) -eq '.') { $insideWorkspace = $false }
         if ($insideWorkspace -and (Test-Path -LiteralPath (Join-Path $ancestor '.git'))) { return $true }
     }
-    $cacheTag = Join-Path $root 'CACHEDIR.TAG'
-    $cargoOutput = (Test-Path -LiteralPath $cacheTag -PathType Leaf) -and
-        -not ((Get-Item -LiteralPath $cacheTag -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint) -and
-        ((Get-Item -LiteralPath $cacheTag).Length -le 4096) -and
-        ([System.IO.File]::ReadAllText($cacheTag).StartsWith('Signature: 8a477f597d28d172789f06886806bc55'))
+    $cargoOutput = Test-ExportDocCargoOutputDirectory -Path $root
     $pending = [System.Collections.Generic.Stack[string]]::new()
     $pending.Push([System.IO.Path]::GetFullPath($Path))
     while ($pending.Count -gt 0) {

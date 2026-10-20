@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 export async function doubleClickDesignerNode(page, selector, read) {
   const point = await read(page, `(async()=>{
     const node=document.querySelector(${JSON.stringify(selector)});
-    node.scrollIntoView({block:'center',inline:'center'});
+    node.scrollIntoView({block:'center',inline:'center',behavior:'instant'});
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
     const r=node.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;
     return {x,y,reachable:node.contains(document.elementFromPoint(x,y))};

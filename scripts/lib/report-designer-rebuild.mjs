@@ -62,6 +62,7 @@ function rebuildDetailTable(api, target) {
     cells: targetRow.cells.map(cell => ({ ...cell, columnId: ids.get(cell.columnId) })) };
   const { id, columns: unusedColumns, ...properties } = target;
   return { id: block.id, ...properties, columns,
+    entryDescriptionColumnId: target.entryDescriptionColumnId && ids.get(target.entryDescriptionColumnId),
     summaryRow: row(target.summaryRow), introRow: row(target.introRow),
     grouping: target.grouping && { ...target.grouping, footer: row(target.grouping.footer) },
     adjustments: target.adjustments && { descriptionColumnId: ids.get(target.adjustments.descriptionColumnId), amountColumnId: ids.get(target.adjustments.amountColumnId) } };
@@ -97,5 +98,5 @@ function printableStructure(document) {
     Object.keys(value).sort().forEach(key => collect(value[key]));
   }
   collect(value);
-  return JSON.parse(JSON.stringify(value, (key, value) => key === 'zIndex' ? undefined : key === 'widthPercent' ? Math.fround(value) : ['id', 'columnId', 'descriptionColumnId', 'amountColumnId'].includes(key) ? ids.get(value) ?? value : value));
+  return JSON.parse(JSON.stringify(value, (key, value) => key === 'zIndex' ? undefined : key === 'widthPercent' ? Math.fround(value) : ['id', 'columnId', 'descriptionColumnId', 'amountColumnId', 'entryDescriptionColumnId'].includes(key) ? ids.get(value) ?? value : value));
 }

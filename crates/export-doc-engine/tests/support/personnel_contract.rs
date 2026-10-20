@@ -22,6 +22,105 @@ fn call(
     Ok(result)
 }
 
+fn unlink_roundtrip(service: &NativeService, admin: &str, person: Value) -> Value {
+    let id = person["employee"]["id"].as_i64().unwrap();
+    let account = &person["account"];
+    let before = call(service, admin, LIST_USERS, 0, None).unwrap();
+    let before = before["users"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|user| user["id"] == account["id"])
+        .unwrap();
+    let login = call(
+        service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":account["username"],"password":"Personnel-Test-2026"})),
+    )
+    .unwrap();
+    let body = json!({"expectedVersion":person["versionNumber"],"userId":account["id"],"expectedAccountVersion":account["versionNumber"],"reason":"纠正账号关联"});
+    for (field, value, status) in [
+        ("expectedVersion", json!(0), 409),
+        ("expectedAccountVersion", json!(0), 409),
+        ("userId", json!(99999999), 409),
+        ("reason", json!("  "), 400),
+    ] {
+        let mut invalid = body.clone();
+        invalid[field] = value;
+        assert_eq!(
+            call(service, admin, UNLINK_PERSONNEL_ACCOUNT, id, Some(invalid))
+                .unwrap_err()
+                .status,
+            Some(status)
+        );
+        assert_eq!(
+            call(service, admin, GET_PERSONNEL, id, None).unwrap()["account"],
+            *account
+        );
+    }
+    let unlinked = call(
+        service,
+        admin,
+        UNLINK_PERSONNEL_ACCOUNT,
+        id,
+        Some(body.clone()),
+    )
+    .unwrap();
+    assert!(unlinked["account"].is_null());
+    assert!(!unlinked["deleteRestriction"].as_str().unwrap().is_empty());
+    assert_eq!(unlinked["employee"]["id"], id);
+    assert_eq!(unlinked["profile"], person["profile"]);
+    assert_eq!(
+        call(service, admin, UNLINK_PERSONNEL_ACCOUNT, id, Some(body))
+            .unwrap_err()
+            .status,
+        Some(409)
+    );
+    assert_eq!(
+        call(
+            service,
+            login["accessToken"].as_str().unwrap(),
+            GET_CURRENT_USER,
+            0,
+            None
+        )
+        .unwrap_err()
+        .status,
+        Some(401)
+    );
+    let users = call(service, admin, LIST_USERS, 0, None).unwrap();
+    let user = users["users"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|user| user["id"] == account["id"])
+        .unwrap();
+    assert!(user["employee"].is_null());
+    for field in [
+        "username",
+        "fullName",
+        "isActive",
+        "departmentId",
+        "companyScope",
+        "role",
+        "permissionTemplateId",
+    ] {
+        assert_eq!(user[field], before[field], "unlink must preserve {field}");
+    }
+    let history = call(service, admin, GET_PERSONNEL_HISTORY, id, None).unwrap();
+    assert!(
+        history["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|event| event["action"] == "UnlinkAccount"
+                && event["note"].as_str().unwrap().contains("纠正账号关联"))
+    );
+    call(service, admin, LINK_PERSONNEL_ACCOUNT, id, Some(json!({"expectedVersion":unlinked["versionNumber"],"userId":user["id"],"expectedAccountVersion":user["versionNumber"]}))).unwrap()
+}
+
 pub fn exercise(service: &NativeService, admin: &str) {
     let suffix = nonce().unwrap();
     let body = json!({"requestKey":suffix,"employeeNumber":format!("AUDIT-{}", &suffix[..8]),"departmentId":"GENERAL","jobTitle":"业务员","employmentType":"FullTime","hireDate":"2026-09-01","onProbation":false,"profile":{"fullName":"资料校验"},
@@ -34,6 +133,8 @@ pub fn exercise(service: &NativeService, admin: &str) {
     );
     assert_eq!(person["images"], json!([]));
     assert_eq!(person["attachments"], json!([]));
+    assert_eq!(person["canDelete"], true);
+    assert_eq!(person["deleteRestriction"], "");
     assert_eq!(
         call(service, admin, CREATE_PERSONNEL, 0, Some(body.clone())).unwrap()["employee"]["id"],
         id
@@ -213,7 +314,21 @@ pub fn exercise(service: &NativeService, admin: &str) {
             .status,
         Some(404)
     );
+    assert_eq!(
+        person["deleteRestriction"], "",
+        "edits and attachments do not prevent correction"
+    );
     person = call(service, admin, LINK_PERSONNEL_ACCOUNT, id, Some(json!({"expectedVersion":person["versionNumber"],"userId":account["id"],"expectedAccountVersion":account["versionNumber"]}))).unwrap();
+    assert_eq!(
+        person["canDelete"], true,
+        "administrator retains permission"
+    );
+    assert!(
+        person["deleteRestriction"]
+            .as_str()
+            .unwrap()
+            .contains("已关联登录账号")
+    );
     let users = call(service, admin, LIST_USERS, 0, None).unwrap();
     let linked = users["users"]
         .as_array()
@@ -286,6 +401,25 @@ pub fn exercise(service: &NativeService, admin: &str) {
     let spare = call(service, admin, CREATE_USER_ACCOUNT, 0, Some(json!({"username":format!("spare-{suffix}"),"fullName":"候选账号","role":"OfficeEmployee","departmentId":"GENERAL","companyScope":"DEFAULT","isActive":true,"resetPassword":"Personnel-Test-2026"}))).unwrap()["user"].clone();
     let draft = call(service, staff_token, CREATE_GENERAL_REQUEST, 0, Some(json!({"requestKey":nonce().unwrap(),"employeeId":if service.provider().unwrap() == "SQLite" {Some(id)} else {None},"title":"更换账号前的未结申请","reason":"保护申请人关联","category":"IT"}))).unwrap();
     let link = json!({"expectedVersion":person["versionNumber"],"userId":spare["id"],"expectedAccountVersion":spare["versionNumber"]});
+    let unlink = json!({"expectedVersion":person["versionNumber"],"userId":account["id"],"expectedAccountVersion":person["account"]["versionNumber"],"reason":"有未结申请时不得解绑"});
+    for (token, status) in [
+        (admin, 409),
+        (staff_token, 403),
+        (other["accessToken"].as_str().unwrap(), 403),
+    ] {
+        assert_eq!(
+            call(
+                service,
+                token,
+                UNLINK_PERSONNEL_ACCOUNT,
+                id,
+                Some(unlink.clone())
+            )
+            .unwrap_err()
+            .status,
+            Some(status)
+        );
+    }
     assert_eq!(
         call(
             service,
@@ -310,6 +444,9 @@ pub fn exercise(service: &NativeService, admin: &str) {
         Some(json!({"expectedVersion":draft["versionNumber"],"note":"完成交接后再关联"})),
     )
     .unwrap();
+    person = unlink_roundtrip(service, admin, person);
+    let mut link = link;
+    link["expectedVersion"] = person["versionNumber"].clone();
     let original_account = person["account"].clone();
     person = call(service, admin, LINK_PERSONNEL_ACCOUNT, id, Some(link)).unwrap();
     person = call(service, admin, LINK_PERSONNEL_ACCOUNT, id, Some(json!({"expectedVersion":person["versionNumber"],"userId":account["id"],"expectedAccountVersion":original_account["versionNumber"]}))).unwrap();

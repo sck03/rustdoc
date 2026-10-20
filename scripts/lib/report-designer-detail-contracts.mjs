@@ -2,6 +2,28 @@ import assert from 'node:assert/strict';
 
 export function verifyDetailTableContracts(api) {
   let table = api.createDetailTableBlock();
+  const original = structuredClone(table);
+  table.sideBand = api.createDetailTableSideBand();
+  table.sideBand.widthMm = 32;
+  const widths = api.detailColumnWidths(table, 180);
+  const resized = api.setDetailColumnWidth(table, table.columns[0].id, widths[0] + 5, 180);
+  const nextWidths = api.detailColumnWidths(resized, 180);
+  assert(Math.abs(nextWidths[0] - widths[0] - 5) < 0.001);
+  assert(Math.abs(nextWidths[1] - widths[1] + 5) < 0.001);
+  assert.deepEqual(nextWidths.slice(2), widths.slice(2));
+  assert.equal(resized.sideBand, table.sideBand, 'physical side band width is unchanged');
+  assert.equal(api.setDetailColumnWidth(table, table.columns[0].id, NaN, 180), table);
+  const inserted = api.addDetailTableColumn(table, table.columns[1].id, 'before');
+  assert.equal(inserted.columns[2], table.columns[1]);
+  assert.equal(inserted.columns[0], table.columns[0], 'insertion shares unchanged columns');
+  table.entryDescriptionColumnId = table.columns[0].id;
+  const preview = api.renderReportDesignerBlockPreviewToHtml(table, 100, 180, 'entries');
+  assert(preview.includes('data-report-entry-kind="blank"'));
+  assert(preview.includes('data-report-entry-kind="note"'));
+  assert(!preview.includes('{{') && !preview.includes('item.'), 'canvas contains examples, not template expressions');
+  assert(!api.renderReportDesignerBlockPreviewToHtml(table, 100, 180).includes('data-report-entry-kind'));
+  assert.equal(api.removeDetailTableColumn(table, table.columns[0].id), table, 'referenced description column is protected');
+  table = original;
   table.columns.forEach((column, index) => { column.widthMm = [8.03, 13.27, 29.42, 80.1][index]; });
   const total = table.columns.reduce((sum, column) => sum + column.widthMm, 0);
   const equal = api.distributeDetailTableColumnWidths(table);

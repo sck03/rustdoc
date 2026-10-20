@@ -1,0 +1,57 @@
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { captureScreenshot } from './web-runtime-browser-session.mjs';
+
+export async function verifyEntryDesignUi({ page, url, read, waitFor, click, key, output, results }) {
+  const block = 'window.__designerSchema.layers.flatMap(l=>l.elements).find(e=>e.id==="invoice-items").block';
+  const control = label => `[...document.querySelectorAll('.new-report-detail-properties label')].find(n=>n.firstElementChild?.textContent===${JSON.stringify(label)})`;
+  const choose = async (label, value) => {
+    await read(page, `(()=>{const n=${control(label)}.querySelector('select');n.value=${JSON.stringify(value)};n.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  };
+  await page.send('Page.navigate', { url: url + '?invoice' });
+  await waitFor(page, 'document.querySelector("[data-v3-element-id=invoice-items]")');
+  await read(page, 'document.querySelector("[data-v3-element-id=invoice-items]").focus()');
+  await key(page, 'Enter');
+  await waitFor(page, 'document.querySelector(".new-report-detail-column-card")');
+  const original = await read(page, block);
+  await choose('画布示例', 'entries');
+  await waitFor(page, 'document.querySelector("[data-report-entry-kind=blank]")');
+  assert.deepEqual(await read(page, block), original, 'preview mode must not mutate the template');
+  assert(await read(page, `!document.querySelector('[data-v3-element-id=invoice-items]').textContent.includes('item.')`));
+  assert(await read(page, `[...document.querySelectorAll('[data-report-entry-kind=note] td')].every(n=>n.dataset.reportDetailColumnId==='description'||!n.textContent)`));
+  await captureScreenshot(page, path.join(output, 'invoice-entry-design.png'), { captureBeyondViewport: false });
+  await read(page, 'document.querySelector("[data-v3-element-id=invoice-items] th[data-report-detail-column-id=price]").click()');
+  await waitFor(page, `${control('选择要修改的列')}.querySelector('select').value==='price'`);
+  await choose('选择要修改的列', 'description');
+  const widthInput = `${control('打印宽度(mm)')}.querySelector('input')`;
+  await read(page, `${widthInput}.focus();${widthInput}.select()`);
+  await page.send('Input.insertText', { text: '75' });
+  await key(page, 'Tab');
+  await waitFor(page, `${block}.columns[0].widthMm===75`);
+  assert.equal(await read(page, `${block}.columns[1].widthMm`), 11);
+  assert.deepEqual(await read(page, `${block}.columns.slice(2)`), original.columns.slice(2));
+  await click(page, 'button[aria-label="撤销"]');
+  await waitFor(page, `${block}.columns[0].widthMm===68`);
+  await read(page, "[...document.querySelectorAll('.new-report-detail-properties button')].find(n=>n.textContent==='在前方插入列').click()");
+  await waitFor(page, `${block}.columns.length===6`);
+  assert.equal(await read(page, `${block}.entryDescriptionColumnId`), 'description');
+  assert.equal(await read(page, `${block}.columns[1].id`), 'description');
+  await click(page, 'button[aria-label="删除列"]');
+  await waitFor(page, `${block}.columns.length===5`);
+  await choose('选择要修改的列', 'description');
+  await read(page, "[...document.querySelectorAll('.new-report-detail-properties summary')].find(n=>n.textContent==='组合排版').click()");
+  await waitFor(page, 'document.querySelector(".new-report-detail-part")');
+  const beforeParts = await read(page, `${block}.columns[0].content`);
+  await read(page, "[...document.querySelectorAll('.new-report-detail-properties button')].find(n=>n.textContent==='复制片段').click()");
+  await waitFor(page, `${block}.columns[0].content.length===${beforeParts.length + 1}`);
+  const parts = await read(page, `${block}.columns[0].content`);
+  assert.equal(parts[1].fieldPath, parts[0].fieldPath);
+  assert.notEqual(parts[1].id, parts[0].id);
+  await click(page, 'button[aria-label="撤销"]');
+  await waitFor(page, `${block}.columns[0].content.length===${beforeParts.length}`);
+  await choose('画布示例', 'products');
+  await waitFor(page, '!document.querySelector("[data-report-entry-kind]")');
+  await captureScreenshot(page, path.join(output, 'invoice-column-composition.png'), { captureBeyondViewport: false });
+  assert.deepEqual(await read(page, 'window.__designerErrors'), []);
+  results.push({ test: 'entry preview, canvas column selection, physical widths, insertion, part copy and undo', passed: true });
+}

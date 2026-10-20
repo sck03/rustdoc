@@ -417,6 +417,13 @@ fn validate_detail_table(
     for column in &table.columns {
         validate_detail_column(column, fields)?;
     }
+    if table
+        .entry_description_column_id
+        .as_ref()
+        .is_some_and(|id| !table.columns.iter().any(|column| &column.id == id))
+    {
+        return Err("按录入行打印的说明列不存在。".into());
+    }
     if let Some(adjustments) = &table.adjustments {
         if adjustments.description_column_id == adjustments.amount_column_id
             || [

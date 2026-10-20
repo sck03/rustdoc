@@ -12,7 +12,6 @@ use subtle::ConstantTimeEq;
 
 const COOKIE: &str = "ExportDocManager.DownloadSession";
 const LIFETIME: Duration = Duration::from_secs(300);
-#[derive(Clone)]
 struct Ticket {
     operation: &'static str,
     job_id: String,
@@ -69,7 +68,8 @@ impl Tickets {
             .0
             .lock()
             .map_err(|_| error(503, "下载票据状态异常。"))?;
-        entries.retain(|_, ticket| ticket.expires > Instant::now());
+        let now = Instant::now();
+        entries.retain(|_, ticket| ticket.expires > now);
         if entries.len() >= 4096 {
             return Err(error(429, "下载请求过多，请稍后重试。"));
         }
@@ -94,7 +94,7 @@ impl Tickets {
                 job_id: job_id.into(),
                 session: session.into(),
                 binding: binding.clone(),
-                expires: Instant::now() + LIFETIME,
+                expires: now + LIFETIME,
             },
         );
         let expiry = (chrono::Utc::now() + chrono::Duration::seconds(300)).to_rfc3339();
@@ -124,7 +124,14 @@ impl Tickets {
             .0
             .lock()
             .map_err(|_| error(503, "下载票据状态异常。"))?;
-        entries.retain(|_, ticket| ticket.expires > Instant::now());
+        // Downloads may resolve the same ticket repeatedly. Only issuance needs
+        // to reclaim the whole bounded cache; reads inspect their own ticket.
+        if entries
+            .get(token)
+            .is_some_and(|ticket| ticket.expires <= Instant::now())
+        {
+            entries.remove(token);
+        }
         let ticket = entries
             .get(token)
             .filter(|ticket| {
@@ -170,5 +177,36 @@ mod tests {
         );
         tickets.revoke("session-1").unwrap();
         assert!(tickets.resolve(token, &binding).is_err());
+    }
+
+    #[test]
+    fn tickets_preserve_retry_and_operation_boundaries_and_reject_expiry() {
+        use export_doc_contracts::generated_api::DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET;
+        let tickets = Tickets::default();
+        let binding = "a".repeat(64);
+        let (value, _) = tickets.issue("job", "session", &binding, false).unwrap();
+        let token = value["token"].as_str().unwrap();
+        assert!(
+            tickets
+                .resolve_for(DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET, token, &binding)
+                .is_err()
+        );
+        for _ in 0..2 {
+            assert_eq!(
+                tickets.resolve(token, &binding).unwrap(),
+                ("job".into(), "session".into())
+            );
+        }
+        tickets.0.lock().unwrap().get_mut(token).unwrap().expires = Instant::now();
+        assert!(tickets.resolve(token, &binding).is_err());
+        assert!(!tickets.0.lock().unwrap().contains_key(token));
+        let (value, _) = tickets
+            .issue("new-job", "session", &binding, false)
+            .unwrap();
+        assert!(
+            tickets
+                .resolve(value["token"].as_str().unwrap(), &binding)
+                .is_ok()
+        );
     }
 }

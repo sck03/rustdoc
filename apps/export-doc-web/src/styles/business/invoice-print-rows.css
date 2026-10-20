@@ -1,0 +1,23 @@
+.invoice-print-rows { display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; }
+.invoice-print-rows .toolbar-actions { flex-wrap: wrap; gap: 6px; }
+.invoice-print-rows .command-button { min-height: 32px; padding: 5px 9px; }
+.invoice-items-view-controls { justify-content: space-between; }
+.invoice-items-view-controls .segmented-control { grid-template-columns: repeat(2, minmax(90px, 1fr)); }
+.invoice-print-rows-scroll { overflow: auto; min-height: 180px; flex: 1; border: 1px solid var(--border-color); }
+.invoice-print-rows table { border-collapse: collapse; width: 100%; min-width: 940px; }
+.invoice-print-rows th, .invoice-print-rows td { border: 1px solid var(--border-color); padding: 4px; vertical-align: top; }
+.invoice-print-rows th:first-child, .invoice-print-rows td:nth-child(2) { white-space: nowrap; }
+.invoice-print-rows th > button { border: 0; background: transparent; color: inherit; min-width: 24px; min-height: 32px; cursor: pointer; }
+.invoice-print-rows thead { position: sticky; top: 0; z-index: 1; background: var(--surface-muted); }
+.invoice-print-rows th:nth-child(3) { min-width: 280px; width: 35%; }
+.invoice-print-rows tr[data-selected="true"] { background: var(--surface-muted); }
+.invoice-print-rows textarea, .invoice-print-rows input:not([type="checkbox"]) { box-sizing: border-box; width: 100%; min-width: 65px; padding: 6px; border: 0; background: transparent; font: inherit; }
+.invoice-print-rows textarea { resize: vertical; min-height: 32px; }
+.invoice-items-panel > .invoice-items-source:not([hidden]) { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.invoice-items-panel > .invoice-items-print:not([hidden]) { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.invoice-print-options { display: flex; flex-wrap: wrap; gap: 6px; align-items: start; }
+.invoice-print-notes { border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; }
+.invoice-print-notes[open] { flex-basis: 100%; }
+.invoice-print-notes summary { cursor: pointer; color: var(--text-secondary); }
+.invoice-print-notes[open] > :not(summary) { margin-top: 8px; }
+.invoice-print-notes textarea { display: block; border: 1px solid var(--border-color); }

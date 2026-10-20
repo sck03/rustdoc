@@ -9,6 +9,7 @@ import {
 import { renderGridDiagonalHeader } from "./reportDesignerGridDiagonal.ts";
 import { detailSpanBorder, renderDetailFixedRow } from "./reportDesignerDetailFixedRows.ts";
 import { renderDetailComposite } from "./reportDesignerDetailComposite.ts";
+import { designerSampleValue } from "./reportDesignerCanvasSamples.ts";
 
 /** Structured HTML for editor/reference fixtures; final document output runs in Rust. */
 export function renderReportDesignerBlockToHtml(block: ReportBlock) {
@@ -16,35 +17,18 @@ export function renderReportDesignerBlockToHtml(block: ReportBlock) {
 }
 
 /**
- * Render a deterministic, data-free preview for the V3 canvas.  Scriban
- * control statements are meaningful to the print renderer but would otherwise
- * leave a Flow element looking like an empty blue rectangle in the editor.
- * The block AST remains the source of truth; this only expands one
- * representative set of rows for visual editing and never gets persisted.
+ * Render synthetic examples directly from the AST for visual editing.
+ * No business data is evaluated or persisted; final output runs in Rust.
  */
-export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock, heightMm?: number) {
+export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock, heightMm?: number, widthMm?: number, mode: "products" | "entries" = "products", labels: ReadonlyMap<string, string> = new Map()) {
+  if (block.type === "DetailTable") return renderDetailTable(block, heightMm, { widthMm, mode, labels });
   // Keep one representative field value, without also showing its fallback.
   let html = renderBlock(block, true, heightMm).replace(
     /\{\{ if ([A-Za-z_][A-Za-z0-9_.]*) \}\}(\{\{ \1 \}\})\{\{ else \}\}[\s\S]*?\{\{ end \}\}/g, "$2");
-  html = expandPreviewLoops(html);
   html = html.replace(/\{\{\s*(?:if|else|end|capture|assign|while|case|when)[\s\S]*?\}\}/gi, "");
   html = html.replace(/\{\{\s*\$?[A-Za-z_][A-Za-z0-9_]*\s*=\s*[\s\S]*?\}\}/g, "");
   html = html.split(`{{ ${shippingMarksFieldPath} }}`).join(shippingMarksPreviewText);
   return html;
-}
-
-function expandPreviewLoops(source: string) {
-  const loopPattern = /\{\{\s*for\s+[^}]+\}\}([\s\S]*?)\{\{\s*end\s*\}\}/gi;
-  let current = source;
-  for (let pass = 0; pass < 4; pass += 1) {
-    const next = current.replace(loopPattern, (_match, body: string) =>
-      ["样例 1", "样例 2", "样例 3"].map((label) => body.replace(/\{\{\s*item\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/gi, (_field, name: string) =>
-        `<span class="edm-report-preview-sample-value">${escapeHtml(name === "Quantity" ? "2" : name === "TotalPrice" ? "1,234.00" : `${label} · ${name}`)}</span>`)).join(""),
-    );
-    if (next === current) return current;
-    current = next;
-  }
-  return current;
 }
 
 function renderBlock(block: ReportBlock, preview = false, heightMm?: number) {
@@ -240,34 +224,40 @@ function renderConditionalExpression(block: Extract<ReportBlock, { type: "Condit
   }
 }
 
-function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>, heightMm?: number) {
+function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>, heightMm?: number, preview?: { widthMm?: number; mode: "products" | "entries"; labels: ReadonlyMap<string, string> }) {
   const fillHeight = block.print.fillHeight && heightMm !== undefined && Number.isFinite(heightMm) && heightMm > 0;
   const fillRow = fillHeight ? `<tr class="edm-detail-fill-row" style="height:100%">${block.columns.map(column => `<td style="${renderDetailCellStyle({}, { ...(column.border ?? block.border), top: false, bottom: false }, column.align)}"></td>`).join("")}</tr>` : "";
-  const renderers = { style: renderDetailCellStyle, field: renderFieldExpression, text: escapeHtml };
+  const sample = (path: string, index = 0) => escapeHtml(path === shippingMarksFieldPath ? shippingMarksPreviewText : designerSampleValue(path, index, preview?.labels ?? new Map()));
+  const renderers = { style: renderDetailCellStyle, field: preview ? sample : renderFieldExpression, text: escapeHtml };
   const summaryRow = renderDetailFixedRow(block, block.summaryRow, renderers);
   const adjustmentRow = block.adjustments ? `<tr>${block.columns.map(column => `<td style="${renderDetailCellStyle(block.bodyStyle, { ...(column.border ?? block.border), top: false, bottom: false }, column.align)}">${column.id === block.adjustments!.descriptionColumnId ? "金额调整说明（有数据时显示）" : column.id === block.adjustments!.amountColumnId ? "增减金额" : ""}</td>`).join("")}</tr>` : "";
   const detailPrintClasses = renderDetailPrintClassNames(block);
-  const detailRow = `<tr>${block.columns
+  const makeRow = (index: number, entry?: "note" | "blank" | "item") => `<tr${entry ? ` data-report-entry-kind="${entry}"` : ""}>${block.columns
     .map((column) => {
       const border = column.border ?? block.border;
-      return `<td style="${renderDetailCellStyle(block.bodyStyle, block.rowSeparators === false ? { ...border, top: false, bottom: false } : border, column.align)}">${renderDetailCellContent(column, block.bodyStyle.verticalAlign)}</td>`;
+      const content = entry && column.id === block.entryDescriptionColumnId
+        ? entry === "blank" ? "<br>" : entry === "note" ? "按录入顺序打印的说明文字" : sample("item.StyleName", index)
+        : entry && entry !== "item" ? "" : renderDetailCellContent(column, block.bodyStyle.verticalAlign, preview ? path => sample(path, index) : undefined);
+      return `<td${preview ? ` data-report-detail-column-id="${escapeHtmlAttribute(column.id)}"` : ""} style="${renderDetailCellStyle(block.bodyStyle, block.rowSeparators === false ? { ...border, top: false, bottom: false } : border, column.align)}">${content}</td>`;
     })
     .join("")}</tr>`;
+  const entryMode = preview?.mode === "entries" && block.entryDescriptionColumnId;
+  const rows = preview ? entryMode ? makeRow(0, "note") + makeRow(0, "blank") + makeRow(0, "item") + makeRow(1, "item") : makeRow(0) + makeRow(1) : renderDetailTableRows(block, makeRow(0));
   const introRow = renderDetailFixedRow(block, block.introRow, renderers);
   const columns = renderProportionalColumns(block.columns.map(column => column.widthMm));
   const header = `<thead>${renderDetailTableHeaderRows(block)}</thead>`;
-  const table = `<table class="edm-detail-table ${detailPrintClasses}" style="${renderBorderStyle(block.border)}${fillHeight ? `;height:${block.sideBand ? "100%" : `${heightMm}mm`}` : ""}">${columns}${block.sideBand ? "" : header}<tbody>${introRow}${renderDetailTableRows(block, detailRow)}${adjustmentRow}${summaryRow}${fillRow}</tbody></table>`;
+  const table = `<table class="edm-detail-table ${detailPrintClasses}" style="${renderBorderStyle(block.border)}${fillHeight ? `;height:${block.sideBand ? "100%" : `${heightMm}mm`}` : ""}">${columns}${block.sideBand ? "" : header}<tbody>${introRow}${rows}${adjustmentRow}${summaryRow}${fillRow}</tbody></table>`;
 
   if (!block.sideBand) {
     return table;
   }
 
   const sideContent = block.sideBand.contentKind === "Field"
-    ? renderFieldExpression(block.sideBand.fieldPath)
+    ? preview ? sample(block.sideBand.fieldPath) : renderFieldExpression(block.sideBand.fieldPath)
     : escapeHtml(block.sideBand.text);
 
   return `<table class="edm-detail-layout ${renderDetailHeaderRepeatClassName(block)}"${fillHeight ? ` style="height:${heightMm}mm"` : ""}>
-  ${renderProportionalColumns([block.sideBand.widthMm, block.detailWidthMm ?? block.columns.reduce((sum, column) => sum + column.widthMm, 0)])}
+  ${renderProportionalColumns([block.sideBand.widthMm, preview?.widthMm ? Math.max(1, preview.widthMm - block.sideBand.widthMm) : block.columns.reduce((sum, column) => sum + column.widthMm, 0)])}
   <thead>
     <tr>
       <th style="${renderDetailLayoutCellStyle(block.headerStyle, block.border)}">${escapeHtml(block.sideBand.title)}</th>
@@ -530,12 +520,12 @@ function renderDetailHeaderRepeatClassName(block: Extract<ReportBlock, { type: "
   return block.print.repeatHeaderOnPageBreak ? "edm-detail-repeat-header" : "edm-detail-no-repeat-header";
 }
 
-function renderDetailCellContent(column: Extract<ReportBlock, { type: "DetailTable" }>["columns"][number], verticalAlign?: ReportTextStyle["verticalAlign"]) {
+function renderDetailCellContent(column: Extract<ReportBlock, { type: "DetailTable" }>["columns"][number], verticalAlign?: ReportTextStyle["verticalAlign"], field = renderDetailItemExpression) {
   if (column.contentKind !== "Composite" || !column.content || column.content.length === 0) {
-    return renderDetailItemExpression(column.fieldPath);
+    return field(column.fieldPath);
   }
   if (column.omitEmptyLines || column.content.some(part => part.kind === "ColumnBreak" || part.kind === "Spacer" || part.condition)) {
-    return `<div class="${column.omitEmptyLines ? "edm-detail-omit-empty-lines" : ""}">${renderDetailComposite(column.content, part => part.kind === "Text" ? escapeHtml(part.text) : renderDetailItemExpression(part.fieldPath), verticalAlign)}</div>`;
+    return `<div class="${column.omitEmptyLines ? "edm-detail-omit-empty-lines" : ""}">${renderDetailComposite(column.content, part => part.kind === "Text" ? escapeHtml(part.text) : field(part.fieldPath), verticalAlign)}</div>`;
   }
 
   return column.content.filter(part => part.visible !== false).map((part) => {
@@ -543,7 +533,7 @@ function renderDetailCellContent(column: Extract<ReportBlock, { type: "DetailTab
       case "Text":
         return escapeHtml(part.text);
       case "Field":
-        return renderDetailItemExpression(part.fieldPath);
+        return field(part.fieldPath);
       case "LineBreak":
         return "<br>";
     }
@@ -591,27 +581,13 @@ function renderDetailCellStyle(
   ].filter(Boolean).join("; ");
 }
 
-function readDetailItemField(fieldPath: string) {
-  const normalized = fieldPath.trim();
-  if (normalized.startsWith("Invoice.Items.")) {
-    return normalized.slice("Invoice.Items.".length);
-  }
-
-  if (normalized.startsWith("item.")) {
-    return normalized.slice("item.".length);
-  }
-
-  return normalized.split(".").pop() ?? normalized;
-}
-
 function renderDetailItemExpression(fieldPath: string) {
   const itemReference = renderDetailItemValueReference(fieldPath);
   return itemReference ? `{{ ${itemReference} }}` : "";
 }
 
 function renderDetailItemValueReference(fieldPath: string) {
-  const itemField = readDetailItemField(fieldPath);
-  return isReportDesignerFieldPath(itemField) ? `item.${itemField}` : "";
+  return isReportDesignerFieldPath(fieldPath.trim()) ? fieldPath.trim() : "";
 }
 
 function renderTextStyle(style: ReportTextStyle) {

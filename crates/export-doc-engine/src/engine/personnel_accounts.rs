@@ -1,7 +1,8 @@
-//! Read the personnel/account relationship without loading private personnel files.
+//! Resolve personnel/account relationships and remove a link transactionally.
 use super::{
-    error::{Result, unavailable},
-    store::Store,
+    error::{Result, conflict, error, unavailable},
+    records,
+    store::{self, Actor, Store},
 };
 use crate::contracts;
 use export_doc_storage::{Connection, DataScope, GenericQuery};
@@ -112,4 +113,44 @@ pub fn current_account(tx: &Connection, person: &Value) -> Result<Value> {
         contracts::schema("PersonnelAccountRecord"),
         user,
     ))
+}
+
+pub fn unlink(store: &Store, actor: &Actor, id: i64, body: &Value) -> Result<Value> {
+    store.transaction_as(actor, |tx, actor| {
+        if !actor.admin {
+            return Err(error(403, "只有管理员可以解除账号绑定。"));
+        }
+        let mut person = super::personnel::person(tx, actor, id, "assign")?;
+        store::check_version(&person, store::expected(body))?;
+        records::required(body, "reason", "解除原因", 500)?;
+        let account = current_account(tx, &person)?;
+        let user_id = account["id"]
+            .as_i64()
+            .filter(|id| body["userId"].as_i64() == Some(*id))
+            .ok_or_else(|| conflict("关联账号已变化，请刷新人员档案。"))?;
+        let user = store::get(tx, "users", user_id)?;
+        store::check_version(&user, body["expectedAccountVersion"].as_i64().unwrap_or(0))?;
+        if super::office_queries::clearance(tx, &person)?["isClear"] != true {
+            return Err(conflict(
+                "人员或账号仍有未结申请、审批或办理职责，请先完成交接再解除绑定。",
+            ));
+        }
+        let username = records::text(&user, "username");
+        // A version change invalidates existing sessions while preserving the account.
+        store::save(
+            tx,
+            "users",
+            user_id,
+            user,
+            Some(username.clone()),
+            actor,
+            "personnel-unlink",
+        )?;
+        person["account"] = Value::Null;
+        let note = format!(
+            "解除账号 {username}（#{user_id}）：{}",
+            records::text(body, "reason")
+        );
+        super::personnel::save(tx, actor, id, person, "account-unlink", &note)
+    })
 }

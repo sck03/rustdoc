@@ -382,7 +382,16 @@ fn validate_department(connection: &Connection, company: &str, code: &str) -> Re
     }
 }
 pub fn can_correct(connection: &Connection, id: i64) -> Result<bool> {
+    Ok(deletion_restriction(connection, id)?.is_none())
+}
+
+pub fn deletion_restriction(connection: &Connection, id: i64) -> Result<Option<&'static str>> {
     let person = store::get(connection, "people", id)?;
+    if person["account"].is_object() {
+        return Ok(Some(
+            "此档案已关联登录账号，不能作为误录档案删除。请在档案信息中核对关联账号；停止任职请办理离职。",
+        ));
+    }
     if super::oa::references(
         connection,
         &text(&person, "companyScope"),
@@ -391,10 +400,9 @@ pub fn can_correct(connection: &Connection, id: i64) -> Result<bool> {
         false,
     )? > 0
     {
-        return Ok(false);
-    }
-    if person["account"].is_object() {
-        return Ok(false);
+        return Ok(Some(
+            "此人员已有行政或人员变动申请记录，需要保留历史。请通过调岗、离职流程处理。",
+        ));
     }
     if store::history(connection, "people", id)?
         .iter()
@@ -410,19 +418,29 @@ pub fn can_correct(connection: &Connection, id: i64) -> Result<bool> {
             .contains(&text(event, "action").as_str())
         })
     {
-        return Ok(false);
+        return Ok(Some(
+            "此档案已有正式任职变动或账号关联历史，需要保留追溯。可在“任职与操作记录”中查看；请通过调岗、离职流程处理。",
+        ));
     }
     for kind in ["bookings", "supply-requests"] {
         if store::all(connection, kind)?
             .iter()
             .any(|item| item["employeeId"] == id)
         {
-            return Ok(false);
+            return Ok(Some(
+                "此人员已有会议室预约或物品领用记录，需要保留业务历史。请通过离职流程处理。",
+            ));
         }
     }
-    Ok(!store::all(connection, "departments")?
+    if store::all(connection, "departments")?
         .iter()
-        .any(|department| department["managerEmployeeId"] == id))
+        .any(|department| department["managerEmployeeId"] == id)
+    {
+        return Ok(Some(
+            "此人员仍被设为部门负责人，请先在组织架构中更换或清除负责人，再删除误录档案。",
+        ));
+    }
+    Ok(None)
 }
 
 fn validate_identity(profile: &Value) -> Result<()> {

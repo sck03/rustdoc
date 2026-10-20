@@ -4,8 +4,14 @@ use serde_json::{Value, json};
 pub(super) const FIELDS: &[(&str, &[&str])] = &[
     (
         "ApiInvoiceDetailDto",
-        &["docSealPath", "customsSealPath", "amountAdjustments"],
+        &[
+            "docSealPath",
+            "customsSealPath",
+            "amountAdjustments",
+            "useEntryPrintRows",
+        ],
     ),
+    ("ApiInvoiceItemDto", &["printRows"]),
     ("ApiReportTemplatePreviewRequest", &["sampleProfile"]),
     ("ApiReportHtmlPreviewRequest", &["content"]),
     ("ApiPaymentReportHtmlPreviewRequest", &["content"]),
@@ -74,6 +80,12 @@ pub(super) fn extend(document: &mut Value) {
     page["maxDimensionHundredthMm"] =
         json!({"type":"integer","default":crate::report_pages::MAX_DIMENSION});
     let schemas = &mut document["components"]["schemas"];
+    schemas["ApiInvoicePrintRow"] = json!({"type":"object","additionalProperties":false,"required":["kind","text"],"properties":{
+        "kind":{"type":"string","enum":["Item","Text","Blank"]},
+        "text":{"type":"string","maxLength":1000,"description":"本行打印原文；空字符串保留空白，不回填品名。"}
+    }});
+    schemas["ApiInvoiceItemDto"]["properties"]["printRows"] = json!({"type":"array","default":[],"maxItems":64,"items":{"$ref":"#/components/schemas/ApiInvoicePrintRow"},"description":"此货项的打印行，非空时必须且只能有一行 Item 承载本货项数量金额；Text 与 Blank 不参与合计。"});
+    schemas["ApiInvoiceDetailDto"]["properties"]["useEntryPrintRows"] = json!({"type":"boolean","default":false,"description":"明细表按货项内录入的打印行顺序输出；模板须指定录入说明列。"});
     schemas["ApiInvoiceAmountAdjustment"] = json!({"type":"object","additionalProperties":false,"required":["description","amount"],"properties":{
         "description":{"type":"string","maxLength":200,"description":"报表上的调整说明，例如 RECEIVED DEPOSIT 或 SAMPLE CHARGE。"},
         "amount":{"type":"string","maxLength":32,"pattern":"^[+-]?[0-9]+(?:\\.[0-9]{1,2})?$","description":"同发票币种的精确金额；负数扣减，正数增加。"}

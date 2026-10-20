@@ -50,7 +50,7 @@ export async function verifyDesktopBlankDetails({ run, request, token, invoice, 
   const tableTemplate = await create('空白商品明细与调整');
   await run("[...document.querySelectorAll('.report-designer-v3-toolbar details')].find(e=>e.querySelector('summary').textContent.includes('高级排版')).open=true; document.querySelector('button[aria-label=明细表]').click(); true");
   await wait("document.querySelector('.new-report-detail-column-card')");
-  await choose('分页与高级', '.new-report-detail-properties [role=tab]');
+  await choose('录入行与合计', '.new-report-detail-properties [role=tab]');
   await choose('定金与费用调整', '.new-report-detail-properties summary');
   await run("[...document.querySelectorAll('label')].find(e=>e.textContent.trim()==='显示发票金额调整').querySelector('input').click(); true");
   await choose('撤销', '.report-designer-v3-toolbar button');
@@ -66,7 +66,7 @@ export async function verifyDesktopBlankDetails({ run, request, token, invoice, 
   await run(`(()=>{const e=[...${intro}.querySelectorAll('label')].find(e=>e.firstElementChild?.textContent==='设置哪一列').querySelector('select');e.value=e.options[e.options.length-1].value;e.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
   await wait(`${intro}.querySelector('.new-report-summary-cell-editor strong')?.textContent==='Amount'`);
   await run(`(()=>{const e=[...${intro}.querySelectorAll('label')].find(e=>e.firstElementChild?.textContent==='字段').querySelector('select');e.value='Invoice.TradeTerms';e.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
-  await wait("[...document.querySelectorAll('[data-v3-element-id]')].some(element=>element.textContent.includes('Invoice.TradeTerms'))");
+  await wait("[...document.querySelectorAll('[data-v3-element-id]')].some(element=>element.textContent.includes('FOB'))");
   const tableDesign = await save(tableTemplate.id);
   const table = tableDesign.layers.flatMap(layer => layer.elements).find(element => element.block?.type === 'DetailTable').block;
   assert(table.adjustments);
