@@ -289,10 +289,10 @@ export function InvoiceMarksAndItemsPanel({
           <button type="button" className={!showPrintRows ? "segmented-active" : ""} aria-pressed={!showPrintRows} onClick={() => showEditor(false)}>商品资料</button>
           <button type="button" className={showPrintRows ? "segmented-active" : ""} aria-pressed={showPrintRows} onClick={() => showEditor(true)}>打印排版</button>
         </div>
-        <label className="checkbox-field"><input type="checkbox" checked={Boolean(invoice.useEntryPrintRows)} disabled={!isEditable} onChange={event => { onChange({ useEntryPrintRows: event.target.checked }); showEditor(event.target.checked); }} />按录入行打印</label>
+        <label>明细打印方式<select aria-label="明细打印方式" value={invoice.useEntryPrintRows ? "entries" : "products"} disabled={!isEditable} onChange={event => { const entries = event.target.value === "entries"; onChange({ useEntryPrintRows: entries }); showEditor(entries); }}><option value="products">商品资料自动组合</option><option value="entries">按录入行打印</option></select></label>
       </div>
       <div className="invoice-items-print" hidden={!showPrintRows}>{visitedEditors.print && <>
-        {!invoice.useEntryPrintRows && <p className="office-muted">当前未启用按录入行打印，勾选后随单据保存生效。</p>}
+        <div className="office-muted" role="status">{invoice.useEntryPrintRows ? "内置发票、装箱单按下方行顺序打印；内置合同、报关单使用商品资料。" : "当前使用商品资料自动组合；选择“按录入行打印”后应用下方排版。"}</div>
         <InvoicePrintRowsEditor items={invoice.items} readOnly={!isEditable} onChangeItem={onChangeItem} onEditItems={onEditItems} onAddItem={onAddItem} onDuplicateItem={onDuplicateItem} onRemoveItem={onRemoveItem} onMoveItem={onMoveItem} onUndo={onUndoItemEdit} onRedo={onRedoItemEdit} canUndo={canUndoItemEdit} canRedo={canRedoItemEdit} />
         <InvoiceItemsSummary count={invoice.items.filter(isMeaningfulInvoiceItem).length} totals={invoice} currency={invoice.currency} /></>}
       </div>

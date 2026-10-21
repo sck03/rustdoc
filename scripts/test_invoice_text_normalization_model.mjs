@@ -64,6 +64,15 @@ assert(printRowModel.changePrintRow(entryItems[0].printRows, 0, 'duplicate') ===
 const full = Array.from({ length: 63 }, () => ({ kind: 'Blank', text: '' }));
 full.unshift({ kind: 'Item', text: '' });
 assert(printRowModel.changePrintRow(full, 1, 'duplicate') === full, 'row limit is checked before mutation');
+const sourceRows = [{ kind: 'Item', text: '  Shared goods\n共同品名  ' }, { kind: 'Text', text: 'tail' }];
+const splitRows = printRowModel.changePrintRow(sourceRows, 0, 'split');
+assert(JSON.stringify(splitRows) === JSON.stringify([{ kind: 'Text', text: sourceRows[0].text }, { kind: 'Item', text: '' }, sourceRows[1]]), 'moving a description to a note preserves exact text and one business row');
+assert(sourceRows[0].text && splitRows[2] === sourceRows[1], 'splitting preserves the undo snapshot and unaffected rows');
+assert(printRowModel.changePrintRow(splitRows, 1, 'split') === splitRows && printRowModel.changePrintRow(full, 0, 'split') === full, 'empty descriptions and full layouts are unchanged');
+const clamped = printRowModel.resolvePrintRowSelection(entryItems, { item: 5, row: 12 });
+assert(clamped.item === 1 && clamped.row === 0, 'undo or deletion clamps selection to a remaining row');
+const validSelection = { item: 0, row: 1 };
+assert(printRowModel.resolvePrintRowSelection(entryItems, validSelection) === validSelection, 'valid selections keep their identity');
 let rejected = false;
 try { printRowModel.insertPrintNotes(full, 1, 'one more'); } catch { rejected = true; }
 assert(rejected && full.length === 64, 'oversized batch leaves original rows untouched');

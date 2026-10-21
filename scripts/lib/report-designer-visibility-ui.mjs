@@ -6,14 +6,15 @@ export async function verifyDetailVisibility({page, url, read, waitFor, results}
   await read(page, "(()=>{const n=document.querySelector('[data-v3-element-id=review-detail]');n.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerId:88}));window.dispatchEvent(new PointerEvent('pointercancel',{pointerId:88}));})()");
   await waitFor(page, "document.querySelectorAll('.new-report-detail-column-card').length===1");
   const visibleCards = () => read(page, "[...document.querySelectorAll('.new-report-detail-column-card')].filter(n=>getComputedStyle(n).display!=='none').length");
+  const columnSelect = `[...document.querySelectorAll('.new-report-detail-properties label')].find(n=>n.firstElementChild?.textContent==='选择要修改的列').querySelector('select')`;
   assert.equal(await visibleCards(), 1);
-  await read(page, "(()=>{const n=document.querySelector('.new-report-detail-column-card:not([hidden]) details');n.open=true;const select=document.querySelector('.new-report-detail-properties select');select.value=select.options[1].value;select.dispatchEvent(new Event('change',{bubbles:true}));})()");
-  await waitFor(page, "document.querySelector('.new-report-detail-properties select').selectedIndex===1");
+  await read(page, `(()=>{const n=document.querySelector('.new-report-detail-column-card:not([hidden]) details');n.open=true;const select=${columnSelect};select.value=select.options[1].value;select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await waitFor(page, "document.querySelector('.new-report-detail-column-card strong').textContent==='第 2 列'");
   assert.equal(await visibleCards(), 1);
-  await read(page, "(()=>{const select=document.querySelector('.new-report-detail-properties select');select.value=select.options[0].value;select.dispatchEvent(new Event('change',{bubbles:true}));})()");
-  await waitFor(page, "document.querySelector('.new-report-detail-properties select').selectedIndex===0");
+  await read(page, `(()=>{const select=${columnSelect};select.value=select.options[0].value;select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await waitFor(page, "document.querySelector('.new-report-detail-column-card strong').textContent==='第 1 列'");
   assert(await read(page, "document.querySelector('.new-report-detail-column-card details').open"), "switching columns must retain expanded settings");
-  for (const label of ["表格样式", "分页与高级", "商品列"]) {
+  for (const label of ["表格样式", "分页与高级", "明细列"]) {
     await read(page, `[...document.querySelectorAll('.new-report-detail-properties [role=tab]')].find(n=>n.textContent===${JSON.stringify(label)}).click()`);
     assert(await read(page, "[...document.querySelectorAll('.new-report-detail-properties [hidden]')].every(n=>getComputedStyle(n).display==='none')"), "inactive controls must stay hidden");
   }

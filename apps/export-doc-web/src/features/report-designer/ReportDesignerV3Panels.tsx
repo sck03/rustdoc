@@ -2,7 +2,6 @@ import { ImageSourceEditor } from "./ReportDesignerV3ImageProperties.tsx";
 import { ElementStyleEditor, FlowStyleEditor, ReportDesignerFontFamilyField } from "./ReportDesignerV3StyleProperties.tsx";
 import { alignProductSummary, insertProductSpacer } from "./reportDesignerProductFields.ts";
 import { ReportDesignerProductVisibility } from "./ReportDesignerProductVisibility.tsx";
-import { isShippingMarksField } from "./reportDesignerFieldRendering.ts";
 import { NumberField, SelectField, InspectorTitle, focusDesignerNode } from "./ReportDesignerV3InspectorControls.tsx";
 import { useState } from "react";
 import { Lock } from "lucide-react";
@@ -128,7 +127,6 @@ export function MultiElementInspector({
           {(["width", "height", "both"] as const).map((dimension) => <button key={dimension} type="button" disabled={!canEdit || movableCount < 2}
             onClick={() => onCommit(matchSelectedV3ElementSize(state, dimension))}>{dimension === "width" ? "等宽" : dimension === "height" ? "等高" : "相同大小"}</button>)}
         </div>
-        <small className="report-designer-v3-muted">以先选中的可编辑元素为基准，锁定元素保留原位。</small>
       </div>
       <div className="report-designer-v3-multi-section">
         <strong>批量操作</strong>
@@ -200,14 +198,13 @@ export function ElementInspector({
   const productField = element.type === "Field" && element.fieldPath.startsWith("item.");
   const editable = canEdit && !element.locked && !layer.locked;
   const alignedSummary = alignProductSummary(state, element.id);
-  const [tab, setTab] = useState<"content" | "style" | "layout">(element.type === "Rectangle" || element.type === "Line" ? "style" : "content");
+  const [tab, setTab] = useState<"content" | "style" | "layout">(element.type === "ProductSpacer" ? "layout" : element.type === "Rectangle" || element.type === "Line" ? "style" : "content");
   const tabs = [
-    ...(element.type === "Rectangle" ? [] : [{ value: "content" as const, label: "内容" }]),
-    { value: "style" as const, label: "外观" }, { value: "layout" as const, label: "布局" },
+    ...(element.type === "Rectangle" || element.type === "ProductSpacer" ? [] : [{ value: "content" as const, label: "内容" }]),
+    ...(element.type === "ProductSpacer" ? [] : [{ value: "style" as const, label: "外观" }]), { value: "layout" as const, label: "布局" },
   ];
   const geometry = <details className="report-designer-property-section" open={element.type !== "Flow"}>
       <summary>位置与大小 <small>{hundredthMmToMm(element.widthHundredthMm)} × {hundredthMmToMm(element.heightHundredthMm)} mm</small></summary>
-      <small>输入坐标保留当前图层；跨区拖动或选择“所在区域”可切换打印区域。</small>
       <div className="report-designer-v3-inspector-grid">
         <NumberField label="X (mm)" value={hundredthMmToMm(element.xHundredthMm)} disabled={!editable} onCommit={(value) => onPatch({ xHundredthMm: Math.round(value * 100) })} />
         <NumberField label="Y (mm)" value={hundredthMmToMm(element.yHundredthMm)} disabled={!editable} onCommit={(value) => onPatch({ yHundredthMm: Math.round(value * 100) })} />
@@ -231,11 +228,10 @@ export function ElementInspector({
   return (
     <div className="report-designer-v3-inspector-content">
       <InspectorTitle title={element.type === "Field" ? element.fieldPath.startsWith("item.") ? "商品明细字段" : "普通字段" : element.type === "Flow" ? reportDesignerV3ElementText(element) : reportDesignerV3ElementKindLabel(element)} subtitle={`${element.label || v3RegionNames[layer.role]}${element.locked || layer.locked ? " · 已锁定" : ""}`} />
-      {element.type === "Field" ? <small>{productField ? "每件商品重复一次，直接拖动字段排好这一行。" : "普通字段独立显示，不随商品重复。"}</small> : null}
       {(productField || element.type === "ProductSpacer") && <ReportDesignerProductVisibility element={element} fieldGroups={fieldGroups} editable={editable} onPatch={onPatch} onAddSpacer={() => onCommit(insertProductSpacer(state))} />}
       {alignedSummary !== state ? <button type="button" className="command-button secondary" disabled={!editable} onClick={() => onCommit(alignedSummary)}>合计与明细同列对齐</button> : null}
       {element.type === "Field" ? <>{content}<ElementStyleEditor element={element} pageFontSizePt={state.schema.page.fontSizePt} editable={editable} onPatch={onPatchStyle} />{geometry}
-        {productField ? <details className="report-designer-property-section"><summary>商品行距</summary><NumberField label="商品行距 (mm)" value={(state.schema.detailRowHeightHundredthMm ?? 1200) / 100} min={4} max={100} disabled={!editable} onCommit={value => onCommit({ ...state, schema: { ...state.schema, detailRowHeightHundredthMm: Math.round(value * 100) } })} /><small>所有商品列共用最小行距，长文字自动撑高。</small></details> : null}
+        {productField ? <details className="report-designer-property-section"><summary>商品行距</summary><NumberField label="商品行距 (mm)" value={(state.schema.detailRowHeightHundredthMm ?? 1200) / 100} min={4} max={100} disabled={!editable} onCommit={value => onCommit({ ...state, schema: { ...state.schema, detailRowHeightHundredthMm: Math.round(value * 100) } })} /></details> : null}
         <details className="report-designer-property-section"><summary>高级设置</summary><RegionSelector state={state} onCommit={onCommit} disabled={!editable} />{output}</details></> : element.type === "Flow" ? <>{content}<FlowStyleEditor style={element.style} editable={editable} onPatch={onPatchStyle} />{geometry}<details className="report-designer-property-section"><summary>图层与输出</summary><RegionSelector state={state} onCommit={onCommit} disabled={!editable} />{output}</details></> :
         <DesignerPropertyTabs value={tab} options={tabs} onChange={setTab}>
           {tab === "content" ? content : tab === "style" ? <ElementStyleEditor element={element} pageFontSizePt={state.schema.page.fontSizePt} editable={editable} onPatch={onPatchStyle} /> :
@@ -257,7 +253,6 @@ function ElementContentEditor({ element, reportType, resources, fieldGroups, edi
       ];
       return <><SelectField label="字段" value={element.fieldPath} options={options} disabled={!editable} onChange={(fieldPath) => onPatch({ fieldPath })} />
         {reportType === "ExportDocument" && <SelectField label="显示格式" value={element.fieldFormat ?? ""} options={[{ value: "", label: "原始值" }, { value: "Currency", label: "币种与金额" }]} disabled={!editable} onChange={(fieldFormat) => onPatch({ fieldFormat: fieldFormat === "Currency" ? "Currency" : undefined })} />}
-        {isShippingMarksField(element.fieldPath) && <small>按发票所选类型显示。文字使用下方样式，图片在此区域内等比例缩放。</small>}
         <details className="report-designer-property-section"><summary>标签与空值</summary><label><span>字段标签（选填）</span><CommitTextField value={element.label ?? ""} disabled={!editable} onCommit={(label) => onPatch({ label: label || undefined })} /></label>
         <label><span>占位文本</span><CommitTextField value={element.fallbackText ?? ""} disabled={!editable} onCommit={(fallbackText) => onPatch({ fallbackText: fallbackText || undefined })} /></label></details></>;
     }
@@ -273,7 +268,7 @@ function ElementContentEditor({ element, reportType, resources, fieldGroups, edi
     case "Rectangle":
       return null;
     case "ProductSpacer":
-      return <p>保留空白高度，在“布局”中设置位置和大小；不输出文字或边框。</p>;
+      return null;
   }
 }
 
@@ -284,5 +279,5 @@ function RegionSelector({ state, onCommit, disabled }: { state: ReportDesignerV3
   return <div className="report-designer-region-control"><label><span>所在区域</span><select aria-label="元素所在区域" disabled={disabled} value={ids.size === 1 ? located[0].layer.id : ""} onChange={(event) => onCommit(moveV3SelectionToRegion(state, event.target.value))}>
     {ids.size !== 1 ? <option value="" disabled>多个区域</option> : null}
     {state.schema.layers.map((layer) => <option key={layer.id} value={layer.id} disabled={layer.locked || !layer.visible || (bodyOnly && layer.role !== "Body")}>{layer.name}{layer.locked ? "（已锁定）" : !layer.visible ? "（已隐藏）" : ""}</option>)}
-  </select></label><small>{bodyOnly ? "自动重复明细和分页符放在主体区域。" : "跨区域拖动时自动更新；覆盖层用于水印等固定内容。"}</small></div>;
+  </select></label></div>;
 }

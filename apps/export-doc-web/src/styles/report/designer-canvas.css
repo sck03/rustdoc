@@ -173,14 +173,6 @@
   font-size: 12px;
 }
 
-.new-report-detail-role-note {
-  display: block;
-  line-height: 1.6;
-  padding: 6px 8px;
-  border-left: 3px solid var(--edm-neutral-400);
-  background: var(--edm-neutral-100);
-}
-
 .new-report-detail-parts {
   display: flex;
   flex-wrap: wrap;

@@ -104,7 +104,6 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, select
           <NumberField label="行数" min={1} max={REPORT_GRID_MAX_ROWS} step={1} value={block.rows.length} onCommit={rows => onCommit(resizeGridStructure(block, rows, block.columns.length))} />
           <NumberField label="列数" min={1} max={REPORT_GRID_MAX_COLUMNS} step={1} value={block.columns.length} onCommit={columns => onCommit(resizeGridStructure(block, block.rows.length, columns))} />
         </div>
-        <small>保留范围内的内容和合并；缩减会移除超出部分，可撤销。</small>
         <GridTrackActions block={block} selected={selected} onCommit={onCommit} />
       </section>
       </> : null}
@@ -146,18 +145,15 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, select
           <SelectField label="调整列" value={widthColumn.id} options={block.columns.map((column, index) => ({ value: column.id, label: `第 ${index + 1} 列` }))} onChange={setWidthColumnId} />
           <NumberField label="列宽 (mm)" value={widthColumn.widthPercent * widthMm / 100} min={widthMm / 100} max={maximumPercent * widthMm / 100} disabled={!adjacentWidthColumn} onCommit={value => resizeColumn(value / widthMm * 100)} />
           <NumberField label="列宽 (%)" value={widthColumn.widthPercent} min={1} max={maximumPercent} step={0.000001} precision={6} disabled={!adjacentWidthColumn} onCommit={resizeColumn} />
-          <small>差额由右侧相邻列承担；最后一列调整左侧相邻列，保持整表宽度。</small>
         </details>}
         <div className="new-report-grid-structure-actions">
           <button className="command-button secondary" type="button" onClick={() => onCommit(distributeGridColumnWidths(block))}>等宽列</button>
           <button className="command-button secondary" type="button" disabled={!selectedRow} onClick={() => onCommit(setGridRowsToUniformHeight(block, selectedRow?.heightMm ?? 9))}>统一行高</button>
         </div>
-        <div className="new-report-designer-muted">修改整表样式会立即应用到全部单元格；之后仍可单独覆盖当前单元格。</div>
         <TextStyleEditor style={block.defaultCellStyle} onChange={(defaultCellStyle) => onCommit(applyGridDefaultCellStyle({ ...block, defaultCellStyle }))} />
         <BorderEditor border={block.border} onChange={(border) => onCommit(applyGridBorderToCells({ ...block, border }))} />
       </section> : null}
       </DesignerPropertyTabs>
-      <small className="report-designer-v3-muted">单击画布选格，双击固定文本编辑；将普通字段拖到格内可直接绑定。</small>
     </div>
   );
 }

@@ -35,7 +35,6 @@ export function ReportDesignerDetailCompositeProperties({ column, fieldGroups, o
   }
   return <div className="new-report-detail-style-group">
     <DesignerCheckbox checked={column.omitEmptyLines === true} onChange={omitEmptyLines => onChange({ omitEmptyLines })}>不显示空内容行</DesignerCheckbox>
-    <p className="report-designer-v3-help">以下片段从左到右组合，换行后另起一行。点击片段修改；新片段插在所选片段后。占位行保留高度。</p>
     <div className="new-report-detail-parts" aria-label="列内容排列">
       {content.map((item, i) => <button key={item.id} type="button" aria-pressed={item.id === part?.id} className={`new-report-detail-part${item.visible === false ? " is-hidden" : ""}`} onClick={() => setSelectedId(item.id)}>
         <span>{i + 1}. {item.kind === "Field" ? fields.get(item.fieldPath) ?? "字段" : item.kind === "Text" ? item.text || "空文本" : partNames[item.kind]}</span>{item.visible === false && <small>隐藏</small>}

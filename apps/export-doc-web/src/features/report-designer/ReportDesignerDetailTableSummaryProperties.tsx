@@ -94,7 +94,6 @@ export function ReportDesignerDetailTableSummaryProperties({
               return (
                 <div className="new-report-summary-cell-editor" key={column.id}>
                   <strong>{column.title}</strong>
-                  {block.columns.indexOf(column) < summaryLabelSpan && <small>此列内容在左侧合并区域内，显示在标签下方。</small>}
                   {cell.contentKind === "Field" && <label><span>单位/后缀</span><input maxLength={30} value={cell.suffix ?? ""} onChange={e => updateSummaryCell(column.id, current => ({ ...current, suffix: e.target.value }))} /></label>}
                   <label>
                     <span>内容</span>
@@ -151,9 +150,7 @@ export function ReportDesignerDetailTableSummaryProperties({
               {block.summaryRow.border && <button type="button" className="command-button secondary" onClick={() => onCommit({ ...block, summaryRow: { ...block.summaryRow!, border: undefined } })}>合计行沿用表格边框</button>}
             </details>
           </div>
-        ) : (
-          <div className="new-report-designer-muted">用于发票总数量、总箱数、总金额等报表尾部汇总，不随明细循环重复。</div>
-        )}
+        ) : null}
       </div>
     </>
   );

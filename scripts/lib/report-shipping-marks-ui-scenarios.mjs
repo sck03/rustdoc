@@ -10,7 +10,6 @@ export async function verifyShippingMarksUi({ page, url, read, waitFor, click, k
   assert.equal(await read(page, '[...document.querySelectorAll("[aria-label^=插入字段]")].filter(node=>node.textContent.includes("唛头")).length'), 1);
   await click(page, '[aria-label="插入字段 唛头（文字 / 图片自动）"]');
   await waitFor(page, 'window.__designerSchema.layers.flatMap(layer=>layer.elements).filter(element=>element.fieldPath==="Invoice.ShippingMarks").length===2');
-  assert(await read(page, 'document.querySelector(".report-designer-v3-inspector").textContent.includes("等比例缩放")'));
   await click(page, 'button[aria-label="撤销"]');
   await waitFor(page, 'window.__designerSchema.layers.flatMap(layer=>layer.elements).filter(element=>element.fieldPath==="Invoice.ShippingMarks").length===1');
   await read(page, 'document.querySelector("[data-v3-element-id=marks-field]").focus()');

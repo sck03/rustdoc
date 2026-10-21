@@ -74,6 +74,7 @@ export async function verifyEntryTemplateDesigner({ run, request, token, cdp, ou
     const current = await request('GetUserReportTemplate', token, undefined, { id: clone.body.id });
     return current.status === 200 && current.body.contentHtml !== saved.body.contentHtml;
   }, 30000, 'readable column widths were not saved');
+  await wait("[...document.querySelectorAll('button')].some(n=>n.textContent.trim()==='保存'&&n.disabled)");
   await run('location.reload();true');
   await wait(`document.querySelector(${JSON.stringify(selector)})?.textContent.includes('Gross kg')`);
   const normal = await request('CreateInvoice', token, { ...originalDraft, invoiceNo: 'ENTRY-NORMAL', useEntryPrintRows: false });

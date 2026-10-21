@@ -43,7 +43,11 @@ export async function verifyDesktopPersonnelDeletion({ run, request, token, cdp,
   const denied = await request('DeletePersonnel', token, { expectedVersion: result.body.versionNumber, reason: '测试拒绝绕过' }, { id: linked.employee.id });
   assert.equal(denied.status, 409, JSON.stringify(denied.body));
   await captureScreenshot(cdp, path.join(output, 'Full-personnel-delete-reason.png'));
-  await run("[...document.querySelectorAll('button')].find(e=>e.textContent==='解除账号绑定').click(); true");
+  await run("[...document.querySelectorAll('button')].find(e=>e.textContent==='关联账号').click(); true");
+  await wait("document.querySelector('[role=dialog]')?.textContent.includes('delete-protection')");
+  assert.equal(await run("document.querySelector('[role=dialog] input[type=radio], [aria-label=搜索可关联账号]')!==null"), false, 'A linked person displays the current account without loading a replacement picker');
+  await captureScreenshot(cdp, path.join(output, 'Full-personnel-current-account.png'));
+  await run("[...document.querySelectorAll('[role=dialog] button')].find(e=>e.textContent==='解除账号绑定').click(); true");
   await wait("document.querySelector('[role=dialog] textarea[name=reason]')");
   await run("document.querySelector('[role=dialog] textarea[name=reason]').focus(); true");
   await cdp.send('Input.insertText', { text: '纠正隔离验收账号关联' });
@@ -56,6 +60,15 @@ export async function verifyDesktopPersonnelDeletion({ run, request, token, cdp,
   assert.equal(preserved.employee, null);
   assert.equal(await run(`${button}.disabled`), true, 'Unlinking must preserve historical deletion protection');
   assert.equal(await run("[...document.querySelectorAll('button')].some(e=>e.textContent==='解除账号绑定')"), false);
+  const replacement = await request('createUserAccount', token, { username: 'replacement-account', fullName: '重新关联验收', role: 'OfficeEmployee', companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Replacement-2026' });
+  assert.equal(replacement.status, 200);
+  await run("[...document.querySelectorAll('button')].find(e=>e.textContent==='关联账号').click(); true");
+  const replacementRadio = `document.querySelector('[role=dialog] input[type=radio][value="${replacement.body.user.id}"]')`;
+  await wait(replacementRadio);
+  await run(`${replacementRadio}.click(); true`);
+  await run("[...document.querySelectorAll('[role=dialog] button')].find(e=>e.textContent==='确认关联').click(); true");
+  await waitFor(async () => (await request('GetPersonnel', token, undefined, { id: linked.employee.id })).body.account?.id === replacement.body.user.id, 30000, 'A different account can be linked only after unlinking');
+  await wait("!document.querySelector('[role=dialog]')");
   await run("[...document.querySelectorAll('button')].find(e=>e.textContent==='任职与操作记录').click(); true");
   await wait("document.querySelector('.office-history')?.textContent.includes('解除账号绑定')");
   await captureScreenshot(cdp, path.join(output, 'Full-personnel-unlinked.png'));

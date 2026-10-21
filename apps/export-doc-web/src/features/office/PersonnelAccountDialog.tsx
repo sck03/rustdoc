@@ -2,9 +2,19 @@ import { useState, type FormEvent } from "react";
 import type { ApiUserDto, ExportDocManagerApiClient, PersonnelAccountRecord, PersonnelRecord } from "../../api/index.ts";
 import { OfficeDialog, OfficePager, OfficeQueryState, OfficeSubmit } from "./OfficeUi.tsx";
 import { usePersonnelAccountOptions, usePersonnelOperation } from "./usePersonnelData.ts";
-export function PersonnelAccountDialog({ client, user, record, onClose }: {
+type Props = {
   client: ExportDocManagerApiClient; user: ApiUserDto; record: PersonnelRecord; onClose: () => void;
-}) {
+};
+export function PersonnelAccountDialog({ record, onUnlink, ...props }: Props & { onUnlink: () => void }) {
+  if (record.account) return <OfficeDialog title={`关联账号 · ${record.employee.fullName}`} onClose={props.onClose}>
+    <p>已关联账号：<strong>{record.account.username}</strong></p>
+    <p>{record.account.fullName || "未填写姓名"} · {record.account.isActive ? "启用" : "停用"}</p>
+    <p className="office-muted">更换账号前，请先解除当前绑定。</p>
+    <button className="command-button secondary" type="button" disabled={!record.canLinkAccount} onClick={onUnlink}>解除账号绑定</button>
+  </OfficeDialog>;
+  return <PersonnelAccountPicker {...props} record={record} />;
+}
+function PersonnelAccountPicker({ client, user, record, onClose }: Props) {
   const operation = usePersonnelOperation();
   const model = usePersonnelAccountOptions(client, user, record.employee.id);
   const [selected, setSelected] = useState<PersonnelAccountRecord | null>(null);

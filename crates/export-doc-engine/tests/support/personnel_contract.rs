@@ -447,8 +447,39 @@ pub fn exercise(service: &NativeService, admin: &str) {
     person = unlink_roundtrip(service, admin, person);
     let mut link = link;
     link["expectedVersion"] = person["versionNumber"].clone();
+    let denied = call(
+        service,
+        admin,
+        LINK_PERSONNEL_ACCOUNT,
+        id,
+        Some(link.clone()),
+    )
+    .unwrap_err();
+    assert_eq!(
+        denied.status,
+        Some(409),
+        "Even after clearance, changing accounts requires an explicit unlink"
+    );
+    assert_eq!(
+        call(service, admin, GET_PERSONNEL, id, None).unwrap(),
+        person
+    );
+    let unlink = |person: &Value| {
+        call(service, admin, UNLINK_PERSONNEL_ACCOUNT, id, Some(json!({"expectedVersion":person["versionNumber"],"userId":person["account"]["id"],"expectedAccountVersion":person["account"]["versionNumber"],"reason":"更换关联账号"}))).unwrap()
+    };
     let original_account = person["account"].clone();
+    person = unlink(&person);
+    link["expectedVersion"] = person["versionNumber"].clone();
     person = call(service, admin, LINK_PERSONNEL_ACCOUNT, id, Some(link)).unwrap();
+    assert_eq!(person["account"]["id"], spare["id"]);
+    person = unlink(&person);
+    let users = call(service, admin, LIST_USERS, 0, None).unwrap();
+    let original_account = users["users"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|user| user["id"] == original_account["id"])
+        .unwrap();
     person = call(service, admin, LINK_PERSONNEL_ACCOUNT, id, Some(json!({"expectedVersion":person["versionNumber"],"userId":account["id"],"expectedAccountVersion":original_account["versionNumber"]}))).unwrap();
     let today = login()["user"]["businessDate"].as_str().unwrap().to_owned();
     let future =

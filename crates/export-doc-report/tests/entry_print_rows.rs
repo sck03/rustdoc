@@ -105,6 +105,44 @@ fn entry_order_blank_rows_and_two_amounts_share_one_description_without_changing
     let document = render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();
     assert!(document.pages[0].svg.contains("INTERNAL PRODUCT NAME"));
     assert!(!document.pages[0].svg.contains("MEN SWEATERS"));
+
+    let mut grouped = Builtin::Invoice.design().unwrap();
+    for element in grouped
+        .layers
+        .iter_mut()
+        .flat_map(|layer| &mut layer.elements)
+    {
+        if let Kind::Flow {
+            block: ReportBlock::DetailTable(table),
+            ..
+        } = &mut element.kind
+        {
+            table.grouping = Some(
+                serde_json::from_value(json!({
+                    "fieldPath": "item.StyleName", "label": "GROUP-HEADING",
+                    "showFieldValue": false, "keepTogether": true, "style": {}
+                }))
+                .unwrap(),
+            );
+        }
+    }
+    let automatic = render_design(&data, &grouped, &AtomicBool::new(false)).unwrap();
+    assert!(
+        automatic
+            .pages
+            .iter()
+            .any(|page| page.svg.contains("GROUP-HEADING"))
+    );
+    data.root["Invoice"]["useEntryPrintRows"] = json!(true);
+    let entries = render_design(&data, &grouped, &AtomicBool::new(false)).unwrap();
+    let plain = render_builtin(Builtin::Invoice, &data, &AtomicBool::new(false)).unwrap();
+    assert_eq!(entries.pages.len(), plain.pages.len());
+    for (actual, expected) in entries.pages.iter().zip(&plain.pages) {
+        assert_eq!(
+            actual.svg, expected.svg,
+            "entry mode preserves authored order without automatic group headings"
+        );
+    }
 }
 
 #[test]

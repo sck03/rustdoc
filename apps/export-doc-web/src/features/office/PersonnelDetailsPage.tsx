@@ -41,7 +41,7 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
     updateRoute({ tab: next }, false);
   }
   const [editing, setEditing] = useState<PersonnelRecord | null>(null);
-  const [linking, setLinking] = useState<PersonnelRecord | null>(null);
+  const [linking, setLinking] = useState(false);
   const [unlinking, setUnlinking] = useState<PersonnelRecord | null>(null);
   const [workflow, setWorkflow] = useState<{ record: PersonnelRecord; action: PersonnelWorkflow } | null>(null);
   const record = query.data;
@@ -59,7 +59,7 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
           {personnelWorkflows(record).map((action) => record.approvalRequiredActions?.includes(action)
             ? oaAccess(user, "personnel", "create") && <Link className="command-button secondary" key={action} to={`/office/requests/personnel?change=${action}&employeeId=${id}`}>申请{personnelChangeLabels[action]}</Link>
             : <button type="button" className="command-button secondary" disabled={imageOperation.busy} key={action} onClick={() => setWorkflow({ record, action })}>办理{personnelChangeLabels[action]}</button>)}
-          {record.canLinkAccount && <button type="button" className="command-button secondary" disabled={imageOperation.busy} onClick={() => setLinking(record)}>关联账号</button>}
+          {record.canLinkAccount && <button type="button" className="command-button secondary" disabled={imageOperation.busy} onClick={() => setLinking(true)}>关联账号</button>}
           {record.canLinkAccount && record.account && <button type="button" className="command-button secondary" disabled={imageOperation.busy} onClick={() => setUnlinking(record)}>解除账号绑定</button>}
           {record.canDelete && <button type="button" className="command-button secondary" disabled={imageOperation.busy || Boolean(record.deleteRestriction)}
             aria-describedby={record.deleteRestriction ? "personnel-delete-restriction" : undefined}
@@ -78,7 +78,7 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
     </section>
     {editing && <PersonnelFormDialog client={client} user={user} departments={departments} record={editing} onClose={() => setEditing(null)} onSaved={() => setEditing(null)} />}
     {workflow && <PersonnelWorkflowDialog client={client} user={user} departments={departments} {...workflow} onClose={() => setWorkflow(null)} />}
-    {linking && <PersonnelAccountDialog client={client} user={user} record={linking} onClose={() => setLinking(null)} />}
+    {linking && record && <PersonnelAccountDialog client={client} user={user} record={record} onClose={() => setLinking(false)} onUnlink={() => { setLinking(false); setUnlinking(record); }} />}
     {unlinking && <PersonnelUnlinkAccountDialog client={client} record={unlinking} onClose={() => setUnlinking(null)} />}
     {deleting && <RecordDeleteDialog name={`${deleting.employee.fullName} · ${deleting.employee.employeeNumber}`} version={deleting.versionNumber} operation={deleteOperation}
       description="仅可删除没有账号、业务及正式任职变动引用的误录档案。档案和所附照片会一起删除，删除审计保留。"

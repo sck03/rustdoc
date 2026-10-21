@@ -25,8 +25,9 @@ await require("esbuild").build({ stdin: { contents: `
 const { office, oa, personnel, organization, communication, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey } = await import(pathToFileURL(bundle).href);
 const grants = scope => ["office.rooms", "office.supplies"].flatMap(resourceKey =>
   ["view", "create", "cancel", "approve", "issue", "return", "restock", "manage"].map(action => ({ resourceKey, action, dataScope: scope })));
+const modules = enabledModules => ({ enabledModules, moduleAccess: enabledModules.map(moduleKey => ({ moduleKey, accessLevel: "view" })) });
 const user = { id: 1, companyScope: "C1", departmentId: "D1", businessDate: "2026-09-07",
-  capabilities: { enabledModules: ["office.rooms", "office.supplies", "system.about"], permissions: grants("own"), productEdition: "Full" } };
+  capabilities: { ...modules(["office.rooms", "office.supplies", "system.about"]), permissions: grants("own"), productEdition: "Full" } };
 const row = { id: 7, meetingRoomId: 2, ownerUserId: 2, departmentId: "D2", status: "Pending", requiresKey: true,
   startsAt: "2026-09-07T08:00:00Z", endsAt: "2026-09-07T09:00:00Z" };
 assert.deepEqual(office.officeRequestActions(row, user, "rooms"), [], "viewing a record does not allow operations beyond own scope");
@@ -55,6 +56,7 @@ assert.equal(office.shiftOfficeBookingEnd("2026-09-07T10:30", "Asia/Shanghai"), 
 assert.equal(getDefaultWorkspaceRoute(user.capabilities), "/office/approvals", "Full employees enter their authorized application workspace");
 assert.equal(getDefaultWorkspaceRoute({...user.capabilities,productEdition:"Document"}),"/access-denied","shipping editions retain their fixed home boundary");
 assert(navigation.filterWorkspaceNavGroups(user.capabilities).some(group => group.key === "office"));
+assert(!navigation.filterWorkspaceNavGroups({ ...user.capabilities, moduleAccess: [] }).some(group => group.key === "office"), "module enablement alone does not grant navigation access");
 assert(!navigation.filterWorkspaceNavGroups({ ...user.capabilities, isDesktopRuntime: true }).some(group => group.key === "office"));
 for (const pathname of ["/office/meeting-rooms", "/office/supplies"]) {
   const args = { pathname, user, canManageSystem: false, isDesktopRuntime: false };
@@ -63,7 +65,7 @@ for (const pathname of ["/office/meeting-rooms", "/office/supplies"]) {
   assert(!isRouteAccessAllowed({ ...args, user: { ...user, capabilities: { ...user.capabilities, enabledModules: [] } } }));
 }
 const descriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
-const personnelUser = { ...user, capabilities: { ...user.capabilities, enabledModules: ["office.people"], permissions: [{resourceKey:"office.people",action:"view",dataScope:"company"}] } };
+const personnelUser = { ...user, capabilities: { ...user.capabilities, ...modules(["office.people"]), permissions: [{resourceKey:"office.people",action:"view",dataScope:"company"}] } };
 assert.equal(getDefaultWorkspaceRoute(personnelUser.capabilities), "/office/directory");
 assert(isRouteAccessAllowed({ pathname:"/office/directory",user:personnelUser,canManageSystem:false,isDesktopRuntime:false }));
 assert(!isRouteAccessAllowed({ pathname:"/office/people",user:personnelUser,canManageSystem:false,isDesktopRuntime:false }));
@@ -96,7 +98,7 @@ assert.throws(()=>organization.departmentOptions([{code:"A",name:"A",parentCode:
 assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=15&applicantUserId=7&employeeId=5")), {requestId:15,applicantUserId:7,employeeId:5});
 assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=-1&applicantUserId=2147483648&employeeId=0")), {requestId:undefined,applicantUserId:undefined,employeeId:undefined});
 const registerUser = { ...manager, capabilities: { ...manager.capabilities, productEdition:"Full", usesOfficeRegister:true,
-  canManageSettings:true, canManageUsers:true, enabledModules:["office.rooms","office.supplies","office.people","system.about"],
+  canManageSettings:true, canManageUsers:true, ...modules(["office.rooms","office.supplies","office.people","system.about"]),
   permissions:[...grants("all"), ...["view","view-details"].map(action=>({resourceKey:"office.people",action,dataScope:"all"}))] } };
 assert.equal(getDefaultWorkspaceRoute(registerUser.capabilities), "/office/approvals");
 assert.equal(navigation.filterWorkspaceNavGroups({ ...registerUser.capabilities, isDesktopRuntime:true }).filter(group=>['office','personnel'].includes(group.key)).flatMap(group=>group.items).length,4);

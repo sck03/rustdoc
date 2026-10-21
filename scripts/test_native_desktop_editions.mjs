@@ -190,9 +190,11 @@ for (const edition of selected) {
     assert.equal(child.exitCode, 0, `${edition}: graceful exit failed`);
     await assert.rejects(fetch(context.apiBaseUrl + '/health', { signal: AbortSignal.timeout(1000) }));
   } catch (error) {
+    console.error(error);
     if (cdp) {
-      await captureScreenshot(cdp, path.join(output, `${edition}-failure.png`));
-      fs.writeFileSync(path.join(output, `${edition}-failure.txt`), await run('document.body.innerText'));
+      await captureScreenshot(cdp, path.join(output, `${edition}-failure.png`)).catch(diagnostic => console.error('Failure screenshot unavailable:', diagnostic));
+      const text = await run('document.body.innerText').catch(() => 'WebView did not respond.');
+      fs.writeFileSync(path.join(output, `${edition}-failure.txt`), `${error.stack || error}\n${text}`);
     }
     throw error;
   } finally {

@@ -93,9 +93,7 @@ export function ReportDesignerDetailTableGroupingProperties({
               <TextStyleEditor style={block.grouping.style} onChange={(style) => onCommit({ ...block, grouping: { ...block.grouping!, style } })} />
             </div>
           </div>
-        ) : (
-          <div className="new-report-designer-muted">用于按品类、箱号或唛头字段变化插入组标题行；数据需按分组字段排序。</div>
-        )}
+        ) : null}
       </div>
       <div className="new-report-detail-style-group">
         <div className="new-report-detail-column-title">
@@ -112,9 +110,7 @@ export function ReportDesignerDetailTableGroupingProperties({
             )
           ) : null}
         </div>
-        {!block.grouping ? (
-          <div className="new-report-designer-muted">先添加分组表头，再配置每组结束时输出的小计行。</div>
-        ) : block.grouping.footer ? (
+        {block.grouping?.footer ? (
           <div className="new-report-property-grid">
             <label>
               <span>标签</span>
@@ -211,9 +207,7 @@ export function ReportDesignerDetailTableGroupingProperties({
               <TextStyleEditor style={block.grouping.footer.style} onChange={(style) => onCommit({ ...block, grouping: { ...block.grouping!, footer: { ...block.grouping!.footer!, style } } })} />
             </div>
           </div>
-        ) : (
-          <div className="new-report-designer-muted">适合按品类、箱号或 HS Code 分组后输出每组数量、金额或行数小计；数据需按分组字段排序。</div>
-        )}
+        ) : null}
       </div>
     </>
   );

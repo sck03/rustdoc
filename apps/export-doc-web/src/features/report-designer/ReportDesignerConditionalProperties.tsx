@@ -45,7 +45,6 @@ export function ConditionalBlockProperties({
           <ConditionRuleProperties rule={rule} fieldGroups={documentFields} onChange={patch => commitRules(rules.map((item, position) => position === index ? { ...item, ...patch } : item))} />
         </div>)}
         <button type="button" className="command-button secondary" disabled={rules.length >= MAX_CONDITIONAL_RULES} onClick={() => commitRules([...rules, { fieldPath: block.condition.fieldPath, operator: "HasValue", value: "" }])}>添加条件</button>
-        <p className="report-designer-v3-help">最多 {MAX_CONDITIONAL_RULES} 条规则；满足后才输出下方内容及边框。“有内容”排除空白和未勾选值。画布保留组件便于编辑，实际效果请查看单据预览。</p>
       </div>
       <div className="new-report-detail-style-group">
         <div className="new-report-detail-column-title">

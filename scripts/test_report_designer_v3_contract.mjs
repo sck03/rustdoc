@@ -194,7 +194,6 @@ assert(panelsSource.includes("CommitTextField"), "V3 属性面板的文本编辑
 assert(propertyControlsSource.includes("当前值：") && propertyControlsSource.includes("需修正"), "V3 字段下拉必须保留非法当前值的可见修正提示");
 assert(imagePropertiesSource.includes('type="file"') && imagePropertiesSource.includes("选择图片并上传"), "图片属性栏必须提供直接选择文件并上传的入口");
 assert(imagePropertiesSource.includes("uploadReportTemplateV3ImageResource") && imagePropertiesSource.includes("已上传图片"), "图片属性栏必须调用受控资源 API 并支持下拉复用已绑定资源");
-assert(imagePropertiesSource.includes("无需填写资源 ID") && imagePropertiesSource.includes("最大 32 MB"), "图片上传必须说明自动绑定行为和文件大小边界");
 assert(inspectorCss.includes("report-designer-v3-upload-button") && inspectorCss.includes("report-designer-v3-upload-feedback.is-error"), "图片上传控件和错误反馈必须具有独立可见样式");
 assert(workspaceSource.includes("setProductFieldsOnly(false); openFieldPanel();"), "工具栏的选择字段按钮必须打开普通字段面板而不是静默插入首个字段");
 assert(workspaceSource.includes("report-designer-v3-zoom-select") && workspaceSource.includes("适合窗口"), "V3 工作区必须提供缩放预设和适合窗口操作");
@@ -777,7 +776,7 @@ assert(canvasSource.includes("createV3RegionMoveConstraint") && canvasSource.inc
 assert(canvasSource.includes("--v3-page-ratio") && canvasCss.includes("aspect-ratio: var(--v3-page-ratio"), "V3 画布必须按 A4 物理宽高比渲染横竖版页面");
 assert(bandsCss.includes("report-designer-layer-tabs") && canvasCss.includes("report-designer-v3-preview-line-horizontal"), "V3 画布必须提供独立图层导航和细线方向");
 assert(resourcePanelsSource.includes('label="普通表格"') && resourcePanelsSource.includes("商品字段（逐行输出）") && resourcePanelsSource.includes("高级排版"), "组件入口必须区分自由商品字段、普通表格和高级组合表格");
-assert(gridPropertiesSource.includes("修改整表样式会立即应用到全部单元格") && !gridPropertiesSource.includes("套用样式") && !gridPropertiesSource.includes("套用边框"), "整表样式和边框必须即时应用，不能依赖容易漏掉的二次套用按钮");
+assert(!gridPropertiesSource.includes("套用样式") && !gridPropertiesSource.includes("套用边框"), "整表样式和边框不能依赖二次套用按钮；实际应用由网格交互回归验证");
 assert(gridCss.includes("data-report-grid-cell-id") && gridCss.includes("is-designer-selected-cell"), "画布样式必须支持单元格直接命中和选中反馈");
 assert(layerResizersSource.includes('role="separator"') && bandsCss.includes("report-designer-v3-band-resizer"), "页眉页脚设计带必须提供可访问的调整入口，拖动行为由真实界面回归验证");
 assert(colorFieldSource.includes("type=\"color\"") && colorFieldSource.includes("常用颜色") && colorFieldSource.includes("高级色值"), "V3 颜色编辑必须提供色板、原生颜色选择器和可选高级色值");

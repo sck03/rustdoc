@@ -306,9 +306,8 @@ pub fn handle(
                         return Err(conflict("账号已经关联其他人员。"));
                     }
                     if person["account"]["id"].as_i64().is_some_and(|old| old != user_id)
-                        && super::office_queries::clearance(tx, &person)?["isClear"] != true
                     {
-                        return Err(conflict("人员或原账号仍有未结申请、审批或办理职责，请先完成交接再更换关联账号。"));
+                        return Err(conflict("人员已关联账号，请先解除当前绑定，再关联其他账号。"));
                     }
                     if user["departmentId"] != person["departmentId"]
                         && super::office_queries::account_clearance(tx, &user)?["isClear"] != true

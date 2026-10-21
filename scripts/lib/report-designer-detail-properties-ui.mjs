@@ -67,19 +67,19 @@ export async function verifyDetailProperties({ page, url, read, waitFor, click, 
   await read(page, `(()=>{const node=${control("首页明细行数", "input")};node.focus();Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(node,'');node.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   await key(page, "Tab");
   await waitFor(page, `${block}.print.firstPageRows===undefined`);
-  await tab("录入行与合计");
+  await tab("说明与合计");
   await open("末页合计");
   assert.equal(await read(page, "[...document.querySelectorAll('.new-report-summary-cell-editor')].filter(n=>n.getClientRects().length).length"), 1);
   await tab("表格样式");
   await waitFor(page, `${control("设置文字样式")}.value==="headerStyle"`);
   results.push({ test: "header and body styles are independent; totals edit one column and tabs preserve selection", passed: true });
-  await tab("商品列");
+  await tab("明细列");
   await waitFor(page, `${control("选择要修改的列")}.value===${JSON.stringify(copy.id)}`);
   results.push({ test: "unvisited detail editors load on demand and retain the selected column after visiting other tabs", initialOptions, passed: true });
   for (const width of [1366, 390]) {
     await page.send("Emulation.setDeviceMetricsOverride", { width, height: 1000, deviceScaleFactor: 1, mobile: width < 500 });
     if (width < 500) await click(page, ".report-designer-v3-compact-tabs button:nth-child(3)");
-    for (const label of ["商品列", "表格样式", "录入行与合计", "分页与高级"]) {
+    for (const label of ["明细列", "表格样式", "说明与合计", "分页与高级"]) {
       await tab(label);
       assert(await read(page, 'document.querySelector(".report-designer-v3-inspector").scrollWidth <= document.querySelector(".report-designer-v3-inspector").clientWidth + 1'));
       await captureScreenshot(page, path.join(output, `detail-${width}-${label}.png`), { captureBeyondViewport: false });

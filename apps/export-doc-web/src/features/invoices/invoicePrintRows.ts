@@ -7,10 +7,19 @@ export function itemPrintRows(item: ApiInvoiceItemDto): ApiInvoicePrintRow[] {
   return item.printRows?.length ? item.printRows : [{ kind: "Item", text: item.styleName ?? "" }];
 }
 
-export function changePrintRow(rows: ApiInvoicePrintRow[], index: number, action: "text" | "blank" | "duplicate" | "delete" | "up" | "down", after = false): ApiInvoicePrintRow[] {
+export function resolvePrintRowSelection(items: ApiInvoiceItemDto[], selected: PrintRowSelection): PrintRowSelection {
+  const item = Math.max(0, Math.min(selected.item, items.length - 1));
+  const row = items[item] ? Math.max(0, Math.min(selected.row, itemPrintRows(items[item]).length - 1)) : 0;
+  return item === selected.item && row === selected.row ? selected : { item, row };
+}
+
+export function changePrintRow(rows: ApiInvoicePrintRow[], index: number, action: "text" | "blank" | "duplicate" | "delete" | "up" | "down" | "split", after = false): ApiInvoicePrintRow[] {
   if (index < 0 || index >= rows.length) return rows;
   const next = [...rows];
-  if (action === "text" || action === "blank" || action === "duplicate") {
+  if (action === "split") {
+    if (rows.length >= maxItemPrintRows || rows[index].kind !== "Item" || !rows[index].text) return rows;
+    next.splice(index, 1, { kind: "Text", text: rows[index].text }, { ...rows[index], text: "" });
+  } else if (action === "text" || action === "blank" || action === "duplicate") {
     if (rows.length >= maxItemPrintRows || action === "duplicate" && rows[index].kind === "Item") return rows;
     next.splice(index + Number(after || action === "duplicate"), 0, action === "duplicate" ? { ...rows[index] } : { kind: action === "text" ? "Text" : "Blank", text: "" });
   } else if (action === "delete") {

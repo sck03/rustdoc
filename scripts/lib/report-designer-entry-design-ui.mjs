@@ -17,6 +17,12 @@ export async function verifyEntryDesignUi({ page, url, read, waitFor, click, key
   await choose('画布示例', 'entries');
   await waitFor(page, 'document.querySelector("[data-report-entry-kind=blank]")');
   assert.deepEqual(await read(page, block), original, 'preview mode must not mutate the template');
+  await choose('按录入行打印的说明列', '');
+  await waitFor(page, `${control('画布示例')}.querySelector('select').value==='products'`);
+  assert(!await read(page, 'Boolean(document.querySelector("[data-report-entry-kind]"))'), 'removing the entry column keeps the canvas and mode selector consistent');
+  await click(page, 'button[aria-label="撤销"]');
+  await waitFor(page, 'document.querySelector("[data-report-entry-kind=blank]")');
+  assert.deepEqual(await read(page, block), original, 'undo restores the entry column and saved composition');
   assert(await read(page, `!document.querySelector('[data-v3-element-id=invoice-items]').textContent.includes('item.')`));
   assert(await read(page, `[...document.querySelectorAll('[data-report-entry-kind=note] td')].every(n=>n.dataset.reportDetailColumnId==='description'||!n.textContent)`));
   await captureScreenshot(page, path.join(output, 'invoice-entry-design.png'), { captureBeyondViewport: false });

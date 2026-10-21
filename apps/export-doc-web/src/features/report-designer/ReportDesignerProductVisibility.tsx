@@ -14,7 +14,6 @@ export function ReportDesignerProductVisibility({ element, fieldGroups, editable
     <DesignerCheckbox checked={Boolean(settings.condition)} onChange={enabled => onPatch({ product:{...settings, condition:enabled ? {fieldPath:element.type === "Field" ? element.fieldPath : "item.StyleNo", operator:"HasValue", value:""} : undefined} })}>按条件显示</DesignerCheckbox>
     {settings.condition && <ConditionRuleProperties rule={settings.condition} itemContext fieldGroups={fields} onChange={patch => onPatch({product:{...settings,condition:{...settings.condition!,...patch}}})} />}
     <DesignerCheckbox checked={settings.collapseEmpty === true} onChange={collapseEmpty => onPatch({product:{...settings,collapseEmpty}})}>隐藏时收起空内容行</DesignerCheckbox>
-    <p className="report-designer-v3-help">整行没有其他内容时收起高度；底部对齐的数量和金额随内容上移。占位行保留设计高度，每件商品重复。</p>
     <button type="button" className="command-button secondary" onClick={onAddSpacer}>在商品末尾添加占位行</button>
   </fieldset></details>;
 }

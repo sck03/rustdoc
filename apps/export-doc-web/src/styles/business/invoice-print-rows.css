@@ -3,6 +3,7 @@
 .invoice-print-rows .command-button { min-height: 32px; padding: 5px 9px; }
 .invoice-items-view-controls { justify-content: space-between; }
 .invoice-items-view-controls .segmented-control { grid-template-columns: repeat(2, minmax(90px, 1fr)); }
+.invoice-items-view-controls > label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .invoice-print-rows-scroll { overflow: auto; min-height: 180px; flex: 1; border: 1px solid var(--border-color); }
 .invoice-print-rows table { border-collapse: collapse; width: 100%; min-width: 940px; }
 .invoice-print-rows th, .invoice-print-rows td { border: 1px solid var(--border-color); padding: 4px; vertical-align: top; }

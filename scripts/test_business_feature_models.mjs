@@ -21,7 +21,7 @@ await require("esbuild").build({ stdin: { loader: "ts", resolveDir: web, content
 ` }, outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 const model = await import(pathToFileURL(bundle).href);
 const permissions = [{ resourceKey: "document.invoices", action: "view", dataScope: "own" }];
-const capabilities = { productEdition: "Full", enabledModules: ["document.invoices"], permissions, canUseDocumentWorkspace: true };
+const capabilities = { productEdition: "Full", enabledModules: ["document.invoices"], moduleAccess: [{ moduleKey: "document.invoices", accessLevel: "view" }], permissions, canUseDocumentWorkspace: true };
 for (const [feature, pathname] of [["worklist", "/worklist"], ["business-attachments", "/business-attachments"], ["business-attachments", "/invoices/17/attachments"]]) {
   const args = { pathname, user: { capabilities }, canManageSystem: false, isDesktopRuntime: true };
   assert.equal(model.isRouteAccessAllowed(args), false, "missing feature information must deny a deep link");

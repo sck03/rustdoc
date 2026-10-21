@@ -219,12 +219,6 @@
   width: 100%;
 }
 
-.report-designer-v3-resource-help {
-  color: var(--edm-neutral-550);
-  font-size: 0.6875rem;
-  line-height: 1.45;
-}
-
 .report-designer-v3-upload-feedback {
   padding: 6px 8px;
   border-radius: 5px;

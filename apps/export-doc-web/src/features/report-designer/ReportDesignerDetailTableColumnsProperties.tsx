@@ -51,15 +51,12 @@ export function ReportDesignerDetailTableColumnsProperties({ block, widthMm, fie
           <button className="icon-button compact-icon-button danger-icon" type="button" title="删除列" aria-label="删除列" disabled={block.columns.length <= 1 || block.entryDescriptionColumnId === column.id || Boolean(block.adjustments && [block.adjustments.descriptionColumnId, block.adjustments.amountColumnId].includes(column.id))} onClick={() => { setSelectedId(block.columns[index + 1]?.id ?? block.columns[index - 1]?.id ?? ""); onCommit(removeDetailTableColumn(block, column.id)); }}><Trash2 size={16} aria-hidden="true" /></button>
         </div>
       </div>
-      {(block.entryDescriptionColumnId === column.id || (block.adjustments && [block.adjustments.descriptionColumnId, block.adjustments.amountColumnId].includes(column.id))) && <small className="new-report-detail-role-note">此列用于{[block.entryDescriptionColumnId === column.id && "录入行说明", block.adjustments?.descriptionColumnId === column.id && "费用说明", block.adjustments?.amountColumnId === column.id && "调整金额"].filter(Boolean).join("、")}。删除前在“录入行与合计”中更换对应列。</small>}
       <div className="new-report-property-grid">
         <label className="new-report-property-wide"><span>标题</span><CommitTextField multiline rows={2} value={column.title} onCommit={title => updateColumn({ title })} /></label>
         {block.columns.length > 1 ? <NumberField label="打印宽度(mm)" value={widths[index]} min={Math.min(8, ...widths)} max={widths[index] + widths[index === widths.length - 1 ? index - 1 : index + 1] - Math.min(8, ...widths)} onCommit={value => onCommit(setDetailColumnWidth(block, column.id, value, widthMm))} /> : <span>打印宽度 {widths[index].toFixed(1)} mm</span>}
         {column.contentKind !== "Composite" && <FieldPathInput selectOnly className="new-report-property-wide" label="显示内容" value={column.fieldPath} fieldGroups={itemFields} onChange={fieldPath => updateColumn({ fieldPath })} />}
         <label><span>对齐方式</span><select value={column.align} onChange={event => updateColumn({ align: normalizeAlign(event.target.value) })}><option value="Left">靠左</option><option value="Center">居中</option><option value="Right">靠右</option></select></label>
       </div>
-      <small className="new-report-designer-muted">改宽度时与相邻列交换空间；其余列和唛头宽度保持。</small>
-      <DesignerCheckbox checked={block.entryDescriptionColumnId === column.id} onChange={checked => onCommit({ ...block, entryDescriptionColumnId: checked ? column.id : undefined })}>用此列接收录入行文字</DesignerCheckbox>
       {column.contentKind === "Composite" && <fieldset className="new-report-detail-style-group"><legend>显示哪些商品信息</legend>
         {(column.content ?? []).filter(part => part.kind === "Field").map(part => <DesignerCheckbox key={part.id} checked={part.visible !== false} onChange={visible => updateColumn({ content: column.content?.map(current => current.id === part.id ? { ...current, visible } : current) })}>{fields.get(part.fieldPath) ?? "未识别的商品信息（请在组合排版中修正）"}</DesignerCheckbox>)}
       </fieldset>}

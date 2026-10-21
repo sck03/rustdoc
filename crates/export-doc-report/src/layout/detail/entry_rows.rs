@@ -13,15 +13,10 @@ pub(super) fn prepare(
         .as_ref()
         .and_then(|id| table.columns.iter().position(|column| &column.id == id))
         .ok_or_else(|| {
-            invalid(
-                "当前模板尚未指定录入说明列，请在明细表的商品列设置中选择“按录入行打印的说明列”。",
-            )
+            invalid("当前模板尚未指定录入说明列，请在明细表属性中选择“按录入行打印的说明列”。")
         })?;
-    if table.grouping.is_some() {
-        return Err(invalid(
-            "按录入行打印时请关闭模板的自动分组，以保留录入顺序。",
-        ));
-    }
+    // Grouping belongs to product composition. Entry rows already carry the
+    // author's order and headings, so both modes can share the same template.
     let style = CellStyle::new(&table.body_style, size, false);
     let mut rows = Vec::new();
     for item in data.items() {

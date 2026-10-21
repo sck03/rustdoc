@@ -95,8 +95,8 @@ export async function verifyProductFieldsUi({ page, url, read, waitFor, click, r
   assert.equal(await read(page,table+".summaryRow.cells.find(c=>c.columnId==='amount').fieldFormat"),'Currency');
   assert(await read(page,"document.querySelector('[data-v3-element-id=invoice-items] .edm-detail-spacer').getBoundingClientRect().height>0"));
   if(capture) await capture();
-  await read(page,"[...document.querySelectorAll('.new-report-detail-properties [role=tab]')].find(n=>n.textContent==='录入行与合计').click()");
-  await read(page,"[...document.querySelectorAll('.new-report-detail-properties details')].find(n=>n.querySelector('summary')?.textContent==='定金与费用调整').open=true");
+  await read(page,"[...document.querySelectorAll('.new-report-detail-properties [role=tab]')].find(n=>n.textContent==='说明与合计').click()");
+  await read(page,"[...document.querySelectorAll('.new-report-detail-properties details')].find(n=>n.querySelector('summary')?.textContent==='金额调整').open=true");
   await read(page,"[...document.querySelectorAll('.new-report-detail-properties label')].find(n=>n.textContent.trim()==='显示发票金额调整').querySelector('input').click()");
   await waitFor(page,table+".adjustments===undefined");
   assert(await read(page,table+".summaryRow.cells.some(c=>c.fieldPath==='Invoice.AdjustedTotalAmount')"), 'hiding adjustment rows must not change the payable total');

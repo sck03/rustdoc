@@ -26,12 +26,10 @@ export function ReportDesignerDetailTablePrintProperties({ block, fieldGroups, o
               }>跨页重复表头</DesignerCheckbox>
           <NumberField label="首页明细行数" optional value={block.print.firstPageRows} min={1} max={80} step={1} precision={0} onCommit={firstPageRows => onCommit({ ...block, print: { ...block.print, firstPageRows } })} />
           <NumberField label="续页明细行数" optional value={block.print.continuationPageRows} min={1} max={80} step={1} precision={0} onCommit={continuationPageRows => onCommit({ ...block, print: { ...block.print, continuationPageRows } })} />
-          <div className="new-report-designer-muted">留空时按页面高度自动分页;填写后每页最多显示该行数。</div>
-          <small>明细按整行分页；单行内容超过一页时，请调整列宽或字号。</small>
         </div>
       </details>
       <details className="new-report-detail-style-group">
-        <summary>唛头侧栏</summary>
+        <summary>侧栏</summary>
         <div className="new-report-detail-column-title">
           <strong>非循环侧栏</strong>
           {block.sideBand ? (
@@ -40,13 +38,13 @@ export function ReportDesignerDetailTablePrintProperties({ block, fieldGroups, o
             </button>
           ) : (
             <button className="command-button secondary" type="button" onClick={() => onCommit({ ...block, sideBand: createDetailTableSideBand() })}>
-              添加唛头栏
+              添加侧栏
             </button>
           )}
         </div>
         {block.sideBand ? (
           <div className="new-report-property-grid">
-            <DesignerCheckbox checked={block.sideBand.firstPageOnly === true} onChange={checked => onCommit({...block,sideBand:{...block.sideBand!,firstPageOnly:checked}})}>唛头内容仅首页显示</DesignerCheckbox>
+            <DesignerCheckbox checked={block.sideBand.firstPageOnly === true} onChange={checked => onCommit({...block,sideBand:{...block.sideBand!,firstPageOnly:checked}})}>侧栏内容仅首页显示</DesignerCheckbox>
             <label>
               <span>侧栏标题</span>
               <CommitTextField
@@ -98,9 +96,7 @@ export function ReportDesignerDetailTablePrintProperties({ block, fieldGroups, o
               <TextStyleEditor style={block.sideBand.style} onChange={(style) => onCommit({ ...block, sideBand: { ...block.sideBand!, style } })} />
             </div>
           </div>
-        ) : (
-          <div className="new-report-designer-muted">唛头自动显示文字或图片，内容不随商品明细循环。</div>
-        )}
+        ) : null}
       </details>
   </>;
 }

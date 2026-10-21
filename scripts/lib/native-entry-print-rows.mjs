@@ -41,10 +41,14 @@ export async function verifyDesktopEntryRows({ run, request, token, cdp, output 
   const invoiceId = created.body.id;
   await run(`location.hash='#/invoices/${invoiceId}?section=items'; true`);
   await wait("document.querySelector('[aria-label=\"商品明细\"]')");
-  await run("[...document.querySelectorAll('label')].find(e=>e.textContent.trim()==='按录入行打印').querySelector('input').click(); true");
-  await edit(1, '');
-  await click('上方插入说明');
+  await run("(()=>{const n=document.querySelector('[aria-label=\"明细打印方式\"]');n.value='entries';n.dispatchEvent(new Event('change',{bubbles:true}));return true})()");
   await edit(1, 'MEN SWEATERS');
+  await click('描述移为上方说明');
+  await wait("document.querySelector('[aria-label=\"打印第 2 行描述\"]').value===''");
+  await click('撤销');
+  await wait("document.querySelectorAll('[aria-label=\"按录入行打印明细\"] tbody tr').length===2");
+  await click('重做');
+  await wait("document.querySelectorAll('[aria-label=\"按录入行打印明细\"] tbody tr').length===3");
   await run("document.querySelector('[aria-label=\"选择打印第 2 行\"]').click(); true");
   await click('下方插入空白行');
   await edit(4, '');
@@ -64,6 +68,16 @@ export async function verifyDesktopEntryRows({ run, request, token, cdp, output 
   await run('location.reload(); true');
   await wait("document.querySelector('[aria-label=\"按录入行打印明细\"]')");
   assert.equal(await run("document.querySelectorAll('[aria-label=\"按录入行打印明细\"] tbody tr').length"), 4);
+  await run("document.querySelector('[aria-label=\"打印第 4 行描述\"]').focus(); true");
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', windowsVirtualKeyCode: 13, modifiers: 2 });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', windowsVirtualKeyCode: 13, modifiers: 2 });
+  await wait("document.activeElement.getAttribute('aria-label')==='打印第 5 行描述'");
+  await click('撤销');
+  await wait("document.querySelectorAll('[aria-label=\"按录入行打印明细\"] tbody tr').length===4");
+  await click('下方插入说明');
+  await wait("document.activeElement.getAttribute('aria-label')==='打印第 5 行描述'");
+  await click('删除说明 / 空白行');
+  await wait("document.querySelectorAll('[aria-label=\"按录入行打印明细\"] tbody tr').length===4");
   const catalog = (await request('ListReportTemplates', token)).body;
   for (const name of ['invoice', 'packing_list']) {
     const templatePath = catalog.find(item => item.templatePath.endsWith(`${name}_template.dtpl`))?.templatePath;
