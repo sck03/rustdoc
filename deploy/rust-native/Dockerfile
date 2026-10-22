@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:26.10.0-trixie-slim AS web
+FROM node:26.12.1-trixie-slim AS web
 WORKDIR /workspace
 ENV npm_config_cache=/workspace/.cache/npm
 COPY apps/export-doc-web/package.json apps/export-doc-web/package-lock.json apps/export-doc-web/
@@ -19,7 +19,7 @@ COPY eng/native-runtime-packages.json eng/
 RUN case "$TARGETARCH" in amd64) rid=linux-x64;; arm64) rid=linux-arm64;; *) exit 1;; esac \
     && node scripts/prepare-native-ocr-runtime.mjs "$rid" /workspace/artifacts/ocr-runtime
 
-FROM rust:1.98.1-slim-trixie AS rust
+FROM rust:1.99.1-slim-trixie AS rust
 WORKDIR /workspace
 ENV CARGO_HOME=/workspace/.cache/cargo CARGO_TARGET_DIR=/workspace/target
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*

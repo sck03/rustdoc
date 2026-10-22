@@ -44,26 +44,22 @@ base64.workspace = true
 aws-sigv4 = { workspace = true, optional = true }
 aws-credential-types = { workspace = true, optional = true }
 aes-gcm = { version = "=0.11.1", default-features = false, features = ["aes", "alloc", "zeroize"] }
-zeroize = "=1.9.0"
+zeroize = "=1.9.1"
 chrono-tz = { version = "=0.10.4", default-features = false, features = ["std"] }
-ureq = { version = "=3.4.2", default-features = false, features = ["json", "native-tls"] }
+ureq = { version = "=3.5.0", default-features = false, features = ["json", "native-tls"] }
 url = "=2.5.8"
 quick-xml = "=0.42.0"
 fs2 = "=0.4.3"
 pbkdf2 = { version = "=0.13.0", features = ["sha2"] }
 subtle = "=2.6.1"
 zip.workspace = true
-cfb = "=0.7.3"
+cfb = "=0.15.0"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "=0.62.2", features = ["Win32_System_JobObjects", "Win32_System_Threading", "Win32_Foundation", "Win32_Security", "Win32_Security_Authorization"] }
 
 [target.'cfg(unix)'.dependencies]
-libc = "=0.2.189"
+libc = "=0.2.191"
 
 [lints]
 workspace = true
-
-[dev-dependencies]
-tokio = { version = "=1.53.1", features = ["rt", "time", "net", "macros"] }
-lettre = { version = "=0.11.23", default-features = false, features = ["builder", "smtp-transport", "tokio1-native-tls"] }

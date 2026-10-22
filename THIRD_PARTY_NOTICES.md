@@ -6,13 +6,13 @@ This file is the unified redistribution notice for package-manager dependencies 
 
 | Ecosystem | Package | Version | Declared license | Used by |
 |---|---|---:|---|---|
-| cargo | adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
+| cargo | adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 | native-desktop, ocr |
 | cargo | aead | 0.6.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | aes | 0.9.3 | MIT OR Apache-2.0 | native-desktop |
 | cargo | aes-gcm | 0.11.1 | Apache-2.0 OR MIT | native-desktop |
 | cargo | aho-corasick | 1.1.5 | Unlicense OR MIT | native-desktop |
-| cargo | alloc-no-stdlib | 2.0.4 | BSD-3-Clause | native-desktop |
-| cargo | alloc-stdlib | 0.2.4 | BSD-3-Clause | native-desktop |
+| cargo | alloc-no-stdlib | 3.0.0 | BSD-3-Clause | native-desktop |
+| cargo | alloc-stdlib | 0.3.0 | BSD-3-Clause | native-desktop |
 | cargo | android_system_properties | 0.1.6 | MIT OR Apache-2.0 | native-desktop |
 | cargo | anyhow | 1.0.104 | MIT OR Apache-2.0 | native-desktop, ocr |
 | cargo | arrayref | 0.3.9 | BSD-2-Clause | native-desktop |
@@ -23,7 +23,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | async-io | 2.6.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | async-lock | 3.4.2 | Apache-2.0 OR MIT | native-desktop |
 | cargo | async-process | 2.5.0 | Apache-2.0 OR MIT | native-desktop |
-| cargo | async-recursion | 1.1.1 | MIT OR Apache-2.0 | native-desktop |
+| cargo | async-recursion | 1.2.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | async-signal | 0.2.14 | Apache-2.0 OR MIT | native-desktop |
 | cargo | async-task | 4.7.1 | Apache-2.0 OR MIT | native-desktop |
 | cargo | async-trait | 0.1.92 | MIT OR Apache-2.0 | native-desktop |
@@ -32,13 +32,13 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | atoi_simd | 0.18.1 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
 | cargo | atomic-waker | 1.1.2 | Apache-2.0 OR MIT | native-desktop |
 | cargo | autocfg | 1.5.1 | Apache-2.0 OR MIT | native-desktop, ocr |
-| cargo | aws-credential-types | 1.3.0 | Apache-2.0 | native-desktop |
-| cargo | aws-sigv4 | 1.6.0 | Apache-2.0 | native-desktop |
-| cargo | aws-smithy-async | 1.3.0 | Apache-2.0 | native-desktop |
-| cargo | aws-smithy-http | 0.64.1 | Apache-2.0 | native-desktop |
-| cargo | aws-smithy-runtime-api | 1.19.0 | Apache-2.0 | native-desktop |
+| cargo | aws-credential-types | 1.3.1 | Apache-2.0 | native-desktop |
+| cargo | aws-sigv4 | 1.6.3 | Apache-2.0 | native-desktop |
+| cargo | aws-smithy-async | 1.3.1 | Apache-2.0 | native-desktop |
+| cargo | aws-smithy-http | 0.64.2 | Apache-2.0 | native-desktop |
+| cargo | aws-smithy-runtime-api | 1.19.1 | Apache-2.0 | native-desktop |
 | cargo | aws-smithy-runtime-api-macros | 1.1.0 | Apache-2.0 | native-desktop |
-| cargo | aws-smithy-types | 1.8.1 | Apache-2.0 | native-desktop |
+| cargo | aws-smithy-types | 1.9.0 | Apache-2.0 | native-desktop |
 | cargo | axum | 0.8.9 | MIT | native-desktop |
 | cargo | axum-core | 0.5.6 | MIT | native-desktop |
 | cargo | base64 | 0.21.7 | MIT OR Apache-2.0 | native-desktop |
@@ -49,16 +49,15 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | bit-set | 0.8.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | bit-vec | 0.8.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | bitflags | 1.3.2 | MIT OR Apache-2.0 | native-desktop |
-| cargo | bitflags | 2.13.1 | MIT OR Apache-2.0 | ocr |
-| cargo | bitflags | 2.13.2 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
+| cargo | bitflags | 2.13.2 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | cargo | block-buffer | 0.10.4 | MIT OR Apache-2.0 | native-desktop |
 | cargo | block-buffer | 0.12.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | block2 | 0.6.2 | MIT | native-desktop |
 | cargo | blocking | 1.7.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | borsh | 1.8.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | borsh-derive | 1.8.1 | Apache-2.0 | native-desktop |
-| cargo | brotli | 8.0.4 | BSD-3-Clause AND MIT | native-desktop |
-| cargo | brotli-decompressor | 5.0.3 | BSD-3-Clause OR MIT | native-desktop |
+| cargo | brotli | 9.0.0 | BSD-3-Clause AND MIT | native-desktop |
+| cargo | brotli-decompressor | 6.0.1 | BSD-3-Clause OR MIT | native-desktop |
 | cargo | bs58 | 0.5.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | bumpalo | 3.20.3 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
 | cargo | bytemuck | 1.25.2 | Zlib OR Apache-2.0 OR MIT | native-desktop, ocr |
@@ -69,32 +68,33 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | bytes-utils | 0.1.4 | Apache-2.0 OR MIT | native-desktop |
 | cargo | cairo-rs | 0.18.5 | MIT | native-desktop |
 | cargo | cairo-sys-rs | 0.18.2 | MIT | native-desktop |
-| cargo | calamine | 0.36.1 | MIT | excel-analyzer, native-desktop |
+| cargo | calamine | 0.37.0 | MIT | excel-analyzer, native-desktop |
 | cargo | camino | 1.2.6 | MIT OR Apache-2.0 | native-desktop |
 | cargo | cargo_metadata | 0.19.2 | MIT | native-desktop |
-| cargo | cargo_toml | 0.22.3 | Apache-2.0 OR MIT | native-desktop |
+| cargo | cargo_toml | 1.0.1 | Apache-2.0 OR MIT | native-desktop |
 | cargo | cargo-platform | 0.1.9 | MIT OR Apache-2.0 | native-desktop |
-| cargo | cc | 1.4.6 | MIT OR Apache-2.0 | native-desktop |
+| cargo | cc | 1.9.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | cesu8 | 1.1.0 | Apache-2.0 OR MIT | native-desktop |
-| cargo | cfb | 0.7.3 | MIT | native-desktop |
+| cargo | cfb | 0.14.0 | MIT | native-desktop |
+| cargo | cfb | 0.15.0 | MIT | native-desktop |
 | cargo | cfg_aliases | 0.2.2 | MIT | excel-analyzer, native-desktop |
 | cargo | cfg-expr | 0.15.8 | MIT OR Apache-2.0 | native-desktop |
-| cargo | cfg-if | 1.0.4 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
+| cargo | cfg-if | 1.0.5 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | cargo | chacha20 | 0.10.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | chrono | 0.4.45 | MIT OR Apache-2.0 | native-desktop |
 | cargo | chrono-tz | 0.10.4 | MIT OR Apache-2.0 | native-desktop |
 | cargo | cipher | 0.5.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | cmov | 0.5.4 | Apache-2.0 OR MIT | native-desktop |
-| cargo | codepage | 0.1.2 | Apache-2.0 OR MIT | excel-analyzer, native-desktop |
+| cargo | codepage | 0.1.3 | Apache-2.0 OR MIT | excel-analyzer, native-desktop |
 | cargo | color_quant | 1.1.0 | MIT | native-desktop |
-| cargo | combine | 4.6.8 | MIT | native-desktop |
+| cargo | combine | 4.6.9 | MIT | native-desktop |
 | cargo | concurrent-queue | 2.5.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | console_error_panic_hook | 0.1.7 | Apache-2.0 OR MIT | native-desktop |
 | cargo | console_log | 1.1.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | const-oid | 0.10.2 | Apache-2.0 OR MIT | native-desktop |
 | cargo | cookie | 0.18.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | cookie_store | 0.22.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | core_detect | 1.0.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | core_detect | 1.0.0 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
 | cargo | core_maths | 0.1.1 | MIT | native-desktop |
 | cargo | core-foundation | 0.10.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | core-foundation | 0.9.4 | MIT OR Apache-2.0 | native-desktop |
@@ -104,63 +104,57 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | cpubits | 0.1.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | cpufeatures | 0.2.17 | MIT OR Apache-2.0 | native-desktop |
 | cargo | cpufeatures | 0.3.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | crc32fast | 1.5.0 | MIT OR Apache-2.0 | excel-analyzer, ocr |
-| cargo | crc32fast | 1.5.2 | MIT OR Apache-2.0 | native-desktop |
+| cargo | crc32fast | 1.5.3 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | cargo | crossbeam-channel | 0.5.17 | MIT OR Apache-2.0 | native-desktop |
 | cargo | crossbeam-utils | 0.8.23 | MIT OR Apache-2.0 | native-desktop |
 | cargo | crunchy | 0.2.4 | MIT | ocr |
 | cargo | crypto-common | 0.1.7 | MIT OR Apache-2.0 | native-desktop |
 | cargo | crypto-common | 0.2.2 | MIT OR Apache-2.0 | native-desktop |
-| cargo | cssparser | 0.36.0 | MPL-2.0 | native-desktop |
 | cargo | cssparser | 0.37.0 | MPL-2.0 | native-desktop |
-| cargo | cssparser-macros | 0.6.1 | MPL-2.0 | native-desktop |
+| cargo | cssparser | 0.38.0 | MPL-2.0 | native-desktop |
 | cargo | cssparser-macros | 0.7.1 | MPL-2.0 | native-desktop |
-| cargo | ctor | 0.8.0 | Apache-2.0 OR MIT | native-desktop |
-| cargo | ctor-proc-macro | 0.0.7 | Apache-2.0 OR MIT | native-desktop |
+| cargo | ctor | 1.0.13 | Apache-2.0 OR MIT | native-desktop |
 | cargo | ctr | 0.10.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | ctutils | 0.4.2 | Apache-2.0 OR MIT | native-desktop |
+| cargo | ctutils | 0.4.3 | Apache-2.0 OR MIT | native-desktop |
 | cargo | darling | 0.24.1 | MIT | native-desktop |
 | cargo | darling_core | 0.24.1 | MIT | native-desktop |
 | cargo | darling_macro | 0.24.1 | MIT | native-desktop |
 | cargo | data-url | 0.3.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | dbus | 0.9.12 | Apache-2.0 OR MIT | native-desktop |
 | cargo | debug_unsafe | 0.1.4 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
-| cargo | defmt | 1.1.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | defmt-macros | 1.1.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | defmt-parser | 1.0.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | defmt | 1.2.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | defmt-macros | 1.2.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | defmt-parser | 1.1.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | der | 0.8.2 | Apache-2.0 OR MIT | native-desktop |
-| cargo | deranged | 0.5.8 | MIT OR Apache-2.0 | native-desktop |
+| cargo | deranged | 0.5.9 | MIT OR Apache-2.0 | native-desktop |
 | cargo | derive_more | 2.1.1 | MIT | native-desktop |
 | cargo | derive_more-impl | 2.1.1 | MIT | native-desktop |
 | cargo | digest | 0.10.7 | MIT OR Apache-2.0 | native-desktop |
 | cargo | digest | 0.11.3 | MIT OR Apache-2.0 | native-desktop |
-| cargo | dirs | 6.0.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | dirs | 7.0.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | dirs-sys | 0.5.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | dispatch2 | 0.3.1 | Zlib OR Apache-2.0 OR MIT | native-desktop |
 | cargo | displaydoc | 0.2.7 | MIT OR Apache-2.0 | native-desktop |
 | cargo | dlopen2 | 0.8.2 | MIT | native-desktop |
 | cargo | dlopen2_derive | 0.4.3 | MIT | native-desktop |
 | cargo | document-features | 0.2.12 | MIT OR Apache-2.0 | native-desktop |
-| cargo | dom_query | 0.27.0 | MIT | native-desktop |
+| cargo | dom_query | 0.28.0 | MIT | native-desktop |
 | cargo | dpi | 0.1.2 | Apache-2.0 AND MIT | native-desktop |
 | cargo | dtoa | 1.0.11 | MIT OR Apache-2.0 | native-desktop |
 | cargo | dtoa-short | 0.3.5 | MPL-2.0 | native-desktop |
-| cargo | dtor | 0.3.0 | Apache-2.0 OR MIT | native-desktop |
-| cargo | dtor-proc-macro | 0.0.6 | Apache-2.0 OR MIT | native-desktop |
 | cargo | dunce | 1.0.5 | CC0-1.0 OR MIT-0 OR Apache-2.0 | native-desktop |
 | cargo | dyn-clone | 1.0.20 | MIT OR Apache-2.0 | native-desktop |
-| cargo | ego-tree | 0.11.0 | ISC | native-desktop |
-| cargo | either | 1.18.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | ego-tree | 0.11.1 | ISC | native-desktop |
+| cargo | either | 1.19.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | email_address | 0.2.9 | MIT | native-desktop |
 | cargo | email-encoding | 0.4.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | embed_plist | 1.2.2 | MIT OR Apache-2.0 | native-desktop |
-| cargo | embed-resource | 3.0.11 | MIT | native-desktop |
-| cargo | encoding_rs | 0.8.35 | (Apache-2.0 OR MIT) AND BSD-3-Clause | excel-analyzer |
-| cargo | encoding_rs | 0.8.41 | (Apache-2.0 OR MIT) AND BSD-3-Clause | native-desktop |
+| cargo | embed-resource | 3.0.12 | MIT | native-desktop |
+| cargo | encoding_rs | 0.8.42 | (Apache-2.0 OR MIT) AND BSD-3-Clause | excel-analyzer, native-desktop |
 | cargo | endi | 1.1.1 | MIT | native-desktop |
 | cargo | enumflags2 | 0.7.12 | MIT OR Apache-2.0 | native-desktop |
 | cargo | enumflags2_derive | 0.7.12 | MIT OR Apache-2.0 | native-desktop |
-| cargo | equivalent | 1.0.2 | Apache-2.0 OR MIT | excel-analyzer, native-desktop |
+| cargo | equivalent | 1.0.3 | Apache-2.0 OR MIT | excel-analyzer, native-desktop |
 | cargo | erased-serde | 0.4.10 | MIT OR Apache-2.0 | native-desktop |
 | cargo | errno | 0.3.14 | MIT OR Apache-2.0 | native-desktop |
 | cargo | euclid | 0.22.14 | MIT OR Apache-2.0 | native-desktop |
@@ -169,15 +163,14 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | fallible-iterator | 0.2.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | fallible-iterator | 0.3.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | fallible-streaming-iterator | 0.1.9 | MIT OR Apache-2.0 | native-desktop |
-| cargo | fast-float2 | 0.2.3 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
+| cargo | fast-float2 | 0.2.4 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
 | cargo | fastrand | 2.5.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | fax | 0.2.7 | MIT | ocr |
 | cargo | fdeflate | 0.3.7 | MIT OR Apache-2.0 | native-desktop, ocr |
 | cargo | field-offset | 0.3.6 | MIT OR Apache-2.0 | native-desktop |
 | cargo | filetime | 0.2.29 | MIT OR Apache-2.0 | native-desktop |
-| cargo | find-msvc-tools | 0.1.12 | MIT OR Apache-2.0 | native-desktop |
-| cargo | flate2 | 1.1.10 | MIT OR Apache-2.0 | native-desktop |
-| cargo | flate2 | 1.1.9 | MIT OR Apache-2.0 | excel-analyzer, ocr |
+| cargo | find-msvc-tools | 0.1.15 | MIT OR Apache-2.0 | native-desktop |
+| cargo | flate2 | 1.1.10 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | cargo | float-cmp | 0.9.0 | MIT | native-desktop |
 | cargo | fnv | 1.0.7 | Apache-2.0 OR MIT | native-desktop |
 | cargo | foldhash | 0.2.0 | Zlib | native-desktop |
@@ -231,8 +224,8 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | hermit-abi | 0.5.3 | MIT OR Apache-2.0 | native-desktop |
 | cargo | hex | 0.4.3 | MIT OR Apache-2.0 | native-desktop |
 | cargo | hmac | 0.13.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | html5ever | 0.38.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | html5ever | 0.39.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | html5ever | 0.40.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | http | 1.5.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | http-body | 1.1.0 | MIT | native-desktop |
 | cargo | http-body-util | 0.1.5 | MIT | native-desktop |
@@ -240,19 +233,19 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | httparse | 1.10.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | httpdate | 1.0.3 | MIT OR Apache-2.0 | native-desktop |
 | cargo | hybrid-array | 0.4.15 | MIT OR Apache-2.0 | native-desktop |
-| cargo | hyper | 1.11.1 | MIT | native-desktop |
-| cargo | hyper-rustls | 0.27.9 | Apache-2.0 OR ISC OR MIT | native-desktop |
-| cargo | hyper-util | 0.1.20 | MIT | native-desktop |
+| cargo | hyper | 1.12.0 | MIT | native-desktop |
+| cargo | hyper-rustls | 0.27.10 | Apache-2.0 OR ISC OR MIT | native-desktop |
+| cargo | hyper-util | 0.1.21 | MIT | native-desktop |
 | cargo | iana-time-zone | 0.1.65 | MIT OR Apache-2.0 | native-desktop |
 | cargo | iana-time-zone-haiku | 0.1.2 | MIT OR Apache-2.0 | native-desktop |
-| cargo | ico | 0.5.0 | MIT | native-desktop |
-| cargo | icu_collections | 2.3.0 | Unicode-3.0 | native-desktop |
-| cargo | icu_locale_core | 2.3.0 | Unicode-3.0 | native-desktop |
-| cargo | icu_normalizer | 2.3.0 | Unicode-3.0 | native-desktop |
-| cargo | icu_normalizer_data | 2.3.0 | Unicode-3.0 | native-desktop |
-| cargo | icu_properties | 2.3.0 | Unicode-3.0 | native-desktop |
-| cargo | icu_properties_data | 2.3.0 | Unicode-3.0 | native-desktop |
-| cargo | icu_provider | 2.3.1 | Unicode-3.0 | native-desktop |
+| cargo | ico | 0.6.0 | MIT | native-desktop |
+| cargo | icu_collections | 2.4.0 | Unicode-3.0 | native-desktop |
+| cargo | icu_locale_core | 2.4.0 | Unicode-3.0 | native-desktop |
+| cargo | icu_normalizer | 2.4.0 | Unicode-3.0 | native-desktop |
+| cargo | icu_normalizer_data | 2.4.0 | Unicode-3.0 | native-desktop |
+| cargo | icu_properties | 2.4.0 | Unicode-3.0 | native-desktop |
+| cargo | icu_properties_data | 2.4.0 | Unicode-3.0 | native-desktop |
+| cargo | icu_provider | 2.4.0 | Unicode-3.0 | native-desktop |
 | cargo | ident_case | 1.0.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | idna | 1.1.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | idna_adapter | 1.2.2 | Apache-2.0 OR MIT | native-desktop |
@@ -260,19 +253,18 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | image-webp | 0.2.4 | MIT OR Apache-2.0 | native-desktop, ocr |
 | cargo | imagesize | 0.14.0 | MIT | native-desktop |
 | cargo | indexmap | 1.9.3 | Apache-2.0 OR MIT | native-desktop |
-| cargo | indexmap | 2.14.0 | Apache-2.0 OR MIT | excel-analyzer |
-| cargo | indexmap | 2.14.2 | Apache-2.0 OR MIT | native-desktop |
-| cargo | infer | 0.19.0 | MIT | native-desktop |
-| cargo | inout | 0.2.2 | MIT OR Apache-2.0 | native-desktop |
+| cargo | indexmap | 2.14.2 | Apache-2.0 OR MIT | excel-analyzer, native-desktop |
+| cargo | infer | 0.22.0 | MIT | native-desktop |
+| cargo | inout | 0.2.5 | MIT OR Apache-2.0 | native-desktop |
 | cargo | ipnet | 2.12.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | itertools | 0.15.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | itoa | 1.0.18 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | cargo | javascriptcore-rs | 1.1.2 | MIT | native-desktop |
 | cargo | javascriptcore-rs-sys | 1.1.1 | MIT | native-desktop |
-| cargo | jiff | 0.2.37 | Unlicense OR MIT | native-desktop |
+| cargo | jiff | 0.2.38 | Unlicense OR MIT | native-desktop |
 | cargo | jiff-core | 0.1.1 | Unlicense OR MIT | native-desktop |
-| cargo | jiff-static | 0.2.37 | Unlicense OR MIT | native-desktop |
-| cargo | jiff-tzdb | 0.1.8 | Unlicense OR MIT | native-desktop |
+| cargo | jiff-static | 0.2.38 | Unlicense OR MIT | native-desktop |
+| cargo | jiff-tzdb | 0.1.9 | Unlicense OR MIT | native-desktop |
 | cargo | jiff-tzdb-platform | 0.1.3 | Unlicense OR MIT | native-desktop |
 | cargo | jni | 0.21.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | jni | 0.22.4 | MIT OR Apache-2.0 | native-desktop |
@@ -280,55 +272,51 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | jni-sys | 0.3.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | jni-sys | 0.4.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | jni-sys-macros | 0.4.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | js-sys | 0.3.105 | MIT OR Apache-2.0 | native-desktop |
-| cargo | json-patch | 3.0.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | jsonptr | 0.6.3 | MIT OR Apache-2.0 | native-desktop |
-| cargo | keyboard-types | 0.7.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | js-sys | 0.3.106 | MIT OR Apache-2.0 | native-desktop |
+| cargo | json-patch | 4.2.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | jsonptr | 0.7.1 | MIT OR Apache-2.0 | native-desktop |
+| cargo | keyboard-types | 0.8.3 | MIT OR Apache-2.0 | native-desktop |
 | cargo | krilla | 0.8.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | krilla-svg | 0.8.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | kurbo | 0.13.1 | Apache-2.0 OR MIT | native-desktop |
 | cargo | lettre | 0.11.23 | MIT | native-desktop |
 | cargo | libappindicator | 0.9.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | libappindicator-sys | 0.9.0 | Apache-2.0 OR MIT | native-desktop |
-| cargo | libc | 0.2.189 | MIT OR Apache-2.0 | native-desktop |
-| cargo | libc | 0.2.191 | MIT OR Apache-2.0 | excel-analyzer |
+| cargo | libc | 0.2.191 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
 | cargo | libdbus-sys | 0.2.7 | Apache-2.0 OR MIT | native-desktop |
 | cargo | libloading | 0.7.4 | ISC | native-desktop |
 | cargo | libloading | 0.9.0 | ISC | native-desktop, ocr |
 | cargo | libm | 0.2.16 | MIT | native-desktop |
-| cargo | libredox | 0.1.24 | MIT | native-desktop |
+| cargo | libredox | 0.1.25 | MIT | native-desktop |
 | cargo | libsqlite3-sys | 0.38.2 | MIT | native-desktop |
 | cargo | linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | native-desktop |
 | cargo | litemap | 0.8.3 | Unicode-3.0 | native-desktop |
-| cargo | litrs | 1.0.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | litrs | 1.0.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | lock_api | 0.4.14 | MIT OR Apache-2.0 | native-desktop |
-| cargo | log | 0.4.33 | MIT OR Apache-2.0 | excel-analyzer |
-| cargo | log | 0.4.34 | MIT OR Apache-2.0 | native-desktop |
-| cargo | markup5ever | 0.38.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | log | 0.4.34 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
 | cargo | markup5ever | 0.39.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | markup5ever | 0.40.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | matchit | 0.8.4 | MIT AND BSD-3-Clause | native-desktop |
 | cargo | matrixmultiply | 0.3.11 | MIT OR Apache-2.0 | ocr |
 | cargo | maybe-owned | 0.3.4 | MIT OR Apache-2.0 | native-desktop |
 | cargo | md-5 | 0.11.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | memchr | 2.8.2 | Unlicense OR MIT | excel-analyzer |
-| cargo | memchr | 2.8.3 | Unlicense OR MIT | native-desktop, ocr |
-| cargo | memmap2 | 0.9.11 | MIT OR Apache-2.0 | native-desktop |
+| cargo | memchr | 2.8.3 | Unlicense OR MIT | excel-analyzer, native-desktop, ocr |
+| cargo | memmap2 | 0.9.12 | MIT OR Apache-2.0 | native-desktop |
 | cargo | memoffset | 0.9.1 | MIT | native-desktop |
 | cargo | mime | 0.3.17 | MIT OR Apache-2.0 | native-desktop |
 | cargo | mime_guess | 2.0.5 | MIT | native-desktop |
-| cargo | minisign-verify | 0.2.5 | MIT | native-desktop |
-| cargo | miniz_oxide | 0.8.9 | MIT OR Zlib OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
-| cargo | miniz_oxide | 0.9.1 | MIT OR Zlib OR Apache-2.0 | native-desktop |
-| cargo | mio | 1.2.3 | MIT | native-desktop |
+| cargo | minisign-verify | 0.3.0 | MIT | native-desktop |
+| cargo | miniz_oxide | 0.8.9 | MIT OR Zlib OR Apache-2.0 | native-desktop, ocr |
+| cargo | miniz_oxide | 0.9.1 | MIT OR Zlib OR Apache-2.0 | native-desktop, ocr |
+| cargo | mio | 1.2.4 | MIT | native-desktop |
 | cargo | moxcms | 0.8.1 | BSD-3-Clause OR Apache-2.0 | native-desktop, ocr |
-| cargo | muda | 0.19.3 | Apache-2.0 OR MIT | native-desktop |
+| cargo | muda | 0.20.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | multer | 3.1.0 | MIT | native-desktop |
-| cargo | multiversion | 0.9.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | multiversion_no_op | 1.0.0 | Apache-2.0 OR MIT | native-desktop |
-| cargo | multiversion-macros | 0.9.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | multiversion_no_op | 1.0.0 | Apache-2.0 OR MIT | excel-analyzer, native-desktop |
 | cargo | native-tls | 0.2.18 | MIT OR Apache-2.0 | native-desktop |
 | cargo | ndarray | 0.17.2 | MIT OR Apache-2.0 | ocr |
 | cargo | ndk | 0.9.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | ndk-context | 0.1.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | ndk-sys | 0.6.0+11769913 | MIT OR Apache-2.0 | native-desktop |
 | cargo | new_debug_unreachable | 1.0.6 | MIT | native-desktop |
 | cargo | nix | 0.31.3 | MIT | excel-analyzer, native-desktop |
@@ -337,10 +325,9 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | num_enum_derive | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 | native-desktop |
 | cargo | num-complex | 0.4.6 | MIT OR Apache-2.0 | ocr |
 | cargo | num-conv | 0.2.2 | MIT OR Apache-2.0 | native-desktop |
-| cargo | num-integer | 0.1.46 | MIT OR Apache-2.0 | ocr |
-| cargo | num-integer | 0.1.47 | MIT OR Apache-2.0 | native-desktop |
+| cargo | num-integer | 0.1.47 | MIT OR Apache-2.0 | native-desktop, ocr |
 | cargo | num-traits | 0.2.19 | MIT OR Apache-2.0 | native-desktop, ocr |
-| cargo | objc2 | 0.6.4 | MIT | native-desktop |
+| cargo | objc2 | 0.6.5 | MIT | native-desktop |
 | cargo | objc2-app-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT | native-desktop |
 | cargo | objc2-cloud-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT | native-desktop |
 | cargo | objc2-core-data | 0.3.2 | Zlib OR Apache-2.0 OR MIT | native-desktop |
@@ -382,34 +369,35 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | percent-encoding | 2.3.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | phf | 0.12.1 | MIT | native-desktop |
 | cargo | phf | 0.13.1 | MIT | native-desktop |
+| cargo | phf | 0.14.0 | MIT | native-desktop |
 | cargo | phf_codegen | 0.13.1 | MIT | native-desktop |
+| cargo | phf_codegen | 0.14.0 | MIT | native-desktop |
 | cargo | phf_generator | 0.13.1 | MIT | native-desktop |
+| cargo | phf_generator | 0.14.0 | MIT | native-desktop |
 | cargo | phf_macros | 0.13.1 | MIT | native-desktop |
+| cargo | phf_macros | 0.14.0 | MIT | native-desktop |
 | cargo | phf_shared | 0.12.1 | MIT | native-desktop |
 | cargo | phf_shared | 0.13.1 | MIT | native-desktop |
+| cargo | phf_shared | 0.14.0 | MIT | native-desktop |
 | cargo | pico-args | 0.5.0 | MIT | native-desktop |
 | cargo | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT | native-desktop, ocr |
-| cargo | pin-utils | 0.1.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | piper | 0.2.5 | MIT OR Apache-2.0 | native-desktop |
 | cargo | piston-float | 1.0.1 | MIT | native-desktop |
 | cargo | pkg-config | 0.3.34 | MIT OR Apache-2.0 | native-desktop |
-| cargo | plist | 1.10.1 | MIT | native-desktop |
-| cargo | png | 0.17.16 | MIT OR Apache-2.0 | native-desktop |
+| cargo | plist | 1.10.3 | MIT | native-desktop |
 | cargo | png | 0.18.1 | MIT OR Apache-2.0 | native-desktop, ocr |
 | cargo | polling | 3.11.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | pollster | 0.4.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | polycool | 0.4.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | polyval | 0.7.3 | Apache-2.0 OR MIT | native-desktop |
-| cargo | portable-atomic | 1.14.0 | Apache-2.0 OR MIT | ocr |
-| cargo | portable-atomic | 1.15.0 | Apache-2.0 OR MIT | native-desktop |
-| cargo | portable-atomic-util | 0.2.7 | Apache-2.0 OR MIT | ocr |
-| cargo | portable-atomic-util | 0.2.8 | Apache-2.0 OR MIT | native-desktop |
+| cargo | portable-atomic | 1.15.0 | Apache-2.0 OR MIT | native-desktop, ocr |
+| cargo | portable-atomic-util | 0.2.8 | Apache-2.0 OR MIT | native-desktop, ocr |
 | cargo | postgres | 0.19.14 | MIT OR Apache-2.0 | native-desktop |
 | cargo | postgres-native-tls | 0.5.3 | MIT OR Apache-2.0 | native-desktop |
 | cargo | postgres-protocol | 0.6.12 | MIT OR Apache-2.0 | native-desktop |
 | cargo | postgres-types | 0.2.14 | MIT OR Apache-2.0 | native-desktop |
 | cargo | potential_utf | 0.1.6 | Unicode-3.0 | native-desktop |
-| cargo | powerfmt | 0.2.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | powerfmt | 0.2.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | ppv-lite86 | 0.2.21 | MIT OR Apache-2.0 | native-desktop |
 | cargo | precomputed-hash | 0.1.1 | MIT | native-desktop |
 | cargo | proc-macro-crate | 1.3.1 | MIT OR Apache-2.0 | native-desktop |
@@ -417,18 +405,15 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | proc-macro-crate | 3.5.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | proc-macro-error | 1.0.4 | MIT OR Apache-2.0 | native-desktop |
 | cargo | proc-macro-error-attr | 1.0.4 | MIT OR Apache-2.0 | native-desktop |
-| cargo | proc-macro2 | 1.0.106 | MIT OR Apache-2.0 | excel-analyzer |
-| cargo | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 | native-desktop, ocr |
+| cargo | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | cargo | pxfm | 0.1.30 | BSD-3-Clause OR Apache-2.0 | native-desktop, ocr |
 | cargo | quick-error | 2.0.1 | MIT OR Apache-2.0 | native-desktop, ocr |
-| cargo | quick-xml | 0.41.0 | MIT | excel-analyzer, native-desktop |
-| cargo | quick-xml | 0.42.0 | MIT | native-desktop |
-| cargo | quote | 1.0.46 | MIT OR Apache-2.0 | excel-analyzer |
-| cargo | quote | 1.0.47 | MIT OR Apache-2.0 | native-desktop, ocr |
+| cargo | quick-xml | 0.42.0 | MIT | excel-analyzer, native-desktop |
+| cargo | quote | 1.0.47 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | cargo | quoted_printable | 0.5.2 | 0BSD | native-desktop |
 | cargo | r-efi | 5.3.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later | native-desktop |
 | cargo | r-efi | 6.0.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later | native-desktop |
-| cargo | rand | 0.10.2 | MIT OR Apache-2.0 | native-desktop |
+| cargo | rand | 0.10.3 | MIT OR Apache-2.0 | native-desktop |
 | cargo | rand | 0.8.8 | MIT OR Apache-2.0 | native-desktop |
 | cargo | rand | 0.9.5 | MIT OR Apache-2.0 | native-desktop |
 | cargo | rand_chacha | 0.3.1 | MIT OR Apache-2.0 | native-desktop |
@@ -457,134 +442,128 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | rust_decimal | 1.43.0 | MIT | native-desktop |
 | cargo | rustc_version | 0.4.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | rustc-hash | 2.1.3 | Apache-2.0 OR MIT | native-desktop |
-| cargo | rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | native-desktop |
+| cargo | rustix | 1.1.5 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | native-desktop |
 | cargo | rustls | 0.23.46 | Apache-2.0 OR ISC OR MIT | native-desktop |
-| cargo | rustls-native-certs | 0.8.4 | Apache-2.0 OR ISC OR MIT | native-desktop |
+| cargo | rustls-native-certs | 0.8.5 | Apache-2.0 OR ISC OR MIT | native-desktop |
 | cargo | rustls-pki-types | 1.15.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | rustls-platform-verifier | 0.7.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | rustls-platform-verifier-android | 0.1.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | rustls-webpki | 0.103.15 | ISC | native-desktop |
+| cargo | rustls-platform-verifier | 0.7.1 | MIT OR Apache-2.0 | native-desktop |
+| cargo | rustls-platform-verifier-android | 0.2.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | rustls-webpki | 0.103.16 | ISC | native-desktop |
 | cargo | rustversion | 1.0.23 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
 | cargo | rustybuzz | 0.20.1 | MIT | native-desktop |
 | cargo | ryu | 1.0.23 | Apache-2.0 OR BSL-1.0 | native-desktop |
 | cargo | same-file | 1.0.6 | Unlicense OR MIT | native-desktop |
-| cargo | schannel | 0.1.29 | MIT | native-desktop |
+| cargo | schannel | 0.1.30 | MIT | native-desktop |
 | cargo | schemars | 0.8.22 | MIT | native-desktop |
 | cargo | schemars | 0.9.0 | MIT | native-desktop |
-| cargo | schemars | 1.2.2 | MIT | native-desktop |
+| cargo | schemars | 1.2.3 | MIT | native-desktop |
 | cargo | schemars_derive | 0.8.22 | MIT | native-desktop |
-| cargo | scopeguard | 1.2.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | scraper | 0.27.0 | ISC | native-desktop |
+| cargo | scopeguard | 1.2.0 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
+| cargo | scraper | 0.29.0 | ISC | native-desktop |
 | cargo | security-framework | 3.7.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | security-framework-sys | 2.17.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | selectors | 0.36.1 | MPL-2.0 | native-desktop |
 | cargo | selectors | 0.38.0 | MPL-2.0 | native-desktop |
+| cargo | selectors | 0.41.0 | MPL-2.0 | native-desktop |
 | cargo | semver | 1.0.28 | MIT OR Apache-2.0 | native-desktop |
-| cargo | serde | 1.0.228 | MIT OR Apache-2.0 | excel-analyzer |
-| cargo | serde | 1.0.229 | MIT OR Apache-2.0 | native-desktop, ocr |
-| cargo | serde_core | 1.0.228 | MIT OR Apache-2.0 | excel-analyzer |
-| cargo | serde_core | 1.0.229 | MIT OR Apache-2.0 | native-desktop, ocr |
-| cargo | serde_derive | 1.0.228 | MIT OR Apache-2.0 | excel-analyzer |
-| cargo | serde_derive | 1.0.229 | MIT OR Apache-2.0 | native-desktop, ocr |
+| cargo | serde | 1.0.229 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
+| cargo | serde_core | 1.0.229 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
+| cargo | serde_derive | 1.0.229 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | cargo | serde_derive_internals | 0.29.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | serde_json | 1.0.150 | MIT OR Apache-2.0 | excel-analyzer, ocr |
-| cargo | serde_json | 1.0.151 | MIT OR Apache-2.0 | native-desktop |
+| cargo | serde_json | 1.0.154 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | cargo | serde_path_to_error | 0.1.20 | MIT OR Apache-2.0 | native-desktop |
 | cargo | serde_repr | 0.1.21 | MIT OR Apache-2.0 | native-desktop |
 | cargo | serde_spanned | 0.6.9 | MIT OR Apache-2.0 | native-desktop |
-| cargo | serde_spanned | 1.1.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | serde_with | 3.23.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | serde_with_macros | 3.23.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | serde_spanned | 1.1.2 | MIT OR Apache-2.0 | native-desktop |
+| cargo | serde_with | 3.24.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | serde_with_macros | 3.24.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | serde-untagged | 0.1.9 | MIT OR Apache-2.0 | native-desktop |
 | cargo | serialize-to-javascript | 0.1.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | serialize-to-javascript-impl | 0.1.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | servo_arc | 0.4.3 | MIT OR Apache-2.0 | native-desktop |
+| cargo | servo_arc | 0.5.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | sha2 | 0.10.9 | MIT OR Apache-2.0 | native-desktop |
-| cargo | sha2 | 0.11.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | sha2 | 0.11.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | shlex | 2.0.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | signal-hook-registry | 1.4.8 | MIT OR Apache-2.0 | native-desktop |
 | cargo | simd_cesu8 | 1.2.0 | Apache-2.0 OR MIT | native-desktop |
-| cargo | simd-adler32 | 0.3.10 | MIT | native-desktop, ocr |
-| cargo | simd-adler32 | 0.3.9 | MIT | excel-analyzer |
-| cargo | simdutf8 | 0.1.5 | MIT OR Apache-2.0 | native-desktop |
+| cargo | simd-adler32 | 0.3.10 | MIT | excel-analyzer, native-desktop, ocr |
+| cargo | simdutf8 | 0.1.5 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
 | cargo | simplecss | 0.2.2 | Apache-2.0 OR MIT | native-desktop |
-| cargo | siphasher | 1.0.3 | MIT OR Apache-2.0 | native-desktop |
+| cargo | siphasher | 1.0.4 | MIT OR Apache-2.0 | native-desktop |
 | cargo | skrifa | 0.42.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | slab | 0.4.12 | MIT | native-desktop |
 | cargo | slotmap | 1.1.1 | Zlib | native-desktop |
-| cargo | smallvec | 1.15.2 | MIT OR Apache-2.0 | ocr |
-| cargo | smallvec | 1.16.1 | MIT OR Apache-2.0 | native-desktop |
+| cargo | smallvec | 1.16.3 | MIT OR Apache-2.0 | native-desktop, ocr |
 | cargo | socket2 | 0.6.5 | MIT OR Apache-2.0 | native-desktop |
 | cargo | softbuffer | 0.4.8 | MIT OR Apache-2.0 | native-desktop |
 | cargo | soup3 | 0.5.0 | MIT | native-desktop |
 | cargo | soup3-sys | 0.5.0 | MIT | native-desktop |
 | cargo | spin | 0.9.9 | MIT | native-desktop |
 | cargo | stable_deref_trait | 1.2.1 | MIT OR Apache-2.0 | native-desktop |
+| cargo | static_vcruntime | 3.0.0 | MIT OR Apache-2.0 OR Zlib | native-desktop |
 | cargo | strict-num | 0.1.1 | MIT | native-desktop |
+| cargo | string_cache | 0.11.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | string_cache | 0.9.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | string_cache_codegen | 0.11.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | string_cache_codegen | 0.6.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | stringprep | 0.1.5 | MIT OR Apache-2.0 | native-desktop |
 | cargo | strsim | 0.11.1 | MIT | native-desktop |
 | cargo | subsetter | 0.2.6 | MIT OR Apache-2.0 | native-desktop |
 | cargo | subtle | 2.6.1 | BSD-3-Clause | native-desktop |
 | cargo | svgtypes | 0.16.1 | Apache-2.0 OR MIT | native-desktop |
-| cargo | swift-rs | 1.0.8 | MIT OR Apache-2.0 | native-desktop |
+| cargo | swift-rs | 1.0.9 | MIT OR Apache-2.0 | native-desktop |
 | cargo | syn | 1.0.109 | MIT OR Apache-2.0 | native-desktop |
-| cargo | syn | 2.0.118 | MIT OR Apache-2.0 | excel-analyzer |
 | cargo | syn | 2.0.119 | MIT OR Apache-2.0 | native-desktop, ocr |
-| cargo | syn | 3.0.1 | MIT OR Apache-2.0 | ocr |
-| cargo | syn | 3.0.5 | MIT OR Apache-2.0 | native-desktop |
+| cargo | syn | 3.0.9 | MIT OR Apache-2.0 | excel-analyzer, native-desktop, ocr |
 | cargo | sync_wrapper | 1.0.2 | Apache-2.0 | native-desktop |
 | cargo | synstructure | 0.14.0 | MIT | native-desktop |
 | cargo | system-configuration | 0.7.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | system-configuration-sys | 0.6.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | system-deps | 6.2.2 | MIT OR Apache-2.0 | native-desktop |
-| cargo | tao | 0.35.3 | Apache-2.0 | native-desktop |
+| cargo | tao | 0.37.1 | Apache-2.0 | native-desktop |
 | cargo | tao-macros | 0.1.4 | MIT OR Apache-2.0 | native-desktop |
 | cargo | tar | 0.4.46 | MIT OR Apache-2.0 | native-desktop |
 | cargo | target-lexicon | 0.12.16 | Apache-2.0 WITH LLVM-exception | native-desktop |
-| cargo | tauri | 2.11.6 | Apache-2.0 OR MIT | native-desktop |
-| cargo | tauri-build | 2.6.3 | Apache-2.0 OR MIT | native-desktop |
-| cargo | tauri-codegen | 2.6.3 | Apache-2.0 OR MIT | native-desktop |
-| cargo | tauri-macros | 2.6.3 | Apache-2.0 OR MIT | native-desktop |
-| cargo | tauri-plugin | 2.6.3 | Apache-2.0 OR MIT | native-desktop |
-| cargo | tauri-plugin-single-instance | 2.4.5 | Apache-2.0 OR MIT | native-desktop |
-| cargo | tauri-plugin-updater | 2.12.0 | Apache-2.0 OR MIT | native-desktop |
-| cargo | tauri-runtime | 2.11.3 | Apache-2.0 OR MIT | native-desktop |
-| cargo | tauri-runtime-wry | 2.11.4 | Apache-2.0 OR MIT | native-desktop |
-| cargo | tauri-utils | 2.9.3 | Apache-2.0 OR MIT | native-desktop |
-| cargo | tauri-winres | 0.3.6 | MIT | native-desktop |
+| cargo | tauri | 2.12.5 | Apache-2.0 OR MIT | native-desktop |
+| cargo | tauri-build | 2.7.4 | Apache-2.0 OR MIT | native-desktop |
+| cargo | tauri-codegen | 2.7.4 | Apache-2.0 OR MIT | native-desktop |
+| cargo | tauri-macros | 2.7.4 | Apache-2.0 OR MIT | native-desktop |
+| cargo | tauri-plugin | 2.7.2 | Apache-2.0 OR MIT | native-desktop |
+| cargo | tauri-plugin-single-instance | 2.5.4 | Apache-2.0 OR MIT | native-desktop |
+| cargo | tauri-plugin-updater | 2.14.0 | Apache-2.0 OR MIT | native-desktop |
+| cargo | tauri-runtime | 2.12.2 | Apache-2.0 OR MIT | native-desktop |
+| cargo | tauri-runtime-wry | 2.12.3 | Apache-2.0 OR MIT | native-desktop |
+| cargo | tauri-utils | 2.10.2 | Apache-2.0 OR MIT | native-desktop |
+| cargo | tauri-winres | 0.3.7 | MIT | native-desktop |
 | cargo | tempfile | 3.27.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | tendril | 0.5.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | thiserror | 1.0.69 | MIT OR Apache-2.0 | native-desktop |
-| cargo | thiserror | 2.0.20 | MIT OR Apache-2.0 | native-desktop |
+| cargo | thiserror | 2.0.21 | MIT OR Apache-2.0 | native-desktop |
 | cargo | thiserror-impl | 1.0.69 | MIT OR Apache-2.0 | native-desktop |
-| cargo | thiserror-impl | 2.0.20 | MIT OR Apache-2.0 | native-desktop |
+| cargo | thiserror-impl | 2.0.21 | MIT OR Apache-2.0 | native-desktop |
 | cargo | tiff | 0.11.3 | MIT | ocr |
 | cargo | time | 0.3.55 | MIT OR Apache-2.0 | native-desktop |
 | cargo | time-core | 0.1.9 | MIT OR Apache-2.0 | native-desktop |
 | cargo | time-macros | 0.2.32 | MIT OR Apache-2.0 | native-desktop |
 | cargo | tiny-skia | 0.12.0 | BSD-3-Clause | native-desktop |
 | cargo | tiny-skia-path | 0.12.0 | BSD-3-Clause | native-desktop |
-| cargo | tinystr | 0.8.4 | Unicode-3.0 | native-desktop |
+| cargo | tinystr | 0.8.5 | Unicode-3.0 | native-desktop |
 | cargo | tinyvec | 1.13.3 | Zlib OR Apache-2.0 OR MIT | native-desktop |
-| cargo | tokio | 1.53.1 | MIT | native-desktop |
+| cargo | tokio | 1.54.1 | MIT | native-desktop |
 | cargo | tokio-macros | 2.7.2 | MIT | native-desktop |
 | cargo | tokio-native-tls | 0.3.1 | MIT | native-desktop |
 | cargo | tokio-postgres | 0.7.18 | MIT OR Apache-2.0 | native-desktop |
-| cargo | tokio-rustls | 0.26.5 | MIT OR Apache-2.0 | native-desktop |
-| cargo | tokio-util | 0.7.19 | MIT | native-desktop |
+| cargo | tokio-rustls | 0.26.6 | MIT OR Apache-2.0 | native-desktop |
+| cargo | tokio-util | 0.7.20 | MIT | native-desktop |
 | cargo | toml | 0.8.2 | MIT OR Apache-2.0 | native-desktop |
-| cargo | toml | 0.9.12+spec-1.1.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | toml | 1.1.6+spec-1.1.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | toml | 1.1.8+spec-1.1.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | toml_datetime | 0.6.3 | MIT OR Apache-2.0 | native-desktop |
-| cargo | toml_datetime | 0.7.5+spec-1.1.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | toml_datetime | 1.1.1+spec-1.1.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | toml_datetime | 1.1.2+spec-1.1.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | toml_edit | 0.19.15 | MIT OR Apache-2.0 | native-desktop |
 | cargo | toml_edit | 0.20.2 | MIT OR Apache-2.0 | native-desktop |
-| cargo | toml_edit | 0.25.15+spec-1.1.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | toml_parser | 1.1.3+spec-1.1.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | toml_writer | 1.1.2+spec-1.1.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | toml_edit | 0.25.17+spec-1.1.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | toml_parser | 1.1.5+spec-1.1.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | toml_writer | 1.1.3+spec-1.1.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | tower | 0.5.3 | MIT | native-desktop |
 | cargo | tower-http | 0.6.11 | MIT | native-desktop |
 | cargo | tower-http | 0.7.1 | MIT | native-desktop |
@@ -593,39 +572,34 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | tracing | 0.1.44 | MIT | native-desktop, ocr |
 | cargo | tracing-attributes | 0.1.31 | MIT | native-desktop |
 | cargo | tracing-core | 0.1.36 | MIT | native-desktop, ocr |
-| cargo | tray-icon | 0.24.2 | MIT OR Apache-2.0 | native-desktop |
+| cargo | tray-icon | 0.25.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | try-lock | 0.2.5 | MIT | native-desktop |
 | cargo | ttf-parser | 0.25.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | typed-path | 0.12.3 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
+| cargo | typed-path | 0.12.4 | MIT OR Apache-2.0 | excel-analyzer, native-desktop |
 | cargo | typeid | 1.0.3 | MIT OR Apache-2.0 | native-desktop |
 | cargo | typenum | 1.20.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | uds_windows | 1.2.1 | MIT | native-desktop |
-| cargo | unic-char-property | 0.9.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | unic-char-range | 0.9.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | unic-common | 0.9.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | unic-ucd-ident | 0.9.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | unic-ucd-version | 0.9.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | unicase | 2.9.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | unicase | 2.10.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | unicode-bidi | 0.3.18 | MIT OR Apache-2.0 | native-desktop |
 | cargo | unicode-bidi-mirroring | 0.4.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | unicode-ccc | 0.4.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | unicode-ident | 1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 | excel-analyzer, native-desktop, ocr |
-| cargo | unicode-normalization | 0.1.25 | MIT OR Apache-2.0 | native-desktop |
+| cargo | unicode-ident | 1.0.27 | (MIT OR Apache-2.0) AND Unicode-3.0 | excel-analyzer, native-desktop, ocr |
+| cargo | unicode-normalization | 0.1.26 | (MIT OR Apache-2.0) AND Unicode-3.0 | native-desktop |
 | cargo | unicode-properties | 0.1.4 | MIT OR Apache-2.0 | native-desktop |
 | cargo | unicode-script | 0.5.8 | MIT OR Apache-2.0 | native-desktop |
 | cargo | unicode-segmentation | 1.13.3 | MIT OR Apache-2.0 | native-desktop |
 | cargo | unicode-vo | 0.1.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | universal-hash | 0.6.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | untrusted | 0.9.0 | ISC | native-desktop |
-| cargo | ureq | 3.4.2 | MIT OR Apache-2.0 | native-desktop |
-| cargo | ureq-proto | 0.6.3 | MIT OR Apache-2.0 | native-desktop |
+| cargo | ureq | 3.5.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | ureq-proto | 0.6.5 | MIT OR Apache-2.0 | native-desktop |
 | cargo | url | 2.5.8 | MIT OR Apache-2.0 | native-desktop |
-| cargo | urlpattern | 0.3.0 | MIT | native-desktop |
+| cargo | urlpattern | 0.6.0 | MIT | native-desktop |
 | cargo | usvg | 0.47.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | utf16string | 0.2.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | utf8_iter | 1.0.4 | Apache-2.0 OR MIT | native-desktop |
 | cargo | utf8-zero | 0.8.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | uuid | 1.26.1 | Apache-2.0 OR MIT | native-desktop |
+| cargo | uuid | 1.28.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | vcpkg | 0.2.15 | MIT OR Apache-2.0 | native-desktop |
 | cargo | vecmath | 1.0.0 | MIT | native-desktop |
 | cargo | version_check | 0.9.5 | MIT OR Apache-2.0 | native-desktop |
@@ -634,130 +608,106 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | vswhom | 0.1.0 | MIT | native-desktop |
 | cargo | vswhom-sys | 0.1.3 | MIT | native-desktop |
 | cargo | walkdir | 2.5.0 | Unlicense OR MIT | native-desktop |
-| cargo | want | 0.3.1 | MIT | native-desktop |
+| cargo | want | 0.3.2 | MIT | native-desktop |
 | cargo | wasi | 0.11.1+wasi-snapshot-preview1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | native-desktop |
 | cargo | wasi | 0.14.7+wasi-0.2.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | native-desktop |
 | cargo | wasip2 | 1.0.4+wasi-0.2.12 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | native-desktop |
 | cargo | wasite | 1.0.2 | Apache-2.0 OR BSL-1.0 OR MIT | native-desktop |
-| cargo | wasm-bindgen | 0.2.128 | MIT OR Apache-2.0 | native-desktop |
-| cargo | wasm-bindgen-futures | 0.4.78 | MIT OR Apache-2.0 | native-desktop |
-| cargo | wasm-bindgen-macro | 0.2.128 | MIT OR Apache-2.0 | native-desktop |
-| cargo | wasm-bindgen-macro-support | 0.2.128 | MIT OR Apache-2.0 | native-desktop |
-| cargo | wasm-bindgen-shared | 0.2.128 | MIT OR Apache-2.0 | native-desktop |
+| cargo | wasm-bindgen | 0.2.129 | MIT OR Apache-2.0 | native-desktop |
+| cargo | wasm-bindgen-futures | 0.4.79 | MIT OR Apache-2.0 | native-desktop |
+| cargo | wasm-bindgen-macro | 0.2.129 | MIT OR Apache-2.0 | native-desktop |
+| cargo | wasm-bindgen-macro-support | 0.2.129 | MIT OR Apache-2.0 | native-desktop |
+| cargo | wasm-bindgen-shared | 0.2.129 | MIT OR Apache-2.0 | native-desktop |
 | cargo | wasm-streams | 0.5.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | web_atoms | 0.2.6 | MIT OR Apache-2.0 | native-desktop |
-| cargo | web-sys | 0.3.105 | MIT OR Apache-2.0 | native-desktop |
+| cargo | web_atoms | 0.3.0 | MIT OR Apache-2.0 | native-desktop |
+| cargo | web-sys | 0.3.106 | MIT OR Apache-2.0 | native-desktop |
+| cargo | web-time | 1.1.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | webkit2gtk | 2.0.2 | MIT | native-desktop |
 | cargo | webkit2gtk-sys | 2.0.2 | MIT | native-desktop |
-| cargo | webpki-root-certs | 1.0.9 | CDLA-Permissive-2.0 | native-desktop |
-| cargo | webview2-com | 0.38.2 | MIT | native-desktop |
+| cargo | webpki-root-certs | 1.0.10 | CDLA-Permissive-2.0 | native-desktop |
+| cargo | webview2-com | 0.39.1 | MIT | native-desktop |
 | cargo | webview2-com-macros | 0.8.1 | MIT | native-desktop |
-| cargo | webview2-com-sys | 0.38.2 | MIT | native-desktop |
+| cargo | webview2-com-sys | 0.39.1 | MIT | native-desktop |
 | cargo | weezl | 0.1.12 | MIT OR Apache-2.0 | native-desktop, ocr |
 | cargo | whoami | 2.1.3 | Apache-2.0 OR BSL-1.0 OR MIT | native-desktop |
 | cargo | winapi | 0.3.9 | MIT OR Apache-2.0 | native-desktop |
 | cargo | winapi-i686-pc-windows-gnu | 0.4.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | winapi-util | 0.1.11 | Unlicense OR MIT | native-desktop |
 | cargo | winapi-x86_64-pc-windows-gnu | 0.4.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | window-vibrancy | 0.6.0 | Apache-2.0 OR MIT | native-desktop |
-| cargo | windows | 0.61.3 | MIT OR Apache-2.0 | native-desktop |
+| cargo | window-vibrancy | 0.8.1 | Apache-2.0 OR MIT | native-desktop |
 | cargo | windows | 0.62.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_aarch64_gnullvm | 0.42.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_aarch64_gnullvm | 0.52.6 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows_aarch64_gnullvm | 0.53.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_aarch64_msvc | 0.42.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_aarch64_msvc | 0.52.6 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows_aarch64_msvc | 0.53.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_i686_gnu | 0.42.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_i686_gnu | 0.52.6 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows_i686_gnu | 0.53.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_i686_gnullvm | 0.52.6 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows_i686_gnullvm | 0.53.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_i686_msvc | 0.42.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_i686_msvc | 0.52.6 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows_i686_msvc | 0.53.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_x86_64_gnu | 0.42.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_x86_64_gnu | 0.52.6 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows_x86_64_gnu | 0.53.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_x86_64_gnullvm | 0.42.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_x86_64_gnullvm | 0.52.6 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows_x86_64_gnullvm | 0.53.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_x86_64_msvc | 0.42.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows_x86_64_msvc | 0.52.6 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows_x86_64_msvc | 0.53.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows-collections | 0.2.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-collections | 0.3.2 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows-core | 0.61.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-core | 0.62.2 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows-future | 0.2.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-future | 0.3.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-implement | 0.60.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-interface | 0.59.3 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows-link | 0.1.3 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-link | 0.2.1 | MIT OR Apache-2.0 | native-desktop, ocr |
-| cargo | windows-numerics | 0.2.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-numerics | 0.3.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-registry | 0.6.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows-result | 0.3.4 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-result | 0.4.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows-strings | 0.4.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-strings | 0.5.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-sys | 0.45.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-sys | 0.52.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows-sys | 0.59.0 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows-sys | 0.60.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-sys | 0.61.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-targets | 0.42.2 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-targets | 0.52.6 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows-targets | 0.53.5 | MIT OR Apache-2.0 | native-desktop |
-| cargo | windows-threading | 0.1.0 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-threading | 0.2.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | windows-version | 0.1.7 | MIT OR Apache-2.0 | native-desktop |
 | cargo | winnow | 0.5.40 | MIT | native-desktop |
-| cargo | winnow | 0.7.15 | MIT | native-desktop |
 | cargo | winnow | 1.0.4 | MIT | native-desktop |
-| cargo | winreg | 0.55.0 | MIT | native-desktop |
+| cargo | winreg | 0.56.0 | MIT | native-desktop |
 | cargo | wit-bindgen | 0.57.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | native-desktop |
 | cargo | write-fonts | 0.48.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | writeable | 0.6.4 | Unicode-3.0 | native-desktop |
-| cargo | wry | 0.55.1 | Apache-2.0 OR MIT | native-desktop |
+| cargo | wry | 0.57.0 | Apache-2.0 OR MIT | native-desktop |
 | cargo | x11 | 2.21.0 | MIT | native-desktop |
 | cargo | x11-dl | 2.21.0 | MIT | native-desktop |
 | cargo | xattr | 1.6.1 | MIT OR Apache-2.0 | native-desktop |
 | cargo | xmlwriter | 0.1.0 | MIT | native-desktop |
 | cargo | xmp-writer | 0.3.3 | MIT OR Apache-2.0 | native-desktop |
-| cargo | yoke | 0.8.3 | Unicode-3.0 | native-desktop |
+| cargo | yoke | 0.8.4 | Unicode-3.0 | native-desktop |
 | cargo | yoke-derive | 0.8.4 | Unicode-3.0 | native-desktop |
 | cargo | zbus | 5.19.0 | MIT | native-desktop |
 | cargo | zbus_macros | 5.19.0 | MIT | native-desktop |
-| cargo | zbus_names | 4.3.4 | MIT | native-desktop |
+| cargo | zbus_names | 4.3.5 | MIT | native-desktop |
 | cargo | zcheapstr | 1.1.0 | MIT | native-desktop |
-| cargo | zerocopy | 0.8.54 | BSD-2-Clause OR Apache-2.0 OR MIT | ocr |
-| cargo | zerocopy | 0.8.57 | BSD-2-Clause OR Apache-2.0 OR MIT | native-desktop |
-| cargo | zerocopy-derive | 0.8.54 | BSD-2-Clause OR Apache-2.0 OR MIT | ocr |
-| cargo | zerocopy-derive | 0.8.57 | BSD-2-Clause OR Apache-2.0 OR MIT | native-desktop |
+| cargo | zerocopy | 0.8.63 | BSD-2-Clause OR Apache-2.0 OR MIT | native-desktop, ocr |
+| cargo | zerocopy-derive | 0.8.63 | BSD-2-Clause OR Apache-2.0 OR MIT | native-desktop, ocr |
 | cargo | zerofrom | 0.1.8 | Unicode-3.0 | native-desktop |
 | cargo | zerofrom-derive | 0.1.8 | Unicode-3.0 | native-desktop |
-| cargo | zeroize | 1.9.0 | Apache-2.0 OR MIT | native-desktop |
+| cargo | zeroize | 1.9.1 | Apache-2.0 OR MIT | native-desktop |
 | cargo | zerotrie | 0.2.5 | Unicode-3.0 | native-desktop |
-| cargo | zerovec | 0.11.8 | Unicode-3.0 | native-desktop |
-| cargo | zerovec-derive | 0.11.6 | Unicode-3.0 | native-desktop |
+| cargo | zerovec | 0.11.9 | Unicode-3.0 | native-desktop |
+| cargo | zerovec-derive | 0.11.7 | Unicode-3.0 | native-desktop |
 | cargo | zip | 9.0.5 | MIT | excel-analyzer, native-desktop |
-| cargo | zlib-rs | 0.6.4 | Zlib | excel-analyzer |
-| cargo | zlib-rs | 0.6.8 | Zlib | native-desktop |
-| cargo | zmij | 1.0.21 | MIT | excel-analyzer |
-| cargo | zmij | 1.0.23 | MIT | native-desktop, ocr |
-| cargo | zopfli | 0.8.3 | Apache-2.0 | excel-analyzer, native-desktop |
-| cargo | zune-core | 0.5.1 | MIT OR Apache-2.0 OR Zlib | ocr |
-| cargo | zune-core | 0.5.3 | MIT OR Apache-2.0 OR Zlib | native-desktop |
+| cargo | zlib-rs | 0.6.8 | Zlib | excel-analyzer, native-desktop, ocr |
+| cargo | zmij | 1.0.23 | MIT | excel-analyzer, native-desktop, ocr |
+| cargo | zopfli | 0.8.4 | Apache-2.0 | excel-analyzer, native-desktop |
+| cargo | zune-core | 0.5.3 | MIT OR Apache-2.0 OR Zlib | native-desktop, ocr |
 | cargo | zune-jpeg | 0.5.15 | MIT OR Apache-2.0 OR Zlib | native-desktop, ocr |
-| cargo | zvariant | 5.15.0 | MIT | native-desktop |
-| cargo | zvariant_derive | 5.15.0 | MIT | native-desktop |
+| cargo | zvariant | 5.15.1 | MIT | native-desktop |
+| cargo | zvariant_derive | 5.15.1 | MIT | native-desktop |
 | cargo | zvariant_utils | 4.2.0 | MIT | native-desktop |
-| native-resource | bblanchon.pdfium.linux | 152.0.7961 | Apache-2.0 | Rust native library only; managed assemblies excluded |
-| native-resource | bblanchon.pdfium.macos | 152.0.7961 | Apache-2.0 | Rust native library only; managed assemblies excluded |
-| native-resource | bblanchon.pdfium.win32 | 152.0.7961 | Apache-2.0 | Rust native library only; managed assemblies excluded |
-| native-resource | microsoft.ml.onnxruntime | 1.29.0 | MIT | Rust native library only; managed assemblies excluded |
+| native-resource | bblanchon.pdfium.linux | 158.0.8111 | Apache-2.0 | Rust native library only; managed assemblies excluded |
+| native-resource | bblanchon.pdfium.macos | 158.0.8111 | Apache-2.0 | Rust native library only; managed assemblies excluded |
+| native-resource | bblanchon.pdfium.win32 | 158.0.8111 | Apache-2.0 | Rust native library only; managed assemblies excluded |
+| native-resource | microsoft.ml.onnxruntime | 1.31.0 | MIT | Rust native library only; managed assemblies excluded |
 | native-resource | postgresql-client | 18.6 | PostgreSQL | Rust web/server backup and migration clients; excluded from desktop |
 | npm | @dimforge/rapier3d-compat | 0.12.0 | Apache-2.0 | web |
 | npm | @esbuild/aix-ppc64 | 0.28.2 | MIT | web |
@@ -786,40 +736,40 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | @esbuild/win32-arm64 | 0.28.2 | MIT | web |
 | npm | @esbuild/win32-ia32 | 0.28.2 | MIT | web |
 | npm | @esbuild/win32-x64 | 0.28.2 | MIT | web |
-| npm | @oxc-project/types | 0.151.0 | MIT | web |
-| npm | @rolldown/binding-android-arm-eabi | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-android-arm64 | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-darwin-arm64 | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-darwin-x64 | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-freebsd-x64 | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-linux-arm-gnueabihf | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-linux-arm64-gnu | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-linux-arm64-musl | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-linux-ppc64-gnu | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-linux-s390x-gnu | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-linux-x64-gnu | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-linux-x64-musl | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-openharmony-arm64 | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-win32-arm64-msvc | 1.2.11 | MIT | web |
-| npm | @rolldown/binding-win32-x64-msvc | 1.2.11 | MIT | web |
+| npm | @oxc-project/types | 0.155.0 | MIT | web |
+| npm | @rolldown/binding-android-arm-eabi | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-android-arm64 | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-darwin-arm64 | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-darwin-x64 | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-freebsd-x64 | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-linux-arm-gnueabihf | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-linux-arm64-gnu | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-linux-arm64-musl | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-linux-ppc64-gnu | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-linux-s390x-gnu | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-linux-x64-gnu | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-linux-x64-musl | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-openharmony-arm64 | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-win32-arm64-msvc | 1.2.15 | MIT | web |
+| npm | @rolldown/binding-win32-x64-msvc | 1.2.15 | MIT | web |
 | npm | @rolldown/pluginutils | 1.0.1 | MIT | web |
-| npm | @tanstack/query-core | 5.103.2 | MIT | web |
-| npm | @tanstack/react-query | 5.103.2 | MIT | web |
-| npm | @tauri-apps/api | 2.11.1 | Apache-2.0 OR MIT | web |
-| npm | @tauri-apps/cli | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
-| npm | @tauri-apps/cli-darwin-arm64 | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
-| npm | @tauri-apps/cli-darwin-x64 | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
-| npm | @tauri-apps/cli-linux-arm-gnueabihf | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
-| npm | @tauri-apps/cli-linux-arm64-gnu | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
-| npm | @tauri-apps/cli-linux-arm64-musl | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
-| npm | @tauri-apps/cli-linux-riscv64-gnu | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
-| npm | @tauri-apps/cli-linux-x64-gnu | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
-| npm | @tauri-apps/cli-linux-x64-musl | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
-| npm | @tauri-apps/cli-win32-arm64-msvc | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
-| npm | @tauri-apps/cli-win32-ia32-msvc | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
-| npm | @tauri-apps/cli-win32-x64-msvc | 2.11.5 | Apache-2.0 OR MIT | tauri-build |
+| npm | @tanstack/query-core | 5.104.5 | MIT | web |
+| npm | @tanstack/react-query | 5.104.5 | MIT | web |
+| npm | @tauri-apps/api | 2.12.4 | Apache-2.0 OR MIT | web |
+| npm | @tauri-apps/cli | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
+| npm | @tauri-apps/cli-darwin-arm64 | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
+| npm | @tauri-apps/cli-darwin-x64 | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
+| npm | @tauri-apps/cli-linux-arm-gnueabihf | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
+| npm | @tauri-apps/cli-linux-arm64-gnu | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
+| npm | @tauri-apps/cli-linux-arm64-musl | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
+| npm | @tauri-apps/cli-linux-riscv64-gnu | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
+| npm | @tauri-apps/cli-linux-x64-gnu | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
+| npm | @tauri-apps/cli-linux-x64-musl | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
+| npm | @tauri-apps/cli-win32-arm64-msvc | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
+| npm | @tauri-apps/cli-win32-ia32-msvc | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
+| npm | @tauri-apps/cli-win32-x64-msvc | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
 | npm | @tweenjs/tween.js | 23.1.3 | MIT | web |
-| npm | @types/node | 26.6.2 | MIT | web |
+| npm | @types/node | 26.6.5 | MIT | web |
 | npm | @types/pngjs | 6.0.5 | MIT | web |
 | npm | @types/react | 19.3.0 | MIT | web |
 | npm | @types/react-dom | 19.3.0 | MIT | web |
@@ -846,8 +796,8 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | @typescript/typescript-sunos-x64 | 7.0.2 | Apache-2.0 | web |
 | npm | @typescript/typescript-win32-arm64 | 7.0.2 | Apache-2.0 | web |
 | npm | @typescript/typescript-win32-x64 | 7.0.2 | Apache-2.0 | web |
-| npm | @vitejs/plugin-react | 6.1.1 | MIT | web |
-| npm | axe-core | 4.13.0 | MPL-2.0 | web |
+| npm | @vitejs/plugin-react | 6.1.2 | MIT | web |
+| npm | axe-core | 4.14.0 | MPL-2.0 | web |
 | npm | cookie | 1.1.1 | MIT | web |
 | npm | csstype | 3.2.3 | MIT | web |
 | npm | detect-libc | 2.1.2 | Apache-2.0 | web |
@@ -867,21 +817,21 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | lightningcss-linux-x64-musl | 1.33.0 | MPL-2.0 | web |
 | npm | lightningcss-win32-arm64-msvc | 1.33.0 | MPL-2.0 | web |
 | npm | lightningcss-win32-x64-msvc | 1.33.0 | MPL-2.0 | web |
-| npm | lucide-react | 1.48.0 | ISC | web |
+| npm | lucide-react | 1.61.0 | ISC | web |
 | npm | meshoptimizer | 1.1.1 | MIT | web |
-| npm | nanoid | 3.3.19 | MIT | web |
+| npm | nanoid | 3.3.20 | MIT | web |
 | npm | picocolors | 1.1.1 | ISC | web |
 | npm | picomatch | 4.0.7 | MIT | web |
-| npm | pixelmatch | 7.2.0 | ISC | web |
-| npm | playwright | 1.63.0 | Apache-2.0 | web |
-| npm | playwright-core | 1.63.0 | Apache-2.0 | web |
+| npm | pixelmatch | 8.0.0 | ISC | web |
+| npm | playwright | 1.64.1 | Apache-2.0 | web |
+| npm | playwright-core | 1.64.1 | Apache-2.0 | web |
 | npm | pngjs | 7.0.0 | MIT | web |
-| npm | postcss | 8.5.28 | MIT | web |
-| npm | react | 19.3.0 | MIT | web |
-| npm | react-dom | 19.3.0 | MIT | web |
+| npm | postcss | 8.5.31 | MIT | web |
+| npm | react | 19.3.1 | MIT | web |
+| npm | react-dom | 19.3.1 | MIT | web |
 | npm | react-router | 7.18.4 | MIT | web |
 | npm | react-router-dom | 7.18.4 | MIT | web |
-| npm | rolldown | 1.2.11 | MIT | web |
+| npm | rolldown | 1.2.15 | MIT | web |
 | npm | scheduler | 0.28.0 | MIT | web |
 | npm | set-cookie-parser | 2.7.2 | MIT | web |
 | npm | source-map-js | 1.2.2 | BSD-3-Clause | web |
@@ -889,11 +839,11 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | tinyglobby | 0.2.17 | MIT | web |
 | npm | typescript | 7.0.2 | Apache-2.0 | web |
 | npm | undici-types | 8.9.0 | MIT | web |
-| npm | vite | 8.3.1 | MIT | web |
+| npm | vite | 8.3.5 | MIT | web |
 
 ## Reviewed source patch
 
-calamine 0.36.1 includes the BIFF8 row-index overflow correction and ZIP 9.0.5 filename-decoding API adaptation. The application and standalone analyzer use the same source; archive checksum and patch provenance are recorded in third_party/README.md.
+calamine 0.37.0 includes the BIFF8 row-index overflow correction. The application and standalone analyzer use the same source; archive checksum and patch provenance are recorded in third_party/README.md.
 
 The MIT License (MIT)
 
@@ -1049,7 +999,7 @@ Commercial use is allowed by these licenses. Redistributors must preserve the ap
 
 # Rust Excel analyzer notices
 
-- `calamine` 0.36.1: MIT License. The application and analyzer use the same reviewed source patch for BIFF8 last-row formula references; provenance and the original license are preserved in `third_party/`.
+- `calamine` 0.37.0: MIT License. The application and analyzer use the same reviewed source patch for BIFF8 last-row formula references; provenance and the original license are preserved in `third_party/`.
 - `serde` and `serde_json`: MIT OR Apache-2.0.
 
 These dependencies are open source and permit commercial use, modification and redistribution subject to their license terms. Preserve the applicable copyright and license notices when redistributing the analyzer.
@@ -1063,7 +1013,7 @@ Windows 绿色版在启动窗口前会检查 Microsoft Edge WebView2 Runtime。
 把微软官方 Evergreen Standalone Installer 放在本目录，构建脚本会按受 Git 跟踪的 `webview2-runtime.json` 固定清单校验版本、体积、SHA-256、微软数字签名和文件元数据，再将它复制到 Windows x64 便携包。当前发布文件名为：
 
 - `MicrosoftEdgeWebView2RuntimeInstallerX64.exe`
-安装器是约 203 MiB 的第三方发布二进制，不提交到 Git；仅小型校验清单和本说明进入仓库。需要升级 Evergreen 安装器时，应从微软官方 WebView2 下载页获取 x64 离线版，审核后一次性更新清单中的固定 HTTPS 地址、版本、大小和 SHA-256：
+安装器是约 205 MiB 的第三方发布二进制，不提交到 Git；仅小型校验清单和本说明进入仓库。需要升级 Evergreen 安装器时，应从微软官方 WebView2 下载页获取 x64 离线版，审核后一次性更新清单中的固定 HTTPS 地址、版本、大小和 SHA-256：
 
 <https://developer.microsoft.com/microsoft-edge/webview2/>
 

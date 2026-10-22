@@ -56,6 +56,8 @@ Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ub
 
 2026-09-25 核对 GitHub run 36044362655：`Audit Rust lock files` 被 glib 0.18.5 的 [RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429) 阻断，SBOM 未生成是连带结果。Tauri 2.11.6 的 GTK3 图使用该版本；修复版本 glib >=0.20 与此依赖图不兼容，0.18 分支没有发布修复。受影响 API 为 VariantStrIter/array_iter_str，当前项目及其它锁定依赖源码没有引用它们。`verify-rustsec-glib-exception.mjs` 为单项风险例外准备了保守检查：固定 Tauri/glib 版本，任何其它依赖或项目出现受影响符号即失败。源码检查不等于修复或形式化不可达证明；例外是否启用必须记录本次决定，不能全局关闭 unsound/yanked 门禁。
 
+2026-10-23 升级重新评估：Tauri `2.12.5` 的 Linux GTK3 图仍锁定 glib `0.18.5`；扫描新锁图 21,298 个 Rust 源文件，项目与其它依赖仍未引用受影响 API。继续保留同一项既有例外，没有新增豁免；主图、OCR 与 Excel 的 unsound/yanked 审计按原参数通过。这不是上游修复，也不替代 Linux 实际运行验收。
+
 ## 签名与验收边界
 
 2026-09-25 修复 run `36081725495` 的相邻仓库链接依赖：证据链接改用本仓库保留的 C# 对照源码，干净 checkout 即可校验。修复 run `36081725496` 时启用上述单项 GLib 例外：先验证固定版本和所有锁定依赖源码，再仅对主锁图传入 `--ignore RUSTSEC-2024-0429`；OCR/Excel 审计不豁免，`unsound`/`yanked` 及其它公告继续阻断。本机扫描 22,212 个 Rust 文件通过；这不表示上游漏洞已修复，Tauri/GLib 升级时必须移除或重新评估例外。

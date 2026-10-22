@@ -16,7 +16,7 @@ if (result.status !== 0) throw new Error(`Cannot inspect locked dependency sourc
 const packages = JSON.parse(result.stdout).packages;
 const glib = packages.filter(item => item.name === "glib");
 const tauri = packages.filter(item => item.name === "tauri");
-if (glib.length !== 1 || glib[0].version !== "0.18.5" || tauri.length !== 1 || tauri[0].version !== "2.11.6") {
+if (glib.length !== 1 || glib[0].version !== "0.18.5" || tauri.length !== 1 || tauri[0].version !== "2.12.5") {
   throw new Error("Tauri/GLib versions changed; remove or reassess RUSTSEC-2024-0429 exception.");
 }
 const symbols = /\b(?:VariantStrIter|array_iter_str)\b/u;
@@ -31,7 +31,7 @@ for (const item of packages) {
     }
   }
 }
-console.log(`RUSTSEC-2024-0429 exception preconditions checked: glib 0.18.5 / tauri 2.11.6, ${scanned} Rust files. Upstream issue remains unfixed.`);
+console.log(`RUSTSEC-2024-0429 exception preconditions checked: glib 0.18.5 / tauri 2.12.5, ${scanned} Rust files. Upstream issue remains unfixed.`);
 
 function* rustFiles(directory) {
   for (const item of readdirSync(directory, { withFileTypes: true })) {

@@ -12,9 +12,9 @@ export-doc-contracts = { path = "../export-doc-contracts" }
 serde_json.workspace = true
 rust_decimal.workspace = true
 chrono.workspace = true
-ureq = { version = "=3.4.2", default-features = false, features = ["native-tls-no-default"] }
+ureq = { version = "=3.5.0", default-features = false, features = ["native-tls-no-default"] }
 url = "=2.5.8"
-scraper = { version = "=0.27.0", default-features = false }
+scraper = { version = "=0.29.0", default-features = false }
 
 [lints]
 workspace = true

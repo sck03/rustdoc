@@ -183,6 +183,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 
 - Rust：`cargo fmt --all --check`、`cargo test --locked --workspace`、`cargo check --locked --workspace --all-features`。
 - OCR 独立工程：`cargo fmt --manifest-path apps/exportdoc-ocr-rs/Cargo.toml --check`、`cargo test --locked --manifest-path apps/exportdoc-ocr-rs/Cargo.toml`；组装资源后运行 `node scripts/test_native_ocr.mjs <AppRoot>`，验证真实模型、倾斜/旋转/手机方向和输入边界。根 workspace 不包含此工程；网页切图、上传、取消及内存回收使用 `test:smart-ocr-ui`。
+- PDFium 升级：`node scripts/test_native_pdf.mjs <包内EXE> <包内PDFium库> <匿名生成PDF>`，真实调用包内 worker 验证文字、预览、OCR 页图、合并后重新打开，以及损坏输入、缺库、页码与流边界。输出仅写 `.codex-runtime/native-pdf-validation`；使用当批报表回归生成的匿名 PDF，不使用业务文件。
 - 实库：`test-native-postgres.ps1 -PostgresBin <PostgreSQL-18-bin>` 创建并停止隔离集群；忽略的实库测试不计通过。
 - 团队备份界面：先完成 React build，再运行同一实库脚本的 `-Scope Maintenance`。使用真实 Rust CLI、文件连接配置、浏览器首次登录、dump 下载/上传、完整迁移、错误/既有密码、停机恢复、主密钥/模板保留和重试幂等；不接受生产端点。该专项不加入普通浏览器重型门禁。
 - Docker：`test_native_docker_lifecycle.ps1` 在无 daemon 环境验证停机顺序与失败中止；真实两架构 CI 另核对内部网络、端口、凭据/卷隔离、运行中重复部署、custom-format dump 恢复及重启持久化。脚本和 Compose 配置通过不等于容器实跑通过。

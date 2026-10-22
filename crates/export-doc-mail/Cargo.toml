@@ -8,12 +8,12 @@ description = "Native MIME, SMTP and safe email template rendering"
 
 [dependencies]
 lettre = { version = "=0.11.23", default-features = false, features = ["builder", "smtp-transport", "tokio1-native-tls"] }
-tokio = { version = "=1.53.1", features = ["rt", "time", "net", "macros"] }
-scraper = { version = "=0.27.0", default-features = false }
-ego-tree = "=0.11.0"
+tokio = { version = "=1.54.1", features = ["rt", "time", "net", "macros"] }
+scraper = { version = "=0.29.0", default-features = false }
+ego-tree = "=0.11.1"
 url = "=2.5.8"
 zip.workspace = true
-zeroize = "=1.9.0"
+zeroize = "=1.9.1"
 
 [lints]
 workspace = true

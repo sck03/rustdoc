@@ -18,7 +18,7 @@ const requiredActions = new Map([
   ["docker/login-action", "dbcb813823bdd20940b903addbd779551569679f"],
   ["dtolnay/rust-toolchain", "4360b52568e2003a75bf9bc1d59f33a8e3fc893c"],
 ]);
-const requiredRustToolchain = "1.98.1";
+const requiredRustToolchain = "1.99.1";
 const failures = [];
 let actionCount = 0;
 

@@ -10,7 +10,7 @@ description = "Native Excel import and template-preserving workbook output"
 export-doc-contracts = { path = "../export-doc-contracts" }
 export-doc-domain = { path = "../export-doc-domain" }
 exportdoc-excel-analyzer = { path = "../../tools/excel-analyzer-rs" }
-calamine = { version = "=0.36.1", features = ["dates"] }
+calamine = { version = "=0.37.0", features = ["dates"] }
 quick-xml = "=0.42.0"
 zip.workspace = true
 serde_json.workspace = true

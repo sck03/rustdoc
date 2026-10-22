@@ -12,7 +12,7 @@ default = []
 custom-protocol = ["tauri/custom-protocol"]
 
 [build-dependencies]
-tauri-build = { version = "=2.6.3", features = [] }
+tauri-build = { version = "=2.7.4", features = [] }
 serde_json.workspace = true
 
 [dependencies]
@@ -27,14 +27,15 @@ regex = "=1.13.1"
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
-tauri = { version = "=2.11.6", features = [] }
-tauri-plugin-single-instance = "=2.4.5"
+# Capabilities are fixed by the bundled configuration; runtime ACL mutation is unused.
+tauri = { version = "=2.12.5", default-features = false, features = ["wry", "compression", "common-controls-v6", "x11", "dbus"] }
+tauri-plugin-single-instance = "=2.5.4"
 # Tauri 2 uses signed installers directly; exclude legacy Windows ZIP extraction.
-tauri-plugin-updater = { version = "=2.12.0", default-features = false, features = ["rustls-tls", "system-proxy"] }
+tauri-plugin-updater = { version = "=2.14.0", default-features = false, features = ["rustls-tls", "system-proxy"] }
 url = "=2.5.8"
 
 [target.'cfg(unix)'.dependencies]
-libc = "=0.2.189"
+libc = "=0.2.191"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.61.2", features = ["Win32_Security", "Win32_Storage_FileSystem", "Win32_System_LibraryLoader", "Win32_System_Registry", "Win32_System_Threading"] }

@@ -17,29 +17,29 @@ members = [
     "apps/export-doc-server",
 ]
 default-members = ["apps/export-doc-tauri/src-tauri", "crates/export-doc-engine", "crates/export-doc-domain"]
-exclude = ["apps/exportdoc-ocr-rs", "tools/excel-analyzer-rs", "third_party/calamine-0.36.1"]
+exclude = ["apps/exportdoc-ocr-rs", "tools/excel-analyzer-rs", "third_party/calamine-0.37.0"]
 
 [patch.crates-io]
-calamine = { path = "third_party/calamine-0.36.1" }
+calamine = { path = "third_party/calamine-0.37.0" }
 
 [workspace.package]
 version = "0.1.2"
 edition = "2024"
-rust-version = "1.98.1"
+rust-version = "1.99.1"
 publish = false
 
 [workspace.dependencies]
 serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = { version = "=1.0.151", features = ["arbitrary_precision", "preserve_order"] }
+serde_json = { version = "=1.0.154", features = ["arbitrary_precision", "preserve_order"] }
 rust_decimal = { version = "=1.43.0", default-features = false, features = ["std", "serde-float", "serde-arbitrary-precision"] }
-unicode-normalization = "=0.1.25"
-sha2 = "=0.11.0"
+unicode-normalization = "=0.1.26"
+sha2 = "=0.11.1"
 getrandom = "=0.4.3"
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
 chrono = { version = "=0.4.45", default-features = false, features = ["clock", "serde"] }
 base64 = "=0.23.1"
-aws-sigv4 = { version = "=1.6.0", default-features = false, features = ["sign-http", "http1"] }
-aws-credential-types = { version = "=1.3.0", default-features = false }
+aws-sigv4 = { version = "=1.6.3", default-features = false, features = ["sign-http", "http1"] }
+aws-credential-types = { version = "=1.3.1", default-features = false }
 rfd = { version = "=0.17.2", default-features = false, features = ["xdg-portal"] }
 zip = { version = "=9.0.5", default-features = false, features = ["deflate"] }
 
@@ -49,9 +49,9 @@ lto = "thin"
 codegen-units = 1
 strip = true
 
-[profile.test]
-# Keep source locations in test backtraces without embedding full type/variable
-# debug information into every integration-test executable.
+[profile.dev]
+# Keep source locations without embedding full type/variable information in
+# every dependency and test executable. Test inherits the same dev profile.
 debug = "line-tables-only"
 
 [profile.dev.package.sha2]

@@ -2,6 +2,8 @@
 
 > 2026-10-15。源码、随包资源、真实测试分别核对；目标平台不等于已经在每种设备上验收。
 
+2026-10-23 运行库升级：中央原生资源清单已固定 ONNX Runtime `1.31.0`，沿用 `ort =2.0.0-rc.12` 的动态 API 23 绑定及现有模型。下文 1.29.0 的性能数字和跨平台结果属于旧批次；新库的实际验证单独记录在当日进度中，不能沿用旧结论。
+
 ## 选择结论
 
 继续使用 **Rust + ONNX Runtime + PP-OCRv6 Small** 的隔离进程，重构识别流水线。RapidOCR 的算法、模型选择和硬件后端更丰富，但不自动使本项目更轻。本日官方最新稳定版为 [v3.10.0](https://github.com/RapidAI/RapidOCR/releases/tag/v3.10.0)，2026-10-08 发布，Apache-2.0；主实现为 Python。[依赖清单](https://github.com/RapidAI/RapidOCR/blob/v3.10.0/python/requirements.txt)包含 OpenCV headless、NumPy、Shapely、pyclipper 等，另需推理后端。直接包装还需携带 Python 环境。

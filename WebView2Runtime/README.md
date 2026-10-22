@@ -5,7 +5,7 @@ Windows 绿色版在启动窗口前会检查 Microsoft Edge WebView2 Runtime。
 把微软官方 Evergreen Standalone Installer 放在本目录，构建脚本会按受 Git 跟踪的 `webview2-runtime.json` 固定清单校验版本、体积、SHA-256、微软数字签名和文件元数据，再将它复制到 Windows x64 便携包。当前发布文件名为：
 
 - `MicrosoftEdgeWebView2RuntimeInstallerX64.exe`
-安装器是约 203 MiB 的第三方发布二进制，不提交到 Git；仅小型校验清单和本说明进入仓库。需要升级 Evergreen 安装器时，应从微软官方 WebView2 下载页获取 x64 离线版，审核后一次性更新清单中的固定 HTTPS 地址、版本、大小和 SHA-256：
+安装器是约 205 MiB 的第三方发布二进制，不提交到 Git；仅小型校验清单和本说明进入仓库。需要升级 Evergreen 安装器时，应从微软官方 WebView2 下载页获取 x64 离线版，审核后一次性更新清单中的固定 HTTPS 地址、版本、大小和 SHA-256：
 
 <https://developer.microsoft.com/microsoft-edge/webview2/>
 

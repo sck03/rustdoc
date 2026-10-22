@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "verifiedAt": "2026-09-25",
+  "verifiedAt": "2026-10-23",
   "postgresqlClient": {
     "version": "18.6",
     "license": "PostgreSQL",
@@ -12,27 +12,27 @@
   },
   "packages": {
     "bblanchon.pdfium.win32": {
-      "version": "152.0.7961",
-      "sha512": "pWyGOMwMdyYGtBGqXa77gdXLKZJ0mJL9jLP09tFEpmJd6QVqZoVYPufmVdaKN/3t3RC16O6dZPuttpV97JBAOw==",
-      "source": "https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.win32/152.0.7961/bblanchon.pdfium.win32.152.0.7961.nupkg",
+      "version": "158.0.8111",
+      "sha512": "zo1g7t583fEyjWbMC/6V5/SMtC9rkKsO/mxXw8mKi1NSQT1iPkRZJlAcsNX2WBipzq1hII+1ThcImpfgz9jwzg==",
+      "source": "https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.win32/158.0.8111/bblanchon.pdfium.win32.158.0.8111.nupkg",
       "license": "Apache-2.0"
     },
     "bblanchon.pdfium.linux": {
-      "version": "152.0.7961",
-      "sha512": "mHqxElmixmwmLHJNCghdxOFlrvwn4rc79DblFfD8fQswbw4Ahk6vFVOCb9zuDyNcM+Fj/QCiVMGyuwlPekJk+w==",
-      "source": "https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.linux/152.0.7961/bblanchon.pdfium.linux.152.0.7961.nupkg",
+      "version": "158.0.8111",
+      "sha512": "qdr5iYb86wdjye9HwEpWQQKIDkxNju5Aqh3Xq0Hyk1dy3f2733paMxkTCsFSG+r6vXFw7nVEIw+bfvsaexbcFQ==",
+      "source": "https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.linux/158.0.8111/bblanchon.pdfium.linux.158.0.8111.nupkg",
       "license": "Apache-2.0"
     },
     "bblanchon.pdfium.macos": {
-      "version": "152.0.7961",
-      "sha512": "o84By5TiSCLoPb6Mr/veMqkJDWCS0keu3Rrp+OpWBKLNOVy/alHUIdNKZhyd9H4PbbFACtBGagRryWNnYUdD7Q==",
-      "source": "https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.macos/152.0.7961/bblanchon.pdfium.macos.152.0.7961.nupkg",
+      "version": "158.0.8111",
+      "sha512": "caemCS9y2KWqzjltBWyEDr8MsM1BWdI484Qrqxe0EgbGhtF0P6ndRKAKTKT17LeAOAy0CoJK8Fav9OcS9uXflA==",
+      "source": "https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.macos/158.0.8111/bblanchon.pdfium.macos.158.0.8111.nupkg",
       "license": "Apache-2.0"
     },
     "microsoft.ml.onnxruntime": {
-      "version": "1.29.0",
-      "sha512": "AJ6YRZdKeGtpI2A7Ix+C6hxfGoTHTxWo9fZZx+j5PNSGPBIPLA8x/Tp6WHnBo9WHtr+z23MhALTmRk8Yti6/YA==",
-      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/1.29.0/microsoft.ml.onnxruntime.1.29.0.nupkg",
+      "version": "1.31.0",
+      "sha512": "J7arTn+7nrWdZ+PF2Sl9aNW1/Ba5DCt1ywZ3r5l3LKqzj3w8oC7Cl/uagG3Xp1ivuYJYQAMSuew0ef/74f7XCw==",
+      "source": "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/1.31.0/microsoft.ml.onnxruntime.1.31.0.nupkg",
       "license": "MIT"
     }
   }

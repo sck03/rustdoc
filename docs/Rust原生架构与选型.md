@@ -29,7 +29,7 @@ Tauri 是桌面宿主；浏览器与 Docker 不运行 Tauri 窗口。Node 只用
 
 2026-09-20 用户确认报表继续使用 **krilla + PDFium** 联动：`export-doc-report` 负责统一 V3 模型、排版和 krilla PDF 编码，隔离的 PDFium worker 负责已有 PDF 的预览、文字提取、OCR 页图及合并。HTML/Scriban 不作为报表模板运行时。当前原生包版本及逐项差距见[《Rust 与 C# 后端功能差距及修正方案》](./Rust与CSharp后端功能差距及修正方案.md)；封装/原生包升级单独验证和治理。
 
-当前已使用 `pdfium-render 0.9.4`，启用 `pdfium_7881 + image_025`，原生包仍为 `152.0.7961`。手写 C ABI 比较保留为历史，不再描述为当前实现；封装加载、原生包组合与各平台运行仍需独立验收，见[《PDFium 跨平台绑定与验收方案》](./PDFium跨平台绑定与验收方案.md)。
+当前已使用 `pdfium-render 0.9.4`，启用 `pdfium_7881 + image_025`，原生包为 `158.0.8111`。手写 C ABI 比较保留为历史，不再描述为当前实现；封装加载、原生包组合与各平台运行仍需独立验收，见[《PDFium 跨平台绑定与验收方案》](./PDFium跨平台绑定与验收方案.md)。
 
 2026-09-21 选择轻量原生路线，2026-09-23 收口为唯一 `.dtpl` 模板格式。六份默认模板按原版字段/布局生成可编辑结构化文档，预览与 PDF 共用 Rust 排版；不建设任意 HTML/CSS/Scriban 原生解释器。文件模板 API 返回可编辑 JSON，磁盘保持带校验的二进制容器，React 可视化设计器可直接打开。内部 schema 版本仍为 3，产品界面不附版本号。`export-doc-report` 的 Builtin 读取同一套 `.dtpl` 资产，没有另一套硬编码票面；默认引用也指向这些文件。六份匿名 PDF 已生成并检查，客户数据逐页签字与跨平台打印仍须独立验收，见[《模板与原版 PDF 验收方案》](./Rust统一V3模板与原版PDF验收方案.md)。
 
@@ -47,9 +47,11 @@ AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data�
 
 ## 版本与许可
 
-2026-09-20 查询 crates.io 与 npm 官方注册表：Tauri `2.11.6`、tauri-build `2.6.3`、single-instance `2.4.5`、updater `2.12.0`；CLI `2.11.5`、前端 API `2.11.1`。这里的 Tauri 2 指最新稳定 2.x，并非退回 2.0.0。版本精确写入 Cargo/npm 清单与锁文件。
+2026-10-23 查询 crates.io 与 npm 官方注册表：Tauri `2.12.5`、tauri-build `2.7.4`、single-instance `2.5.4`、updater `2.14.0`；CLI 与前端 API 均为 `2.12.4`。Rust `1.99.1`、React `19.3.1`、Vite `8.3.5`，构建用 Node `26.12.1`。版本精确写入 Cargo/npm 清单、锁文件及构建镜像；不将历史平台验证冒充新版本验收。
 
-Tauri 使用 MIT／Apache-2.0 双许可路径，具体传递组件以生成 notices 和依赖治理为准。WebView2／WebKit 是明确采用的平台显示依赖；Slint 许可不再属于交付图。NPOI 2.7.6 仅约束保留的 C# 对照程序。OCR 沿用已有 `ort 2.0.0-rc.12`，官方尚无稳定 2.x；本轮未将它升级到另一个 RC。PDFium／ONNX 原生资源只从签名校验后的归档抽取本地库，Rust 构建不执行 dotnet restore。
+依赖裁剪关闭未用的 Tauri 动态 ACL、tower-http limit feature，移除无引用的 serde 与 Engine 测试 tokio/lettre 声明。保留实际所需的平台显示、OCR、Excel、报表和网络能力。calamine 升至 `0.37.0`，删除旧 ZIP 适配，只保留上游尚未修复的两处 BIFF8 末行索引扩宽；供应源码仅保留库、清单、说明及许可。`usvg 0.47.0` 与最新版 krilla-svg 的公开类型对齐，不为追逐独立版本制造第二套 SVG 依赖。开发与测试统一使用行号调试信息，避免每份产物重复包含完整类型信息；Release 优化不变。
+
+Tauri 使用 MIT／Apache-2.0 双许可路径，具体传递组件以生成 notices 和依赖治理为准。WebView2／WebKit 是明确采用的平台显示依赖；Slint 许可不再属于交付图。NPOI 2.7.6 仅约束保留的 C# 对照程序。OCR 沿用已有 `ort 2.0.0-rc.12`，官方尚无稳定 2.x；本轮未将它升级到另一个 RC。PDFium／ONNX 原生资源只从通过受管 SHA-512 校验的官方归档抽取本地库，Rust 构建不执行 dotnet restore。
 
 ## 开发与验收
 

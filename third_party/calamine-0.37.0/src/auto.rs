@@ -10,7 +10,7 @@ use crate::vba::VbaProject;
 use crate::Picture;
 use crate::{
     open_workbook, open_workbook_from_rs, Data, DataRef, HeaderRow, Metadata, Ods, Range, Reader,
-    ReaderRef, Xls, Xlsb, Xlsx,
+    ReaderRef, WorkbookProperties, Xls, Xlsb, Xlsx,
 };
 
 use std::fs::File;
@@ -27,6 +27,29 @@ pub enum Sheets<RS> {
     Xlsb(Xlsb<RS>),
     /// Ods reader
     Ods(Ods<RS>),
+}
+
+impl<RS: std::io::Read + std::io::Seek> Sheets<RS> {
+    /// Get the workbook document properties.
+    ///
+    /// Read the document properties, such as the creator, title, application
+    /// and company, into a [`WorkbookProperties`] struct. Missing fields are
+    /// returned as `None`.
+    ///
+    /// Document properties are only supported for the [`Xlsx`] and [`Xlsb`]
+    /// readers. The [`Xls`] and [`Ods`] readers return an error.
+    ///
+    /// See [`Xlsx::workbook_properties()`] for an example.
+    ///
+    pub fn workbook_properties(&mut self) -> Result<WorkbookProperties, Error> {
+        match self {
+            Sheets::Xlsx(e) => e.workbook_properties().map_err(Error::Xlsx),
+            Sheets::Xlsb(e) => e.workbook_properties().map_err(Error::Xlsb),
+            Sheets::Xls(_) | Sheets::Ods(_) => Err(Error::Msg(
+                "Workbook properties are not supported for this format",
+            )),
+        }
+    }
 }
 
 /// Opens a workbook and define the file type at runtime.

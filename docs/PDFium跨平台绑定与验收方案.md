@@ -12,7 +12,7 @@
 | 原生库来源、版本及哈希 | [中央原生资源清单](../eng/native-runtime-packages.json) |
 | React 编辑和样例/单据预览 | 同一 Rust 排版结果生成 SVG，由受控 HTML 包装显示；不是 PDFium 页图预览 |
 
-[Engine 清单](../crates/export-doc-engine/Cargo.toml)精确固定 `pdfium-render = 0.9.4`，关闭默认 feature，启用 `pdfium_7881` 与 `image_025`；当前原生载荷为 `152.0.7961`。这分别是绑定版本、API 集和原生构建，不是三个可以互换的版本号。2026-09-20 的“最新版本”查询只属于历史，后续升级重新核验，不按旧候选版本直接更新。
+[Engine 清单](../crates/export-doc-engine/Cargo.toml)精确固定 `pdfium-render = 0.9.4`，关闭默认 feature，启用 `pdfium_7881` 与 `image_025`；当前原生载荷为 `158.0.8111`。这分别是绑定版本、API 集和原生构建，不是三个可以互换的版本号。2026-09-20 的“最新版本”查询只属于历史，后续升级重新核验，不按旧候选版本直接更新。
 
 已没有第二套手写 PDFium 绑定，也未采用 pdfium-sys 或 firecrawl-pdfium。封装负责 C ABI 和对象生命周期，本项目继续负责受管路径、输入/输出限制、错误分类和 worker 隔离。PDFium 本体仍是原生 C++ 库。
 
@@ -36,6 +36,8 @@
 现有目标均为 64 位。ABI、符号名称、整数宽度、结构与回调各自核查：Windows 32 位的 stdcall 名称修饰规则不能套到当前 x64/ARM64；macOS 工具显示的前导下划线不能直接变成动态查询名。具体声明由锁定的 pdfium-render 维护，业务代码不另造 FFI。
 
 Windows 本机的报表导出和界面预览记录见[进度](./程序改进重构进度文档.md)。krilla 成功生成 PDF、浏览器显示 SVG、静态导出表检查，都不能单独证明 PDFium 文字/OCR/合并以及其它 OS 已完成验收。
+
+2026-10-23 使用新版 Windows x64 GNU / Debug 包内 EXE 与 `158.0.8111` DLL 执行 `scripts/test_native_pdf.mjs`：实际加载、文字、PNG 预览、OCR 页图、合并后重开，以及坏文件、缺库、页码越界、零输入与截断合并流均通过；失败无部分输出。原始日志为 `.codex-runtime/upgrade-native-pdf.log`，输出与回执在 `.codex-runtime/native-pdf-validation`。本次使用报表回归生成的匿名 PDF，不将其扩展为所有特殊 PDF、取消/超时或其它平台均已验收。
 
 ## 验收与剩余工作
 

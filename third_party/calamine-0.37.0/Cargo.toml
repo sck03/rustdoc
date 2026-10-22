@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.88"
 name = "calamine"
-version = "0.36.1"
+version = "0.37.0"
 authors = ["Johann Tuffe <tafia973@gmail.com>"]
 build = false
 exclude = ["tests/**/*"]
@@ -60,60 +60,6 @@ picture = []
 name = "calamine"
 path = "src/lib.rs"
 
-[[example]]
-name = "deserialize_fallible"
-path = "examples/deserialize_fallible.rs"
-
-[[example]]
-name = "deserialize_flatten"
-path = "examples/deserialize_flatten.rs"
-
-[[example]]
-name = "deserialize_no_headers"
-path = "examples/deserialize_no_headers.rs"
-
-[[example]]
-name = "deserialize_range"
-path = "examples/deserialize_range.rs"
-
-[[example]]
-name = "deserialize_seed"
-path = "examples/deserialize_seed.rs"
-
-[[example]]
-name = "deserialize_struct"
-path = "examples/deserialize_struct.rs"
-
-[[example]]
-name = "excel_to_csv"
-path = "examples/excel_to_csv.rs"
-
-[[example]]
-name = "read_hyperlinks"
-path = "examples/read_hyperlinks.rs"
-
-[[example]]
-name = "read_picture_data"
-path = "examples/read_picture_data.rs"
-required-features = ["picture"]
-
-[[example]]
-name = "search_errors"
-path = "examples/search_errors.rs"
-
-[[example]]
-name = "simple_read"
-path = "examples/simple_read.rs"
-
-[[example]]
-name = "xlsx_formula_stream"
-path = "examples/xlsx_formula_stream.rs"
-
-[[bench]]
-name = "basic"
-path = "benches/basic.rs"
-harness = false
-
 [dependencies.atoi_simd]
 version = "0.18"
 
@@ -139,33 +85,13 @@ version = "0.2"
 version = "0.4"
 
 [dependencies.quick-xml]
-version = "0.41"
+version = "0.42"
 features = ["encoding"]
 
 [dependencies.serde]
 version = "1.0"
 
 [dependencies.zip]
-version = "=9.0.5"
+version = "9.0"
 features = ["deflate"]
 default-features = false
-
-[dev-dependencies.criterion]
-version = "0.7"
-features = ["html_reports"]
-
-[dev-dependencies.env_logger]
-version = "0.11"
-
-[dev-dependencies.glob]
-version = "0.3"
-
-[dev-dependencies.rstest]
-version = "0.26"
-default-features = false
-
-[dev-dependencies.serde_derive]
-version = "1.0"
-
-[dev-dependencies.sha2]
-version = "0.10"

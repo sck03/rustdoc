@@ -4,7 +4,7 @@
 
 ## 稳定版本
 
-查询时间为 2026-09-20。官方 [Tauri crates.io](https://crates.io/crates/tauri) 稳定版本 `2.11.6`，构建库 `2.6.3`；[npm CLI](https://www.npmjs.com/package/@tauri-apps/cli) `2.11.5`、[npm API](https://www.npmjs.com/package/@tauri-apps/api) `2.11.1`。single-instance `2.4.5`、updater `2.12.0`。精确清单与锁文件为版本事实源。
+查询时间为 2026-10-23。官方 [Tauri crates.io](https://crates.io/crates/tauri) 稳定版本 `2.12.5`，构建库 `2.7.4`；[npm CLI](https://www.npmjs.com/package/@tauri-apps/cli) 与 [npm API](https://www.npmjs.com/package/@tauri-apps/api) 均为 `2.12.4`。single-instance `2.5.4`、updater `2.14.0`。Rust `1.99.1`，构建用 Node `26.12.1`；Node 不进入运行包。精确清单与锁文件为版本事实源，旧版本跨平台结果不替代升级后的验收。
 
 ## 平台边界
 
@@ -28,7 +28,9 @@ OCR 同样按目标 OS/架构组装 Rust worker、ONNX 和模型。2026-10-15 �
 
 2026-10-15 在[原生交付工作流](https://github.com/sck03/rustdoc/actions/runs/38694473894)完成上表全部五种 target 的独立桌面构建、运行依赖检查、Document 包组装及七份真实 OCR 模型夹具。Windows ARM64 实际加载 ARM64 ONNX 和三个 ARM64 CRT；x64 MSVC 与本机 GNU 分别记录。Linux/macOS runner 未在本批执行完整窗口、系统输入法及打印操作。本机最新 Full SQLite / 含 OCR 测试包另通过 Tauri 页面、空白设计、保存回读、十份 PDF、员工权限及退出清理，构建与路径见本日进度。
 
-报表维持 krilla 生成 PDF、PDFium worker 处理已有 PDF。当前已采用 `pdfium-render 0.9.4`（`pdfium_7881 + image_025`），原生包为 `152.0.7961`；尚需验证完整封装/API feature/原生库组合。Windows x64/ARM64、Linux x64/ARM64、macOS ARM64 分别验收，不能将迁移前手写绑定的静态符号检查当成新封装运行通过。
+2026-10-23 升级后的 Windows x64 GNU / Debug / Full SQLite / 含 OCR 测试包位于 `artifacts/personnel-stability-desktop/ExportDocManager.Tauri.Full`，完整 Tauri 回归覆盖人员组织编辑、确认框真实鼠标交互、中文字段、表格编辑、报表、OCR 与正常退出。16 份 PDF 共 16 页经 Poppler 渲染检查；自定义小纸张样例只验证尺寸保存和输出，内容裁切不计为重新排版通过。ONNX Runtime `1.31.0` 的七组真实样例及异常边界通过。实际构建标识和证据目录见[当日进度](./程序改进重构进度文档.md)。
+
+报表维持 krilla 生成 PDF、PDFium worker 处理已有 PDF。当前已采用 `pdfium-render 0.9.4`（`pdfium_7881 + image_025`），原生包为 `158.0.8111`；2026-10-23 包内 Windows x64 GNU worker 的真实加载、文字、预览、OCR 页图、合并重开及异常边界通过。其它目标和 MSVC 发布须分别验收，不能将迁移前手写绑定的静态符号检查当成新封装运行通过。
 
 2026-09-20 本地 Windows x64 DLL 与 Linux x64 ELF 静态导出检查均包含当前 19/19 个所需符号；本轮没有执行 Linux/macOS/ARM64 加载或功能调用，不据此宣称跨平台运行通过。详细平台矩阵、符号/加载/回调/资源限制检查见[《PDFium 跨平台绑定与验收方案》](./PDFium跨平台绑定与验收方案.md)。
 

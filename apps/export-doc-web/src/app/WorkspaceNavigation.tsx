@@ -29,7 +29,7 @@ export function WorkspaceNavigation({ groups, pathname, collapsed, activeGroupKe
       {groups.map((group) => {
         const Icon = group.icon;
         return <button key={group.key} className={group.key === activeGroupKey ? "nav-rail-item nav-rail-item-active" : "nav-rail-item"}
-          type="button" aria-label={`展开${group.label}`} aria-current={group.key === activeGroupKey ? "true" : undefined} title={group.label} onClick={() => onExpand(group.key)}>
+          type="button" aria-label={`${group.shortLabel}：展开${group.label}`} aria-current={group.key === activeGroupKey ? "true" : undefined} title={group.label} onClick={() => onExpand(group.key)}>
           <Icon size={18} aria-hidden="true" /><span>{group.shortLabel}</span>
         </button>;
       })}
