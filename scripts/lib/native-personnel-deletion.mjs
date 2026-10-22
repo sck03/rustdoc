@@ -23,6 +23,34 @@ export async function verifyDesktopPersonnelDeletion({ run, request, token, cdp,
   await run(`location.hash='#/office/people/${unlinked.employee.id}'; true`);
   await wait(button);
   assert.equal(await run(`${button}.disabled`), false, 'Administrator may correct an unreferenced entry');
+  const edit = "[...document.querySelectorAll('button')].find(e=>e.textContent==='编辑档案')";
+  const close = "document.querySelector('[role=dialog] button[aria-label=关闭窗口]')";
+  const correction = "document.querySelector('[role=dialog] [data-dialog-control] input')";
+  const confirmation = "document.querySelector('.confirmation-dialog')";
+  async function click(expression) {
+    await wait(expression);
+    const point = await run(`(() => { const r = (${expression}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point });
+  }
+  await click(edit);
+  await click(correction);
+  await click(close);
+  await wait("!document.querySelector('[role=dialog]')");
+  await click(edit);
+  await click(correction);
+  await run("document.querySelector('input[name=fullName]').focus(); true");
+  await cdp.send('Input.insertText', { text: '未保存的修改' });
+  await click(close);
+  await wait(confirmation);
+  await captureScreenshot(cdp, path.join(output, 'Full-personnel-discard.png'));
+  await click("[...document.querySelectorAll('.confirmation-dialog button')].find(e=>e.textContent.trim()==='取消')");
+  await wait(`!${confirmation}`);
+  assert(await run(`Boolean(${close})`), 'Cancel keeps the personnel draft open');
+  await click(close);
+  await click("[...document.querySelectorAll('.confirmation-dialog button')].find(e=>e.textContent.trim()==='放弃并关闭')");
+  await wait("!document.querySelector('[role=dialog]')");
+  assert.equal((await request('GetPersonnel', token, undefined, { id: unlinked.employee.id })).body.versionNumber, unlinked.versionNumber, 'Discard does not save personnel changes');
   await run(`${button}.click(); true`);
   await wait("document.querySelector('textarea[name=reason]')");
   await run("document.querySelector('textarea[name=reason]').focus(); true");

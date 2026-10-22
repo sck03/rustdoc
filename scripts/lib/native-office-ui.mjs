@@ -43,6 +43,9 @@ export async function withOfficeUi(name, run) {
       await page.locator('input[autocomplete=current-password]').fill(password);
       await page.getByRole('button', { name: '登录', exact: true }).click();
       await page.locator('.login-submit-button').waitFor({ state: 'hidden' });
+      await page.waitForURL(current => current.hash.startsWith('#/') && current.hash.length > 2);
+      await page.getByRole('main').getByRole('heading', { level: 1 }).waitFor();
+      await page.getByText('正在加载页面', { exact: true }).waitFor({ state: 'hidden' });
       return page;
     };
     await run({ repo, output, require, url, operations, invoke, openPage });

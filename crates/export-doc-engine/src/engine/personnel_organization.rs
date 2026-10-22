@@ -198,12 +198,18 @@ pub fn project(tx: &Connection, person: &Value) -> Result<Value> {
         );
     }
     enrich(&mut value, &names);
+    let mut departments = super::organization::DepartmentNames::default();
     for assignment in value["additionalAssignments"]
         .as_array_mut()
         .into_iter()
         .flatten()
     {
         enrich(assignment, &names);
+        assignment["departmentName"] = json!(departments.get(
+            tx,
+            &text(person, "companyScope"),
+            &text(assignment, "departmentId")
+        )?);
     }
     Ok(value)
 }

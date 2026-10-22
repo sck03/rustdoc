@@ -33,7 +33,8 @@ export function PersonnelWorkflowDialog({ client, user, record, action, departme
       ...(changesJob ? { organization } : {}),
     }, signal), onClose);
   }
-  return <OfficeDialog title={`办理${personnelChangeLabels[action]} · ${record.employee.fullName}`} onClose={onClose} {...operation} protectChanges>
+  return <OfficeDialog title={`办理${personnelChangeLabels[action]} · ${record.employee.fullName}`} onClose={onClose} {...operation} protectChanges
+    hasChanges={changesJob && JSON.stringify(organization) !== JSON.stringify(action === "Rehire" ? emptyOrganization() : record.organization ?? emptyOrganization())}>
     <p>{record.employee.employeeNumber} · {record.employee.departmentName} · {record.employee.jobTitle}</p>
     <p className="office-muted">{action === "Depart" ? `完成交接后归档人员，保留全部历史记录。${record.account ? "关联账号将停用并撤销会话。" : ""}`
       : action === "Rehire" ? `登记新一轮任职，清除上一轮试用及合同截止日期，再按新合同补充。${record.account ? "关联账号由系统管理员复核权限后启用。" : ""}`

@@ -3619,6 +3619,7 @@ export interface ApiUserDto {
   capabilities: ApiUserCapabilitiesDto;
   companyScope: string;
   departmentId: string;
+  effectiveDepartmentIds?: string[];
   employee?: AccountPersonnelRecord | null;
   fullName: string;
   id: number;
@@ -4703,6 +4704,7 @@ export interface PersonnelAccountRequest {
 
 export interface PersonnelAssignment {
   departmentId: string;
+  departmentName?: string;
   functionalManagerEmployeeIds: number[];
   functionalManagerNames?: string[];
   jobTitle: string;
@@ -4862,6 +4864,7 @@ export interface PersonnelRegistrationCorrection {
   hireDate: string;
   jobTitle: string;
   onProbation: boolean;
+  organization?: PersonnelOrganization;
 }
 
 export interface PersonnelTransitionRequest {

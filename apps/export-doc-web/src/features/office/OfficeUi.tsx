@@ -27,7 +27,9 @@ export function OfficeDialog({ title, children, onClose, busy = false, error = "
       <header className="office-dialog-header"><h2 id={titleId}>{title}</h2>
         <button type="button" className="icon-button" aria-label="关闭窗口" disabled={busy} onClick={close}><X size={18} aria-hidden="true" /></button>
       </header>
-      <div className="office-dialog-body" onChangeCapture={() => setDirty(true)} onInvalidCapture={event => {
+      <div className="office-dialog-body" onChangeCapture={event => {
+        if (!(event.target as HTMLElement).closest('[data-dialog-control]')) setDirty(true);
+      }} onInvalidCapture={event => {
         let section = (event.target as HTMLElement).closest("details");
         while (section) { section.open = true; section = section.parentElement?.closest("details") ?? null; }
       }}>

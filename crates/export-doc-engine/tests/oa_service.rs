@@ -9,6 +9,8 @@ mod native_fixture;
 mod oa_contract;
 #[path = "support/organization_workflow_contract.rs"]
 mod organization_workflow_contract;
+#[path = "support/personnel_scope_contract.rs"]
+mod personnel_scope_contract;
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 
@@ -101,6 +103,7 @@ fn appointments_countersign_conditions_and_visibility_form_a_closed_workflow() {
     )
     .unwrap();
     organization_workflow_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    personnel_scope_contract::exercise(&service, login["accessToken"].as_str().unwrap());
     service.close().unwrap();
 }
 

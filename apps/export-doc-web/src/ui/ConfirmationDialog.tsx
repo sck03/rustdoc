@@ -1,4 +1,5 @@
 import { useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, X } from "lucide-react";
 import { Button, IconButton } from "./Button.tsx";
 import { useModalDialog } from "./useModalDialog.ts";
@@ -30,7 +31,7 @@ export function ConfirmationDialog({
     initialFocusRef: cancelButtonRef,
   });
 
-  return (
+  return createPortal(
     <div
       className="confirmation-dialog-backdrop"
       role="presentation"
@@ -81,6 +82,6 @@ export function ConfirmationDialog({
           </Button>
         </footer>
       </div>
-    </div>
+    </div>, document.body
   );
 }

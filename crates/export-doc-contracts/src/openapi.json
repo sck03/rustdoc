@@ -71922,6 +71922,14 @@
             "default": null,
             "readOnly": true,
             "description": "Current personnel link; maintained through personnel workflows, never account save input."
+          },
+          "effectiveDepartmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "readOnly": true,
+            "description": "Current department data scope: appointments plus departments managed by the linked employee and their active descendants. Does not grant operations."
           }
         }
       },
@@ -76737,6 +76745,9 @@
           },
           "onProbation": {
             "type": "boolean"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/PersonnelOrganization"
           }
         }
       },
@@ -80374,6 +80385,10 @@
             "items": {
               "type": "string"
             },
+            "readOnly": true
+          },
+          "departmentName": {
+            "type": "string",
             "readOnly": true
           }
         },

@@ -22,13 +22,18 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
   const [requestKey] = useState(createRequestKey);
   const [hireDate, setHireDate] = useState(record?.hireDate ?? user.businessDate);
   const [departmentId, setDepartmentId] = useState(record?.employee.departmentId ?? user.departmentId ?? "");
-  const [organization, setOrganization] = useState(emptyOrganization);
+  const [organization, setOrganization] = useState(record?.organization ?? emptyOrganization());
+  const [correcting, setCorrecting] = useState(false);
+  const canCorrectRegistration = !record || (record.canCorrectRegistration && correcting);
+  const organizationChanged = canCorrectRegistration && JSON.stringify(organization) !== JSON.stringify(record?.organization ?? emptyOrganization());
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    void operation.run(signal => attachments.save(JSON.stringify(readPersonnelUpdate(form, 0)), signal,
+    const update = readPersonnelUpdate(form, 0);
+    if (update.registration) update.registration.organization = organization;
+    void operation.run(signal => attachments.save(JSON.stringify(update), signal,
       (current, signal) => current
-        ? client.updatePersonnel({ id: current.employee.id, body: readPersonnelUpdate(form, current.versionNumber) }, { signal })
+        ? client.updatePersonnel({ id: current.employee.id, body: { ...update, expectedVersion: current.versionNumber } }, { signal })
         : client.createPersonnel({ body: { ...readPersonnelCreate(form, requestKey), organization } }, { signal }),
       (current, entry, signal) => {
         const body = new FormData(); body.set("file", entry.file); body.set("expectedVersion", String(current.versionNumber));
@@ -36,13 +41,11 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
           : client.uploadPersonnelImage({ id: current.employee.id, kind: entry.kind as "Avatar" | "IdentityFront" | "IdentityBack", body }, { signal });
       }), onSaved);
   }
-  const [correcting, setCorrecting] = useState(false);
-  const canCorrectRegistration = !record || (record.canCorrectRegistration && correcting);
-  return <OfficeDialog title={record ? `编辑档案 · ${record.employee.fullName}` : "入职登记"} onClose={onClose} {...operation} protectChanges>
+  return <OfficeDialog title={record ? `编辑档案 · ${record.employee.fullName}` : "入职登记"} onClose={onClose} {...operation} protectChanges hasChanges={organizationChanged}>
     <form className="personnel-form" onSubmit={submit} autoComplete="off">
       <fieldset className="office-form-grid" disabled={operation.busy}>
         <legend>基本信息</legend>
-        {record?.canCorrectRegistration && <label className="checkbox-field office-field-wide"><input type="checkbox" checked={correcting} onChange={event => setCorrecting(event.target.checked)} />纠正登记信息（须说明原因）</label>}
+        {record?.canCorrectRegistration && <label className="checkbox-field office-field-wide" data-dialog-control><input type="checkbox" checked={correcting} onChange={event => setCorrecting(event.target.checked)} />纠正登记信息（须说明原因）</label>}
         {record && correcting && <OfficeField label="登记纠错原因" wide><textarea name="correctionNote" required maxLength={500} rows={2} /></OfficeField>}
         {canCorrectRegistration && <OfficeField label="工号（系统内唯一）"><input name="employeeNumber" required maxLength={40} defaultValue={record?.employee.employeeNumber} autoFocus={!record} /></OfficeField>}
         <OfficeField label="姓名"><input name="fullName" required maxLength={100} defaultValue={record?.profile.fullName ?? ""} autoFocus={Boolean(record)} /></OfficeField>
@@ -54,13 +57,13 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
           <OfficeField label="入职日期"><input type="date" name="hireDate" required min="1900-01-01" max={user.businessDate} value={hireDate} onChange={(event) => setHireDate(event.target.value)} /></OfficeField>
           <label className="checkbox-field"><input name="onProbation" type="checkbox" defaultChecked={!record || record.employee.status === "Probation"} />入职时处于试用期</label>
         </>}
-        {record && <p className="office-field-wide office-muted">{canCorrectRegistration ? "用于纠正登记错误，保存后保留原值与纠错原因；日常任职变动请使用转正、调岗等办理入口。" : `${record.employee.employeeNumber} · ${record.employee.departmentName} · ${record.employee.jobTitle}。部门与职位通过相应人员变动入口办理。`}</p>}
+        {record && <p className="office-field-wide office-muted">{canCorrectRegistration ? "用于纠正登记错误，保存后保留原值与纠错原因；日常任职变动请使用转正、调岗等办理入口。" : `${record.employee.employeeNumber} · ${record.employee.departmentName} · ${record.employee.jobTitle}。部门、职位、兼职与汇报关系请从档案详情办理或申请调岗；登记错误可勾选纠正登记信息。`}</p>}
         <OfficeField label="用工类型"><select name="employmentType" defaultValue={record?.employmentType ?? "FullTime"}>
           {Object.entries(employmentTypeLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
         </select></OfficeField>
         <OfficeField label="试用截止日期（选填）"><input type="date" name="probationEndsOn" min={hireDate} defaultValue={record?.probationEndsOn ?? ""} /></OfficeField>
         <OfficeField label="合同截止日期（选填）"><input type="date" name="contractEndsOn" min={hireDate} defaultValue={record?.contractEndsOn ?? ""} /></OfficeField>
-        {!record && <PersonnelOrganizationEditor client={client} company={user.companyScope} departments={departments} primaryDepartment={departmentId} value={organization} onChange={setOrganization} positions={positions.data?.positions} />}
+        {canCorrectRegistration && <PersonnelOrganizationEditor client={client} company={record?.companyScope ?? user.companyScope} departments={departments} primaryDepartment={departmentId} value={organization} onChange={setOrganization} positions={positions.data?.positions} />}
       </fieldset>
       <fieldset className="office-form-grid" disabled={operation.busy}><legend>工作联系方式 · 公司通讯录可见</legend>
         <OfficeField label="工作邮箱"><input type="email" name="workEmail" maxLength={254} defaultValue={record?.profile.workEmail ?? ""} /></OfficeField>

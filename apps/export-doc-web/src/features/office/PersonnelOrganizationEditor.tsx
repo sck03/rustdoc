@@ -45,6 +45,6 @@ export function PersonnelOrganizationFacts({ value }: { value?: PersonnelOrganiz
   if (!value) return null;
   const reporting = (item: Reporting) => <p>直属负责人：{item.managerName || (item.managerEmployeeId ? `人员 #${item.managerEmployeeId}` : "未设置")}；职能负责人：{item.functionalManagerNames?.join("、") || item.functionalManagerEmployeeIds.map(id => `人员 #${id}`).join("、") || "未设置"}</p>;
   return <section className="personnel-fact-section" aria-label="任职与汇报关系"><h3>任职与汇报关系</h3>{reporting(value)}
-    {value.additionalAssignments.map(assignment => <div key={assignment.departmentId}><strong>兼职部门 {assignment.departmentId} · {assignment.jobTitle}</strong>{reporting(assignment)}</div>)}
+    {value.additionalAssignments.length ? value.additionalAssignments.map(assignment => <div key={assignment.departmentId}><strong>兼职部门：{assignment.departmentName || assignment.departmentId} · {assignment.jobTitle}</strong>{reporting(assignment)}</div>) : <p>兼职部门：未登记</p>}
   </section>;
 }

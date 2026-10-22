@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "c81f5e34271e15ca89b8c08d829f7feb7704579c0ad2b157bfcf8619b9c4f629",
+  "digest": "36c232154cbeee7e29dda1b627352f95bd28dc9bd5d9336aed54a8142786a08c",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -77195,6 +77195,14 @@
           "default": null,
           "readOnly": true,
           "description": "Current personnel link; maintained through personnel workflows, never account save input."
+        },
+        "effectiveDepartmentIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "readOnly": true,
+          "description": "Current department data scope: appointments plus departments managed by the linked employee and their active descendants. Does not grant operations."
         }
       }
     },
@@ -82506,6 +82514,10 @@
             "type": "string"
           },
           "readOnly": true
+        },
+        "departmentName": {
+          "type": "string",
+          "readOnly": true
         }
       },
       "required": [
@@ -83210,6 +83222,9 @@
         },
         "onProbation": {
           "type": "boolean"
+        },
+        "organization": {
+          "$ref": "#/components/schemas/PersonnelOrganization"
         }
       }
     },

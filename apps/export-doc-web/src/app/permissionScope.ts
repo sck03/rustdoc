@@ -1,8 +1,9 @@
-export type PermissionSubject = { id: number; companyScope: string; departmentId: string; employee?: { organization?: { additionalAssignments: { departmentId: string }[] } } | null };
+export type PermissionSubject = { id: number; companyScope: string; departmentId: string; effectiveDepartmentIds?: string[]; employee?: { organization?: { additionalAssignments: { departmentId: string }[] } } | null };
 export type PermissionRecord = { ownerUserId?: number | null; companyScope: string; departmentId: string };
 
-export function hasDepartment(subject: Pick<PermissionSubject, "departmentId" | "employee">, department: string) {
-  return subject.departmentId === department || subject.employee?.organization?.additionalAssignments.some(assignment => assignment.departmentId === department) === true;
+export function hasDepartment(subject: Pick<PermissionSubject, "departmentId" | "employee" | "effectiveDepartmentIds">, department: string) {
+  return subject.effectiveDepartmentIds ? subject.effectiveDepartmentIds.includes(department)
+    : subject.departmentId === department || subject.employee?.organization?.additionalAssignments.some(assignment => assignment.departmentId === department) === true;
 }
 
 export function isRecordInPermissionScope(scope: string, subject: PermissionSubject | undefined, record: PermissionRecord | null, administrator = false) {

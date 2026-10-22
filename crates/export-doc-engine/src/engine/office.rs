@@ -96,8 +96,23 @@ pub fn validate(
                         ));
                     }
                     required(value, "correctionNote", "登记纠错原因", 500)?;
-                    let changing_job = registration["departmentId"] != previous["departmentId"]
-                        || registration["jobTitle"] != previous["jobTitle"];
+                    let organization = registration.get("organization").filter(|v| !v.is_null());
+                    for field in ["employeeNumber", "departmentId", "jobTitle", "hireDate"] {
+                        value[field] = registration[field].clone();
+                    }
+                    if let Some(organization) = organization {
+                        super::personnel_organization::validate(
+                            connection,
+                            actor,
+                            value,
+                            organization,
+                            "edit",
+                        )?;
+                    }
+                    let changing_job = value["departmentId"] != previous["departmentId"]
+                        || value["jobTitle"] != previous["jobTitle"]
+                        || super::personnel_organization::organization(value)?
+                            != super::personnel_organization::organization(previous)?;
                     if changing_job
                         && super::office_queries::clearance(connection, previous)?["isClear"]
                             != true
@@ -105,9 +120,6 @@ pub fn validate(
                         return Err(conflict(
                             "仍有未结申请或办理职责，请完成交接后再纠正任职信息。",
                         ));
-                    }
-                    for field in ["employeeNumber", "departmentId", "jobTitle", "hireDate"] {
-                        value[field] = registration[field].clone();
                     }
                     required(value, "employeeNumber", "工号", 50)?;
                     required(value, "jobTitle", "职位", 120)?;

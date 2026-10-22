@@ -294,7 +294,7 @@ export function PermissionTemplateManagementPanel({
           />
           <details className="permission-effective-details">
             <summary>权限设置说明</summary>
-            <p>总经理等跨部门负责人可从“公司审批负责人”新建方案，部门主管可从“部门审批负责人”开始，再按职责增减。方案复制普通员工的操作和关闭模块，只增加人事、行政的查看与审批；查看范围内的草稿与历史也可见。审批步骤、财务接收、档案维护及系统管理分别配置。部门范围包含主职及兼职部门；可另启用仅本人和分派申请可见。</p>
+            <p>总经理等跨部门负责人可从“公司审批负责人”新建方案，部门主管可从“部门审批负责人”开始，再按职责增减。方案复制普通员工的操作和关闭模块，只增加人事、行政的查看与审批；查看范围内的草稿与历史也可见。审批步骤、财务接收、档案维护及系统管理分别配置。部门范围包含主职、兼职及本人负责的部门与启用子部门；可另启用仅本人和分派申请可见。</p>
           </details>
           <EffectivePermissionSummary effectiveGrants={selectedTemplate?.effectiveGrants ?? []} resourceByKey={resourceByKey} />
           <TechnicalPermissionCatalog

@@ -316,11 +316,11 @@ fn actor_from_connection(
         name: user["fullName"].as_str().unwrap_or("").into(),
         company: user["companyScope"].as_str().unwrap_or("").into(),
         department: user["departmentId"].as_str().unwrap_or("").into(),
-        departments: match user.get("organizationDepartments") {
-            Some(value) => serde_json::from_value(value.clone())
-                .map_err(|_| unavailable("账号任职部门损坏。"))?,
-            None => vec![text(user, "departmentId")],
-        },
+        departments: super::organization_scope::departments(
+            connection,
+            user,
+            user["role"] != "Admin" && grants.iter().any(|grant| grant.data_scope == "department"),
+        )?,
         oa_assigned_only: super::account_permissions::assigned_only(connection, user)?,
         admin: user["role"] == "Admin",
         grants: grants
@@ -364,6 +364,7 @@ pub fn user_dto(
     };
     let now = clock.now().map_err(unavailable)?;
     user["businessDate"] = json!(now.today.to_string());
+    user["effectiveDepartmentIds"] = json!(actor.departments);
     user["businessTimeZone"] = json!(now.time_zone);
     user["businessDateValidUntilUtc"] = json!(now.valid_until.to_rfc3339());
     let grants: Vec<Grant> = serde_json::from_value(json!(actor.grants))?;

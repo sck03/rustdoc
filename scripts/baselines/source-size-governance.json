@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-10-22",
+  "updatedAt": "2026-10-23",
   "rules": [
     {
       "name": "repository web production default",
@@ -37,9 +37,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 68069,
+      "baselineAggregateLines": 68203,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 68144,
+      "maximumAggregateLines": 68278,
       "reportFiles": false
     },
     {
@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 17673,
+      "baselineAggregateLines": 17892,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 17793,
+      "maximumAggregateLines": 18012,
       "reportFiles": false
     },
     {
@@ -120,7 +120,7 @@
       "directory": "apps/export-doc-web/src/features/office",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 220,
-      "maximumAggregateLines": 922,
+      "maximumAggregateLines": 924,
       "excludePattern": "/(?:Personnel.*|personnelModel|usePersonnelData|usePersonnelImage|usePersonnelPositions)\\.(?:ts|tsx)$"
     },
     {
@@ -327,7 +327,7 @@
       "filePattern": "^(?:Personnel.*|personnelModel|usePersonnelData|usePersonnelPositions)\\.(?:ts|tsx)$",
       "excludePattern": "/Personnel(?:Avatar|IdentityFields|ImagesPanel)\\.tsx$",
       "maximumLines": 220,
-      "maximumAggregateLines": 692
+      "maximumAggregateLines": 696
     },
     {
       "name": "personnel image and identity workspace",

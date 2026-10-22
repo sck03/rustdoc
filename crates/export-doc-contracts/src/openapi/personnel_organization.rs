@@ -20,6 +20,7 @@ pub(super) fn extend(doc: &mut Value) {
     for name in [
         "PersonnelRecord",
         "PersonnelCreateRequest",
+        "PersonnelRegistrationCorrection",
         "PersonnelTransitionRequest",
         "OaPersonnelChange",
         "AccountPersonnelRecord",
@@ -27,6 +28,10 @@ pub(super) fn extend(doc: &mut Value) {
         schemas[name]["properties"]["organization"] =
             json!({"$ref":"#/components/schemas/PersonnelOrganization"});
     }
+    schemas["PersonnelAssignment"]["properties"]["departmentName"] =
+        json!({"type":"string","readOnly":true});
+    schemas["ApiUserDto"]["properties"]["effectiveDepartmentIds"] = json!({"type":"array","items":{"type":"string"},"readOnly":true,
+        "description":"Current department data scope: appointments plus departments managed by the linked employee and their active descendants. Does not grant operations."});
     schemas["AccountPersonnelRecord"]["properties"]["departmentId"] = json!({"type":"string"});
     for name in ["PersonnelRecord", "OaRequest"] {
         schemas[name]["properties"]["companyScope"] = json!({"type":"string","readOnly":true});

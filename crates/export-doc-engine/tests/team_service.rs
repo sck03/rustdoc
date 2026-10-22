@@ -25,6 +25,8 @@ mod organization_workflow_contract;
 mod personnel_contract;
 #[path = "support/personnel_policy_contract.rs"]
 mod personnel_policy_contract;
+#[path = "support/personnel_scope_contract.rs"]
+mod personnel_scope_contract;
 #[path = "support/template_contract.rs"]
 mod template_contract;
 #[path = "support/tools_contract.rs"]
@@ -269,6 +271,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     oa_contract::exercise(&service, admin_token, staff_token, None);
     approval_contract::exercise(&service, admin_token);
     organization_workflow_contract::exercise(&service, admin_token);
+    personnel_scope_contract::exercise(&service, admin_token);
     handling_contract::exercise(&service, admin_token);
     communication_contract::exercise(&service, admin_token);
     account_scope::exercise(&service, admin_token);

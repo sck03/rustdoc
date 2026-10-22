@@ -60,6 +60,7 @@ mod office_queries;
 mod office_workflows;
 mod operation_sets;
 mod organization;
+mod organization_scope;
 mod packing;
 #[cfg(feature = "excel")]
 mod party_files;
